@@ -1,0 +1,18 @@
+[package]
+name = "monero-harness"
+version = "0.1.0"
+authors = ["CoBloX Team <team@coblox.tech>"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1"
+futures = "0.3"
+rand = "0.7"
+reqwest = { version = "0.10", default-features = false, features = ["json", "native-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+spectral = "0.6"
+testcontainers = "0.10"
+tokio = { version = "0.2", default-features = false, features = ["blocking", "macros", "rt-core", "time"] }
+tracing = "0.1"
+url = "2"
