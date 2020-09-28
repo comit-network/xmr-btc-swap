@@ -1,0 +1,4 @@
+status = [
+    "static_analysis",
+    "build_test",
+]
