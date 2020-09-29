@@ -1,6 +1,4 @@
 pub mod transactions;
-#[cfg(test)]
-pub mod wallet;
 
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
@@ -27,9 +25,6 @@ use std::str::FromStr;
 pub use crate::bitcoin::transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund};
 pub use bitcoin::{Address, Amount, OutPoint, Txid};
 pub use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
-
-#[cfg(test)]
-pub use wallet::{make_wallet, Wallet};
 
 pub const TX_FEE: u64 = 10_000;
 

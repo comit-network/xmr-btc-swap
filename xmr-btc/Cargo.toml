@@ -17,6 +17,8 @@ monero = "0.9"
 rand = "0.7"
 sha2 = "0.9"
 thiserror = "1"
+tokio = { version = "0.2", default-features = false, features = ["time"] }
+tracing = "0.1"
 
 [dev-dependencies]
 base64 = "0.12"
@@ -25,3 +27,5 @@ monero-harness = { path = "../monero-harness" }
 reqwest = { version = "0.10", default-features = false }
 testcontainers = "0.10"
 tokio = { version = "0.2", default-features = false, features = ["blocking", "macros", "rt-core", "time", "rt-threaded"] }
+tracing-subscriber = "0.2.12"
+tracing = "0.1"

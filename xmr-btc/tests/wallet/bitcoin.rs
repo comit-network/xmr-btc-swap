@@ -1,6 +1,3 @@
-use crate::bitcoin::{
-    BroadcastSignedTransaction, BuildTxLockPsbt, GetRawTransaction, SignTxLock, TxLock,
-};
 use anyhow::Result;
 use async_trait::async_trait;
 use bitcoin::{util::psbt::PartiallySignedTransaction, Address, Amount, Transaction, Txid};
@@ -8,6 +5,9 @@ use bitcoin_harness::{bitcoind_rpc::PsbtBase64, Bitcoind};
 use reqwest::Url;
 use std::time::Duration;
 use tokio::time;
+use xmr_btc::bitcoin::{
+    BroadcastSignedTransaction, BuildTxLockPsbt, GetRawTransaction, SignTxLock, TxLock,
+};
 
 #[derive(Debug)]
 pub struct Wallet(pub bitcoin_harness::Wallet);
@@ -109,7 +109,10 @@ impl BroadcastSignedTransaction for Wallet {
 #[async_trait]
 impl GetRawTransaction for Wallet {
     async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
+        // TODO: put into loop instead of delaying
+        time::delay_for(Duration::from_millis(5000)).await;
         let tx = self.0.get_raw_transaction(txid).await?;
+        tracing::info!("{}", tx.txid());
 
         Ok(tx)
     }
