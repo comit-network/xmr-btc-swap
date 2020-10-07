@@ -27,5 +27,6 @@ monero-harness = { path = "../monero-harness" }
 reqwest = { version = "0.10", default-features = false }
 testcontainers = "0.10"
 tokio = { version = "0.2", default-features = false, features = ["blocking", "macros", "rt-core", "time", "rt-threaded"] }
-tracing-subscriber = "0.2.12"
+tracing-subscriber = "0.2"
 tracing = "0.1"
+futures = "0.3"

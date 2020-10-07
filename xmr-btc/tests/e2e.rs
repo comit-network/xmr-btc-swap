@@ -152,12 +152,12 @@ mod tests {
         node::{run_alice_until, run_bob_until},
     };
 
-    use futures::future;
     use monero_harness::Monero;
     use rand::rngs::OsRng;
-    use std::convert::TryInto;
     use testcontainers::clients::Cli;
 
+    use futures::future;
+    use std::convert::TryInto;
     use tracing_subscriber::util::SubscriberInitExt;
     use xmr_btc::{
         alice, bitcoin,
