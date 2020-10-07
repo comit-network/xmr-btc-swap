@@ -21,7 +21,6 @@ pub mod message;
 pub use message::{Message, Message0, Message1, Message2, Message3, UnexpectedMessage};
 
 pub async fn next_state<
-    'a,
     R: RngCore + CryptoRng,
     B: GetRawTransaction + SignTxLock + BuildTxLockPsbt + BroadcastSignedTransaction,
     M: ImportOutput + CheckTransfer,
