@@ -6,7 +6,7 @@ use reqwest::Url;
 use std::time::Duration;
 use tokio::time;
 use xmr_btc::bitcoin::{
-    BroadcastSignedTransaction, BuildTxLockPsbt, GetRawTransaction, SignTxLock, TxLock,
+    BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock, TxLock, WatchForRawTransaction,
 };
 
 #[derive(Debug)]
@@ -107,13 +107,13 @@ impl BroadcastSignedTransaction for Wallet {
 }
 
 #[async_trait]
-impl GetRawTransaction for Wallet {
-    async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
-        // TODO: put into loop instead of delaying
-        time::delay_for(Duration::from_millis(5000)).await;
-        let tx = self.0.get_raw_transaction(txid).await?;
-        tracing::info!("{}", tx.txid());
-
-        Ok(tx)
+impl WatchForRawTransaction for Wallet {
+    async fn watch_for_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
+        loop {
+            if let Ok(tx) = self.0.get_raw_transaction(txid).await {
+                return Ok(tx);
+            }
+            time::delay_for(Duration::from_millis(200)).await;
+        }
     }
 }

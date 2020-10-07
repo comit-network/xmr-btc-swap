@@ -1,7 +1,8 @@
 use crate::{
     alice,
     bitcoin::{
-        self, BroadcastSignedTransaction, BuildTxLockPsbt, GetRawTransaction, SignTxLock, TxCancel,
+        self, BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock, TxCancel,
+        WatchForRawTransaction,
     },
     monero,
     monero::{CheckTransfer, ImportOutput},
@@ -22,7 +23,7 @@ pub use message::{Message, Message0, Message1, Message2, Message3, UnexpectedMes
 
 pub async fn next_state<
     R: RngCore + CryptoRng,
-    B: GetRawTransaction + SignTxLock + BuildTxLockPsbt + BroadcastSignedTransaction,
+    B: WatchForRawTransaction + SignTxLock + BuildTxLockPsbt + BroadcastSignedTransaction,
     M: ImportOutput + CheckTransfer,
     T: SendReceive<Message, alice::Message>,
 >(
@@ -500,12 +501,14 @@ impl State4 {
 
     pub async fn watch_for_redeem_btc<W>(self, bitcoin_wallet: &W) -> Result<State5>
     where
-        W: GetRawTransaction,
+        W: WatchForRawTransaction,
     {
         let tx_redeem = bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address);
         let tx_redeem_encsig = self.b.encsign(self.S_a_bitcoin.clone(), tx_redeem.digest());
 
-        let tx_redeem_candidate = bitcoin_wallet.get_raw_transaction(tx_redeem.txid()).await?;
+        let tx_redeem_candidate = bitcoin_wallet
+            .watch_for_raw_transaction(tx_redeem.txid())
+            .await?;
 
         let tx_redeem_sig =
             tx_redeem.extract_signature_by_key(tx_redeem_candidate, self.b.public())?;

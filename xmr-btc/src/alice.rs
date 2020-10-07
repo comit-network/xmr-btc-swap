@@ -4,7 +4,7 @@ use rand::{CryptoRng, RngCore};
 
 use crate::{
     bitcoin,
-    bitcoin::{BroadcastSignedTransaction, GetRawTransaction},
+    bitcoin::{BroadcastSignedTransaction, WatchForRawTransaction},
     bob, monero,
     monero::{ImportOutput, Transfer},
     transport::SendReceive,
@@ -18,7 +18,7 @@ pub use message::{Message, Message0, Message1, Message2, UnexpectedMessage};
 
 pub async fn next_state<
     R: RngCore + CryptoRng,
-    B: GetRawTransaction + BroadcastSignedTransaction,
+    B: WatchForRawTransaction + BroadcastSignedTransaction,
     M: ImportOutput + Transfer,
     T: SendReceive<Message, bob::Message>,
 >(
@@ -48,7 +48,6 @@ pub async fn next_state<
         State::State2(state2) => {
             let bob_message2: bob::Message2 = transport.receive_message().await?.try_into()?;
             let state3 = state2.receive(bob_message2)?;
-            tokio::time::delay_for(std::time::Duration::new(5, 0)).await;
             Ok(state3.into())
         }
         State::State3(state3) => {
@@ -394,11 +393,11 @@ pub struct State3 {
 impl State3 {
     pub async fn watch_for_lock_btc<W>(self, bitcoin_wallet: &W) -> Result<State4>
     where
-        W: bitcoin::GetRawTransaction,
+        W: bitcoin::WatchForRawTransaction,
     {
         tracing::info!("{}", self.tx_lock.txid());
         let tx = bitcoin_wallet
-            .get_raw_transaction(self.tx_lock.txid())
+            .watch_for_raw_transaction(self.tx_lock.txid())
             .await?;
 
         tracing::info!("{}", tx.txid());
@@ -581,7 +580,7 @@ impl State5 {
     // watch for refund on btc, recover s_b and refund xmr
     pub async fn refund_xmr<B, M>(self, bitcoin_wallet: &B, monero_wallet: &M) -> Result<()>
     where
-        B: GetRawTransaction,
+        B: WatchForRawTransaction,
         M: ImportOutput,
     {
         let tx_cancel = bitcoin::TxCancel::new(
@@ -595,7 +594,9 @@ impl State5 {
 
         let tx_refund_encsig = self.a.encsign(self.S_b_bitcoin.clone(), tx_refund.digest());
 
-        let tx_refund_candidate = bitcoin_wallet.get_raw_transaction(tx_refund.txid()).await?;
+        let tx_refund_candidate = bitcoin_wallet
+            .watch_for_raw_transaction(tx_refund.txid())
+            .await?;
 
         let tx_refund_sig =
             tx_refund.extract_signature_by_key(tx_refund_candidate, self.a.public())?;
