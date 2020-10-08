@@ -52,7 +52,7 @@ async fn happy_path() {
     let refund_timelock = 1;
     let punish_timelock = 1;
 
-    let a_state0 = alice::State0::new(
+    let a_state = alice::State0::new(
         &mut OsRng,
         btc_amount,
         xmr_amount,
@@ -61,7 +61,7 @@ async fn happy_path() {
         redeem_address,
         punish_address,
     );
-    let b_state0 = bob::State0::new(
+    let b_state = bob::State0::new(
         &mut OsRng,
         btc_amount,
         xmr_amount,
@@ -70,41 +70,41 @@ async fn happy_path() {
         refund_address.clone(),
     );
 
-    let a_message0 = a_state0.next_message(&mut OsRng);
-    let b_message0 = b_state0.next_message(&mut OsRng);
+    let a_msg = a_state.next_message(&mut OsRng);
+    let b_msg = b_state.next_message(&mut OsRng);
 
-    let a_state1 = a_state0.receive(b_message0).unwrap();
-    let b_state1 = b_state0.receive(&b_btc_wallet, a_message0).await.unwrap();
+    let a_state = a_state.receive(b_msg).unwrap();
+    let b_state = b_state.receive(&b_btc_wallet, a_msg).await.unwrap();
 
-    let b_message1 = b_state1.next_message();
-    let a_state2 = a_state1.receive(b_message1);
-    let a_message1 = a_state2.next_message();
-    let b_state2 = b_state1.receive(a_message1).unwrap();
+    let b_msg = b_state.next_message();
+    let a_state = a_state.receive(b_msg);
+    let a_msg = a_state.next_message();
+    let b_state = b_state.receive(a_msg).unwrap();
 
-    let b_message2 = b_state2.next_message();
-    let a_state3 = a_state2.receive(b_message2).unwrap();
+    let b_msg = b_state.next_message();
+    let a_state = a_state.receive(b_msg).unwrap();
 
-    let b_state2b = b_state2.lock_btc(&b_btc_wallet).await.unwrap();
-    let lock_txid = b_state2b.tx_lock_id();
+    let b_state = b_state.lock_btc(&b_btc_wallet).await.unwrap();
+    let lock_txid = b_state.tx_lock_id();
 
-    let a_state4 = a_state3.watch_for_lock_btc(&a_btc_wallet).await.unwrap();
+    let a_state = a_state.watch_for_lock_btc(&a_btc_wallet).await.unwrap();
 
-    let (a_state4b, lock_tx_monero_fee) = a_state4.lock_xmr(&a_xmr_wallet).await.unwrap();
+    let (a_state, lock_tx_monero_fee) = a_state.lock_xmr(&a_xmr_wallet).await.unwrap();
 
-    let a_message2 = a_state4b.next_message();
+    let a_msg = a_state.next_message();
 
-    let b_state3 = b_state2b
-        .watch_for_lock_xmr(&b_xmr_wallet, a_message2)
+    let b_state = b_state
+        .watch_for_lock_xmr(&b_xmr_wallet, a_msg)
         .await
         .unwrap();
 
-    let b_message3 = b_state3.next_message();
-    let a_state5 = a_state4b.receive(b_message3);
+    let b_msg = b_state.next_message();
+    let a_state = a_state.receive(b_msg);
 
-    a_state5.redeem_btc(&a_btc_wallet).await.unwrap();
-    let b_state4 = b_state3.watch_for_redeem_btc(&b_btc_wallet).await.unwrap();
+    a_state.redeem_btc(&a_btc_wallet).await.unwrap();
+    let b_state = b_state.watch_for_redeem_btc(&b_btc_wallet).await.unwrap();
 
-    b_state4.claim_xmr(&b_xmr_wallet).await.unwrap();
+    b_state.claim_xmr(&b_xmr_wallet).await.unwrap();
 
     let a_final_btc_balance = a_btc_wallet.balance().await.unwrap();
     let b_final_btc_balance = b_btc_wallet.balance().await.unwrap();
