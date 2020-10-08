@@ -94,7 +94,6 @@ pub async fn init_test<'a>(
         .unwrap();
 
     let (alice_transport, bob_transport) = init_alice_and_bob_transports();
-
     let alice = AliceNode::new(alice_transport, alice_btc_wallet, alice_monero_wallet);
 
     let bob = BobNode::new(bob_transport, bob_btc_wallet, bob_monero_wallet);
@@ -205,16 +204,6 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(
-            alice_final_btc_balance,
-            initial_balances.alice_btc + swap_amounts.btc
-                - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
-        );
-        assert_eq!(
-            bob_final_btc_balance,
-            initial_balances.bob_btc - swap_amounts.btc - lock_tx_bitcoin_fee
-        );
-
         let alice_final_xmr_balance = alice_node
             .monero_wallet
             .0
@@ -230,6 +219,16 @@ mod tests {
             .unwrap();
 
         let bob_final_xmr_balance = bob_node.monero_wallet.0.get_balance_bob().await.unwrap();
+
+        assert_eq!(
+            alice_final_btc_balance,
+            initial_balances.alice_btc + swap_amounts.btc
+                - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
+        );
+        assert_eq!(
+            bob_final_btc_balance,
+            initial_balances.bob_btc - swap_amounts.btc - lock_tx_bitcoin_fee
+        );
 
         assert_eq!(
             alice_final_xmr_balance,
@@ -297,13 +296,6 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(alice_final_btc_balance, initial_balances.alice_btc);
-        assert_eq!(
-            bob_final_btc_balance,
-            // The 2 * TX_FEE corresponds to tx_refund and tx_cancel.
-            initial_balances.bob_btc - Amount::from_sat(2 * TX_FEE) - lock_tx_bitcoin_fee
-        );
-
         alice_node
             .monero_wallet
             .0
@@ -317,6 +309,13 @@ mod tests {
             .await
             .unwrap();
         let bob_final_xmr_balance = bob_node.monero_wallet.0.get_balance_bob().await.unwrap();
+
+        assert_eq!(alice_final_btc_balance, initial_balances.alice_btc);
+        assert_eq!(
+            bob_final_btc_balance,
+            // The 2 * TX_FEE corresponds to tx_refund and tx_cancel.
+            initial_balances.bob_btc - Amount::from_sat(2 * TX_FEE) - lock_tx_bitcoin_fee
+        );
 
         // Because we create a new wallet when claiming Monero, we can only assert on
         // this new wallet owning all of `xmr_amount` after refund
