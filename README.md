@@ -3,6 +3,21 @@ XMR to BTC Atomic Swap
 
 This repository is a proof of concept for atomically swapping XMR for BTC.
 
+In the best-case scenario the protocol looks like this:
+
+1. Alice and Bob exchange a set of addresses, keys, zero-knowledge proofs and signatures.
+2. Bob publishes `Tx_lock`, locking up his bitcoin in a 2-of-2 multisig output owned by Alice and Bob.
+Given the information exchanged in step 1, Bob can refund his bitcoin if he waits until time `t_1` by using `Tx_cancel` and `Tx_refund`.
+If Bob doesn't refund after time `t_1`, Alice can punish Bob for being inactive by first publishing `Tx_cancel` and, after `t_2`, spending the output using `Tx_punish`.
+3. Alice sees that Bob has locked up the bitcoin, so she publishes `Tx_lock` on the Monero blockchain, locking up her monero in an output which can only be spent with a secret key owned by Alice (`s_a`) *and* a secret key owned by Bob (`s_b`).
+This means that neither of them can actually spend this output unless they learn the secret key of the other party.
+4. Bob sees that Alice has locked up the monero, so he now sends Alice a missing key bit of information which will allow Alice to redeem the bitcoin using `Tx_redeem`.
+5. Alice uses this information to spend the bitcoin to an address owned by her.
+When doing so she leaks her Monero secret key `s_a` to Bob through the magic of adaptor signatures.
+6. Bob sees Alice's `Tx_redeem` on Bitcoin, extracts Alice's secret key from it and combines it with his own to spend the monero to an address of his own.
+
+<img alt="BTC/XMR Atomic Swap Protocol" src={useBaseUrl('blog/assets/images/2020-10/BTC_XMR_atomic_swap_protocol.svg')} />
+
 We define:
 
 - Alice to be the actor that initially holds XMR.
@@ -24,14 +39,14 @@ Currently we have a single test function that proves the following:
 
 - Interaction with both block chains and their respective wallets works.
 - The messages required are correct and can manually drive the state transitions to execute a swap.
-  
+- It is possible to interact with and watch the monero blockcahin using `monero-wallet-rpc`
+- It is possible to watch a bitcoind instance using `bitcoin-harness` (we already knew this :)
 
 Currently we do not do:
 
 - Actual network communication.
-- Watch the blockchain for transactions (we just assume they have been mined as soon as we broadcast and move onto the next state).
 - Verification that the UI is acceptable.
-Since we do everything in a single test function their is no user interaction, this is unrealistic for a real product.
+Since we do everything in a single test function there is no user interaction, this is unrealistic for a real product.
   
 
 ## Testing
