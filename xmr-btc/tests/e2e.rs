@@ -141,7 +141,6 @@ pub async fn init_test<'a>(
     )
 }
 
-#[cfg(test)]
 mod tests {
     use crate::{
         harness,
