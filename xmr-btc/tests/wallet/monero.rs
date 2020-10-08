@@ -4,8 +4,8 @@ use monero::{Address, Network, PrivateKey};
 use monero_harness::Monero;
 use std::str::FromStr;
 use xmr_btc::monero::{
-    Amount, CheckTransfer, ImportOutput, PrivateViewKey, PublicKey, PublicViewKey, Transfer,
-    TransferProof, TxHash,
+    Amount, CheckTransfer, CreateWalletForOutput, PrivateViewKey, PublicKey, PublicViewKey,
+    Transfer, TransferProof, TxHash,
 };
 
 #[derive(Debug)]
@@ -37,8 +37,8 @@ impl Transfer for AliceWallet<'_> {
 }
 
 #[async_trait]
-impl ImportOutput for AliceWallet<'_> {
-    async fn import_output(
+impl CreateWalletForOutput for AliceWallet<'_> {
+    async fn create_and_load_wallet_for_output(
         &self,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
@@ -99,8 +99,8 @@ impl CheckTransfer for BobWallet<'_> {
 }
 
 #[async_trait]
-impl ImportOutput for BobWallet<'_> {
-    async fn import_output(
+impl CreateWalletForOutput for BobWallet<'_> {
+    async fn create_and_load_wallet_for_output(
         &self,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,

@@ -2,7 +2,7 @@ use crate::{
     bitcoin,
     bitcoin::{BroadcastSignedTransaction, WatchForRawTransaction},
     bob, monero,
-    monero::{ImportOutput, Transfer},
+    monero::{CreateWalletForOutput, Transfer},
     transport::SendReceive,
 };
 use anyhow::{anyhow, Result};
@@ -20,7 +20,7 @@ pub use message::{Message, Message0, Message1, Message2, UnexpectedMessage};
 pub async fn next_state<
     R: RngCore + CryptoRng,
     B: WatchForRawTransaction + BroadcastSignedTransaction,
-    M: ImportOutput + Transfer,
+    M: CreateWalletForOutput + Transfer,
     T: SendReceive<Message, bob::Message>,
 >(
     bitcoin_wallet: &B,
@@ -582,7 +582,7 @@ impl State5 {
     pub async fn refund_xmr<B, M>(self, bitcoin_wallet: &B, monero_wallet: &M) -> Result<()>
     where
         B: WatchForRawTransaction,
-        M: ImportOutput,
+        M: CreateWalletForOutput,
     {
         let tx_cancel = bitcoin::TxCancel::new(
             &self.tx_lock,
@@ -611,7 +611,7 @@ impl State5 {
         // NOTE: This actually generates and opens a new wallet, closing the currently
         // open one.
         monero_wallet
-            .import_output(monero::PrivateKey::from_scalar(s), self.v)
+            .create_and_load_wallet_for_output(monero::PrivateKey::from_scalar(s), self.v)
             .await?;
 
         Ok(())

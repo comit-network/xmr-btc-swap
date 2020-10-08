@@ -5,7 +5,7 @@ use crate::{
         WatchForRawTransaction,
     },
     monero,
-    monero::{CheckTransfer, ImportOutput},
+    monero::{CheckTransfer, CreateWalletForOutput},
     transport::SendReceive,
 };
 use anyhow::{anyhow, Result};
@@ -24,7 +24,7 @@ pub use message::{Message, Message0, Message1, Message2, Message3, UnexpectedMes
 pub async fn next_state<
     R: RngCore + CryptoRng,
     B: WatchForRawTransaction + SignTxLock + BuildTxLockPsbt + BroadcastSignedTransaction,
-    M: ImportOutput + CheckTransfer,
+    M: CreateWalletForOutput + CheckTransfer,
     T: SendReceive<Message, alice::Message>,
 >(
     bitcoin_wallet: &B,
@@ -559,7 +559,7 @@ pub struct State5 {
 impl State5 {
     pub async fn claim_xmr<W>(&self, monero_wallet: &W) -> Result<()>
     where
-        W: monero::ImportOutput,
+        W: monero::CreateWalletForOutput,
     {
         let s_b = monero::PrivateKey {
             scalar: self.s_b.into_ed25519(),
@@ -569,7 +569,9 @@ impl State5 {
 
         // NOTE: This actually generates and opens a new wallet, closing the currently
         // open one.
-        monero_wallet.import_output(s, self.v).await?;
+        monero_wallet
+            .create_and_load_wallet_for_output(s, self.v)
+            .await?;
 
         Ok(())
     }

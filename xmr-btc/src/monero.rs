@@ -122,8 +122,8 @@ pub trait CheckTransfer {
 }
 
 #[async_trait]
-pub trait ImportOutput {
-    async fn import_output(
+pub trait CreateWalletForOutput {
+    async fn create_and_load_wallet_for_output(
         &self,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
