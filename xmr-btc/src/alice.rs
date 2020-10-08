@@ -388,12 +388,12 @@ impl State3 {
     where
         W: bitcoin::WatchForRawTransaction,
     {
-        tracing::info!("{}", self.tx_lock.txid());
+        tracing::info!("watching for lock btc with txid: {}", self.tx_lock.txid());
         let tx = bitcoin_wallet
             .watch_for_raw_transaction(self.tx_lock.txid())
             .await?;
 
-        tracing::info!("{}", tx.txid());
+        tracing::info!("tx lock seen with txid: {}", tx.txid());
 
         Ok(State4 {
             a: self.a,
