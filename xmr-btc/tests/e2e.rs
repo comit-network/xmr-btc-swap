@@ -1,8 +1,9 @@
-use crate::{
+use crate::harness::wallet;
+use bitcoin_harness::Bitcoind;
+use harness::{
     node::{AliceNode, BobNode},
     transport::Transport,
 };
-use bitcoin_harness::Bitcoind;
 use monero_harness::Monero;
 use rand::rngs::OsRng;
 use testcontainers::clients::Cli;
@@ -12,9 +13,7 @@ use tokio::sync::{
 };
 use xmr_btc::{alice, bitcoin, bob, monero};
 
-mod node;
-mod transport;
-mod wallet;
+mod harness;
 
 const TEN_XMR: u64 = 10_000_000_000_000;
 const RELATIVE_REFUND_TIMELOCK: u32 = 1;
@@ -146,8 +145,8 @@ pub async fn init_test<'a>(
 #[cfg(test)]
 mod tests {
     use crate::{
+        harness::node::{run_alice_until, run_bob_until},
         init_bitcoind, init_test,
-        node::{run_alice_until, run_bob_until},
     };
 
     use monero_harness::Monero;

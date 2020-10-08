@@ -1,4 +1,4 @@
-use crate::{transport::Transport, wallet};
+use crate::harness::{transport::Transport, wallet};
 use anyhow::Result;
 use rand::{CryptoRng, RngCore};
 use xmr_btc::{alice, bob};
