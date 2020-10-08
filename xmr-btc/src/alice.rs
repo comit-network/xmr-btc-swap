@@ -69,13 +69,14 @@ pub async fn next_state<
             let state6 = state5.receive(message3);
             tracing::info!("alice has received bob message 3");
             tracing::info!("alice is redeeming btc");
-            state6.redeem_btc(bitcoin_wallet).await.unwrap();
+            state6.redeem_btc(bitcoin_wallet).await?;
             Ok(state6.into())
         }
         State::State6(state6) => Ok(state6.into()),
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum State {
     State0(State0),
@@ -89,24 +90,15 @@ pub enum State {
 
 // TODO: use macro or generics
 pub fn is_state4(state: &State) -> bool {
-    match state {
-        State::State4 { .. } => true,
-        _ => false,
-    }
+    matches!(state, State::State4 { .. })
 }
 // TODO: use macro or generics
 pub fn is_state5(state: &State) -> bool {
-    match state {
-        State::State5 { .. } => true,
-        _ => false,
-    }
+    matches!(state, State::State5 { .. })
 }
 // TODO: use macro or generics
 pub fn is_state6(state: &State) -> bool {
-    match state {
-        State::State6 { .. } => true,
-        _ => false,
-    }
+    matches!(state, State::State6 { .. })
 }
 
 macro_rules! impl_try_from_parent_state {

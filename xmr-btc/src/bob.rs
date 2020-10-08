@@ -126,18 +126,12 @@ impl_from_child_state!(State5);
 
 // TODO: use macro or generics
 pub fn is_state5(state: &State) -> bool {
-    match state {
-        State::State5 { .. } => true,
-        _ => false,
-    }
+    matches!(state, State::State5 { .. })
 }
 
 // TODO: use macro or generics
 pub fn is_state3(state: &State) -> bool {
-    match state {
-        State::State3 { .. } => true,
-        _ => false,
-    }
+    matches!(state, State::State3 { .. })
 }
 
 #[derive(Debug)]

@@ -124,7 +124,7 @@ pub async fn init_test<'a>(
         xmr_amount,
         RELATIVE_REFUND_TIMELOCK,
         RELATIVE_PUNISH_TIMELOCK,
-        refund_address.clone(),
+        refund_address,
     );
     let initial_balances = InitialBalances {
         alice_xmr: alice_initial_xmr_balance,
