@@ -3,6 +3,11 @@ XMR to BTC Atomic Swap
 
 This repository is a proof of concept for atomically swapping XMR for BTC.
 
+We define:
+
+- Alice to be the actor that initially holds XMR.
+- Bob to be the actor that initially holds BTC.
+
 In the best-case scenario the protocol looks like this:
 
 1. Alice and Bob exchange a set of addresses, keys, zero-knowledge proofs and signatures.
@@ -17,11 +22,6 @@ When doing so she leaks her Monero secret key `s_a` to Bob through the magic of 
 6. Bob sees Alice's `Tx_redeem` on Bitcoin, extracts Alice's secret key from it and combines it with his own to spend the monero to an address of his own.
 
 ![BTC/XMR atomic swap protocol](https://github.com/comit-network/xmr-btc-swap/blob/readme/BTC_XMR_atomic_swap_protocol.svg)
-
-We define:
-
-- Alice to be the actor that initially holds XMR.
-- Bob to be the actor that initially holds BTC.
 
 The repository is structured as a library and a single test function that executes the swap.
 The library has the following modules:
