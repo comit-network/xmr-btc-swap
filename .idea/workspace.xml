@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="BranchesTreeState">
+    <expand>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="LOCAL_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="REMOTE_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="REMOTE_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="GROUP_NODE:origin" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+    </expand>
+    <select>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="LOCAL_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="BRANCH:async-squashed" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+    </select>
+  </component>
+  <component name="CMakeRunConfigurationManager" shouldGenerate="true" shouldDeleteObsolete="true">
+    <generated />
+  </component>
+  <component name="CMakeSettings">
+    <configurations>
+      <configuration PROFILE_NAME="Debug" CONFIG_NAME="Debug" />
+    </configurations>
+  </component>
+  <component name="CargoProjects">
+    <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="6c7e9ff3-bf9f-45e2-bc16-52c0ca6d3feb" name="Default Changelist" comment="" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Rust File" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitRewordedCommitMessages">
+    <option name="commitMessagesMapping">
+      <RewordedCommitMessageMapping>
+        <option name="originalMessage" value="WIP: watch for redeem btc working" />
+        <option name="rewordedMessage" value="WIP: watch for redeem btc working&#10;&#10;&#10;WIP: future stream&#10;&#10;&#10;Add genawait based stream example demonstrating how to drive alice and bob nodes&#10;&#10;&#10;WIP&#10;&#10;&#10;happy path works with generator based execution&#10;&#10;&#10;Upgrade refund and punish tests to use generator based async execution&#10;&#10;&#10;Remove generator based execution and replace with match statement and recursive call&#10;&#10;&#10;Move test initialisation into reusable function&#10;&#10;&#10;Remove wallet trait bounds from Node&#10;&#10;The wallet trait bounds are implemented on the wallets. Use the&#10;concrete wallet types instead of using generics to reduce the&#10;type parameter noise in Node.&#10;&#10;&#10;Move tests into tests module&#10;&#10;Remove b states. All tests passing with futures + loop based state executor.&#10;Fix warnings.&#10;&#10;&#10;Move state transition functions to lib&#10;&#10;&#10;Move message into submodule" />
+      </RewordedCommitMessageMapping>
+    </option>
+    <option name="currentCommit" value="1" />
+    <option name="onto" value="1f99cf001cbfe9a6166f7113acc3960a09d7051b" />
+  </component>
+  <component name="MacroExpansionManager">
+    <option name="directoryName" value="ev83xvyy" />
+  </component>
+  <component name="ProjectId" id="1i87TsKavV5ZqmfbBXFmi69oxqC" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="cf.first.check.clang-format" value="false" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../comit-rs" />
+    <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
+    <property name="settings.editor.selected.configurable" value="language.rust" />
+  </component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/xmr-btc/tests/harness" />
+      <recent name="$PROJECT_DIR$/xmr-btc/tests/node" />
+      <recent name="$PROJECT_DIR$/xmr-btc/tests/wallet" />
+      <recent name="$PROJECT_DIR$/xmr-btc/tests" />
+      <recent name="$PROJECT_DIR$/xmr-btc/tests/bitcoin" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Cargo.TomlFmt">
+    <configuration name="Build" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+      <option name="channel" value="DEFAULT" />
+      <option name="command" value="build" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+        <option name="RunConfigurationTask" enabled="true" run_configuration_name="Fmt" run_configuration_type="CargoCommandRunConfiguration" />
+      </method>
+    </configuration>
+    <configuration name="Clippy" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+      <option name="channel" value="DEFAULT" />
+      <option name="command" value="clippy --all-targets --all-features -- -D warnings" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Fmt" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+      <option name="channel" value="DEFAULT" />
+      <option name="command" value="fmt" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test e2e" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="channel" value="DEFAULT" />
+      <option name="command" value="test --package xmr-btc --test e2e &quot;&quot;" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test test::tests" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="channel" value="DEFAULT" />
+      <option name="command" value="test --package xmr-btc --test test tests" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test tests::alice_punishes" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="channel" value="DEFAULT" />
+      <option name="command" value="test --package xmr-btc --test e2e tests::alice_punishes -- --exact" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test tests::both_refund" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="channel" value="DEFAULT" />
+      <option name="command" value="test --package xmr-btc --test e2e tests::both_refund -- --exact" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test tests::happy_path (2)" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="channel" value="NIGHTLY" />
+      <option name="command" value="test --package xmr-btc --test e2e tests::happy_path -- --exact" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="TomlFmt" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+      <option name="channel" value="NIGHTLY" />
+      <option name="command" value="tomlfmt -d -p Cargo.toml" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+      <option name="channel" value="DEFAULT" />
+      <option name="command" value="fmt" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="GradleAppRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" PASS_PARENT_ENVS_2="true">
+      <method v="2">
+        <option name="com.jetbrains.cidr.cpp.gradle.execution.GradleNativeBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <list>
+      <item itemvalue="Cargo.Build" />
+      <item itemvalue="Cargo.Fmt" />
+      <item itemvalue="Cargo.TomlFmt" />
+      <item itemvalue="Cargo.Clippy" />
+      <item itemvalue="Cargo.Test test::tests" />
+      <item itemvalue="Cargo.Test e2e" />
+      <item itemvalue="Cargo.Test tests::happy_path (2)" />
+      <item itemvalue="Cargo.Test tests::both_refund" />
+      <item itemvalue="Cargo.Test tests::alice_punishes" />
+    </list>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Cargo.Test e2e" />
+        <item itemvalue="Cargo.Test tests::happy_path (2)" />
+        <item itemvalue="Cargo.Test tests::alice_punishes" />
+        <item itemvalue="Cargo.Test tests::both_refund" />
+        <item itemvalue="Cargo.Test test::tests" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="RustProjectSettings">
+    <option name="runRustfmtOnSave" value="true" />
+    <option name="toolchainHomeDirectory" value="$PROJECT_DIR$/../.cargo/bin" />
+    <option name="version" value="2" />
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="6c7e9ff3-bf9f-45e2-bc16-52c0ca6d3feb" name="Default Changelist" comment="" />
+      <created>1601277375890</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1601277375890</updated>
+      <workItem from="1601277376936" duration="788000" />
+      <workItem from="1601289440925" duration="1801000" />
+      <workItem from="1601333486440" duration="34954000" />
+      <workItem from="1601425491245" duration="2048000" />
+      <workItem from="1601505487290" duration="22798000" />
+      <workItem from="1601596042001" duration="22468000" />
+      <workItem from="1601689163868" duration="721000" />
+      <workItem from="1601876682553" duration="2199000" />
+      <workItem from="1601890620271" duration="1770000" />
+      <workItem from="1601935262467" duration="57000" />
+      <workItem from="1601935334581" duration="1093000" />
+      <workItem from="1601936436712" duration="15808000" />
+      <workItem from="1601966461744" duration="2132000" />
+      <workItem from="1602019064986" duration="7302000" />
+      <workItem from="1602049318230" duration="1144000" />
+      <workItem from="1602108631225" duration="10611000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State>
+              <option name="FILTERS">
+                <map>
+                  <entry key="branch">
+                    <value>
+                      <list>
+                        <option value="async-squashed" />
+                      </list>
+                    </value>
+                  </entry>
+                </map>
+              </option>
+            </State>
+          </value>
+        </entry>
+      </map>
+    </option>
+    <option name="oldMeFiltersMigrated" value="true" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Execute Alice and Bob state machines concurrently&#10;&#10;Previously we were testing the protocol by manually driving Alice and&#10;Bob's state machines. This logic has now be moved to an async state&#10;transition function that can take any possible state as input. The&#10;state transition function is called in a loop until it returns the&#10;desired state. This allows use to interrupt midway through the protocol&#10;and perform refund and redeem tests. This design was chosen over a&#10;generator based implementation because the the generator based&#10;implementation results in a impure state transition function that is&#10;difficult to reason about and prone to bugs.&#10;&#10;Test related code was extracted into the tests folder.&#10;&#10;The 2b and 4b states were renamed to be consistent with the rest.&#10;&#10;Macros were used to reduce code duplication when converting&#10;child states to their parent states and vice versa.&#10;&#10;Todos were added were neccessary." />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="418" y="211" width="1084" height="732" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1602118597944">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="418" y="211" width="1084" height="732" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.27.1920.1053@0.27.1920.1053" timestamp="1602118597944" />
+    <state x="709" y="357" width="512" height="400" key="#com.intellij.fileTypes.FileTypeChooser" timestamp="1601960557827">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="709" y="357" width="512" height="400" key="#com.intellij.fileTypes.FileTypeChooser/0.27.1920.1053@0.27.1920.1053" timestamp="1601960557827" />
+    <state x="768" y="272" width="374" height="569" key="#com.intellij.ide.util.MemberChooser" timestamp="1601961334449">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="768" y="272" width="374" height="569" key="#com.intellij.ide.util.MemberChooser/0.27.1920.1053@0.27.1920.1053" timestamp="1601961334449" />
+    <state x="743" y="311" width="424" height="491" key="FileChooserDialogImpl" timestamp="1602032711992">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="743" y="311" width="424" height="491" key="FileChooserDialogImpl/0.27.1920.1053@0.27.1920.1053" timestamp="1602032711992" />
+    <state x="455" y="157" width="1194" height="717" key="Git.Interactive.Rebase.Dialog" timestamp="1602115973151">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="455" y="157" width="1194" height="717" key="Git.Interactive.Rebase.Dialog/0.27.1920.1053@0.27.1920.1053" timestamp="1602115973151" />
+    <state x="661" y="300" width="588" height="513" key="Git.Rebase.Log.Action.NewCommitMessage.Dialog" timestamp="1601953303729">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="661" y="300" width="588" height="513" key="Git.Rebase.Log.Action.NewCommitMessage.Dialog/0.27.1920.1053@0.27.1920.1053" timestamp="1601953303729" />
+    <state width="533" height="897" key="GridCell.Tab.0.bottom" timestamp="1602118599158">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="533" height="897" key="GridCell.Tab.0.bottom/0.27.1920.1053@0.27.1920.1053" timestamp="1602118599158" />
+    <state width="533" height="897" key="GridCell.Tab.0.center" timestamp="1602118599157">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="533" height="897" key="GridCell.Tab.0.center/0.27.1920.1053@0.27.1920.1053" timestamp="1602118599157" />
+    <state width="533" height="897" key="GridCell.Tab.0.left" timestamp="1602118599157">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="533" height="897" key="GridCell.Tab.0.left/0.27.1920.1053@0.27.1920.1053" timestamp="1602118599157" />
+    <state width="533" height="897" key="GridCell.Tab.0.right" timestamp="1602118599158">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="533" height="897" key="GridCell.Tab.0.right/0.27.1920.1053@0.27.1920.1053" timestamp="1602118599158" />
+    <state width="620" height="897" key="GridCell.Tab.1.bottom" timestamp="1601519054477">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="620" height="897" key="GridCell.Tab.1.bottom/0.27.1920.1053@0.27.1920.1053" timestamp="1601519054477" />
+    <state width="620" height="897" key="GridCell.Tab.1.center" timestamp="1601519054477">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="620" height="897" key="GridCell.Tab.1.center/0.27.1920.1053@0.27.1920.1053" timestamp="1601519054477" />
+    <state width="620" height="897" key="GridCell.Tab.1.left" timestamp="1601519054477">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="620" height="897" key="GridCell.Tab.1.left/0.27.1920.1053@0.27.1920.1053" timestamp="1601519054477" />
+    <state width="620" height="897" key="GridCell.Tab.1.right" timestamp="1601519054477">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="620" height="897" key="GridCell.Tab.1.right/0.27.1920.1053@0.27.1920.1053" timestamp="1601519054477" />
+    <state x="543" y="291" width="824" height="532" key="IDE.errors.dialog" timestamp="1601358309964">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="543" y="291" width="824" height="532" key="IDE.errors.dialog/0.27.1920.1053@0.27.1920.1053" timestamp="1601358309964" />
+    <state x="464" y="188" width="992" height="737" key="SettingsEditor" timestamp="1601341250667">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="464" y="188" width="992" height="737" key="SettingsEditor/0.27.1920.1053@0.27.1920.1053" timestamp="1601341250667" />
+    <state x="689" y="284" width="540" height="524" key="StructurePopup" timestamp="1601507681734">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="689" y="284" width="540" height="524" key="StructurePopup/0.27.1920.1053@0.27.1920.1053" timestamp="1601507681734" />
+    <state x="624" y="252" key="run.anything.popup" timestamp="1601345288818">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="624" y="252" key="run.anything.popup/0.27.1920.1053@0.27.1920.1053" timestamp="1601345288818" />
+    <state x="623" y="259" width="672" height="678" key="search.everywhere.popup" timestamp="1602116711797">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="623" y="259" width="672" height="678" key="search.everywhere.popup/0.27.1920.1053@0.27.1920.1053" timestamp="1602116711797" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
+          <url>file://$PROJECT_DIR$/xmr-btc/tests/e2e.rs</url>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+</project>
