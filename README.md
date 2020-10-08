@@ -39,7 +39,7 @@ Currently we have a single test function that proves the following:
 
 - Interaction with both block chains and their respective wallets works.
 - The messages required are correct and can manually drive the state transitions to execute a swap.
-- It is possible to interact with and watch the monero blockcahin using `monero-wallet-rpc`
+- It is possible to interact with, and watch, the monero blockchain using `monero-wallet-rpc`.
 - It is possible to watch a bitcoind instance using `bitcoin-harness` (we already knew this :)
 
 Currently we do not do:
