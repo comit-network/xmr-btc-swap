@@ -14,6 +14,10 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
+use anyhow::Result;
+use async_trait::async_trait;
+use std::convert::TryFrom;
+
 pub mod alice;
 pub mod bitcoin;
 pub mod bob;
@@ -21,6 +25,186 @@ pub mod monero;
 
 #[cfg(test)]
 mod happy_path;
+
+#[async_trait]
+pub trait SendMessage {
+    async fn send_message(&mut self, message: Message) -> Result<()>;
+}
+
+#[async_trait]
+pub trait ReceiveMessage {
+    async fn receive_message(&mut self) -> Result<Message>;
+}
+
+/// All possible messages that are sent between two parties.
+#[derive(Debug)]
+pub enum Message {
+    Alice0(alice::Message0),
+    Alice1(alice::Message1),
+    Alice2(alice::Message2),
+    Bob0(bob::Message0),
+    Bob1(bob::Message1),
+    Bob2(bob::Message2),
+    Bob3(bob::Message3),
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("expected message of type {expected_type}, got {received:?}")]
+pub struct UnexpectedMessage {
+    expected_type: String,
+    received: Message,
+}
+
+impl UnexpectedMessage {
+    pub fn new<T>(received: Message) -> Self {
+        let expected_type = std::any::type_name::<T>();
+
+        Self {
+            expected_type: expected_type.to_string(),
+            received,
+        }
+    }
+}
+
+impl From<alice::Message0> for Message {
+    fn from(msg: alice::Message0) -> Self {
+        Message::Alice0(msg)
+    }
+}
+
+impl TryFrom<Message> for alice::Message0 {
+    type Error = UnexpectedMessage;
+
+    fn try_from(msg: Message) -> Result<Self, Self::Error> {
+        match msg {
+            Message::Alice0(msg) => Ok(msg),
+            _ => Err(UnexpectedMessage {
+                expected_type: "alice::Message0".to_string(),
+                received: msg,
+            }),
+        }
+    }
+}
+
+impl From<alice::Message1> for Message {
+    fn from(msg: alice::Message1) -> Self {
+        Message::Alice1(msg)
+    }
+}
+
+impl TryFrom<Message> for alice::Message1 {
+    type Error = UnexpectedMessage;
+
+    fn try_from(msg: Message) -> Result<Self, Self::Error> {
+        match msg {
+            Message::Alice1(msg) => Ok(msg),
+            _ => Err(UnexpectedMessage {
+                expected_type: "alice::Message1".to_string(),
+                received: msg,
+            }),
+        }
+    }
+}
+
+impl From<alice::Message2> for Message {
+    fn from(msg: alice::Message2) -> Self {
+        Message::Alice2(msg)
+    }
+}
+
+impl TryFrom<Message> for alice::Message2 {
+    type Error = UnexpectedMessage;
+
+    fn try_from(msg: Message) -> Result<Self, Self::Error> {
+        match msg {
+            Message::Alice2(msg) => Ok(msg),
+            _ => Err(UnexpectedMessage {
+                expected_type: "alice::Message2".to_string(),
+                received: msg,
+            }),
+        }
+    }
+}
+
+impl From<bob::Message0> for Message {
+    fn from(msg: bob::Message0) -> Self {
+        Message::Bob0(msg)
+    }
+}
+
+impl TryFrom<Message> for bob::Message0 {
+    type Error = UnexpectedMessage;
+
+    fn try_from(msg: Message) -> Result<Self, Self::Error> {
+        match msg {
+            Message::Bob0(msg) => Ok(msg),
+            _ => Err(UnexpectedMessage {
+                expected_type: "bob::Message0".to_string(),
+                received: msg,
+            }),
+        }
+    }
+}
+
+impl From<bob::Message1> for Message {
+    fn from(msg: bob::Message1) -> Self {
+        Message::Bob1(msg)
+    }
+}
+
+impl TryFrom<Message> for bob::Message1 {
+    type Error = UnexpectedMessage;
+
+    fn try_from(msg: Message) -> Result<Self, Self::Error> {
+        match msg {
+            Message::Bob1(msg) => Ok(msg),
+            _ => Err(UnexpectedMessage {
+                expected_type: "bob::Message1".to_string(),
+                received: msg,
+            }),
+        }
+    }
+}
+
+impl From<bob::Message2> for Message {
+    fn from(msg: bob::Message2) -> Self {
+        Message::Bob2(msg)
+    }
+}
+
+impl TryFrom<Message> for bob::Message2 {
+    type Error = UnexpectedMessage;
+
+    fn try_from(msg: Message) -> Result<Self, Self::Error> {
+        match msg {
+            Message::Bob2(msg) => Ok(msg),
+            _ => Err(UnexpectedMessage {
+                expected_type: "bob::Message2".to_string(),
+                received: msg,
+            }),
+        }
+    }
+}
+
+impl From<bob::Message3> for Message {
+    fn from(msg: bob::Message3) -> Self {
+        Message::Bob3(msg)
+    }
+}
+
+impl TryFrom<Message> for bob::Message3 {
+    type Error = UnexpectedMessage;
+
+    fn try_from(msg: Message) -> Result<Self, Self::Error> {
+        match msg {
+            Message::Bob3(msg) => Ok(msg),
+            _ => Err(UnexpectedMessage {
+                expected_type: "bob::Message3".to_string(),
+                received: msg,
+            }),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
