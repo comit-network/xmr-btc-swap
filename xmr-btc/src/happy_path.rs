@@ -29,8 +29,8 @@ async fn happy_path() {
     let fund_bob = 0;
     monero.init(fund_alice, fund_bob).await.unwrap();
 
-    let a_monero_wallet = monero::AliceWallet(&monero);
-    let b_monero_wallet = monero::BobWallet(&monero);
+    let a_xmr_wallet = monero::AliceWallet(&monero);
+    let b_xmr_wallet = monero::BobWallet(&monero);
 
     let a_btc_wallet = bitcoin::Wallet::new("alice", &bitcoind.node_url)
         .await
@@ -42,8 +42,8 @@ async fn happy_path() {
     let a_initial_btc_balance = a_btc_wallet.balance().await.unwrap();
     let b_initial_btc_balance = b_btc_wallet.balance().await.unwrap();
 
-    let a_initial_xmr_balance = a_monero_wallet.0.get_balance_alice().await.unwrap();
-    let b_initial_xmr_balance = b_monero_wallet.0.get_balance_bob().await.unwrap();
+    let a_initial_xmr_balance = a_xmr_wallet.0.get_balance_alice().await.unwrap();
+    let b_initial_xmr_balance = b_xmr_wallet.0.get_balance_bob().await.unwrap();
 
     let redeem_address = a_btc_wallet.new_address().await.unwrap();
     let punish_address = redeem_address.clone();
@@ -89,12 +89,12 @@ async fn happy_path() {
 
     let a_state4 = a_state3.watch_for_lock_btc(&a_btc_wallet).await.unwrap();
 
-    let (a_state4b, lock_tx_monero_fee) = a_state4.lock_xmr(&a_monero_wallet).await.unwrap();
+    let (a_state4b, lock_tx_monero_fee) = a_state4.lock_xmr(&a_xmr_wallet).await.unwrap();
 
     let a_message2 = a_state4b.next_message();
 
     let b_state3 = b_state2b
-        .watch_for_lock_xmr(&b_monero_wallet, a_message2)
+        .watch_for_lock_xmr(&b_xmr_wallet, a_message2)
         .await
         .unwrap();
 
@@ -104,7 +104,7 @@ async fn happy_path() {
     a_state5.redeem_btc(&a_btc_wallet).await.unwrap();
     let b_state4 = b_state3.watch_for_redeem_btc(&b_btc_wallet).await.unwrap();
 
-    b_state4.claim_xmr(&b_monero_wallet).await.unwrap();
+    b_state4.claim_xmr(&b_xmr_wallet).await.unwrap();
 
     let a_final_btc_balance = a_btc_wallet.balance().await.unwrap();
     let b_final_btc_balance = b_btc_wallet.balance().await.unwrap();
@@ -120,13 +120,13 @@ async fn happy_path() {
         b_initial_btc_balance - btc_amount - lock_tx_bitcoin_fee
     );
 
-    let a_final_xmr_balance = a_monero_wallet.0.get_balance_alice().await.unwrap();
-    b_monero_wallet
+    let a_final_xmr_balance = a_xmr_wallet.0.get_balance_alice().await.unwrap();
+    b_xmr_wallet
         .0
         .wait_for_bob_wallet_block_height()
         .await
         .unwrap();
-    let b_final_xmr_balance = b_monero_wallet.0.get_balance_bob().await.unwrap();
+    let b_final_xmr_balance = b_xmr_wallet.0.get_balance_bob().await.unwrap();
 
     assert_eq!(
         a_final_xmr_balance,
