@@ -15,7 +15,7 @@ use sha2::Sha256;
 use std::convert::{TryFrom, TryInto};
 
 pub mod message;
-pub use message::{Message, Message0, Message1, Message2, UnexpectedMessage};
+pub use message::{Message, Message0, Message1, Message2};
 
 pub async fn next_state<
     R: RngCore + CryptoRng,
@@ -88,46 +88,21 @@ pub enum State {
     State6(State6),
 }
 
-macro_rules! impl_try_from_parent_state {
-    ($type:ident) => {
-        impl TryFrom<State> for $type {
-            type Error = anyhow::Error;
-            fn try_from(from: State) -> Result<Self> {
-                if let State::$type(state) = from {
-                    Ok(state)
-                } else {
-                    Err(anyhow!("Failed to convert parent state to child state"))
-                }
-            }
-        }
-    };
-}
+impl_try_from_parent_enum!(State0, State);
+impl_try_from_parent_enum!(State1, State);
+impl_try_from_parent_enum!(State2, State);
+impl_try_from_parent_enum!(State3, State);
+impl_try_from_parent_enum!(State4, State);
+impl_try_from_parent_enum!(State5, State);
+impl_try_from_parent_enum!(State6, State);
 
-impl_try_from_parent_state!(State0);
-impl_try_from_parent_state!(State1);
-impl_try_from_parent_state!(State2);
-impl_try_from_parent_state!(State3);
-impl_try_from_parent_state!(State4);
-impl_try_from_parent_state!(State5);
-impl_try_from_parent_state!(State6);
-
-macro_rules! impl_from_child_state {
-    ($type:ident) => {
-        impl From<$type> for State {
-            fn from(from: $type) -> Self {
-                State::$type(from)
-            }
-        }
-    };
-}
-
-impl_from_child_state!(State0);
-impl_from_child_state!(State1);
-impl_from_child_state!(State2);
-impl_from_child_state!(State3);
-impl_from_child_state!(State4);
-impl_from_child_state!(State5);
-impl_from_child_state!(State6);
+impl_from_child_enum!(State0, State);
+impl_from_child_enum!(State1, State);
+impl_from_child_enum!(State2, State);
+impl_from_child_enum!(State3, State);
+impl_from_child_enum!(State4, State);
+impl_from_child_enum!(State5, State);
+impl_from_child_enum!(State6, State);
 
 impl State {
     pub fn new<R: RngCore + CryptoRng>(
