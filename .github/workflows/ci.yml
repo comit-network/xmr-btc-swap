@@ -74,4 +74,4 @@ jobs:
         run: cargo check --workspace --all-targets --all-features
 
       - name: Cargo test
-        run: cargo test --workspace --all-features
+        run: cargo test --workspace --all-features -- --test-threads 1
