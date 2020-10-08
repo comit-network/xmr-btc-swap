@@ -16,7 +16,7 @@ This means that neither of them can actually spend this output unless they learn
 When doing so she leaks her Monero secret key `s_a` to Bob through the magic of adaptor signatures.
 6. Bob sees Alice's `Tx_redeem` on Bitcoin, extracts Alice's secret key from it and combines it with his own to spend the monero to an address of his own.
 
-<img alt="BTC/XMR Atomic Swap Protocol" src={useBaseUrl('blog/assets/images/2020-10/BTC_XMR_atomic_swap_protocol.svg')} />
+![BTC/XMR atomic swap protocol](https://github.com/comit-network/xmr-btc-swap/blob/readme/BTC_XMR_atomic_swap_protocol.svg)
 
 We define:
 
