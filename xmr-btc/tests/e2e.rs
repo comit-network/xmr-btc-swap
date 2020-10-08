@@ -144,16 +144,15 @@ pub async fn init_test<'a>(
 #[cfg(test)]
 mod tests {
     use crate::{
+        harness,
         harness::node::{run_alice_until, run_bob_until},
         init_bitcoind, init_test,
     };
-
+    use futures::future;
     use monero_harness::Monero;
     use rand::rngs::OsRng;
-    use testcontainers::clients::Cli;
-
-    use futures::future;
     use std::convert::TryInto;
+    use testcontainers::clients::Cli;
     use tracing_subscriber::util::SubscriberInitExt;
     use xmr_btc::{
         alice, bitcoin,
@@ -184,10 +183,15 @@ mod tests {
             run_alice_until(
                 &mut alice_node,
                 alice_state0.into(),
-                alice::is_state6,
+                harness::alice::is_state6,
                 &mut OsRng,
             ),
-            run_bob_until(&mut bob_node, bob_state0.into(), bob::is_state5, &mut OsRng),
+            run_bob_until(
+                &mut bob_node,
+                bob_state0.into(),
+                harness::bob::is_state5,
+                &mut OsRng,
+            ),
         )
         .await
         .unwrap();
@@ -265,10 +269,15 @@ mod tests {
             run_alice_until(
                 &mut alice_node,
                 alice_state0.into(),
-                alice::is_state5,
+                harness::alice::is_state5,
                 &mut OsRng,
             ),
-            run_bob_until(&mut bob_node, bob_state0.into(), bob::is_state3, &mut OsRng),
+            run_bob_until(
+                &mut bob_node,
+                bob_state0.into(),
+                harness::bob::is_state3,
+                &mut OsRng,
+            ),
         )
         .await
         .unwrap();
@@ -346,10 +355,15 @@ mod tests {
             run_alice_until(
                 &mut alice_node,
                 alice_state0.into(),
-                alice::is_state4,
+                harness::alice::is_state4,
                 &mut OsRng,
             ),
-            run_bob_until(&mut bob_node, bob_state0.into(), bob::is_state3, &mut OsRng),
+            run_bob_until(
+                &mut bob_node,
+                bob_state0.into(),
+                harness::bob::is_state3,
+                &mut OsRng,
+            ),
         )
         .await
         .unwrap();

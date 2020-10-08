@@ -88,19 +88,6 @@ pub enum State {
     State6(State6),
 }
 
-// TODO: use macro or generics
-pub fn is_state4(state: &State) -> bool {
-    matches!(state, State::State4 { .. })
-}
-// TODO: use macro or generics
-pub fn is_state5(state: &State) -> bool {
-    matches!(state, State::State5 { .. })
-}
-// TODO: use macro or generics
-pub fn is_state6(state: &State) -> bool {
-    matches!(state, State::State6 { .. })
-}
-
 macro_rules! impl_try_from_parent_state {
     ($type:ident) => {
         impl TryFrom<State> for $type {

@@ -124,16 +124,6 @@ impl_from_child_state!(State3);
 impl_from_child_state!(State4);
 impl_from_child_state!(State5);
 
-// TODO: use macro or generics
-pub fn is_state5(state: &State) -> bool {
-    matches!(state, State::State5 { .. })
-}
-
-// TODO: use macro or generics
-pub fn is_state3(state: &State) -> bool {
-    matches!(state, State::State3 { .. })
-}
-
 #[derive(Debug)]
 pub struct State0 {
     b: bitcoin::SecretKey,
