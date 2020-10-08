@@ -4,10 +4,7 @@ use tokio::{
     stream::StreamExt,
     sync::mpsc::{Receiver, Sender},
 };
-use xmr_btc::{
-    alice, bob,
-    transport::{Receive, Send},
-};
+use xmr_btc::transport::{ReceiveMessage, SendMessage};
 
 #[derive(Debug)]
 pub struct Transport<SendMsg, RecvMsg> {
@@ -16,8 +13,12 @@ pub struct Transport<SendMsg, RecvMsg> {
 }
 
 #[async_trait]
-impl Send<alice::Message> for Transport<alice::Message, bob::Message> {
-    async fn send_message(&mut self, message: alice::Message) -> Result<()> {
+impl<SendMsg, RecvMsg> SendMessage<SendMsg> for Transport<SendMsg, RecvMsg>
+where
+    SendMsg: Send + Sync,
+    RecvMsg: std::marker::Send,
+{
+    async fn send_message(&mut self, message: SendMsg) -> Result<()> {
         let _ = self
             .sender
             .send(message)
@@ -28,32 +29,12 @@ impl Send<alice::Message> for Transport<alice::Message, bob::Message> {
 }
 
 #[async_trait]
-impl Receive<bob::Message> for Transport<alice::Message, bob::Message> {
-    async fn receive_message(&mut self) -> Result<bob::Message> {
-        let message = self
-            .receiver
-            .next()
-            .await
-            .ok_or_else(|| anyhow!("failed to receive message"))?;
-        Ok(message)
-    }
-}
-
-#[async_trait]
-impl Send<bob::Message> for Transport<bob::Message, alice::Message> {
-    async fn send_message(&mut self, message: bob::Message) -> Result<()> {
-        let _ = self
-            .sender
-            .send(message)
-            .await
-            .map_err(|_| anyhow!("failed to send message"))?;
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl Receive<alice::Message> for Transport<bob::Message, alice::Message> {
-    async fn receive_message(&mut self) -> Result<alice::Message> {
+impl<SendMsg, RecvMsg> ReceiveMessage<RecvMsg> for Transport<SendMsg, RecvMsg>
+where
+    SendMsg: std::marker::Send,
+    RecvMsg: Send + Sync,
+{
+    async fn receive_message(&mut self) -> Result<RecvMsg> {
         let message = self
             .receiver
             .next()
