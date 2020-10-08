@@ -20,6 +20,9 @@ pub mod bob;
 pub mod monero;
 
 #[cfg(test)]
+mod happy_path;
+
+#[cfg(test)]
 mod tests {
     use crate::{
         alice, bitcoin,
