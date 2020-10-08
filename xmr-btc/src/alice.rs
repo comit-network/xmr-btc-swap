@@ -35,19 +35,19 @@ pub async fn next_state<
                 .send_message(state0.next_message(rng).into())
                 .await?;
 
-            let bob_message0: bob::Message0 = transport.receive_message().await?.try_into()?;
+            let bob_message0 = transport.receive_message().await?.try_into()?;
             let state1 = state0.receive(bob_message0)?;
             Ok(state1.into())
         }
         State::State1(state1) => {
-            let bob_message1: bob::Message1 = transport.receive_message().await?.try_into()?;
+            let bob_message1 = transport.receive_message().await?.try_into()?;
             let state2 = state1.receive(bob_message1);
-            let alice_message1: Message1 = state2.next_message();
+            let alice_message1 = state2.next_message();
             transport.send_message(alice_message1.into()).await?;
             Ok(state2.into())
         }
         State::State2(state2) => {
-            let bob_message2: bob::Message2 = transport.receive_message().await?.try_into()?;
+            let bob_message2 = transport.receive_message().await?.try_into()?;
             let state3 = state2.receive(bob_message2)?;
             Ok(state3.into())
         }
@@ -65,7 +65,7 @@ pub async fn next_state<
             transport.send_message(state5.next_message().into()).await?;
             // todo: pass in state4b as a parameter somewhere in this call to prevent the
             // user from waiting for a message that wont be sent
-            let message3: bob::Message3 = transport.receive_message().await?.try_into()?;
+            let message3 = transport.receive_message().await?.try_into()?;
             let state6 = state5.receive(message3);
             tracing::info!("alice has received bob message 3");
             tracing::info!("alice is redeeming btc");

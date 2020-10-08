@@ -38,14 +38,14 @@ pub async fn next_state<
             transport
                 .send_message(state0.next_message(rng).into())
                 .await?;
-            let message0: alice::Message0 = transport.receive_message().await?.try_into()?;
+            let message0 = transport.receive_message().await?.try_into()?;
             let state1 = state0.receive(bitcoin_wallet, message0).await?;
             Ok(state1.into())
         }
         State::State1(state1) => {
             transport.send_message(state1.next_message().into()).await?;
 
-            let message1: alice::Message1 = transport.receive_message().await?.try_into()?;
+            let message1 = transport.receive_message().await?.try_into()?;
             let state2 = state1.receive(message1)?;
             Ok(state2.into())
         }
@@ -57,7 +57,7 @@ pub async fn next_state<
             Ok(state3.into())
         }
         State::State3(state3) => {
-            let message2: alice::Message2 = transport.receive_message().await?.try_into()?;
+            let message2 = transport.receive_message().await?.try_into()?;
             let state4 = state3.watch_for_lock_xmr(monero_wallet, message2).await?;
             tracing::info!("bob has seen that alice has locked xmr");
             Ok(state4.into())
