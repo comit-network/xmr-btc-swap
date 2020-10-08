@@ -1,7 +1,6 @@
 use crate::{bitcoin, monero};
 use anyhow::Result;
 use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
-
 use std::convert::TryFrom;
 
 #[derive(Debug)]

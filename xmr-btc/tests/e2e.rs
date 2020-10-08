@@ -3,10 +3,8 @@ use crate::{
     transport::Transport,
 };
 use bitcoin_harness::Bitcoind;
-
 use monero_harness::Monero;
 use rand::rngs::OsRng;
-
 use testcontainers::clients::Cli;
 use tokio::sync::{
     mpsc,

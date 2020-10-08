@@ -1,7 +1,3 @@
-use anyhow::{anyhow, Result};
-use ecdsa_fun::adaptor::{Adaptor, EncryptedSignature};
-use rand::{CryptoRng, RngCore};
-
 use crate::{
     bitcoin,
     bitcoin::{BroadcastSignedTransaction, WatchForRawTransaction},
@@ -9,7 +5,12 @@ use crate::{
     monero::{ImportOutput, Transfer},
     transport::SendReceive,
 };
-use ecdsa_fun::nonce::Deterministic;
+use anyhow::{anyhow, Result};
+use ecdsa_fun::{
+    adaptor::{Adaptor, EncryptedSignature},
+    nonce::Deterministic,
+};
+use rand::{CryptoRng, RngCore};
 use sha2::Sha256;
 use std::convert::{TryFrom, TryInto};
 

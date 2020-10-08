@@ -1,10 +1,8 @@
 use anyhow::Result;
-use ecdsa_fun::adaptor::EncryptedSignature;
+use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
+use std::convert::TryFrom;
 
 use crate::{bitcoin, monero};
-use ecdsa_fun::Signature;
-
-use std::convert::TryFrom;
 
 #[derive(Debug)]
 pub enum Message {

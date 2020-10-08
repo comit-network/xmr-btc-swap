@@ -1,11 +1,9 @@
-use std::ops::Add;
-
 use anyhow::Result;
 use async_trait::async_trait;
-use rand::{CryptoRng, RngCore};
-
 pub use curve25519_dalek::scalar::Scalar;
 pub use monero::{Address, PrivateKey, PublicKey};
+use rand::{CryptoRng, RngCore};
+use std::ops::Add;
 
 pub fn random_private_key<R: RngCore + CryptoRng>(rng: &mut R) -> PrivateKey {
     let scalar = Scalar::random(rng);
