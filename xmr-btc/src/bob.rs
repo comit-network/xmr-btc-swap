@@ -6,7 +6,7 @@ use crate::{
     },
     monero,
     monero::{CheckTransfer, CreateWalletForOutput},
-    transport::SendReceive,
+    transport::{Receive, Send},
 };
 use anyhow::{anyhow, Result};
 use ecdsa_fun::{
@@ -25,7 +25,7 @@ pub async fn next_state<
     R: RngCore + CryptoRng,
     B: WatchForRawTransaction + SignTxLock + BuildTxLockPsbt + BroadcastSignedTransaction,
     M: CreateWalletForOutput + CheckTransfer,
-    T: SendReceive<Message, alice::Message>,
+    T: Send<Message> + Receive<alice::Message>,
 >(
     bitcoin_wallet: &B,
     monero_wallet: &M,

@@ -3,7 +3,7 @@ use crate::{
     bitcoin::{BroadcastSignedTransaction, WatchForRawTransaction},
     bob, monero,
     monero::{CreateWalletForOutput, Transfer},
-    transport::SendReceive,
+    transport::{Receive, Send},
 };
 use anyhow::{anyhow, Result};
 use ecdsa_fun::{
@@ -21,7 +21,7 @@ pub async fn next_state<
     R: RngCore + CryptoRng,
     B: WatchForRawTransaction + BroadcastSignedTransaction,
     M: CreateWalletForOutput + Transfer,
-    T: SendReceive<Message, bob::Message>,
+    T: Send<Message> + Receive<bob::Message>,
 >(
     bitcoin_wallet: &B,
     monero_wallet: &M,
