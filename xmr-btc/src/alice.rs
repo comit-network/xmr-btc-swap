@@ -76,7 +76,7 @@ pub async fn next_state<
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum State {
     State0(State0),
     State1(State1),
@@ -172,7 +172,7 @@ impl State {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct State0 {
     a: bitcoin::SecretKey,
     s_a: cross_curve_dleq::Scalar,
@@ -258,7 +258,7 @@ impl State0 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct State1 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
@@ -296,7 +296,7 @@ impl State1 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct State2 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
@@ -371,7 +371,7 @@ impl State2 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct State3 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
@@ -424,7 +424,7 @@ impl State3 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct State4 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
@@ -527,7 +527,7 @@ impl State4 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct State5 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
@@ -618,7 +618,7 @@ impl State5 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct State6 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,

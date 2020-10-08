@@ -58,16 +58,13 @@ pub async fn next_state<
         }
         State::State3(state3) => {
             let message2: alice::Message2 = transport.receive_message().await?.try_into()?;
-
             let state4 = state3.watch_for_lock_xmr(monero_wallet, message2).await?;
             tracing::info!("bob has seen that alice has locked xmr");
             Ok(state4.into())
         }
         State::State4(state4) => {
             transport.send_message(state4.next_message().into()).await?;
-
             tracing::info!("bob is watching for redeem_btc");
-            tokio::time::delay_for(std::time::Duration::new(5, 0)).await;
             let state5 = state4.watch_for_redeem_btc(bitcoin_wallet).await?;
             tracing::info!("bob has seen that alice has redeemed btc");
             state5.claim_xmr(monero_wallet).await?;
@@ -231,7 +228,7 @@ impl State0 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct State1 {
     A: bitcoin::PublicKey,
     b: bitcoin::SecretKey,
@@ -294,7 +291,7 @@ impl State1 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct State2 {
     A: bitcoin::PublicKey,
     b: bitcoin::SecretKey,
@@ -365,7 +362,7 @@ impl State2 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct State3 {
     A: bitcoin::PublicKey,
     b: bitcoin::SecretKey,
@@ -471,7 +468,7 @@ impl State3 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct State4 {
     A: bitcoin::PublicKey,
     b: bitcoin::SecretKey,
@@ -538,7 +535,7 @@ impl State4 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct State5 {
     A: bitcoin::PublicKey,
     b: bitcoin::SecretKey,
