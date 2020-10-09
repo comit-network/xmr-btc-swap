@@ -1,23 +1,15 @@
-#[cfg(test)]
-pub mod wallet;
-
-use std::ops::Add;
-
 use anyhow::Result;
 use async_trait::async_trait;
-use rand::{CryptoRng, RngCore};
-
 pub use curve25519_dalek::scalar::Scalar;
 pub use monero::{Address, PrivateKey, PublicKey};
+use rand::{CryptoRng, RngCore};
+use std::ops::Add;
 
 pub fn random_private_key<R: RngCore + CryptoRng>(rng: &mut R) -> PrivateKey {
     let scalar = Scalar::random(rng);
 
     PrivateKey::from_scalar(scalar)
 }
-
-#[cfg(test)]
-pub use wallet::{AliceWallet, BobWallet};
 
 #[derive(Clone, Copy, Debug)]
 pub struct PrivateViewKey(PrivateKey);
@@ -69,6 +61,9 @@ impl Amount {
     pub fn from_piconero(amount: u64) -> Self {
         Amount(amount)
     }
+    pub fn as_piconero(&self) -> u64 {
+        self.0
+    }
 }
 
 impl From<Amount> for u64 {
@@ -83,8 +78,21 @@ pub struct TransferProof {
     tx_key: PrivateKey,
 }
 
+impl TransferProof {
+    pub fn new(tx_hash: TxHash, tx_key: PrivateKey) -> Self {
+        Self { tx_hash, tx_key }
+    }
+    pub fn tx_hash(&self) -> TxHash {
+        self.tx_hash.clone()
+    }
+    pub fn tx_key(&self) -> PrivateKey {
+        self.tx_key
+    }
+}
+
+// TODO: add constructor/ change String to fixed length byte array
 #[derive(Clone, Debug)]
-pub struct TxHash(String);
+pub struct TxHash(pub String);
 
 impl From<TxHash> for String {
     fn from(from: TxHash) -> Self {
@@ -114,8 +122,8 @@ pub trait CheckTransfer {
 }
 
 #[async_trait]
-pub trait ImportOutput {
-    async fn import_output(
+pub trait CreateWalletForOutput {
+    async fn create_and_load_wallet_for_output(
         &self,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,

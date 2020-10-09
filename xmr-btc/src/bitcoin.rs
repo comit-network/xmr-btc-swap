@@ -1,6 +1,4 @@
 pub mod transactions;
-#[cfg(test)]
-pub mod wallet;
 
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
@@ -10,6 +8,7 @@ use bitcoin::{
     util::psbt::PartiallySignedTransaction,
     SigHash, Transaction,
 };
+pub use bitcoin::{Address, Amount, OutPoint, Txid};
 use ecdsa_fun::{
     adaptor::Adaptor,
     fun::{
@@ -19,17 +18,13 @@ use ecdsa_fun::{
     nonce::Deterministic,
     ECDSA,
 };
+pub use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
 use miniscript::{Descriptor, Segwitv0};
 use rand::{CryptoRng, RngCore};
 use sha2::Sha256;
 use std::str::FromStr;
 
 pub use crate::bitcoin::transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund};
-pub use bitcoin::{Address, Amount, OutPoint, Txid};
-pub use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
-
-#[cfg(test)]
-pub use wallet::{make_wallet, Wallet};
 
 pub const TX_FEE: u64 = 10_000;
 
@@ -193,8 +188,8 @@ pub trait BroadcastSignedTransaction {
 }
 
 #[async_trait]
-pub trait GetRawTransaction {
-    async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction>;
+pub trait WatchForRawTransaction {
+    async fn watch_for_raw_transaction(&self, txid: Txid) -> Result<Transaction>;
 }
 
 pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Result<SecretKey> {

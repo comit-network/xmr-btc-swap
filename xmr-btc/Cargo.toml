@@ -17,11 +17,15 @@ monero = "0.9"
 rand = "0.7"
 sha2 = "0.9"
 thiserror = "1"
+tracing = "0.1"
 
 [dev-dependencies]
 base64 = "0.12"
 bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "d402b36d3d6406150e3bfb71492ff4a0a7cb290e" }
+futures = "0.3"
 monero-harness = { path = "../monero-harness" }
 reqwest = { version = "0.10", default-features = false }
 testcontainers = "0.10"
 tokio = { version = "0.2", default-features = false, features = ["blocking", "macros", "rt-core", "time", "rt-threaded"] }
+tracing = "0.1"
+tracing-subscriber = "0.2"
