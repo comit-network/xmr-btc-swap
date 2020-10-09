@@ -342,7 +342,6 @@ pub struct State3 {
 }
 
 impl State3 {
-    // todo: loop until punish? timelock has expired
     pub async fn watch_for_lock_xmr<W>(self, xmr_wallet: &W, msg: alice::Message2) -> Result<State4>
     where
         W: monero::CheckTransfer,
