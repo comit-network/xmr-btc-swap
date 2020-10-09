@@ -74,4 +74,6 @@ jobs:
         run: cargo check --workspace --all-targets --all-features
 
       - name: Cargo test
-        run: cargo test --workspace --all-features -- --test-threads 1
+        run: cargo test --workspace --all-features
+        env:
+          MONERO_ADDITIONAL_SLEEP_PERIOD: 60000
