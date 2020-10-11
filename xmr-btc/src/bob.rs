@@ -21,6 +21,9 @@ use std::convert::{TryFrom, TryInto};
 pub mod message;
 pub use message::{Message, Message0, Message1, Message2, Message3};
 
+// There are no guarantees that send_message and receive_massage do not block
+// the flow of execution. Therefore they must be paired between Alice/Bob, one
+// send to one receive in the correct order.
 pub async fn next_state<
     R: RngCore + CryptoRng,
     B: WatchForRawTransaction + SignTxLock + BuildTxLockPsbt + BroadcastSignedTransaction,

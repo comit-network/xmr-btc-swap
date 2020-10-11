@@ -17,6 +17,9 @@ use std::convert::{TryFrom, TryInto};
 pub mod message;
 pub use message::{Message, Message0, Message1, Message2};
 
+// There are no guarantees that send_message and receive_massage do not block
+// the flow of execution. Therefore they must be paired between Alice/Bob, one
+// send to one receive in the correct order.
 pub async fn next_state<
     R: RngCore + CryptoRng,
     B: WatchForRawTransaction + BroadcastSignedTransaction,
@@ -31,11 +34,11 @@ pub async fn next_state<
 ) -> Result<State> {
     match state {
         State::State0(state0) => {
-            transport
-                .send_message(state0.next_message(rng).into())
-                .await?;
+            let alice_message0 = state0.next_message(rng).into();
 
             let bob_message0 = transport.receive_message().await?.try_into()?;
+            transport.send_message(alice_message0).await?;
+
             let state1 = state0.receive(bob_message0)?;
             Ok(state1.into())
         }
