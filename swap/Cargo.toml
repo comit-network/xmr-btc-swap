@@ -1,0 +1,14 @@
+[package]
+name = "swap"
+version = "0.1.0"
+authors = ["CoBloX developers <team@coblox.tech>"]
+edition = "2018"
+description = "XMR/BTC trustless atomic swaps."
+
+[dependencies]
+anyhow = "1"
+bitcoin = "0.25"                # TODO: Upgrade other crates in this repo to use this version.
+monero = "0.9"
+structopt = "0.3"
+tokio = { version = "0.2", features = ["rt-threaded", "macros"] }
+xmr-btc = { path = "../xmr-btc" }
