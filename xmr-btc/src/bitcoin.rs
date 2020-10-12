@@ -6,9 +6,8 @@ use bitcoin::{
     hashes::{hex::ToHex, Hash},
     secp256k1,
     util::psbt::PartiallySignedTransaction,
-    SigHash, Transaction,
+    SigHash,
 };
-pub use bitcoin::{Address, Amount, OutPoint, Txid};
 use ecdsa_fun::{
     adaptor::Adaptor,
     fun::{
@@ -18,13 +17,14 @@ use ecdsa_fun::{
     nonce::Deterministic,
     ECDSA,
 };
-pub use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
 use miniscript::{Descriptor, Segwitv0};
 use rand::{CryptoRng, RngCore};
 use sha2::Sha256;
 use std::str::FromStr;
 
 pub use crate::bitcoin::transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund};
+pub use bitcoin::{Address, Amount, OutPoint, Transaction, Txid};
+pub use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
 
 pub const TX_FEE: u64 = 10_000;
 

@@ -50,3 +50,151 @@ pub mod bitcoin;
 pub mod bob;
 pub mod monero;
 pub mod transport;
+
+use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
+use genawaiter::sync::{Gen, GenBoxed};
+use sha2::Sha256;
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
+pub enum Action {
+    LockBitcoin(bitcoin::TxLock),
+    SendBitcoinRedeemEncsig(bitcoin::EncryptedSignature),
+    CreateMoneroWalletForOutput {
+        spend_key: monero::PrivateKey,
+        view_key: monero::PrivateViewKey,
+    },
+    RefundBitcoin {
+        tx_cancel: bitcoin::Transaction,
+        tx_refund: bitcoin::Transaction,
+    },
+}
+
+// TODO: This could be moved to the monero module
+pub trait ReceiveTransferProof {
+    fn receive_transfer_proof(&self) -> monero::TransferProof;
+}
+
+/// Perform the on-chain protocol to swap monero and bitcoin as Bob.
+///
+/// This is called post handshake, after all the keys, addresses and most of the
+/// signatures have been exchanged.
+pub fn action_generator_bob<N, M, B>(
+    network: &'static N,
+    monero_ledger: &'static M,
+    bitcoin_ledger: &'static B,
+    // TODO: Replace this with a new, slimmer struct?
+    bob::State2 {
+        A,
+        b,
+        s_b,
+        S_a_monero,
+        S_a_bitcoin,
+        v,
+        xmr,
+        refund_timelock,
+        redeem_address,
+        refund_address,
+        tx_lock,
+        tx_cancel_sig_a,
+        tx_refund_encsig,
+        ..
+    }: bob::State2,
+) -> GenBoxed<Action, (), ()>
+where
+    N: ReceiveTransferProof + Send + Sync,
+    M: monero::CheckTransfer + Send + Sync,
+    B: bitcoin::WatchForRawTransaction + Send + Sync,
+{
+    Gen::new_boxed(|co| async move {
+        let swap_result: Result<(), ()> = {
+            co.yield_(Action::LockBitcoin(tx_lock.clone())).await;
+
+            // the source of this could be the database, this layer doesn't care
+            let transfer_proof = network.receive_transfer_proof();
+
+            let S_b_monero = monero::PublicKey::from_private_key(&monero::PrivateKey::from_scalar(
+                s_b.into_ed25519(),
+            ));
+            let S = S_a_monero + S_b_monero;
+
+            // TODO: We should require a specific number of confirmations on the lock
+            // transaction
+            monero_ledger
+                .check_transfer(S, v.public(), transfer_proof, xmr)
+                .await
+                .expect("TODO: implementor of this trait must make it infallible by retrying");
+
+            let tx_redeem = bitcoin::TxRedeem::new(&tx_lock, &redeem_address);
+            let tx_redeem_encsig = b.encsign(S_a_bitcoin.clone(), tx_redeem.digest());
+
+            co.yield_(Action::SendBitcoinRedeemEncsig(tx_redeem_encsig.clone()))
+                .await;
+
+            let tx_redeem_published = bitcoin_ledger
+                .watch_for_raw_transaction(tx_redeem.txid())
+                .await
+                .expect("TODO: implementor of this trait must make it infallible by retrying");
+
+            // NOTE: If any of this fails, Bob will never be able to take the monero.
+            // Therefore, there is no way to handle these errors other than aborting
+            let tx_redeem_sig = tx_redeem
+                .extract_signature_by_key(tx_redeem_published, b.public())
+                .expect("redeem transaction must include signature from us");
+            let s_a = bitcoin::recover(S_a_bitcoin, tx_redeem_sig, tx_redeem_encsig).expect(
+                "alice can only produce our signature by decrypting our encrypted signature",
+            );
+            let s_a = monero::PrivateKey::from_scalar(monero::Scalar::from_bytes_mod_order(
+                s_a.to_bytes(),
+            ));
+
+            let s_b = monero::PrivateKey {
+                scalar: s_b.into_ed25519(),
+            };
+
+            co.yield_(Action::CreateMoneroWalletForOutput {
+                spend_key: s_a + s_b,
+                view_key: v,
+            })
+            .await;
+
+            Ok(())
+        };
+
+        // NOTE: swap result should only be `Err` if we have reached the
+        // `refund_timelock`. Therefore, we should always yield the refund action
+        if swap_result.is_err() {
+            let tx_cancel =
+                bitcoin::TxCancel::new(&tx_lock, refund_timelock, A.clone(), b.public());
+            let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &refund_address);
+
+            let signed_tx_cancel = {
+                let sig_a = tx_cancel_sig_a.clone();
+                let sig_b = b.sign(tx_cancel.digest());
+
+                tx_cancel
+                    .clone()
+                    .add_signatures(&tx_lock, (A.clone(), sig_a), (b.public(), sig_b))
+                    .expect("sig_{a,b} to be valid signatures for tx_cancel")
+            };
+
+            let signed_tx_refund = {
+                let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
+
+                let sig_a =
+                    adaptor.decrypt_signature(&s_b.into_secp256k1(), tx_refund_encsig.clone());
+                let sig_b = b.sign(tx_refund.digest());
+
+                tx_refund
+                    .add_signatures(&tx_cancel, (A.clone(), sig_a), (b.public(), sig_b))
+                    .expect("sig_{a,b} to be valid signatures for tx_refund")
+            };
+
+            co.yield_(Action::RefundBitcoin {
+                tx_cancel: signed_tx_cancel,
+                tx_refund: signed_tx_refund,
+            })
+            .await;
+        }
+    })
+}
