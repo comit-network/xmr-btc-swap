@@ -1,8 +1,10 @@
+use crate::serde::monero_private_key;
 use anyhow::Result;
 use async_trait::async_trait;
 pub use curve25519_dalek::scalar::Scalar;
 pub use monero::{Address, PrivateKey, PublicKey};
 use rand::{CryptoRng, RngCore};
+use serde::{Deserialize, Serialize};
 use std::ops::Add;
 
 pub fn random_private_key<R: RngCore + CryptoRng>(rng: &mut R) -> PrivateKey {
@@ -11,8 +13,8 @@ pub fn random_private_key<R: RngCore + CryptoRng>(rng: &mut R) -> PrivateKey {
     PrivateKey::from_scalar(scalar)
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct PrivateViewKey(PrivateKey);
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+pub struct PrivateViewKey(#[serde(with = "monero_private_key")] PrivateKey);
 
 impl PrivateViewKey {
     pub fn new_random<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
@@ -50,7 +52,7 @@ impl From<PublicViewKey> for PublicKey {
 #[derive(Clone, Copy, Debug)]
 pub struct PublicViewKey(PublicKey);
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize, PartialEq)]
 pub struct Amount(u64);
 
 impl Amount {
@@ -72,9 +74,10 @@ impl From<Amount> for u64 {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TransferProof {
     tx_hash: TxHash,
+    #[serde(with = "monero_private_key")]
     tx_key: PrivateKey,
 }
 
@@ -91,7 +94,7 @@ impl TransferProof {
 }
 
 // TODO: add constructor/ change String to fixed length byte array
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TxHash(pub String);
 
 impl From<TxHash> for String {

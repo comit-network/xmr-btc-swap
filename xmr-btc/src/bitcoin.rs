@@ -21,6 +21,7 @@ use ecdsa_fun::{
 pub use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
 use miniscript::{Descriptor, Segwitv0};
 use rand::{CryptoRng, RngCore};
+use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
 
@@ -28,7 +29,7 @@ pub use crate::bitcoin::transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxR
 
 pub const TX_FEE: u64 = 10_000;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct SecretKey {
     inner: Scalar,
     public: Point,
@@ -83,7 +84,7 @@ impl SecretKey {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PublicKey(Point);
 
 impl From<PublicKey> for Point<Jacobian> {

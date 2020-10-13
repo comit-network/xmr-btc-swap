@@ -8,9 +8,10 @@ use bitcoin::{
 };
 use ecdsa_fun::Signature;
 use miniscript::Descriptor;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TxLock {
     inner: Transaction,
     output_descriptor: Descriptor<::bitcoin::PublicKey>,
