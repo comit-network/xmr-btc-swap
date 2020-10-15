@@ -76,8 +76,9 @@ pub enum Action {
 }
 
 // TODO: This could be moved to the monero module
+#[async_trait]
 pub trait ReceiveTransferProof {
-    fn receive_transfer_proof(&self) -> monero::TransferProof;
+    async fn receive_transfer_proof(&mut self) -> monero::TransferProof;
 }
 
 #[async_trait]
@@ -90,7 +91,7 @@ pub trait MedianTime {
 /// This is called post handshake, after all the keys, addresses and most of the
 /// signatures have been exchanged.
 pub fn action_generator_bob<N, M, B>(
-    network: &'static N,
+    network: &'static mut N,
     monero_ledger: &'static M,
     bitcoin_ledger: &'static B,
     // TODO: Replace this with a new, slimmer struct?
@@ -150,7 +151,7 @@ where
             futures::pin_mut!(poll_until_btc_has_expired);
 
             // the source of this could be the database, this layer doesn't care
-            let transfer_proof = network.receive_transfer_proof();
+            let transfer_proof = network.receive_transfer_proof().await;
 
             let S_b_monero = monero::PublicKey::from_private_key(&monero::PrivateKey::from_scalar(
                 s_b.into_ed25519(),

@@ -1,6 +1,7 @@
 pub mod harness;
 
 use anyhow::Result;
+use async_trait::async_trait;
 use genawaiter::GeneratorState;
 use harness::wallet::{bitcoin, monero};
 use xmr_btc::{
@@ -13,14 +14,15 @@ use xmr_btc::{
 
 struct Network;
 
+#[async_trait]
 impl ReceiveTransferProof for Network {
-    fn receive_transfer_proof(&self) -> xmr_btc::monero::TransferProof {
+    async fn receive_transfer_proof(&mut self) -> xmr_btc::monero::TransferProof {
         todo!("use libp2p")
     }
 }
 
 async fn swap_as_bob(
-    network: &'static Network,
+    network: &'static mut Network,
     monero_wallet: &'static monero::BobWallet<'static>,
     bitcoin_wallet: &'static bitcoin::Wallet,
     state: bob::State2,
