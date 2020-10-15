@@ -1,12 +1,16 @@
 use anyhow::Result;
 use async_trait::async_trait;
+use backoff::{future::FutureOperation as _, ExponentialBackoff};
 use bitcoin::{util::psbt::PartiallySignedTransaction, Address, Amount, Transaction, Txid};
 use bitcoin_harness::{bitcoind_rpc::PsbtBase64, Bitcoind};
 use reqwest::Url;
 use std::time::Duration;
 use tokio::time;
-use xmr_btc::bitcoin::{
-    BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock, TxLock, WatchForRawTransaction,
+use xmr_btc::{
+    bitcoin::{
+        BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock, TxLock, WatchForRawTransaction,
+    },
+    MedianTime,
 };
 
 #[derive(Debug)]
@@ -115,5 +119,18 @@ impl WatchForRawTransaction for Wallet {
             }
             time::delay_for(Duration::from_millis(200)).await;
         }
+    }
+}
+
+#[async_trait]
+impl MedianTime for Wallet {
+    async fn median_time(&self) -> u32 {
+        (|| async { Ok(self.0.median_time().await?) })
+            .retry(ExponentialBackoff {
+                max_elapsed_time: None,
+                ..Default::default()
+            })
+            .await
+            .expect("transient errors to be retried")
     }
 }

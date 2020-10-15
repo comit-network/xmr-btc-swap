@@ -51,7 +51,9 @@ pub mod bob;
 pub mod monero;
 pub mod transport;
 
+use async_trait::async_trait;
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
+use futures::future::Either;
 use genawaiter::sync::{Gen, GenBoxed};
 use sha2::Sha256;
 
@@ -73,6 +75,11 @@ pub enum Action {
 // TODO: This could be moved to the monero module
 pub trait ReceiveTransferProof {
     fn receive_transfer_proof(&self) -> monero::TransferProof;
+}
+
+#[async_trait]
+pub trait MedianTime {
+    async fn median_time(&self) -> u32;
 }
 
 /// Perform the on-chain protocol to swap monero and bitcoin as Bob.
@@ -104,15 +111,30 @@ pub fn action_generator_bob<N, M, B>(
 where
     N: ReceiveTransferProof + Send + Sync,
     M: monero::WatchForTransfer + Send + Sync,
-    B: bitcoin::WatchForRawTransaction + Send + Sync,
+    B: MedianTime + bitcoin::WatchForRawTransaction + Send + Sync,
 {
-    enum SwapFailedRefund {
+    enum SwapFailed {
+        TimelockReached,
         InsufficientXMR(monero::InsufficientFunds),
     }
 
+    async fn poll_until_bitcoin_time<B>(bitcoin_client: &B, timestamp: u32)
+    where
+        B: MedianTime,
+    {
+        loop {
+            if bitcoin_client.median_time().await >= timestamp {
+                return;
+            }
+        }
+    }
+
     Gen::new_boxed(|co| async move {
-        let swap_result: Result<(), SwapFailedRefund> = async {
+        let swap_result: Result<(), SwapFailed> = async {
             co.yield_(Action::LockBitcoin(tx_lock.clone())).await;
+
+            let poll_until_expiry = poll_until_bitcoin_time(bitcoin_ledger, refund_timelock);
+            futures::pin_mut!(poll_until_expiry);
 
             // the source of this could be the database, this layer doesn't care
             let transfer_proof = network.receive_transfer_proof();
@@ -122,12 +144,22 @@ where
             ));
             let S = S_a_monero + S_b_monero;
 
-            // TODO: We should require a specific number of confirmations on the lock
-            // transaction
-            monero_ledger
-                .watch_for_transfer(S, v.public(), transfer_proof, xmr, 10)
-                .await
-                .map_err(|e| SwapFailedRefund::InsufficientXMR(e))?;
+            match futures::future::select(
+                monero_ledger.watch_for_transfer(
+                    S,
+                    v.public(),
+                    transfer_proof,
+                    xmr,
+                    monero::MIN_CONFIRMATIONS,
+                ),
+                poll_until_expiry,
+            )
+            .await
+            {
+                Either::Left((Err(e), _)) => return Err(SwapFailed::InsufficientXMR(e)),
+                Either::Right(_) => return Err(SwapFailed::TimelockReached),
+                _ => {}
+            }
 
             let tx_redeem = bitcoin::TxRedeem::new(&tx_lock, &redeem_address);
             let tx_redeem_encsig = b.encsign(S_a_bitcoin.clone(), tx_redeem.digest());
@@ -166,8 +198,6 @@ where
         }
         .await;
 
-        // NOTE: swap result should only be `Err` if we have reached the
-        // `refund_timelock`. Therefore, we should always yield the refund action
         if swap_result.is_err() {
             let tx_cancel =
                 bitcoin::TxCancel::new(&tx_lock, refund_timelock, A.clone(), b.public());
