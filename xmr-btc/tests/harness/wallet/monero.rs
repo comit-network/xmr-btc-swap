@@ -111,7 +111,10 @@ impl WatchForTransfer for BobWallet<'_> {
 
             Ok(proof)
         })
-        .retry(ExponentialBackoff::default())
+        .retry(ExponentialBackoff {
+            max_elapsed_time: None,
+            ..Default::default()
+        })
         .await;
 
         if let Err(Error::InsufficientFunds { expected, actual }) = res {
