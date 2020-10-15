@@ -21,6 +21,7 @@ thiserror = "1"
 tracing = "0.1"
 
 [dev-dependencies]
+backoff = { version = "0.2", features = ["tokio"] }
 base64 = "0.12"
 bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "d402b36d3d6406150e3bfb71492ff4a0a7cb290e" }
 futures = "0.3"

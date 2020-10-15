@@ -1,11 +1,12 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use async_trait::async_trait;
+use backoff::{future::FutureOperation as _, ExponentialBackoff};
 use monero::{Address, Network, PrivateKey};
 use monero_harness::Monero;
 use std::str::FromStr;
 use xmr_btc::monero::{
-    Amount, CheckTransfer, CreateWalletForOutput, PrivateViewKey, PublicKey, PublicViewKey,
-    Transfer, TransferProof, TxHash,
+    Amount, CreateWalletForOutput, InsufficientFunds, PrivateViewKey, PublicKey, PublicViewKey,
+    Transfer, TransferProof, TxHash, WatchForTransfer,
 };
 
 #[derive(Debug)]
@@ -66,33 +67,56 @@ impl CreateWalletForOutput for AliceWallet<'_> {
 pub struct BobWallet<'c>(pub &'c Monero<'c>);
 
 #[async_trait]
-impl CheckTransfer for BobWallet<'_> {
-    async fn check_transfer(
+impl WatchForTransfer for BobWallet<'_> {
+    async fn watch_for_transfer(
         &self,
         public_spend_key: PublicKey,
         public_view_key: PublicViewKey,
         transfer_proof: TransferProof,
-        amount: Amount,
-    ) -> Result<()> {
+        expected_amount: Amount,
+        expected_confirmations: u32,
+    ) -> Result<(), InsufficientFunds> {
+        enum Error {
+            TxNotFound,
+            InsufficientConfirmations,
+            InsufficientFunds { expected: Amount, actual: Amount },
+        }
+
+        let wallet = self.0.bob_wallet_rpc_client();
         let address = Address::standard(Network::Mainnet, public_spend_key, public_view_key.into());
 
-        let cli = self.0.bob_wallet_rpc_client();
+        let res = (|| async {
+            // NOTE: Currently, this is conflating IO errors with the transaction not being
+            // in the blockchain yet, or not having enough confirmations on it. All these
+            // errors warrant a retry, but the strategy should probably differ per case
+            let proof = wallet
+                .check_tx_key(
+                    &String::from(transfer_proof.tx_hash()),
+                    &transfer_proof.tx_key().to_string(),
+                    &address.to_string(),
+                )
+                .await
+                .map_err(|_| backoff::Error::Transient(Error::TxNotFound))?;
 
-        let res = cli
-            .check_tx_key(
-                &String::from(transfer_proof.tx_hash()),
-                &transfer_proof.tx_key().to_string(),
-                &address.to_string(),
-            )
-            .await?;
+            if proof.received != expected_amount.as_piconero() {
+                return Err(backoff::Error::Permanent(Error::InsufficientFunds {
+                    expected: expected_amount,
+                    actual: Amount::from_piconero(proof.received),
+                }));
+            }
 
-        if res.received != u64::from(amount) {
-            bail!(
-                "tx_lock doesn't pay enough: expected {:?}, got {:?}",
-                res.received,
-                amount
-            )
-        }
+            if proof.confirmations < expected_confirmations {
+                return Err(backoff::Error::Transient(Error::InsufficientConfirmations));
+            }
+
+            Ok(proof)
+        })
+        .retry(ExponentialBackoff::default())
+        .await;
+
+        if let Err(Error::InsufficientFunds { expected, actual }) = res {
+            return Err(InsufficientFunds { expected, actual });
+        };
 
         Ok(())
     }

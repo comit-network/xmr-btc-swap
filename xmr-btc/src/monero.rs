@@ -1,9 +1,10 @@
-use anyhow::Result;
 use async_trait::async_trait;
 pub use curve25519_dalek::scalar::Scalar;
 pub use monero::{Address, PrivateKey, PublicKey};
 use rand::{CryptoRng, RngCore};
 use std::ops::Add;
+
+pub const MIN_CONFIRMATIONS: u32 = 10;
 
 pub fn random_private_key<R: RngCore + CryptoRng>(rng: &mut R) -> PrivateKey {
     let scalar = Scalar::random(rng);
@@ -107,18 +108,26 @@ pub trait Transfer {
         public_spend_key: PublicKey,
         public_view_key: PublicViewKey,
         amount: Amount,
-    ) -> Result<(TransferProof, Amount)>;
+    ) -> anyhow::Result<(TransferProof, Amount)>;
 }
 
 #[async_trait]
-pub trait CheckTransfer {
-    async fn check_transfer(
+pub trait WatchForTransfer {
+    async fn watch_for_transfer(
         &self,
         public_spend_key: PublicKey,
         public_view_key: PublicViewKey,
         transfer_proof: TransferProof,
         amount: Amount,
-    ) -> Result<()>;
+        expected_confirmations: u32,
+    ) -> Result<(), InsufficientFunds>;
+}
+
+#[derive(Debug, Clone, Copy, thiserror::Error)]
+#[error("transaction does not pay enough: expected {expected:?}, got {actual:?}")]
+pub struct InsufficientFunds {
+    pub expected: Amount,
+    pub actual: Amount,
 }
 
 #[async_trait]
@@ -127,5 +136,5 @@ pub trait CreateWalletForOutput {
         &self,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
-    ) -> Result<()>;
+    ) -> anyhow::Result<()>;
 }

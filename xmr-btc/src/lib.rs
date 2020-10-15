@@ -103,11 +103,15 @@ pub fn action_generator_bob<N, M, B>(
 ) -> GenBoxed<Action, (), ()>
 where
     N: ReceiveTransferProof + Send + Sync,
-    M: monero::CheckTransfer + Send + Sync,
+    M: monero::WatchForTransfer + Send + Sync,
     B: bitcoin::WatchForRawTransaction + Send + Sync,
 {
+    enum SwapFailedRefund {
+        InsufficientXMR(monero::InsufficientFunds),
+    }
+
     Gen::new_boxed(|co| async move {
-        let swap_result: Result<(), ()> = {
+        let swap_result: Result<(), SwapFailedRefund> = async {
             co.yield_(Action::LockBitcoin(tx_lock.clone())).await;
 
             // the source of this could be the database, this layer doesn't care
@@ -121,9 +125,9 @@ where
             // TODO: We should require a specific number of confirmations on the lock
             // transaction
             monero_ledger
-                .check_transfer(S, v.public(), transfer_proof, xmr)
+                .watch_for_transfer(S, v.public(), transfer_proof, xmr, 10)
                 .await
-                .expect("TODO: implementor of this trait must make it infallible by retrying");
+                .map_err(|e| SwapFailedRefund::InsufficientXMR(e))?;
 
             let tx_redeem = bitcoin::TxRedeem::new(&tx_lock, &redeem_address);
             let tx_redeem_encsig = b.encsign(S_a_bitcoin.clone(), tx_redeem.digest());
@@ -159,7 +163,8 @@ where
             .await;
 
             Ok(())
-        };
+        }
+        .await;
 
         // NOTE: swap result should only be `Err` if we have reached the
         // `refund_timelock`. Therefore, we should always yield the refund action

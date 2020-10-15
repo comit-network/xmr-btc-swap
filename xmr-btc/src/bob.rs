@@ -5,7 +5,7 @@ use crate::{
         WatchForRawTransaction,
     },
     monero,
-    monero::{CheckTransfer, CreateWalletForOutput},
+    monero::{CreateWalletForOutput, WatchForTransfer},
     transport::{ReceiveMessage, SendMessage},
 };
 use anyhow::{anyhow, Result};
@@ -27,7 +27,7 @@ pub use message::{Message, Message0, Message1, Message2, Message3};
 pub async fn next_state<
     R: RngCore + CryptoRng,
     B: WatchForRawTransaction + SignTxLock + BuildTxLockPsbt + BroadcastSignedTransaction,
-    M: CreateWalletForOutput + CheckTransfer,
+    M: CreateWalletForOutput + WatchForTransfer,
     T: SendMessage<Message> + ReceiveMessage<alice::Message>,
 >(
     bitcoin_wallet: &B,
@@ -347,7 +347,7 @@ pub struct State3 {
 impl State3 {
     pub async fn watch_for_lock_xmr<W>(self, xmr_wallet: &W, msg: alice::Message2) -> Result<State4>
     where
-        W: monero::CheckTransfer,
+        W: monero::WatchForTransfer,
     {
         let S_b_monero = monero::PublicKey::from_private_key(&monero::PrivateKey::from_scalar(
             self.s_b.into_ed25519(),
@@ -355,7 +355,13 @@ impl State3 {
         let S = self.S_a_monero + S_b_monero;
 
         xmr_wallet
-            .check_transfer(S, self.v.public(), msg.tx_lock_proof, self.xmr)
+            .watch_for_transfer(
+                S,
+                self.v.public(),
+                msg.tx_lock_proof,
+                self.xmr,
+                monero::MIN_CONFIRMATIONS,
+            )
             .await?;
 
         Ok(State4 {
