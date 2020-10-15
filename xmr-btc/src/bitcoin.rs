@@ -189,7 +189,7 @@ pub trait BroadcastSignedTransaction {
 
 #[async_trait]
 pub trait WatchForRawTransaction {
-    async fn watch_for_raw_transaction(&self, txid: Txid) -> Result<Transaction>;
+    async fn watch_for_raw_transaction(&self, txid: Txid) -> Transaction;
 }
 
 pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Result<SecretKey> {

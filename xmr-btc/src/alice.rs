@@ -356,7 +356,7 @@ impl State3 {
         tracing::info!("watching for lock btc with txid: {}", self.tx_lock.txid());
         let tx = bitcoin_wallet
             .watch_for_raw_transaction(self.tx_lock.txid())
-            .await?;
+            .await;
 
         tracing::info!("tx lock seen with txid: {}", tx.txid());
 
@@ -554,7 +554,7 @@ impl State5 {
 
         let tx_refund_candidate = bitcoin_wallet
             .watch_for_raw_transaction(tx_refund.txid())
-            .await?;
+            .await;
 
         let tx_refund_sig =
             tx_refund.extract_signature_by_key(tx_refund_candidate, self.a.public())?;

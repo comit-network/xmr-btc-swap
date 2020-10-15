@@ -53,7 +53,10 @@ pub mod transport;
 
 use async_trait::async_trait;
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
-use futures::future::Either;
+use futures::{
+    future::{select, Either},
+    FutureExt,
+};
 use genawaiter::sync::{Gen, GenBoxed};
 use sha2::Sha256;
 
@@ -133,7 +136,8 @@ where
         let swap_result: Result<(), SwapFailed> = async {
             co.yield_(Action::LockBitcoin(tx_lock.clone())).await;
 
-            let poll_until_expiry = poll_until_bitcoin_time(bitcoin_ledger, refund_timelock);
+            let poll_until_expiry =
+                poll_until_bitcoin_time(bitcoin_ledger, refund_timelock).shared();
             futures::pin_mut!(poll_until_expiry);
 
             // the source of this could be the database, this layer doesn't care
@@ -144,7 +148,7 @@ where
             ));
             let S = S_a_monero + S_b_monero;
 
-            match futures::future::select(
+            match select(
                 monero_ledger.watch_for_transfer(
                     S,
                     v.public(),
@@ -152,7 +156,7 @@ where
                     xmr,
                     monero::MIN_CONFIRMATIONS,
                 ),
-                poll_until_expiry,
+                poll_until_expiry.clone(),
             )
             .await
             {
@@ -167,10 +171,15 @@ where
             co.yield_(Action::SendBitcoinRedeemEncsig(tx_redeem_encsig.clone()))
                 .await;
 
-            let tx_redeem_published = bitcoin_ledger
-                .watch_for_raw_transaction(tx_redeem.txid())
-                .await
-                .expect("TODO: implementor of this trait must make it infallible by retrying");
+            let tx_redeem_published = match select(
+                bitcoin_ledger.watch_for_raw_transaction(tx_redeem.txid()),
+                poll_until_expiry,
+            )
+            .await
+            {
+                Either::Left((tx, _)) => tx,
+                Either::Right(_) => return Err(SwapFailed::TimelockReached),
+            };
 
             // NOTE: If any of this fails, Bob will never be able to take the monero.
             // Therefore, there is no way to handle these errors other than aborting

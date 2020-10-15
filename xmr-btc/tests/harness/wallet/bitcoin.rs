@@ -112,13 +112,14 @@ impl BroadcastSignedTransaction for Wallet {
 
 #[async_trait]
 impl WatchForRawTransaction for Wallet {
-    async fn watch_for_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
-        loop {
-            if let Ok(tx) = self.0.get_raw_transaction(txid).await {
-                return Ok(tx);
-            }
-            time::delay_for(Duration::from_millis(200)).await;
-        }
+    async fn watch_for_raw_transaction(&self, txid: Txid) -> Transaction {
+        (|| async { Ok(self.0.get_raw_transaction(txid).await?) })
+            .retry(ExponentialBackoff {
+                max_elapsed_time: None,
+                ..Default::default()
+            })
+            .await
+            .expect("transient errors to be retried")
     }
 }
 
