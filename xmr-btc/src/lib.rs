@@ -151,7 +151,16 @@ where
             futures::pin_mut!(poll_until_btc_has_expired);
 
             // the source of this could be the database, this layer doesn't care
-            let transfer_proof = network.receive_transfer_proof().await;
+
+            let transfer_proof = match select(
+                network.receive_transfer_proof(),
+                poll_until_btc_has_expired.clone(),
+            )
+            .await
+            {
+                Either::Left((proof, _)) => proof,
+                Either::Right(_) => return Err(SwapFailed::TimelockReached),
+            };
 
             let S_b_monero = monero::PublicKey::from_private_key(&monero::PrivateKey::from_scalar(
                 s_b.into_ed25519(),
