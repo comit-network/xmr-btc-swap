@@ -55,7 +55,7 @@ use async_trait::async_trait;
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
 use futures::{
     future::{select, Either},
-    FutureExt,
+    Future, FutureExt,
 };
 use genawaiter::sync::{Gen, GenBoxed};
 use sha2::Sha256;
@@ -121,24 +121,33 @@ where
         InsufficientXMR(monero::InsufficientFunds),
     }
 
-    async fn poll_until_bitcoin_time<B>(bitcoin_client: &B, timestamp: u32)
-    where
-        B: MedianTime,
-    {
+    async fn poll_until(condition_future: impl Future<Output = bool> + Clone) {
         loop {
-            if bitcoin_client.median_time().await >= timestamp {
+            if condition_future.clone().await {
                 return;
             }
         }
     }
 
+    async fn bitcoin_time_is_gte<B>(bitcoin_client: &B, timestamp: u32) -> bool
+    where
+        B: MedianTime,
+    {
+        bitcoin_client.median_time().await >= timestamp
+    }
+
     Gen::new_boxed(|co| async move {
         let swap_result: Result<(), SwapFailed> = async {
+            let btc_has_expired = bitcoin_time_is_gte(bitcoin_ledger, refund_timelock).shared();
+
+            if btc_has_expired.clone().await {
+                return Err(SwapFailed::TimelockReached);
+            }
+
             co.yield_(Action::LockBitcoin(tx_lock.clone())).await;
 
-            let poll_until_expiry =
-                poll_until_bitcoin_time(bitcoin_ledger, refund_timelock).shared();
-            futures::pin_mut!(poll_until_expiry);
+            let poll_until_btc_has_expired = poll_until(btc_has_expired).shared();
+            futures::pin_mut!(poll_until_btc_has_expired);
 
             // the source of this could be the database, this layer doesn't care
             let transfer_proof = network.receive_transfer_proof();
@@ -156,7 +165,7 @@ where
                     xmr,
                     monero::MIN_CONFIRMATIONS,
                 ),
-                poll_until_expiry.clone(),
+                poll_until_btc_has_expired.clone(),
             )
             .await
             {
@@ -173,7 +182,7 @@ where
 
             let tx_redeem_published = match select(
                 bitcoin_ledger.watch_for_raw_transaction(tx_redeem.txid()),
-                poll_until_expiry,
+                poll_until_btc_has_expired,
             )
             .await
             {
