@@ -1,3 +1,5 @@
+pub mod harness;
+
 use crate::harness::wallet;
 use bitcoin_harness::Bitcoind;
 use harness::{
@@ -12,8 +14,6 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
 };
 use xmr_btc::{alice, bitcoin, bob, monero};
-
-mod harness;
 
 const TEN_XMR: u64 = 10_000_000_000_000;
 const RELATIVE_REFUND_TIMELOCK: u32 = 1;

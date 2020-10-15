@@ -1,4 +1,4 @@
-mod harness;
+pub mod harness;
 
 use anyhow::Result;
 use genawaiter::GeneratorState;
