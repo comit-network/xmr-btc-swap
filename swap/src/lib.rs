@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::fmt::{self, Display};
 
 pub mod alice;
 pub mod bob;
@@ -9,13 +10,13 @@ pub const ONE_BTC: u64 = 100_000_000;
 pub type Never = std::convert::Infallible;
 
 /// Commands sent from Bob to the main task.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum Cmd {
     VerifyAmounts(SwapParams),
 }
 
 /// Responses send from the main task back to Bob.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Rsp {
     Verified,
     Abort,
@@ -28,6 +29,12 @@ pub struct SwapParams {
     pub btc: bitcoin::Amount,
     /// Amount of XMR to swap.
     pub xmr: monero::Amount,
+}
+
+impl Display for SwapParams {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} for {}", self.btc, self.xmr)
+    }
 }
 
 // FIXME: Amount modules are a quick hack so we can derive serde.

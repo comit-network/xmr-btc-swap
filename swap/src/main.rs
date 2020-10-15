@@ -16,9 +16,9 @@ use anyhow::{bail, Result};
 use futures::{channel::mpsc, StreamExt};
 use libp2p::Multiaddr;
 use log::LevelFilter;
+use std::{io, io::Write, process};
 use structopt::StructOpt;
 use tracing::info;
-
 mod cli;
 mod trace;
 
@@ -77,8 +77,10 @@ async fn swap_as_bob(sats: u64, addr: Multiaddr) -> Result<()> {
         match read {
             Some(cmd) => match cmd {
                 Cmd::VerifyAmounts(p) => {
-                    if verified(p) {
-                        rsp_tx.try_send(Rsp::Verified)?;
+                    let rsp = verify(p);
+                    rsp_tx.try_send(rsp)?;
+                    if rsp == Rsp::Abort {
+                        process::exit(0);
                     }
                 }
             },
@@ -90,7 +92,29 @@ async fn swap_as_bob(sats: u64, addr: Multiaddr) -> Result<()> {
     }
 }
 
-fn verified(_p: SwapParams) -> bool {
-    // TODO: Read input from the shell.
-    true
+fn verify(p: SwapParams) -> Rsp {
+    let mut s = String::new();
+    println!("Got rate from Alice for XMR/BTC swap\n");
+    println!("{}", p);
+    print!("Would you like to continue with this swap [y/N]: ");
+    let _ = io::stdout().flush();
+    io::stdin()
+        .read_line(&mut s)
+        .expect("Did not enter a correct string");
+    if let Some('\n') = s.chars().next_back() {
+        s.pop();
+    }
+    if let Some('\r') = s.chars().next_back() {
+        s.pop();
+    }
+    if !is_yes(&s) {
+        println!("No worries, try again later - Alice updates her rate regularly");
+        return Rsp::Abort;
+    }
+
+    Rsp::Verified
+}
+
+fn is_yes(s: &str) -> bool {
+    matches!(s, "y" | "Y" | "yes" | "YES" | "Yes")
 }

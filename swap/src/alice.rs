@@ -6,8 +6,8 @@ use libp2p::{
     request_response::ResponseChannel,
     NetworkBehaviour, PeerId,
 };
-use std::{thread, time::Duration};
-use tracing::{debug, warn};
+use std::time::Duration;
+use tracing::debug;
 
 mod messenger;
 
@@ -27,24 +27,22 @@ pub type Swarm = libp2p::Swarm<Alice>;
 pub async fn swap(listen: Multiaddr) -> Result<()> {
     let mut swarm = new_swarm(listen)?;
 
-    match swarm.next().await {
-        BehaviourOutEvent::Request(messenger::BehaviourOutEvent::Btc { btc, channel }) => {
-            debug!("Got request from Bob");
-            let params = SwapParams {
-                btc,
-                // TODO: Do a real calculation.
-                xmr: monero::Amount::from_piconero(10),
-            };
+    loop {
+        match swarm.next().await {
+            BehaviourOutEvent::Request(messenger::BehaviourOutEvent::Btc { btc, channel }) => {
+                debug!("Got request from Bob to swap {}", btc);
+                let params = SwapParams {
+                    btc,
+                    // TODO: Do a real calculation.
+                    xmr: monero::Amount::from_piconero(10),
+                };
 
-            let msg = AliceToBob::Amounts(params);
-            swarm.send(channel, msg);
+                let msg = AliceToBob::Amounts(params);
+                swarm.send(channel, msg);
+            }
+            other => panic!("unexpected event: {:?}", other),
         }
-        other => panic!("unexpected event: {:?}", other),
     }
-
-    warn!("parking thread ...");
-    thread::park();
-    Ok(())
 }
 
 fn new_swarm(listen: Multiaddr) -> Result<Swarm> {

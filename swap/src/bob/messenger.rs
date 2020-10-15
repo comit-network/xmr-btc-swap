@@ -12,7 +12,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::{
     bitcoin,
@@ -55,10 +55,8 @@ impl Messenger {
         alice: PeerId,
         btc: bitcoin::Amount,
     ) -> Result<RequestId> {
-        debug!("Sending request ...");
         let msg = BobToAlice::AmountsFromBtc(btc);
         let id = self.rr.send_request(&alice, msg);
-        debug!("Sent.");
 
         Ok(id)
     }
