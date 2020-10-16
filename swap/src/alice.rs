@@ -132,6 +132,7 @@ impl Default for Alice {
     }
 }
 
+// TODO: Check that this is correct.
 fn calculate_amounts(btc: bitcoin::Amount) -> SwapParams {
     const XMR_PER_BTC: u64 = 100; // TODO: Get this from an exchange.
 
