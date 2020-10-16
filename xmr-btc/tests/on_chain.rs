@@ -48,14 +48,12 @@ async fn swap_as_bob(
                     .create_and_load_wallet_for_output(spend_key, view_key)
                     .await?;
             }
-            GeneratorState::Yielded(Action::RefundBitcoin {
-                tx_cancel,
-                tx_refund,
-            }) => {
+            GeneratorState::Yielded(Action::CancelBitcoin(tx_cancel)) => {
                 let _ = bitcoin_wallet
                     .broadcast_signed_transaction(tx_cancel)
                     .await?;
-
+            }
+            GeneratorState::Yielded(Action::RefundBitcoin(tx_refund)) => {
                 let _ = bitcoin_wallet
                     .broadcast_signed_transaction(tx_refund)
                     .await?;

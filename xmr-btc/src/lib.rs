@@ -69,10 +69,8 @@ pub enum Action {
         spend_key: monero::PrivateKey,
         view_key: monero::PrivateViewKey,
     },
-    RefundBitcoin {
-        tx_cancel: bitcoin::Transaction,
-        tx_refund: bitcoin::Transaction,
-    },
+    CancelBitcoin(bitcoin::Transaction),
+    RefundBitcoin(bitcoin::Transaction),
 }
 
 // TODO: This could be moved to the monero module
@@ -250,8 +248,6 @@ where
         if let Err(SwapFailed::AfterBtcLock(_)) = swap_result {
             let tx_cancel =
                 bitcoin::TxCancel::new(&tx_lock, refund_timelock, A.clone(), b.public());
-            let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &refund_address);
-
             let signed_tx_cancel = {
                 let sig_a = tx_cancel_sig_a.clone();
                 let sig_b = b.sign(tx_cancel.digest());
@@ -262,7 +258,11 @@ where
                     .expect("sig_{a,b} to be valid signatures for tx_cancel")
             };
 
+            co.yield_(Action::CancelBitcoin(signed_tx_cancel)).await;
+
             let signed_tx_refund = {
+                let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &refund_address);
+
                 let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
 
                 let sig_a =
@@ -274,11 +274,7 @@ where
                     .expect("sig_{a,b} to be valid signatures for tx_refund")
             };
 
-            co.yield_(Action::RefundBitcoin {
-                tx_cancel: signed_tx_cancel,
-                tx_refund: signed_tx_refund,
-            })
-            .await;
+            co.yield_(Action::RefundBitcoin(signed_tx_refund)).await;
         }
     })
 }
