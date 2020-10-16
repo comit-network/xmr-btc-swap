@@ -122,8 +122,11 @@ where
         AfterBtcLock(Reason),
     }
 
+    /// Reason why the swap has failed.
     enum Reason {
+        /// The refund timelock has been reached.
         BtcExpired,
+        /// Alice did not lock up enough monero in the shared output.
         InsufficientXMR(monero::InsufficientFunds),
     }
 
