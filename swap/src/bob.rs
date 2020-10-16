@@ -19,7 +19,7 @@ use crate::{
         request_response::TIMEOUT,
         transport, TokioExecutor,
     },
-    Cmd, Never, Rsp,
+    Cmd, Rsp,
 };
 
 pub async fn swap(
@@ -85,13 +85,6 @@ fn new_swarm() -> Result<Swarm> {
 pub enum BehaviourOutEvent {
     Response(messenger::BehaviourOutEvent),
     ConnectionEstablished(PeerId),
-    Never, // FIXME: Why do we need this?
-}
-
-impl From<Never> for BehaviourOutEvent {
-    fn from(_: Never) -> Self {
-        BehaviourOutEvent::Never
-    }
 }
 
 impl From<messenger::BehaviourOutEvent> for BehaviourOutEvent {

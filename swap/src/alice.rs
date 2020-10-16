@@ -19,7 +19,7 @@ use crate::{
         request_response::{AliceToBob, TIMEOUT},
         transport, TokioExecutor,
     },
-    Never, SwapParams,
+    SwapParams,
 };
 
 pub type Swarm = libp2p::Swarm<Alice>;
@@ -68,13 +68,6 @@ fn new_swarm(listen: Multiaddr) -> Result<Swarm> {
 pub enum BehaviourOutEvent {
     Request(messenger::BehaviourOutEvent),
     ConnectionEstablished(PeerId),
-    Never, // FIXME: Why do we need this?
-}
-
-impl From<Never> for BehaviourOutEvent {
-    fn from(_: Never) -> Self {
-        BehaviourOutEvent::Never
-    }
 }
 
 impl From<messenger::BehaviourOutEvent> for BehaviourOutEvent {
