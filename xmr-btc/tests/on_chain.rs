@@ -9,7 +9,7 @@ use xmr_btc::{
     bitcoin::{BroadcastSignedTransaction, SignTxLock},
     bob,
     monero::CreateWalletForOutput,
-    Action, ReceiveTransferProof,
+    BobAction, ReceiveTransferProof,
 };
 
 struct Network;
@@ -31,16 +31,16 @@ async fn swap_as_bob(
 
     loop {
         match action_generator.async_resume().await {
-            GeneratorState::Yielded(Action::LockBitcoin(tx_lock)) => {
+            GeneratorState::Yielded(BobAction::LockBitcoin(tx_lock)) => {
                 let signed_tx_lock = bitcoin_wallet.sign_tx_lock(tx_lock).await?;
                 let _ = bitcoin_wallet
                     .broadcast_signed_transaction(signed_tx_lock)
                     .await?;
             }
-            GeneratorState::Yielded(Action::SendBitcoinRedeemEncsig(_tx_redeem_encsig)) => {
+            GeneratorState::Yielded(BobAction::SendBitcoinRedeemEncsig(_tx_redeem_encsig)) => {
                 todo!("use libp2p")
             }
-            GeneratorState::Yielded(Action::CreateMoneroWalletForOutput {
+            GeneratorState::Yielded(BobAction::CreateMoneroWalletForOutput {
                 spend_key,
                 view_key,
             }) => {
@@ -48,12 +48,12 @@ async fn swap_as_bob(
                     .create_and_load_wallet_for_output(spend_key, view_key)
                     .await?;
             }
-            GeneratorState::Yielded(Action::CancelBitcoin(tx_cancel)) => {
+            GeneratorState::Yielded(BobAction::CancelBitcoin(tx_cancel)) => {
                 let _ = bitcoin_wallet
                     .broadcast_signed_transaction(tx_cancel)
                     .await?;
             }
-            GeneratorState::Yielded(Action::RefundBitcoin(tx_refund)) => {
+            GeneratorState::Yielded(BobAction::RefundBitcoin(tx_refund)) => {
                 let _ = bitcoin_wallet
                     .broadcast_signed_transaction(tx_refund)
                     .await?;

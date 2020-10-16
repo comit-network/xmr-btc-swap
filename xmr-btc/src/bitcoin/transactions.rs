@@ -463,6 +463,10 @@ impl TxPunish {
         }
     }
 
+    pub fn txid(&self) -> Txid {
+        self.inner.txid()
+    }
+
     pub fn digest(&self) -> SigHash {
         self.digest
     }

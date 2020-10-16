@@ -330,22 +330,22 @@ impl State2 {
 
 #[derive(Debug)]
 pub struct State3 {
-    a: bitcoin::SecretKey,
-    B: bitcoin::PublicKey,
-    s_a: cross_curve_dleq::Scalar,
-    S_b_monero: monero::PublicKey,
-    S_b_bitcoin: bitcoin::PublicKey,
-    v: monero::PrivateViewKey,
+    pub a: bitcoin::SecretKey,
+    pub B: bitcoin::PublicKey,
+    pub s_a: cross_curve_dleq::Scalar,
+    pub S_b_monero: monero::PublicKey,
+    pub S_b_bitcoin: bitcoin::PublicKey,
+    pub v: monero::PrivateViewKey,
     btc: bitcoin::Amount,
-    xmr: monero::Amount,
-    refund_timelock: u32,
-    punish_timelock: u32,
-    refund_address: bitcoin::Address,
-    redeem_address: bitcoin::Address,
-    punish_address: bitcoin::Address,
-    tx_lock: bitcoin::TxLock,
-    tx_punish_sig_bob: bitcoin::Signature,
-    tx_cancel_sig_bob: bitcoin::Signature,
+    pub xmr: monero::Amount,
+    pub refund_timelock: u32,
+    pub punish_timelock: u32,
+    pub refund_address: bitcoin::Address,
+    pub redeem_address: bitcoin::Address,
+    pub punish_address: bitcoin::Address,
+    pub tx_lock: bitcoin::TxLock,
+    pub tx_punish_sig_bob: bitcoin::Signature,
+    pub tx_cancel_sig_bob: bitcoin::Signature,
 }
 
 impl State3 {
