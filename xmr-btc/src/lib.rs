@@ -120,6 +120,7 @@ where
     enum SwapFailed {
         BeforeBtcLock,
         AfterBtcLock(Reason),
+        AfterBtcRedeem(Reason),
     }
 
     /// Reason why the swap has failed.
@@ -128,6 +129,12 @@ where
         BtcExpired,
         /// Alice did not lock up enough monero in the shared output.
         InsufficientXMR(monero::InsufficientFunds),
+        /// Could not find Bob's signature on the redeem transaction witness
+        /// stack.
+        BtcRedeemSignature,
+        /// Could not recover secret `s_a` from Bob's redeem transaction
+        /// signature.
+        SecretRecovery,
     }
 
     async fn poll_until(condition_future: impl Future<Output = bool> + Clone) {
@@ -221,10 +228,9 @@ where
             // Therefore, there is no way to handle these errors other than aborting
             let tx_redeem_sig = tx_redeem
                 .extract_signature_by_key(tx_redeem_published, b.public())
-                .expect("redeem transaction must include signature from us");
-            let s_a = bitcoin::recover(S_a_bitcoin, tx_redeem_sig, tx_redeem_encsig).expect(
-                "alice can only produce our signature by decrypting our encrypted signature",
-            );
+                .map_err(|_| SwapFailed::AfterBtcRedeem(Reason::BtcRedeemSignature))?;
+            let s_a = bitcoin::recover(S_a_bitcoin, tx_redeem_sig, tx_redeem_encsig)
+                .map_err(|_| SwapFailed::AfterBtcRedeem(Reason::SecretRecovery))?;
             let s_a = monero::PrivateKey::from_scalar(monero::Scalar::from_bytes_mod_order(
                 s_a.to_bytes(),
             ));
