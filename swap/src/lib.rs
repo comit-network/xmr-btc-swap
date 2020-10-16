@@ -43,7 +43,7 @@ pub mod monero {
     use serde::{Deserialize, Serialize};
     use std::fmt;
 
-    #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+    #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
     pub struct Amount(u64);
 
     impl Amount {
@@ -76,7 +76,7 @@ pub mod bitcoin {
     use serde::{Deserialize, Serialize};
     use std::fmt;
 
-    #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+    #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
     pub struct Amount(u64);
 
     impl Amount {
@@ -91,6 +91,10 @@ pub mod bitcoin {
         /// satoshis.
         pub fn from_sat(satoshi: u64) -> Amount {
             Amount(satoshi)
+        }
+
+        pub fn as_sat(&self) -> u64 {
+            self.0
         }
     }
 

@@ -13,7 +13,7 @@ mod messenger;
 
 use self::messenger::*;
 use crate::{
-    monero,
+    bitcoin, monero,
     network::{
         peer_tracker::{self, PeerTracker},
         request_response::{AliceToBob, TIMEOUT},
@@ -31,14 +31,8 @@ pub async fn swap(listen: Multiaddr) -> Result<()> {
         match swarm.next().await {
             BehaviourOutEvent::Request(messenger::BehaviourOutEvent::Btc { btc, channel }) => {
                 debug!("Got request from Bob to swap {}", btc);
-                let params = SwapParams {
-                    btc,
-                    // TODO: Do a real calculation.
-                    xmr: monero::Amount::from_piconero(10),
-                };
-
-                let msg = AliceToBob::Amounts(params);
-                swarm.send(channel, msg);
+                let p = calculate_amounts(btc);
+                swarm.send(channel, AliceToBob::Amounts(p));
             }
             other => panic!("unexpected event: {:?}", other),
         }
@@ -135,5 +129,32 @@ impl Default for Alice {
             pt: PeerTracker::default(),
             identity,
         }
+    }
+}
+
+fn calculate_amounts(btc: bitcoin::Amount) -> SwapParams {
+    const XMR_PER_BTC: u64 = 100; // TODO: Get this from an exchange.
+
+    // XMR uses 12 zerose BTC uses 8.
+    let picos = (btc.as_sat() * 10000) * XMR_PER_BTC;
+    let xmr = monero::Amount::from_piconero(picos);
+
+    SwapParams { btc, xmr }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const ONE_BTC: u64 = 100_000_000;
+    const HUNDRED_XMR: u64 = 100_000_000_000_000;
+
+    #[test]
+    fn one_bitcoin_equals_a_hundred_moneroj() {
+        let btc = bitcoin::Amount::from_sat(ONE_BTC);
+        let want = monero::Amount::from_piconero(HUNDRED_XMR);
+
+        let SwapParams { xmr: got, .. } = calculate_amounts(btc);
+        assert_eq!(got, want);
     }
 }
