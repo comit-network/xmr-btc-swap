@@ -128,7 +128,7 @@ where
         /// The refund timelock has been reached.
         BtcExpired,
         /// Alice did not lock up enough monero in the shared output.
-        InsufficientXMR(monero::InsufficientFunds),
+        InsufficientXmr(monero::InsufficientFunds),
         /// Could not find Bob's signature on the redeem transaction witness
         /// stack.
         BtcRedeemSignature,
@@ -202,7 +202,7 @@ where
             .await
             {
                 Either::Left((Err(e), _)) => {
-                    return Err(SwapFailed::AfterBtcLock(Reason::InsufficientXMR(e)))
+                    return Err(SwapFailed::AfterBtcLock(Reason::InsufficientXmr(e)))
                 }
                 Either::Right(_) => return Err(SwapFailed::AfterBtcLock(Reason::BtcExpired)),
                 _ => {}
