@@ -145,6 +145,8 @@ where
     Gen::new_boxed(|co| async move {
         let swap_result: Result<(), SwapFailed> = async {
             let btc_has_expired = bitcoin_time_is_gte(bitcoin_ledger, refund_timelock).shared();
+            let poll_until_btc_has_expired = poll_until(btc_has_expired.clone()).shared();
+            futures::pin_mut!(poll_until_btc_has_expired);
 
             if btc_has_expired.clone().await {
                 return Err(SwapFailed::BeforeBtcLock);
@@ -152,8 +154,15 @@ where
 
             co.yield_(Action::LockBitcoin(tx_lock.clone())).await;
 
-            let poll_until_btc_has_expired = poll_until(btc_has_expired).shared();
-            futures::pin_mut!(poll_until_btc_has_expired);
+            match select(
+                bitcoin_ledger.watch_for_raw_transaction(tx_lock.txid()),
+                poll_until_btc_has_expired.clone(),
+            )
+            .await
+            {
+                Either::Left(_) => {}
+                Either::Right(_) => return Err(SwapFailed::BeforeBtcLock),
+            }
 
             let transfer_proof = match select(
                 network.receive_transfer_proof(),
