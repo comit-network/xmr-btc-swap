@@ -118,7 +118,12 @@ where
     B: MedianTime + bitcoin::WatchForRawTransaction + Send + Sync,
 {
     enum SwapFailed {
-        TimelockReached,
+        BeforeBtcLock,
+        AfterBtcLock(Reason),
+    }
+
+    enum Reason {
+        BtcExpired,
         InsufficientXMR(monero::InsufficientFunds),
     }
 
@@ -142,15 +147,13 @@ where
             let btc_has_expired = bitcoin_time_is_gte(bitcoin_ledger, refund_timelock).shared();
 
             if btc_has_expired.clone().await {
-                return Err(SwapFailed::TimelockReached);
+                return Err(SwapFailed::BeforeBtcLock);
             }
 
             co.yield_(Action::LockBitcoin(tx_lock.clone())).await;
 
             let poll_until_btc_has_expired = poll_until(btc_has_expired).shared();
             futures::pin_mut!(poll_until_btc_has_expired);
-
-            // the source of this could be the database, this layer doesn't care
 
             let transfer_proof = match select(
                 network.receive_transfer_proof(),
@@ -159,7 +162,7 @@ where
             .await
             {
                 Either::Left((proof, _)) => proof,
-                Either::Right(_) => return Err(SwapFailed::TimelockReached),
+                Either::Right(_) => return Err(SwapFailed::AfterBtcLock(Reason::BtcExpired)),
             };
 
             let S_b_monero = monero::PublicKey::from_private_key(&monero::PrivateKey::from_scalar(
@@ -179,8 +182,10 @@ where
             )
             .await
             {
-                Either::Left((Err(e), _)) => return Err(SwapFailed::InsufficientXMR(e)),
-                Either::Right(_) => return Err(SwapFailed::TimelockReached),
+                Either::Left((Err(e), _)) => {
+                    return Err(SwapFailed::AfterBtcLock(Reason::InsufficientXMR(e)))
+                }
+                Either::Right(_) => return Err(SwapFailed::AfterBtcLock(Reason::BtcExpired)),
                 _ => {}
             }
 
@@ -197,7 +202,7 @@ where
             .await
             {
                 Either::Left((tx, _)) => tx,
-                Either::Right(_) => return Err(SwapFailed::TimelockReached),
+                Either::Right(_) => return Err(SwapFailed::AfterBtcLock(Reason::BtcExpired)),
             };
 
             // NOTE: If any of this fails, Bob will never be able to take the monero.
@@ -226,7 +231,7 @@ where
         }
         .await;
 
-        if swap_result.is_err() {
+        if let Err(SwapFailed::AfterBtcLock(_)) = swap_result {
             let tx_cancel =
                 bitcoin::TxCancel::new(&tx_lock, refund_timelock, A.clone(), b.public());
             let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &refund_address);
