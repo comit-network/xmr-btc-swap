@@ -90,8 +90,8 @@ pub trait MedianTime {
 /// signatures have been exchanged.
 pub fn action_generator_bob<N, M, B>(
     network: &'static mut N,
-    monero_ledger: &'static M,
-    bitcoin_ledger: &'static B,
+    monero_client: &'static M,
+    bitcoin_client: &'static B,
     // TODO: Replace this with a new, slimmer struct?
     bob::State2 {
         A,
@@ -152,7 +152,7 @@ where
 
     Gen::new_boxed(|co| async move {
         let swap_result: Result<(), SwapFailed> = async {
-            let btc_has_expired = bitcoin_time_is_gte(bitcoin_ledger, refund_timelock).shared();
+            let btc_has_expired = bitcoin_time_is_gte(bitcoin_client, refund_timelock).shared();
             let poll_until_btc_has_expired = poll_until(btc_has_expired.clone()).shared();
             futures::pin_mut!(poll_until_btc_has_expired);
 
@@ -163,7 +163,7 @@ where
             co.yield_(Action::LockBitcoin(tx_lock.clone())).await;
 
             match select(
-                bitcoin_ledger.watch_for_raw_transaction(tx_lock.txid()),
+                bitcoin_client.watch_for_raw_transaction(tx_lock.txid()),
                 poll_until_btc_has_expired.clone(),
             )
             .await
@@ -188,7 +188,7 @@ where
             let S = S_a_monero + S_b_monero;
 
             match select(
-                monero_ledger.watch_for_transfer(
+                monero_client.watch_for_transfer(
                     S,
                     v.public(),
                     transfer_proof,
@@ -213,7 +213,7 @@ where
                 .await;
 
             let tx_redeem_published = match select(
-                bitcoin_ledger.watch_for_raw_transaction(tx_redeem.txid()),
+                bitcoin_client.watch_for_raw_transaction(tx_redeem.txid()),
                 poll_until_btc_has_expired,
             )
             .await
@@ -261,7 +261,7 @@ where
 
             co.yield_(Action::CancelBitcoin(signed_tx_cancel)).await;
 
-            let _ = bitcoin_ledger
+            let _ = bitcoin_client
                 .watch_for_raw_transaction(tx_cancel_txid)
                 .await;
 
@@ -281,7 +281,7 @@ where
 
             co.yield_(Action::RefundBitcoin(signed_tx_refund)).await;
 
-            let _ = bitcoin_ledger
+            let _ = bitcoin_client
                 .watch_for_raw_transaction(tx_refund_txid)
                 .await;
         }
