@@ -248,6 +248,7 @@ where
         if let Err(SwapFailed::AfterBtcLock(_)) = swap_result {
             let tx_cancel =
                 bitcoin::TxCancel::new(&tx_lock, refund_timelock, A.clone(), b.public());
+            let tx_cancel_txid = tx_cancel.txid();
             let signed_tx_cancel = {
                 let sig_a = tx_cancel_sig_a.clone();
                 let sig_b = b.sign(tx_cancel.digest());
@@ -260,9 +261,13 @@ where
 
             co.yield_(Action::CancelBitcoin(signed_tx_cancel)).await;
 
-            let signed_tx_refund = {
-                let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &refund_address);
+            let _ = bitcoin_ledger
+                .watch_for_raw_transaction(tx_cancel_txid)
+                .await;
 
+            let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &refund_address);
+            let tx_refund_txid = tx_refund.txid();
+            let signed_tx_refund = {
                 let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
 
                 let sig_a =
@@ -275,6 +280,10 @@ where
             };
 
             co.yield_(Action::RefundBitcoin(signed_tx_refund)).await;
+
+            let _ = bitcoin_ledger
+                .watch_for_raw_transaction(tx_refund_txid)
+                .await;
         }
     })
 }
