@@ -224,8 +224,6 @@ where
                 Either::Right(_) => return Err(SwapFailed::AfterBtcLock(Reason::BtcExpired)),
             };
 
-            // NOTE: If any of this fails, Bob will never be able to take the monero.
-            // Therefore, there is no way to handle these errors other than aborting
             let tx_redeem_sig = tx_redeem
                 .extract_signature_by_key(tx_redeem_published, b.public())
                 .map_err(|_| SwapFailed::AfterBtcRedeem(Reason::BtcRedeemSignature))?;
