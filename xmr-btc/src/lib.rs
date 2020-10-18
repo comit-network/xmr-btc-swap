@@ -342,7 +342,7 @@ pub fn action_generator_alice<N, M, B>(
 ) -> GenBoxed<AliceAction, (), ()>
 where
     N: ReceiveBitcoinRedeemEncsig + Send + Sync,
-    M: monero::WatchForTransfer + Send + Sync,
+    M: Send + Sync,
     B: MedianTime + bitcoin::WatchForRawTransaction + Send + Sync,
 {
     enum SwapFailed {
