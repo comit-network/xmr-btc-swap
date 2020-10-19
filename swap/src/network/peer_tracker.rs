@@ -7,85 +7,56 @@ use libp2p::{
     },
     Multiaddr, PeerId,
 };
-use std::{
-    collections::{hash_map::Entry, HashMap, VecDeque},
-    task::Poll,
-};
+use std::{collections::VecDeque, task::Poll};
 
 #[derive(Debug)]
-pub enum BehaviourOutEvent {
+pub enum OutEvent {
     ConnectionEstablished(PeerId),
 }
 
-/// A NetworkBehaviour that tracks connections to other peers.
+/// A NetworkBehaviour that tracks connections to the counterparty. Although the
+/// libp2p `NetworkBehaviour` abstraction encompasses connections to multiple
+/// peers we only ever connect to a single counterparty. Peer Tracker tracks
+/// that connection.
 #[derive(Default, Debug)]
 pub struct PeerTracker {
-    connected_peers: HashMap<PeerId, Vec<Multiaddr>>,
-    address_hints: HashMap<PeerId, VecDeque<Multiaddr>>,
-    events: VecDeque<BehaviourOutEvent>,
+    connected: Option<(PeerId, Multiaddr)>,
+    events: VecDeque<OutEvent>,
 }
 
 impl PeerTracker {
     /// Returns an arbitrary connected counterparty.
     /// This is useful if we are connected to a single other node.
-    pub fn counterparty(&self) -> Option<PeerId> {
-        // TODO: Refactor to use combinators.
-        if let Some((id, _)) = self.connected_peers().next() {
-            return Some(id);
+    pub fn counterparty_peer_id(&self) -> Option<PeerId> {
+        if let Some((id, _)) = &self.connected {
+            return Some(id.clone());
         }
         None
     }
 
-    pub fn connected_peers(&self) -> impl Iterator<Item = (PeerId, Vec<Multiaddr>)> {
-        self.connected_peers.clone().into_iter()
-    }
-
-    /// Adds an address hint for the given peer id. The added address is
-    /// considered most recent and hence is added at the start of the list
-    /// because libp2p tries to connect with the first address first.
-    pub fn add_recent_address_hint(&mut self, id: PeerId, addr: Multiaddr) {
-        let old_addresses = self.address_hints.get_mut(&id);
-
-        match old_addresses {
-            None => {
-                let mut hints = VecDeque::new();
-                hints.push_back(addr);
-                self.address_hints.insert(id, hints);
-            }
-            Some(hints) => {
-                hints.push_front(addr);
-            }
+    /// Returns an arbitrary connected counterparty.
+    /// This is useful if we are connected to a single other node.
+    pub fn counterparty_addr(&self) -> Option<Multiaddr> {
+        if let Some((_, addr)) = &self.connected {
+            return Some(addr.clone());
         }
+        None
     }
 }
 
 impl NetworkBehaviour for PeerTracker {
     type ProtocolsHandler = DummyProtocolsHandler;
-    type OutEvent = BehaviourOutEvent;
+    type OutEvent = OutEvent;
 
     fn new_handler(&mut self) -> Self::ProtocolsHandler {
         DummyProtocolsHandler::default()
     }
 
-    /// Note (from libp2p doc):
-    /// The addresses will be tried in the order returned by this function,
-    /// which means that they should be ordered by decreasing likelihood of
-    /// reachability. In other words, the first address should be the most
-    /// likely to be reachable.
-    fn addresses_of_peer(&mut self, peer: &PeerId) -> Vec<Multiaddr> {
+    fn addresses_of_peer(&mut self, _: &PeerId) -> Vec<Multiaddr> {
         let mut addresses: Vec<Multiaddr> = vec![];
 
-        // If we are connected then this address is most likely to be valid
-        if let Some(connected) = self.connected_peers.get(peer) {
-            for addr in connected.iter() {
-                addresses.push(addr.clone())
-            }
-        }
-
-        if let Some(hints) = self.address_hints.get(peer) {
-            for hint in hints {
-                addresses.push(hint.clone());
-            }
+        if let Some(addr) = self.counterparty_addr() {
+            addresses.push(addr)
         }
 
         addresses
@@ -101,35 +72,24 @@ impl NetworkBehaviour for PeerTracker {
         _: &ConnectionId,
         point: &ConnectedPoint,
     ) {
-        if let ConnectedPoint::Dialer { address } = point {
-            self.connected_peers
-                .entry(peer.clone())
-                .or_default()
-                .push(address.clone());
-
-            self.events
-                .push_back(BehaviourOutEvent::ConnectionEstablished(peer.clone()));
-        }
-    }
-
-    fn inject_connection_closed(
-        &mut self,
-        peer: &PeerId,
-        _: &ConnectionId,
-        point: &ConnectedPoint,
-    ) {
-        if let ConnectedPoint::Dialer { address } = point {
-            match self.connected_peers.entry(peer.clone()) {
-                Entry::Vacant(_) => {}
-                Entry::Occupied(mut entry) => {
-                    let addresses = entry.get_mut();
-
-                    if let Some(pos) = addresses.iter().position(|a| a == address) {
-                        addresses.remove(pos);
-                    }
-                }
+        match point {
+            ConnectedPoint::Dialer { address } => {
+                self.connected = Some((peer.clone(), address.clone()));
+            }
+            ConnectedPoint::Listener {
+                local_addr: _,
+                send_back_addr,
+            } => {
+                self.connected = Some((peer.clone(), send_back_addr.clone()));
             }
         }
+
+        self.events
+            .push_back(OutEvent::ConnectionEstablished(peer.clone()));
+    }
+
+    fn inject_connection_closed(&mut self, _: &PeerId, _: &ConnectionId, _: &ConnectedPoint) {
+        self.connected = None;
     }
 
     fn inject_event(&mut self, _: PeerId, _: ConnectionId, _: void::Void) {}

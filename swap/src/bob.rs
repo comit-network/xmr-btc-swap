@@ -9,9 +9,9 @@ use libp2p::{core::identity::Keypair, Multiaddr, NetworkBehaviour, PeerId};
 use std::{process, thread, time::Duration};
 use tracing::{debug, info, warn};
 
-mod messenger;
+mod amounts;
 
-use self::messenger::*;
+use self::amounts::*;
 use crate::{
     bitcoin,
     network::{
@@ -32,7 +32,7 @@ pub async fn swap(
 
     libp2p::Swarm::dial_addr(&mut swarm, addr)?;
     let id = match swarm.next().await {
-        BehaviourOutEvent::ConnectionEstablished(id) => id,
+        OutEvent::ConnectionEstablished(id) => id,
         other => panic!("unexpected event: {:?}", other),
     };
     info!("Connection established.");
@@ -40,7 +40,7 @@ pub async fn swap(
     swarm.request_amounts(id, btc).await;
 
     match swarm.next().await {
-        BehaviourOutEvent::Response(messenger::BehaviourOutEvent::Amounts(p)) => {
+        OutEvent::Response(amounts::OutEvent::Amounts(p)) => {
             debug!("Got response from Alice: {:?}", p);
             let cmd = Cmd::VerifyAmounts(p);
             cmd_tx.try_send(cmd)?;
@@ -82,22 +82,22 @@ fn new_swarm() -> Result<Swarm> {
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
-pub enum BehaviourOutEvent {
-    Response(messenger::BehaviourOutEvent),
+pub enum OutEvent {
+    Response(amounts::OutEvent),
     ConnectionEstablished(PeerId),
 }
 
-impl From<messenger::BehaviourOutEvent> for BehaviourOutEvent {
-    fn from(event: messenger::BehaviourOutEvent) -> Self {
-        BehaviourOutEvent::Response(event)
+impl From<amounts::OutEvent> for OutEvent {
+    fn from(event: amounts::OutEvent) -> Self {
+        OutEvent::Response(event)
     }
 }
 
-impl From<peer_tracker::BehaviourOutEvent> for BehaviourOutEvent {
-    fn from(event: peer_tracker::BehaviourOutEvent) -> Self {
+impl From<peer_tracker::OutEvent> for OutEvent {
+    fn from(event: peer_tracker::OutEvent) -> Self {
         match event {
-            peer_tracker::BehaviourOutEvent::ConnectionEstablished(id) => {
-                BehaviourOutEvent::ConnectionEstablished(id)
+            peer_tracker::OutEvent::ConnectionEstablished(id) => {
+                OutEvent::ConnectionEstablished(id)
             }
         }
     }
@@ -105,10 +105,10 @@ impl From<peer_tracker::BehaviourOutEvent> for BehaviourOutEvent {
 
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Bob.
 #[derive(NetworkBehaviour)]
-#[behaviour(out_event = "BehaviourOutEvent", event_process = false)]
+#[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Bob {
-    net: Messenger,
+    amounts: Amounts,
     pt: PeerTracker,
     #[behaviour(ignore)]
     identity: Keypair,
@@ -126,13 +126,13 @@ impl Bob {
     /// Sends a message to Alice to get current amounts based on `btc`.
     pub async fn request_amounts(&mut self, alice: PeerId, btc: u64) {
         let btc = bitcoin::Amount::from_sat(btc);
-        let _id = self.net.request_amounts(alice.clone(), btc).await;
+        let _id = self.amounts.request_amounts(alice.clone(), btc).await;
         debug!("Requesting amounts from: {}", alice);
     }
 
     /// Returns Alice's peer id if we are connected.
     pub fn peer_id_of_alice(&self) -> Option<PeerId> {
-        self.pt.counterparty()
+        self.pt.counterparty_peer_id()
     }
 }
 
@@ -142,7 +142,7 @@ impl Default for Bob {
         let timeout = Duration::from_secs(TIMEOUT);
 
         Self {
-            net: Messenger::new(timeout),
+            amounts: Amounts::new(timeout),
             pt: PeerTracker::default(),
             identity,
         }

@@ -2,7 +2,7 @@ use anyhow::Result;
 use libp2p::{
     request_response::{
         handler::RequestProtocol, ProtocolSupport, RequestId, RequestResponse,
-        RequestResponseConfig, RequestResponseEvent, RequestResponseMessage,
+        RequestResponseConfig, RequestResponseEvent, RequestResponseMessage, ResponseChannel,
     },
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
     NetworkBehaviour, PeerId,
@@ -12,30 +12,32 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::{
     bitcoin,
     network::request_response::{AliceToBob, BobToAlice, Codec, Protocol},
-    Never, SwapParams,
 };
 
 #[derive(Debug)]
-pub enum BehaviourOutEvent {
-    Amounts(SwapParams),
+pub enum OutEvent {
+    Btc {
+        btc: bitcoin::Amount,
+        channel: ResponseChannel<AliceToBob>,
+    },
 }
 
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Bob.
 #[derive(NetworkBehaviour)]
-#[behaviour(out_event = "BehaviourOutEvent", poll_method = "poll")]
+#[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
-pub struct Messenger {
+pub struct Amounts {
     rr: RequestResponse<Codec>,
     #[behaviour(ignore)]
-    events: VecDeque<BehaviourOutEvent>,
+    events: VecDeque<OutEvent>,
 }
 
-impl Messenger {
+impl Amounts {
     pub fn new(timeout: Duration) -> Self {
         let mut config = RequestResponseConfig::default();
         config.set_request_timeout(timeout);
@@ -50,6 +52,11 @@ impl Messenger {
         }
     }
 
+    /// Alice always sends her messages as a response to a request from Bob.
+    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: AliceToBob) {
+        self.rr.send_response(channel, msg);
+    }
+
     pub async fn request_amounts(
         &mut self,
         alice: PeerId,
@@ -57,6 +64,7 @@ impl Messenger {
     ) -> Result<RequestId> {
         let msg = BobToAlice::AmountsFromBtc(btc);
         let id = self.rr.send_request(&alice, msg);
+        debug!("Request sent to: {}", alice);
 
         Ok(id)
     }
@@ -65,7 +73,7 @@ impl Messenger {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec>, BehaviourOutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec>, OutEvent>> {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -74,26 +82,37 @@ impl Messenger {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Messenger {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Amounts {
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
             RequestResponseEvent::Message {
                 peer: _,
-                message: RequestResponseMessage::Request { .. },
-            } => panic!("Bob should never get a request from Alice"),
+                message:
+                    RequestResponseMessage::Request {
+                        request,
+                        request_id: _,
+                        channel,
+                    },
+            } => match request {
+                BobToAlice::AmountsFromBtc(btc) => {
+                    self.events.push_back(OutEvent::Btc { btc, channel })
+                }
+                _ => panic!("unexpected request"),
+            },
             RequestResponseEvent::Message {
                 peer: _,
                 message:
                     RequestResponseMessage::Response {
-                        response,
+                        response: _,
                         request_id: _,
                     },
-            } => match response {
-                AliceToBob::Amounts(p) => self.events.push_back(BehaviourOutEvent::Amounts(p)),
-            },
-
-            RequestResponseEvent::InboundFailure { .. } => {
-                panic!("Bob should never get a request from Alice, so should never get an InboundFailure");
+            } => panic!("unexpected response"),
+            RequestResponseEvent::InboundFailure {
+                peer: _,
+                request_id: _,
+                error,
+            } => {
+                error!("Inbound failure: {:?}", error);
             }
             RequestResponseEvent::OutboundFailure {
                 peer: _,
@@ -104,12 +123,4 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             }
         }
     }
-}
-
-impl libp2p::swarm::NetworkBehaviourEventProcess<()> for Messenger {
-    fn inject_event(&mut self, _event: ()) {}
-}
-
-impl libp2p::swarm::NetworkBehaviourEventProcess<Never> for Messenger {
-    fn inject_event(&mut self, _: Never) {}
 }
