@@ -49,4 +49,5 @@ pub mod alice;
 pub mod bitcoin;
 pub mod bob;
 pub mod monero;
+pub mod tor;
 pub mod transport;
