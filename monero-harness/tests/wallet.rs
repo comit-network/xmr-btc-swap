@@ -1,24 +1,21 @@
-use monero_harness::{rpc::wallet::Client, Monero};
+use monero_harness::Monero;
 use spectral::prelude::*;
 use testcontainers::clients::Cli;
 
 #[tokio::test]
 async fn wallet_and_accounts() {
     let tc = Cli::default();
-    let monero = Monero::new(&tc);
-    let miner_wallet = Client::localhost(monero.miner_wallet_rpc_port);
+    let (monero, _container) = Monero::new(&tc);
+    let cli = monero.miner_wallet_rpc_client();
 
     println!("creating wallet ...");
 
-    let _ = miner_wallet
+    let _ = cli
         .create_wallet("wallet")
         .await
         .expect("failed to create wallet");
 
-    let got = miner_wallet
-        .get_balance(0)
-        .await
-        .expect("failed to get balance");
+    let got = cli.get_balance(0).await.expect("failed to get balance");
     let want = 0;
 
     assert_that!(got).is_equal_to(want);
@@ -27,8 +24,8 @@ async fn wallet_and_accounts() {
 #[tokio::test]
 async fn create_account_and_retrieve_it() {
     let tc = Cli::default();
-    let monero = Monero::new(&tc);
-    let cli = Client::localhost(monero.miner_wallet_rpc_port);
+    let (monero, _container) = Monero::new(&tc);
+    let cli = monero.miner_wallet_rpc_client();
 
     let label = "Iron Man"; // This is intentionally _not_ Alice or Bob.
 
@@ -61,18 +58,20 @@ async fn transfer_and_check_tx_key() {
     let fund_bob = 0;
 
     let tc = Cli::default();
-    let monero = Monero::new(&tc);
+    let (monero, _container) = Monero::new(&tc);
     let _ = monero.init(fund_alice, fund_bob).await;
 
     let address_bob = monero
-        .get_address_bob()
+        .bob_wallet_rpc_client()
+        .get_address(0)
         .await
         .expect("failed to get Bob's address")
         .address;
 
     let transfer_amount = 100;
     let transfer = monero
-        .transfer_from_alice(transfer_amount, &address_bob)
+        .alice_wallet_rpc_client()
+        .transfer(0, transfer_amount, &address_bob)
         .await
         .expect("transfer failed");
 

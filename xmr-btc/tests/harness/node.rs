@@ -5,18 +5,18 @@ use xmr_btc::{alice, bob};
 
 // TODO: merge this with bob node
 // This struct is responsible for I/O
-pub struct AliceNode<'a> {
+pub struct AliceNode {
     transport: Transport<alice::Message, bob::Message>,
     pub bitcoin_wallet: wallet::bitcoin::Wallet,
-    pub monero_wallet: wallet::monero::AliceWallet<'a>,
+    pub monero_wallet: wallet::monero::Wallet,
 }
 
-impl<'a> AliceNode<'a> {
+impl AliceNode {
     pub fn new(
         transport: Transport<alice::Message, bob::Message>,
         bitcoin_wallet: wallet::bitcoin::Wallet,
-        monero_wallet: wallet::monero::AliceWallet<'a>,
-    ) -> AliceNode<'a> {
+        monero_wallet: wallet::monero::Wallet,
+    ) -> AliceNode {
         Self {
             transport,
             bitcoin_wallet,
@@ -25,8 +25,8 @@ impl<'a> AliceNode<'a> {
     }
 }
 
-pub async fn run_alice_until<'a, R: RngCore + CryptoRng>(
-    alice: &mut AliceNode<'a>,
+pub async fn run_alice_until<R: RngCore + CryptoRng>(
+    alice: &mut AliceNode,
     initial_state: alice::State,
     is_state: fn(&alice::State) -> bool,
     rng: &mut R,
@@ -49,18 +49,18 @@ pub async fn run_alice_until<'a, R: RngCore + CryptoRng>(
 
 // TODO: merge this with alice node
 // This struct is responsible for I/O
-pub struct BobNode<'a> {
+pub struct BobNode {
     transport: Transport<bob::Message, alice::Message>,
     pub bitcoin_wallet: wallet::bitcoin::Wallet,
-    pub monero_wallet: wallet::monero::BobWallet<'a>,
+    pub monero_wallet: wallet::monero::Wallet,
 }
 
-impl<'a> BobNode<'a> {
+impl BobNode {
     pub fn new(
         transport: Transport<bob::Message, alice::Message>,
         bitcoin_wallet: wallet::bitcoin::Wallet,
-        monero_wallet: wallet::monero::BobWallet<'a>,
-    ) -> BobNode<'a> {
+        monero_wallet: wallet::monero::Wallet,
+    ) -> BobNode {
         Self {
             transport,
             bitcoin_wallet,
@@ -69,8 +69,8 @@ impl<'a> BobNode<'a> {
     }
 }
 
-pub async fn run_bob_until<'a, R: RngCore + CryptoRng>(
-    bob: &mut BobNode<'a>,
+pub async fn run_bob_until<R: RngCore + CryptoRng>(
+    bob: &mut BobNode,
     initial_state: bob::State,
     is_state: fn(&bob::State) -> bool,
     rng: &mut R,

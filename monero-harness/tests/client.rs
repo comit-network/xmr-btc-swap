@@ -5,29 +5,24 @@ use testcontainers::clients::Cli;
 const ALICE_FUND_AMOUNT: u64 = 1_000_000_000_000;
 const BOB_FUND_AMOUNT: u64 = 0;
 
-fn init_cli() -> Cli {
-    Cli::default()
-}
-
-async fn init_monero(tc: &'_ Cli) -> Monero<'_> {
-    let monero = Monero::new(tc);
-    let _ = monero.init(ALICE_FUND_AMOUNT, BOB_FUND_AMOUNT).await;
-
-    monero
-}
-
 #[tokio::test]
 async fn init_accounts_for_alice_and_bob() {
-    let cli = init_cli();
-    let monero = init_monero(&cli).await;
+    let tc = Cli::default();
+    let (monero, _container) = Monero::new(&tc);
+    monero
+        .init(ALICE_FUND_AMOUNT, BOB_FUND_AMOUNT)
+        .await
+        .unwrap();
 
     let got_balance_alice = monero
-        .get_balance_alice()
+        .alice_wallet_rpc_client()
+        .get_balance(0)
         .await
         .expect("failed to get alice's balance");
 
     let got_balance_bob = monero
-        .get_balance_bob()
+        .bob_wallet_rpc_client()
+        .get_balance(0)
         .await
         .expect("failed to get bob's balance");
 

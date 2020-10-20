@@ -45,7 +45,7 @@ async fn swap_as_alice(
     // FIXME: It would be more intuitive to have a single network/transport struct instead of
     // splitting into two, but Rust ownership rules make this tedious
     mut sender: Sender<TransferProof>,
-    monero_wallet: &'static monero::AliceWallet<'static>,
+    monero_wallet: &'static monero::Wallet,
     bitcoin_wallet: &'static bitcoin::Wallet,
     state: alice::State3,
 ) -> Result<()> {
@@ -86,7 +86,7 @@ async fn swap_as_alice(
 async fn swap_as_bob(
     network: &'static mut BobNetwork,
     mut sender: Sender<EncryptedSignature>,
-    monero_wallet: &'static monero::BobWallet<'static>,
+    monero_wallet: &'static monero::Wallet,
     bitcoin_wallet: &'static bitcoin::Wallet,
     state: bob::State2,
 ) -> Result<()> {

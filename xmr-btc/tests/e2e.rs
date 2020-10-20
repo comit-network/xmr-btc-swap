@@ -59,14 +59,14 @@ pub fn init_alice_and_bob_transports() -> (
     (a_transport, b_transport)
 }
 
-pub async fn init_test<'a>(
-    monero: &'a Monero<'a>,
+pub async fn init_test(
+    monero: &Monero,
     bitcoind: &Bitcoind<'_>,
 ) -> (
     alice::State0,
     bob::State0,
-    AliceNode<'a>,
-    BobNode<'a>,
+    AliceNode,
+    BobNode,
     InitialBalances,
     SwapAmounts,
 ) {
@@ -83,8 +83,8 @@ pub async fn init_test<'a>(
     let fund_bob = 0;
     monero.init(fund_alice, fund_bob).await.unwrap();
 
-    let alice_monero_wallet = wallet::monero::AliceWallet(&monero);
-    let bob_monero_wallet = wallet::monero::BobWallet(&monero);
+    let alice_monero_wallet = wallet::monero::Wallet(monero.alice_wallet_rpc_client());
+    let bob_monero_wallet = wallet::monero::Wallet(monero.bob_wallet_rpc_client());
 
     let alice_btc_wallet = wallet::bitcoin::Wallet::new("alice", &bitcoind.node_url)
         .await
@@ -101,8 +101,8 @@ pub async fn init_test<'a>(
     let alice_initial_btc_balance = alice.bitcoin_wallet.balance().await.unwrap();
     let bob_initial_btc_balance = bob.bitcoin_wallet.balance().await.unwrap();
 
-    let alice_initial_xmr_balance = alice.monero_wallet.0.get_balance_alice().await.unwrap();
-    let bob_initial_xmr_balance = bob.monero_wallet.0.get_balance_bob().await.unwrap();
+    let alice_initial_xmr_balance = alice.monero_wallet.0.get_balance(0).await.unwrap();
+    let bob_initial_xmr_balance = bob.monero_wallet.0.get_balance(0).await.unwrap();
 
     let redeem_address = alice.bitcoin_wallet.new_address().await.unwrap();
     let punish_address = redeem_address.clone();
@@ -166,7 +166,7 @@ mod tests {
             .set_default();
 
         let cli = Cli::default();
-        let monero = Monero::new(&cli);
+        let (monero, _container) = Monero::new(&cli);
         let bitcoind = init_bitcoind(&cli).await;
 
         let (
@@ -207,21 +207,11 @@ mod tests {
             .await
             .unwrap();
 
-        let alice_final_xmr_balance = alice_node
-            .monero_wallet
-            .0
-            .get_balance_alice()
-            .await
-            .unwrap();
+        let alice_final_xmr_balance = alice_node.monero_wallet.0.get_balance(0).await.unwrap();
 
-        bob_node
-            .monero_wallet
-            .0
-            .wait_for_bob_wallet_block_height()
-            .await
-            .unwrap();
+        monero.wait_for_bob_wallet_block_height().await.unwrap();
 
-        let bob_final_xmr_balance = bob_node.monero_wallet.0.get_balance_bob().await.unwrap();
+        let bob_final_xmr_balance = bob_node.monero_wallet.0.get_balance(0).await.unwrap();
 
         assert_eq!(
             alice_final_btc_balance,
@@ -252,7 +242,7 @@ mod tests {
             .set_default();
 
         let cli = Cli::default();
-        let monero = Monero::new(&cli);
+        let (monero, _container) = Monero::new(&cli);
         let bitcoind = init_bitcoind(&cli).await;
 
         let (
@@ -304,19 +294,9 @@ mod tests {
             .await
             .unwrap();
 
-        alice_node
-            .monero_wallet
-            .0
-            .wait_for_alice_wallet_block_height()
-            .await
-            .unwrap();
-        let alice_final_xmr_balance = alice_node
-            .monero_wallet
-            .0
-            .get_balance_alice()
-            .await
-            .unwrap();
-        let bob_final_xmr_balance = bob_node.monero_wallet.0.get_balance_bob().await.unwrap();
+        monero.wait_for_alice_wallet_block_height().await.unwrap();
+        let alice_final_xmr_balance = alice_node.monero_wallet.0.get_balance(0).await.unwrap();
+        let bob_final_xmr_balance = bob_node.monero_wallet.0.get_balance(0).await.unwrap();
 
         assert_eq!(alice_final_btc_balance, initial_balances.alice_btc);
         assert_eq!(
@@ -338,7 +318,7 @@ mod tests {
             .set_default();
 
         let cli = Cli::default();
-        let monero = Monero::new(&cli);
+        let (monero, _container) = Monero::new(&cli);
         let bitcoind = init_bitcoind(&cli).await;
 
         let (
