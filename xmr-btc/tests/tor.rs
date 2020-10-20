@@ -28,7 +28,6 @@ mod tor_test {
             rx.await.ok();
         });
         tokio::spawn(async {
-            // server.await.unwrap();
             if let Err(e) = graceful.await {
                 eprintln!("server error: {}", e);
             }
@@ -93,7 +92,7 @@ mod tor_test {
 
         let proxy = reqwest::Proxy::all(format!("socks5h://127.0.0.1:{}", proxy_port).as_str())
             .expect("tor proxy should be there");
-        let client = reqwest::Client::builder().proxy(proxy).build().unwrap();
+        let client = reqwest::Client::builder().proxy(proxy).build()?;
         let onion_address = tor_secret_key_v3.public().get_onion_address().to_string();
         let onion_url = format!("http://{}:8080", onion_address);
 

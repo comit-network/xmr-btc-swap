@@ -36,63 +36,54 @@ impl UnauthenticatedConnection {
     }
 
     /// checks if tor is running
-    async fn tor_running(&self) -> Result<()> {
+    async fn assert_tor_running(&self) -> Result<()> {
         // Make sure you are running tor and this is your socks port
         let proxy = reqwest::Proxy::all(format!("socks5h://{}", self.tor_proxy_address).as_str())
-            .expect("tor proxy should be there");
-        let client = reqwest::Client::builder()
-            .proxy(proxy)
-            .build()
-            .expect("should be able to build reqwest client");
+            .map_err(|_| anyhow!("tor proxy should be there"))?;
+        let client = reqwest::Client::builder().proxy(proxy).build()?;
 
         let res = client.get("https://check.torproject.org").send().await?;
-
         let text = res.text().await?;
-        let is_tor = text.contains("Congratulations. This browser is configured to use Tor.");
 
-        if is_tor {
-            Ok(())
-        } else {
+        if !text.contains("Congratulations. This browser is configured to use Tor.") {
             bail!("Tor is currently not running")
         }
+
+        Ok(())
     }
 
     async fn init_unauthenticated_connection(&self) -> Result<UnauthenticatedConn<TcpStream>> {
         // Connect to local tor service via control port
         let sock = TcpStream::connect(self.tor_control_port_address).await?;
-        let unauthenticated_connection = UnauthenticatedConn::new(sock);
-        Ok(unauthenticated_connection)
+        let uc = UnauthenticatedConn::new(sock);
+        Ok(uc)
     }
 
     /// Create a new authenticated connection to your local Tor service
     pub async fn init_authenticated_connection(self) -> Result<AuthenticatedConnection> {
-        self.tor_running().await?;
+        self.assert_tor_running().await?;
 
-        let mut unauthenticated_connection = match self.init_unauthenticated_connection().await {
-            Err(_) => bail!("Tor instance not running"),
-            Ok(unauthenticated_connection) => unauthenticated_connection,
-        };
+        let mut uc = self
+            .init_unauthenticated_connection()
+            .await
+            .map_err(|_| anyhow!("Tor instance not running."))?;
 
-        let tor_info = match unauthenticated_connection.load_protocol_info().await {
-            Ok(info) => info,
-            Err(_) => bail!("Failed to load protocol info from Tor."),
-        };
+        let tor_info = uc
+            .load_protocol_info()
+            .await
+            .map_err(|_| anyhow!("Failed to load protocol info from Tor."))?;
+
         let tor_auth_data = tor_info
             .make_auth_data()?
-            .expect("Failed to make auth data.");
+            .ok_or_else(|| anyhow!("Failed to make auth data."))?;
 
         // Get an authenticated connection to the Tor via the Tor Controller protocol.
-        if unauthenticated_connection
-            .authenticate(&tor_auth_data)
+        uc.authenticate(&tor_auth_data)
             .await
-            .is_err()
-        {
-            bail!("Failed to authenticate with Tor")
-        }
-        let authenticated_connection = unauthenticated_connection.into_authenticated().await;
+            .map_err(|_| anyhow!("Failed to authenticate with Tor"))?;
 
         Ok(AuthenticatedConnection {
-            authenticated_connection,
+            authenticated_connection: uc.into_authenticated().await,
         })
     }
 }
@@ -121,7 +112,6 @@ impl AuthenticatedConnection {
                 .iter(),
             )
             .await
-            .map_err(|_| anyhow!("Could not add onion service."))?;
-        Ok(())
+            .map_err(|_| anyhow!("Could not add onion service."))
     }
 }
