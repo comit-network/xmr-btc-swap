@@ -5,10 +5,13 @@ mod tor_test {
     use hyper::service::{make_service_fn, service_fn};
     use reqwest::StatusCode;
     use spectral::prelude::*;
-    use std::convert::Infallible;
+    use std::{convert::Infallible, process::Child};
     use tokio::sync::oneshot::Receiver;
-    use torut::onion::TorSecretKeyV3;
-    use xmr_btc::tor::{AuthenticatedConnection, TOR_PROXY_ADDR};
+    use torut::{
+        onion::TorSecretKeyV3,
+        utils::{run_tor, AutoKillChild},
+    };
+    use xmr_btc::tor::AuthenticatedConnection;
 
     async fn hello_world(
         _req: hyper::Request<hyper::Body>,
@@ -32,15 +35,43 @@ mod tor_test {
         });
     }
 
+    fn run_tmp_tor() -> (Child, u16, u16) {
+        let control_port = 9051;
+        let proxy_port = 9050;
+
+        (
+            run_tor(
+                "tor",
+                &mut [
+                    "--CookieAuthentication",
+                    "1",
+                    "--ControlPort",
+                    control_port.to_string().as_str(),
+                ]
+                .iter(),
+            )
+            .expect("Starting tor filed"),
+            control_port,
+            proxy_port,
+        )
+    }
+
     #[tokio::test]
     async fn test_tor_control_port() -> Result<()> {
+        // start tmp tor
+        let (child, control_port, proxy_port) = run_tmp_tor();
+        let _child = AutoKillChild::new(child);
+
         // Setup test HTTP Server
         let (tx, rx) = tokio::sync::oneshot::channel::<()>();
         let port = 8080;
         start_test_service(port, rx);
 
         // Connect to local Tor service
-        let mut authenticated_connection = AuthenticatedConnection::new().await?;
+        let mut authenticated_connection =
+            AuthenticatedConnection::with_ports(proxy_port, control_port)
+                .connect()
+                .await?;
 
         // Expose an onion service that re-directs to the echo server.
         let tor_secret_key_v3 = TorSecretKeyV3::generate();
@@ -50,7 +81,7 @@ mod tor_test {
 
         // Test if Tor service forwards to HTTP Server
 
-        let proxy = reqwest::Proxy::all(format!("socks5h://{}", *TOR_PROXY_ADDR).as_str())
+        let proxy = reqwest::Proxy::all(format!("socks5h://127.0.0.1:{}", proxy_port).as_str())
             .expect("tor proxy should be there");
         let client = reqwest::Client::builder().proxy(proxy).build().unwrap();
         let onion_address = tor_secret_key_v3.public().get_onion_address().to_string();
