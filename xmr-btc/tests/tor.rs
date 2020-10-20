@@ -11,7 +11,7 @@ mod tor_test {
         onion::TorSecretKeyV3,
         utils::{run_tor, AutoKillChild},
     };
-    use xmr_btc::tor::AuthenticatedConnection;
+    use xmr_btc::tor::UnauthenticatedConnection;
 
     async fn hello_world(
         _req: hyper::Request<hyper::Body>,
@@ -36,8 +36,16 @@ mod tor_test {
     }
 
     fn run_tmp_tor() -> (Child, u16, u16) {
-        let control_port = 9051;
-        let proxy_port = 9050;
+        let control_port = if port_check::is_local_port_free(9051) {
+            9051
+        } else {
+            port_check::free_local_port().unwrap()
+        };
+        let proxy_port = if port_check::is_local_port_free(9050) {
+            9050
+        } else {
+            port_check::free_local_port().unwrap()
+        };
 
         (
             run_tor(
@@ -47,6 +55,8 @@ mod tor_test {
                     "1",
                     "--ControlPort",
                     control_port.to_string().as_str(),
+                    "--SocksPort",
+                    proxy_port.to_string().as_str(),
                 ]
                 .iter(),
             )
@@ -69,8 +79,8 @@ mod tor_test {
 
         // Connect to local Tor service
         let mut authenticated_connection =
-            AuthenticatedConnection::with_ports(proxy_port, control_port)
-                .connect()
+            UnauthenticatedConnection::with_ports(proxy_port, control_port)
+                .init_authenticated_connection()
                 .await?;
 
         // Expose an onion service that re-directs to the echo server.

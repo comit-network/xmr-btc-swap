@@ -1,5 +1,4 @@
 use anyhow::{anyhow, bail, Result};
-use lazy_static::lazy_static;
 use std::{
     future::Future,
     net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4},
@@ -10,33 +9,32 @@ use torut::{
     onion::TorSecretKeyV3,
 };
 
-// lazy_static! {
-//     The default TOR socks5 proxy address, `127.0.0.1:9050`.
-// pub static ref TOR_PROXY_ADDR: SocketAddrV4 =
-// SocketAddrV4::new(Ipv4Addr::LOCALHOST, 9050); The default TOR Controller
-// Protocol address, `127.0.0.1:9051`. pub static ref TOR_CP_ADDR: SocketAddr =
-// SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 9051)); }
-
-type Handler = fn(AsyncEvent<'_>) -> Box<dyn Future<Output = Result<(), ConnError>> + Unpin>;
-
-#[allow(missing_debug_implementations)]
-pub struct AuthenticatedConnection {
+#[derive(Debug, Clone, Copy)]
+pub struct UnauthenticatedConnection {
     tor_proxy_address: SocketAddrV4,
     tor_control_port_address: SocketAddr,
-    authenticated_connection: Option<AuthenticatedConn<TcpStream, Handler>>,
 }
 
-impl Default for AuthenticatedConnection {
+impl Default for UnauthenticatedConnection {
     fn default() -> Self {
         Self {
             tor_proxy_address: SocketAddrV4::new(Ipv4Addr::LOCALHOST, 9050),
             tor_control_port_address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 9051)),
-            authenticated_connection: None,
         }
     }
 }
 
-impl AuthenticatedConnection {
+impl UnauthenticatedConnection {
+    pub fn with_ports(proxy_port: u16, control_port: u16) -> Self {
+        Self {
+            tor_proxy_address: SocketAddrV4::new(Ipv4Addr::LOCALHOST, proxy_port),
+            tor_control_port_address: SocketAddr::V4(SocketAddrV4::new(
+                Ipv4Addr::LOCALHOST,
+                control_port,
+            )),
+        }
+    }
+
     /// checks if tor is running
     async fn tor_running(&self) -> Result<()> {
         // Make sure you are running tor and this is your socks port
@@ -60,25 +58,14 @@ impl AuthenticatedConnection {
     }
 
     async fn init_unauthenticated_connection(&self) -> Result<UnauthenticatedConn<TcpStream>> {
-        // try to connect to local tor service via control port
+        // Connect to local tor service via control port
         let sock = TcpStream::connect(self.tor_control_port_address).await?;
         let unauthenticated_connection = UnauthenticatedConn::new(sock);
         Ok(unauthenticated_connection)
     }
 
-    pub fn with_ports(proxy_port: u16, control_port: u16) -> Self {
-        Self {
-            tor_proxy_address: SocketAddrV4::new(Ipv4Addr::LOCALHOST, proxy_port),
-            tor_control_port_address: SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::LOCALHOST,
-                control_port,
-            )),
-            authenticated_connection: None,
-        }
-    }
-
     /// Create a new authenticated connection to your local Tor service
-    pub async fn connect(self) -> Result<Self> {
+    pub async fn init_authenticated_connection(self) -> Result<AuthenticatedConnection> {
         self.tor_running().await?;
 
         let mut unauthenticated_connection = match self.init_unauthenticated_connection().await {
@@ -105,33 +92,36 @@ impl AuthenticatedConnection {
         let authenticated_connection = unauthenticated_connection.into_authenticated().await;
 
         Ok(AuthenticatedConnection {
-            authenticated_connection: Some(authenticated_connection),
-            ..self
+            authenticated_connection,
         })
     }
+}
 
+type Handler = fn(AsyncEvent<'_>) -> Box<dyn Future<Output = Result<(), ConnError>> + Unpin>;
+
+#[allow(missing_debug_implementations)]
+pub struct AuthenticatedConnection {
+    authenticated_connection: AuthenticatedConn<TcpStream, Handler>,
+}
+
+impl AuthenticatedConnection {
     /// Add an ephemeral tor service on localhost with the provided key
     pub async fn add_service(&mut self, port: u16, tor_key: &TorSecretKeyV3) -> Result<()> {
-        match self.authenticated_connection {
-            None => bail!("Not connected to local tor instance"),
-            Some(ref mut aut) => {
-                aut.add_onion_v3(
-                    tor_key,
-                    false,
-                    false,
-                    false,
-                    None,
-                    &mut [(
-                        port,
-                        SocketAddr::new(IpAddr::from(Ipv4Addr::new(127, 0, 0, 1)), port),
-                    )]
-                    .iter(),
-                )
-                .await
-                .map_err(|_| anyhow!("Could not add onion service."))?;
-            }
-        }
-
+        self.authenticated_connection
+            .add_onion_v3(
+                tor_key,
+                false,
+                false,
+                false,
+                None,
+                &mut [(
+                    port,
+                    SocketAddr::new(IpAddr::from(Ipv4Addr::new(127, 0, 0, 1)), port),
+                )]
+                .iter(),
+            )
+            .await
+            .map_err(|_| anyhow!("Could not add onion service."))?;
         Ok(())
     }
 }
