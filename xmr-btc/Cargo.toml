@@ -22,7 +22,7 @@ serde_json = "1"
 sha2 = "0.9"
 thiserror = "1"
 tokio = { version = "0.2", default-features = false, features = ["blocking", "macros", "rt-core", "time", "rt-threaded"] }
-torut = "0.1"
+torut = { version = "0.1", optional = true }
 tracing = "0.1"
 
 [dev-dependencies]
@@ -35,3 +35,7 @@ spectral = "0.6"
 testcontainers = "0.10"
 tracing = "0.1"
 tracing-subscriber = "0.2"
+
+[features]
+default = []
+tor = ["torut"]

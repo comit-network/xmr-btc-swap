@@ -46,6 +46,9 @@ jobs:
   build_test:
     runs-on: ubuntu-latest
     steps:
+      - name: Install tor
+        run: sudo apt-get tor
+
       - name: Checkout sources
         uses: actions/checkout@v2
 
