@@ -188,7 +188,7 @@ impl State0 {
 
     pub fn receive(self, msg: bob::Message0) -> Result<State1> {
         msg.dleq_proof_s_b.verify(
-            &msg.S_b_bitcoin.clone().into(),
+            msg.S_b_bitcoin.clone().into(),
             msg.S_b_monero
                 .point
                 .decompress()
