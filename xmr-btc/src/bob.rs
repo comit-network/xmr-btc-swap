@@ -102,7 +102,7 @@ impl_from_child_enum!(State3, State);
 impl_from_child_enum!(State4, State);
 impl_from_child_enum!(State5, State);
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct State0 {
     b: bitcoin::SecretKey,
     s_b: cross_curve_dleq::Scalar,
@@ -190,7 +190,7 @@ impl State0 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct State1 {
     A: bitcoin::PublicKey,
     b: bitcoin::SecretKey,

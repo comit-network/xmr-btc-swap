@@ -129,7 +129,7 @@ impl State {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct State0 {
     a: bitcoin::SecretKey,
     s_a: cross_curve_dleq::Scalar,
@@ -215,7 +215,7 @@ impl State0 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct State1 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,

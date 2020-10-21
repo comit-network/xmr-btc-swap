@@ -11,7 +11,7 @@ pub enum Message {
     Message2(Message2),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Message0 {
     pub(crate) A: bitcoin::PublicKey,
     pub(crate) S_a_monero: monero::PublicKey,
@@ -22,13 +22,13 @@ pub struct Message0 {
     pub(crate) punish_address: bitcoin::Address,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Message1 {
     pub(crate) tx_cancel_sig: Signature,
     pub(crate) tx_refund_encsig: EncryptedSignature,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Message2 {
     pub(crate) tx_lock_proof: monero::TransferProof,
 }
