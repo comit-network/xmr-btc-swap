@@ -10,10 +10,7 @@ use bitcoin::{
 };
 use ecdsa_fun::{
     adaptor::Adaptor,
-    fun::{
-        marker::{Jacobian, Mark},
-        Point, Scalar,
-    },
+    fun::{Point, Scalar},
     nonce::Deterministic,
     ECDSA,
 };
@@ -87,9 +84,9 @@ impl SecretKey {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PublicKey(Point);
 
-impl From<PublicKey> for Point<Jacobian> {
+impl From<PublicKey> for Point {
     fn from(from: PublicKey) -> Self {
-        from.0.mark::<Jacobian>()
+        from.0
     }
 }
 
