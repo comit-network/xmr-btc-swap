@@ -131,7 +131,7 @@ impl State {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct State0 {
     a: bitcoin::SecretKey,
     #[serde(with = "cross_curve_dleq_scalar")]
@@ -219,7 +219,7 @@ impl State0 {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct State1 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
@@ -259,7 +259,7 @@ impl State1 {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct State2 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
@@ -336,7 +336,7 @@ impl State2 {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct State3 {
     pub a: bitcoin::SecretKey,
     pub B: bitcoin::PublicKey,
@@ -393,7 +393,7 @@ impl State3 {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct State4 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
@@ -500,7 +500,7 @@ impl State4 {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct State5 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
@@ -595,7 +595,7 @@ impl State5 {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct State6 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
