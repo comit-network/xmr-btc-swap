@@ -106,7 +106,7 @@ mod tests {
     async fn recover_state_from_db() {
         let db = Database::open(Path::new("../target/test_recover.db")).unwrap();
 
-        let a = crate::bitcoin::SecretKey::new_random(&mut OsRng);
+        let a = xmr_btc::bitcoin::SecretKey::new_random(&mut OsRng);
         let s_a = cross_curve_dleq::Scalar::random(&mut OsRng);
         let s_b = monero::PrivateKey::from_scalar(Scalar::random(&mut OsRng));
         let v_a = xmr_btc::monero::PrivateViewKey::new_random(&mut OsRng);
@@ -125,7 +125,7 @@ mod tests {
             S_a_bitcoin,
             v: v_a,
             btc: ::bitcoin::Amount::from_sat(100),
-            xmr: crate::monero::Amount::from_piconero(1000),
+            xmr: xmr_btc::monero::Amount::from_piconero(1000),
             refund_timelock: 0,
             refund_address: ::bitcoin::Address::from_str("1L5wSMgerhHg8GZGcsNmAx5EXMRXSKR3He")
                 .unwrap(),

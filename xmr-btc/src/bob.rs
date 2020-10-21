@@ -5,7 +5,7 @@ use crate::{
         WatchForRawTransaction,
     },
     monero,
-    monero::{CheckTransfer, CreateWalletForOutput, WatchForTransfer},
+    monero::{CreateWalletForOutput, WatchForTransfer},
     serde::{bitcoin_amount, cross_curve_dleq_scalar, monero_private_key},
     transport::{ReceiveMessage, SendMessage},
 };

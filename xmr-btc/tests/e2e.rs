@@ -62,7 +62,7 @@ pub fn init_alice_and_bob_transports() -> (
 }
 
 pub async fn init_test<'a>(
-    monero: &'a Monero<'a>,
+    monero: &'a Monero,
     bitcoind: &Bitcoind<'a>,
 ) -> (
     alice::State0,
@@ -391,7 +391,7 @@ mod tests {
             .set_default();
 
         let cli = Cli::default();
-        let monero = Monero::new(&cli);
+        let (monero, _container) = Monero::new(&cli);
         let bitcoind = init_bitcoind(&cli).await;
         let alice_db = harness::storage::Database::open(Path::new(ALICE_TEST_DB_FOLDER)).unwrap();
         let bob_db = harness::storage::Database::open(Path::new(BOB_TEST_DB_FOLDER)).unwrap();
@@ -468,21 +468,11 @@ mod tests {
             .await
             .unwrap();
 
-        let alice_final_xmr_balance = alice_node
-            .monero_wallet
-            .0
-            .get_balance_alice()
-            .await
-            .unwrap();
+        let alice_final_xmr_balance = alice_node.monero_wallet.0.get_balance(0).await.unwrap();
 
-        bob_node
-            .monero_wallet
-            .0
-            .wait_for_bob_wallet_block_height()
-            .await
-            .unwrap();
+        monero.wait_for_bob_wallet_block_height().await.unwrap();
 
-        let bob_final_xmr_balance = bob_node.monero_wallet.0.get_balance_bob().await.unwrap();
+        let bob_final_xmr_balance = bob_node.monero_wallet.0.get_balance(0).await.unwrap();
 
         assert_eq!(
             alice_final_btc_balance,
