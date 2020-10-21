@@ -142,6 +142,11 @@ pub async fn init_test<'a>(
 }
 
 mod tests {
+    // NOTE: For some reason running these tests overflows the stack. In order to
+    // mitigate this run them with:
+    //
+    //     RUST_MIN_STACK=100000000 cargo test
+
     use crate::{
         harness,
         harness::node::{run_alice_until, run_bob_until},
