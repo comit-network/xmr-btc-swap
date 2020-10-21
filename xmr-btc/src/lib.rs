@@ -59,6 +59,14 @@ use futures::{
 };
 use genawaiter::sync::{Gen, GenBoxed};
 use sha2::Sha256;
+use std::{sync::Arc, time::Duration};
+use tokio::time::timeout;
+use tracing::error;
+
+// TODO: Replace this with something configurable, such as an function argument.
+/// Time that Bob has to publish the Bitcoin lock transaction before both
+/// parties will abort, in seconds.
+const SECS_TO_ACT_BOB: u64 = 60;
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
@@ -80,8 +88,13 @@ pub trait ReceiveTransferProof {
 }
 
 #[async_trait]
-pub trait MedianTime {
-    async fn median_time(&self) -> u32;
+pub trait BlockHeight {
+    async fn block_height(&self) -> u32;
+}
+
+#[async_trait]
+pub trait TransactionBlockHeight {
+    async fn transaction_block_height(&self, txid: bitcoin::Txid) -> u32;
 }
 
 /// Perform the on-chain protocol to swap monero and bitcoin as Bob.
@@ -89,9 +102,9 @@ pub trait MedianTime {
 /// This is called post handshake, after all the keys, addresses and most of the
 /// signatures have been exchanged.
 pub fn action_generator_bob<N, M, B>(
-    network: &'static mut N,
-    monero_client: &'static M,
-    bitcoin_client: &'static B,
+    mut network: N,
+    monero_client: Arc<M>,
+    bitcoin_client: Arc<B>,
     // TODO: Replace this with a new, slimmer struct?
     bob::State2 {
         A,
@@ -111,10 +124,16 @@ pub fn action_generator_bob<N, M, B>(
     }: bob::State2,
 ) -> GenBoxed<BobAction, (), ()>
 where
-    N: ReceiveTransferProof + Send + Sync,
-    M: monero::WatchForTransfer + Send + Sync,
-    B: MedianTime + bitcoin::WatchForRawTransaction + Send + Sync,
+    N: ReceiveTransferProof + Send + Sync + 'static,
+    M: monero::WatchForTransfer + Send + Sync + 'static,
+    B: BlockHeight
+        + TransactionBlockHeight
+        + bitcoin::WatchForRawTransaction
+        + Send
+        + Sync
+        + 'static,
 {
+    #[derive(Debug)]
     enum SwapFailed {
         BeforeBtcLock,
         AfterBtcLock(Reason),
@@ -122,6 +141,7 @@ where
     }
 
     /// Reason why the swap has failed.
+    #[derive(Debug)]
     enum Reason {
         /// The refund timelock has been reached.
         BtcExpired,
@@ -140,37 +160,40 @@ where
             if condition_future.clone().await {
                 return;
             }
+
+            tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
         }
     }
 
-    async fn bitcoin_time_is_gte<B>(bitcoin_client: &B, timestamp: u32) -> bool
+    async fn bitcoin_block_height_is_gte<B>(bitcoin_client: &B, n_blocks: u32) -> bool
     where
-        B: MedianTime,
+        B: BlockHeight,
     {
-        bitcoin_client.median_time().await >= timestamp
+        bitcoin_client.block_height().await >= n_blocks
     }
 
     Gen::new_boxed(|co| async move {
         let swap_result: Result<(), SwapFailed> = async {
-            let btc_has_expired = bitcoin_time_is_gte(bitcoin_client, refund_timelock).shared();
-            let poll_until_btc_has_expired = poll_until(btc_has_expired.clone()).shared();
-            futures::pin_mut!(poll_until_btc_has_expired);
-
-            if btc_has_expired.clone().await {
-                return Err(SwapFailed::BeforeBtcLock);
-            }
-
             co.yield_(BobAction::LockBitcoin(tx_lock.clone())).await;
 
-            match select(
+            timeout(
+                Duration::from_secs(SECS_TO_ACT_BOB),
                 bitcoin_client.watch_for_raw_transaction(tx_lock.txid()),
-                poll_until_btc_has_expired.clone(),
             )
             .await
-            {
-                Either::Left(_) => {}
-                Either::Right(_) => return Err(SwapFailed::BeforeBtcLock),
-            }
+            .map(|tx| tx.txid())
+            .map_err(|_| SwapFailed::BeforeBtcLock)?;
+
+            let tx_lock_height = bitcoin_client
+                .transaction_block_height(tx_lock.txid())
+                .await;
+            let btc_has_expired = bitcoin_block_height_is_gte(
+                bitcoin_client.as_ref(),
+                tx_lock_height + refund_timelock,
+            )
+            .shared();
+            let poll_until_btc_has_expired = poll_until(btc_has_expired).shared();
+            futures::pin_mut!(poll_until_btc_has_expired);
 
             let transfer_proof = match select(
                 network.receive_transfer_proof(),
@@ -245,7 +268,9 @@ where
         }
         .await;
 
-        if let Err(SwapFailed::AfterBtcLock(_)) = swap_result {
+        if let Err(err @ SwapFailed::AfterBtcLock(_)) = swap_result {
+            error!("Swap failed, reason: {:?}", err);
+
             let tx_cancel =
                 bitcoin::TxCancel::new(&tx_lock, refund_timelock, A.clone(), b.public());
             let tx_cancel_txid = tx_cancel.txid();
@@ -316,10 +341,9 @@ pub trait ReceiveBitcoinRedeemEncsig {
 ///
 /// This is called post handshake, after all the keys, addresses and most of the
 /// signatures have been exchanged.
-pub fn action_generator_alice<N, M, B>(
-    network: &'static mut N,
-    _monero_client: &'static M,
-    bitcoin_client: &'static B,
+pub fn action_generator_alice<N, B>(
+    mut network: N,
+    bitcoin_client: Arc<B>,
     // TODO: Replace this with a new, slimmer struct?
     alice::State3 {
         a,
@@ -341,16 +365,22 @@ pub fn action_generator_alice<N, M, B>(
     }: alice::State3,
 ) -> GenBoxed<AliceAction, (), ()>
 where
-    N: ReceiveBitcoinRedeemEncsig + Send + Sync,
-    M: Send + Sync,
-    B: MedianTime + bitcoin::WatchForRawTransaction + Send + Sync,
+    N: ReceiveBitcoinRedeemEncsig + Send + Sync + 'static,
+    B: BlockHeight
+        + TransactionBlockHeight
+        + bitcoin::WatchForRawTransaction
+        + Send
+        + Sync
+        + 'static,
 {
+    #[derive(Debug)]
     enum SwapFailed {
         BeforeBtcLock,
         AfterXmrLock(Reason),
     }
 
     /// Reason why the swap has failed.
+    #[derive(Debug)]
     enum Reason {
         /// The refund timelock has been reached.
         BtcExpired,
@@ -373,31 +403,37 @@ where
             if condition_future.clone().await {
                 return;
             }
+
+            tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
         }
     }
 
-    async fn bitcoin_time_is_gte<B>(bitcoin_client: &B, timestamp: u32) -> bool
+    async fn bitcoin_block_height_is_gte<B>(bitcoin_client: &B, n_blocks: u32) -> bool
     where
-        B: MedianTime,
+        B: BlockHeight,
     {
-        bitcoin_client.median_time().await >= timestamp
+        bitcoin_client.block_height().await >= n_blocks
     }
 
     Gen::new_boxed(|co| async move {
         let swap_result: Result<(), SwapFailed> = async {
-            let btc_has_expired = bitcoin_time_is_gte(bitcoin_client, refund_timelock).shared();
-            let poll_until_btc_has_expired = poll_until(btc_has_expired.clone()).shared();
-            futures::pin_mut!(poll_until_btc_has_expired);
-
-            match select(
+            timeout(
+                Duration::from_secs(SECS_TO_ACT_BOB),
                 bitcoin_client.watch_for_raw_transaction(tx_lock.txid()),
-                poll_until_btc_has_expired.clone(),
             )
             .await
-            {
-                Either::Left(_) => {}
-                Either::Right(_) => return Err(SwapFailed::BeforeBtcLock),
-            }
+            .map_err(|_| SwapFailed::BeforeBtcLock)?;
+
+            let tx_lock_height = bitcoin_client
+                .transaction_block_height(tx_lock.txid())
+                .await;
+            let btc_has_expired = bitcoin_block_height_is_gte(
+                bitcoin_client.as_ref(),
+                tx_lock_height + refund_timelock,
+            )
+            .shared();
+            let poll_until_btc_has_expired = poll_until(btc_has_expired).shared();
+            futures::pin_mut!(poll_until_btc_has_expired);
 
             let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey {
                 scalar: s_a.into_ed25519(),
@@ -459,7 +495,7 @@ where
         if let Err(SwapFailed::AfterXmrLock(Reason::BtcExpired)) = swap_result {
             let refund_result: Result<(), RefundFailed> = async {
                 let bob_can_be_punished =
-                    bitcoin_time_is_gte(bitcoin_client, punish_timelock).shared();
+                    bitcoin_block_height_is_gte(bitcoin_client.as_ref(), punish_timelock).shared();
                 let poll_until_bob_can_be_punished = poll_until(bob_can_be_punished).shared();
                 futures::pin_mut!(poll_until_bob_can_be_punished);
 

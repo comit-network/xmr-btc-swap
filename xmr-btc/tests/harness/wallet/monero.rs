@@ -1,15 +1,24 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use backoff::{future::FutureOperation as _, ExponentialBackoff};
+use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
 use monero::{Address, Network, PrivateKey};
 use monero_harness::rpc::wallet;
-use std::str::FromStr;
+use std::{str::FromStr, time::Duration};
 use xmr_btc::monero::{
     Amount, CreateWalletForOutput, InsufficientFunds, PrivateViewKey, PublicKey, PublicViewKey,
     Transfer, TransferProof, TxHash, WatchForTransfer,
 };
 
 pub struct Wallet(pub wallet::Client);
+
+impl Wallet {
+    /// Get the balance of the primary account.
+    pub async fn get_balance(&self) -> Result<Amount> {
+        let amount = self.0.get_balance(0).await?;
+
+        Ok(Amount::from_piconero(amount))
+    }
+}
 
 #[async_trait]
 impl Transfer for Wallet {
@@ -106,10 +115,7 @@ impl WatchForTransfer for Wallet {
 
             Ok(proof)
         })
-        .retry(ExponentialBackoff {
-            max_elapsed_time: None,
-            ..Default::default()
-        })
+        .retry(ConstantBackoff::new(Duration::from_secs(1)))
         .await;
 
         if let Err(Error::InsufficientFunds { expected, actual }) = res {

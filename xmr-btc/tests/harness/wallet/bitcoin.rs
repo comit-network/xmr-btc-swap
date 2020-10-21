@@ -1,6 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use backoff::{future::FutureOperation as _, ExponentialBackoff};
+use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
 use bitcoin::{util::psbt::PartiallySignedTransaction, Address, Amount, Transaction, Txid};
 use bitcoin_harness::{bitcoind_rpc::PsbtBase64, Bitcoind};
 use reqwest::Url;
@@ -10,7 +10,7 @@ use xmr_btc::{
     bitcoin::{
         BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock, TxLock, WatchForRawTransaction,
     },
-    MedianTime,
+    BlockHeight, TransactionBlockHeight,
 };
 
 #[derive(Debug)]
@@ -114,24 +114,45 @@ impl BroadcastSignedTransaction for Wallet {
 impl WatchForRawTransaction for Wallet {
     async fn watch_for_raw_transaction(&self, txid: Txid) -> Transaction {
         (|| async { Ok(self.0.get_raw_transaction(txid).await?) })
-            .retry(ExponentialBackoff {
-                max_elapsed_time: None,
-                ..Default::default()
-            })
+            .retry(ConstantBackoff::new(Duration::from_secs(1)))
             .await
             .expect("transient errors to be retried")
     }
 }
 
 #[async_trait]
-impl MedianTime for Wallet {
-    async fn median_time(&self) -> u32 {
-        (|| async { Ok(self.0.median_time().await?) })
-            .retry(ExponentialBackoff {
-                max_elapsed_time: None,
-                ..Default::default()
-            })
+impl BlockHeight for Wallet {
+    async fn block_height(&self) -> u32 {
+        (|| async { Ok(self.0.block_height().await?) })
+            .retry(ConstantBackoff::new(Duration::from_secs(1)))
             .await
             .expect("transient errors to be retried")
+    }
+}
+
+#[async_trait]
+impl TransactionBlockHeight for Wallet {
+    async fn transaction_block_height(&self, txid: Txid) -> u32 {
+        #[derive(Debug)]
+        enum Error {
+            Io,
+            NotYetMined,
+        }
+
+        (|| async {
+            let block_height = self
+                .0
+                .transaction_block_height(txid)
+                .await
+                .map_err(|_| backoff::Error::Transient(Error::Io))?;
+
+            let block_height =
+                block_height.ok_or_else(|| backoff::Error::Transient(Error::NotYetMined))?;
+
+            Result::<_, backoff::Error<Error>>::Ok(block_height)
+        })
+        .retry(ConstantBackoff::new(Duration::from_secs(1)))
+        .await
+        .expect("transient errors to be retried")
     }
 }

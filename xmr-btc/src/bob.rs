@@ -50,13 +50,15 @@ pub async fn next_state<
 
             let message1 = transport.receive_message().await?.try_into()?;
             let state2 = state1.receive(message1)?;
+
+            let message2 = state2.next_message();
+            transport.send_message(message2.into()).await?;
             Ok(state2.into())
         }
         State::State2(state2) => {
-            let message2 = state2.next_message();
             let state3 = state2.lock_btc(bitcoin_wallet).await?;
             tracing::info!("bob has locked btc");
-            transport.send_message(message2.into()).await?;
+
             Ok(state3.into())
         }
         State::State3(state3) => {

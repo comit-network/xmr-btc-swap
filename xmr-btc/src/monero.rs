@@ -2,7 +2,7 @@ use async_trait::async_trait;
 pub use curve25519_dalek::scalar::Scalar;
 pub use monero::{Address, PrivateKey, PublicKey};
 use rand::{CryptoRng, RngCore};
-use std::ops::Add;
+use std::ops::{Add, Sub};
 
 pub const MIN_CONFIRMATIONS: u32 = 10;
 
@@ -51,7 +51,7 @@ impl From<PublicViewKey> for PublicKey {
 #[derive(Clone, Copy, Debug)]
 pub struct PublicViewKey(PublicKey);
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct Amount(u64);
 
 impl Amount {
@@ -64,6 +64,22 @@ impl Amount {
     }
     pub fn as_piconero(&self) -> u64 {
         self.0
+    }
+}
+
+impl Add for Amount {
+    type Output = Amount;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl Sub for Amount {
+    type Output = Amount;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0)
     }
 }
 
