@@ -3,7 +3,7 @@ use crate::{
     bitcoin::{BroadcastSignedTransaction, WatchForRawTransaction},
     bob, monero,
     monero::{CreateWalletForOutput, Transfer},
-    serde::{bitcoin_amount, cross_curve_dleq_scalar, ecdsa_fun_signature},
+    serde::{bitcoin_amount, cross_curve_dleq_scalar},
     transport::{ReceiveMessage, SendMessage},
 };
 use anyhow::{anyhow, Result};
@@ -347,17 +347,15 @@ pub struct State3 {
     pub v: monero::PrivateViewKey,
     #[serde(with = "bitcoin_amount")]
     btc: bitcoin::Amount,
-    pub xmr: monero::Amount,
-    pub refund_timelock: u32,
-    pub punish_timelock: u32,
-    pub refund_address: bitcoin::Address,
-    pub redeem_address: bitcoin::Address,
-    pub punish_address: bitcoin::Address,
-    pub tx_lock: bitcoin::TxLock,
-    #[serde(with = "ecdsa_fun_signature")]
-    pub tx_punish_sig_bob: bitcoin::Signature,
-    #[serde(with = "ecdsa_fun_signature")]
-    pub tx_cancel_sig_bob: bitcoin::Signature,
+    xmr: monero::Amount,
+    refund_timelock: u32,
+    punish_timelock: u32,
+    refund_address: bitcoin::Address,
+    redeem_address: bitcoin::Address,
+    punish_address: bitcoin::Address,
+    tx_lock: bitcoin::TxLock,
+    tx_punish_sig_bob: bitcoin::Signature,
+    tx_cancel_sig_bob: bitcoin::Signature,
 }
 
 impl State3 {
@@ -411,9 +409,7 @@ pub struct State4 {
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
-    #[serde(with = "ecdsa_fun_signature")]
     tx_punish_sig_bob: bitcoin::Signature,
-    #[serde(with = "ecdsa_fun_signature")]
     tx_cancel_sig_bob: bitcoin::Signature,
 }
 
@@ -519,9 +515,9 @@ pub struct State5 {
     punish_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
     tx_lock_proof: monero::TransferProof,
-    #[serde(with = "ecdsa_fun_signature")]
+
     tx_punish_sig_bob: bitcoin::Signature,
-    #[serde(with = "ecdsa_fun_signature")]
+
     tx_cancel_sig_bob: bitcoin::Signature,
     lock_xmr_fee: monero::Amount,
 }
@@ -613,7 +609,7 @@ pub struct State6 {
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
-    #[serde(with = "ecdsa_fun_signature")]
+
     tx_punish_sig_bob: bitcoin::Signature,
     tx_redeem_encsig: EncryptedSignature,
     lock_xmr_fee: monero::Amount,

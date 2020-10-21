@@ -10,10 +10,8 @@ impl Database {
     const LAST_STATE_KEY: &'static str = "latest_state";
 
     pub fn open(path: &Path) -> Result<Self> {
-        let path = path
-            .to_str()
-            .ok_or_else(|| anyhow!("The path is not utf-8 valid: {:?}", path))?;
-        let db = sled::open(path).with_context(|| format!("Could not open the DB at {}", path))?;
+        let db =
+            sled::open(path).with_context(|| format!("Could not open the DB at {:?}", path))?;
 
         Ok(Database { db })
     }
@@ -30,7 +28,7 @@ impl Database {
         self.db
             .compare_and_swap(key, old_value, Some(new_value))
             .context("Could not write in the DB")?
-            .context("Stored swap somehow changed, aborting saving")?; // let _ =
+            .context("Stored swap somehow changed, aborting saving")?;
 
         self.db
             .flush_async()
@@ -77,9 +75,7 @@ mod tests {
     use curve25519_dalek::scalar::Scalar;
     use ecdsa_fun::fun::rand_core::OsRng;
     use std::str::FromStr;
-    use xmr_btc::serde::{
-        bitcoin_amount, cross_curve_dleq_scalar, ecdsa_fun_signature, monero_private_key,
-    };
+    use xmr_btc::serde::{bitcoin_amount, cross_curve_dleq_scalar, monero_private_key};
 
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     pub struct TestState {
@@ -98,7 +94,6 @@ mod tests {
         refund_timelock: u32,
         refund_address: ::bitcoin::Address,
         transaction: ::bitcoin::Transaction,
-        #[serde(with = "ecdsa_fun_signature")]
         tx_punish_sig: xmr_btc::bitcoin::Signature,
     }
 
