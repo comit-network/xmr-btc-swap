@@ -76,4 +76,6 @@ jobs:
       - name: Cargo test
         run: cargo test --workspace --all-features
         env:
+          # To avoid stack overflows
+          RUST_MIN_STACK: 100000000
           MONERO_ADDITIONAL_SLEEP_PERIOD: 60000

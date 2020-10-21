@@ -3,6 +3,7 @@ use crate::{
     bitcoin::{BroadcastSignedTransaction, WatchForRawTransaction},
     bob, monero,
     monero::{CreateWalletForOutput, Transfer},
+    serde::{bitcoin_amount, cross_curve_dleq_scalar, ecdsa_fun_signature},
     transport::{ReceiveMessage, SendMessage},
 };
 use anyhow::{anyhow, Result};
@@ -11,6 +12,7 @@ use ecdsa_fun::{
     nonce::Deterministic,
 };
 use rand::{CryptoRng, RngCore};
+use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::convert::{TryFrom, TryInto};
 
@@ -129,11 +131,13 @@ impl State {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct State0 {
     a: bitcoin::SecretKey,
+    #[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     v_a: monero::PrivateViewKey,
+    #[serde(with = "bitcoin_amount")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     refund_timelock: u32,
@@ -188,7 +192,7 @@ impl State0 {
 
     pub fn receive(self, msg: bob::Message0) -> Result<State1> {
         msg.dleq_proof_s_b.verify(
-            &msg.S_b_bitcoin.clone().into(),
+            msg.S_b_bitcoin.clone().into(),
             msg.S_b_monero
                 .point
                 .decompress()
@@ -215,14 +219,16 @@ impl State0 {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct State1 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
+    #[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
+    #[serde(with = "bitcoin_amount")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     refund_timelock: u32,
@@ -253,14 +259,16 @@ impl State1 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct State2 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
+    #[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
+    #[serde(with = "bitcoin_amount")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     refund_timelock: u32,
@@ -328,14 +336,16 @@ impl State2 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct State3 {
     pub a: bitcoin::SecretKey,
     pub B: bitcoin::PublicKey,
+    #[serde(with = "cross_curve_dleq_scalar")]
     pub s_a: cross_curve_dleq::Scalar,
     pub S_b_monero: monero::PublicKey,
     pub S_b_bitcoin: bitcoin::PublicKey,
     pub v: monero::PrivateViewKey,
+    #[serde(with = "bitcoin_amount")]
     btc: bitcoin::Amount,
     pub xmr: monero::Amount,
     pub refund_timelock: u32,
@@ -344,7 +354,9 @@ pub struct State3 {
     pub redeem_address: bitcoin::Address,
     pub punish_address: bitcoin::Address,
     pub tx_lock: bitcoin::TxLock,
+    #[serde(with = "ecdsa_fun_signature")]
     pub tx_punish_sig_bob: bitcoin::Signature,
+    #[serde(with = "ecdsa_fun_signature")]
     pub tx_cancel_sig_bob: bitcoin::Signature,
 }
 
@@ -381,14 +393,16 @@ impl State3 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct State4 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
+    #[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
+    #[serde(with = "bitcoin_amount")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     refund_timelock: u32,
@@ -397,7 +411,9 @@ pub struct State4 {
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
+    #[serde(with = "ecdsa_fun_signature")]
     tx_punish_sig_bob: bitcoin::Signature,
+    #[serde(with = "ecdsa_fun_signature")]
     tx_cancel_sig_bob: bitcoin::Signature,
 }
 
@@ -484,14 +500,16 @@ impl State4 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct State5 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
+    #[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
+    #[serde(with = "bitcoin_amount")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     refund_timelock: u32,
@@ -501,7 +519,9 @@ pub struct State5 {
     punish_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
     tx_lock_proof: monero::TransferProof,
+    #[serde(with = "ecdsa_fun_signature")]
     tx_punish_sig_bob: bitcoin::Signature,
+    #[serde(with = "ecdsa_fun_signature")]
     tx_cancel_sig_bob: bitcoin::Signature,
     lock_xmr_fee: monero::Amount,
 }
@@ -575,14 +595,16 @@ impl State5 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct State6 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
+    #[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
+    #[serde(with = "bitcoin_amount")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     refund_timelock: u32,
@@ -591,6 +613,7 @@ pub struct State6 {
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
+    #[serde(with = "ecdsa_fun_signature")]
     tx_punish_sig_bob: bitcoin::Signature,
     tx_redeem_encsig: EncryptedSignature,
     lock_xmr_fee: monero::Amount,

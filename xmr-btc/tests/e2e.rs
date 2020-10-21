@@ -18,6 +18,8 @@ use xmr_btc::{alice, bitcoin, bob, monero};
 const TEN_XMR: u64 = 10_000_000_000_000;
 const RELATIVE_REFUND_TIMELOCK: u32 = 1;
 const RELATIVE_PUNISH_TIMELOCK: u32 = 1;
+const ALICE_TEST_DB_FOLDER: &str = "../target/e2e-test-alice-recover";
+const BOB_TEST_DB_FOLDER: &str = "../target/e2e-test-bob-recover";
 
 pub async fn init_bitcoind(tc_client: &Cli) -> Bitcoind<'_> {
     let bitcoind = Bitcoind::new(tc_client, "0.19.1").expect("failed to create bitcoind");
@@ -59,9 +61,9 @@ pub fn init_alice_and_bob_transports() -> (
     (a_transport, b_transport)
 }
 
-pub async fn init_test(
-    monero: &Monero,
-    bitcoind: &Bitcoind<'_>,
+pub async fn init_test<'a>(
+    monero: &'a Monero<'a>,
+    bitcoind: &Bitcoind<'a>,
 ) -> (
     alice::State0,
     bob::State0,
@@ -142,15 +144,21 @@ pub async fn init_test(
 }
 
 mod tests {
+    // NOTE: For some reason running these tests overflows the stack. In order to
+    // mitigate this run them with:
+    //
+    //     RUST_MIN_STACK=100000000 cargo test
+
     use crate::{
         harness,
         harness::node::{run_alice_until, run_bob_until},
-        init_bitcoind, init_test,
+        init_bitcoind, init_test, ALICE_TEST_DB_FOLDER, BOB_TEST_DB_FOLDER,
     };
     use futures::future;
     use monero_harness::Monero;
     use rand::rngs::OsRng;
-    use std::convert::TryInto;
+
+    use std::{convert::TryInto, path::Path};
     use testcontainers::clients::Cli;
     use tracing_subscriber::util::SubscriberInitExt;
     use xmr_btc::{
@@ -373,6 +381,128 @@ mod tests {
         assert_eq!(
             bob_final_btc_balance,
             initial_balances.bob_btc - swap_amounts.btc - lock_tx_bitcoin_fee
+        );
+    }
+
+    #[tokio::test]
+    async fn recover_protocol_state_from_db() {
+        let _guard = tracing_subscriber::fmt()
+            .with_env_filter("info")
+            .set_default();
+
+        let cli = Cli::default();
+        let monero = Monero::new(&cli);
+        let bitcoind = init_bitcoind(&cli).await;
+        let alice_db = harness::storage::Database::open(Path::new(ALICE_TEST_DB_FOLDER)).unwrap();
+        let bob_db = harness::storage::Database::open(Path::new(BOB_TEST_DB_FOLDER)).unwrap();
+
+        let (
+            alice_state0,
+            bob_state0,
+            mut alice_node,
+            mut bob_node,
+            initial_balances,
+            swap_amounts,
+        ) = init_test(&monero, &bitcoind).await;
+
+        {
+            let (alice_state, bob_state) = future::try_join(
+                run_alice_until(
+                    &mut alice_node,
+                    alice_state0.into(),
+                    harness::alice::is_state5,
+                    &mut OsRng,
+                ),
+                run_bob_until(
+                    &mut bob_node,
+                    bob_state0.into(),
+                    harness::bob::is_state3,
+                    &mut OsRng,
+                ),
+            )
+            .await
+            .unwrap();
+
+            let alice_state5: alice::State5 = alice_state.try_into().unwrap();
+            let bob_state3: bob::State3 = bob_state.try_into().unwrap();
+
+            // save state to db
+            alice_db.insert_latest_state(&alice_state5).await.unwrap();
+            bob_db.insert_latest_state(&bob_state3).await.unwrap();
+        };
+
+        let (alice_state6, bob_state5) = {
+            // recover state from db
+            let alice_state5: alice::State5 = alice_db.get_latest_state().unwrap();
+            let bob_state3: bob::State3 = bob_db.get_latest_state().unwrap();
+
+            let (alice_state, bob_state) = future::try_join(
+                run_alice_until(
+                    &mut alice_node,
+                    alice_state5.into(),
+                    harness::alice::is_state6,
+                    &mut OsRng,
+                ),
+                run_bob_until(
+                    &mut bob_node,
+                    bob_state3.into(),
+                    harness::bob::is_state5,
+                    &mut OsRng,
+                ),
+            )
+            .await
+            .unwrap();
+
+            let alice_state: alice::State6 = alice_state.try_into().unwrap();
+            let bob_state: bob::State5 = bob_state.try_into().unwrap();
+
+            (alice_state, bob_state)
+        };
+
+        let alice_final_btc_balance = alice_node.bitcoin_wallet.balance().await.unwrap();
+        let bob_final_btc_balance = bob_node.bitcoin_wallet.balance().await.unwrap();
+
+        let lock_tx_bitcoin_fee = bob_node
+            .bitcoin_wallet
+            .transaction_fee(bob_state5.tx_lock_id())
+            .await
+            .unwrap();
+
+        let alice_final_xmr_balance = alice_node
+            .monero_wallet
+            .0
+            .get_balance_alice()
+            .await
+            .unwrap();
+
+        bob_node
+            .monero_wallet
+            .0
+            .wait_for_bob_wallet_block_height()
+            .await
+            .unwrap();
+
+        let bob_final_xmr_balance = bob_node.monero_wallet.0.get_balance_bob().await.unwrap();
+
+        assert_eq!(
+            alice_final_btc_balance,
+            initial_balances.alice_btc + swap_amounts.btc
+                - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
+        );
+        assert_eq!(
+            bob_final_btc_balance,
+            initial_balances.bob_btc - swap_amounts.btc - lock_tx_bitcoin_fee
+        );
+
+        assert_eq!(
+            alice_final_xmr_balance,
+            initial_balances.alice_xmr
+                - u64::from(swap_amounts.xmr)
+                - u64::from(alice_state6.lock_xmr_fee())
+        );
+        assert_eq!(
+            bob_final_xmr_balance,
+            initial_balances.bob_xmr + u64::from(swap_amounts.xmr)
         );
     }
 }
