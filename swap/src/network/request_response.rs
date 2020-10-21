@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, io};
 
 use crate::SwapParams;
-use xmr_btc::{alice, bob, monero};
+use xmr_btc::monero;
 
 /// Time to wait for a response back once we send a request.
 pub const TIMEOUT: u64 = 3600; // One hour.
@@ -19,14 +19,16 @@ pub enum BobToAlice {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     AmountsFromBtc(::bitcoin::Amount),
     AmountsFromXmr(monero::Amount),
-    Message0(bob::Message0),
+    Message0,
+    // Message0(bob::Message0),
 }
 
 /// Messages Alice sends to Bob.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum AliceToBob {
     Amounts(SwapParams),
-    Message0(alice::Message0),
+    Message0,
+    // Message0(alice::Message0),
 }
 
 #[derive(Debug, Clone, Copy, Default)]

@@ -32,7 +32,7 @@ pub async fn swap<R: RngCore + CryptoRng>(
     redeem_address: ::bitcoin::Address,
     punish_address: ::bitcoin::Address,
 ) -> Result<()> {
-    let mut message0: Option<bob::Message0> = None;
+    let message0: Option<bob::Message0> = None;
     let mut last_amounts: Option<SwapParams> = None;
 
     let mut swarm = new_swarm(listen)?;
@@ -48,13 +48,12 @@ pub async fn swap<R: RngCore + CryptoRng>(
                 last_amounts = Some(p);
                 swarm.send(channel, AliceToBob::Amounts(p));
             }
-            OutEvent::Message0(msg) => {
+            OutEvent::Message0 => {
                 debug!("Got message0 from Bob");
                 // TODO: Do this in a more Rusty/functional way.
-                message0 = Some(msg);
+                // message0 = Some(msg);
                 break;
             }
-            other => panic!("unexpected event: {:?}", other),
         };
     }
 
@@ -78,9 +77,9 @@ pub async fn swap<R: RngCore + CryptoRng>(
     );
     swarm.set_state0(state0.clone());
 
-    let state1 = match message0 {
+    let _state1 = match message0 {
         Some(msg) => state0.receive(msg),
-        None => unreachable!("should have msg by here"),
+        None => todo!("implement serde on Message0"),
     };
 
     tracing::warn!("parking thread ...");
@@ -117,7 +116,8 @@ fn new_swarm(listen: Multiaddr) -> Result<Swarm> {
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
     Request(amounts::OutEvent),
-    Message0(bob::Message0),
+    // Message0(bob::Message0),
+    Message0,
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -139,7 +139,8 @@ impl From<amounts::OutEvent> for OutEvent {
 impl From<message0::OutEvent> for OutEvent {
     fn from(event: message0::OutEvent) -> Self {
         match event {
-            message0::OutEvent::Msg(msg) => OutEvent::Message0(msg),
+            // message0::OutEvent::Msg(msg) => OutEvent::Message0(msg),
+            message0::OutEvent::Msg => OutEvent::Message0,
         }
     }
 }
@@ -171,7 +172,7 @@ impl Alice {
     }
 
     pub fn set_state0(&mut self, state: State0) {
-        self.message0.set_state(state);
+        let _ = self.message0.set_state(state);
     }
 }
 

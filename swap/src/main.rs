@@ -20,17 +20,20 @@ use rand::rngs::OsRng;
 use std::{io, io::Write, process};
 use structopt::StructOpt;
 use tracing::info;
+use url::Url;
+
 mod cli;
 mod trace;
 
 use cli::Options;
-use swap::{alice, bob, Cmd, Rsp, SwapParams};
-
+use swap::{alice, bitcoin::Wallet, bob, Cmd, Rsp, SwapParams};
+use xmr_btc::bitcoin::BuildTxLockPsbt;
 // TODO: Add root seed file instead of generating new seed each run.
 
 // Alice's address and port until we have a config file.
 pub const PORT: u16 = 9876; // Arbitrarily chosen.
 pub const ADDR: &str = "127.0.0.1";
+pub const BITCOIND_JSON_RPC_URL: &str = "127.0.0.1:8332";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -48,23 +51,40 @@ async fn main() -> Result<()> {
             bail!("Alice cannot set the amount to swap via the cli");
         }
 
-        // TODO: Get these addresses from command line
-        let redeem = bitcoin::Address::default();
-        let punish = bitcoin::Address::default();
+        let url = Url::parse(BITCOIND_JSON_RPC_URL).expect("failed to parse url");
+        let bitcoin_wallet = Wallet::new("alice", &url)
+            .await
+            .expect("failed to create bitcoin wallet");
 
-        swap_as_alice(alice, redeem, refund).await?;
+        let redeem = bitcoin_wallet
+            .new_address()
+            .await
+            .expect("failed to get new redeem address");
+        let punish = bitcoin_wallet
+            .new_address()
+            .await
+            .expect("failed to get new punish address");
+
+        swap_as_alice(alice.clone(), redeem, punish).await?;
     } else {
         info!("running swap node as Bob ...");
 
-        // TODO: Get refund address from command line
-        let refund = bitcoin::Address::default();
+        let url = Url::parse(BITCOIND_JSON_RPC_URL).expect("failed to parse url");
+        let bitcoin_wallet = Wallet::new("bob", &url)
+            .await
+            .expect("failed to create bitcoin wallet");
+
+        let refund = bitcoin_wallet
+            .new_address()
+            .await
+            .expect("failed to get new address");
 
         match (opt.piconeros, opt.satoshis) {
             (Some(_), Some(_)) => bail!("Please supply only a single amount to swap"),
             (None, None) => bail!("Please supply an amount to swap"),
             (Some(_picos), _) => todo!("support starting with picos"),
             (None, Some(sats)) => {
-                swap_as_bob(sats, alice_addr, refund).await?;
+                swap_as_bob(sats, alice, refund, bitcoin_wallet).await?;
             }
         };
     }
@@ -74,16 +94,24 @@ async fn main() -> Result<()> {
 
 async fn swap_as_alice(
     addr: Multiaddr,
-    redeem: bitcoin::Address::default(),
-    punish: bitcoin::Address::default(),
+    redeem: bitcoin::Address,
+    punish: bitcoin::Address,
 ) -> Result<()> {
-    alice::swap(addr, OsRng, redeem, punish).await
+    alice::swap(addr, &mut OsRng, redeem, punish).await
 }
 
-async fn swap_as_bob(sats: u64, addr: Multiaddr, refund: bitcoin::Address) -> Result<()> {
+async fn swap_as_bob<W>(
+    sats: u64,
+    addr: Multiaddr,
+    refund: bitcoin::Address,
+    wallet: W,
+) -> Result<()>
+where
+    W: BuildTxLockPsbt + Send + Sync + 'static,
+{
     let (cmd_tx, mut cmd_rx) = mpsc::channel(1);
     let (mut rsp_tx, rsp_rx) = mpsc::channel(1);
-    tokio::spawn(bob::swap(sats, addr, cmd_tx, rsp_rx, OsRng, refund));
+    tokio::spawn(bob::swap(sats, addr, cmd_tx, rsp_rx, refund, wallet));
     loop {
         let read = cmd_rx.next().await;
         match read {

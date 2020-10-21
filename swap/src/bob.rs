@@ -6,7 +6,7 @@ use futures::{
     StreamExt,
 };
 use libp2p::{core::identity::Keypair, Multiaddr, NetworkBehaviour, PeerId};
-use rand::{CryptoRng, RngCore};
+use rand::rngs::OsRng;
 use std::{process, thread, time::Duration};
 use tracing::{debug, info, warn};
 
@@ -23,23 +23,20 @@ use crate::{
     Cmd, Rsp, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use xmr_btc::{
-    alice,
     bitcoin::BuildTxLockPsbt,
     bob::{self, State0},
 };
 
-pub async fn swap<W, R>(
+pub async fn swap<W>(
     btc: u64,
     addr: Multiaddr,
     mut cmd_tx: Sender<Cmd>,
     mut rsp_rx: Receiver<Rsp>,
-    rng: &mut R,
     refund_address: ::bitcoin::Address,
-    wallet: &W,
+    _wallet: W,
 ) -> Result<()>
 where
-    W: BuildTxLockPsbt,
-    R: RngCore + CryptoRng,
+    W: BuildTxLockPsbt + Send + Sync + 'static,
 {
     let mut swarm = new_swarm()?;
 
@@ -73,6 +70,7 @@ where
     let xmr = xmr_btc::monero::Amount::from_piconero(xmr.as_piconero());
     let btc = ::bitcoin::Amount::from_sat(btc.as_sat());
 
+    let rng = &mut OsRng;
     let state0 = State0::new(
         rng,
         btc,
@@ -82,9 +80,11 @@ where
         refund_address,
     );
     swarm.send_message0(alice.clone(), state0.next_message(rng));
-    let state1 = match swarm.next().await {
-        OutEvent::Message0(msg) => {
-            state0.receive(wallet, msg) // TODO: More graceful error handling.
+    let _state1 = match swarm.next().await {
+        OutEvent::Message0 => {
+            // state0.receive(wallet, msg) // TODO: More graceful error
+            // handling.
+            println!("TODO: receive after serde is done for Message0")
         }
         other => panic!("unexpected event: {:?}", other),
     };
@@ -120,7 +120,8 @@ fn new_swarm() -> Result<Swarm> {
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
     Amounts(amounts::OutEvent),
-    Message0(alice::Message0),
+    // Message0(alice::Message0),
+    Message0,
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -142,7 +143,8 @@ impl From<amounts::OutEvent> for OutEvent {
 impl From<message0::OutEvent> for OutEvent {
     fn from(event: message0::OutEvent) -> Self {
         match event {
-            message0::OutEvent::Msg(msg) => OutEvent::Message0(msg),
+            // message0::OutEvent::Msg(msg) => OutEvent::Message0(msg),
+            message0::OutEvent::Msg => OutEvent::Message0,
         }
     }
 }
