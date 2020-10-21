@@ -160,7 +160,7 @@ impl State0 {
         W: BuildTxLockPsbt,
     {
         msg.dleq_proof_s_a.verify(
-            &msg.S_a_bitcoin.clone().into(),
+            msg.S_a_bitcoin.clone().into(),
             msg.S_a_monero
                 .point
                 .decompress()
