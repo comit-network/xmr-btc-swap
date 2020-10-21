@@ -9,7 +9,7 @@ description = "XMR/BTC trustless atomic swaps."
 anyhow = "1"
 async-trait = "0.1"
 atty = "0.2"
-bitcoin = "0.25"                # TODO: Upgrade other crates in this repo to use this version.
+bitcoin = { version = "0.25", features = ["rand", "use-serde"] } # TODO: Upgrade other crates in this repo to use this version.
 derivative = "2"
 futures = { version = "0.3", default-features = false }
 libp2p = { version = "0.28", default-features = false, features = ["tcp-tokio", "yamux", "mplex", "dns", "noise", "request-response"] }

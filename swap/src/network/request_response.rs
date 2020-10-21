@@ -15,6 +15,7 @@ pub const TIMEOUT: u64 = 3600; // One hour.
 /// Messages Bob sends to Alice.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum BobToAlice {
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     AmountsFromBtc(bitcoin::Amount),
     AmountsFromXmr(monero::Amount),
     /* TODO: How are we going to do this when the messages are not Clone?
