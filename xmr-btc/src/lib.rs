@@ -49,4 +49,6 @@ pub mod alice;
 pub mod bitcoin;
 pub mod bob;
 pub mod monero;
+#[cfg(feature = "tor")]
+pub mod tor;
 pub mod transport;

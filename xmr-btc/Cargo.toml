@@ -12,20 +12,32 @@ cross-curve-dleq = { git = "https://github.com/comit-network/cross-curve-dleq", 
 curve25519-dalek = "2"
 ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", rev = "510d48ef6a2b19805f7f5c70c598e5b03f668e7a", features = ["libsecp_compat"] }
 ed25519-dalek = "1.0.0-pre.4" # Cannot be 1 because they depend on curve25519-dalek version 3
+lazy_static = "1.4"
 miniscript = "1"
 monero = "0.9"
 rand = "0.7"
+reqwest = { version = "0.10", default-features = false, features = ["socks"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 sha2 = "0.9"
 thiserror = "1"
+tokio = { version = "0.2", default-features = false, features = ["blocking", "macros", "rt-core", "time", "rt-threaded"] }
+torut = { version = "0.1", optional = true }
 tracing = "0.1"
 
 [dev-dependencies]
 base64 = "0.12"
 bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "d402b36d3d6406150e3bfb71492ff4a0a7cb290e" }
 futures = "0.3"
+hyper = "0.13"
 monero-harness = { path = "../monero-harness" }
-reqwest = { version = "0.10", default-features = false }
+port_check = "0.1"
+spectral = "0.6"
+tempfile = "3"
 testcontainers = "0.10"
-tokio = { version = "0.2", default-features = false, features = ["blocking", "macros", "rt-core", "time", "rt-threaded"] }
 tracing = "0.1"
 tracing-subscriber = "0.2"
+
+[features]
+default = []
+tor = ["torut"]
