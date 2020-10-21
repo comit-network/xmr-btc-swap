@@ -9,7 +9,10 @@ description = "XMR/BTC trustless atomic swaps."
 anyhow = "1"
 async-trait = "0.1"
 atty = "0.2"
-bitcoin = { version = "0.25", features = ["rand", "use-serde"] } # TODO: Upgrade other crates in this repo to use this version.
+backoff = { version = "0.2", features = ["tokio"] }
+base64 = "0.12"
+bitcoin = { version = "0.23", features = ["rand", "use-serde"] } # TODO: Upgrade other crates in this repo to use this version.
+bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "d402b36d3d6406150e3bfb71492ff4a0a7cb290e" }
 derivative = "2"
 futures = { version = "0.3", default-features = false }
 libp2p = { version = "0.28", default-features = false, features = ["tcp-tokio", "yamux", "mplex", "dns", "noise", "request-response"] }
@@ -17,6 +20,7 @@ libp2p-tokio-socks5 = "0.3"
 log = { version = "0.4", features = ["serde"] }
 monero = "0.9"
 rand = "0.7"
+reqwest = { version = "0.10", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_derive = "1.0"
 serde_json = "1"

@@ -6,25 +6,35 @@ use libp2p::{
     request_response::ResponseChannel,
     NetworkBehaviour, PeerId,
 };
-use std::time::Duration;
+use rand::{CryptoRng, RngCore};
+use std::{thread, time::Duration};
 use tracing::debug;
 
 mod amounts;
+mod message0;
 
-use self::amounts::*;
+use self::{amounts::*, message0::*};
 use crate::{
-    bitcoin, monero,
     network::{
         peer_tracker::{self, PeerTracker},
         request_response::{AliceToBob, TIMEOUT},
         transport, TokioExecutor,
     },
-    SwapParams,
+    SwapParams, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
+use xmr_btc::{alice::State0, bob, monero};
 
 pub type Swarm = libp2p::Swarm<Alice>;
 
-pub async fn swap(listen: Multiaddr) -> Result<()> {
+pub async fn swap<R: RngCore + CryptoRng>(
+    listen: Multiaddr,
+    rng: &mut R,
+    redeem_address: ::bitcoin::Address,
+    punish_address: ::bitcoin::Address,
+) -> Result<()> {
+    let mut message0: Option<bob::Message0> = None;
+    let mut last_amounts: Option<SwapParams> = None;
+
     let mut swarm = new_swarm(listen)?;
 
     loop {
@@ -35,10 +45,47 @@ pub async fn swap(listen: Multiaddr) -> Result<()> {
             OutEvent::Request(amounts::OutEvent::Btc { btc, channel }) => {
                 debug!("Got request from Bob to swap {}", btc);
                 let p = calculate_amounts(btc);
+                last_amounts = Some(p);
                 swarm.send(channel, AliceToBob::Amounts(p));
             }
-        }
+            OutEvent::Message0(msg) => {
+                debug!("Got message0 from Bob");
+                // TODO: Do this in a more Rusty/functional way.
+                message0 = Some(msg);
+                break;
+            }
+            other => panic!("unexpected event: {:?}", other),
+        };
     }
+
+    let (xmr, btc) = match last_amounts {
+        Some(p) => (p.xmr, p.btc),
+        None => unreachable!("should have amounts by here"),
+    };
+
+    // FIXME: Too many `bitcoin` crates/modules.
+    let xmr = monero::Amount::from_piconero(xmr.as_piconero());
+    let btc = ::bitcoin::Amount::from_sat(btc.as_sat());
+
+    let state0 = State0::new(
+        rng,
+        btc,
+        xmr,
+        REFUND_TIMELOCK,
+        PUNISH_TIMELOCK,
+        redeem_address,
+        punish_address,
+    );
+    swarm.set_state0(state0.clone());
+
+    let state1 = match message0 {
+        Some(msg) => state0.receive(msg),
+        None => unreachable!("should have msg by here"),
+    };
+
+    tracing::warn!("parking thread ...");
+    thread::park();
+    Ok(())
 }
 
 fn new_swarm(listen: Multiaddr) -> Result<Swarm> {
@@ -68,14 +115,9 @@ fn new_swarm(listen: Multiaddr) -> Result<Swarm> {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum OutEvent {
-    Request(amounts::OutEvent),
     ConnectionEstablished(PeerId),
-}
-
-impl From<amounts::OutEvent> for OutEvent {
-    fn from(event: amounts::OutEvent) -> Self {
-        OutEvent::Request(event)
-    }
+    Request(amounts::OutEvent),
+    Message0(bob::Message0),
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -88,13 +130,28 @@ impl From<peer_tracker::OutEvent> for OutEvent {
     }
 }
 
+impl From<amounts::OutEvent> for OutEvent {
+    fn from(event: amounts::OutEvent) -> Self {
+        OutEvent::Request(event)
+    }
+}
+
+impl From<message0::OutEvent> for OutEvent {
+    fn from(event: message0::OutEvent) -> Self {
+        match event {
+            message0::OutEvent::Msg(msg) => OutEvent::Message0(msg),
+        }
+    }
+}
+
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Alice.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Alice {
-    amounts: Amounts,
     pt: PeerTracker,
+    amounts: Amounts,
+    message0: Message0,
     #[behaviour(ignore)]
     identity: Keypair,
 }
@@ -112,6 +169,10 @@ impl Alice {
     pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: AliceToBob) {
         self.amounts.send(channel, msg);
     }
+
+    pub fn set_state0(&mut self, state: State0) {
+        self.message0.set_state(state);
+    }
 }
 
 impl Default for Alice {
@@ -120,15 +181,16 @@ impl Default for Alice {
         let timeout = Duration::from_secs(TIMEOUT);
 
         Self {
-            amounts: Amounts::new(timeout),
             pt: PeerTracker::default(),
+            amounts: Amounts::new(timeout),
+            message0: Message0::new(timeout),
             identity,
         }
     }
 }
 
 // TODO: Check that this is correct.
-fn calculate_amounts(btc: bitcoin::Amount) -> SwapParams {
+fn calculate_amounts(btc: ::bitcoin::Amount) -> SwapParams {
     const XMR_PER_BTC: u64 = 100; // TODO: Get this from an exchange.
 
     // XMR uses 12 zerose BTC uses 8.
@@ -147,7 +209,7 @@ mod tests {
 
     #[test]
     fn one_bitcoin_equals_a_hundred_moneroj() {
-        let btc = bitcoin::Amount::from_sat(ONE_BTC);
+        let btc = ::bitcoin::Amount::from_sat(ONE_BTC);
         let want = monero::Amount::from_piconero(HUNDRED_XMR);
 
         let SwapParams { xmr: got, .. } = calculate_amounts(btc);

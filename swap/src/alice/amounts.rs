@@ -14,20 +14,17 @@ use std::{
 };
 use tracing::{debug, error};
 
-use crate::{
-    bitcoin,
-    network::request_response::{AliceToBob, BobToAlice, Codec, Protocol},
-};
+use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol};
 
 #[derive(Debug)]
 pub enum OutEvent {
     Btc {
-        btc: bitcoin::Amount,
+        btc: ::bitcoin::Amount,
         channel: ResponseChannel<AliceToBob>,
     },
 }
 
-/// A `NetworkBehaviour` that represents an XMR/BTC swap node as Bob.
+/// A `NetworkBehaviour` that represents getting the amounts of an XMR/BTC swap.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
@@ -60,7 +57,7 @@ impl Amounts {
     pub async fn request_amounts(
         &mut self,
         alice: PeerId,
-        btc: bitcoin::Amount,
+        btc: ::bitcoin::Amount,
     ) -> Result<RequestId> {
         let msg = BobToAlice::AmountsFromBtc(btc);
         let id = self.rr.send_request(&alice, msg);

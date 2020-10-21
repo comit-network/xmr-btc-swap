@@ -6,42 +6,55 @@ use futures::{
     StreamExt,
 };
 use libp2p::{core::identity::Keypair, Multiaddr, NetworkBehaviour, PeerId};
+use rand::{CryptoRng, RngCore};
 use std::{process, thread, time::Duration};
 use tracing::{debug, info, warn};
 
 mod amounts;
+mod message0;
 
-use self::amounts::*;
+use self::{amounts::*, message0::*};
 use crate::{
-    bitcoin,
     network::{
         peer_tracker::{self, PeerTracker},
         request_response::TIMEOUT,
         transport, TokioExecutor,
     },
-    Cmd, Rsp,
+    Cmd, Rsp, PUNISH_TIMELOCK, REFUND_TIMELOCK,
+};
+use xmr_btc::{
+    alice,
+    bitcoin::BuildTxLockPsbt,
+    bob::{self, State0},
 };
 
-pub async fn swap(
+pub async fn swap<W, R>(
     btc: u64,
     addr: Multiaddr,
     mut cmd_tx: Sender<Cmd>,
     mut rsp_rx: Receiver<Rsp>,
-) -> Result<()> {
+    rng: &mut R,
+    refund_address: ::bitcoin::Address,
+    wallet: &W,
+) -> Result<()>
+where
+    W: BuildTxLockPsbt,
+    R: RngCore + CryptoRng,
+{
     let mut swarm = new_swarm()?;
 
     libp2p::Swarm::dial_addr(&mut swarm, addr)?;
-    let id = match swarm.next().await {
-        OutEvent::ConnectionEstablished(id) => id,
+    let alice = match swarm.next().await {
+        OutEvent::ConnectionEstablished(alice) => alice,
         other => panic!("unexpected event: {:?}", other),
     };
     info!("Connection established.");
 
-    swarm.request_amounts(id, btc).await;
+    swarm.request_amounts(alice.clone(), btc);
 
-    match swarm.next().await {
-        OutEvent::Response(amounts::OutEvent::Amounts(p)) => {
-            debug!("Got response from Alice: {:?}", p);
+    let (btc, xmr) = match swarm.next().await {
+        OutEvent::Amounts(amounts::OutEvent::Amounts(p)) => {
+            debug!("Got amounts from Alice: {:?}", p);
             let cmd = Cmd::VerifyAmounts(p);
             cmd_tx.try_send(cmd)?;
             let response = rsp_rx.next().await;
@@ -49,10 +62,32 @@ pub async fn swap(
                 info!("Amounts no good, aborting ...");
                 process::exit(0);
             }
+
             info!("User verified amounts, continuing with swap ...");
+            (p.btc, p.xmr)
         }
         other => panic!("unexpected event: {:?}", other),
-    }
+    };
+
+    // FIXME: Too many `bitcoin` crates/modules.
+    let xmr = xmr_btc::monero::Amount::from_piconero(xmr.as_piconero());
+    let btc = ::bitcoin::Amount::from_sat(btc.as_sat());
+
+    let state0 = State0::new(
+        rng,
+        btc,
+        xmr,
+        REFUND_TIMELOCK,
+        PUNISH_TIMELOCK,
+        refund_address,
+    );
+    swarm.send_message0(alice.clone(), state0.next_message(rng));
+    let state1 = match swarm.next().await {
+        OutEvent::Message0(msg) => {
+            state0.receive(wallet, msg) // TODO: More graceful error handling.
+        }
+        other => panic!("unexpected event: {:?}", other),
+    };
 
     warn!("parking thread ...");
     thread::park();
@@ -83,14 +118,9 @@ fn new_swarm() -> Result<Swarm> {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum OutEvent {
-    Response(amounts::OutEvent),
     ConnectionEstablished(PeerId),
-}
-
-impl From<amounts::OutEvent> for OutEvent {
-    fn from(event: amounts::OutEvent) -> Self {
-        OutEvent::Response(event)
-    }
+    Amounts(amounts::OutEvent),
+    Message0(alice::Message0),
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -103,13 +133,28 @@ impl From<peer_tracker::OutEvent> for OutEvent {
     }
 }
 
+impl From<amounts::OutEvent> for OutEvent {
+    fn from(event: amounts::OutEvent) -> Self {
+        OutEvent::Amounts(event)
+    }
+}
+
+impl From<message0::OutEvent> for OutEvent {
+    fn from(event: message0::OutEvent) -> Self {
+        match event {
+            message0::OutEvent::Msg(msg) => OutEvent::Message0(msg),
+        }
+    }
+}
+
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Bob.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Bob {
-    amounts: Amounts,
     pt: PeerTracker,
+    amounts: Amounts,
+    message0: Message0,
     #[behaviour(ignore)]
     identity: Keypair,
 }
@@ -124,10 +169,15 @@ impl Bob {
     }
 
     /// Sends a message to Alice to get current amounts based on `btc`.
-    pub async fn request_amounts(&mut self, alice: PeerId, btc: u64) {
-        let btc = bitcoin::Amount::from_sat(btc);
-        let _id = self.amounts.request_amounts(alice.clone(), btc).await;
+    pub fn request_amounts(&mut self, alice: PeerId, btc: u64) {
+        let btc = ::bitcoin::Amount::from_sat(btc);
+        let _id = self.amounts.request_amounts(alice.clone(), btc);
         debug!("Requesting amounts from: {}", alice);
+    }
+
+    /// Sends Bob's first state message to Alice.
+    pub fn send_message0(&mut self, alice: PeerId, msg: bob::Message0) {
+        self.message0.send(alice, msg)
     }
 
     /// Returns Alice's peer id if we are connected.
@@ -142,8 +192,9 @@ impl Default for Bob {
         let timeout = Duration::from_secs(TIMEOUT);
 
         Self {
-            amounts: Amounts::new(timeout),
             pt: PeerTracker::default(),
+            amounts: Amounts::new(timeout),
+            message0: Message0::new(timeout),
             identity,
         }
     }

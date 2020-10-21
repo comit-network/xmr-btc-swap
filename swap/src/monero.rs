@@ -1,30 +1,27 @@
-use serde::{Deserialize, Serialize};
-use std::fmt;
+use serde::{de::Error, Deserialize, Deserializer, Serializer};
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct Amount(u64);
+use xmr_btc::monero::Amount;
 
-impl Amount {
-    /// Create an [Amount] with piconero precision and the given number of
-    /// piconeros.
-    ///
-    /// A piconero (a.k.a atomic unit) is equal to 1e-12 XMR.
-    pub fn from_piconero(amount: u64) -> Self {
-        Amount(amount)
+pub mod amount_serde {
+    use super::*;
+    use std::str::FromStr;
+
+    pub fn serialize<S>(value: &Amount, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&value.as_piconero().to_string())
     }
-    pub fn as_piconero(&self) -> u64 {
-        self.0
-    }
-}
 
-impl From<Amount> for u64 {
-    fn from(from: Amount) -> u64 {
-        from.0
-    }
-}
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Amount, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        let value =
+            u64::from_str(value.as_str()).map_err(<D as Deserializer<'de>>::Error::custom)?;
+        let amount = Amount::from_piconero(value);
 
-impl fmt::Display for Amount {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} piconeros", self.0)
+        Ok(amount)
     }
 }

@@ -1,12 +1,13 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use libp2p::{
     request_response::{
-        handler::RequestProtocol, ProtocolSupport, RequestId, RequestResponse,
-        RequestResponseConfig, RequestResponseEvent, RequestResponseMessage,
+        handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
+        RequestResponseEvent, RequestResponseMessage,
     },
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
-    NetworkBehaviour, PeerId,
+    NetworkBehaviour,
 };
+use rand::rngs::OsRng;
 use std::{
     collections::VecDeque,
     task::{Context, Poll},
@@ -14,27 +15,27 @@ use std::{
 };
 use tracing::error;
 
-use crate::{
-    network::request_response::{AliceToBob, BobToAlice, Codec, Protocol},
-    SwapParams,
-};
+use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol};
+use xmr_btc::{alice::State0, bob};
 
 #[derive(Debug)]
 pub enum OutEvent {
-    Amounts(SwapParams),
+    Msg(bob::Message0),
 }
 
 /// A `NetworkBehaviour` that represents getting the amounts of an XMR/BTC swap.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
-pub struct Amounts {
+pub struct Message0 {
     rr: RequestResponse<Codec>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
+    #[behaviour(ignore)]
+    state: Option<State0>,
 }
 
-impl Amounts {
+impl Message0 {
     pub fn new(timeout: Duration) -> Self {
         let mut config = RequestResponseConfig::default();
         config.set_request_timeout(timeout);
@@ -46,14 +47,17 @@ impl Amounts {
                 config,
             ),
             events: Default::default(),
+            state: None,
         }
     }
 
-    pub fn request_amounts(&mut self, alice: PeerId, btc: ::bitcoin::Amount) -> Result<RequestId> {
-        let msg = BobToAlice::AmountsFromBtc(btc);
-        let id = self.rr.send_request(&alice, msg);
+    pub fn set_state(&mut self, state: State0) -> Result<()> {
+        if self.state.is_some() {
+            bail!("Trying to set state a second time");
+        }
+        self.state = Some(state);
 
-        Ok(id)
+        Ok(())
     }
 
     fn poll(
@@ -69,26 +73,45 @@ impl Amounts {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Amounts {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Message0 {
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
             RequestResponseEvent::Message {
                 peer: _,
-                message: RequestResponseMessage::Request { .. },
-            } => panic!("Bob should never get a request from Alice"),
+                message:
+                    RequestResponseMessage::Request {
+                        request,
+                        request_id: _,
+                        channel,
+                    },
+            } => match request {
+                BobToAlice::Message0(msg) => {
+                    let response = match self.state {
+                        None => panic!("No state, did you forget to set it?"),
+                        Some(state) => {
+                            // TODO: Get OsRng from somewhere?
+                            AliceToBob::Message0(state.next_message(&mut OsRng))
+                        }
+                    };
+                    self.rr.send_response(channel, response);
+                    self.events.push_back(OutEvent::Msg(msg));
+                }
+                _ => panic!("unexpected request"),
+            },
             RequestResponseEvent::Message {
                 peer: _,
                 message:
                     RequestResponseMessage::Response {
-                        response,
+                        response: _,
                         request_id: _,
                     },
-            } => match response {
-                AliceToBob::Amounts(p) => self.events.push_back(OutEvent::Amounts(p)),
-            },
-
-            RequestResponseEvent::InboundFailure { .. } => {
-                panic!("Bob should never get a request from Alice, so should never get an InboundFailure");
+            } => panic!("unexpected response"),
+            RequestResponseEvent::InboundFailure {
+                peer: _,
+                request_id: _,
+                error,
+            } => {
+                error!("Inbound failure: {:?}", error);
             }
             RequestResponseEvent::OutboundFailure {
                 peer: _,

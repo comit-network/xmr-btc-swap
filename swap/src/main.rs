@@ -16,6 +16,7 @@ use anyhow::{bail, Result};
 use futures::{channel::mpsc, StreamExt};
 use libp2p::Multiaddr;
 use log::LevelFilter;
+use rand::rngs::OsRng;
 use std::{io, io::Write, process};
 use structopt::StructOpt;
 use tracing::info;
@@ -38,7 +39,7 @@ async fn main() -> Result<()> {
     trace::init_tracing(LevelFilter::Debug)?;
 
     let addr = format!("/ip4/{}/tcp/{}", ADDR, PORT);
-    let alice_addr: Multiaddr = addr.parse().expect("failed to parse Alice's address");
+    let alice: Multiaddr = addr.parse().expect("failed to parse Alice's address");
 
     if opt.as_alice {
         info!("running swap node as Alice ...");
@@ -47,16 +48,23 @@ async fn main() -> Result<()> {
             bail!("Alice cannot set the amount to swap via the cli");
         }
 
-        swap_as_alice(alice_addr).await?;
+        // TODO: Get these addresses from command line
+        let redeem = bitcoin::Address::default();
+        let punish = bitcoin::Address::default();
+
+        swap_as_alice(alice, redeem, refund).await?;
     } else {
         info!("running swap node as Bob ...");
+
+        // TODO: Get refund address from command line
+        let refund = bitcoin::Address::default();
 
         match (opt.piconeros, opt.satoshis) {
             (Some(_), Some(_)) => bail!("Please supply only a single amount to swap"),
             (None, None) => bail!("Please supply an amount to swap"),
             (Some(_picos), _) => todo!("support starting with picos"),
             (None, Some(sats)) => {
-                swap_as_bob(sats, alice_addr).await?;
+                swap_as_bob(sats, alice_addr, refund).await?;
             }
         };
     }
@@ -64,14 +72,18 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn swap_as_alice(addr: Multiaddr) -> Result<()> {
-    alice::swap(addr).await
+async fn swap_as_alice(
+    addr: Multiaddr,
+    redeem: bitcoin::Address::default(),
+    punish: bitcoin::Address::default(),
+) -> Result<()> {
+    alice::swap(addr, OsRng, redeem, punish).await
 }
 
-async fn swap_as_bob(sats: u64, addr: Multiaddr) -> Result<()> {
+async fn swap_as_bob(sats: u64, addr: Multiaddr, refund: bitcoin::Address) -> Result<()> {
     let (cmd_tx, mut cmd_rx) = mpsc::channel(1);
     let (mut rsp_tx, rsp_rx) = mpsc::channel(1);
-    tokio::spawn(bob::swap(sats, addr, cmd_tx, rsp_rx));
+    tokio::spawn(bob::swap(sats, addr, cmd_tx, rsp_rx, OsRng, refund));
     loop {
         let read = cmd_rx.next().await;
         match read {

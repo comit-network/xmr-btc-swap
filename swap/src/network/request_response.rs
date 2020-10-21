@@ -7,7 +7,8 @@ use libp2p::{
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, io};
 
-use crate::{bitcoin, monero, SwapParams};
+use crate::SwapParams;
+use xmr_btc::{alice, bob, monero};
 
 /// Time to wait for a response back once we send a request.
 pub const TIMEOUT: u64 = 3600; // One hour.
@@ -16,18 +17,16 @@ pub const TIMEOUT: u64 = 3600; // One hour.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum BobToAlice {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
-    AmountsFromBtc(bitcoin::Amount),
+    AmountsFromBtc(::bitcoin::Amount),
     AmountsFromXmr(monero::Amount),
-    /* TODO: How are we going to do this when the messages are not Clone?
-     * Msg(bob::Message), */
+    Message0(bob::Message0),
 }
 
 /// Messages Alice sends to Bob.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum AliceToBob {
     Amounts(SwapParams),
-    /* TODO: How are we going to do this when the messages are not Clone?
-     * Msg(alice::Message) */
+    Message0(alice::Message0),
 }
 
 #[derive(Debug, Clone, Copy, Default)]
