@@ -33,6 +33,7 @@ hyper = "0.13"
 monero-harness = { path = "../monero-harness" }
 port_check = "0.1"
 spectral = "0.6"
+tempfile = "3"
 testcontainers = "0.10"
 tracing = "0.1"
 tracing-subscriber = "0.2"

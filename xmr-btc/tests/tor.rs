@@ -5,12 +5,14 @@ mod tor_test {
     use hyper::service::{make_service_fn, service_fn};
     use reqwest::StatusCode;
     use spectral::prelude::*;
-    use std::{convert::Infallible, process::Child};
+    use std::{convert::Infallible, fs};
+    use tempfile::{Builder, NamedTempFile};
     use tokio::sync::oneshot::Receiver;
     use torut::{
         onion::TorSecretKeyV3,
         utils::{run_tor, AutoKillChild},
     };
+    use tracing_subscriber::util::SubscriberInitExt;
     use xmr_btc::tor::UnauthenticatedConnection;
 
     async fn hello_world(
@@ -32,9 +34,16 @@ mod tor_test {
                 eprintln!("server error: {}", e);
             }
         });
+
+        tracing::info!("Test server started at port: {}", port);
     }
 
-    fn run_tmp_tor() -> (Child, u16, u16) {
+    fn run_tmp_tor() -> Result<(AutoKillChild, u16, u16, NamedTempFile)> {
+        // we create an empty torrc file to not use the system one
+        let temp_torrc = Builder::new().tempfile()?;
+        let torrc_file = format!("{}", fs::canonicalize(temp_torrc.path())?.display());
+        tracing::info!("Temp torrc file created at: {}", torrc_file);
+
         let control_port = if port_check::is_local_port_free(9051) {
             9051
         } else {
@@ -46,30 +55,33 @@ mod tor_test {
             port_check::free_local_port().unwrap()
         };
 
-        (
-            run_tor(
-                "tor",
-                &mut [
-                    "--CookieAuthentication",
-                    "1",
-                    "--ControlPort",
-                    control_port.to_string().as_str(),
-                    "--SocksPort",
-                    proxy_port.to_string().as_str(),
-                ]
-                .iter(),
-            )
-            .expect("Starting tor filed"),
-            control_port,
-            proxy_port,
-        )
+        let child = run_tor(
+            "tor",
+            &mut [
+                "--CookieAuthentication",
+                "1",
+                "--ControlPort",
+                control_port.to_string().as_str(),
+                "--SocksPort",
+                proxy_port.to_string().as_str(),
+                "-f",
+                &torrc_file,
+            ]
+            .iter(),
+        )?;
+        tracing::info!("Tor running with pid: {}", child.id());
+        let child = AutoKillChild::new(child);
+        Ok((child, control_port, proxy_port, temp_torrc))
     }
 
     #[tokio::test]
     async fn test_tor_control_port() -> Result<()> {
+        let _guard = tracing_subscriber::fmt()
+            .with_env_filter("info")
+            .set_default();
+
         // start tmp tor
-        let (child, control_port, proxy_port) = run_tmp_tor();
-        let _child = AutoKillChild::new(child);
+        let (_child, control_port, proxy_port, _tmp_torrc) = run_tmp_tor()?;
 
         // Setup test HTTP Server
         let (tx, rx) = tokio::sync::oneshot::channel::<()>();
@@ -81,6 +93,8 @@ mod tor_test {
             UnauthenticatedConnection::with_ports(proxy_port, control_port)
                 .init_authenticated_connection()
                 .await?;
+
+        tracing::info!("Tor authenticated.");
 
         // Expose an onion service that re-directs to the echo server.
         let tor_secret_key_v3 = TorSecretKeyV3::generate();
@@ -96,11 +110,18 @@ mod tor_test {
         let onion_address = tor_secret_key_v3.public().get_onion_address().to_string();
         let onion_url = format!("http://{}:8080", onion_address);
 
+        tracing::info!("Tor service added: {}", onion_url);
+
         let res = client.get(&onion_url).send().await?;
+
         assert_that(&res.status()).is_equal_to(StatusCode::OK);
 
         let text = res.text().await?;
         assert_that!(text).contains("Hello World");
+        tracing::info!(
+            "Local server called via Tor proxy. Its response is: {}",
+            text
+        );
 
         // gracefully shut down server
         let _ = tx.send(());
