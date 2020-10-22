@@ -35,10 +35,10 @@ bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = 
 futures = "0.3"
 hyper = "0.13"
 monero-harness = { path = "../monero-harness" }
+port_check = "0.1"
 reqwest = { version = "0.10", default-features = false }
 serde_cbor = "0.11"
 sled = "0.34"
-port_check = "0.1"
 spectral = "0.6"
 tempfile = "3"
 testcontainers = "0.10"
