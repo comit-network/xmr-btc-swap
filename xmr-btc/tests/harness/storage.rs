@@ -14,6 +14,7 @@ impl<T> Database<T>
 where
     T: Serialize + DeserializeOwned,
 {
+    // TODO: serialize using lazy/one-time initlisation
     const LAST_STATE_KEY: &'static str = "latest_state";
 
     pub fn open(path: &Path) -> Result<Self> {
@@ -37,6 +38,7 @@ where
             .context("Could not write in the DB")?
             .context("Stored swap somehow changed, aborting saving")?;
 
+        // TODO: see if this can be done through sled config
         self.db
             .flush_async()
             .await
