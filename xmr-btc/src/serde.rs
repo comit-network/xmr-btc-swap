@@ -132,23 +132,44 @@ pub mod monero_private_key {
 }
 
 pub mod bitcoin_amount {
+    use bitcoin::Amount;
     use serde::{Deserialize, Deserializer, Serializer};
 
-    pub fn serialize<S>(value: &bitcoin::Amount, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(x: &Amount, s: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        serializer.serialize_u64(value.as_sat())
+        s.serialize_u64(x.as_sat())
     }
 
-    pub fn deserialize<'de, D>(
-        deserializer: D,
-    ) -> Result<bitcoin::Amount, <D as Deserializer<'de>>::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Amount, <D as Deserializer<'de>>::Error>
     where
         D: Deserializer<'de>,
     {
-        let value = u64::deserialize(deserializer)?;
-        let amount = bitcoin::Amount::from_sat(value);
+        let sats = u64::deserialize(deserializer)?;
+        let amount = Amount::from_sat(sats);
+
+        Ok(amount)
+    }
+}
+
+pub mod monero_amount {
+    use crate::monero::Amount;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(x: &Amount, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        s.serialize_u64(x.as_piconero())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Amount, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let picos = u64::deserialize(deserializer)?;
+        let amount = Amount::from_piconero(picos);
 
         Ok(amount)
     }

@@ -4,7 +4,6 @@ use std::fmt::{self, Display};
 pub mod alice;
 pub mod bitcoin;
 pub mod bob;
-pub mod monero;
 pub mod network;
 
 pub const ONE_BTC: u64 = 100_000_000;
@@ -34,7 +33,7 @@ pub struct SwapAmounts {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub btc: ::bitcoin::Amount,
     /// Amount of XMR to swap.
-    #[serde(with = "crate::monero::amount_serde")]
+    #[serde(with = "xmr_btc::serde::monero_amount")]
     pub xmr: xmr_btc::monero::Amount,
 }
 
