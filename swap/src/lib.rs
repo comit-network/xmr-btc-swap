@@ -5,6 +5,8 @@ pub mod alice;
 pub mod bitcoin;
 pub mod bob;
 pub mod network;
+#[cfg(feature = "tor")]
+pub mod tor;
 
 pub const ONE_BTC: u64 = 100_000_000;
 
