@@ -2,24 +2,31 @@ use anyhow::{anyhow, Context, Result};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::path::Path;
 
-pub struct Database {
+pub struct Database<T>
+where
+    T: Serialize + DeserializeOwned,
+{
     db: sled::Db,
+    _marker: std::marker::PhantomData<T>,
 }
 
-impl Database {
+impl<T> Database<T>
+where
+    T: Serialize + DeserializeOwned,
+{
     const LAST_STATE_KEY: &'static str = "latest_state";
 
     pub fn open(path: &Path) -> Result<Self> {
         let db =
             sled::open(path).with_context(|| format!("Could not open the DB at {:?}", path))?;
 
-        Ok(Database { db })
+        Ok(Database {
+            db,
+            _marker: Default::default(),
+        })
     }
 
-    pub async fn insert_latest_state<T>(&self, state: &T) -> Result<()>
-    where
-        T: Serialize + DeserializeOwned,
-    {
+    pub async fn insert_latest_state(&self, state: &T) -> Result<()> {
         let key = serialize(&Self::LAST_STATE_KEY)?;
         let new_value = serialize(&state).context("Could not serialize new state value")?;
 
@@ -37,10 +44,7 @@ impl Database {
             .context("Could not flush db")
     }
 
-    pub fn get_latest_state<T>(&self) -> anyhow::Result<T>
-    where
-        T: DeserializeOwned,
-    {
+    pub fn get_latest_state(&self) -> anyhow::Result<T> {
         let key = serialize(&Self::LAST_STATE_KEY)?;
 
         let encoded = self

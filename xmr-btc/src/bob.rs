@@ -82,7 +82,7 @@ pub async fn next_state<
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub enum State {
     State0(State0),
     State1(State1),
