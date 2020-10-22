@@ -6,7 +6,7 @@ use crate::{
     },
     monero,
     monero::{CreateWalletForOutput, WatchForTransfer},
-    serde::{bitcoin_amount, cross_curve_dleq_scalar, monero_private_key},
+    serde::{bitcoin_amount, monero_private_key},
     transport::{ReceiveMessage, SendMessage},
 };
 use anyhow::{anyhow, Result};
@@ -109,7 +109,6 @@ impl_from_child_enum!(State5, State);
 #[derive(Debug, Deserialize, Serialize)]
 pub struct State0 {
     b: bitcoin::SecretKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     s_b: cross_curve_dleq::Scalar,
     v_b: monero::PrivateViewKey,
     #[serde(with = "bitcoin_amount")]
@@ -200,7 +199,6 @@ impl State0 {
 pub struct State1 {
     A: bitcoin::PublicKey,
     b: bitcoin::SecretKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     s_b: cross_curve_dleq::Scalar,
     S_a_monero: monero::PublicKey,
     S_a_bitcoin: bitcoin::PublicKey,
@@ -265,7 +263,6 @@ impl State1 {
 pub struct State2 {
     pub A: bitcoin::PublicKey,
     pub b: bitcoin::SecretKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     pub s_b: cross_curve_dleq::Scalar,
     pub S_a_monero: monero::PublicKey,
     pub S_a_bitcoin: bitcoin::PublicKey,
@@ -338,7 +335,6 @@ impl State2 {
 pub struct State3 {
     A: bitcoin::PublicKey,
     b: bitcoin::SecretKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     s_b: cross_curve_dleq::Scalar,
     S_a_monero: monero::PublicKey,
     S_a_bitcoin: bitcoin::PublicKey,
@@ -451,7 +447,6 @@ impl State3 {
 pub struct State4 {
     A: bitcoin::PublicKey,
     b: bitcoin::SecretKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     s_b: cross_curve_dleq::Scalar,
     S_a_monero: monero::PublicKey,
     S_a_bitcoin: bitcoin::PublicKey,
@@ -522,7 +517,6 @@ pub struct State5 {
     b: bitcoin::SecretKey,
     #[serde(with = "monero_private_key")]
     s_a: monero::PrivateKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     s_b: cross_curve_dleq::Scalar,
     S_a_monero: monero::PublicKey,
     S_a_bitcoin: bitcoin::PublicKey,

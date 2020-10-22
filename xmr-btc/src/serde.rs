@@ -1,48 +1,3 @@
-pub mod cross_curve_dleq_scalar {
-    use serde::{de, de::Visitor, Deserializer, Serializer};
-    use std::{convert::TryFrom, fmt};
-
-    struct Bytes32Visitor;
-
-    impl<'de> Visitor<'de> for Bytes32Visitor {
-        type Value = cross_curve_dleq::Scalar;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(formatter, "a string containing 32 bytes")
-        }
-
-        fn visit_bytes<E>(self, s: &[u8]) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            if let Ok(value) = <[u8; 32]>::try_from(s) {
-                Ok(cross_curve_dleq::Scalar::from(value))
-            } else {
-                Err(de::Error::invalid_length(s.len(), &self))
-            }
-        }
-    }
-
-    pub fn serialize<S>(x: &cross_curve_dleq::Scalar, s: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        // Serialise as ed25519 because the inner bytes are private
-        // TODO: Open PR in cross_curve_dleq to allow accessing the inner bytes
-        s.serialize_bytes(&x.into_ed25519().to_bytes())
-    }
-
-    pub fn deserialize<'de, D>(
-        deserializer: D,
-    ) -> Result<cross_curve_dleq::Scalar, <D as Deserializer<'de>>::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let dleq = deserializer.deserialize_bytes(Bytes32Visitor)?;
-        Ok(dleq)
-    }
-}
-
 pub mod monero_private_key {
     use serde::{de, de::Visitor, Deserializer, Serializer};
     use std::fmt;
@@ -138,23 +93,10 @@ mod tests {
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
-    pub struct CrossCurveDleqScalar(
-        #[serde(with = "cross_curve_dleq_scalar")] cross_curve_dleq::Scalar,
-    );
-
-    #[derive(Debug, Serialize, Deserialize, PartialEq)]
     pub struct MoneroPrivateKey(#[serde(with = "monero_private_key")] crate::monero::PrivateKey);
 
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     pub struct BitcoinAmount(#[serde(with = "bitcoin_amount")] ::bitcoin::Amount);
-
-    #[test]
-    fn serde_cross_curv_dleq_scalar() {
-        let scalar = CrossCurveDleqScalar(cross_curve_dleq::Scalar::random(&mut OsRng));
-        let encoded = serde_cbor::to_vec(&scalar).unwrap();
-        let decoded: CrossCurveDleqScalar = serde_cbor::from_slice(&encoded).unwrap();
-        assert_eq!(scalar, decoded);
-    }
 
     #[test]
     fn serde_monero_private_key() {

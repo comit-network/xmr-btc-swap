@@ -3,7 +3,7 @@ use crate::{
     bitcoin::{BroadcastSignedTransaction, WatchForRawTransaction},
     bob, monero,
     monero::{CreateWalletForOutput, Transfer},
-    serde::{bitcoin_amount, cross_curve_dleq_scalar},
+    serde::bitcoin_amount,
     transport::{ReceiveMessage, SendMessage},
 };
 use anyhow::{anyhow, Result};
@@ -134,7 +134,7 @@ impl State {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct State0 {
     a: bitcoin::SecretKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
+    //#[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     v_a: monero::PrivateViewKey,
     #[serde(with = "bitcoin_amount")]
@@ -223,7 +223,6 @@ impl State0 {
 pub struct State1 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
@@ -263,7 +262,6 @@ impl State1 {
 pub struct State2 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
@@ -340,7 +338,6 @@ impl State2 {
 pub struct State3 {
     pub a: bitcoin::SecretKey,
     pub B: bitcoin::PublicKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     pub s_a: cross_curve_dleq::Scalar,
     pub S_b_monero: monero::PublicKey,
     pub S_b_bitcoin: bitcoin::PublicKey,
@@ -395,7 +392,6 @@ impl State3 {
 pub struct State4 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
@@ -500,7 +496,6 @@ impl State4 {
 pub struct State5 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
@@ -595,7 +590,6 @@ impl State5 {
 pub struct State6 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,

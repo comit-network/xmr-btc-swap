@@ -81,13 +81,12 @@ mod tests {
     use curve25519_dalek::scalar::Scalar;
     use ecdsa_fun::fun::rand_core::OsRng;
     use std::str::FromStr;
-    use xmr_btc::serde::{bitcoin_amount, cross_curve_dleq_scalar, monero_private_key};
+    use xmr_btc::serde::{bitcoin_amount, monero_private_key};
 
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     pub struct TestState {
         A: xmr_btc::bitcoin::PublicKey,
         a: xmr_btc::bitcoin::SecretKey,
-        #[serde(with = "cross_curve_dleq_scalar")]
         s_a: ::cross_curve_dleq::Scalar,
         #[serde(with = "monero_private_key")]
         s_b: monero::PrivateKey,
