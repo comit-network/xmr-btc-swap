@@ -46,8 +46,19 @@ jobs:
   build_test:
     runs-on: ubuntu-latest
     steps:
+
       - name: Checkout sources
         uses: actions/checkout@v2
+
+      - name: Install and stop tor in case it was running
+        run: |
+          sudo apt install software-properties-common
+          sudo curl https://deb.torproject.org/torproject.org/A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89.asc | sudo gpg --import
+          sudo gpg --export A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89 | sudo apt-key add -
+          sudo add-apt-repository 'deb https://deb.torproject.org/torproject.org bionic main'
+          sudo apt update
+          sudo apt install tor deb.torproject.org-keyring
+          sudo /etc/init.d/tor stop
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1

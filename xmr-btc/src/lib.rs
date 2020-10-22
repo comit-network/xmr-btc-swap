@@ -50,6 +50,8 @@ pub mod bitcoin;
 pub mod bob;
 pub mod monero;
 pub mod serde;
+#[cfg(feature = "tor")]
+pub mod tor;
 pub mod transport;
 
 use async_trait::async_trait;
