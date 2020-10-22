@@ -7,6 +7,7 @@ use libp2p::{
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
     NetworkBehaviour,
 };
+use rand::rngs::OsRng;
 use std::{
     collections::VecDeque,
     task::{Context, Poll},
@@ -15,12 +16,11 @@ use std::{
 use tracing::error;
 
 use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol};
-use xmr_btc::alice::State0;
+use xmr_btc::{alice::State0, bob};
 
 #[derive(Debug)]
 pub enum OutEvent {
-    // Msg(bob::Message0),
-    Msg,
+    Msg(bob::Message0),
 }
 
 /// A `NetworkBehaviour` that represents getting the amounts of an XMR/BTC swap.
@@ -85,18 +85,17 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                         channel,
                     },
             } => match request {
-                BobToAlice::Message0 => {
+                BobToAlice::Message0(msg) => {
                     let response = match &self.state {
                         None => panic!("No state, did you forget to set it?"),
-                        Some(_state) => {
+                        Some(state) => {
                             // TODO: Get OsRng from somewhere?
-                            // AliceToBob::Message0(state.next_message(&mut OsRng))
-                            AliceToBob::Message0
+                            AliceToBob::Message0(state.next_message(&mut OsRng))
                         }
                     };
                     self.rr.send_response(channel, response);
 
-                    self.events.push_back(OutEvent::Msg);
+                    self.events.push_back(OutEvent::Msg(msg));
                 }
                 _ => panic!("unexpected request"),
             },

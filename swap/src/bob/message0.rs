@@ -14,12 +14,11 @@ use std::{
 use tracing::error;
 
 use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol};
-use xmr_btc::bob;
+use xmr_btc::{alice, bob};
 
 #[derive(Debug)]
 pub enum OutEvent {
-    // Msg(alice::Message0),
-    Msg,
+    Msg(alice::Message0),
 }
 
 /// A `NetworkBehaviour` that represents send/recv of message 0.
@@ -47,9 +46,8 @@ impl Message0 {
         }
     }
 
-    pub fn send(&mut self, alice: PeerId, _msg: bob::Message0) {
-        // let msg = BobToAlice::Message0(msg);
-        let msg = BobToAlice::Message0;
+    pub fn send(&mut self, alice: PeerId, msg: bob::Message0) {
+        let msg = BobToAlice::Message0(msg);
         let _id = self.rr.send_request(&alice, msg);
     }
 
@@ -81,8 +79,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                         request_id: _,
                     },
             } => match response {
-                // AliceToBob::Message0(msg) => self.events.push_back(OutEvent::Msg(msg)),
-                AliceToBob::Message0 => self.events.push_back(OutEvent::Msg),
+                AliceToBob::Message0(msg) => self.events.push_back(OutEvent::Msg(msg)),
                 AliceToBob::Amounts(_) => panic!("shouldn't get amounts here"),
             },
 

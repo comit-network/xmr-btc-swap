@@ -23,6 +23,7 @@ use crate::{
     Cmd, Rsp, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use xmr_btc::{
+    alice,
     bitcoin::BuildTxLockPsbt,
     bob::{self, State0},
 };
@@ -33,7 +34,7 @@ pub async fn swap<W>(
     mut cmd_tx: Sender<Cmd>,
     mut rsp_rx: Receiver<Rsp>,
     refund_address: ::bitcoin::Address,
-    _wallet: W,
+    wallet: W,
 ) -> Result<()>
 where
     W: BuildTxLockPsbt + Send + Sync + 'static,
@@ -81,10 +82,8 @@ where
     );
     swarm.send_message0(alice.clone(), state0.next_message(rng));
     let _state1 = match swarm.next().await {
-        OutEvent::Message0 => {
-            // state0.receive(wallet, msg) // TODO: More graceful error
-            // handling.
-            println!("TODO: receive after serde is done for Message0")
+        OutEvent::Message0(msg) => {
+            state0.receive(&wallet, msg) // TODO: More graceful error handling.
         }
         other => panic!("unexpected event: {:?}", other),
     };
@@ -120,8 +119,7 @@ fn new_swarm() -> Result<Swarm> {
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
     Amounts(amounts::OutEvent),
-    // Message0(alice::Message0),
-    Message0,
+    Message0(alice::Message0),
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -143,8 +141,7 @@ impl From<amounts::OutEvent> for OutEvent {
 impl From<message0::OutEvent> for OutEvent {
     fn from(event: message0::OutEvent) -> Self {
         match event {
-            // message0::OutEvent::Msg(msg) => OutEvent::Message0(msg),
-            message0::OutEvent::Msg => OutEvent::Message0,
+            message0::OutEvent::Msg(msg) => OutEvent::Message0(msg),
         }
     }
 }

@@ -26,13 +26,14 @@ use xmr_btc::{alice::State0, bob, monero};
 
 pub type Swarm = libp2p::Swarm<Alice>;
 
+#[allow(unused_assignments)] // Due to the mutable message0?
 pub async fn swap<R: RngCore + CryptoRng>(
     listen: Multiaddr,
     rng: &mut R,
     redeem_address: ::bitcoin::Address,
     punish_address: ::bitcoin::Address,
 ) -> Result<()> {
-    let message0: Option<bob::Message0> = None;
+    let mut message0: Option<bob::Message0> = None;
     let mut last_amounts: Option<SwapParams> = None;
 
     let mut swarm = new_swarm(listen)?;
@@ -48,10 +49,10 @@ pub async fn swap<R: RngCore + CryptoRng>(
                 last_amounts = Some(p);
                 swarm.send(channel, AliceToBob::Amounts(p));
             }
-            OutEvent::Message0 => {
+            OutEvent::Message0(msg) => {
                 debug!("Got message0 from Bob");
                 // TODO: Do this in a more Rusty/functional way.
-                // message0 = Some(msg);
+                message0 = Some(msg);
                 break;
             }
         };
@@ -79,7 +80,7 @@ pub async fn swap<R: RngCore + CryptoRng>(
 
     let _state1 = match message0 {
         Some(msg) => state0.receive(msg),
-        None => todo!("implement serde on Message0"),
+        None => panic!("should have the message by here"),
     };
 
     tracing::warn!("parking thread ...");
@@ -116,8 +117,7 @@ fn new_swarm(listen: Multiaddr) -> Result<Swarm> {
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
     Request(amounts::OutEvent),
-    // Message0(bob::Message0),
-    Message0,
+    Message0(bob::Message0),
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -139,8 +139,7 @@ impl From<amounts::OutEvent> for OutEvent {
 impl From<message0::OutEvent> for OutEvent {
     fn from(event: message0::OutEvent) -> Self {
         match event {
-            // message0::OutEvent::Msg(msg) => OutEvent::Message0(msg),
-            message0::OutEvent::Msg => OutEvent::Message0,
+            message0::OutEvent::Msg(msg) => OutEvent::Message0(msg),
         }
     }
 }

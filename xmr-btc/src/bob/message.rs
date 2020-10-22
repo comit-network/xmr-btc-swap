@@ -1,6 +1,7 @@
-use crate::{bitcoin, monero};
+use crate::{bitcoin, monero, serde::cross_curve_dleq_proof};
 use anyhow::Result;
 use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
+use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
 #[derive(Clone, Debug)]
@@ -11,11 +12,12 @@ pub enum Message {
     Message3(Message3),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message0 {
     pub(crate) B: bitcoin::PublicKey,
     pub(crate) S_b_monero: monero::PublicKey,
     pub(crate) S_b_bitcoin: bitcoin::PublicKey,
+    #[serde(with = "cross_curve_dleq_proof")]
     pub(crate) dleq_proof_s_b: cross_curve_dleq::Proof,
     pub(crate) v_b: monero::PrivateViewKey,
     pub(crate) refund_address: bitcoin::Address,
