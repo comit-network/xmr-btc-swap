@@ -11,7 +11,6 @@ mod tests {
         harness::{
             init_bitcoind, init_test,
             node::{run_alice_until, run_bob_until},
-            ALICE_TEST_DB_FOLDER, BOB_TEST_DB_FOLDER,
         },
     };
     use futures::future;
@@ -19,7 +18,7 @@ mod tests {
     use rand::rngs::OsRng;
 
     use crate::harness::storage::Database;
-    use std::{convert::TryInto, path::Path};
+    use std::convert::TryInto;
     use testcontainers::clients::Cli;
     use tracing_subscriber::util::SubscriberInitExt;
     use xmr_btc::{
@@ -252,10 +251,13 @@ mod tests {
         let cli = Cli::default();
         let (monero, _container) = Monero::new(&cli);
         let bitcoind = init_bitcoind(&cli).await;
+
+        let alice_db_dir = tempfile::tempdir().unwrap();
         let alice_db: Database<alice::State> =
-            harness::storage::Database::open(Path::new(ALICE_TEST_DB_FOLDER)).unwrap();
+            harness::storage::Database::open(alice_db_dir.path()).unwrap();
+        let bob_db_dir = tempfile::tempdir().unwrap();
         let bob_db: Database<bob::State> =
-            harness::storage::Database::open(Path::new(BOB_TEST_DB_FOLDER)).unwrap();
+            harness::storage::Database::open(bob_db_dir.path()).unwrap();
 
         let (
             alice_state0,

@@ -105,7 +105,8 @@ mod tests {
 
     #[tokio::test]
     async fn recover_state_from_db() {
-        let db = Database::open(Path::new("../target/test_recover.db")).unwrap();
+        let db_dir = tempfile::tempdir().unwrap();
+        let db = Database::open(db_dir.path()).unwrap();
 
         let a = xmr_btc::bitcoin::SecretKey::new_random(&mut OsRng);
         let s_a = cross_curve_dleq::Scalar::random(&mut OsRng);
