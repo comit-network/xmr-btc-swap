@@ -8,8 +8,11 @@ mod tests {
 
     use crate::{
         harness,
-        harness::node::{run_alice_until, run_bob_until},
-        init_bitcoind, init_test, ALICE_TEST_DB_FOLDER, BOB_TEST_DB_FOLDER,
+        harness::{
+            init_bitcoind, init_test,
+            node::{run_alice_until, run_bob_until},
+            ALICE_TEST_DB_FOLDER, BOB_TEST_DB_FOLDER,
+        },
     };
     use futures::future;
     use monero_harness::Monero;
@@ -258,7 +261,7 @@ mod tests {
             mut bob_node,
             initial_balances,
             swap_amounts,
-        ) = init_test(&monero, &bitcoind).await;
+        ) = init_test(&monero, &bitcoind, None, None).await;
 
         {
             let (alice_state, bob_state) = future::try_join(
@@ -341,13 +344,13 @@ mod tests {
 
         assert_eq!(
             alice_final_xmr_balance,
-            initial_balances.alice_xmr
-                - u64::from(swap_amounts.xmr)
-                - u64::from(alice_state6.lock_xmr_fee())
+            initial_balances.alice_xmr.as_piconero()
+                - swap_amounts.xmr.as_piconero()
+                - alice_state6.lock_xmr_fee().as_piconero()
         );
         assert_eq!(
             bob_final_xmr_balance,
-            initial_balances.bob_xmr + u64::from(swap_amounts.xmr)
+            initial_balances.bob_xmr.as_piconero() + swap_amounts.xmr.as_piconero()
         );
     }
 }

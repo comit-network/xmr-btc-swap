@@ -59,6 +59,8 @@ use xmr_btc::{bitcoin, monero};
 const TEN_XMR: u64 = 10_000_000_000_000;
 const RELATIVE_REFUND_TIMELOCK: u32 = 1;
 const RELATIVE_PUNISH_TIMELOCK: u32 = 1;
+pub const ALICE_TEST_DB_FOLDER: &str = "../target/e2e-test-alice-recover";
+pub const BOB_TEST_DB_FOLDER: &str = "../target/e2e-test-bob-recover";
 
 pub async fn init_bitcoind(tc_client: &Cli) -> Bitcoind<'_> {
     let bitcoind = Bitcoind::new(tc_client, "0.19.1").expect("failed to create bitcoind");
