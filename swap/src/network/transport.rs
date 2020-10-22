@@ -1,20 +1,18 @@
 use anyhow::Result;
 use libp2p::{
     core::{
-        either::EitherError,
         identity,
         muxing::StreamMuxerBox,
-        transport::{boxed::Boxed, timeout::TransportTimeoutError},
+        transport::Boxed,
         upgrade::{SelectUpgrade, Version},
-        Transport, UpgradeError,
+        Transport,
     },
-    dns::{DnsConfig, DnsErr},
+    dns::DnsConfig,
     mplex::MplexConfig,
-    noise::{self, NoiseConfig, NoiseError, X25519Spec},
+    noise::{self, NoiseConfig, X25519Spec},
     tcp::TokioTcpConfig,
     yamux, PeerId,
 };
-use std::{io, time::Duration};
 
 /// Builds a libp2p transport with the following features:
 /// - TcpConnection
@@ -36,18 +34,9 @@ pub fn build(id_keys: identity::Keypair) -> Result<SwapTransport> {
             MplexConfig::new(),
         ))
         .map(|(peer, muxer), _| (peer, StreamMuxerBox::new(muxer)))
-        .timeout(Duration::from_secs(20))
         .boxed();
 
     Ok(transport)
 }
 
-pub type SwapTransport = Boxed<
-    (PeerId, StreamMuxerBox),
-    TransportTimeoutError<
-        EitherError<
-            EitherError<DnsErr<io::Error>, UpgradeError<NoiseError>>,
-            UpgradeError<EitherError<io::Error, io::Error>>,
-        >,
-    >,
->;
+pub type SwapTransport = Boxed<(PeerId, StreamMuxerBox)>;
