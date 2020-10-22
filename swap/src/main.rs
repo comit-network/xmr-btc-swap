@@ -158,7 +158,7 @@ fn verify(amounts: SwapAmounts) -> Rsp {
         return Rsp::Abort;
     }
 
-    Rsp::Verified
+    Rsp::VerifiedAmounts
 }
 
 fn is_yes(s: &str) -> bool {

@@ -19,10 +19,10 @@ pub enum Cmd {
     VerifyAmounts(SwapAmounts),
 }
 
-/// Responses send from the main task back to Bob.
+/// Responses sent from the main task back to Bob.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Rsp {
-    Verified,
+    VerifiedAmounts,
     Abort,
 }
 
@@ -37,6 +37,7 @@ pub struct SwapAmounts {
     pub xmr: xmr_btc::monero::Amount,
 }
 
+// TODO: Display in XMR and BTC (not picos and sats).
 impl Display for SwapAmounts {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
