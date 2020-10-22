@@ -1,9 +1,13 @@
+use crate::serde::monero_private_key;
 use anyhow::Result;
 use async_trait::async_trait;
 pub use curve25519_dalek::scalar::Scalar;
 pub use monero::{Address, PrivateKey, PublicKey};
 use rand::{CryptoRng, RngCore};
-use std::ops::Add;
+use serde::{Deserialize, Serialize};
+use std::ops::{Add, Sub};
+
+pub const MIN_CONFIRMATIONS: u32 = 10;
 
 pub fn random_private_key<R: RngCore + CryptoRng>(rng: &mut R) -> PrivateKey {
     let scalar = Scalar::random(rng);
@@ -11,8 +15,8 @@ pub fn random_private_key<R: RngCore + CryptoRng>(rng: &mut R) -> PrivateKey {
     PrivateKey::from_scalar(scalar)
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct PrivateViewKey(PrivateKey);
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+pub struct PrivateViewKey(#[serde(with = "monero_private_key")] PrivateKey);
 
 impl PrivateViewKey {
     pub fn new_random<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
@@ -50,7 +54,7 @@ impl From<PublicViewKey> for PublicKey {
 #[derive(Clone, Copy, Debug)]
 pub struct PublicViewKey(PublicKey);
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize, PartialEq, PartialOrd)]
 pub struct Amount(u64);
 
 impl Amount {
@@ -66,15 +70,32 @@ impl Amount {
     }
 }
 
+impl Add for Amount {
+    type Output = Amount;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl Sub for Amount {
+    type Output = Amount;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
 impl From<Amount> for u64 {
     fn from(from: Amount) -> u64 {
         from.0
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TransferProof {
     tx_hash: TxHash,
+    #[serde(with = "monero_private_key")]
     tx_key: PrivateKey,
 }
 
@@ -91,7 +112,7 @@ impl TransferProof {
 }
 
 // TODO: add constructor/ change String to fixed length byte array
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TxHash(pub String);
 
 impl From<TxHash> for String {
@@ -107,18 +128,26 @@ pub trait Transfer {
         public_spend_key: PublicKey,
         public_view_key: PublicViewKey,
         amount: Amount,
-    ) -> Result<(TransferProof, Amount)>;
+    ) -> anyhow::Result<(TransferProof, Amount)>;
 }
 
 #[async_trait]
-pub trait CheckTransfer {
-    async fn check_transfer(
+pub trait WatchForTransfer {
+    async fn watch_for_transfer(
         &self,
         public_spend_key: PublicKey,
         public_view_key: PublicViewKey,
         transfer_proof: TransferProof,
         amount: Amount,
-    ) -> Result<()>;
+        expected_confirmations: u32,
+    ) -> Result<(), InsufficientFunds>;
+}
+
+#[derive(Debug, Clone, Copy, thiserror::Error)]
+#[error("transaction does not pay enough: expected {expected:?}, got {actual:?}")]
+pub struct InsufficientFunds {
+    pub expected: Amount,
+    pub actual: Amount,
 }
 
 #[async_trait]
@@ -127,5 +156,5 @@ pub trait CreateWalletForOutput {
         &self,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
-    ) -> Result<()>;
+    ) -> anyhow::Result<()>;
 }

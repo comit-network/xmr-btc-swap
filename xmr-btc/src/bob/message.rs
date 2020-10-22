@@ -1,9 +1,10 @@
 use crate::{bitcoin, monero};
 use anyhow::Result;
 use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
+use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Message {
     Message0(Message0),
     Message1(Message1),
@@ -11,7 +12,7 @@ pub enum Message {
     Message3(Message3),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message0 {
     pub(crate) B: bitcoin::PublicKey,
     pub(crate) S_b_monero: monero::PublicKey,
@@ -21,18 +22,18 @@ pub struct Message0 {
     pub(crate) refund_address: bitcoin::Address,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message1 {
     pub(crate) tx_lock: bitcoin::TxLock,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Message2 {
     pub(crate) tx_punish_sig: Signature,
     pub(crate) tx_cancel_sig: Signature,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Message3 {
     pub(crate) tx_redeem_encsig: EncryptedSignature,
 }

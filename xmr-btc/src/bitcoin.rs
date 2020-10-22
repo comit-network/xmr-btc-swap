@@ -6,29 +6,27 @@ use bitcoin::{
     hashes::{hex::ToHex, Hash},
     secp256k1,
     util::psbt::PartiallySignedTransaction,
-    SigHash, Transaction,
+    SigHash,
 };
-pub use bitcoin::{Address, Amount, OutPoint, Txid};
 use ecdsa_fun::{
     adaptor::Adaptor,
-    fun::{
-        marker::{Jacobian, Mark},
-        Point, Scalar,
-    },
+    fun::{Point, Scalar},
     nonce::Deterministic,
     ECDSA,
 };
-pub use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
 use miniscript::{Descriptor, Segwitv0};
 use rand::{CryptoRng, RngCore};
+use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
 
 pub use crate::bitcoin::transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund};
+pub use bitcoin::{Address, Amount, OutPoint, Transaction, Txid};
+pub use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
 
 pub const TX_FEE: u64 = 10_000;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct SecretKey {
     inner: Scalar,
     public: Point,
@@ -83,12 +81,12 @@ impl SecretKey {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PublicKey(Point);
 
-impl From<PublicKey> for Point<Jacobian> {
+impl From<PublicKey> for Point {
     fn from(from: PublicKey) -> Self {
-        from.0.mark::<Jacobian>()
+        from.0
     }
 }
 
@@ -189,7 +187,7 @@ pub trait BroadcastSignedTransaction {
 
 #[async_trait]
 pub trait WatchForRawTransaction {
-    async fn watch_for_raw_transaction(&self, txid: Txid) -> Result<Transaction>;
+    async fn watch_for_raw_transaction(&self, txid: Txid) -> Transaction;
 }
 
 pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Result<SecretKey> {
