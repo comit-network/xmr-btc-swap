@@ -88,44 +88,6 @@ pub mod cross_curve_dleq_scalar {
     }
 }
 
-pub mod cross_curve_dleq_proof {
-    use serde::{de, de::Visitor, Deserializer, Serializer};
-    use std::fmt;
-
-    struct MyVisitor;
-
-    impl<'de> Visitor<'de> for MyVisitor {
-        type Value = cross_curve_dleq::Proof;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(formatter, "todo")
-        }
-
-        fn visit_bytes<E>(self, _s: &[u8]) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            todo!("visit_bytes")
-        }
-    }
-
-    pub fn serialize<S>(_x: &cross_curve_dleq::Proof, _s: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        todo!("serialize")
-    }
-
-    pub fn deserialize<'de, D>(
-        _deserializer: D,
-    ) -> Result<cross_curve_dleq::Proof, <D as Deserializer<'de>>::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        todo!("deserialize")
-    }
-}
-
 pub mod monero_private_key {
     use serde::{de, de::Visitor, Deserializer, Serializer};
     use std::fmt;

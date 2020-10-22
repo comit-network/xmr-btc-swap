@@ -3,7 +3,7 @@ use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
-use crate::{bitcoin, monero, serde::cross_curve_dleq_proof};
+use crate::{bitcoin, monero};
 
 #[derive(Debug)]
 pub enum Message {
@@ -17,7 +17,6 @@ pub struct Message0 {
     pub(crate) A: bitcoin::PublicKey,
     pub(crate) S_a_monero: monero::PublicKey,
     pub(crate) S_a_bitcoin: bitcoin::PublicKey,
-    #[serde(with = "cross_curve_dleq_proof")]
     pub(crate) dleq_proof_s_a: cross_curve_dleq::Proof,
     pub(crate) v_a: monero::PrivateViewKey,
     pub(crate) redeem_address: bitcoin::Address,

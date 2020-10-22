@@ -1,4 +1,4 @@
-use crate::{bitcoin, monero, serde::cross_curve_dleq_proof};
+use crate::{bitcoin, monero};
 use anyhow::Result;
 use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,6 @@ pub struct Message0 {
     pub(crate) B: bitcoin::PublicKey,
     pub(crate) S_b_monero: monero::PublicKey,
     pub(crate) S_b_bitcoin: bitcoin::PublicKey,
-    #[serde(with = "cross_curve_dleq_proof")]
     pub(crate) dleq_proof_s_b: cross_curve_dleq::Proof,
     pub(crate) v_b: monero::PrivateViewKey,
     pub(crate) refund_address: bitcoin::Address,
