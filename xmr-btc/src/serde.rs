@@ -1,38 +1,42 @@
 pub mod monero_private_key {
-    use serde::{de, de::Visitor, Deserializer, Serializer};
-    use std::fmt;
+    use monero::{
+        consensus::{Decodable, Encodable},
+        PrivateKey,
+    };
+    use serde::{de, de::Visitor, ser::Error, Deserializer, Serializer};
+    use std::{fmt, io::Cursor};
 
     struct BytesVisitor;
 
     impl<'de> Visitor<'de> for BytesVisitor {
-        type Value = monero::PrivateKey;
+        type Value = PrivateKey;
 
         fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(formatter, "a string containing 32 bytes")
+            write!(formatter, "a byte array representing a Monero private key")
         }
 
         fn visit_bytes<E>(self, s: &[u8]) -> Result<Self::Value, E>
         where
             E: de::Error,
         {
-            if let Ok(key) = monero::PrivateKey::from_slice(s) {
-                Ok(key)
-            } else {
-                Err(de::Error::invalid_length(s.len(), &self))
-            }
+            let mut s = s;
+            PrivateKey::consensus_decode(&mut s).map_err(|err| E::custom(format!("{:?}", err)))
         }
     }
 
-    pub fn serialize<S>(x: &monero::PrivateKey, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(x: &PrivateKey, s: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        s.serialize_bytes(x.as_bytes())
+        let mut bytes = Cursor::new(vec![]);
+        x.consensus_encode(&mut bytes)
+            .map_err(|err| S::Error::custom(format!("{:?}", err)))?;
+        s.serialize_bytes(bytes.into_inner().as_ref())
     }
 
     pub fn deserialize<'de, D>(
         deserializer: D,
-    ) -> Result<monero::PrivateKey, <D as Deserializer<'de>>::Error>
+    ) -> Result<PrivateKey, <D as Deserializer<'de>>::Error>
     where
         D: Deserializer<'de>,
     {
