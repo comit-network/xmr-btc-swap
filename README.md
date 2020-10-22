@@ -1,6 +1,30 @@
 XMR to BTC Atomic Swap
 ======================
 
+## How to start
+
+### As a maker
+
+To start the application as a maker type the following into your terminal:  
+```bash 
+xmr_btc --maker
+```
+The application will then print your listening address and waits for a taker to connect to you. 
+Once connected, it will perform the atomic swap automatically. 
+
+### As a taker
+
+To start the application as a taker type the following into your terminal:
+
+```bash
+xmr-btc --taker --address <maker_address>
+```
+
+You will connect to the maker as defined by `<maker_address>` and retrieve his latest rate. 
+If you are happy with this rate just hit `ENTER` and the application will perform the atomic swap for you. 
+
+-----
+
 This repository is a proof of concept for atomically swapping XMR for BTC.
 
 We define:

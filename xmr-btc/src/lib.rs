@@ -48,6 +48,7 @@ mod utils {
 pub mod alice;
 pub mod bitcoin;
 pub mod bob;
+pub mod cli;
 pub mod monero;
 #[cfg(feature = "tor")]
 pub mod tor;
