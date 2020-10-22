@@ -346,16 +346,16 @@ pub struct State3 {
     pub S_b_bitcoin: bitcoin::PublicKey,
     pub v: monero::PrivateViewKey,
     #[serde(with = "bitcoin_amount")]
-    btc: bitcoin::Amount,
-    xmr: monero::Amount,
-    refund_timelock: u32,
-    punish_timelock: u32,
-    refund_address: bitcoin::Address,
-    redeem_address: bitcoin::Address,
-    punish_address: bitcoin::Address,
-    tx_lock: bitcoin::TxLock,
-    tx_punish_sig_bob: bitcoin::Signature,
-    tx_cancel_sig_bob: bitcoin::Signature,
+    pub btc: bitcoin::Amount,
+    pub xmr: monero::Amount,
+    pub refund_timelock: u32,
+    pub punish_timelock: u32,
+    pub refund_address: bitcoin::Address,
+    pub redeem_address: bitcoin::Address,
+    pub punish_address: bitcoin::Address,
+    pub tx_lock: bitcoin::TxLock,
+    pub tx_punish_sig_bob: bitcoin::Signature,
+    pub tx_cancel_sig_bob: bitcoin::Signature,
 }
 
 impl State3 {
