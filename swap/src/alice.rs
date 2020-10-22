@@ -6,7 +6,7 @@ use libp2p::{
     request_response::ResponseChannel,
     NetworkBehaviour, PeerId,
 };
-use rand::{CryptoRng, RngCore};
+use rand::rngs::OsRng;
 use std::{thread, time::Duration};
 use tracing::debug;
 
@@ -21,21 +21,20 @@ use crate::{
         request_response::{AliceToBob, TIMEOUT},
         transport, TokioExecutor,
     },
-    SwapParams, PUNISH_TIMELOCK, REFUND_TIMELOCK,
+    SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use xmr_btc::{alice::State0, bob, monero};
 
 pub type Swarm = libp2p::Swarm<Alice>;
 
 #[allow(unused_assignments)] // Due to the mutable message0?
-pub async fn swap<R: RngCore + CryptoRng>(
+pub async fn swap(
     listen: Multiaddr,
-    rng: &mut R,
     redeem_address: ::bitcoin::Address,
     punish_address: ::bitcoin::Address,
 ) -> Result<()> {
     let mut message0: Option<bob::Message0> = None;
-    let mut last_amounts: Option<SwapParams> = None;
+    let mut last_amounts: Option<SwapAmounts> = None;
 
     let mut swarm = new_swarm(listen)?;
 
@@ -65,10 +64,12 @@ pub async fn swap<R: RngCore + CryptoRng>(
         None => unreachable!("should have amounts by here"),
     };
 
-    // FIXME: Too many `bitcoin` crates/modules.
     let xmr = monero::Amount::from_piconero(xmr.as_piconero());
+    //  TODO: This should be the Amount exported by xmr_btc.
     let btc = ::bitcoin::Amount::from_sat(btc.as_sat());
 
+    // TODO: Pass this in using <R: RngCore + CryptoRng>
+    let rng = &mut OsRng;
     let state0 = State0::new(
         rng,
         btc,
@@ -195,8 +196,8 @@ impl Alice {
     }
 
     /// Alice always sends her messages as a response to a request from Bob.
-    pub fn send_amounts(&mut self, channel: ResponseChannel<AliceToBob>, p: SwapParams) {
-        let msg = AliceToBob::Amounts(p);
+    pub fn send_amounts(&mut self, channel: ResponseChannel<AliceToBob>, amounts: SwapAmounts) {
+        let msg = AliceToBob::Amounts(amounts);
         self.amounts.send(channel, msg);
     }
 
@@ -228,15 +229,15 @@ impl Default for Alice {
     }
 }
 
-// TODO: Check that this is correct.
-fn calculate_amounts(btc: ::bitcoin::Amount) -> SwapParams {
+fn calculate_amounts(btc: ::bitcoin::Amount) -> SwapAmounts {
     const XMR_PER_BTC: u64 = 100; // TODO: Get this from an exchange.
 
+    // TODO: Check that this is correct.
     // XMR uses 12 zerose BTC uses 8.
     let picos = (btc.as_sat() * 10000) * XMR_PER_BTC;
     let xmr = monero::Amount::from_piconero(picos);
 
-    SwapParams { btc, xmr }
+    SwapAmounts { btc, xmr }
 }
 
 #[cfg(test)]
@@ -251,7 +252,7 @@ mod tests {
         let btc = ::bitcoin::Amount::from_sat(ONE_BTC);
         let want = monero::Amount::from_piconero(HUNDRED_XMR);
 
-        let SwapParams { xmr: got, .. } = calculate_amounts(btc);
+        let SwapAmounts { xmr: got, .. } = calculate_amounts(btc);
         assert_eq!(got, want);
     }
 }

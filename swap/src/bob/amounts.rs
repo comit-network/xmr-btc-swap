@@ -16,12 +16,12 @@ use tracing::error;
 
 use crate::{
     network::request_response::{AliceToBob, BobToAlice, Codec, Protocol},
-    SwapParams,
+    SwapAmounts,
 };
 
 #[derive(Debug)]
 pub enum OutEvent {
-    Amounts(SwapParams),
+    Amounts(SwapAmounts),
 }
 
 /// A `NetworkBehaviour` that represents getting the amounts of an XMR/BTC swap.

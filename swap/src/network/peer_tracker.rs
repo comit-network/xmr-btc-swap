@@ -25,8 +25,7 @@ pub struct PeerTracker {
 }
 
 impl PeerTracker {
-    /// Returns an arbitrary connected counterparty.
-    /// This is useful if we are connected to a single other node.
+    /// Returns the peer id of counterparty if we are connected.
     pub fn counterparty_peer_id(&self) -> Option<PeerId> {
         if let Some((id, _)) = &self.connected {
             return Some(id.clone());
@@ -34,8 +33,7 @@ impl PeerTracker {
         None
     }
 
-    /// Returns an arbitrary connected counterparty.
-    /// This is useful if we are connected to a single other node.
+    /// Returns the multiaddr of counterparty if we are connected.
     pub fn counterparty_addr(&self) -> Option<Multiaddr> {
         if let Some((_, addr)) = &self.connected {
             return Some(addr.clone());

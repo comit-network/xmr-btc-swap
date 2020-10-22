@@ -7,7 +7,7 @@ use libp2p::{
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, io};
 
-use crate::SwapParams;
+use crate::SwapAmounts;
 use xmr_btc::{alice, bob, monero};
 
 /// Time to wait for a response back once we send a request.
@@ -28,7 +28,7 @@ pub enum BobToAlice {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum AliceToBob {
-    Amounts(SwapParams),
+    Amounts(SwapAmounts),
     Message0(alice::Message0),
     Message1(alice::Message1),
 }

@@ -16,7 +16,6 @@ use anyhow::{bail, Result};
 use futures::{channel::mpsc, StreamExt};
 use libp2p::Multiaddr;
 use log::LevelFilter;
-use rand::rngs::OsRng;
 use std::{io, io::Write, process};
 use structopt::StructOpt;
 use tracing::info;
@@ -26,10 +25,13 @@ mod cli;
 mod trace;
 
 use cli::Options;
-use swap::{alice, bitcoin::Wallet, bob, Cmd, Rsp, SwapParams};
+use swap::{alice, bitcoin::Wallet, bob, Cmd, Rsp, SwapAmounts};
 use xmr_btc::bitcoin::BuildTxLockPsbt;
-// TODO: Add root seed file instead of generating new seed each run.
 
+// TODO: Add root seed file instead of generating new seed each run.
+// TODO: Remove all instances of the todo! macro
+
+// TODO: Add a config file with these in it.
 // Alice's address and port until we have a config file.
 pub const PORT: u16 = 9876; // Arbitrarily chosen.
 pub const ADDR: &str = "127.0.0.1";
@@ -97,7 +99,7 @@ async fn swap_as_alice(
     redeem: bitcoin::Address,
     punish: bitcoin::Address,
 ) -> Result<()> {
-    alice::swap(addr, &mut OsRng, redeem, punish).await
+    alice::swap(addr, redeem, punish).await
 }
 
 async fn swap_as_bob<W>(
@@ -132,10 +134,10 @@ where
     }
 }
 
-fn verify(p: SwapParams) -> Rsp {
+fn verify(amounts: SwapAmounts) -> Rsp {
     let mut s = String::new();
     println!("Got rate from Alice for XMR/BTC swap\n");
-    println!("{}", p);
+    println!("{}", amounts);
     print!("Would you like to continue with this swap [y/N]: ");
     let _ = io::stdout().flush();
     io::stdin()
