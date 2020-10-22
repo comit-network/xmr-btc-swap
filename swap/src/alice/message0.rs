@@ -15,7 +15,7 @@ use std::{
 };
 use tracing::error;
 
-use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol};
+use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol, TIMEOUT};
 use xmr_btc::{alice::State0, bob};
 
 #[derive(Debug)]
@@ -36,21 +36,6 @@ pub struct Message0 {
 }
 
 impl Message0 {
-    pub fn new(timeout: Duration) -> Self {
-        let mut config = RequestResponseConfig::default();
-        config.set_request_timeout(timeout);
-
-        Self {
-            rr: RequestResponse::new(
-                Codec::default(),
-                vec![(Protocol, ProtocolSupport::Full)],
-                config,
-            ),
-            events: Default::default(),
-            state: None,
-        }
-    }
-
     pub fn set_state(&mut self, state: State0) -> Result<()> {
         if self.state.is_some() {
             bail!("Trying to set state a second time");
@@ -70,6 +55,24 @@ impl Message0 {
         }
 
         Poll::Pending
+    }
+}
+
+impl Default for Message0 {
+    fn default() -> Self {
+        let timeout = Duration::from_secs(TIMEOUT);
+        let mut config = RequestResponseConfig::default();
+        config.set_request_timeout(timeout);
+
+        Self {
+            rr: RequestResponse::new(
+                Codec::default(),
+                vec![(Protocol, ProtocolSupport::Full)],
+                config,
+            ),
+            events: Default::default(),
+            state: None,
+        }
     }
 }
 

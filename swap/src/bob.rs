@@ -7,7 +7,7 @@ use futures::{
 };
 use libp2p::{core::identity::Keypair, Multiaddr, NetworkBehaviour, PeerId};
 use rand::rngs::OsRng;
-use std::{process, thread, time::Duration};
+use std::{process, thread};
 use tracing::{debug, info};
 
 mod amounts;
@@ -18,10 +18,9 @@ use self::{amounts::*, message0::*, message1::*};
 use crate::{
     network::{
         peer_tracker::{self, PeerTracker},
-        request_response::TIMEOUT,
         transport, TokioExecutor,
     },
-    Cmd, Rsp, PUNISH_TIMELOCK, REFUND_TIMELOCK,
+    Cmd, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use xmr_btc::{
     alice,
@@ -29,6 +28,7 @@ use xmr_btc::{
     bob::{self, State0},
 };
 
+// FIXME: This whole function is horrible, needs total re-write.
 pub async fn swap<W>(
     btc: u64,
     addr: Multiaddr,
@@ -52,9 +52,9 @@ where
     swarm.request_amounts(alice.clone(), btc);
 
     let (btc, xmr) = match swarm.next().await {
-        OutEvent::Amounts(amounts::OutEvent::Amounts(p)) => {
-            debug!("Got amounts from Alice: {:?}", p);
-            let cmd = Cmd::VerifyAmounts(p);
+        OutEvent::Amounts(amounts) => {
+            debug!("Got amounts from Alice: {:?}", amounts);
+            let cmd = Cmd::VerifyAmounts(amounts);
             cmd_tx.try_send(cmd)?;
             let response = rsp_rx.next().await;
             if response == Some(Rsp::Abort) {
@@ -63,7 +63,7 @@ where
             }
 
             info!("User verified amounts, continuing with swap ...");
-            (p.btc, p.xmr)
+            (amounts.btc, amounts.xmr)
         }
         other => panic!("unexpected event: {:?}", other),
     };
@@ -131,7 +131,7 @@ fn new_swarm() -> Result<Swarm> {
 #[derive(Debug)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
-    Amounts(amounts::OutEvent),
+    Amounts(SwapAmounts),
     Message0(alice::Message0),
     Message1(alice::Message1),
 }
@@ -148,7 +148,9 @@ impl From<peer_tracker::OutEvent> for OutEvent {
 
 impl From<amounts::OutEvent> for OutEvent {
     fn from(event: amounts::OutEvent) -> Self {
-        OutEvent::Amounts(event)
+        match event {
+            amounts::OutEvent::Amounts(amounts) => OutEvent::Amounts(amounts),
+        }
     }
 }
 
@@ -216,13 +218,12 @@ impl Bob {
 impl Default for Bob {
     fn default() -> Bob {
         let identity = Keypair::generate_ed25519();
-        let timeout = Duration::from_secs(TIMEOUT);
 
         Self {
             pt: PeerTracker::default(),
-            amounts: Amounts::new(timeout),
-            message0: Message0::new(timeout),
-            message1: Message1::new(timeout),
+            amounts: Amounts::default(),
+            message0: Message0::default(),
+            message1: Message1::default(),
             identity,
         }
     }

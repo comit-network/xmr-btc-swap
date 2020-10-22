@@ -15,7 +15,7 @@ use std::{
 use tracing::error;
 
 use crate::{
-    network::request_response::{AliceToBob, BobToAlice, Codec, Protocol},
+    network::request_response::{AliceToBob, BobToAlice, Codec, Protocol, TIMEOUT},
     SwapAmounts,
 };
 
@@ -35,20 +35,6 @@ pub struct Amounts {
 }
 
 impl Amounts {
-    pub fn new(timeout: Duration) -> Self {
-        let mut config = RequestResponseConfig::default();
-        config.set_request_timeout(timeout);
-
-        Self {
-            rr: RequestResponse::new(
-                Codec::default(),
-                vec![(Protocol, ProtocolSupport::Full)],
-                config,
-            ),
-            events: Default::default(),
-        }
-    }
-
     pub fn request_amounts(&mut self, alice: PeerId, btc: ::bitcoin::Amount) -> Result<RequestId> {
         let msg = BobToAlice::AmountsFromBtc(btc);
         let id = self.rr.send_request(&alice, msg);
@@ -66,6 +52,24 @@ impl Amounts {
         }
 
         Poll::Pending
+    }
+}
+
+impl Default for Amounts {
+    fn default() -> Self {
+        let timeout = Duration::from_secs(TIMEOUT);
+
+        let mut config = RequestResponseConfig::default();
+        config.set_request_timeout(timeout);
+
+        Self {
+            rr: RequestResponse::new(
+                Codec::default(),
+                vec![(Protocol, ProtocolSupport::Full)],
+                config,
+            ),
+            events: Default::default(),
+        }
     }
 }
 

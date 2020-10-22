@@ -13,7 +13,7 @@ use std::{
 };
 use tracing::error;
 
-use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol};
+use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol, TIMEOUT};
 use xmr_btc::{alice, bob};
 
 #[derive(Debug)]
@@ -32,20 +32,6 @@ pub struct Message0 {
 }
 
 impl Message0 {
-    pub fn new(timeout: Duration) -> Self {
-        let mut config = RequestResponseConfig::default();
-        config.set_request_timeout(timeout);
-
-        Self {
-            rr: RequestResponse::new(
-                Codec::default(),
-                vec![(Protocol, ProtocolSupport::Full)],
-                config,
-            ),
-            events: Default::default(),
-        }
-    }
-
     pub fn send(&mut self, alice: PeerId, msg: bob::Message0) {
         let msg = BobToAlice::Message0(msg);
         let _id = self.rr.send_request(&alice, msg);
@@ -61,6 +47,23 @@ impl Message0 {
         }
 
         Poll::Pending
+    }
+}
+
+impl Default for Message0 {
+    fn default() -> Self {
+        let timeout = Duration::from_secs(TIMEOUT);
+        let mut config = RequestResponseConfig::default();
+        config.set_request_timeout(timeout);
+
+        Self {
+            rr: RequestResponse::new(
+                Codec::default(),
+                vec![(Protocol, ProtocolSupport::Full)],
+                config,
+            ),
+            events: Default::default(),
+        }
     }
 }
 

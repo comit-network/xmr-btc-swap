@@ -7,7 +7,7 @@ use libp2p::{
     NetworkBehaviour, PeerId,
 };
 use rand::rngs::OsRng;
-use std::{thread, time::Duration};
+use std::thread;
 use tracing::debug;
 
 mod amounts;
@@ -18,7 +18,7 @@ use self::{amounts::*, message0::*, message1::*};
 use crate::{
     network::{
         peer_tracker::{self, PeerTracker},
-        request_response::{AliceToBob, TIMEOUT},
+        request_response::AliceToBob,
         transport, TokioExecutor,
     },
     SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
@@ -27,6 +27,7 @@ use xmr_btc::{alice::State0, bob, monero};
 
 pub type Swarm = libp2p::Swarm<Alice>;
 
+// FIXME: This whole function is horrible, needs total re-write.
 #[allow(unused_assignments)] // Due to the mutable message0?
 pub async fn swap(
     listen: Multiaddr,
@@ -132,7 +133,7 @@ fn new_swarm(listen: Multiaddr) -> Result<Swarm> {
 #[derive(Debug)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
-    Request(amounts::OutEvent),
+    Request(amounts::OutEvent), // Not-uniform with Bob on purpose, ready for adding Xmr event.
     Message0(bob::Message0),
     Message1 {
         msg: bob::Message1,
@@ -200,10 +201,12 @@ impl Alice {
         self.amounts.send(channel, msg);
     }
 
+    /// Message0 gets sent within the network layer using this state0.
     pub fn set_state0(&mut self, state: State0) {
         let _ = self.message0.set_state(state);
     }
 
+    /// Send Message1 to Bob in response to receiving his Message1.
     pub fn send_message1(
         &mut self,
         channel: ResponseChannel<AliceToBob>,
@@ -216,13 +219,12 @@ impl Alice {
 impl Default for Alice {
     fn default() -> Self {
         let identity = Keypair::generate_ed25519();
-        let timeout = Duration::from_secs(TIMEOUT);
 
         Self {
             pt: PeerTracker::default(),
-            amounts: Amounts::new(timeout),
-            message0: Message0::new(timeout),
-            message1: Message1::new(timeout),
+            amounts: Amounts::default(),
+            message0: Message0::default(),
+            message1: Message1::default(),
             identity,
         }
     }

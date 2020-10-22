@@ -13,7 +13,7 @@ use std::{
 };
 use tracing::error;
 
-use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol};
+use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol, TIMEOUT};
 use xmr_btc::bob;
 
 #[derive(Debug)]
@@ -37,20 +37,6 @@ pub struct Message1 {
 }
 
 impl Message1 {
-    pub fn new(timeout: Duration) -> Self {
-        let mut config = RequestResponseConfig::default();
-        config.set_request_timeout(timeout);
-
-        Self {
-            rr: RequestResponse::new(
-                Codec::default(),
-                vec![(Protocol, ProtocolSupport::Full)],
-                config,
-            ),
-            events: Default::default(),
-        }
-    }
-
     pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: xmr_btc::alice::Message1) {
         let msg = AliceToBob::Message1(msg);
         self.rr.send_response(channel, msg);
@@ -108,6 +94,23 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             } => {
                 error!("Outbound failure: {:?}", error);
             }
+        }
+    }
+}
+
+impl Default for Message1 {
+    fn default() -> Self {
+        let timeout = Duration::from_secs(TIMEOUT);
+        let mut config = RequestResponseConfig::default();
+        config.set_request_timeout(timeout);
+
+        Self {
+            rr: RequestResponse::new(
+                Codec::default(),
+                vec![(Protocol, ProtocolSupport::Full)],
+                config,
+            ),
+            events: Default::default(),
         }
     }
 }
