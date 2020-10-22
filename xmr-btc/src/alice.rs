@@ -3,7 +3,7 @@ use crate::{
     bitcoin::{BroadcastSignedTransaction, WatchForRawTransaction},
     bob, monero,
     monero::{CreateWalletForOutput, Transfer},
-    serde::{bitcoin_amount, cross_curve_dleq_scalar, ecdsa_fun_signature},
+    serde::bitcoin_amount,
     transport::{ReceiveMessage, SendMessage},
 };
 use anyhow::{anyhow, Result};
@@ -82,7 +82,7 @@ pub async fn next_state<
 }
 
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub enum State {
     State0(State0),
     State1(State1),
@@ -134,7 +134,7 @@ impl State {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct State0 {
     a: bitcoin::SecretKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
+    //#[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     v_a: monero::PrivateViewKey,
     #[serde(with = "bitcoin_amount")]
@@ -223,7 +223,6 @@ impl State0 {
 pub struct State1 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
@@ -263,7 +262,6 @@ impl State1 {
 pub struct State2 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
@@ -340,13 +338,12 @@ impl State2 {
 pub struct State3 {
     pub a: bitcoin::SecretKey,
     pub B: bitcoin::PublicKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     pub s_a: cross_curve_dleq::Scalar,
     pub S_b_monero: monero::PublicKey,
     pub S_b_bitcoin: bitcoin::PublicKey,
     pub v: monero::PrivateViewKey,
     #[serde(with = "bitcoin_amount")]
-    btc: bitcoin::Amount,
+    pub btc: bitcoin::Amount,
     pub xmr: monero::Amount,
     pub refund_timelock: u32,
     pub punish_timelock: u32,
@@ -354,9 +351,7 @@ pub struct State3 {
     pub redeem_address: bitcoin::Address,
     pub punish_address: bitcoin::Address,
     pub tx_lock: bitcoin::TxLock,
-    #[serde(with = "ecdsa_fun_signature")]
     pub tx_punish_sig_bob: bitcoin::Signature,
-    #[serde(with = "ecdsa_fun_signature")]
     pub tx_cancel_sig_bob: bitcoin::Signature,
 }
 
@@ -397,7 +392,6 @@ impl State3 {
 pub struct State4 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
@@ -411,9 +405,7 @@ pub struct State4 {
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
-    #[serde(with = "ecdsa_fun_signature")]
     tx_punish_sig_bob: bitcoin::Signature,
-    #[serde(with = "ecdsa_fun_signature")]
     tx_cancel_sig_bob: bitcoin::Signature,
 }
 
@@ -504,7 +496,6 @@ impl State4 {
 pub struct State5 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
@@ -519,9 +510,9 @@ pub struct State5 {
     punish_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
     tx_lock_proof: monero::TransferProof,
-    #[serde(with = "ecdsa_fun_signature")]
+
     tx_punish_sig_bob: bitcoin::Signature,
-    #[serde(with = "ecdsa_fun_signature")]
+
     tx_cancel_sig_bob: bitcoin::Signature,
     lock_xmr_fee: monero::Amount,
 }
@@ -599,7 +590,6 @@ impl State5 {
 pub struct State6 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
-    #[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
@@ -613,7 +603,7 @@ pub struct State6 {
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
-    #[serde(with = "ecdsa_fun_signature")]
+
     tx_punish_sig_bob: bitcoin::Signature,
     tx_redeem_encsig: EncryptedSignature,
     lock_xmr_fee: monero::Amount,

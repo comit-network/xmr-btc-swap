@@ -2,26 +2,32 @@ use anyhow::{anyhow, Context, Result};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::path::Path;
 
-pub struct Database {
+pub struct Database<T>
+where
+    T: Serialize + DeserializeOwned,
+{
     db: sled::Db,
+    _marker: std::marker::PhantomData<T>,
 }
 
-impl Database {
+impl<T> Database<T>
+where
+    T: Serialize + DeserializeOwned,
+{
+    // TODO: serialize using lazy/one-time initlisation
     const LAST_STATE_KEY: &'static str = "latest_state";
 
     pub fn open(path: &Path) -> Result<Self> {
-        let path = path
-            .to_str()
-            .ok_or_else(|| anyhow!("The path is not utf-8 valid: {:?}", path))?;
-        let db = sled::open(path).with_context(|| format!("Could not open the DB at {}", path))?;
+        let db =
+            sled::open(path).with_context(|| format!("Could not open the DB at {:?}", path))?;
 
-        Ok(Database { db })
+        Ok(Database {
+            db,
+            _marker: Default::default(),
+        })
     }
 
-    pub async fn insert_latest_state<T>(&self, state: &T) -> Result<()>
-    where
-        T: Serialize + DeserializeOwned,
-    {
+    pub async fn insert_latest_state(&self, state: &T) -> Result<()> {
         let key = serialize(&Self::LAST_STATE_KEY)?;
         let new_value = serialize(&state).context("Could not serialize new state value")?;
 
@@ -30,8 +36,9 @@ impl Database {
         self.db
             .compare_and_swap(key, old_value, Some(new_value))
             .context("Could not write in the DB")?
-            .context("Stored swap somehow changed, aborting saving")?; // let _ =
+            .context("Stored swap somehow changed, aborting saving")?;
 
+        // TODO: see if this can be done through sled config
         self.db
             .flush_async()
             .await
@@ -39,10 +46,7 @@ impl Database {
             .context("Could not flush db")
     }
 
-    pub fn get_latest_state<T>(&self) -> anyhow::Result<T>
-    where
-        T: DeserializeOwned,
-    {
+    pub fn get_latest_state(&self) -> anyhow::Result<T> {
         let key = serialize(&Self::LAST_STATE_KEY)?;
 
         let encoded = self
@@ -77,15 +81,12 @@ mod tests {
     use curve25519_dalek::scalar::Scalar;
     use ecdsa_fun::fun::rand_core::OsRng;
     use std::str::FromStr;
-    use xmr_btc::serde::{
-        bitcoin_amount, cross_curve_dleq_scalar, ecdsa_fun_signature, monero_private_key,
-    };
+    use xmr_btc::serde::{bitcoin_amount, monero_private_key};
 
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     pub struct TestState {
         A: xmr_btc::bitcoin::PublicKey,
         a: xmr_btc::bitcoin::SecretKey,
-        #[serde(with = "cross_curve_dleq_scalar")]
         s_a: ::cross_curve_dleq::Scalar,
         #[serde(with = "monero_private_key")]
         s_b: monero::PrivateKey,
@@ -98,13 +99,13 @@ mod tests {
         refund_timelock: u32,
         refund_address: ::bitcoin::Address,
         transaction: ::bitcoin::Transaction,
-        #[serde(with = "ecdsa_fun_signature")]
         tx_punish_sig: xmr_btc::bitcoin::Signature,
     }
 
     #[tokio::test]
     async fn recover_state_from_db() {
-        let db = Database::open(Path::new("../target/test_recover.db")).unwrap();
+        let db_dir = tempfile::tempdir().unwrap();
+        let db = Database::open(db_dir.path()).unwrap();
 
         let a = xmr_btc::bitcoin::SecretKey::new_random(&mut OsRng);
         let s_a = cross_curve_dleq::Scalar::random(&mut OsRng);

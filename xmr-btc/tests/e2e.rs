@@ -11,14 +11,14 @@ mod tests {
         harness::{
             init_bitcoind, init_test,
             node::{run_alice_until, run_bob_until},
-            ALICE_TEST_DB_FOLDER, BOB_TEST_DB_FOLDER,
         },
     };
     use futures::future;
     use monero_harness::Monero;
     use rand::rngs::OsRng;
 
-    use std::{convert::TryInto, path::Path};
+    use crate::harness::storage::Database;
+    use std::convert::TryInto;
     use testcontainers::clients::Cli;
     use tracing_subscriber::util::SubscriberInitExt;
     use xmr_btc::{
@@ -251,8 +251,13 @@ mod tests {
         let cli = Cli::default();
         let (monero, _container) = Monero::new(&cli);
         let bitcoind = init_bitcoind(&cli).await;
-        let alice_db = harness::storage::Database::open(Path::new(ALICE_TEST_DB_FOLDER)).unwrap();
-        let bob_db = harness::storage::Database::open(Path::new(BOB_TEST_DB_FOLDER)).unwrap();
+
+        let alice_db_dir = tempfile::tempdir().unwrap();
+        let alice_db: Database<alice::State> =
+            harness::storage::Database::open(alice_db_dir.path()).unwrap();
+        let bob_db_dir = tempfile::tempdir().unwrap();
+        let bob_db: Database<bob::State> =
+            harness::storage::Database::open(bob_db_dir.path()).unwrap();
 
         let (
             alice_state0,
@@ -281,29 +286,26 @@ mod tests {
             .await
             .unwrap();
 
-            let alice_state5: alice::State5 = alice_state.try_into().unwrap();
-            let bob_state3: bob::State3 = bob_state.try_into().unwrap();
-
             // save state to db
-            alice_db.insert_latest_state(&alice_state5).await.unwrap();
-            bob_db.insert_latest_state(&bob_state3).await.unwrap();
+            alice_db.insert_latest_state(&alice_state).await.unwrap();
+            bob_db.insert_latest_state(&bob_state).await.unwrap();
         };
 
         let (alice_state6, bob_state5) = {
             // recover state from db
-            let alice_state5: alice::State5 = alice_db.get_latest_state().unwrap();
-            let bob_state3: bob::State3 = bob_db.get_latest_state().unwrap();
+            let alice_state = alice_db.get_latest_state().unwrap();
+            let bob_state = bob_db.get_latest_state().unwrap();
 
             let (alice_state, bob_state) = future::try_join(
                 run_alice_until(
                     &mut alice_node,
-                    alice_state5.into(),
+                    alice_state,
                     harness::alice::is_state6,
                     &mut OsRng,
                 ),
                 run_bob_until(
                     &mut bob_node,
-                    bob_state3.into(),
+                    bob_state,
                     harness::bob::is_state5,
                     &mut OsRng,
                 ),
