@@ -11,7 +11,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol, TIMEOUT};
 use xmr_btc::bob;
@@ -55,49 +55,6 @@ impl Message1 {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Message1 {
-    fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
-        match event {
-            RequestResponseEvent::Message {
-                peer: _,
-                message:
-                    RequestResponseMessage::Request {
-                        request,
-                        request_id: _,
-                        channel,
-                    },
-            } => match request {
-                BobToAlice::Message1(msg) => {
-                    self.events.push_back(OutEvent::Msg { msg, channel });
-                }
-                other => panic!("unexpected request: {:?}", other),
-            },
-            RequestResponseEvent::Message {
-                peer: _,
-                message:
-                    RequestResponseMessage::Response {
-                        response: _,
-                        request_id: _,
-                    },
-            } => panic!("unexpected response"),
-            RequestResponseEvent::InboundFailure {
-                peer: _,
-                request_id: _,
-                error,
-            } => {
-                error!("Inbound failure: {:?}", error);
-            }
-            RequestResponseEvent::OutboundFailure {
-                peer: _,
-                request_id: _,
-                error,
-            } => {
-                error!("Outbound failure: {:?}", error);
-            }
-        }
-    }
-}
-
 impl Default for Message1 {
     fn default() -> Self {
         let timeout = Duration::from_secs(TIMEOUT);
@@ -111,6 +68,35 @@ impl Default for Message1 {
                 config,
             ),
             events: Default::default(),
+        }
+    }
+}
+
+impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Message1 {
+    fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
+        match event {
+            RequestResponseEvent::Message {
+                message:
+                    RequestResponseMessage::Request {
+                        request, channel, ..
+                    },
+                ..
+            } => match request {
+                BobToAlice::Message1(msg) => {
+                    self.events.push_back(OutEvent::Msg { msg, channel });
+                }
+                other => debug!("got request: {:?}", other),
+            },
+            RequestResponseEvent::Message {
+                message: RequestResponseMessage::Response { .. },
+                ..
+            } => panic!("Alice should not get a Response"),
+            RequestResponseEvent::InboundFailure { error, .. } => {
+                error!("Inbound failure: {:?}", error);
+            }
+            RequestResponseEvent::OutboundFailure { error, .. } => {
+                error!("Outbound failure: {:?}", error);
+            }
         }
     }
 }

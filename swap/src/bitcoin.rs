@@ -1,15 +1,18 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use backoff::{future::FutureOperation as _, ExponentialBackoff};
-use bitcoin::{util::psbt::PartiallySignedTransaction, Address, Amount, Transaction, Txid};
+use bitcoin::{util::psbt::PartiallySignedTransaction, Address, Transaction};
 use bitcoin_harness::bitcoind_rpc::PsbtBase64;
 use reqwest::Url;
 use xmr_btc::{
     bitcoin::{
-        BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock, TxLock, WatchForRawTransaction,
+        Amount, BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock, TxLock, Txid,
+        WatchForRawTransaction,
     },
     MedianTime,
 };
+
+// This is cut'n'paste from xmr_btc/tests/harness/wallet/bitcoin.rs
 
 #[derive(Debug)]
 pub struct Wallet(pub bitcoin_harness::Wallet);
@@ -37,8 +40,6 @@ impl Wallet {
             .await
             .map(|res| bitcoin::Amount::from_btc(-res.fee))??;
 
-        // FIXME: Handle re-export of bitcoin::Amount correctly.
-        let fee = Amount::from_sat(fee.as_sat());
         Ok(fee)
     }
 }

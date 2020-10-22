@@ -12,7 +12,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::{
     network::request_response::{AliceToBob, BobToAlice, Codec, Protocol, TIMEOUT},
@@ -77,29 +77,20 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
             RequestResponseEvent::Message {
-                peer: _,
                 message: RequestResponseMessage::Request { .. },
+                ..
             } => panic!("Bob should never get a request from Alice"),
             RequestResponseEvent::Message {
-                peer: _,
-                message:
-                    RequestResponseMessage::Response {
-                        response,
-                        request_id: _,
-                    },
+                message: RequestResponseMessage::Response { response, .. },
+                ..
             } => match response {
                 AliceToBob::Amounts(p) => self.events.push_back(OutEvent::Amounts(p)),
-                other => panic!("unexpected response: {:?}", other),
+                other => debug!("got response: {:?}", other),
             },
-
-            RequestResponseEvent::InboundFailure { .. } => {
-                panic!("Bob should never get a request from Alice, so should never get an InboundFailure");
+            RequestResponseEvent::InboundFailure { error, .. } => {
+                error!("Inbound failure: {:?}", error);
             }
-            RequestResponseEvent::OutboundFailure {
-                peer: _,
-                request_id: _,
-                error,
-            } => {
+            RequestResponseEvent::OutboundFailure { error, .. } => {
                 error!("Outbound failure: {:?}", error);
             }
         }

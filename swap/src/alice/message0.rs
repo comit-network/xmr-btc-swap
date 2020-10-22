@@ -13,7 +13,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol, TIMEOUT};
 use xmr_btc::{alice::State0, bob};
@@ -80,13 +80,11 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
             RequestResponseEvent::Message {
-                peer: _,
                 message:
                     RequestResponseMessage::Request {
-                        request,
-                        request_id: _,
-                        channel,
+                        request, channel, ..
                     },
+                ..
             } => match request {
                 BobToAlice::Message0(msg) => {
                     let response = match &self.state {
@@ -97,31 +95,18 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                         }
                     };
                     self.rr.send_response(channel, response);
-
                     self.events.push_back(OutEvent::Msg(msg));
                 }
-                _ => panic!("unexpected request"),
+                other => debug!("got request: {:?}", other),
             },
             RequestResponseEvent::Message {
-                peer: _,
-                message:
-                    RequestResponseMessage::Response {
-                        response: _,
-                        request_id: _,
-                    },
-            } => panic!("unexpected response"),
-            RequestResponseEvent::InboundFailure {
-                peer: _,
-                request_id: _,
-                error,
-            } => {
+                message: RequestResponseMessage::Response { .. },
+                ..
+            } => panic!("Alice should not get a Response"),
+            RequestResponseEvent::InboundFailure { error, .. } => {
                 error!("Inbound failure: {:?}", error);
             }
-            RequestResponseEvent::OutboundFailure {
-                peer: _,
-                request_id: _,
-                error,
-            } => {
+            RequestResponseEvent::OutboundFailure { error, .. } => {
                 error!("Outbound failure: {:?}", error);
             }
         }
