@@ -23,7 +23,7 @@ pub struct Message0 {
     pub(crate) punish_address: bitcoin::Address,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message1 {
     pub(crate) tx_cancel_sig: Signature,
     pub(crate) tx_refund_encsig: EncryptedSignature,

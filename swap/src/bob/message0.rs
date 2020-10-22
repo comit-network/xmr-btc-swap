@@ -80,7 +80,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                     },
             } => match response {
                 AliceToBob::Message0(msg) => self.events.push_back(OutEvent::Msg(msg)),
-                AliceToBob::Amounts(_) => panic!("shouldn't get amounts here"),
+                other => panic!("unexpected response: {:?}", other),
             },
 
             RequestResponseEvent::InboundFailure { .. } => {

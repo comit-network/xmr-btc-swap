@@ -23,7 +23,7 @@ pub enum OutEvent {
     Msg(bob::Message0),
 }
 
-/// A `NetworkBehaviour` that represents getting the amounts of an XMR/BTC swap.
+/// A `NetworkBehaviour` that represents send/recv of message 0.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]

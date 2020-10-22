@@ -12,8 +12,9 @@ use tracing::debug;
 
 mod amounts;
 mod message0;
+mod message1;
 
-use self::{amounts::*, message0::*};
+use self::{amounts::*, message0::*, message1::*};
 use crate::{
     network::{
         peer_tracker::{self, PeerTracker},
@@ -47,7 +48,7 @@ pub async fn swap<R: RngCore + CryptoRng>(
                 debug!("Got request from Bob to swap {}", btc);
                 let p = calculate_amounts(btc);
                 last_amounts = Some(p);
-                swarm.send(channel, AliceToBob::Amounts(p));
+                swarm.send_amounts(channel, p);
             }
             OutEvent::Message0(msg) => {
                 debug!("Got message0 from Bob");
@@ -55,6 +56,7 @@ pub async fn swap<R: RngCore + CryptoRng>(
                 message0 = Some(msg);
                 break;
             }
+            other => panic!("Unexpected event: {:?}", other),
         };
     }
 
@@ -78,10 +80,24 @@ pub async fn swap<R: RngCore + CryptoRng>(
     );
     swarm.set_state0(state0.clone());
 
-    let _state1 = match message0 {
-        Some(msg) => state0.receive(msg),
+    let state1 = match message0 {
+        Some(msg) => state0.receive(msg).expect("failed to receive msg 0"),
         None => panic!("should have the message by here"),
     };
+
+    let (state2, channel) = match swarm.next().await {
+        OutEvent::Message1 { msg, channel } => {
+            debug!("Got message1 from Bob");
+            let state2 = state1.receive(msg);
+            (state2, channel)
+        }
+        other => panic!("Unexpected event: {:?}", other),
+    };
+
+    let msg = state2.next_message();
+    swarm.send_message1(channel, msg);
+
+    tracing::info!("handshake complete, we now have State2 for Alice.");
 
     tracing::warn!("parking thread ...");
     thread::park();
@@ -118,6 +134,10 @@ pub enum OutEvent {
     ConnectionEstablished(PeerId),
     Request(amounts::OutEvent),
     Message0(bob::Message0),
+    Message1 {
+        msg: bob::Message1,
+        channel: ResponseChannel<AliceToBob>,
+    },
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -144,6 +164,14 @@ impl From<message0::OutEvent> for OutEvent {
     }
 }
 
+impl From<message1::OutEvent> for OutEvent {
+    fn from(event: message1::OutEvent) -> Self {
+        match event {
+            message1::OutEvent::Msg { msg, channel } => OutEvent::Message1 { msg, channel },
+        }
+    }
+}
+
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Alice.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
@@ -152,6 +180,7 @@ pub struct Alice {
     pt: PeerTracker,
     amounts: Amounts,
     message0: Message0,
+    message1: Message1,
     #[behaviour(ignore)]
     identity: Keypair,
 }
@@ -166,12 +195,21 @@ impl Alice {
     }
 
     /// Alice always sends her messages as a response to a request from Bob.
-    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: AliceToBob) {
+    pub fn send_amounts(&mut self, channel: ResponseChannel<AliceToBob>, p: SwapParams) {
+        let msg = AliceToBob::Amounts(p);
         self.amounts.send(channel, msg);
     }
 
     pub fn set_state0(&mut self, state: State0) {
         let _ = self.message0.set_state(state);
+    }
+
+    pub fn send_message1(
+        &mut self,
+        channel: ResponseChannel<AliceToBob>,
+        msg: xmr_btc::alice::Message1,
+    ) {
+        self.message1.send(channel, msg)
     }
 }
 
@@ -184,6 +222,7 @@ impl Default for Alice {
             pt: PeerTracker::default(),
             amounts: Amounts::new(timeout),
             message0: Message0::new(timeout),
+            message1: Message1::new(timeout),
             identity,
         }
     }

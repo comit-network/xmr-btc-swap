@@ -8,12 +8,13 @@ use futures::{
 use libp2p::{core::identity::Keypair, Multiaddr, NetworkBehaviour, PeerId};
 use rand::rngs::OsRng;
 use std::{process, thread, time::Duration};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 mod amounts;
 mod message0;
+mod message1;
 
-use self::{amounts::*, message0::*};
+use self::{amounts::*, message0::*, message1::*};
 use crate::{
     network::{
         peer_tracker::{self, PeerTracker},
@@ -80,15 +81,26 @@ where
         PUNISH_TIMELOCK,
         refund_address,
     );
+
     swarm.send_message0(alice.clone(), state0.next_message(rng));
-    let _state1 = match swarm.next().await {
+    let state1 = match swarm.next().await {
         OutEvent::Message0(msg) => {
-            state0.receive(&wallet, msg) // TODO: More graceful error handling.
+            state0.receive(&wallet, msg).await? // TODO: More graceful error
+                                                // handling.
         }
         other => panic!("unexpected event: {:?}", other),
     };
 
-    warn!("parking thread ...");
+    swarm.send_message1(alice.clone(), state1.next_message());
+    let _state2 = match swarm.next().await {
+        OutEvent::Message1(msg) => {
+            state1.receive(msg) // TODO: More graceful error handling.
+        }
+        other => panic!("unexpected event: {:?}", other),
+    };
+
+    info!("handshake complete, we now have State2 for Bob.");
+
     thread::park();
     Ok(())
 }
@@ -120,6 +132,7 @@ pub enum OutEvent {
     ConnectionEstablished(PeerId),
     Amounts(amounts::OutEvent),
     Message0(alice::Message0),
+    Message1(alice::Message1),
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -146,6 +159,14 @@ impl From<message0::OutEvent> for OutEvent {
     }
 }
 
+impl From<message1::OutEvent> for OutEvent {
+    fn from(event: message1::OutEvent) -> Self {
+        match event {
+            message1::OutEvent::Msg(msg) => OutEvent::Message1(msg),
+        }
+    }
+}
+
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Bob.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
@@ -154,6 +175,7 @@ pub struct Bob {
     pt: PeerTracker,
     amounts: Amounts,
     message0: Message0,
+    message1: Message1,
     #[behaviour(ignore)]
     identity: Keypair,
 }
@@ -174,9 +196,14 @@ impl Bob {
         debug!("Requesting amounts from: {}", alice);
     }
 
-    /// Sends Bob's first state message to Alice.
+    /// Sends Bob's first message to Alice.
     pub fn send_message0(&mut self, alice: PeerId, msg: bob::Message0) {
         self.message0.send(alice, msg)
+    }
+
+    /// Sends Bob's second message to Alice.
+    pub fn send_message1(&mut self, alice: PeerId, msg: bob::Message1) {
+        self.message1.send(alice, msg)
     }
 
     /// Returns Alice's peer id if we are connected.
@@ -194,6 +221,7 @@ impl Default for Bob {
             pt: PeerTracker::default(),
             amounts: Amounts::new(timeout),
             message0: Message0::new(timeout),
+            message1: Message1::new(timeout),
             identity,
         }
     }

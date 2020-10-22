@@ -22,7 +22,7 @@ pub struct Message0 {
     pub(crate) refund_address: bitcoin::Address,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message1 {
     pub(crate) tx_lock: bitcoin::TxLock,
 }

@@ -21,6 +21,7 @@ pub enum BobToAlice {
     AmountsFromBtc(::bitcoin::Amount),
     AmountsFromXmr(monero::Amount),
     Message0(bob::Message0),
+    Message1(bob::Message1),
 }
 
 /// Messages Alice sends to Bob.
@@ -29,6 +30,7 @@ pub enum BobToAlice {
 pub enum AliceToBob {
     Amounts(SwapParams),
     Message0(alice::Message0),
+    Message1(alice::Message1),
 }
 
 #[derive(Debug, Clone, Copy, Default)]

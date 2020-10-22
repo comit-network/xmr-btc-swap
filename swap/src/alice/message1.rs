@@ -1,11 +1,10 @@
-use anyhow::Result;
 use libp2p::{
     request_response::{
-        handler::RequestProtocol, ProtocolSupport, RequestId, RequestResponse,
-        RequestResponseConfig, RequestResponseEvent, RequestResponseMessage,
+        handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
+        RequestResponseEvent, RequestResponseMessage, ResponseChannel,
     },
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
-    NetworkBehaviour, PeerId,
+    NetworkBehaviour,
 };
 use std::{
     collections::VecDeque,
@@ -14,27 +13,30 @@ use std::{
 };
 use tracing::error;
 
-use crate::{
-    network::request_response::{AliceToBob, BobToAlice, Codec, Protocol},
-    SwapParams,
-};
+use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol};
+use xmr_btc::bob;
 
 #[derive(Debug)]
 pub enum OutEvent {
-    Amounts(SwapParams),
+    Msg {
+        /// Received message from Bob.
+        msg: bob::Message1,
+        /// Channel to send back Alice's message 1.
+        channel: ResponseChannel<AliceToBob>,
+    },
 }
 
-/// A `NetworkBehaviour` that represents getting the amounts of an XMR/BTC swap.
+/// A `NetworkBehaviour` that represents send/recv of message 1.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
-pub struct Amounts {
+pub struct Message1 {
     rr: RequestResponse<Codec>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
-impl Amounts {
+impl Message1 {
     pub fn new(timeout: Duration) -> Self {
         let mut config = RequestResponseConfig::default();
         config.set_request_timeout(timeout);
@@ -49,11 +51,9 @@ impl Amounts {
         }
     }
 
-    pub fn request_amounts(&mut self, alice: PeerId, btc: ::bitcoin::Amount) -> Result<RequestId> {
-        let msg = BobToAlice::AmountsFromBtc(btc);
-        let id = self.rr.send_request(&alice, msg);
-
-        Ok(id)
+    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: xmr_btc::alice::Message1) {
+        let msg = AliceToBob::Message1(msg);
+        self.rr.send_response(channel, msg);
     }
 
     fn poll(
@@ -69,27 +69,37 @@ impl Amounts {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Amounts {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Message1 {
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
             RequestResponseEvent::Message {
                 peer: _,
-                message: RequestResponseMessage::Request { .. },
-            } => panic!("Bob should never get a request from Alice"),
+                message:
+                    RequestResponseMessage::Request {
+                        request,
+                        request_id: _,
+                        channel,
+                    },
+            } => match request {
+                BobToAlice::Message1(msg) => {
+                    self.events.push_back(OutEvent::Msg { msg, channel });
+                }
+                other => panic!("unexpected request: {:?}", other),
+            },
             RequestResponseEvent::Message {
                 peer: _,
                 message:
                     RequestResponseMessage::Response {
-                        response,
+                        response: _,
                         request_id: _,
                     },
-            } => match response {
-                AliceToBob::Amounts(p) => self.events.push_back(OutEvent::Amounts(p)),
-                other => panic!("unexpected response: {:?}", other),
-            },
-
-            RequestResponseEvent::InboundFailure { .. } => {
-                panic!("Bob should never get a request from Alice, so should never get an InboundFailure");
+            } => panic!("unexpected response"),
+            RequestResponseEvent::InboundFailure {
+                peer: _,
+                request_id: _,
+                error,
+            } => {
+                error!("Inbound failure: {:?}", error);
             }
             RequestResponseEvent::OutboundFailure {
                 peer: _,
