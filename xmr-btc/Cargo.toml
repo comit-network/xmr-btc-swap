@@ -20,12 +20,13 @@ rand = "0.7"
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.9"
 thiserror = "1"
+tokio = { version = "0.2", features = ["time"] }
 tracing = "0.1"
 
 [dev-dependencies]
 backoff = { version = "0.2", features = ["tokio"] }
 base64 = "0.12"
-bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "d402b36d3d6406150e3bfb71492ff4a0a7cb290e" }
+bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "7ff30a559ab57cc3aa71189e71433ef6b2a6c3a2" }
 futures = "0.3"
 monero-harness = { path = "../monero-harness" }
 reqwest = { version = "0.10", default-features = false }
