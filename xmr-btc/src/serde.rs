@@ -41,28 +41,6 @@ pub mod monero_private_key {
     }
 }
 
-pub mod bitcoin_amount {
-    use bitcoin::Amount;
-    use serde::{Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S>(x: &Amount, s: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        s.serialize_u64(x.as_sat())
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Amount, <D as Deserializer<'de>>::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let sats = u64::deserialize(deserializer)?;
-        let amount = Amount::from_sat(sats);
-
-        Ok(amount)
-    }
-}
-
 pub mod monero_amount {
     use crate::monero::Amount;
     use serde::{Deserialize, Deserializer, Serializer};
@@ -95,21 +73,11 @@ mod tests {
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     pub struct MoneroPrivateKey(#[serde(with = "monero_private_key")] crate::monero::PrivateKey);
 
-    #[derive(Debug, Serialize, Deserialize, PartialEq)]
-    pub struct BitcoinAmount(#[serde(with = "bitcoin_amount")] ::bitcoin::Amount);
-
     #[test]
     fn serde_monero_private_key() {
         let key = MoneroPrivateKey(monero::PrivateKey::from_scalar(Scalar::random(&mut OsRng)));
         let encoded = serde_cbor::to_vec(&key).unwrap();
         let decoded: MoneroPrivateKey = serde_cbor::from_slice(&encoded).unwrap();
         assert_eq!(key, decoded);
-    }
-    #[test]
-    fn serde_bitcoin_amount() {
-        let amount = BitcoinAmount(::bitcoin::Amount::from_sat(100));
-        let encoded = serde_cbor::to_vec(&amount).unwrap();
-        let decoded: BitcoinAmount = serde_cbor::from_slice(&encoded).unwrap();
-        assert_eq!(amount, decoded);
     }
 }

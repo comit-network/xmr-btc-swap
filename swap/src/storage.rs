@@ -81,10 +81,7 @@ mod tests {
     use rand::rngs::OsRng;
     use serde::{Deserialize, Serialize};
     use std::str::FromStr;
-    use xmr_btc::{
-        serde::{bitcoin_amount, monero_private_key},
-        CrossCurveScalar, Curve25519Scalar,
-    };
+    use xmr_btc::serde::monero_private_key;
 
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     pub struct TestState {
@@ -96,7 +93,7 @@ mod tests {
         S_a_monero: ::monero::PublicKey,
         S_a_bitcoin: xmr_btc::bitcoin::PublicKey,
         v: xmr_btc::monero::PrivateViewKey,
-        #[serde(with = "bitcoin_amount")]
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
         btc: ::bitcoin::Amount,
         xmr: xmr_btc::monero::Amount,
         refund_timelock: u32,
