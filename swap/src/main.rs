@@ -104,7 +104,7 @@ async fn swap_as_alice(
 
 async fn swap_as_bob<W>(
     sats: u64,
-    addr: Multiaddr,
+    alice: Multiaddr,
     refund: bitcoin::Address,
     wallet: W,
 ) -> Result<()>
@@ -113,7 +113,8 @@ where
 {
     let (cmd_tx, mut cmd_rx) = mpsc::channel(1);
     let (mut rsp_tx, rsp_rx) = mpsc::channel(1);
-    tokio::spawn(bob::swap(sats, addr, cmd_tx, rsp_rx, refund, wallet));
+    tokio::spawn(bob::swap(sats, alice, cmd_tx, rsp_rx, refund, wallet));
+
     loop {
         let read = cmd_rx.next().await;
         match read {
@@ -139,16 +140,19 @@ fn verify(amounts: SwapAmounts) -> Rsp {
     println!("Got rate from Alice for XMR/BTC swap\n");
     println!("{}", amounts);
     print!("Would you like to continue with this swap [y/N]: ");
+
     let _ = io::stdout().flush();
     io::stdin()
         .read_line(&mut s)
         .expect("Did not enter a correct string");
+
     if let Some('\n') = s.chars().next_back() {
         s.pop();
     }
     if let Some('\r') = s.chars().next_back() {
         s.pop();
     }
+
     if !is_yes(&s) {
         println!("No worries, try again later - Alice updates her rate regularly");
         return Rsp::Abort;

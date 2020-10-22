@@ -1,10 +1,10 @@
-use serde::{de::Error, Deserialize, Deserializer, Serializer};
+//! Monero stuff, for now just serde.
 
-use xmr_btc::monero::Amount;
-
+// This has to be in a sub-module to use with serde derive.
 pub mod amount_serde {
-    use super::*;
+    use serde::{de::Error, Deserialize, Deserializer, Serializer};
     use std::str::FromStr;
+    use xmr_btc::monero::Amount;
 
     pub fn serialize<S>(value: &Amount, serializer: S) -> Result<S::Ok, S::Error>
     where

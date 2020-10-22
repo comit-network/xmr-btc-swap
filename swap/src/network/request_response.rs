@@ -13,6 +13,9 @@ use xmr_btc::{alice, bob, monero};
 /// Time to wait for a response back once we send a request.
 pub const TIMEOUT: u64 = 3600; // One hour.
 
+// TODO: Think about whether there is a better way to do this, e.g., separate
+// Codec for each Message and a macro that implements them.
+
 /// Messages Bob sends to Alice.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]

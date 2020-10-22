@@ -88,7 +88,6 @@ pub async fn swap(
 
     let (state2, channel) = match swarm.next().await {
         OutEvent::Message1 { msg, channel } => {
-            debug!("Got message1 from Bob");
             let state2 = state1.receive(msg);
             (state2, channel)
         }

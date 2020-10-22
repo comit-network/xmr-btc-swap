@@ -14,6 +14,8 @@ use libp2p::{
     yamux, PeerId,
 };
 
+// TOOD: Add the tor transport builder.
+
 /// Builds a libp2p transport with the following features:
 /// - TcpConnection
 /// - DNS name resolution
