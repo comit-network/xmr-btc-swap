@@ -19,13 +19,10 @@ genawaiter = "0.99.1"
 miniscript = { version = "1", features = ["serde"] }
 monero = { version = "0.9", features = ["serde_support"] }
 rand = "0.7"
-reqwest = { version = "0.10", default-features = false, features = ["socks"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
 sha2 = "0.9"
 thiserror = "1"
-tokio = { version = "0.2", default-features = false, features = ["blocking", "macros", "rt-core", "time", "rt-threaded"] }
-torut = { version = "0.1", optional = true }
+tokio = { version = "0.2", default-features = false, features = ["time"] }
 tracing = "0.1"
 
 [dev-dependencies]
@@ -33,18 +30,11 @@ backoff = { version = "0.2", features = ["tokio"] }
 base64 = "0.12"
 bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "7ff30a559ab57cc3aa71189e71433ef6b2a6c3a2" }
 futures = "0.3"
-hyper = "0.13"
 monero-harness = { path = "../monero-harness" }
-port_check = "0.1"
 reqwest = { version = "0.10", default-features = false }
 serde_cbor = "0.11"
 sled = "0.34"
-spectral = "0.6"
 tempfile = "3"
 testcontainers = "0.10"
 tracing = "0.1"
 tracing-subscriber = "0.2"
-
-[features]
-default = []
-tor = ["torut"]

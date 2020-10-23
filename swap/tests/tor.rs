@@ -6,6 +6,7 @@ mod tor_test {
     use reqwest::StatusCode;
     use spectral::prelude::*;
     use std::{convert::Infallible, fs};
+    use swap::tor::UnauthenticatedConnection;
     use tempfile::{Builder, NamedTempFile};
     use tokio::sync::oneshot::Receiver;
     use torut::{
@@ -13,7 +14,6 @@ mod tor_test {
         utils::{run_tor, AutoKillChild},
     };
     use tracing_subscriber::util::SubscriberInitExt;
-    use xmr_btc::tor::UnauthenticatedConnection;
 
     async fn hello_world(
         _req: hyper::Request<hyper::Body>,
