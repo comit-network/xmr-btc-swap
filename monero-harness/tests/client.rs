@@ -8,7 +8,7 @@ const BOB_FUND_AMOUNT: u64 = 0;
 #[tokio::test]
 async fn init_accounts_for_alice_and_bob() {
     let tc = Cli::default();
-    let (monero, _container) = Monero::new(&tc);
+    let (monero, _container) = Monero::new(&tc).unwrap();
     monero
         .init(ALICE_FUND_AMOUNT, BOB_FUND_AMOUNT)
         .await

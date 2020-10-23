@@ -164,7 +164,7 @@ async fn swap_as_bob(
 #[tokio::test]
 async fn on_chain_happy_path() {
     let cli = Cli::default();
-    let (monero, _container) = Monero::new(&cli);
+    let (monero, _container) = Monero::new(&cli).unwrap();
     let bitcoind = init_bitcoind(&cli).await;
 
     let (alice_state0, bob_state0, mut alice_node, mut bob_node, initial_balances, swap_amounts) =

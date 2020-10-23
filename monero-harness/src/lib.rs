@@ -24,8 +24,7 @@
 pub mod image;
 pub mod rpc;
 
-use anyhow::Result;
-use rand::Rng;
+use anyhow::{anyhow, Result};
 use serde::Deserialize;
 use std::time::Duration;
 use testcontainers::{clients::Cli, core::Port, Container, Docker};
@@ -58,12 +57,15 @@ pub struct Monero {
 
 impl<'c> Monero {
     /// Starts a new regtest monero container.
-    pub fn new(cli: &'c Cli) -> (Self, Container<'c, Cli, image::Monero>) {
-        let mut rng = rand::thread_rng();
-        let monerod_rpc_port: u16 = rng.gen_range(1024, u16::MAX);
-        let miner_wallet_rpc_port: u16 = rng.gen_range(1024, u16::MAX);
-        let alice_wallet_rpc_port: u16 = rng.gen_range(1024, u16::MAX);
-        let bob_wallet_rpc_port: u16 = rng.gen_range(1024, u16::MAX);
+    pub fn new(cli: &'c Cli) -> Result<(Self, Container<'c, Cli, image::Monero>)> {
+        let monerod_rpc_port: u16 =
+            port_check::free_local_port().ok_or_else(|| anyhow!("Could not retrieve free port"))?;
+        let miner_wallet_rpc_port: u16 =
+            port_check::free_local_port().ok_or_else(|| anyhow!("Could not retrieve free port"))?;
+        let alice_wallet_rpc_port: u16 =
+            port_check::free_local_port().ok_or_else(|| anyhow!("Could not retrieve free port"))?;
+        let bob_wallet_rpc_port: u16 =
+            port_check::free_local_port().ok_or_else(|| anyhow!("Could not retrieve free port"))?;
 
         let image = image::Monero::default()
             .with_mapped_port(Port {
@@ -90,7 +92,7 @@ impl<'c> Monero {
         let docker = cli.run(image);
         println!("image ran");
 
-        (
+        Ok((
             Self {
                 monerod_rpc_port,
                 miner_wallet_rpc_port,
@@ -98,7 +100,7 @@ impl<'c> Monero {
                 bob_wallet_rpc_port,
             },
             docker,
-        )
+        ))
     }
 
     pub fn miner_wallet_rpc_client(&self) -> wallet::Client {

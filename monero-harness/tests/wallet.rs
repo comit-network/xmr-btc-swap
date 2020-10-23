@@ -5,7 +5,7 @@ use testcontainers::clients::Cli;
 #[tokio::test]
 async fn wallet_and_accounts() {
     let tc = Cli::default();
-    let (monero, _container) = Monero::new(&tc);
+    let (monero, _container) = Monero::new(&tc).unwrap();
     let cli = monero.miner_wallet_rpc_client();
 
     println!("creating wallet ...");
@@ -24,7 +24,7 @@ async fn wallet_and_accounts() {
 #[tokio::test]
 async fn create_account_and_retrieve_it() {
     let tc = Cli::default();
-    let (monero, _container) = Monero::new(&tc);
+    let (monero, _container) = Monero::new(&tc).unwrap();
     let cli = monero.miner_wallet_rpc_client();
 
     let label = "Iron Man"; // This is intentionally _not_ Alice or Bob.
@@ -58,7 +58,7 @@ async fn transfer_and_check_tx_key() {
     let fund_bob = 0;
 
     let tc = Cli::default();
-    let (monero, _container) = Monero::new(&tc);
+    let (monero, _container) = Monero::new(&tc).unwrap();
     let _ = monero.init(fund_alice, fund_bob).await;
 
     let address_bob = monero
