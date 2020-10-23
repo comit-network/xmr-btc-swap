@@ -34,7 +34,7 @@ mod tests {
             .set_default();
 
         let cli = Cli::default();
-        let (monero, _container) = Monero::new(&cli);
+        let (monero, _container) = Monero::new(&cli).unwrap();
         let bitcoind = init_bitcoind(&cli).await;
 
         let (
@@ -108,7 +108,7 @@ mod tests {
             .set_default();
 
         let cli = Cli::default();
-        let (monero, _container) = Monero::new(&cli);
+        let (monero, _container) = Monero::new(&cli).unwrap();
         let bitcoind = init_bitcoind(&cli).await;
 
         let (
@@ -184,7 +184,7 @@ mod tests {
             .set_default();
 
         let cli = Cli::default();
-        let (monero, _container) = Monero::new(&cli);
+        let (monero, _container) = Monero::new(&cli).unwrap();
         let bitcoind = init_bitcoind(&cli).await;
 
         let (
@@ -249,7 +249,7 @@ mod tests {
             .set_default();
 
         let cli = Cli::default();
-        let (monero, _container) = Monero::new(&cli);
+        let (monero, _container) = Monero::new(&cli).unwrap();
         let bitcoind = init_bitcoind(&cli).await;
 
         let alice_db_dir = tempfile::tempdir().unwrap();

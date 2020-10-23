@@ -9,7 +9,7 @@ fn init_cli() -> Cli {
 #[tokio::test]
 async fn connect_to_monerod() {
     let tc = init_cli();
-    let (monero, _container) = Monero::new(&tc);
+    let (monero, _container) = Monero::new(&tc).unwrap();
     let cli = monero.monerod_rpc_client();
 
     let header = cli
