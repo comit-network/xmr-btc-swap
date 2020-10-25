@@ -58,7 +58,7 @@ pub trait ReceiveBitcoinRedeemEncsig {
 ///
 /// This is called post handshake, after all the keys, addresses and most of the
 /// signatures have been exchanged.
-pub fn action_generator_alice<N, B>(
+pub fn action_generator<N, B>(
     mut network: N,
     bitcoin_client: Arc<B>,
     // TODO: Replace this with a new, slimmer struct?

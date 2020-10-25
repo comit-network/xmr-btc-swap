@@ -19,7 +19,7 @@ use rand::rngs::OsRng;
 use testcontainers::clients::Cli;
 use tracing::info;
 use xmr_btc::{
-    alice::{self, action_generator_alice, ReceiveBitcoinRedeemEncsig},
+    alice::{self, ReceiveBitcoinRedeemEncsig},
     bitcoin::{BroadcastSignedTransaction, EncryptedSignature, SignTxLock},
     bob::{self, ReceiveTransferProof},
     monero::{CreateWalletForOutput, Transfer, TransferProof},
@@ -87,7 +87,7 @@ async fn swap_as_alice(
     behaviour: AliceBehaviour,
     state: alice::State3,
 ) -> Result<()> {
-    let mut action_generator = action_generator_alice(network, bitcoin_wallet.clone(), state);
+    let mut action_generator = alice::action_generator(network, bitcoin_wallet.clone(), state);
 
     loop {
         let state = action_generator.async_resume().await;
