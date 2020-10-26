@@ -81,22 +81,19 @@ mod tests {
     use rand::rngs::OsRng;
     use serde::{Deserialize, Serialize};
     use std::str::FromStr;
-    use xmr_btc::{
-        serde::{bitcoin_amount, monero_private_key},
-        CrossCurveScalar, Curve25519Scalar,
-    };
+    use xmr_btc::{cross_curve_dleq, curve25519_dalek, serde::monero_private_key};
 
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     pub struct TestState {
         A: xmr_btc::bitcoin::PublicKey,
         a: xmr_btc::bitcoin::SecretKey,
-        s_a: CrossCurveScalar,
+        s_a: cross_curve_dleq::Scalar,
         #[serde(with = "monero_private_key")]
         s_b: monero::PrivateKey,
         S_a_monero: ::monero::PublicKey,
         S_a_bitcoin: xmr_btc::bitcoin::PublicKey,
         v: xmr_btc::monero::PrivateViewKey,
-        #[serde(with = "bitcoin_amount")]
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
         btc: ::bitcoin::Amount,
         xmr: xmr_btc::monero::Amount,
         refund_timelock: u32,
@@ -111,8 +108,9 @@ mod tests {
         let db = Database::open(db_dir.path()).unwrap();
 
         let a = xmr_btc::bitcoin::SecretKey::new_random(&mut OsRng);
-        let s_a = CrossCurveScalar::random(&mut OsRng);
-        let s_b = monero::PrivateKey::from_scalar(Curve25519Scalar::random(&mut OsRng));
+        let s_a = cross_curve_dleq::Scalar::random(&mut OsRng);
+        let s_b =
+            monero::PrivateKey::from_scalar(curve25519_dalek::scalar::Scalar::random(&mut OsRng));
         let v_a = xmr_btc::monero::PrivateViewKey::new_random(&mut OsRng);
         let S_a_monero = monero::PublicKey::from_private_key(&monero::PrivateKey {
             scalar: s_a.into_ed25519(),

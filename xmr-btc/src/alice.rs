@@ -3,7 +3,6 @@ use crate::{
     bitcoin::{BroadcastSignedTransaction, WatchForRawTransaction},
     bob, monero,
     monero::{CreateWalletForOutput, Transfer},
-    serde::bitcoin_amount,
     transport::{ReceiveMessage, SendMessage},
 };
 use anyhow::{anyhow, Result};
@@ -134,10 +133,9 @@ impl State {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct State0 {
     a: bitcoin::SecretKey,
-    //#[serde(with = "cross_curve_dleq_scalar")]
     s_a: cross_curve_dleq::Scalar,
     v_a: monero::PrivateViewKey,
-    #[serde(with = "bitcoin_amount")]
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     refund_timelock: u32,
@@ -227,7 +225,7 @@ pub struct State1 {
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
-    #[serde(with = "bitcoin_amount")]
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     refund_timelock: u32,
@@ -266,7 +264,7 @@ pub struct State2 {
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
-    #[serde(with = "bitcoin_amount")]
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     refund_timelock: u32,
@@ -342,7 +340,7 @@ pub struct State3 {
     pub S_b_monero: monero::PublicKey,
     pub S_b_bitcoin: bitcoin::PublicKey,
     pub v: monero::PrivateViewKey,
-    #[serde(with = "bitcoin_amount")]
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub btc: bitcoin::Amount,
     pub xmr: monero::Amount,
     pub refund_timelock: u32,
@@ -396,7 +394,7 @@ pub struct State4 {
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
-    #[serde(with = "bitcoin_amount")]
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     refund_timelock: u32,
@@ -500,7 +498,7 @@ pub struct State5 {
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
-    #[serde(with = "bitcoin_amount")]
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     refund_timelock: u32,
@@ -594,7 +592,7 @@ pub struct State6 {
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
-    #[serde(with = "bitcoin_amount")]
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     refund_timelock: u32,

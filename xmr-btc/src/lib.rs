@@ -52,8 +52,8 @@ pub mod monero;
 pub mod serde;
 pub mod transport;
 
-pub use cross_curve_dleq::Scalar as CrossCurveScalar;
-pub use curve25519_dalek::scalar::Scalar as Curve25519Scalar;
+pub use cross_curve_dleq;
+pub use curve25519_dalek;
 
 use async_trait::async_trait;
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
