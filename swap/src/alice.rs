@@ -28,6 +28,9 @@ use xmr_btc::{alice::State0, bob, monero};
 
 pub type Swarm = libp2p::Swarm<Alice>;
 
+// TODO: After we have done some testing replace all the 'panic's with log
+// statements or error returns.
+
 // FIXME: This whole function is horrible, needs total re-write.
 pub async fn swap(
     listen: Multiaddr,
@@ -83,6 +86,7 @@ pub async fn swap(
     );
     swarm.set_state0(state0.clone());
 
+    // TODO: Can we verify message 0 before calling this so we never fail?
     let state1 = state0.receive(message0).expect("failed to receive msg 0");
 
     let (state2, channel) = match swarm.next().await {

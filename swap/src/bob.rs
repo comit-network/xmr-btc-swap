@@ -83,8 +83,9 @@ where
     swarm.send_message0(alice.clone(), state0.next_message(rng));
     let state1 = match swarm.next().await {
         OutEvent::Message0(msg) => {
-            state0.receive(&wallet, msg).await? // TODO: More graceful error
-                                                // handling.
+            // TODO: Verify the response message before calling receive() and handle any
+            // error gracefully.
+            state0.receive(&wallet, msg).await?
         }
         other => panic!("unexpected event: {:?}", other),
     };
@@ -92,7 +93,7 @@ where
     swarm.send_message1(alice.clone(), state1.next_message());
     let state2 = match swarm.next().await {
         OutEvent::Message1(msg) => {
-            state1.receive(msg)? // TODO: More graceful error handling.
+            state1.receive(msg)? // TODO: Same as above.
         }
         other => panic!("unexpected event: {:?}", other),
     };
