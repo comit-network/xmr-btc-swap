@@ -92,13 +92,15 @@ where
 {
     #[derive(Debug)]
     enum SwapFailed {
-        BeforeBtcLock,
+        BeforeBtcLock(Reason),
         AfterXmrLock { tx_lock_height: u32, reason: Reason },
     }
 
     /// Reason why the swap has failed.
     #[derive(Debug)]
     enum Reason {
+        /// Bob was too slow to lock the bitcoin.
+        InactiveBob,
         /// Bob's encrypted signature on the Bitcoin redeem transaction is
         /// invalid.
         InvalidEncryptedSignature,
@@ -126,7 +128,7 @@ where
                 bitcoin_client.watch_for_raw_transaction(tx_lock.txid()),
             )
             .await
-            .map_err(|_| SwapFailed::BeforeBtcLock)?;
+            .map_err(|_| SwapFailed::BeforeBtcLock(Reason::InactiveBob))?;
 
             let tx_lock_height = bitcoin_client
                 .transaction_block_height(tx_lock.txid())

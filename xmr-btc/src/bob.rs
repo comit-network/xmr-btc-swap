@@ -97,7 +97,7 @@ where
 {
     #[derive(Debug)]
     enum SwapFailed {
-        BeforeBtcLock,
+        BeforeBtcLock(Reason),
         AfterBtcLock(Reason),
         AfterBtcRedeem(Reason),
     }
@@ -105,6 +105,8 @@ where
     /// Reason why the swap has failed.
     #[derive(Debug)]
     enum Reason {
+        /// Bob was too slow to lock the bitcoin.
+        InactiveBob,
         /// The refund timelock has been reached.
         BtcExpired,
         /// Alice did not lock up enough monero in the shared output.
@@ -127,7 +129,7 @@ where
             )
             .await
             .map(|tx| tx.txid())
-            .map_err(|_| SwapFailed::BeforeBtcLock)?;
+            .map_err(|_| SwapFailed::BeforeBtcLock(Reason::InactiveBob))?;
 
             let tx_lock_height = bitcoin_client
                 .transaction_block_height(tx_lock.txid())
