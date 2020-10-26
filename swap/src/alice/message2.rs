@@ -71,11 +71,17 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
             RequestResponseEvent::Message {
-                message: RequestResponseMessage::Request { request, .. },
+                message:
+                    RequestResponseMessage::Request {
+                        request, channel, ..
+                    },
                 ..
             } => match request {
                 BobToAlice::Message2(msg) => {
                     self.events.push_back(OutEvent::Msg(msg));
+                    // Send back empty response so that the request/response protocol completes.
+                    let msg = AliceToBob::EmptyResponse;
+                    self.rr.send_response(channel, msg);
                 }
                 other => debug!("got request: {:?}", other),
             },

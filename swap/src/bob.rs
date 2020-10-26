@@ -21,7 +21,7 @@ use crate::{
         peer_tracker::{self, PeerTracker},
         transport, TokioExecutor,
     },
-    Cmd, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
+    Cmd, Never, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use xmr_btc::{
     alice,
@@ -134,7 +134,6 @@ pub enum OutEvent {
     Amounts(SwapAmounts),
     Message0(alice::Message0),
     Message1(alice::Message1),
-    Message2(alice::Message2),
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -171,11 +170,9 @@ impl From<message1::OutEvent> for OutEvent {
     }
 }
 
-impl From<message2::OutEvent> for OutEvent {
-    fn from(event: message2::OutEvent) -> Self {
-        match event {
-            message2::OutEvent::Msg(msg) => OutEvent::Message2(msg),
-        }
+impl From<Never> for OutEvent {
+    fn from(_: Never) -> Self {
+        panic!("this never happens")
     }
 }
 
