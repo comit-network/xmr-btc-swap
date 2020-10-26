@@ -13,7 +13,7 @@ use ecdsa_fun::{
 };
 use futures::{
     future::{select, Either},
-    FutureExt,
+    pin_mut, FutureExt,
 };
 use genawaiter::sync::{Gen, GenBoxed};
 use rand::{CryptoRng, RngCore};
@@ -138,7 +138,7 @@ where
                 tx_lock_height + refund_timelock,
             )
             .shared();
-            futures::pin_mut!(poll_until_btc_has_expired);
+            pin_mut!(poll_until_btc_has_expired);
 
             let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey {
                 scalar: s_a.into_ed25519(),
@@ -233,7 +233,7 @@ where
                     tx_lock_height + refund_timelock + punish_timelock,
                 )
                 .shared();
-                futures::pin_mut!(poll_until_bob_can_be_punished);
+                pin_mut!(poll_until_bob_can_be_punished);
 
                 let tx_cancel =
                     bitcoin::TxCancel::new(&tx_lock, refund_timelock, a.public(), B.clone());

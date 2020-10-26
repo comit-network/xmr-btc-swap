@@ -17,7 +17,7 @@ use ecdsa_fun::{
 };
 use futures::{
     future::{select, Either},
-    FutureExt,
+    pin_mut, FutureExt,
 };
 use genawaiter::sync::{Gen, GenBoxed};
 use rand::{CryptoRng, RngCore};
@@ -139,7 +139,7 @@ where
                 tx_lock_height + refund_timelock,
             )
             .shared();
-            futures::pin_mut!(poll_until_btc_has_expired);
+            pin_mut!(poll_until_btc_has_expired);
 
             let transfer_proof = match select(
                 network.receive_transfer_proof(),
