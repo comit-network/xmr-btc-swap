@@ -99,6 +99,9 @@ where
     /// Reason why the swap has failed.
     #[derive(Debug)]
     enum Reason {
+        /// Bob's encrypted signature on the Bitcoin redeem transaction is
+        /// invalid.
+        InvalidEncryptedSignature,
         /// The refund timelock has been reached.
         BtcExpired,
     }
@@ -168,6 +171,17 @@ where
                 let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
 
                 let tx_redeem = bitcoin::TxRedeem::new(&tx_lock, &redeem_address);
+
+                bitcoin::verify_encsig(
+                    B.clone(),
+                    s_a.into_secp256k1().into(),
+                    &tx_redeem.digest(),
+                    &tx_redeem_encsig,
+                )
+                .map_err(|_| SwapFailed::AfterXmrLock {
+                    reason: Reason::InvalidEncryptedSignature,
+                    tx_lock_height,
+                })?;
 
                 let sig_a = a.sign(tx_redeem.digest());
                 let sig_b =
