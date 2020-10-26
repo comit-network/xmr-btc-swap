@@ -1,22 +1,368 @@
 use crate::{
     bitcoin,
-    bitcoin::{BroadcastSignedTransaction, WatchForRawTransaction},
+    bitcoin::{poll_until_block_height_is_gte, BroadcastSignedTransaction, WatchForRawTransaction},
     bob, monero,
     monero::{CreateWalletForOutput, Transfer},
     transport::{ReceiveMessage, SendMessage},
 };
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use ecdsa_fun::{
     adaptor::{Adaptor, EncryptedSignature},
     nonce::Deterministic,
 };
+use futures::{
+    future::{select, Either},
+    pin_mut, FutureExt,
+};
+use genawaiter::sync::{Gen, GenBoxed};
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-use std::convert::{TryFrom, TryInto};
+use std::{
+    convert::{TryFrom, TryInto},
+    sync::Arc,
+    time::Duration,
+};
+use tokio::time::timeout;
+use tracing::error;
 
 pub mod message;
 pub use message::{Message, Message0, Message1, Message2};
+
+#[derive(Debug)]
+pub enum Action {
+    // This action also includes proving to Bob that this has happened, given that our current
+    // protocol requires a transfer proof to verify that the coins have been locked on Monero
+    LockXmr {
+        amount: monero::Amount,
+        public_spend_key: monero::PublicKey,
+        public_view_key: monero::PublicViewKey,
+    },
+    RedeemBtc(bitcoin::Transaction),
+    CreateMoneroWalletForOutput {
+        spend_key: monero::PrivateKey,
+        view_key: monero::PrivateViewKey,
+    },
+    CancelBtc(bitcoin::Transaction),
+    PunishBtc(bitcoin::Transaction),
+}
+
+// TODO: This could be moved to the bitcoin module
+#[async_trait]
+pub trait ReceiveBitcoinRedeemEncsig {
+    async fn receive_bitcoin_redeem_encsig(&mut self) -> bitcoin::EncryptedSignature;
+}
+
+/// Perform the on-chain protocol to swap monero and bitcoin as Alice.
+///
+/// This is called post handshake, after all the keys, addresses and most of the
+/// signatures have been exchanged.
+///
+/// The argument `bitcoin_tx_lock_timeout` is used to determine how long we will
+/// wait for Bob, the counterparty, to lock up the bitcoin.
+pub fn action_generator<N, B>(
+    mut network: N,
+    bitcoin_client: Arc<B>,
+    // TODO: Replace this with a new, slimmer struct?
+    State3 {
+        a,
+        B,
+        s_a,
+        S_b_monero,
+        S_b_bitcoin,
+        v,
+        xmr,
+        refund_timelock,
+        punish_timelock,
+        refund_address,
+        redeem_address,
+        punish_address,
+        tx_lock,
+        tx_punish_sig_bob,
+        tx_cancel_sig_bob,
+        ..
+    }: State3,
+    bitcoin_tx_lock_timeout: u64,
+) -> GenBoxed<Action, (), ()>
+where
+    N: ReceiveBitcoinRedeemEncsig + Send + Sync + 'static,
+    B: bitcoin::BlockHeight
+        + bitcoin::TransactionBlockHeight
+        + bitcoin::WatchForRawTransaction
+        + Send
+        + Sync
+        + 'static,
+{
+    #[derive(Debug)]
+    enum SwapFailed {
+        BeforeBtcLock(Reason),
+        AfterXmrLock { tx_lock_height: u32, reason: Reason },
+    }
+
+    /// Reason why the swap has failed.
+    #[derive(Debug)]
+    enum Reason {
+        /// Bob was too slow to lock the bitcoin.
+        InactiveBob,
+        /// Bob's encrypted signature on the Bitcoin redeem transaction is
+        /// invalid.
+        InvalidEncryptedSignature,
+        /// The refund timelock has been reached.
+        BtcExpired,
+    }
+
+    #[derive(Debug)]
+    enum RefundFailed {
+        BtcPunishable {
+            tx_cancel_was_published: bool,
+        },
+        /// Could not find Alice's signature on the refund transaction witness
+        /// stack.
+        BtcRefundSignature,
+        /// Could not recover secret `s_b` from Alice's refund transaction
+        /// signature.
+        SecretRecovery,
+    }
+
+    Gen::new_boxed(|co| async move {
+        let swap_result: Result<(), SwapFailed> = async {
+            timeout(
+                Duration::from_secs(bitcoin_tx_lock_timeout),
+                bitcoin_client.watch_for_raw_transaction(tx_lock.txid()),
+            )
+            .await
+            .map_err(|_| SwapFailed::BeforeBtcLock(Reason::InactiveBob))?;
+
+            let tx_lock_height = bitcoin_client
+                .transaction_block_height(tx_lock.txid())
+                .await;
+            let poll_until_btc_has_expired = poll_until_block_height_is_gte(
+                bitcoin_client.as_ref(),
+                tx_lock_height + refund_timelock,
+            )
+            .shared();
+            pin_mut!(poll_until_btc_has_expired);
+
+            let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey {
+                scalar: s_a.into_ed25519(),
+            });
+
+            co.yield_(Action::LockXmr {
+                amount: xmr,
+                public_spend_key: S_a + S_b_monero,
+                public_view_key: v.public(),
+            })
+            .await;
+
+            // TODO: Watch for LockXmr using watch-only wallet. Doing so will prevent Alice
+            // from cancelling/refunding unnecessarily.
+
+            let tx_redeem_encsig = match select(
+                network.receive_bitcoin_redeem_encsig(),
+                poll_until_btc_has_expired.clone(),
+            )
+            .await
+            {
+                Either::Left((encsig, _)) => encsig,
+                Either::Right(_) => {
+                    return Err(SwapFailed::AfterXmrLock {
+                        reason: Reason::BtcExpired,
+                        tx_lock_height,
+                    })
+                }
+            };
+
+            let (signed_tx_redeem, tx_redeem_txid) = {
+                let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
+
+                let tx_redeem = bitcoin::TxRedeem::new(&tx_lock, &redeem_address);
+
+                bitcoin::verify_encsig(
+                    B.clone(),
+                    s_a.into_secp256k1().into(),
+                    &tx_redeem.digest(),
+                    &tx_redeem_encsig,
+                )
+                .map_err(|_| SwapFailed::AfterXmrLock {
+                    reason: Reason::InvalidEncryptedSignature,
+                    tx_lock_height,
+                })?;
+
+                let sig_a = a.sign(tx_redeem.digest());
+                let sig_b =
+                    adaptor.decrypt_signature(&s_a.into_secp256k1(), tx_redeem_encsig.clone());
+
+                let tx = tx_redeem
+                    .add_signatures(&tx_lock, (a.public(), sig_a), (B.clone(), sig_b))
+                    .expect("sig_{a,b} to be valid signatures for tx_redeem");
+                let txid = tx.txid();
+
+                (tx, txid)
+            };
+
+            co.yield_(Action::RedeemBtc(signed_tx_redeem)).await;
+
+            match select(
+                bitcoin_client.watch_for_raw_transaction(tx_redeem_txid),
+                poll_until_btc_has_expired,
+            )
+            .await
+            {
+                Either::Left(_) => {}
+                Either::Right(_) => {
+                    return Err(SwapFailed::AfterXmrLock {
+                        reason: Reason::BtcExpired,
+                        tx_lock_height,
+                    })
+                }
+            };
+
+            Ok(())
+        }
+        .await;
+
+        if let Err(ref err) = swap_result {
+            error!("swap failed: {:?}", err);
+        }
+
+        if let Err(SwapFailed::AfterXmrLock {
+            reason: Reason::BtcExpired,
+            tx_lock_height,
+        }) = swap_result
+        {
+            let refund_result: Result<(), RefundFailed> = async {
+                let poll_until_bob_can_be_punished = poll_until_block_height_is_gte(
+                    bitcoin_client.as_ref(),
+                    tx_lock_height + refund_timelock + punish_timelock,
+                )
+                .shared();
+                pin_mut!(poll_until_bob_can_be_punished);
+
+                let tx_cancel =
+                    bitcoin::TxCancel::new(&tx_lock, refund_timelock, a.public(), B.clone());
+                let signed_tx_cancel = {
+                    let sig_a = a.sign(tx_cancel.digest());
+                    let sig_b = tx_cancel_sig_bob.clone();
+
+                    tx_cancel
+                        .clone()
+                        .add_signatures(&tx_lock, (a.public(), sig_a), (B.clone(), sig_b))
+                        .expect("sig_{a,b} to be valid signatures for tx_cancel")
+                };
+
+                co.yield_(Action::CancelBtc(signed_tx_cancel)).await;
+
+                match select(
+                    bitcoin_client.watch_for_raw_transaction(tx_cancel.txid()),
+                    poll_until_bob_can_be_punished.clone(),
+                )
+                .await
+                {
+                    Either::Left(_) => {}
+                    Either::Right(_) => {
+                        return Err(RefundFailed::BtcPunishable {
+                            tx_cancel_was_published: false,
+                        })
+                    }
+                };
+
+                let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &refund_address);
+                let tx_refund_published = match select(
+                    bitcoin_client.watch_for_raw_transaction(tx_refund.txid()),
+                    poll_until_bob_can_be_punished,
+                )
+                .await
+                {
+                    Either::Left((tx, _)) => tx,
+                    Either::Right(_) => {
+                        return Err(RefundFailed::BtcPunishable {
+                            tx_cancel_was_published: true,
+                        });
+                    }
+                };
+
+                let s_a = monero::PrivateKey {
+                    scalar: s_a.into_ed25519(),
+                };
+
+                let tx_refund_sig = tx_refund
+                    .extract_signature_by_key(tx_refund_published, a.public())
+                    .map_err(|_| RefundFailed::BtcRefundSignature)?;
+                let tx_refund_encsig = a.encsign(S_b_bitcoin.clone(), tx_refund.digest());
+
+                let s_b = bitcoin::recover(S_b_bitcoin, tx_refund_sig, tx_refund_encsig)
+                    .map_err(|_| RefundFailed::SecretRecovery)?;
+                let s_b = monero::PrivateKey::from_scalar(monero::Scalar::from_bytes_mod_order(
+                    s_b.to_bytes(),
+                ));
+
+                co.yield_(Action::CreateMoneroWalletForOutput {
+                    spend_key: s_a + s_b,
+                    view_key: v,
+                })
+                .await;
+
+                Ok(())
+            }
+            .await;
+
+            if let Err(ref err) = refund_result {
+                error!("refund failed: {:?}", err);
+            }
+
+            // LIMITATION: When approaching the punish scenario, Bob could theoretically
+            // wake up in between Alice's publication of tx cancel and beat Alice's punish
+            // transaction with his refund transaction. Alice would then need to carry on
+            // with the refund on Monero. Doing so may be too verbose with the current,
+            // linear approach. A different design may be required
+            if let Err(RefundFailed::BtcPunishable {
+                tx_cancel_was_published,
+            }) = refund_result
+            {
+                let tx_cancel =
+                    bitcoin::TxCancel::new(&tx_lock, refund_timelock, a.public(), B.clone());
+
+                if !tx_cancel_was_published {
+                    let tx_cancel_txid = tx_cancel.txid();
+                    let signed_tx_cancel = {
+                        let sig_a = a.sign(tx_cancel.digest());
+                        let sig_b = tx_cancel_sig_bob;
+
+                        tx_cancel
+                            .clone()
+                            .add_signatures(&tx_lock, (a.public(), sig_a), (B.clone(), sig_b))
+                            .expect("sig_{a,b} to be valid signatures for tx_cancel")
+                    };
+
+                    co.yield_(Action::CancelBtc(signed_tx_cancel)).await;
+
+                    let _ = bitcoin_client
+                        .watch_for_raw_transaction(tx_cancel_txid)
+                        .await;
+                }
+
+                let tx_punish =
+                    bitcoin::TxPunish::new(&tx_cancel, &punish_address, punish_timelock);
+                let tx_punish_txid = tx_punish.txid();
+                let signed_tx_punish = {
+                    let sig_a = a.sign(tx_punish.digest());
+                    let sig_b = tx_punish_sig_bob;
+
+                    tx_punish
+                        .add_signatures(&tx_cancel, (a.public(), sig_a), (B, sig_b))
+                        .expect("sig_{a,b} to be valid signatures for tx_cancel")
+                };
+
+                co.yield_(Action::PunishBtc(signed_tx_punish)).await;
+
+                let _ = bitcoin_client
+                    .watch_for_raw_transaction(tx_punish_txid)
+                    .await;
+            }
+        }
+    })
+}
 
 // There are no guarantees that send_message and receive_massage do not block
 // the flow of execution. Therefore they must be paired between Alice/Bob, one

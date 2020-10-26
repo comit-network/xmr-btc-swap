@@ -6,11 +6,9 @@ use bitcoin_harness::{bitcoind_rpc::PsbtBase64, Bitcoind};
 use reqwest::Url;
 use std::time::Duration;
 use tokio::time;
-use xmr_btc::{
-    bitcoin::{
-        BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock, TxLock, WatchForRawTransaction,
-    },
-    BlockHeight, TransactionBlockHeight,
+use xmr_btc::bitcoin::{
+    BlockHeight, BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock, TransactionBlockHeight,
+    TxLock, WatchForRawTransaction,
 };
 
 #[derive(Debug)]

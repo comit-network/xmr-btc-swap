@@ -190,6 +190,16 @@ pub trait WatchForRawTransaction {
     async fn watch_for_raw_transaction(&self, txid: Txid) -> Transaction;
 }
 
+#[async_trait]
+pub trait BlockHeight {
+    async fn block_height(&self) -> u32;
+}
+
+#[async_trait]
+pub trait TransactionBlockHeight {
+    async fn transaction_block_height(&self, txid: Txid) -> u32;
+}
+
 pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Result<SecretKey> {
     let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
 
@@ -199,4 +209,13 @@ pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Resu
         .ok_or_else(|| anyhow!("secret recovery failure"))?;
 
     Ok(s)
+}
+
+pub async fn poll_until_block_height_is_gte<B>(client: &B, target: u32)
+where
+    B: BlockHeight,
+{
+    while client.block_height().await < target {
+        tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+    }
 }
