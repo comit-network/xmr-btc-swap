@@ -6,8 +6,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use futures::{
     channel::mpsc::{channel, Receiver, Sender},
-    future::try_join,
-    SinkExt, StreamExt,
+    future::{select, try_join},
+    pin_mut, SinkExt, StreamExt,
 };
 use genawaiter::GeneratorState;
 use harness::{
@@ -18,6 +18,7 @@ use monero_harness::Monero;
 use rand::rngs::OsRng;
 use testcontainers::clients::Cli;
 use tracing::info;
+use tracing_subscriber::util::SubscriberInitExt;
 use xmr_btc::{
     alice::{self, ReceiveBitcoinRedeemEncsig},
     bitcoin::{BroadcastSignedTransaction, EncryptedSignature, SignTxLock},
@@ -80,12 +81,32 @@ impl Default for AliceBehaviour {
     }
 }
 
+struct BobBehaviour {
+    lock_btc: bool,
+    send_btc_redeem_encsig: bool,
+    create_monero_wallet_for_output: bool,
+    cancel_btc: bool,
+    refund_btc: bool,
+}
+
+impl Default for BobBehaviour {
+    fn default() -> Self {
+        Self {
+            lock_btc: true,
+            send_btc_redeem_encsig: true,
+            create_monero_wallet_for_output: true,
+            cancel_btc: true,
+            refund_btc: true,
+        }
+    }
+}
+
 async fn swap_as_alice(
     network: AliceNetwork,
     // FIXME: It would be more intuitive to have a single network/transport struct instead of
     // splitting into two, but Rust ownership rules make this tedious
     mut sender: Sender<TransferProof>,
-    monero_wallet: &harness::wallet::monero::Wallet,
+    monero_wallet: Arc<harness::wallet::monero::Wallet>,
     bitcoin_wallet: Arc<harness::wallet::bitcoin::Wallet>,
     behaviour: AliceBehaviour,
     state: alice::State3,
@@ -151,6 +172,7 @@ async fn swap_as_bob(
     mut sender: Sender<EncryptedSignature>,
     monero_wallet: Arc<harness::wallet::monero::Wallet>,
     bitcoin_wallet: Arc<harness::wallet::bitcoin::Wallet>,
+    behaviour: BobBehaviour,
     state: bob::State2,
 ) -> Result<()> {
     let mut action_generator = bob::action_generator(
@@ -168,31 +190,41 @@ async fn swap_as_bob(
 
         match state {
             GeneratorState::Yielded(bob::Action::LockBtc(tx_lock)) => {
-                let signed_tx_lock = bitcoin_wallet.sign_tx_lock(tx_lock).await?;
-                let _ = bitcoin_wallet
-                    .broadcast_signed_transaction(signed_tx_lock)
-                    .await?;
+                if behaviour.lock_btc {
+                    let signed_tx_lock = bitcoin_wallet.sign_tx_lock(tx_lock).await?;
+                    let _ = bitcoin_wallet
+                        .broadcast_signed_transaction(signed_tx_lock)
+                        .await?;
+                }
             }
             GeneratorState::Yielded(bob::Action::SendBtcRedeemEncsig(tx_redeem_encsig)) => {
-                sender.send(tx_redeem_encsig).await.unwrap();
+                if behaviour.send_btc_redeem_encsig {
+                    sender.send(tx_redeem_encsig).await.unwrap();
+                }
             }
             GeneratorState::Yielded(bob::Action::CreateXmrWalletForOutput {
                 spend_key,
                 view_key,
             }) => {
-                monero_wallet
-                    .create_and_load_wallet_for_output(spend_key, view_key)
-                    .await?;
+                if behaviour.create_monero_wallet_for_output {
+                    monero_wallet
+                        .create_and_load_wallet_for_output(spend_key, view_key)
+                        .await?;
+                }
             }
             GeneratorState::Yielded(bob::Action::CancelBtc(tx_cancel)) => {
-                let _ = bitcoin_wallet
-                    .broadcast_signed_transaction(tx_cancel)
-                    .await?;
+                if behaviour.cancel_btc {
+                    let _ = bitcoin_wallet
+                        .broadcast_signed_transaction(tx_cancel)
+                        .await?;
+                }
             }
             GeneratorState::Yielded(bob::Action::RefundBtc(tx_refund)) => {
-                let _ = bitcoin_wallet
-                    .broadcast_signed_transaction(tx_refund)
-                    .await?;
+                if behaviour.refund_btc {
+                    let _ = bitcoin_wallet
+                        .broadcast_signed_transaction(tx_refund)
+                        .await?;
+                }
             }
             GeneratorState::Complete(()) => return Ok(()),
         }
@@ -246,7 +278,7 @@ async fn on_chain_happy_path() {
         swap_as_alice(
             alice_network,
             alice_sender,
-            &alice_monero_wallet.clone(),
+            alice_monero_wallet.clone(),
             alice_bitcoin_wallet.clone(),
             AliceBehaviour::default(),
             alice,
@@ -256,6 +288,7 @@ async fn on_chain_happy_path() {
             bob_sender,
             bob_monero_wallet.clone(),
             bob_bitcoin_wallet.clone(),
+            BobBehaviour::default(),
             bob,
         ),
     )
@@ -287,7 +320,7 @@ async fn on_chain_happy_path() {
 
     // Getting the Monero LockTx fee is tricky in a clean way, I think checking this
     // condition is sufficient
-    assert!(alice_final_xmr_balance <= initial_balances.alice_xmr - swap_amounts.xmr,);
+    assert!(alice_final_xmr_balance <= initial_balances.alice_xmr - swap_amounts.xmr);
     assert_eq!(
         bob_final_xmr_balance,
         initial_balances.bob_xmr + swap_amounts.xmr
@@ -336,7 +369,7 @@ async fn on_chain_both_refund_if_alice_never_redeems() {
         swap_as_alice(
             alice_network,
             alice_sender,
-            &alice_monero_wallet.clone(),
+            alice_monero_wallet.clone(),
             alice_bitcoin_wallet.clone(),
             AliceBehaviour {
                 redeem_btc: false,
@@ -349,6 +382,7 @@ async fn on_chain_both_refund_if_alice_never_redeems() {
             bob_sender,
             bob_monero_wallet.clone(),
             bob_bitcoin_wallet.clone(),
+            BobBehaviour::default(),
             bob,
         ),
     )
@@ -380,5 +414,105 @@ async fn on_chain_both_refund_if_alice_never_redeems() {
     // Because we create a new wallet when claiming Monero, we can only assert on
     // this new wallet owning all of `xmr_amount` after refund
     assert_eq!(alice_final_xmr_balance, swap_amounts.xmr);
+    assert_eq!(bob_final_xmr_balance, initial_balances.bob_xmr);
+}
+
+#[tokio::test]
+async fn on_chain_alice_punishes_if_bob_never_acts_after_fund() {
+    let _guard = tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .with_ansi(false)
+        .set_default();
+
+    let cli = Cli::default();
+    let (monero, _container) = Monero::new(&cli).unwrap();
+    let bitcoind = init_bitcoind(&cli).await;
+
+    let (alice_state0, bob_state0, mut alice_node, mut bob_node, initial_balances, swap_amounts) =
+        init_test(&monero, &bitcoind, Some(10), Some(10)).await;
+
+    // run the handshake as part of the setup
+    let (alice_state, bob_state) = try_join(
+        run_alice_until(
+            &mut alice_node,
+            alice_state0.into(),
+            harness::alice::is_state3,
+            &mut OsRng,
+        ),
+        run_bob_until(
+            &mut bob_node,
+            bob_state0.into(),
+            harness::bob::is_state2,
+            &mut OsRng,
+        ),
+    )
+    .await
+    .unwrap();
+    let alice: alice::State3 = alice_state.try_into().unwrap();
+    let bob: bob::State2 = bob_state.try_into().unwrap();
+    let tx_lock_txid = bob.tx_lock.txid();
+
+    let alice_bitcoin_wallet = Arc::new(alice_node.bitcoin_wallet);
+    let bob_bitcoin_wallet = Arc::new(bob_node.bitcoin_wallet);
+    let alice_monero_wallet = Arc::new(alice_node.monero_wallet);
+    let bob_monero_wallet = Arc::new(bob_node.monero_wallet);
+
+    let (alice_network, bob_sender) = Network::<EncryptedSignature>::new();
+    let (bob_network, alice_sender) = Network::<TransferProof>::new();
+
+    let alice_swap = swap_as_alice(
+        alice_network,
+        alice_sender,
+        alice_monero_wallet.clone(),
+        alice_bitcoin_wallet.clone(),
+        AliceBehaviour::default(),
+        alice,
+    );
+    let bob_swap = swap_as_bob(
+        bob_network,
+        bob_sender,
+        bob_monero_wallet.clone(),
+        bob_bitcoin_wallet.clone(),
+        BobBehaviour {
+            send_btc_redeem_encsig: false,
+            create_monero_wallet_for_output: false,
+            cancel_btc: false,
+            refund_btc: false,
+            ..Default::default()
+        },
+        bob,
+    );
+
+    pin_mut!(alice_swap);
+    pin_mut!(bob_swap);
+
+    // since we model Bob as inactive after locking bitcoin, his future does not
+    // resolve, so we wait for one of the two (Alice's) to resolve via select
+    select(alice_swap, bob_swap).await;
+
+    let alice_final_btc_balance = alice_bitcoin_wallet.balance().await.unwrap();
+    let bob_final_btc_balance = bob_bitcoin_wallet.balance().await.unwrap();
+
+    let lock_tx_bitcoin_fee = bob_bitcoin_wallet
+        .transaction_fee(tx_lock_txid)
+        .await
+        .unwrap();
+
+    let alice_final_xmr_balance = alice_monero_wallet.get_balance().await.unwrap();
+    let bob_final_xmr_balance = bob_monero_wallet.get_balance().await.unwrap();
+
+    assert_eq!(
+        alice_final_btc_balance,
+        initial_balances.alice_btc + swap_amounts.btc
+            - bitcoin::Amount::from_sat(2 * xmr_btc::bitcoin::TX_FEE)
+    );
+    assert_eq!(
+        bob_final_btc_balance,
+        initial_balances.bob_btc - swap_amounts.btc - lock_tx_bitcoin_fee
+    );
+
+    // Getting the Monero LockTx fee is tricky in a clean way, I think checking this
+    // condition is sufficient
+    assert!(alice_final_xmr_balance <= initial_balances.alice_xmr - swap_amounts.xmr,);
     assert_eq!(bob_final_xmr_balance, initial_balances.bob_xmr);
 }
