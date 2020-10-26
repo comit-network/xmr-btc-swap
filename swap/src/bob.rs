@@ -13,8 +13,9 @@ use tracing::{debug, info};
 mod amounts;
 mod message0;
 mod message1;
+mod message2;
 
-use self::{amounts::*, message0::*, message1::*};
+use self::{amounts::*, message0::*, message1::*, message2::*};
 use crate::{
     network::{
         peer_tracker::{self, PeerTracker},
@@ -24,7 +25,7 @@ use crate::{
 };
 use xmr_btc::{
     alice,
-    bitcoin::BuildTxLockPsbt,
+    bitcoin::{BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock},
     bob::{self, State0},
 };
 
@@ -38,7 +39,7 @@ pub async fn swap<W>(
     wallet: W,
 ) -> Result<()>
 where
-    W: BuildTxLockPsbt + Send + Sync + 'static,
+    W: BuildTxLockPsbt + SignTxLock + BroadcastSignedTransaction + Send + Sync + 'static,
 {
     let mut swarm = new_swarm()?;
 
@@ -93,14 +94,16 @@ where
     };
 
     swarm.send_message1(alice.clone(), state1.next_message());
-    let _state2 = match swarm.next().await {
+    let state2 = match swarm.next().await {
         OutEvent::Message1(msg) => {
-            state1.receive(msg) // TODO: More graceful error handling.
+            state1.receive(msg)? // TODO: More graceful error handling.
         }
         other => panic!("unexpected event: {:?}", other),
     };
 
-    info!("handshake complete, we now have State2 for Bob.");
+    swarm.send_message2(alice.clone(), state2.next_message());
+
+    info!("Handshake complete, we now have State2 for Bob.");
 
     thread::park();
     Ok(())
@@ -134,6 +137,7 @@ pub enum OutEvent {
     Amounts(SwapAmounts),
     Message0(alice::Message0),
     Message1(alice::Message1),
+    Message2(alice::Message2),
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -170,6 +174,14 @@ impl From<message1::OutEvent> for OutEvent {
     }
 }
 
+impl From<message2::OutEvent> for OutEvent {
+    fn from(event: message2::OutEvent) -> Self {
+        match event {
+            message2::OutEvent::Msg(msg) => OutEvent::Message2(msg),
+        }
+    }
+}
+
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Bob.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
@@ -179,6 +191,7 @@ pub struct Bob {
     amounts: Amounts,
     message0: Message0,
     message1: Message1,
+    message2: Message2,
     #[behaviour(ignore)]
     identity: Keypair,
 }
@@ -209,6 +222,11 @@ impl Bob {
         self.message1.send(alice, msg)
     }
 
+    /// Sends Bob's third message to Alice.
+    pub fn send_message2(&mut self, alice: PeerId, msg: bob::Message2) {
+        self.message2.send(alice, msg)
+    }
+
     /// Returns Alice's peer id if we are connected.
     pub fn peer_id_of_alice(&self) -> Option<PeerId> {
         self.pt.counterparty_peer_id()
@@ -224,6 +242,7 @@ impl Default for Bob {
             amounts: Amounts::default(),
             message0: Message0::default(),
             message1: Message1::default(),
+            message2: Message2::default(),
             identity,
         }
     }
