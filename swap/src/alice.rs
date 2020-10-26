@@ -28,13 +28,12 @@ use xmr_btc::{alice::State0, bob, monero};
 pub type Swarm = libp2p::Swarm<Alice>;
 
 // FIXME: This whole function is horrible, needs total re-write.
-#[allow(unused_assignments)] // Due to the mutable message0?
 pub async fn swap(
     listen: Multiaddr,
     redeem_address: ::bitcoin::Address,
     punish_address: ::bitcoin::Address,
 ) -> Result<()> {
-    let mut message0: Option<bob::Message0> = None;
+    let message0: bob::Message0;
     let mut last_amounts: Option<SwapAmounts> = None;
 
     let mut swarm = new_swarm(listen)?;
@@ -53,7 +52,7 @@ pub async fn swap(
             OutEvent::Message0(msg) => {
                 debug!("Got message0 from Bob");
                 // TODO: Do this in a more Rusty/functional way.
-                message0 = Some(msg);
+                message0 = msg;
                 break;
             }
             other => panic!("Unexpected event: {:?}", other),
@@ -82,10 +81,7 @@ pub async fn swap(
     );
     swarm.set_state0(state0.clone());
 
-    let state1 = match message0 {
-        Some(msg) => state0.receive(msg).expect("failed to receive msg 0"),
-        None => panic!("should have the message by here"),
-    };
+    let state1 = state0.receive(message0).expect("failed to receive msg 0");
 
     let (state2, channel) = match swarm.next().await {
         OutEvent::Message1 { msg, channel } => {
