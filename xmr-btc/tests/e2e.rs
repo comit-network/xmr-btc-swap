@@ -16,8 +16,6 @@ mod tests {
     use futures::future;
     use monero_harness::Monero;
     use rand::rngs::OsRng;
-
-    use crate::harness::storage::Database;
     use std::convert::TryInto;
     use testcontainers::clients::Cli;
     use tracing_subscriber::util::SubscriberInitExt;
@@ -239,120 +237,6 @@ mod tests {
         assert_eq!(
             bob_final_btc_balance,
             initial_balances.bob_btc - swap_amounts.btc - lock_tx_bitcoin_fee
-        );
-    }
-
-    #[tokio::test]
-    async fn recover_protocol_state_from_db() {
-        let _guard = tracing_subscriber::fmt()
-            .with_env_filter("info")
-            .set_default();
-
-        let cli = Cli::default();
-        let (monero, _container) = Monero::new(&cli).unwrap();
-        let bitcoind = init_bitcoind(&cli).await;
-
-        let alice_db_dir = tempfile::tempdir().unwrap();
-        let alice_db: Database<alice::State> =
-            harness::storage::Database::open(alice_db_dir.path()).unwrap();
-        let bob_db_dir = tempfile::tempdir().unwrap();
-        let bob_db: Database<bob::State> =
-            harness::storage::Database::open(bob_db_dir.path()).unwrap();
-
-        let (
-            alice_state0,
-            bob_state0,
-            mut alice_node,
-            mut bob_node,
-            initial_balances,
-            swap_amounts,
-        ) = init_test(&monero, &bitcoind, None, None).await;
-
-        {
-            let (alice_state, bob_state) = future::try_join(
-                run_alice_until(
-                    &mut alice_node,
-                    alice_state0.into(),
-                    harness::alice::is_state5,
-                    &mut OsRng,
-                ),
-                run_bob_until(
-                    &mut bob_node,
-                    bob_state0.into(),
-                    harness::bob::is_state3,
-                    &mut OsRng,
-                ),
-            )
-            .await
-            .unwrap();
-
-            // save state to db
-            alice_db.insert_latest_state(&alice_state).await.unwrap();
-            bob_db.insert_latest_state(&bob_state).await.unwrap();
-        };
-
-        let (alice_state6, bob_state5) = {
-            // recover state from db
-            let alice_state = alice_db.get_latest_state().unwrap();
-            let bob_state = bob_db.get_latest_state().unwrap();
-
-            let (alice_state, bob_state) = future::try_join(
-                run_alice_until(
-                    &mut alice_node,
-                    alice_state,
-                    harness::alice::is_state6,
-                    &mut OsRng,
-                ),
-                run_bob_until(
-                    &mut bob_node,
-                    bob_state,
-                    harness::bob::is_state5,
-                    &mut OsRng,
-                ),
-            )
-            .await
-            .unwrap();
-
-            let alice_state: alice::State6 = alice_state.try_into().unwrap();
-            let bob_state: bob::State5 = bob_state.try_into().unwrap();
-
-            (alice_state, bob_state)
-        };
-
-        let alice_final_btc_balance = alice_node.bitcoin_wallet.balance().await.unwrap();
-        let bob_final_btc_balance = bob_node.bitcoin_wallet.balance().await.unwrap();
-
-        let lock_tx_bitcoin_fee = bob_node
-            .bitcoin_wallet
-            .transaction_fee(bob_state5.tx_lock_id())
-            .await
-            .unwrap();
-
-        let alice_final_xmr_balance = alice_node.monero_wallet.0.get_balance(0).await.unwrap();
-
-        monero.wait_for_bob_wallet_block_height().await.unwrap();
-
-        let bob_final_xmr_balance = bob_node.monero_wallet.0.get_balance(0).await.unwrap();
-
-        assert_eq!(
-            alice_final_btc_balance,
-            initial_balances.alice_btc + swap_amounts.btc
-                - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
-        );
-        assert_eq!(
-            bob_final_btc_balance,
-            initial_balances.bob_btc - swap_amounts.btc - lock_tx_bitcoin_fee
-        );
-
-        assert_eq!(
-            alice_final_xmr_balance,
-            initial_balances.alice_xmr.as_piconero()
-                - swap_amounts.xmr.as_piconero()
-                - alice_state6.lock_xmr_fee().as_piconero()
-        );
-        assert_eq!(
-            bob_final_xmr_balance,
-            initial_balances.bob_xmr.as_piconero() + swap_amounts.xmr.as_piconero()
         );
     }
 }

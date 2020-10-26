@@ -5,6 +5,7 @@ pub mod alice;
 pub mod bitcoin;
 pub mod bob;
 pub mod network;
+pub mod storage;
 #[cfg(feature = "tor")]
 pub mod tor;
 
