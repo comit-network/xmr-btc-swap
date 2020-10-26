@@ -114,7 +114,16 @@ fn new_swarm() -> Result<Swarm> {
     let local_key_pair = behaviour.identity();
     let local_peer_id = behaviour.peer_id();
 
-    let transport = transport::build(local_key_pair)?;
+    let transport = {
+        #[cfg(feature = "tor")]
+        {
+            transport::build(local_key_pair, None)?
+        }
+        #[cfg(not(feature = "tor"))]
+        {
+            transport::build(local_key_pair)?
+        }
+    };
 
     let swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id.clone())
         .executor(Box::new(TokioExecutor {

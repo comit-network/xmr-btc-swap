@@ -28,19 +28,37 @@ use xmr_btc::{alice::State0, bob, monero};
 
 pub type Swarm = libp2p::Swarm<Alice>;
 
-// TODO: After we have done some testing replace all the 'panic's with log
-// statements or error returns.
-
-// FIXME: This whole function is horrible, needs total re-write.
+#[cfg(not(feature = "tor"))]
 pub async fn swap(
     listen: Multiaddr,
     redeem_address: ::bitcoin::Address,
     punish_address: ::bitcoin::Address,
 ) -> Result<()> {
+    let swarm = new_swarm(listen)?;
+    _swap(redeem_address, punish_address, swarm).await
+}
+#[cfg(feature = "tor")]
+pub async fn swap(
+    listen: Multiaddr,
+    local_port: u16,
+    redeem_address: ::bitcoin::Address,
+    punish_address: ::bitcoin::Address,
+) -> Result<()> {
+    let swarm = new_swarm(listen, local_port)?;
+    _swap(redeem_address, punish_address, swarm).await
+}
+
+// TODO: After we have done some testing replace all the 'panic's with log
+// statements or error returns.
+
+// FIXME: This whole function is horrible, needs total re-write.
+async fn _swap(
+    redeem_address: ::bitcoin::Address,
+    punish_address: ::bitcoin::Address,
+    mut swarm: Swarm,
+) -> Result<()> {
     let message0: bob::Message0;
     let mut last_amounts: Option<SwapAmounts> = None;
-
-    let mut swarm = new_swarm(listen)?;
 
     loop {
         match swarm.next().await {
@@ -111,6 +129,32 @@ pub async fn swap(
     Ok(())
 }
 
+#[cfg(feature = "tor")]
+fn new_swarm(listen: Multiaddr, port: u16) -> Result<Swarm> {
+    use anyhow::Context as _;
+
+    let behaviour = Alice::default();
+
+    let local_key_pair = behaviour.identity();
+    let local_peer_id = behaviour.peer_id();
+
+    let transport = transport::build(local_key_pair, Some((listen.clone(), port)))?;
+
+    let mut swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id.clone())
+        .executor(Box::new(TokioExecutor {
+            handle: tokio::runtime::Handle::current(),
+        }))
+        .build();
+
+    Swarm::listen_on(&mut swarm, listen.clone())
+        .with_context(|| format!("Address is not supported: {:#}", listen))?;
+
+    tracing::info!("Initialized swarm: {}", local_peer_id);
+
+    Ok(swarm)
+}
+
+#[cfg(not(feature = "tor"))]
 fn new_swarm(listen: Multiaddr) -> Result<Swarm> {
     use anyhow::Context as _;
 
