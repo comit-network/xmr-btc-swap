@@ -82,6 +82,7 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use std::str::FromStr;
     use xmr_btc::serde::monero_private_key;
+    use xmr_btc::{CrossCurveScalar, Curve25519Scalar};
 
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     pub struct TestState {

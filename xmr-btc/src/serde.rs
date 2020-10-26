@@ -77,11 +77,22 @@ mod tests {
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     pub struct MoneroPrivateKey(#[serde(with = "monero_private_key")] crate::monero::PrivateKey);
 
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    pub struct MoneroAmount(#[serde(with = "monero_amount")] crate::monero::Amount);
+
     #[test]
     fn serde_monero_private_key() {
         let key = MoneroPrivateKey(monero::PrivateKey::from_scalar(Scalar::random(&mut OsRng)));
         let encoded = serde_cbor::to_vec(&key).unwrap();
         let decoded: MoneroPrivateKey = serde_cbor::from_slice(&encoded).unwrap();
         assert_eq!(key, decoded);
+    }
+
+    #[test]
+    fn serde_monero_amount() {
+        let amount = MoneroAmount(crate::monero::Amount::from_piconero(1000));
+        let encoded = serde_cbor::to_vec(&amount).unwrap();
+        let decoded: MoneroAmount = serde_cbor::from_slice(&encoded).unwrap();
+        assert_eq!(amount, decoded);
     }
 }
