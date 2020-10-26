@@ -53,4 +53,3 @@ pub mod serde;
 pub mod transport;
 
 pub use cross_curve_dleq;
-pub use curve25519_dalek;
