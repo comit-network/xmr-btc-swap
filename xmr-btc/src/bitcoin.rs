@@ -215,11 +215,7 @@ pub async fn poll_until_block_height_is_gte<B>(client: &B, target: u32)
 where
     B: BlockHeight,
 {
-    loop {
-        if client.block_height().await >= target {
-            return;
-        }
-
+    while client.block_height().await < target {
         tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
     }
 }
