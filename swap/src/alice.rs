@@ -46,9 +46,11 @@ pub async fn swap(
             }
             OutEvent::Request(amounts::OutEvent::Btc { btc, channel }) => {
                 debug!("Got request from Bob to swap {}", btc);
-                let p = calculate_amounts(btc);
-                last_amounts = Some(p);
-                swarm.send_amounts(channel, p);
+                let amounts = calculate_amounts(btc);
+                // TODO: We cache the last amounts returned, this needs improving along with
+                // verification of message 0.
+                last_amounts = Some(amounts);
+                swarm.send_amounts(channel, amounts);
             }
             OutEvent::Message0(msg) => {
                 // We don't want Bob to be able to crash us by sending an out of
