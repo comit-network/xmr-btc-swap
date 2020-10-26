@@ -69,10 +69,6 @@ where
         other => panic!("unexpected event: {:?}", other),
     };
 
-    // FIXME: Too many `bitcoin` crates/modules.
-    let xmr = xmr_btc::monero::Amount::from_piconero(xmr.as_piconero());
-    let btc = ::bitcoin::Amount::from_sat(btc.as_sat());
-
     // TODO: Pass this in using <R: RngCore + CryptoRng>
     let rng = &mut OsRng;
     let state0 = State0::new(

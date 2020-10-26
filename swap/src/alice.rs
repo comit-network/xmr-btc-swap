@@ -70,10 +70,6 @@ pub async fn swap(
         None => unreachable!("should have amounts by here"),
     };
 
-    let xmr = monero::Amount::from_piconero(xmr.as_piconero());
-    //  TODO: This should be the Amount exported by xmr_btc.
-    let btc = ::bitcoin::Amount::from_sat(btc.as_sat());
-
     // TODO: Pass this in using <R: RngCore + CryptoRng>
     let rng = &mut OsRng;
     let state0 = State0::new(
