@@ -25,6 +25,9 @@ use xmr_btc::{
     monero::{CreateWalletForOutput, Transfer, TransferProof},
 };
 
+/// Time given to Bob to get the Bitcoin lock transaction included in a block.
+const BITCOIN_TX_LOCK_TIMEOUT: u64 = 5;
+
 type AliceNetwork = Network<EncryptedSignature>;
 type BobNetwork = Network<TransferProof>;
 
@@ -87,7 +90,12 @@ async fn swap_as_alice(
     behaviour: AliceBehaviour,
     state: alice::State3,
 ) -> Result<()> {
-    let mut action_generator = alice::action_generator(network, bitcoin_wallet.clone(), state);
+    let mut action_generator = alice::action_generator(
+        network,
+        bitcoin_wallet.clone(),
+        state,
+        BITCOIN_TX_LOCK_TIMEOUT,
+    );
 
     loop {
         let state = action_generator.async_resume().await;
@@ -150,6 +158,7 @@ async fn swap_as_bob(
         monero_wallet.clone(),
         bitcoin_wallet.clone(),
         state,
+        BITCOIN_TX_LOCK_TIMEOUT,
     );
 
     loop {

@@ -35,11 +35,6 @@ pub mod message;
 use crate::monero::{CreateWalletForOutput, WatchForTransfer};
 pub use message::{Message, Message0, Message1, Message2, Message3};
 
-// TODO: Replace this with something configurable, such as an function argument.
-/// Time that Bob has to publish the Bitcoin lock transaction before both
-/// parties will abort, in seconds.
-pub const SECS_TO_ACT: u64 = 60;
-
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum Action {
@@ -63,6 +58,9 @@ pub trait ReceiveTransferProof {
 ///
 /// This is called post handshake, after all the keys, addresses and most of the
 /// signatures have been exchanged.
+///
+/// The argument `bitcoin_tx_lock_timeout` is used to determine how long we will
+/// wait for Bob, the caller of this function, to lock up the bitcoin.
 pub fn action_generator<N, M, B>(
     mut network: N,
     monero_client: Arc<M>,
@@ -84,6 +82,7 @@ pub fn action_generator<N, M, B>(
         tx_refund_encsig,
         ..
     }: State2,
+    bitcoin_tx_lock_timeout: u64,
 ) -> GenBoxed<Action, (), ()>
 where
     N: ReceiveTransferProof + Send + Sync + 'static,
@@ -124,7 +123,7 @@ where
             co.yield_(Action::LockBtc(tx_lock.clone())).await;
 
             timeout(
-                Duration::from_secs(SECS_TO_ACT),
+                Duration::from_secs(bitcoin_tx_lock_timeout),
                 bitcoin_client.watch_for_raw_transaction(tx_lock.txid()),
             )
             .await

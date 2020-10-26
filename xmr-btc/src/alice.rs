@@ -58,6 +58,9 @@ pub trait ReceiveBitcoinRedeemEncsig {
 ///
 /// This is called post handshake, after all the keys, addresses and most of the
 /// signatures have been exchanged.
+///
+/// The argument `bitcoin_tx_lock_timeout` is used to determine how long we will
+/// wait for Bob, the counterparty, to lock up the bitcoin.
 pub fn action_generator<N, B>(
     mut network: N,
     bitcoin_client: Arc<B>,
@@ -80,6 +83,7 @@ pub fn action_generator<N, B>(
         tx_cancel_sig_bob,
         ..
     }: State3,
+    bitcoin_tx_lock_timeout: u64,
 ) -> GenBoxed<Action, (), ()>
 where
     N: ReceiveBitcoinRedeemEncsig + Send + Sync + 'static,
@@ -124,7 +128,7 @@ where
     Gen::new_boxed(|co| async move {
         let swap_result: Result<(), SwapFailed> = async {
             timeout(
-                Duration::from_secs(bob::SECS_TO_ACT),
+                Duration::from_secs(bitcoin_tx_lock_timeout),
                 bitcoin_client.watch_for_raw_transaction(tx_lock.txid()),
             )
             .await
