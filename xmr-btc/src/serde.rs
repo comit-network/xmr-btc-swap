@@ -70,7 +70,6 @@ pub mod monero_amount {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use curve25519_dalek::scalar::Scalar;
     use rand::rngs::OsRng;
     use serde::{Deserialize, Serialize};
 
@@ -82,7 +81,9 @@ mod tests {
 
     #[test]
     fn serde_monero_private_key() {
-        let key = MoneroPrivateKey(monero::PrivateKey::from_scalar(Scalar::random(&mut OsRng)));
+        let key = MoneroPrivateKey(monero::PrivateKey::from_scalar(
+            crate::monero::Scalar::random(&mut OsRng),
+        ));
         let encoded = serde_cbor::to_vec(&key).unwrap();
         let decoded: MoneroPrivateKey = serde_cbor::from_slice(&encoded).unwrap();
         assert_eq!(key, decoded);
