@@ -51,10 +51,13 @@ pub async fn swap(
                 swarm.send_amounts(channel, p);
             }
             OutEvent::Message0(msg) => {
-                debug!("Got message0 from Bob");
-                // TODO: Do this in a more Rusty/functional way.
-                message0 = msg;
-                break;
+                // We don't want Bob to be able to crash us by sending an out of
+                // order message. Keep looping if Bob has not requested amounts.
+                if last_amounts.is_some() {
+                    // TODO: We should verify the amounts and notify Bob if they have changed.
+                    message0 = msg;
+                    break;
+                }
             }
             other => panic!("Unexpected event: {:?}", other),
         };
