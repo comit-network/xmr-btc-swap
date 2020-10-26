@@ -29,7 +29,7 @@ pub struct Message1 {
     pub(crate) tx_refund_encsig: EncryptedSignature,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message2 {
     pub(crate) tx_lock_proof: monero::TransferProof,
 }

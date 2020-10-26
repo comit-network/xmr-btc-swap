@@ -27,7 +27,7 @@ pub struct Message1 {
     pub(crate) tx_lock: bitcoin::TxLock,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message2 {
     pub(crate) tx_punish_sig: Signature,
     pub(crate) tx_cancel_sig: Signature,

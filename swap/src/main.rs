@@ -26,7 +26,7 @@ mod trace;
 
 use cli::Options;
 use swap::{alice, bitcoin::Wallet, bob, Cmd, Rsp, SwapAmounts};
-use xmr_btc::bitcoin::BuildTxLockPsbt;
+use xmr_btc::bitcoin::{BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock};
 
 // TODO: Add root seed file instead of generating new seed each run.
 // TODO: Remove all instances of the todo! macro
@@ -109,7 +109,7 @@ async fn swap_as_bob<W>(
     wallet: W,
 ) -> Result<()>
 where
-    W: BuildTxLockPsbt + Send + Sync + 'static,
+    W: BuildTxLockPsbt + SignTxLock + BroadcastSignedTransaction + Send + Sync + 'static,
 {
     let (cmd_tx, mut cmd_rx) = mpsc::channel(1);
     let (mut rsp_tx, rsp_rx) = mpsc::channel(1);

@@ -8,13 +8,14 @@ use libp2p::{
 };
 use rand::rngs::OsRng;
 use std::thread;
-use tracing::debug;
+use tracing::{debug, info};
 
 mod amounts;
 mod message0;
 mod message1;
+mod message2;
 
-use self::{amounts::*, message0::*, message1::*};
+use self::{amounts::*, message0::*, message1::*, message2::*};
 use crate::{
     network::{
         peer_tracker::{self, PeerTracker},
@@ -42,7 +43,7 @@ pub async fn swap(
     loop {
         match swarm.next().await {
             OutEvent::ConnectionEstablished(id) => {
-                tracing::info!("Connection established with: {}", id);
+                info!("Connection established with: {}", id);
             }
             OutEvent::Request(amounts::OutEvent::Btc { btc, channel }) => {
                 debug!("Got request from Bob to swap {}", btc);
@@ -98,9 +99,13 @@ pub async fn swap(
     let msg = state2.next_message();
     swarm.send_message1(channel, msg);
 
-    tracing::info!("handshake complete, we now have State2 for Alice.");
+    let _state3 = match swarm.next().await {
+        OutEvent::Message2(msg) => state2.receive(msg)?,
+        other => panic!("Unexpected event: {:?}", other),
+    };
 
-    tracing::warn!("parking thread ...");
+    info!("Handshake complete, we now have State3 for Alice.");
+
     thread::park();
     Ok(())
 }
@@ -124,7 +129,7 @@ fn new_swarm(listen: Multiaddr) -> Result<Swarm> {
     Swarm::listen_on(&mut swarm, listen.clone())
         .with_context(|| format!("Address is not supported: {:#}", listen))?;
 
-    tracing::info!("Initialized swarm: {}", local_peer_id);
+    info!("Initialized swarm: {}", local_peer_id);
 
     Ok(swarm)
 }
@@ -139,6 +144,7 @@ pub enum OutEvent {
         msg: bob::Message1,
         channel: ResponseChannel<AliceToBob>,
     },
+    Message2(bob::Message2),
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -173,6 +179,14 @@ impl From<message1::OutEvent> for OutEvent {
     }
 }
 
+impl From<message2::OutEvent> for OutEvent {
+    fn from(event: message2::OutEvent) -> Self {
+        match event {
+            message2::OutEvent::Msg(msg) => OutEvent::Message2(msg),
+        }
+    }
+}
+
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Alice.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
@@ -182,6 +196,7 @@ pub struct Alice {
     amounts: Amounts,
     message0: Message0,
     message1: Message1,
+    message2: Message2,
     #[behaviour(ignore)]
     identity: Keypair,
 }
@@ -225,6 +240,7 @@ impl Default for Alice {
             amounts: Amounts::default(),
             message0: Message0::default(),
             message1: Message1::default(),
+            message2: Message2::default(),
             identity,
         }
     }
