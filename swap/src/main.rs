@@ -74,20 +74,11 @@ async fn main() -> Result<()> {
         let bitcoin_wallet = bitcoin::Wallet::new("alice", &url)
             .await
             .expect("failed to create bitcoin wallet");
+        let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
         let monero_wallet = Arc::new(monero::Wallet::localhost(MONERO_WALLET_RPC_PORT));
 
-        let redeem = bitcoin_wallet
-            .new_address()
-            .await
-            .expect("failed to get new redeem address");
-        let punish = bitcoin_wallet
-            .new_address()
-            .await
-            .expect("failed to get new punish address");
-
-        let bitcoin_wallet = Arc::new(bitcoin_wallet);
-        swap_as_alice(bitcoin_wallet, monero_wallet, alice.clone(), redeem, punish).await?;
+        swap_as_alice(bitcoin_wallet, monero_wallet, alice.clone()).await?;
     } else {
         info!("running swap node as Bob ...");
 
@@ -101,21 +92,16 @@ async fn main() -> Result<()> {
         let bitcoin_wallet = bitcoin::Wallet::new("bob", &url)
             .await
             .expect("failed to create bitcoin wallet");
+        let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
         let monero_wallet = Arc::new(monero::Wallet::localhost(MONERO_WALLET_RPC_PORT));
 
-        let refund = bitcoin_wallet
-            .new_address()
-            .await
-            .expect("failed to get new address");
-
-        let bitcoin_wallet = Arc::new(bitcoin_wallet);
         match (opt.piconeros, opt.satoshis) {
             (Some(_), Some(_)) => bail!("Please supply only a single amount to swap"),
             (None, None) => bail!("Please supply an amount to swap"),
             (Some(_picos), _) => todo!("support starting with picos"),
             (None, Some(sats)) => {
-                swap_as_bob(bitcoin_wallet, monero_wallet, sats, alice, refund).await?;
+                swap_as_bob(bitcoin_wallet, monero_wallet, sats, alice).await?;
             }
         };
     }
@@ -145,24 +131,14 @@ async fn swap_as_alice(
     bitcoin_wallet: Arc<swap::bitcoin::Wallet>,
     monero_wallet: Arc<swap::monero::Wallet>,
     addr: Multiaddr,
-    redeem: ::bitcoin::Address,
-    punish: ::bitcoin::Address,
 ) -> Result<()> {
     #[cfg(not(feature = "tor"))]
     {
-        alice::swap(bitcoin_wallet, monero_wallet, addr, None, redeem, punish).await
+        alice::swap(bitcoin_wallet, monero_wallet, addr, None).await
     }
     #[cfg(feature = "tor")]
     {
-        alice::swap(
-            bitcoin_wallet,
-            monero_wallet,
-            addr,
-            Some(PORT),
-            redeem,
-            punish,
-        )
-        .await
+        alice::swap(bitcoin_wallet, monero_wallet, addr, Some(PORT)).await
     }
 }
 
@@ -171,7 +147,6 @@ async fn swap_as_bob(
     monero_wallet: Arc<swap::monero::Wallet>,
     sats: u64,
     alice: Multiaddr,
-    refund: ::bitcoin::Address,
 ) -> Result<()> {
     let (cmd_tx, mut cmd_rx) = mpsc::channel(1);
     let (mut rsp_tx, rsp_rx) = mpsc::channel(1);
@@ -182,7 +157,6 @@ async fn swap_as_bob(
         alice,
         cmd_tx,
         rsp_rx,
-        refund,
     ));
 
     loop {

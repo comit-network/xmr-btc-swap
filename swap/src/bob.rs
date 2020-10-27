@@ -46,7 +46,6 @@ pub async fn swap(
     addr: Multiaddr,
     mut cmd_tx: Sender<Cmd>,
     mut rsp_rx: Receiver<Rsp>,
-    refund_address: ::bitcoin::Address,
 ) -> Result<()> {
     struct Network(Swarm);
 
@@ -105,6 +104,8 @@ pub async fn swap(
         }
         other => panic!("unexpected event: {:?}", other),
     };
+
+    let refund_address = bitcoin_wallet.new_address().await?;
 
     // TODO: Pass this in using <R: RngCore + CryptoRng>
     let rng = &mut OsRng;
