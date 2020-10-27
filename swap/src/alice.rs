@@ -127,7 +127,7 @@ fn new_swarm(listen: Multiaddr, port: Option<u16>) -> Result<Swarm> {
     {
         transport = match port {
             None => transport::build(local_key_pair)?,
-            Some(port) => anyhow::bail!("local port should not be provided for non-tor usage"),
+            Some(_) => anyhow::bail!("local port should not be provided for non-tor usage"),
         };
     }
 
