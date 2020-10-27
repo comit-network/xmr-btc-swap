@@ -12,6 +12,8 @@ use xmr_btc::bitcoin::{
     TransactionBlockHeight, TxLock, Txid, WatchForRawTransaction,
 };
 
+pub const TX_LOCK_MINE_TIMEOUT: u64 = 3600;
+
 // This is cut'n'paste from xmr_btc/tests/harness/wallet/bitcoin.rs
 
 #[derive(Debug)]

@@ -18,10 +18,13 @@ mod amounts;
 mod message0;
 mod message1;
 mod message2;
+mod message3;
 
-use self::{amounts::*, message0::*, message1::*, message2::*};
+use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
 use crate::{
-    bitcoin, monero,
+    bitcoin,
+    bitcoin::TX_LOCK_MINE_TIMEOUT,
+    monero,
     network::{
         peer_tracker::{self, PeerTracker},
         request_response::AliceToBob,
@@ -117,7 +120,6 @@ pub async fn swap(
     );
     swarm.set_state0(state0.clone());
 
-    // TODO: Can we verify message 0 before calling this so we never fail?
     let state1 = state0.receive(message0).expect("failed to receive msg 0");
 
     let (state2, channel) = match swarm.next().await {
@@ -146,8 +148,12 @@ pub async fn swap(
         channel: Some(channel),
     }));
 
-    let mut action_generator =
-        action_generator(network.clone(), bitcoin_wallet.clone(), state3, 3600);
+    let mut action_generator = action_generator(
+        network.clone(),
+        bitcoin_wallet.clone(),
+        state3,
+        TX_LOCK_MINE_TIMEOUT,
+    );
 
     loop {
         let state = action_generator.async_resume().await;
@@ -242,6 +248,7 @@ pub enum OutEvent {
         msg: bob::Message2,
         channel: ResponseChannel<AliceToBob>,
     },
+    Message3(bob::Message3),
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -284,6 +291,14 @@ impl From<message2::OutEvent> for OutEvent {
     }
 }
 
+impl From<message3::OutEvent> for OutEvent {
+    fn from(event: message3::OutEvent) -> Self {
+        match event {
+            message3::OutEvent::Msg(msg) => OutEvent::Message3(msg),
+        }
+    }
+}
+
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Alice.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
@@ -294,6 +309,7 @@ pub struct Alice {
     message0: Message0,
     message1: Message1,
     message2: Message2,
+    message3: Message3,
     #[behaviour(ignore)]
     identity: Keypair,
 }
@@ -347,6 +363,7 @@ impl Default for Alice {
             message0: Message0::default(),
             message1: Message1::default(),
             message2: Message2::default(),
+            message3: Message3::default(),
             identity,
         }
     }

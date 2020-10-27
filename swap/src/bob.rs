@@ -1,46 +1,61 @@
 //! Run an XMR/BTC swap in the role of Bob.
 //! Bob holds BTC and wishes receive XMR.
 use anyhow::Result;
+use async_trait::async_trait;
 use futures::{
     channel::mpsc::{Receiver, Sender},
     StreamExt,
 };
+use genawaiter::GeneratorState;
 use libp2p::{core::identity::Keypair, Multiaddr, NetworkBehaviour, PeerId};
 use rand::rngs::OsRng;
-use std::{process, thread};
+use std::{process, sync::Arc};
+use tokio::sync::Mutex;
 use tracing::{debug, info};
 
 mod amounts;
 mod message0;
 mod message1;
 mod message2;
+mod message3;
 
-use self::{amounts::*, message0::*, message1::*, message2::*};
+use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
 use crate::{
+    bitcoin,
+    bitcoin::TX_LOCK_MINE_TIMEOUT,
+    monero,
     network::{
         peer_tracker::{self, PeerTracker},
         transport, TokioExecutor,
     },
-    Cmd, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
+    Cmd, Never, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use xmr_btc::{
     alice,
-    bitcoin::{BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock},
-    bob::{self, State0},
+    bitcoin::{BroadcastSignedTransaction, EncryptedSignature, SignTxLock},
+    bob::{self, action_generator, ReceiveTransferProof, State0},
+    monero::CreateWalletForOutput,
 };
 
 // FIXME: This whole function is horrible, needs total re-write.
-pub async fn swap<W>(
+pub async fn swap(
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
     btc: u64,
     addr: Multiaddr,
     mut cmd_tx: Sender<Cmd>,
     mut rsp_rx: Receiver<Rsp>,
     refund_address: ::bitcoin::Address,
-    wallet: W,
-) -> Result<()>
-where
-    W: BuildTxLockPsbt + SignTxLock + BroadcastSignedTransaction + Send + Sync + 'static,
-{
+) -> Result<()> {
+    struct Network(Swarm);
+
+    #[async_trait]
+    impl ReceiveTransferProof for Network {
+        async fn receive_transfer_proof(&mut self) -> monero::TransferProof {
+            todo!()
+        }
+    }
+
     let mut swarm = new_swarm()?;
 
     libp2p::Swarm::dial_addr(&mut swarm, addr)?;
@@ -82,11 +97,7 @@ where
 
     swarm.send_message0(alice.clone(), state0.next_message(rng));
     let state1 = match swarm.next().await {
-        OutEvent::Message0(msg) => {
-            // TODO: Verify the response message before calling receive() and handle any
-            // error gracefully.
-            state0.receive(&wallet, msg).await?
-        }
+        OutEvent::Message0(msg) => state0.receive(bitcoin_wallet.as_ref(), msg).await?,
         other => panic!("unexpected event: {:?}", other),
     };
 
@@ -102,8 +113,53 @@ where
 
     info!("Handshake complete, we now have State2 for Bob.");
 
-    thread::park();
-    Ok(())
+    let network = Arc::new(Mutex::new(Network(swarm)));
+
+    let mut action_generator = action_generator(
+        network.clone(),
+        monero_wallet.clone(),
+        bitcoin_wallet.clone(),
+        state2,
+        TX_LOCK_MINE_TIMEOUT,
+    );
+
+    loop {
+        let state = action_generator.async_resume().await;
+
+        info!("resumed execution of bob generator, got: {:?}", state);
+
+        match state {
+            GeneratorState::Yielded(bob::Action::LockBtc(tx_lock)) => {
+                let signed_tx_lock = bitcoin_wallet.sign_tx_lock(tx_lock).await?;
+                let _ = bitcoin_wallet
+                    .broadcast_signed_transaction(signed_tx_lock)
+                    .await?;
+            }
+            GeneratorState::Yielded(bob::Action::SendBtcRedeemEncsig(tx_redeem_encsig)) => {
+                let mut guard = network.as_ref().lock().await;
+                guard.0.send_message3(alice.clone(), tx_redeem_encsig);
+            }
+            GeneratorState::Yielded(bob::Action::CreateXmrWalletForOutput {
+                spend_key,
+                view_key,
+            }) => {
+                monero_wallet
+                    .create_and_load_wallet_for_output(spend_key, view_key)
+                    .await?;
+            }
+            GeneratorState::Yielded(bob::Action::CancelBtc(tx_cancel)) => {
+                let _ = bitcoin_wallet
+                    .broadcast_signed_transaction(tx_cancel)
+                    .await?;
+            }
+            GeneratorState::Yielded(bob::Action::RefundBtc(tx_refund)) => {
+                let _ = bitcoin_wallet
+                    .broadcast_signed_transaction(tx_refund)
+                    .await?;
+            }
+            GeneratorState::Complete(()) => return Ok(()),
+        }
+    }
 }
 
 pub type Swarm = libp2p::Swarm<Bob>;
@@ -188,6 +244,12 @@ impl From<message2::OutEvent> for OutEvent {
     }
 }
 
+impl From<Never> for OutEvent {
+    fn from(_: Never) -> Self {
+        panic!("not ever")
+    }
+}
+
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Bob.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
@@ -198,6 +260,7 @@ pub struct Bob {
     message0: Message0,
     message1: Message1,
     message2: Message2,
+    message3: Message3,
     #[behaviour(ignore)]
     identity: Keypair,
 }
@@ -233,6 +296,12 @@ impl Bob {
         self.message2.send(alice, msg)
     }
 
+    /// Sends Bob's fourth message to Alice.
+    pub fn send_message3(&mut self, alice: PeerId, tx_redeem_encsig: EncryptedSignature) {
+        let msg = bob::Message3 { tx_redeem_encsig };
+        self.message3.send(alice, msg)
+    }
+
     /// Returns Alice's peer id if we are connected.
     pub fn peer_id_of_alice(&self) -> Option<PeerId> {
         self.pt.counterparty_peer_id()
@@ -249,6 +318,7 @@ impl Default for Bob {
             message0: Message0::default(),
             message1: Message1::default(),
             message2: Message2::default(),
+            message3: Message3::default(),
             identity,
         }
     }

@@ -33,9 +33,9 @@ pub struct Message2 {
     pub(crate) tx_cancel_sig: Signature,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message3 {
-    pub(crate) tx_redeem_encsig: EncryptedSignature,
+    pub tx_redeem_encsig: EncryptedSignature,
 }
 
 impl_try_from_parent_enum!(Message0, Message);
