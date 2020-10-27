@@ -1,6 +1,6 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use anyhow::{bail, Result};
+use anyhow::Result;
 use libp2p::{
     core::{identity::Keypair, Multiaddr},
     request_response::ResponseChannel,
@@ -120,7 +120,7 @@ fn new_swarm(listen: Multiaddr, port: Option<u16>) -> Result<Swarm> {
     {
         transport = match port {
             Some(port) => transport::build(local_key_pair, Some((listen.clone(), port)))?,
-            None => bail!("Must supply local port"),
+            None => anyhow::bail!("Must supply local port"),
         };
     }
     #[cfg(not(feature = "tor"))]
