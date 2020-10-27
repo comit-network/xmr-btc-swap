@@ -2,16 +2,17 @@
 //! Bob holds BTC and wishes receive XMR.
 use anyhow::Result;
 use async_trait::async_trait;
+use backoff::{future::FutureOperation as _, ExponentialBackoff};
 use futures::{
     channel::mpsc::{Receiver, Sender},
-    StreamExt,
+    FutureExt, StreamExt,
 };
 use genawaiter::GeneratorState;
 use libp2p::{core::identity::Keypair, Multiaddr, NetworkBehaviour, PeerId};
 use rand::rngs::OsRng;
 use std::{process, sync::Arc};
 use tokio::sync::Mutex;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 mod amounts;
 mod message0;
@@ -52,7 +53,28 @@ pub async fn swap(
     #[async_trait]
     impl ReceiveTransferProof for Network {
         async fn receive_transfer_proof(&mut self) -> monero::TransferProof {
-            todo!()
+            #[derive(Debug)]
+            struct UnexpectedMessage;
+
+            let future = self.0.next().shared();
+
+            (|| async {
+                let proof = match future.clone().await {
+                    OutEvent::Message2(msg) => msg.tx_lock_proof,
+                    other => {
+                        warn!("Expected Alice's Message2, got: {:?}", other);
+                        return Err(backoff::Error::Transient(UnexpectedMessage));
+                    }
+                };
+
+                Result::<_, backoff::Error<UnexpectedMessage>>::Ok(proof)
+            })
+            .retry(ExponentialBackoff {
+                max_elapsed_time: None,
+                ..Default::default()
+            })
+            .await
+            .expect("transient errors to be retried")
         }
     }
 
@@ -193,7 +215,7 @@ fn new_swarm() -> Result<Swarm> {
 }
 
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
     Amounts(SwapAmounts),

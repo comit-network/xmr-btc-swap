@@ -2,6 +2,7 @@
 //! Alice holds XMR and wishes receive BTC.
 use anyhow::Result;
 use async_trait::async_trait;
+use backoff::{future::FutureOperation as _, ExponentialBackoff};
 use genawaiter::GeneratorState;
 use libp2p::{
     core::{identity::Keypair, Multiaddr},
@@ -50,17 +51,20 @@ pub async fn swap(
     punish_address: ::bitcoin::Address,
 ) -> Result<()> {
     struct Network {
-        swarm: Swarm,
+        swarm: Arc<Mutex<Swarm>>,
         channel: Option<ResponseChannel<AliceToBob>>,
     }
 
     impl Network {
-        pub fn send_message2(&mut self, proof: monero::TransferProof) {
+        pub async fn send_message2(&mut self, proof: monero::TransferProof) {
             match self.channel.take() {
                 None => warn!("Channel not found, did you call this twice?"),
-                Some(channel) => self.swarm.send_message2(channel, alice::Message2 {
-                    tx_lock_proof: proof,
-                }),
+                Some(channel) => {
+                    let mut guard = self.swarm.lock().await;
+                    guard.send_message2(channel, alice::Message2 {
+                        tx_lock_proof: proof,
+                    })
+                }
             }
         }
     }
@@ -68,7 +72,27 @@ pub async fn swap(
     #[async_trait]
     impl ReceiveBitcoinRedeemEncsig for Network {
         async fn receive_bitcoin_redeem_encsig(&mut self) -> xmr_btc::bitcoin::EncryptedSignature {
-            todo!()
+            #[derive(Debug)]
+            struct UnexpectedMessage;
+
+            (|| async {
+                let mut guard = self.swarm.lock().await;
+                let encsig = match guard.next().await {
+                    OutEvent::Message3(msg) => msg.tx_redeem_encsig,
+                    other => {
+                        warn!("Expected Bob's Message3, got: {:?}", other);
+                        return Err(backoff::Error::Transient(UnexpectedMessage));
+                    }
+                };
+
+                Result::<_, backoff::Error<UnexpectedMessage>>::Ok(encsig)
+            })
+            .retry(ExponentialBackoff {
+                max_elapsed_time: None,
+                ..Default::default()
+            })
+            .await
+            .expect("transient errors to be retried")
         }
     }
 
@@ -144,7 +168,7 @@ pub async fn swap(
     info!("Handshake complete, we now have State3 for Alice.");
 
     let network = Arc::new(Mutex::new(Network {
-        swarm,
+        swarm: Arc::new(Mutex::new(swarm)),
         channel: Some(channel),
     }));
 
@@ -171,7 +195,7 @@ pub async fn swap(
                     .await?;
 
                 let mut guard = network.as_ref().lock().await;
-                guard.send_message2(transfer_proof);
+                guard.send_message2(transfer_proof).await;
             }
 
             GeneratorState::Yielded(Action::RedeemBtc(tx)) => {
