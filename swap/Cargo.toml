@@ -36,9 +36,10 @@ tracing-core = "0.1"
 tracing-futures = { version = "0.2", features = ["std-future", "futures-03"] }
 tracing-log = "0.1"
 tracing-subscriber = { version = "0.2", default-features = false, features = ["fmt", "ansi", "env-filter"] }
-url = "2.1"
+url = { version = "2.1", features = ["serde"] }
 void = "1"
 xmr-btc = { path = "../xmr-btc" }
+toml = "0.5"
 
 [dev-dependencies]
 hyper = "0.13"

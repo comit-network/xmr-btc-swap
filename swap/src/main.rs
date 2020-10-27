@@ -13,38 +13,36 @@
 #![forbid(unsafe_code)]
 
 use anyhow::{bail, Result};
+use cli::Options;
+use config::Config;
 use futures::{channel::mpsc, StreamExt};
 use libp2p::Multiaddr;
 use log::LevelFilter;
-use std::{io, io::Write, process};
+use std::{io, io::Write, path::Path, process};
 use structopt::StructOpt;
+use swap::{alice, bitcoin::Wallet, bob, config, Cmd, Rsp, SwapAmounts};
 use tracing::info;
-use url::Url;
+use xmr_btc::bitcoin::{BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock};
 
 mod cli;
 mod trace;
 
-use cli::Options;
-use swap::{alice, bitcoin::Wallet, bob, Cmd, Rsp, SwapAmounts};
-use xmr_btc::bitcoin::{BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock};
-
 // TODO: Add root seed file instead of generating new seed each run.
 // TODO: Remove all instances of the todo! macro
 
-// TODO: Add a config file with these in it.
-// Alice's address and port until we have a config file.
-pub const PORT: u16 = 9876; // Arbitrarily chosen.
-pub const ADDR: &str = "127.0.0.1";
-pub const BITCOIND_JSON_RPC_URL: &str = "127.0.0.1:8332";
-
 #[tokio::main]
 async fn main() -> Result<()> {
-    let opt = Options::from_args();
+    let opt: Options = Options::from_args();
 
     trace::init_tracing(LevelFilter::Debug)?;
 
-    let addr = format!("/ip4/{}/tcp/{}", ADDR, PORT);
-    let alice: Multiaddr = addr.parse().expect("failed to parse Alice's address");
+    let config = match opt.config {
+        Some(path) => Config::load(Path::new(&path))?,
+        None => Config::default(),
+    };
+
+    let alice: Multiaddr = config.listen_addr;
+    let url = config.bitcoind_url;
 
     if opt.as_alice {
         info!("running swap node as Alice ...");
@@ -52,8 +50,6 @@ async fn main() -> Result<()> {
         if opt.piconeros.is_some() || opt.satoshis.is_some() {
             bail!("Alice cannot set the amount to swap via the cli");
         }
-
-        let url = Url::parse(BITCOIND_JSON_RPC_URL).expect("failed to parse url");
         let bitcoin_wallet = Wallet::new("alice", &url)
             .await
             .expect("failed to create bitcoin wallet");
@@ -71,7 +67,6 @@ async fn main() -> Result<()> {
     } else {
         info!("running swap node as Bob ...");
 
-        let url = Url::parse(BITCOIND_JSON_RPC_URL).expect("failed to parse url");
         let bitcoin_wallet = Wallet::new("bob", &url)
             .await
             .expect("failed to create bitcoin wallet");

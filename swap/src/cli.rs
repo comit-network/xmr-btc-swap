@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 #[derive(structopt::StructOpt, Debug)]
 pub struct Options {
     /// Run the swap as Alice.
@@ -11,4 +13,8 @@ pub struct Options {
     /// Run the swap as Bob and try to swap this many BTC (in satoshi).
     #[structopt(long = "sats")]
     pub satoshis: Option<u64>,
+
+    /// Node config
+    #[structopt(long = "config")]
+    pub config: Option<PathBuf>,
 }
