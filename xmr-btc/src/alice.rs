@@ -24,7 +24,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::time::timeout;
+use tokio::{sync::Mutex, time::timeout};
 use tracing::error;
 
 pub mod message;
@@ -62,7 +62,7 @@ pub trait ReceiveBitcoinRedeemEncsig {
 /// The argument `bitcoin_tx_lock_timeout` is used to determine how long we will
 /// wait for Bob, the counterparty, to lock up the bitcoin.
 pub fn action_generator<N, B>(
-    mut network: N,
+    network: Arc<Mutex<N>>,
     bitcoin_client: Arc<B>,
     // TODO: Replace this with a new, slimmer struct?
     State3 {
@@ -86,7 +86,7 @@ pub fn action_generator<N, B>(
     bitcoin_tx_lock_timeout: u64,
 ) -> GenBoxed<Action, (), ()>
 where
-    N: ReceiveBitcoinRedeemEncsig + Send + Sync + 'static,
+    N: ReceiveBitcoinRedeemEncsig + Send + 'static,
     B: bitcoin::BlockHeight
         + bitcoin::TransactionBlockHeight
         + bitcoin::WatchForRawTransaction
@@ -158,19 +158,24 @@ where
             // TODO: Watch for LockXmr using watch-only wallet. Doing so will prevent Alice
             // from cancelling/refunding unnecessarily.
 
-            let tx_redeem_encsig = match select(
-                network.receive_bitcoin_redeem_encsig(),
-                poll_until_btc_has_expired.clone(),
-            )
-            .await
-            {
-                Either::Left((encsig, _)) => encsig,
-                Either::Right(_) => {
-                    return Err(SwapFailed::AfterXmrLock {
-                        reason: Reason::BtcExpired,
-                        tx_lock_height,
-                    })
-                }
+            let tx_redeem_encsig = {
+                let mut guard = network.as_ref().lock().await;
+                let tx_redeem_encsig = match select(
+                    guard.receive_bitcoin_redeem_encsig(),
+                    poll_until_btc_has_expired.clone(),
+                )
+                .await
+                {
+                    Either::Left((encsig, _)) => encsig,
+                    Either::Right(_) => {
+                        return Err(SwapFailed::AfterXmrLock {
+                            reason: Reason::BtcExpired,
+                            tx_lock_height,
+                        })
+                    }
+                };
+
+                tx_redeem_encsig
             };
 
             let (signed_tx_redeem, tx_redeem_txid) = {

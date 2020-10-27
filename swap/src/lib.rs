@@ -4,6 +4,7 @@ use std::fmt::{self, Display};
 pub mod alice;
 pub mod bitcoin;
 pub mod bob;
+pub mod monero;
 pub mod network;
 pub mod storage;
 #[cfg(feature = "tor")]

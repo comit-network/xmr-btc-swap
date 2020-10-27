@@ -1,14 +1,18 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
 use anyhow::Result;
+use async_trait::async_trait;
+use genawaiter::GeneratorState;
 use libp2p::{
     core::{identity::Keypair, Multiaddr},
     request_response::ResponseChannel,
     NetworkBehaviour, PeerId,
 };
 use rand::rngs::OsRng;
-use std::thread;
-use tracing::{debug, info};
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use tracing::{debug, info, warn};
+use xmr_btc::alice;
 
 mod amounts;
 mod message0;
@@ -17,6 +21,7 @@ mod message2;
 
 use self::{amounts::*, message0::*, message1::*, message2::*};
 use crate::{
+    bitcoin, monero,
     network::{
         peer_tracker::{self, PeerTracker},
         request_response::AliceToBob,
@@ -24,16 +29,46 @@ use crate::{
     },
     SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
-use xmr_btc::{alice::State0, bob, monero};
+use xmr_btc::{
+    alice::{action_generator, Action, ReceiveBitcoinRedeemEncsig, State0},
+    bitcoin::BroadcastSignedTransaction,
+    bob,
+    monero::{CreateWalletForOutput, Transfer},
+};
 
 pub type Swarm = libp2p::Swarm<Alice>;
 
 pub async fn swap(
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
     listen: Multiaddr,
     local_port: Option<u16>,
     redeem_address: ::bitcoin::Address,
     punish_address: ::bitcoin::Address,
 ) -> Result<()> {
+    struct Network {
+        swarm: Swarm,
+        channel: Option<ResponseChannel<AliceToBob>>,
+    }
+
+    impl Network {
+        pub fn send_message2(&mut self, proof: monero::TransferProof) {
+            match self.channel.take() {
+                None => warn!("Channel not found, did you call this twice?"),
+                Some(channel) => self.swarm.send_message2(channel, alice::Message2 {
+                    tx_lock_proof: proof,
+                }),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl ReceiveBitcoinRedeemEncsig for Network {
+        async fn receive_bitcoin_redeem_encsig(&mut self) -> xmr_btc::bitcoin::EncryptedSignature {
+            todo!()
+        }
+    }
+
     let mut swarm = new_swarm(listen, local_port)?;
     let message0: bob::Message0;
     let mut last_amounts: Option<SwapAmounts> = None;
@@ -96,15 +131,63 @@ pub async fn swap(
     let msg = state2.next_message();
     swarm.send_message1(channel, msg);
 
-    let _state3 = match swarm.next().await {
-        OutEvent::Message2(msg) => state2.receive(msg)?,
+    let (state3, channel) = match swarm.next().await {
+        OutEvent::Message2 { msg, channel } => {
+            let state3 = state2.receive(msg)?;
+            (state3, channel)
+        }
         other => panic!("Unexpected event: {:?}", other),
     };
 
     info!("Handshake complete, we now have State3 for Alice.");
 
-    thread::park();
-    Ok(())
+    let network = Arc::new(Mutex::new(Network {
+        swarm,
+        channel: Some(channel),
+    }));
+
+    let mut action_generator =
+        action_generator(network.clone(), bitcoin_wallet.clone(), state3, 3600);
+
+    loop {
+        let state = action_generator.async_resume().await;
+
+        tracing::info!("resumed execution of alice generator, got: {:?}", state);
+
+        match state {
+            GeneratorState::Yielded(Action::LockXmr {
+                amount,
+                public_spend_key,
+                public_view_key,
+            }) => {
+                let (transfer_proof, _) = monero_wallet
+                    .transfer(public_spend_key, public_view_key, amount)
+                    .await?;
+
+                let mut guard = network.as_ref().lock().await;
+                guard.send_message2(transfer_proof);
+            }
+
+            GeneratorState::Yielded(Action::RedeemBtc(tx)) => {
+                let _ = bitcoin_wallet.broadcast_signed_transaction(tx).await?;
+            }
+            GeneratorState::Yielded(Action::CancelBtc(tx)) => {
+                let _ = bitcoin_wallet.broadcast_signed_transaction(tx).await?;
+            }
+            GeneratorState::Yielded(Action::PunishBtc(tx)) => {
+                let _ = bitcoin_wallet.broadcast_signed_transaction(tx).await?;
+            }
+            GeneratorState::Yielded(Action::CreateMoneroWalletForOutput {
+                spend_key,
+                view_key,
+            }) => {
+                monero_wallet
+                    .create_and_load_wallet_for_output(spend_key, view_key)
+                    .await?;
+            }
+            GeneratorState::Complete(()) => return Ok(()),
+        }
+    }
 }
 
 fn new_swarm(listen: Multiaddr, port: Option<u16>) -> Result<Swarm> {
@@ -155,7 +238,10 @@ pub enum OutEvent {
         msg: bob::Message1,
         channel: ResponseChannel<AliceToBob>,
     },
-    Message2(bob::Message2),
+    Message2 {
+        msg: bob::Message2,
+        channel: ResponseChannel<AliceToBob>,
+    },
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -193,7 +279,7 @@ impl From<message1::OutEvent> for OutEvent {
 impl From<message2::OutEvent> for OutEvent {
     fn from(event: message2::OutEvent) -> Self {
         match event {
-            message2::OutEvent::Msg(msg) => OutEvent::Message2(msg),
+            message2::OutEvent::Msg { msg, channel } => OutEvent::Message2 { msg, channel },
         }
     }
 }
@@ -239,6 +325,15 @@ impl Alice {
         msg: xmr_btc::alice::Message1,
     ) {
         self.message1.send(channel, msg)
+    }
+
+    /// Send Message2 to Bob in response to receiving his Message2.
+    pub fn send_message2(
+        &mut self,
+        channel: ResponseChannel<AliceToBob>,
+        msg: xmr_btc::alice::Message2,
+    ) {
+        self.message2.send(channel, msg)
     }
 }
 

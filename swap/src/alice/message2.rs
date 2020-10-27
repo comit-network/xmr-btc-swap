@@ -18,7 +18,12 @@ use xmr_btc::bob;
 
 #[derive(Debug)]
 pub enum OutEvent {
-    Msg(bob::Message2),
+    Msg {
+        /// Received message from Bob.
+        msg: bob::Message2,
+        /// Channel to send back Alice's message 2.
+        channel: ResponseChannel<AliceToBob>,
+    },
 }
 
 /// A `NetworkBehaviour` that represents receiving of message 2 from Bob.
@@ -78,10 +83,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                 ..
             } => match request {
                 BobToAlice::Message2(msg) => {
-                    self.events.push_back(OutEvent::Msg(msg));
-                    // Send back empty response so that the request/response protocol completes.
-                    let msg = AliceToBob::EmptyResponse;
-                    self.rr.send_response(channel, msg);
+                    self.events.push_back(OutEvent::Msg { msg, channel });
                 }
                 other => debug!("got request: {:?}", other),
             },

@@ -1,7 +1,5 @@
 pub mod harness;
 
-use std::{convert::TryInto, sync::Arc};
-
 use anyhow::Result;
 use async_trait::async_trait;
 use futures::{
@@ -16,7 +14,9 @@ use harness::{
 };
 use monero_harness::Monero;
 use rand::rngs::OsRng;
+use std::{convert::TryInto, sync::Arc};
 use testcontainers::clients::Cli;
+use tokio::sync::Mutex;
 use tracing::info;
 use tracing_subscriber::util::SubscriberInitExt;
 use xmr_btc::{
@@ -102,7 +102,7 @@ impl Default for BobBehaviour {
 }
 
 async fn swap_as_alice(
-    network: AliceNetwork,
+    network: Arc<Mutex<AliceNetwork>>,
     // FIXME: It would be more intuitive to have a single network/transport struct instead of
     // splitting into two, but Rust ownership rules make this tedious
     mut sender: Sender<TransferProof>,
@@ -274,6 +274,8 @@ async fn on_chain_happy_path() {
     let (alice_network, bob_sender) = Network::<EncryptedSignature>::new();
     let (bob_network, alice_sender) = Network::<TransferProof>::new();
 
+    let alice_network = Arc::new(Mutex::new(alice_network));
+
     try_join(
         swap_as_alice(
             alice_network,
@@ -364,6 +366,8 @@ async fn on_chain_both_refund_if_alice_never_redeems() {
 
     let (alice_network, bob_sender) = Network::<EncryptedSignature>::new();
     let (bob_network, alice_sender) = Network::<TransferProof>::new();
+
+    let alice_network = Arc::new(Mutex::new(alice_network));
 
     try_join(
         swap_as_alice(
@@ -459,6 +463,8 @@ async fn on_chain_alice_punishes_if_bob_never_acts_after_fund() {
 
     let (alice_network, bob_sender) = Network::<EncryptedSignature>::new();
     let (bob_network, alice_sender) = Network::<TransferProof>::new();
+
+    let alice_network = Arc::new(Mutex::new(alice_network));
 
     let alice_swap = swap_as_alice(
         alice_network,

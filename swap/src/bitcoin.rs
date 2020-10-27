@@ -1,12 +1,15 @@
+use std::time::Duration;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use backoff::{future::FutureOperation as _, ExponentialBackoff};
 use bitcoin::{util::psbt::PartiallySignedTransaction, Address, Transaction};
-use bitcoin_harness::bitcoind_rpc::PsbtBase64;
+use bitcoin_harness::{bitcoind_rpc::PsbtBase64, Bitcoind};
 use reqwest::Url;
+use tokio::time;
 use xmr_btc::bitcoin::{
-    Amount, BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock, TxLock, Txid,
-    WatchForRawTransaction,
+    Amount, BlockHeight, BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock,
+    TransactionBlockHeight, TxLock, Txid, WatchForRawTransaction,
 };
 
 // This is cut'n'paste from xmr_btc/tests/harness/wallet/bitcoin.rs
@@ -39,6 +42,22 @@ impl Wallet {
 
         Ok(fee)
     }
+}
+
+pub async fn make_wallet(
+    name: &str,
+    bitcoind: &Bitcoind<'_>,
+    fund_amount: Amount,
+) -> Result<Wallet> {
+    let wallet = Wallet::new(name, &bitcoind.node_url).await?;
+    let buffer = Amount::from_btc(1.0).unwrap();
+    let amount = fund_amount + buffer;
+
+    let address = wallet.0.new_address().await.unwrap();
+
+    bitcoind.mint(address, amount).await.unwrap();
+
+    Ok(wallet)
 }
 
 #[async_trait]
@@ -81,6 +100,13 @@ impl SignTxLock for Wallet {
 impl BroadcastSignedTransaction for Wallet {
     async fn broadcast_signed_transaction(&self, transaction: Transaction) -> Result<Txid> {
         let txid = self.0.send_raw_transaction(transaction).await?;
+
+        // TODO: Instead of guessing how long it will take for the transaction to be
+        // mined we should ask bitcoind for the number of confirmations on `txid`
+
+        // give time for transaction to be mined
+        time::delay_for(Duration::from_millis(1100)).await;
+
         Ok(txid)
     }
 }
@@ -95,5 +121,48 @@ impl WatchForRawTransaction for Wallet {
             })
             .await
             .expect("transient errors to be retried")
+    }
+}
+
+#[async_trait]
+impl BlockHeight for Wallet {
+    async fn block_height(&self) -> u32 {
+        (|| async { Ok(self.0.block_height().await?) })
+            .retry(ExponentialBackoff {
+                max_elapsed_time: None,
+                ..Default::default()
+            })
+            .await
+            .expect("transient errors to be retried")
+    }
+}
+
+#[async_trait]
+impl TransactionBlockHeight for Wallet {
+    async fn transaction_block_height(&self, txid: Txid) -> u32 {
+        #[derive(Debug)]
+        enum Error {
+            Io,
+            NotYetMined,
+        }
+
+        (|| async {
+            let block_height = self
+                .0
+                .transaction_block_height(txid)
+                .await
+                .map_err(|_| backoff::Error::Transient(Error::Io))?;
+
+            let block_height =
+                block_height.ok_or_else(|| backoff::Error::Transient(Error::NotYetMined))?;
+
+            Result::<_, backoff::Error<Error>>::Ok(block_height)
+        })
+        .retry(ExponentialBackoff {
+            max_elapsed_time: None,
+            ..Default::default()
+        })
+        .await
+        .expect("transient errors to be retried")
     }
 }

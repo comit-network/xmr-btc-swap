@@ -35,7 +35,6 @@ pub enum AliceToBob {
     Amounts(SwapAmounts),
     Message0(alice::Message0),
     Message1(alice::Message1),
-    EmptyResponse, // This is sent back as response to Message2 from Bob.
     Message2(alice::Message2),
 }
 
