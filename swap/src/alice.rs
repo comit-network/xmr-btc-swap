@@ -125,7 +125,10 @@ fn new_swarm(listen: Multiaddr, port: Option<u16>) -> Result<Swarm> {
     }
     #[cfg(not(feature = "tor"))]
     {
-        transport = transport::build(local_key_pair)?;
+        transport = match port {
+            None => transport::build(local_key_pair)?,
+            Some(port) => anyhow::bail!("local port should not be provided for non-tor usage"),
+        };
     }
 
     let mut swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id.clone())
