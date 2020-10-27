@@ -7,28 +7,23 @@ use libp2p::{
     NetworkBehaviour, PeerId,
 };
 use std::{
-    collections::VecDeque,
     task::{Context, Poll},
     time::Duration,
 };
 use tracing::{debug, error};
 
-use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol, TIMEOUT};
-use xmr_btc::{alice, bob};
-
-#[derive(Debug)]
-pub enum OutEvent {
-    Msg(alice::Message2),
-}
+use crate::{
+    network::request_response::{AliceToBob, BobToAlice, Codec, Protocol, TIMEOUT},
+    Never,
+};
+use xmr_btc::bob;
 
 /// A `NetworkBehaviour` that represents sending message 2 to Alice.
 #[derive(NetworkBehaviour)]
-#[behaviour(out_event = "OutEvent", poll_method = "poll")]
+#[behaviour(out_event = "Never", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Message2 {
     rr: RequestResponse<Codec>,
-    #[behaviour(ignore)]
-    events: VecDeque<OutEvent>,
 }
 
 impl Message2 {
@@ -37,15 +32,13 @@ impl Message2 {
         let _id = self.rr.send_request(&alice, msg);
     }
 
+    // TODO: Do we need a custom implementation if we are not bubbling any out
+    // events?
     fn poll(
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec>, OutEvent>> {
-        if let Some(event) = self.events.pop_front() {
-            return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
-        }
-
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec>, Never>> {
         Poll::Pending
     }
 }
@@ -62,7 +55,6 @@ impl Default for Message2 {
                 vec![(Protocol, ProtocolSupport::Full)],
                 config,
             ),
-            events: Default::default(),
         }
     }
 }
@@ -78,8 +70,8 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                 message: RequestResponseMessage::Response { response, .. },
                 ..
             } => match response {
-                AliceToBob::Message2(msg) => self.events.push_back(OutEvent::Msg(msg)),
-                other => debug!("got response: {:?}", other),
+                AliceToBob::EmptyResponse => debug!("Alice correctly responded to message 2"),
+                other => debug!("unexpected response: {:?}", other),
             },
             RequestResponseEvent::InboundFailure { error, .. } => {
                 error!("Inbound failure: {:?}", error);

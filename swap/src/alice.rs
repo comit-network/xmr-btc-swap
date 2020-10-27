@@ -28,6 +28,9 @@ use xmr_btc::{alice::State0, bob, monero};
 
 pub type Swarm = libp2p::Swarm<Alice>;
 
+// TODO: After we have done some testing replace all the 'panic's with log
+// statements or error returns.
+
 // FIXME: This whole function is horrible, needs total re-write.
 pub async fn swap(
     listen: Multiaddr,
@@ -46,15 +49,20 @@ pub async fn swap(
             }
             OutEvent::Request(amounts::OutEvent::Btc { btc, channel }) => {
                 debug!("Got request from Bob to swap {}", btc);
-                let p = calculate_amounts(btc);
-                last_amounts = Some(p);
-                swarm.send_amounts(channel, p);
+                let amounts = calculate_amounts(btc);
+                // TODO: We cache the last amounts returned, this needs improving along with
+                // verification of message 0.
+                last_amounts = Some(amounts);
+                swarm.send_amounts(channel, amounts);
             }
             OutEvent::Message0(msg) => {
-                debug!("Got message0 from Bob");
-                // TODO: Do this in a more Rusty/functional way.
-                message0 = msg;
-                break;
+                // We don't want Bob to be able to crash us by sending an out of
+                // order message. Keep looping if Bob has not requested amounts.
+                if last_amounts.is_some() {
+                    // TODO: We should verify the amounts and notify Bob if they have changed.
+                    message0 = msg;
+                    break;
+                }
             }
             other => panic!("Unexpected event: {:?}", other),
         };
@@ -64,10 +72,6 @@ pub async fn swap(
         Some(p) => (p.xmr, p.btc),
         None => unreachable!("should have amounts by here"),
     };
-
-    let xmr = monero::Amount::from_piconero(xmr.as_piconero());
-    //  TODO: This should be the Amount exported by xmr_btc.
-    let btc = ::bitcoin::Amount::from_sat(btc.as_sat());
 
     // TODO: Pass this in using <R: RngCore + CryptoRng>
     let rng = &mut OsRng;
@@ -82,6 +86,7 @@ pub async fn swap(
     );
     swarm.set_state0(state0.clone());
 
+    // TODO: Can we verify message 0 before calling this so we never fail?
     let state1 = state0.receive(message0).expect("failed to receive msg 0");
 
     let (state2, channel) = match swarm.next().await {

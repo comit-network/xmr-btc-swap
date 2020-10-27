@@ -21,7 +21,7 @@ use crate::{
         peer_tracker::{self, PeerTracker},
         transport, TokioExecutor,
     },
-    Cmd, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
+    Cmd, Never, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use xmr_btc::{
     alice,
@@ -69,10 +69,6 @@ where
         other => panic!("unexpected event: {:?}", other),
     };
 
-    // FIXME: Too many `bitcoin` crates/modules.
-    let xmr = xmr_btc::monero::Amount::from_piconero(xmr.as_piconero());
-    let btc = ::bitcoin::Amount::from_sat(btc.as_sat());
-
     // TODO: Pass this in using <R: RngCore + CryptoRng>
     let rng = &mut OsRng;
     let state0 = State0::new(
@@ -87,8 +83,9 @@ where
     swarm.send_message0(alice.clone(), state0.next_message(rng));
     let state1 = match swarm.next().await {
         OutEvent::Message0(msg) => {
-            state0.receive(&wallet, msg).await? // TODO: More graceful error
-                                                // handling.
+            // TODO: Verify the response message before calling receive() and handle any
+            // error gracefully.
+            state0.receive(&wallet, msg).await?
         }
         other => panic!("unexpected event: {:?}", other),
     };
@@ -96,7 +93,7 @@ where
     swarm.send_message1(alice.clone(), state1.next_message());
     let state2 = match swarm.next().await {
         OutEvent::Message1(msg) => {
-            state1.receive(msg)? // TODO: More graceful error handling.
+            state1.receive(msg)? // TODO: Same as above.
         }
         other => panic!("unexpected event: {:?}", other),
     };
@@ -137,7 +134,6 @@ pub enum OutEvent {
     Amounts(SwapAmounts),
     Message0(alice::Message0),
     Message1(alice::Message1),
-    Message2(alice::Message2),
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -174,11 +170,9 @@ impl From<message1::OutEvent> for OutEvent {
     }
 }
 
-impl From<message2::OutEvent> for OutEvent {
-    fn from(event: message2::OutEvent) -> Self {
-        match event {
-            message2::OutEvent::Msg(msg) => OutEvent::Message2(msg),
-        }
+impl From<Never> for OutEvent {
+    fn from(_: Never) -> Self {
+        panic!("this never happens")
     }
 }
 
