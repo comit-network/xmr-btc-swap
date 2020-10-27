@@ -143,11 +143,11 @@ async fn swap_as_alice(
 ) -> Result<()> {
     #[cfg(not(feature = "tor"))]
     {
-        alice::swap(addr, redeem, punish).await
+        alice::swap(addr, None, redeem, punish).await
     }
     #[cfg(feature = "tor")]
     {
-        alice::swap(addr, PORT, redeem, punish).await
+        alice::swap(addr, Some(PORT), redeem, punish).await
     }
 }
 
