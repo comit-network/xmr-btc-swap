@@ -3,9 +3,7 @@ use crate::rpc::{Request, Response};
 use anyhow::Result;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-
-// TODO: Either use println! directly or import tracing also?
-use std::println as debug;
+use tracing::debug;
 
 /// JSON RPC client for monero-wallet-rpc.
 #[derive(Debug)]
