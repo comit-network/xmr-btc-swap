@@ -12,21 +12,20 @@
 )]
 #![forbid(unsafe_code)]
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
+use cli::Options;
 use futures::{channel::mpsc, StreamExt};
 use libp2p::Multiaddr;
 use log::LevelFilter;
 use std::{io, io::Write, process};
 use structopt::StructOpt;
+use swap::{alice, bitcoin::Wallet, bob, Cmd, Rsp, SwapAmounts};
 use tracing::info;
 use url::Url;
+use xmr_btc::bitcoin::{BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock};
 
 mod cli;
 mod trace;
-
-use cli::Options;
-use swap::{alice, bitcoin::Wallet, bob, Cmd, Rsp, SwapAmounts};
-use xmr_btc::bitcoin::{BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock};
 
 // TODO: Add root seed file instead of generating new seed each run.
 // TODO: Remove all instances of the todo! macro
@@ -35,7 +34,10 @@ use xmr_btc::bitcoin::{BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock};
 // Alice's address and port until we have a config file.
 pub const PORT: u16 = 9876; // Arbitrarily chosen.
 pub const ADDR: &str = "127.0.0.1";
-pub const BITCOIND_JSON_RPC_URL: &str = "127.0.0.1:8332";
+pub const BITCOIND_JSON_RPC_URL: &str = "http://127.0.0.1:8332";
+
+#[cfg(feature = "tor")]
+pub const TOR_PORT: u16 = PORT + 1;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -43,7 +45,21 @@ async fn main() -> Result<()> {
 
     trace::init_tracing(LevelFilter::Debug)?;
 
+    #[cfg(feature = "tor")]
+    let (addr, _ac) = {
+        let tor_secret_key = torut::onion::TorSecretKeyV3::generate();
+        let onion_address = tor_secret_key
+            .public()
+            .get_onion_address()
+            .get_address_without_dot_onion();
+        (
+            format!("/onion3/{}:{}", onion_address, TOR_PORT),
+            create_tor_service(tor_secret_key).await?,
+        )
+    };
+    #[cfg(not(feature = "tor"))]
     let addr = format!("/ip4/{}/tcp/{}", ADDR, PORT);
+
     let alice: Multiaddr = addr.parse().expect("failed to parse Alice's address");
 
     if opt.as_alice {
@@ -71,6 +87,12 @@ async fn main() -> Result<()> {
     } else {
         info!("running swap node as Bob ...");
 
+        let alice_address = match opt.alice_address {
+            Some(addr) => addr,
+            None => bail!("Address required to dial"),
+        };
+        let alice_address = multiaddr(&alice_address)?;
+
         let url = Url::parse(BITCOIND_JSON_RPC_URL).expect("failed to parse url");
         let bitcoin_wallet = Wallet::new("bob", &url)
             .await
@@ -86,7 +108,7 @@ async fn main() -> Result<()> {
             (None, None) => bail!("Please supply an amount to swap"),
             (Some(_picos), _) => todo!("support starting with picos"),
             (None, Some(sats)) => {
-                swap_as_bob(sats, alice, refund, bitcoin_wallet).await?;
+                swap_as_bob(sats, alice_address, refund, bitcoin_wallet).await?;
             }
         };
     }
@@ -94,12 +116,37 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "tor")]
+async fn create_tor_service(
+    tor_secret_key: torut::onion::TorSecretKeyV3,
+) -> Result<swap::tor::AuthenticatedConnection> {
+    // TODO use configurable ports for tor connection
+    let mut authenticated_connection = swap::tor::UnauthenticatedConnection::default()
+        .init_authenticated_connection()
+        .await?;
+    tracing::info!("Tor authenticated.");
+
+    authenticated_connection
+        .add_service(TOR_PORT, &tor_secret_key)
+        .await?;
+    tracing::info!("Tor service added.");
+
+    Ok(authenticated_connection)
+}
+
 async fn swap_as_alice(
     addr: Multiaddr,
     redeem: bitcoin::Address,
     punish: bitcoin::Address,
 ) -> Result<()> {
-    alice::swap(addr, redeem, punish).await
+    #[cfg(not(feature = "tor"))]
+    {
+        alice::swap(addr, None, redeem, punish).await
+    }
+    #[cfg(feature = "tor")]
+    {
+        alice::swap(addr, Some(PORT), redeem, punish).await
+    }
 }
 
 async fn swap_as_bob<W>(
@@ -163,4 +210,11 @@ fn verify(amounts: SwapAmounts) -> Rsp {
 
 fn is_yes(s: &str) -> bool {
     matches!(s, "y" | "Y" | "yes" | "YES" | "Yes")
+}
+
+fn multiaddr(s: &str) -> Result<Multiaddr> {
+    let addr = s
+        .parse()
+        .with_context(|| format!("failed to parse multiaddr: {}", s))?;
+    Ok(addr)
 }

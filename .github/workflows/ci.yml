@@ -40,7 +40,10 @@ jobs:
       - name: Check code formatting
         run: cargo fmt --all -- --check
 
-      - name: Run clippy
+      - name: Run clippy with default features
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run clippy with all features enabled (e.g. tor)
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   build_test:

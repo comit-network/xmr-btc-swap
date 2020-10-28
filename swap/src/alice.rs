@@ -28,19 +28,15 @@ use xmr_btc::{alice::State0, bob, monero};
 
 pub type Swarm = libp2p::Swarm<Alice>;
 
-// TODO: After we have done some testing replace all the 'panic's with log
-// statements or error returns.
-
-// FIXME: This whole function is horrible, needs total re-write.
 pub async fn swap(
     listen: Multiaddr,
+    local_port: Option<u16>,
     redeem_address: ::bitcoin::Address,
     punish_address: ::bitcoin::Address,
 ) -> Result<()> {
+    let mut swarm = new_swarm(listen, local_port)?;
     let message0: bob::Message0;
     let mut last_amounts: Option<SwapAmounts> = None;
-
-    let mut swarm = new_swarm(listen)?;
 
     loop {
         match swarm.next().await {
@@ -111,7 +107,7 @@ pub async fn swap(
     Ok(())
 }
 
-fn new_swarm(listen: Multiaddr) -> Result<Swarm> {
+fn new_swarm(listen: Multiaddr, port: Option<u16>) -> Result<Swarm> {
     use anyhow::Context as _;
 
     let behaviour = Alice::default();
@@ -119,7 +115,21 @@ fn new_swarm(listen: Multiaddr) -> Result<Swarm> {
     let local_key_pair = behaviour.identity();
     let local_peer_id = behaviour.peer_id();
 
-    let transport = transport::build(local_key_pair)?;
+    let transport;
+    #[cfg(feature = "tor")]
+    {
+        transport = match port {
+            Some(port) => transport::build(local_key_pair, Some((listen.clone(), port)))?,
+            None => anyhow::bail!("Must supply local port"),
+        };
+    }
+    #[cfg(not(feature = "tor"))]
+    {
+        transport = match port {
+            None => transport::build(local_key_pair)?,
+            Some(_) => anyhow::bail!("local port should not be provided for non-tor usage"),
+        };
+    }
 
     let mut swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id.clone())
         .executor(Box::new(TokioExecutor {
@@ -130,7 +140,7 @@ fn new_swarm(listen: Multiaddr) -> Result<Swarm> {
     Swarm::listen_on(&mut swarm, listen.clone())
         .with_context(|| format!("Address is not supported: {:#}", listen))?;
 
-    info!("Initialized swarm: {}", local_peer_id);
+    tracing::info!("Initialized swarm: {}", local_peer_id);
 
     Ok(swarm)
 }
