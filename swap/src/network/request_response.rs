@@ -13,6 +13,9 @@ use xmr_btc::{alice, bob, monero};
 /// Time to wait for a response back once we send a request.
 pub const TIMEOUT: u64 = 3600; // One hour.
 
+/// Message receive buffer.
+const BUF_SIZE: usize = 1024 * 1024;
+
 // TODO: Think about whether there is a better way to do this, e.g., separate
 // Codec for each Message and a macro that implements them.
 
@@ -62,7 +65,7 @@ impl RequestResponseCodec for Codec {
     where
         T: AsyncRead + Unpin + Send,
     {
-        let message = upgrade::read_one(io, 1024)
+        let message = upgrade::read_one(io, BUF_SIZE)
             .await
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         let mut de = serde_json::Deserializer::from_slice(&message);
@@ -79,7 +82,7 @@ impl RequestResponseCodec for Codec {
     where
         T: AsyncRead + Unpin + Send,
     {
-        let message = upgrade::read_one(io, 1024)
+        let message = upgrade::read_one(io, BUF_SIZE)
             .await
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         let mut de = serde_json::Deserializer::from_slice(&message);
