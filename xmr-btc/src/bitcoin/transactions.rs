@@ -7,7 +7,6 @@ use bitcoin::{
     Address, Amount, Network, SigHash, Transaction, TxIn, TxOut,
 };
 use ecdsa_fun::Signature;
-use miniscript::Descriptor;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -225,12 +224,12 @@ pub struct NotThreeWitnesses(usize);
 pub struct TxCancel {
     inner: Transaction,
     digest: SigHash,
-    output_descriptor: Descriptor<::bitcoin::PublicKey>,
+    output_descriptor: (PublicKey, PublicKey),
 }
 
 impl TxCancel {
     pub fn new(tx_lock: &TxLock, cancel_timelock: u32, A: PublicKey, B: PublicKey) -> Self {
-        let cancel_output_descriptor = build_shared_output_descriptor(A.0, B.0);
+        let cancel_output_descriptor = build_shared_output_descriptor(A.clone().0, B.clone().0);
 
         let tx_in = TxIn {
             previous_output: tx_lock.as_outpoint(),
@@ -251,8 +250,9 @@ impl TxCancel {
             output: vec![tx_out],
         };
 
-        let (A, B) = &tx_lock.output_descriptor;
-        let lock_output_descriptor = build_shared_output_descriptor(A.clone().0, B.clone().0);
+        let (tx_lock_A, tx_lock_B) = &tx_lock.output_descriptor;
+        let lock_output_descriptor =
+            build_shared_output_descriptor(tx_lock_A.clone().0, tx_lock_B.clone().0);
         let digest = SighashComponents::new(&transaction).sighash_all(
             &tx_in,
             &lock_output_descriptor.witness_script(),
@@ -262,7 +262,7 @@ impl TxCancel {
         Self {
             inner: transaction,
             digest,
-            output_descriptor: cancel_output_descriptor,
+            output_descriptor: (A, B),
         }
     }
 
@@ -355,9 +355,11 @@ impl TxRefund {
     pub fn new(tx_cancel: &TxCancel, refund_address: &Address) -> Self {
         let (tx_punish, cancel_input) = tx_cancel.build_spend_transaction(refund_address, None);
 
+        let (A, B) = &tx_cancel.output_descriptor;
+        let cancel_output_descriptor = build_shared_output_descriptor(A.clone().0, B.clone().0);
         let digest = SighashComponents::new(&tx_punish).sighash_all(
             &cancel_input,
-            &tx_cancel.output_descriptor.witness_script(),
+            &cancel_output_descriptor.witness_script(),
             tx_cancel.amount().as_sat(),
         );
 
@@ -401,9 +403,9 @@ impl TxRefund {
         };
 
         let mut tx_refund = self.inner;
-        tx_cancel
-            .output_descriptor
-            .satisfy(&mut tx_refund.input[0], satisfier)?;
+        let (A, B) = &tx_cancel.output_descriptor;
+        let cancel_output_descriptor = build_shared_output_descriptor(A.clone().0, B.clone().0);
+        cancel_output_descriptor.satisfy(&mut tx_refund.input[0], satisfier)?;
 
         Ok(tx_refund)
     }
@@ -457,9 +459,11 @@ impl TxPunish {
         let (tx_punish, lock_input) =
             tx_cancel.build_spend_transaction(punish_address, Some(punish_timelock));
 
+        let (A, B) = &tx_cancel.output_descriptor;
+        let cancel_output_descriptor = build_shared_output_descriptor(A.clone().0, B.clone().0);
         let digest = SighashComponents::new(&tx_punish).sighash_all(
             &lock_input,
-            &tx_cancel.output_descriptor.witness_script(),
+            &cancel_output_descriptor.witness_script(),
             tx_cancel.amount().as_sat(),
         );
 
@@ -503,9 +507,9 @@ impl TxPunish {
         };
 
         let mut tx_punish = self.inner;
-        tx_cancel
-            .output_descriptor
-            .satisfy(&mut tx_punish.input[0], satisfier)?;
+        let (A, B) = &tx_cancel.output_descriptor;
+        let cancel_output_descriptor = build_shared_output_descriptor(A.clone().0, B.clone().0);
+        cancel_output_descriptor.satisfy(&mut tx_punish.input[0], satisfier)?;
 
         Ok(tx_punish)
     }
