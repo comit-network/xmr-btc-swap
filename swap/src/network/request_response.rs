@@ -68,8 +68,9 @@ impl RequestResponseCodec for Codec {
         let message = upgrade::read_one(io, BUF_SIZE)
             .await
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        let mut de = serde_json::Deserializer::from_slice(&message);
-        let msg = BobToAlice::deserialize(&mut de)?;
+        let mut de = serde_cbor::Deserializer::from_slice(&message);
+        let msg = BobToAlice::deserialize(&mut de)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
         Ok(msg)
     }
@@ -85,8 +86,9 @@ impl RequestResponseCodec for Codec {
         let message = upgrade::read_one(io, BUF_SIZE)
             .await
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        let mut de = serde_json::Deserializer::from_slice(&message);
-        let msg = AliceToBob::deserialize(&mut de)?;
+        let mut de = serde_cbor::Deserializer::from_slice(&message);
+        let msg = AliceToBob::deserialize(&mut de)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
         Ok(msg)
     }
@@ -100,7 +102,8 @@ impl RequestResponseCodec for Codec {
     where
         T: AsyncWrite + Unpin + Send,
     {
-        let bytes = serde_json::to_vec(&req)?;
+        let bytes =
+            serde_cbor::to_vec(&req).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         upgrade::write_one(io, &bytes).await?;
 
         Ok(())
@@ -115,7 +118,8 @@ impl RequestResponseCodec for Codec {
     where
         T: AsyncWrite + Unpin + Send,
     {
-        let bytes = serde_json::to_vec(&res)?;
+        let bytes =
+            serde_cbor::to_vec(&res).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         upgrade::write_one(io, &bytes).await?;
 
         Ok(())
