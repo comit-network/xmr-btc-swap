@@ -37,10 +37,6 @@ pub const ADDR: &str = "127.0.0.1";
 pub const BITCOIND_JSON_RPC_URL: &str = "http://127.0.0.1:8332";
 
 #[cfg(feature = "tor")]
-use swap::tor::{AuthenticatedConnection, UnauthenticatedConnection};
-#[cfg(feature = "tor")]
-use torut::onion::TorSecretKeyV3;
-#[cfg(feature = "tor")]
 pub const TOR_PORT: u16 = PORT + 1;
 
 #[tokio::main]
@@ -51,7 +47,7 @@ async fn main() -> Result<()> {
 
     #[cfg(feature = "tor")]
     let (addr, _ac) = {
-        let tor_secret_key = TorSecretKeyV3::generate();
+        let tor_secret_key = torut::onion::TorSecretKeyV3::generate();
         let onion_address = tor_secret_key
             .public()
             .get_onion_address()
@@ -121,9 +117,11 @@ async fn main() -> Result<()> {
 }
 
 #[cfg(feature = "tor")]
-async fn create_tor_service(tor_secret_key: TorSecretKeyV3) -> Result<AuthenticatedConnection> {
-    // todo use configurable ports for tor connection
-    let mut authenticated_connection = UnauthenticatedConnection::default()
+async fn create_tor_service(
+    tor_secret_key: torut::onion::TorSecretKeyV3,
+) -> Result<swap::tor::AuthenticatedConnection> {
+    // TODO use configurable ports for tor connection
+    let mut authenticated_connection = swap::tor::UnauthenticatedConnection::default()
         .init_authenticated_connection()
         .await?;
     tracing::info!("Tor authenticated.");
