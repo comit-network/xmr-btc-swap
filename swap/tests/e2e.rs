@@ -57,7 +57,12 @@ async fn swap() {
     let alice_xmr_wallet = Arc::new(swap::monero::Wallet(monero.alice_wallet_rpc_client()));
     let bob_xmr_wallet = Arc::new(swap::monero::Wallet(monero.bob_wallet_rpc_client()));
 
-    let alice_swap = alice::swap(alice_btc_wallet, alice_xmr_wallet, alice_multiaddr.clone());
+    let alice_swap = alice::swap(
+        alice_btc_wallet,
+        alice_xmr_wallet,
+        alice_multiaddr.clone(),
+        None,
+    );
 
     let (cmd_tx, mut _cmd_rx) = mpsc::channel(1);
     let (mut rsp_tx, rsp_rx) = mpsc::channel(1);

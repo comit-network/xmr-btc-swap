@@ -12,7 +12,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::{
     network::request_response::{AliceToBob, BobToAlice, Codec, Protocol, TIMEOUT},
@@ -83,10 +83,11 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { response, .. },
                 ..
-            } => match response {
-                AliceToBob::Amounts(p) => self.events.push_back(OutEvent::Amounts(p)),
-                other => debug!("got response: {:?}", other),
-            },
+            } => {
+                if let AliceToBob::Amounts(p) = response {
+                    self.events.push_back(OutEvent::Amounts(p));
+                }
+            }
             RequestResponseEvent::InboundFailure { error, .. } => {
                 error!("Inbound failure: {:?}", error);
             }

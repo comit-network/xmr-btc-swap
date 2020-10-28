@@ -11,7 +11,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol, TIMEOUT};
 use xmr_btc::{alice, bob};
@@ -77,10 +77,11 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { response, .. },
                 ..
-            } => match response {
-                AliceToBob::Message2(msg) => self.events.push_back(OutEvent::Msg(msg)),
-                other => debug!("unexpected response: {:?}", other),
-            },
+            } => {
+                if let AliceToBob::Message2(msg) = response {
+                    self.events.push_back(OutEvent::Msg(msg));
+                }
+            }
             RequestResponseEvent::InboundFailure { error, .. } => {
                 error!("Inbound failure: {:?}", error);
             }

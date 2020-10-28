@@ -11,7 +11,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol, TIMEOUT};
 use xmr_btc::bob;
@@ -71,14 +71,13 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                         request, channel, ..
                     },
                 ..
-            } => match request {
-                BobToAlice::Message3(msg) => {
+            } => {
+                if let BobToAlice::Message3(msg) = request {
                     self.events.push_back(OutEvent::Msg(msg));
                     // Send back empty response so that the request/response protocol completes.
                     self.rr.send_response(channel, AliceToBob::Message3);
                 }
-                other => debug!("got request: {:?}", other),
-            },
+            }
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { .. },
                 ..

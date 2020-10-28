@@ -69,10 +69,11 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { response, .. },
                 ..
-            } => match response {
-                AliceToBob::Message3 => debug!("Alice correctly responded to message 3"),
-                other => debug!("unexpected response: {:?}", other),
-            },
+            } => {
+                if let AliceToBob::Message3 = response {
+                    debug!("Alice correctly responded to message 3");
+                }
+            }
             RequestResponseEvent::InboundFailure { error, .. } => {
                 error!("Inbound failure: {:?}", error);
             }

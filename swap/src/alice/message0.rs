@@ -13,7 +13,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol, TIMEOUT};
 use xmr_btc::{alice::State0, bob};
@@ -85,8 +85,8 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                         request, channel, ..
                     },
                 ..
-            } => match request {
-                BobToAlice::Message0(msg) => {
+            } => {
+                if let BobToAlice::Message0(msg) = request {
                     info!("Got Alice's first message");
                     let response = match &self.state {
                         None => panic!("No state, did you forget to set it?"),
@@ -98,8 +98,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                     self.rr.send_response(channel, response);
                     self.events.push_back(OutEvent::Msg(msg));
                 }
-                other => debug!("got request: {:?}", other),
-            },
+            }
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { .. },
                 ..
