@@ -77,6 +77,8 @@ pub async fn swap(
         }
     }
 
+    debug!("swapping ...");
+
     let mut swarm = new_swarm()?;
 
     libp2p::Swarm::dial_addr(&mut swarm, addr)?;
