@@ -14,7 +14,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TxLock {
     inner: Transaction,
-    output_descriptor: Descriptor<::bitcoin::PublicKey>,
+    output_descriptor: (PublicKey, PublicKey),
 }
 
 impl TxLock {
@@ -22,7 +22,7 @@ impl TxLock {
     where
         W: BuildTxLockPsbt,
     {
-        let lock_output_descriptor = build_shared_output_descriptor(A.0, B.0);
+        let lock_output_descriptor = build_shared_output_descriptor(A.clone().0, B.clone().0);
         let address = lock_output_descriptor
             .address(Network::Regtest)
             .expect("can derive address from descriptor");
@@ -36,7 +36,7 @@ impl TxLock {
 
         Ok(Self {
             inner,
-            output_descriptor: lock_output_descriptor,
+            output_descriptor: (A, B),
         })
     }
 
@@ -56,10 +56,12 @@ impl TxLock {
     /// Retreive the index of the locked output in the transaction outputs
     /// vector
     fn lock_output_vout(&self) -> usize {
+        let (A, B) = &self.output_descriptor;
+        let lock_output_descriptor = build_shared_output_descriptor(A.clone().0, B.clone().0);
         self.inner
             .output
             .iter()
-            .position(|output| output.script_pubkey == self.output_descriptor.script_pubkey())
+            .position(|output| output.script_pubkey == lock_output_descriptor.script_pubkey())
             .expect("transaction contains lock output")
     }
 
@@ -110,10 +112,11 @@ impl TxRedeem {
         // lock_input is the shared output that is now being used as an input for the
         // redeem transaction
         let (tx_redeem, lock_input) = tx_lock.build_spend_transaction(redeem_address, None);
-
+        let (A, B) = &tx_lock.output_descriptor;
+        let lock_output_descriptor = build_shared_output_descriptor(A.clone().0, B.clone().0);
         let digest = SighashComponents::new(&tx_redeem).sighash_all(
             &lock_input,
-            &tx_lock.output_descriptor.witness_script(),
+            &lock_output_descriptor.witness_script(),
             tx_lock.lock_amount().as_sat(),
         );
 
@@ -157,9 +160,9 @@ impl TxRedeem {
         };
 
         let mut tx_redeem = self.inner;
-        tx_lock
-            .output_descriptor
-            .satisfy(&mut tx_redeem.input[0], satisfier)?;
+        let (A, B) = &tx_lock.output_descriptor;
+        let lock_output_descriptor = build_shared_output_descriptor(A.clone().0, B.clone().0);
+        lock_output_descriptor.satisfy(&mut tx_redeem.input[0], satisfier)?;
 
         Ok(tx_redeem)
     }
@@ -248,9 +251,11 @@ impl TxCancel {
             output: vec![tx_out],
         };
 
+        let (A, B) = &tx_lock.output_descriptor;
+        let lock_output_descriptor = build_shared_output_descriptor(A.clone().0, B.clone().0);
         let digest = SighashComponents::new(&transaction).sighash_all(
             &tx_in,
-            &tx_lock.output_descriptor.witness_script(),
+            &lock_output_descriptor.witness_script(),
             tx_lock.lock_amount().as_sat(),
         );
 
@@ -303,9 +308,9 @@ impl TxCancel {
         };
 
         let mut tx_cancel = self.inner;
-        tx_lock
-            .output_descriptor
-            .satisfy(&mut tx_cancel.input[0], satisfier)?;
+        let (A, B) = &tx_lock.output_descriptor;
+        let lock_output_descriptor = build_shared_output_descriptor(A.clone().0, B.clone().0);
+        lock_output_descriptor.satisfy(&mut tx_cancel.input[0], satisfier)?;
 
         Ok(tx_cancel)
     }
