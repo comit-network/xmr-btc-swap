@@ -25,7 +25,7 @@ use std::{
     time::Duration,
 };
 use tokio::{sync::Mutex, time::timeout};
-use tracing::error;
+use tracing::{error, info};
 
 pub mod message;
 pub use message::{Message, Message0, Message1, Message2};
@@ -524,6 +524,7 @@ impl State0 {
     }
 
     pub fn next_message<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Message0 {
+        info!("Producing first message");
         let dleq_proof_s_a = cross_curve_dleq::Proof::new(rng, &self.s_a);
 
         Message0 {

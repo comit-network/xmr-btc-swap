@@ -356,6 +356,7 @@ impl Alice {
 
     /// Message0 gets sent within the network layer using this state0.
     pub fn set_state0(&mut self, state: State0) {
+        info!("Set state 0");
         let _ = self.message0.set_state(state);
     }
 

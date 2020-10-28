@@ -306,7 +306,8 @@ impl Bob {
 
     /// Sends Bob's first message to Alice.
     pub fn send_message0(&mut self, alice: PeerId, msg: bob::Message0) {
-        self.message0.send(alice, msg)
+        self.message0.send(alice, msg);
+        info!("Sent first message to Alice");
     }
 
     /// Sends Bob's second message to Alice.

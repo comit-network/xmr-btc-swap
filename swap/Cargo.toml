@@ -47,6 +47,7 @@ hyper = "0.13"
 port_check = "0.1"
 spectral = "0.6"
 tempfile = "3"
+testcontainers = "0.10"
 
 [features]
 default = []

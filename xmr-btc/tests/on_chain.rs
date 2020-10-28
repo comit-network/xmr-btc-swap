@@ -18,7 +18,6 @@ use std::{convert::TryInto, sync::Arc};
 use testcontainers::clients::Cli;
 use tokio::sync::Mutex;
 use tracing::info;
-use tracing_subscriber::util::SubscriberInitExt;
 use xmr_btc::{
     alice::{self, ReceiveBitcoinRedeemEncsig},
     bitcoin::{BroadcastSignedTransaction, EncryptedSignature, SignTxLock},
@@ -419,11 +418,6 @@ async fn on_chain_both_refund_if_alice_never_redeems() {
 
 #[tokio::test]
 async fn on_chain_alice_punishes_if_bob_never_acts_after_fund() {
-    let _guard = tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .with_ansi(false)
-        .set_default();
-
     let cli = Cli::default();
     let (monero, _container) = Monero::new(&cli).unwrap();
     let bitcoind = init_bitcoind(&cli).await;

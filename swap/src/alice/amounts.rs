@@ -1,11 +1,10 @@
-use anyhow::Result;
 use libp2p::{
     request_response::{
-        handler::RequestProtocol, ProtocolSupport, RequestId, RequestResponse,
-        RequestResponseConfig, RequestResponseEvent, RequestResponseMessage, ResponseChannel,
+        handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
+        RequestResponseEvent, RequestResponseMessage, ResponseChannel,
     },
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
-    NetworkBehaviour, PeerId,
+    NetworkBehaviour,
 };
 use std::{
     collections::VecDeque,
@@ -38,18 +37,6 @@ impl Amounts {
     /// Alice always sends her messages as a response to a request from Bob.
     pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: AliceToBob) {
         self.rr.send_response(channel, msg);
-    }
-
-    pub async fn request_amounts(
-        &mut self,
-        alice: PeerId,
-        btc: ::bitcoin::Amount,
-    ) -> Result<RequestId> {
-        let msg = BobToAlice::AmountsFromBtc(btc);
-        let id = self.rr.send_request(&alice, msg);
-        debug!("Request sent to: {}", alice);
-
-        Ok(id)
     }
 
     fn poll(
