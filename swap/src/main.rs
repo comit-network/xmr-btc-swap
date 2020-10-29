@@ -14,7 +14,7 @@
 
 use anyhow::{bail, Context, Result};
 use futures::{channel::mpsc, StreamExt};
-use libp2p::Multiaddr;
+use libp2p::core::Multiaddr;
 use log::LevelFilter;
 use std::{io, io::Write, process, sync::Arc};
 use structopt::StructOpt;
@@ -29,80 +29,74 @@ use swap::{alice, bitcoin, bob, monero, Cmd, Rsp, SwapAmounts};
 
 // TODO: Add root seed file instead of generating new seed each run.
 
-// TODO: Add a config file with these in it.
-// Alice's address and port until we have a config file.
-pub const PORT: u16 = 9876; // Arbitrarily chosen.
-pub const ADDR: &str = "127.0.0.1";
-pub const BITCOIND_JSON_RPC_URL: &str = "http://127.0.0.1:8332";
-pub const MONERO_WALLET_RPC_PORT: u16 = 18083;
-
-#[cfg(feature = "tor")]
-pub const TOR_PORT: u16 = PORT + 1;
+// // TODO: Add a config file with these in it.
+// // Alice's address and port until we have a config file.
+// pub const LISTEN_PORT: u16 = 9876; // Arbitrarily chosen.
+// pub const LISTEN_ADDR: &str = "127.0.0.1";
+// pub const BITCOIND_JSON_RPC_URL: &str = "http://127.0.0.1:8332";
+//
+// #[cfg(feature = "tor")]
+// pub const TOR_PORT: u16 = LISTEN_PORT + 1;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let opt = Options::from_args();
+    let opt: Options = Options::from_args();
 
     trace::init_tracing(LevelFilter::Debug)?;
 
-    #[cfg(feature = "tor")]
-    let (addr, _ac) = {
-        let tor_secret_key = torut::onion::TorSecretKeyV3::generate();
-        let onion_address = tor_secret_key
-            .public()
-            .get_onion_address()
-            .get_address_without_dot_onion();
-        (
-            format!("/onion3/{}:{}", onion_address, TOR_PORT),
-            create_tor_service(tor_secret_key).await?,
-        )
-    };
-    #[cfg(not(feature = "tor"))]
-    let addr = format!("/ip4/{}/tcp/{}", ADDR, PORT);
+    match opt {
+        Options::Alice {
+            bitcoind_url: url,
+            listen_addr,
+            listen_port,
+            ..
+        } => {
+            info!("running swap node as Alice ...");
 
-    let alice: Multiaddr = addr.parse().expect("failed to parse Alice's address");
+            #[cfg(feature = "tor")]
+            let (alice, _ac) = {
+                let tor_secret_key = torut::onion::TorSecretKeyV3::generate();
+                let onion_address = tor_secret_key
+                    .public()
+                    .get_onion_address()
+                    .get_address_without_dot_onion();
+                let onion_address_string = format!("/onion3/{}:{}", onion_address, TOR_PORT);
+                let addr: Multiaddr = onion_address_string.parse()?;
 
-    if opt.as_alice {
-        info!("running swap node as Alice ...");
+                (addr, create_tor_service(tor_secret_key).await?)
+            };
 
-        if opt.piconeros.is_some() || opt.satoshis.is_some() {
-            bail!("Alice cannot set the amount to swap via the cli");
+            #[cfg(not(feature = "tor"))]
+            let alice = {
+                let alice: Multiaddr = listen_addr
+                    .parse()
+                    .expect("failed to parse Alice's address");
+            };
+
+            let bitcoin_wallet = bitcoin::Wallet::new("alice", &url)
+                .await
+                .expect("failed to create bitcoin wallet");
+            let bitcoin_wallet = Arc::new(bitcoin_wallet);
+
+            let monero_wallet = Arc::new(monero::Wallet::localhost(MONERO_WALLET_RPC_PORT));
+
+            swap_as_alice(bitcoin_wallet, monero_wallet, alice.clone()).await?;
         }
+        Options::Bob {
+            alice_addr: alice_address,
+            satoshis,
+            bitcoind_url: url,
+        } => {
+            info!("running swap node as Bob ...");
 
-        let url = Url::parse(BITCOIND_JSON_RPC_URL).expect("failed to parse url");
-        let bitcoin_wallet = bitcoin::Wallet::new("alice", &url)
-            .await
-            .expect("failed to create bitcoin wallet");
-        let bitcoin_wallet = Arc::new(bitcoin_wallet);
+            let bitcoin_wallet = Wallet::new("bob", &url)
+                .await
+                .expect("failed to create bitcoin wallet");
 
-        let monero_wallet = Arc::new(monero::Wallet::localhost(MONERO_WALLET_RPC_PORT));
+            let monero_wallet = Arc::new(monero::Wallet::localhost(MONERO_WALLET_RPC_PORT));
 
-        swap_as_alice(bitcoin_wallet, monero_wallet, alice.clone()).await?;
-    } else {
-        info!("running swap node as Bob ...");
-
-        let alice = match opt.alice_address {
-            Some(addr) => addr,
-            None => bail!("Address required to dial"),
-        };
-        let alice = multiaddr(&alice)?;
-
-        let url = Url::parse(BITCOIND_JSON_RPC_URL).expect("failed to parse url");
-        let bitcoin_wallet = bitcoin::Wallet::new("bob", &url)
-            .await
-            .expect("failed to create bitcoin wallet");
-        let bitcoin_wallet = Arc::new(bitcoin_wallet);
-
-        let monero_wallet = Arc::new(monero::Wallet::localhost(MONERO_WALLET_RPC_PORT));
-
-        match (opt.piconeros, opt.satoshis) {
-            (Some(_), Some(_)) => bail!("Please supply only a single amount to swap"),
-            (None, None) => bail!("Please supply an amount to swap"),
-            (Some(_picos), _) => todo!("support starting with picos"),
-            (None, Some(sats)) => {
-                swap_as_bob(bitcoin_wallet, monero_wallet, sats, alice).await?;
-            }
-        };
+            swap_as_bob(satoshis, alice_address, refund, bitcoin_wallet).await?;
+        }
     }
 
     Ok(())
@@ -137,7 +131,7 @@ async fn swap_as_alice(
     }
     #[cfg(feature = "tor")]
     {
-        alice::swap(bitcoin_wallet, monero_wallet, addr, Some(PORT)).await
+        alice::swap(bitcoin_wallet, monero_wallet, addr, Some(LISTEN_PORT)).await
     }
 }
 
