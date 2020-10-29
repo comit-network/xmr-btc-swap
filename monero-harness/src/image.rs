@@ -124,6 +124,12 @@ pub struct Args {
     wallets: Vec<WalletArgs>,
 }
 
+#[derive(Debug)]
+pub enum MoneroArgs {
+    MonerodArgs(MonerodArgs),
+    WalletArgs(WalletArgs),
+}
+
 #[derive(Debug, Clone)]
 pub struct MonerodArgs {
     pub regtest: bool,
@@ -282,10 +288,7 @@ impl IntoIterator for Args {
         args.push("/bin/bash".into());
         args.push("-c".into());
 
-        let wallet_args: Vec<String> = self.wallets.iter().map(|wallet| wallet.args()).collect();
-        let wallet_args = wallet_args.join(" & ");
-
-        let cmd = format!("{} & {} ", self.monerod.args(), wallet_args);
+        let cmd = format!("{} ", self.monerod.args());
         args.push(cmd);
 
         args.into_iter()
