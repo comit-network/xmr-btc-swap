@@ -5,8 +5,7 @@ use libp2p::{
     request_response::{ProtocolName, RequestResponseCodec},
 };
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, io};
-use tracing::debug;
+use std::{fmt::Debug, io, marker::PhantomData};
 
 use crate::SwapAmounts;
 use xmr_btc::{alice, bob, monero};
@@ -45,20 +44,61 @@ pub enum AliceToBob {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-pub struct Protocol;
+pub struct AmountsProtocol;
 
-impl ProtocolName for Protocol {
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Message0Protocol;
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Message1Protocol;
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Message2Protocol;
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Message3Protocol;
+
+impl ProtocolName for AmountsProtocol {
     fn protocol_name(&self) -> &[u8] {
-        b"/xmr/btc/1.0.0"
+        b"/xmr/btc/amounts/1.0.0"
+    }
+}
+
+impl ProtocolName for Message0Protocol {
+    fn protocol_name(&self) -> &[u8] {
+        b"/xmr/btc/message0/1.0.0"
+    }
+}
+
+impl ProtocolName for Message1Protocol {
+    fn protocol_name(&self) -> &[u8] {
+        b"/xmr/btc/message1/1.0.0"
+    }
+}
+
+impl ProtocolName for Message2Protocol {
+    fn protocol_name(&self) -> &[u8] {
+        b"/xmr/btc/message2/1.0.0"
+    }
+}
+
+impl ProtocolName for Message3Protocol {
+    fn protocol_name(&self) -> &[u8] {
+        b"/xmr/btc/message3/1.0.0"
     }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct Codec;
+pub struct Codec<P> {
+    phantom: PhantomData<P>,
+}
 
 #[async_trait]
-impl RequestResponseCodec for Codec {
-    type Protocol = Protocol;
+impl<P> RequestResponseCodec for Codec<P>
+where
+    P: Send + Sync + Clone + ProtocolName,
+{
+    type Protocol = P;
     type Request = BobToAlice;
     type Response = AliceToBob;
 
@@ -109,11 +149,8 @@ impl RequestResponseCodec for Codec {
     where
         T: AsyncWrite + Unpin + Send,
     {
-        debug!("enter write_request");
-        let bytes = serde_cbor::to_vec(&req).map_err(|e| {
-            tracing::debug!("serde write_request error: {:?}", e);
-            io::Error::new(io::ErrorKind::InvalidData, e)
-        })?;
+        let bytes =
+            serde_cbor::to_vec(&req).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
         upgrade::write_one(io, &bytes).await?;
 

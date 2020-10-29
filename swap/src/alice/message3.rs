@@ -13,7 +13,7 @@ use std::{
 };
 use tracing::error;
 
-use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol, TIMEOUT};
+use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Message3Protocol, TIMEOUT};
 use xmr_btc::bob;
 
 #[derive(Debug)]
@@ -26,7 +26,7 @@ pub enum OutEvent {
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Message3 {
-    rr: RequestResponse<Codec>,
+    rr: RequestResponse<Codec<Message3Protocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
@@ -36,7 +36,7 @@ impl Message3 {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message3Protocol>>, OutEvent>> {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -54,7 +54,7 @@ impl Default for Message3 {
         Self {
             rr: RequestResponse::new(
                 Codec::default(),
-                vec![(Protocol, ProtocolSupport::Full)],
+                vec![(Message3Protocol, ProtocolSupport::Full)],
                 config,
             ),
             events: Default::default(),

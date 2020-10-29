@@ -15,7 +15,7 @@ use std::{
 use tracing::error;
 
 use crate::{
-    network::request_response::{AliceToBob, BobToAlice, Codec, Protocol, TIMEOUT},
+    network::request_response::{AliceToBob, AmountsProtocol, BobToAlice, Codec, TIMEOUT},
     SwapAmounts,
 };
 
@@ -29,7 +29,7 @@ pub enum OutEvent {
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Amounts {
-    rr: RequestResponse<Codec>,
+    rr: RequestResponse<Codec<AmountsProtocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
@@ -46,7 +46,7 @@ impl Amounts {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<AmountsProtocol>>, OutEvent>> {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -65,7 +65,7 @@ impl Default for Amounts {
         Self {
             rr: RequestResponse::new(
                 Codec::default(),
-                vec![(Protocol, ProtocolSupport::Full)],
+                vec![(AmountsProtocol, ProtocolSupport::Full)],
                 config,
             ),
             events: Default::default(),

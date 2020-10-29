@@ -98,6 +98,7 @@ pub async fn swap(
 
     let mut swarm = new_swarm(listen, local_port)?;
     let message0: bob::Message0;
+    let mut state0: Option<alice::State0> = None;
     let mut last_amounts: Option<SwapAmounts> = None;
 
     loop {
@@ -112,6 +113,29 @@ pub async fn swap(
                 // verification of message 0.
                 last_amounts = Some(amounts);
                 swarm.send_amounts(channel, amounts);
+
+                let (xmr, btc) = match last_amounts {
+                    Some(p) => (p.xmr, p.btc),
+                    None => unreachable!("should have amounts by here"),
+                };
+
+                let redeem_address = bitcoin_wallet.as_ref().new_address().await?;
+                let punish_address = redeem_address.clone();
+
+                // TODO: Pass this in using <R: RngCore + CryptoRng>
+                let rng = &mut OsRng;
+                let state = State0::new(
+                    rng,
+                    btc,
+                    xmr,
+                    REFUND_TIMELOCK,
+                    PUNISH_TIMELOCK,
+                    redeem_address,
+                    punish_address,
+                );
+                swarm.set_state0(state.clone());
+
+                state0 = Some(state)
             }
             OutEvent::Message0(msg) => {
                 debug!("got message 0 from Bob");
@@ -127,28 +151,10 @@ pub async fn swap(
         };
     }
 
-    let (xmr, btc) = match last_amounts {
-        Some(p) => (p.xmr, p.btc),
-        None => unreachable!("should have amounts by here"),
-    };
-
-    let redeem_address = bitcoin_wallet.as_ref().new_address().await?;
-    let punish_address = redeem_address.clone();
-
-    // TODO: Pass this in using <R: RngCore + CryptoRng>
-    let rng = &mut OsRng;
-    let state0 = State0::new(
-        rng,
-        btc,
-        xmr,
-        REFUND_TIMELOCK,
-        PUNISH_TIMELOCK,
-        redeem_address,
-        punish_address,
-    );
-    swarm.set_state0(state0.clone());
-
-    let state1 = state0.receive(message0).expect("failed to receive msg 0");
+    let state1 = state0
+        .expect("to be set")
+        .receive(message0)
+        .expect("failed to receive msg 0");
 
     let (state2, channel) = match swarm.next().await {
         OutEvent::Message1 { msg, channel } => {

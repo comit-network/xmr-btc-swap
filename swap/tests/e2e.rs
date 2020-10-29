@@ -13,7 +13,7 @@ async fn swap() {
         .with_env_filter(
             "swap=debug,hyper=off,reqwest=off,monero-harness=info,testcontainers=info,libp2p=debug",
         )
-        .with_ansi(true)
+        .with_ansi(false)
         .set_default();
 
     let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9876"
