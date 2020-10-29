@@ -175,6 +175,8 @@ where
                     }
                 };
 
+                tracing::debug!("select returned redeem encsig from message");
+
                 tx_redeem_encsig
             };
 

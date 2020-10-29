@@ -78,10 +78,15 @@ pub async fn swap(
             #[derive(Debug)]
             struct UnexpectedMessage;
 
+            tracing::debug!("Receiving bitcoin redeem encsig");
+
             (|| async {
                 let mut guard = self.swarm.lock().await;
                 let encsig = match guard.next().await {
-                    OutEvent::Message3(msg) => msg.tx_redeem_encsig,
+                    OutEvent::Message3(msg) => {
+                        tracing::debug!("Got redeem encsig from Bob");
+                        msg.tx_redeem_encsig
+                    }
                     other => {
                         warn!("Expected Bob's Message3, got: {:?}", other);
                         return Err(backoff::Error::Transient(UnexpectedMessage));

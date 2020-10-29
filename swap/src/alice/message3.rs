@@ -73,6 +73,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                 ..
             } => {
                 if let BobToAlice::Message3(msg) = request {
+                    tracing::debug!("Alice: got message 3 from Bob");
                     self.events.push_back(OutEvent::Msg(msg));
                     // Send back empty response so that the request/response protocol completes.
                     self.rr.send_response(channel, AliceToBob::Message3);

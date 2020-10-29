@@ -29,7 +29,7 @@ use crate::{
         peer_tracker::{self, PeerTracker},
         transport, TokioExecutor,
     },
-    Cmd, Never, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
+    Cmd, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use xmr_btc::{
     alice,
@@ -64,7 +64,10 @@ pub async fn swap(
 
             (|| async {
                 let proof = match future.clone().await {
-                    OutEvent::Message2(msg) => msg.tx_lock_proof,
+                    OutEvent::Message2(msg) => {
+                        debug!("Got transfer proof from Alice");
+                        msg.tx_lock_proof
+                    }
                     other => {
                         warn!("Expected Alice's Message2, got: {:?}", other);
                         return Err(backoff::Error::Transient(UnexpectedMessage));
@@ -164,7 +167,14 @@ pub async fn swap(
             }
             GeneratorState::Yielded(bob::Action::SendBtcRedeemEncsig(tx_redeem_encsig)) => {
                 let mut guard = network.as_ref().lock().await;
+                debug!("Bob: sending message 3");
                 guard.0.send_message3(alice.clone(), tx_redeem_encsig);
+                match guard.0.next().shared().await {
+                    OutEvent::Message3 => {
+                        debug!("Got message 3 response from Alice");
+                    }
+                    other => panic!("unexpected event: {:?}", other),
+                };
             }
             GeneratorState::Yielded(bob::Action::CreateXmrWalletForOutput {
                 spend_key,
@@ -227,6 +237,7 @@ pub enum OutEvent {
     Message0(alice::Message0),
     Message1(alice::Message1),
     Message2(alice::Message2),
+    Message3,
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -271,9 +282,11 @@ impl From<message2::OutEvent> for OutEvent {
     }
 }
 
-impl From<Never> for OutEvent {
-    fn from(_: Never) -> Self {
-        panic!("not ever")
+impl From<message3::OutEvent> for OutEvent {
+    fn from(event: message3::OutEvent) -> Self {
+        match event {
+            message3::OutEvent::Msg => OutEvent::Message3,
+        }
     }
 }
 

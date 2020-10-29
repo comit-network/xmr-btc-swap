@@ -152,6 +152,8 @@ where
                     Either::Right(_) => return Err(SwapFailed::AfterBtcLock(Reason::BtcExpired)),
                 };
 
+                tracing::debug!("select returned transfer proof from message");
+
                 transfer_proof
             };
 
