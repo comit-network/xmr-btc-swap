@@ -11,7 +11,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 async fn swap() {
     let _guard = tracing_subscriber::fmt()
         .with_env_filter(
-            "swap=debug,hyper=off,reqwest=off,monero-harness=info,testcontainers=info,libp2p=debug",
+            "swap=debug,xmr_btc=debug,hyper=off,reqwest=off,monero_harness=info,testcontainers=info,libp2p=debug",
         )
         .with_ansi(false)
         .set_default();
