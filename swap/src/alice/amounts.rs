@@ -80,6 +80,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                     },
                 ..
             } => {
+                tracing::debug!("amounts: Request from Bob received");
                 if let BobToAlice::AmountsFromBtc(btc) = request {
                     self.events.push_back(OutEvent::Btc { btc, channel })
                 }

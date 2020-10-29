@@ -86,8 +86,9 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                     },
                 ..
             } => {
+                tracing::debug!("message0: Request from Bob received");
                 if let BobToAlice::Message0(msg) = request {
-                    info!("Got Alice's first message");
+                    info!("Got Bob's first message");
                     let response = match &self.state {
                         None => panic!("No state, did you forget to set it?"),
                         Some(state) => {

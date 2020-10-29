@@ -6,6 +6,7 @@ use libp2p::{
 };
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, io};
+use tracing::debug;
 
 use crate::SwapAmounts;
 use xmr_btc::{alice, bob, monero};
@@ -65,12 +66,15 @@ impl RequestResponseCodec for Codec {
     where
         T: AsyncRead + Unpin + Send,
     {
+        debug!("enter read_request");
         let message = upgrade::read_one(io, BUF_SIZE)
             .await
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         let mut de = serde_cbor::Deserializer::from_slice(&message);
-        let msg = BobToAlice::deserialize(&mut de)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let msg = BobToAlice::deserialize(&mut de).map_err(|e| {
+            tracing::debug!("serde read_request error: {:?}", e);
+            io::Error::new(io::ErrorKind::Other, e)
+        })?;
 
         Ok(msg)
     }
@@ -83,12 +87,15 @@ impl RequestResponseCodec for Codec {
     where
         T: AsyncRead + Unpin + Send,
     {
+        debug!("enter read_response");
         let message = upgrade::read_one(io, BUF_SIZE)
             .await
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         let mut de = serde_cbor::Deserializer::from_slice(&message);
-        let msg = AliceToBob::deserialize(&mut de)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let msg = AliceToBob::deserialize(&mut de).map_err(|e| {
+            tracing::debug!("serde read_response error: {:?}", e);
+            io::Error::new(io::ErrorKind::InvalidData, e)
+        })?;
 
         Ok(msg)
     }
@@ -102,8 +109,9 @@ impl RequestResponseCodec for Codec {
     where
         T: AsyncWrite + Unpin + Send,
     {
+        debug!("enter write_request");
         let bytes = serde_cbor::to_vec(&req).map_err(|e| {
-            tracing::debug!("yes Lucas we are actually here");
+            tracing::debug!("serde write_request error: {:?}", e);
             io::Error::new(io::ErrorKind::InvalidData, e)
         })?;
 
@@ -121,8 +129,11 @@ impl RequestResponseCodec for Codec {
     where
         T: AsyncWrite + Unpin + Send,
     {
-        let bytes =
-            serde_cbor::to_vec(&res).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        debug!("enter write_response");
+        let bytes = serde_cbor::to_vec(&res).map_err(|e| {
+            tracing::debug!("serde write_reponse error: {:?}", e);
+            io::Error::new(io::ErrorKind::InvalidData, e)
+        })?;
         upgrade::write_one(io, &bytes).await?;
 
         Ok(())
