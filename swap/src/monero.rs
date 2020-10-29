@@ -75,6 +75,9 @@ impl CreateWalletForOutput for Wallet {
     }
 }
 
+// TODO: For retry, use `backoff::ExponentialBackoff` in production as opposed
+// to `ConstantBackoff`.
+
 #[async_trait]
 impl WatchForTransfer for Wallet {
     async fn watch_for_transfer(

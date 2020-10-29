@@ -10,8 +10,6 @@ pub mod storage;
 #[cfg(feature = "tor")]
 pub mod tor;
 
-pub const ONE_BTC: u64 = 100_000_000;
-
 const REFUND_TIMELOCK: u32 = 10; // Relative timelock, this is number of blocks. TODO: What should it be?
 const PUNISH_TIMELOCK: u32 = 10; // FIXME: What should this be?
 

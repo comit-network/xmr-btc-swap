@@ -2,7 +2,7 @@
 //! Alice holds XMR and wishes receive BTC.
 use anyhow::Result;
 use async_trait::async_trait;
-use backoff::{future::FutureOperation as _, ExponentialBackoff};
+use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
 use genawaiter::GeneratorState;
 use libp2p::{
     core::{identity::Keypair, Multiaddr},
@@ -10,9 +10,9 @@ use libp2p::{
     NetworkBehaviour, PeerId,
 };
 use rand::rngs::OsRng;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 use xmr_btc::alice;
 
 mod amounts;
@@ -55,6 +55,8 @@ pub async fn swap(
 
     impl Network {
         pub async fn send_message2(&mut self, proof: monero::TransferProof) {
+            tracing::debug!("Sending transfer proof");
+
             match self.channel.take() {
                 None => warn!("Channel not found, did you call this twice?"),
                 Some(channel) => {
@@ -66,6 +68,9 @@ pub async fn swap(
             }
         }
     }
+
+    // TODO: For retry, use `backoff::ExponentialBackoff` in production as opposed
+    // to `ConstantBackoff`.
 
     #[async_trait]
     impl ReceiveBitcoinRedeemEncsig for Network {
@@ -85,16 +90,13 @@ pub async fn swap(
 
                 Result::<_, backoff::Error<UnexpectedMessage>>::Ok(encsig)
             })
-            .retry(ExponentialBackoff {
-                max_elapsed_time: None,
-                ..Default::default()
-            })
+            .retry(ConstantBackoff::new(Duration::from_secs(1)))
             .await
             .expect("transient errors to be retried")
         }
     }
 
-    debug!("swapping ...");
+    tracing::debug!("swapping ...");
 
     let mut swarm = new_swarm(listen, local_port)?;
     let message0: bob::Message0;
@@ -107,7 +109,6 @@ pub async fn swap(
                 info!("Connection established with: {}", id);
             }
             OutEvent::Request(amounts::OutEvent::Btc { btc, channel }) => {
-                debug!("Got request from Bob to swap {}", btc);
                 let amounts = calculate_amounts(btc);
                 // TODO: We cache the last amounts returned, this needs improving along with
                 // verification of message 0.
@@ -138,7 +139,6 @@ pub async fn swap(
                 state0 = Some(state)
             }
             OutEvent::Message0(msg) => {
-                debug!("got message 0 from Bob");
                 // We don't want Bob to be able to crash us by sending an out of
                 // order message. Keep looping if Bob has not requested amounts.
                 if last_amounts.is_some() {

@@ -2,7 +2,7 @@
 //! Bob holds BTC and wishes receive XMR.
 use anyhow::Result;
 use async_trait::async_trait;
-use backoff::{future::FutureOperation as _, ExponentialBackoff};
+use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
 use futures::{
     channel::mpsc::{Receiver, Sender},
     FutureExt, StreamExt,
@@ -10,7 +10,7 @@ use futures::{
 use genawaiter::GeneratorState;
 use libp2p::{core::identity::Keypair, Multiaddr, NetworkBehaviour, PeerId};
 use rand::rngs::OsRng;
-use std::{process, sync::Arc};
+use std::{process, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
 
@@ -49,11 +49,16 @@ pub async fn swap(
 ) -> Result<()> {
     struct Network(Swarm);
 
+    // TODO: For retry, use `backoff::ExponentialBackoff` in production as opposed
+    // to `ConstantBackoff`.
+
     #[async_trait]
     impl ReceiveTransferProof for Network {
         async fn receive_transfer_proof(&mut self) -> monero::TransferProof {
             #[derive(Debug)]
             struct UnexpectedMessage;
+
+            tracing::debug!("Receiving transfer proof");
 
             let future = self.0.next().shared();
 
@@ -68,10 +73,7 @@ pub async fn swap(
 
                 Result::<_, backoff::Error<UnexpectedMessage>>::Ok(proof)
             })
-            .retry(ExponentialBackoff {
-                max_elapsed_time: None,
-                ..Default::default()
-            })
+            .retry(ConstantBackoff::new(Duration::from_secs(1)))
             .await
             .expect("transient errors to be retried")
         }

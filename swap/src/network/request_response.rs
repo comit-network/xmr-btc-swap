@@ -6,6 +6,7 @@ use libp2p::{
 };
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, io, marker::PhantomData};
+use tracing::debug;
 
 use crate::SwapAmounts;
 use xmr_btc::{alice, bob, monero};

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use backoff::{future::FutureOperation as _, ExponentialBackoff};
+use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
 use bitcoin::{util::psbt::PartiallySignedTransaction, Address, Transaction};
 use bitcoin_harness::{bitcoind_rpc::PsbtBase64, Bitcoind};
 use reqwest::Url;
@@ -113,14 +113,14 @@ impl BroadcastSignedTransaction for Wallet {
     }
 }
 
+// TODO: For retry, use `backoff::ExponentialBackoff` in production as opposed
+// to `ConstantBackoff`.
+
 #[async_trait]
 impl WatchForRawTransaction for Wallet {
     async fn watch_for_raw_transaction(&self, txid: Txid) -> Transaction {
         (|| async { Ok(self.0.get_raw_transaction(txid).await?) })
-            .retry(ExponentialBackoff {
-                max_elapsed_time: None,
-                ..Default::default()
-            })
+            .retry(ConstantBackoff::new(Duration::from_secs(1)))
             .await
             .expect("transient errors to be retried")
     }
@@ -130,10 +130,7 @@ impl WatchForRawTransaction for Wallet {
 impl BlockHeight for Wallet {
     async fn block_height(&self) -> u32 {
         (|| async { Ok(self.0.block_height().await?) })
-            .retry(ExponentialBackoff {
-                max_elapsed_time: None,
-                ..Default::default()
-            })
+            .retry(ConstantBackoff::new(Duration::from_secs(1)))
             .await
             .expect("transient errors to be retried")
     }
@@ -160,10 +157,7 @@ impl TransactionBlockHeight for Wallet {
 
             Result::<_, backoff::Error<Error>>::Ok(block_height)
         })
-        .retry(ExponentialBackoff {
-            max_elapsed_time: None,
-            ..Default::default()
-        })
+        .retry(ConstantBackoff::new(Duration::from_secs(1)))
         .await
         .expect("transient errors to be retried")
     }
