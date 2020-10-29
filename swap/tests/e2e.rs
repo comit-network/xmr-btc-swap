@@ -1,7 +1,6 @@
 use bitcoin_harness::Bitcoind;
 use futures::{channel::mpsc, future::try_join};
 use libp2p::Multiaddr;
-use log::LevelFilter;
 use monero_harness::Monero;
 use std::sync::Arc;
 use swap::{alice, bob};
@@ -11,13 +10,10 @@ use tracing_subscriber::util::SubscriberInitExt;
 #[tokio::test]
 async fn swap() {
     let _guard = tracing_subscriber::fmt()
-        .with_env_filter(format!(
-            "swap={},xmr_btc={},libp2p={}",
-            LevelFilter::Debug,
-            LevelFilter::Debug,
-            LevelFilter::Debug
-        ))
-        .with_ansi(false)
+        .with_env_filter(
+            "swap=debug,hyper=off,reqwest=off,monero-harness=info,testcontainers=info,libp2p=debug",
+        )
+        .with_ansi(true)
         .set_default();
 
     let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9876"

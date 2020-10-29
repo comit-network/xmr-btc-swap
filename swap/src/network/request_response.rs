@@ -70,7 +70,7 @@ impl RequestResponseCodec for Codec {
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         let mut de = serde_cbor::Deserializer::from_slice(&message);
         let msg = BobToAlice::deserialize(&mut de)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
         Ok(msg)
     }
@@ -102,8 +102,11 @@ impl RequestResponseCodec for Codec {
     where
         T: AsyncWrite + Unpin + Send,
     {
-        let bytes =
-            serde_cbor::to_vec(&req).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let bytes = serde_cbor::to_vec(&req).map_err(|e| {
+            tracing::debug!("yes Lucas we are actually here");
+            io::Error::new(io::ErrorKind::InvalidData, e)
+        })?;
+
         upgrade::write_one(io, &bytes).await?;
 
         Ok(())
