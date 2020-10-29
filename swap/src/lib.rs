@@ -7,7 +7,7 @@ pub mod bob;
 pub mod monero;
 pub mod network;
 pub mod storage;
-#[cfg(feature = "tor")]
+//#[cfg(feature = "tor")]
 pub mod tor;
 
 const REFUND_TIMELOCK: u32 = 10; // Relative timelock, this is number of blocks. TODO: What should it be?

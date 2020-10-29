@@ -5,7 +5,7 @@ use libp2p::{
         muxing::StreamMuxerBox,
         transport::Boxed,
         upgrade::{SelectUpgrade, Version},
-        Transport,
+        Multiaddr, Transport,
     },
     dns::DnsConfig,
     mplex::MplexConfig,
@@ -18,7 +18,7 @@ use libp2p::{
 /// - DNS name resolution
 /// - authentication via noise
 /// - multiplexing via yamux or mplex
-#[cfg(not(feature = "tor"))]
+/// #[cfg(not(feature = "tor"))]
 pub fn build(id_keys: identity::Keypair) -> Result<SwapTransport> {
     use libp2p::tcp::TokioTcpConfig;
 
@@ -40,24 +40,21 @@ pub fn build(id_keys: identity::Keypair) -> Result<SwapTransport> {
 
     Ok(transport)
 }
-
 /// Builds a libp2p transport with Tor and with the following features:
 /// - TCP connection over the Tor network
 /// - DNS name resolution
 /// - authentication via noise
 /// - multiplexing via yamux or mplex
-#[cfg(feature = "tor")]
-pub fn build(
+// #[cfg(feature = "tor")]
+pub fn build_tor(
     id_keys: identity::Keypair,
-    address_port_pair: Option<(libp2p::core::Multiaddr, u16)>,
+    addr: libp2p::core::Multiaddr,
+    port: u16,
 ) -> Result<SwapTransport> {
     use libp2p_tokio_socks5::Socks5TokioTcpConfig;
     use std::collections::HashMap;
 
-    let mut map = HashMap::new();
-    if let Some((addr, port)) = address_port_pair {
-        map.insert(addr, port);
-    }
+    let map: HashMap<Multiaddr, u16> = [(addr, port)].iter().cloned().collect();
 
     let dh_keys = noise::Keypair::<X25519Spec>::new().into_authentic(&id_keys)?;
     let noise = NoiseConfig::xx(dh_keys).into_authenticated();

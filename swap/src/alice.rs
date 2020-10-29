@@ -28,7 +28,9 @@ use crate::{
     network::{
         peer_tracker::{self, PeerTracker},
         request_response::AliceToBob,
-        transport, TokioExecutor,
+        transport,
+        transport::SwapTransport,
+        TokioExecutor,
     },
     SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
@@ -43,7 +45,10 @@ pub async fn swap(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
     listen: Multiaddr,
-    local_port: Option<u16>,
+    redeem_address: ::bitcoin::Address,
+    punish_address: ::bitcoin::Address,
+    transport: SwapTransport,
+    behaviour: Alice,
 ) -> Result<()> {
     struct Network {
         swarm: Arc<Mutex<Swarm>>,
@@ -96,7 +101,7 @@ pub async fn swap(
         }
     }
 
-    let mut swarm = new_swarm(listen, local_port)?;
+    let mut swarm = new_swarm(listen, transport, behaviour)?;
     let message0: bob::Message0;
     let mut state0: Option<alice::State0> = None;
     let mut last_amounts: Option<SwapAmounts> = None;
@@ -230,29 +235,10 @@ pub async fn swap(
 
 pub type Swarm = libp2p::Swarm<Alice>;
 
-fn new_swarm(listen: Multiaddr, port: Option<u16>) -> Result<Swarm> {
+fn new_swarm(listen: Multiaddr, transport: SwapTransport, behaviour: Alice) -> Result<Swarm> {
     use anyhow::Context as _;
 
-    let behaviour = Alice::default();
-
-    let local_key_pair = behaviour.identity();
     let local_peer_id = behaviour.peer_id();
-
-    let transport;
-    #[cfg(feature = "tor")]
-    {
-        transport = match port {
-            Some(port) => transport::build(local_key_pair, Some((listen.clone(), port)))?,
-            None => anyhow::bail!("Must supply local port"),
-        };
-    }
-    #[cfg(not(feature = "tor"))]
-    {
-        transport = match port {
-            None => transport::build(local_key_pair)?,
-            Some(_) => anyhow::bail!("local port should not be provided for non-tor usage"),
-        };
-    }
 
     let mut swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id.clone())
         .executor(Box::new(TokioExecutor {

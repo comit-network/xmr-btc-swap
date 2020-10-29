@@ -27,7 +27,9 @@ use crate::{
     monero,
     network::{
         peer_tracker::{self, PeerTracker},
-        transport, TokioExecutor,
+        transport,
+        transport::SwapTransport,
+        TokioExecutor,
     },
     Cmd, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
@@ -45,6 +47,8 @@ pub async fn swap(
     addr: Multiaddr,
     mut cmd_tx: Sender<Cmd>,
     mut rsp_rx: Receiver<Rsp>,
+    transport: SwapTransport,
+    behaviour: Bob,
 ) -> Result<()> {
     struct Network(Swarm);
 
@@ -80,7 +84,7 @@ pub async fn swap(
         }
     }
 
-    let mut swarm = new_swarm()?;
+    let mut swarm = new_swarm(transport, behaviour)?;
 
     libp2p::Swarm::dial_addr(&mut swarm, addr)?;
     let alice = match swarm.next().await {
@@ -202,22 +206,8 @@ pub async fn swap(
 
 pub type Swarm = libp2p::Swarm<Bob>;
 
-fn new_swarm() -> Result<Swarm> {
-    let behaviour = Bob::default();
-
-    let local_key_pair = behaviour.identity();
+fn new_swarm(transport: SwapTransport, behaviour: Bob) -> Result<Swarm> {
     let local_peer_id = behaviour.peer_id();
-
-    let transport = {
-        #[cfg(feature = "tor")]
-        {
-            transport::build(local_key_pair, None)?
-        }
-        #[cfg(not(feature = "tor"))]
-        {
-            transport::build(local_key_pair)?
-        }
-    };
 
     let swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id.clone())
         .executor(Box::new(TokioExecutor {

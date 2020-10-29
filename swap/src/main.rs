@@ -12,14 +12,24 @@
 )]
 #![forbid(unsafe_code)]
 
-use anyhow::{bail, Context, Result};
+use anyhow::Result;
 use futures::{channel::mpsc, StreamExt};
 use libp2p::core::Multiaddr;
 use log::LevelFilter;
 use std::{io, io::Write, process, sync::Arc};
 use structopt::StructOpt;
+use swap::{
+    alice,
+    alice::Alice,
+    bitcoin::Wallet,
+    bob,
+    bob::Bob,
+    network::transport::{build, build_tor, SwapTransport},
+    Cmd, Rsp, SwapAmounts,
+};
 use tracing::info;
 use url::Url;
+use xmr_btc::bitcoin::{BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock};
 
 mod cli;
 mod trace;
@@ -28,15 +38,6 @@ use cli::Options;
 use swap::{alice, bitcoin, bob, monero, Cmd, Rsp, SwapAmounts};
 
 // TODO: Add root seed file instead of generating new seed each run.
-
-// // TODO: Add a config file with these in it.
-// // Alice's address and port until we have a config file.
-// pub const LISTEN_PORT: u16 = 9876; // Arbitrarily chosen.
-// pub const LISTEN_ADDR: &str = "127.0.0.1";
-// pub const BITCOIND_JSON_RPC_URL: &str = "http://127.0.0.1:8332";
-//
-// #[cfg(feature = "tor")]
-// pub const TOR_PORT: u16 = LISTEN_PORT + 1;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -48,29 +49,31 @@ async fn main() -> Result<()> {
         Options::Alice {
             bitcoind_url: url,
             listen_addr,
-            listen_port,
+            tor_port,
             ..
         } => {
             info!("running swap node as Alice ...");
 
-            #[cfg(feature = "tor")]
-            let (alice, _ac) = {
-                let tor_secret_key = torut::onion::TorSecretKeyV3::generate();
-                let onion_address = tor_secret_key
-                    .public()
-                    .get_onion_address()
-                    .get_address_without_dot_onion();
-                let onion_address_string = format!("/onion3/{}:{}", onion_address, TOR_PORT);
-                let addr: Multiaddr = onion_address_string.parse()?;
+            let behaviour = Alice::default();
+            let local_key_pair = behaviour.identity();
 
-                (addr, create_tor_service(tor_secret_key).await?)
-            };
-
-            #[cfg(not(feature = "tor"))]
-            let alice = {
-                let alice: Multiaddr = listen_addr
-                    .parse()
-                    .expect("failed to parse Alice's address");
+            let (listen_addr, ac, transport) = match tor_port {
+                Some(tor_port) => {
+                    let tor_secret_key = torut::onion::TorSecretKeyV3::generate();
+                    let onion_address = tor_secret_key
+                        .public()
+                        .get_onion_address()
+                        .get_address_without_dot_onion();
+                    let onion_address_string = format!("/onion3/{}:{}", onion_address, tor_port);
+                    let addr: Multiaddr = onion_address_string.parse()?;
+                    let ac = create_tor_service(tor_secret_key, tor_port).await?;
+                    let transport = build_tor(local_key_pair, addr.clone(), tor_port)?;
+                    (addr, Some(ac), transport)
+                }
+                None => {
+                    let transport = build(local_key_pair)?;
+                    (listen_addr, None, transport)
+                }
             };
 
             let bitcoin_wallet = bitcoin::Wallet::new("alice", &url)
@@ -80,14 +83,19 @@ async fn main() -> Result<()> {
 
             let monero_wallet = Arc::new(monero::Wallet::localhost(MONERO_WALLET_RPC_PORT));
 
-            swap_as_alice(bitcoin_wallet, monero_wallet, alice.clone()).await?;
+            swap_as_alice(listen_addr, redeem, punish, transport, behaviour).await?;
         }
         Options::Bob {
-            alice_addr: alice_address,
+            alice_addr,
             satoshis,
             bitcoind_url: url,
         } => {
             info!("running swap node as Bob ...");
+
+            let behaviour = Bob::default();
+            let local_key_pair = behaviour.identity();
+
+            let transport = build(local_key_pair)?;
 
             let bitcoin_wallet = Wallet::new("bob", &url)
                 .await
@@ -95,16 +103,24 @@ async fn main() -> Result<()> {
 
             let monero_wallet = Arc::new(monero::Wallet::localhost(MONERO_WALLET_RPC_PORT));
 
-            swap_as_bob(satoshis, alice_address, refund, bitcoin_wallet).await?;
+            swap_as_bob(
+                satoshis,
+                alice_addr,
+                refund,
+                bitcoin_wallet,
+                transport,
+                behaviour,
+            )
+            .await?;
         }
     }
 
     Ok(())
 }
 
-#[cfg(feature = "tor")]
 async fn create_tor_service(
     tor_secret_key: torut::onion::TorSecretKeyV3,
+    tor_port: u16,
 ) -> Result<swap::tor::AuthenticatedConnection> {
     // TODO use configurable ports for tor connection
     let mut authenticated_connection = swap::tor::UnauthenticatedConnection::default()
@@ -113,7 +129,7 @@ async fn create_tor_service(
     tracing::info!("Tor authenticated.");
 
     authenticated_connection
-        .add_service(TOR_PORT, &tor_secret_key)
+        .add_service(tor_port, &tor_secret_key)
         .await?;
     tracing::info!("Tor service added.");
 
@@ -124,15 +140,12 @@ async fn swap_as_alice(
     bitcoin_wallet: Arc<swap::bitcoin::Wallet>,
     monero_wallet: Arc<swap::monero::Wallet>,
     addr: Multiaddr,
+    redeem: bitcoin::Address,
+    punish: bitcoin::Address,
+    transport: SwapTransport,
+    behaviour: Alice,
 ) -> Result<()> {
-    #[cfg(not(feature = "tor"))]
-    {
-        alice::swap(bitcoin_wallet, monero_wallet, addr, None).await
-    }
-    #[cfg(feature = "tor")]
-    {
-        alice::swap(bitcoin_wallet, monero_wallet, addr, Some(LISTEN_PORT)).await
-    }
+    alice::swap(addr, redeem, punish, transport, behaviour).await
 }
 
 async fn swap_as_bob(
@@ -140,16 +153,18 @@ async fn swap_as_bob(
     monero_wallet: Arc<swap::monero::Wallet>,
     sats: u64,
     alice: Multiaddr,
-) -> Result<()> {
+    refund: bitcoin::Address,
+    wallet: W,
+    transport: SwapTransport,
+    behaviour: Bob,
+) -> Result<()>
+where
+    W: BuildTxLockPsbt + SignTxLock + BroadcastSignedTransaction + Send + Sync + 'static,
+{
     let (cmd_tx, mut cmd_rx) = mpsc::channel(1);
     let (mut rsp_tx, rsp_rx) = mpsc::channel(1);
     tokio::spawn(bob::swap(
-        bitcoin_wallet,
-        monero_wallet,
-        sats,
-        alice,
-        cmd_tx,
-        rsp_rx,
+        sats, alice, cmd_tx, rsp_rx, refund, wallet, transport, behaviour,
     ));
 
     loop {
@@ -200,11 +215,4 @@ fn verify(amounts: SwapAmounts) -> Rsp {
 
 fn is_yes(s: &str) -> bool {
     matches!(s, "y" | "Y" | "yes" | "YES" | "Yes")
-}
-
-fn multiaddr(s: &str) -> Result<Multiaddr> {
-    let addr = s
-        .parse()
-        .with_context(|| format!("failed to parse multiaddr: {}", s))?;
-    Ok(addr)
 }
