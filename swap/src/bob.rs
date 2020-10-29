@@ -107,15 +107,6 @@ pub async fn swap(
         other => panic!("unexpected event: {:?}", other),
     };
 
-    swarm.request_amounts(alice.clone(), btc);
-
-    match swarm.next().await {
-        OutEvent::Amounts(amounts) => {
-            debug!("Got amounts from Alice: {:?}", amounts);
-        }
-        other => panic!("unexpected event: {:?}", other),
-    };
-
     let refund_address = bitcoin_wallet.new_address().await?;
 
     // TODO: Pass this in using <R: RngCore + CryptoRng>
