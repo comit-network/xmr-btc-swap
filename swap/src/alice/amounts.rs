@@ -11,7 +11,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::network::request_response::{AliceToBob, AmountsProtocol, BobToAlice, Codec, TIMEOUT};
 
@@ -80,8 +80,8 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                     },
                 ..
             } => {
-                tracing::debug!("amounts: Request from Bob received");
                 if let BobToAlice::AmountsFromBtc(btc) = request {
+                    debug!("Received amounts request");
                     self.events.push_back(OutEvent::Btc { btc, channel })
                 }
             }

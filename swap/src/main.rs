@@ -28,7 +28,6 @@ use cli::Options;
 use swap::{alice, bitcoin, bob, monero, Cmd, Rsp, SwapAmounts};
 
 // TODO: Add root seed file instead of generating new seed each run.
-// TODO: Remove all instances of the todo! macro
 
 // TODO: Add a config file with these in it.
 // Alice's address and port until we have a config file.

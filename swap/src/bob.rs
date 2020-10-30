@@ -38,7 +38,6 @@ use xmr_btc::{
     monero::CreateWalletForOutput,
 };
 
-// FIXME: This whole function is horrible, needs total re-write.
 pub async fn swap(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
@@ -58,18 +57,13 @@ pub async fn swap(
             #[derive(Debug)]
             struct UnexpectedMessage;
 
-            tracing::debug!("Receiving transfer proof");
-
             let future = self.0.next().shared();
 
-            (|| async {
+            let proof = (|| async {
                 let proof = match future.clone().await {
-                    OutEvent::Message2(msg) => {
-                        debug!("Got transfer proof from Alice");
-                        msg.tx_lock_proof
-                    }
+                    OutEvent::Message2(msg) => msg.tx_lock_proof,
                     other => {
-                        warn!("Expected Alice's Message2, got: {:?}", other);
+                        warn!("Expected transfer proof, got: {:?}", other);
                         return Err(backoff::Error::Transient(UnexpectedMessage));
                     }
                 };
@@ -78,11 +72,13 @@ pub async fn swap(
             })
             .retry(ConstantBackoff::new(Duration::from_secs(1)))
             .await
-            .expect("transient errors to be retried")
+            .expect("transient errors to be retried");
+
+            info!("Received transfer proof");
+
+            proof
         }
     }
-
-    debug!("swapping ...");
 
     let mut swarm = new_swarm()?;
 
@@ -91,22 +87,22 @@ pub async fn swap(
         OutEvent::ConnectionEstablished(alice) => alice,
         other => panic!("unexpected event: {:?}", other),
     };
-    info!("Connection established.");
+    info!("Connection established with: {}", alice);
 
     swarm.request_amounts(alice.clone(), btc);
 
-    let (btc_amount, xmr) = match swarm.next().await {
+    let (btc, xmr) = match swarm.next().await {
         OutEvent::Amounts(amounts) => {
-            debug!("Got amounts from Alice: {:?}", amounts);
+            info!("Got amounts from Alice: {:?}", amounts);
             let cmd = Cmd::VerifyAmounts(amounts);
             cmd_tx.try_send(cmd)?;
             let response = rsp_rx.next().await;
             if response == Some(Rsp::Abort) {
-                info!("Amounts no good, aborting ...");
+                info!("User rejected amounts proposed by Alice, aborting...");
                 process::exit(0);
             }
 
-            info!("User verified amounts, continuing with swap ...");
+            info!("User accepted amounts proposed by Alice");
             (amounts.btc, amounts.xmr)
         }
         other => panic!("unexpected event: {:?}", other),
@@ -118,12 +114,14 @@ pub async fn swap(
     let rng = &mut OsRng;
     let state0 = State0::new(
         rng,
-        btc_amount,
+        btc,
         xmr,
         REFUND_TIMELOCK,
         PUNISH_TIMELOCK,
         refund_address,
     );
+
+    info!("Commencing handshake");
 
     swarm.send_message0(alice.clone(), state0.next_message(rng));
     let state1 = match swarm.next().await {
@@ -141,7 +139,7 @@ pub async fn swap(
 
     swarm.send_message2(alice.clone(), state2.next_message());
 
-    info!("Handshake complete, we now have State2 for Bob.");
+    info!("Handshake complete");
 
     let network = Arc::new(Mutex::new(Network(swarm)));
 
@@ -156,7 +154,7 @@ pub async fn swap(
     loop {
         let state = action_generator.async_resume().await;
 
-        info!("resumed execution of bob generator, got: {:?}", state);
+        info!("Resumed execution of generator, got: {:?}", state);
 
         match state {
             GeneratorState::Yielded(bob::Action::LockBtc(tx_lock)) => {
@@ -167,11 +165,14 @@ pub async fn swap(
             }
             GeneratorState::Yielded(bob::Action::SendBtcRedeemEncsig(tx_redeem_encsig)) => {
                 let mut guard = network.as_ref().lock().await;
-                debug!("Bob: sending message 3");
                 guard.0.send_message3(alice.clone(), tx_redeem_encsig);
+                info!("Sent Bitcoin redeem encsig");
+
+                // TODO: Does Bob need to wait for Alice to send an empty response, or can we
+                // just continue?
                 match guard.0.next().shared().await {
                     OutEvent::Message3 => {
-                        debug!("Got message 3 response from Alice");
+                        debug!("Got Message3 empty response");
                     }
                     other => panic!("unexpected event: {:?}", other),
                 };
@@ -318,29 +319,32 @@ impl Bob {
     pub fn request_amounts(&mut self, alice: PeerId, btc: u64) {
         let btc = ::bitcoin::Amount::from_sat(btc);
         let _id = self.amounts.request_amounts(alice.clone(), btc);
-        debug!("Requesting amounts from: {}", alice);
+        info!("Requesting amounts from: {}", alice);
     }
 
     /// Sends Bob's first message to Alice.
     pub fn send_message0(&mut self, alice: PeerId, msg: bob::Message0) {
         self.message0.send(alice, msg);
-        info!("Sent first message to Alice");
+        debug!("Sent Message0");
     }
 
     /// Sends Bob's second message to Alice.
     pub fn send_message1(&mut self, alice: PeerId, msg: bob::Message1) {
-        self.message1.send(alice, msg)
+        self.message1.send(alice, msg);
+        debug!("Sent Message1");
     }
 
     /// Sends Bob's third message to Alice.
     pub fn send_message2(&mut self, alice: PeerId, msg: bob::Message2) {
-        self.message2.send(alice, msg)
+        self.message2.send(alice, msg);
+        debug!("Sent Message2");
     }
 
     /// Sends Bob's fourth message to Alice.
     pub fn send_message3(&mut self, alice: PeerId, tx_redeem_encsig: EncryptedSignature) {
         let msg = bob::Message3 { tx_redeem_encsig };
-        self.message3.send(alice, msg)
+        self.message3.send(alice, msg);
+        debug!("Sent Message3");
     }
 
     /// Returns Alice's peer id if we are connected.

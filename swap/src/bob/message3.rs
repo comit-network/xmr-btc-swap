@@ -34,7 +34,6 @@ pub struct Message3 {
 impl Message3 {
     pub fn send(&mut self, alice: PeerId, msg: bob::Message3) {
         let msg = BobToAlice::Message3(msg);
-        tracing::debug!("sending ...");
         let _id = self.rr.send_request(&alice, msg);
     }
 
@@ -81,7 +80,6 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             } => {
                 if let AliceToBob::Message3 = response {
                     self.events.push_back(OutEvent::Msg);
-                    tracing::debug!("Alice correctly responded to message 3");
                 }
             }
             RequestResponseEvent::InboundFailure { error, .. } => {
