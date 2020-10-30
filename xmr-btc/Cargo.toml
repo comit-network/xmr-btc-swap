@@ -28,7 +28,7 @@ tracing = "0.1"
 [dev-dependencies]
 backoff = { version = "0.2", features = ["tokio"] }
 base64 = "0.12"
-bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "7ff30a559ab57cc3aa71189e71433ef6b2a6c3a2" }
+bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "f1bbe6a4540d0741f1f4f22577cfeeadbfd7aaaf" }
 futures = "0.3"
 monero-harness = { path = "../monero-harness" }
 reqwest = { version = "0.10", default-features = false }
