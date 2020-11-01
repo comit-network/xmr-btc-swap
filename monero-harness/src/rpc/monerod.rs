@@ -4,6 +4,7 @@ use crate::{
 };
 
 use anyhow::Result;
+use digest_auth::AuthContext;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
@@ -36,11 +37,23 @@ impl Client {
             amount_of_blocks,
             wallet_address: wallet_address.to_owned(),
         };
+        let url = self.url.clone();
+        // // Step 1:  Get the auth header
+        // let res = self.inner.get(url.clone()).send().await?;
+        // let headers = res.headers();
+        // let wwwauth = headers["www-authenticate"].to_str()?;
+        //
+        // // Step 2:  Given the auth header, sign the digest for the real req.
+        // let tmp_url = url.clone();
+        // let context = AuthContext::new("username", "password", tmp_url.path());
+        // let mut prompt = digest_auth::parse(wwwauth)?;
+        // let answer = prompt.respond(&context)?.to_header_string();
+
         let request = Request::new("generateblocks", params);
 
         let response = self
             .inner
-            .post(self.url.clone())
+            .post(url)
             .json(&request)
             .send()
             .await?

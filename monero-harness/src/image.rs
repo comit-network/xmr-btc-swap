@@ -4,10 +4,10 @@ use testcontainers::{
     Image,
 };
 
+pub const MONEROD_DAEMON_CONTAINER_NAME: &str = "monerod";
+pub const MONEROD_DEFAULT_NETWORK: &str = "monero_network";
 pub const MONEROD_RPC_PORT: u16 = 48081;
-pub const MINER_WALLET_RPC_PORT: u16 = 48083;
-pub const ALICE_WALLET_RPC_PORT: u16 = 48084;
-pub const BOB_WALLET_RPC_PORT: u16 = 48085;
+pub const WALLET_RPC_PORT: u16 = 48083;
 
 #[derive(Debug)]
 pub struct Monero {
@@ -15,6 +15,7 @@ pub struct Monero {
     args: Args,
     ports: Option<Vec<Port>>,
     entrypoint: Option<String>,
+    wait_for_message: String,
 }
 
 impl Image for Monero {
@@ -31,9 +32,7 @@ impl Image for Monero {
         container
             .logs()
             .stdout
-            .wait_for_message(
-                "The daemon is running offline and will not attempt to sync to the Monero network",
-            )
+            .wait_for_message(&self.wait_for_message)
             .unwrap();
 
         let additional_sleep_period =
@@ -85,6 +84,9 @@ impl Default for Monero {
             args: Args::default(),
             ports: None,
             entrypoint: Some("".into()),
+            wait_for_message:
+                "The daemon is running offline and will not attempt to sync to the Monero network"
+                    .to_string(),
         }
     }
 }
@@ -104,30 +106,45 @@ impl Monero {
         self
     }
 
-    pub fn with_wallet(self, name: &str, rpc_port: u16) -> Self {
-        let wallet = WalletArgs::new(name, rpc_port);
-        let mut wallet_args = self.args.wallets;
-        wallet_args.push(wallet);
+    pub fn wallet(name: &str) -> Self {
+        let wallet = WalletArgs::new(name, WALLET_RPC_PORT);
+        let default = Monero::default();
         Self {
             args: Args {
-                monerod: self.args.monerod,
-                wallets: wallet_args,
+                image_args: ImageArgs::WalletArgs(wallet),
             },
-            ..self
+            wait_for_message: "Run server thread name: RPC".to_string(),
+            ..default
         }
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Args {
-    monerod: MonerodArgs,
-    wallets: Vec<WalletArgs>,
+    image_args: ImageArgs,
 }
 
-#[derive(Debug)]
-pub enum MoneroArgs {
+impl Default for Args {
+    fn default() -> Self {
+        Self {
+            image_args: ImageArgs::MonerodArgs(MonerodArgs::default()),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum ImageArgs {
     MonerodArgs(MonerodArgs),
     WalletArgs(WalletArgs),
+}
+
+impl ImageArgs {
+    fn args(&self) -> String {
+        match self {
+            ImageArgs::MonerodArgs(monerod_args) => monerod_args.args(),
+            ImageArgs::WalletArgs(wallet_args) => wallet_args.args(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -143,13 +160,14 @@ pub struct MonerodArgs {
     pub rpc_bind_port: u16,
     pub fixed_difficulty: u32,
     pub data_dir: String,
+    pub log_level: u32,
 }
 
 #[derive(Debug, Clone)]
 pub struct WalletArgs {
     pub disable_rpc_login: bool,
     pub confirm_external_bind: bool,
-    pub wallet_dir: String,
+    pub wallet_file: String,
     pub rpc_bind_ip: String,
     pub rpc_bind_port: u16,
     pub daemon_address: String,
@@ -171,6 +189,7 @@ impl Default for MonerodArgs {
             rpc_bind_port: MONEROD_RPC_PORT,
             fixed_difficulty: 1,
             data_dir: "/monero".to_string(),
+            log_level: 2,
         }
     }
 }
@@ -224,17 +243,23 @@ impl MonerodArgs {
             args.push(format!("--fixed-difficulty {}", self.fixed_difficulty));
         }
 
+        if self.log_level != 0 {
+            args.push(format!("--log-level {}", self.log_level));
+        }
+
+        // args.push(format!("--disable-rpc-login"));
+
         args.join(" ")
     }
 }
 
 impl WalletArgs {
-    pub fn new(wallet_dir: &str, rpc_port: u16) -> Self {
-        let daemon_address = format!("localhost:{}", MONEROD_RPC_PORT);
+    pub fn new(wallet_name: &str, rpc_port: u16) -> Self {
+        let daemon_address = format!("{}:{}", MONEROD_DAEMON_CONTAINER_NAME, MONEROD_RPC_PORT);
         WalletArgs {
             disable_rpc_login: true,
             confirm_external_bind: true,
-            wallet_dir: wallet_dir.into(),
+            wallet_file: wallet_name.into(),
             rpc_bind_ip: "0.0.0.0".into(),
             rpc_bind_port: rpc_port,
             daemon_address,
@@ -254,8 +279,10 @@ impl WalletArgs {
             args.push("--confirm-external-bind".to_string())
         }
 
-        if !self.wallet_dir.is_empty() {
-            args.push(format!("--wallet-dir {}", self.wallet_dir));
+        if !self.wallet_file.is_empty() {
+            args.push(format!("--wallet-dir /monero"));
+            // args.push(format!("--wallet-file {}", self.wallet_file));
+            // args.push(format!("--password {}", self.wallet_file));
         }
 
         if !self.rpc_bind_ip.is_empty() {
@@ -273,6 +300,11 @@ impl WalletArgs {
         if self.log_level != 0 {
             args.push(format!("--log-level {}", self.log_level));
         }
+        // args.push(format!("--daemon-login username:password"));
+        // docker run --rm -d --net host -e DAEMON_HOST=node.xmr.to -e DAEMON_PORT=18081
+        // -e RPC_BIND_PORT=18083 -e RPC_USER=user -e RPC_PASSWD=passwd -v
+        // <path/to/and/including/wallet_folder>:/monero xmrto/monero monero-wallet-rpc
+        // --wallet-file wallet --password-file wallet.passwd
 
         args.join(" ")
     }
@@ -288,7 +320,7 @@ impl IntoIterator for Args {
         args.push("/bin/bash".into());
         args.push("-c".into());
 
-        let cmd = format!("{} ", self.monerod.args());
+        let cmd = format!("{} ", self.image_args.args());
         args.push(cmd);
 
         args.into_iter()
