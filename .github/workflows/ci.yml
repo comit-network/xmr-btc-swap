@@ -36,6 +36,7 @@ jobs:
           cargo tomlfmt -d -p Cargo.toml
           cargo tomlfmt -d -p xmr-btc/Cargo.toml
           cargo tomlfmt -d -p monero-harness/Cargo.toml
+          cargo tomlfmt -d -p swap/Cargo.toml
 
       - name: Check code formatting
         run: cargo fmt --all -- --check
