@@ -174,10 +174,6 @@ pub async fn swap(
                     .await?;
             }
             GeneratorState::Yielded(bob::Action::SendBtcRedeemEncsig(tx_redeem_encsig)) => {
-                // FIXME: We _know_ that this action is only yielded if the monero has been
-                // locked. This only works because we know that this is the case, but it may be
-                // cleaner to save the state inside an implementation of `watch_for_transfer` or
-                // modify the library code to make this easier
                 db.insert_latest_state(&storage::Bob::XmrLocked(state2.clone()))
                     .await?;
 
@@ -198,10 +194,6 @@ pub async fn swap(
                 spend_key,
                 view_key,
             }) => {
-                // FIXME: We _know_ that this action is only yielded if the bitcoin has been
-                // redeemed. This only works because we know that this is the case, but it may
-                // be cleaner to save the state inside an implementation of `watch_for_transfer`
-                // or modify the library code to make this easier
                 db.insert_latest_state(&storage::Bob::BtcRedeemed(state2.clone()))
                     .await?;
 
@@ -215,9 +207,6 @@ pub async fn swap(
 
                 let _ = bitcoin_wallet
                     .broadcast_signed_transaction(tx_cancel)
-                    .await?;
-
-                db.insert_latest_state(&storage::Bob::BtcRefundable(state2.clone()))
                     .await?;
             }
             GeneratorState::Yielded(bob::Action::RefundBtc(tx_refund)) => {

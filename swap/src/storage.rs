@@ -1,7 +1,27 @@
 use anyhow::{anyhow, Context, Result};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::path::Path;
-use xmr_btc::{alice, bitcoin::EncryptedSignature, bob, serde::monero_private_key};
+use xmr_btc::{alice, bob, monero, serde::monero_private_key};
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum Alice {
+    Handshaken(alice::State3),
+    BtcLocked(alice::State3),
+    XmrLocked(alice::State3),
+    BtcRedeemable {
+        state: alice::State3,
+        redeem_tx: bitcoin::Transaction,
+    },
+    BtcPunishable(alice::State3),
+    BtcRefunded {
+        state: alice::State3,
+        #[serde(with = "monero_private_key")]
+        spend_key: monero::PrivateKey,
+        view_key: monero::PrivateViewKey,
+    },
+    SwapComplete,
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum Bob {
@@ -10,25 +30,6 @@ pub enum Bob {
     XmrLocked(bob::State2),
     BtcRedeemed(bob::State2),
     BtcRefundable(bob::State2),
-    SwapComplete,
-}
-
-#[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum Alice {
-    Handshaken(alice::State3),
-    BtcLocked(alice::State3),
-    XmrLocked(alice::State3),
-    ReceivedEncSig {
-        state: alice::State3,
-        enc_sig: EncryptedSignature,
-    },
-    BtcCancelled(alice::State3),
-    BtcRefunded {
-        state: alice::State3,
-        #[serde(with = "monero_private_key")]
-        s_b: monero::PrivateKey,
-    },
     SwapComplete,
 }
 
@@ -56,6 +57,8 @@ where
             _marker: Default::default(),
         })
     }
+
+    // TODO: Add method to update state
 
     pub async fn insert_latest_state(&self, state: &T) -> Result<()> {
         let key = serialize(&Self::LAST_STATE_KEY)?;
