@@ -104,8 +104,8 @@ impl Monero {
         self
     }
 
-    pub fn wallet(name: &str) -> Self {
-        let wallet = WalletArgs::new(name, WALLET_RPC_PORT);
+    pub fn wallet(name: &str, daemon_address: String) -> Self {
+        let wallet = WalletArgs::new(name, daemon_address, WALLET_RPC_PORT);
         let default = Monero::default();
         Self {
             args: Args {
@@ -252,8 +252,7 @@ impl MonerodArgs {
 }
 
 impl WalletArgs {
-    pub fn new(wallet_name: &str, rpc_port: u16) -> Self {
-        let daemon_address = format!("{}:{}", MONEROD_DAEMON_CONTAINER_NAME, MONEROD_RPC_PORT);
+    pub fn new(wallet_name: &str, daemon_address: String, rpc_port: u16) -> Self {
         WalletArgs {
             disable_rpc_login: true,
             confirm_external_bind: true,
