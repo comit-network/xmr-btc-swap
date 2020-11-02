@@ -1,2 +1,2 @@
 [workspace]
-members = ["monero-harness"]
+members = ["monero-harness", "xmr-btc", "swap"]
