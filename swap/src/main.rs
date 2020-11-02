@@ -27,6 +27,7 @@ use swap::{
     network::transport::{build, build_tor, SwapTransport},
     Cmd, Rsp, SwapAmounts,
 };
+use tempfile::tempdir;
 use tracing::info;
 
 mod cli;
@@ -80,9 +81,12 @@ async fn main() -> Result<()> {
 
             let monero_wallet = Arc::new(monero::Wallet::new(monerod_url));
 
+            let db = Database::open(db_dir.path()).unwrap();
+
             swap_as_alice(
                 bitcoin_wallet,
                 monero_wallet,
+                db
                 listen_addr,
                 transport,
                 behaviour,
@@ -113,9 +117,12 @@ async fn main() -> Result<()> {
 
             let monero_wallet = Arc::new(monero::Wallet::new(monerod_url));
 
+            let db = Database::open(db_dir.path()).unwrap();
+
             swap_as_bob(
                 bitcoin_wallet,
                 monero_wallet,
+                db
                 satoshis,
                 alice_addr,
                 transport,
@@ -149,6 +156,7 @@ async fn create_tor_service(
 async fn swap_as_alice(
     bitcoin_wallet: Arc<swap::bitcoin::Wallet>,
     monero_wallet: Arc<swap::monero::Wallet>,
+    db: Database<storage::Alice>,
     addr: Multiaddr,
     transport: SwapTransport,
     behaviour: Alice,
@@ -159,6 +167,7 @@ async fn swap_as_alice(
 async fn swap_as_bob(
     bitcoin_wallet: Arc<swap::bitcoin::Wallet>,
     monero_wallet: Arc<swap::monero::Wallet>,
+    db: Database<storage::Bob>,
     sats: u64,
     alice: Multiaddr,
     transport: SwapTransport,
@@ -169,6 +178,7 @@ async fn swap_as_bob(
     tokio::spawn(bob::swap(
         bitcoin_wallet,
         monero_wallet,
+        db,
         sats,
         alice,
         cmd_tx,

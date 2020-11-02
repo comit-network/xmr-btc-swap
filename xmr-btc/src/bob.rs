@@ -495,7 +495,7 @@ impl State1 {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct State2 {
     pub A: bitcoin::PublicKey,
     pub b: bitcoin::SecretKey,

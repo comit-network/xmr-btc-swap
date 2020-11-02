@@ -22,14 +22,14 @@ mod message3;
 
 use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
 use crate::{
-    bitcoin,
-    bitcoin::TX_LOCK_MINE_TIMEOUT,
+    bitcoin::{self, TX_LOCK_MINE_TIMEOUT},
     monero,
     network::{
         peer_tracker::{self, PeerTracker},
         transport::SwapTransport,
         TokioExecutor,
     },
+    storage::{self, Database},
     Cmd, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use xmr_btc::{
@@ -43,6 +43,7 @@ use xmr_btc::{
 pub async fn swap(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
+    db: Database<storage::Bob>,
     btc: u64,
     addr: Multiaddr,
     mut cmd_tx: Sender<Cmd>,
@@ -141,6 +142,9 @@ pub async fn swap(
         other => panic!("unexpected event: {:?}", other),
     };
 
+    db.insert_latest_state(&storage::Bob::Handshaken(state2.clone()))
+        .await?;
+
     swarm.send_message2(alice.clone(), state2.next_message());
 
     info!("Handshake complete");
@@ -151,7 +155,7 @@ pub async fn swap(
         network.clone(),
         monero_wallet.clone(),
         bitcoin_wallet.clone(),
-        state2,
+        state2.clone(),
         TX_LOCK_MINE_TIMEOUT,
     );
 
@@ -166,8 +170,17 @@ pub async fn swap(
                 let _ = bitcoin_wallet
                     .broadcast_signed_transaction(signed_tx_lock)
                     .await?;
+                db.insert_latest_state(&storage::Bob::BtcLocked(state2.clone()))
+                    .await?;
             }
             GeneratorState::Yielded(bob::Action::SendBtcRedeemEncsig(tx_redeem_encsig)) => {
+                // FIXME: We _know_ that this action is only yielded if the monero has been
+                // locked. This only works because we know that this is the case, but it may be
+                // cleaner to save the state inside an implementation of `watch_for_transfer` or
+                // modify the library code to make this easier
+                db.insert_latest_state(&storage::Bob::XmrLocked(state2.clone()))
+                    .await?;
+
                 let mut guard = network.as_ref().lock().await;
                 guard.0.send_message3(alice.clone(), tx_redeem_encsig);
                 info!("Sent Bitcoin redeem encsig");
@@ -185,21 +198,41 @@ pub async fn swap(
                 spend_key,
                 view_key,
             }) => {
+                // FIXME: We _know_ that this action is only yielded if the bitcoin has been
+                // redeemed. This only works because we know that this is the case, but it may
+                // be cleaner to save the state inside an implementation of `watch_for_transfer`
+                // or modify the library code to make this easier
+                db.insert_latest_state(&storage::Bob::BtcRedeemed(state2.clone()))
+                    .await?;
+
                 monero_wallet
                     .create_and_load_wallet_for_output(spend_key, view_key)
                     .await?;
             }
             GeneratorState::Yielded(bob::Action::CancelBtc(tx_cancel)) => {
+                db.insert_latest_state(&storage::Bob::BtcRefundable(state2.clone()))
+                    .await?;
+
                 let _ = bitcoin_wallet
                     .broadcast_signed_transaction(tx_cancel)
                     .await?;
+
+                db.insert_latest_state(&storage::Bob::BtcRefundable(state2.clone()))
+                    .await?;
             }
             GeneratorState::Yielded(bob::Action::RefundBtc(tx_refund)) => {
+                db.insert_latest_state(&storage::Bob::BtcRefundable(state2.clone()))
+                    .await?;
+
                 let _ = bitcoin_wallet
                     .broadcast_signed_transaction(tx_refund)
                     .await?;
             }
-            GeneratorState::Complete(()) => return Ok(()),
+            GeneratorState::Complete(()) => {
+                db.insert_latest_state(&storage::Bob::SwapComplete).await?;
+
+                return Ok(());
+            }
         }
     }
 }

@@ -1,6 +1,36 @@
 use anyhow::{anyhow, Context, Result};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::path::Path;
+use xmr_btc::{alice, bitcoin::EncryptedSignature, bob, serde::monero_private_key};
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum Bob {
+    Handshaken(bob::State2),
+    BtcLocked(bob::State2),
+    XmrLocked(bob::State2),
+    BtcRedeemed(bob::State2),
+    BtcRefundable(bob::State2),
+    SwapComplete,
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum Alice {
+    Handshaken(alice::State3),
+    BtcLocked(alice::State3),
+    XmrLocked(alice::State3),
+    ReceivedEncSig {
+        state: alice::State3,
+        enc_sig: EncryptedSignature,
+    },
+    BtcCancelled(alice::State3),
+    BtcRefunded {
+        state: alice::State3,
+        #[serde(with = "monero_private_key")]
+        s_b: monero::PrivateKey,
+    },
+    SwapComplete,
+}
 
 pub struct Database<T>
 where

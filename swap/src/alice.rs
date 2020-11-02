@@ -31,6 +31,7 @@ use crate::{
         transport::SwapTransport,
         TokioExecutor,
     },
+    storage::Database,
     SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use xmr_btc::{
@@ -43,6 +44,7 @@ use xmr_btc::{
 pub async fn swap(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
+    _db: Database<crate::storage::Alice>,
     listen: Multiaddr,
     transport: SwapTransport,
     behaviour: Alice,
