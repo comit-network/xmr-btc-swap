@@ -1,7 +1,4 @@
-use crate::{
-    rpc::{Request, Response},
-    BlockHeader,
-};
+use crate::rpc::{Request, Response};
 
 use anyhow::Result;
 use reqwest::Url;
@@ -136,4 +133,23 @@ struct GetBlockHeaderByHeight {
 struct BlockCount {
     count: u32,
     status: String,
+}
+
+// We should be able to use monero-rs for this but it does not include all
+// the fields.
+#[derive(Clone, Debug, Deserialize)]
+pub struct BlockHeader {
+    pub block_size: u32,
+    pub depth: u32,
+    pub difficulty: u32,
+    pub hash: String,
+    pub height: u32,
+    pub major_version: u32,
+    pub minor_version: u32,
+    pub nonce: u32,
+    pub num_txes: u32,
+    pub orphan_status: bool,
+    pub prev_hash: String,
+    pub reward: u64,
+    pub timestamp: u32,
 }
