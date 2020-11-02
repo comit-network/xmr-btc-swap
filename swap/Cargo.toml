@@ -12,7 +12,7 @@ atty = "0.2"
 backoff = { version = "0.2", features = ["tokio"] }
 base64 = "0.12"
 bitcoin = { version = "0.23", features = ["rand", "use-serde"] } # TODO: Upgrade other crates in this repo to use this version.
-bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "f1bbe6a4540d0741f1f4f22577cfeeadbfd7aaaf" }
+bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "3be644cd9512c157d3337a189298b8257ed54d04" }
 derivative = "2"
 futures = { version = "0.3", default-features = false }
 genawaiter = "0.99.1"

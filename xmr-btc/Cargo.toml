@@ -28,12 +28,12 @@ tracing = "0.1"
 [dev-dependencies]
 backoff = { version = "0.2", features = ["tokio"] }
 base64 = "0.12"
-bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "f1bbe6a4540d0741f1f4f22577cfeeadbfd7aaaf" }
+bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "3be644cd9512c157d3337a189298b8257ed54d04" }
 futures = "0.3"
 monero-harness = { path = "../monero-harness" }
 reqwest = { version = "0.10", default-features = false }
 serde_cbor = "0.11"
 tempfile = "3"
-testcontainers = "0.10"
+testcontainers = "0.11"
 tracing = "0.1"
 tracing-subscriber = "0.2"

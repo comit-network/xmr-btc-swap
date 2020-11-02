@@ -35,7 +35,7 @@ use crate::{
     },
     rpc::{
         monerod,
-        wallet::{self, GetAddress, Transfer},
+        wallet::{self, GetAddress, Refreshed, Transfer},
     },
 };
 
@@ -49,7 +49,6 @@ const WAIT_WALLET_SYNC_MILLIS: u64 = 1000;
 pub struct Monero {
     monerod: Monerod,
     wallets: Vec<MoneroWalletRpc>,
-    miner_address: String,
     container_prefix: String,
 }
 impl<'c> Monero {
@@ -79,19 +78,9 @@ impl<'c> Monero {
         let mut containers = vec![monerod_container];
         let mut wallets = vec![];
 
-        tracing::info!("Starting miner...");
+        tracing::info!("Starting miner wallet...");
         let miner = format!("{}{}", container_prefix, "miner");
         let (miner_wallet, miner_container) = MoneroWalletRpc::new(cli, &miner, &monerod).await?;
-        let miner_address = miner_wallet.address().await?.address;
-
-        monerod.start_miner(&miner_address).await?;
-
-        tracing::info!("Waiting for miner wallet to catch up...");
-        let block_height = monerod.inner().get_block_count().await?;
-        miner_wallet
-            .wait_for_wallet_height(block_height)
-            .await
-            .unwrap();
 
         wallets.push(miner_wallet);
         containers.push(miner_container);
@@ -107,7 +96,6 @@ impl<'c> Monero {
             Self {
                 monerod,
                 wallets,
-                miner_address,
                 container_prefix,
             },
             containers,
@@ -129,6 +117,46 @@ impl<'c> Monero {
         Ok(wallet)
     }
 
+    pub async fn init(&self, alice_amount: u64, bob_amount: u64) -> Result<()> {
+        let miner_wallet = self.wallet("miner")?;
+        let miner_address = miner_wallet.address().await?.address;
+
+        let alice_wallet = self.wallet("alice")?;
+        let alice_address = alice_wallet.address().await?.address;
+
+        let bob_wallet = self.wallet("bob")?;
+        let bob_address = bob_wallet.address().await?.address;
+
+        // generate the first 70 as bulk
+        let monerod = &self.monerod;
+        let block = monerod.inner().generate_blocks(70, &miner_address).await?;
+        tracing::info!("Generated {:?} blocks", block);
+        miner_wallet.refresh().await?;
+
+        if alice_amount > 0 {
+            miner_wallet.transfer(&alice_address, alice_amount).await?;
+            tracing::info!("Funded alice wallet with {}", alice_amount);
+        }
+        if bob_amount > 0 {
+            miner_wallet.transfer(&bob_address, bob_amount).await?;
+            tracing::info!("Funded bob wallet with {}", bob_amount);
+        }
+
+        monerod.inner().generate_blocks(10, &miner_address).await?;
+        alice_wallet.refresh().await?;
+        bob_wallet.refresh().await?;
+        monerod.start_miner(&miner_address).await?;
+
+        tracing::info!("Waiting for miner wallet to catch up...");
+        let block_height = monerod.inner().get_block_count().await?;
+        miner_wallet
+            .wait_for_wallet_height(block_height)
+            .await
+            .unwrap();
+
+        Ok(())
+    }
+
     pub async fn fund(&self, address: &str, amount: u64) -> Result<Transfer> {
         self.transfer("miner", address, amount).await
     }
@@ -144,9 +172,10 @@ impl<'c> Monero {
     async fn transfer(&self, from_wallet: &str, address: &str, amount: u64) -> Result<Transfer> {
         let from = self.wallet(from_wallet)?;
         let transfer = from.transfer(address, amount).await?;
+        let miner_address = self.wallet("miner")?.address().await?.address;
         self.monerod
             .inner()
-            .generate_blocks(10, &self.miner_address)
+            .generate_blocks(10, &miner_address)
             .await?;
         from.inner().refresh().await?;
         Ok(transfer)
@@ -204,10 +233,7 @@ impl<'c> Monerod {
     /// address
     pub async fn start_miner(&self, miner_wallet_address: &str) -> Result<()> {
         let monerod = self.inner();
-        // generate the first 70 as bulk
-        let block = monerod.generate_blocks(70, &miner_wallet_address).await?;
-        println!("Generated {:?} blocks", block);
-        let _ = tokio::spawn(mine(monerod.clone(), miner_wallet_address.to_string()));
+        let _ = tokio::spawn(mine(monerod, miner_wallet_address.to_string()));
         Ok(())
     }
 }
@@ -283,6 +309,10 @@ impl<'c> MoneroWalletRpc {
     pub async fn balance(&self) -> Result<u64> {
         self.inner().refresh().await?;
         self.inner().get_balance(0).await
+    }
+
+    pub async fn refresh(&self) -> Result<Refreshed> {
+        self.inner().refresh().await
     }
 }
 /// Mine a block ever BLOCK_TIME_SECS seconds.
