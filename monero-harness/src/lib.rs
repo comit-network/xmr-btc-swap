@@ -36,7 +36,7 @@ use crate::{
     },
     rpc::{
         monerod,
-        wallet::{self, GetAddress, Transfer},
+        wallet::{self, Transfer},
     },
 };
 
@@ -77,6 +77,8 @@ impl<'c> Monero {
         ))
     }
 
+    /// Starts a new wallet container which is attached to
+    /// MONEROD_DEFAULT_NETWORK and MONEROD_DAEMON_CONTAINER_NAME
     pub async fn new_wallet(
         cli: &'c Cli,
         name: &str,
@@ -140,6 +142,15 @@ impl<'c> Monero {
             retry += 1;
         }
         Ok(())
+    }
+
+    /// Sends amount to address
+    pub async fn transfer(&self, address: &str, amount: u64) -> Result<Transfer> {
+        let miner_wallet = self.wallet_rpc_client();
+
+        let transfer = miner_wallet.transfer(0, amount, address).await?;
+
+        Ok(transfer)
     }
 }
 

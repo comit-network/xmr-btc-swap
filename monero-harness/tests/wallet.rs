@@ -3,87 +3,77 @@ use spectral::prelude::*;
 use testcontainers::clients::Cli;
 
 #[tokio::test]
-async fn wallet_and_accounts() {
-    let tc = Cli::default();
-    let (monero, _monerod_container) = Monero::new_monerod(&tc).unwrap();
-    let (wallet, _wallet_container) = Monero::new_wallet(&tc, "wallet").unwrap();
-    // let cli = monero.miner_wallet_rpc_client();
-    //
-    // println!("creating wallet ...");
-    //
-    // let _ = cli
-    //     .create_wallet("wallet")
-    //     .await
-    //     .expect("failed to create wallet");
-    //
-    // let got = cli.get_balance(0).await.expect("failed to get balance");
-    // let want = 0;
-    //
-    // assert_that!(got).is_equal_to(want);
-}
-
-#[tokio::test]
-async fn create_account_and_retrieve_it() {
-    let tc = Cli::default();
-    let (monero, _container) = Monero::new_monerod(&tc).unwrap();
-    // let cli = monero.miner_wallet_rpc_client();
-    //
-    // let label = "Iron Man"; // This is intentionally _not_ Alice or Bob.
-    //
-    // let _ = cli
-    //     .create_wallet("wallet")
-    //     .await
-    //     .expect("failed to create wallet");
-    //
-    // let _ = cli
-    //     .create_account(label)
-    //     .await
-    //     .expect("failed to create account");
-    //
-    // let mut found: bool = false;
-    // let accounts = cli
-    //     .get_accounts("") // Empty filter.
-    //     .await
-    //     .expect("failed to get accounts");
-    // for account in accounts.subaddress_accounts {
-    //     if account.label == label {
-    //         found = true;
-    //     }
-    // }
-    // assert!(found);
-}
-
-#[tokio::test]
-async fn transfer_and_check_tx_key() {
+async fn fund_transfer_and_check_tx_key() {
     let fund_alice: u64 = 1_000_000_000_000;
     let fund_bob = 0;
 
     let tc = Cli::default();
-    let (monero, _container) = Monero::new_monerod(&tc).unwrap();
-    // let _ = monero.init(fund_alice, fund_bob).await;
-    //
-    // let address_bob = monero
-    //     .bob_wallet_rpc_client()
-    //     .get_address(0)
-    //     .await
-    //     .expect("failed to get Bob's address")
-    //     .address;
-    //
-    // let transfer_amount = 100;
-    // let transfer = monero
-    //     .alice_wallet_rpc_client()
-    //     .transfer(0, transfer_amount, &address_bob)
-    //     .await
-    //     .expect("transfer failed");
-    //
-    // let tx_id = transfer.tx_hash;
-    // let tx_key = transfer.tx_key;
-    //
-    // let cli = monero.miner_wallet_rpc_client();
-    // let res = cli
-    //     .check_tx_key(&tx_id, &tx_key, &address_bob)
-    //     .await
-    //     .expect("failed to check tx by key");
-    //
-    // assert_that!(res.received).is_equal_to(transfer_amount);
+    let (monerod, _monerod_container) = Monero::new_monerod(&tc).unwrap();
+
+    let (miner_wallet, _wallet_container) = Monero::new_wallet(&tc, "miner").await.unwrap();
+    let (alice_wallet, _alice_wallet_container) = Monero::new_wallet(&tc, "alice").await.unwrap();
+    let (bob_wallet, _bob_wallet_container) = Monero::new_wallet(&tc, "bob").await.unwrap();
+
+    let address = miner_wallet
+        .wallet_rpc_client()
+        .get_address(0)
+        .await
+        .unwrap()
+        .address;
+
+    monerod.start_miner(&address).await.unwrap();
+
+    let block_height = monerod
+        .monerod_rpc_client()
+        .get_block_count()
+        .await
+        .unwrap();
+
+    miner_wallet
+        .wait_for_wallet_height(block_height)
+        .await
+        .unwrap();
+
+    let alice_address = alice_wallet
+        .wallet_rpc_client()
+        .get_address(0)
+        .await
+        .unwrap()
+        .address;
+
+    let transfer = miner_wallet
+        .transfer(&alice_address, fund_alice)
+        .await
+        .unwrap();
+
+    monerod
+        .monerod_rpc_client()
+        .generate_blocks(10, &address)
+        .await
+        .unwrap();
+
+    let refreshed = alice_wallet.wallet_rpc_client().refresh().await.unwrap();
+    assert_that(&refreshed.received_money).is_true();
+
+    let got_alice_balance = alice_wallet
+        .wallet_rpc_client()
+        .get_balance(0)
+        .await
+        .unwrap();
+
+    let got_bob_balance = bob_wallet.wallet_rpc_client().get_balance(0).await.unwrap();
+
+    assert_that(&got_alice_balance).is_equal_to(fund_alice);
+    assert_that(&got_bob_balance).is_equal_to(fund_bob);
+
+    let tx_id = transfer.tx_hash;
+    let tx_key = transfer.tx_key;
+
+    let res = alice_wallet
+        .wallet_rpc_client()
+        .check_tx_key(&tx_id, &tx_key, &alice_address)
+        .await
+        .expect("failed to check tx by key");
+
+    assert_that!(res.received).is_equal_to(fund_alice);
 }

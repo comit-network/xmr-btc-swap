@@ -84,9 +84,7 @@ impl Default for Monero {
             args: Args::default(),
             ports: None,
             entrypoint: Some("".into()),
-            wait_for_message:
-                "The daemon is running offline and will not attempt to sync to the Monero network"
-                    .to_string(),
+            wait_for_message: "core RPC server started ok".to_string(),
         }
     }
 }
@@ -167,7 +165,7 @@ pub struct MonerodArgs {
 pub struct WalletArgs {
     pub disable_rpc_login: bool,
     pub confirm_external_bind: bool,
-    pub wallet_file: String,
+    pub wallet_dir: String,
     pub rpc_bind_ip: String,
     pub rpc_bind_port: u16,
     pub daemon_address: String,
@@ -259,7 +257,7 @@ impl WalletArgs {
         WalletArgs {
             disable_rpc_login: true,
             confirm_external_bind: true,
-            wallet_file: wallet_name.into(),
+            wallet_dir: wallet_name.into(),
             rpc_bind_ip: "0.0.0.0".into(),
             rpc_bind_port: rpc_port,
             daemon_address,
@@ -279,10 +277,8 @@ impl WalletArgs {
             args.push("--confirm-external-bind".to_string())
         }
 
-        if !self.wallet_file.is_empty() {
-            args.push(format!("--wallet-dir /monero"));
-            // args.push(format!("--wallet-file {}", self.wallet_file));
-            // args.push(format!("--password {}", self.wallet_file));
+        if !self.wallet_dir.is_empty() {
+            args.push(format!("--wallet-dir {}", self.wallet_dir));
         }
 
         if !self.rpc_bind_ip.is_empty() {
@@ -300,11 +296,6 @@ impl WalletArgs {
         if self.log_level != 0 {
             args.push(format!("--log-level {}", self.log_level));
         }
-        // args.push(format!("--daemon-login username:password"));
-        // docker run --rm -d --net host -e DAEMON_HOST=node.xmr.to -e DAEMON_PORT=18081
-        // -e RPC_BIND_PORT=18083 -e RPC_USER=user -e RPC_PASSWD=passwd -v
-        // <path/to/and/including/wallet_folder>:/monero xmrto/monero monero-wallet-rpc
-        // --wallet-file wallet --password-file wallet.passwd
 
         args.join(" ")
     }

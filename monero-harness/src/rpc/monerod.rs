@@ -4,7 +4,6 @@ use crate::{
 };
 
 use anyhow::Result;
-use digest_auth::AuthContext;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
