@@ -51,11 +51,21 @@ mod e2e_test {
             .await
             .unwrap();
 
-        let (monero, _container) = Monero::new(&cli).unwrap();
-        monero.init(xmr_alice, xmr_bob).await.unwrap();
+        let (monero, _container) = Monero::new(&cli, Some("swap_".to_string()), vec![
+            "alice".to_string(),
+            "bob".to_string(),
+        ])
+        .await
+        .unwrap();
+        monero
+            .init(vec![("alice", xmr_alice), ("bob", xmr_bob)])
+            .await
+            .unwrap();
 
-        let alice_xmr_wallet = Arc::new(swap::monero::Wallet(monero.alice_wallet_rpc_client()));
-        let bob_xmr_wallet = Arc::new(swap::monero::Wallet(monero.bob_wallet_rpc_client()));
+        let alice_xmr_wallet = Arc::new(swap::monero::Wallet(
+            monero.wallet("alice").unwrap().client(),
+        ));
+        let bob_xmr_wallet = Arc::new(swap::monero::Wallet(monero.wallet("bob").unwrap().client()));
 
         let alice_behaviour = alice::Alice::default();
         let alice_transport = build(alice_behaviour.identity()).unwrap();
@@ -92,7 +102,7 @@ mod e2e_test {
 
         let xmr_alice_final = alice_xmr_wallet.as_ref().get_balance().await.unwrap();
 
-        monero.wait_for_bob_wallet_block_height().await.unwrap();
+        bob_xmr_wallet.as_ref().0.refresh().await.unwrap();
         let xmr_bob_final = bob_xmr_wallet.as_ref().get_balance().await.unwrap();
 
         assert_eq!(
