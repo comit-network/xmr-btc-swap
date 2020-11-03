@@ -113,7 +113,7 @@ impl<'c> Monero {
         Ok(wallet)
     }
 
-    pub async fn init(&self, alice_amount: u64, bob_amount: u64) -> Result<()> {
+    pub async fn init(&self, wallet_amount: Vec<(&str, u64)>) -> Result<()> {
         let miner_wallet = self.wallet("miner")?;
         let miner_address = miner_wallet.address().await?.address;
 
@@ -123,21 +123,15 @@ impl<'c> Monero {
         tracing::info!("Generated {:?} blocks", block);
         miner_wallet.refresh().await?;
 
-        if alice_amount > 0 {
-            let alice_wallet = self.wallet("alice")?;
-            let alice_address = alice_wallet.address().await?.address;
-            miner_wallet.transfer(&alice_address, alice_amount).await?;
-            tracing::info!("Funded alice wallet with {}", alice_amount);
-            monerod.inner().generate_blocks(10, &miner_address).await?;
-            alice_wallet.refresh().await?;
-        }
-        if bob_amount > 0 {
-            let bob_wallet = self.wallet("bob")?;
-            let bob_address = bob_wallet.address().await?.address;
-            miner_wallet.transfer(&bob_address, bob_amount).await?;
-            tracing::info!("Funded bob wallet with {}", bob_amount);
-            monerod.inner().generate_blocks(10, &miner_address).await?;
-            bob_wallet.refresh().await?;
+        for (wallet, amount) in wallet_amount.iter() {
+            if *amount > 0 {
+                let wallet = self.wallet(wallet)?;
+                let address = wallet.address().await?.address;
+                miner_wallet.transfer(&address, *amount).await?;
+                tracing::info!("Funded {} wallet with {}", wallet.name, amount);
+                monerod.inner().generate_blocks(10, &miner_address).await?;
+                wallet.refresh().await?;
+            }
         }
 
         monerod.start_miner(&miner_address).await?;
@@ -150,30 +144,6 @@ impl<'c> Monero {
             .unwrap();
 
         Ok(())
-    }
-
-    pub async fn fund(&self, address: &str, amount: u64) -> Result<Transfer> {
-        self.transfer("miner", address, amount).await
-    }
-
-    pub async fn transfer_from_alice(&self, address: &str, amount: u64) -> Result<Transfer> {
-        self.transfer("alice", address, amount).await
-    }
-
-    pub async fn transfer_from_bob(&self, address: &str, amount: u64) -> Result<Transfer> {
-        self.transfer("bob", address, amount).await
-    }
-
-    async fn transfer(&self, from_wallet: &str, address: &str, amount: u64) -> Result<Transfer> {
-        let from = self.wallet(from_wallet)?;
-        let transfer = from.transfer(address, amount).await?;
-        let miner_address = self.wallet("miner")?.address().await?.address;
-        self.monerod
-            .inner()
-            .generate_blocks(10, &miner_address)
-            .await?;
-        from.inner().refresh().await?;
-        Ok(transfer)
     }
 }
 
@@ -292,9 +262,7 @@ impl<'c> MoneroWalletRpc {
 
     /// Sends amount to address
     pub async fn transfer(&self, address: &str, amount: u64) -> Result<Transfer> {
-        let transfer = self.inner().transfer(0, amount, address).await?;
-        self.inner().refresh().await?;
-        Ok(transfer)
+        self.inner().transfer(0, amount, address).await
     }
 
     pub async fn address(&self) -> Result<GetAddress> {

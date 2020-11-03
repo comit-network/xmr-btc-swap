@@ -9,7 +9,8 @@ async fn init_miner_and_mine_to_miner_address() {
     let tc = Cli::default();
     let (monero, _monerod_container) = Monero::new(&tc, None, vec![]).await.unwrap();
 
-    monero.init(0, 0).await.unwrap();
+    monero.init(vec![]).await.unwrap();
+
     let monerod = monero.monerod();
     let miner_wallet = monero.wallet("miner").unwrap();
 

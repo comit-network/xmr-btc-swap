@@ -17,23 +17,36 @@ async fn fund_transfer_and_check_tx_key() {
     .unwrap();
     let alice_wallet = monero.wallet("alice").unwrap();
     let bob_wallet = monero.wallet("bob").unwrap();
+    let miner_wallet = monero.wallet("miner").unwrap();
+
+    let miner_address = miner_wallet.address().await.unwrap().address;
 
     // fund alice
-    monero.init(fund_alice, fund_bob).await.unwrap();
+    monero
+        .init(vec![("alice", fund_alice), ("bob", fund_bob)])
+        .await
+        .unwrap();
 
     // check alice balance
-    alice_wallet.inner().refresh().await.unwrap();
+    alice_wallet.refresh().await.unwrap();
     let got_alice_balance = alice_wallet.balance().await.unwrap();
     assert_that(&got_alice_balance).is_equal_to(fund_alice);
 
     // transfer from alice to bob
     let bob_address = bob_wallet.address().await.unwrap().address;
-    let transfer = monero
-        .transfer_from_alice(&bob_address, send_to_bob)
+    let transfer = alice_wallet
+        .transfer(&bob_address, send_to_bob)
         .await
         .unwrap();
 
-    bob_wallet.inner().refresh().await.unwrap();
+    monero
+        .monerod()
+        .inner()
+        .generate_blocks(10, &miner_address)
+        .await
+        .unwrap();
+
+    bob_wallet.refresh().await.unwrap();
     let got_bob_balance = bob_wallet.balance().await.unwrap();
     assert_that(&got_bob_balance).is_equal_to(send_to_bob);
 
