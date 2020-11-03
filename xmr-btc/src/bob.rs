@@ -28,7 +28,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::time::timeout;
+use tokio::{sync::Mutex, time::timeout};
 use tracing::error;
 
 pub mod message;
@@ -62,7 +62,7 @@ pub trait ReceiveTransferProof {
 /// The argument `bitcoin_tx_lock_timeout` is used to determine how long we will
 /// wait for Bob, the caller of this function, to lock up the bitcoin.
 pub fn action_generator<N, M, B>(
-    mut network: N,
+    network: Arc<Mutex<N>>,
     monero_client: Arc<M>,
     bitcoin_client: Arc<B>,
     // TODO: Replace this with a new, slimmer struct?
@@ -85,7 +85,7 @@ pub fn action_generator<N, M, B>(
     bitcoin_tx_lock_timeout: u64,
 ) -> GenBoxed<Action, (), ()>
 where
-    N: ReceiveTransferProof + Send + Sync + 'static,
+    N: ReceiveTransferProof + Send + 'static,
     M: monero::WatchForTransfer + Send + Sync + 'static,
     B: bitcoin::BlockHeight
         + bitcoin::TransactionBlockHeight
@@ -140,14 +140,21 @@ where
             .shared();
             pin_mut!(poll_until_btc_has_expired);
 
-            let transfer_proof = match select(
-                network.receive_transfer_proof(),
-                poll_until_btc_has_expired.clone(),
-            )
-            .await
-            {
-                Either::Left((proof, _)) => proof,
-                Either::Right(_) => return Err(SwapFailed::AfterBtcLock(Reason::BtcExpired)),
+            let transfer_proof = {
+                let mut guard = network.as_ref().lock().await;
+                let transfer_proof = match select(
+                    guard.receive_transfer_proof(),
+                    poll_until_btc_has_expired.clone(),
+                )
+                .await
+                {
+                    Either::Left((proof, _)) => proof,
+                    Either::Right(_) => return Err(SwapFailed::AfterBtcLock(Reason::BtcExpired)),
+                };
+
+                tracing::debug!("select returned transfer proof from message");
+
+                transfer_proof
             };
 
             let S_b_monero = monero::PublicKey::from_private_key(&monero::PrivateKey::from_scalar(

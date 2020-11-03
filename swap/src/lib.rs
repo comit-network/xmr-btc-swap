@@ -4,15 +4,14 @@ use std::fmt::{self, Display};
 pub mod alice;
 pub mod bitcoin;
 pub mod bob;
+pub mod monero;
 pub mod network;
 pub mod storage;
 #[cfg(feature = "tor")]
 pub mod tor;
 
-pub const ONE_BTC: u64 = 100_000_000;
-
 const REFUND_TIMELOCK: u32 = 10; // Relative timelock, this is number of blocks. TODO: What should it be?
-const PUNISH_TIMELOCK: u32 = 20; // FIXME: What should this be?
+const PUNISH_TIMELOCK: u32 = 10; // FIXME: What should this be?
 
 pub type Never = std::convert::Infallible;
 

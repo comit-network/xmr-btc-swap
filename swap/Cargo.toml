@@ -12,13 +12,15 @@ atty = "0.2"
 backoff = { version = "0.2", features = ["tokio"] }
 base64 = "0.12"
 bitcoin = { version = "0.23", features = ["rand", "use-serde"] } # TODO: Upgrade other crates in this repo to use this version.
-bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "d402b36d3d6406150e3bfb71492ff4a0a7cb290e" }
+bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "f1bbe6a4540d0741f1f4f22577cfeeadbfd7aaaf" }
 derivative = "2"
 futures = { version = "0.3", default-features = false }
+genawaiter = "0.99.1"
 libp2p = { version = "0.29", default-features = false, features = ["tcp-tokio", "yamux", "mplex", "dns", "noise", "request-response"] }
 libp2p-tokio-socks5 = "0.4"
 log = { version = "0.4", features = ["serde"] }
 monero = "0.9"
+monero-harness = { path = "../monero-harness" }
 rand = "0.7"
 reqwest = { version = "0.10", default-features = false, features = ["socks"] }
 serde = { version = "1", features = ["derive"] }
@@ -45,6 +47,7 @@ hyper = "0.13"
 port_check = "0.1"
 spectral = "0.6"
 tempfile = "3"
+testcontainers = "0.10"
 
 [features]
 default = []

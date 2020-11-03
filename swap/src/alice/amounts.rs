@@ -1,11 +1,10 @@
-use anyhow::Result;
 use libp2p::{
     request_response::{
-        handler::RequestProtocol, ProtocolSupport, RequestId, RequestResponse,
-        RequestResponseConfig, RequestResponseEvent, RequestResponseMessage, ResponseChannel,
+        handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
+        RequestResponseEvent, RequestResponseMessage, ResponseChannel,
     },
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
-    NetworkBehaviour, PeerId,
+    NetworkBehaviour,
 };
 use std::{
     collections::VecDeque,
@@ -14,7 +13,7 @@ use std::{
 };
 use tracing::{debug, error};
 
-use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Protocol, TIMEOUT};
+use crate::network::request_response::{AliceToBob, AmountsProtocol, BobToAlice, Codec, TIMEOUT};
 
 #[derive(Debug)]
 pub enum OutEvent {
@@ -29,7 +28,7 @@ pub enum OutEvent {
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Amounts {
-    rr: RequestResponse<Codec>,
+    rr: RequestResponse<Codec<AmountsProtocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
@@ -40,23 +39,11 @@ impl Amounts {
         self.rr.send_response(channel, msg);
     }
 
-    pub async fn request_amounts(
-        &mut self,
-        alice: PeerId,
-        btc: ::bitcoin::Amount,
-    ) -> Result<RequestId> {
-        let msg = BobToAlice::AmountsFromBtc(btc);
-        let id = self.rr.send_request(&alice, msg);
-        debug!("Request sent to: {}", alice);
-
-        Ok(id)
-    }
-
     fn poll(
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<AmountsProtocol>>, OutEvent>> {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -75,7 +62,7 @@ impl Default for Amounts {
         Self {
             rr: RequestResponse::new(
                 Codec::default(),
-                vec![(Protocol, ProtocolSupport::Full)],
+                vec![(AmountsProtocol, ProtocolSupport::Full)],
                 config,
             ),
             events: Default::default(),
@@ -92,12 +79,12 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                         request, channel, ..
                     },
                 ..
-            } => match request {
-                BobToAlice::AmountsFromBtc(btc) => {
+            } => {
+                if let BobToAlice::AmountsFromBtc(btc) = request {
+                    debug!("Received amounts request");
                     self.events.push_back(OutEvent::Btc { btc, channel })
                 }
-                other => debug!("got request: {:?}", other),
-            },
+            }
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { .. },
                 ..

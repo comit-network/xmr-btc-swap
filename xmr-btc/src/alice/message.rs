@@ -31,7 +31,7 @@ pub struct Message1 {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message2 {
-    pub(crate) tx_lock_proof: monero::TransferProof,
+    pub tx_lock_proof: monero::TransferProof,
 }
 
 impl_try_from_parent_enum!(Message0, Message);

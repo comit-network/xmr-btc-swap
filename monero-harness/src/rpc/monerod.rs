@@ -6,12 +6,7 @@ use crate::{
 use anyhow::Result;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-
-// #[cfg(not(test))]
-// use tracing::debug;
-//
-// #[cfg(test)]
-use std::eprintln as debug;
+use tracing::debug;
 
 /// RPC client for monerod and monero-wallet-rpc.
 #[derive(Debug, Clone)]

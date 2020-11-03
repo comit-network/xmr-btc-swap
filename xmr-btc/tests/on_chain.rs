@@ -1,7 +1,5 @@
 pub mod harness;
 
-use std::{convert::TryInto, sync::Arc};
-
 use anyhow::Result;
 use async_trait::async_trait;
 use futures::{
@@ -16,9 +14,10 @@ use harness::{
 };
 use monero_harness::Monero;
 use rand::rngs::OsRng;
+use std::{convert::TryInto, sync::Arc};
 use testcontainers::clients::Cli;
+use tokio::sync::Mutex;
 use tracing::info;
-use tracing_subscriber::util::SubscriberInitExt;
 use xmr_btc::{
     alice::{self, ReceiveBitcoinRedeemEncsig},
     bitcoin::{BroadcastSignedTransaction, EncryptedSignature, SignTxLock},
@@ -102,7 +101,7 @@ impl Default for BobBehaviour {
 }
 
 async fn swap_as_alice(
-    network: AliceNetwork,
+    network: Arc<Mutex<AliceNetwork>>,
     // FIXME: It would be more intuitive to have a single network/transport struct instead of
     // splitting into two, but Rust ownership rules make this tedious
     mut sender: Sender<TransferProof>,
@@ -168,7 +167,7 @@ async fn swap_as_alice(
 }
 
 async fn swap_as_bob(
-    network: BobNetwork,
+    network: Arc<Mutex<BobNetwork>>,
     mut sender: Sender<EncryptedSignature>,
     monero_wallet: Arc<harness::wallet::monero::Wallet>,
     bitcoin_wallet: Arc<harness::wallet::bitcoin::Wallet>,
@@ -276,7 +275,7 @@ async fn on_chain_happy_path() {
 
     try_join(
         swap_as_alice(
-            alice_network,
+            Arc::new(Mutex::new(alice_network)),
             alice_sender,
             alice_monero_wallet.clone(),
             alice_bitcoin_wallet.clone(),
@@ -284,7 +283,7 @@ async fn on_chain_happy_path() {
             alice,
         ),
         swap_as_bob(
-            bob_network,
+            Arc::new(Mutex::new(bob_network)),
             bob_sender,
             bob_monero_wallet.clone(),
             bob_bitcoin_wallet.clone(),
@@ -367,7 +366,7 @@ async fn on_chain_both_refund_if_alice_never_redeems() {
 
     try_join(
         swap_as_alice(
-            alice_network,
+            Arc::new(Mutex::new(alice_network)),
             alice_sender,
             alice_monero_wallet.clone(),
             alice_bitcoin_wallet.clone(),
@@ -378,7 +377,7 @@ async fn on_chain_both_refund_if_alice_never_redeems() {
             alice,
         ),
         swap_as_bob(
-            bob_network,
+            Arc::new(Mutex::new(bob_network)),
             bob_sender,
             bob_monero_wallet.clone(),
             bob_bitcoin_wallet.clone(),
@@ -419,11 +418,6 @@ async fn on_chain_both_refund_if_alice_never_redeems() {
 
 #[tokio::test]
 async fn on_chain_alice_punishes_if_bob_never_acts_after_fund() {
-    let _guard = tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .with_ansi(false)
-        .set_default();
-
     let cli = Cli::default();
     let (monero, _container) = Monero::new(&cli).unwrap();
     let bitcoind = init_bitcoind(&cli).await;
@@ -461,7 +455,7 @@ async fn on_chain_alice_punishes_if_bob_never_acts_after_fund() {
     let (bob_network, alice_sender) = Network::<TransferProof>::new();
 
     let alice_swap = swap_as_alice(
-        alice_network,
+        Arc::new(Mutex::new(alice_network)),
         alice_sender,
         alice_monero_wallet.clone(),
         alice_bitcoin_wallet.clone(),
@@ -469,7 +463,7 @@ async fn on_chain_alice_punishes_if_bob_never_acts_after_fund() {
         alice,
     );
     let bob_swap = swap_as_bob(
-        bob_network,
+        Arc::new(Mutex::new(bob_network)),
         bob_sender,
         bob_monero_wallet.clone(),
         bob_bitcoin_wallet.clone(),
