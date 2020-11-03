@@ -57,7 +57,7 @@ async fn main() -> Result<()> {
             let behaviour = Alice::default();
             let local_key_pair = behaviour.identity();
 
-            let (listen_addr, ac, transport) = match tor_port {
+            let (listen_addr, _ac, transport) = match tor_port {
                 Some(tor_port) => {
                     let tor_secret_key = torut::onion::TorSecretKeyV3::generate();
                     let onion_address = tor_secret_key

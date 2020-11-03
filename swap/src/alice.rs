@@ -28,7 +28,6 @@ use crate::{
     network::{
         peer_tracker::{self, PeerTracker},
         request_response::AliceToBob,
-        transport,
         transport::SwapTransport,
         TokioExecutor,
     },

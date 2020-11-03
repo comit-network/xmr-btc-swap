@@ -27,7 +27,6 @@ use crate::{
     monero,
     network::{
         peer_tracker::{self, PeerTracker},
-        transport,
         transport::SwapTransport,
         TokioExecutor,
     },
