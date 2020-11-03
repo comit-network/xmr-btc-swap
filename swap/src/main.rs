@@ -156,7 +156,7 @@ async fn create_tor_service(
 async fn swap_as_alice(
     bitcoin_wallet: Arc<swap::bitcoin::Wallet>,
     monero_wallet: Arc<swap::monero::Wallet>,
-    db: Database<storage::Alice>,
+    db: Database,
     addr: Multiaddr,
     transport: SwapTransport,
     behaviour: Alice,
@@ -167,7 +167,7 @@ async fn swap_as_alice(
 async fn swap_as_bob(
     bitcoin_wallet: Arc<swap::bitcoin::Wallet>,
     monero_wallet: Arc<swap::monero::Wallet>,
-    db: Database<storage::Bob>,
+    db: Database,
     sats: u64,
     alice: Multiaddr,
     transport: SwapTransport,

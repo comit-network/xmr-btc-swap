@@ -45,7 +45,7 @@ use xmr_btc::{
 pub async fn swap(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
-    db: Database<storage::Alice>,
+    db: Database,
     listen: Multiaddr,
     transport: SwapTransport,
     behaviour: Alice,
@@ -177,7 +177,7 @@ pub async fn swap(
     };
 
     let swap_id = Uuid::new_v4();
-    db.insert_latest_state(swap_id, &storage::Alice::Handshaken(state3.clone()))
+    db.insert_latest_state(swap_id, storage::Alice::Handshaken(state3.clone()).into())
         .await?;
 
     info!("Handshake complete, we now have State3 for Alice.");
@@ -205,14 +205,14 @@ pub async fn swap(
                 public_spend_key,
                 public_view_key,
             }) => {
-                db.insert_latest_state(swap_id, &storage::Alice::BtcLocked(state3.clone()))
+                db.insert_latest_state(swap_id, storage::Alice::BtcLocked(state3.clone()).into())
                     .await?;
 
                 let (transfer_proof, _) = monero_wallet
                     .transfer(public_spend_key, public_view_key, amount)
                     .await?;
 
-                db.insert_latest_state(swap_id, &storage::Alice::XmrLocked(state3.clone()))
+                db.insert_latest_state(swap_id, storage::Alice::XmrLocked(state3.clone()).into())
                     .await?;
 
                 let mut guard = network.as_ref().lock().await;
@@ -221,10 +221,14 @@ pub async fn swap(
             }
 
             GeneratorState::Yielded(Action::RedeemBtc(tx)) => {
-                db.insert_latest_state(swap_id, &storage::Alice::BtcRedeemable {
-                    state: state3.clone(),
-                    redeem_tx: tx.clone(),
-                })
+                db.insert_latest_state(
+                    swap_id,
+                    storage::Alice::BtcRedeemable {
+                        state: state3.clone(),
+                        redeem_tx: tx.clone(),
+                    }
+                    .into(),
+                )
                 .await?;
 
                 let _ = bitcoin_wallet.broadcast_signed_transaction(tx).await?;
@@ -233,8 +237,11 @@ pub async fn swap(
                 let _ = bitcoin_wallet.broadcast_signed_transaction(tx).await?;
             }
             GeneratorState::Yielded(Action::PunishBtc(tx)) => {
-                db.insert_latest_state(swap_id, &storage::Alice::BtcPunishable(state3.clone()))
-                    .await?;
+                db.insert_latest_state(
+                    swap_id,
+                    storage::Alice::BtcPunishable(state3.clone()).into(),
+                )
+                .await?;
 
                 let _ = bitcoin_wallet.broadcast_signed_transaction(tx).await?;
             }
@@ -242,11 +249,15 @@ pub async fn swap(
                 spend_key,
                 view_key,
             }) => {
-                db.insert_latest_state(swap_id, &storage::Alice::BtcRefunded {
-                    state: state3.clone(),
-                    spend_key,
-                    view_key,
-                })
+                db.insert_latest_state(
+                    swap_id,
+                    storage::Alice::BtcRefunded {
+                        state: state3.clone(),
+                        spend_key,
+                        view_key,
+                    }
+                    .into(),
+                )
                 .await?;
 
                 monero_wallet
@@ -254,7 +265,7 @@ pub async fn swap(
                     .await?;
             }
             GeneratorState::Complete(()) => {
-                db.insert_latest_state(swap_id, &storage::Alice::SwapComplete)
+                db.insert_latest_state(swap_id, storage::Alice::SwapComplete.into())
                     .await?;
 
                 return Ok(());
