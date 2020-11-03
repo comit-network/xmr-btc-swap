@@ -2,6 +2,7 @@ use libp2p::core::Multiaddr;
 use url::Url;
 
 #[derive(structopt::StructOpt, Debug)]
+#[structopt(name = "xmr-btc-swap", about = "Trustless XMR BTC swaps")]
 pub enum Options {
     Alice {
         #[structopt(default_value = "http://127.0.0.1:8332", long = "bitcoind")]
@@ -22,5 +23,8 @@ pub enum Options {
 
         #[structopt(default_value = "http://127.0.0.1:8332", long = "bitcoind")]
         bitcoind_url: Url,
+
+        #[structopt(long = "tor")]
+        tor: bool,
     },
 }

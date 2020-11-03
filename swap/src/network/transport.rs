@@ -5,7 +5,7 @@ use libp2p::{
         muxing::StreamMuxerBox,
         transport::Boxed,
         upgrade::{SelectUpgrade, Version},
-        Multiaddr, Transport,
+        Transport,
     },
     dns::DnsConfig,
     mplex::MplexConfig,
@@ -46,13 +46,15 @@ pub fn build(id_keys: identity::Keypair) -> Result<SwapTransport> {
 /// - multiplexing via yamux or mplex
 pub fn build_tor(
     id_keys: identity::Keypair,
-    addr: libp2p::core::Multiaddr,
-    port: u16,
+    address_port_pair: Option<(libp2p::core::Multiaddr, u16)>,
 ) -> Result<SwapTransport> {
     use libp2p_tokio_socks5::Socks5TokioTcpConfig;
     use std::collections::HashMap;
 
-    let map: HashMap<Multiaddr, u16> = [(addr, port)].iter().cloned().collect();
+    let mut map = HashMap::new();
+    if let Some((addr, port)) = address_port_pair {
+        map.insert(addr, port);
+    }
 
     let dh_keys = noise::Keypair::<X25519Spec>::new().into_authentic(&id_keys)?;
     let noise = NoiseConfig::xx(dh_keys).into_authenticated();

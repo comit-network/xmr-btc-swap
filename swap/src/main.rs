@@ -66,7 +66,7 @@ async fn main() -> Result<()> {
                     let onion_address_string = format!("/onion3/{}:{}", onion_address, tor_port);
                     let addr: Multiaddr = onion_address_string.parse()?;
                     let ac = create_tor_service(tor_secret_key, tor_port).await?;
-                    let transport = build_tor(local_key_pair, addr.clone(), tor_port)?;
+                    let transport = build_tor(local_key_pair, Some((addr.clone(), tor_port)))?;
                     (addr, Some(ac), transport)
                 }
                 None => {
@@ -88,13 +88,17 @@ async fn main() -> Result<()> {
             alice_addr,
             satoshis,
             bitcoind_url: url,
+            tor,
         } => {
             info!("running swap node as Bob ...");
 
             let behaviour = Bob::default();
             let local_key_pair = behaviour.identity();
 
-            let transport = build(local_key_pair)?;
+            let transport = match tor {
+                true => build_tor(local_key_pair, None)?,
+                false => build(local_key_pair)?,
+            };
 
             let bitcoin_wallet = Wallet::new("bob", &url)
                 .await
