@@ -4,7 +4,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
 use bitcoin::{util::psbt::PartiallySignedTransaction, Address, Transaction};
-use bitcoin_harness::{bitcoind_rpc::PsbtBase64, Bitcoind};
+use bitcoin_harness::bitcoind_rpc::PsbtBase64;
 use reqwest::Url;
 use tokio::time;
 use xmr_btc::bitcoin::{
@@ -20,8 +20,8 @@ pub const TX_LOCK_MINE_TIMEOUT: u64 = 3600;
 pub struct Wallet(pub bitcoin_harness::Wallet);
 
 impl Wallet {
-    pub async fn new(name: &str, url: &Url) -> Result<Self> {
-        let wallet = bitcoin_harness::Wallet::new(name, url.clone()).await?;
+    pub async fn new(name: &str, url: Url) -> Result<Self> {
+        let wallet = bitcoin_harness::Wallet::new(name, url).await?;
 
         Ok(Self(wallet))
     }
@@ -44,22 +44,6 @@ impl Wallet {
 
         Ok(fee)
     }
-}
-
-pub async fn make_wallet(
-    name: &str,
-    bitcoind: &Bitcoind<'_>,
-    fund_amount: Amount,
-) -> Result<Wallet> {
-    let wallet = Wallet::new(name, &bitcoind.node_url).await?;
-    let buffer = Amount::from_btc(1.0).unwrap();
-    let amount = fund_amount + buffer;
-
-    let address = wallet.0.new_address().await.unwrap();
-
-    bitcoind.mint(address, amount).await.unwrap();
-
-    Ok(wallet)
 }
 
 #[async_trait]

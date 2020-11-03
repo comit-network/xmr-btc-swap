@@ -1,19 +1,36 @@
+use libp2p::core::Multiaddr;
+use url::Url;
+
 #[derive(structopt::StructOpt, Debug)]
-pub struct Options {
-    /// Run the swap as Alice.
-    #[structopt(long = "as-alice")]
-    pub as_alice: bool,
+#[structopt(name = "xmr-btc-swap", about = "Trustless XMR BTC swaps")]
+pub enum Options {
+    Alice {
+        #[structopt(default_value = "http://127.0.0.1:8332", long = "bitcoind")]
+        bitcoind_url: Url,
 
-    /// Run the swap as Bob and try to swap this many XMR (in piconero).
-    #[structopt(long = "picos")]
-    pub piconeros: Option<u64>,
+        #[structopt(default_value = "http://127.0.0.1:18083", long = "monerod")]
+        monerod_url: Url,
 
-    /// Run the swap as Bob and try to swap this many BTC (in satoshi).
-    #[structopt(long = "sats")]
-    pub satoshis: Option<u64>,
+        #[structopt(default_value = "/ip4/127.0.0.1/tcp/9876", long = "listen-addr")]
+        listen_addr: Multiaddr,
 
-    /// Alice's onion multitaddr (only required for Bob, Alice will autogenerate
-    /// one)
-    #[structopt(long)]
-    pub alice_address: Option<String>,
+        #[structopt(long = "tor-port")]
+        tor_port: Option<u16>,
+    },
+    Bob {
+        #[structopt(long = "sats")]
+        satoshis: u64,
+
+        #[structopt(long = "alice-addr")]
+        alice_addr: Multiaddr,
+
+        #[structopt(default_value = "http://127.0.0.1:8332", long = "bitcoind")]
+        bitcoind_url: Url,
+
+        #[structopt(default_value = "http://127.0.0.1:18083", long = "monerod")]
+        monerod_url: Url,
+
+        #[structopt(long = "tor")]
+        tor: bool,
+    },
 }

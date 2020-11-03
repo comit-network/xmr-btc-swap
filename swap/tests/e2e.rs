@@ -5,7 +5,7 @@ mod e2e_test {
     use libp2p::Multiaddr;
     use monero_harness::Monero;
     use std::sync::Arc;
-    use swap::{alice, bob};
+    use swap::{alice, bob, network::transport::build};
     use testcontainers::clients::Cli;
     use tracing_subscriber::util::SubscriberInitExt;
 
@@ -37,12 +37,12 @@ mod e2e_test {
         let xmr_bob = 0;
 
         let alice_btc_wallet = Arc::new(
-            swap::bitcoin::Wallet::new("alice", &bitcoind.node_url)
+            swap::bitcoin::Wallet::new("alice", bitcoind.node_url.clone())
                 .await
                 .unwrap(),
         );
         let bob_btc_wallet = Arc::new(
-            swap::bitcoin::Wallet::new("bob", &bitcoind.node_url)
+            swap::bitcoin::Wallet::new("bob", bitcoind.node_url.clone())
                 .await
                 .unwrap(),
         );
@@ -57,15 +57,20 @@ mod e2e_test {
         let alice_xmr_wallet = Arc::new(swap::monero::Wallet(monero.alice_wallet_rpc_client()));
         let bob_xmr_wallet = Arc::new(swap::monero::Wallet(monero.bob_wallet_rpc_client()));
 
+        let alice_behaviour = alice::Alice::default();
+        let alice_transport = build(alice_behaviour.identity()).unwrap();
         let alice_swap = alice::swap(
             alice_btc_wallet.clone(),
             alice_xmr_wallet.clone(),
             alice_multiaddr.clone(),
-            None,
+            alice_transport,
+            alice_behaviour,
         );
 
         let (cmd_tx, mut _cmd_rx) = mpsc::channel(1);
         let (mut rsp_tx, rsp_rx) = mpsc::channel(1);
+        let bob_behaviour = bob::Bob::default();
+        let bob_transport = build(bob_behaviour.identity()).unwrap();
         let bob_swap = bob::swap(
             bob_btc_wallet.clone(),
             bob_xmr_wallet.clone(),
@@ -73,6 +78,8 @@ mod e2e_test {
             alice_multiaddr,
             cmd_tx,
             rsp_rx,
+            bob_transport,
+            bob_behaviour,
         );
 
         // automate the verification step by accepting any amounts sent over by Alice
