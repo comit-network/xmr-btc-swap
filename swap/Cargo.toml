@@ -39,6 +39,7 @@ tracing-futures = { version = "0.2", features = ["std-future", "futures-03"] }
 tracing-log = "0.1"
 tracing-subscriber = { version = "0.2", default-features = false, features = ["fmt", "ansi", "env-filter"] }
 url = "2.1"
+uuid = { version = "0.8", features = ["serde", "v4"] }
 void = "1"
 xmr-btc = { path = "../xmr-btc" }
 

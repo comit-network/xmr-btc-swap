@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::path::Path;
+use uuid::Uuid;
 use xmr_btc::{alice, bob, monero, serde::monero_private_key};
 
 #[allow(clippy::large_enum_variant)]
@@ -45,9 +46,6 @@ impl<T> Database<T>
 where
     T: Serialize + DeserializeOwned,
 {
-    // TODO: serialize using lazy/one-time initlisation
-    const LAST_STATE_KEY: &'static str = "latest_state";
-
     pub fn open(path: &Path) -> Result<Self> {
         let db =
             sled::open(path).with_context(|| format!("Could not open the DB at {:?}", path))?;
@@ -60,8 +58,8 @@ where
 
     // TODO: Add method to update state
 
-    pub async fn insert_latest_state(&self, state: &T) -> Result<()> {
-        let key = serialize(&Self::LAST_STATE_KEY)?;
+    pub async fn insert_latest_state(&self, swap_id: Uuid, state: &T) -> Result<()> {
+        let key = serialize(&swap_id)?;
         let new_value = serialize(&state).context("Could not serialize new state value")?;
 
         let old_value = self.db.get(&key)?;
@@ -79,8 +77,8 @@ where
             .context("Could not flush db")
     }
 
-    pub fn get_latest_state(&self) -> anyhow::Result<T> {
-        let key = serialize(&Self::LAST_STATE_KEY)?;
+    pub fn get_latest_state(&self, swap_id: Uuid) -> anyhow::Result<T> {
+        let key = serialize(&swap_id)?;
 
         let encoded = self
             .db
@@ -172,20 +170,21 @@ mod tests {
             tx_punish_sig,
         };
 
-        db.insert_latest_state(&state)
+        let swap_id = Uuid::new_v4();
+        db.insert_latest_state(swap_id, &state)
             .await
             .expect("Failed to save state the first time");
         let recovered: TestState = db
-            .get_latest_state()
+            .get_latest_state(swap_id)
             .expect("Failed to recover state the first time");
 
         // We insert and recover twice to ensure database implementation allows the
         // caller to write to an existing key
-        db.insert_latest_state(&recovered)
+        db.insert_latest_state(swap_id, &recovered)
             .await
             .expect("Failed to save state the second time");
         let recovered: TestState = db
-            .get_latest_state()
+            .get_latest_state(swap_id)
             .expect("Failed to recover state the second time");
 
         assert_eq!(state, recovered);
