@@ -5,6 +5,7 @@ use monero::{Address, Network, PrivateKey};
 use monero_harness::rpc::wallet;
 use std::{str::FromStr, time::Duration};
 
+use url::Url;
 pub use xmr_btc::monero::{
     Amount, CreateWalletForOutput, InsufficientFunds, PrivateViewKey, PublicKey, PublicViewKey,
     Transfer, TransferProof, TxHash, WatchForTransfer, *,
@@ -13,8 +14,8 @@ pub use xmr_btc::monero::{
 pub struct Wallet(pub wallet::Client);
 
 impl Wallet {
-    pub fn localhost(port: u16) -> Self {
-        Self(wallet::Client::localhost(port))
+    pub fn new(url: Url) -> Self {
+        Self(wallet::Client::new(url))
     }
 
     /// Get the balance of the primary account.

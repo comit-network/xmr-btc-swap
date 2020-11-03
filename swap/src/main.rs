@@ -21,21 +21,18 @@ use structopt::StructOpt;
 use swap::{
     alice,
     alice::Alice,
-    bitcoin::Wallet,
-    bob,
+    bitcoin, bob,
     bob::Bob,
+    monero,
     network::transport::{build, build_tor, SwapTransport},
     Cmd, Rsp, SwapAmounts,
 };
 use tracing::info;
-use url::Url;
-use xmr_btc::bitcoin::{BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock};
 
 mod cli;
 mod trace;
 
 use cli::Options;
-use swap::{alice, bitcoin, bob, monero, Cmd, Rsp, SwapAmounts};
 
 // TODO: Add root seed file instead of generating new seed each run.
 
@@ -47,7 +44,8 @@ async fn main() -> Result<()> {
 
     match opt {
         Options::Alice {
-            bitcoind_url: url,
+            bitcoind_url,
+            monerod_url,
             listen_addr,
             tor_port,
         } => {
@@ -75,19 +73,27 @@ async fn main() -> Result<()> {
                 }
             };
 
-            let bitcoin_wallet = bitcoin::Wallet::new("alice", &url)
+            let bitcoin_wallet = bitcoin::Wallet::new("alice", bitcoind_url)
                 .await
                 .expect("failed to create bitcoin wallet");
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
-            let monero_wallet = Arc::new(monero::Wallet::localhost(MONERO_WALLET_RPC_PORT));
+            let monero_wallet = Arc::new(monero::Wallet::new(monerod_url));
 
-            swap_as_alice(listen_addr, redeem, punish, transport, behaviour).await?;
+            swap_as_alice(
+                bitcoin_wallet,
+                monero_wallet,
+                listen_addr,
+                transport,
+                behaviour,
+            )
+            .await?;
         }
         Options::Bob {
             alice_addr,
             satoshis,
-            bitcoind_url: url,
+            bitcoind_url,
+            monerod_url,
             tor,
         } => {
             info!("running swap node as Bob ...");
@@ -100,17 +106,18 @@ async fn main() -> Result<()> {
                 false => build(local_key_pair)?,
             };
 
-            let bitcoin_wallet = Wallet::new("bob", &url)
+            let bitcoin_wallet = bitcoin::Wallet::new("bob", bitcoind_url)
                 .await
                 .expect("failed to create bitcoin wallet");
+            let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
-            let monero_wallet = Arc::new(monero::Wallet::localhost(MONERO_WALLET_RPC_PORT));
+            let monero_wallet = Arc::new(monero::Wallet::new(monerod_url));
 
             swap_as_bob(
+                bitcoin_wallet,
+                monero_wallet,
                 satoshis,
                 alice_addr,
-                refund,
-                bitcoin_wallet,
                 transport,
                 behaviour,
             )
@@ -143,12 +150,10 @@ async fn swap_as_alice(
     bitcoin_wallet: Arc<swap::bitcoin::Wallet>,
     monero_wallet: Arc<swap::monero::Wallet>,
     addr: Multiaddr,
-    redeem: bitcoin::Address,
-    punish: bitcoin::Address,
     transport: SwapTransport,
     behaviour: Alice,
 ) -> Result<()> {
-    alice::swap(addr, redeem, punish, transport, behaviour).await
+    alice::swap(bitcoin_wallet, monero_wallet, addr, transport, behaviour).await
 }
 
 async fn swap_as_bob(
@@ -156,18 +161,20 @@ async fn swap_as_bob(
     monero_wallet: Arc<swap::monero::Wallet>,
     sats: u64,
     alice: Multiaddr,
-    refund: bitcoin::Address,
-    wallet: W,
     transport: SwapTransport,
     behaviour: Bob,
-) -> Result<()>
-where
-    W: BuildTxLockPsbt + SignTxLock + BroadcastSignedTransaction + Send + Sync + 'static,
-{
+) -> Result<()> {
     let (cmd_tx, mut cmd_rx) = mpsc::channel(1);
     let (mut rsp_tx, rsp_rx) = mpsc::channel(1);
     tokio::spawn(bob::swap(
-        sats, alice, cmd_tx, rsp_rx, refund, wallet, transport, behaviour,
+        bitcoin_wallet,
+        monero_wallet,
+        sats,
+        alice,
+        cmd_tx,
+        rsp_rx,
+        transport,
+        behaviour,
     ));
 
     loop {

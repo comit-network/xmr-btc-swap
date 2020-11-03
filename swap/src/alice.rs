@@ -44,8 +44,6 @@ pub async fn swap(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
     listen: Multiaddr,
-    redeem_address: ::bitcoin::Address,
-    punish_address: ::bitcoin::Address,
     transport: SwapTransport,
     behaviour: Alice,
 ) -> Result<()> {
@@ -71,7 +69,6 @@ pub async fn swap(
 
     // TODO: For retry, use `backoff::ExponentialBackoff` in production as opposed
     // to `ConstantBackoff`.
-
     #[async_trait]
     impl ReceiveBitcoinRedeemEncsig for Network {
         async fn receive_bitcoin_redeem_encsig(&mut self) -> xmr_btc::bitcoin::EncryptedSignature {

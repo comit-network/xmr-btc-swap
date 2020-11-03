@@ -39,6 +39,7 @@ use xmr_btc::{
     monero::CreateWalletForOutput,
 };
 
+#[allow(clippy::too_many_arguments)]
 pub async fn swap(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
