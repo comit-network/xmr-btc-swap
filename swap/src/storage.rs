@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::path::Path;
 use uuid::Uuid;
@@ -95,6 +95,25 @@ impl Database {
         let state = deserialize(&encoded).context("Could not deserialize state")?;
         Ok(state)
     }
+
+    pub fn all(&self) -> Result<Vec<(Uuid, Swap)>> {
+        self.0
+            .iter()
+            .map(|item| match item {
+                Ok((key, value)) => {
+                    let swap_id = deserialize::<Uuid>(&key);
+                    let swap = deserialize::<Swap>(&value).context("failed to deserialize swap");
+
+                    match (swap_id, swap) {
+                        (Ok(swap_id), Ok(swap)) => Ok((swap_id, swap)),
+                        (Ok(_), Err(err)) => Err(err),
+                        _ => bail!("failed to deserialize swap"),
+                    }
+                }
+                Err(err) => Err(err).context("failed to retrieve swap from DB"),
+            })
+            .collect()
+    }
 }
 
 pub fn serialize<T>(t: &T) -> anyhow::Result<Vec<u8>>
@@ -169,5 +188,29 @@ mod tests {
             .expect("Failed to recover state the second time");
 
         assert_eq!(recovered, state);
+    }
+
+    #[tokio::test]
+    async fn can_fetch_all_keys() {
+        let db_dir = tempfile::tempdir().unwrap();
+        let db = Database::open(db_dir.path()).unwrap();
+
+        let state_1 = Swap::Alice(Alice::SwapComplete);
+        let swap_id_1 = Uuid::new_v4();
+        db.insert_latest_state(swap_id_1, state_1.clone())
+            .await
+            .expect("Failed to save second state");
+
+        let state_2 = Swap::Bob(Bob::SwapComplete);
+        let swap_id_2 = Uuid::new_v4();
+        db.insert_latest_state(swap_id_2, state_2.clone())
+            .await
+            .expect("Failed to save first state");
+
+        let swaps = db.all().unwrap();
+
+        assert_eq!(swaps.len(), 2);
+        assert!(swaps.contains(&(swap_id_1, state_1)));
+        assert!(swaps.contains(&(swap_id_2, state_2)));
     }
 }
