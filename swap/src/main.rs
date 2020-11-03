@@ -14,7 +14,7 @@
 
 use anyhow::Result;
 use futures::{channel::mpsc, StreamExt};
-use libp2p::core::Multiaddr;
+use libp2p::Multiaddr;
 use log::LevelFilter;
 use std::{io, io::Write, process, sync::Arc};
 use structopt::StructOpt;

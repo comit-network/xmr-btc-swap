@@ -18,7 +18,6 @@ use libp2p::{
 /// - DNS name resolution
 /// - authentication via noise
 /// - multiplexing via yamux or mplex
-/// #[cfg(not(feature = "tor"))]
 pub fn build(id_keys: identity::Keypair) -> Result<SwapTransport> {
     use libp2p::tcp::TokioTcpConfig;
 
@@ -45,7 +44,6 @@ pub fn build(id_keys: identity::Keypair) -> Result<SwapTransport> {
 /// - DNS name resolution
 /// - authentication via noise
 /// - multiplexing via yamux or mplex
-// #[cfg(feature = "tor")]
 pub fn build_tor(
     id_keys: identity::Keypair,
     addr: libp2p::core::Multiaddr,
