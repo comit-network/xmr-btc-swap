@@ -53,29 +53,28 @@ pub struct Monero {
 }
 impl<'c> Monero {
     /// Starts a new regtest monero container setup consisting out of 1 monerod
-    /// node and n wallets. The containers and network will be prefixed with
-    /// `prefix` if provided. There will be 1 miner wallet started
-    /// automatically. Default monerod container name will be: `monerod`
-    /// Default miner wallet container name will be: `miner`
-    /// Default network will be: `monero`
-    /// Each default will be prefixed with `prefix`.
+    /// node and n wallets. The containers and network will be prefixed, either
+    /// randomly generated or as defined in `prefix` if provided. There will
+    /// be 1 miner wallet started automatically. Default monerod container
+    /// name will be: `prefix`_`monerod` Default miner wallet container name
+    /// will be: `prefix`_`miner` Default network will be: `prefix`_`monero`
     pub async fn new(
         cli: &'c Cli,
         prefix: Option<String>,
         additional_wallets: Vec<String>,
     ) -> Result<(Self, Vec<Container<'c, Cli, image::Monero>>)> {
-        let prefix = prefix.unwrap_or_else(|| "".to_string());
+        let prefix = format!("{}_", prefix.unwrap_or_else(random_prefix));
 
         let monerod_name = format!("{}{}", prefix, MONEROD_DAEMON_CONTAINER_NAME);
         let network = format!("{}{}", prefix, MONEROD_DEFAULT_NETWORK);
 
-        tracing::info!("Starting monerod...");
+        tracing::info!("Starting monerod... {}", monerod_name);
         let (monerod, monerod_container) = Monerod::new(cli, monerod_name, network)?;
         let mut containers = vec![monerod_container];
         let mut wallets = vec![];
 
-        tracing::info!("Starting miner wallet...");
         let miner = format!("{}{}", prefix, "miner");
+        tracing::info!("Starting miner wallet... {}", miner);
         let (miner_wallet, miner_container) = MoneroWalletRpc::new(cli, &miner, &monerod).await?;
 
         wallets.push(miner_wallet);
@@ -145,6 +144,21 @@ impl<'c> Monero {
 
         Ok(())
     }
+}
+
+fn random_prefix() -> String {
+    use rand::Rng;
+    const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyz";
+    const LEN: usize = 4;
+    let mut rng = rand::thread_rng();
+
+    let prefix: String = (0..LEN)
+        .map(|_| {
+            let idx = rng.gen_range(0, CHARSET.len());
+            CHARSET[idx] as char
+        })
+        .collect();
+    prefix
 }
 
 #[derive(Clone, Debug)]
