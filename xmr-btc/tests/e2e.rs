@@ -32,7 +32,12 @@ mod tests {
             .set_default();
 
         let cli = Cli::default();
-        let (monero, _container) = Monero::new(&cli).unwrap();
+        let (monero, _container) = Monero::new(&cli, Some("hp".to_string()), vec![
+            "alice".to_string(),
+            "bob".to_string(),
+        ])
+        .await
+        .unwrap();
         let bitcoind = init_bitcoind(&cli).await;
 
         let (
@@ -75,7 +80,7 @@ mod tests {
 
         let alice_final_xmr_balance = alice_node.monero_wallet.get_balance().await.unwrap();
 
-        monero.wait_for_bob_wallet_block_height().await.unwrap();
+        monero.wallet("bob").unwrap().refresh().await.unwrap();
 
         let bob_final_xmr_balance = bob_node.monero_wallet.get_balance().await.unwrap();
 
@@ -106,7 +111,12 @@ mod tests {
             .set_default();
 
         let cli = Cli::default();
-        let (monero, _container) = Monero::new(&cli).unwrap();
+        let (monero, _container) = Monero::new(&cli, Some("br".to_string()), vec![
+            "alice".to_string(),
+            "bob".to_string(),
+        ])
+        .await
+        .unwrap();
         let bitcoind = init_bitcoind(&cli).await;
 
         let (
@@ -158,7 +168,7 @@ mod tests {
             .await
             .unwrap();
 
-        monero.wait_for_alice_wallet_block_height().await.unwrap();
+        monero.wallet("alice").unwrap().refresh().await.unwrap();
         let alice_final_xmr_balance = alice_node.monero_wallet.get_balance().await.unwrap();
         let bob_final_xmr_balance = bob_node.monero_wallet.get_balance().await.unwrap();
 
@@ -182,7 +192,13 @@ mod tests {
             .set_default();
 
         let cli = Cli::default();
-        let (monero, _container) = Monero::new(&cli).unwrap();
+        let (monero, _containers) = Monero::new(&cli, Some("ap".to_string()), vec![
+            "alice".to_string(),
+            "bob".to_string(),
+        ])
+        .await
+        .unwrap();
+
         let bitcoind = init_bitcoind(&cli).await;
 
         let (

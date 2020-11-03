@@ -130,10 +130,13 @@ pub async fn init_test(
 
     let fund_alice = TEN_XMR;
     let fund_bob = 0;
-    monero.init(fund_alice, fund_bob).await.unwrap();
+    monero
+        .init(vec![("alice", fund_alice), ("bob", fund_bob)])
+        .await
+        .unwrap();
 
-    let alice_monero_wallet = wallet::monero::Wallet(monero.alice_wallet_rpc_client());
-    let bob_monero_wallet = wallet::monero::Wallet(monero.bob_wallet_rpc_client());
+    let alice_monero_wallet = wallet::monero::Wallet(monero.wallet("alice").unwrap().client());
+    let bob_monero_wallet = wallet::monero::Wallet(monero.wallet("bob").unwrap().client());
 
     let alice_btc_wallet = wallet::bitcoin::Wallet::new("alice", &bitcoind.node_url)
         .await

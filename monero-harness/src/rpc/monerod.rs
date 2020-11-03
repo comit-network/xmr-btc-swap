@@ -1,7 +1,4 @@
-use crate::{
-    rpc::{Request, Response},
-    BlockHeader,
-};
+use crate::rpc::{Request, Response};
 
 use anyhow::Result;
 use reqwest::Url;
@@ -36,11 +33,23 @@ impl Client {
             amount_of_blocks,
             wallet_address: wallet_address.to_owned(),
         };
+        let url = self.url.clone();
+        // // Step 1:  Get the auth header
+        // let res = self.inner.get(url.clone()).send().await?;
+        // let headers = res.headers();
+        // let wwwauth = headers["www-authenticate"].to_str()?;
+        //
+        // // Step 2:  Given the auth header, sign the digest for the real req.
+        // let tmp_url = url.clone();
+        // let context = AuthContext::new("username", "password", tmp_url.path());
+        // let mut prompt = digest_auth::parse(wwwauth)?;
+        // let answer = prompt.respond(&context)?.to_header_string();
+
         let request = Request::new("generateblocks", params);
 
         let response = self
             .inner
-            .post(self.url.clone())
+            .post(url)
             .json(&request)
             .send()
             .await?
@@ -124,4 +133,23 @@ struct GetBlockHeaderByHeight {
 struct BlockCount {
     count: u32,
     status: String,
+}
+
+// We should be able to use monero-rs for this but it does not include all
+// the fields.
+#[derive(Clone, Debug, Deserialize)]
+pub struct BlockHeader {
+    pub block_size: u32,
+    pub depth: u32,
+    pub difficulty: u32,
+    pub hash: String,
+    pub height: u32,
+    pub major_version: u32,
+    pub minor_version: u32,
+    pub nonce: u32,
+    pub num_txes: u32,
+    pub orphan_status: bool,
+    pub prev_hash: String,
+    pub reward: u64,
+    pub timestamp: u32,
 }

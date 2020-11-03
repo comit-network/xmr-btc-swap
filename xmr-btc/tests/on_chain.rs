@@ -238,7 +238,12 @@ async fn swap_as_bob(
 #[tokio::test]
 async fn on_chain_happy_path() {
     let cli = Cli::default();
-    let (monero, _container) = Monero::new(&cli).unwrap();
+    let (monero, _container) = Monero::new(&cli, Some("ochp".to_string()), vec![
+        "alice".to_string(),
+        "bob".to_string(),
+    ])
+    .await
+    .unwrap();
     let bitcoind = init_bitcoind(&cli).await;
 
     let (alice_state0, bob_state0, mut alice_node, mut bob_node, initial_balances, swap_amounts) =
@@ -304,7 +309,7 @@ async fn on_chain_happy_path() {
 
     let alice_final_xmr_balance = alice_monero_wallet.get_balance().await.unwrap();
 
-    monero.wait_for_bob_wallet_block_height().await.unwrap();
+    monero.wallet("bob").unwrap().refresh().await.unwrap();
     let bob_final_xmr_balance = bob_monero_wallet.get_balance().await.unwrap();
 
     assert_eq!(
@@ -329,7 +334,12 @@ async fn on_chain_happy_path() {
 #[tokio::test]
 async fn on_chain_both_refund_if_alice_never_redeems() {
     let cli = Cli::default();
-    let (monero, _container) = Monero::new(&cli).unwrap();
+    let (monero, _container) = Monero::new(&cli, Some("ocbr".to_string()), vec![
+        "alice".to_string(),
+        "bob".to_string(),
+    ])
+    .await
+    .unwrap();
     let bitcoind = init_bitcoind(&cli).await;
 
     let (alice_state0, bob_state0, mut alice_node, mut bob_node, initial_balances, swap_amounts) =
@@ -396,7 +406,7 @@ async fn on_chain_both_refund_if_alice_never_redeems() {
         .await
         .unwrap();
 
-    monero.wait_for_alice_wallet_block_height().await.unwrap();
+    monero.wallet("alice").unwrap().refresh().await.unwrap();
     let alice_final_xmr_balance = alice_monero_wallet.get_balance().await.unwrap();
 
     let bob_final_xmr_balance = bob_monero_wallet.get_balance().await.unwrap();
@@ -419,7 +429,12 @@ async fn on_chain_both_refund_if_alice_never_redeems() {
 #[tokio::test]
 async fn on_chain_alice_punishes_if_bob_never_acts_after_fund() {
     let cli = Cli::default();
-    let (monero, _container) = Monero::new(&cli).unwrap();
+    let (monero, _container) = Monero::new(&cli, Some("ocap".to_string()), vec![
+        "alice".to_string(),
+        "bob".to_string(),
+    ])
+    .await
+    .unwrap();
     let bitcoind = init_bitcoind(&cli).await;
 
     let (alice_state0, bob_state0, mut alice_node, mut bob_node, initial_balances, swap_amounts) =

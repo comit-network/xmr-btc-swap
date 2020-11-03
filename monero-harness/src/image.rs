@@ -4,10 +4,10 @@ use testcontainers::{
     Image,
 };
 
+pub const MONEROD_DAEMON_CONTAINER_NAME: &str = "monerod";
+pub const MONEROD_DEFAULT_NETWORK: &str = "monero_network";
 pub const MONEROD_RPC_PORT: u16 = 48081;
-pub const MINER_WALLET_RPC_PORT: u16 = 48083;
-pub const ALICE_WALLET_RPC_PORT: u16 = 48084;
-pub const BOB_WALLET_RPC_PORT: u16 = 48085;
+pub const WALLET_RPC_PORT: u16 = 48083;
 
 #[derive(Debug)]
 pub struct Monero {
@@ -15,6 +15,7 @@ pub struct Monero {
     args: Args,
     ports: Option<Vec<Port>>,
     entrypoint: Option<String>,
+    wait_for_message: String,
 }
 
 impl Image for Monero {
@@ -31,9 +32,7 @@ impl Image for Monero {
         container
             .logs()
             .stdout
-            .wait_for_message(
-                "The daemon is running offline and will not attempt to sync to the Monero network",
-            )
+            .wait_for_message(&self.wait_for_message)
             .unwrap();
 
         let additional_sleep_period =
@@ -85,6 +84,7 @@ impl Default for Monero {
             args: Args::default(),
             ports: None,
             entrypoint: Some("".into()),
+            wait_for_message: "core RPC server started ok".to_string(),
         }
     }
 }
@@ -104,24 +104,45 @@ impl Monero {
         self
     }
 
-    pub fn with_wallet(self, name: &str, rpc_port: u16) -> Self {
-        let wallet = WalletArgs::new(name, rpc_port);
-        let mut wallet_args = self.args.wallets;
-        wallet_args.push(wallet);
+    pub fn wallet(name: &str, daemon_address: String) -> Self {
+        let wallet = WalletArgs::new(name, daemon_address, WALLET_RPC_PORT);
+        let default = Monero::default();
         Self {
             args: Args {
-                monerod: self.args.monerod,
-                wallets: wallet_args,
+                image_args: ImageArgs::WalletArgs(wallet),
             },
-            ..self
+            wait_for_message: "Run server thread name: RPC".to_string(),
+            ..default
         }
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Args {
-    monerod: MonerodArgs,
-    wallets: Vec<WalletArgs>,
+    image_args: ImageArgs,
+}
+
+impl Default for Args {
+    fn default() -> Self {
+        Self {
+            image_args: ImageArgs::MonerodArgs(MonerodArgs::default()),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum ImageArgs {
+    MonerodArgs(MonerodArgs),
+    WalletArgs(WalletArgs),
+}
+
+impl ImageArgs {
+    fn args(&self) -> String {
+        match self {
+            ImageArgs::MonerodArgs(monerod_args) => monerod_args.args(),
+            ImageArgs::WalletArgs(wallet_args) => wallet_args.args(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -137,6 +158,7 @@ pub struct MonerodArgs {
     pub rpc_bind_port: u16,
     pub fixed_difficulty: u32,
     pub data_dir: String,
+    pub log_level: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -165,6 +187,7 @@ impl Default for MonerodArgs {
             rpc_bind_port: MONEROD_RPC_PORT,
             fixed_difficulty: 1,
             data_dir: "/monero".to_string(),
+            log_level: 2,
         }
     }
 }
@@ -218,17 +241,20 @@ impl MonerodArgs {
             args.push(format!("--fixed-difficulty {}", self.fixed_difficulty));
         }
 
+        if self.log_level != 0 {
+            args.push(format!("--log-level {}", self.log_level));
+        }
+
         args.join(" ")
     }
 }
 
 impl WalletArgs {
-    pub fn new(wallet_dir: &str, rpc_port: u16) -> Self {
-        let daemon_address = format!("localhost:{}", MONEROD_RPC_PORT);
+    pub fn new(wallet_name: &str, daemon_address: String, rpc_port: u16) -> Self {
         WalletArgs {
             disable_rpc_login: true,
             confirm_external_bind: true,
-            wallet_dir: wallet_dir.into(),
+            wallet_dir: wallet_name.into(),
             rpc_bind_ip: "0.0.0.0".into(),
             rpc_bind_port: rpc_port,
             daemon_address,
@@ -282,10 +308,7 @@ impl IntoIterator for Args {
         args.push("/bin/bash".into());
         args.push("-c".into());
 
-        let wallet_args: Vec<String> = self.wallets.iter().map(|wallet| wallet.args()).collect();
-        let wallet_args = wallet_args.join(" & ");
-
-        let cmd = format!("{} & {} ", self.monerod.args(), wallet_args);
+        let cmd = format!("{} ", self.image_args.args());
         args.push(cmd);
 
         args.into_iter()

@@ -264,6 +264,24 @@ impl Client {
         let r: Response<GenerateFromKeys> = serde_json::from_str(&response)?;
         Ok(r.result)
     }
+
+    pub async fn refresh(&self) -> Result<Refreshed> {
+        let request = Request::new("refresh", "");
+
+        let response = self
+            .inner
+            .post(self.url.clone())
+            .json(&request)
+            .send()
+            .await?
+            .text()
+            .await?;
+
+        debug!("refresh RPC response: {}", response);
+
+        let r: Response<Refreshed> = serde_json::from_str(&response)?;
+        Ok(r.result)
+    }
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -392,4 +410,10 @@ pub struct GenerateFromKeysParams {
 pub struct GenerateFromKeys {
     pub address: String,
     pub info: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+pub struct Refreshed {
+    pub blocks_fetched: u32,
+    pub received_money: bool,
 }

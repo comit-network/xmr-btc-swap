@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1"
+digest_auth = "0.2.3"
 futures = "0.3"
 port_check = "0.1"
 rand = "0.7"
@@ -13,7 +14,7 @@ reqwest = { version = "0.10", default-features = false, features = ["json", "nat
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 spectral = "0.6"
-testcontainers = "0.10"
+testcontainers = "0.11"
 tokio = { version = "0.2", default-features = false, features = ["blocking", "macros", "rt-core", "time"] }
 tracing = "0.1"
 url = "2"

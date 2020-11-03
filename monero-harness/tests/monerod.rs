@@ -1,21 +1,26 @@
 use monero_harness::Monero;
 use spectral::prelude::*;
+use std::time::Duration;
 use testcontainers::clients::Cli;
-
-fn init_cli() -> Cli {
-    Cli::default()
-}
+use tokio::time;
 
 #[tokio::test]
-async fn connect_to_monerod() {
-    let tc = init_cli();
-    let (monero, _container) = Monero::new(&tc).unwrap();
-    let cli = monero.monerod_rpc_client();
+async fn init_miner_and_mine_to_miner_address() {
+    let tc = Cli::default();
+    let (monero, _monerod_container) = Monero::new(&tc, None, vec![]).await.unwrap();
 
-    let header = cli
-        .get_block_header_by_height(0)
-        .await
-        .expect("failed to get block 0");
+    monero.init(vec![]).await.unwrap();
 
-    assert_that!(header.height).is_equal_to(0);
+    let monerod = monero.monerod();
+    let miner_wallet = monero.wallet("miner").unwrap();
+
+    let got_miner_balance = miner_wallet.balance().await.unwrap();
+    assert_that!(got_miner_balance).is_greater_than(0);
+
+    time::delay_for(Duration::from_millis(1010)).await;
+
+    // after a bit more than 1 sec another block should have been mined
+    let block_height = monerod.client().get_block_count().await.unwrap();
+
+    assert_that(&block_height).is_greater_than(70);
 }
