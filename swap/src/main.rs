@@ -16,6 +16,7 @@ use anyhow::Result;
 use futures::{channel::mpsc, StreamExt};
 use libp2p::Multiaddr;
 use log::LevelFilter;
+use prettytable::{row, Table};
 use std::{io, io::Write, process, sync::Arc};
 use structopt::StructOpt;
 use swap::{
@@ -29,6 +30,9 @@ use swap::{
 };
 use tempfile::tempdir;
 use tracing::info;
+
+#[macro_use]
+extern crate prettytable;
 
 mod cli;
 mod trace;
@@ -81,13 +85,7 @@ async fn main() -> Result<()> {
 
             let monero_wallet = Arc::new(monero::Wallet::new(monerod_url));
 
-            let db = Database::open(db_dir.path()).unwrap();
-
-            swap_as_alice(
-                bitcoin_wallet,
-                monero_wallet,
-                db
-                listen_addr,
+            swap_as_alice(bitcoin_wallet, monero_wallet, dblisten_addr,
                 transport,
                 behaviour,
             )

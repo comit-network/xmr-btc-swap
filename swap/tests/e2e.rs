@@ -8,6 +8,11 @@ mod e2e_test {
     use swap::{alice, bob, network::transport::build};
     use testcontainers::clients::Cli;
 
+    // NOTE: For some reason running these tests overflows the stack. In order to
+    // mitigate this run them with:
+    //
+    //     RUST_MIN_STACK=100000000 cargo test
+
     #[tokio::test]
     async fn swap() {
         let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9876"
