@@ -14,8 +14,6 @@ impl Database {
         Ok(Database(db))
     }
 
-    // TODO: Add method to update state
-
     pub async fn insert_latest_state(&self, swap_id: Uuid, state: Swap) -> Result<()> {
         let key = serialize(&swap_id)?;
         let new_value = serialize(&state).context("Could not serialize new state value")?;
