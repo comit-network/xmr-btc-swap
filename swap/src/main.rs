@@ -16,7 +16,6 @@ use anyhow::Result;
 use futures::{channel::mpsc, StreamExt};
 use libp2p::Multiaddr;
 use log::LevelFilter;
-use prettytable::{row, Table};
 use std::{io, io::Write, process, sync::Arc};
 use structopt::StructOpt;
 use swap::{
@@ -31,13 +30,11 @@ use swap::{
 use tempfile::tempdir;
 use tracing::info;
 
-#[macro_use]
-extern crate prettytable;
-
 mod cli;
 mod trace;
 
 use cli::Options;
+use swap::storage::Database;
 
 // TODO: Add root seed file instead of generating new seed each run.
 
@@ -46,6 +43,9 @@ async fn main() -> Result<()> {
     let opt = Options::from_args();
 
     trace::init_tracing(LevelFilter::Debug)?;
+
+    let db_dir = tempdir()?;
+    let db = Database::open(db_dir.path()).unwrap();
 
     match opt {
         Options::Alice {
@@ -85,7 +85,11 @@ async fn main() -> Result<()> {
 
             let monero_wallet = Arc::new(monero::Wallet::new(monerod_url));
 
-            swap_as_alice(bitcoin_wallet, monero_wallet, dblisten_addr,
+            swap_as_alice(
+                bitcoin_wallet,
+                monero_wallet,
+                db,
+                listen_addr,
                 transport,
                 behaviour,
             )
@@ -115,12 +119,10 @@ async fn main() -> Result<()> {
 
             let monero_wallet = Arc::new(monero::Wallet::new(monerod_url));
 
-            let db = Database::open(db_dir.path()).unwrap();
-
             swap_as_bob(
                 bitcoin_wallet,
                 monero_wallet,
-                db
+                db,
                 satoshis,
                 alice_addr,
                 transport,
@@ -159,7 +161,15 @@ async fn swap_as_alice(
     transport: SwapTransport,
     behaviour: Alice,
 ) -> Result<()> {
-    alice::swap(bitcoin_wallet, monero_wallet, addr, transport, behaviour).await
+    alice::swap(
+        bitcoin_wallet,
+        monero_wallet,
+        db,
+        addr,
+        transport,
+        behaviour,
+    )
+    .await
 }
 
 async fn swap_as_bob(

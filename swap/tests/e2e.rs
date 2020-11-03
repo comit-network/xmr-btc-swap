@@ -5,7 +5,8 @@ mod e2e_test {
     use libp2p::Multiaddr;
     use monero_harness::Monero;
     use std::sync::Arc;
-    use swap::{alice, bob, network::transport::build};
+    use swap::{alice, bob, network::transport::build, storage::Database};
+    use tempfile::tempdir;
     use testcontainers::clients::Cli;
 
     // NOTE: For some reason running these tests overflows the stack. In order to
@@ -48,12 +49,10 @@ mod e2e_test {
             .await
             .unwrap();
 
-        let (monero, _container) = Monero::new(&cli, Some("swap_".to_string()), vec![
-            "alice".to_string(),
-            "bob".to_string(),
-        ])
-        .await
-        .unwrap();
+        let (monero, _container) =
+            Monero::new(&cli, None, vec!["alice".to_string(), "bob".to_string()])
+                .await
+                .unwrap();
         monero
             .init(vec![("alice", xmr_alice), ("bob", xmr_bob)])
             .await
@@ -68,7 +67,7 @@ mod e2e_test {
         let alice_transport = build(alice_behaviour.identity()).unwrap();
 
         let db_dir = tempdir().unwrap();
-        let db = Database::open(std::path::Path::new("/home/luckysori/test/xmr_btc_swap")).unwrap();
+        let db = Database::open(db_dir.path()).unwrap();
         let alice_swap = alice::swap(
             alice_btc_wallet.clone(),
             alice_xmr_wallet.clone(),

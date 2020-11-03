@@ -97,7 +97,7 @@ where
     #[derive(Debug)]
     enum SwapFailed {
         BeforeBtcLock(Reason),
-        AfterXmrLock { tx_lock_height: u32, reason: Reason },
+        AfterXmrLock(Reason),
     }
 
     /// Reason why the swap has failed.
@@ -114,9 +114,7 @@ where
 
     #[derive(Debug)]
     enum RefundFailed {
-        BtcPunishable {
-            tx_cancel_was_published: bool,
-        },
+        BtcPunishable,
         /// Could not find Alice's signature on the refund transaction witness
         /// stack.
         BtcRefundSignature,
@@ -167,12 +165,7 @@ where
                 .await
                 {
                     Either::Left((encsig, _)) => encsig,
-                    Either::Right(_) => {
-                        return Err(SwapFailed::AfterXmrLock {
-                            reason: Reason::BtcExpired,
-                            tx_lock_height,
-                        })
-                    }
+                    Either::Right(_) => return Err(SwapFailed::AfterXmrLock(Reason::BtcExpired)),
                 };
 
                 tracing::debug!("select returned redeem encsig from message");
@@ -191,10 +184,7 @@ where
                     &tx_redeem.digest(),
                     &tx_redeem_encsig,
                 )
-                .map_err(|_| SwapFailed::AfterXmrLock {
-                    reason: Reason::InvalidEncryptedSignature,
-                    tx_lock_height,
-                })?;
+                .map_err(|_| SwapFailed::AfterXmrLock(Reason::InvalidEncryptedSignature))?;
 
                 let sig_a = a.sign(tx_redeem.digest());
                 let sig_b =
@@ -217,12 +207,7 @@ where
             .await
             {
                 Either::Left(_) => {}
-                Either::Right(_) => {
-                    return Err(SwapFailed::AfterXmrLock {
-                        reason: Reason::BtcExpired,
-                        tx_lock_height,
-                    })
-                }
+                Either::Right(_) => return Err(SwapFailed::AfterXmrLock(Reason::BtcExpired)),
             };
 
             Ok(())
@@ -233,19 +218,8 @@ where
             error!("swap failed: {:?}", err);
         }
 
-        if let Err(SwapFailed::AfterXmrLock {
-            reason: Reason::BtcExpired,
-            tx_lock_height,
-        }) = swap_result
-        {
+        if let Err(SwapFailed::AfterXmrLock(Reason::BtcExpired)) = swap_result {
             let refund_result: Result<(), RefundFailed> = async {
-                let poll_until_bob_can_be_punished = poll_until_block_height_is_gte(
-                    bitcoin_client.as_ref(),
-                    tx_lock_height + refund_timelock + punish_timelock,
-                )
-                .shared();
-                pin_mut!(poll_until_bob_can_be_punished);
-
                 let tx_cancel =
                     bitcoin::TxCancel::new(&tx_lock, refund_timelock, a.public(), B.clone());
                 let signed_tx_cancel = {
@@ -260,19 +234,19 @@ where
 
                 co.yield_(Action::CancelBtc(signed_tx_cancel)).await;
 
-                match select(
-                    bitcoin_client.watch_for_raw_transaction(tx_cancel.txid()),
-                    poll_until_bob_can_be_punished.clone(),
+                bitcoin_client
+                    .watch_for_raw_transaction(tx_cancel.txid())
+                    .await;
+
+                let tx_cancel_height = bitcoin_client
+                    .transaction_block_height(tx_cancel.txid())
+                    .await;
+                let poll_until_bob_can_be_punished = poll_until_block_height_is_gte(
+                    bitcoin_client.as_ref(),
+                    tx_cancel_height + punish_timelock,
                 )
-                .await
-                {
-                    Either::Left(_) => {}
-                    Either::Right(_) => {
-                        return Err(RefundFailed::BtcPunishable {
-                            tx_cancel_was_published: false,
-                        })
-                    }
-                };
+                .shared();
+                pin_mut!(poll_until_bob_can_be_punished);
 
                 let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &refund_address);
                 let tx_refund_published = match select(
@@ -282,11 +256,7 @@ where
                 .await
                 {
                     Either::Left((tx, _)) => tx,
-                    Either::Right(_) => {
-                        return Err(RefundFailed::BtcPunishable {
-                            tx_cancel_was_published: true,
-                        });
-                    }
+                    Either::Right(_) => return Err(RefundFailed::BtcPunishable),
                 };
 
                 let s_a = monero::PrivateKey {
@@ -321,32 +291,9 @@ where
             // transaction with his refund transaction. Alice would then need to carry on
             // with the refund on Monero. Doing so may be too verbose with the current,
             // linear approach. A different design may be required
-            if let Err(RefundFailed::BtcPunishable {
-                tx_cancel_was_published,
-            }) = refund_result
-            {
+            if let Err(RefundFailed::BtcPunishable) = refund_result {
                 let tx_cancel =
                     bitcoin::TxCancel::new(&tx_lock, refund_timelock, a.public(), B.clone());
-
-                if !tx_cancel_was_published {
-                    let tx_cancel_txid = tx_cancel.txid();
-                    let signed_tx_cancel = {
-                        let sig_a = a.sign(tx_cancel.digest());
-                        let sig_b = tx_cancel_sig_bob;
-
-                        tx_cancel
-                            .clone()
-                            .add_signatures(&tx_lock, (a.public(), sig_a), (B.clone(), sig_b))
-                            .expect("sig_{a,b} to be valid signatures for tx_cancel")
-                    };
-
-                    co.yield_(Action::CancelBtc(signed_tx_cancel)).await;
-
-                    let _ = bitcoin_client
-                        .watch_for_raw_transaction(tx_cancel_txid)
-                        .await;
-                }
-
                 let tx_punish =
                     bitcoin::TxPunish::new(&tx_cancel, &punish_address, punish_timelock);
                 let tx_punish_txid = tx_punish.txid();

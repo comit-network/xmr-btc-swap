@@ -33,7 +33,7 @@ impl Database {
             .context("Could not flush db")
     }
 
-    pub fn get_latest_state(&self, swap_id: Uuid) -> anyhow::Result<Swap> {
+    pub fn get_state(&self, swap_id: Uuid) -> anyhow::Result<Swap> {
         let key = serialize(&swap_id)?;
 
         let encoded = self
@@ -103,11 +103,11 @@ mod tests {
             .expect("Failed to save first state");
 
         let recovered_1 = db
-            .get_latest_state(swap_id_1)
+            .get_state(swap_id_1)
             .expect("Failed to recover first state");
 
         let recovered_2 = db
-            .get_latest_state(swap_id_2)
+            .get_state(swap_id_2)
             .expect("Failed to recover second state");
 
         assert_eq!(recovered_1, state_1);
@@ -126,7 +126,7 @@ mod tests {
             .await
             .expect("Failed to save state the first time");
         let recovered = db
-            .get_latest_state(swap_id)
+            .get_state(swap_id)
             .expect("Failed to recover state the first time");
 
         // We insert and recover twice to ensure database implementation allows the
@@ -135,7 +135,7 @@ mod tests {
             .await
             .expect("Failed to save state the second time");
         let recovered = db
-            .get_latest_state(swap_id)
+            .get_state(swap_id)
             .expect("Failed to recover state the second time");
 
         assert_eq!(recovered, state);
