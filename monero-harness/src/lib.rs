@@ -121,12 +121,6 @@ impl<'c> Monero {
         let miner_wallet = self.wallet("miner")?;
         let miner_address = miner_wallet.address().await?.address;
 
-        let alice_wallet = self.wallet("alice")?;
-        let alice_address = alice_wallet.address().await?.address;
-
-        let bob_wallet = self.wallet("bob")?;
-        let bob_address = bob_wallet.address().await?.address;
-
         // generate the first 70 as bulk
         let monerod = &self.monerod;
         let block = monerod.inner().generate_blocks(70, &miner_address).await?;
@@ -134,17 +128,22 @@ impl<'c> Monero {
         miner_wallet.refresh().await?;
 
         if alice_amount > 0 {
+            let alice_wallet = self.wallet("alice")?;
+            let alice_address = alice_wallet.address().await?.address;
             miner_wallet.transfer(&alice_address, alice_amount).await?;
             tracing::info!("Funded alice wallet with {}", alice_amount);
+            monerod.inner().generate_blocks(10, &miner_address).await?;
+            alice_wallet.refresh().await?;
         }
         if bob_amount > 0 {
+            let bob_wallet = self.wallet("bob")?;
+            let bob_address = bob_wallet.address().await?.address;
             miner_wallet.transfer(&bob_address, bob_amount).await?;
             tracing::info!("Funded bob wallet with {}", bob_amount);
+            monerod.inner().generate_blocks(10, &miner_address).await?;
+            bob_wallet.refresh().await?;
         }
 
-        monerod.inner().generate_blocks(10, &miner_address).await?;
-        alice_wallet.refresh().await?;
-        bob_wallet.refresh().await?;
         monerod.start_miner(&miner_address).await?;
 
         tracing::info!("Waiting for miner wallet to catch up...");
