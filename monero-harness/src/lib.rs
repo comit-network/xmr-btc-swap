@@ -49,29 +49,25 @@ const WAIT_WALLET_SYNC_MILLIS: u64 = 1000;
 pub struct Monero {
     monerod: Monerod,
     wallets: Vec<MoneroWalletRpc>,
-    container_prefix: String,
+    prefix: String,
 }
 impl<'c> Monero {
     /// Starts a new regtest monero container setup consisting out of 1 monerod
-    /// node and n wallets. The containers will be prefixed with
-    /// `container_prefix` if provided. There will be 1 miner wallet started
+    /// node and n wallets. The containers and network will be prefixed with
+    /// `prefix` if provided. There will be 1 miner wallet started
     /// automatically. Default monerod container name will be: `monerod`
     /// Default miner wallet container name will be: `miner`
     /// Default network will be: `monero`
+    /// Each default will be prefixed with `prefix`.
     pub async fn new(
         cli: &'c Cli,
-        container_prefix: Option<String>,
-        network_prefix: Option<String>,
+        prefix: Option<String>,
         additional_wallets: Vec<String>,
     ) -> Result<(Self, Vec<Container<'c, Cli, image::Monero>>)> {
-        let container_prefix = container_prefix.unwrap_or_else(|| "".to_string());
+        let prefix = prefix.unwrap_or_else(|| "".to_string());
 
-        let monerod_name = format!("{}{}", container_prefix, MONEROD_DAEMON_CONTAINER_NAME);
-        let network = format!(
-            "{}{}",
-            network_prefix.unwrap_or_else(|| "".to_string()),
-            MONEROD_DEFAULT_NETWORK
-        );
+        let monerod_name = format!("{}{}", prefix, MONEROD_DAEMON_CONTAINER_NAME);
+        let network = format!("{}{}", prefix, MONEROD_DEFAULT_NETWORK);
 
         tracing::info!("Starting monerod...");
         let (monerod, monerod_container) = Monerod::new(cli, monerod_name, network)?;
@@ -79,14 +75,14 @@ impl<'c> Monero {
         let mut wallets = vec![];
 
         tracing::info!("Starting miner wallet...");
-        let miner = format!("{}{}", container_prefix, "miner");
+        let miner = format!("{}{}", prefix, "miner");
         let (miner_wallet, miner_container) = MoneroWalletRpc::new(cli, &miner, &monerod).await?;
 
         wallets.push(miner_wallet);
         containers.push(miner_container);
         for wallet in additional_wallets.iter() {
             tracing::info!("Starting wallet: {}...", wallet);
-            let wallet = format!("{}{}", container_prefix, wallet);
+            let wallet = format!("{}{}", prefix, wallet);
             let (wallet, container) = MoneroWalletRpc::new(cli, &wallet, &monerod).await?;
             wallets.push(wallet);
             containers.push(container);
@@ -96,7 +92,7 @@ impl<'c> Monero {
             Self {
                 monerod,
                 wallets,
-                container_prefix,
+                prefix,
             },
             containers,
         ))
@@ -107,7 +103,7 @@ impl<'c> Monero {
     }
 
     pub fn wallet(&self, name: &str) -> Result<&MoneroWalletRpc> {
-        let name = format!("{}{}", self.container_prefix, name);
+        let name = format!("{}{}", self.prefix, name);
         let wallet = self
             .wallets
             .iter()

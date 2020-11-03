@@ -32,13 +32,12 @@ mod tests {
             .set_default();
 
         let cli = Cli::default();
-        let (monero, _container) =
-            Monero::new(&cli, Some("hp".to_string()), Some("hp".to_string()), vec![
-                "alice".to_string(),
-                "bob".to_string(),
-            ])
-            .await
-            .unwrap();
+        let (monero, _container) = Monero::new(&cli, Some("hp".to_string()), vec![
+            "alice".to_string(),
+            "bob".to_string(),
+        ])
+        .await
+        .unwrap();
         let bitcoind = init_bitcoind(&cli).await;
 
         let (
@@ -112,13 +111,12 @@ mod tests {
             .set_default();
 
         let cli = Cli::default();
-        let (monero, _container) =
-            Monero::new(&cli, Some("br".to_string()), Some("br".to_string()), vec![
-                "alice".to_string(),
-                "bob".to_string(),
-            ])
-            .await
-            .unwrap();
+        let (monero, _container) = Monero::new(&cli, Some("br".to_string()), vec![
+            "alice".to_string(),
+            "bob".to_string(),
+        ])
+        .await
+        .unwrap();
         let bitcoind = init_bitcoind(&cli).await;
 
         let (
@@ -194,13 +192,12 @@ mod tests {
             .set_default();
 
         let cli = Cli::default();
-        let (monero, _containers) =
-            Monero::new(&cli, Some("ap".to_string()), Some("ap".to_string()), vec![
-                "alice".to_string(),
-                "bob".to_string(),
-            ])
-            .await
-            .unwrap();
+        let (monero, _containers) = Monero::new(&cli, Some("ap".to_string()), vec![
+            "alice".to_string(),
+            "bob".to_string(),
+        ])
+        .await
+        .unwrap();
 
         let bitcoind = init_bitcoind(&cli).await;
 

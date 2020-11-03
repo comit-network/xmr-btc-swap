@@ -9,7 +9,7 @@ async fn fund_transfer_and_check_tx_key() {
     let send_to_bob = 5_000_000_000;
 
     let tc = Cli::default();
-    let (monero, _containers) = Monero::new(&tc, Some("test_".to_string()), None, vec![
+    let (monero, _containers) = Monero::new(&tc, Some("test_".to_string()), vec![
         "alice".to_string(),
         "bob".to_string(),
     ])
