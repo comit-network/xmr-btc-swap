@@ -68,8 +68,7 @@ mod e2e_test {
         let alice_transport = build(alice_behaviour.identity()).unwrap();
 
         let db_dir = tempdir().unwrap();
-        let db = Database::open(db_dir.path()).unwrap();
-
+        let db = Database::open(std::path::Path::new("/home/luckysori/test/xmr_btc_swap")).unwrap();
         let alice_swap = alice::swap(
             alice_btc_wallet.clone(),
             alice_xmr_wallet.clone(),

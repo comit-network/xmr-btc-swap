@@ -6,6 +6,7 @@ pub mod bitcoin;
 pub mod bob;
 pub mod monero;
 pub mod network;
+pub mod state;
 pub mod storage;
 pub mod tor;
 
