@@ -135,8 +135,8 @@ pub async fn init_test(
         .await
         .unwrap();
 
-    let alice_monero_wallet = wallet::monero::Wallet(monero.wallet("alice").unwrap().inner());
-    let bob_monero_wallet = wallet::monero::Wallet(monero.wallet("bob").unwrap().inner());
+    let alice_monero_wallet = wallet::monero::Wallet(monero.wallet("alice").unwrap().client());
+    let bob_monero_wallet = wallet::monero::Wallet(monero.wallet("bob").unwrap().client());
 
     let alice_btc_wallet = wallet::bitcoin::Wallet::new("alice", &bitcoind.node_url)
         .await

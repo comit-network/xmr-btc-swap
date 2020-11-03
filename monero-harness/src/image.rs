@@ -245,8 +245,6 @@ impl MonerodArgs {
             args.push(format!("--log-level {}", self.log_level));
         }
 
-        // args.push(format!("--disable-rpc-login"));
-
         args.join(" ")
     }
 }

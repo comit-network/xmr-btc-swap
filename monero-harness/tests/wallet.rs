@@ -41,7 +41,7 @@ async fn fund_transfer_and_check_tx_key() {
 
     monero
         .monerod()
-        .inner()
+        .client()
         .generate_blocks(10, &miner_address)
         .await
         .unwrap();
@@ -54,7 +54,7 @@ async fn fund_transfer_and_check_tx_key() {
     let tx_id = transfer.tx_hash;
     let tx_key = transfer.tx_key;
     let res = bob_wallet
-        .inner()
+        .client()
         .check_tx_key(&tx_id, &tx_key, &bob_address)
         .await
         .expect("failed to check tx by key");

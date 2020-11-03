@@ -20,7 +20,7 @@ async fn init_miner_and_mine_to_miner_address() {
     time::delay_for(Duration::from_millis(1010)).await;
 
     // after a bit more than 1 sec another block should have been mined
-    let block_height = monerod.inner().get_block_count().await.unwrap();
+    let block_height = monerod.client().get_block_count().await.unwrap();
 
     assert_that(&block_height).is_greater_than(70);
 }
