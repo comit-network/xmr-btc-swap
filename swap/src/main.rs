@@ -41,7 +41,7 @@ use swap::{alice, bitcoin, bob, monero, Cmd, Rsp, SwapAmounts};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let opt: Options = Options::from_args();
+    let opt = Options::from_args();
 
     trace::init_tracing(LevelFilter::Debug)?;
 
@@ -50,7 +50,6 @@ async fn main() -> Result<()> {
             bitcoind_url: url,
             listen_addr,
             tor_port,
-            ..
         } => {
             info!("running swap node as Alice ...");
 
