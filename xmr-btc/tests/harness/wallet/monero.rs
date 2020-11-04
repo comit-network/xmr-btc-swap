@@ -4,10 +4,10 @@ use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _
 use futures::TryFutureExt;
 use monero::{Address, Network, PrivateKey};
 use monero_harness::rpc::wallet;
-use std::{str::FromStr, time::Duration};
+use std::time::Duration;
 use xmr_btc::monero::{
-    Address, Amount, CreateWalletForOutput, InsufficientFunds, Network, PrivateKey, PrivateViewKey,
-    PublicKey, PublicViewKey, Transfer, TransferProof, TxHash, WatchForTransfer, WatchForTransferImproved,
+    Amount, CreateWalletForOutput, PrivateViewKey, PublicKey, PublicViewKey, Transfer,
+    WatchForTransfer,
 };
 
 pub struct Wallet {
@@ -33,7 +33,7 @@ impl Transfer for Wallet {
         public_spend_key: PublicKey,
         public_view_key: PublicViewKey,
         amount: Amount,
-    ) -> Result<(TransferProof, Amount)> {
+    ) -> Result<Amount> {
         let destination_address =
             Address::standard(Network::Mainnet, public_spend_key, public_view_key.into());
 
@@ -42,12 +42,7 @@ impl Transfer for Wallet {
             .transfer(0, amount.as_piconero(), &destination_address.to_string())
             .await?;
 
-        let tx_hash = TxHash(res.tx_hash);
-        let tx_key = PrivateKey::from_str(&res.tx_key)?;
-
-        let fee = Amount::from_piconero(res.fee);
-
-        Ok((TransferProof::new(tx_hash, tx_key), fee))
+        Ok(Amount::from_piconero(res.fee))
     }
 }
 
@@ -80,66 +75,10 @@ impl CreateWalletForOutput for Wallet {
 impl WatchForTransfer for Wallet {
     async fn watch_for_transfer(
         &self,
-        public_spend_key: PublicKey,
-        public_view_key: PublicViewKey,
-        transfer_proof: TransferProof,
-        expected_amount: Amount,
-        expected_confirmations: u32,
-    ) -> Result<(), InsufficientFunds> {
-        enum Error {
-            TxNotFound,
-            InsufficientConfirmations,
-            InsufficientFunds { expected: Amount, actual: Amount },
-        }
-
-        let address = Address::standard(Network::Mainnet, public_spend_key, public_view_key.into());
-
-        let res = (|| async {
-            // NOTE: Currently, this is conflating IO errors with the transaction not being
-            // in the blockchain yet, or not having enough confirmations on it. All these
-            // errors warrant a retry, but the strategy should probably differ per case
-            let proof = self
-                .inner
-                .check_tx_key(
-                    &String::from(transfer_proof.tx_hash()),
-                    &transfer_proof.tx_key().to_string(),
-                    &address.to_string(),
-                )
-                .await
-                .map_err(|_| backoff::Error::Transient(Error::TxNotFound))?;
-
-            if proof.received != expected_amount.as_piconero() {
-                return Err(backoff::Error::Permanent(Error::InsufficientFunds {
-                    expected: expected_amount,
-                    actual: Amount::from_piconero(proof.received),
-                }));
-            }
-
-            if proof.confirmations < expected_confirmations {
-                return Err(backoff::Error::Transient(Error::InsufficientConfirmations));
-            }
-
-            Ok(proof)
-        })
-        .retry(ConstantBackoff::new(Duration::from_secs(1)))
-        .await;
-
-        if let Err(Error::InsufficientFunds { expected, actual }) = res {
-            return Err(InsufficientFunds { expected, actual });
-        };
-
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl WatchForTransferImproved for Wallet {
-    async fn watch_for_transfer_improved(
-        &self,
         address: Address,
         expected_amount: Amount,
         private_view_key: PrivateViewKey,
-    ) -> Result<(), InsufficientFunds> {
+    ) {
         let address = address.to_string();
         let private_view_key = PrivateKey::from(private_view_key).to_string();
         let load_address = || {
@@ -148,11 +87,13 @@ impl WatchForTransferImproved for Wallet {
                 .map_err(backoff::Error::Transient)
         };
 
+        // QUESTION: Should we really retry every error?
         load_address
             .retry(ConstantBackoff::new(Duration::from_secs(1)))
             .await
             .expect("transient error is never returned");
 
+        // QUESTION: Should we retry this error at all?
         let refresh = || self.watch_only.refresh().map_err(backoff::Error::Transient);
 
         refresh
@@ -160,25 +101,24 @@ impl WatchForTransferImproved for Wallet {
             .await
             .expect("transient error is never returned");
 
-        let get_balance = || {
-            self.watch_only
+        let check_balance = || async {
+            let balance = self
+                .watch_only
                 .get_balance(0)
-                .map_err(backoff::Error::Transient)
+                .await
+                .map_err(|_| backoff::Error::Transient("io"))?;
+            let balance = Amount::from_piconero(balance);
+
+            if balance != expected_amount {
+                return Err(backoff::Error::Transient("insufficient funds"));
+            }
+
+            Ok(())
         };
 
-        let balance = get_balance
+        check_balance
             .retry(ConstantBackoff::new(Duration::from_secs(1)))
             .await
             .expect("transient error is never returned");
-        let balance = Amount::from_piconero(balance);
-
-        if balance != expected_amount {
-            return Err(InsufficientFunds {
-                expected: expected_amount,
-                actual: balance,
-            });
-        }
-
-        Ok(())
     }
 }

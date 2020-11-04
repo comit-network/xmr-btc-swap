@@ -8,11 +8,6 @@ use tempfile::tempdir;
 use testcontainers::clients::Cli;
 use xmr_btc::bitcoin;
 
-// NOTE: For some reason running these tests overflows the stack. In order to
-// mitigate this run them with:
-//
-//     RUST_MIN_STACK=100000000 cargo test
-
 #[tokio::test]
 async fn swap() {
     use tracing_subscriber::util::SubscriberInitExt as _;
@@ -55,43 +50,46 @@ async fn swap() {
         .await
         .unwrap();
 
-    let (monero, _container) =
-        Monero::new(&cli, None, vec!["alice".to_string(), "bob".to_string()])
-            .await
-            .unwrap();
+    let (monero, _container) = Monero::new(&cli, None, vec![
+        "alice".to_string(),
+        "alice-watch-only".to_string(),
+        "bob".to_string(),
+        "bob-watch-only".to_string(),
+    ])
+    .await
+    .unwrap();
     monero
         .init(vec![("alice", xmr_alice), ("bob", xmr_bob)])
         .await
         .unwrap();
 
-    let alice_xmr_wallet = Arc::new(swap::monero::Wallet(
-        monero.wallet("alice").unwrap().client(),
-    ));
-    let bob_xmr_wallet = Arc::new(swap::monero::Wallet(monero.wallet("bob").unwrap().client()));
+    let alice_xmr_wallet = Arc::new(swap::monero::Facade {
+        user_wallet: monero.wallet("alice").unwrap().client(),
+        watch_only_wallet: monero.wallet("alice-watch-only").unwrap().client(),
+    });
+    let bob_xmr_wallet = Arc::new(swap::monero::Facade {
+        user_wallet: monero.wallet("bob").unwrap().client(),
+        watch_only_wallet: monero.wallet("bob-watch-only").unwrap().client(),
+    });
 
     let alice_behaviour = alice::Alice::default();
     let alice_transport = build(alice_behaviour.identity()).unwrap();
-
-    let db = Database::open(std::path::Path::new("../.swap-db/")).unwrap();
-    let alice_swap = alice::swap(
+let db = Database::open(std::path::Path::new("../.swap-db/")).unwrap();    let alice_swap = alice::swap(
         alice_btc_wallet.clone(),
-        alice_xmr_wallet.clone(),
-        db,
+        alice_xmr_wallet.clone(),db,
         alice_multiaddr.clone(),
         alice_transport,
         alice_behaviour,
     );
 
     let db_dir = tempdir().unwrap();
-    let db = Database::open(db_dir.path()).unwrap();
-    let (cmd_tx, mut _cmd_rx) = mpsc::channel(1);
+    let db = Database::open(db_dir.path()).unwrap();let (cmd_tx, mut _cmd_rx) = mpsc::channel(1);
     let (mut rsp_tx, rsp_rx) = mpsc::channel(1);
     let bob_behaviour = bob::Bob::default();
     let bob_transport = build(bob_behaviour.identity()).unwrap();
     let bob_swap = bob::swap(
         bob_btc_wallet.clone(),
-        bob_xmr_wallet.clone(),
-        db,
+        bob_xmr_wallet.clone(),db,
         btc.as_sat(),
         alice_multiaddr,
         cmd_tx,
@@ -110,7 +108,7 @@ async fn swap() {
 
     let xmr_alice_final = alice_xmr_wallet.as_ref().get_balance().await.unwrap();
 
-    bob_xmr_wallet.as_ref().0.refresh().await.unwrap();
+    bob_xmr_wallet.as_ref().user_wallet.refresh().await.unwrap();
     let xmr_bob_final = bob_xmr_wallet.as_ref().get_balance().await.unwrap();
 
     assert_eq!(
