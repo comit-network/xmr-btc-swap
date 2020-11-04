@@ -63,7 +63,7 @@ impl CreateWalletForOutput for Wallet {
             .0
             .generate_from_keys(
                 &address.to_string(),
-                &private_spend_key.to_string(),
+                Some(&private_spend_key.to_string()),
                 &PrivateKey::from(private_view_key).to_string(),
             )
             .await?;
