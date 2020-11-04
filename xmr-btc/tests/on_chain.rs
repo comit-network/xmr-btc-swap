@@ -113,6 +113,7 @@ async fn swap_as_alice(
     let mut action_generator = alice::action_generator(
         network,
         bitcoin_wallet.clone(),
+        monero_wallet.clone(),
         state,
         BITCOIN_TX_LOCK_TIMEOUT,
     );
@@ -233,9 +234,11 @@ async fn swap_as_bob(
 #[tokio::test]
 async fn on_chain_happy_path() {
     let cli = Cli::default();
-    let (monero, _container) = Monero::new(&cli, Some("ochp".to_string()), vec![
+    let (monero, _container) = Monero::new(&cli, None, vec![
         "alice".to_string(),
+        "alice-watch-only".to_string(),
         "bob".to_string(),
+        "bob-watch-only".to_string(),
     ])
     .await
     .unwrap();
@@ -328,9 +331,11 @@ async fn on_chain_happy_path() {
 #[tokio::test]
 async fn on_chain_both_refund_if_alice_never_redeems() {
     let cli = Cli::default();
-    let (monero, _container) = Monero::new(&cli, Some("ocbr".to_string()), vec![
+    let (monero, _container) = Monero::new(&cli, None, vec![
         "alice".to_string(),
+        "alice-watch-only".to_string(),
         "bob".to_string(),
+        "bob-watch-only".to_string(),
     ])
     .await
     .unwrap();
@@ -423,9 +428,11 @@ async fn on_chain_both_refund_if_alice_never_redeems() {
 #[tokio::test]
 async fn on_chain_alice_punishes_if_bob_never_acts_after_fund() {
     let cli = Cli::default();
-    let (monero, _container) = Monero::new(&cli, Some("ocap".to_string()), vec![
+    let (monero, _container) = Monero::new(&cli, None, vec![
         "alice".to_string(),
+        "alice-watch-only".to_string(),
         "bob".to_string(),
+        "bob-watch-only".to_string(),
     ])
     .await
     .unwrap();

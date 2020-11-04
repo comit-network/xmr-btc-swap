@@ -1,19 +1,26 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
+use futures::TryFutureExt;
+use monero::{Address, Network, PrivateKey};
 use monero_harness::rpc::wallet;
 use std::{str::FromStr, time::Duration};
 use xmr_btc::monero::{
     Address, Amount, CreateWalletForOutput, InsufficientFunds, Network, PrivateKey, PrivateViewKey,
-    PublicKey, PublicViewKey, Transfer, TransferProof, TxHash, WatchForTransfer,
+    PublicKey, PublicViewKey, Transfer, TransferProof, TxHash, WatchForTransfer, WatchForTransferImproved,
 };
 
-pub struct Wallet(pub wallet::Client);
+pub struct Wallet {
+    pub inner: wallet::Client,
+    /// Secondary wallet which is only used to watch for the Monero lock
+    /// transaction without needing a transfer proof.
+    pub watch_only: wallet::Client,
+}
 
 impl Wallet {
     /// Get the balance of the primary account.
     pub async fn get_balance(&self) -> Result<Amount> {
-        let amount = self.0.get_balance(0).await?;
+        let amount = self.inner.get_balance(0).await?;
 
         Ok(Amount::from_piconero(amount))
     }
@@ -31,7 +38,7 @@ impl Transfer for Wallet {
             Address::standard(Network::Mainnet, public_spend_key, public_view_key.into());
 
         let res = self
-            .0
+            .inner
             .transfer(0, amount.as_piconero(), &destination_address.to_string())
             .await?;
 
@@ -57,7 +64,7 @@ impl CreateWalletForOutput for Wallet {
         let address = Address::standard(Network::Mainnet, public_spend_key, public_view_key);
 
         let _ = self
-            .0
+            .inner
             .generate_from_keys(
                 &address.to_string(),
                 Some(&private_spend_key.to_string()),
@@ -92,7 +99,7 @@ impl WatchForTransfer for Wallet {
             // in the blockchain yet, or not having enough confirmations on it. All these
             // errors warrant a retry, but the strategy should probably differ per case
             let proof = self
-                .0
+                .inner
                 .check_tx_key(
                     &String::from(transfer_proof.tx_hash()),
                     &transfer_proof.tx_key().to_string(),
@@ -120,6 +127,57 @@ impl WatchForTransfer for Wallet {
         if let Err(Error::InsufficientFunds { expected, actual }) = res {
             return Err(InsufficientFunds { expected, actual });
         };
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl WatchForTransferImproved for Wallet {
+    async fn watch_for_transfer_improved(
+        &self,
+        address: Address,
+        expected_amount: Amount,
+        private_view_key: PrivateViewKey,
+    ) -> Result<(), InsufficientFunds> {
+        let address = address.to_string();
+        let private_view_key = PrivateKey::from(private_view_key).to_string();
+        let load_address = || {
+            self.watch_only
+                .generate_from_keys(&address, None, &private_view_key)
+                .map_err(backoff::Error::Transient)
+        };
+
+        load_address
+            .retry(ConstantBackoff::new(Duration::from_secs(1)))
+            .await
+            .expect("transient error is never returned");
+
+        let refresh = || self.watch_only.refresh().map_err(backoff::Error::Transient);
+
+        refresh
+            .retry(ConstantBackoff::new(Duration::from_secs(1)))
+            .await
+            .expect("transient error is never returned");
+
+        let get_balance = || {
+            self.watch_only
+                .get_balance(0)
+                .map_err(backoff::Error::Transient)
+        };
+
+        let balance = get_balance
+            .retry(ConstantBackoff::new(Duration::from_secs(1)))
+            .await
+            .expect("transient error is never returned");
+        let balance = Amount::from_piconero(balance);
+
+        if balance != expected_amount {
+            return Err(InsufficientFunds {
+                expected: expected_amount,
+                actual: balance,
+            });
+        }
 
         Ok(())
     }

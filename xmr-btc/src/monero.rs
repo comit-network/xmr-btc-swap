@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::ops::{Add, Sub};
 
 pub use curve25519_dalek::scalar::Scalar;
-pub use monero::*;
+pub use monero::{Address, Network, PrivateKey, PublicKey};
 
 pub const MIN_CONFIRMATIONS: u32 = 10;
 
@@ -151,6 +151,16 @@ pub trait WatchForTransfer {
         transfer_proof: TransferProof,
         amount: Amount,
         expected_confirmations: u32,
+    ) -> Result<(), InsufficientFunds>;
+}
+
+#[async_trait]
+pub trait WatchForTransferImproved {
+    async fn watch_for_transfer_improved(
+        &self,
+        address: Address,
+        amount: Amount,
+        private_view_key: PrivateViewKey,
     ) -> Result<(), InsufficientFunds>;
 }
 

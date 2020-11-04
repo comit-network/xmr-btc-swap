@@ -61,9 +61,10 @@ pub trait ReceiveBitcoinRedeemEncsig {
 ///
 /// The argument `bitcoin_tx_lock_timeout` is used to determine how long we will
 /// wait for Bob, the counterparty, to lock up the bitcoin.
-pub fn action_generator<N, B>(
+pub fn action_generator<N, B, M>(
     network: Arc<Mutex<N>>,
     bitcoin_client: Arc<B>,
+    monero_client: Arc<M>,
     // TODO: Replace this with a new, slimmer struct?
     State3 {
         a,
@@ -93,10 +94,13 @@ where
         + Send
         + Sync
         + 'static,
+    M: monero::WatchForTransferImproved + Send + Sync + 'static,
 {
+    #[allow(clippy::enum_variant_names)]
     #[derive(Debug)]
     enum SwapFailed {
         BeforeBtcLock(Reason),
+        AfterBtcLock(Reason),
         AfterXmrLock(Reason),
     }
 
@@ -146,15 +150,30 @@ where
                 scalar: s_a.into_ed25519(),
             });
 
+            let public_spend_key = S_a + S_b_monero;
+            let public_view_key = v.public();
+
             co.yield_(Action::LockXmr {
                 amount: xmr,
-                public_spend_key: S_a + S_b_monero,
-                public_view_key: v.public(),
+                public_spend_key,
+                public_view_key,
             })
             .await;
 
-            // TODO: Watch for LockXmr using watch-only wallet. Doing so will prevent Alice
-            // from cancelling/refunding unnecessarily.
+            let monero_joint_address = monero::Address::standard(
+                monero::Network::Mainnet,
+                public_spend_key,
+                public_view_key.into(),
+            );
+
+            if let Either::Right(_) = select(
+                monero_client.watch_for_transfer_improved(monero_joint_address, xmr, v),
+                poll_until_btc_has_expired.clone(),
+            )
+            .await
+            {
+                return Err(SwapFailed::AfterBtcLock(Reason::BtcExpired));
+            };
 
             let tx_redeem_encsig = {
                 let mut guard = network.as_ref().lock().await;
