@@ -14,8 +14,18 @@ pub enum Options {
         #[structopt(default_value = "/ip4/127.0.0.1/tcp/9876", long = "listen-addr")]
         listen_addr: Multiaddr,
 
-        #[structopt(long = "tor-port")]
-        tor_port: Option<u16>,
+        #[structopt(long = "use-tor")]
+        tor: bool,
+
+        /// Local port Alice will be listenning on if tor is used
+        #[structopt(long = "tor_service_port")]
+        tor_service_port: Option<u16>,
+
+        #[structopt()]
+        tor_control_port: Option<u16>,
+
+        #[structopt()]
+        tor_proxy_port: Option<u16>,
     },
     Bob {
         #[structopt(long = "sats")]
@@ -30,7 +40,13 @@ pub enum Options {
         #[structopt(default_value = "http://127.0.0.1:18083", long = "monerod")]
         monerod_url: Url,
 
-        #[structopt(long = "tor")]
+        #[structopt(long = "use-tor")]
         tor: bool,
+
+        #[structopt()]
+        tor_control_port: Option<u16>,
+
+        #[structopt()]
+        tor_proxy_port: Option<u16>,
     },
 }

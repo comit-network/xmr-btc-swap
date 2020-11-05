@@ -25,7 +25,7 @@ use swap::{
     bob::Bob,
     monero,
     network::transport::{build, build_tor, SwapTransport},
-    Cmd, Rsp, SwapAmounts,
+    Cmd, Rsp, SwapAmounts, TorConf,
 };
 use tracing::info;
 
@@ -47,30 +47,37 @@ async fn main() -> Result<()> {
             bitcoind_url,
             monerod_url,
             listen_addr,
-            tor_port,
+            tor,
+            tor_service_port,
+            tor_control_port,
+            tor_proxy_port,
         } => {
             info!("running swap node as Alice ...");
 
             let behaviour = Alice::default();
             let local_key_pair = behaviour.identity();
 
-            let (listen_addr, _ac, transport) = match tor_port {
-                Some(tor_port) => {
-                    let tor_secret_key = torut::onion::TorSecretKeyV3::generate();
-                    let onion_address = tor_secret_key
-                        .public()
-                        .get_onion_address()
-                        .get_address_without_dot_onion();
-                    let onion_address_string = format!("/onion3/{}:{}", onion_address, tor_port);
-                    let addr: Multiaddr = onion_address_string.parse()?;
-                    let ac = create_tor_service(tor_secret_key, tor_port).await?;
-                    let transport = build_tor(local_key_pair, Some((addr.clone(), tor_port)))?;
-                    (addr, Some(ac), transport)
-                }
-                None => {
-                    let transport = build(local_key_pair)?;
-                    (listen_addr, None, transport)
-                }
+            let (listen_addr, _ac, transport) = if tor {
+                let tor_conf = tor_conf(tor_service_port, tor_control_port, tor_proxy_port);
+
+                let tor_secret_key = torut::onion::TorSecretKeyV3::generate();
+                let onion_address = tor_secret_key
+                    .public()
+                    .get_onion_address()
+                    .get_address_without_dot_onion();
+                let onion_address_string =
+                    format!("/onion3/{}:{}", onion_address, tor_conf.service_port);
+                let addr: Multiaddr = onion_address_string.parse()?;
+                let transport = build_tor(
+                    local_key_pair,
+                    Some((addr.clone(), tor_conf.service_port)),
+                    tor_conf,
+                )?;
+                let ac = create_tor_service(tor_secret_key, tor_conf).await?;
+                (addr, Some(ac), transport)
+            } else {
+                let transport = build(local_key_pair)?;
+                (listen_addr, None, transport)
             };
 
             let bitcoin_wallet = bitcoin::Wallet::new("alice", bitcoind_url)
@@ -94,6 +101,8 @@ async fn main() -> Result<()> {
             satoshis,
             bitcoind_url,
             monerod_url,
+            tor_proxy_port,
+            tor_control_port,
             tor,
         } => {
             info!("running swap node as Bob ...");
@@ -101,8 +110,10 @@ async fn main() -> Result<()> {
             let behaviour = Bob::default();
             let local_key_pair = behaviour.identity();
 
+            let tor_conf = tor_conf(None, tor_control_port, tor_proxy_port);
+
             let transport = match tor {
-                true => build_tor(local_key_pair, None)?,
+                true => build_tor(local_key_pair, None, tor_conf)?,
                 false => build(local_key_pair)?,
             };
 
@@ -128,18 +139,39 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+fn tor_conf(
+    tor_service_port: Option<u16>,
+    tor_control_port: Option<u16>,
+    tor_proxy_port: Option<u16>,
+) -> TorConf {
+    let mut tor_conf = TorConf::default();
+    if let Some(tor_service_port) = tor_service_port {
+        tor_conf = tor_conf.with_service_port(tor_service_port);
+    }
+    if let Some(tor_control_port) = tor_control_port {
+        tor_conf = tor_conf.with_control_port(tor_control_port);
+    }
+    if let Some(tor_proxy_port) = tor_proxy_port {
+        tor_conf = tor_conf.with_proxy_port(tor_proxy_port);
+    }
+    tor_conf
+}
+
 async fn create_tor_service(
     tor_secret_key: torut::onion::TorSecretKeyV3,
-    tor_port: u16,
+    tor_conf: TorConf,
 ) -> Result<swap::tor::AuthenticatedConnection> {
     // TODO use configurable ports for tor connection
-    let mut authenticated_connection = swap::tor::UnauthenticatedConnection::default()
-        .init_authenticated_connection()
-        .await?;
+    let mut authenticated_connection = swap::tor::UnauthenticatedConnection::with_ports(
+        tor_conf.proxy_port,
+        tor_conf.control_port,
+    )
+    .init_authenticated_connection()
+    .await?;
     tracing::info!("Tor authenticated.");
 
     authenticated_connection
-        .add_service(tor_port, &tor_secret_key)
+        .add_service(tor_conf.service_port, &tor_secret_key)
         .await?;
     tracing::info!("Tor service added.");
 

@@ -9,7 +9,8 @@ pub mod network;
 pub mod storage;
 pub mod tor;
 
-const REFUND_TIMELOCK: u32 = 10; // Relative timelock, this is number of blocks. TODO: What should it be?
+const REFUND_TIMELOCK: u32 = 300; // Relative timelock, 300 chosen for test purposes where we have
+                                  // 1block/second
 const PUNISH_TIMELOCK: u32 = 10; // FIXME: What should this be?
 
 pub type Never = std::convert::Infallible;
@@ -47,5 +48,42 @@ impl Display for SwapAmounts {
             self.btc.as_sat(),
             self.xmr.as_piconero()
         )
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct TorConf {
+    pub control_port: u16,
+    pub proxy_port: u16,
+    pub service_port: u16,
+}
+
+impl Default for TorConf {
+    fn default() -> Self {
+        Self {
+            control_port: 9051,
+            proxy_port: 9050,
+            service_port: 9090,
+        }
+    }
+}
+
+impl TorConf {
+    pub fn with_control_port(self, control_port: u16) -> Self {
+        Self {
+            control_port,
+            ..self
+        }
+    }
+
+    pub fn with_proxy_port(self, proxy_port: u16) -> Self {
+        Self { proxy_port, ..self }
+    }
+
+    pub fn with_service_port(self, service_port: u16) -> Self {
+        Self {
+            service_port,
+            ..self
+        }
     }
 }

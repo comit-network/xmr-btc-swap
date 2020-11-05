@@ -1,3 +1,4 @@
+use crate::TorConf;
 use anyhow::Result;
 use libp2p::{
     core::{
@@ -47,6 +48,7 @@ pub fn build(id_keys: identity::Keypair) -> Result<SwapTransport> {
 pub fn build_tor(
     id_keys: identity::Keypair,
     address_port_pair: Option<(libp2p::core::Multiaddr, u16)>,
+    tor_conf: TorConf,
 ) -> Result<SwapTransport> {
     use libp2p_tokio_socks5::Socks5TokioTcpConfig;
     use std::collections::HashMap;
@@ -59,7 +61,10 @@ pub fn build_tor(
     let dh_keys = noise::Keypair::<X25519Spec>::new().into_authentic(&id_keys)?;
     let noise = NoiseConfig::xx(dh_keys).into_authenticated();
 
-    let socks = Socks5TokioTcpConfig::default().nodelay(true).onion_map(map);
+    let socks = Socks5TokioTcpConfig::default()
+        .socks_port(tor_conf.proxy_port)
+        .nodelay(true)
+        .onion_map(map);
     let dns = DnsConfig::new(socks)?;
 
     let transport = dns
