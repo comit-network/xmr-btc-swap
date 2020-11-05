@@ -112,9 +112,10 @@ async fn main() -> Result<()> {
 
             let tor_conf = tor_conf(None, tor_control_port, tor_proxy_port);
 
-            let transport = match tor {
-                true => build_tor(local_key_pair, None, tor_conf)?,
-                false => build(local_key_pair)?,
+            let transport = if tor {
+                build_tor(local_key_pair, None, tor_conf)?
+            } else {
+                build(local_key_pair)?
             };
 
             let bitcoin_wallet = bitcoin::Wallet::new("bob", bitcoind_url)
