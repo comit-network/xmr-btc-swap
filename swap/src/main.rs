@@ -16,6 +16,7 @@ use anyhow::Result;
 use futures::{channel::mpsc, StreamExt};
 use libp2p::Multiaddr;
 use log::LevelFilter;
+use prettytable::{row, Table};
 use std::{io, io::Write, process, sync::Arc};
 use structopt::StructOpt;
 use swap::{
@@ -27,8 +28,10 @@ use swap::{
     network::transport::{build, build_tor, SwapTransport},
     Cmd, Rsp, SwapAmounts,
 };
-use tempfile::tempdir;
 use tracing::info;
+
+#[macro_use]
+extern crate prettytable;
 
 mod cli;
 mod trace;
@@ -44,8 +47,8 @@ async fn main() -> Result<()> {
 
     trace::init_tracing(LevelFilter::Debug)?;
 
-    let db_dir = tempdir()?;
-    let db = Database::open(db_dir.path()).unwrap();
+    // This currently creates the directory if it's not there in the first place
+    let db = Database::open(std::path::Path::new("./.swap-db/")).unwrap();
 
     match opt {
         Options::Alice {
@@ -129,6 +132,18 @@ async fn main() -> Result<()> {
                 behaviour,
             )
             .await?;
+        }
+        Options::History => {
+            let mut table = Table::new();
+
+            table.add_row(row!["SWAP ID", "STATE"]);
+
+            for (swap_id, state) in db.all()? {
+                table.add_row(row![swap_id, state]);
+            }
+
+            // Print the table to stdout
+            table.printstd();
         }
     }
 

@@ -33,4 +33,5 @@ pub enum Options {
         #[structopt(long = "tor")]
         tor: bool,
     },
+    History,
 }
