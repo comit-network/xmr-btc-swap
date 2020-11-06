@@ -9,7 +9,7 @@ pub enum Options {
         #[structopt(default_value = "http://127.0.0.1:8332", long = "bitcoind")]
         bitcoind_url: Url,
 
-        #[structopt(default_value = "http://127.0.0.1:18083", long = "monerod")]
+        #[structopt(default_value = "http://127.0.0.1:18083/json_rpc", long = "monerod")]
         monerod_url: Url,
 
         #[structopt(default_value = "/ip4/127.0.0.1/tcp/9876", long = "listen-addr")]
@@ -28,7 +28,7 @@ pub enum Options {
         #[structopt(default_value = "http://127.0.0.1:8332", long = "bitcoind")]
         bitcoind_url: Url,
 
-        #[structopt(default_value = "http://127.0.0.1:18083", long = "monerod")]
+        #[structopt(default_value = "http://127.0.0.1:18083/json_rpc", long = "monerod")]
         monerod_url: Url,
 
         #[structopt(long = "tor")]
@@ -42,7 +42,7 @@ pub enum Options {
         #[structopt(default_value = "http://127.0.0.1:8332", long = "bitcoind")]
         bitcoind_url: Url,
 
-        #[structopt(default_value = "http://127.0.0.1:18083", long = "monerod")]
+        #[structopt(default_value = "http://127.0.0.1:18083/json_rpc", long = "monerod")]
         monerod_url: Url,
     },
 }
