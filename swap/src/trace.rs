@@ -14,7 +14,10 @@ pub fn init_tracing(level: log::LevelFilter) -> anyhow::Result<()> {
 
     let is_terminal = atty::is(Stream::Stdout);
     let subscriber = FmtSubscriber::builder()
-        .with_env_filter(format!("swap={}", level))
+        .with_env_filter(format!(
+            "swap={},xmr_btc={},monero_harness={}",
+            level, level, level
+        ))
         .with_ansi(is_terminal)
         .finish();
 
