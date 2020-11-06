@@ -79,8 +79,9 @@ pub async fn alice_recover(
                 bitcoin_wallet
                     .broadcast_signed_transaction(tx_cancel)
                     .await?;
-                info!("Successfully published Bitcoin cancel transaction");
             }
+
+            info!("Confirmed that Bitcoin cancel transaction is on the blockchain");
 
             let tx_cancel_height = bitcoin_wallet
                 .transaction_block_height(tx_cancel.txid())
@@ -103,6 +104,10 @@ pub async fn alice_recover(
                 Either::Left((tx_refund_published, ..)) => {
                     info!("Found Bitcoin refund transaction");
 
+                    let s_a = monero::PrivateKey {
+                        scalar: state.s_a.into_ed25519(),
+                    };
+
                     let tx_refund_sig = tx_refund
                         .extract_signature_by_key(tx_refund_published, state.a.public())?;
                     let tx_refund_encsig = state
@@ -117,10 +122,6 @@ pub async fn alice_recover(
                     let s_b = monero::PrivateKey::from_scalar(
                         xmr_btc::monero::Scalar::from_bytes_mod_order(s_b.to_bytes()),
                     );
-
-                    let s_a = monero::PrivateKey {
-                        scalar: state.s_a.into_ed25519(),
-                    };
 
                     monero_wallet
                         .create_and_load_wallet_for_output(s_a + s_b, state.v)
@@ -200,8 +201,9 @@ pub async fn alice_recover(
                     bitcoin_wallet
                         .broadcast_signed_transaction(tx_cancel)
                         .await?;
-                    info!("Successfully published Bitcoin cancel transaction");
                 }
+
+                info!("Confirmed that Bitcoin cancel transaction is on the blockchain");
 
                 let tx_cancel_height = bitcoin_wallet
                     .transaction_block_height(tx_cancel.txid())
@@ -224,6 +226,10 @@ pub async fn alice_recover(
                     Either::Left((tx_refund_published, ..)) => {
                         info!("Found Bitcoin refund transaction");
 
+                        let s_a = monero::PrivateKey {
+                            scalar: state.s_a.into_ed25519(),
+                        };
+
                         let tx_refund_sig = tx_refund
                             .extract_signature_by_key(tx_refund_published, state.a.public())?;
                         let tx_refund_encsig = state
@@ -238,10 +244,6 @@ pub async fn alice_recover(
                         let s_b = monero::PrivateKey::from_scalar(
                             xmr_btc::monero::Scalar::from_bytes_mod_order(s_b.to_bytes()),
                         );
-
-                        let s_a = monero::PrivateKey {
-                            scalar: state.s_a.into_ed25519(),
-                        };
 
                         monero_wallet
                             .create_and_load_wallet_for_output(s_a + s_b, state.v)
