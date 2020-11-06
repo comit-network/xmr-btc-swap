@@ -167,6 +167,9 @@ pub async fn swap(
 
         info!("Resumed execution of generator, got: {:?}", state);
 
+        // TODO: Protect against transient errors
+        // TODO: Ignore transaction-already-in-block-chain errors
+
         match state {
             GeneratorState::Yielded(bob::Action::LockBtc(tx_lock)) => {
                 let signed_tx_lock = bitcoin_wallet.sign_tx_lock(tx_lock).await?;
@@ -184,8 +187,9 @@ pub async fn swap(
                 guard.0.send_message3(alice.clone(), tx_redeem_encsig);
                 info!("Sent Bitcoin redeem encsig");
 
-                // TODO: Does Bob need to wait for Alice to send an empty response, or can we
-                // just continue?
+                // FIXME: Having to wait for Alice's response here is a big problem, because
+                // we're stuck if she doesn't send her response back. I believe this is
+                // currently necessary, so we may have to rework this and/or how we use libp2p
                 match guard.0.next().shared().await {
                     OutEvent::Message3 => {
                         debug!("Got Message3 empty response");

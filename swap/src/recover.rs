@@ -1,3 +1,15 @@
+//! This module is used to attempt to recover an unfinished swap.
+//!
+//! Recovery is only supported for certain states and the strategy followed is
+//! to perform the simplest steps that require no further action from the
+//! counterparty.
+//!
+//! The quality of this module is bad because there is a lot of code
+//! duplication, both within the module and with respect to
+//! `xmr_btc/src/{alice,bob}.rs`. In my opinion, a better approach to support
+//! swap recovery would be through the `action_generator`s themselves, but this
+//! was deemed too complicated for the time being.
+
 use crate::{
     monero::CreateWalletForOutput,
     state::{Alice, Bob, Swap},
@@ -257,7 +269,7 @@ pub async fn alice_recover(
                             TxPunish::new(&tx_cancel, &state.punish_address, state.punish_timelock);
 
                         let sig_a = state.a.sign(tx_punish.digest());
-                        let sig_b = state.tx_cancel_sig_bob.clone();
+                        let sig_b = state.tx_punish_sig_bob.clone();
 
                         let sig_tx_punish = tx_punish.add_signatures(
                             &tx_cancel,
@@ -282,22 +294,61 @@ pub async fn alice_recover(
                 state.a.public(),
                 state.B.clone(),
             );
+            let tx_refund = TxRefund::new(&tx_cancel, &state.refund_address);
 
-            let tx_punish = TxPunish::new(&tx_cancel, &state.punish_address, state.punish_timelock);
+            info!("Checking if Bitcoin has already been refunded");
 
-            let sig_a = state.a.sign(tx_punish.digest());
-            let sig_b = state.tx_punish_sig_bob.clone();
+            // TODO: Protect against transient errors so that we can correctly decide if the
+            // bitcoin has been refunded
+            match bitcoin_wallet.0.get_raw_transaction(tx_refund.txid()).await {
+                Ok(tx_refund_published) => {
+                    info!("Bitcoin already refunded");
 
-            let sig_tx_punish = tx_punish.add_signatures(
-                &tx_cancel,
-                (state.a.public(), sig_a),
-                (state.B.clone(), sig_b),
-            )?;
+                    let s_a = monero::PrivateKey {
+                        scalar: state.s_a.into_ed25519(),
+                    };
 
-            bitcoin_wallet
-                .broadcast_signed_transaction(sig_tx_punish)
-                .await?;
-            info!("Successfully punished Bob's inactivity by taking bitcoin");
+                    let tx_refund_sig = tx_refund
+                        .extract_signature_by_key(tx_refund_published, state.a.public())?;
+                    let tx_refund_encsig = state
+                        .a
+                        .encsign(state.S_b_bitcoin.clone(), tx_refund.digest());
+
+                    let s_b = xmr_btc::bitcoin::recover(
+                        state.S_b_bitcoin,
+                        tx_refund_sig,
+                        tx_refund_encsig,
+                    )?;
+                    let s_b = monero::PrivateKey::from_scalar(
+                        xmr_btc::monero::Scalar::from_bytes_mod_order(s_b.to_bytes()),
+                    );
+
+                    monero_wallet
+                        .create_and_load_wallet_for_output(s_a + s_b, state.v)
+                        .await?;
+                    info!("Successfully refunded monero");
+                }
+                Err(_) => {
+                    info!("Bitcoin not yet refunded");
+
+                    let tx_punish =
+                        TxPunish::new(&tx_cancel, &state.punish_address, state.punish_timelock);
+
+                    let sig_a = state.a.sign(tx_punish.digest());
+                    let sig_b = state.tx_punish_sig_bob.clone();
+
+                    let sig_tx_punish = tx_punish.add_signatures(
+                        &tx_cancel,
+                        (state.a.public(), sig_a),
+                        (state.B.clone(), sig_b),
+                    )?;
+
+                    bitcoin_wallet
+                        .broadcast_signed_transaction(sig_tx_punish)
+                        .await?;
+                    info!("Successfully punished Bob's inactivity by taking bitcoin");
+                }
+            }
         }
         Alice::BtcRefunded {
             view_key,
