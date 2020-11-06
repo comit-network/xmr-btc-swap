@@ -158,7 +158,7 @@ pub async fn alice_recover(
             let refund_absolute_expiry = tx_lock_height + state.refund_timelock;
 
             // bob cannot cancel
-            if block_height > refund_absolute_expiry {
+            if block_height < refund_absolute_expiry {
                 bitcoin_wallet
                     .broadcast_signed_transaction(redeem_tx)
                     .await?;
@@ -169,6 +169,40 @@ pub async fn alice_recover(
                     state.a.public(),
                     state.B.clone(),
                 );
+
+                // Ensure that TxCancel is on the blockchain
+                if bitcoin_wallet
+                    .0
+                    .get_raw_transaction(tx_cancel.txid())
+                    .await
+                    .is_err()
+                {
+                    let tx_lock_height = bitcoin_wallet
+                        .transaction_block_height(state.tx_lock.txid())
+                        .await;
+                    poll_until_block_height_is_gte(
+                        &bitcoin_wallet,
+                        tx_lock_height + state.refund_timelock,
+                    )
+                    .await;
+
+                    let sig_a = state.a.sign(tx_cancel.digest());
+                    let sig_b = state.tx_cancel_sig_bob.clone();
+
+                    let tx_cancel = tx_cancel
+                        .clone()
+                        .add_signatures(
+                            &state.tx_lock,
+                            (state.a.public(), sig_a),
+                            (state.B.clone(), sig_b),
+                        )
+                        .expect("sig_{a,b} to be valid signatures for tx_cancel");
+
+                    // TODO: We should not fail if the transaction is already on the blockchain
+                    bitcoin_wallet
+                        .broadcast_signed_transaction(tx_cancel)
+                        .await?;
+                }
 
                 let tx_cancel_height = bitcoin_wallet
                     .transaction_block_height(tx_cancel.txid())
@@ -245,7 +279,7 @@ pub async fn alice_recover(
             let tx_punish = TxPunish::new(&tx_cancel, &state.punish_address, state.punish_timelock);
 
             let sig_a = state.a.sign(tx_punish.digest());
-            let sig_b = state.tx_cancel_sig_bob.clone();
+            let sig_b = state.tx_punish_sig_bob.clone();
 
             let sig_tx_punish = tx_punish.add_signatures(
                 &tx_cancel,
