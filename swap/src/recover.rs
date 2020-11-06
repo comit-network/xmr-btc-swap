@@ -150,6 +150,8 @@ pub async fn alice_recover(
             };
         }
         Alice::BtcRedeemable { redeem_tx, state } => {
+            info!("Have the means to redeem the Bitcoin");
+
             let tx_lock_height = bitcoin_wallet
                 .transaction_block_height(state.tx_lock.txid())
                 .await;
@@ -157,12 +159,17 @@ pub async fn alice_recover(
             let block_height = bitcoin_wallet.0.block_height().await?;
             let refund_absolute_expiry = tx_lock_height + state.refund_timelock;
 
-            // bob cannot cancel
+            info!("Checking refund timelock");
             if block_height < refund_absolute_expiry {
+                info!("Safe to redeem");
+
                 bitcoin_wallet
                     .broadcast_signed_transaction(redeem_tx)
                     .await?;
+                info!("Successfully redeemed bitcoin");
             } else {
+                info!("Refund timelock reached");
+
                 let tx_cancel = TxCancel::new(
                     &state.tx_lock,
                     state.refund_timelock,
@@ -170,22 +177,13 @@ pub async fn alice_recover(
                     state.B.clone(),
                 );
 
-                // Ensure that TxCancel is on the blockchain
+                info!("Checking if the Bitcoin cancel transaction has been published");
                 if bitcoin_wallet
                     .0
                     .get_raw_transaction(tx_cancel.txid())
                     .await
                     .is_err()
                 {
-                    let tx_lock_height = bitcoin_wallet
-                        .transaction_block_height(state.tx_lock.txid())
-                        .await;
-                    poll_until_block_height_is_gte(
-                        &bitcoin_wallet,
-                        tx_lock_height + state.refund_timelock,
-                    )
-                    .await;
-
                     let sig_a = state.a.sign(tx_cancel.digest());
                     let sig_b = state.tx_cancel_sig_bob.clone();
 
@@ -202,6 +200,7 @@ pub async fn alice_recover(
                     bitcoin_wallet
                         .broadcast_signed_transaction(tx_cancel)
                         .await?;
+                    info!("Successfully published Bitcoin cancel transaction");
                 }
 
                 let tx_cancel_height = bitcoin_wallet
@@ -215,6 +214,7 @@ pub async fn alice_recover(
 
                 let tx_refund = TxRefund::new(&tx_cancel, &state.refund_address);
 
+                info!("Waiting for either Bitcoin refund or punish timelock");
                 match select(
                     bitcoin_wallet.watch_for_raw_transaction(tx_refund.txid()),
                     poll_until_bob_can_be_punished,
@@ -222,6 +222,8 @@ pub async fn alice_recover(
                 .await
                 {
                     Either::Left((tx_refund_published, ..)) => {
+                        info!("Found Bitcoin refund transaction");
+
                         let tx_refund_sig = tx_refund
                             .extract_signature_by_key(tx_refund_published, state.a.public())?;
                         let tx_refund_encsig = state
@@ -244,8 +246,11 @@ pub async fn alice_recover(
                         monero_wallet
                             .create_and_load_wallet_for_output(s_a + s_b, state.v)
                             .await?;
+                        info!("Successfully refunded monero");
                     }
                     Either::Right(_) => {
+                        info!("Punish timelock reached, attempting to punish Bob");
+
                         let tx_punish =
                             TxPunish::new(&tx_cancel, &state.punish_address, state.punish_timelock);
 
@@ -261,7 +266,7 @@ pub async fn alice_recover(
                         bitcoin_wallet
                             .broadcast_signed_transaction(sig_tx_punish)
                             .await?;
-                        info!("Successfully redeemed bitcoin");
+                        info!("Successfully punished Bob's inactivity by taking bitcoin");
                     }
                 };
             }
