@@ -17,7 +17,7 @@ pub struct Message0 {
     pub(crate) B: bitcoin::PublicKey,
     pub(crate) S_b_monero: monero::PublicKey,
     pub(crate) S_b_bitcoin: bitcoin::PublicKey,
-    pub(crate) dleq_proof_s_b: cross_curve_dleq::Proof,
+    // pub(crate) dleq_proof_s_b: cross_curve_dleq::Proof,
     pub(crate) v_b: monero::PrivateViewKey,
     pub(crate) refund_address: bitcoin::Address,
 }

@@ -392,7 +392,7 @@ impl State0 {
                 scalar: self.s_b.into_ed25519(),
             }),
             S_b_bitcoin: self.s_b.into_secp256k1().into(),
-            dleq_proof_s_b,
+            // dleq_proof_s_b,
             v_b: self.v_b,
             refund_address: self.refund_address.clone(),
         }
@@ -402,13 +402,13 @@ impl State0 {
     where
         W: BuildTxLockPsbt,
     {
-        msg.dleq_proof_s_a.verify(
-            msg.S_a_bitcoin.clone().into(),
-            msg.S_a_monero
-                .point
-                .decompress()
-                .ok_or_else(|| anyhow!("S_a is not a monero curve point"))?,
-        )?;
+        // msg.dleq_proof_s_a.verify(
+        //     msg.S_a_bitcoin.clone().into(),
+        //     msg.S_a_monero
+        //         .point
+        //         .decompress()
+        //         .ok_or_else(|| anyhow!("S_a is not a monero curve point"))?,
+        // )?;
 
         let tx_lock =
             bitcoin::TxLock::new(wallet, self.btc, msg.A.clone(), self.b.public()).await?;
