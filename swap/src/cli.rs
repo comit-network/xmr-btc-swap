@@ -1,5 +1,6 @@
 use libp2p::core::Multiaddr;
 use url::Url;
+use uuid::Uuid;
 
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(name = "xmr-btc-swap", about = "Trustless XMR BTC swaps")]
@@ -34,4 +35,14 @@ pub enum Options {
         tor: bool,
     },
     History,
+    Recover {
+        #[structopt(required = true)]
+        swap_id: Uuid,
+
+        #[structopt(default_value = "http://127.0.0.1:8332", long = "bitcoind")]
+        bitcoind_url: Url,
+
+        #[structopt(default_value = "http://127.0.0.1:18083", long = "monerod")]
+        monerod_url: Url,
+    },
 }

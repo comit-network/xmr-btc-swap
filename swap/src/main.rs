@@ -20,12 +20,12 @@ use prettytable::{row, Table};
 use std::{io, io::Write, process, sync::Arc};
 use structopt::StructOpt;
 use swap::{
-    alice,
-    alice::Alice,
-    bitcoin, bob,
-    bob::Bob,
+    alice::{self, Alice},
+    bitcoin,
+    bob::{self, Bob},
     monero,
     network::transport::{build, build_tor, SwapTransport},
+    recover::recover,
     Cmd, Rsp, SwapAmounts,
 };
 use tracing::info;
@@ -144,6 +144,19 @@ async fn main() -> Result<()> {
 
             // Print the table to stdout
             table.printstd();
+        }
+        Options::Recover {
+            swap_id,
+            bitcoind_url,
+            monerod_url,
+        } => {
+            let state = db.get_state(swap_id)?;
+            let bitcoin_wallet = bitcoin::Wallet::new("bob", bitcoind_url)
+                .await
+                .expect("failed to create bitcoin wallet");
+            let monero_wallet = monero::Wallet::new(monerod_url);
+
+            recover(bitcoin_wallet, monero_wallet, state).await?;
         }
     }
 
