@@ -2,12 +2,7 @@ pub mod transactions;
 
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
-use bitcoin::{
-    hashes::{hex::ToHex, Hash},
-    secp256k1,
-    util::psbt::PartiallySignedTransaction,
-    SigHash,
-};
+use bitcoin::hashes::{hex::ToHex, Hash};
 use ecdsa_fun::{adaptor::Adaptor, fun::Point, nonce::Deterministic, ECDSA};
 use miniscript::{Descriptor, Segwitv0};
 use rand::{CryptoRng, RngCore};
@@ -15,9 +10,9 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
 
-pub use crate::bitcoin::transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund};
-pub use bitcoin::{Address, Amount, OutPoint, Transaction, Txid};
+pub use bitcoin::{util::psbt::PartiallySignedTransaction, *};
 pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
+pub use transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund};
 
 pub const TX_FEE: u64 = 10_000;
 

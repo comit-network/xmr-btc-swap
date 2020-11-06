@@ -1,11 +1,12 @@
 use crate::serde::monero_private_key;
 use anyhow::Result;
 use async_trait::async_trait;
-pub use curve25519_dalek::scalar::Scalar;
-pub use monero::{Address, PrivateKey, PublicKey};
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Sub};
+
+pub use curve25519_dalek::scalar::Scalar;
+pub use monero::*;
 
 pub const MIN_CONFIRMATIONS: u32 = 10;
 

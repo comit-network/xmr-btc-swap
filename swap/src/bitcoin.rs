@@ -8,13 +8,13 @@ use bitcoin_harness::bitcoind_rpc::PsbtBase64;
 use reqwest::Url;
 use tokio::time;
 use xmr_btc::bitcoin::{
-    Amount, BlockHeight, BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock,
-    TransactionBlockHeight, TxLock, Txid, WatchForRawTransaction,
+    BlockHeight, BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock, TransactionBlockHeight,
+    WatchForRawTransaction,
 };
 
-pub const TX_LOCK_MINE_TIMEOUT: u64 = 3600;
+pub use xmr_btc::bitcoin::*;
 
-// This is cut'n'paste from xmr_btc/tests/harness/wallet/bitcoin.rs
+pub const TX_LOCK_MINE_TIMEOUT: u64 = 3600;
 
 #[derive(Debug)]
 pub struct Wallet(pub bitcoin_harness::Wallet);

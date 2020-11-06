@@ -75,7 +75,7 @@ pub async fn swap(
     // to `ConstantBackoff`.
     #[async_trait]
     impl ReceiveBitcoinRedeemEncsig for Network {
-        async fn receive_bitcoin_redeem_encsig(&mut self) -> xmr_btc::bitcoin::EncryptedSignature {
+        async fn receive_bitcoin_redeem_encsig(&mut self) -> bitcoin::EncryptedSignature {
             #[derive(Debug)]
             struct UnexpectedMessage;
 

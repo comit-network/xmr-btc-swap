@@ -6,6 +6,7 @@ use std::sync::Arc;
 use swap::{alice, bob, network::transport::build, storage::Database};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
+use xmr_btc::bitcoin;
 
 // NOTE: For some reason running these tests overflows the stack. In order to
 // mitigate this run them with:
@@ -114,7 +115,7 @@ async fn swap() {
 
     assert_eq!(
         btc_alice_final,
-        btc_alice + btc - bitcoin::Amount::from_sat(xmr_btc::bitcoin::TX_FEE)
+        btc_alice + btc - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
     );
     assert!(btc_bob_final <= btc_bob - btc);
 

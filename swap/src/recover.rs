@@ -11,6 +11,7 @@
 //! was deemed too complicated for the time being.
 
 use crate::{
+    bitcoin, monero,
     monero::CreateWalletForOutput,
     state::{Alice, Bob, Swap},
 };
@@ -23,13 +24,13 @@ use futures::{
 use sha2::Sha256;
 use tracing::info;
 use xmr_btc::bitcoin::{
-    poll_until_block_height_is_gte, BroadcastSignedTransaction, TransactionBlockHeight, TxCancel,
-    TxPunish, TxRedeem, TxRefund, WatchForRawTransaction,
+    poll_until_block_height_is_gte, BroadcastSignedTransaction, TransactionBlockHeight,
+    WatchForRawTransaction,
 };
 
 pub async fn recover(
-    bitcoin_wallet: crate::bitcoin::Wallet,
-    monero_wallet: crate::monero::Wallet,
+    bitcoin_wallet: bitcoin::Wallet,
+    monero_wallet: monero::Wallet,
     state: Swap,
 ) -> Result<()> {
     match state {
@@ -39,8 +40,8 @@ pub async fn recover(
 }
 
 pub async fn alice_recover(
-    bitcoin_wallet: crate::bitcoin::Wallet,
-    monero_wallet: crate::monero::Wallet,
+    bitcoin_wallet: bitcoin::Wallet,
+    monero_wallet: monero::Wallet,
     state: Alice,
 ) -> Result<()> {
     match state {
@@ -50,7 +51,7 @@ pub async fn alice_recover(
         Alice::XmrLocked(state) => {
             info!("Monero still locked up");
 
-            let tx_cancel = TxCancel::new(
+            let tx_cancel = bitcoin::TxCancel::new(
                 &state.tx_lock,
                 state.refund_timelock,
                 state.a.public(),
@@ -104,7 +105,7 @@ pub async fn alice_recover(
             );
             pin_mut!(poll_until_bob_can_be_punished);
 
-            let tx_refund = TxRefund::new(&tx_cancel, &state.refund_address);
+            let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &state.refund_address);
 
             info!("Waiting for either Bitcoin refund or punish timelock");
             match select(
@@ -126,13 +127,9 @@ pub async fn alice_recover(
                         .a
                         .encsign(state.S_b_bitcoin.clone(), tx_refund.digest());
 
-                    let s_b = xmr_btc::bitcoin::recover(
-                        state.S_b_bitcoin,
-                        tx_refund_sig,
-                        tx_refund_encsig,
-                    )?;
+                    let s_b = bitcoin::recover(state.S_b_bitcoin, tx_refund_sig, tx_refund_encsig)?;
                     let s_b = monero::PrivateKey::from_scalar(
-                        xmr_btc::monero::Scalar::from_bytes_mod_order(s_b.to_bytes()),
+                        monero::Scalar::from_bytes_mod_order(s_b.to_bytes()),
                     );
 
                     monero_wallet
@@ -143,8 +140,11 @@ pub async fn alice_recover(
                 Either::Right(_) => {
                     info!("Punish timelock reached, attempting to punish Bob");
 
-                    let tx_punish =
-                        TxPunish::new(&tx_cancel, &state.punish_address, state.punish_timelock);
+                    let tx_punish = bitcoin::TxPunish::new(
+                        &tx_cancel,
+                        &state.punish_address,
+                        state.punish_timelock,
+                    );
 
                     let sig_a = state.a.sign(tx_punish.digest());
                     let sig_b = state.tx_punish_sig_bob.clone();
@@ -183,7 +183,7 @@ pub async fn alice_recover(
             } else {
                 info!("Refund timelock reached");
 
-                let tx_cancel = TxCancel::new(
+                let tx_cancel = bitcoin::TxCancel::new(
                     &state.tx_lock,
                     state.refund_timelock,
                     state.a.public(),
@@ -226,7 +226,7 @@ pub async fn alice_recover(
                 );
                 pin_mut!(poll_until_bob_can_be_punished);
 
-                let tx_refund = TxRefund::new(&tx_cancel, &state.refund_address);
+                let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &state.refund_address);
 
                 info!("Waiting for either Bitcoin refund or punish timelock");
                 match select(
@@ -248,13 +248,10 @@ pub async fn alice_recover(
                             .a
                             .encsign(state.S_b_bitcoin.clone(), tx_refund.digest());
 
-                        let s_b = xmr_btc::bitcoin::recover(
-                            state.S_b_bitcoin,
-                            tx_refund_sig,
-                            tx_refund_encsig,
-                        )?;
+                        let s_b =
+                            bitcoin::recover(state.S_b_bitcoin, tx_refund_sig, tx_refund_encsig)?;
                         let s_b = monero::PrivateKey::from_scalar(
-                            xmr_btc::monero::Scalar::from_bytes_mod_order(s_b.to_bytes()),
+                            monero::Scalar::from_bytes_mod_order(s_b.to_bytes()),
                         );
 
                         monero_wallet
@@ -265,8 +262,11 @@ pub async fn alice_recover(
                     Either::Right(_) => {
                         info!("Punish timelock reached, attempting to punish Bob");
 
-                        let tx_punish =
-                            TxPunish::new(&tx_cancel, &state.punish_address, state.punish_timelock);
+                        let tx_punish = bitcoin::TxPunish::new(
+                            &tx_cancel,
+                            &state.punish_address,
+                            state.punish_timelock,
+                        );
 
                         let sig_a = state.a.sign(tx_punish.digest());
                         let sig_b = state.tx_punish_sig_bob.clone();
@@ -288,13 +288,13 @@ pub async fn alice_recover(
         Alice::BtcPunishable(state) => {
             info!("Punish timelock reached, attempting to punish Bob");
 
-            let tx_cancel = TxCancel::new(
+            let tx_cancel = bitcoin::TxCancel::new(
                 &state.tx_lock,
                 state.refund_timelock,
                 state.a.public(),
                 state.B.clone(),
             );
-            let tx_refund = TxRefund::new(&tx_cancel, &state.refund_address);
+            let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &state.refund_address);
 
             info!("Checking if Bitcoin has already been refunded");
 
@@ -314,13 +314,9 @@ pub async fn alice_recover(
                         .a
                         .encsign(state.S_b_bitcoin.clone(), tx_refund.digest());
 
-                    let s_b = xmr_btc::bitcoin::recover(
-                        state.S_b_bitcoin,
-                        tx_refund_sig,
-                        tx_refund_encsig,
-                    )?;
+                    let s_b = bitcoin::recover(state.S_b_bitcoin, tx_refund_sig, tx_refund_encsig)?;
                     let s_b = monero::PrivateKey::from_scalar(
-                        xmr_btc::monero::Scalar::from_bytes_mod_order(s_b.to_bytes()),
+                        monero::Scalar::from_bytes_mod_order(s_b.to_bytes()),
                     );
 
                     monero_wallet
@@ -331,8 +327,11 @@ pub async fn alice_recover(
                 Err(_) => {
                     info!("Bitcoin not yet refunded");
 
-                    let tx_punish =
-                        TxPunish::new(&tx_cancel, &state.punish_address, state.punish_timelock);
+                    let tx_punish = bitcoin::TxPunish::new(
+                        &tx_cancel,
+                        &state.punish_address,
+                        state.punish_timelock,
+                    );
 
                     let sig_a = state.a.sign(tx_punish.digest());
                     let sig_b = state.tx_punish_sig_bob.clone();
@@ -379,7 +378,7 @@ pub async fn bob_recover(
         Bob::BtcLocked(state) | Bob::XmrLocked(state) | Bob::BtcRefundable(state) => {
             info!("Bitcoin may still be locked up, attempting to refund");
 
-            let tx_cancel = TxCancel::new(
+            let tx_cancel = bitcoin::TxCancel::new(
                 &state.tx_lock,
                 state.refund_timelock,
                 state.A.clone(),
@@ -420,10 +419,11 @@ pub async fn bob_recover(
                 bitcoin_wallet
                     .broadcast_signed_transaction(tx_cancel)
                     .await?;
-                info!("Successfully published Bitcoin cancel transaction");
             }
 
-            let tx_refund = TxRefund::new(&tx_cancel, &state.refund_address);
+            info!("Confirmed that Bitcoin cancel transaction is on the blockchain");
+
+            let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &state.refund_address);
             let signed_tx_refund = {
                 let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
                 let sig_a = adaptor
@@ -449,7 +449,7 @@ pub async fn bob_recover(
         Bob::BtcRedeemed(state) => {
             info!("Bitcoin was redeemed, attempting to redeem monero");
 
-            let tx_redeem = TxRedeem::new(&state.tx_lock, &state.redeem_address);
+            let tx_redeem = bitcoin::TxRedeem::new(&state.tx_lock, &state.redeem_address);
             let tx_redeem_published = bitcoin_wallet
                 .0
                 .get_raw_transaction(tx_redeem.txid())
@@ -461,11 +461,10 @@ pub async fn bob_recover(
             let tx_redeem_sig =
                 tx_redeem.extract_signature_by_key(tx_redeem_published, state.b.public())?;
 
-            let s_a =
-                xmr_btc::bitcoin::recover(state.S_a_bitcoin, tx_redeem_sig, tx_redeem_encsig)?;
-            let s_a = monero::PrivateKey::from_scalar(
-                xmr_btc::monero::Scalar::from_bytes_mod_order(s_a.to_bytes()),
-            );
+            let s_a = bitcoin::recover(state.S_a_bitcoin, tx_redeem_sig, tx_redeem_encsig)?;
+            let s_a = monero::PrivateKey::from_scalar(monero::Scalar::from_bytes_mod_order(
+                s_a.to_bytes(),
+            ));
 
             let s_b = monero::PrivateKey {
                 scalar: state.s_b.into_ed25519(),

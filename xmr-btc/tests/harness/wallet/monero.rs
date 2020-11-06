@@ -1,12 +1,11 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
-use monero::{Address, Network, PrivateKey};
 use monero_harness::rpc::wallet;
 use std::{str::FromStr, time::Duration};
 use xmr_btc::monero::{
-    Amount, CreateWalletForOutput, InsufficientFunds, PrivateViewKey, PublicKey, PublicViewKey,
-    Transfer, TransferProof, TxHash, WatchForTransfer,
+    Address, Amount, CreateWalletForOutput, InsufficientFunds, Network, PrivateKey, PrivateViewKey,
+    PublicKey, PublicViewKey, Transfer, TransferProof, TxHash, WatchForTransfer,
 };
 
 pub struct Wallet(pub wallet::Client);

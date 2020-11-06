@@ -20,7 +20,7 @@ use tokio::sync::Mutex;
 use tracing::info;
 use xmr_btc::{
     alice::{self, ReceiveBitcoinRedeemEncsig},
-    bitcoin::{BroadcastSignedTransaction, EncryptedSignature, SignTxLock},
+    bitcoin::{self, BroadcastSignedTransaction, EncryptedSignature, SignTxLock},
     bob::{self, ReceiveTransferProof},
     monero::{CreateWalletForOutput, Transfer, TransferProof},
 };
@@ -309,8 +309,7 @@ async fn on_chain_happy_path() {
 
     assert_eq!(
         alice_final_btc_balance,
-        initial_balances.alice_btc + swap_amounts.btc
-            - bitcoin::Amount::from_sat(xmr_btc::bitcoin::TX_FEE)
+        initial_balances.alice_btc + swap_amounts.btc - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
     );
     assert_eq!(
         bob_final_btc_balance,
@@ -411,7 +410,7 @@ async fn on_chain_both_refund_if_alice_never_redeems() {
         bob_final_btc_balance,
         // The 2 * TX_FEE corresponds to tx_refund and tx_cancel.
         initial_balances.bob_btc
-            - bitcoin::Amount::from_sat(2 * xmr_btc::bitcoin::TX_FEE)
+            - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE)
             - lock_tx_bitcoin_fee
     );
 
@@ -508,7 +507,7 @@ async fn on_chain_alice_punishes_if_bob_never_acts_after_fund() {
     assert_eq!(
         alice_final_btc_balance,
         initial_balances.alice_btc + swap_amounts.btc
-            - bitcoin::Amount::from_sat(2 * xmr_btc::bitcoin::TX_FEE)
+            - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE)
     );
     assert_eq!(
         bob_final_btc_balance,
