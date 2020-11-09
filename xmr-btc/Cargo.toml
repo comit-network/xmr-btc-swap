@@ -10,7 +10,7 @@ edition = "2018"
 anyhow = "1"
 async-trait = "0.1"
 bitcoin = { version = "0.23", features = ["rand", "serde"] }
-cross-curve-dleq = { git = "https://github.com/comit-network/cross-curve-dleq", rev = "1931c0436f259e1a1f53a4ec8acbbaaf614bd1e4", features = ["serde"] }
+cross-curve-dleq = { git = "https://github.com/comit-network/cross-curve-dleq", rev = "a19608734da1e8803cb4c806022483df4e7d5588", features = ["serde"] }
 curve25519-dalek = "2"
 ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", rev = "510d48ef6a2b19805f7f5c70c598e5b03f668e7a", features = ["libsecp_compat", "serde", "serialization"] }
 ed25519-dalek = { version = "1.0.0-pre.4", features = ["serde"] }# Cannot be 1 because they depend on curve25519-dalek version 3

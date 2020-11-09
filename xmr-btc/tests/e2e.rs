@@ -1,11 +1,6 @@
 pub mod harness;
 
 mod tests {
-    // NOTE: For some reason running these tests overflows the stack. In order to
-    // mitigate this run them with:
-    //
-    //     RUST_MIN_STACK=100000000 cargo test
-
     use crate::{
         harness,
         harness::{
