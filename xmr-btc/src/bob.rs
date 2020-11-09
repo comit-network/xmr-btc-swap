@@ -196,9 +196,7 @@ where
                 .map_err(|_| SwapFailed::AfterBtcRedeem(Reason::BtcRedeemSignature))?;
             let s_a = bitcoin::recover(S_a_bitcoin, tx_redeem_sig, tx_redeem_encsig)
                 .map_err(|_| SwapFailed::AfterBtcRedeem(Reason::SecretRecovery))?;
-            let s_a = monero::PrivateKey::from_scalar(monero::Scalar::from_bytes_mod_order(
-                s_a.to_bytes(),
-            ));
+            let s_a = monero::private_key_from_secp256k1_scalar(s_a.into());
 
             let s_b = monero::PrivateKey {
                 scalar: s_b.into_ed25519(),
@@ -724,8 +722,7 @@ impl State4 {
         let tx_redeem_sig =
             tx_redeem.extract_signature_by_key(tx_redeem_candidate, self.b.public())?;
         let s_a = bitcoin::recover(self.S_a_bitcoin.clone(), tx_redeem_sig, tx_redeem_encsig)?;
-        let s_a =
-            monero::PrivateKey::from_scalar(monero::Scalar::from_bytes_mod_order(s_a.to_bytes()));
+        let s_a = monero::private_key_from_secp256k1_scalar(s_a.into());
 
         Ok(State5 {
             A: self.A,

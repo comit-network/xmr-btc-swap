@@ -300,9 +300,7 @@ where
 
                 let s_b = bitcoin::recover(S_b_bitcoin, tx_refund_sig, tx_refund_encsig)
                     .map_err(|_| RefundFailed::SecretRecovery)?;
-                let s_b = monero::PrivateKey::from_scalar(monero::Scalar::from_bytes_mod_order(
-                    s_b.to_bytes(),
-                ));
+                let s_b = monero::private_key_from_secp256k1_scalar(s_b.into());
 
                 co.yield_(Action::CreateMoneroWalletForOutput {
                     spend_key: s_a + s_b,
@@ -923,8 +921,7 @@ impl State5 {
             tx_refund.extract_signature_by_key(tx_refund_candidate, self.a.public())?;
 
         let s_b = bitcoin::recover(self.S_b_bitcoin, tx_refund_sig, tx_refund_encsig)?;
-        let s_b =
-            monero::PrivateKey::from_scalar(monero::Scalar::from_bytes_mod_order(s_b.to_bytes()));
+        let s_b = monero::private_key_from_secp256k1_scalar(s_b.into());
 
         let s = s_b.scalar + self.s_a.into_ed25519();
 

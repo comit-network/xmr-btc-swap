@@ -15,6 +15,16 @@ pub fn random_private_key<R: RngCore + CryptoRng>(rng: &mut R) -> PrivateKey {
     PrivateKey::from_scalar(scalar)
 }
 
+pub fn private_key_from_secp256k1_scalar(scalar: crate::bitcoin::Scalar) -> PrivateKey {
+    let mut bytes = scalar.to_bytes();
+
+    // we must reverse the bytes because a secp256k1 scalar is big endian, whereas a
+    // ed25519 scalar is little endian
+    bytes.reverse();
+
+    PrivateKey::from_scalar(Scalar::from_bytes_mod_order(bytes))
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
 pub struct PrivateViewKey(#[serde(with = "monero_private_key")] PrivateKey);
 

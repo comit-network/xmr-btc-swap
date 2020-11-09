@@ -230,11 +230,6 @@ async fn swap_as_bob(
     }
 }
 
-// NOTE: For some reason running these tests overflows the stack. In order to
-// mitigate this run them with:
-//
-//     RUST_MIN_STACK=100000000 cargo test
-
 #[tokio::test]
 async fn on_chain_happy_path() {
     let cli = Cli::default();

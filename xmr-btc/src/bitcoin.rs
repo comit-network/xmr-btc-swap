@@ -8,12 +8,7 @@ use bitcoin::{
     util::psbt::PartiallySignedTransaction,
     SigHash,
 };
-use ecdsa_fun::{
-    adaptor::Adaptor,
-    fun::{Point, Scalar},
-    nonce::Deterministic,
-    ECDSA,
-};
+use ecdsa_fun::{adaptor::Adaptor, fun::Point, nonce::Deterministic, ECDSA};
 use miniscript::{Descriptor, Segwitv0};
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -22,7 +17,7 @@ use std::str::FromStr;
 
 pub use crate::bitcoin::transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund};
 pub use bitcoin::{Address, Amount, OutPoint, Transaction, Txid};
-pub use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
+pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
 
 pub const TX_FEE: u64 = 10_000;
 
@@ -99,6 +94,12 @@ impl From<Scalar> for SecretKey {
             inner: scalar,
             public,
         }
+    }
+}
+
+impl From<SecretKey> for Scalar {
+    fn from(sk: SecretKey) -> Self {
+        sk.inner
     }
 }
 
