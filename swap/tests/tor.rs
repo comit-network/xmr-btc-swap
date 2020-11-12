@@ -13,7 +13,6 @@ mod tor_test {
         onion::TorSecretKeyV3,
         utils::{run_tor, AutoKillChild},
     };
-    use tracing_subscriber::util::SubscriberInitExt;
 
     async fn hello_world(
         _req: hyper::Request<hyper::Body>,
@@ -76,10 +75,6 @@ mod tor_test {
 
     #[tokio::test]
     async fn test_tor_control_port() -> Result<()> {
-        let _guard = tracing_subscriber::fmt()
-            .with_env_filter("info")
-            .set_default();
-
         // start tmp tor
         let (_child, control_port, proxy_port, _tmp_torrc) = run_tmp_tor()?;
 

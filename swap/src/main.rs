@@ -16,23 +16,28 @@ use anyhow::Result;
 use futures::{channel::mpsc, StreamExt};
 use libp2p::Multiaddr;
 use log::LevelFilter;
+use prettytable::{row, Table};
 use std::{io, io::Write, process, sync::Arc};
 use structopt::StructOpt;
 use swap::{
-    alice,
-    alice::Alice,
-    bitcoin, bob,
-    bob::Bob,
+    alice::{self, Alice},
+    bitcoin,
+    bob::{self, Bob},
     monero,
     network::transport::{build, build_tor, SwapTransport},
+    recover::recover,
     Cmd, Rsp, SwapAmounts,
 };
 use tracing::info;
+
+#[macro_use]
+extern crate prettytable;
 
 mod cli;
 mod trace;
 
 use cli::Options;
+use swap::storage::Database;
 
 // TODO: Add root seed file instead of generating new seed each run.
 
@@ -41,6 +46,9 @@ async fn main() -> Result<()> {
     let opt = Options::from_args();
 
     trace::init_tracing(LevelFilter::Debug)?;
+
+    // This currently creates the directory if it's not there in the first place
+    let db = Database::open(std::path::Path::new("./.swap-db/")).unwrap();
 
     match opt {
         Options::Alice {
@@ -83,6 +91,7 @@ async fn main() -> Result<()> {
             swap_as_alice(
                 bitcoin_wallet,
                 monero_wallet,
+                db,
                 listen_addr,
                 transport,
                 behaviour,
@@ -116,12 +125,38 @@ async fn main() -> Result<()> {
             swap_as_bob(
                 bitcoin_wallet,
                 monero_wallet,
+                db,
                 satoshis,
                 alice_addr,
                 transport,
                 behaviour,
             )
             .await?;
+        }
+        Options::History => {
+            let mut table = Table::new();
+
+            table.add_row(row!["SWAP ID", "STATE"]);
+
+            for (swap_id, state) in db.all()? {
+                table.add_row(row![swap_id, state]);
+            }
+
+            // Print the table to stdout
+            table.printstd();
+        }
+        Options::Recover {
+            swap_id,
+            bitcoind_url,
+            monerod_url,
+        } => {
+            let state = db.get_state(swap_id)?;
+            let bitcoin_wallet = bitcoin::Wallet::new("bob", bitcoind_url)
+                .await
+                .expect("failed to create bitcoin wallet");
+            let monero_wallet = monero::Wallet::new(monerod_url);
+
+            recover(bitcoin_wallet, monero_wallet, state).await?;
         }
     }
 
@@ -149,16 +184,26 @@ async fn create_tor_service(
 async fn swap_as_alice(
     bitcoin_wallet: Arc<swap::bitcoin::Wallet>,
     monero_wallet: Arc<swap::monero::Wallet>,
+    db: Database,
     addr: Multiaddr,
     transport: SwapTransport,
     behaviour: Alice,
 ) -> Result<()> {
-    alice::swap(bitcoin_wallet, monero_wallet, addr, transport, behaviour).await
+    alice::swap(
+        bitcoin_wallet,
+        monero_wallet,
+        db,
+        addr,
+        transport,
+        behaviour,
+    )
+    .await
 }
 
 async fn swap_as_bob(
     bitcoin_wallet: Arc<swap::bitcoin::Wallet>,
     monero_wallet: Arc<swap::monero::Wallet>,
+    db: Database,
     sats: u64,
     alice: Multiaddr,
     transport: SwapTransport,
@@ -169,6 +214,7 @@ async fn swap_as_bob(
     tokio::spawn(bob::swap(
         bitcoin_wallet,
         monero_wallet,
+        db,
         sats,
         alice,
         cmd_tx,

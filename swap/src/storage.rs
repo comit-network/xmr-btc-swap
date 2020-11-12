@@ -1,61 +1,67 @@
-use anyhow::{anyhow, Context, Result};
+use crate::state::Swap;
+use anyhow::{anyhow, bail, Context, Result};
 use serde::{de::DeserializeOwned, Serialize};
 use std::path::Path;
+use uuid::Uuid;
 
-pub struct Database<T>
-where
-    T: Serialize + DeserializeOwned,
-{
-    db: sled::Db,
-    _marker: std::marker::PhantomData<T>,
-}
+pub struct Database(sled::Db);
 
-impl<T> Database<T>
-where
-    T: Serialize + DeserializeOwned,
-{
-    // TODO: serialize using lazy/one-time initlisation
-    const LAST_STATE_KEY: &'static str = "latest_state";
-
+impl Database {
     pub fn open(path: &Path) -> Result<Self> {
         let db =
             sled::open(path).with_context(|| format!("Could not open the DB at {:?}", path))?;
 
-        Ok(Database {
-            db,
-            _marker: Default::default(),
-        })
+        Ok(Database(db))
     }
 
-    pub async fn insert_latest_state(&self, state: &T) -> Result<()> {
-        let key = serialize(&Self::LAST_STATE_KEY)?;
+    pub async fn insert_latest_state(&self, swap_id: Uuid, state: Swap) -> Result<()> {
+        let key = serialize(&swap_id)?;
         let new_value = serialize(&state).context("Could not serialize new state value")?;
 
-        let old_value = self.db.get(&key)?;
+        let old_value = self.0.get(&key)?;
 
-        self.db
+        self.0
             .compare_and_swap(key, old_value, Some(new_value))
             .context("Could not write in the DB")?
             .context("Stored swap somehow changed, aborting saving")?;
 
         // TODO: see if this can be done through sled config
-        self.db
+        self.0
             .flush_async()
             .await
             .map(|_| ())
             .context("Could not flush db")
     }
 
-    pub fn get_latest_state(&self) -> anyhow::Result<T> {
-        let key = serialize(&Self::LAST_STATE_KEY)?;
+    pub fn get_state(&self, swap_id: Uuid) -> anyhow::Result<Swap> {
+        let key = serialize(&swap_id)?;
 
         let encoded = self
-            .db
+            .0
             .get(&key)?
             .ok_or_else(|| anyhow!("State does not exist {:?}", key))?;
 
         let state = deserialize(&encoded).context("Could not deserialize state")?;
         Ok(state)
+    }
+
+    pub fn all(&self) -> Result<Vec<(Uuid, Swap)>> {
+        self.0
+            .iter()
+            .map(|item| match item {
+                Ok((key, value)) => {
+                    let swap_id = deserialize::<Uuid>(&key);
+                    let swap = deserialize::<Swap>(&value).context("failed to deserialize swap");
+
+                    match (swap_id, swap) {
+                        (Ok(swap_id), Ok(swap)) => Ok((swap_id, swap)),
+                        (Ok(_), Err(err)) => Err(err),
+                        _ => bail!("failed to deserialize swap"),
+                    }
+                }
+                Err(err) => Err(err).context("failed to retrieve swap from DB"),
+            })
+            .collect()
     }
 }
 
@@ -75,86 +81,87 @@ where
 
 #[cfg(test)]
 mod tests {
-    #![allow(non_snake_case)]
-    use super::*;
-    use bitcoin::SigHash;
-    use rand::rngs::OsRng;
-    use serde::{Deserialize, Serialize};
-    use std::str::FromStr;
-    use xmr_btc::{cross_curve_dleq, monero, serde::monero_private_key};
+    use crate::state::{Alice, Bob};
 
-    #[derive(Debug, Serialize, Deserialize, PartialEq)]
-    pub struct TestState {
-        A: xmr_btc::bitcoin::PublicKey,
-        a: xmr_btc::bitcoin::SecretKey,
-        s_a: cross_curve_dleq::Scalar,
-        #[serde(with = "monero_private_key")]
-        s_b: monero::PrivateKey,
-        S_a_monero: ::monero::PublicKey,
-        S_a_bitcoin: xmr_btc::bitcoin::PublicKey,
-        v: xmr_btc::monero::PrivateViewKey,
-        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
-        btc: ::bitcoin::Amount,
-        xmr: xmr_btc::monero::Amount,
-        refund_timelock: u32,
-        refund_address: ::bitcoin::Address,
-        transaction: ::bitcoin::Transaction,
-        tx_punish_sig: xmr_btc::bitcoin::Signature,
-    }
+    use super::*;
 
     #[tokio::test]
-    async fn recover_state_from_db() {
+    async fn can_write_and_read_to_multiple_keys() {
         let db_dir = tempfile::tempdir().unwrap();
         let db = Database::open(db_dir.path()).unwrap();
 
-        let a = xmr_btc::bitcoin::SecretKey::new_random(&mut OsRng);
-        let s_a = cross_curve_dleq::Scalar::random(&mut OsRng);
-        let s_b = monero::PrivateKey::from_scalar(monero::Scalar::random(&mut OsRng));
-        let v_a = xmr_btc::monero::PrivateViewKey::new_random(&mut OsRng);
-        let S_a_monero = monero::PublicKey::from_private_key(&monero::PrivateKey {
-            scalar: s_a.into_ed25519(),
-        });
-        let S_a_bitcoin = s_a.into_secp256k1().into();
-        let tx_punish_sig = a.sign(SigHash::default());
+        let state_1 = Swap::Alice(Alice::SwapComplete);
+        let swap_id_1 = Uuid::new_v4();
+        db.insert_latest_state(swap_id_1, state_1.clone())
+            .await
+            .expect("Failed to save second state");
 
-        let state = TestState {
-            A: a.public(),
-            a,
-            s_b,
-            s_a,
-            S_a_monero,
-            S_a_bitcoin,
-            v: v_a,
-            btc: ::bitcoin::Amount::from_sat(100),
-            xmr: xmr_btc::monero::Amount::from_piconero(1000),
-            refund_timelock: 0,
-            refund_address: ::bitcoin::Address::from_str("1L5wSMgerhHg8GZGcsNmAx5EXMRXSKR3He")
-                .unwrap(),
-            transaction: ::bitcoin::Transaction {
-                version: 0,
-                lock_time: 0,
-                input: vec![::bitcoin::TxIn::default()],
-                output: vec![::bitcoin::TxOut::default()],
-            },
-            tx_punish_sig,
-        };
+        let state_2 = Swap::Bob(Bob::SwapComplete);
+        let swap_id_2 = Uuid::new_v4();
+        db.insert_latest_state(swap_id_2, state_2.clone())
+            .await
+            .expect("Failed to save first state");
 
-        db.insert_latest_state(&state)
+        let recovered_1 = db
+            .get_state(swap_id_1)
+            .expect("Failed to recover first state");
+
+        let recovered_2 = db
+            .get_state(swap_id_2)
+            .expect("Failed to recover second state");
+
+        assert_eq!(recovered_1, state_1);
+        assert_eq!(recovered_2, state_2);
+    }
+
+    #[tokio::test]
+    async fn can_write_twice_to_one_key() {
+        let db_dir = tempfile::tempdir().unwrap();
+        let db = Database::open(db_dir.path()).unwrap();
+
+        let state = Swap::Alice(Alice::SwapComplete);
+
+        let swap_id = Uuid::new_v4();
+        db.insert_latest_state(swap_id, state.clone())
             .await
             .expect("Failed to save state the first time");
-        let recovered: TestState = db
-            .get_latest_state()
+        let recovered = db
+            .get_state(swap_id)
             .expect("Failed to recover state the first time");
 
         // We insert and recover twice to ensure database implementation allows the
         // caller to write to an existing key
-        db.insert_latest_state(&recovered)
+        db.insert_latest_state(swap_id, recovered)
             .await
             .expect("Failed to save state the second time");
-        let recovered: TestState = db
-            .get_latest_state()
+        let recovered = db
+            .get_state(swap_id)
             .expect("Failed to recover state the second time");
 
-        assert_eq!(state, recovered);
+        assert_eq!(recovered, state);
+    }
+
+    #[tokio::test]
+    async fn can_fetch_all_keys() {
+        let db_dir = tempfile::tempdir().unwrap();
+        let db = Database::open(db_dir.path()).unwrap();
+
+        let state_1 = Swap::Alice(Alice::SwapComplete);
+        let swap_id_1 = Uuid::new_v4();
+        db.insert_latest_state(swap_id_1, state_1.clone())
+            .await
+            .expect("Failed to save second state");
+
+        let state_2 = Swap::Bob(Bob::SwapComplete);
+        let swap_id_2 = Uuid::new_v4();
+        db.insert_latest_state(swap_id_2, state_2.clone())
+            .await
+            .expect("Failed to save first state");
+
+        let swaps = db.all().unwrap();
+
+        assert_eq!(swaps.len(), 2);
+        assert!(swaps.contains(&(swap_id_1, state_1)));
+        assert!(swaps.contains(&(swap_id_2, state_2)));
     }
 }

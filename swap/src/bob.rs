@@ -13,6 +13,7 @@ use rand::rngs::OsRng;
 use std::{process, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
+use uuid::Uuid;
 
 mod amounts;
 mod message0;
@@ -22,14 +23,15 @@ mod message3;
 
 use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
 use crate::{
-    bitcoin,
-    bitcoin::TX_LOCK_MINE_TIMEOUT,
+    bitcoin::{self, TX_LOCK_MINE_TIMEOUT},
     monero,
     network::{
         peer_tracker::{self, PeerTracker},
         transport::SwapTransport,
         TokioExecutor,
     },
+    state,
+    storage::Database,
     Cmd, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use xmr_btc::{
@@ -43,6 +45,7 @@ use xmr_btc::{
 pub async fn swap(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
+    db: Database,
     btc: u64,
     addr: Multiaddr,
     mut cmd_tx: Sender<Cmd>,
@@ -141,6 +144,10 @@ pub async fn swap(
         other => panic!("unexpected event: {:?}", other),
     };
 
+    let swap_id = Uuid::new_v4();
+    db.insert_latest_state(swap_id, state::Bob::Handshaken(state2.clone()).into())
+        .await?;
+
     swarm.send_message2(alice.clone(), state2.next_message());
 
     info!("Handshake complete");
@@ -151,7 +158,7 @@ pub async fn swap(
         network.clone(),
         monero_wallet.clone(),
         bitcoin_wallet.clone(),
-        state2,
+        state2.clone(),
         TX_LOCK_MINE_TIMEOUT,
     );
 
@@ -160,20 +167,29 @@ pub async fn swap(
 
         info!("Resumed execution of generator, got: {:?}", state);
 
+        // TODO: Protect against transient errors
+        // TODO: Ignore transaction-already-in-block-chain errors
+
         match state {
             GeneratorState::Yielded(bob::Action::LockBtc(tx_lock)) => {
                 let signed_tx_lock = bitcoin_wallet.sign_tx_lock(tx_lock).await?;
                 let _ = bitcoin_wallet
                     .broadcast_signed_transaction(signed_tx_lock)
                     .await?;
+                db.insert_latest_state(swap_id, state::Bob::BtcLocked(state2.clone()).into())
+                    .await?;
             }
             GeneratorState::Yielded(bob::Action::SendBtcRedeemEncsig(tx_redeem_encsig)) => {
+                db.insert_latest_state(swap_id, state::Bob::XmrLocked(state2.clone()).into())
+                    .await?;
+
                 let mut guard = network.as_ref().lock().await;
                 guard.0.send_message3(alice.clone(), tx_redeem_encsig);
                 info!("Sent Bitcoin redeem encsig");
 
-                // TODO: Does Bob need to wait for Alice to send an empty response, or can we
-                // just continue?
+                // FIXME: Having to wait for Alice's response here is a big problem, because
+                // we're stuck if she doesn't send her response back. I believe this is
+                // currently necessary, so we may have to rework this and/or how we use libp2p
                 match guard.0.next().shared().await {
                     OutEvent::Message3 => {
                         debug!("Got Message3 empty response");
@@ -185,21 +201,35 @@ pub async fn swap(
                 spend_key,
                 view_key,
             }) => {
+                db.insert_latest_state(swap_id, state::Bob::BtcRedeemed(state2.clone()).into())
+                    .await?;
+
                 monero_wallet
                     .create_and_load_wallet_for_output(spend_key, view_key)
                     .await?;
             }
             GeneratorState::Yielded(bob::Action::CancelBtc(tx_cancel)) => {
+                db.insert_latest_state(swap_id, state::Bob::BtcRefundable(state2.clone()).into())
+                    .await?;
+
                 let _ = bitcoin_wallet
                     .broadcast_signed_transaction(tx_cancel)
                     .await?;
             }
             GeneratorState::Yielded(bob::Action::RefundBtc(tx_refund)) => {
+                db.insert_latest_state(swap_id, state::Bob::BtcRefundable(state2.clone()).into())
+                    .await?;
+
                 let _ = bitcoin_wallet
                     .broadcast_signed_transaction(tx_refund)
                     .await?;
             }
-            GeneratorState::Complete(()) => return Ok(()),
+            GeneratorState::Complete(()) => {
+                db.insert_latest_state(swap_id, state::Bob::SwapComplete.into())
+                    .await?;
+
+                return Ok(());
+            }
         }
     }
 }

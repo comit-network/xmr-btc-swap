@@ -6,6 +6,8 @@ pub mod bitcoin;
 pub mod bob;
 pub mod monero;
 pub mod network;
+pub mod recover;
+pub mod state;
 pub mod storage;
 pub mod tor;
 
@@ -32,10 +34,10 @@ pub enum Rsp {
 pub struct SwapAmounts {
     /// Amount of BTC to swap.
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
-    pub btc: ::bitcoin::Amount,
+    pub btc: bitcoin::Amount,
     /// Amount of XMR to swap.
     #[serde(with = "xmr_btc::serde::monero_amount")]
-    pub xmr: xmr_btc::monero::Amount,
+    pub xmr: monero::Amount,
 }
 
 // TODO: Display in XMR and BTC (not picos and sats).
