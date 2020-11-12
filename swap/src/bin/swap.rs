@@ -15,7 +15,6 @@
 use anyhow::Result;
 use futures::{channel::mpsc, StreamExt};
 use libp2p::Multiaddr;
-use log::LevelFilter;
 use prettytable::{row, Table};
 use std::{io, io::Write, process, sync::Arc};
 use structopt::StructOpt;
@@ -23,9 +22,11 @@ use swap::{
     alice::{self, Alice},
     bitcoin,
     bob::{self, Bob},
+    cli::Options,
     monero,
     network::transport::{build, build_tor, SwapTransport},
     recover::recover,
+    storage::Database,
     Cmd, Rsp, SwapAmounts,
 };
 use tracing::info;
@@ -33,19 +34,11 @@ use tracing::info;
 #[macro_use]
 extern crate prettytable;
 
-mod cli;
-mod trace;
-
-use cli::Options;
-use swap::storage::Database;
-
 // TODO: Add root seed file instead of generating new seed each run.
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let opt = Options::from_args();
-
-    trace::init_tracing(LevelFilter::Debug)?;
 
     // This currently creates the directory if it's not there in the first place
     let db = Database::open(std::path::Path::new("./.swap-db/")).unwrap();

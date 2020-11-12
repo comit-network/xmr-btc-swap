@@ -1,5 +1,18 @@
 //! Run an XMR/BTC swap in the role of Bob.
 //! Bob holds BTC and wishes receive XMR.
+use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
+use crate::{
+    bitcoin::{self, TX_LOCK_MINE_TIMEOUT},
+    monero,
+    network::{
+        peer_tracker::{self, PeerTracker},
+        transport::SwapTransport,
+        TokioExecutor,
+    },
+    state,
+    storage::Database,
+    Cmd, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
+};
 use anyhow::Result;
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
@@ -14,32 +27,18 @@ use std::{process, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
-
-mod amounts;
-mod message0;
-mod message1;
-mod message2;
-mod message3;
-
-use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
-use crate::{
-    bitcoin::{self, TX_LOCK_MINE_TIMEOUT},
-    monero,
-    network::{
-        peer_tracker::{self, PeerTracker},
-        transport::SwapTransport,
-        TokioExecutor,
-    },
-    state,
-    storage::Database,
-    Cmd, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
-};
 use xmr_btc::{
     alice,
     bitcoin::{BroadcastSignedTransaction, EncryptedSignature, SignTxLock},
     bob::{self, action_generator, ReceiveTransferProof, State0},
     monero::CreateWalletForOutput,
 };
+
+mod amounts;
+mod message0;
+mod message1;
+mod message2;
+mod message3;
 
 #[allow(clippy::too_many_arguments)]
 pub async fn swap(
@@ -98,6 +97,9 @@ pub async fn swap(
 
     swarm.request_amounts(alice.clone(), btc);
 
+    // What is going on here, shouldn't this be a simple req/resp??
+    // Why do we need mspc channels?
+    // Todo: simplify this code
     let (btc, xmr) = match swarm.next().await {
         OutEvent::Amounts(amounts) => {
             info!("Got amounts from Alice: {:?}", amounts);
@@ -108,7 +110,6 @@ pub async fn swap(
                 info!("User rejected amounts proposed by Alice, aborting...");
                 process::exit(0);
             }
-
             info!("User accepted amounts proposed by Alice");
             (amounts.btc, amounts.xmr)
         }

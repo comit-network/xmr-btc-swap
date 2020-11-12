@@ -32,7 +32,11 @@ use tokio::{sync::Mutex, time::timeout};
 use tracing::error;
 
 pub mod message;
-use crate::monero::{CreateWalletForOutput, WatchForTransfer};
+use crate::{
+    bitcoin::{BlockHeight, GetRawTransaction, TransactionBlockHeight},
+    monero::{CreateWalletForOutput, WatchForTransfer},
+};
+use ::bitcoin::{Transaction, Txid};
 pub use message::{Message, Message0, Message1, Message2, Message3};
 
 #[allow(clippy::large_enum_variant)]
@@ -679,23 +683,23 @@ impl State3 {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct State4 {
-    A: bitcoin::PublicKey,
-    b: bitcoin::SecretKey,
+    pub A: bitcoin::PublicKey,
+    pub b: bitcoin::SecretKey,
     s_b: cross_curve_dleq::Scalar,
     S_a_monero: monero::PublicKey,
-    S_a_bitcoin: bitcoin::PublicKey,
+    pub S_a_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
-    refund_timelock: u32,
+    pub refund_timelock: u32,
     punish_timelock: u32,
     refund_address: bitcoin::Address,
-    redeem_address: bitcoin::Address,
+    pub redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
-    tx_lock: bitcoin::TxLock,
+    pub tx_lock: bitcoin::TxLock,
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: EncryptedSignature,
 }
@@ -708,7 +712,77 @@ impl State4 {
         Message3 { tx_redeem_encsig }
     }
 
-    pub async fn watch_for_redeem_btc<W>(self, bitcoin_wallet: &W) -> Result<State5>
+    pub fn tx_redeem_encsig(&self) -> EncryptedSignature {
+        let tx_redeem = bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address);
+        self.b.encsign(self.S_a_bitcoin.clone(), tx_redeem.digest())
+    }
+
+    pub async fn check_for_tx_cancel<W>(&self, bitcoin_wallet: &W) -> Result<Transaction>
+    where
+        W: GetRawTransaction,
+    {
+        let tx_cancel = bitcoin::TxCancel::new(
+            &self.tx_lock,
+            self.refund_timelock,
+            self.A.clone(),
+            self.b.public(),
+        );
+
+        // todo: check if this is correct
+        let sig_a = self.tx_cancel_sig_a.clone();
+        let sig_b = self.b.sign(tx_cancel.digest());
+
+        let tx_cancel = tx_cancel
+            .clone()
+            .add_signatures(
+                &self.tx_lock,
+                (self.A.clone(), sig_a),
+                (self.b.public(), sig_b),
+            )
+            .expect(
+                "sig_{a,b} to be valid signatures for
+                tx_cancel",
+            );
+
+        let tx = bitcoin_wallet.get_raw_transaction(tx_cancel.txid()).await?;
+
+        Ok(tx)
+    }
+
+    pub async fn submit_tx_cancel<W>(&self, bitcoin_wallet: &W) -> Result<Txid>
+    where
+        W: BroadcastSignedTransaction,
+    {
+        let tx_cancel = bitcoin::TxCancel::new(
+            &self.tx_lock,
+            self.refund_timelock,
+            self.A.clone(),
+            self.b.public(),
+        );
+
+        // todo: check if this is correct
+        let sig_a = self.tx_cancel_sig_a.clone();
+        let sig_b = self.b.sign(tx_cancel.digest());
+
+        let tx_cancel = tx_cancel
+            .clone()
+            .add_signatures(
+                &self.tx_lock,
+                (self.A.clone(), sig_a),
+                (self.b.public(), sig_b),
+            )
+            .expect(
+                "sig_{a,b} to be valid signatures for
+                tx_cancel",
+            );
+
+        let tx_id = bitcoin_wallet
+            .broadcast_signed_transaction(tx_cancel)
+            .await?;
+        Ok(tx_id)
+    }
+
+    pub async fn watch_for_redeem_btc<W>(&self, bitcoin_wallet: &W) -> Result<State5>
     where
         W: WatchForRawTransaction,
     {
@@ -725,24 +799,37 @@ impl State4 {
         let s_a = monero::private_key_from_secp256k1_scalar(s_a.into());
 
         Ok(State5 {
-            A: self.A,
-            b: self.b,
+            A: self.A.clone(),
+            b: self.b.clone(),
             s_a,
             s_b: self.s_b,
             S_a_monero: self.S_a_monero,
-            S_a_bitcoin: self.S_a_bitcoin,
+            S_a_bitcoin: self.S_a_bitcoin.clone(),
             v: self.v,
             btc: self.btc,
             xmr: self.xmr,
             refund_timelock: self.refund_timelock,
             punish_timelock: self.punish_timelock,
-            refund_address: self.refund_address,
-            redeem_address: self.redeem_address,
-            punish_address: self.punish_address,
-            tx_lock: self.tx_lock,
-            tx_refund_encsig: self.tx_refund_encsig,
-            tx_cancel_sig: self.tx_cancel_sig_a,
+            refund_address: self.refund_address.clone(),
+            redeem_address: self.redeem_address.clone(),
+            punish_address: self.punish_address.clone(),
+            tx_lock: self.tx_lock.clone(),
+            tx_refund_encsig: self.tx_refund_encsig.clone(),
+            tx_cancel_sig: self.tx_cancel_sig_a.clone(),
         })
+    }
+
+    pub async fn wait_for_t1<W>(&self, bitcoin_wallet: &W) -> Result<()>
+    where
+        W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
+    {
+        let tx_id = self.tx_lock.txid().clone();
+        let tx_lock_height = bitcoin_wallet.transaction_block_height(tx_id).await;
+
+        let t1_timeout =
+            poll_until_block_height_is_gte(bitcoin_wallet, tx_lock_height + self.refund_timelock);
+        t1_timeout.await;
+        Ok(())
     }
 }
 
@@ -791,4 +878,64 @@ impl State5 {
     pub fn tx_lock_id(&self) -> bitcoin::Txid {
         self.tx_lock.txid()
     }
+}
+
+/// Watch for the refund transaction on the blockchain. Watch until t2 has
+/// elapsed.
+pub async fn watch_for_refund_btc<W>(state: State5, bitcoin_wallet: &W) -> Result<()>
+where
+    W: WatchForRawTransaction,
+{
+    let tx_cancel = bitcoin::TxCancel::new(
+        &state.tx_lock,
+        state.refund_timelock,
+        state.A.clone(),
+        state.b.public(),
+    );
+
+    let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &state.refund_address);
+
+    let tx_refund_watcher = bitcoin_wallet.watch_for_raw_transaction(tx_refund.txid());
+
+    Ok(())
+}
+
+// Watch for refund transaction on the blockchain
+pub async fn watch_for_redeem_btc<W>(state: State4, bitcoin_wallet: &W) -> Result<State5>
+where
+    W: WatchForRawTransaction,
+{
+    let tx_redeem = bitcoin::TxRedeem::new(&state.tx_lock, &state.redeem_address);
+    let tx_redeem_encsig = state
+        .b
+        .encsign(state.S_a_bitcoin.clone(), tx_redeem.digest());
+
+    let tx_redeem_candidate = bitcoin_wallet
+        .watch_for_raw_transaction(tx_redeem.txid())
+        .await;
+
+    let tx_redeem_sig =
+        tx_redeem.extract_signature_by_key(tx_redeem_candidate, state.b.public())?;
+    let s_a = bitcoin::recover(state.S_a_bitcoin.clone(), tx_redeem_sig, tx_redeem_encsig)?;
+    let s_a = monero::private_key_from_secp256k1_scalar(s_a.into());
+
+    Ok(State5 {
+        A: state.A.clone(),
+        b: state.b.clone(),
+        s_a,
+        s_b: state.s_b,
+        S_a_monero: state.S_a_monero,
+        S_a_bitcoin: state.S_a_bitcoin.clone(),
+        v: state.v,
+        btc: state.btc,
+        xmr: state.xmr,
+        refund_timelock: state.refund_timelock,
+        punish_timelock: state.punish_timelock,
+        refund_address: state.refund_address.clone(),
+        redeem_address: state.redeem_address.clone(),
+        punish_address: state.punish_address.clone(),
+        tx_lock: state.tx_lock.clone(),
+        tx_refund_encsig: state.tx_refund_encsig.clone(),
+        tx_cancel_sig: state.tx_cancel_sig_a.clone(),
+    })
 }

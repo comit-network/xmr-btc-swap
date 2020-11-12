@@ -111,6 +111,13 @@ impl WatchForRawTransaction for Wallet {
 }
 
 #[async_trait]
+impl GetRawTransaction for Wallet {
+    async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
+        Ok(self.0.get_raw_transaction(txid).await?)
+    }
+}
+
+#[async_trait]
 impl BlockHeight for Wallet {
     async fn block_height(&self) -> u32 {
         (|| async { Ok(self.0.block_height().await?) })
