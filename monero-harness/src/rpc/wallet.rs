@@ -236,14 +236,14 @@ impl Client {
     pub async fn generate_from_keys(
         &self,
         address: &str,
-        spend_key: &str,
+        spend_key: Option<&str>,
         view_key: &str,
     ) -> Result<GenerateFromKeys> {
         let params = GenerateFromKeysParams {
             restore_height: 0,
             filename: view_key.into(),
             address: address.into(),
-            spendkey: spend_key.into(),
+            spendkey: spend_key.map(|sk| sk.into()),
             viewkey: view_key.into(),
             password: "".into(),
             autosave_current: true,
@@ -400,7 +400,8 @@ pub struct GenerateFromKeysParams {
     pub restore_height: u32,
     pub filename: String,
     pub address: String,
-    pub spendkey: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spendkey: Option<String>,
     pub viewkey: String,
     pub password: String,
     pub autosave_current: bool,

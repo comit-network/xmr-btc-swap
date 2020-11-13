@@ -1,14 +1,11 @@
 use crate::serde::monero_private_key;
-use anyhow::Result;
 use async_trait::async_trait;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Sub};
 
 pub use curve25519_dalek::scalar::Scalar;
-pub use monero::*;
-
-pub const MIN_CONFIRMATIONS: u32 = 10;
+pub use monero::{Address, Network, PrivateKey, PublicKey};
 
 pub fn random_private_key<R: RngCore + CryptoRng>(rng: &mut R) -> PrivateKey {
     let scalar = Scalar::random(rng);
@@ -103,35 +100,6 @@ impl From<Amount> for u64 {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TransferProof {
-    tx_hash: TxHash,
-    #[serde(with = "monero_private_key")]
-    tx_key: PrivateKey,
-}
-
-impl TransferProof {
-    pub fn new(tx_hash: TxHash, tx_key: PrivateKey) -> Self {
-        Self { tx_hash, tx_key }
-    }
-    pub fn tx_hash(&self) -> TxHash {
-        self.tx_hash.clone()
-    }
-    pub fn tx_key(&self) -> PrivateKey {
-        self.tx_key
-    }
-}
-
-// TODO: add constructor/ change String to fixed length byte array
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TxHash(pub String);
-
-impl From<TxHash> for String {
-    fn from(from: TxHash) -> Self {
-        from.0
-    }
-}
-
 #[async_trait]
 pub trait Transfer {
     async fn transfer(
@@ -139,19 +107,17 @@ pub trait Transfer {
         public_spend_key: PublicKey,
         public_view_key: PublicViewKey,
         amount: Amount,
-    ) -> anyhow::Result<(TransferProof, Amount)>;
+    ) -> anyhow::Result<Amount>;
 }
 
 #[async_trait]
 pub trait WatchForTransfer {
     async fn watch_for_transfer(
         &self,
-        public_spend_key: PublicKey,
-        public_view_key: PublicViewKey,
-        transfer_proof: TransferProof,
+        address: Address,
         amount: Amount,
-        expected_confirmations: u32,
-    ) -> Result<(), InsufficientFunds>;
+        private_view_key: PrivateViewKey,
+    );
 }
 
 #[derive(Debug, Clone, Copy, thiserror::Error)]
