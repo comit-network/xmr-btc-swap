@@ -156,13 +156,15 @@ async fn main() -> Result<()> {
         Options::Recover {
             swap_id,
             bitcoind_url,
-            monerod_url,
+            monero_wallet_rpc_url,
+            monero_watch_only_wallet_rpc_url,
         } => {
             let state = db.get_state(swap_id)?;
             let bitcoin_wallet = bitcoin::Wallet::new("bob", bitcoind_url)
                 .await
                 .expect("failed to create bitcoin wallet");
-            let monero_wallet = monero::Wallet::new(monerod_url);
+            let monero_wallet =
+                monero::Facade::new(monero_wallet_rpc_url, monero_watch_only_wallet_rpc_url);
 
             recover(bitcoin_wallet, monero_wallet, state).await?;
         }

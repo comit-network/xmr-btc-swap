@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
 use futures::TryFutureExt;
-use monero::{Address, Network, PrivateKey};
+use monero::{Address, Network};
 use monero_harness::rpc::wallet;
 use std::time::Duration;
 use url::Url;

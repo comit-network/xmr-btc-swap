@@ -18,7 +18,10 @@ pub enum Options {
         #[structopt(default_value = "http://127.0.0.1:8332", long = "bitcoind")]
         bitcoind_url: Url,
 
-        #[structopt(default_value = "http://127.0.0.1:18083/json_rpc", long = "monero_wallet_rpc")]
+        #[structopt(
+            default_value = "http://127.0.0.1:18083/json_rpc",
+            long = "monero_wallet_rpc"
+        )]
         monero_wallet_rpc_url: Url,
 
         #[structopt(
@@ -43,7 +46,10 @@ pub enum Options {
         #[structopt(default_value = "http://127.0.0.1:8332", long = "bitcoind")]
         bitcoind_url: Url,
 
-        #[structopt(default_value = "http://127.0.0.1:18083/json_rpc", long = "monero_wallet_rpc")]
+        #[structopt(
+            default_value = "http://127.0.0.1:18083/json_rpc",
+            long = "monero_wallet_rpc"
+        )]
         monero_wallet_rpc_url: Url,
 
         #[structopt(
@@ -63,7 +69,16 @@ pub enum Options {
         #[structopt(default_value = "http://127.0.0.1:8332", long = "bitcoind")]
         bitcoind_url: Url,
 
-        #[structopt(default_value = "http://127.0.0.1:18083/json_rpc", long = "monerod")]
-        monerod_url: Url,
+        #[structopt(
+            default_value = "http://127.0.0.1:18083/json_rpc",
+            long = "monero_wallet_rpc"
+        )]
+        monero_wallet_rpc_url: Url,
+
+        #[structopt(
+            default_value = "http://127.0.0.1:18084",
+            long = "monero_watch_only_wallet_rpc"
+        )]
+        monero_watch_only_wallet_rpc_url: Url,
     },
 }

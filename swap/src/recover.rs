@@ -29,8 +29,8 @@ use xmr_btc::bitcoin::{
 };
 
 pub async fn recover(
-    bitcoin_wallet: bitcoin::Wallet,
-    monero_wallet: monero::Wallet,
+    bitcoin_wallet: crate::bitcoin::Wallet,
+    monero_wallet: crate::monero::Facade,
     state: Swap,
 ) -> Result<()> {
     match state {
@@ -40,8 +40,8 @@ pub async fn recover(
 }
 
 pub async fn alice_recover(
-    bitcoin_wallet: bitcoin::Wallet,
-    monero_wallet: monero::Wallet,
+    bitcoin_wallet: crate::bitcoin::Wallet,
+    monero_wallet: crate::monero::Facade,
     state: Alice,
 ) -> Result<()> {
     match state {
@@ -368,7 +368,7 @@ pub async fn alice_recover(
 
 pub async fn bob_recover(
     bitcoin_wallet: crate::bitcoin::Wallet,
-    monero_wallet: crate::monero::Wallet,
+    monero_wallet: crate::monero::Facade,
     state: Bob,
 ) -> Result<()> {
     match state {
