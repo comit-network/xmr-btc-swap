@@ -6,6 +6,7 @@ pub mod bitcoin;
 pub mod bob;
 pub mod bob_simple;
 pub mod cli;
+pub mod io;
 pub mod monero;
 pub mod network;
 pub mod recover;

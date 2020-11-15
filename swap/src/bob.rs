@@ -1,19 +1,7 @@
 //! Run an XMR/BTC swap in the role of Bob.
 //! Bob holds BTC and wishes receive XMR.
-use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
-use crate::{
-    bitcoin::{self, TX_LOCK_MINE_TIMEOUT},
-    monero,
-    network::{
-        peer_tracker::{self, PeerTracker},
-        transport::SwapTransport,
-        TokioExecutor,
-    },
-    state,
-    storage::Database,
-    Cmd, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
-};
 use anyhow::Result;
+use async_recursion::async_recursion;
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
 use futures::{
@@ -27,6 +15,28 @@ use std::{process, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
+
+mod amounts;
+mod message0;
+mod message1;
+mod message2;
+mod message3;
+
+use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
+use crate::{
+    bitcoin::{self, TX_LOCK_MINE_TIMEOUT},
+    io::Io,
+    monero,
+    network::{
+        peer_tracker::{self, PeerTracker},
+        transport::SwapTransport,
+        TokioExecutor,
+    },
+    state,
+    storage::Database,
+    Cmd, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
+};
+
 use xmr_btc::{
     alice,
     bitcoin::{BroadcastSignedTransaction, EncryptedSignature, SignTxLock},
@@ -34,11 +44,128 @@ use xmr_btc::{
     monero::CreateWalletForOutput,
 };
 
-mod amounts;
-mod message0;
-mod message1;
-mod message2;
-mod message3;
+// The same data structure is used for swap execution and recovery.
+// This allows for a seamless transition from a failed swap to recovery.
+pub enum BobState {
+    Started,
+    Negotiated,
+    BtcLocked,
+    XmrLocked,
+    BtcRedeemed,
+    BtcRefunded,
+    XmrRedeemed,
+    Cancelled,
+    Punished,
+    SafelyAborted,
+}
+
+// State machine driver for swap execution
+#[async_recursion]
+pub async fn simple_swap(state: BobState, io: Io) -> Result<BobState> {
+    match state {
+        BobState::Started => {
+            // Alice and Bob exchange swap info
+            // Todo: Poll the swarm here until Alice and Bob have exchanged info
+            simple_swap(BobState::Negotiated, io).await
+        }
+        BobState::Negotiated => {
+            // Alice and Bob have exchanged info
+            // Bob Locks Btc
+            simple_swap(BobState::BtcLocked, io).await
+        }
+        BobState::BtcLocked => {
+            // Bob has locked Btc
+            // Watch for Alice to Lock Xmr
+            simple_swap(BobState::XmrLocked, io).await
+        }
+        BobState::XmrLocked => {
+            // Alice has locked Xmr
+            // Bob sends Alice his key
+            // Todo: This should be a oneshot
+            if unimplemented!("Redeemed before t1") {
+                simple_swap(BobState::BtcRedeemed, io).await
+            } else {
+                // submit TxCancel
+                simple_swap(BobState::Cancelled, io).await
+            }
+        }
+        BobState::Cancelled => {
+            if unimplemented!("<t2") {
+                // submit TxRefund
+                simple_swap(BobState::BtcRefunded, io).await
+            } else {
+                simple_swap(BobState::Punished, io).await
+            }
+        }
+        BobState::BtcRefunded => Ok(BobState::BtcRefunded),
+        BobState::BtcRedeemed => {
+            // Bob redeems XMR using revealed s_a
+            simple_swap(BobState::XmrRedeemed, io).await
+        }
+        BobState::Punished => Ok(BobState::Punished),
+        BobState::SafelyAborted => Ok(BobState::SafelyAborted),
+        BobState::XmrRedeemed => Ok(BobState::XmrRedeemed),
+    }
+}
+
+// State machine driver for recovery execution
+#[async_recursion]
+pub async fn abort(state: BobState, io: Io) -> Result<BobState> {
+    match state {
+        BobState::Started => {
+            // Nothing has been commited by either party, abort swap.
+            abort(BobState::SafelyAborted, io).await
+        }
+        BobState::Negotiated => {
+            // Nothing has been commited by either party, abort swap.
+            abort(BobState::SafelyAborted, io).await
+        }
+        BobState::BtcLocked => {
+            // Bob has locked BTC and must refund it
+            // Bob waits for alice to publish TxRedeem or t1
+            if unimplemented!("TxRedeemSeen") {
+                // Alice has redeemed revealing s_a
+                abort(BobState::BtcRedeemed, io).await
+            } else if unimplemented!("T1Elapsed") {
+                // publish TxCancel or see if it has been published
+                abort(BobState::Cancelled, io).await
+            } else {
+                Err(unimplemented!())
+            }
+        }
+        BobState::XmrLocked => {
+            // Alice has locked Xmr
+            // Wait until t1
+            if unimplemented!(">t1 and <t2") {
+                // Bob publishes TxCancel
+                abort(BobState::Cancelled, io).await
+            } else {
+                // >t2
+                // submit TxCancel
+                abort(BobState::Punished, io).await
+            }
+        }
+        BobState::Cancelled => {
+            // Bob has cancelled the swap
+            // If <t2 Bob refunds
+            if unimplemented!("<t2") {
+                // Submit TxRefund
+                abort(BobState::BtcRefunded, io).await
+            } else {
+                // Bob failed to refund in time and has been punished
+                abort(BobState::Punished, io).await
+            }
+        }
+        BobState::BtcRedeemed => {
+            // Bob uses revealed s_a to redeem XMR
+            abort(BobState::XmrRedeemed, io).await
+        }
+        BobState::BtcRefunded => Ok(BobState::BtcRefunded),
+        BobState::Punished => Ok(BobState::Punished),
+        BobState::SafelyAborted => Ok(BobState::SafelyAborted),
+        BobState::XmrRedeemed => Ok(BobState::XmrRedeemed),
+    }
+}
 
 #[allow(clippy::too_many_arguments)]
 pub async fn swap(
@@ -97,9 +224,6 @@ pub async fn swap(
 
     swarm.request_amounts(alice.clone(), btc);
 
-    // What is going on here, shouldn't this be a simple req/resp??
-    // Why do we need mspc channels?
-    // Todo: simplify this code
     let (btc, xmr) = match swarm.next().await {
         OutEvent::Amounts(amounts) => {
             info!("Got amounts from Alice: {:?}", amounts);
@@ -110,6 +234,7 @@ pub async fn swap(
                 info!("User rejected amounts proposed by Alice, aborting...");
                 process::exit(0);
             }
+
             info!("User accepted amounts proposed by Alice");
             (amounts.btc, amounts.xmr)
         }
@@ -237,7 +362,7 @@ pub async fn swap(
 
 pub type Swarm = libp2p::Swarm<Bob>;
 
-pub fn new_swarm(transport: SwapTransport, behaviour: Bob) -> Result<Swarm> {
+fn new_swarm(transport: SwapTransport, behaviour: Bob) -> Result<Swarm> {
     let local_peer_id = behaviour.peer_id();
 
     let swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id.clone())

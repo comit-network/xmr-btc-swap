@@ -1,6 +1,7 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
 use anyhow::Result;
+use async_recursion::async_recursion;
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
 use genawaiter::GeneratorState;
@@ -25,6 +26,7 @@ use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
 use crate::{
     bitcoin,
     bitcoin::TX_LOCK_MINE_TIMEOUT,
+    io::Io,
     monero,
     network::{
         peer_tracker::{self, PeerTracker},
@@ -36,12 +38,127 @@ use crate::{
     storage::Database,
     SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
+
 use xmr_btc::{
     alice::{self, action_generator, Action, ReceiveBitcoinRedeemEncsig, State0},
     bitcoin::BroadcastSignedTransaction,
     bob,
     monero::{CreateWalletForOutput, Transfer},
 };
+
+// The same data structure is used for swap execution and recovery.
+// This allows for a seamless transition from a failed swap to recovery.
+pub enum AliceState {
+    Started,
+    Negotiated,
+    BtcLocked,
+    XmrLocked,
+    BtcRedeemed,
+    XmrRefunded,
+    Cancelled,
+    Punished,
+    SafelyAborted,
+}
+
+// State machine driver for swap execution
+#[async_recursion]
+pub async fn simple_swap(state: AliceState, io: Io) -> Result<AliceState> {
+    match state {
+        AliceState::Started => {
+            // Alice and Bob exchange swap info
+            // Todo: Poll the swarm here until Alice and Bob have exchanged info
+            simple_swap(AliceState::Negotiated, io).await
+        }
+        AliceState::Negotiated => {
+            // Alice and Bob have exchanged info
+            // Todo: Alice watches for BTC to be locked on chain
+            // Todo: Timeout at t1?
+            simple_swap(AliceState::BtcLocked, io).await
+        }
+        AliceState::BtcLocked => {
+            // Alice has seen that Bob has locked BTC
+            // Todo: Alice locks XMR
+            simple_swap(AliceState::XmrLocked, io).await
+        }
+        AliceState::XmrLocked => {
+            // Alice has locked Xmr
+            // Alice waits until Bob sends her key to redeem BTC
+            // Todo: Poll the swarm here until msg from Bob arrives or t1
+            if unimplemented!("key_received") {
+                // Alice redeems BTC
+                simple_swap(AliceState::BtcRedeemed, io).await
+            } else {
+                // submit TxCancel
+                simple_swap(AliceState::Cancelled, io).await
+            }
+        }
+        AliceState::Cancelled => {
+            // Wait until t2 or if TxRefund is seen
+            // If Bob has refunded the Alice should extract Bob's monero secret key and move
+            // the TxLockXmr output to her wallet.
+            if unimplemented!("refunded") {
+                simple_swap(AliceState::XmrRefunded, io).await
+            } else {
+                simple_swap(AliceState::Punished, io).await
+            }
+        }
+        AliceState::XmrRefunded => Ok(AliceState::XmrRefunded),
+        AliceState::BtcRedeemed => Ok(AliceState::BtcRedeemed),
+        AliceState::Punished => Ok(AliceState::Punished),
+        AliceState::SafelyAborted => Ok(AliceState::SafelyAborted),
+    }
+}
+
+// State machine driver for recovery execution
+#[async_recursion]
+pub async fn abort(state: AliceState, io: Io) -> Result<AliceState> {
+    match state {
+        AliceState::Started => {
+            // Nothing has been commited by either party, abort swap.
+            abort(AliceState::SafelyAborted, io).await
+        }
+        AliceState::Negotiated => {
+            // Nothing has been commited by either party, abort swap.
+            abort(AliceState::SafelyAborted, io).await
+        }
+        AliceState::BtcLocked => {
+            // Alice has seen that Bob has locked BTC
+            // Alice does not need to do anything to recover
+            abort(AliceState::SafelyAborted, io).await
+        }
+        AliceState::XmrLocked => {
+            // Alice has locked XMR
+            // Alice watches for TxRedeem until t1
+            if unimplemented!("TxRedeemSeen") {
+                // Alice has successfully redeemed, protocol was a success
+                abort(AliceState::BtcRedeemed, io).await
+            } else if unimplemented!("T1Elapsed") {
+                // publish TxCancel or see if it has been published
+                abort(AliceState::Cancelled, io).await
+            } else {
+                Err(unimplemented!())
+            }
+        }
+        AliceState::Cancelled => {
+            // Alice has cancelled the swap
+            // Alice waits watches for t2 or TxRefund
+            if unimplemented!("TxRefundSeen") {
+                // Bob has refunded and leaked s_b
+                abort(AliceState::XmrRefunded, io).await
+            } else if unimplemented!("T1Elapsed") {
+                // publish TxCancel or see if it has been published
+                // Wait until t2 and publish TxPunish
+                abort(AliceState::Punished, io).await
+            } else {
+                Err(unimplemented!())
+            }
+        }
+        AliceState::BtcRedeemed => Ok(AliceState::BtcRedeemed),
+        AliceState::XmrRefunded => Ok(AliceState::XmrRefunded),
+        AliceState::Punished => Ok(AliceState::Punished),
+        AliceState::SafelyAborted => Ok(AliceState::SafelyAborted),
+    }
+}
 
 pub async fn swap(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
