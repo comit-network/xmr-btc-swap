@@ -1,27 +1,5 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use anyhow::Result;
-use async_recursion::async_recursion;
-use async_trait::async_trait;
-use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
-use genawaiter::GeneratorState;
-use libp2p::{
-    core::{identity::Keypair, Multiaddr},
-    request_response::ResponseChannel,
-    NetworkBehaviour, PeerId,
-};
-use rand::rngs::OsRng;
-use std::{sync::Arc, time::Duration};
-use tokio::sync::Mutex;
-use tracing::{debug, info, warn};
-use uuid::Uuid;
-
-mod amounts;
-mod message0;
-mod message1;
-mod message2;
-mod message3;
-
 use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
 use crate::{
     bitcoin,
@@ -38,13 +16,33 @@ use crate::{
     storage::Database,
     SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
-
+use anyhow::Result;
+use async_recursion::async_recursion;
+use async_trait::async_trait;
+use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
+use genawaiter::GeneratorState;
+use libp2p::{
+    core::{identity::Keypair, Multiaddr},
+    request_response::ResponseChannel,
+    NetworkBehaviour, PeerId,
+};
+use rand::rngs::OsRng;
+use std::{sync::Arc, time::Duration};
+use tokio::sync::Mutex;
+use tracing::{debug, info, warn};
+use uuid::Uuid;
 use xmr_btc::{
     alice::{self, action_generator, Action, ReceiveBitcoinRedeemEncsig, State0},
     bitcoin::BroadcastSignedTransaction,
     bob,
     monero::{CreateWalletForOutput, Transfer},
 };
+
+mod amounts;
+mod message0;
+mod message1;
+mod message2;
+mod message3;
 
 // The same data structure is used for swap execution and recovery.
 // This allows for a seamless transition from a failed swap to recovery.
