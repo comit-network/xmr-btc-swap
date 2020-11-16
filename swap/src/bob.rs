@@ -36,7 +36,6 @@ use crate::{
     storage::Database,
     Cmd, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
-
 use xmr_btc::{
     alice,
     bitcoin::{BroadcastSignedTransaction, EncryptedSignature, SignTxLock},

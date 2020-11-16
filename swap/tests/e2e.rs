@@ -74,7 +74,7 @@ async fn swap() {
     ));
     let bob_xmr_wallet = Arc::new(swap::monero::Wallet(monero.wallet("bob").unwrap().client()));
 
-    let alice_behaviour = alice::Alice::default();
+    let alice_behaviour = alice::Behaviour::default();
     let alice_transport = build(alice_behaviour.identity()).unwrap();
 
     let db = Database::open(std::path::Path::new("../.swap-db/")).unwrap();

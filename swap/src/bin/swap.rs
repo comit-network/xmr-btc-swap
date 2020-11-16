@@ -19,7 +19,7 @@ use prettytable::{row, Table};
 use std::{io, io::Write, process, sync::Arc};
 use structopt::StructOpt;
 use swap::{
-    alice::{self, Alice},
+    alice::{self, Behaviour},
     bitcoin,
     bob::{self, Bob},
     cli::Options,
@@ -52,7 +52,7 @@ async fn main() -> Result<()> {
         } => {
             info!("running swap node as Alice ...");
 
-            let behaviour = Alice::default();
+            let behaviour = Behaviour::default();
             let local_key_pair = behaviour.identity();
 
             let (listen_addr, _ac, transport) = match tor_port {
@@ -180,7 +180,7 @@ async fn swap_as_alice(
     db: Database,
     addr: Multiaddr,
     transport: SwapTransport,
-    behaviour: Alice,
+    behaviour: Behaviour,
 ) -> Result<()> {
     alice::swap(
         bitcoin_wallet,
