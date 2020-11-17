@@ -15,7 +15,7 @@ use crate::{
     storage::Database,
     SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use async_recursion::async_recursion;
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
@@ -25,14 +25,14 @@ use libp2p::{
     request_response::ResponseChannel,
     NetworkBehaviour, PeerId,
 };
-use rand::rngs::OsRng;
+use rand::{rngs::OsRng, CryptoRng, RngCore};
 use std::{sync::Arc, time::Duration};
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, time::timeout};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 use xmr_btc::{
-    alice::{self, action_generator, Action, ReceiveBitcoinRedeemEncsig, State0},
-    bitcoin::BroadcastSignedTransaction,
+    alice::{self, action_generator, Action, ReceiveBitcoinRedeemEncsig, State0, State3},
+    bitcoin::{BroadcastSignedTransaction, WatchForRawTransaction},
     bob,
     monero::{CreateWalletForOutput, Transfer},
 };
@@ -47,7 +47,7 @@ mod message3;
 // This allows for a seamless transition from a failed swap to recovery.
 pub enum AliceState {
     Started,
-    Negotiated,
+    Negotiated(State3),
     BtcLocked,
     XmrLocked,
     BtcRedeemed,
@@ -59,12 +59,16 @@ pub enum AliceState {
 
 // State machine driver for swap execution
 #[async_recursion]
-pub async fn simple_swap<R: RngCore + CryptoRng>(
+pub async fn simple_swap<R>(
     state: AliceState,
-    &mut rng: R,
+    rng: &mut R,
     mut swarm: Swarm,
+    db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
-) -> Result<AliceState> {
+) -> Result<AliceState>
+where
+    R: RngCore + CryptoRng + Send,
+{
     match state {
         AliceState::Started => {
             // Bob dials us
@@ -96,10 +100,6 @@ pub async fn simple_swap<R: RngCore + CryptoRng>(
                 redeem_address,
                 punish_address,
             );
-
-            // TODO(Franck) This is not needed
-            // Review if the swarm really needs to store states
-            swarm.set_state0(state0.clone());
 
             // Bob sends us message0
             let message0 = match swarm.next().await {
@@ -140,18 +140,31 @@ pub async fn simple_swap<R: RngCore + CryptoRng>(
                 bob_peer_id
             );
 
-            simple_swap(AliceState::Negotiated, swarm, rng, bitcoin_wallet).await
+            simple_swap(
+                AliceState::Negotiated(state3),
+                rng,
+                swarm,
+                db,
+                bitcoin_wallet,
+            )
+            .await
         }
-        AliceState::Negotiated => {
-            // Alice and Bob have exchanged info
-            // Todo: Alice watches for BTC to be locked on chain
-            // Todo: Timeout at t1?
-            simple_swap(AliceState::BtcLocked, swarm, rng, bitcoin_wallet).await
+        AliceState::Negotiated(state3) => {
+            // TODO(1): Do a future select with watch bitcoin blockchain time
+            // TODO(2): Implement a proper safe expiry module
+            timeout(
+                Duration::from_secs(TX_LOCK_MINE_TIMEOUT),
+                bitcoin_wallet.watch_for_raw_transaction(state3.tx_lock.txid()),
+            )
+            .await
+            .context("Timed out, Bob did not lock Bitcoin in time")?;
+
+            simple_swap(AliceState::BtcLocked, rng, swarm, db, bitcoin_wallet).await
         }
         AliceState::BtcLocked => {
             // Alice has seen that Bob has locked BTC
             // Todo: Alice locks XMR
-            simple_swap(AliceState::XmrLocked, swarm, bitcoin_wallet).await
+            simple_swap(AliceState::XmrLocked, rng, swarm, db, bitcoin_wallet).await
         }
         AliceState::XmrLocked => {
             // Alice has locked Xmr
@@ -159,10 +172,10 @@ pub async fn simple_swap<R: RngCore + CryptoRng>(
             // Todo: Poll the swarm here until msg from Bob arrives or t1
             if unimplemented!("key_received") {
                 // Alice redeems BTC
-                simple_swap(AliceState::BtcRedeemed, swarm, bitcoin_wallet).await
+                simple_swap(AliceState::BtcRedeemed, rng, swarm, db, bitcoin_wallet).await
             } else {
                 // submit TxCancel
-                simple_swap(AliceState::Cancelled, swarm, bitcoin_wallet).await
+                simple_swap(AliceState::Cancelled, rng, swarm, db, bitcoin_wallet).await
             }
         }
         AliceState::Cancelled => {
@@ -170,9 +183,9 @@ pub async fn simple_swap<R: RngCore + CryptoRng>(
             // If Bob has refunded the Alice should extract Bob's monero secret key and move
             // the TxLockXmr output to her wallet.
             if unimplemented!("refunded") {
-                simple_swap(AliceState::XmrRefunded, swarm, bitcoin_wallet).await
+                simple_swap(AliceState::XmrRefunded, rng, swarm, db, bitcoin_wallet).await
             } else {
-                simple_swap(AliceState::Punished, swarm, bitcoin_wallet).await
+                simple_swap(AliceState::Punished, rng, swarm, db, bitcoin_wallet).await
             }
         }
         AliceState::XmrRefunded => Ok(AliceState::XmrRefunded),
@@ -190,7 +203,7 @@ pub async fn abort(state: AliceState) -> Result<AliceState> {
             // Nothing has been commited by either party, abort swap.
             abort(AliceState::SafelyAborted).await
         }
-        AliceState::Negotiated => {
+        AliceState::Negotiated(_) => {
             // Nothing has been commited by either party, abort swap.
             abort(AliceState::SafelyAborted).await
         }
@@ -550,6 +563,7 @@ impl Behaviour {
         info!("Sent amounts response");
     }
 
+    // TODO(Franck) remove
     /// Message0 gets sent within the network layer using this state0.
     pub fn set_state0(&mut self, state: State0) {
         debug!("Set state 0");
