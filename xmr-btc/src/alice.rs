@@ -617,6 +617,7 @@ impl State2 {
             S_b_monero: self.S_b_monero,
             S_b_bitcoin: self.S_b_bitcoin,
             v: self.v,
+            // TODO(Franck): Review if these amounts are actually needed
             btc: self.btc,
             xmr: self.xmr,
             refund_timelock: self.refund_timelock,

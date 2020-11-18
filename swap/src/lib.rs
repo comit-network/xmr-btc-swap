@@ -34,6 +34,7 @@ pub enum Rsp {
 
 /// XMR/BTC swap amounts.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+// TODO(Franck): review necessity of this struct
 pub struct SwapAmounts {
     /// Amount of BTC to swap.
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
