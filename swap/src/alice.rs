@@ -3,7 +3,7 @@
 use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
 use crate::{
     bitcoin,
-    bitcoin::TX_LOCK_MINE_TIMEOUT,
+    bitcoin::{EncryptedSignature, TX_LOCK_MINE_TIMEOUT},
     monero,
     network::{
         peer_tracker::{self, PeerTracker},
@@ -19,6 +19,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use async_recursion::async_recursion;
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
+use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
 use genawaiter::GeneratorState;
 use libp2p::{
     core::{identity::Keypair, Multiaddr},
@@ -26,6 +27,7 @@ use libp2p::{
     NetworkBehaviour, PeerId,
 };
 use rand::{rngs::OsRng, CryptoRng, RngCore};
+use sha2::Sha256;
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::Mutex, time::timeout};
 use tracing::{debug, info, warn};
@@ -61,10 +63,16 @@ pub enum AliceState {
         amounts: SwapAmounts,
         state3: State3,
     },
-    XmrLocked,
+    XmrLocked {
+        state3: State3,
+    },
+    EncSignLearned {
+        state3: State3,
+        encrypted_signature: EncryptedSignature,
+    },
     BtcRedeemed,
     XmrRefunded,
-    Cancelled,
+    WaitingToCancel,
     Punished,
     SafelyAborted,
 }
@@ -239,11 +247,11 @@ where
             // primitive to execute the protocol 2. the more general/business
             // state that contains the crypto + other business data such as network
             // communication, amounts to verify, swap id, etc.
-            db.insert_latest_state(swap_id, state::Alice::XmrLocked(state3).into())
+            db.insert_latest_state(swap_id, state::Alice::XmrLocked(state3.clone()).into())
                 .await?;
 
             simple_swap(
-                AliceState::XmrLocked,
+                AliceState::XmrLocked { state3 },
                 rng,
                 swarm,
                 db,
@@ -252,35 +260,121 @@ where
             )
             .await
         }
-        AliceState::XmrLocked => {
-            // Alice has locked Xmr
-            // Alice waits until Bob sends her key to redeem BTC
-            // Todo: Poll the swarm here until msg from Bob arrives or t1
-            if unimplemented!("key_received") {
-                // Alice redeems BTC
-                simple_swap(
-                    AliceState::BtcRedeemed,
-                    rng,
-                    swarm,
-                    db,
-                    bitcoin_wallet,
-                    monero_wallet,
-                )
-                .await
-            } else {
-                // submit TxCancel
-                simple_swap(
-                    AliceState::Cancelled,
-                    rng,
-                    swarm,
-                    db,
-                    bitcoin_wallet,
-                    monero_wallet,
-                )
-                .await
+        AliceState::XmrLocked { state3 } => {
+            let encsig = timeout(
+                // TODO(Franck): This is now inefficient as time has been spent since btc was
+                // locked
+                Duration::from_secs(TX_LOCK_MINE_TIMEOUT),
+                async {
+                    match swarm.next().await {
+                        OutEvent::Message3(msg) => Ok(msg.tx_redeem_encsig),
+                        other => Err(anyhow!(
+                            "Expected Bob's Bitcoin redeem encsig, got: {:?}",
+                            other
+                        )),
+                    }
+                },
+            )
+            .await
+            .context("Timed out, Bob did not send redeem encsign in time");
+
+            match encsig {
+                Err(_timeout_error) => {
+                    // TODO(Franck): Insert in DB
+
+                    simple_swap(
+                        AliceState::WaitingToCancel,
+                        rng,
+                        swarm,
+                        db,
+                        bitcoin_wallet,
+                        monero_wallet,
+                    )
+                    .await
+                }
+                Ok(Err(_unexpected_msg_error)) => {
+                    // TODO(Franck): Insert in DB
+
+                    simple_swap(
+                        AliceState::WaitingToCancel,
+                        rng,
+                        swarm,
+                        db,
+                        bitcoin_wallet,
+                        monero_wallet,
+                    )
+                    .await
+                }
+                Ok(Ok(encrypted_signature)) => {
+                    // TODO(Franck): Insert in DB
+
+                    simple_swap(
+                        AliceState::EncSignLearned {
+                            state3,
+                            encrypted_signature,
+                        },
+                        rng,
+                        swarm,
+                        db,
+                        bitcoin_wallet,
+                        monero_wallet,
+                    )
+                    .await
+                }
             }
         }
-        AliceState::Cancelled => {
+        AliceState::EncSignLearned {
+            state3,
+            encrypted_signature,
+        } => {
+            let (signed_tx_redeem, tx_redeem_txid) = {
+                let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
+
+                let tx_redeem = bitcoin::TxRedeem::new(&state3.tx_lock, &state3.redeem_address);
+
+                bitcoin::verify_encsig(
+                    state3.B.clone(),
+                    state3.s_a.into_secp256k1().into(),
+                    &tx_redeem.digest(),
+                    &encrypted_signature,
+                )
+                .context("Invalid encrypted signature received")?;
+
+                let sig_a = state3.a.sign(tx_redeem.digest());
+                let sig_b = adaptor
+                    .decrypt_signature(&state3.s_a.into_secp256k1(), encrypted_signature.clone());
+
+                let tx = tx_redeem
+                    .add_signatures(
+                        &state3.tx_lock,
+                        (state3.a.public(), sig_a),
+                        (state3.B.clone(), sig_b),
+                    )
+                    .expect("sig_{a,b} to be valid signatures for tx_redeem");
+                let txid = tx.txid();
+
+                (tx, txid)
+            };
+
+            // TODO(Franck): Insert in db
+
+            let _ = bitcoin_wallet
+                .broadcast_signed_transaction(signed_tx_redeem)
+                .await?;
+
+            // TODO(Franck) Wait for confirmations
+
+            simple_swap(
+                AliceState::BtcRedeemed,
+                rng,
+                swarm,
+                db,
+                bitcoin_wallet,
+                monero_wallet,
+            )
+            .await
+        }
+        AliceState::WaitingToCancel => {
             // Wait until t2 or if TxRefund is seen
             // If Bob has refunded the Alice should extract Bob's monero secret key and move
             // the TxLockXmr output to her wallet.
@@ -330,7 +424,7 @@ pub async fn abort(state: AliceState) -> Result<AliceState> {
             // Alice does not need to do anything to recover
             abort(AliceState::SafelyAborted).await
         }
-        AliceState::XmrLocked => {
+        AliceState::XmrLocked { state3 } => {
             // Alice has locked XMR
             // Alice watches for TxRedeem until t1
             if unimplemented!("TxRedeemSeen") {
@@ -338,12 +432,13 @@ pub async fn abort(state: AliceState) -> Result<AliceState> {
                 abort(AliceState::BtcRedeemed).await
             } else if unimplemented!("T1Elapsed") {
                 // publish TxCancel or see if it has been published
-                abort(AliceState::Cancelled).await
+                abort(AliceState::WaitingToCancel).await
             } else {
                 Err(unimplemented!())
             }
         }
-        AliceState::Cancelled => {
+        AliceState::EncSignLearned { .. } => todo!(),
+        AliceState::WaitingToCancel => {
             // Alice has cancelled the swap
             // Alice waits watches for t2 or TxRefund
             if unimplemented!("TxRefundSeen") {
