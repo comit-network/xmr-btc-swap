@@ -12,10 +12,8 @@ Is a `taker` happy to...
 1. run a monerod full-node
 1. use a webpage for discovering makers
 1. open "random" (tor) website found on various media (forums, chat) to access a single market maker
-1. manually add makers to retrieve orders
 1. download software (swap execution daemon) before being able to do a swap
-1. run the swap daemon locally on the taker's machine
-1. keep a GUI open for the whole length of the swap execution
+1. keep a GUI/CLI open for the whole length of the swap execution
 1. keep a computer running (that host the daemon) for the whole length of the swap execution
 1. Swap funds held in monero-wallet (monerod)
 1. Swap funds held in bitcoind wallet
@@ -33,7 +31,7 @@ Is a `maker` happy to...
 1. run a monerod full-node
 1. set up a webpage where takers get a price 
 1. publicly advertise being a maker
-1. be in different cryptographic roles depending on the direction of the swap
+1. have different steps (locking first vs second) depending on the direction of the swap
 1. run the swap execution daemon without using Tor
  
 ... to do an XMR<>BTC swap?
