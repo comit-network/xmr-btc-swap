@@ -1,4 +1,4 @@
-# XMR<>BTC Atomic Swap - User Interface Prototypes
+# XMR<>BTC Atomic Swap - User Interface Prototype Definition
 
 This document specifies assumptions concerning possible user interfaces on top of the [Monero-Bitcoin swap as described by Lucas on the COMIT-blog](https://comit.network/blog/2020/10/06/monero-bitcoin/).
 
@@ -9,13 +9,16 @@ This document will be used as a basis for defining and evaluating low-fidelity U
 
 This section sums up assumptions around the current setup, protocol and existing software. 
 
-### Technical Limitations
+### Security Assumptions
 
-Swap-solutions that run completely in the browser (webpage) can be problematic because blockchain nodes, notably [bitcoind](https://github.com/bitcoin/bitcoin/issues/11833), do not specifying [CORS headers](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) in their response.
+Swap-solutions that run completely in the browser (webpage) and rely on connecting to a locally running blockchain node are currently not possible because specifying [CORS headers](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) is a security risk.
 This means the browser will reject a response from a locally running Bitcoin node.
+Discussions have been ongoing, notably for [bitcoind](https://github.com/bitcoin/bitcoin/issues/11833), to ad features that would allow webpages to communicate with locally running blockchain nodes directly.
+However, it is hard to verify the code of a webpage when accessing the webpage in a browser and thus not recommended to add features that would allow to do this. 
 
 Theoretically this could be overcome by creating a node infrastructure behind a proper REST API, or with a locally running proxy. However, it is questionable if these are favourable solution, as they adds additional software on top of the blockchain nodes.  
-We will focus on solutions that favour the use of locally running blockchain nodes.
+
+We will focus on solutions that favour the use of locally running blockchain nodes and explore solutions that do not access locally running blockchain nodes from a webpage directly.
 
 ### Current Setup
 
@@ -31,10 +34,15 @@ Given the current setup this results in the following software necessary to achi
 * **Interface to connect the trading partners**: The two parties have to find each other and start the `Swap Execution Daemon` with the correct parameters. The interface can be realised in multiple different ways, from single-maker, P2P trading platform to P2P marketplace. 
 
 For Bitcoin the current setup relies on a synced bitcoind node and bitcoind's wallet. 
+For Monero the current setup relies on a synced monerod node and monero's wallet RPC. 
+For funding Monero an existing wallet is unlocked and used for the swap.
+For funding Bitcoin an existing wallet is unlocked and used for the swap. 
+The swap execution daemon has control over the wallets during the swap execution to allow automated broadcasting of the transactions.
 
-For Monero the current setup relies on a synced monerod node and monero's wallet RPC. For funding Monero an existing wallet is unlocked and used for the swap. The current setup reliese on generating a *new* Monero wallet for `redeeming` or `refunding`.
-This is not optimal for the user experience, as it means that a user cannot redeem or refund to an existing Monero wallet in the current setup. We decided **not** to model this restriction of the current setup in the prototypes, but to model the prototypes using an existin Monero wallet. 
-We believe that it should be possible to use an existing wallet with investing more implementation time into the setup and protocol.
+The current setup relies on generating a *new* Monero wallet for `redeeming` or `refunding`.
+One trivial solution would be to add an additional transaction in the end, that transfers the Monero to the user's wallet.
+More optimized solutions are possible as well, but require more research.
+Since there are solutions to overcome the need of a second wallet we decided **not** to mock this part of the current setup in the UI prototypes.
 
 ### Current Protocol
 
@@ -60,8 +68,8 @@ Hardware wallet support can be added at a later point if requested as feature by
 
 ## Possible Solutions
 
-This section outlines possible solutions based on the technical limitations and assumptions stated above.
-This section does not focus on the UX of the swap and the use-case specifics, but on the flow of the application considering restrictions to the browser and applications running next to it.
+This section outlines possible solutions based on the assumptions stated above.
+This section does not focus on the UX of the swap and the use-case specifics, but on the interaction between browser and other applications needed to achieve the swap.
 
 We have explored the following options:
 
@@ -82,15 +90,15 @@ For the time being the way forward seems to be a swap tool that plugs into exist
 
 ### Webpage
 
-A complete webpage based solution is unfortunately not easily possible because of the restrictions of CORS headers and blockchain nodes not being able to supply CORS headers.
-The swap protocol implementation could be done in javascript, or run as web-assembly, but since the current setup requires extensive communication with a (local) wallet 
+Allowing webpages access to a locally running 
+A complete webpage based solution is not easily possible because of the CORS header restriction of browsers.
 We could enable communication between blockchain nodes and the browser through e.g. a proxy, but such a solution would not have an advantage over running a desktop application, because either way one has to run additional software next to the blockchain nodes to enable the swap.
 
 ### Browser Extension
 
-In the previous section we discussed that webpage based solutions are currently not possible, due to blockchain nodes inability to specify CORS headers.
-Browser extensions, however, are not as restrictive as webpages as can be seen in the [Google Chrome's documentsion](https://developer.chrome.com/extensions/xhr).
-A browser extension would have the advantage of being able to offer a well-defined API, that allows multiple different web-sites to offer services within the extension.
+Browser extensions, are not as restrictive as webpages as can be seen in the [Google Chrome's documentsion](https://developer.chrome.com/extensions/xhr).
+The code of a browser extension can be signed and is easily verifiable.
+A browser extension would be able to offer a well-defined API, that allows multiple different web-sites to offer services within the extension.
 This could range from discovery, negotiation to execution. 
 
 Implementing a browser extension that handles the communication between maker and taker, and is able to communicate with locally running wallets and blockchain nodes is a valid solution.
@@ -103,14 +111,15 @@ Mozilla's [web-ext tool](https://github.com/mozilla/web-ext) - besides [other to
 ### Desktop Application
 
 A desktop application is a valid solution that is not subject to restrictions by the browser.
-For previous MVPs we used Electron to implement cross-platform desktop applications. 
 
 The problem of finding a trading partner can be outsourced to a webpage (e.g. single-maker only).
 Custom URL schemes can help to provide a better user experience, as they allow us to open the swap desktop application with parameters passed to the application through the customer URL. 
 It can, however, be be quite a pain to achieve the proper registration of custom URL schemas for different kinds of operating systems.
 
 A stand-alone desktop applications is possible, but can be seen as a hurdle, because every user first has to download the binary to see any form of user interface.
-For completx applications that involve a decentralized orderbook a desktop application might be advisable for the moment.
+For complex applications that involve a decentralized orderbook a desktop application might be advisable for the moment.
+
+For previous MVPs we used [Electron](https://www.electronjs.org/) to implement cross-platform desktop applications. 
 
 ## Use-case specific prototypes
 
