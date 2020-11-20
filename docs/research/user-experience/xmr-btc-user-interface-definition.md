@@ -13,7 +13,7 @@ This section sums up assumptions around the current setup, protocol and existing
 
 Swap-solutions that run completely in the browser (webpage) and rely on connecting to a locally running blockchain node are currently not possible because specifying [CORS headers](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) is a security risk.
 This means the browser will reject a response from a locally running Bitcoin node.
-Discussions have been ongoing, notably for [bitcoind](https://github.com/bitcoin/bitcoin/issues/11833), to ad features that would allow webpages to communicate with locally running blockchain nodes directly.
+Discussions have been ongoing, notably for [bitcoind](https://github.com/bitcoin/bitcoin/issues/11833), to add features that would allow webpages to communicate with locally running blockchain nodes directly.
 However, it is hard to verify the code of a webpage when accessing the webpage in a browser and thus not recommended to add features that would allow to do this. 
 
 Theoretically this could be overcome by creating a node infrastructure behind a proper REST API, or with a locally running proxy. However, it is questionable if these are favourable solution, as they adds additional software on top of the blockchain nodes.  
@@ -64,6 +64,7 @@ The UX of the swap might be different depending on the role a party takes, espec
 The first version of a prototype will not include hardware wallet (e.g. Ledger Nano S) support.
 In previous products we focused on swaps directly from and to cold storage, however, this does not concern a large enough user base to support it in the initial version. 
 Furthermore, hardware wallets add certain restrictions (forced user-interaction to sign transactions) that might conflict with the current prototol design.
+Using the wallets of the standard implementations (monerod and bitcoind) is the easiest, most straightforward starting point.
 Hardware wallet support can be added at a later point if requested as feature by the community.
 
 ## Possible Solutions
