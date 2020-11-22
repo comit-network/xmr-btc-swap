@@ -98,7 +98,6 @@ We could enable communication between blockchain nodes and the browser through e
 ### Browser Extension
 
 Browser extensions, are not as restrictive as webpages as can be seen in the [Google Chrome's documentsion](https://developer.chrome.com/extensions/xhr).
-The code of a browser extension can be signed and is easily verifiable.
 A browser extension would be able to offer a well-defined API, that allows multiple different web-sites to offer services within the extension.
 This could range from discovery, negotiation to execution. 
 
@@ -125,7 +124,7 @@ For previous MVPs we used [Electron](https://www.electronjs.org/) to implement c
 ## Use-case specific prototypes
 
 Given the assumptions, technical limitations and resulting possible solutions described above this section specifies details for the prototypes described in the [initial project description](https://github.com/coblox/spikes/blob/master/0003-xmr-btc-product.md).
-In the initial project description we define two products to be be mocked as prototypes, (A) single market maker and (B) peer-to-peer decentralized trading platform. 
+In the initial project description we define two products to be mocked as prototypes, (A) single market maker and (B) peer-to-peer decentralized trading platform. 
 
 Note, that the use-cases of a single market maker product and a peer-to-peer decentralized trading platform are agnostic to the user interface.
 Both products can be realised as CLI or UI taken into account the assumption listed above.
@@ -136,7 +135,7 @@ When it comes to prototyping specific user interface details, like for example t
 ### A. Single Market Maker product
 
 The point of this product is to keep `finding a trading partner` (discovery) and `agreeing on a trade` (negotiation) simple by only having a single maker. 
-A single-maker runs a webpage that gives a price. A taker can "take it of leave it".
+A single-maker runs a webpage that gives a price. A taker can "take it or leave it".
 
 We plan to create two prototypes:
 
