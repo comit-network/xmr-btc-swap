@@ -20,9 +20,8 @@ The questions are split between `M`aker (liquidity provider) and `T`aker (normal
 |   |  |  | run both his own Bitcoin and Monero node | TM |
 |   | How do users brodcast transactions to Bitcoin and Monero? | Is a user fine with trusting a third party to broadcast transactions? | use a wallet that connects to third party nodes | TM |
 |   |  |  | send signed transactions through third part nodes | TM |
-|   |  |  | run his own Bitcoin node, third party service for Monero | TM |
-|   |  |  | run his own Monero node, third party service for Bitcoin | TM |
-|   |  |  | run both his own Bitcoin and Monero node | TM |
+|   |  |  | run his own blockchain full node | TM |
+|   |  |  | run an SPV node (Bitcoin) | TM |
 |   | How do users manage their wallets to interace with other software? | Do users want to use already existing wallets? | fund and redeem from existing wallets | TM |
 |   |  |  | fund from existing Monero wallet, redeem to new Bitcoin wallet | TM |
 |   |  |  | fund from existing Bitcoin wallet, redeem to new Monero wallet | TM |
@@ -37,11 +36,11 @@ The questions are split between `M`aker (liquidity provider) and `T`aker (normal
 |   |  |  | configure Tor for trading | TM |
 |   |  | Do users care about P2P? | use a centralized service to find makers | TM |
 |   |  |  | user a decentralized service to find makers | TM |
-|  Software Setup |  |  | download software (swap execution daemon) before being able to do a swap | T |
-|   |  |  | keep a GUI/CLI open for the whole length of the swap execution | T |
+|  Software Setup | How does the user want to manage the swap software setup? | Is the user willing to download software? | download software (swap execution daemon) before being able to do a swap | T |
+|   |  | How does the user want to manage long-running tasks? | keep a GUI/CLI open for the whole length of the swap execution | T |
 |   |  |  | keep a computer running (that hosts the daemon) for the whole length of the swap execution | T |
 |   |  |  | keep the browser open for the whole length of a swap | T |
-|  Protocol |  |  | have different steps (locking first vs second) depending on the direction of the swap | TM |
+|  Protocol | How important are protocol details to the user? | Does the user care about the incentives of each role? | have different steps (locking first vs second) depending on the direction of the swap | TM |
 
 ## Prototypes
 
@@ -76,9 +75,8 @@ Example:
 |  run both his own Bitcoin and Monero node | TM | T | T |  |  |
 |  use a wallet that connects to third party nodes | TM |  |  |  |  |
 |  send signed transactions through third part nodes | TM |  |  |  |  |
-|  run his own Bitcoin node, third party service for Monero | TM |  |  |  |  |
-|  run his own Monero node, third party service for Bitcoin | TM |  |  |  |  |
-|  run both his own Bitcoin and Monero node | TM | T | T |  |  |
+|  run his own blockchain full node | TM |  |  |  |  |
+|  run an SPV node (Bitcoin) | TM |  |  |  |  |
 |  fund and redeem from existing wallets | TM | T | T |  |  |
 |  fund from existing Monero wallet, redeem to new Bitcoin wallet | TM |  |  |  |  |
 |  fund from existing Bitcoin wallet, redeem to new Monero wallet | TM |  |  |  |  |
