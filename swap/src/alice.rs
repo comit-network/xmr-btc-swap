@@ -520,57 +520,8 @@ where
 
 // State machine driver for recovery execution
 #[async_recursion]
-pub async fn abort(state: AliceState) -> Result<AliceState> {
-    match state {
-        AliceState::Started { .. } => {
-            // Nothing has been committed by either party, abort swap.
-            abort(AliceState::SafelyAborted).await
-        }
-        AliceState::Negotiated { .. } => {
-            // Nothing has been committed by either party, abort swap.
-            abort(AliceState::SafelyAborted).await
-        }
-        AliceState::BtcLocked { .. } => {
-            // Alice has seen that Bob has locked BTC
-            // Alice does not need to do anything to recover
-            abort(AliceState::SafelyAborted).await
-        }
-        AliceState::XmrLocked { state3 } => {
-            // Alice has locked XMR
-            // Alice watches for TxRedeem until t1
-            if unimplemented!("TxRedeemSeen") {
-                // Alice has successfully redeemed, protocol was a success
-                abort(AliceState::BtcRedeemed).await
-            } else if unimplemented!("T1Elapsed") {
-                // publish TxCancel or see if it has been published
-                abort(AliceState::WaitingToCancel { state3 }).await
-            } else {
-                Err(unimplemented!())
-            }
-        }
-        AliceState::EncSignLearned { .. } => todo!(),
-        AliceState::WaitingToCancel { state3 } => {
-            // Alice has cancelled the swap
-            // Alice waits watches for t2 or TxRefund
-            if unimplemented!("TxRefundSeen") {
-                // Bob has refunded and leaked s_b
-                abort(AliceState::XmrRefunded).await
-            } else if unimplemented!("T1Elapsed") {
-                // publish TxCancel or see if it has been published
-                // Wait until t2 and publish TxPunish
-                abort(AliceState::Punished).await
-            } else {
-                Err(unimplemented!())
-            }
-        }
-        AliceState::BtcRedeemed => Ok(AliceState::BtcRedeemed),
-        AliceState::XmrRefunded => Ok(AliceState::XmrRefunded),
-        AliceState::Punished => Ok(AliceState::Punished),
-        AliceState::SafelyAborted => Ok(AliceState::SafelyAborted),
-        AliceState::BtcCancelled { .. } => todo!(),
-        AliceState::BtcRefunded { .. } => todo!(),
-        AliceState::BtcPunishable => todo!(),
-    }
+pub async fn abort(_state: AliceState) -> Result<AliceState> {
+    todo!()
 }
 
 pub async fn swap(
