@@ -423,7 +423,9 @@ where
                     )
                     .expect("sig_{a,b} to be valid signatures for tx_cancel");
 
-                bitcoin_wallet.broadcast_signed_transaction(tx_cancel).await;
+                bitcoin_wallet
+                    .broadcast_signed_transaction(tx_cancel)
+                    .await?;
             }
 
             simple_swap(

@@ -156,7 +156,7 @@ impl TransactionBlockHeight for Wallet {
 
 #[async_trait]
 impl GetRawTransaction for Wallet {
-    async fn get_raw_transaction(&self, txid: Txid) -> Option<Transaction> {
+    async fn get_raw_transaction(&self, _txid: Txid) -> Option<Transaction> {
         todo!()
     }
 }
