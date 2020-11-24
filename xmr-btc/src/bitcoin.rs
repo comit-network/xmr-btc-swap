@@ -201,6 +201,16 @@ pub trait TransactionBlockHeight {
     async fn transaction_block_height(&self, txid: Txid) -> u32;
 }
 
+#[async_trait]
+pub trait WaitForBlockHeight {
+    async fn wait_for_block_height(&self, height: u32);
+}
+
+#[async_trait]
+pub trait GetRawTransaction {
+    async fn get_raw_transaction(&self, txid: Txid) -> Option<Transaction>;
+}
+
 pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Result<SecretKey> {
     let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
 

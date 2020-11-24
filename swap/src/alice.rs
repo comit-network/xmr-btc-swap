@@ -20,6 +20,10 @@ use async_recursion::async_recursion;
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
+use futures::{
+    future::{select, Either},
+    pin_mut,
+};
 use genawaiter::GeneratorState;
 use libp2p::{
     core::{identity::Keypair, Multiaddr},
@@ -34,7 +38,10 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 use xmr_btc::{
     alice::{self, action_generator, Action, ReceiveBitcoinRedeemEncsig, State0, State3},
-    bitcoin::{BroadcastSignedTransaction, WatchForRawTransaction},
+    bitcoin::{
+        poll_until_block_height_is_gte, BroadcastSignedTransaction, GetRawTransaction,
+        TransactionBlockHeight, TxCancel, WatchForRawTransaction,
+    },
     bob,
     monero::{CreateWalletForOutput, Transfer},
 };
@@ -71,8 +78,18 @@ pub enum AliceState {
         encrypted_signature: EncryptedSignature,
     },
     BtcRedeemed,
+    BtcCancelled {
+        state3: State3,
+        tx_cancel: TxCancel,
+    },
+    BtcRefunded {
+        refund_tx: ::bitcoin::Transaction,
+    },
+    BtcPunishable,
     XmrRefunded,
-    WaitingToCancel,
+    WaitingToCancel {
+        state3: State3,
+    },
     Punished,
     SafelyAborted,
 }
@@ -283,7 +300,7 @@ where
                     // TODO(Franck): Insert in DB
 
                     simple_swap(
-                        AliceState::WaitingToCancel,
+                        AliceState::WaitingToCancel { state3 },
                         rng,
                         swarm,
                         db,
@@ -296,7 +313,7 @@ where
                     // TODO(Franck): Insert in DB
 
                     simple_swap(
-                        AliceState::WaitingToCancel,
+                        AliceState::WaitingToCancel { state3 },
                         rng,
                         swarm,
                         db,
@@ -327,7 +344,7 @@ where
             state3,
             encrypted_signature,
         } => {
-            let (signed_tx_redeem, tx_redeem_txid) = {
+            let (signed_tx_redeem, _tx_redeem_txid) = {
                 let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
 
                 let tx_redeem = bitcoin::TxRedeem::new(&state3.tx_lock, &state3.redeem_address);
@@ -374,32 +391,92 @@ where
             )
             .await
         }
-        AliceState::WaitingToCancel => {
-            // Wait until t2 or if TxRefund is seen
-            // If Bob has refunded the Alice should extract Bob's monero secret key and move
-            // the TxLockXmr output to her wallet.
-            if unimplemented!("refunded") {
-                simple_swap(
-                    AliceState::XmrRefunded,
-                    rng,
-                    swarm,
-                    db,
-                    bitcoin_wallet,
-                    monero_wallet,
-                )
-                .await
-            } else {
-                simple_swap(
-                    AliceState::Punished,
-                    rng,
-                    swarm,
-                    db,
-                    bitcoin_wallet,
-                    monero_wallet,
-                )
-                .await
+        AliceState::WaitingToCancel { state3 } => {
+            let tx_lock_height = bitcoin_wallet
+                .transaction_block_height(state3.tx_lock.txid())
+                .await;
+            poll_until_block_height_is_gte(
+                bitcoin_wallet.as_ref(),
+                tx_lock_height + state3.refund_timelock,
+            )
+            .await;
+
+            let tx_cancel = bitcoin::TxCancel::new(
+                &state3.tx_lock,
+                state3.refund_timelock,
+                state3.a.public(),
+                state3.B.clone(),
+            );
+
+            if let None = bitcoin_wallet.get_raw_transaction(tx_cancel.txid()).await {
+                let sig_a = state3.a.sign(tx_cancel.digest());
+                let sig_b = state3.tx_cancel_sig_bob.clone();
+
+                let tx_cancel = tx_cancel
+                    .clone()
+                    .add_signatures(
+                        &state3.tx_lock,
+                        (state3.a.public(), sig_a),
+                        (state3.B.clone(), sig_b),
+                    )
+                    .expect("sig_{a,b} to be valid signatures for tx_cancel");
+
+                bitcoin_wallet.broadcast_signed_transaction(tx_cancel).await;
+            }
+
+            simple_swap(
+                AliceState::BtcCancelled { state3, tx_cancel },
+                rng,
+                swarm,
+                db,
+                bitcoin_wallet,
+                monero_wallet,
+            )
+            .await
+        }
+        AliceState::BtcCancelled { state3, tx_cancel } => {
+            let tx_cancel_height = bitcoin_wallet
+                .transaction_block_height(tx_cancel.txid())
+                .await;
+
+            let reached_t2 = poll_until_block_height_is_gte(
+                bitcoin_wallet.as_ref(),
+                tx_cancel_height + state3.punish_timelock,
+            );
+
+            let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &state3.refund_address);
+            let seen_refund_tx = bitcoin_wallet.watch_for_raw_transaction(tx_refund.txid());
+
+            pin_mut!(reached_t2);
+            pin_mut!(seen_refund_tx);
+
+            match select(reached_t2, seen_refund_tx).await {
+                Either::Left(_) => {
+                    simple_swap(
+                        AliceState::BtcPunishable,
+                        rng,
+                        swarm,
+                        db,
+                        bitcoin_wallet.clone(),
+                        monero_wallet,
+                    )
+                    .await
+                }
+                Either::Right((refund_tx, _)) => {
+                    simple_swap(
+                        AliceState::BtcRefunded { refund_tx },
+                        rng,
+                        swarm,
+                        db,
+                        bitcoin_wallet.clone(),
+                        monero_wallet,
+                    )
+                    .await
+                }
             }
         }
+        AliceState::BtcRefunded { .. } => todo!(),
+        AliceState::BtcPunishable => todo!(),
         AliceState::XmrRefunded => Ok(AliceState::XmrRefunded),
         AliceState::BtcRedeemed => Ok(AliceState::BtcRedeemed),
         AliceState::Punished => Ok(AliceState::Punished),
@@ -412,11 +489,11 @@ where
 pub async fn abort(state: AliceState) -> Result<AliceState> {
     match state {
         AliceState::Started { .. } => {
-            // Nothing has been commited by either party, abort swap.
+            // Nothing has been committed by either party, abort swap.
             abort(AliceState::SafelyAborted).await
         }
         AliceState::Negotiated { .. } => {
-            // Nothing has been commited by either party, abort swap.
+            // Nothing has been committed by either party, abort swap.
             abort(AliceState::SafelyAborted).await
         }
         AliceState::BtcLocked { .. } => {
@@ -432,13 +509,13 @@ pub async fn abort(state: AliceState) -> Result<AliceState> {
                 abort(AliceState::BtcRedeemed).await
             } else if unimplemented!("T1Elapsed") {
                 // publish TxCancel or see if it has been published
-                abort(AliceState::WaitingToCancel).await
+                abort(AliceState::WaitingToCancel { state3 }).await
             } else {
                 Err(unimplemented!())
             }
         }
         AliceState::EncSignLearned { .. } => todo!(),
-        AliceState::WaitingToCancel => {
+        AliceState::WaitingToCancel { state3 } => {
             // Alice has cancelled the swap
             // Alice waits watches for t2 or TxRefund
             if unimplemented!("TxRefundSeen") {
@@ -456,6 +533,9 @@ pub async fn abort(state: AliceState) -> Result<AliceState> {
         AliceState::XmrRefunded => Ok(AliceState::XmrRefunded),
         AliceState::Punished => Ok(AliceState::Punished),
         AliceState::SafelyAborted => Ok(AliceState::SafelyAborted),
+        AliceState::BtcCancelled { .. } => todo!(),
+        AliceState::BtcRefunded { .. } => todo!(),
+        AliceState::BtcPunishable => todo!(),
     }
 }
 
