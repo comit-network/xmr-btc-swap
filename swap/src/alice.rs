@@ -40,7 +40,7 @@ use xmr_btc::{
     alice::{self, action_generator, Action, ReceiveBitcoinRedeemEncsig, State0, State3},
     bitcoin::{
         poll_until_block_height_is_gte, BroadcastSignedTransaction, GetRawTransaction,
-        TransactionBlockHeight, TxCancel, WatchForRawTransaction,
+        TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction,
     },
     bob,
     monero::{CreateWalletForOutput, Transfer},
@@ -83,7 +83,9 @@ pub enum AliceState {
         tx_cancel: TxCancel,
     },
     BtcRefunded {
-        refund_tx: ::bitcoin::Transaction,
+        tx_refund: TxRefund,
+        published_refund_tx: ::bitcoin::Transaction,
+        state3: State3,
     },
     BtcPunishable,
     XmrRefunded,
@@ -462,9 +464,13 @@ where
                     )
                     .await
                 }
-                Either::Right((refund_tx, _)) => {
+                Either::Right((published_refund_tx, _)) => {
                     simple_swap(
-                        AliceState::BtcRefunded { refund_tx },
+                        AliceState::BtcRefunded {
+                            tx_refund,
+                            published_refund_tx,
+                            state3,
+                        },
                         rng,
                         swarm,
                         db,
@@ -475,7 +481,35 @@ where
                 }
             }
         }
-        AliceState::BtcRefunded { .. } => todo!(),
+        AliceState::BtcRefunded {
+            tx_refund,
+            published_refund_tx,
+            state3,
+        } => {
+            let s_a = monero::PrivateKey {
+                scalar: state3.s_a.into_ed25519(),
+            };
+
+            let tx_refund_sig = tx_refund
+                .extract_signature_by_key(published_refund_tx, state3.a.public())
+                .context("Failed to extract signature from Bitcoin refund tx")?;
+            let tx_refund_encsig = state3
+                .a
+                .encsign(state3.S_b_bitcoin.clone(), tx_refund.digest());
+
+            let s_b = bitcoin::recover(state3.S_b_bitcoin, tx_refund_sig, tx_refund_encsig)
+                .context("Failed to recover Monero secret key from Bitcoin signature")?;
+            let s_b = monero::private_key_from_secp256k1_scalar(s_b.into());
+
+            let spend_key = s_a + s_b;
+            let view_key = state3.v;
+
+            monero_wallet
+                .create_and_load_wallet_for_output(spend_key, view_key)
+                .await?;
+
+            Ok(AliceState::XmrRefunded)
+        }
         AliceState::BtcPunishable => todo!(),
         AliceState::XmrRefunded => Ok(AliceState::XmrRefunded),
         AliceState::BtcRedeemed => Ok(AliceState::BtcRedeemed),
