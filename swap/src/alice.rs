@@ -520,12 +520,6 @@ where
     }
 }
 
-// State machine driver for recovery execution
-#[async_recursion]
-pub async fn abort(_state: AliceState) -> Result<AliceState> {
-    todo!()
-}
-
 pub async fn swap(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
