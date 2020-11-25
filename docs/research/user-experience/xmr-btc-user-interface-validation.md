@@ -36,12 +36,12 @@ The questions are split between `M`aker (liquidity provider) and `T`aker (normal
 |   |  |  | configure Tor for trading | TM |
 |   |  | Do users care about P2P? | use a centralized service to find makers | TM |
 |   |  |  | user a decentralized service to find makers | TM |
+|   |  |  | add peers manually | TM |
 |  Software Setup | How does the user want to manage the swap software setup? | Is the user willing to download software? | download software (swap execution daemon) before being able to do a swap | T |
 |   |  | How does the user want to manage long-running tasks? | keep a GUI/CLI open for the whole length of the swap execution | T |
 |   |  |  | keep a computer running (that hosts the daemon) for the whole length of the swap execution | T |
 |   |  |  | keep the browser open for the whole length of a swap | T |
 |  Protocol | How important are protocol details to the user? | Does the user care about the incentives of each role? | have different steps (locking first vs second) depending on the direction of the swap | TM |
-
 ## Prototypes
 
 In the initial project description we distinguished product `A` a single market-maker product and product `B` a product including peer-to-peer discovery and multiple makers.
@@ -91,12 +91,12 @@ Example:
 |  configure Tor for trading | TM |  |  |  |  |
 |  use a centralized service to find makers | TM | T | T |  |  |
 |  user a decentralized service to find makers | TM |  |  |  |  |
+|  add peers manually | TM |  |  |  |  |
 |  download software (swap execution daemon) before being able to do a swap | T |  |  |  |  |
 |  keep a GUI/CLI open for the whole length of the swap execution | T |  |  | T | T |
 |  keep a computer running (that hosts the daemon) for the whole length of the swap execution | T | T | T | T | T |
 |  keep the browser open for the whole length of a swap | T |  |  |  |  |
 |  have different steps (locking first vs second) depending on the direction of the swap | TM |  |  | T (M) | T (M) |
-
 Legend:
 
 ```
