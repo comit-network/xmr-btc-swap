@@ -184,7 +184,7 @@ pub async fn swap(
     };
 
     let swap_id = Uuid::new_v4();
-    db.insert_latest_state(swap_id, state::Alice::Handshaken(state3.clone()).into())
+    db.insert_latest_state(swap_id, state::Alice::Negotiated(state3.clone()).into())
         .await?;
 
     info!("Handshake complete, we now have State3 for Alice.");
@@ -280,11 +280,7 @@ pub async fn swap(
 
 pub type Swarm = libp2p::Swarm<Behaviour>;
 
-pub fn new_swarm(
-    listen: Multiaddr,
-    transport: SwapTransport,
-    behaviour: Behaviour,
-) -> Result<Swarm> {
+fn new_swarm(listen: Multiaddr, transport: SwapTransport, behaviour: Behaviour) -> Result<Swarm> {
     use anyhow::Context as _;
 
     let local_peer_id = behaviour.peer_id();

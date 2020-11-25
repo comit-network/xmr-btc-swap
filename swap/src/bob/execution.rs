@@ -1,13 +1,13 @@
 use crate::{
     bob::{OutEvent, Swarm},
-    Cmd, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
+    Cmd, Rsp, SwapAmounts,
 };
 use anyhow::Result;
 use rand::{CryptoRng, RngCore};
 use std::sync::Arc;
 use tokio::{stream::StreamExt, sync::mpsc};
 
-use xmr_btc::bob::{State0, State2};
+use xmr_btc::bob::State2;
 
 pub async fn negotiate<R>(
     state0: xmr_btc::bob::State0,

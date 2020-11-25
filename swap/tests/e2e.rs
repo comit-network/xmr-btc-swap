@@ -1,11 +1,5 @@
 use bitcoin_harness::Bitcoind;
-use futures::{
-    channel::{
-        mpsc,
-        mpsc::{Receiver, Sender},
-    },
-    future::try_join,
-};
+use futures::{channel::mpsc, future::try_join};
 use libp2p::Multiaddr;
 use monero_harness::Monero;
 use rand::rngs::OsRng;

@@ -160,15 +160,23 @@ pub async fn init_test(
     let punish_address = redeem_address.clone();
     let refund_address = bob.bitcoin_wallet.new_address().await.unwrap();
 
-    let alice_state0 = xmr_btc::alice::State0::new(
-        &mut OsRng,
-        btc_amount,
-        xmr_amount,
-        refund_timelock.unwrap_or(RELATIVE_REFUND_TIMELOCK),
-        punish_timelock.unwrap_or(RELATIVE_PUNISH_TIMELOCK),
-        redeem_address.clone(),
-        punish_address.clone(),
-    );
+    let alice_state0 = {
+        let a = bitcoin::SecretKey::new_random(&mut OsRng);
+        let s_a = cross_curve_dleq::Scalar::random(&mut OsRng);
+        let v_a = monero::PrivateViewKey::new_random(&mut OsRng);
+
+        xmr_btc::alice::State0::new(
+            a,
+            s_a,
+            v_a,
+            btc_amount,
+            xmr_amount,
+            refund_timelock.unwrap_or(RELATIVE_REFUND_TIMELOCK),
+            punish_timelock.unwrap_or(RELATIVE_PUNISH_TIMELOCK),
+            redeem_address.clone(),
+            punish_address.clone(),
+        )
+    };
     let bob_state0 = xmr_btc::bob::State0::new(
         &mut OsRng,
         btc_amount,
