@@ -2,6 +2,7 @@
 //! Alice holds XMR and wishes receive BTC.
 use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
 use crate::{
+    alice::execution::{lock_xmr, negotiate},
     bitcoin,
     bitcoin::{EncryptedSignature, TX_LOCK_MINE_TIMEOUT},
     monero,
@@ -15,7 +16,7 @@ use crate::{
     storage::Database,
     SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Context, Result};
 use async_recursion::async_recursion;
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
@@ -40,14 +41,15 @@ use xmr_btc::{
     alice::{self, action_generator, Action, ReceiveBitcoinRedeemEncsig, State0, State3},
     bitcoin::{
         poll_until_block_height_is_gte, BroadcastSignedTransaction, GetRawTransaction,
-        TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction,
-        WatchForTransactionFinality,
+        TransactionBlockHeight, TxCancel, TxRefund, WaitForTransactionFinality,
+        WatchForRawTransaction,
     },
     bob, cross_curve_dleq,
     monero::{CreateWalletForOutput, Transfer},
 };
 
 mod amounts;
+mod execution;
 mod message0;
 mod message1;
 mod message2;
@@ -67,13 +69,11 @@ pub enum AliceState {
         v_a: monero::PrivateViewKey,
     },
     Negotiated {
-        swap_id: Uuid,
         channel: ResponseChannel<AliceToBob>,
         amounts: SwapAmounts,
         state3: State3,
     },
     BtcLocked {
-        swap_id: Uuid,
         channel: ResponseChannel<AliceToBob>,
         amounts: SwapAmounts,
         state3: State3,
@@ -117,7 +117,6 @@ pub enum AliceState {
 pub async fn simple_swap(
     state: AliceState,
     mut swarm: Swarm,
-    db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
 ) -> Result<AliceState> {
@@ -128,166 +127,62 @@ pub async fn simple_swap(
             s_a,
             v_a,
         } => {
-            // Bob dials us
-            let bob_peer_id = match swarm.next().await {
-                OutEvent::ConnectionEstablished(bob_peer_id) => bob_peer_id,
-                other => bail!("Unexpected event received: {:?}", other),
-            };
-
-            // Bob sends us a request
-            let (btc, channel) = match swarm.next().await {
-                OutEvent::Request(amounts::OutEvent::Btc { btc, channel }) => (btc, channel),
-                other => bail!("Unexpected event received: {:?}", other),
-            };
-
-            if btc != amounts.btc {
-                bail!(
-                    "Bob proposed a different amount; got {}, expected: {}",
-                    btc,
-                    amounts.btc
-                );
-            }
-            swarm.send_amounts(channel, amounts);
-
-            let SwapAmounts { btc, xmr } = amounts;
-
-            let redeem_address = bitcoin_wallet.as_ref().new_address().await?;
-            let punish_address = redeem_address.clone();
-
-            let state0 = State0::new(
-                a,
-                s_a,
-                v_a,
-                btc,
-                xmr,
-                REFUND_TIMELOCK,
-                PUNISH_TIMELOCK,
-                redeem_address,
-                punish_address,
-            );
-
-            // Bob sends us message0
-            let message0 = match swarm.next().await {
-                OutEvent::Message0(msg) => msg,
-                other => bail!("Unexpected event received: {:?}", other),
-            };
-
-            let state1 = state0.receive(message0)?;
-
-            // TODO(Franck) We should use the same channel everytime,
-            // Can we remove this response channel?
-            let (state2, channel) = match swarm.next().await {
-                OutEvent::Message1 { msg, channel } => {
-                    let state2 = state1.receive(msg);
-                    (state2, channel)
-                }
-                other => bail!("Unexpected event: {:?}", other),
-            };
-
-            let message1 = state2.next_message();
-            swarm.send_message1(channel, message1);
-
-            let (state3, channel) = match swarm.next().await {
-                OutEvent::Message2 { msg, channel } => {
-                    let state3 = state2.receive(msg)?;
-                    (state3, channel)
-                }
-                other => bail!("Unexpected event: {:?}", other),
-            };
-
-            let swap_id = Uuid::new_v4();
-            // TODO(Franck): Use the same terminology (negotiated) to describe this state.
-            db.insert_latest_state(swap_id, state::Alice::Handshaken(state3.clone()).into())
-                .await?;
-
-            info!(
-                "State transitioned from Started to Negotiated, Bob peer id is {}",
-                bob_peer_id
-            );
+            let (channel, amounts, state3) =
+                negotiate(amounts, a, s_a, v_a, &mut swarm, bitcoin_wallet.clone()).await?;
 
             simple_swap(
                 AliceState::Negotiated {
-                    swap_id,
-                    state3,
                     channel,
                     amounts,
+                    state3,
                 },
                 swarm,
-                db,
                 bitcoin_wallet,
                 monero_wallet,
             )
             .await
         }
         AliceState::Negotiated {
-            swap_id,
             state3,
             channel,
             amounts,
         } => {
-            // TODO(1): Do a future select with watch bitcoin blockchain time
-            // TODO(2): Implement a proper safe expiry module
             timeout(
                 Duration::from_secs(TX_LOCK_MINE_TIMEOUT),
-                // TODO(Franck): Need to check amount?
-                bitcoin_wallet.watch_for_raw_transaction(state3.tx_lock.txid()),
+                bitcoin_wallet.wait_for_transaction_finality(state3.tx_lock.txid()),
             )
             .await
             .context("Timed out, Bob did not lock Bitcoin in time")?;
 
-            db.insert_latest_state(swap_id, state::Alice::BtcLocked(state3.clone()).into())
-                .await?;
-
             simple_swap(
                 AliceState::BtcLocked {
-                    swap_id,
                     channel,
                     amounts,
                     state3,
                 },
                 swarm,
-                db,
                 bitcoin_wallet,
                 monero_wallet,
             )
             .await
         }
         AliceState::BtcLocked {
-            swap_id,
             channel,
             amounts,
             state3,
         } => {
-            let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey {
-                scalar: state3.s_a.into_ed25519(),
-            });
-
-            let public_spend_key = S_a + state3.S_b_monero;
-            let public_view_key = state3.v.public();
-
-            // TODO(Franck): Probably need to wait at least 1 confirmation to be sure that
-            // we don't wrongfully think this is done.
-            let (transfer_proof, _) = monero_wallet
-                .transfer(public_spend_key, public_view_key, amounts.xmr)
-                .await?;
-
-            swarm.send_message2(channel, alice::Message2 {
-                tx_lock_proof: transfer_proof,
-            });
-
-            // TODO(Franck): we should merge state::Alice and AliceState.
-            // There should be only 2 states:
-            // 1. the cryptographic state (State0, etc) which only aware of the crypto
-            // primitive to execute the protocol 2. the more general/business
-            // state that contains the crypto + other business data such as network
-            // communication, amounts to verify, swap id, etc.
-            db.insert_latest_state(swap_id, state::Alice::XmrLocked(state3.clone()).into())
-                .await?;
+            lock_xmr(
+                channel,
+                amounts,
+                state3.clone(),
+                &mut swarm,
+                monero_wallet.clone(),
+            )
+            .await?;
 
             simple_swap(
                 AliceState::XmrLocked { state3 },
                 swarm,
-                db,
                 bitcoin_wallet,
                 monero_wallet,
             )
@@ -295,8 +190,7 @@ pub async fn simple_swap(
         }
         AliceState::XmrLocked { state3 } => {
             let encsig = timeout(
-                // TODO(Franck): This is now inefficient as time has been spent since btc was
-                // locked
+                // Give a set arbitrary time to Bob to send us `tx_redeem_encsign`
                 Duration::from_secs(TX_LOCK_MINE_TIMEOUT),
                 async {
                     match swarm.next().await {
@@ -318,7 +212,6 @@ pub async fn simple_swap(
                     simple_swap(
                         AliceState::WaitingToCancel { state3 },
                         swarm,
-                        db,
                         bitcoin_wallet,
                         monero_wallet,
                     )
@@ -330,7 +223,6 @@ pub async fn simple_swap(
                     simple_swap(
                         AliceState::WaitingToCancel { state3 },
                         swarm,
-                        db,
                         bitcoin_wallet,
                         monero_wallet,
                     )
@@ -345,7 +237,6 @@ pub async fn simple_swap(
                             encrypted_signature,
                         },
                         swarm,
-                        db,
                         bitcoin_wallet,
                         monero_wallet,
                     )
@@ -397,7 +288,6 @@ pub async fn simple_swap(
             simple_swap(
                 AliceState::BtcRedeemed,
                 swarm,
-                db,
                 bitcoin_wallet,
                 monero_wallet,
             )
@@ -441,7 +331,6 @@ pub async fn simple_swap(
             simple_swap(
                 AliceState::BtcCancelled { state3, tx_cancel },
                 swarm,
-                db,
                 bitcoin_wallet,
                 monero_wallet,
             )
@@ -468,7 +357,6 @@ pub async fn simple_swap(
                     simple_swap(
                         AliceState::BtcPunishable { tx_refund, state3 },
                         swarm,
-                        db,
                         bitcoin_wallet.clone(),
                         monero_wallet,
                     )
@@ -482,7 +370,6 @@ pub async fn simple_swap(
                             state3,
                         },
                         swarm,
-                        db,
                         bitcoin_wallet.clone(),
                         monero_wallet,
                     )
@@ -552,7 +439,6 @@ pub async fn simple_swap(
                     state3,
                 },
                 swarm,
-                db,
                 bitcoin_wallet.clone(),
                 monero_wallet,
             )
@@ -563,7 +449,7 @@ pub async fn simple_swap(
             tx_refund,
             state3,
         } => {
-            let punish_tx_finalised = bitcoin_wallet.watch_for_transaction_finality(punished_tx_id);
+            let punish_tx_finalised = bitcoin_wallet.wait_for_transaction_finality(punished_tx_id);
 
             let refund_tx_seen = bitcoin_wallet.watch_for_raw_transaction(tx_refund.txid());
 
@@ -575,7 +461,6 @@ pub async fn simple_swap(
                     simple_swap(
                         AliceState::Punished,
                         swarm,
-                        db,
                         bitcoin_wallet.clone(),
                         monero_wallet,
                     )
@@ -589,7 +474,6 @@ pub async fn simple_swap(
                             state3,
                         },
                         swarm,
-                        db,
                         bitcoin_wallet.clone(),
                         monero_wallet,
                     )

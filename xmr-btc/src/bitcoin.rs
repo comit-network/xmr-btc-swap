@@ -186,9 +186,8 @@ pub trait WatchForRawTransaction {
     async fn watch_for_raw_transaction(&self, txid: Txid) -> Transaction;
 }
 
-#[async_trait]
-pub trait GetRawTransaction {
-    async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction>;
+pub trait WaitForTransactionFinality {
+    async fn wait_for_transaction_finality(&self, txid: Txid);
 }
 
 #[async_trait]
@@ -208,7 +207,7 @@ pub trait WaitForBlockHeight {
 
 #[async_trait]
 pub trait GetRawTransaction {
-    async fn get_raw_transaction(&self, txid: Txid) -> Option<Transaction>;
+    async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction>;
 }
 
 pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Result<SecretKey> {

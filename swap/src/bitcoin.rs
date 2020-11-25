@@ -162,8 +162,8 @@ impl GetRawTransaction for Wallet {
 }
 
 #[async_trait]
-impl WatchForTransactionFinality for Wallet {
-    async fn watch_for_transaction_finality(&self, _txid: Txid) {
+impl WaitForTransactionFinality for Wallet {
+    async fn wait_for_transaction_finality(&self, _txid: Txid) {
         todo!()
     }
 }
