@@ -41,6 +41,7 @@ use xmr_btc::{
     bitcoin::{
         poll_until_block_height_is_gte, BroadcastSignedTransaction, GetRawTransaction,
         TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction,
+        WatchForTransactionFinality,
     },
     bob,
     monero::{CreateWalletForOutput, Transfer},
@@ -88,9 +89,11 @@ pub enum AliceState {
         state3: State3,
     },
     BtcPunishable {
+        tx_refund: TxRefund,
         state3: State3,
     },
     BtcPunished {
+        tx_refund: TxRefund,
         punished_tx_id: bitcoin::Txid,
         state3: State3,
     },
@@ -463,7 +466,7 @@ where
             match select(reached_t2, seen_refund_tx).await {
                 Either::Left(_) => {
                     simple_swap(
-                        AliceState::BtcPunishable { state3 },
+                        AliceState::BtcPunishable { tx_refund, state3 },
                         rng,
                         swarm,
                         db,
@@ -518,15 +521,7 @@ where
 
             Ok(AliceState::XmrRefunded)
         }
-        AliceState::BtcPunished {
-            punished_tx_id,
-            state3,
-        } => {
-            // TODO(Franck): Watch for Btc refund in mempool and punish
-            // transaction being mined.
-            todo!()
-        }
-        AliceState::BtcPunishable { state3 } => {
+        AliceState::BtcPunishable { tx_refund, state3 } => {
             let tx_cancel = bitcoin::TxCancel::new(
                 &state3.tx_lock,
                 state3.refund_timelock,
@@ -554,6 +549,7 @@ where
 
             simple_swap(
                 AliceState::BtcPunished {
+                    tx_refund,
                     punished_tx_id,
                     state3,
                 },
@@ -565,6 +561,48 @@ where
             )
             .await
         }
+        AliceState::BtcPunished {
+            punished_tx_id,
+            tx_refund,
+            state3,
+        } => {
+            let punish_tx_finalised = bitcoin_wallet.watch_for_transaction_finality(punished_tx_id);
+
+            let refund_tx_seen = bitcoin_wallet.watch_for_raw_transaction(tx_refund.txid());
+
+            pin_mut!(punish_tx_finalised);
+            pin_mut!(refund_tx_seen);
+
+            match select(punish_tx_finalised, refund_tx_seen).await {
+                Either::Left(_) => {
+                    simple_swap(
+                        AliceState::Punished,
+                        rng,
+                        swarm,
+                        db,
+                        bitcoin_wallet.clone(),
+                        monero_wallet,
+                    )
+                    .await
+                }
+                Either::Right((published_refund_tx, _)) => {
+                    simple_swap(
+                        AliceState::BtcRefunded {
+                            tx_refund,
+                            published_refund_tx,
+                            state3,
+                        },
+                        rng,
+                        swarm,
+                        db,
+                        bitcoin_wallet.clone(),
+                        monero_wallet,
+                    )
+                    .await
+                }
+            }
+        }
+
         AliceState::XmrRefunded => Ok(AliceState::XmrRefunded),
         AliceState::BtcRedeemed => Ok(AliceState::BtcRedeemed),
         AliceState::Punished => Ok(AliceState::Punished),

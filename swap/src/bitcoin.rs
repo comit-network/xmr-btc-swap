@@ -160,3 +160,10 @@ impl GetRawTransaction for Wallet {
         todo!()
     }
 }
+
+#[async_trait]
+impl WatchForTransactionFinality for Wallet {
+    async fn watch_for_transaction_finality(&self, _txid: Txid) {
+        todo!()
+    }
+}
