@@ -43,7 +43,7 @@ use xmr_btc::{
         TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction,
         WatchForTransactionFinality,
     },
-    bob,
+    bob, cross_curve_dleq,
     monero::{CreateWalletForOutput, Transfer},
 };
 
@@ -53,11 +53,18 @@ mod message1;
 mod message2;
 mod message3;
 
+trait Rng: RngCore + CryptoRng + Send {}
+
+impl<T> Rng for T where T: RngCore + CryptoRng + Send {}
+
 // The same data structure is used for swap execution and recovery.
 // This allows for a seamless transition from a failed swap to recovery.
 pub enum AliceState {
     Started {
         amounts: SwapAmounts,
+        a: bitcoin::SecretKey,
+        s_a: cross_curve_dleq::Scalar,
+        v_a: monero::PrivateViewKey,
     },
     Negotiated {
         swap_id: Uuid,
@@ -107,21 +114,20 @@ pub enum AliceState {
 
 // State machine driver for swap execution
 #[async_recursion]
-pub async fn simple_swap<R>(
+pub async fn simple_swap(
     state: AliceState,
-    // TODO: Would it make it better if it's in the `Started` enum variant so we don't carry it
-    // along?
-    rng: &mut R,
     mut swarm: Swarm,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
-) -> Result<AliceState>
-where
-    R: RngCore + CryptoRng + Send,
-{
+) -> Result<AliceState> {
     match state {
-        AliceState::Started { amounts } => {
+        AliceState::Started {
+            amounts,
+            a,
+            s_a,
+            v_a,
+        } => {
             // Bob dials us
             let bob_peer_id = match swarm.next().await {
                 OutEvent::ConnectionEstablished(bob_peer_id) => bob_peer_id,
@@ -149,7 +155,9 @@ where
             let punish_address = redeem_address.clone();
 
             let state0 = State0::new(
-                rng,
+                a,
+                s_a,
+                v_a,
                 btc,
                 xmr,
                 REFUND_TIMELOCK,
@@ -204,7 +212,6 @@ where
                     channel,
                     amounts,
                 },
-                rng,
                 swarm,
                 db,
                 bitcoin_wallet,
@@ -238,7 +245,6 @@ where
                     amounts,
                     state3,
                 },
-                rng,
                 swarm,
                 db,
                 bitcoin_wallet,
@@ -280,7 +286,6 @@ where
 
             simple_swap(
                 AliceState::XmrLocked { state3 },
-                rng,
                 swarm,
                 db,
                 bitcoin_wallet,
@@ -312,7 +317,6 @@ where
 
                     simple_swap(
                         AliceState::WaitingToCancel { state3 },
-                        rng,
                         swarm,
                         db,
                         bitcoin_wallet,
@@ -325,7 +329,6 @@ where
 
                     simple_swap(
                         AliceState::WaitingToCancel { state3 },
-                        rng,
                         swarm,
                         db,
                         bitcoin_wallet,
@@ -341,7 +344,6 @@ where
                             state3,
                             encrypted_signature,
                         },
-                        rng,
                         swarm,
                         db,
                         bitcoin_wallet,
@@ -394,7 +396,6 @@ where
 
             simple_swap(
                 AliceState::BtcRedeemed,
-                rng,
                 swarm,
                 db,
                 bitcoin_wallet,
@@ -439,7 +440,6 @@ where
 
             simple_swap(
                 AliceState::BtcCancelled { state3, tx_cancel },
-                rng,
                 swarm,
                 db,
                 bitcoin_wallet,
@@ -467,7 +467,6 @@ where
                 Either::Left(_) => {
                     simple_swap(
                         AliceState::BtcPunishable { tx_refund, state3 },
-                        rng,
                         swarm,
                         db,
                         bitcoin_wallet.clone(),
@@ -482,7 +481,6 @@ where
                             published_refund_tx,
                             state3,
                         },
-                        rng,
                         swarm,
                         db,
                         bitcoin_wallet.clone(),
@@ -553,7 +551,6 @@ where
                     punished_tx_id,
                     state3,
                 },
-                rng,
                 swarm,
                 db,
                 bitcoin_wallet.clone(),
@@ -577,7 +574,6 @@ where
                 Either::Left(_) => {
                     simple_swap(
                         AliceState::Punished,
-                        rng,
                         swarm,
                         db,
                         bitcoin_wallet.clone(),
@@ -592,7 +588,6 @@ where
                             published_refund_tx,
                             state3,
                         },
-                        rng,
                         swarm,
                         db,
                         bitcoin_wallet.clone(),
@@ -677,8 +672,13 @@ pub async fn swap(
 
                 // TODO: Pass this in using <R: RngCore + CryptoRng>
                 let rng = &mut OsRng;
+                let a = bitcoin::SecretKey::new_random(rng);
+                let s_a = cross_curve_dleq::Scalar::random(rng);
+                let v_a = monero::PrivateViewKey::new_random(rng);
                 let state = State0::new(
-                    rng,
+                    a,
+                    s_a,
+                    v_a,
                     btc,
                     xmr,
                     REFUND_TIMELOCK,
