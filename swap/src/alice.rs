@@ -87,7 +87,13 @@ pub enum AliceState {
         published_refund_tx: ::bitcoin::Transaction,
         state3: State3,
     },
-    BtcPunishable,
+    BtcPunishable {
+        state3: State3,
+    },
+    BtcPunished {
+        punished_tx_id: bitcoin::Txid,
+        state3: State3,
+    },
     XmrRefunded,
     WaitingToCancel {
         state3: State3,
@@ -457,7 +463,7 @@ where
             match select(reached_t2, seen_refund_tx).await {
                 Either::Left(_) => {
                     simple_swap(
-                        AliceState::BtcPunishable,
+                        AliceState::BtcPunishable { state3 },
                         rng,
                         swarm,
                         db,
@@ -512,7 +518,53 @@ where
 
             Ok(AliceState::XmrRefunded)
         }
-        AliceState::BtcPunishable => todo!(),
+        AliceState::BtcPunished {
+            punished_tx_id,
+            state3,
+        } => {
+            // TODO(Franck): Watch for Btc refund in mempool and punish
+            // transaction being mined.
+            todo!()
+        }
+        AliceState::BtcPunishable { state3 } => {
+            let tx_cancel = bitcoin::TxCancel::new(
+                &state3.tx_lock,
+                state3.refund_timelock,
+                state3.a.public(),
+                state3.B.clone(),
+            );
+            let tx_punish =
+                bitcoin::TxPunish::new(&tx_cancel, &state3.punish_address, state3.punish_timelock);
+            let punished_tx_id = tx_punish.txid();
+
+            let sig_a = state3.a.sign(tx_punish.digest());
+            let sig_b = state3.tx_punish_sig_bob.clone();
+
+            let signed_tx_punish = tx_punish
+                .add_signatures(
+                    &tx_cancel,
+                    (state3.a.public(), sig_a),
+                    (state3.B.clone(), sig_b),
+                )
+                .expect("sig_{a,b} to be valid signatures for tx_cancel");
+
+            let _ = bitcoin_wallet
+                .broadcast_signed_transaction(signed_tx_punish)
+                .await?;
+
+            simple_swap(
+                AliceState::BtcPunished {
+                    punished_tx_id,
+                    state3,
+                },
+                rng,
+                swarm,
+                db,
+                bitcoin_wallet.clone(),
+                monero_wallet,
+            )
+            .await
+        }
         AliceState::XmrRefunded => Ok(AliceState::XmrRefunded),
         AliceState::BtcRedeemed => Ok(AliceState::BtcRedeemed),
         AliceState::Punished => Ok(AliceState::Punished),
