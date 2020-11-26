@@ -237,7 +237,7 @@ pub async fn swap(
 
 pub type Swarm = libp2p::Swarm<Bob>;
 
-fn new_swarm(transport: SwapTransport, behaviour: Bob) -> Result<Swarm> {
+pub fn new_swarm(transport: SwapTransport, behaviour: Bob) -> Result<Swarm> {
     let local_peer_id = behaviour.peer_id();
 
     let swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id.clone())

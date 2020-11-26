@@ -57,6 +57,7 @@ pub async fn simple_swap(
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
     mut rng: OsRng,
+    swap_id: Uuid,
 ) -> Result<BobState> {
     match state {
         BobState::Started(mut cmd_tx, mut rsp_rx, btc, alice_peer_id) => {
@@ -128,12 +129,14 @@ pub async fn simple_swap(
                 bitcoin_wallet,
                 monero_wallet,
                 rng,
+                swap_id,
             )
             .await
         }
         BobState::Negotiated(state2, alice_peer_id) => {
             // Alice and Bob have exchanged info
             let state3 = state2.lock_btc(bitcoin_wallet.as_ref()).await?;
+            // db.insert_latest_state(state);
             simple_swap(
                 BobState::BtcLocked(state3, alice_peer_id),
                 swarm,
@@ -141,6 +144,7 @@ pub async fn simple_swap(
                 bitcoin_wallet,
                 monero_wallet,
                 rng,
+                swap_id,
             )
             .await
         }
@@ -163,6 +167,7 @@ pub async fn simple_swap(
                 bitcoin_wallet,
                 monero_wallet,
                 rng,
+                swap_id,
             )
             .await
         }
@@ -184,6 +189,7 @@ pub async fn simple_swap(
                 bitcoin_wallet,
                 monero_wallet,
                 rng,
+                swap_id,
             )
             .await
         }
@@ -201,6 +207,7 @@ pub async fn simple_swap(
                         bitcoin_wallet,
                         monero_wallet,
                                  rng,
+                                 swap_id,
                     )
                     .await
                 }
@@ -217,7 +224,8 @@ pub async fn simple_swap(
                         db,
                         bitcoin_wallet,
                         monero_wallet,
-                    rng,
+                        rng,
+                 swap_id
                     )
                     .await
 
@@ -234,6 +242,7 @@ pub async fn simple_swap(
                 bitcoin_wallet,
                 monero_wallet,
                 rng,
+                swap_id,
             )
             .await
         }
