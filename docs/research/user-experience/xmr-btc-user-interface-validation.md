@@ -113,3 +113,23 @@ Through user interviews we plan to collect more information on the current setup
 Specific prototypes showcase specific answers to the questions listed above. We may use the prototypes in interviews to showcase scenarios.
 
 
+## Feedback 
+
+### Possible Features List
+
+This section points out features that were mentioned by the community. These features will be evaluated and prioritized before we start building.
+
+#### Avoid receiving tainted Bitcoin
+
+The receiver of the Bitcoin should be able to validate the address to be used by the sender to avoid receiving tainted Bitcoin (i.e. coins that were unlawfully used). 
+This feature is relevant for the receiving party of the Bitcoin, it is relevant for taker and maker.
+This feature is relevant independent of the user use case.
+
+In order to be able to spot tainted Bitcoin, the receiver has to validate the address to be used of the sender. 
+In the current protocol the party funding (sending) Bitcoin always moves first.
+
+The party receiving the Bitcoin would have to request the address to be used by the sender. 
+For the beginning it might be good enough to let the taker verify that the Bitcoin are not tainted manually, eventually it can be done automated against a service listing tainted Bitcoin.
+Once the daemon of the party receiving the Bitcoin sees the Bitcoin transaction of the sender, the address has to be evaluated to ensure the correct address has been used for funding.
+This can be done automated.
+In case a tainted address was used the swap execution should halt and give a warning to the receiving party.
