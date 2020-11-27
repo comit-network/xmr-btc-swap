@@ -99,7 +99,6 @@ impl BroadcastSignedTransaction for Wallet {
 
 // TODO: For retry, use `backoff::ExponentialBackoff` in production as opposed
 // to `ConstantBackoff`.
-
 #[async_trait]
 impl WatchForRawTransaction for Wallet {
     async fn watch_for_raw_transaction(&self, txid: Txid) -> Transaction {
@@ -112,6 +111,7 @@ impl WatchForRawTransaction for Wallet {
 
 #[async_trait]
 impl GetRawTransaction for Wallet {
+    // todo: potentially replace with option
     async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
         Ok(self.0.get_raw_transaction(txid).await?)
     }
@@ -151,13 +151,6 @@ impl TransactionBlockHeight for Wallet {
         .retry(ConstantBackoff::new(Duration::from_secs(1)))
         .await
         .expect("transient errors to be retried")
-    }
-}
-
-#[async_trait]
-impl GetRawTransaction for Wallet {
-    async fn get_raw_transaction(&self, _txid: Txid) -> Option<Transaction> {
-        todo!()
     }
 }
 

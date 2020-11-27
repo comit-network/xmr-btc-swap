@@ -2,9 +2,8 @@
 //! Alice holds XMR and wishes receive BTC.
 use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
 use crate::{
-    alice::execution::{lock_xmr, negotiate},
     bitcoin,
-    bitcoin::{EncryptedSignature, TX_LOCK_MINE_TIMEOUT},
+    bitcoin::TX_LOCK_MINE_TIMEOUT,
     monero,
     network::{
         peer_tracker::{self, PeerTracker},
@@ -16,34 +15,23 @@ use crate::{
     storage::Database,
     SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
-use anyhow::{anyhow, Context, Result};
-use async_recursion::async_recursion;
+use anyhow::Result;
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
-use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
-use futures::{
-    future::{select, Either},
-    pin_mut,
-};
 use genawaiter::GeneratorState;
 use libp2p::{
     core::{identity::Keypair, Multiaddr},
     request_response::ResponseChannel,
     NetworkBehaviour, PeerId,
 };
-use rand::{rngs::OsRng, CryptoRng, RngCore};
-use sha2::Sha256;
+use rand::rngs::OsRng;
 use std::{sync::Arc, time::Duration};
-use tokio::{sync::Mutex, time::timeout};
+use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 use xmr_btc::{
-    alice::{self, action_generator, Action, ReceiveBitcoinRedeemEncsig, State0, State3},
-    bitcoin::{
-        poll_until_block_height_is_gte, BroadcastSignedTransaction, GetRawTransaction,
-        TransactionBlockHeight, TxCancel, TxRefund, WaitForTransactionFinality,
-        WatchForRawTransaction,
-    },
+    alice::{self, action_generator, Action, ReceiveBitcoinRedeemEncsig, State0},
+    bitcoin::BroadcastSignedTransaction,
     bob, cross_curve_dleq,
     monero::{CreateWalletForOutput, Transfer},
 };
@@ -54,440 +42,7 @@ mod message0;
 mod message1;
 mod message2;
 mod message3;
-
-trait Rng: RngCore + CryptoRng + Send {}
-
-impl<T> Rng for T where T: RngCore + CryptoRng + Send {}
-
-// The same data structure is used for swap execution and recovery.
-// This allows for a seamless transition from a failed swap to recovery.
-pub enum AliceState {
-    Started {
-        amounts: SwapAmounts,
-        a: bitcoin::SecretKey,
-        s_a: cross_curve_dleq::Scalar,
-        v_a: monero::PrivateViewKey,
-    },
-    Negotiated {
-        channel: ResponseChannel<AliceToBob>,
-        amounts: SwapAmounts,
-        state3: State3,
-    },
-    BtcLocked {
-        channel: ResponseChannel<AliceToBob>,
-        amounts: SwapAmounts,
-        state3: State3,
-    },
-    XmrLocked {
-        state3: State3,
-    },
-    EncSignLearned {
-        state3: State3,
-        encrypted_signature: EncryptedSignature,
-    },
-    BtcRedeemed,
-    BtcCancelled {
-        state3: State3,
-        tx_cancel: TxCancel,
-    },
-    BtcRefunded {
-        tx_refund: TxRefund,
-        published_refund_tx: ::bitcoin::Transaction,
-        state3: State3,
-    },
-    BtcPunishable {
-        tx_refund: TxRefund,
-        state3: State3,
-    },
-    BtcPunished {
-        tx_refund: TxRefund,
-        punished_tx_id: bitcoin::Txid,
-        state3: State3,
-    },
-    XmrRefunded,
-    WaitingToCancel {
-        state3: State3,
-    },
-    Punished,
-    SafelyAborted,
-}
-
-// State machine driver for swap execution
-#[async_recursion]
-pub async fn simple_swap(
-    state: AliceState,
-    mut swarm: Swarm,
-    bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
-    monero_wallet: Arc<crate::monero::Wallet>,
-) -> Result<AliceState> {
-    match state {
-        AliceState::Started {
-            amounts,
-            a,
-            s_a,
-            v_a,
-        } => {
-            let (channel, amounts, state3) =
-                negotiate(amounts, a, s_a, v_a, &mut swarm, bitcoin_wallet.clone()).await?;
-
-            simple_swap(
-                AliceState::Negotiated {
-                    channel,
-                    amounts,
-                    state3,
-                },
-                swarm,
-                bitcoin_wallet,
-                monero_wallet,
-            )
-            .await
-        }
-        AliceState::Negotiated {
-            state3,
-            channel,
-            amounts,
-        } => {
-            timeout(
-                Duration::from_secs(TX_LOCK_MINE_TIMEOUT),
-                bitcoin_wallet.wait_for_transaction_finality(state3.tx_lock.txid()),
-            )
-            .await
-            .context("Timed out, Bob did not lock Bitcoin in time")?;
-
-            simple_swap(
-                AliceState::BtcLocked {
-                    channel,
-                    amounts,
-                    state3,
-                },
-                swarm,
-                bitcoin_wallet,
-                monero_wallet,
-            )
-            .await
-        }
-        AliceState::BtcLocked {
-            channel,
-            amounts,
-            state3,
-        } => {
-            lock_xmr(
-                channel,
-                amounts,
-                state3.clone(),
-                &mut swarm,
-                monero_wallet.clone(),
-            )
-            .await?;
-
-            simple_swap(
-                AliceState::XmrLocked { state3 },
-                swarm,
-                bitcoin_wallet,
-                monero_wallet,
-            )
-            .await
-        }
-        AliceState::XmrLocked { state3 } => {
-            let encsig = timeout(
-                // Give a set arbitrary time to Bob to send us `tx_redeem_encsign`
-                Duration::from_secs(TX_LOCK_MINE_TIMEOUT),
-                async {
-                    match swarm.next().await {
-                        OutEvent::Message3(msg) => Ok(msg.tx_redeem_encsig),
-                        other => Err(anyhow!(
-                            "Expected Bob's Bitcoin redeem encsig, got: {:?}",
-                            other
-                        )),
-                    }
-                },
-            )
-            .await
-            .context("Timed out, Bob did not send redeem encsign in time");
-
-            match encsig {
-                Err(_timeout_error) => {
-                    // TODO(Franck): Insert in DB
-
-                    simple_swap(
-                        AliceState::WaitingToCancel { state3 },
-                        swarm,
-                        bitcoin_wallet,
-                        monero_wallet,
-                    )
-                    .await
-                }
-                Ok(Err(_unexpected_msg_error)) => {
-                    // TODO(Franck): Insert in DB
-
-                    simple_swap(
-                        AliceState::WaitingToCancel { state3 },
-                        swarm,
-                        bitcoin_wallet,
-                        monero_wallet,
-                    )
-                    .await
-                }
-                Ok(Ok(encrypted_signature)) => {
-                    // TODO(Franck): Insert in DB
-
-                    simple_swap(
-                        AliceState::EncSignLearned {
-                            state3,
-                            encrypted_signature,
-                        },
-                        swarm,
-                        bitcoin_wallet,
-                        monero_wallet,
-                    )
-                    .await
-                }
-            }
-        }
-        AliceState::EncSignLearned {
-            state3,
-            encrypted_signature,
-        } => {
-            let (signed_tx_redeem, _tx_redeem_txid) = {
-                let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
-
-                let tx_redeem = bitcoin::TxRedeem::new(&state3.tx_lock, &state3.redeem_address);
-
-                bitcoin::verify_encsig(
-                    state3.B.clone(),
-                    state3.s_a.into_secp256k1().into(),
-                    &tx_redeem.digest(),
-                    &encrypted_signature,
-                )
-                .context("Invalid encrypted signature received")?;
-
-                let sig_a = state3.a.sign(tx_redeem.digest());
-                let sig_b = adaptor
-                    .decrypt_signature(&state3.s_a.into_secp256k1(), encrypted_signature.clone());
-
-                let tx = tx_redeem
-                    .add_signatures(
-                        &state3.tx_lock,
-                        (state3.a.public(), sig_a),
-                        (state3.B.clone(), sig_b),
-                    )
-                    .expect("sig_{a,b} to be valid signatures for tx_redeem");
-                let txid = tx.txid();
-
-                (tx, txid)
-            };
-
-            // TODO(Franck): Insert in db
-
-            let _ = bitcoin_wallet
-                .broadcast_signed_transaction(signed_tx_redeem)
-                .await?;
-
-            // TODO(Franck) Wait for confirmations
-
-            simple_swap(
-                AliceState::BtcRedeemed,
-                swarm,
-                bitcoin_wallet,
-                monero_wallet,
-            )
-            .await
-        }
-        AliceState::WaitingToCancel { state3 } => {
-            let tx_lock_height = bitcoin_wallet
-                .transaction_block_height(state3.tx_lock.txid())
-                .await;
-            poll_until_block_height_is_gte(
-                bitcoin_wallet.as_ref(),
-                tx_lock_height + state3.refund_timelock,
-            )
-            .await;
-
-            let tx_cancel = bitcoin::TxCancel::new(
-                &state3.tx_lock,
-                state3.refund_timelock,
-                state3.a.public(),
-                state3.B.clone(),
-            );
-
-            if let None = bitcoin_wallet.get_raw_transaction(tx_cancel.txid()).await {
-                let sig_a = state3.a.sign(tx_cancel.digest());
-                let sig_b = state3.tx_cancel_sig_bob.clone();
-
-                let tx_cancel = tx_cancel
-                    .clone()
-                    .add_signatures(
-                        &state3.tx_lock,
-                        (state3.a.public(), sig_a),
-                        (state3.B.clone(), sig_b),
-                    )
-                    .expect("sig_{a,b} to be valid signatures for tx_cancel");
-
-                bitcoin_wallet
-                    .broadcast_signed_transaction(tx_cancel)
-                    .await?;
-            }
-
-            simple_swap(
-                AliceState::BtcCancelled { state3, tx_cancel },
-                swarm,
-                bitcoin_wallet,
-                monero_wallet,
-            )
-            .await
-        }
-        AliceState::BtcCancelled { state3, tx_cancel } => {
-            let tx_cancel_height = bitcoin_wallet
-                .transaction_block_height(tx_cancel.txid())
-                .await;
-
-            let reached_t2 = poll_until_block_height_is_gte(
-                bitcoin_wallet.as_ref(),
-                tx_cancel_height + state3.punish_timelock,
-            );
-
-            let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &state3.refund_address);
-            let seen_refund_tx = bitcoin_wallet.watch_for_raw_transaction(tx_refund.txid());
-
-            pin_mut!(reached_t2);
-            pin_mut!(seen_refund_tx);
-
-            match select(reached_t2, seen_refund_tx).await {
-                Either::Left(_) => {
-                    simple_swap(
-                        AliceState::BtcPunishable { tx_refund, state3 },
-                        swarm,
-                        bitcoin_wallet.clone(),
-                        monero_wallet,
-                    )
-                    .await
-                }
-                Either::Right((published_refund_tx, _)) => {
-                    simple_swap(
-                        AliceState::BtcRefunded {
-                            tx_refund,
-                            published_refund_tx,
-                            state3,
-                        },
-                        swarm,
-                        bitcoin_wallet.clone(),
-                        monero_wallet,
-                    )
-                    .await
-                }
-            }
-        }
-        AliceState::BtcRefunded {
-            tx_refund,
-            published_refund_tx,
-            state3,
-        } => {
-            let s_a = monero::PrivateKey {
-                scalar: state3.s_a.into_ed25519(),
-            };
-
-            let tx_refund_sig = tx_refund
-                .extract_signature_by_key(published_refund_tx, state3.a.public())
-                .context("Failed to extract signature from Bitcoin refund tx")?;
-            let tx_refund_encsig = state3
-                .a
-                .encsign(state3.S_b_bitcoin.clone(), tx_refund.digest());
-
-            let s_b = bitcoin::recover(state3.S_b_bitcoin, tx_refund_sig, tx_refund_encsig)
-                .context("Failed to recover Monero secret key from Bitcoin signature")?;
-            let s_b = monero::private_key_from_secp256k1_scalar(s_b.into());
-
-            let spend_key = s_a + s_b;
-            let view_key = state3.v;
-
-            monero_wallet
-                .create_and_load_wallet_for_output(spend_key, view_key)
-                .await?;
-
-            Ok(AliceState::XmrRefunded)
-        }
-        AliceState::BtcPunishable { tx_refund, state3 } => {
-            let tx_cancel = bitcoin::TxCancel::new(
-                &state3.tx_lock,
-                state3.refund_timelock,
-                state3.a.public(),
-                state3.B.clone(),
-            );
-            let tx_punish =
-                bitcoin::TxPunish::new(&tx_cancel, &state3.punish_address, state3.punish_timelock);
-            let punished_tx_id = tx_punish.txid();
-
-            let sig_a = state3.a.sign(tx_punish.digest());
-            let sig_b = state3.tx_punish_sig_bob.clone();
-
-            let signed_tx_punish = tx_punish
-                .add_signatures(
-                    &tx_cancel,
-                    (state3.a.public(), sig_a),
-                    (state3.B.clone(), sig_b),
-                )
-                .expect("sig_{a,b} to be valid signatures for tx_cancel");
-
-            let _ = bitcoin_wallet
-                .broadcast_signed_transaction(signed_tx_punish)
-                .await?;
-
-            simple_swap(
-                AliceState::BtcPunished {
-                    tx_refund,
-                    punished_tx_id,
-                    state3,
-                },
-                swarm,
-                bitcoin_wallet.clone(),
-                monero_wallet,
-            )
-            .await
-        }
-        AliceState::BtcPunished {
-            punished_tx_id,
-            tx_refund,
-            state3,
-        } => {
-            let punish_tx_finalised = bitcoin_wallet.wait_for_transaction_finality(punished_tx_id);
-
-            let refund_tx_seen = bitcoin_wallet.watch_for_raw_transaction(tx_refund.txid());
-
-            pin_mut!(punish_tx_finalised);
-            pin_mut!(refund_tx_seen);
-
-            match select(punish_tx_finalised, refund_tx_seen).await {
-                Either::Left(_) => {
-                    simple_swap(
-                        AliceState::Punished,
-                        swarm,
-                        bitcoin_wallet.clone(),
-                        monero_wallet,
-                    )
-                    .await
-                }
-                Either::Right((published_refund_tx, _)) => {
-                    simple_swap(
-                        AliceState::BtcRefunded {
-                            tx_refund,
-                            published_refund_tx,
-                            state3,
-                        },
-                        swarm,
-                        bitcoin_wallet.clone(),
-                        monero_wallet,
-                    )
-                    .await
-                }
-            }
-        }
-
-        AliceState::XmrRefunded => Ok(AliceState::XmrRefunded),
-        AliceState::BtcRedeemed => Ok(AliceState::BtcRedeemed),
-        AliceState::Punished => Ok(AliceState::Punished),
-        AliceState::SafelyAborted => Ok(AliceState::SafelyAborted),
-    }
-}
+pub mod swap;
 
 pub async fn swap(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
@@ -497,7 +52,25 @@ pub async fn swap(
     transport: SwapTransport,
     behaviour: Behaviour,
 ) -> Result<()> {
-    struct Network(Arc<Mutex<Swarm>>);
+    struct Network {
+        swarm: Arc<Mutex<Swarm>>,
+        channel: Option<ResponseChannel<AliceToBob>>,
+    }
+
+    impl Network {
+        pub async fn send_message2(&mut self, proof: monero::TransferProof) {
+            match self.channel.take() {
+                None => warn!("Channel not found, did you call this twice?"),
+                Some(channel) => {
+                    let mut guard = self.swarm.lock().await;
+                    guard.send_message2(channel, alice::Message2 {
+                        tx_lock_proof: proof,
+                    });
+                    info!("Sent transfer proof");
+                }
+            }
+        }
+    }
 
     // TODO: For retry, use `backoff::ExponentialBackoff` in production as opposed
     // to `ConstantBackoff`.
@@ -508,7 +81,7 @@ pub async fn swap(
             struct UnexpectedMessage;
 
             let encsig = (|| async {
-                let mut guard = self.0.lock().await;
+                let mut guard = self.swarm.lock().await;
                 let encsig = match guard.next().await {
                     OutEvent::Message3(msg) => msg.tx_redeem_encsig,
                     other => {
@@ -602,8 +175,11 @@ pub async fn swap(
     let msg = state2.next_message();
     swarm.send_message1(channel, msg);
 
-    let state3 = match swarm.next().await {
-        OutEvent::Message2(msg) => state2.receive(msg)?,
+    let (state3, channel) = match swarm.next().await {
+        OutEvent::Message2 { msg, channel } => {
+            let state3 = state2.receive(msg)?;
+            (state3, channel)
+        }
         other => panic!("Unexpected event: {:?}", other),
     };
 
@@ -613,10 +189,13 @@ pub async fn swap(
 
     info!("Handshake complete, we now have State3 for Alice.");
 
-    let network = Arc::new(Mutex::new(Network(unimplemented!())));
+    let network = Arc::new(Mutex::new(Network {
+        swarm: Arc::new(Mutex::new(swarm)),
+        channel: Some(channel),
+    }));
 
     let mut action_generator = action_generator(
-        network,
+        network.clone(),
         bitcoin_wallet.clone(),
         state3.clone(),
         TX_LOCK_MINE_TIMEOUT,
@@ -636,12 +215,16 @@ pub async fn swap(
                 db.insert_latest_state(swap_id, state::Alice::BtcLocked(state3.clone()).into())
                     .await?;
 
-                let _ = monero_wallet
+                let (transfer_proof, _) = monero_wallet
                     .transfer(public_spend_key, public_view_key, amount)
                     .await?;
 
                 db.insert_latest_state(swap_id, state::Alice::XmrLocked(state3.clone()).into())
                     .await?;
+
+                let mut guard = network.as_ref().lock().await;
+                guard.send_message2(transfer_proof).await;
+                info!("Sent transfer proof");
             }
 
             GeneratorState::Yielded(Action::RedeemBtc(tx)) => {
@@ -728,7 +311,10 @@ pub enum OutEvent {
         msg: bob::Message1,
         channel: ResponseChannel<AliceToBob>,
     },
-    Message2(bob::Message2),
+    Message2 {
+        msg: bob::Message2,
+        channel: ResponseChannel<AliceToBob>,
+    },
     Message3(bob::Message3),
 }
 
@@ -767,7 +353,7 @@ impl From<message1::OutEvent> for OutEvent {
 impl From<message2::OutEvent> for OutEvent {
     fn from(event: message2::OutEvent) -> Self {
         match event {
-            message2::OutEvent::Msg { msg, .. } => OutEvent::Message2(msg),
+            message2::OutEvent::Msg { msg, channel } => OutEvent::Message2 { msg, channel },
         }
     }
 }
@@ -826,6 +412,16 @@ impl Behaviour {
     ) {
         self.message1.send(channel, msg);
         debug!("Sent Message1");
+    }
+
+    /// Send Message2 to Bob in response to receiving his Message2.
+    pub fn send_message2(
+        &mut self,
+        channel: ResponseChannel<AliceToBob>,
+        msg: xmr_btc::alice::Message2,
+    ) {
+        self.message2.send(channel, msg);
+        debug!("Sent Message2");
     }
 }
 

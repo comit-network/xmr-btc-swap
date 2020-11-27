@@ -186,6 +186,7 @@ pub trait WatchForRawTransaction {
     async fn watch_for_raw_transaction(&self, txid: Txid) -> Transaction;
 }
 
+#[async_trait]
 pub trait WaitForTransactionFinality {
     async fn wait_for_transaction_finality(&self, txid: Txid);
 }

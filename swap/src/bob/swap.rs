@@ -1,36 +1,24 @@
 use crate::{
-    bitcoin::{self},
     bob::{OutEvent, Swarm},
-    network::{transport::SwapTransport, TokioExecutor},
     state,
     storage::Database,
-    Cmd, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
+    Cmd, Rsp, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use anyhow::Result;
 use async_recursion::async_recursion;
-use async_trait::async_trait;
-use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
+
 use futures::{
     channel::mpsc::{Receiver, Sender},
-    future::Either,
-    FutureExt, StreamExt,
+    StreamExt,
 };
-use genawaiter::GeneratorState;
-use libp2p::{core::identity::Keypair, Multiaddr, NetworkBehaviour, PeerId};
-use rand::{rngs::OsRng, CryptoRng, RngCore};
-use std::{process, sync::Arc, time::Duration};
-use tokio::sync::Mutex;
-use tracing::{debug, info, warn};
+
+use libp2p::PeerId;
+use rand::rngs::OsRng;
+use std::{process, sync::Arc};
+
+use tracing::info;
 use uuid::Uuid;
-use xmr_btc::{
-    alice,
-    bitcoin::{
-        poll_until_block_height_is_gte, BroadcastSignedTransaction, EncryptedSignature, SignTxLock,
-        TransactionBlockHeight,
-    },
-    bob::{self, action_generator, ReceiveTransferProof, State0},
-    monero::CreateWalletForOutput,
-};
+use xmr_btc::bob::{self, State0};
 
 // The same data structure is used for swap execution and recovery.
 // This allows for a seamless transition from a failed swap to recovery.
@@ -50,7 +38,7 @@ pub enum BobState {
 
 // State machine driver for swap execution
 #[async_recursion]
-pub async fn simple_swap(
+pub async fn swap(
     state: BobState,
     mut swarm: Swarm,
     db: Database,
@@ -122,7 +110,7 @@ pub async fn simple_swap(
 
             info!("Handshake complete");
 
-            simple_swap(
+            swap(
                 BobState::Negotiated(state2, alice_peer_id),
                 swarm,
                 db,
@@ -137,7 +125,7 @@ pub async fn simple_swap(
             // Alice and Bob have exchanged info
             let state3 = state2.lock_btc(bitcoin_wallet.as_ref()).await?;
             // db.insert_latest_state(state);
-            simple_swap(
+            swap(
                 BobState::BtcLocked(state3, alice_peer_id),
                 swarm,
                 db,
@@ -160,7 +148,7 @@ pub async fn simple_swap(
                 }
                 other => panic!("unexpected event: {:?}", other),
             };
-            simple_swap(
+            swap(
                 BobState::XmrLocked(state4, alice_peer_id),
                 swarm,
                 db,
@@ -182,7 +170,7 @@ pub async fn simple_swap(
             // should happen in this arm?
             swarm.send_message3(alice_peer_id.clone(), tx_redeem_encsig);
 
-            simple_swap(
+            swap(
                 BobState::EncSigSent(state, alice_peer_id),
                 swarm,
                 db,
@@ -200,7 +188,7 @@ pub async fn simple_swap(
 
             tokio::select! {
                 val = redeem_watcher => {
-                    simple_swap(
+                    swap(
                         BobState::BtcRedeemed(val?),
                         swarm,
                         db,
@@ -211,14 +199,14 @@ pub async fn simple_swap(
                     )
                     .await
                 }
-                val = t1_timeout => {
+                _ = t1_timeout => {
                     // Check whether TxCancel has been published.
                     // We should not fail if the transaction is already on the blockchain
-                    if let Err(_e) = state.check_for_tx_cancel(bitcoin_wallet.as_ref()).await {
-                            state.submit_tx_cancel(bitcoin_wallet.as_ref()).await;
+                    if let Err(_) = state.check_for_tx_cancel(bitcoin_wallet.as_ref()).await {
+                            state.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
                     }
 
-                    simple_swap(
+                    swap(
                         BobState::Cancelled(state),
                         swarm,
                         db,
@@ -235,7 +223,7 @@ pub async fn simple_swap(
         BobState::BtcRedeemed(state) => {
             // Bob redeems XMR using revealed s_a
             state.claim_xmr(monero_wallet.as_ref()).await?;
-            simple_swap(
+            swap(
                 BobState::XmrRedeemed,
                 swarm,
                 db,
@@ -253,6 +241,7 @@ pub async fn simple_swap(
         BobState::XmrRedeemed => Ok(BobState::XmrRedeemed),
     }
 }
+
 // // State machine driver for recovery execution
 // #[async_recursion]
 // pub async fn abort(state: BobState, io: Io) -> Result<BobState> {

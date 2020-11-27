@@ -1,11 +1,6 @@
 use anyhow::Result;
 use structopt::StructOpt;
-use swap::{
-    bob_simple::{simple_swap, BobState},
-    cli::Options,
-    storage::Database,
-};
-use uuid::Uuid;
+use swap::{alice::swap::swap, bob::swap::BobState, cli::Options, storage::Database};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -20,16 +15,7 @@ async fn main() -> Result<()> {
 
     match opt {
         Options::Alice { .. } => {
-            simple_swap(
-                bob_state,
-                swarm,
-                db,
-                bitcoin_wallet,
-                monero_wallet,
-                rng,
-                Uuid::new_v4(),
-            )
-            .await?;
+            swap(bob_state, swarm, bitcoin_wallet, monero_wallet).await?;
         }
         Options::Recover { .. } => {
             let _stored_state: BobState = unimplemented!("io.get_state(uuid)?");
