@@ -121,6 +121,10 @@ This section points out features that were mentioned by the community. These fea
 
 #### Avoid receiving tainted Bitcoin
 
+Mentions:
+
+* [27.11.2020 on Reddit](https://www.reddit.com/r/Monero/comments/k14hug/how_would_an_atomic_swap_ui_look_like/gdplnt8?utm_source=share&utm_medium=web2x&context=3)
+
 The receiver of the Bitcoin should be able to validate the address to be used by the sender to avoid receiving tainted Bitcoin (i.e. coins that were unlawfully used). 
 This feature is relevant for the receiving party of the Bitcoin, it is relevant for taker and maker.
 This feature is relevant independent of the user use case.
