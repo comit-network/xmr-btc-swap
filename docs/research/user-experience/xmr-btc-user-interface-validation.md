@@ -133,7 +133,10 @@ In order to be able to spot tainted Bitcoin, the receiver has to validate the ad
 In the current protocol the party funding (sending) Bitcoin always moves first.
 
 The party receiving the Bitcoin would have to request the address to be used by the sender. 
-For the beginning it might be good enough to let the taker verify that the Bitcoin are not tainted manually, eventually it can be done automated against a service listing tainted Bitcoin.
+For the beginning it might be good enough to let the taker verify that the Bitcoin are not tainted manually, by enabling the taker to provide e.g. a CSV file with tainted addresses by themselves. 
+Eventually, an automated service could be integrated, that keeps listings of tainted Bitcoin up to date. 
+More research is needed to evaluate if reliable services exist. 
+
 Once the daemon of the party receiving the Bitcoin sees the Bitcoin transaction of the sender, the address has to be evaluated to ensure the correct address has been used for funding.
 This can be done automated.
 In case a tainted address was used the swap execution should halt and give a warning to the receiving party.
