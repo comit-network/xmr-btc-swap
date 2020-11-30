@@ -1,15 +1,18 @@
 //! Run an XMR/BTC swap in the role of Bob.
 //! Bob holds BTC and wishes receive XMR.
 use anyhow::Result;
+use async_trait::async_trait;
+use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
 use futures::{
     channel::mpsc::{Receiver, Sender},
-    StreamExt,
+    FutureExt, StreamExt,
 };
 use genawaiter::GeneratorState;
 use libp2p::{core::identity::Keypair, Multiaddr, NetworkBehaviour, PeerId};
 use rand::rngs::OsRng;
-use std::{process, sync::Arc};
-use tracing::{debug, info};
+use std::{process, sync::Arc, time::Duration};
+use tokio::sync::Mutex;
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 mod amounts;
@@ -34,14 +37,14 @@ use crate::{
 use xmr_btc::{
     alice,
     bitcoin::{BroadcastSignedTransaction, EncryptedSignature, SignTxLock},
-    bob::{self, action_generator, State0},
+    bob::{self, action_generator, ReceiveTransferProof, State0},
     monero::CreateWalletForOutput,
 };
 
 #[allow(clippy::too_many_arguments)]
 pub async fn swap(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Facade>,
+    monero_wallet: Arc<monero::Wallet>,
     db: Database,
     btc: u64,
     addr: Multiaddr,
@@ -50,6 +53,40 @@ pub async fn swap(
     transport: SwapTransport,
     behaviour: Bob,
 ) -> Result<()> {
+    struct Network(Swarm);
+
+    // TODO: For retry, use `backoff::ExponentialBackoff` in production as opposed
+    // to `ConstantBackoff`.
+
+    #[async_trait]
+    impl ReceiveTransferProof for Network {
+        async fn receive_transfer_proof(&mut self) -> monero::TransferProof {
+            #[derive(Debug)]
+            struct UnexpectedMessage;
+
+            let future = self.0.next().shared();
+
+            let proof = (|| async {
+                let proof = match future.clone().await {
+                    OutEvent::Message2(msg) => msg.tx_lock_proof,
+                    other => {
+                        warn!("Expected transfer proof, got: {:?}", other);
+                        return Err(backoff::Error::Transient(UnexpectedMessage));
+                    }
+                };
+
+                Result::<_, backoff::Error<UnexpectedMessage>>::Ok(proof)
+            })
+            .retry(ConstantBackoff::new(Duration::from_secs(1)))
+            .await
+            .expect("transient errors to be retried");
+
+            info!("Received transfer proof");
+
+            proof
+        }
+    }
+
     let mut swarm = new_swarm(transport, behaviour)?;
 
     libp2p::Swarm::dial_addr(&mut swarm, addr)?;
@@ -112,19 +149,13 @@ pub async fn swap(
         .await?;
 
     swarm.send_message2(alice.clone(), state2.next_message());
-    // NOTE: We must poll the swarm after `send_messageX` to actually trigger
-    // sending the message. This is really weird to me and has been a constant
-    // source of bugs. Is this the only way?
-    match swarm.next().await {
-        OutEvent::Message2 => {
-            debug!("Got message 3 response from Alice");
-        }
-        other => panic!("unexpected event: {:?}", other),
-    };
 
     info!("Handshake complete");
 
+    let network = Arc::new(Mutex::new(Network(swarm)));
+
     let mut action_generator = action_generator(
+        network.clone(),
         monero_wallet.clone(),
         bitcoin_wallet.clone(),
         state2.clone(),
@@ -151,14 +182,20 @@ pub async fn swap(
             GeneratorState::Yielded(bob::Action::SendBtcRedeemEncsig(tx_redeem_encsig)) => {
                 db.insert_latest_state(swap_id, state::Bob::XmrLocked(state2.clone()).into())
                     .await?;
-                swarm.send_message3(alice.clone(), tx_redeem_encsig);
-                match swarm.next().await {
+
+                let mut guard = network.as_ref().lock().await;
+                guard.0.send_message3(alice.clone(), tx_redeem_encsig);
+                info!("Sent Bitcoin redeem encsig");
+
+                // FIXME: Having to wait for Alice's response here is a big problem, because
+                // we're stuck if she doesn't send her response back. I believe this is
+                // currently necessary, so we may have to rework this and/or how we use libp2p
+                match guard.0.next().shared().await {
                     OutEvent::Message3 => {
-                        debug!("Got message 3 response from Alice");
+                        debug!("Got Message3 empty response");
                     }
                     other => panic!("unexpected event: {:?}", other),
                 };
-                info!("Sent Bitcoin redeem encsig");
             }
             GeneratorState::Yielded(bob::Action::CreateXmrWalletForOutput {
                 spend_key,
@@ -220,7 +257,7 @@ pub enum OutEvent {
     Amounts(SwapAmounts),
     Message0(alice::Message0),
     Message1(alice::Message1),
-    Message2,
+    Message2(alice::Message2),
     Message3,
 }
 
@@ -261,7 +298,7 @@ impl From<message1::OutEvent> for OutEvent {
 impl From<message2::OutEvent> for OutEvent {
     fn from(event: message2::OutEvent) -> Self {
         match event {
-            message2::OutEvent::Msg => OutEvent::Message2,
+            message2::OutEvent::Msg(msg) => OutEvent::Message2(msg),
         }
     }
 }

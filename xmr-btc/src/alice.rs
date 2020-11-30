@@ -24,14 +24,16 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::time::timeout;
+use tokio::{sync::Mutex, time::timeout};
 use tracing::{error, info};
 
 pub mod message;
-pub use message::{Message, Message0, Message1};
+pub use message::{Message, Message0, Message1, Message2};
 
 #[derive(Debug)]
 pub enum Action {
+    // This action also includes proving to Bob that this has happened, given that our current
+    // protocol requires a transfer proof to verify that the coins have been locked on Monero
     LockXmr {
         amount: monero::Amount,
         public_spend_key: monero::PublicKey,
@@ -59,10 +61,9 @@ pub trait ReceiveBitcoinRedeemEncsig {
 ///
 /// The argument `bitcoin_tx_lock_timeout` is used to determine how long we will
 /// wait for Bob, the counterparty, to lock up the bitcoin.
-pub fn action_generator<N, B, M>(
-    mut network: N,
+pub fn action_generator<N, B>(
+    network: Arc<Mutex<N>>,
     bitcoin_client: Arc<B>,
-    monero_client: Arc<M>,
     // TODO: Replace this with a new, slimmer struct?
     State3 {
         a,
@@ -92,13 +93,10 @@ where
         + Send
         + Sync
         + 'static,
-    M: monero::WatchForTransfer + Send + Sync + 'static,
 {
-    #[allow(clippy::enum_variant_names)]
     #[derive(Debug)]
     enum SwapFailed {
         BeforeBtcLock(Reason),
-        AfterBtcLock(Reason),
         AfterXmrLock(Reason),
     }
 
@@ -147,30 +145,21 @@ where
             let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey {
                 scalar: s_a.into_ed25519(),
             });
-            let S = S_a + S_b_monero;
 
             co.yield_(Action::LockXmr {
                 amount: xmr,
-                public_spend_key: S,
+                public_spend_key: S_a + S_b_monero,
                 public_view_key: v.public(),
             })
             .await;
 
-            let monero_joint_address =
-                monero::Address::standard(monero::Network::Mainnet, S, v.public().into());
-
-            if let Either::Right(_) = select(
-                monero_client.watch_for_transfer(monero_joint_address, xmr, v),
-                poll_until_btc_has_expired.clone(),
-            )
-            .await
-            {
-                return Err(SwapFailed::AfterBtcLock(Reason::BtcExpired));
-            };
+            // TODO: Watch for LockXmr using watch-only wallet. Doing so will prevent Alice
+            // from cancelling/refunding unnecessarily.
 
             let tx_redeem_encsig = {
+                let mut guard = network.as_ref().lock().await;
                 let tx_redeem_encsig = match select(
-                    network.receive_bitcoin_redeem_encsig(),
+                    guard.receive_bitcoin_redeem_encsig(),
                     poll_until_btc_has_expired.clone(),
                 )
                 .await
@@ -375,6 +364,7 @@ pub async fn next_state<
             Ok(state5.into())
         }
         State::State5(state5) => {
+            transport.send_message(state5.next_message().into()).await?;
             // todo: pass in state4b as a parameter somewhere in this call to prevent the
             // user from waiting for a message that wont be sent
             let message3 = transport.receive_message().await?.try_into()?;
@@ -726,7 +716,7 @@ impl State4 {
         });
         let S_b = self.S_b_monero;
 
-        let fee = monero_wallet
+        let (tx_lock_proof, fee) = monero_wallet
             .transfer(S_a + S_b, self.v.public(), self.xmr)
             .await?;
 
@@ -745,6 +735,7 @@ impl State4 {
             redeem_address: self.redeem_address,
             punish_address: self.punish_address,
             tx_lock: self.tx_lock,
+            tx_lock_proof,
             tx_punish_sig_bob: self.tx_punish_sig_bob,
             tx_cancel_sig_bob: self.tx_cancel_sig_bob,
             lock_xmr_fee: fee,
@@ -815,6 +806,7 @@ pub struct State5 {
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
+    tx_lock_proof: monero::TransferProof,
 
     tx_punish_sig_bob: bitcoin::Signature,
 
@@ -823,6 +815,12 @@ pub struct State5 {
 }
 
 impl State5 {
+    pub fn next_message(&self) -> Message2 {
+        Message2 {
+            tx_lock_proof: self.tx_lock_proof.clone(),
+        }
+    }
+
     pub fn receive(self, msg: bob::Message3) -> State6 {
         State6 {
             a: self.a,

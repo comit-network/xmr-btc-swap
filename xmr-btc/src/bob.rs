@@ -5,11 +5,11 @@ use crate::{
         SignTxLock, TxCancel, WatchForRawTransaction,
     },
     monero,
-    monero::WatchForTransfer,
     serde::monero_private_key,
     transport::{ReceiveMessage, SendMessage},
 };
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use ecdsa_fun::{
     adaptor::{Adaptor, EncryptedSignature},
     nonce::Deterministic,
@@ -28,11 +28,11 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::time::timeout;
+use tokio::{sync::Mutex, time::timeout};
 use tracing::error;
 
 pub mod message;
-use crate::monero::CreateWalletForOutput;
+use crate::monero::{CreateWalletForOutput, WatchForTransfer};
 pub use message::{Message, Message0, Message1, Message2, Message3};
 
 #[allow(clippy::large_enum_variant)]
@@ -48,6 +48,12 @@ pub enum Action {
     RefundBtc(bitcoin::Transaction),
 }
 
+// TODO: This could be moved to the monero module
+#[async_trait]
+pub trait ReceiveTransferProof {
+    async fn receive_transfer_proof(&mut self) -> monero::TransferProof;
+}
+
 /// Perform the on-chain protocol to swap monero and bitcoin as Bob.
 ///
 /// This is called post handshake, after all the keys, addresses and most of the
@@ -55,7 +61,8 @@ pub enum Action {
 ///
 /// The argument `bitcoin_tx_lock_timeout` is used to determine how long we will
 /// wait for Bob, the caller of this function, to lock up the bitcoin.
-pub fn action_generator<M, B>(
+pub fn action_generator<N, M, B>(
+    network: Arc<Mutex<N>>,
     monero_client: Arc<M>,
     bitcoin_client: Arc<B>,
     // TODO: Replace this with a new, slimmer struct?
@@ -78,6 +85,7 @@ pub fn action_generator<M, B>(
     bitcoin_tx_lock_timeout: u64,
 ) -> GenBoxed<Action, (), ()>
 where
+    N: ReceiveTransferProof + Send + 'static,
     M: monero::WatchForTransfer + Send + Sync + 'static,
     B: bitcoin::BlockHeight
         + bitcoin::TransactionBlockHeight
@@ -100,6 +108,8 @@ where
         InactiveBob,
         /// The refund timelock has been reached.
         BtcExpired,
+        /// Alice did not lock up enough monero in the shared output.
+        InsufficientXmr(monero::InsufficientFunds),
         /// Could not find Bob's signature on the redeem transaction witness
         /// stack.
         BtcRedeemSignature,
@@ -130,21 +140,39 @@ where
             .shared();
             pin_mut!(poll_until_btc_has_expired);
 
+            let transfer_proof = {
+                let mut guard = network.as_ref().lock().await;
+                let transfer_proof = match select(
+                    guard.receive_transfer_proof(),
+                    poll_until_btc_has_expired.clone(),
+                )
+                .await
+                {
+                    Either::Left((proof, _)) => proof,
+                    Either::Right(_) => return Err(SwapFailed::AfterBtcLock(Reason::BtcExpired)),
+                };
+
+                tracing::debug!("select returned transfer proof from message");
+
+                transfer_proof
+            };
+
             let S_b_monero = monero::PublicKey::from_private_key(&monero::PrivateKey::from_scalar(
                 s_b.into_ed25519(),
             ));
             let S = S_a_monero + S_b_monero;
 
-            let monero_joint_address =
-                monero::Address::standard(monero::Network::Mainnet, S, v.public().into());
-
-            if let Either::Right(_) = select(
-                monero_client.watch_for_transfer(monero_joint_address, xmr, v),
+            match select(
+                monero_client.watch_for_transfer(S, v.public(), transfer_proof, xmr, 0),
                 poll_until_btc_has_expired.clone(),
             )
             .await
             {
-                return Err(SwapFailed::AfterBtcLock(Reason::BtcExpired));
+                Either::Left((Err(e), _)) => {
+                    return Err(SwapFailed::AfterBtcLock(Reason::InsufficientXmr(e)))
+                }
+                Either::Right(_) => return Err(SwapFailed::AfterBtcLock(Reason::BtcExpired)),
+                _ => {}
             }
 
             let tx_redeem = bitcoin::TxRedeem::new(&tx_lock, &redeem_address);
@@ -272,7 +300,8 @@ pub async fn next_state<
             Ok(state3.into())
         }
         State::State3(state3) => {
-            let state4 = state3.watch_for_lock_xmr(monero_wallet).await?;
+            let message2 = transport.receive_message().await?.try_into()?;
+            let state4 = state3.watch_for_lock_xmr(monero_wallet, message2).await?;
             tracing::info!("bob has seen that alice has locked xmr");
             Ok(state4.into())
         }
@@ -560,7 +589,7 @@ pub struct State3 {
 }
 
 impl State3 {
-    pub async fn watch_for_lock_xmr<W>(self, xmr_wallet: &W) -> Result<State4>
+    pub async fn watch_for_lock_xmr<W>(self, xmr_wallet: &W, msg: alice::Message2) -> Result<State4>
     where
         W: monero::WatchForTransfer,
     {
@@ -569,12 +598,15 @@ impl State3 {
         ));
         let S = self.S_a_monero + S_b_monero;
 
-        let monero_joint_address =
-            monero::Address::standard(monero::Network::Mainnet, S, self.v.public().into());
-
         xmr_wallet
-            .watch_for_transfer(monero_joint_address, self.xmr, self.v)
-            .await;
+            .watch_for_transfer(
+                S,
+                self.v.public(),
+                msg.tx_lock_proof,
+                self.xmr,
+                monero::MIN_CONFIRMATIONS,
+            )
+            .await?;
 
         Ok(State4 {
             A: self.A,
