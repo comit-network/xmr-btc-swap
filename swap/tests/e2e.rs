@@ -1,22 +1,23 @@
 use bitcoin_harness::Bitcoind;
-use futures::{channel::mpsc, future::try_join};
+use futures::{
+    channel::{
+        mpsc,
+        mpsc::{Receiver, Sender},
+    },
+    future::try_join,
+};
 use libp2p::Multiaddr;
 use monero_harness::Monero;
 use rand::rngs::OsRng;
 use std::sync::Arc;
 use swap::{
-    alice, bob, bob::new_swarm, bob_simple, bob_simple::BobState, network::transport::build,
-    storage::Database,
+    alice, alice::swap::AliceState, bob, bob::swap::BobState, network::transport::build,
+    storage::Database, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
 use uuid::Uuid;
-use xmr_btc::bitcoin;
-
-// NOTE: For some reason running these tests overflows the stack. In order to
-// mitigate this run them with:
-//
-//     RUST_MIN_STACK=100000000 cargo test
+use xmr_btc::{bitcoin, cross_curve_dleq};
 
 #[tokio::test]
 async fn swap() {
@@ -91,7 +92,7 @@ async fn swap() {
     let db = Database::open(db_dir.path()).unwrap();
     let (cmd_tx, mut _cmd_rx) = mpsc::channel(1);
     let (mut rsp_tx, rsp_rx) = mpsc::channel(1);
-    let bob_behaviour = bob::Bob::default();
+    let bob_behaviour = bob::Behaviour::default();
     let bob_transport = build(bob_behaviour.identity()).unwrap();
     let bob_swap = bob::swap(
         bob_btc_wallet.clone(),
@@ -184,32 +185,65 @@ async fn simple_swap_happy_path() {
     ));
     let bob_xmr_wallet = Arc::new(swap::monero::Wallet(monero.wallet("bob").unwrap().client()));
 
-    let alice_behaviour = alice::Alice::default();
+    // let redeem_address = bitcoin_wallet.as_ref().new_address().await?;
+    // let punish_address = redeem_address.clone();
+    let amounts = SwapAmounts {
+        btc,
+        xmr: xmr_btc::monero::Amount::from_piconero(xmr),
+    };
+
+    let alice_behaviour = alice::Behaviour::default();
+    let alice_peer_id = alice_behaviour.peer_id().clone();
     let alice_transport = build(alice_behaviour.identity()).unwrap();
+    let rng = &mut OsRng;
+    let alice_state = {
+        let a = bitcoin::SecretKey::new_random(rng);
+        let s_a = cross_curve_dleq::Scalar::random(rng);
+        let v_a = xmr_btc::monero::PrivateViewKey::new_random(rng);
+        AliceState::Started {
+            amounts,
+            a,
+            s_a,
+            v_a,
+        }
+    };
+    let alice_swarm = alice::new_swarm(alice_multiaddr, alice_transport, alice_behaviour).unwrap();
+    let alice_swap = alice::swap::swap(
+        alice_state,
+        alice_swarm,
+        alice_btc_wallet.clone(),
+        alice_xmr_wallet.clone(),
+    );
 
-    let db = Database::open(std::path::Path::new("../.swap-db/")).unwrap();
-    let alice_swap = todo!();
-
-    let db_dir = tempdir().unwrap();
-    let db = Database::open(db_dir.path()).unwrap();
-    let (cmd_tx, mut _cmd_rx) = mpsc::channel(1);
-    let (mut rsp_tx, rsp_rx) = mpsc::channel(1);
-    let bob_behaviour = bob::Bob::default();
+    let bob_db_dir = tempdir().unwrap();
+    let bob_db = Database::open(bob_db_dir.path()).unwrap();
+    let bob_behaviour = bob::Behaviour::default();
     let bob_transport = build(bob_behaviour.identity()).unwrap();
-    let bob_state = BobState::Started(cmd_tx, rsp_rx, btc_bob.as_sat(), alice_behaviour.peer_id());
-    let bob_swarm = new_swarm(bob_transport, bob_behaviour).unwrap();
-    let bob_swap = bob_simple::simple_swap(
+
+    let refund_address = bob_btc_wallet.new_address().await.unwrap();
+    let state0 = xmr_btc::bob::State0::new(
+        rng,
+        btc,
+        xmr_btc::monero::Amount::from_piconero(xmr),
+        REFUND_TIMELOCK,
+        PUNISH_TIMELOCK,
+        refund_address,
+    );
+    let bob_state = BobState::Started {
+        state0,
+        amounts,
+        peer_id: alice_peer_id,
+    };
+    let bob_swarm = bob::new_swarm(bob_transport, bob_behaviour).unwrap();
+    let bob_swap = bob::swap::swap(
         bob_state,
         bob_swarm,
-        db,
+        bob_db,
         bob_btc_wallet.clone(),
         bob_xmr_wallet.clone(),
         OsRng,
         Uuid::new_v4(),
     );
-
-    // automate the verification step by accepting any amounts sent over by Alice
-    rsp_tx.try_send(swap::Rsp::VerifiedAmounts).unwrap();
 
     try_join(alice_swap, bob_swap).await.unwrap();
 

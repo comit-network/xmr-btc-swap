@@ -17,6 +17,7 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 mod amounts;
+mod execution;
 mod message0;
 mod message1;
 mod message2;
@@ -53,7 +54,7 @@ pub async fn swap(
     mut cmd_tx: Sender<Cmd>,
     mut rsp_rx: Receiver<Rsp>,
     transport: SwapTransport,
-    behaviour: Bob,
+    behaviour: Behaviour,
 ) -> Result<()> {
     struct Network(Swarm);
 
@@ -236,9 +237,9 @@ pub async fn swap(
     }
 }
 
-pub type Swarm = libp2p::Swarm<Bob>;
+pub type Swarm = libp2p::Swarm<Behaviour>;
 
-fn new_swarm(transport: SwapTransport, behaviour: Bob) -> Result<Swarm> {
+pub fn new_swarm(transport: SwapTransport, behaviour: Behaviour) -> Result<Swarm> {
     let local_peer_id = behaviour.peer_id();
 
     let swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id.clone())
@@ -317,7 +318,7 @@ impl From<message3::OutEvent> for OutEvent {
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
-pub struct Bob {
+pub struct Behaviour {
     pt: PeerTracker,
     amounts: Amounts,
     message0: Message0,
@@ -328,7 +329,7 @@ pub struct Bob {
     identity: Keypair,
 }
 
-impl Bob {
+impl Behaviour {
     pub fn identity(&self) -> Keypair {
         self.identity.clone()
     }
@@ -375,8 +376,8 @@ impl Bob {
     }
 }
 
-impl Default for Bob {
-    fn default() -> Bob {
+impl Default for Behaviour {
+    fn default() -> Behaviour {
         let identity = Keypair::generate_ed25519();
 
         Self {

@@ -13,13 +13,11 @@ use crate::{
 };
 use anyhow::{anyhow, Context, Result};
 use async_recursion::async_recursion;
-
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
 use futures::{
     future::{select, Either},
     pin_mut,
 };
-
 use libp2p::request_response::ResponseChannel;
 use rand::{CryptoRng, RngCore};
 use sha2::Sha256;

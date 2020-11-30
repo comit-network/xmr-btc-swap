@@ -823,7 +823,7 @@ impl State4 {
     where
         W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
     {
-        let tx_id = self.tx_lock.txid().clone();
+        let tx_id = self.tx_lock.txid();
         let tx_lock_height = bitcoin_wallet.transaction_block_height(tx_id).await;
 
         let t1_timeout =

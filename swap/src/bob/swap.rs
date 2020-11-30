@@ -1,29 +1,24 @@
 use crate::{
-    bob::{OutEvent, Swarm},
-    state,
+    bob::{execution::negotiate, OutEvent, Swarm},
     storage::Database,
-    Cmd, Rsp, PUNISH_TIMELOCK, REFUND_TIMELOCK,
+    SwapAmounts,
 };
 use anyhow::Result;
 use async_recursion::async_recursion;
-
-use futures::{
-    channel::mpsc::{Receiver, Sender},
-    StreamExt,
-};
-
 use libp2p::PeerId;
-use rand::rngs::OsRng;
-use std::{process, sync::Arc};
-
-use tracing::info;
+use rand::{CryptoRng, RngCore};
+use std::sync::Arc;
 use uuid::Uuid;
-use xmr_btc::bob::{self, State0};
+use xmr_btc::bob::{self};
 
 // The same data structure is used for swap execution and recovery.
 // This allows for a seamless transition from a failed swap to recovery.
 pub enum BobState {
-    Started(Sender<Cmd>, Receiver<Rsp>, u64, PeerId),
+    Started {
+        state0: bob::State0,
+        amounts: SwapAmounts,
+        peer_id: PeerId,
+    },
     Negotiated(bob::State2, PeerId),
     BtcLocked(bob::State3, PeerId),
     XmrLocked(bob::State4, PeerId),
@@ -38,80 +33,34 @@ pub enum BobState {
 
 // State machine driver for swap execution
 #[async_recursion]
-pub async fn swap(
+pub async fn swap<R>(
     state: BobState,
     mut swarm: Swarm,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
-    mut rng: OsRng,
+    mut rng: R,
     swap_id: Uuid,
-) -> Result<BobState> {
+) -> Result<BobState>
+where
+    R: RngCore + CryptoRng + Send,
+{
     match state {
-        BobState::Started(mut cmd_tx, mut rsp_rx, btc, alice_peer_id) => {
-            // todo: dial the swarm outside
-            // libp2p::Swarm::dial_addr(&mut swarm, addr)?;
-            let alice = match swarm.next().await {
-                OutEvent::ConnectionEstablished(alice) => alice,
-                other => panic!("unexpected event: {:?}", other),
-            };
-            info!("Connection established with: {}", alice);
-
-            swarm.request_amounts(alice.clone(), btc);
-
-            // todo: remove mspc channel
-            let (btc, xmr) = match swarm.next().await {
-                OutEvent::Amounts(amounts) => {
-                    info!("Got amounts from Alice: {:?}", amounts);
-                    let cmd = Cmd::VerifyAmounts(amounts);
-                    cmd_tx.try_send(cmd)?;
-                    let response = rsp_rx.next().await;
-                    if response == Some(Rsp::Abort) {
-                        info!("User rejected amounts proposed by Alice, aborting...");
-                        process::exit(0);
-                    }
-
-                    info!("User accepted amounts proposed by Alice");
-                    (amounts.btc, amounts.xmr)
-                }
-                other => panic!("unexpected event: {:?}", other),
-            };
-
-            let refund_address = bitcoin_wallet.new_address().await?;
-
-            let state0 = State0::new(
+        BobState::Started {
+            state0,
+            amounts,
+            peer_id,
+        } => {
+            let (swap_amounts, state2) = negotiate(
+                state0,
+                amounts,
+                &mut swarm,
                 &mut rng,
-                btc,
-                xmr,
-                REFUND_TIMELOCK,
-                PUNISH_TIMELOCK,
-                refund_address,
-            );
-
-            info!("Commencing handshake");
-
-            swarm.send_message0(alice.clone(), state0.next_message(&mut rng));
-            let state1 = match swarm.next().await {
-                OutEvent::Message0(msg) => state0.receive(bitcoin_wallet.as_ref(), msg).await?,
-                other => panic!("unexpected event: {:?}", other),
-            };
-
-            swarm.send_message1(alice.clone(), state1.next_message());
-            let state2 = match swarm.next().await {
-                OutEvent::Message1(msg) => state1.receive(msg)?,
-                other => panic!("unexpected event: {:?}", other),
-            };
-
-            let swap_id = Uuid::new_v4();
-            db.insert_latest_state(swap_id, state::Bob::Handshaken(state2.clone()).into())
-                .await?;
-
-            swarm.send_message2(alice.clone(), state2.next_message());
-
-            info!("Handshake complete");
-
+                bitcoin_wallet.clone(),
+            )
+            .await?;
             swap(
-                BobState::Negotiated(state2, alice_peer_id),
+                BobState::Negotiated(state2, peer_id),
                 swarm,
                 db,
                 bitcoin_wallet,
@@ -162,7 +111,6 @@ pub async fn swap(
         BobState::XmrLocked(state, alice_peer_id) => {
             // Alice has locked Xmr
             // Bob sends Alice his key
-            // let cloned = state.clone();
             let tx_redeem_encsig = state.tx_redeem_encsig();
             // Do we have to wait for a response?
             // What if Alice fails to receive this? Should we always resend?
