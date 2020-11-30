@@ -280,7 +280,11 @@ pub async fn swap(
 
 pub type Swarm = libp2p::Swarm<Behaviour>;
 
-fn new_swarm(listen: Multiaddr, transport: SwapTransport, behaviour: Behaviour) -> Result<Swarm> {
+pub fn new_swarm(
+    listen: Multiaddr,
+    transport: SwapTransport,
+    behaviour: Behaviour,
+) -> Result<Swarm> {
     use anyhow::Context as _;
 
     let local_peer_id = behaviour.peer_id();
