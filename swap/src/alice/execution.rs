@@ -71,6 +71,24 @@ pub async fn negotiate(
     // TODO: get an ack from libp2p2
     swarm.send_amounts(channel, amounts);
 
+    let redeem_address = bitcoin_wallet.as_ref().new_address().await?;
+    let punish_address = redeem_address.clone();
+
+    let state0 = State0::new(
+        a,
+        s_a,
+        v_a,
+        amounts.btc,
+        amounts.xmr,
+        REFUND_TIMELOCK,
+        PUNISH_TIMELOCK,
+        redeem_address,
+        punish_address,
+    );
+
+    // TODO(Franck): Understand why this is needed.
+    swarm.set_state0(state0.clone());
+
     let event = timeout(*BOB_TIME_TO_ACT, swarm.next())
         .await
         .context("Failed to receive message 0 from Bob")?;
@@ -80,21 +98,6 @@ pub async fn negotiate(
     };
 
     let SwapAmounts { btc, xmr } = amounts;
-
-    let redeem_address = bitcoin_wallet.as_ref().new_address().await?;
-    let punish_address = redeem_address.clone();
-
-    let state0 = State0::new(
-        a,
-        s_a,
-        v_a,
-        btc,
-        xmr,
-        REFUND_TIMELOCK,
-        PUNISH_TIMELOCK,
-        redeem_address,
-        punish_address,
-    );
 
     let state1 = state0.receive(message0)?;
 
