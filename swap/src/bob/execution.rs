@@ -19,9 +19,6 @@ pub async fn negotiate<R>(
 where
     R: RngCore + CryptoRng + Send,
 {
-    let (mut cmd_tx, _cmd_rx) = mpsc::channel(1);
-    let (_rsp_tx, mut rsp_rx) = mpsc::channel(1);
-
     // todo: dial the swarm outside
     // libp2p::Swarm::dial_addr(&mut swarm, addr)?;
     let alice = match swarm.next().await {
@@ -31,21 +28,11 @@ where
 
     swarm.request_amounts(alice.clone(), amounts.btc.as_sat());
 
-    // todo: remove/refactor mspc channel
+    // todo: see if we can remove
     let (btc, xmr) = match swarm.next().await {
-        OutEvent::Amounts(amounts) => {
-            let cmd = Cmd::VerifyAmounts(amounts);
-            cmd_tx.try_send(cmd)?;
-            let response = rsp_rx.next().await;
-            if response == Some(Rsp::Abort) {
-                panic!("abort response");
-            }
-            (amounts.btc, amounts.xmr)
-        }
+        OutEvent::Amounts(amounts) => (amounts.btc, amounts.xmr),
         other => panic!("unexpected event: {:?}", other),
     };
-
-    let refund_address = bitcoin_wallet.as_ref().new_address().await?;
 
     swarm.send_message0(alice.clone(), state0.next_message(&mut rng));
     let state1 = match swarm.next().await {
