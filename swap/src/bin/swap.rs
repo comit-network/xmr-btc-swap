@@ -13,21 +13,26 @@
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
-use futures::{channel::mpsc, StreamExt};
 use libp2p::Multiaddr;
 use prettytable::{row, Table};
-use std::{io, io::Write, process, sync::Arc};
+use rand::rngs::OsRng;
+use std::sync::Arc;
 use structopt::StructOpt;
 use swap::{
-    alice, bitcoin, bob,
+    alice,
+    alice::swap::AliceState,
+    bitcoin, bob,
+    bob::swap::BobState,
     cli::Options,
     monero,
-    network::transport::{build, build_tor, SwapTransport},
+    network::transport::{build, build_tor},
     recover::recover,
     storage::Database,
-    Cmd, Rsp, SwapAmounts,
+    SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use tracing::info;
+use uuid::Uuid;
+use xmr_btc::cross_curve_dleq;
 
 #[macro_use]
 extern crate prettytable;
@@ -40,13 +45,16 @@ async fn main() -> Result<()> {
 
     // This currently creates the directory if it's not there in the first place
     let db = Database::open(std::path::Path::new("./.swap-db/")).unwrap();
+    let rng = &mut OsRng;
 
     match opt {
         Options::Alice {
             bitcoind_url,
-            monerod_url,
+            monero_wallet_rpc_url,
             listen_addr,
             tor_port,
+            send_monero,
+            receive_bitcoin,
         } => {
             info!("running swap node as Alice ...");
 
@@ -67,9 +75,16 @@ async fn main() -> Result<()> {
                     (addr, Some(ac), transport)
                 }
                 None => {
+                    // TODO: Does this have to be adapted? ->
+                    // build(alice_behaviour.identity()).unwrap()
                     let transport = build(local_key_pair)?;
                     (listen_addr, None, transport)
                 }
+            };
+
+            let amounts = SwapAmounts {
+                btc: receive_bitcoin,
+                xmr: send_monero,
             };
 
             let bitcoin_wallet = bitcoin::Wallet::new("alice", bitcoind_url)
@@ -77,24 +92,38 @@ async fn main() -> Result<()> {
                 .expect("failed to create bitcoin wallet");
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
-            let monero_wallet = Arc::new(monero::Wallet::new(monerod_url));
+            let monero_wallet = Arc::new(monero::Wallet::new(monero_wallet_rpc_url));
 
-            swap_as_alice(
-                bitcoin_wallet,
-                monero_wallet,
-                db,
-                listen_addr,
-                transport,
-                behaviour,
+            let alice_state = {
+                let a = bitcoin::SecretKey::new_random(rng);
+                let s_a = cross_curve_dleq::Scalar::random(rng);
+                let v_a = xmr_btc::monero::PrivateViewKey::new_random(rng);
+                AliceState::Started {
+                    amounts,
+                    a,
+                    s_a,
+                    v_a,
+                }
+            };
+            let alice_swarm = alice::new_swarm(listen_addr.clone(), transport, behaviour).unwrap();
+
+            // TODO: Is this supposed to an await or await?
+            alice::swap::swap(
+                alice_state,
+                alice_swarm,
+                bitcoin_wallet.clone(),
+                monero_wallet.clone(),
             )
             .await?;
         }
         Options::Bob {
             alice_addr,
-            satoshis,
+            alice_peer_id,
             bitcoind_url,
-            monerod_url,
+            monero_wallet_rpc_url,
             tor,
+            send_bitcoin,
+            receive_monero,
         } => {
             info!("running swap node as Bob ...");
 
@@ -103,24 +132,46 @@ async fn main() -> Result<()> {
 
             let transport = match tor {
                 true => build_tor(local_key_pair, None)?,
+                // TODO: Does this have to be adapted? -> build(bob_behaviour.identity()).unwrap()
                 false => build(local_key_pair)?,
+            };
+
+            let amounts = SwapAmounts {
+                btc: send_bitcoin,
+                xmr: receive_monero,
             };
 
             let bitcoin_wallet = bitcoin::Wallet::new("bob", bitcoind_url)
                 .await
                 .expect("failed to create bitcoin wallet");
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
+            let monero_wallet = Arc::new(monero::Wallet::new(monero_wallet_rpc_url));
 
-            let monero_wallet = Arc::new(monero::Wallet::new(monerod_url));
+            let refund_address = bitcoin_wallet.new_address().await.unwrap();
+            let state0 = xmr_btc::bob::State0::new(
+                rng,
+                send_bitcoin,
+                receive_monero,
+                REFUND_TIMELOCK,
+                PUNISH_TIMELOCK,
+                refund_address,
+            );
 
-            swap_as_bob(
-                bitcoin_wallet,
-                monero_wallet,
+            let bob_state = BobState::Started {
+                state0,
+                amounts,
+                peer_id: alice_peer_id,
+                addr: alice_addr,
+            };
+            let bob_swarm = bob::new_swarm(transport, behaviour).unwrap();
+            bob::swap::swap(
+                bob_state,
+                bob_swarm,
                 db,
-                satoshis,
-                alice_addr,
-                transport,
-                behaviour,
+                bitcoin_wallet.clone(),
+                monero_wallet.clone(),
+                OsRng,
+                Uuid::new_v4(),
             )
             .await?;
         }
@@ -170,96 +221,4 @@ async fn create_tor_service(
     tracing::info!("Tor service added.");
 
     Ok(authenticated_connection)
-}
-
-async fn swap_as_alice(
-    bitcoin_wallet: Arc<swap::bitcoin::Wallet>,
-    monero_wallet: Arc<swap::monero::Wallet>,
-    db: Database,
-    addr: Multiaddr,
-    transport: SwapTransport,
-    behaviour: alice::Behaviour,
-) -> Result<()> {
-    alice::swap(
-        bitcoin_wallet,
-        monero_wallet,
-        db,
-        addr,
-        transport,
-        behaviour,
-    )
-    .await
-}
-
-async fn swap_as_bob(
-    bitcoin_wallet: Arc<swap::bitcoin::Wallet>,
-    monero_wallet: Arc<swap::monero::Wallet>,
-    db: Database,
-    sats: u64,
-    alice: Multiaddr,
-    transport: SwapTransport,
-    behaviour: bob::Behaviour,
-) -> Result<()> {
-    let (cmd_tx, mut cmd_rx) = mpsc::channel(1);
-    let (mut rsp_tx, rsp_rx) = mpsc::channel(1);
-    tokio::spawn(bob::swap(
-        bitcoin_wallet,
-        monero_wallet,
-        db,
-        sats,
-        alice,
-        cmd_tx,
-        rsp_rx,
-        transport,
-        behaviour,
-    ));
-
-    loop {
-        let read = cmd_rx.next().await;
-        match read {
-            Some(cmd) => match cmd {
-                Cmd::VerifyAmounts(p) => {
-                    let rsp = verify(p);
-                    rsp_tx.try_send(rsp)?;
-                    if rsp == Rsp::Abort {
-                        process::exit(0);
-                    }
-                }
-            },
-            None => {
-                info!("Channel closed from other end");
-                return Ok(());
-            }
-        }
-    }
-}
-
-fn verify(amounts: SwapAmounts) -> Rsp {
-    let mut s = String::new();
-    println!("Got rate from Alice for XMR/BTC swap\n");
-    println!("{}", amounts);
-    print!("Would you like to continue with this swap [y/N]: ");
-
-    let _ = io::stdout().flush();
-    io::stdin()
-        .read_line(&mut s)
-        .expect("Did not enter a correct string");
-
-    if let Some('\n') = s.chars().next_back() {
-        s.pop();
-    }
-    if let Some('\r') = s.chars().next_back() {
-        s.pop();
-    }
-
-    if !is_yes(&s) {
-        println!("No worries, try again later - Alice updates her rate regularly");
-        return Rsp::Abort;
-    }
-
-    Rsp::VerifiedAmounts
-}
-
-fn is_yes(s: &str) -> bool {
-    matches!(s, "y" | "Y" | "yes" | "YES" | "Yes")
 }
