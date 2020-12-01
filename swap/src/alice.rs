@@ -45,13 +45,31 @@ use xmr_btc::{
 
 pub async fn swap(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Facade>,
+    monero_wallet: Arc<monero::Wallet>,
     db: Database,
     listen: Multiaddr,
     transport: SwapTransport,
     behaviour: Alice,
 ) -> Result<()> {
-    struct Network(Arc<Mutex<Swarm>>);
+    struct Network {
+        swarm: Arc<Mutex<Swarm>>,
+        channel: Option<ResponseChannel<AliceToBob>>,
+    }
+
+    impl Network {
+        pub async fn send_message2(&mut self, proof: monero::TransferProof) {
+            match self.channel.take() {
+                None => warn!("Channel not found, did you call this twice?"),
+                Some(channel) => {
+                    let mut guard = self.swarm.lock().await;
+                    guard.send_message2(channel, alice::Message2 {
+                        tx_lock_proof: proof,
+                    });
+                    info!("Sent transfer proof");
+                }
+            }
+        }
+    }
 
     // TODO: For retry, use `backoff::ExponentialBackoff` in production as opposed
     // to `ConstantBackoff`.
@@ -62,7 +80,7 @@ pub async fn swap(
             struct UnexpectedMessage;
 
             let encsig = (|| async {
-                let mut guard = self.0.lock().await;
+                let mut guard = self.swarm.lock().await;
                 let encsig = match guard.next().await {
                     OutEvent::Message3(msg) => msg.tx_redeem_encsig,
                     other => {
@@ -151,8 +169,11 @@ pub async fn swap(
     let msg = state2.next_message();
     swarm.send_message1(channel, msg);
 
-    let state3 = match swarm.next().await {
-        OutEvent::Message2(msg) => state2.receive(msg)?,
+    let (state3, channel) = match swarm.next().await {
+        OutEvent::Message2 { msg, channel } => {
+            let state3 = state2.receive(msg)?;
+            (state3, channel)
+        }
         other => panic!("Unexpected event: {:?}", other),
     };
 
@@ -162,12 +183,14 @@ pub async fn swap(
 
     info!("Handshake complete, we now have State3 for Alice.");
 
-    let network = Network(Arc::new(Mutex::new(swarm)));
+    let network = Arc::new(Mutex::new(Network {
+        swarm: Arc::new(Mutex::new(swarm)),
+        channel: Some(channel),
+    }));
 
     let mut action_generator = action_generator(
-        network,
+        network.clone(),
         bitcoin_wallet.clone(),
-        monero_wallet.clone(),
         state3.clone(),
         TX_LOCK_MINE_TIMEOUT,
     );
@@ -186,12 +209,16 @@ pub async fn swap(
                 db.insert_latest_state(swap_id, state::Alice::BtcLocked(state3.clone()).into())
                     .await?;
 
-                let _ = monero_wallet
+                let (transfer_proof, _) = monero_wallet
                     .transfer(public_spend_key, public_view_key, amount)
                     .await?;
 
                 db.insert_latest_state(swap_id, state::Alice::XmrLocked(state3.clone()).into())
                     .await?;
+
+                let mut guard = network.as_ref().lock().await;
+                guard.send_message2(transfer_proof).await;
+                info!("Sent transfer proof");
             }
 
             GeneratorState::Yielded(Action::RedeemBtc(tx)) => {
@@ -276,7 +303,10 @@ pub enum OutEvent {
         msg: bob::Message1,
         channel: ResponseChannel<AliceToBob>,
     },
-    Message2(bob::Message2),
+    Message2 {
+        msg: bob::Message2,
+        channel: ResponseChannel<AliceToBob>,
+    },
     Message3(bob::Message3),
 }
 
@@ -315,7 +345,7 @@ impl From<message1::OutEvent> for OutEvent {
 impl From<message2::OutEvent> for OutEvent {
     fn from(event: message2::OutEvent) -> Self {
         match event {
-            message2::OutEvent::Msg(msg) => OutEvent::Message2(msg),
+            message2::OutEvent::Msg { msg, channel } => OutEvent::Message2 { msg, channel },
         }
     }
 }
@@ -373,6 +403,16 @@ impl Alice {
     ) {
         self.message1.send(channel, msg);
         debug!("Sent Message1");
+    }
+
+    /// Send Message2 to Bob in response to receiving his Message2.
+    pub fn send_message2(
+        &mut self,
+        channel: ResponseChannel<AliceToBob>,
+        msg: xmr_btc::alice::Message2,
+    ) {
+        self.message2.send(channel, msg);
+        debug!("Sent Message2");
     }
 }
 

@@ -1,7 +1,7 @@
 use libp2p::{
     request_response::{
         handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
-        RequestResponseEvent, RequestResponseMessage,
+        RequestResponseEvent, RequestResponseMessage, ResponseChannel,
     },
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
     NetworkBehaviour,
@@ -18,7 +18,12 @@ use xmr_btc::bob;
 
 #[derive(Debug)]
 pub enum OutEvent {
-    Msg(bob::Message2),
+    Msg {
+        /// Received message from Bob.
+        msg: bob::Message2,
+        /// Channel to send back Alice's message 2.
+        channel: ResponseChannel<AliceToBob>,
+    },
 }
 
 /// A `NetworkBehaviour` that represents receiving of message 2 from Bob.
@@ -32,6 +37,11 @@ pub struct Message2 {
 }
 
 impl Message2 {
+    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: xmr_btc::alice::Message2) {
+        let msg = AliceToBob::Message2(msg);
+        self.rr.send_response(channel, msg);
+    }
+
     fn poll(
         &mut self,
         _: &mut Context<'_>,
@@ -74,10 +84,8 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             } => {
                 if let BobToAlice::Message2(msg) = request {
                     debug!("Received Message2");
-                    self.events.push_back(OutEvent::Msg(msg));
+                    self.events.push_back(OutEvent::Msg { msg, channel });
                 }
-                // Send back empty response so that the request/response protocol completes.
-                self.rr.send_response(channel, AliceToBob::Message2);
             }
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { .. },

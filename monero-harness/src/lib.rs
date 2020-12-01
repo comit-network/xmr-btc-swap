@@ -136,7 +136,11 @@ impl<'c> Monero {
         monerod.start_miner(&miner_address).await?;
 
         tracing::info!("Waiting for miner wallet to catch up...");
-        miner_wallet.refresh().await?;
+        let block_height = monerod.client().get_block_count().await?;
+        miner_wallet
+            .wait_for_wallet_height(block_height)
+            .await
+            .unwrap();
 
         Ok(())
     }

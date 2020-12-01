@@ -9,6 +9,7 @@ use crate::{bitcoin, monero};
 pub enum Message {
     Message0(Message0),
     Message1(Message1),
+    Message2(Message2),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -28,8 +29,15 @@ pub struct Message1 {
     pub(crate) tx_refund_encsig: EncryptedSignature,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message2 {
+    pub tx_lock_proof: monero::TransferProof,
+}
+
 impl_try_from_parent_enum!(Message0, Message);
 impl_try_from_parent_enum!(Message1, Message);
+impl_try_from_parent_enum!(Message2, Message);
 
 impl_from_child_enum!(Message0, Message);
 impl_from_child_enum!(Message1, Message);
+impl_from_child_enum!(Message2, Message);

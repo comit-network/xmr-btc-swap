@@ -135,14 +135,8 @@ pub async fn init_test(
         .await
         .unwrap();
 
-    let alice_monero_wallet = wallet::monero::Wallet {
-        inner: monero.wallet("alice").unwrap().client(),
-        watch_only: monero.wallet("alice-watch-only").unwrap().client(),
-    };
-    let bob_monero_wallet = wallet::monero::Wallet {
-        inner: monero.wallet("bob").unwrap().client(),
-        watch_only: monero.wallet("bob-watch-only").unwrap().client(),
-    };
+    let alice_monero_wallet = wallet::monero::Wallet(monero.wallet("alice").unwrap().client());
+    let bob_monero_wallet = wallet::monero::Wallet(monero.wallet("bob").unwrap().client());
 
     let alice_btc_wallet = wallet::bitcoin::Wallet::new("alice", &bitcoind.node_url)
         .await

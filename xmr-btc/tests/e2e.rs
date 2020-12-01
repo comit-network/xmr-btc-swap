@@ -22,11 +22,9 @@ mod tests {
     #[tokio::test]
     async fn happy_path() {
         let cli = Cli::default();
-        let (monero, _container) = Monero::new(&cli, None, vec![
+        let (monero, _container) = Monero::new(&cli, Some("hp".to_string()), vec![
             "alice".to_string(),
-            "alice-watch-only".to_string(),
             "bob".to_string(),
-            "bob-watch-only".to_string(),
         ])
         .await
         .unwrap();
@@ -99,11 +97,9 @@ mod tests {
     #[tokio::test]
     async fn both_refund() {
         let cli = Cli::default();
-        let (monero, _container) = Monero::new(&cli, None, vec![
+        let (monero, _container) = Monero::new(&cli, Some("br".to_string()), vec![
             "alice".to_string(),
-            "alice-watch-only".to_string(),
             "bob".to_string(),
-            "bob-watch-only".to_string(),
         ])
         .await
         .unwrap();
@@ -178,11 +174,9 @@ mod tests {
     #[tokio::test]
     async fn alice_punishes() {
         let cli = Cli::default();
-        let (monero, _container) = Monero::new(&cli, None, vec![
+        let (monero, _containers) = Monero::new(&cli, Some("ap".to_string()), vec![
             "alice".to_string(),
-            "alice-watch-only".to_string(),
             "bob".to_string(),
-            "bob-watch-only".to_string(),
         ])
         .await
         .unwrap();

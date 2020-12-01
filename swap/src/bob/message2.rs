@@ -11,14 +11,14 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Message2Protocol, TIMEOUT};
-use xmr_btc::bob;
+use xmr_btc::{alice, bob};
 
 #[derive(Debug)]
 pub enum OutEvent {
-    Msg,
+    Msg(alice::Message2),
 }
 
 /// A `NetworkBehaviour` that represents sending message 2 to Alice.
@@ -78,8 +78,9 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                 message: RequestResponseMessage::Response { response, .. },
                 ..
             } => {
-                if let AliceToBob::Message2 = response {
-                    self.events.push_back(OutEvent::Msg);
+                if let AliceToBob::Message2(msg) = response {
+                    debug!("Received Message2");
+                    self.events.push_back(OutEvent::Msg(msg));
                 }
             }
             RequestResponseEvent::InboundFailure { error, .. } => {
