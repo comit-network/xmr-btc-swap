@@ -142,10 +142,10 @@ where
     .await
     .context("Failed to find lock Bitcoin tx")?;
 
-    // We saw the transaction in the mempool, waiting for it to be confirmed.
-    bitcoin_wallet
-        .wait_for_transaction_finality(lock_bitcoin_txid)
-        .await;
+    // // We saw the transaction in the mempool, waiting for it to be confirmed.
+    // bitcoin_wallet
+    //     .wait_for_transaction_finality(lock_bitcoin_txid)
+    //     .await;
 
     Ok(())
 }
@@ -235,8 +235,8 @@ where
         .broadcast_signed_transaction(redeem_tx)
         .await?;
 
-    // TODO(Franck): Not sure if we wait for finality here or just mined
-    bitcoin_wallet.wait_for_transaction_finality(tx_id).await;
+    // // TODO(Franck): Not sure if we wait for finality here or just mined
+    // bitcoin_wallet.wait_for_transaction_finality(tx_id).await;
     Ok(())
 }
 
@@ -370,7 +370,8 @@ where
         .broadcast_signed_transaction(punish_tx)
         .await?;
 
-    bitcoin_wallet.wait_for_transaction_finality(txid).await;
+    // todo: enable this once trait is implemented
+    // bitcoin_wallet.wait_for_transaction_finality(txid).await;
 
     Ok(txid)
 }

@@ -179,8 +179,6 @@ async fn simple_swap_happy_path() {
     ));
     let bob_xmr_wallet = Arc::new(swap::monero::Wallet(monero.wallet("bob").unwrap().client()));
 
-    // let redeem_address = bitcoin_wallet.as_ref().new_address().await?;
-    // let punish_address = redeem_address.clone();
     let amounts = SwapAmounts {
         btc,
         xmr: xmr_btc::monero::Amount::from_piconero(xmr),
@@ -201,7 +199,8 @@ async fn simple_swap_happy_path() {
             v_a,
         }
     };
-    let alice_swarm = alice::new_swarm(alice_multiaddr, alice_transport, alice_behaviour).unwrap();
+    let alice_swarm =
+        alice::new_swarm(alice_multiaddr.clone(), alice_transport, alice_behaviour).unwrap();
     let alice_swap = alice::swap::swap(
         alice_state,
         alice_swarm,
@@ -227,6 +226,7 @@ async fn simple_swap_happy_path() {
         state0,
         amounts,
         peer_id: alice_peer_id,
+        addr: alice_multiaddr,
     };
     let bob_swarm = bob::new_swarm(bob_transport, bob_behaviour).unwrap();
     let bob_swap = bob::swap::swap(

@@ -5,9 +5,10 @@ use crate::{
 };
 use anyhow::Result;
 use async_recursion::async_recursion;
-use libp2p::PeerId;
+use libp2p::{core::Multiaddr, PeerId};
 use rand::{CryptoRng, RngCore};
 use std::sync::Arc;
+use tracing::debug;
 use uuid::Uuid;
 use xmr_btc::bob::{self};
 
@@ -18,6 +19,7 @@ pub enum BobState {
         state0: bob::State0,
         amounts: SwapAmounts,
         peer_id: PeerId,
+        addr: Multiaddr,
     },
     Negotiated(bob::State2, PeerId),
     BtcLocked(bob::State3, PeerId),
@@ -50,11 +52,13 @@ where
             state0,
             amounts,
             peer_id,
+            addr,
         } => {
             let (swap_amounts, state2) = negotiate(
                 state0,
                 amounts,
                 &mut swarm,
+                addr,
                 &mut rng,
                 bitcoin_wallet.clone(),
             )
@@ -117,6 +121,17 @@ where
             // todo: If we cannot dial Alice we should go to EncSigSent. Maybe dialing
             // should happen in this arm?
             swarm.send_message3(alice_peer_id.clone(), tx_redeem_encsig);
+
+            // Sadly we have to poll the swarm to get make sure the message is sent?
+            // FIXME: Having to wait for Alice's response here is a big problem, because
+            // we're stuck if she doesn't send her response back. I believe this is
+            // currently necessary, so we may have to rework this and/or how we use libp2p
+            match swarm.next().await {
+                OutEvent::Message3 => {
+                    debug!("Got Message3 empty response");
+                }
+                other => panic!("unexpected event: {:?}", other),
+            };
 
             swap(
                 BobState::EncSigSent(state, alice_peer_id),
