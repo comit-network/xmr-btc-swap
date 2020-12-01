@@ -13,7 +13,7 @@ atty = "0.2"
 backoff = { version = "0.2", features = ["tokio"] }
 base64 = "0.12"
 bitcoin = { version = "0.23", features = ["rand", "use-serde"] } # TODO: Upgrade other crates in this repo to use this version.
-bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "3be644cd9512c157d3337a189298b8257ed54d04" }
+bitcoin-harness = { git = "https://github.com/d4nte/bitcoin-harness-rs", branch = "access-wallet-client" }
 conquer-once = "0.3"
 derivative = "2"
 ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", rev = "510d48ef6a2b19805f7f5c70c598e5b03f668e7a", features = ["libsecp_compat", "serde", "serialization"] }

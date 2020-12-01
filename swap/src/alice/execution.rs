@@ -15,6 +15,7 @@ use libp2p::request_response::ResponseChannel;
 use sha2::Sha256;
 use std::{sync::Arc, time::Duration};
 use tokio::time::timeout;
+use tracing::trace;
 use xmr_btc::{
     alice,
     alice::{State0, State3},
@@ -23,12 +24,10 @@ use xmr_btc::{
         EncryptedSignature, GetRawTransaction, TransactionBlockHeight, TxCancel, TxLock, TxRefund,
         WaitForTransactionFinality, WatchForRawTransaction,
     },
+    config::Config,
     cross_curve_dleq,
     monero::Transfer,
 };
-
-// For each step, we are giving Bob 10 minutes to act.
-static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(10 * 60));
 
 // The maximum we assume we need to wait from the moment the monero transaction
 // is mined to the moment it reaches finality. We set 15 confirmations for now
@@ -44,8 +43,10 @@ pub async fn negotiate(
     v_a: monero::PrivateViewKey,
     swarm: &mut Swarm,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
+    config: Config,
 ) -> Result<(ResponseChannel<AliceToBob>, State3)> {
-    let event = timeout(*BOB_TIME_TO_ACT, swarm.next())
+    trace!("Starting negotiate");
+    let event = timeout(config.bob_time_to_act, swarm.next())
         .await
         .context("Failed to receive dial connection from Bob")?;
     match event {
@@ -53,7 +54,7 @@ pub async fn negotiate(
         other => bail!("Unexpected event received: {:?}", other),
     }
 
-    let event = timeout(*BOB_TIME_TO_ACT, swarm.next())
+    let event = timeout(config.bob_time_to_act, swarm.next())
         .await
         .context("Failed to receive amounts from Bob")?;
     let (btc, channel) = match event {
@@ -89,7 +90,7 @@ pub async fn negotiate(
     // TODO(Franck): Understand why this is needed.
     swarm.set_state0(state0.clone());
 
-    let event = timeout(*BOB_TIME_TO_ACT, swarm.next())
+    let event = timeout(config.bob_time_to_act, swarm.next())
         .await
         .context("Failed to receive message 0 from Bob")?;
     let message0 = match event {
@@ -99,7 +100,7 @@ pub async fn negotiate(
 
     let state1 = state0.receive(message0)?;
 
-    let event = timeout(*BOB_TIME_TO_ACT, swarm.next())
+    let event = timeout(config.bob_time_to_act, swarm.next())
         .await
         .context("Failed to receive message 1 from Bob")?;
     let (msg, channel) = match event {
@@ -112,7 +113,7 @@ pub async fn negotiate(
     let message1 = state2.next_message();
     swarm.send_message1(channel, message1);
 
-    let event = timeout(*BOB_TIME_TO_ACT, swarm.next())
+    let event = timeout(config.bob_time_to_act, swarm.next())
         .await
         .context("Failed to receive message 2 from Bob")?;
     let (msg, channel) = match event {
@@ -128,13 +129,14 @@ pub async fn negotiate(
 pub async fn wait_for_locked_bitcoin<W>(
     lock_bitcoin_txid: bitcoin::Txid,
     bitcoin_wallet: Arc<W>,
+    config: Config,
 ) -> Result<()>
 where
     W: WatchForRawTransaction + WaitForTransactionFinality,
 {
     // We assume we will see Bob's transaction in the mempool first.
     timeout(
-        *BOB_TIME_TO_ACT,
+        config.bob_time_to_act,
         bitcoin_wallet.watch_for_raw_transaction(lock_bitcoin_txid),
     )
     .await
@@ -142,7 +144,7 @@ where
 
     // // We saw the transaction in the mempool, waiting for it to be confirmed.
     // bitcoin_wallet
-    //     .wait_for_transaction_finality(lock_bitcoin_txid)
+    //     .wait_for_transaction_finality(lock_bitcoin_txid, config)
     //     .await;
 
     Ok(())
@@ -225,17 +227,18 @@ pub fn build_bitcoin_redeem_transaction(
 pub async fn publish_bitcoin_redeem_transaction<W>(
     redeem_tx: bitcoin::Transaction,
     bitcoin_wallet: Arc<W>,
+    config: Config,
 ) -> Result<()>
 where
     W: BroadcastSignedTransaction + WaitForTransactionFinality,
 {
-    let _tx_id = bitcoin_wallet
+    let tx_id = bitcoin_wallet
         .broadcast_signed_transaction(redeem_tx)
         .await?;
 
-    // // TODO(Franck): Not sure if we wait for finality here or just mined
-    // bitcoin_wallet.wait_for_transaction_finality(tx_id).await;
-    Ok(())
+    bitcoin_wallet
+        .wait_for_transaction_finality(tx_id, config)
+        .await
 }
 
 pub async fn publish_cancel_transaction<W>(
@@ -364,6 +367,7 @@ pub fn build_bitcoin_punish_transaction(
 pub async fn publish_bitcoin_punish_transaction<W>(
     punish_tx: bitcoin::Transaction,
     bitcoin_wallet: Arc<W>,
+    config: Config,
 ) -> Result<bitcoin::Txid>
 where
     W: BroadcastSignedTransaction + WaitForTransactionFinality,
@@ -372,8 +376,9 @@ where
         .broadcast_signed_transaction(punish_tx)
         .await?;
 
-    // todo: enable this once trait is implemented
-    // bitcoin_wallet.wait_for_transaction_finality(txid).await;
+    bitcoin_wallet
+        .wait_for_transaction_finality(txid, config)
+        .await?;
 
     Ok(txid)
 }

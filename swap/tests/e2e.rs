@@ -202,11 +202,13 @@ async fn happy_path_recursive_executor() {
     };
     let alice_swarm =
         alice::new_swarm(alice_multiaddr.clone(), alice_transport, alice_behaviour).unwrap();
+    let config = xmr_btc::config::Config::regtest();
     let alice_swap = alice::swap::swap(
         alice_state,
         alice_swarm,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),
+        config,
     );
 
     let bob_db_dir = tempdir().unwrap();

@@ -48,6 +48,7 @@ mod utils {
 pub mod alice;
 pub mod bitcoin;
 pub mod bob;
+pub mod config;
 pub mod monero;
 pub mod serde;
 pub mod transport;
