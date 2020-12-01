@@ -3,15 +3,15 @@ use std::time::Duration;
 use anyhow::Result;
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
-use bitcoin::{util::psbt::PartiallySignedTransaction, Address, Transaction};
+use bitcoin::util::psbt::PartiallySignedTransaction;
 use bitcoin_harness::bitcoind_rpc::PsbtBase64;
 use reqwest::Url;
-use tokio::time;
 use xmr_btc::bitcoin::{
     BlockHeight, BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock, TransactionBlockHeight,
     WatchForRawTransaction,
 };
 
+pub use ::bitcoin::{Address, Transaction};
 pub use xmr_btc::bitcoin::*;
 
 pub const TX_LOCK_MINE_TIMEOUT: u64 = 3600;
@@ -85,21 +85,12 @@ impl SignTxLock for Wallet {
 #[async_trait]
 impl BroadcastSignedTransaction for Wallet {
     async fn broadcast_signed_transaction(&self, transaction: Transaction) -> Result<Txid> {
-        let txid = self.0.send_raw_transaction(transaction).await?;
-
-        // TODO: Instead of guessing how long it will take for the transaction to be
-        // mined we should ask bitcoind for the number of confirmations on `txid`
-
-        // give time for transaction to be mined
-        time::delay_for(Duration::from_millis(1100)).await;
-
-        Ok(txid)
+        Ok(self.0.send_raw_transaction(transaction).await?)
     }
 }
 
 // TODO: For retry, use `backoff::ExponentialBackoff` in production as opposed
 // to `ConstantBackoff`.
-
 #[async_trait]
 impl WatchForRawTransaction for Wallet {
     async fn watch_for_raw_transaction(&self, txid: Txid) -> Transaction {
@@ -107,6 +98,14 @@ impl WatchForRawTransaction for Wallet {
             .retry(ConstantBackoff::new(Duration::from_secs(1)))
             .await
             .expect("transient errors to be retried")
+    }
+}
+
+#[async_trait]
+impl GetRawTransaction for Wallet {
+    // todo: potentially replace with option
+    async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
+        Ok(self.0.get_raw_transaction(txid).await?)
     }
 }
 
@@ -144,5 +143,12 @@ impl TransactionBlockHeight for Wallet {
         .retry(ConstantBackoff::new(Duration::from_secs(1)))
         .await
         .expect("transient errors to be retried")
+    }
+}
+
+#[async_trait]
+impl WaitForTransactionFinality for Wallet {
+    async fn wait_for_transaction_finality(&self, _txid: Txid) {
+        todo!()
     }
 }

@@ -12,7 +12,7 @@ pub enum Swap {
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Alice {
-    Handshaken(alice::State3),
+    Negotiated(alice::State3),
     BtcLocked(alice::State3),
     XmrLocked(alice::State3),
     BtcRedeemable {
@@ -63,7 +63,7 @@ impl Display for Swap {
 impl Display for Alice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Alice::Handshaken(_) => f.write_str("Handshake complete"),
+            Alice::Negotiated(_) => f.write_str("Handshake complete"),
             Alice::BtcLocked(_) => f.write_str("Bitcoin locked"),
             Alice::XmrLocked(_) => f.write_str("Monero locked"),
             Alice::BtcRedeemable { .. } => f.write_str("Bitcoin redeemable"),

@@ -416,8 +416,14 @@ impl State {
         redeem_address: bitcoin::Address,
         punish_address: bitcoin::Address,
     ) -> Self {
+        let a = bitcoin::SecretKey::new_random(rng);
+        let s_a = cross_curve_dleq::Scalar::random(rng);
+        let v_a = monero::PrivateViewKey::new_random(rng);
+
         Self::State0(State0::new(
-            rng,
+            a,
+            s_a,
+            v_a,
             btc,
             xmr,
             refund_timelock,
@@ -443,8 +449,11 @@ pub struct State0 {
 }
 
 impl State0 {
-    pub fn new<R: RngCore + CryptoRng>(
-        rng: &mut R,
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        a: bitcoin::SecretKey,
+        s_a: cross_curve_dleq::Scalar,
+        v_a: monero::PrivateViewKey,
         btc: bitcoin::Amount,
         xmr: monero::Amount,
         refund_timelock: u32,
@@ -452,11 +461,6 @@ impl State0 {
         redeem_address: bitcoin::Address,
         punish_address: bitcoin::Address,
     ) -> Self {
-        let a = bitcoin::SecretKey::new_random(rng);
-
-        let s_a = cross_curve_dleq::Scalar::random(rng);
-        let v_a = monero::PrivateViewKey::new_random(rng);
-
         Self {
             a,
             s_a,
@@ -617,6 +621,7 @@ impl State2 {
             S_b_monero: self.S_b_monero,
             S_b_bitcoin: self.S_b_bitcoin,
             v: self.v,
+            // TODO(Franck): Review if these amounts are actually needed
             btc: self.btc,
             xmr: self.xmr,
             refund_timelock: self.refund_timelock,

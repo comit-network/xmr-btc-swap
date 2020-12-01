@@ -15,17 +15,16 @@
 use anyhow::Result;
 use futures::{channel::mpsc, StreamExt};
 use libp2p::Multiaddr;
-use log::LevelFilter;
 use prettytable::{row, Table};
 use std::{io, io::Write, process, sync::Arc};
 use structopt::StructOpt;
 use swap::{
-    alice::{self, Alice},
-    bitcoin,
-    bob::{self, Bob},
+    alice, bitcoin, bob,
+    cli::Options,
     monero,
     network::transport::{build, build_tor, SwapTransport},
     recover::recover,
+    storage::Database,
     Cmd, Rsp, SwapAmounts,
 };
 use tracing::info;
@@ -33,19 +32,11 @@ use tracing::info;
 #[macro_use]
 extern crate prettytable;
 
-mod cli;
-mod trace;
-
-use cli::Options;
-use swap::storage::Database;
-
 // TODO: Add root seed file instead of generating new seed each run.
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let opt = Options::from_args();
-
-    trace::init_tracing(LevelFilter::Debug)?;
 
     // This currently creates the directory if it's not there in the first place
     let db = Database::open(std::path::Path::new("./.swap-db/")).unwrap();
@@ -59,7 +50,7 @@ async fn main() -> Result<()> {
         } => {
             info!("running swap node as Alice ...");
 
-            let behaviour = Alice::default();
+            let behaviour = alice::Behaviour::default();
             let local_key_pair = behaviour.identity();
 
             let (listen_addr, _ac, transport) = match tor_port {
@@ -107,7 +98,7 @@ async fn main() -> Result<()> {
         } => {
             info!("running swap node as Bob ...");
 
-            let behaviour = Bob::default();
+            let behaviour = bob::Behaviour::default();
             let local_key_pair = behaviour.identity();
 
             let transport = match tor {
@@ -187,7 +178,7 @@ async fn swap_as_alice(
     db: Database,
     addr: Multiaddr,
     transport: SwapTransport,
-    behaviour: Alice,
+    behaviour: alice::Behaviour,
 ) -> Result<()> {
     alice::swap(
         bitcoin_wallet,
@@ -207,7 +198,7 @@ async fn swap_as_bob(
     sats: u64,
     alice: Multiaddr,
     transport: SwapTransport,
-    behaviour: Bob,
+    behaviour: bob::Behaviour,
 ) -> Result<()> {
     let (cmd_tx, mut cmd_rx) = mpsc::channel(1);
     let (mut rsp_tx, rsp_rx) = mpsc::channel(1);

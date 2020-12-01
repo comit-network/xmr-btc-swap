@@ -45,7 +45,7 @@ pub async fn alice_recover(
     state: Alice,
 ) -> Result<()> {
     match state {
-        Alice::Handshaken(_) | Alice::BtcLocked(_) | Alice::SwapComplete => {
+        Alice::Negotiated(_) | Alice::BtcLocked(_) | Alice::SwapComplete => {
             info!("Nothing to do");
         }
         Alice::XmrLocked(state) => {

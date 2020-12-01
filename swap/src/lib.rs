@@ -1,9 +1,12 @@
+#![allow(non_snake_case)]
+
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
 pub mod alice;
 pub mod bitcoin;
 pub mod bob;
+pub mod cli;
 pub mod monero;
 pub mod network;
 pub mod recover;
@@ -11,8 +14,8 @@ pub mod state;
 pub mod storage;
 pub mod tor;
 
-const REFUND_TIMELOCK: u32 = 10; // Relative timelock, this is number of blocks. TODO: What should it be?
-const PUNISH_TIMELOCK: u32 = 10; // FIXME: What should this be?
+pub const REFUND_TIMELOCK: u32 = 10; // Relative timelock, this is number of blocks. TODO: What should it be?
+pub const PUNISH_TIMELOCK: u32 = 10; // FIXME: What should this be?
 
 pub type Never = std::convert::Infallible;
 
@@ -31,6 +34,7 @@ pub enum Rsp {
 
 /// XMR/BTC swap amounts.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+// TODO(Franck): review necessity of this struct
 pub struct SwapAmounts {
     /// Amount of BTC to swap.
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]

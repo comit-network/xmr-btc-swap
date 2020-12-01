@@ -1,26 +1,5 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use anyhow::Result;
-use async_trait::async_trait;
-use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
-use genawaiter::GeneratorState;
-use libp2p::{
-    core::{identity::Keypair, Multiaddr},
-    request_response::ResponseChannel,
-    NetworkBehaviour, PeerId,
-};
-use rand::rngs::OsRng;
-use std::{sync::Arc, time::Duration};
-use tokio::sync::Mutex;
-use tracing::{debug, info, warn};
-use uuid::Uuid;
-
-mod amounts;
-mod message0;
-mod message1;
-mod message2;
-mod message3;
-
 use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
 use crate::{
     bitcoin,
@@ -36,12 +15,34 @@ use crate::{
     storage::Database,
     SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
+use anyhow::Result;
+use async_trait::async_trait;
+use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
+use genawaiter::GeneratorState;
+use libp2p::{
+    core::{identity::Keypair, Multiaddr},
+    request_response::ResponseChannel,
+    NetworkBehaviour, PeerId,
+};
+use rand::rngs::OsRng;
+use std::{sync::Arc, time::Duration};
+use tokio::sync::Mutex;
+use tracing::{debug, info, warn};
+use uuid::Uuid;
 use xmr_btc::{
     alice::{self, action_generator, Action, ReceiveBitcoinRedeemEncsig, State0},
     bitcoin::BroadcastSignedTransaction,
-    bob,
+    bob, cross_curve_dleq,
     monero::{CreateWalletForOutput, Transfer},
 };
+
+mod amounts;
+mod execution;
+mod message0;
+mod message1;
+mod message2;
+mod message3;
+pub mod swap;
 
 pub async fn swap(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
@@ -49,7 +50,7 @@ pub async fn swap(
     db: Database,
     listen: Multiaddr,
     transport: SwapTransport,
-    behaviour: Alice,
+    behaviour: Behaviour,
 ) -> Result<()> {
     struct Network {
         swarm: Arc<Mutex<Swarm>>,
@@ -128,8 +129,13 @@ pub async fn swap(
 
                 // TODO: Pass this in using <R: RngCore + CryptoRng>
                 let rng = &mut OsRng;
+                let a = bitcoin::SecretKey::new_random(rng);
+                let s_a = cross_curve_dleq::Scalar::random(rng);
+                let v_a = monero::PrivateViewKey::new_random(rng);
                 let state = State0::new(
-                    rng,
+                    a,
+                    s_a,
+                    v_a,
                     btc,
                     xmr,
                     REFUND_TIMELOCK,
@@ -178,7 +184,7 @@ pub async fn swap(
     };
 
     let swap_id = Uuid::new_v4();
-    db.insert_latest_state(swap_id, state::Alice::Handshaken(state3.clone()).into())
+    db.insert_latest_state(swap_id, state::Alice::Negotiated(state3.clone()).into())
         .await?;
 
     info!("Handshake complete, we now have State3 for Alice.");
@@ -272,9 +278,13 @@ pub async fn swap(
     }
 }
 
-pub type Swarm = libp2p::Swarm<Alice>;
+pub type Swarm = libp2p::Swarm<Behaviour>;
 
-fn new_swarm(listen: Multiaddr, transport: SwapTransport, behaviour: Alice) -> Result<Swarm> {
+pub fn new_swarm(
+    listen: Multiaddr,
+    transport: SwapTransport,
+    behaviour: Behaviour,
+) -> Result<Swarm> {
     use anyhow::Context as _;
 
     let local_peer_id = behaviour.peer_id();
@@ -297,6 +307,8 @@ fn new_swarm(listen: Multiaddr, transport: SwapTransport, behaviour: Alice) -> R
 #[derive(Debug)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
+    // TODO (Franck): Change this to get both amounts so parties can verify the amounts are
+    // expected early on.
     Request(amounts::OutEvent), // Not-uniform with Bob on purpose, ready for adding Xmr event.
     Message0(bob::Message0),
     Message1 {
@@ -362,7 +374,7 @@ impl From<message3::OutEvent> for OutEvent {
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
-pub struct Alice {
+pub struct Behaviour {
     pt: PeerTracker,
     amounts: Amounts,
     message0: Message0,
@@ -373,7 +385,7 @@ pub struct Alice {
     identity: Keypair,
 }
 
-impl Alice {
+impl Behaviour {
     pub fn identity(&self) -> Keypair {
         self.identity.clone()
     }
@@ -389,6 +401,7 @@ impl Alice {
         info!("Sent amounts response");
     }
 
+    // TODO(Franck) remove
     /// Message0 gets sent within the network layer using this state0.
     pub fn set_state0(&mut self, state: State0) {
         debug!("Set state 0");
@@ -416,7 +429,7 @@ impl Alice {
     }
 }
 
-impl Default for Alice {
+impl Default for Behaviour {
     fn default() -> Self {
         let identity = Keypair::generate_ed25519();
 
@@ -433,8 +446,8 @@ impl Default for Alice {
 }
 
 fn calculate_amounts(btc: ::bitcoin::Amount) -> SwapAmounts {
-    // TODO: Get this from an exchange.
-    // This value corresponds to 100 XMR per BTC
+    // TODO (Franck): This should instead verify that the received amounts matches
+    // the command line arguments This value corresponds to 100 XMR per BTC
     const PICONERO_PER_SAT: u64 = 1_000_000;
 
     let picos = btc.as_sat() * PICONERO_PER_SAT;
