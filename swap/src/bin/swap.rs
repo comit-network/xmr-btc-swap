@@ -50,6 +50,7 @@ async fn main() -> Result<()> {
     match opt {
         Options::Alice {
             bitcoind_url,
+            bitcoin_wallet_name,
             monero_wallet_rpc_url,
             listen_addr,
             tor_port,
@@ -87,7 +88,7 @@ async fn main() -> Result<()> {
                 xmr: send_monero,
             };
 
-            let bitcoin_wallet = bitcoin::Wallet::new("alice", bitcoind_url)
+            let bitcoin_wallet = bitcoin::Wallet::new(bitcoin_wallet_name.as_ref(), bitcoind_url)
                 .await
                 .expect("failed to create bitcoin wallet");
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
@@ -120,6 +121,7 @@ async fn main() -> Result<()> {
             alice_addr,
             alice_peer_id,
             bitcoind_url,
+            bitcoin_wallet_name,
             monero_wallet_rpc_url,
             tor,
             send_bitcoin,
@@ -141,7 +143,7 @@ async fn main() -> Result<()> {
                 xmr: receive_monero,
             };
 
-            let bitcoin_wallet = bitcoin::Wallet::new("bob", bitcoind_url)
+            let bitcoin_wallet = bitcoin::Wallet::new(bitcoin_wallet_name.as_ref(), bitcoind_url)
                 .await
                 .expect("failed to create bitcoin wallet");
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
@@ -191,9 +193,10 @@ async fn main() -> Result<()> {
             swap_id,
             bitcoind_url,
             monerod_url,
+            bitcoin_wallet_name,
         } => {
             let state = db.get_state(swap_id)?;
-            let bitcoin_wallet = bitcoin::Wallet::new("bob", bitcoind_url)
+            let bitcoin_wallet = bitcoin::Wallet::new(bitcoin_wallet_name.as_ref(), bitcoind_url)
                 .await
                 .expect("failed to create bitcoin wallet");
             let monero_wallet = monero::Wallet::new(monerod_url);
