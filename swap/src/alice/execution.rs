@@ -97,8 +97,6 @@ pub async fn negotiate(
         other => bail!("Unexpected event received: {:?}", other),
     };
 
-    let SwapAmounts { btc, xmr } = amounts;
-
     let state1 = state0.receive(message0)?;
 
     let event = timeout(*BOB_TIME_TO_ACT, swarm.next())

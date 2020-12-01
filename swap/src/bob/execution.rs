@@ -1,12 +1,11 @@
 use crate::{
     bob::{OutEvent, Swarm},
-    Cmd, Rsp, SwapAmounts,
+    SwapAmounts,
 };
 use anyhow::Result;
 use libp2p::core::Multiaddr;
 use rand::{CryptoRng, RngCore};
 use std::sync::Arc;
-use tokio::{stream::StreamExt, sync::mpsc};
 use xmr_btc::bob::State2;
 
 pub async fn negotiate<R>(
@@ -16,7 +15,7 @@ pub async fn negotiate<R>(
     addr: Multiaddr,
     mut rng: R,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
-) -> Result<(SwapAmounts, State2)>
+) -> Result<State2>
 where
     R: RngCore + CryptoRng + Send,
 {
@@ -30,7 +29,7 @@ where
     swarm.request_amounts(alice.clone(), amounts.btc.as_sat());
 
     // todo: see if we can remove
-    let (btc, xmr) = match swarm.next().await {
+    let (_btc, _xmr) = match swarm.next().await {
         OutEvent::Amounts(amounts) => (amounts.btc, amounts.xmr),
         other => panic!("unexpected event: {:?}", other),
     };
@@ -49,5 +48,5 @@ where
 
     swarm.send_message2(alice.clone(), state2.next_message());
 
-    Ok((amounts, state2))
+    Ok(state2)
 }

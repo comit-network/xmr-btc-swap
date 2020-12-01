@@ -54,7 +54,7 @@ where
             peer_id,
             addr,
         } => {
-            let (swap_amounts, state2) = negotiate(
+            let state2 = negotiate(
                 state0,
                 amounts,
                 &mut swarm,
