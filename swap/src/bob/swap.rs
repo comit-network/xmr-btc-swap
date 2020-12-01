@@ -165,8 +165,8 @@ where
                 _ = t1_timeout => {
                     // Check whether TxCancel has been published.
                     // We should not fail if the transaction is already on the blockchain
-                    if let Err(_) = state.check_for_tx_cancel(bitcoin_wallet.as_ref()).await {
-                            state.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
+                    if state.check_for_tx_cancel(bitcoin_wallet.as_ref()).await.is_err() {
+                        state.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
                     }
 
                     swap(

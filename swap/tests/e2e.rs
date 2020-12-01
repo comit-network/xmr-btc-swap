@@ -13,6 +13,7 @@ use testcontainers::clients::Cli;
 use uuid::Uuid;
 use xmr_btc::{bitcoin, cross_curve_dleq};
 
+#[ignore]
 #[tokio::test]
 async fn swap() {
     use tracing_subscriber::util::SubscriberInitExt as _;
@@ -124,7 +125,7 @@ async fn swap() {
 }
 
 #[tokio::test]
-async fn simple_swap_happy_path() {
+async fn happy_path_recursive_executor() {
     use tracing_subscriber::util::SubscriberInitExt as _;
     let _guard = tracing_subscriber::fmt()
         .with_env_filter("swap=info,xmr_btc=info")

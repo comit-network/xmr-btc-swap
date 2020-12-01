@@ -213,10 +213,10 @@ pub fn build_bitcoin_redeem_transaction(
     .context("Invalid encrypted signature received")?;
 
     let sig_a = a.sign(tx_redeem.digest());
-    let sig_b = adaptor.decrypt_signature(&s_a.into_secp256k1(), encrypted_signature.clone());
+    let sig_b = adaptor.decrypt_signature(&s_a.into_secp256k1(), encrypted_signature);
 
     let tx = tx_redeem
-        .add_signatures(&tx_lock, (a.public(), sig_a), (B.clone(), sig_b))
+        .add_signatures(&tx_lock, (a.public(), sig_a), (B, sig_b))
         .context("sig_{a,b} are invalid for tx_redeem")?;
 
     Ok(tx)
@@ -229,7 +229,7 @@ pub async fn publish_bitcoin_redeem_transaction<W>(
 where
     W: BroadcastSignedTransaction + WaitForTransactionFinality,
 {
-    let tx_id = bitcoin_wallet
+    let _tx_id = bitcoin_wallet
         .broadcast_signed_transaction(redeem_tx)
         .await?;
 
@@ -258,7 +258,11 @@ where
     let tx_cancel = bitcoin::TxCancel::new(&tx_lock, refund_timelock, a.public(), B.clone());
 
     // If Bob hasn't yet broadcasted the tx cancel, we do it
-    if let Err(_) = bitcoin_wallet.get_raw_transaction(tx_cancel.txid()).await {
+    if bitcoin_wallet
+        .get_raw_transaction(tx_cancel.txid())
+        .await
+        .is_err()
+    {
         // TODO(Franck): Maybe the cancel transaction is already mined, in this case,
         // the broadcast will error out.
 
@@ -348,10 +352,10 @@ pub fn build_bitcoin_punish_transaction(
     let tx_punish = bitcoin::TxPunish::new(&tx_cancel, &punish_address, punish_timelock);
 
     let sig_a = a.sign(tx_punish.digest());
-    let sig_b = tx_punish_sig_bob.clone();
+    let sig_b = tx_punish_sig_bob;
 
     let signed_tx_punish = tx_punish
-        .add_signatures(&tx_cancel, (a.public(), sig_a), (B.clone(), sig_b))
+        .add_signatures(&tx_cancel, (a.public(), sig_a), (B, sig_b))
         .expect("sig_{a,b} to be valid signatures for tx_cancel");
 
     Ok(signed_tx_punish)

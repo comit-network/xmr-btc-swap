@@ -38,6 +38,7 @@ impl<T> Rng for T where T: RngCore + CryptoRng + Send {}
 
 // The same data structure is used for swap execution and recovery.
 // This allows for a seamless transition from a failed swap to recovery.
+#[allow(clippy::large_enum_variant)]
 pub enum AliceState {
     Started {
         amounts: SwapAmounts,

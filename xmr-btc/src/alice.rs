@@ -449,6 +449,7 @@ pub struct State0 {
 }
 
 impl State0 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         a: bitcoin::SecretKey,
         s_a: cross_curve_dleq::Scalar,
