@@ -33,10 +33,31 @@ pub enum BobState {
     SafelyAborted,
 }
 
-// State machine driver for swap execution
-#[async_recursion]
 pub async fn swap<R>(
     state: BobState,
+    swarm: Swarm,
+    db: Database,
+    bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
+    monero_wallet: Arc<crate::monero::Wallet>,
+    rng: R,
+    swap_id: Uuid,
+) -> Result<BobState>
+    where
+        R: RngCore + CryptoRng + Send,
+{
+    run_until(state, is_complete, swarm, db, bitcoin_wallet, monero_wallet, rng, swap_id).await
+}
+
+// TODO: use macro or generics
+pub fn is_complete(state: &BobState) -> bool {
+    matches!(state, BobState::BtcRefunded| BobState::XmrRedeemed | BobState::Punished | BobState::SafelyAborted)
+}
+
+// State machine driver for swap execution
+#[async_recursion]
+pub async fn run_until<R>(
+    state: BobState,
+    is_state: fn(&BobState) -> bool,
     mut swarm: Swarm,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
@@ -47,112 +68,120 @@ pub async fn swap<R>(
 where
     R: RngCore + CryptoRng + Send,
 {
-    match state {
-        BobState::Started {
-            state0,
-            amounts,
-            peer_id,
-            addr,
-        } => {
-            let state2 = negotiate(
+    if is_state(&state) {
+        Ok(state)
+    } else {
+        match state {
+            BobState::Started {
                 state0,
                 amounts,
-                &mut swarm,
+                peer_id,
                 addr,
-                &mut rng,
-                bitcoin_wallet.clone(),
-            )
-            .await?;
-            swap(
-                BobState::Negotiated(state2, peer_id),
-                swarm,
-                db,
-                bitcoin_wallet,
-                monero_wallet,
-                rng,
-                swap_id,
-            )
-            .await
-        }
-        BobState::Negotiated(state2, alice_peer_id) => {
-            // Alice and Bob have exchanged info
-            let state3 = state2.lock_btc(bitcoin_wallet.as_ref()).await?;
-            // db.insert_latest_state(state);
-            swap(
-                BobState::BtcLocked(state3, alice_peer_id),
-                swarm,
-                db,
-                bitcoin_wallet,
-                monero_wallet,
-                rng,
-                swap_id,
-            )
-            .await
-        }
-        // Bob has locked Btc
-        // Watch for Alice to Lock Xmr or for t1 to elapse
-        BobState::BtcLocked(state3, alice_peer_id) => {
-            // todo: watch until t1, not indefinetely
-            let state4 = match swarm.next().await {
-                OutEvent::Message2(msg) => {
-                    state3
-                        .watch_for_lock_xmr(monero_wallet.as_ref(), msg)
-                        .await?
-                }
-                other => panic!("unexpected event: {:?}", other),
-            };
-            swap(
-                BobState::XmrLocked(state4, alice_peer_id),
-                swarm,
-                db,
-                bitcoin_wallet,
-                monero_wallet,
-                rng,
-                swap_id,
-            )
-            .await
-        }
-        BobState::XmrLocked(state, alice_peer_id) => {
-            // Alice has locked Xmr
-            // Bob sends Alice his key
-            let tx_redeem_encsig = state.tx_redeem_encsig();
-            // Do we have to wait for a response?
-            // What if Alice fails to receive this? Should we always resend?
-            // todo: If we cannot dial Alice we should go to EncSigSent. Maybe dialing
-            // should happen in this arm?
-            swarm.send_message3(alice_peer_id.clone(), tx_redeem_encsig);
+            } => {
+                let state2 = negotiate(
+                    state0,
+                    amounts,
+                    &mut swarm,
+                    addr,
+                    &mut rng,
+                    bitcoin_wallet.clone(),
+                )
+                    .await?;
+                run_until(
+                    BobState::Negotiated(state2, peer_id),
+                    is_state,
+                    swarm,
+                    db,
+                    bitcoin_wallet,
+                    monero_wallet,
+                    rng,
+                    swap_id,
+                )
+                    .await
+            }
+            BobState::Negotiated(state2, alice_peer_id) => {
+                // Alice and Bob have exchanged info
+                let state3 = state2.lock_btc(bitcoin_wallet.as_ref()).await?;
+                // db.insert_latest_state(state);
+                run_until(
+                    BobState::BtcLocked(state3, alice_peer_id),
+                    is_state,
+                    swarm,
+                    db,
+                    bitcoin_wallet,
+                    monero_wallet,
+                    rng,
+                    swap_id,
+                )
+                    .await
+            }
+            // Bob has locked Btc
+            // Watch for Alice to Lock Xmr or for t1 to elapse
+            BobState::BtcLocked(state3, alice_peer_id) => {
+                // todo: watch until t1, not indefinetely
+                let state4 = match swarm.next().await {
+                    OutEvent::Message2(msg) => {
+                        state3
+                            .watch_for_lock_xmr(monero_wallet.as_ref(), msg)
+                            .await?
+                    }
+                    other => panic!("unexpected event: {:?}", other),
+                };
+                run_until(
+                    BobState::XmrLocked(state4, alice_peer_id),
+                    is_state,
+                    swarm,
+                    db,
+                    bitcoin_wallet,
+                    monero_wallet,
+                    rng,
+                    swap_id,
+                )
+                    .await
+            }
+            BobState::XmrLocked(state, alice_peer_id) => {
+                // Alice has locked Xmr
+                // Bob sends Alice his key
+                let tx_redeem_encsig = state.tx_redeem_encsig();
+                // Do we have to wait for a response?
+                // What if Alice fails to receive this? Should we always resend?
+                // todo: If we cannot dial Alice we should go to EncSigSent. Maybe dialing
+                // should happen in this arm?
+                swarm.send_message3(alice_peer_id.clone(), tx_redeem_encsig);
 
-            // Sadly we have to poll the swarm to get make sure the message is sent?
-            // FIXME: Having to wait for Alice's response here is a big problem, because
-            // we're stuck if she doesn't send her response back. I believe this is
-            // currently necessary, so we may have to rework this and/or how we use libp2p
-            match swarm.next().await {
-                OutEvent::Message3 => {
-                    debug!("Got Message3 empty response");
-                }
-                other => panic!("unexpected event: {:?}", other),
-            };
+                // Sadly we have to poll the swarm to get make sure the message is sent?
+                // FIXME: Having to wait for Alice's response here is a big problem, because
+                // we're stuck if she doesn't send her response back. I believe this is
+                // currently necessary, so we may have to rework this and/or how we use libp2p
+                match swarm.next().await {
+                    OutEvent::Message3 => {
+                        debug!("Got Message3 empty response");
+                    }
+                    other => panic!("unexpected event: {:?}", other),
+                };
 
-            swap(
-                BobState::EncSigSent(state, alice_peer_id),
-                swarm,
-                db,
-                bitcoin_wallet,
-                monero_wallet,
-                rng,
-                swap_id,
-            )
-            .await
-        }
-        BobState::EncSigSent(state, ..) => {
-            // Watch for redeem
-            let redeem_watcher = state.watch_for_redeem_btc(bitcoin_wallet.as_ref());
-            let t1_timeout = state.wait_for_t1(bitcoin_wallet.as_ref());
+                run_until(
+                    BobState::EncSigSent(state, alice_peer_id),
+                    is_state,
+                    swarm,
+                    db,
+                    bitcoin_wallet,
+                    monero_wallet,
+                    rng,
+                    swap_id,
+                )
+                    .await
+            }
+            BobState::EncSigSent(state, ..) => {
+                // Watch for redeem
+                let redeem_watcher = state.watch_for_redeem_btc(bitcoin_wallet.as_ref());
+                let t1_timeout = state.wait_for_t1(bitcoin_wallet.as_ref());
 
-            tokio::select! {
+                tokio::select! {
                 val = redeem_watcher => {
-                    swap(
+                    run_until(
                         BobState::BtcRedeemed(val?),
+                             is_state,
                         swarm,
                         db,
                         bitcoin_wallet,
@@ -169,8 +198,9 @@ where
                         state.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
                     }
 
-                    swap(
+                    run_until(
                         BobState::Cancelled(state),
+                             is_state,
                         swarm,
                         db,
                         bitcoin_wallet,
@@ -182,28 +212,34 @@ where
 
                 }
             }
+            }
+            BobState::BtcRedeemed(state) => {
+                // Bob redeems XMR using revealed s_a
+                state.claim_xmr(monero_wallet.as_ref()).await?;
+                run_until(
+                    BobState::XmrRedeemed,
+                    is_state,
+                    swarm,
+                    db,
+                    bitcoin_wallet,
+                    monero_wallet,
+                    rng,
+                    swap_id,
+                )
+                    .await
+            }
+            BobState::Cancelled(_state) => Ok(BobState::BtcRefunded),
+            BobState::BtcRefunded => Ok(BobState::BtcRefunded),
+            BobState::Punished => Ok(BobState::Punished),
+            BobState::SafelyAborted => Ok(BobState::SafelyAborted),
+            BobState::XmrRedeemed => Ok(BobState::XmrRedeemed),
         }
-        BobState::BtcRedeemed(state) => {
-            // Bob redeems XMR using revealed s_a
-            state.claim_xmr(monero_wallet.as_ref()).await?;
-            swap(
-                BobState::XmrRedeemed,
-                swarm,
-                db,
-                bitcoin_wallet,
-                monero_wallet,
-                rng,
-                swap_id,
-            )
-            .await
-        }
-        BobState::Cancelled(_state) => Ok(BobState::BtcRefunded),
-        BobState::BtcRefunded => Ok(BobState::BtcRefunded),
-        BobState::Punished => Ok(BobState::Punished),
-        BobState::SafelyAborted => Ok(BobState::SafelyAborted),
-        BobState::XmrRedeemed => Ok(BobState::XmrRedeemed),
     }
 }
+
+
+
+
 
 // // State machine driver for recovery execution
 // #[async_recursion]

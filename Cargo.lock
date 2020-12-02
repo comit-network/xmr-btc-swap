@@ -3369,6 +3369,7 @@ dependencies = [
  "bitcoin",
  "bitcoin-harness",
  "conquer-once",
+ "conquer-once",
  "derivative",
  "ecdsa_fun",
  "futures",
