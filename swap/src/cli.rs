@@ -14,7 +14,7 @@ pub enum Options {
         )]
         bitcoind_url: Url,
 
-        #[structopt(short = "bn", long = "bitcoin-wallet-name")]
+        #[structopt(short = "n", long = "bitcoin-wallet-name")]
         bitcoin_wallet_name: String,
 
         #[structopt(
@@ -57,7 +57,7 @@ pub enum Options {
         )]
         bitcoind_url: Url,
 
-        #[structopt(short = "bn", long = "bitcoin-wallet-name")]
+        #[structopt(short = "n", long = "bitcoin-wallet-name")]
         bitcoin_wallet_name: String,
 
         #[structopt(
@@ -87,7 +87,7 @@ pub enum Options {
         #[structopt(default_value = "http://127.0.0.1:18083/json_rpc", long = "monerod")]
         monerod_url: Url,
 
-        #[structopt(short = "bn", long = "bitcoin-wallet-name")]
+        #[structopt(short = "n", long = "bitcoin-wallet-name")]
         bitcoin_wallet_name: String,
     },
 }

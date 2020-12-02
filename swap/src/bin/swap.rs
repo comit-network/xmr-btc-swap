@@ -30,7 +30,9 @@ use swap::{
     storage::Database,
     SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
-use tracing::info;
+use tracing::{info, log::LevelFilter, subscriber};
+use tracing_log::LogTracer;
+use tracing_subscriber::FmtSubscriber;
 use uuid::Uuid;
 use xmr_btc::cross_curve_dleq;
 
@@ -41,6 +43,8 @@ extern crate prettytable;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    init_tracing(LevelFilter::Trace).expect("initialize tracing");
+
     let opt = Options::from_args();
 
     // This currently creates the directory if it's not there in the first place
@@ -88,12 +92,24 @@ async fn main() -> Result<()> {
                 xmr: send_monero,
             };
 
-            let bitcoin_wallet = bitcoin::Wallet::new(bitcoin_wallet_name.as_ref(), bitcoind_url)
+            let bitcoin_wallet = bitcoin::Wallet::new(bitcoin_wallet_name.as_str(), bitcoind_url)
                 .await
                 .expect("failed to create bitcoin wallet");
+
+            let bitcoin_balance = bitcoin_wallet.balance().await?;
+            info!(
+                "Connection to Bitcoin wallet succeeded, balance: {}",
+                bitcoin_balance
+            );
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
-            let monero_wallet = Arc::new(monero::Wallet::new(monero_wallet_rpc_url));
+            let monero_wallet = monero::Wallet::new(monero_wallet_rpc_url);
+            let monero_balance = monero_wallet.get_balance().await?;
+            info!(
+                "Connection to Monero wallet succeeded, balance: {:?}",
+                monero_balance
+            );
+            let monero_wallet = Arc::new(monero_wallet);
 
             let alice_state = {
                 let a = bitcoin::SecretKey::new_random(rng);
@@ -143,11 +159,25 @@ async fn main() -> Result<()> {
                 xmr: receive_monero,
             };
 
-            let bitcoin_wallet = bitcoin::Wallet::new(bitcoin_wallet_name.as_ref(), bitcoind_url)
+            let bitcoin_wallet = bitcoin::Wallet::new(bitcoin_wallet_name.as_str(), bitcoind_url)
                 .await
                 .expect("failed to create bitcoin wallet");
+            let bitcoin_balance = bitcoin_wallet.balance().await?;
+            info!(
+                "Connection to Bitcoin wallet succeeded, balance: {}",
+                bitcoin_balance
+            );
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
-            let monero_wallet = Arc::new(monero::Wallet::new(monero_wallet_rpc_url));
+
+            let monero_wallet = monero::Wallet::new(monero_wallet_rpc_url);
+            let monero_balance = monero_wallet.get_balance().await?;
+            // TODO: impl Display for monero wallet to display proper monero balance
+            // (currently only used to validate that connection to wallet succeeded)
+            info!(
+                "Connection to Monero wallet succeeded, balance: {:?}",
+                monero_balance
+            );
+            let monero_wallet = Arc::new(monero_wallet);
 
             let refund_address = bitcoin_wallet.new_address().await.unwrap();
             let state0 = xmr_btc::bob::State0::new(
@@ -224,4 +254,25 @@ async fn create_tor_service(
     tracing::info!("Tor service added.");
 
     Ok(authenticated_connection)
+}
+
+pub fn init_tracing(level: log::LevelFilter) -> anyhow::Result<()> {
+    if level == LevelFilter::Off {
+        return Ok(());
+    }
+
+    // We want upstream library log messages, just only at Info level.
+    LogTracer::init_with_filter(LevelFilter::Info)?;
+
+    let is_terminal = atty::is(atty::Stream::Stderr);
+    let subscriber = FmtSubscriber::builder()
+        .with_env_filter(format!("swap={},http=info,warp=info", level,))
+        .with_writer(std::io::stderr)
+        .with_ansi(is_terminal)
+        .finish();
+
+    subscriber::set_global_default(subscriber)?;
+    info!("Initialized tracing with level: {}", level);
+
+    Ok(())
 }
