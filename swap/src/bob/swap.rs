@@ -7,8 +7,8 @@ use anyhow::Result;
 use async_recursion::async_recursion;
 use libp2p::{core::Multiaddr, PeerId};
 use rand::{CryptoRng, RngCore};
-use std::sync::Arc;
-use tracing::debug;
+use std::{fmt, sync::Arc};
+use tracing::{debug, info};
 use uuid::Uuid;
 use xmr_btc::bob::{self};
 
@@ -33,6 +33,24 @@ pub enum BobState {
     SafelyAborted,
 }
 
+impl fmt::Display for BobState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BobState::Started { .. } => write!(f, "started"),
+            BobState::Negotiated(..) => write!(f, "negotiated"),
+            BobState::BtcLocked(..) => write!(f, "btc_locked"),
+            BobState::XmrLocked(..) => write!(f, "xmr_locked"),
+            BobState::EncSigSent(..) => write!(f, "encsig_sent"),
+            BobState::BtcRedeemed(_) => write!(f, "btc_redeemed"),
+            BobState::Cancelled(_) => write!(f, "cancelled"),
+            BobState::BtcRefunded => write!(f, "btc_refunded"),
+            BobState::XmrRedeemed => write!(f, "xmr_redeemed"),
+            BobState::Punished => write!(f, "punished"),
+            BobState::SafelyAborted => write!(f, "safely_aborted"),
+        }
+    }
+}
+
 pub async fn swap<R>(
     state: BobState,
     swarm: Swarm,
@@ -42,22 +60,47 @@ pub async fn swap<R>(
     rng: R,
     swap_id: Uuid,
 ) -> Result<BobState>
-    where
-        R: RngCore + CryptoRng + Send,
+where
+    R: RngCore + CryptoRng + Send,
 {
-    run_until(state, is_complete, swarm, db, bitcoin_wallet, monero_wallet, rng, swap_id).await
+    run_until(
+        state,
+        is_complete,
+        swarm,
+        db,
+        bitcoin_wallet,
+        monero_wallet,
+        rng,
+        swap_id,
+    )
+    .await
 }
 
 // TODO: use macro or generics
 pub fn is_complete(state: &BobState) -> bool {
-    matches!(state, BobState::BtcRefunded| BobState::XmrRedeemed | BobState::Punished | BobState::SafelyAborted)
+    matches!(
+        state,
+        BobState::BtcRefunded
+            | BobState::XmrRedeemed
+            | BobState::Punished
+            | BobState::SafelyAborted
+    )
+}
+
+pub fn is_btc_locked(state: &BobState) -> bool {
+    matches!(state, BobState::BtcLocked(..))
+}
+
+pub fn is_xmr_locked(state: &BobState) -> bool {
+    matches!(state, BobState::XmrLocked(..))
 }
 
 // State machine driver for swap execution
+#[allow(clippy::too_many_arguments)]
 #[async_recursion]
 pub async fn run_until<R>(
     state: BobState,
-    is_state: fn(&BobState) -> bool,
+    is_target_state: fn(&BobState) -> bool,
     mut swarm: Swarm,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
@@ -68,7 +111,8 @@ pub async fn run_until<R>(
 where
     R: RngCore + CryptoRng + Send,
 {
-    if is_state(&state) {
+    info!("{}", state);
+    if is_target_state(&state) {
         Ok(state)
     } else {
         match state {
@@ -86,10 +130,10 @@ where
                     &mut rng,
                     bitcoin_wallet.clone(),
                 )
-                    .await?;
+                .await?;
                 run_until(
                     BobState::Negotiated(state2, peer_id),
-                    is_state,
+                    is_target_state,
                     swarm,
                     db,
                     bitcoin_wallet,
@@ -97,7 +141,7 @@ where
                     rng,
                     swap_id,
                 )
-                    .await
+                .await
             }
             BobState::Negotiated(state2, alice_peer_id) => {
                 // Alice and Bob have exchanged info
@@ -105,7 +149,7 @@ where
                 // db.insert_latest_state(state);
                 run_until(
                     BobState::BtcLocked(state3, alice_peer_id),
-                    is_state,
+                    is_target_state,
                     swarm,
                     db,
                     bitcoin_wallet,
@@ -113,7 +157,7 @@ where
                     rng,
                     swap_id,
                 )
-                    .await
+                .await
             }
             // Bob has locked Btc
             // Watch for Alice to Lock Xmr or for t1 to elapse
@@ -129,7 +173,7 @@ where
                 };
                 run_until(
                     BobState::XmrLocked(state4, alice_peer_id),
-                    is_state,
+                    is_target_state,
                     swarm,
                     db,
                     bitcoin_wallet,
@@ -137,7 +181,7 @@ where
                     rng,
                     swap_id,
                 )
-                    .await
+                .await
             }
             BobState::XmrLocked(state, alice_peer_id) => {
                 // Alice has locked Xmr
@@ -162,7 +206,7 @@ where
 
                 run_until(
                     BobState::EncSigSent(state, alice_peer_id),
-                    is_state,
+                    is_target_state,
                     swarm,
                     db,
                     bitcoin_wallet,
@@ -170,7 +214,7 @@ where
                     rng,
                     swap_id,
                 )
-                    .await
+                .await
             }
             BobState::EncSigSent(state, ..) => {
                 // Watch for redeem
@@ -178,47 +222,47 @@ where
                 let t1_timeout = state.wait_for_t1(bitcoin_wallet.as_ref());
 
                 tokio::select! {
-                val = redeem_watcher => {
-                    run_until(
-                        BobState::BtcRedeemed(val?),
-                             is_state,
-                        swarm,
-                        db,
-                        bitcoin_wallet,
-                        monero_wallet,
-                                 rng,
-                                 swap_id,
-                    )
-                    .await
-                }
-                _ = t1_timeout => {
-                    // Check whether TxCancel has been published.
-                    // We should not fail if the transaction is already on the blockchain
-                    if state.check_for_tx_cancel(bitcoin_wallet.as_ref()).await.is_err() {
-                        state.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
+                    val = redeem_watcher => {
+                        run_until(
+                            BobState::BtcRedeemed(val?),
+                                 is_target_state,
+                            swarm,
+                            db,
+                            bitcoin_wallet,
+                            monero_wallet,
+                                     rng,
+                                     swap_id,
+                        )
+                        .await
                     }
+                    _ = t1_timeout => {
+                        // Check whether TxCancel has been published.
+                        // We should not fail if the transaction is already on the blockchain
+                        if state.check_for_tx_cancel(bitcoin_wallet.as_ref()).await.is_err() {
+                            state.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
+                        }
 
-                    run_until(
-                        BobState::Cancelled(state),
-                             is_state,
-                        swarm,
-                        db,
-                        bitcoin_wallet,
-                        monero_wallet,
-                        rng,
-                 swap_id
-                    )
-                    .await
+                        run_until(
+                            BobState::Cancelled(state),
+                                 is_target_state,
+                            swarm,
+                            db,
+                            bitcoin_wallet,
+                            monero_wallet,
+                            rng,
+                     swap_id
+                        )
+                        .await
 
+                    }
                 }
-            }
             }
             BobState::BtcRedeemed(state) => {
                 // Bob redeems XMR using revealed s_a
                 state.claim_xmr(monero_wallet.as_ref()).await?;
                 run_until(
                     BobState::XmrRedeemed,
-                    is_state,
+                    is_target_state,
                     swarm,
                     db,
                     bitcoin_wallet,
@@ -226,20 +270,39 @@ where
                     rng,
                     swap_id,
                 )
-                    .await
+                .await
             }
-            BobState::Cancelled(_state) => Ok(BobState::BtcRefunded),
-            BobState::BtcRefunded => Ok(BobState::BtcRefunded),
-            BobState::Punished => Ok(BobState::Punished),
-            BobState::SafelyAborted => Ok(BobState::SafelyAborted),
-            BobState::XmrRedeemed => Ok(BobState::XmrRedeemed),
+            BobState::Cancelled(_state) => {
+                // Bob has cancelled the swap
+                // If <t2 Bob refunds
+                // if unimplemented!("<t2") {
+                //     // Submit TxRefund
+                //     abort(BobState::BtcRefunded, io).await
+                // } else {
+                //     // Bob failed to refund in time and has been punished
+                //     abort(BobState::Punished, io).await
+                // }
+                Ok(BobState::BtcRefunded)
+            }
+            BobState::BtcRefunded => {
+                info!("btc refunded");
+                Ok(BobState::BtcRefunded)
+            }
+            BobState::Punished => {
+                info!("punished");
+                Ok(BobState::Punished)
+            }
+            BobState::SafelyAborted => {
+                info!("safely aborted");
+                Ok(BobState::SafelyAborted)
+            }
+            BobState::XmrRedeemed => {
+                info!("xmr redeemed");
+                Ok(BobState::XmrRedeemed)
+            }
         }
     }
 }
-
-
-
-
 
 // // State machine driver for recovery execution
 // #[async_recursion]

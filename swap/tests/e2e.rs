@@ -1,6 +1,6 @@
 use bitcoin_harness::Bitcoind;
-use futures::{channel::mpsc, future::try_join};
-use libp2p::Multiaddr;
+use futures::future::try_join;
+use libp2p::{Multiaddr, PeerId};
 use monero_harness::Monero;
 use rand::rngs::OsRng;
 use std::sync::Arc;
@@ -11,25 +11,20 @@ use swap::{
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
 use uuid::Uuid;
-use xmr_btc::{bitcoin, cross_curve_dleq};
+use xmr_btc::{bitcoin, config::Config, cross_curve_dleq};
 
-#[ignore]
+/// Run the following tests with RUST_MIN_STACK=100000000000
+
 #[tokio::test]
-async fn swap() {
-    use tracing_subscriber::util::SubscriberInitExt as _;
-    let _guard = tracing_subscriber::fmt()
-        .with_env_filter("swap=info,xmr_btc=info")
-        .with_ansi(false)
-        .set_default();
-
-    let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9876"
-        .parse()
-        .expect("failed to parse Alice's address");
-
+async fn happy_path() {
+    init_tracing();
     let cli = Cli::default();
     let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
-    dbg!(&bitcoind.node_url);
     let _ = bitcoind.init(5).await;
+    let (monero, _container) =
+        Monero::new(&cli, None, vec!["alice".to_string(), "bob".to_string()])
+            .await
+            .unwrap();
 
     let btc = bitcoin::Amount::from_sat(1_000_000);
     let btc_alice = bitcoin::Amount::ZERO;
@@ -41,197 +36,35 @@ async fn swap() {
     let xmr_alice = xmr * 10;
     let xmr_bob = 0;
 
-    let alice_btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new("alice", bitcoind.node_url.clone())
-            .await
-            .unwrap(),
-    );
-    let bob_btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new("bob", bitcoind.node_url.clone())
-            .await
-            .unwrap(),
-    );
-    bitcoind
-        .mint(bob_btc_wallet.0.new_address().await.unwrap(), btc_bob)
-        .await
-        .unwrap();
-
-    let (monero, _container) =
-        Monero::new(&cli, None, vec!["alice".to_string(), "bob".to_string()])
-            .await
-            .unwrap();
-    monero
-        .init(vec![("alice", xmr_alice), ("bob", xmr_bob)])
-        .await
-        .unwrap();
-
-    let alice_xmr_wallet = Arc::new(swap::monero::Wallet(
-        monero.wallet("alice").unwrap().client(),
-    ));
-    let bob_xmr_wallet = Arc::new(swap::monero::Wallet(monero.wallet("bob").unwrap().client()));
-
-    let alice_behaviour = alice::Behaviour::default();
-    let alice_transport = build(alice_behaviour.identity()).unwrap();
-
-    let db = Database::open(std::path::Path::new("../.swap-db/")).unwrap();
-    let alice_swap = alice::swap(
-        alice_btc_wallet.clone(),
-        alice_xmr_wallet.clone(),
-        db,
-        alice_multiaddr.clone(),
-        alice_transport,
-        alice_behaviour,
-    );
-
-    let db_dir = tempdir().unwrap();
-    let db = Database::open(db_dir.path()).unwrap();
-    let (cmd_tx, mut _cmd_rx) = mpsc::channel(1);
-    let (mut rsp_tx, rsp_rx) = mpsc::channel(1);
-    let bob_behaviour = bob::Behaviour::default();
-    let bob_transport = build(bob_behaviour.identity()).unwrap();
-    let bob_swap = bob::swap(
-        bob_btc_wallet.clone(),
-        bob_xmr_wallet.clone(),
-        db,
-        btc.as_sat(),
+    let (
+        alice_state,
+        alice_swarm,
+        alice_btc_wallet,
+        alice_xmr_wallet,
+        alice_peer_id,
         alice_multiaddr,
-        cmd_tx,
-        rsp_rx,
-        bob_transport,
-        bob_behaviour,
-    );
+    ) = init_alice(&bitcoind, &monero, btc, btc_alice, xmr, xmr_alice).await;
 
-    // automate the verification step by accepting any amounts sent over by Alice
-    rsp_tx.try_send(swap::Rsp::VerifiedAmounts).unwrap();
-
-    try_join(alice_swap, bob_swap).await.unwrap();
-
-    let btc_alice_final = alice_btc_wallet.as_ref().balance().await.unwrap();
-    let btc_bob_final = bob_btc_wallet.as_ref().balance().await.unwrap();
-
-    let xmr_alice_final = alice_xmr_wallet.as_ref().get_balance().await.unwrap();
-
-    bob_xmr_wallet.as_ref().0.refresh().await.unwrap();
-    let xmr_bob_final = bob_xmr_wallet.as_ref().get_balance().await.unwrap();
-
-    assert_eq!(
-        btc_alice_final,
-        btc_alice + btc - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
-    );
-    assert!(btc_bob_final <= btc_bob - btc);
-
-    assert!(xmr_alice_final.as_piconero() <= xmr_alice - xmr);
-    assert_eq!(xmr_bob_final.as_piconero(), xmr_bob + xmr);
-}
-
-#[tokio::test]
-async fn happy_path_recursive_executor() {
-    use tracing_subscriber::util::SubscriberInitExt as _;
-    let _guard = tracing_subscriber::fmt()
-        .with_env_filter("swap=info,xmr_btc=info")
-        .with_ansi(false)
-        .set_default();
-
-    let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9876"
-        .parse()
-        .expect("failed to parse Alice's address");
-
-    let cli = Cli::default();
-    let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
-    dbg!(&bitcoind.node_url);
-    let _ = bitcoind.init(5).await;
-
-    let btc = bitcoin::Amount::from_sat(1_000_000);
-    let btc_alice = bitcoin::Amount::ZERO;
-    let btc_bob = btc * 10;
-
-    // this xmr value matches the logic of alice::calculate_amounts i.e. btc *
-    // 10_000 * 100
-    let xmr = 1_000_000_000_000;
-    let xmr_alice = xmr * 10;
-    let xmr_bob = 0;
-
-    let alice_btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new("alice", bitcoind.node_url.clone())
-            .await
-            .unwrap(),
-    );
-    let bob_btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new("bob", bitcoind.node_url.clone())
-            .await
-            .unwrap(),
-    );
-    bitcoind
-        .mint(bob_btc_wallet.0.new_address().await.unwrap(), btc_bob)
-        .await
-        .unwrap();
-
-    let (monero, _container) =
-        Monero::new(&cli, None, vec!["alice".to_string(), "bob".to_string()])
-            .await
-            .unwrap();
-    monero
-        .init(vec![("alice", xmr_alice), ("bob", xmr_bob)])
-        .await
-        .unwrap();
-
-    let alice_xmr_wallet = Arc::new(swap::monero::Wallet(
-        monero.wallet("alice").unwrap().client(),
-    ));
-    let bob_xmr_wallet = Arc::new(swap::monero::Wallet(monero.wallet("bob").unwrap().client()));
-
-    let amounts = SwapAmounts {
+    let (bob_state, bob_swarm, bob_btc_wallet, bob_xmr_wallet, bob_db) = init_bob(
+        alice_multiaddr,
+        alice_peer_id,
+        &bitcoind,
+        &monero,
         btc,
-        xmr: xmr_btc::monero::Amount::from_piconero(xmr),
-    };
+        btc_bob,
+        xmr,
+        xmr_bob,
+    )
+    .await;
 
-    let alice_behaviour = alice::Behaviour::default();
-    let alice_peer_id = alice_behaviour.peer_id().clone();
-    let alice_transport = build(alice_behaviour.identity()).unwrap();
-    let rng = &mut OsRng;
-    let alice_state = {
-        let a = bitcoin::SecretKey::new_random(rng);
-        let s_a = cross_curve_dleq::Scalar::random(rng);
-        let v_a = xmr_btc::monero::PrivateViewKey::new_random(rng);
-        AliceState::Started {
-            amounts,
-            a,
-            s_a,
-            v_a,
-        }
-    };
-    let alice_swarm =
-        alice::new_swarm(alice_multiaddr.clone(), alice_transport, alice_behaviour).unwrap();
-    let config = xmr_btc::config::Config::regtest();
     let alice_swap = alice::swap::swap(
         alice_state,
         alice_swarm,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),
-        config,
+        Config::regtest(),
     );
 
-    let bob_db_dir = tempdir().unwrap();
-    let bob_db = Database::open(bob_db_dir.path()).unwrap();
-    let bob_behaviour = bob::Behaviour::default();
-    let bob_transport = build(bob_behaviour.identity()).unwrap();
-
-    let refund_address = bob_btc_wallet.new_address().await.unwrap();
-    let state0 = xmr_btc::bob::State0::new(
-        rng,
-        btc,
-        xmr_btc::monero::Amount::from_piconero(xmr),
-        REFUND_TIMELOCK,
-        PUNISH_TIMELOCK,
-        refund_address,
-    );
-    let bob_state = BobState::Started {
-        state0,
-        amounts,
-        peer_id: alice_peer_id,
-        addr: alice_multiaddr,
-    };
-    let bob_swarm = bob::new_swarm(bob_transport, bob_behaviour).unwrap();
     let bob_swap = bob::swap::swap(
         bob_state,
         bob_swarm,
@@ -260,4 +93,242 @@ async fn happy_path_recursive_executor() {
 
     assert!(xmr_alice_final.as_piconero() <= xmr_alice - xmr);
     assert_eq!(xmr_bob_final.as_piconero(), xmr_bob + xmr);
+}
+
+/// Bob locks Btc and Alice locks Xmr. Bob does not act; he fails to send Alice
+/// the encsig and fail to refund or redeem. Alice punishes.
+#[tokio::test]
+async fn alice_punishes_if_bob_never_acts_after_fund() {
+    init_tracing();
+    let cli = Cli::default();
+    let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
+    let _ = bitcoind.init(5).await;
+    let (monero, _container) =
+        Monero::new(&cli, None, vec!["alice".to_string(), "bob".to_string()])
+            .await
+            .unwrap();
+
+    let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
+    let xmr_to_swap = 1_000_000_000_000;
+
+    let bob_btc_starting_balance = btc_to_swap * 10;
+    let bob_xmr_starting_balance = 0;
+
+    let alice_btc_starting_balance = bitcoin::Amount::ZERO;
+    let alice_xmr_starting_balance = xmr_to_swap * 10;
+
+    let (
+        alice_state,
+        alice_swarm,
+        alice_btc_wallet,
+        alice_xmr_wallet,
+        alice_peer_id,
+        alice_multiaddr,
+    ) = init_alice(
+        &bitcoind,
+        &monero,
+        btc_to_swap,
+        alice_btc_starting_balance,
+        xmr_to_swap,
+        alice_xmr_starting_balance,
+    )
+    .await;
+
+    let (bob_state, bob_swarm, bob_btc_wallet, bob_xmr_wallet, bob_db) = init_bob(
+        alice_multiaddr,
+        alice_peer_id,
+        &bitcoind,
+        &monero,
+        btc_to_swap,
+        bob_btc_starting_balance,
+        xmr_to_swap,
+        bob_xmr_starting_balance,
+    )
+    .await;
+
+    let bob_xmr_locked_fut = bob::swap::run_until(
+        bob_state,
+        bob::swap::is_xmr_locked,
+        bob_swarm,
+        bob_db,
+        bob_btc_wallet.clone(),
+        bob_xmr_wallet.clone(),
+        OsRng,
+        Uuid::new_v4(),
+    );
+
+    let alice_xmr_locked_fut = alice::swap::run_until(
+        alice_state,
+        alice::swap::is_xmr_locked,
+        alice_swarm,
+        alice_btc_wallet.clone(),
+        alice_xmr_wallet.clone(),
+        Config::regtest(),
+    );
+
+    // Wait until alice has locked xmr and bob has locked btc
+    let ((alice_state, alice_swarm), _bob_state) =
+        try_join(alice_xmr_locked_fut, bob_xmr_locked_fut)
+            .await
+            .unwrap();
+
+    let (punished, _) = alice::swap::swap(
+        alice_state,
+        alice_swarm,
+        alice_btc_wallet.clone(),
+        alice_xmr_wallet.clone(),
+        Config::regtest(),
+    )
+    .await
+    .unwrap();
+
+    assert!(matches!(punished, AliceState::Punished));
+
+    // todo: Add balance assertions
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn init_alice(
+    bitcoind: &Bitcoind<'_>,
+    monero: &Monero,
+    btc_to_swap: bitcoin::Amount,
+    _btc_starting_balance: bitcoin::Amount,
+    xmr_to_swap: u64,
+    xmr_starting_balance: u64,
+) -> (
+    AliceState,
+    alice::Swarm,
+    Arc<swap::bitcoin::Wallet>,
+    Arc<swap::monero::Wallet>,
+    PeerId,
+    Multiaddr,
+) {
+    monero
+        .init(vec![("alice", xmr_starting_balance)])
+        .await
+        .unwrap();
+
+    let alice_xmr_wallet = Arc::new(swap::monero::Wallet(
+        monero.wallet("alice").unwrap().client(),
+    ));
+
+    let alice_btc_wallet = Arc::new(
+        swap::bitcoin::Wallet::new("alice", bitcoind.node_url.clone())
+            .await
+            .unwrap(),
+    );
+
+    let amounts = SwapAmounts {
+        btc: btc_to_swap,
+        xmr: xmr_btc::monero::Amount::from_piconero(xmr_to_swap),
+    };
+
+    let alice_behaviour = alice::Behaviour::default();
+    let alice_peer_id = alice_behaviour.peer_id();
+    let alice_transport = build(alice_behaviour.identity()).unwrap();
+    let rng = &mut OsRng;
+    let alice_state = {
+        let a = bitcoin::SecretKey::new_random(rng);
+        let s_a = cross_curve_dleq::Scalar::random(rng);
+        let v_a = xmr_btc::monero::PrivateViewKey::new_random(rng);
+        AliceState::Started {
+            amounts,
+            a,
+            s_a,
+            v_a,
+        }
+    };
+
+    let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9876"
+        .parse()
+        .expect("failed to parse Alice's address");
+
+    let alice_swarm =
+        alice::new_swarm(alice_multiaddr.clone(), alice_transport, alice_behaviour).unwrap();
+
+    (
+        alice_state,
+        alice_swarm,
+        alice_btc_wallet,
+        alice_xmr_wallet,
+        alice_peer_id,
+        alice_multiaddr,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn init_bob(
+    alice_multiaddr: Multiaddr,
+    alice_peer_id: PeerId,
+    bitcoind: &Bitcoind<'_>,
+    monero: &Monero,
+    btc_to_swap: bitcoin::Amount,
+    btc_starting_balance: bitcoin::Amount,
+    xmr_to_swap: u64,
+    xmr_stating_balance: u64,
+) -> (
+    BobState,
+    bob::Swarm,
+    Arc<swap::bitcoin::Wallet>,
+    Arc<swap::monero::Wallet>,
+    Database,
+) {
+    let bob_btc_wallet = Arc::new(
+        swap::bitcoin::Wallet::new("bob", bitcoind.node_url.clone())
+            .await
+            .unwrap(),
+    );
+    bitcoind
+        .mint(
+            bob_btc_wallet.0.new_address().await.unwrap(),
+            btc_starting_balance,
+        )
+        .await
+        .unwrap();
+
+    monero
+        .init(vec![("bob", xmr_stating_balance)])
+        .await
+        .unwrap();
+
+    let bob_xmr_wallet = Arc::new(swap::monero::Wallet(monero.wallet("bob").unwrap().client()));
+
+    let amounts = SwapAmounts {
+        btc: btc_to_swap,
+        xmr: xmr_btc::monero::Amount::from_piconero(xmr_to_swap),
+    };
+
+    let rng = &mut OsRng;
+
+    let bob_db_dir = tempdir().unwrap();
+    let bob_db = Database::open(bob_db_dir.path()).unwrap();
+    let bob_behaviour = bob::Behaviour::default();
+    let bob_transport = build(bob_behaviour.identity()).unwrap();
+
+    let refund_address = bob_btc_wallet.new_address().await.unwrap();
+    let state0 = xmr_btc::bob::State0::new(
+        rng,
+        btc_to_swap,
+        xmr_btc::monero::Amount::from_piconero(xmr_to_swap),
+        REFUND_TIMELOCK,
+        PUNISH_TIMELOCK,
+        refund_address,
+    );
+    let bob_state = BobState::Started {
+        state0,
+        amounts,
+        peer_id: alice_peer_id,
+        addr: alice_multiaddr,
+    };
+    let bob_swarm = bob::new_swarm(bob_transport, bob_behaviour).unwrap();
+
+    (bob_state, bob_swarm, bob_btc_wallet, bob_xmr_wallet, bob_db)
+}
+
+fn init_tracing() {
+    use tracing_subscriber::util::SubscriberInitExt as _;
+    let _guard = tracing_subscriber::fmt()
+        .with_env_filter("swap=info,xmr_btc=info")
+        .with_ansi(false)
+        .set_default();
 }
