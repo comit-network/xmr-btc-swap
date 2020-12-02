@@ -255,7 +255,7 @@ dependencies = [
 [[package]]
 name = "bitcoin-harness"
 version = "0.1.0"
-source = "git+https://github.com/coblox/bitcoin-harness-rs?rev=3be644cd9512c157d3337a189298b8257ed54d04#3be644cd9512c157d3337a189298b8257ed54d04"
+source = "git+https://github.com/d4nte/bitcoin-harness-rs?rev=2869620689f7e54bdb8ab3d1838560cb9bc8fd60#2869620689f7e54bdb8ab3d1838560cb9bc8fd60"
 dependencies = [
  "base64 0.12.3",
  "bitcoin",
@@ -275,7 +275,7 @@ dependencies = [
 [[package]]
 name = "bitcoin-harness"
 version = "0.1.0"
-source = "git+https://github.com/d4nte/bitcoin-harness-rs?branch=access-wallet-client#2ceccaa89bd994c2bc49e23a11cd8af647afc31b"
+source = "git+https://github.com/coblox/bitcoin-harness-rs?rev=3be644cd9512c157d3337a189298b8257ed54d04#3be644cd9512c157d3337a189298b8257ed54d04"
 dependencies = [
  "base64 0.12.3",
  "bitcoin",
@@ -3389,7 +3389,7 @@ dependencies = [
  "backoff",
  "base64 0.12.3",
  "bitcoin",
- "bitcoin-harness 0.1.0 (git+https://github.com/d4nte/bitcoin-harness-rs?branch=access-wallet-client)",
+ "bitcoin-harness 0.1.0 (git+https://github.com/d4nte/bitcoin-harness-rs?rev=2869620689f7e54bdb8ab3d1838560cb9bc8fd60)",
  "conquer-once",
  "derivative",
  "ecdsa_fun",
