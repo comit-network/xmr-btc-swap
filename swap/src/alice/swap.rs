@@ -69,8 +69,7 @@ pub enum AliceState {
         tx_cancel: TxCancel,
     },
     BtcRefunded {
-        tx_refund: TxRefund,
-        published_refund_tx: ::bitcoin::Transaction,
+        spend_key: monero::PrivateKey,
         state3: State3,
     },
     BtcPunishable {
@@ -296,12 +295,16 @@ pub async fn swap(
                     .await
                 }
                 Some(published_refund_tx) => {
+                    let spend_key = extract_monero_private_key(
+                        published_refund_tx,
+                        tx_refund,
+                        state3.s_a,
+                        state3.a.clone(),
+                        state3.S_b_bitcoin.clone(),
+                    )?;
+
                     swap(
-                        AliceState::BtcRefunded {
-                            tx_refund,
-                            published_refund_tx,
-                            state3,
-                        },
+                        AliceState::BtcRefunded { spend_key, state3 },
                         swarm,
                         bitcoin_wallet.clone(),
                         monero_wallet,
@@ -310,18 +313,7 @@ pub async fn swap(
                 }
             }
         }
-        AliceState::BtcRefunded {
-            tx_refund,
-            published_refund_tx,
-            state3,
-        } => {
-            let spend_key = extract_monero_private_key(
-                published_refund_tx,
-                tx_refund,
-                state3.s_a,
-                state3.a.clone(),
-                state3.S_b_bitcoin,
-            )?;
+        AliceState::BtcRefunded { spend_key, state3 } => {
             let view_key = state3.v;
 
             monero_wallet
@@ -360,12 +352,16 @@ pub async fn swap(
                     .await
                 }
                 Either::Right((published_refund_tx, _)) => {
+                    let spend_key = extract_monero_private_key(
+                        published_refund_tx,
+                        tx_refund,
+                        state3.s_a,
+                        state3.a.clone(),
+                        state3.S_b_bitcoin.clone(),
+                    )?;
+
                     swap(
-                        AliceState::BtcRefunded {
-                            tx_refund,
-                            published_refund_tx,
-                            state3,
-                        },
+                        AliceState::BtcRefunded { spend_key, state3 },
                         swarm,
                         bitcoin_wallet.clone(),
                         monero_wallet,
