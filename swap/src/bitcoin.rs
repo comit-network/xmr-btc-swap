@@ -1,11 +1,10 @@
-use std::time::Duration;
-
 use anyhow::Result;
 use async_trait::async_trait;
-use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
+use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation};
 use bitcoin::util::psbt::PartiallySignedTransaction;
-use bitcoin_harness::bitcoind_rpc::PsbtBase64;
+use bitcoin_harness::bitcoind_rpc_api::PsbtBase64;
 use reqwest::Url;
+use std::time::Duration;
 use xmr_btc::bitcoin::{
     BlockHeight, BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock, TransactionBlockHeight,
     WatchForRawTransaction,
@@ -33,16 +32,6 @@ impl Wallet {
 
     pub async fn new_address(&self) -> Result<Address> {
         self.0.new_address().await.map_err(Into::into)
-    }
-
-    pub async fn transaction_fee(&self, txid: Txid) -> Result<Amount> {
-        let fee = self
-            .0
-            .get_wallet_transaction(txid)
-            .await
-            .map(|res| bitcoin::Amount::from_btc(-res.fee))??;
-
-        Ok(fee)
     }
 }
 

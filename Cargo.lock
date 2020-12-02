@@ -246,22 +246,35 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a32c9d2fa897cfbb0db45d71e3d2838666194abc4828c0f994e4b5c3bf85ba4"
 dependencies = [
  "bech32",
- "bitcoin_hashes",
+ "bitcoin_hashes 0.7.6",
  "hex 0.3.2",
- "secp256k1",
+ "secp256k1 0.17.2",
+ "serde",
+]
+
+[[package]]
+name = "bitcoin"
+version = "0.25.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aefc9be9f17185f4ebccae6575d342063f775924d57df0000edb1880c0fb7095"
+dependencies = [
+ "bech32",
+ "bitcoin_hashes 0.9.4",
+ "secp256k1 0.19.0",
  "serde",
 ]
 
 [[package]]
 name = "bitcoin-harness"
 version = "0.1.0"
-source = "git+https://github.com/coblox/bitcoin-harness-rs?rev=3be644cd9512c157d3337a189298b8257ed54d04#3be644cd9512c157d3337a189298b8257ed54d04"
 dependencies = [
+ "async-trait",
  "base64 0.12.3",
- "bitcoin",
+ "bitcoin 0.23.0",
  "bitcoincore-rpc-json",
  "futures",
  "hex 0.4.2",
+ "jsonrpc_client",
  "reqwest",
  "serde",
  "serde_json",
@@ -282,12 +295,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "bitcoincore-rpc-json"
-version = "0.11.0"
+name = "bitcoin_hashes"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea6d55f23cd516d515ae10911164c603ea1040024670ec109715a20d7f6c9d0c"
+checksum = "0aaf87b776808e26ae93289bc7d025092b6d909c193f0cdee0b3a86e7bd3c776"
 dependencies = [
- "bitcoin",
+ "serde",
+]
+
+[[package]]
+name = "bitcoincore-rpc-json"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76d488ec31e9cb6726c361be5160f7d2aaace89a0681acf1f476b8fada770b6e"
+dependencies = [
+ "bitcoin 0.25.2",
  "hex 0.3.2",
  "serde",
  "serde_json",
@@ -1552,6 +1574,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonrpc_client"
+version = "0.3.0"
+source = "git+https://github.com/thomaseizinger/rust-jsonrpc-client?rev=c7010817e0f86ab24b3dc10d6bb0463faa0aace4#c7010817e0f86ab24b3dc10d6bb0463faa0aace4"
+dependencies = [
+ "async-trait",
+ "jsonrpc_client_macro",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "url",
+]
+
+[[package]]
+name = "jsonrpc_client_macro"
+version = "0.1.0"
+source = "git+https://github.com/thomaseizinger/rust-jsonrpc-client?rev=c7010817e0f86ab24b3dc10d6bb0463faa0aace4#c7010817e0f86ab24b3dc10d6bb0463faa0aace4"
+dependencies = [
+ "quote 1.0.7",
+ "syn 1.0.48",
+]
+
+[[package]]
 name = "keccak"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1944,7 +1988,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "58f196216a07ade53d91a263b3721057f1f0cfd6f95f3d324626f3f9cf7cdfce"
 dependencies = [
- "bitcoin",
+ "bitcoin 0.23.0",
  "serde",
 ]
 
@@ -2932,7 +2976,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2932dc07acd2066ff2e3921a4419606b220ba6cd03a9935123856cc534877056"
 dependencies = [
  "rand 0.6.5",
- "secp256k1-sys",
+ "secp256k1-sys 0.1.2",
+ "serde",
+]
+
+[[package]]
+name = "secp256k1"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6179428c22c73ac0fbb7b5579a56353ce78ba29759b3b8575183336ea74cdfb"
+dependencies = [
+ "secp256k1-sys 0.3.0",
  "serde",
 ]
 
@@ -2946,13 +3000,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "secp256k1-sys"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11553d210db090930f4432bea123b31f70bbf693ace14504ea2a35e796c28dd2"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "secp256kfun"
 version = "0.3.2-alpha.0"
 source = "git+https://github.com/LLFourn/secp256kfun?rev=510d48ef6a2b19805f7f5c70c598e5b03f668e7a#510d48ef6a2b19805f7f5c70c598e5b03f668e7a"
 dependencies = [
  "digest 0.9.0",
  "rand_core 0.5.1",
- "secp256k1",
+ "secp256k1 0.17.2",
  "secp256kfun_parity_backend",
  "serde",
  "subtle 2.3.0",
@@ -3368,7 +3431,7 @@ dependencies = [
  "atty",
  "backoff",
  "base64 0.12.3",
- "bitcoin",
+ "bitcoin 0.23.0",
  "bitcoin-harness",
  "conquer-once",
  "derivative",
@@ -4146,7 +4209,7 @@ dependencies = [
  "async-trait",
  "backoff",
  "base64 0.12.3",
- "bitcoin",
+ "bitcoin 0.23.0",
  "bitcoin-harness",
  "cross-curve-dleq",
  "curve25519-dalek 2.1.0",
