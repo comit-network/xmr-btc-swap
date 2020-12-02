@@ -1,10 +1,4 @@
-use crate::{
-    bitcoin,
-    bitcoin::{BroadcastSignedTransaction, WatchForRawTransaction},
-    bob, monero,
-    monero::{CreateWalletForOutput, Transfer},
-    transport::{ReceiveMessage, SendMessage},
-};
+use crate::{bitcoin, bitcoin::WatchForRawTransaction, bob, monero, monero::CreateWalletForOutput};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ecdsa_fun::{
@@ -14,7 +8,7 @@ use ecdsa_fun::{
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 use tracing::info;
 
 pub mod message;
@@ -42,68 +36,6 @@ pub enum Action {
 #[async_trait]
 pub trait ReceiveBitcoinRedeemEncsig {
     async fn receive_bitcoin_redeem_encsig(&mut self) -> bitcoin::EncryptedSignature;
-}
-
-// There are no guarantees that send_message and receive_massage do not block
-// the flow of execution. Therefore they must be paired between Alice/Bob, one
-// send to one receive in the correct order.
-pub async fn next_state<
-    R: RngCore + CryptoRng,
-    B: WatchForRawTransaction + BroadcastSignedTransaction,
-    M: CreateWalletForOutput + Transfer,
-    T: SendMessage<Message> + ReceiveMessage<bob::Message>,
->(
-    bitcoin_wallet: &B,
-    monero_wallet: &M,
-    transport: &mut T,
-    state: State,
-    rng: &mut R,
-) -> Result<State> {
-    match state {
-        State::State0(state0) => {
-            let alice_message0 = state0.next_message(rng).into();
-
-            let bob_message0 = transport.receive_message().await?.try_into()?;
-            transport.send_message(alice_message0).await?;
-
-            let state1 = state0.receive(bob_message0)?;
-            Ok(state1.into())
-        }
-        State::State1(state1) => {
-            let bob_message1 = transport.receive_message().await?.try_into()?;
-            let state2 = state1.receive(bob_message1);
-            let alice_message1 = state2.next_message();
-            transport.send_message(alice_message1.into()).await?;
-            Ok(state2.into())
-        }
-        State::State2(state2) => {
-            let bob_message2 = transport.receive_message().await?.try_into()?;
-            let state3 = state2.receive(bob_message2)?;
-            Ok(state3.into())
-        }
-        State::State3(state3) => {
-            tracing::info!("alice is watching for locked btc");
-            let state4 = state3.watch_for_lock_btc(bitcoin_wallet).await?;
-            Ok(state4.into())
-        }
-        State::State4(state4) => {
-            let state5 = state4.lock_xmr(monero_wallet).await?;
-            tracing::info!("alice has locked xmr");
-            Ok(state5.into())
-        }
-        State::State5(state5) => {
-            transport.send_message(state5.next_message().into()).await?;
-            // todo: pass in state4b as a parameter somewhere in this call to prevent the
-            // user from waiting for a message that wont be sent
-            let message3 = transport.receive_message().await?.try_into()?;
-            let state6 = state5.receive(message3);
-            tracing::info!("alice has received bob message 3");
-            tracing::info!("alice is redeeming btc");
-            state6.redeem_btc(bitcoin_wallet).await?;
-            Ok(state6.into())
-        }
-        State::State6(state6) => Ok(state6.into()),
-    }
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -349,9 +281,6 @@ impl State2 {
             S_b_monero: self.S_b_monero,
             S_b_bitcoin: self.S_b_bitcoin,
             v: self.v,
-            // TODO(Franck): Review if these amounts are actually needed
-            btc: self.btc,
-            xmr: self.xmr,
             refund_timelock: self.refund_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: self.refund_address,
@@ -372,9 +301,6 @@ pub struct State3 {
     pub S_b_monero: monero::PublicKey,
     pub S_b_bitcoin: bitcoin::PublicKey,
     pub v: monero::PrivateViewKey,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
-    pub btc: bitcoin::Amount,
-    pub xmr: monero::Amount,
     pub refund_timelock: u32,
     pub punish_timelock: u32,
     pub refund_address: bitcoin::Address,
@@ -404,8 +330,6 @@ impl State3 {
             S_b_monero: self.S_b_monero,
             S_b_bitcoin: self.S_b_bitcoin,
             v: self.v,
-            btc: self.btc,
-            xmr: self.xmr,
             refund_timelock: self.refund_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: self.refund_address,
@@ -426,9 +350,6 @@ pub struct State4 {
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
-    btc: bitcoin::Amount,
-    xmr: monero::Amount,
     refund_timelock: u32,
     punish_timelock: u32,
     refund_address: bitcoin::Address,
@@ -440,41 +361,6 @@ pub struct State4 {
 }
 
 impl State4 {
-    pub async fn lock_xmr<W>(self, monero_wallet: &W) -> Result<State5>
-    where
-        W: monero::Transfer,
-    {
-        let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey {
-            scalar: self.s_a.into_ed25519(),
-        });
-        let S_b = self.S_b_monero;
-
-        let (tx_lock_proof, fee) = monero_wallet
-            .transfer(S_a + S_b, self.v.public(), self.xmr)
-            .await?;
-
-        Ok(State5 {
-            a: self.a,
-            B: self.B,
-            s_a: self.s_a,
-            S_b_monero: self.S_b_monero,
-            S_b_bitcoin: self.S_b_bitcoin,
-            v: self.v,
-            btc: self.btc,
-            xmr: self.xmr,
-            refund_timelock: self.refund_timelock,
-            punish_timelock: self.punish_timelock,
-            refund_address: self.refund_address,
-            redeem_address: self.redeem_address,
-            punish_address: self.punish_address,
-            tx_lock: self.tx_lock,
-            tx_lock_proof,
-            tx_punish_sig_bob: self.tx_punish_sig_bob,
-            tx_cancel_sig_bob: self.tx_cancel_sig_bob,
-            lock_xmr_fee: fee,
-        })
-    }
-
     pub async fn punish<W: bitcoin::BroadcastSignedTransaction>(
         &self,
         bitcoin_wallet: &W,

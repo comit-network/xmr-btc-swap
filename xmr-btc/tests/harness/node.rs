@@ -25,28 +25,6 @@ impl AliceNode {
     }
 }
 
-pub async fn run_alice_until<R: RngCore + CryptoRng>(
-    alice: &mut AliceNode,
-    initial_state: alice::State,
-    is_state: fn(&alice::State) -> bool,
-    rng: &mut R,
-) -> Result<alice::State> {
-    let mut result = initial_state;
-    loop {
-        result = alice::next_state(
-            &alice.bitcoin_wallet,
-            &alice.monero_wallet,
-            &mut alice.transport,
-            result,
-            rng,
-        )
-        .await?;
-        if is_state(&result) {
-            return Ok(result);
-        }
-    }
-}
-
 // TODO: merge this with alice node
 // This struct is responsible for I/O
 pub struct BobNode {
