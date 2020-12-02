@@ -64,6 +64,11 @@ async fn main() -> Result<()> {
             info!("running swap node as Alice ...");
 
             let behaviour = alice::Behaviour::default();
+            let alice_peer_id = behaviour.peer_id().clone();
+            info!(
+                "Alice Peer ID (to be used by Bob to dial her): {}",
+                alice_peer_id
+            );
             let local_key_pair = behaviour.identity();
 
             let (listen_addr, _ac, transport) = match tor_port {
