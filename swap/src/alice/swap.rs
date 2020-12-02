@@ -86,16 +86,38 @@ pub enum AliceState {
     SafelyAborted,
 }
 
+pub async fn swap<R>(
+    state: AliceState,
+    swarm: Swarm,
+    bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
+    monero_wallet: Arc<crate::monero::Wallet>,
+) -> Result<AliceState>
+    where
+        R: RngCore + CryptoRng + Send,
+{
+    run_until(state, is_complete, swarm, bitcoin_wallet, monero_wallet).await
+}
+
+// TODO: use macro or generics
+pub fn is_complete(state: &AliceState) -> bool {
+    matches!(state,  AliceState::XmrRefunded| AliceState::BtcRedeemed | AliceState::Punished | AliceState::SafelyAborted)
+}
+
+
 // State machine driver for swap execution
 #[async_recursion]
-pub async fn swap(
+pub async fn run_until(
     state: AliceState,
+    is_state: fn(&AliceState) -> bool,
     mut swarm: Swarm,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
     config: Config,
 ) -> Result<AliceState> {
-    match state {
+    if is_state(&state) {
+        Ok(state)
+    } else {
+        match state {
         AliceState::Started {
             amounts,
             a,
@@ -113,12 +135,13 @@ pub async fn swap(
             )
             .await?;
 
-            swap(
+            run_until(
                 AliceState::Negotiated {
                     channel,
                     amounts,
                     state3,
                 },
+                is_state,
                 swarm,
                 bitcoin_wallet,
                 monero_wallet,
@@ -134,12 +157,13 @@ pub async fn swap(
             let _ = wait_for_locked_bitcoin(state3.tx_lock.txid(), bitcoin_wallet.clone(), config)
                 .await?;
 
-            swap(
+            run_until(
                 AliceState::BtcLocked {
                     channel,
                     amounts,
                     state3,
                 },
+                is_state,
                 swarm,
                 bitcoin_wallet,
                 monero_wallet,
@@ -161,8 +185,9 @@ pub async fn swap(
             )
             .await?;
 
-            swap(
+            run_until(
                 AliceState::XmrLocked { state3 },
+                is_state,
                 swarm,
                 bitcoin_wallet,
                 monero_wallet,
@@ -175,11 +200,12 @@ pub async fn swap(
             // step fails
             match wait_for_bitcoin_encrypted_signature(&mut swarm).await {
                 Ok(encrypted_signature) => {
-                    swap(
+                    run_until(
                         AliceState::EncSignLearned {
                             state3,
                             encrypted_signature,
                         },
+                        is_state,
                         swarm,
                         bitcoin_wallet,
                         monero_wallet,
@@ -188,8 +214,9 @@ pub async fn swap(
                     .await
                 }
                 Err(_) => {
-                    swap(
+                    run_until(
                         AliceState::WaitingToCancel { state3 },
+                        is_state,
                         swarm,
                         bitcoin_wallet,
                         monero_wallet,
@@ -213,8 +240,9 @@ pub async fn swap(
             ) {
                 Ok(tx) => tx,
                 Err(_) => {
-                    return swap(
+                    return run_until(
                         AliceState::WaitingToCancel { state3 },
+                        is_state,
                         swarm,
                         bitcoin_wallet,
                         monero_wallet,
@@ -230,8 +258,9 @@ pub async fn swap(
             publish_bitcoin_redeem_transaction(signed_tx_redeem, bitcoin_wallet.clone(), config)
                 .await?;
 
-            swap(
+            run_until(
                 AliceState::BtcRedeemed,
+                is_state,
                 swarm,
                 bitcoin_wallet,
                 monero_wallet,
@@ -250,8 +279,9 @@ pub async fn swap(
             )
             .await?;
 
-            swap(
+            run_until(
                 AliceState::BtcCancelled { state3, tx_cancel },
+                is_state,
                 swarm,
                 bitcoin_wallet,
                 monero_wallet,
@@ -276,8 +306,9 @@ pub async fn swap(
             // TODO(Franck): Review error handling
             match published_refund_tx {
                 None => {
-                    swap(
+                    run_until(
                         AliceState::BtcPunishable { tx_refund, state3 },
+                        is_state,
                         swarm,
                         bitcoin_wallet.clone(),
                         monero_wallet,
@@ -286,12 +317,13 @@ pub async fn swap(
                     .await
                 }
                 Some(published_refund_tx) => {
-                    swap(
+                    run_until(
                         AliceState::BtcRefunded {
                             tx_refund,
                             published_refund_tx,
                             state3,
                         },
+                        is_state,
                         swarm,
                         bitcoin_wallet.clone(),
                         monero_wallet,
@@ -345,8 +377,9 @@ pub async fn swap(
 
             match select(punish_tx_finalised, refund_tx_seen).await {
                 Either::Left(_) => {
-                    swap(
+                    run_until(
                         AliceState::Punished,
+                        is_state,
                         swarm,
                         bitcoin_wallet.clone(),
                         monero_wallet,
@@ -355,12 +388,13 @@ pub async fn swap(
                     .await
                 }
                 Either::Right((published_refund_tx, _)) => {
-                    swap(
+                    run_until(
                         AliceState::BtcRefunded {
                             tx_refund,
                             published_refund_tx,
                             state3,
                         },
+                        is_state,
                         swarm,
                         bitcoin_wallet.clone(),
                         monero_wallet,
@@ -374,5 +408,6 @@ pub async fn swap(
         AliceState::BtcRedeemed => Ok(AliceState::BtcRedeemed),
         AliceState::Punished => Ok(AliceState::Punished),
         AliceState::SafelyAborted => Ok(AliceState::SafelyAborted),
+    }
     }
 }
