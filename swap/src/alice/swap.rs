@@ -44,12 +44,12 @@ pub enum AliceState {
         state0: State0,
     },
     Negotiated {
-        channel: ResponseChannel<AliceToBob>,
+        channel: Option<ResponseChannel<AliceToBob>>,
         amounts: SwapAmounts,
         state3: State3,
     },
     BtcLocked {
-        channel: ResponseChannel<AliceToBob>,
+        channel: Option<ResponseChannel<AliceToBob>>,
         amounts: SwapAmounts,
         state3: State3,
     },
@@ -157,7 +157,7 @@ pub async fn run_until(
 
                 run_until(
                     AliceState::Negotiated {
-                        channel,
+                        channel: Some(channel),
                         amounts,
                         state3,
                     },
@@ -174,48 +174,84 @@ pub async fn run_until(
                 channel,
                 amounts,
             } => {
-                let _ =
-                    wait_for_locked_bitcoin(state3.tx_lock.txid(), bitcoin_wallet.clone(), config)
+                match channel {
+                    Some(channel) => {
+                        let _ = wait_for_locked_bitcoin(
+                            state3.tx_lock.txid(),
+                            bitcoin_wallet.clone(),
+                            config,
+                        )
                         .await?;
 
-                run_until(
-                    AliceState::BtcLocked {
-                        channel,
-                        amounts,
-                        state3,
-                    },
-                    is_target_state,
-                    swarm,
-                    bitcoin_wallet,
-                    monero_wallet,
-                    config,
-                )
-                .await
+                        run_until(
+                            AliceState::BtcLocked {
+                                channel: Some(channel),
+                                amounts,
+                                state3,
+                            },
+                            is_target_state,
+                            swarm,
+                            bitcoin_wallet,
+                            monero_wallet,
+                            config,
+                        )
+                        .await
+                    }
+                    None => {
+                        tracing::info!("Cannot resume swap from negotiated state, aborting");
+
+                        // Alice did not lock Xmr yet
+                        run_until(
+                            AliceState::SafelyAborted,
+                            is_target_state,
+                            swarm,
+                            bitcoin_wallet,
+                            monero_wallet,
+                            config,
+                        )
+                        .await
+                    }
+                }
             }
             AliceState::BtcLocked {
                 channel,
                 amounts,
                 state3,
-            } => {
-                lock_xmr(
-                    channel,
-                    amounts,
-                    state3.clone(),
-                    &mut swarm,
-                    monero_wallet.clone(),
-                )
-                .await?;
+            } => match channel {
+                Some(channel) => {
+                    lock_xmr(
+                        channel,
+                        amounts,
+                        state3.clone(),
+                        &mut swarm,
+                        monero_wallet.clone(),
+                    )
+                    .await?;
 
-                run_until(
-                    AliceState::XmrLocked { state3 },
-                    is_target_state,
-                    swarm,
-                    bitcoin_wallet,
-                    monero_wallet,
-                    config,
-                )
-                .await
-            }
+                    run_until(
+                        AliceState::XmrLocked { state3 },
+                        is_target_state,
+                        swarm,
+                        bitcoin_wallet,
+                        monero_wallet,
+                        config,
+                    )
+                    .await
+                }
+                None => {
+                    tracing::info!("Cannot resume swap from BTC locked state, aborting");
+
+                    // Alice did not lock Xmr yet
+                    swap(
+                        AliceState::SafelyAborted,
+                        swarm,
+                        bitcoin_wallet,
+                        monero_wallet,
+                        config,
+                    )
+                    .await
+                }
+            },
             AliceState::XmrLocked { state3 } => {
                 // Our Monero is locked, we need to go through the cancellation process if this
                 // step fails
