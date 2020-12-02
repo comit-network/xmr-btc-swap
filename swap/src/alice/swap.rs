@@ -66,8 +66,7 @@ pub enum AliceState {
         tx_cancel: TxCancel,
     },
     BtcRefunded {
-        tx_refund: TxRefund,
-        published_refund_tx: ::bitcoin::Transaction,
+        spend_key: monero::PrivateKey,
         state3: State3,
     },
     BtcPunishable {
@@ -242,8 +241,9 @@ pub async fn run_until(
                     tracing::info!("Cannot resume swap from BTC locked state, aborting");
 
                     // Alice did not lock Xmr yet
-                    swap(
+                    run_until(
                         AliceState::SafelyAborted,
+                        is_target_state,
                         swarm,
                         bitcoin_wallet,
                         monero_wallet,
@@ -383,12 +383,16 @@ pub async fn run_until(
                         .await
                     }
                     Some(published_refund_tx) => {
+                        let spend_key = extract_monero_private_key(
+                            published_refund_tx,
+                            tx_refund,
+                            state3.s_a,
+                            state3.a.clone(),
+                            state3.S_b_bitcoin,
+                        )?;
+
                         run_until(
-                            AliceState::BtcRefunded {
-                                tx_refund,
-                                published_refund_tx,
-                                state3,
-                            },
+                            AliceState::BtcRefunded { spend_key, state3 },
                             is_target_state,
                             swarm,
                             bitcoin_wallet.clone(),
@@ -399,18 +403,7 @@ pub async fn run_until(
                     }
                 }
             }
-            AliceState::BtcRefunded {
-                tx_refund,
-                published_refund_tx,
-                state3,
-            } => {
-                let spend_key = extract_monero_private_key(
-                    published_refund_tx,
-                    tx_refund,
-                    state3.s_a,
-                    state3.a.clone(),
-                    state3.S_b_bitcoin,
-                )?;
+            AliceState::BtcRefunded { spend_key, state3 } => {
                 let view_key = state3.v;
 
                 monero_wallet
@@ -454,12 +447,16 @@ pub async fn run_until(
                         .await
                     }
                     Either::Right((published_refund_tx, _)) => {
+                        let spend_key = extract_monero_private_key(
+                            published_refund_tx,
+                            tx_refund,
+                            state3.s_a,
+                            state3.a.clone(),
+                            state3.S_b_bitcoin,
+                        )?;
+
                         run_until(
-                            AliceState::BtcRefunded {
-                                tx_refund,
-                                published_refund_tx,
-                                state3,
-                            },
+                            AliceState::BtcRefunded { spend_key, state3 },
                             is_target_state,
                             swarm,
                             bitcoin_wallet.clone(),
