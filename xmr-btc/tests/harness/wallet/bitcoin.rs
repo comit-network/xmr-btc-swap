@@ -7,8 +7,8 @@ use reqwest::Url;
 use std::time::Duration;
 use tokio::time;
 use xmr_btc::bitcoin::{
-    BlockHeight, BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock, TransactionBlockHeight,
-    TxLock, WatchForRawTransaction,
+    BlockHeight, BroadcastSignedTransaction, BuildTxLockPsbt, Network, SignTxLock,
+    TransactionBlockHeight, TxLock, WatchForRawTransaction,
 };
 
 #[derive(Debug)]
@@ -150,5 +150,11 @@ impl TransactionBlockHeight for Wallet {
         .retry(ConstantBackoff::new(Duration::from_secs(1)))
         .await
         .expect("transient errors to be retried")
+    }
+}
+
+impl Network for Wallet {
+    fn get_network(&self) -> bitcoin::Network {
+        bitcoin::Network::Regtest
     }
 }

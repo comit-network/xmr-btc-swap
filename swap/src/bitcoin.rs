@@ -16,22 +16,28 @@ pub use xmr_btc::bitcoin::*;
 pub const TX_LOCK_MINE_TIMEOUT: u64 = 3600;
 
 #[derive(Debug)]
-pub struct Wallet(pub bitcoin_harness::Wallet);
+pub struct Wallet {
+    pub inner: bitcoin_harness::Wallet,
+    pub network: bitcoin::Network,
+}
 
 impl Wallet {
-    pub async fn new(name: &str, url: Url) -> Result<Self> {
+    pub async fn new(name: &str, url: Url, network: bitcoin::Network) -> Result<Self> {
         let wallet = bitcoin_harness::Wallet::new(name, url).await?;
 
-        Ok(Self(wallet))
+        Ok(Self {
+            inner: wallet,
+            network,
+        })
     }
 
     pub async fn balance(&self) -> Result<Amount> {
-        let balance = self.0.balance().await?;
+        let balance = self.inner.balance().await?;
         Ok(balance)
     }
 
     pub async fn new_address(&self) -> Result<Address> {
-        self.0.new_address().await.map_err(Into::into)
+        self.inner.new_address().await.map_err(Into::into)
     }
 }
 
@@ -42,7 +48,7 @@ impl BuildTxLockPsbt for Wallet {
         output_address: Address,
         output_amount: Amount,
     ) -> Result<PartiallySignedTransaction> {
-        let psbt = self.0.fund_psbt(output_address, output_amount).await?;
+        let psbt = self.inner.fund_psbt(output_address, output_amount).await?;
         let as_hex = base64::decode(psbt)?;
 
         let psbt = bitcoin::consensus::deserialize(&as_hex)?;
@@ -59,7 +65,10 @@ impl SignTxLock for Wallet {
         let psbt = bitcoin::consensus::serialize(&psbt);
         let as_base64 = base64::encode(psbt);
 
-        let psbt = self.0.wallet_process_psbt(PsbtBase64(as_base64)).await?;
+        let psbt = self
+            .inner
+            .wallet_process_psbt(PsbtBase64(as_base64))
+            .await?;
         let PsbtBase64(signed_psbt) = PsbtBase64::from(psbt);
 
         let as_hex = base64::decode(signed_psbt)?;
@@ -74,7 +83,9 @@ impl SignTxLock for Wallet {
 #[async_trait]
 impl BroadcastSignedTransaction for Wallet {
     async fn broadcast_signed_transaction(&self, transaction: Transaction) -> Result<Txid> {
-        Ok(self.0.send_raw_transaction(transaction).await?)
+        let txid = self.inner.send_raw_transaction(transaction).await?;
+        tracing::debug!("Bitcoin tx broadcasted! TXID = {}", txid);
+        Ok(txid)
     }
 }
 
@@ -83,7 +94,7 @@ impl BroadcastSignedTransaction for Wallet {
 #[async_trait]
 impl WatchForRawTransaction for Wallet {
     async fn watch_for_raw_transaction(&self, txid: Txid) -> Transaction {
-        (|| async { Ok(self.0.get_raw_transaction(txid).await?) })
+        (|| async { Ok(self.inner.get_raw_transaction(txid).await?) })
             .retry(ConstantBackoff::new(Duration::from_secs(1)))
             .await
             .expect("transient errors to be retried")
@@ -94,14 +105,14 @@ impl WatchForRawTransaction for Wallet {
 impl GetRawTransaction for Wallet {
     // todo: potentially replace with option
     async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
-        Ok(self.0.get_raw_transaction(txid).await?)
+        Ok(self.inner.get_raw_transaction(txid).await?)
     }
 }
 
 #[async_trait]
 impl BlockHeight for Wallet {
     async fn block_height(&self) -> u32 {
-        (|| async { Ok(self.0.block_height().await?) })
+        (|| async { Ok(self.inner.block_height().await?) })
             .retry(ConstantBackoff::new(Duration::from_secs(1)))
             .await
             .expect("transient errors to be retried")
@@ -119,7 +130,7 @@ impl TransactionBlockHeight for Wallet {
 
         (|| async {
             let block_height = self
-                .0
+                .inner
                 .transaction_block_height(txid)
                 .await
                 .map_err(|_| backoff::Error::Transient(Error::Io))?;
@@ -139,5 +150,11 @@ impl TransactionBlockHeight for Wallet {
 impl WaitForTransactionFinality for Wallet {
     async fn wait_for_transaction_finality(&self, _txid: Txid) {
         todo!()
+    }
+}
+
+impl Network for Wallet {
+    fn get_network(&self) -> bitcoin::Network {
+        self.network
     }
 }

@@ -14,8 +14,9 @@ pub mod state;
 pub mod storage;
 pub mod tor;
 
-// REFUND_TIMELOCK determines the interval between lock-time until TX_cancel is allowed,
-// PUNISH_TIMELOCK determines the interval between TX_cancel and TX_punish being allowed.
+// REFUND_TIMELOCK determines the interval between lock-time until TX_cancel is
+// allowed, PUNISH_TIMELOCK determines the interval between TX_cancel and
+// TX_punish being allowed.
 //
 // *[1]
 //     |----REFUND_TIMELOCK--|

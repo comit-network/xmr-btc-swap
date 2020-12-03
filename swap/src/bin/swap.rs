@@ -16,7 +16,10 @@ use anyhow::Result;
 use libp2p::Multiaddr;
 use prettytable::{row, Table};
 use rand::rngs::OsRng;
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use structopt::StructOpt;
 use swap::{
     alice,
@@ -45,10 +48,18 @@ extern crate prettytable;
 async fn main() -> Result<()> {
     init_tracing(LevelFilter::Trace).expect("initialize tracing");
 
-    let opt = Options::from_args();
+    let now = SystemTime::now();
+    let timestamp = now
+        .duration_since(UNIX_EPOCH)
+        .expect("time to move forward");
 
+    let opt = Options::from_args();
     // This currently creates the directory if it's not there in the first place
-    let db = Database::open(std::path::Path::new("./.swap-db/")).unwrap();
+    let db = Database::open(std::path::Path::new(&format!(
+        "./.swap-db/{}/",
+        timestamp.as_millis()
+    )))
+    .unwrap();
     let rng = &mut OsRng;
 
     match opt {
@@ -97,9 +108,14 @@ async fn main() -> Result<()> {
                 xmr: send_monero,
             };
 
-            let bitcoin_wallet = bitcoin::Wallet::new(bitcoin_wallet_name.as_str(), bitcoind_url)
-                .await
-                .expect("failed to create bitcoin wallet");
+            // TODO: network should be configurable through CLI defaulting to mainnet
+            let bitcoin_wallet = bitcoin::Wallet::new(
+                bitcoin_wallet_name.as_str(),
+                bitcoind_url,
+                ::bitcoin::Network::Bitcoin,
+            )
+            .await
+            .expect("failed to create bitcoin wallet");
 
             let bitcoin_balance = bitcoin_wallet.balance().await?;
             info!(
@@ -164,9 +180,13 @@ async fn main() -> Result<()> {
                 xmr: receive_monero,
             };
 
-            let bitcoin_wallet = bitcoin::Wallet::new(bitcoin_wallet_name.as_str(), bitcoind_url)
-                .await
-                .expect("failed to create bitcoin wallet");
+            let bitcoin_wallet = bitcoin::Wallet::new(
+                bitcoin_wallet_name.as_str(),
+                bitcoind_url,
+                ::bitcoin::Network::Bitcoin,
+            )
+            .await
+            .expect("failed to create bitcoin wallet");
             let bitcoin_balance = bitcoin_wallet.balance().await?;
             info!(
                 "Connection to Bitcoin wallet succeeded, balance: {}",
@@ -231,9 +251,13 @@ async fn main() -> Result<()> {
             bitcoin_wallet_name,
         } => {
             let state = db.get_state(swap_id)?;
-            let bitcoin_wallet = bitcoin::Wallet::new(bitcoin_wallet_name.as_ref(), bitcoind_url)
-                .await
-                .expect("failed to create bitcoin wallet");
+            let bitcoin_wallet = bitcoin::Wallet::new(
+                bitcoin_wallet_name.as_ref(),
+                bitcoind_url,
+                ::bitcoin::Network::Bitcoin,
+            )
+            .await
+            .expect("failed to create bitcoin wallet");
             let monero_wallet = monero::Wallet::new(monerod_url);
 
             recover(bitcoin_wallet, monero_wallet, state).await?;
@@ -271,7 +295,10 @@ pub fn init_tracing(level: log::LevelFilter) -> anyhow::Result<()> {
 
     let is_terminal = atty::is(atty::Stream::Stderr);
     let subscriber = FmtSubscriber::builder()
-        .with_env_filter(format!("swap={},http=info,warp=info", level,))
+        .with_env_filter(format!(
+            "swap={},xmr-btc={},http=info,warp=info",
+            level, level
+        ))
         .with_writer(std::io::stderr)
         .with_ansi(is_terminal)
         .finish();

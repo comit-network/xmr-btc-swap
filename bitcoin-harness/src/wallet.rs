@@ -269,7 +269,7 @@ mod test {
     //
     //     let psbt = {
     //         let partial_signed_bitcoin_transaction =
-    //             
+    //
     // PartiallySignedTransaction::from_unsigned_tx(transaction).unwrap();
     //         let hex_vec =
     // bitcoin::consensus::serialize(&partial_signed_bitcoin_transaction);

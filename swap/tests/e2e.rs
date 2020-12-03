@@ -42,17 +42,25 @@ async fn swap() {
     let xmr_bob = 0;
 
     let alice_btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new("alice", bitcoind.node_url.clone())
-            .await
-            .unwrap(),
+        swap::bitcoin::Wallet::new(
+            "alice",
+            bitcoind.node_url.clone(),
+            ::bitcoin::Network::Regtest,
+        )
+        .await
+        .unwrap(),
     );
     let bob_btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new("bob", bitcoind.node_url.clone())
-            .await
-            .unwrap(),
+        swap::bitcoin::Wallet::new(
+            "bob",
+            bitcoind.node_url.clone(),
+            ::bitcoin::Network::Regtest,
+        )
+        .await
+        .unwrap(),
     );
     bitcoind
-        .mint(bob_btc_wallet.0.new_address().await.unwrap(), btc_bob)
+        .mint(bob_btc_wallet.inner.new_address().await.unwrap(), btc_bob)
         .await
         .unwrap();
 
@@ -152,17 +160,25 @@ async fn happy_path_recursive_executor() {
     let xmr_bob = 0;
 
     let alice_btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new("alice", bitcoind.node_url.clone())
-            .await
-            .unwrap(),
+        swap::bitcoin::Wallet::new(
+            "alice",
+            bitcoind.node_url.clone(),
+            ::bitcoin::Network::Regtest,
+        )
+        .await
+        .unwrap(),
     );
     let bob_btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new("bob", bitcoind.node_url.clone())
-            .await
-            .unwrap(),
+        swap::bitcoin::Wallet::new(
+            "bob",
+            bitcoind.node_url.clone(),
+            ::bitcoin::Network::Regtest,
+        )
+        .await
+        .unwrap(),
     );
     bitcoind
-        .mint(bob_btc_wallet.0.new_address().await.unwrap(), btc_bob)
+        .mint(bob_btc_wallet.inner.new_address().await.unwrap(), btc_bob)
         .await
         .unwrap();
 
