@@ -14,7 +14,14 @@ pub use bitcoin::{util::psbt::PartiallySignedTransaction, *};
 pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
 pub use transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund};
 
-pub const TX_FEE: u64 = 10_000;
+
+// TODO: Configurable tx-fee (note: the parties have to agree on it prior to swapping)
+// Current reasoning:
+// tx with largest weight (as determined by get_weight() upon broadcast in e2e test) = 609
+// assuming segwit and 60 sat/vB:
+// (609 / 4) * 60 (sat/vB) = 9135 sats
+// Recommended: Overpay a bit to ensure we don't have to wait too long for test runs.
+pub const TX_FEE: u64 = 15_000;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct SecretKey {
