@@ -207,7 +207,7 @@ pub fn build_bitcoin_redeem_transaction(
     let tx_redeem = bitcoin::TxRedeem::new(tx_lock, redeem_address);
 
     bitcoin::verify_encsig(
-        B.clone(),
+        B,
         s_a.into_secp256k1().into(),
         &tx_redeem.digest(),
         &encrypted_signature,
@@ -258,7 +258,7 @@ where
         .await;
     poll_until_block_height_is_gte(bitcoin_wallet.as_ref(), tx_lock_height + refund_timelock).await;
 
-    let tx_cancel = bitcoin::TxCancel::new(&tx_lock, refund_timelock, a.public(), B.clone());
+    let tx_cancel = bitcoin::TxCancel::new(&tx_lock, refund_timelock, a.public(), B);
 
     // If Bob hasn't yet broadcasted the tx cancel, we do it
     if bitcoin_wallet
@@ -274,7 +274,7 @@ where
 
         let tx_cancel = tx_cancel
             .clone()
-            .add_signatures(&tx_lock, (a.public(), sig_a), (B.clone(), sig_b))
+            .add_signatures(&tx_lock, (a.public(), sig_a), (B, sig_b))
             .expect("sig_{a,b} to be valid signatures for tx_cancel");
 
         // TODO(Franck): Error handling is delicate, why can't we broadcast?
@@ -331,7 +331,7 @@ pub fn extract_monero_private_key(
     let tx_refund_sig = tx_refund
         .extract_signature_by_key(published_refund_tx, a.public())
         .context("Failed to extract signature from Bitcoin refund tx")?;
-    let tx_refund_encsig = a.encsign(S_b_bitcoin.clone(), tx_refund.digest());
+    let tx_refund_encsig = a.encsign(S_b_bitcoin, tx_refund.digest());
 
     let s_b = bitcoin::recover(S_b_bitcoin, tx_refund_sig, tx_refund_encsig)
         .context("Failed to recover Monero secret key from Bitcoin signature")?;
@@ -351,7 +351,7 @@ pub fn build_bitcoin_punish_transaction(
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
 ) -> Result<bitcoin::Transaction> {
-    let tx_cancel = bitcoin::TxCancel::new(&tx_lock, refund_timelock, a.public(), B.clone());
+    let tx_cancel = bitcoin::TxCancel::new(&tx_lock, refund_timelock, a.public(), B);
     let tx_punish = bitcoin::TxPunish::new(&tx_cancel, &punish_address, punish_timelock);
 
     let sig_a = a.sign(tx_punish.digest());

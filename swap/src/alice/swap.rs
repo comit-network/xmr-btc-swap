@@ -208,7 +208,7 @@ pub async fn swap(
                 &state3.tx_lock,
                 state3.a.clone(),
                 state3.s_a,
-                state3.B.clone(),
+                state3.B,
                 &state3.redeem_address,
             ) {
                 Ok(tx) => tx,
@@ -243,7 +243,7 @@ pub async fn swap(
             let tx_cancel = publish_cancel_transaction(
                 state3.tx_lock.clone(),
                 state3.a.clone(),
-                state3.B.clone(),
+                state3.B,
                 state3.refund_timelock,
                 state3.tx_cancel_sig_bob.clone(),
                 bitcoin_wallet.clone(),
@@ -329,7 +329,7 @@ pub async fn swap(
                 state3.punish_timelock,
                 state3.tx_punish_sig_bob.clone(),
                 state3.a.clone(),
-                state3.B.clone(),
+                state3.B,
             )?;
 
             let punish_tx_finalised = publish_bitcoin_punish_transaction(

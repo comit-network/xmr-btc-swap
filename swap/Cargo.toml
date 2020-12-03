@@ -12,11 +12,11 @@ async-trait = "0.1"
 atty = "0.2"
 backoff = { version = "0.2", features = ["tokio"] }
 base64 = "0.12"
-bitcoin = { version = "0.23", features = ["rand", "use-serde"] } # TODO: Upgrade other crates in this repo to use this version.
-bitcoin-harness = { git = "https://github.com/d4nte/bitcoin-harness-rs", rev = "2869620689f7e54bdb8ab3d1838560cb9bc8fd60" }
+bitcoin = { version = "0.25", features = ["rand", "use-serde"] }
+bitcoin-harness = { git = "https://github.com/d4nte/bitcoin-harness-rs", branch = "rust-bitcoin-0.25" }
 conquer-once = "0.3"
 derivative = "2"
-ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", rev = "510d48ef6a2b19805f7f5c70c598e5b03f668e7a", features = ["libsecp_compat", "serde", "serialization"] }
+ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", rev = "cdfbc766045ea678a41780919d6228dd5acee3be", features = ["libsecp_compat", "serde"] }
 futures = { version = "0.3", default-features = false }
 genawaiter = "0.99.1"
 libp2p = { version = "0.29", default-features = false, features = ["tcp-tokio", "yamux", "mplex", "dns", "noise", "request-response"] }

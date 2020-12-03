@@ -241,13 +241,12 @@ checksum = "5f0dc55f2d8a1a85650ac47858bb001b4c0dd73d79e3c455a842925e68d29cd3"
 
 [[package]]
 name = "bitcoin"
-version = "0.23.0"
+version = "0.25.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a32c9d2fa897cfbb0db45d71e3d2838666194abc4828c0f994e4b5c3bf85ba4"
+checksum = "aefc9be9f17185f4ebccae6575d342063f775924d57df0000edb1880c0fb7095"
 dependencies = [
  "bech32",
  "bitcoin_hashes",
- "hex 0.3.2",
  "secp256k1",
  "serde",
 ]
@@ -255,27 +254,7 @@ dependencies = [
 [[package]]
 name = "bitcoin-harness"
 version = "0.1.0"
-source = "git+https://github.com/d4nte/bitcoin-harness-rs?rev=2869620689f7e54bdb8ab3d1838560cb9bc8fd60#2869620689f7e54bdb8ab3d1838560cb9bc8fd60"
-dependencies = [
- "base64 0.12.3",
- "bitcoin",
- "bitcoincore-rpc-json",
- "futures",
- "hex 0.4.2",
- "reqwest",
- "serde",
- "serde_json",
- "testcontainers",
- "thiserror",
- "tokio",
- "tracing",
- "url",
-]
-
-[[package]]
-name = "bitcoin-harness"
-version = "0.1.0"
-source = "git+https://github.com/coblox/bitcoin-harness-rs?rev=3be644cd9512c157d3337a189298b8257ed54d04#3be644cd9512c157d3337a189298b8257ed54d04"
+source = "git+https://github.com/d4nte/bitcoin-harness-rs?branch=rust-bitcoin-0.25#e773e37a070fb38f982c5b80919071420e4ead21"
 dependencies = [
  "base64 0.12.3",
  "bitcoin",
@@ -294,18 +273,18 @@ dependencies = [
 
 [[package]]
 name = "bitcoin_hashes"
-version = "0.7.6"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b375d62f341cef9cd9e77793ec8f1db3fc9ce2e4d57e982c8fe697a2c16af3b6"
+checksum = "0aaf87b776808e26ae93289bc7d025092b6d909c193f0cdee0b3a86e7bd3c776"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "bitcoincore-rpc-json"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea6d55f23cd516d515ae10911164c603ea1040024670ec109715a20d7f6c9d0c"
+checksum = "76d488ec31e9cb6726c361be5160f7d2aaace89a0681acf1f476b8fada770b6e"
 dependencies = [
  "bitcoin",
  "hex 0.3.2",
@@ -626,7 +605,7 @@ dependencies = [
 [[package]]
 name = "cross-curve-dleq"
 version = "0.1.0"
-source = "git+https://github.com/comit-network/cross-curve-dleq?rev=a19608734da1e8803cb4c806022483df4e7d5588#a19608734da1e8803cb4c806022483df4e7d5588"
+source = "git+https://github.com/comit-network/cross-curve-dleq?rev=b43c73ac93a79fdce90cd11a458564c613048f0e#b43c73ac93a79fdce90cd11a458564c613048f0e"
 dependencies = [
  "bit-vec",
  "curve25519-dalek 2.1.0",
@@ -846,7 +825,7 @@ checksum = "134951f4028bdadb9b84baf4232681efbf277da25144b9b0ad65df75946c422b"
 [[package]]
 name = "ecdsa_fun"
 version = "0.3.2-alpha.0"
-source = "git+https://github.com/LLFourn/secp256kfun?rev=510d48ef6a2b19805f7f5c70c598e5b03f668e7a#510d48ef6a2b19805f7f5c70c598e5b03f668e7a"
+source = "git+https://github.com/LLFourn/secp256kfun?rev=cdfbc766045ea678a41780919d6228dd5acee3be#cdfbc766045ea678a41780919d6228dd5acee3be"
 dependencies = [
  "secp256kfun",
  "serde",
@@ -1960,9 +1939,9 @@ dependencies = [
 
 [[package]]
 name = "miniscript"
-version = "1.0.0"
+version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58f196216a07ade53d91a263b3721057f1f0cfd6f95f3d324626f3f9cf7cdfce"
+checksum = "cc7da049151be4bc7f8da628f5e862e6fae3fe5d7c8201a746cb8373735e789b"
 dependencies = [
  "bitcoin",
  "serde",
@@ -2947,9 +2926,9 @@ checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
 name = "secp256k1"
-version = "0.17.2"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2932dc07acd2066ff2e3921a4419606b220ba6cd03a9935123856cc534877056"
+checksum = "c6179428c22c73ac0fbb7b5579a56353ce78ba29759b3b8575183336ea74cdfb"
 dependencies = [
  "rand 0.6.5",
  "secp256k1-sys",
@@ -2958,9 +2937,9 @@ dependencies = [
 
 [[package]]
 name = "secp256k1-sys"
-version = "0.1.2"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ab2c26f0d3552a0f12e639ae8a64afc2e3db9c52fe32f5fc6c289d38519f220"
+checksum = "11553d210db090930f4432bea123b31f70bbf693ace14504ea2a35e796c28dd2"
 dependencies = [
  "cc",
 ]
@@ -2968,7 +2947,7 @@ dependencies = [
 [[package]]
 name = "secp256kfun"
 version = "0.3.2-alpha.0"
-source = "git+https://github.com/LLFourn/secp256kfun?rev=510d48ef6a2b19805f7f5c70c598e5b03f668e7a#510d48ef6a2b19805f7f5c70c598e5b03f668e7a"
+source = "git+https://github.com/LLFourn/secp256kfun?rev=cdfbc766045ea678a41780919d6228dd5acee3be#cdfbc766045ea678a41780919d6228dd5acee3be"
 dependencies = [
  "digest 0.9.0",
  "rand_core 0.5.1",
@@ -2980,9 +2959,8 @@ dependencies = [
 
 [[package]]
 name = "secp256kfun_parity_backend"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "959911ff66eae1b170a4eec00aa9b987647ad604dc57982014d85e635b7b4f99"
+version = "0.1.3-alpha.0"
+source = "git+https://github.com/LLFourn/secp256kfun?rev=cdfbc766045ea678a41780919d6228dd5acee3be#cdfbc766045ea678a41780919d6228dd5acee3be"
 dependencies = [
  "crunchy 0.2.2",
  "subtle 2.3.0",
@@ -3389,7 +3367,7 @@ dependencies = [
  "backoff",
  "base64 0.12.3",
  "bitcoin",
- "bitcoin-harness 0.1.0 (git+https://github.com/d4nte/bitcoin-harness-rs?rev=2869620689f7e54bdb8ab3d1838560cb9bc8fd60)",
+ "bitcoin-harness",
  "conquer-once",
  "derivative",
  "ecdsa_fun",
@@ -4167,7 +4145,7 @@ dependencies = [
  "backoff",
  "base64 0.12.3",
  "bitcoin",
- "bitcoin-harness 0.1.0 (git+https://github.com/coblox/bitcoin-harness-rs?rev=3be644cd9512c157d3337a189298b8257ed54d04)",
+ "bitcoin-harness",
  "conquer-once",
  "cross-curve-dleq",
  "curve25519-dalek 2.1.0",
