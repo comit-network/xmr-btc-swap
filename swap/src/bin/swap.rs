@@ -18,7 +18,6 @@ use prettytable::{row, Table};
 use rand::rngs::OsRng;
 use std::{
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
 };
 use structopt::StructOpt;
 use swap::{
@@ -48,18 +47,11 @@ extern crate prettytable;
 async fn main() -> Result<()> {
     init_tracing(LevelFilter::Trace).expect("initialize tracing");
 
-    let now = SystemTime::now();
-    let timestamp = now
-        .duration_since(UNIX_EPOCH)
-        .expect("time to move forward");
-
     let opt = Options::from_args();
+
     // This currently creates the directory if it's not there in the first place
-    let db = Database::open(std::path::Path::new(&format!(
-        "./.swap-db/{}/",
-        timestamp.as_millis()
-    )))
-    .unwrap();
+    let db = Database::open(std::path::Path::new("./.swap-db/")).unwrap();
+
     let rng = &mut OsRng;
 
     match opt {
