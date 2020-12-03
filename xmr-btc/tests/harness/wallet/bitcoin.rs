@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
 use bitcoin::{util::psbt::PartiallySignedTransaction, Address, Amount, Transaction, Txid};
-use bitcoin_harness::{bitcoind_rpc::PsbtBase64, Bitcoind};
+use bitcoin_harness::{bitcoind_rpc_api::PsbtBase64, Bitcoind};
 use reqwest::Url;
 use std::time::Duration;
 use tokio::time;
@@ -31,11 +31,9 @@ impl Wallet {
     }
 
     pub async fn transaction_fee(&self, txid: Txid) -> Result<Amount> {
-        let fee = self
-            .0
-            .get_wallet_transaction(txid)
-            .await
-            .map(|res| bitcoin::Amount::from_btc(-res.fee))??;
+        let fee = self.0.get_wallet_transaction(txid).await.map(|res| {
+            bitcoin::Amount::from_btc(-res.fee.expect("fee exists at this point").as_btc())
+        })??;
 
         Ok(fee)
     }
