@@ -25,6 +25,7 @@ use futures::{
 use libp2p::request_response::ResponseChannel;
 use rand::{CryptoRng, RngCore};
 use std::sync::Arc;
+use tracing::info;
 use xmr_btc::{
     alice::State3,
     bitcoin::{TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction},
@@ -100,6 +101,7 @@ pub async fn swap(
             s_a,
             v_a,
         } => {
+            info!("Alice State: started");
             let (channel, state3) =
                 negotiate(amounts, a, s_a, v_a, &mut swarm, bitcoin_wallet.clone()).await?;
 
@@ -120,6 +122,7 @@ pub async fn swap(
             channel,
             amounts,
         } => {
+            info!("Alice State: negotiated, waiting for Bob to lock BTC...");
             let _ = wait_for_locked_bitcoin(state3.tx_lock.txid(), bitcoin_wallet.clone()).await?;
 
             swap(
@@ -139,6 +142,7 @@ pub async fn swap(
             amounts,
             state3,
         } => {
+            info!("Alice State: BTC locked, locking up XMR...");
             lock_xmr(
                 channel,
                 amounts,
@@ -157,6 +161,7 @@ pub async fn swap(
             .await
         }
         AliceState::XmrLocked { state3 } => {
+            info!("Alice State: XMR locked, waiting for Bob to provide encsig to redeem BTC...");
             // Our Monero is locked, we need to go through the cancellation process if this
             // step fails
             match wait_for_bitcoin_encrypted_signature(&mut swarm).await {
@@ -187,6 +192,7 @@ pub async fn swap(
             state3,
             encrypted_signature,
         } => {
+            info!("Alice State: encsig learned, redeeming BTC...");
             let signed_tx_redeem = match build_bitcoin_redeem_transaction(
                 encrypted_signature,
                 &state3.tx_lock,
@@ -221,6 +227,7 @@ pub async fn swap(
             .await
         }
         AliceState::WaitingToCancel { state3 } => {
+            info!("Alice State: cancel");
             let tx_cancel = publish_cancel_transaction(
                 state3.tx_lock.clone(),
                 state3.a.clone(),
@@ -240,6 +247,7 @@ pub async fn swap(
             .await
         }
         AliceState::BtcCancelled { state3, tx_cancel } => {
+            info!("Alice State: BTC cancelled");
             let tx_cancel_height = bitcoin_wallet
                 .transaction_block_height(tx_cancel.txid())
                 .await;
@@ -256,6 +264,7 @@ pub async fn swap(
             // TODO(Franck): Review error handling
             match published_refund_tx {
                 None => {
+                    info!("Alice State: waiting for publishable");
                     swap(
                         AliceState::BtcPunishable { tx_refund, state3 },
                         swarm,
@@ -265,6 +274,7 @@ pub async fn swap(
                     .await
                 }
                 Some(published_refund_tx) => {
+                    info!("Alice State: Bob refunded");
                     swap(
                         AliceState::BtcRefunded {
                             tx_refund,
@@ -284,6 +294,7 @@ pub async fn swap(
             published_refund_tx,
             state3,
         } => {
+            info!("Alice State: BTC refunded, taking XMR back...");
             let spend_key = extract_monero_private_key(
                 published_refund_tx,
                 tx_refund,
@@ -300,6 +311,7 @@ pub async fn swap(
             Ok(AliceState::XmrRefunded)
         }
         AliceState::BtcPunishable { tx_refund, state3 } => {
+            info!("Alice State: publishing, boom!");
             let signed_tx_punish = build_bitcoin_punish_transaction(
                 &state3.tx_lock,
                 state3.refund_timelock,
@@ -320,6 +332,7 @@ pub async fn swap(
 
             match select(punish_tx_finalised, refund_tx_seen).await {
                 Either::Left(_) => {
+                    info!("Alice State: published");
                     swap(
                         AliceState::Punished,
                         swarm,
@@ -329,6 +342,7 @@ pub async fn swap(
                     .await
                 }
                 Either::Right((published_refund_tx, _)) => {
+                    info!("Alice State: BTC refunded");
                     swap(
                         AliceState::BtcRefunded {
                             tx_refund,
@@ -343,9 +357,21 @@ pub async fn swap(
                 }
             }
         }
-        AliceState::XmrRefunded => Ok(AliceState::XmrRefunded),
-        AliceState::BtcRedeemed => Ok(AliceState::BtcRedeemed),
-        AliceState::Punished => Ok(AliceState::Punished),
-        AliceState::SafelyAborted => Ok(AliceState::SafelyAborted),
+        AliceState::XmrRefunded => {
+            info!("Alice State: XMR refunded");
+            Ok(AliceState::XmrRefunded)
+        }
+        AliceState::BtcRedeemed => {
+            info!("Alice State: BTC redeemed");
+            Ok(AliceState::BtcRedeemed)
+        }
+        AliceState::Punished => {
+            info!("Alice State: published");
+            Ok(AliceState::Punished)
+        }
+        AliceState::SafelyAborted => {
+            info!("Alice State: safely aborted");
+            Ok(AliceState::SafelyAborted)
+        }
     }
 }
