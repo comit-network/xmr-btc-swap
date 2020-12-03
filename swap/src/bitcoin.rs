@@ -6,9 +6,13 @@ use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _
 use bitcoin::util::psbt::PartiallySignedTransaction;
 use bitcoin_harness::bitcoind_rpc::PsbtBase64;
 use reqwest::Url;
-use xmr_btc::bitcoin::{
-    BlockHeight, BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock, TransactionBlockHeight,
-    WatchForRawTransaction,
+use tokio::time::interval;
+use xmr_btc::{
+    bitcoin::{
+        BlockHeight, BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock,
+        TransactionBlockHeight, WatchForRawTransaction,
+    },
+    config::Config,
 };
 
 pub use ::bitcoin::{Address, Transaction};
@@ -148,7 +152,23 @@ impl TransactionBlockHeight for Wallet {
 
 #[async_trait]
 impl WaitForTransactionFinality for Wallet {
-    async fn wait_for_transaction_finality(&self, _txid: Txid) {
-        todo!()
+    async fn wait_for_transaction_finality(&self, txid: Txid, config: Config) -> Result<()> {
+        // TODO(Franck): This assumes that bitcoind runs with txindex=1
+
+        // Divide by 4 to not check too often yet still be aware of the new block early
+        // on.
+        let mut interval = interval(config.bitcoin_avg_block_time / 4);
+
+        loop {
+            let tx = self.0.client.get_raw_transaction_verbose(txid).await?;
+            if let Some(confirmations) = tx.confirmations {
+                if confirmations >= config.bitcoin_finality_confirmations {
+                    break;
+                }
+            }
+            interval.tick().await;
+        }
+
+        Ok(())
     }
 }

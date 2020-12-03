@@ -1,5 +1,6 @@
 pub mod transactions;
 
+use crate::config::Config;
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
 use bitcoin::hashes::{hex::ToHex, Hash};
@@ -188,7 +189,7 @@ pub trait WatchForRawTransaction {
 
 #[async_trait]
 pub trait WaitForTransactionFinality {
-    async fn wait_for_transaction_finality(&self, txid: Txid);
+    async fn wait_for_transaction_finality(&self, txid: Txid, config: Config) -> Result<()>;
 }
 
 #[async_trait]

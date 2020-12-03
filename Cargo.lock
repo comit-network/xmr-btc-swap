@@ -125,6 +125,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-recursion"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5444eec77a9ec2bfe4524139e09195862e981400c4358d3b760cae634e4c4ee"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "quote 1.0.7",
+ "syn 1.0.48",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -239,6 +250,26 @@ dependencies = [
  "hex 0.3.2",
  "secp256k1",
  "serde",
+]
+
+[[package]]
+name = "bitcoin-harness"
+version = "0.1.0"
+source = "git+https://github.com/d4nte/bitcoin-harness-rs?rev=2869620689f7e54bdb8ab3d1838560cb9bc8fd60#2869620689f7e54bdb8ab3d1838560cb9bc8fd60"
+dependencies = [
+ "base64 0.12.3",
+ "bitcoin",
+ "bitcoincore-rpc-json",
+ "futures",
+ "hex 0.4.2",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "testcontainers",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "url",
 ]
 
 [[package]]
@@ -533,6 +564,21 @@ checksum = "4344512281c643ae7638bbabc3af17a11307803ec8f0fcad9fae512a8bf36467"
 dependencies = [
  "bitflags",
 ]
+
+[[package]]
+name = "conquer-once"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5cb45322099323eefa1b48850ce6c148f5b510894c531e038539f6370c887214"
+dependencies = [
+ "conquer-util",
+]
+
+[[package]]
+name = "conquer-util"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e763eef8846b13b380f37dfecda401770b0ca4e56e95170237bd7c25c7db3582"
 
 [[package]]
 name = "const_fn"
@@ -1975,10 +2021,8 @@ name = "monero-harness"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "curve25519-dalek 2.1.0",
  "digest_auth",
  "futures",
- "monero",
  "port_check",
  "rand 0.7.3",
  "reqwest",
@@ -3339,12 +3383,14 @@ name = "swap"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-recursion",
  "async-trait",
  "atty",
  "backoff",
  "base64 0.12.3",
  "bitcoin",
- "bitcoin-harness",
+ "bitcoin-harness 0.1.0 (git+https://github.com/d4nte/bitcoin-harness-rs?rev=2869620689f7e54bdb8ab3d1838560cb9bc8fd60)",
+ "conquer-once",
  "derivative",
  "ecdsa_fun",
  "futures",
@@ -4121,7 +4167,8 @@ dependencies = [
  "backoff",
  "base64 0.12.3",
  "bitcoin",
- "bitcoin-harness",
+ "bitcoin-harness 0.1.0 (git+https://github.com/coblox/bitcoin-harness-rs?rev=3be644cd9512c157d3337a189298b8257ed54d04)",
+ "conquer-once",
  "cross-curve-dleq",
  "curve25519-dalek 2.1.0",
  "ecdsa_fun",

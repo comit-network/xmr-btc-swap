@@ -28,6 +28,7 @@ use std::sync::Arc;
 use xmr_btc::{
     alice::State3,
     bitcoin::{TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction},
+    config::Config,
     cross_curve_dleq,
     monero::CreateWalletForOutput,
 };
@@ -92,6 +93,7 @@ pub async fn swap(
     mut swarm: Swarm,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
+    config: Config,
 ) -> Result<AliceState> {
     match state {
         AliceState::Started {
@@ -100,8 +102,16 @@ pub async fn swap(
             s_a,
             v_a,
         } => {
-            let (channel, state3) =
-                negotiate(amounts, a, s_a, v_a, &mut swarm, bitcoin_wallet.clone()).await?;
+            let (channel, state3) = negotiate(
+                amounts,
+                a,
+                s_a,
+                v_a,
+                &mut swarm,
+                bitcoin_wallet.clone(),
+                config,
+            )
+            .await?;
 
             swap(
                 AliceState::Negotiated {
@@ -112,6 +122,7 @@ pub async fn swap(
                 swarm,
                 bitcoin_wallet,
                 monero_wallet,
+                config,
             )
             .await
         }
@@ -120,7 +131,8 @@ pub async fn swap(
             channel,
             amounts,
         } => {
-            let _ = wait_for_locked_bitcoin(state3.tx_lock.txid(), bitcoin_wallet.clone()).await?;
+            let _ = wait_for_locked_bitcoin(state3.tx_lock.txid(), bitcoin_wallet.clone(), config)
+                .await?;
 
             swap(
                 AliceState::BtcLocked {
@@ -131,6 +143,7 @@ pub async fn swap(
                 swarm,
                 bitcoin_wallet,
                 monero_wallet,
+                config,
             )
             .await
         }
@@ -153,6 +166,7 @@ pub async fn swap(
                 swarm,
                 bitcoin_wallet,
                 monero_wallet,
+                config,
             )
             .await
         }
@@ -169,6 +183,7 @@ pub async fn swap(
                         swarm,
                         bitcoin_wallet,
                         monero_wallet,
+                        config,
                     )
                     .await
                 }
@@ -178,6 +193,7 @@ pub async fn swap(
                         swarm,
                         bitcoin_wallet,
                         monero_wallet,
+                        config,
                     )
                     .await
                 }
@@ -202,6 +218,7 @@ pub async fn swap(
                         swarm,
                         bitcoin_wallet,
                         monero_wallet,
+                        config,
                     )
                     .await;
                 }
@@ -210,13 +227,15 @@ pub async fn swap(
             // TODO(Franck): Error handling is delicate here.
             // If Bob sees this transaction he can redeem Monero
             // e.g. If the Bitcoin node is down then the user needs to take action.
-            publish_bitcoin_redeem_transaction(signed_tx_redeem, bitcoin_wallet.clone()).await?;
+            publish_bitcoin_redeem_transaction(signed_tx_redeem, bitcoin_wallet.clone(), config)
+                .await?;
 
             swap(
                 AliceState::BtcRedeemed,
                 swarm,
                 bitcoin_wallet,
                 monero_wallet,
+                config,
             )
             .await
         }
@@ -236,6 +255,7 @@ pub async fn swap(
                 swarm,
                 bitcoin_wallet,
                 monero_wallet,
+                config,
             )
             .await
         }
@@ -261,6 +281,7 @@ pub async fn swap(
                         swarm,
                         bitcoin_wallet.clone(),
                         monero_wallet,
+                        config,
                     )
                     .await
                 }
@@ -274,6 +295,7 @@ pub async fn swap(
                         swarm,
                         bitcoin_wallet.clone(),
                         monero_wallet,
+                        config,
                     )
                     .await
                 }
@@ -310,8 +332,11 @@ pub async fn swap(
                 state3.B.clone(),
             )?;
 
-            let punish_tx_finalised =
-                publish_bitcoin_punish_transaction(signed_tx_punish, bitcoin_wallet.clone());
+            let punish_tx_finalised = publish_bitcoin_punish_transaction(
+                signed_tx_punish,
+                bitcoin_wallet.clone(),
+                config,
+            );
 
             let refund_tx_seen = bitcoin_wallet.watch_for_raw_transaction(tx_refund.txid());
 
@@ -325,6 +350,7 @@ pub async fn swap(
                         swarm,
                         bitcoin_wallet.clone(),
                         monero_wallet,
+                        config,
                     )
                     .await
                 }
@@ -338,6 +364,7 @@ pub async fn swap(
                         swarm,
                         bitcoin_wallet.clone(),
                         monero_wallet,
+                        config,
                     )
                     .await
                 }
