@@ -255,27 +255,7 @@ dependencies = [
 [[package]]
 name = "bitcoin-harness"
 version = "0.1.0"
-source = "git+https://github.com/d4nte/bitcoin-harness-rs?rev=2869620689f7e54bdb8ab3d1838560cb9bc8fd60#2869620689f7e54bdb8ab3d1838560cb9bc8fd60"
-dependencies = [
- "base64 0.12.3",
- "bitcoin",
- "bitcoincore-rpc-json",
- "futures",
- "hex 0.4.2",
- "reqwest",
- "serde",
- "serde_json",
- "testcontainers",
- "thiserror",
- "tokio",
- "tracing",
- "url",
-]
-
-[[package]]
-name = "bitcoin-harness"
-version = "0.1.0"
-source = "git+https://github.com/coblox/bitcoin-harness-rs?rev=3be644cd9512c157d3337a189298b8257ed54d04#3be644cd9512c157d3337a189298b8257ed54d04"
+source = "git+https://github.com/coblox/bitcoin-harness-rs?rev=7c9a8b12e437f33a9c7a0d0a1ac6dfba1732b353#7c9a8b12e437f33a9c7a0d0a1ac6dfba1732b353"
 dependencies = [
  "base64 0.12.3",
  "bitcoin",
@@ -3389,7 +3369,7 @@ dependencies = [
  "backoff",
  "base64 0.12.3",
  "bitcoin",
- "bitcoin-harness 0.1.0 (git+https://github.com/d4nte/bitcoin-harness-rs?rev=2869620689f7e54bdb8ab3d1838560cb9bc8fd60)",
+ "bitcoin-harness",
  "conquer-once",
  "derivative",
  "ecdsa_fun",
@@ -4167,7 +4147,7 @@ dependencies = [
  "backoff",
  "base64 0.12.3",
  "bitcoin",
- "bitcoin-harness 0.1.0 (git+https://github.com/coblox/bitcoin-harness-rs?rev=3be644cd9512c157d3337a189298b8257ed54d04)",
+ "bitcoin-harness",
  "conquer-once",
  "cross-curve-dleq",
  "curve25519-dalek 2.1.0",
