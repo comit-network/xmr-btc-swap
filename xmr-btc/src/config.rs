@@ -41,9 +41,9 @@ mod regtest {
     use super::*;
 
     // In test, set to 5 seconds to fail fast
-    pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(5));
+    pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(10));
 
     pub static BITCOIN_FINALITY_CONFIRMATIONS: u32 = 1;
 
-    pub static BITCOIN_AVG_BLOCK_TIME: Lazy<Duration> = Lazy::new(|| Duration::from_secs(1));
+    pub static BITCOIN_AVG_BLOCK_TIME: Lazy<Duration> = Lazy::new(|| Duration::from_secs(5));
 }
