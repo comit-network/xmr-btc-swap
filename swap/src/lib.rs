@@ -14,8 +14,23 @@ pub mod state;
 pub mod storage;
 pub mod tor;
 
-pub const REFUND_TIMELOCK: u32 = 10; // Relative timelock, this is number of blocks. TODO: What should it be?
-pub const PUNISH_TIMELOCK: u32 = 10; // FIXME: What should this be?
+// REFUND_TIMELOCK determines the interval between lock-time until TX_cancel is
+// allowed, PUNISH_TIMELOCK determines the interval between TX_cancel and
+// TX_punish being allowed.
+//
+// *[1]
+//     |----REFUND_TIMELOCK--|
+//                            *[2]
+//                                |----PUNISH_TIMELOCK----|
+//                                                         *[3]
+// [1] LockTime point
+// [2] TX_cancel+TX_Refund point
+// [3] TX_punish point
+//
+// Given the above, setting both to 24 blocks (roughly 4h) is reasonable.
+// TODO: More reasoning what are "good" timelocks
+pub const REFUND_TIMELOCK: u32 = 24; // Relative timelock, this is number of blocks.
+pub const PUNISH_TIMELOCK: u32 = 24;
 
 pub type Never = std::convert::Infallible;
 

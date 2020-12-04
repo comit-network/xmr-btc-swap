@@ -61,7 +61,7 @@ pub async fn alice_recover(
 
             info!("Checking if the Bitcoin cancel transaction has been published");
             if bitcoin_wallet
-                .0
+                .inner
                 .get_raw_transaction(tx_cancel.txid())
                 .await
                 .is_err()
@@ -164,7 +164,7 @@ pub async fn alice_recover(
                 .transaction_block_height(state.tx_lock.txid())
                 .await;
 
-            let block_height = bitcoin_wallet.0.client.getblockcount().await?;
+            let block_height = bitcoin_wallet.inner.client.getblockcount().await?;
             let refund_absolute_expiry = tx_lock_height + state.refund_timelock;
 
             info!("Checking refund timelock");
@@ -187,7 +187,7 @@ pub async fn alice_recover(
 
                 info!("Checking if the Bitcoin cancel transaction has been published");
                 if bitcoin_wallet
-                    .0
+                    .inner
                     .get_raw_transaction(tx_cancel.txid())
                     .await
                     .is_err()
@@ -290,7 +290,11 @@ pub async fn alice_recover(
 
             // TODO: Protect against transient errors so that we can correctly decide if the
             // bitcoin has been refunded
-            match bitcoin_wallet.0.get_raw_transaction(tx_refund.txid()).await {
+            match bitcoin_wallet
+                .inner
+                .get_raw_transaction(tx_refund.txid())
+                .await
+            {
                 Ok(tx_refund_published) => {
                     info!("Bitcoin already refunded");
 
@@ -375,7 +379,7 @@ pub async fn bob_recover(
 
             info!("Checking if the Bitcoin cancel transaction has been published");
             if bitcoin_wallet
-                .0
+                .inner
                 .get_raw_transaction(tx_cancel.txid())
                 .await
                 .is_err()
@@ -431,7 +435,7 @@ pub async fn bob_recover(
 
             let tx_redeem = bitcoin::TxRedeem::new(&state.tx_lock, &state.redeem_address);
             let tx_redeem_published = bitcoin_wallet
-                .0
+                .inner
                 .get_raw_transaction(tx_redeem.txid())
                 .await?;
 
