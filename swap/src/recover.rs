@@ -55,7 +55,7 @@ pub async fn alice_recover(
                 &state.tx_lock,
                 state.refund_timelock,
                 state.a.public(),
-                state.B.clone(),
+                state.B,
             );
 
             info!("Checking if the Bitcoin cancel transaction has been published");
@@ -81,11 +81,7 @@ pub async fn alice_recover(
 
                 let tx_cancel = tx_cancel
                     .clone()
-                    .add_signatures(
-                        &state.tx_lock,
-                        (state.a.public(), sig_a),
-                        (state.B.clone(), sig_b),
-                    )
+                    .add_signatures(&state.tx_lock, (state.a.public(), sig_a), (state.B, sig_b))
                     .expect("sig_{a,b} to be valid signatures for tx_cancel");
 
                 // TODO: We should not fail if the transaction is already on the blockchain
@@ -123,9 +119,7 @@ pub async fn alice_recover(
 
                     let tx_refund_sig = tx_refund
                         .extract_signature_by_key(tx_refund_published, state.a.public())?;
-                    let tx_refund_encsig = state
-                        .a
-                        .encsign(state.S_b_bitcoin.clone(), tx_refund.digest());
+                    let tx_refund_encsig = state.a.encsign(state.S_b_bitcoin, tx_refund.digest());
 
                     let s_b = bitcoin::recover(state.S_b_bitcoin, tx_refund_sig, tx_refund_encsig)?;
                     let s_b = monero::PrivateKey::from_scalar(
@@ -152,7 +146,7 @@ pub async fn alice_recover(
                     let sig_tx_punish = tx_punish.add_signatures(
                         &tx_cancel,
                         (state.a.public(), sig_a),
-                        (state.B.clone(), sig_b),
+                        (state.B, sig_b),
                     )?;
 
                     bitcoin_wallet
@@ -187,7 +181,7 @@ pub async fn alice_recover(
                     &state.tx_lock,
                     state.refund_timelock,
                     state.a.public(),
-                    state.B.clone(),
+                    state.B,
                 );
 
                 info!("Checking if the Bitcoin cancel transaction has been published");
@@ -202,11 +196,7 @@ pub async fn alice_recover(
 
                     let tx_cancel = tx_cancel
                         .clone()
-                        .add_signatures(
-                            &state.tx_lock,
-                            (state.a.public(), sig_a),
-                            (state.B.clone(), sig_b),
-                        )
+                        .add_signatures(&state.tx_lock, (state.a.public(), sig_a), (state.B, sig_b))
                         .expect("sig_{a,b} to be valid signatures for tx_cancel");
 
                     // TODO: We should not fail if the transaction is already on the blockchain
@@ -244,9 +234,8 @@ pub async fn alice_recover(
 
                         let tx_refund_sig = tx_refund
                             .extract_signature_by_key(tx_refund_published, state.a.public())?;
-                        let tx_refund_encsig = state
-                            .a
-                            .encsign(state.S_b_bitcoin.clone(), tx_refund.digest());
+                        let tx_refund_encsig =
+                            state.a.encsign(state.S_b_bitcoin, tx_refund.digest());
 
                         let s_b =
                             bitcoin::recover(state.S_b_bitcoin, tx_refund_sig, tx_refund_encsig)?;
@@ -274,7 +263,7 @@ pub async fn alice_recover(
                         let sig_tx_punish = tx_punish.add_signatures(
                             &tx_cancel,
                             (state.a.public(), sig_a),
-                            (state.B.clone(), sig_b),
+                            (state.B, sig_b),
                         )?;
 
                         bitcoin_wallet
@@ -292,7 +281,7 @@ pub async fn alice_recover(
                 &state.tx_lock,
                 state.refund_timelock,
                 state.a.public(),
-                state.B.clone(),
+                state.B,
             );
             let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &state.refund_address);
 
@@ -310,9 +299,7 @@ pub async fn alice_recover(
 
                     let tx_refund_sig = tx_refund
                         .extract_signature_by_key(tx_refund_published, state.a.public())?;
-                    let tx_refund_encsig = state
-                        .a
-                        .encsign(state.S_b_bitcoin.clone(), tx_refund.digest());
+                    let tx_refund_encsig = state.a.encsign(state.S_b_bitcoin, tx_refund.digest());
 
                     let s_b = bitcoin::recover(state.S_b_bitcoin, tx_refund_sig, tx_refund_encsig)?;
                     let s_b = monero::PrivateKey::from_scalar(
@@ -339,7 +326,7 @@ pub async fn alice_recover(
                     let sig_tx_punish = tx_punish.add_signatures(
                         &tx_cancel,
                         (state.a.public(), sig_a),
-                        (state.B.clone(), sig_b),
+                        (state.B, sig_b),
                     )?;
 
                     bitcoin_wallet
@@ -381,7 +368,7 @@ pub async fn bob_recover(
             let tx_cancel = bitcoin::TxCancel::new(
                 &state.tx_lock,
                 state.refund_timelock,
-                state.A.clone(),
+                state.A,
                 state.b.public(),
             );
 
@@ -408,11 +395,7 @@ pub async fn bob_recover(
 
                 let tx_cancel = tx_cancel
                     .clone()
-                    .add_signatures(
-                        &state.tx_lock,
-                        (state.A.clone(), sig_a),
-                        (state.b.public(), sig_b),
-                    )
+                    .add_signatures(&state.tx_lock, (state.A, sig_a), (state.b.public(), sig_b))
                     .expect("sig_{a,b} to be valid signatures for tx_cancel");
 
                 // TODO: We should not fail if the transaction is already on the blockchain
@@ -431,11 +414,7 @@ pub async fn bob_recover(
                 let sig_b = state.b.sign(tx_refund.digest());
 
                 tx_refund
-                    .add_signatures(
-                        &tx_cancel,
-                        (state.A.clone(), sig_a),
-                        (state.b.public(), sig_b),
-                    )
+                    .add_signatures(&tx_cancel, (state.A, sig_a), (state.b.public(), sig_b))
                     .expect("sig_{a,b} to be valid signatures for tx_refund")
             };
 
@@ -455,9 +434,7 @@ pub async fn bob_recover(
                 .get_raw_transaction(tx_redeem.txid())
                 .await?;
 
-            let tx_redeem_encsig = state
-                .b
-                .encsign(state.S_a_bitcoin.clone(), tx_redeem.digest());
+            let tx_redeem_encsig = state.b.encsign(state.S_a_bitcoin, tx_redeem.digest());
             let tx_redeem_sig =
                 tx_redeem.extract_signature_by_key(tx_redeem_published, state.b.public())?;
 

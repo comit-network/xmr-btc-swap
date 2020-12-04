@@ -37,7 +37,7 @@ impl SecretKey {
     }
 
     pub fn public(&self) -> PublicKey {
-        PublicKey(self.public.clone())
+        PublicKey(self.public)
     }
 
     pub fn to_bytes(&self) -> [u8; 32] {
@@ -72,7 +72,7 @@ impl SecretKey {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PublicKey(Point);
 
 impl From<PublicKey> for Point {

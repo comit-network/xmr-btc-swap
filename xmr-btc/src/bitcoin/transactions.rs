@@ -3,11 +3,11 @@ use crate::bitcoin::{
 };
 use anyhow::{bail, Context, Result};
 use bitcoin::{
-    util::{bip143::SighashComponents, psbt::PartiallySignedTransaction},
-    Address, Amount, Network, SigHash, Transaction, TxIn, TxOut,
+    util::{bip143::SigHashCache, psbt::PartiallySignedTransaction},
+    Address, Amount, Network, SigHash, SigHashType, Transaction, TxIn, TxOut,
 };
 use ecdsa_fun::Signature;
-use miniscript::Descriptor;
+use miniscript::{Descriptor, NullCtx};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -24,7 +24,7 @@ impl TxLock {
     {
         let lock_output_descriptor = build_shared_output_descriptor(A.0, B.0);
         let address = lock_output_descriptor
-            .address(Network::Regtest)
+            .address(Network::Regtest, NullCtx)
             .expect("can derive address from descriptor");
 
         // We construct a psbt for convenience
@@ -59,7 +59,9 @@ impl TxLock {
         self.inner
             .output
             .iter()
-            .position(|output| output.script_pubkey == self.output_descriptor.script_pubkey())
+            .position(|output| {
+                output.script_pubkey == self.output_descriptor.script_pubkey(NullCtx)
+            })
             .expect("transaction contains lock output")
     }
 
@@ -67,7 +69,7 @@ impl TxLock {
         &self,
         spend_address: &Address,
         sequence: Option<u32>,
-    ) -> (Transaction, TxIn) {
+    ) -> Transaction {
         let previous_output = self.as_outpoint();
 
         let tx_in = TxIn {
@@ -82,14 +84,12 @@ impl TxLock {
             script_pubkey: spend_address.script_pubkey(),
         };
 
-        let transaction = Transaction {
+        Transaction {
             version: 2,
             lock_time: 0,
-            input: vec![tx_in.clone()],
+            input: vec![tx_in],
             output: vec![tx_out],
-        };
-
-        (transaction, tx_in)
+        }
     }
 }
 
@@ -109,12 +109,13 @@ impl TxRedeem {
     pub fn new(tx_lock: &TxLock, redeem_address: &Address) -> Self {
         // lock_input is the shared output that is now being used as an input for the
         // redeem transaction
-        let (tx_redeem, lock_input) = tx_lock.build_spend_transaction(redeem_address, None);
+        let tx_redeem = tx_lock.build_spend_transaction(redeem_address, None);
 
-        let digest = SighashComponents::new(&tx_redeem).sighash_all(
-            &lock_input,
-            &tx_lock.output_descriptor.witness_script(),
+        let digest = SigHashCache::new(&tx_redeem).signature_hash(
+            0, // Only one input: lock_input (lock transaction)
+            &tx_lock.output_descriptor.witness_script(NullCtx),
             tx_lock.lock_amount().as_sat(),
+            SigHashType::All,
         );
 
         Self {
@@ -159,7 +160,7 @@ impl TxRedeem {
         let mut tx_redeem = self.inner;
         tx_lock
             .output_descriptor
-            .satisfy(&mut tx_redeem.input[0], satisfier)?;
+            .satisfy(&mut tx_redeem.input[0], satisfier, NullCtx)?;
 
         Ok(tx_redeem)
     }
@@ -238,20 +239,21 @@ impl TxCancel {
 
         let tx_out = TxOut {
             value: tx_lock.lock_amount().as_sat() - TX_FEE,
-            script_pubkey: cancel_output_descriptor.script_pubkey(),
+            script_pubkey: cancel_output_descriptor.script_pubkey(NullCtx),
         };
 
         let transaction = Transaction {
             version: 2,
             lock_time: 0,
-            input: vec![tx_in.clone()],
+            input: vec![tx_in],
             output: vec![tx_out],
         };
 
-        let digest = SighashComponents::new(&transaction).sighash_all(
-            &tx_in,
-            &tx_lock.output_descriptor.witness_script(),
+        let digest = SigHashCache::new(&transaction).signature_hash(
+            0, // Only one input: lock_input (lock transaction)
+            &tx_lock.output_descriptor.witness_script(NullCtx),
             tx_lock.lock_amount().as_sat(),
+            SigHashType::All,
         );
 
         Self {
@@ -305,7 +307,7 @@ impl TxCancel {
         let mut tx_cancel = self.inner;
         tx_lock
             .output_descriptor
-            .satisfy(&mut tx_cancel.input[0], satisfier)?;
+            .satisfy(&mut tx_cancel.input[0], satisfier, NullCtx)?;
 
         Ok(tx_cancel)
     }
@@ -314,7 +316,7 @@ impl TxCancel {
         &self,
         spend_address: &Address,
         sequence: Option<u32>,
-    ) -> (Transaction, TxIn) {
+    ) -> Transaction {
         let previous_output = self.as_outpoint();
 
         let tx_in = TxIn {
@@ -329,14 +331,12 @@ impl TxCancel {
             script_pubkey: spend_address.script_pubkey(),
         };
 
-        let transaction = Transaction {
+        Transaction {
             version: 2,
             lock_time: 0,
-            input: vec![tx_in.clone()],
+            input: vec![tx_in],
             output: vec![tx_out],
-        };
-
-        (transaction, tx_in)
+        }
     }
 }
 
@@ -348,12 +348,13 @@ pub struct TxRefund {
 
 impl TxRefund {
     pub fn new(tx_cancel: &TxCancel, refund_address: &Address) -> Self {
-        let (tx_punish, cancel_input) = tx_cancel.build_spend_transaction(refund_address, None);
+        let tx_punish = tx_cancel.build_spend_transaction(refund_address, None);
 
-        let digest = SighashComponents::new(&tx_punish).sighash_all(
-            &cancel_input,
-            &tx_cancel.output_descriptor.witness_script(),
+        let digest = SigHashCache::new(&tx_punish).signature_hash(
+            0, // Only one input: cancel transaction
+            &tx_cancel.output_descriptor.witness_script(NullCtx),
             tx_cancel.amount().as_sat(),
+            SigHashType::All,
         );
 
         Self {
@@ -398,7 +399,7 @@ impl TxRefund {
         let mut tx_refund = self.inner;
         tx_cancel
             .output_descriptor
-            .satisfy(&mut tx_refund.input[0], satisfier)?;
+            .satisfy(&mut tx_refund.input[0], satisfier, NullCtx)?;
 
         Ok(tx_refund)
     }
@@ -449,13 +450,13 @@ pub struct TxPunish {
 
 impl TxPunish {
     pub fn new(tx_cancel: &TxCancel, punish_address: &Address, punish_timelock: u32) -> Self {
-        let (tx_punish, lock_input) =
-            tx_cancel.build_spend_transaction(punish_address, Some(punish_timelock));
+        let tx_punish = tx_cancel.build_spend_transaction(punish_address, Some(punish_timelock));
 
-        let digest = SighashComponents::new(&tx_punish).sighash_all(
-            &lock_input,
-            &tx_cancel.output_descriptor.witness_script(),
+        let digest = SigHashCache::new(&tx_punish).signature_hash(
+            0, // Only one input: cancel transaction
+            &tx_cancel.output_descriptor.witness_script(NullCtx),
             tx_cancel.amount().as_sat(),
+            SigHashType::All,
         );
 
         Self {
@@ -500,7 +501,7 @@ impl TxPunish {
         let mut tx_punish = self.inner;
         tx_cancel
             .output_descriptor
-            .satisfy(&mut tx_punish.input[0], satisfier)?;
+            .satisfy(&mut tx_punish.input[0], satisfier, NullCtx)?;
 
         Ok(tx_punish)
     }

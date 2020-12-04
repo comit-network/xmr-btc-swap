@@ -180,7 +180,7 @@ where
             }
 
             let tx_redeem = bitcoin::TxRedeem::new(&tx_lock, &redeem_address);
-            let tx_redeem_encsig = b.encsign(S_a_bitcoin.clone(), tx_redeem.digest());
+            let tx_redeem_encsig = b.encsign(S_a_bitcoin, tx_redeem.digest());
 
             co.yield_(Action::SendBtcRedeemEncsig(tx_redeem_encsig.clone()))
                 .await;
@@ -221,8 +221,7 @@ where
         }
 
         if let Err(SwapFailed::AfterBtcLock(_)) = swap_result {
-            let tx_cancel =
-                bitcoin::TxCancel::new(&tx_lock, refund_timelock, A.clone(), b.public());
+            let tx_cancel = bitcoin::TxCancel::new(&tx_lock, refund_timelock, A, b.public());
             let tx_cancel_txid = tx_cancel.txid();
             let signed_tx_cancel = {
                 let sig_a = tx_cancel_sig_a.clone();
@@ -230,7 +229,7 @@ where
 
                 tx_cancel
                     .clone()
-                    .add_signatures(&tx_lock, (A.clone(), sig_a), (b.public(), sig_b))
+                    .add_signatures(&tx_lock, (A, sig_a), (b.public(), sig_b))
                     .expect("sig_{a,b} to be valid signatures for tx_cancel")
             };
 
@@ -250,7 +249,7 @@ where
                 let sig_b = b.sign(tx_refund.digest());
 
                 tx_refund
-                    .add_signatures(&tx_cancel, (A.clone(), sig_a), (b.public(), sig_b))
+                    .add_signatures(&tx_cancel, (A, sig_a), (b.public(), sig_b))
                     .expect("sig_{a,b} to be valid signatures for tx_refund")
             };
 
@@ -412,8 +411,7 @@ impl State0 {
                 .ok_or_else(|| anyhow!("S_a is not a monero curve point"))?,
         )?;
 
-        let tx_lock =
-            bitcoin::TxLock::new(wallet, self.btc, msg.A.clone(), self.b.public()).await?;
+        let tx_lock = bitcoin::TxLock::new(wallet, self.btc, msg.A, self.b.public()).await?;
         let v = msg.v_a + self.v_b;
 
         Ok(State1 {
@@ -462,17 +460,12 @@ impl State1 {
     }
 
     pub fn receive(self, msg: alice::Message1) -> Result<State2> {
-        let tx_cancel = TxCancel::new(
-            &self.tx_lock,
-            self.refund_timelock,
-            self.A.clone(),
-            self.b.public(),
-        );
+        let tx_cancel = TxCancel::new(&self.tx_lock, self.refund_timelock, self.A, self.b.public());
         let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &self.refund_address);
 
         bitcoin::verify_sig(&self.A, &tx_cancel.digest(), &msg.tx_cancel_sig)?;
         bitcoin::verify_encsig(
-            self.A.clone(),
+            self.A,
             self.s_b.into_secp256k1().into(),
             &tx_refund.digest(),
             &msg.tx_refund_encsig,
@@ -522,12 +515,7 @@ pub struct State2 {
 
 impl State2 {
     pub fn next_message(&self) -> Message2 {
-        let tx_cancel = TxCancel::new(
-            &self.tx_lock,
-            self.refund_timelock,
-            self.A.clone(),
-            self.b.public(),
-        );
+        let tx_cancel = TxCancel::new(&self.tx_lock, self.refund_timelock, self.A, self.b.public());
         let tx_cancel_sig = self.b.sign(tx_cancel.digest());
         let tx_punish =
             bitcoin::TxPunish::new(&tx_cancel, &self.punish_address, self.punish_timelock);
@@ -636,12 +624,8 @@ impl State3 {
         &self,
         bitcoin_wallet: &W,
     ) -> Result<()> {
-        let tx_cancel = bitcoin::TxCancel::new(
-            &self.tx_lock,
-            self.refund_timelock,
-            self.A.clone(),
-            self.b.public(),
-        );
+        let tx_cancel =
+            bitcoin::TxCancel::new(&self.tx_lock, self.refund_timelock, self.A, self.b.public());
         let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &self.refund_address);
 
         {
@@ -650,7 +634,7 @@ impl State3 {
 
             let signed_tx_cancel = tx_cancel.clone().add_signatures(
                 &self.tx_lock,
-                (self.A.clone(), sig_a),
+                (self.A, sig_a),
                 (self.b.public(), sig_b),
             )?;
 
@@ -668,7 +652,7 @@ impl State3 {
 
             let signed_tx_refund = tx_refund.add_signatures(
                 &tx_cancel.clone(),
-                (self.A.clone(), sig_a),
+                (self.A, sig_a),
                 (self.b.public(), sig_b),
             )?;
 
@@ -707,26 +691,22 @@ pub struct State4 {
 impl State4 {
     pub fn next_message(&self) -> Message3 {
         let tx_redeem = bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address);
-        let tx_redeem_encsig = self.b.encsign(self.S_a_bitcoin.clone(), tx_redeem.digest());
+        let tx_redeem_encsig = self.b.encsign(self.S_a_bitcoin, tx_redeem.digest());
 
         Message3 { tx_redeem_encsig }
     }
 
     pub fn tx_redeem_encsig(&self) -> EncryptedSignature {
         let tx_redeem = bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address);
-        self.b.encsign(self.S_a_bitcoin.clone(), tx_redeem.digest())
+        self.b.encsign(self.S_a_bitcoin, tx_redeem.digest())
     }
 
     pub async fn check_for_tx_cancel<W>(&self, bitcoin_wallet: &W) -> Result<Transaction>
     where
         W: GetRawTransaction,
     {
-        let tx_cancel = bitcoin::TxCancel::new(
-            &self.tx_lock,
-            self.refund_timelock,
-            self.A.clone(),
-            self.b.public(),
-        );
+        let tx_cancel =
+            bitcoin::TxCancel::new(&self.tx_lock, self.refund_timelock, self.A, self.b.public());
 
         // todo: check if this is correct
         let sig_a = self.tx_cancel_sig_a.clone();
@@ -734,11 +714,7 @@ impl State4 {
 
         let tx_cancel = tx_cancel
             .clone()
-            .add_signatures(
-                &self.tx_lock,
-                (self.A.clone(), sig_a),
-                (self.b.public(), sig_b),
-            )
+            .add_signatures(&self.tx_lock, (self.A, sig_a), (self.b.public(), sig_b))
             .expect(
                 "sig_{a,b} to be valid signatures for
                 tx_cancel",
@@ -753,12 +729,8 @@ impl State4 {
     where
         W: BroadcastSignedTransaction,
     {
-        let tx_cancel = bitcoin::TxCancel::new(
-            &self.tx_lock,
-            self.refund_timelock,
-            self.A.clone(),
-            self.b.public(),
-        );
+        let tx_cancel =
+            bitcoin::TxCancel::new(&self.tx_lock, self.refund_timelock, self.A, self.b.public());
 
         // todo: check if this is correct
         let sig_a = self.tx_cancel_sig_a.clone();
@@ -766,11 +738,7 @@ impl State4 {
 
         let tx_cancel = tx_cancel
             .clone()
-            .add_signatures(
-                &self.tx_lock,
-                (self.A.clone(), sig_a),
-                (self.b.public(), sig_b),
-            )
+            .add_signatures(&self.tx_lock, (self.A, sig_a), (self.b.public(), sig_b))
             .expect(
                 "sig_{a,b} to be valid signatures for
                 tx_cancel",
@@ -787,7 +755,7 @@ impl State4 {
         W: WatchForRawTransaction,
     {
         let tx_redeem = bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address);
-        let tx_redeem_encsig = self.b.encsign(self.S_a_bitcoin.clone(), tx_redeem.digest());
+        let tx_redeem_encsig = self.b.encsign(self.S_a_bitcoin, tx_redeem.digest());
 
         let tx_redeem_candidate = bitcoin_wallet
             .watch_for_raw_transaction(tx_redeem.txid())
@@ -795,16 +763,16 @@ impl State4 {
 
         let tx_redeem_sig =
             tx_redeem.extract_signature_by_key(tx_redeem_candidate, self.b.public())?;
-        let s_a = bitcoin::recover(self.S_a_bitcoin.clone(), tx_redeem_sig, tx_redeem_encsig)?;
+        let s_a = bitcoin::recover(self.S_a_bitcoin, tx_redeem_sig, tx_redeem_encsig)?;
         let s_a = monero::private_key_from_secp256k1_scalar(s_a.into());
 
         Ok(State5 {
-            A: self.A.clone(),
+            A: self.A,
             b: self.b.clone(),
             s_a,
             s_b: self.s_b,
             S_a_monero: self.S_a_monero,
-            S_a_bitcoin: self.S_a_bitcoin.clone(),
+            S_a_bitcoin: self.S_a_bitcoin,
             v: self.v,
             btc: self.btc,
             xmr: self.xmr,
