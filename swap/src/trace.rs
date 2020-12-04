@@ -1,4 +1,4 @@
-use atty::{self, Stream};
+use atty::{self};
 use log::LevelFilter;
 use tracing::{info, subscriber};
 use tracing_log::LogTracer;
@@ -9,15 +9,16 @@ pub fn init_tracing(level: log::LevelFilter) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    // Upstream log filter.
-    LogTracer::init_with_filter(LevelFilter::Debug)?;
+    // We want upstream library log messages, just only at Info level.
+    LogTracer::init_with_filter(LevelFilter::Info)?;
 
-    let is_terminal = atty::is(Stream::Stdout);
+    let is_terminal = atty::is(atty::Stream::Stderr);
     let subscriber = FmtSubscriber::builder()
         .with_env_filter(format!(
-            "swap={},xmr_btc={},monero_harness={}",
-            level, level, level
+            "swap={},xmr-btc={},http=warn,warp=warn",
+            level, level
         ))
+        .with_writer(std::io::stderr)
         .with_ansi(is_terminal)
         .finish();
 

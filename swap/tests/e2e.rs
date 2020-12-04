@@ -247,7 +247,7 @@ async fn init_alice(
     ));
 
     let alice_btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new("alice", bitcoind.node_url.clone())
+        swap::bitcoin::Wallet::new("alice", bitcoind.node_url.clone(), config.bitcoin_network)
             .await
             .unwrap(),
     );
@@ -322,13 +322,13 @@ async fn init_bob(
     Database,
 ) {
     let bob_btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new("bob", bitcoind.node_url.clone())
+        swap::bitcoin::Wallet::new("bob", bitcoind.node_url.clone(), config.bitcoin_network)
             .await
             .unwrap(),
     );
     bitcoind
         .mint(
-            bob_btc_wallet.0.new_address().await.unwrap(),
+            bob_btc_wallet.inner.new_address().await.unwrap(),
             btc_starting_balance,
         )
         .await
