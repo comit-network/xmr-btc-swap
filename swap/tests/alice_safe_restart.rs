@@ -3,7 +3,7 @@ use futures::future::try_join;
 use libp2p::Multiaddr;
 use monero_harness::{image, Monero};
 use rand::rngs::OsRng;
-use std::sync::Arc;
+use std::{convert::TryInto, sync::Arc};
 use swap::{
     alice, alice::swap::AliceState, bitcoin, bob, bob::swap::BobState, monero,
     network::transport::build, storage::Database, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
@@ -80,7 +80,7 @@ async fn setup_wallets(
 }
 
 #[tokio::test]
-async fn alice_safe_restart_after_btc_is_locked() {
+async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     setup_tracing();
 
     let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9876"
@@ -116,9 +116,10 @@ async fn alice_safe_restart_after_btc_is_locked() {
         xmr: xmr_to_swap,
     };
 
-    let alice_swap = {
+    let alice_db_dir = TempDir::new().unwrap();
+    let alice_swap_fut = async {
         let rng = &mut OsRng;
-        let (alice_state, alice_behaviour) = {
+        let (alice_start_state, state0) = {
             let a = bitcoin::SecretKey::new_random(rng);
             let s_a = cross_curve_dleq::Scalar::random(rng);
             let v_a = xmr_btc::monero::PrivateViewKey::new_random(rng);
@@ -141,26 +142,29 @@ async fn alice_safe_restart_after_btc_is_locked() {
                     amounts,
                     state0: state0.clone(),
                 },
-                alice::Behaviour::new(state0),
+                state0,
             )
         };
+        let alice_behaviour = alice::Behaviour::new(state0.clone());
         let alice_transport = build(alice_behaviour.identity()).unwrap();
-        let (mut alice_event_loop, alice_event_loop_handle) = alice::event_loop::EventLoop::new(
+        let (mut alice_event_loop_1, alice_event_loop_handle) = alice::event_loop::EventLoop::new(
             alice_transport,
             alice_behaviour,
             alice_multiaddr.clone(),
         )
         .unwrap();
 
-        let _alice_swarm_fut = tokio::spawn(async move { alice_event_loop.run().await });
+        let _alice_event_loop_1 = tokio::spawn(async move { alice_event_loop_1.run().await });
 
         let config = xmr_btc::config::Config::regtest();
         let swap_id = Uuid::new_v4();
-        let tmp_dir = TempDir::new().unwrap();
-        let db = Database::open(tmp_dir.path()).unwrap();
 
-        alice::swap::swap(
-            alice_state,
+        let db = Database::open(alice_db_dir.path()).unwrap();
+
+        // Alice reaches encsig_learned
+        alice::swap::run_until(
+            alice_start_state,
+            |state| matches!(state, AliceState::EncSignLearned { .. }),
             alice_event_loop_handle,
             alice_btc_wallet.clone(),
             alice_xmr_wallet.clone(),
@@ -168,6 +172,37 @@ async fn alice_safe_restart_after_btc_is_locked() {
             swap_id,
             db,
         )
+        .await
+        .unwrap();
+
+        let db = Database::open(alice_db_dir.path()).unwrap();
+
+        let alice_behaviour = alice::Behaviour::new(state0);
+        let alice_transport = build(alice_behaviour.identity()).unwrap();
+        let (mut alice_event_loop_2, alice_event_loop_handle) = alice::event_loop::EventLoop::new(
+            alice_transport,
+            alice_behaviour,
+            alice_multiaddr.clone(),
+        )
+        .unwrap();
+
+        let _alice_event_loop_2 = tokio::spawn(async move { alice_event_loop_2.run().await });
+
+        // Load the latest state from the db
+        let latest_state = db.get_state(swap_id).unwrap();
+        let latest_state = latest_state.try_into().unwrap();
+
+        // Finish the swap
+        alice::swap::swap(
+            latest_state,
+            alice_event_loop_handle,
+            alice_btc_wallet.clone(),
+            alice_xmr_wallet.clone(),
+            config,
+            swap_id,
+            db,
+        )
+        .await
     };
 
     let (bob_swap, bob_event_loop) = {
@@ -189,7 +224,7 @@ async fn alice_safe_restart_after_btc_is_locked() {
         let bob_state = BobState::Started {
             state0,
             amounts,
-            addr: alice_multiaddr,
+            addr: alice_multiaddr.clone(),
         };
         let (bob_event_loop, bob_event_loop_handle) =
             bob::event_loop::EventLoop::new(bob_transport, bob_behaviour).unwrap();
@@ -210,7 +245,7 @@ async fn alice_safe_restart_after_btc_is_locked() {
 
     let _bob_event_loop = tokio::spawn(async move { bob_event_loop.run().await });
 
-    try_join(alice_swap, bob_swap).await.unwrap();
+    try_join(alice_swap_fut, bob_swap).await.unwrap();
 
     let btc_alice_final = alice_btc_wallet.balance().await.unwrap();
     let xmr_alice_final = alice_xmr_wallet.get_balance().await.unwrap();
