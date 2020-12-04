@@ -63,44 +63,52 @@ Example:
 
 ### Figma Links
 
+Main prototypes
+
 * [P-A1](https://www.figma.com/proto/QdvmbRYuBpEpFI3D1R4qyM/XMR-BTC_SingleMaker_LowFidelity?node-id=54%3A4894&viewport=1503%2C-52%2C0.5576764941215515&scaling=min-zoom): Webpage for discovery, CLI for execution
 * [P-A2](https://www.figma.com/proto/QdvmbRYuBpEpFI3D1R4qyM/XMR-BTC_SingleMaker_LowFidelity?node-id=7%3A4377&viewport=696%2C-250%2C0.362735778093338&scaling=min-zoom): Webpage for discovery, GUI for execution
+* [P-B1](https://www.figma.com/proto/JnZDMtdEIiqcW1A8pTCfWx/XMR-BTC_TradingPlatform_LowFidelity?node-id=392%3A0&viewport=-1132%2C957%2C0.5096595883369446&scaling=min-zoom): Manual or automated P2P discovery of trades, CLI for execution
+* [P-B2](https://www.figma.com/proto/qla2uA7bXeyAU0XYqf4APh/XMR-BTC-P2P-Trading-GUI?node-id=138%3A480&viewport=-49%2C1295%2C0.17819291353225708&scaling=min-zoom): Automated P2P discovery of trades, GUI for execution
+
+Showcasing details:
+
 * [D-A2-1](https://www.figma.com/proto/QdvmbRYuBpEpFI3D1R4qyM/XMR-BTC_SingleMaker_LowFidelity?node-id=235%3A1374&viewport=1336%2C-1825%2C0.7878535389900208&scaling=min-zoom): GUI swap execution steps for `send` `BTC`, `receive` `XMR`
 * [D-A2-2](https://www.figma.com/proto/QdvmbRYuBpEpFI3D1R4qyM/XMR-BTC_SingleMaker_LowFidelity?node-id=128%3A8016&viewport=1404%2C-1158%2C0.66261225938797&scaling=min-zoom): GUI swap execution steps for `send` `XMR`, `receive` `BTC`
 
+
 ### Mapping of Prototype to validation criteria
 
-|  **User is happy to...** | **Actor** | **P-A1** | **P-A2** | **D-A2-1** | **D-A2-2** |
-| --- | --- | --- | --- | --- | --- |
-|  use a service like blockchain.com to retrieve blocks for validation | TM |  |  |  |  |
-|  run his own Bitcoin node, third party service for Monero | TM |  |  |  |  |
-|  run his own Monero node, third party service for Bitcoin | TM |  |  |  |  |
-|  run both his own Bitcoin and Monero node | TM | T | T |  |  |
-|  use a wallet that connects to third party nodes | TM |  |  |  |  |
-|  send signed transactions through third part nodes | TM |  |  |  |  |
-|  run his own blockchain full node | TM | T | T |  |  |
-|  run an SPV node (Bitcoin) | TM |  |  |  |  |
-|  fund and redeem from existing wallets | TM | T | T |  |  |
-|  fund from existing Monero wallet, redeem to new Bitcoin wallet | TM |  |  |  |  |
-|  fund from existing Bitcoin wallet, redeem to new Monero wallet | TM |  |  |  |  |
-|  fund and redeem into new wallets (explicitly used for swap execution) | TM |  |  |  |  |
-|  give the execution daemon control over the wallets (no user interaction, fully automated) | TM | T | T |  |  |
-|  use a Bitcoin transaction to give funds to the swap application | TM |  |  |  |  |
-|  use a Monero transaction to give funds to the swap application | TM |  |  |  |  |
-|  explicitly sign each transaction | TM |  |  |  |  |
-|  go to website and take price from there | T |  |  |  |  |
-|  set up website (publicly) to advertise price (and connection information) | M | M | M |  |  |
-|  open "random" (tor) website found on various media (forums, chat) to access a single market maker. | T |  |  |  |  |
-|  configure Tor for trading | TM |  |  |  |  |
-|  use a centralized service to find makers | TM | T | T |  |  |
-|  user a decentralized service to find makers | TM |  |  |  |  |
-|  discover peers automatically | TM |  |  |  |  |
-|  add peers manually | TM |  |  |  |  |
-|  download software (swap execution daemon) before being able to do a swap | T |  |  |  |  |
-|  keep a GUI/CLI open for the whole length of the swap execution | T |  |  | T | T |
-|  keep a computer running (that hosts the daemon) for the whole length of the swap execution | T | T | T | T | T |
-|  keep the browser open for the whole length of a swap | T |  |  |  |  |
-|  have different steps (locking first vs second) depending on the direction of the swap | TM |  |  | T (M) | T (M) |
+|  **User is happy to...** | **Actor** | **P-A1** | **P-A2** | **D-A2-1** | **D-A2-2** | **P-B1** | **P-B2** |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+|  use a service like blockchain.com to retrieve blocks for validation | TM |  |  |  |  |  |  |
+|  run his own Bitcoin node, third party service for Monero | TM |  |  |  |  |  |  |
+|  run his own Monero node, third party service for Bitcoin | TM |  |  |  |  |  |  |
+|  run both his own Bitcoin and Monero node | TM | T | T |  |  | T | T |
+|  use a wallet that connects to third party nodes | TM |  |  |  |  |  |  |
+|  send signed transactions through third part nodes | TM |  |  |  |  |  |  |
+|  run his own blockchain full node | TM | T | T |  |  | T | T |
+|  run an SPV node (Bitcoin) | TM |  |  |  |  |  |  |
+|  fund and redeem from existing wallets | TM | T | T |  |  | T | T |
+|  fund from existing Monero wallet, redeem to new Bitcoin wallet | TM |  |  |  |  |  |  |
+|  fund from existing Bitcoin wallet, redeem to new Monero wallet | TM |  |  |  |  |  |  |
+|  fund and redeem into new wallets (explicitly used for swap execution) | TM |  |  |  |  |  |  |
+|  give the execution daemon control over the wallets (no user interaction, fully automated) | TM | T | T |  |  | T | T |
+|  use a Bitcoin transaction to give funds to the swap application | TM |  |  |  |  |  |  |
+|  use a Monero transaction to give funds to the swap application | TM |  |  |  |  |  |  |
+|  explicitly sign each transaction | TM |  |  |  |  |  |  |
+|  go to website and take price from there | T |  |  |  |  |  |  |
+|  set up website (publicly) to advertise price (and connection information) | M | M | M |  |  |  |  |
+|  open "random" (tor) website found on various media (forums, chat) to access a single market maker. | T |  |  |  |  |  |  |
+|  configure Tor for trading | TM |  |  |  |  |  |  |
+|  use a centralized service to find makers | TM | T | T |  |  |  |  |
+|  user a decentralized service to find makers | TM |  |  |  |  | T | T |
+|  discover peers automatically | TM |  |  |  |  | T | T |
+|  add peers manually | TM |  |  |  |  | T |  |
+|  download software (swap execution daemon) before being able to do a swap | T |  |  |  |  |  |  |
+|  keep a GUI/CLI open for the whole length of the swap execution | T |  |  | T | T | T | T |
+|  keep a computer running (that hosts the daemon) for the whole length of the swap execution | T | T | T | T | T | T | T |
+|  keep the browser open for the whole length of a swap | T |  |  |  |  |  |  |
+|  have different steps (locking first vs second) depending on the direction of the swap | TM |  |  | T (M) | T (M) | T (M) | T (M) |
 
 
 Legend:
