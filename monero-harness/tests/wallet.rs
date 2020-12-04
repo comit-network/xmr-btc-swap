@@ -42,6 +42,7 @@ async fn fund_transfer_and_check_tx_key() {
     monero
         .monerod()
         .client()
+        .unwrap()
         .generate_blocks(10, &miner_address)
         .await
         .unwrap();

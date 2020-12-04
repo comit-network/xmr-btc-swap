@@ -5,9 +5,11 @@ authors = ["CoBloX Team <team@coblox.tech>"]
 edition = "2018"
 
 [dependencies]
+async-trait = "0.1"
 anyhow = "1"
 digest_auth = "0.2.3"
 futures = "0.3"
+jsonrpc_client = { git = "https://github.com/thomaseizinger/rust-jsonrpc-client", rev = "c7010817e0f86ab24b3dc10d6bb0463faa0aace4", features = ["reqwest"] }
 port_check = "0.1"
 rand = "0.7"
 reqwest = { version = "0.10", default-features = false, features = ["json", "native-tls"] }

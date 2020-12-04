@@ -38,16 +38,6 @@ impl Wallet {
     pub async fn new_address(&self) -> Result<Address> {
         self.0.new_address().await.map_err(Into::into)
     }
-
-    pub async fn transaction_fee(&self, txid: Txid) -> Result<Amount> {
-        let fee = self
-            .0
-            .get_wallet_transaction(txid)
-            .await
-            .map(|res| bitcoin::Amount::from_btc(-res.fee))??;
-
-        Ok(fee)
-    }
 }
 
 #[async_trait]

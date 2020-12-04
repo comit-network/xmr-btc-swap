@@ -1,5 +1,6 @@
 //! JSON RPC clients for `monerd` and `monero-wallet-rpc`.
 pub mod monerod;
+pub mod monerod_api;
 pub mod wallet;
 
 use serde::{Deserialize, Serialize};

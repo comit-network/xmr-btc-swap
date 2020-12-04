@@ -1551,6 +1551,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonrpc_client"
+version = "0.3.0"
+source = "git+https://github.com/thomaseizinger/rust-jsonrpc-client?rev=c7010817e0f86ab24b3dc10d6bb0463faa0aace4#c7010817e0f86ab24b3dc10d6bb0463faa0aace4"
+dependencies = [
+ "async-trait",
+ "jsonrpc_client_macro",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "url",
+]
+
+[[package]]
+name = "jsonrpc_client_macro"
+version = "0.1.0"
+source = "git+https://github.com/thomaseizinger/rust-jsonrpc-client?rev=c7010817e0f86ab24b3dc10d6bb0463faa0aace4#c7010817e0f86ab24b3dc10d6bb0463faa0aace4"
+dependencies = [
+ "quote 1.0.7",
+ "syn 1.0.48",
+]
+
+[[package]]
 name = "keccak"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2000,8 +2022,10 @@ name = "monero-harness"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "digest_auth",
  "futures",
+ "jsonrpc_client",
  "port_check",
  "rand 0.7.3",
  "reqwest",

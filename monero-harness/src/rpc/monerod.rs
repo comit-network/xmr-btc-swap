@@ -1,106 +1,41 @@
-use crate::rpc::{Request, Response};
-
-use anyhow::Result;
-use reqwest::Url;
+use crate::rpc::monerod_api::MonerodRpcApi;
 use serde::{Deserialize, Serialize};
-use tracing::debug;
 
-/// RPC client for monerod and monero-wallet-rpc.
+#[jsonrpc_client::implement(MonerodRpcApi)]
 #[derive(Debug, Clone)]
 pub struct Client {
-    pub inner: reqwest::Client,
-    pub url: Url,
+    inner: reqwest::Client,
+    base_url: reqwest::Url,
 }
 
 impl Client {
-    /// New local host monerod RPC client.
-    pub fn localhost(port: u16) -> Self {
-        let url = format!("http://127.0.0.1:{}/json_rpc", port);
-        let url = Url::parse(&url).expect("url is well formed");
-
-        Self {
+    pub fn localhost(port: u16) -> anyhow::Result<Self> {
+        Ok(Client {
             inner: reqwest::Client::new(),
-            url,
-        }
+            base_url: reqwest::Url::parse(format!("http://127.0.0.1:{}/json_rpc", port).as_str())?,
+        })
     }
 
     pub async fn generate_blocks(
         &self,
         amount_of_blocks: u32,
         wallet_address: &str,
-    ) -> Result<GenerateBlocks> {
-        let params = GenerateBlocksParams {
-            amount_of_blocks,
-            wallet_address: wallet_address.to_owned(),
-        };
-        let url = self.url.clone();
-        // // Step 1:  Get the auth header
-        // let res = self.inner.get(url.clone()).send().await?;
-        // let headers = res.headers();
-        // let wwwauth = headers["www-authenticate"].to_str()?;
-        //
-        // // Step 2:  Given the auth header, sign the digest for the real req.
-        // let tmp_url = url.clone();
-        // let context = AuthContext::new("username", "password", tmp_url.path());
-        // let mut prompt = digest_auth::parse(wwwauth)?;
-        // let answer = prompt.respond(&context)?.to_header_string();
-
-        let request = Request::new("generateblocks", params);
-
-        let response = self
-            .inner
-            .post(url)
-            .json(&request)
-            .send()
-            .await?
-            .text()
+    ) -> anyhow::Result<GenerateBlocks> {
+        let res: GenerateBlocks = self
+            .generateblocks(amount_of_blocks, wallet_address)
             .await?;
-
-        debug!("generate blocks response: {}", response);
-
-        let res: Response<GenerateBlocks> = serde_json::from_str(&response)?;
-
-        Ok(res.result)
+        Ok(res)
     }
 
-    // $ curl http://127.0.0.1:18081/json_rpc -d '{"jsonrpc":"2.0","id":"0","method":"get_block_header_by_height","params":{"height":1}}' -H 'Content-Type: application/json'
-    pub async fn get_block_header_by_height(&self, height: u32) -> Result<BlockHeader> {
-        let params = GetBlockHeaderByHeightParams { height };
-        let request = Request::new("get_block_header_by_height", params);
-
-        let response = self
-            .inner
-            .post(self.url.clone())
-            .json(&request)
-            .send()
-            .await?
-            .text()
-            .await?;
-
-        debug!("get block header by height response: {}", response);
-
-        let res: Response<GetBlockHeaderByHeight> = serde_json::from_str(&response)?;
-
-        Ok(res.result.block_header)
+    // TODO: We should not need wrapper functions, why does it not compile without?
+    pub async fn get_block_header_by_height_rpc(&self, height: u32) -> anyhow::Result<BlockHeader> {
+        let res: BlockHeader = self.get_block_header_by_height(height).await?;
+        Ok(res)
     }
 
-    pub async fn get_block_count(&self) -> Result<u32> {
-        let request = Request::new("get_block_count", "");
-
-        let response = self
-            .inner
-            .post(self.url.clone())
-            .json(&request)
-            .send()
-            .await?
-            .text()
-            .await?;
-
-        debug!("get block count response: {}", response);
-
-        let res: Response<BlockCount> = serde_json::from_str(&response)?;
-
-        Ok(res.result.count)
+    pub async fn get_block_count_rpc(&self) -> anyhow::Result<u32> {
+        let res: u32 = self.get_block_count().await?;
+        Ok(res)
     }
 }
 

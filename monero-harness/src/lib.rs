@@ -118,7 +118,10 @@ impl<'c> Monero {
 
         // generate the first 70 as bulk
         let monerod = &self.monerod;
-        let block = monerod.client().generate_blocks(70, &miner_address).await?;
+        let block = monerod
+            .client()?
+            .generate_blocks(70, &miner_address)
+            .await?;
         tracing::info!("Generated {:?} blocks", block);
         miner_wallet.refresh().await?;
 
@@ -128,7 +131,10 @@ impl<'c> Monero {
                 let address = wallet.address().await?.address;
                 miner_wallet.transfer(&address, *amount).await?;
                 tracing::info!("Funded {} wallet with {}", wallet.name, amount);
-                monerod.client().generate_blocks(10, &miner_address).await?;
+                monerod
+                    .client()?
+                    .generate_blocks(10, &miner_address)
+                    .await?;
                 wallet.refresh().await?;
             }
         }
@@ -136,7 +142,7 @@ impl<'c> Monero {
         monerod.start_miner(&miner_address).await?;
 
         tracing::info!("Waiting for miner wallet to catch up...");
-        let block_height = monerod.client().get_block_count().await?;
+        let block_height = monerod.client()?.get_block_count_rpc().await?;
         miner_wallet
             .wait_for_wallet_height(block_height)
             .await
@@ -204,14 +210,14 @@ impl<'c> Monerod {
         ))
     }
 
-    pub fn client(&self) -> monerod::Client {
-        monerod::Client::localhost(self.rpc_port)
+    pub fn client(&self) -> anyhow::Result<monerod::Client> {
+        Ok(monerod::Client::localhost(self.rpc_port)?)
     }
 
     /// Spawns a task to mine blocks in a regular interval to the provided
     /// address
     pub async fn start_miner(&self, miner_wallet_address: &str) -> Result<()> {
-        let monerod = self.client();
+        let monerod = self.client()?;
         let _ = tokio::spawn(mine(monerod, miner_wallet_address.to_string()));
         Ok(())
     }
