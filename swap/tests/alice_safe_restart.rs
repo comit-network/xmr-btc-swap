@@ -21,7 +21,7 @@ fn setup_tracing() {
         .set_default();
 }
 
-// This is just to keep the container alive
+// This is just to keep the containers alive
 #[allow(dead_code)]
 struct Containers<'a> {
     bitcoind: Bitcoind<'a>,
@@ -116,67 +116,76 @@ async fn alice_safe_restart_after_btc_is_locked() {
         xmr: xmr_to_swap,
     };
 
-    let alice_behaviour = alice::Behaviour::default();
-    let alice_peer_id = alice_behaviour.peer_id().clone();
-    let alice_transport = build(alice_behaviour.identity()).unwrap();
-    let rng = &mut OsRng;
-    let alice_state = {
-        let a = bitcoin::SecretKey::new_random(rng);
-        let s_a = cross_curve_dleq::Scalar::random(rng);
-        let v_a = xmr_btc::monero::PrivateViewKey::new_random(rng);
-        AliceState::Started {
+    let (alice_swap, alice_peer_id) = {
+        let rng = &mut OsRng;
+        let alice_behaviour = alice::Behaviour::default();
+        let alice_peer_id = alice_behaviour.peer_id();
+        let alice_transport = build(alice_behaviour.identity()).unwrap();
+        let alice_state = {
+            let a = bitcoin::SecretKey::new_random(rng);
+            let s_a = cross_curve_dleq::Scalar::random(rng);
+            let v_a = xmr_btc::monero::PrivateViewKey::new_random(rng);
+            AliceState::Started {
+                amounts,
+                a,
+                s_a,
+                v_a,
+            }
+        };
+        let alice_swarm =
+            alice::new_swarm(alice_multiaddr.clone(), alice_transport, alice_behaviour).unwrap();
+        let config = xmr_btc::config::Config::regtest();
+        let swap_id = Uuid::new_v4();
+        let tmp_dir = TempDir::new().unwrap();
+        let db = Database::open(tmp_dir.path()).unwrap();
+
+        (
+            alice::swap::swap(
+                alice_state,
+                alice_swarm,
+                alice_btc_wallet.clone(),
+                alice_xmr_wallet.clone(),
+                config,
+                swap_id,
+                db,
+            ),
+            alice_peer_id,
+        )
+    };
+
+    let bob_swap = {
+        let rng = &mut OsRng;
+        let bob_db_dir = tempdir().unwrap();
+        let bob_db = Database::open(bob_db_dir.path()).unwrap();
+        let bob_behaviour = bob::Behaviour::default();
+        let bob_transport = build(bob_behaviour.identity()).unwrap();
+
+        let refund_address = bob_btc_wallet.new_address().await.unwrap();
+        let state0 = xmr_btc::bob::State0::new(
+            rng,
+            btc_to_swap,
+            xmr_to_swap,
+            REFUND_TIMELOCK,
+            PUNISH_TIMELOCK,
+            refund_address,
+        );
+        let bob_state = BobState::Started {
+            state0,
             amounts,
-            a,
-            s_a,
-            v_a,
-        }
+            peer_id: alice_peer_id,
+            addr: alice_multiaddr,
+        };
+        let bob_swarm = bob::new_swarm(bob_transport, bob_behaviour).unwrap();
+        bob::swap::swap(
+            bob_state,
+            bob_swarm,
+            bob_db,
+            bob_btc_wallet.clone(),
+            bob_xmr_wallet.clone(),
+            OsRng,
+            Uuid::new_v4(),
+        )
     };
-    let alice_swarm =
-        alice::new_swarm(alice_multiaddr.clone(), alice_transport, alice_behaviour).unwrap();
-    let config = xmr_btc::config::Config::regtest();
-    let swap_id = Uuid::new_v4();
-    let tmp_dir = TempDir::new().unwrap();
-    let db = Database::open(tmp_dir.path()).unwrap();
-    let alice_swap = alice::swap::swap(
-        alice_state,
-        alice_swarm,
-        alice_btc_wallet.clone(),
-        alice_xmr_wallet.clone(),
-        config,
-        swap_id,
-        db,
-    );
-
-    let bob_db_dir = tempdir().unwrap();
-    let bob_db = Database::open(bob_db_dir.path()).unwrap();
-    let bob_behaviour = bob::Behaviour::default();
-    let bob_transport = build(bob_behaviour.identity()).unwrap();
-
-    let refund_address = bob_btc_wallet.new_address().await.unwrap();
-    let state0 = xmr_btc::bob::State0::new(
-        rng,
-        btc_to_swap,
-        xmr_to_swap,
-        REFUND_TIMELOCK,
-        PUNISH_TIMELOCK,
-        refund_address,
-    );
-    let bob_state = BobState::Started {
-        state0,
-        amounts,
-        peer_id: alice_peer_id,
-        addr: alice_multiaddr,
-    };
-    let bob_swarm = bob::new_swarm(bob_transport, bob_behaviour).unwrap();
-    let bob_swap = bob::swap::swap(
-        bob_state,
-        bob_swarm,
-        bob_db,
-        bob_btc_wallet.clone(),
-        bob_xmr_wallet.clone(),
-        OsRng,
-        Uuid::new_v4(),
-    );
 
     try_join(alice_swap, bob_swap).await.unwrap();
 
