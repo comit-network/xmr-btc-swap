@@ -189,13 +189,13 @@ async fn alice_safe_restart_after_btc_is_locked() {
 
     try_join(alice_swap, bob_swap).await.unwrap();
 
-    let btc_alice_final = alice_btc_wallet.as_ref().balance().await.unwrap();
-    let btc_bob_final = bob_btc_wallet.as_ref().balance().await.unwrap();
+    let btc_alice_final = alice_btc_wallet.balance().await.unwrap();
+    let btc_bob_final = bob_btc_wallet.balance().await.unwrap();
 
-    let xmr_alice_final = alice_xmr_wallet.as_ref().get_balance().await.unwrap();
+    let xmr_alice_final = alice_xmr_wallet.get_balance().await.unwrap();
 
-    bob_xmr_wallet.as_ref().0.refresh().await.unwrap();
-    let xmr_bob_final = bob_xmr_wallet.as_ref().get_balance().await.unwrap();
+    bob_xmr_wallet.0.refresh().await.unwrap();
+    let xmr_bob_final = bob_xmr_wallet.get_balance().await.unwrap();
 
     assert_eq!(
         btc_alice_final,
