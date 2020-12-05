@@ -36,14 +36,20 @@ async fn happy_path() {
     let xmr_alice = xmr * 10;
     let xmr_bob = 0;
 
-    let (
-        alice_state,
-        alice_swarm,
-        alice_btc_wallet,
-        alice_xmr_wallet,
-        alice_peer_id,
-        alice_multiaddr,
-    ) = init_alice(&bitcoind, &monero, btc, btc_alice, xmr, xmr_alice).await;
+    let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9876"
+        .parse()
+        .expect("failed to parse Alice's address");
+
+    let (alice_state, alice_swarm, alice_btc_wallet, alice_xmr_wallet, alice_peer_id) = init_alice(
+        &bitcoind,
+        &monero,
+        btc,
+        btc_alice,
+        xmr,
+        xmr_alice,
+        alice_multiaddr.clone(),
+    )
+    .await;
 
     let (bob_state, bob_swarm, bob_btc_wallet, bob_xmr_wallet, bob_db) = init_bob(
         alice_multiaddr,
@@ -117,20 +123,18 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
     let alice_btc_starting_balance = bitcoin::Amount::ZERO;
     let alice_xmr_starting_balance = xmr_to_swap * 10;
 
-    let (
-        alice_state,
-        alice_swarm,
-        alice_btc_wallet,
-        alice_xmr_wallet,
-        alice_peer_id,
-        alice_multiaddr,
-    ) = init_alice(
+    let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9877"
+        .parse()
+        .expect("failed to parse Alice's address");
+
+    let (alice_state, alice_swarm, alice_btc_wallet, alice_xmr_wallet, alice_peer_id) = init_alice(
         &bitcoind,
         &monero,
         btc_to_swap,
         alice_btc_starting_balance,
         xmr_to_swap,
         alice_xmr_starting_balance,
+        alice_multiaddr.clone(),
     )
     .await;
 
@@ -195,13 +199,13 @@ async fn init_alice(
     _btc_starting_balance: bitcoin::Amount,
     xmr_to_swap: u64,
     xmr_starting_balance: u64,
+    alice_multiaddr: Multiaddr,
 ) -> (
     AliceState,
     alice::Swarm,
     Arc<swap::bitcoin::Wallet>,
     Arc<swap::monero::Wallet>,
     PeerId,
-    Multiaddr,
 ) {
     monero
         .init(vec![("alice", xmr_starting_balance)])
@@ -239,12 +243,7 @@ async fn init_alice(
         }
     };
 
-    let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9876"
-        .parse()
-        .expect("failed to parse Alice's address");
-
-    let alice_swarm =
-        alice::new_swarm(alice_multiaddr.clone(), alice_transport, alice_behaviour).unwrap();
+    let alice_swarm = alice::new_swarm(alice_multiaddr, alice_transport, alice_behaviour).unwrap();
 
     (
         alice_state,
@@ -252,7 +251,6 @@ async fn init_alice(
         alice_btc_wallet,
         alice_xmr_wallet,
         alice_peer_id,
-        alice_multiaddr,
     )
 }
 
