@@ -1,11 +1,10 @@
-use std::time::Duration;
-
-use anyhow::Result;
+use anyhow::{Context, Result};
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
 use bitcoin::util::psbt::PartiallySignedTransaction;
-use bitcoin_harness::bitcoind_rpc::PsbtBase64;
+use bitcoin_harness::{bitcoind_rpc::PsbtBase64, BitcoindRpcApi};
 use reqwest::Url;
+use std::time::Duration;
 use tokio::time::interval;
 use xmr_btc::{
     bitcoin::{
@@ -44,7 +43,15 @@ impl Wallet {
             .0
             .get_wallet_transaction(txid)
             .await
-            .map(|res| bitcoin::Amount::from_btc(-res.fee))??;
+            .map(|res| {
+                res.fee.map(|signed_amount| {
+                    signed_amount
+                        .abs()
+                        .to_unsigned()
+                        .expect("Absolute value is always positive")
+                })
+            })?
+            .context("Rpc response did not contain a fee")?;
 
         Ok(fee)
     }
@@ -116,7 +123,7 @@ impl GetRawTransaction for Wallet {
 #[async_trait]
 impl BlockHeight for Wallet {
     async fn block_height(&self) -> u32 {
-        (|| async { Ok(self.0.block_height().await?) })
+        (|| async { Ok(self.0.client.getblockcount().await?) })
             .retry(ConstantBackoff::new(Duration::from_secs(1)))
             .await
             .expect("transient errors to be retried")

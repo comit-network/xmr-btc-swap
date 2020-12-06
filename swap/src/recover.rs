@@ -16,6 +16,7 @@ use crate::{
     state::{Alice, Bob, Swap},
 };
 use anyhow::Result;
+use bitcoin_harness::BitcoindRpcApi;
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
 use futures::{
     future::{select, Either},
@@ -163,7 +164,7 @@ pub async fn alice_recover(
                 .transaction_block_height(state.tx_lock.txid())
                 .await;
 
-            let block_height = bitcoin_wallet.0.block_height().await?;
+            let block_height = bitcoin_wallet.0.client.getblockcount().await?;
             let refund_absolute_expiry = tx_lock_height + state.refund_timelock;
 
             info!("Checking refund timelock");

@@ -254,14 +254,15 @@ dependencies = [
 [[package]]
 name = "bitcoin-harness"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f4cd49a4bc53eaeab332d66022a158515f0b5bb4b381a1583a07a0c667ac280"
+source = "git+https://github.com/coblox/bitcoin-harness-rs?rev=864b55fcba2e770105f135781dd2e3002c503d12#864b55fcba2e770105f135781dd2e3002c503d12"
 dependencies = [
+ "async-trait",
  "base64 0.12.3",
  "bitcoin",
  "bitcoincore-rpc-json",
  "futures",
  "hex 0.4.2",
+ "jsonrpc_client",
  "reqwest",
  "serde",
  "serde_json",
@@ -1549,6 +1550,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca059e81d9486668f12d455a4ea6daa600bd408134cd17e3d3fb5a32d1f016f8"
 dependencies = [
  "wasm-bindgen",
+]
+
+[[package]]
+name = "jsonrpc_client"
+version = "0.3.0"
+source = "git+https://github.com/thomaseizinger/rust-jsonrpc-client?rev=c7010817e0f86ab24b3dc10d6bb0463faa0aace4#c7010817e0f86ab24b3dc10d6bb0463faa0aace4"
+dependencies = [
+ "async-trait",
+ "jsonrpc_client_macro",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "url",
+]
+
+[[package]]
+name = "jsonrpc_client_macro"
+version = "0.1.0"
+source = "git+https://github.com/thomaseizinger/rust-jsonrpc-client?rev=c7010817e0f86ab24b3dc10d6bb0463faa0aace4#c7010817e0f86ab24b3dc10d6bb0463faa0aace4"
+dependencies = [
+ "quote 1.0.7",
+ "syn 1.0.48",
 ]
 
 [[package]]
