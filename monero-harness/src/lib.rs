@@ -35,6 +35,7 @@ use crate::{
     },
     rpc::{
         monerod,
+        monerod_api::MonerodRpcApi,
         wallet::{self, GetAddress, Refreshed, Transfer},
     },
 };
@@ -118,10 +119,7 @@ impl<'c> Monero {
 
         // generate the first 70 as bulk
         let monerod = &self.monerod;
-        let block = monerod
-            .client()?
-            .generate_blocks(70, &miner_address)
-            .await?;
+        let block = monerod.client()?.generateblocks(70, &miner_address).await?;
         tracing::info!("Generated {:?} blocks", block);
         miner_wallet.refresh().await?;
 
@@ -131,10 +129,7 @@ impl<'c> Monero {
                 let address = wallet.address().await?.address;
                 miner_wallet.transfer(&address, *amount).await?;
                 tracing::info!("Funded {} wallet with {}", wallet.name, amount);
-                monerod
-                    .client()?
-                    .generate_blocks(10, &miner_address)
-                    .await?;
+                monerod.client()?.generateblocks(10, &miner_address).await?;
                 wallet.refresh().await?;
             }
         }
@@ -142,7 +137,7 @@ impl<'c> Monero {
         monerod.start_miner(&miner_address).await?;
 
         tracing::info!("Waiting for miner wallet to catch up...");
-        let block_height = monerod.client()?.get_block_count_rpc().await?;
+        let block_height = monerod.client()?.get_block_count().await?;
         miner_wallet
             .wait_for_wallet_height(block_height)
             .await
@@ -302,6 +297,6 @@ impl<'c> MoneroWalletRpc {
 async fn mine(monerod: monerod::Client, reward_address: String) -> Result<()> {
     loop {
         time::delay_for(Duration::from_secs(BLOCK_TIME_SECS)).await;
-        monerod.generate_blocks(1, &reward_address).await?;
+        monerod.generateblocks(1, &reward_address).await?;
     }
 }
