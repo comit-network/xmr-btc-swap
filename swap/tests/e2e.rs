@@ -13,7 +13,7 @@ use testcontainers::clients::Cli;
 use uuid::Uuid;
 use xmr_btc::{bitcoin, config::Config, cross_curve_dleq};
 
-/// Run the following tests with RUST_MIN_STACK=100000000000
+/// Run the following tests with RUST_MIN_STACK=10000000
 
 #[tokio::test]
 async fn happy_path() {
