@@ -10,11 +10,15 @@ use crate::{
             wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund, wait_for_locked_bitcoin,
         },
     },
+    bitcoin,
     bitcoin::EncryptedSignature,
     network::request_response::AliceToBob,
+    state,
+    state::{Alice, Swap},
+    storage::Database,
     SwapAmounts,
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 use async_recursion::async_recursion;
 use futures::{
     future::{select, Either},
@@ -22,8 +26,13 @@ use futures::{
 };
 use libp2p::request_response::ResponseChannel;
 use rand::{CryptoRng, RngCore};
-use std::{fmt, sync::Arc};
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt,
+    sync::Arc,
+};
 use tracing::info;
+use uuid::Uuid;
 use xmr_btc::{
     alice::{State0, State3},
     bitcoin::{TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction},
@@ -101,12 +110,124 @@ impl fmt::Display for AliceState {
     }
 }
 
+impl TryFrom<&AliceState> for state::Swap {
+    type Error = anyhow::Error;
+
+    fn try_from(alice_state: &AliceState) -> Result<Self> {
+        use state::{Alice::*, Swap::Alice};
+
+        let state = match alice_state {
+            AliceState::Started { .. } => bail!("Does not support storing `Started state."),
+            AliceState::Negotiated { state3, .. } => Negotiated(state3.clone()),
+            AliceState::BtcLocked { state3, .. } => BtcLocked(state3.clone()),
+            AliceState::XmrLocked { state3 } => XmrLocked(state3.clone()),
+            AliceState::EncSignLearned {
+                state3,
+                encrypted_signature,
+            } => EncSignLearned {
+                state: state3.clone(),
+                encrypted_signature: encrypted_signature.clone(),
+            },
+            AliceState::BtcRedeemed => SwapComplete,
+            AliceState::BtcCancelled { state3, .. } => BtcCancelled(state3.clone()),
+            AliceState::BtcRefunded { .. } => SwapComplete,
+            AliceState::BtcPunishable { state3, .. } => BtcPunishable(state3.clone()),
+            AliceState::XmrRefunded => SwapComplete,
+            // TODO(Franck): it may be more efficient to store the fact that we already want to
+            // abort
+            AliceState::WaitingToCancel { state3 } => XmrLocked(state3.clone()),
+            AliceState::Punished => SwapComplete,
+            AliceState::SafelyAborted => SwapComplete,
+        };
+
+        Ok(Alice(state))
+    }
+}
+
+impl TryFrom<state::Swap> for AliceState {
+    type Error = anyhow::Error;
+
+    fn try_from(db_state: Swap) -> Result<Self, Self::Error> {
+        use AliceState::*;
+        if let Swap::Alice(state) = db_state {
+            let alice_state = match state {
+                Alice::Negotiated(state3) => Negotiated {
+                    channel: None,
+                    amounts: SwapAmounts {
+                        btc: state3.btc,
+                        xmr: state3.xmr,
+                    },
+                    state3,
+                },
+                Alice::BtcLocked(state3) => BtcLocked {
+                    channel: None,
+                    amounts: SwapAmounts {
+                        btc: state3.btc,
+                        xmr: state3.xmr,
+                    },
+                    state3,
+                },
+                Alice::XmrLocked(state3) => XmrLocked { state3 },
+                Alice::BtcRedeemable { .. } => bail!("BtcRedeemable state is unexpected"),
+                Alice::EncSignLearned {
+                    state,
+                    encrypted_signature,
+                } => EncSignLearned {
+                    state3: state,
+                    encrypted_signature,
+                },
+                Alice::BtcCancelled(state) => {
+                    let tx_cancel = bitcoin::TxCancel::new(
+                        &state.tx_lock,
+                        state.refund_timelock,
+                        state.a.public(),
+                        state.B,
+                    );
+
+                    BtcCancelled {
+                        state3: state,
+                        tx_cancel,
+                    }
+                }
+                Alice::BtcPunishable(state) => {
+                    let tx_cancel = bitcoin::TxCancel::new(
+                        &state.tx_lock,
+                        state.refund_timelock,
+                        state.a.public(),
+                        state.B,
+                    );
+                    let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &state.refund_address);
+                    BtcPunishable {
+                        tx_refund,
+                        state3: state,
+                    }
+                }
+                Alice::BtcRefunded {
+                    state, spend_key, ..
+                } => BtcRefunded {
+                    spend_key,
+                    state3: state,
+                },
+                Alice::SwapComplete => {
+                    // TODO(Franck): Better fine grain
+                    AliceState::SafelyAborted
+                }
+            };
+            Ok(alice_state)
+        } else {
+            bail!("Alice swap state expected.")
+        }
+    }
+}
+
 pub async fn swap(
     state: AliceState,
     swarm: EventLoopHandle,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
     config: Config,
+    swap_id: Uuid,
+    db: Database,
 ) -> Result<(AliceState, EventLoopHandle)> {
     run_until(
         state,
@@ -115,6 +236,8 @@ pub async fn swap(
         bitcoin_wallet,
         monero_wallet,
         config,
+        swap_id,
+        db,
     )
     .await
 }
@@ -138,6 +261,7 @@ pub fn is_xmr_locked(state: &AliceState) -> bool {
 
 // State machine driver for swap execution
 #[async_recursion]
+#[allow(clippy::too_many_arguments)]
 pub async fn run_until(
     state: AliceState,
     is_target_state: fn(&AliceState) -> bool,
@@ -145,6 +269,8 @@ pub async fn run_until(
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
     config: Config,
+    swap_id: Uuid,
+    db: Database,
 ) -> Result<(AliceState, EventLoopHandle)> {
     info!("Current state:{}", state);
     if is_target_state(&state) {
@@ -154,17 +280,23 @@ pub async fn run_until(
             AliceState::Started { amounts, state0 } => {
                 let (channel, state3) = negotiate(state0, amounts, &mut swarm, config).await?;
 
+                let state = AliceState::Negotiated {
+                    channel: Some(channel),
+                    amounts,
+                    state3,
+                };
+
+                let db_state = (&state).try_into()?;
+                db.insert_latest_state(swap_id, db_state).await?;
                 run_until(
-                    AliceState::Negotiated {
-                        channel: Some(channel),
-                        amounts,
-                        state3,
-                    },
+                    state,
                     is_target_state,
                     swarm,
                     bitcoin_wallet,
                     monero_wallet,
                     config,
+                    swap_id,
+                    db,
                 )
                 .await
             }
@@ -173,7 +305,7 @@ pub async fn run_until(
                 channel,
                 amounts,
             } => {
-                match channel {
+                let state = match channel {
                     Some(channel) => {
                         let _ = wait_for_locked_bitcoin(
                             state3.tx_lock.txid(),
@@ -182,111 +314,103 @@ pub async fn run_until(
                         )
                         .await?;
 
-                        run_until(
-                            AliceState::BtcLocked {
-                                channel: Some(channel),
-                                amounts,
-                                state3,
-                            },
-                            is_target_state,
-                            swarm,
-                            bitcoin_wallet,
-                            monero_wallet,
-                            config,
-                        )
-                        .await
+                        AliceState::BtcLocked {
+                            channel: Some(channel),
+                            amounts,
+                            state3,
+                        }
                     }
                     None => {
                         tracing::info!("Cannot resume swap from negotiated state, aborting");
 
                         // Alice did not lock Xmr yet
-                        run_until(
-                            AliceState::SafelyAborted,
-                            is_target_state,
-                            swarm,
-                            bitcoin_wallet,
-                            monero_wallet,
-                            config,
-                        )
-                        .await
+                        AliceState::SafelyAborted
                     }
-                }
+                };
+
+                let db_state = (&state).try_into()?;
+                db.insert_latest_state(swap_id, db_state).await?;
+                run_until(
+                    state,
+                    is_target_state,
+                    swarm,
+                    bitcoin_wallet,
+                    monero_wallet,
+                    config,
+                    swap_id,
+                    db,
+                )
+                .await
             }
             AliceState::BtcLocked {
                 channel,
                 amounts,
                 state3,
-            } => match channel {
-                Some(channel) => {
-                    lock_xmr(
-                        channel,
-                        amounts,
-                        state3.clone(),
-                        &mut swarm,
-                        monero_wallet.clone(),
-                    )
-                    .await?;
+            } => {
+                let state = match channel {
+                    Some(channel) => {
+                        lock_xmr(
+                            channel,
+                            amounts,
+                            state3.clone(),
+                            &mut swarm,
+                            monero_wallet.clone(),
+                        )
+                        .await?;
 
-                    run_until(
-                        AliceState::XmrLocked { state3 },
-                        is_target_state,
-                        swarm,
-                        bitcoin_wallet,
-                        monero_wallet,
-                        config,
-                    )
-                    .await
-                }
-                None => {
-                    tracing::info!("Cannot resume swap from BTC locked state, aborting");
+                        AliceState::XmrLocked { state3 }
+                    }
+                    None => {
+                        tracing::info!("Cannot resume swap from BTC locked state, aborting");
 
-                    // Alice did not lock Xmr yet
-                    run_until(
-                        AliceState::SafelyAborted,
-                        is_target_state,
-                        swarm,
-                        bitcoin_wallet,
-                        monero_wallet,
-                        config,
-                    )
-                    .await
-                }
-            },
+                        // Alice did not lock Xmr yet
+                        AliceState::SafelyAborted
+                    }
+                };
+
+                let db_state = (&state).try_into()?;
+                db.insert_latest_state(swap_id, db_state).await?;
+                run_until(
+                    state,
+                    is_target_state,
+                    swarm,
+                    bitcoin_wallet,
+                    monero_wallet,
+                    config,
+                    swap_id,
+                    db,
+                )
+                .await
+            }
             AliceState::XmrLocked { state3 } => {
                 // Our Monero is locked, we need to go through the cancellation process if this
                 // step fails
-                match wait_for_bitcoin_encrypted_signature(
+                let state = match wait_for_bitcoin_encrypted_signature(
                     &mut swarm,
                     config.monero_max_finality_time,
                 )
                 .await
                 {
-                    Ok(encrypted_signature) => {
-                        run_until(
-                            AliceState::EncSignLearned {
-                                state3,
-                                encrypted_signature,
-                            },
-                            is_target_state,
-                            swarm,
-                            bitcoin_wallet,
-                            monero_wallet,
-                            config,
-                        )
-                        .await
-                    }
-                    Err(_) => {
-                        run_until(
-                            AliceState::WaitingToCancel { state3 },
-                            is_target_state,
-                            swarm,
-                            bitcoin_wallet,
-                            monero_wallet,
-                            config,
-                        )
-                        .await
-                    }
-                }
+                    Ok(encrypted_signature) => AliceState::EncSignLearned {
+                        state3,
+                        encrypted_signature,
+                    },
+                    Err(_) => AliceState::WaitingToCancel { state3 },
+                };
+
+                let db_state = (&state).try_into()?;
+                db.insert_latest_state(swap_id, db_state).await?;
+                run_until(
+                    state,
+                    is_target_state,
+                    swarm,
+                    bitcoin_wallet,
+                    monero_wallet,
+                    config,
+                    swap_id,
+                    db,
+                )
+                .await
             }
             AliceState::EncSignLearned {
                 state3,
@@ -302,13 +426,18 @@ pub async fn run_until(
                 ) {
                     Ok(tx) => tx,
                     Err(_) => {
+                        let state = AliceState::WaitingToCancel { state3 };
+                        let db_state = (&state).try_into()?;
+                        db.insert_latest_state(swap_id, db_state).await?;
                         return run_until(
-                            AliceState::WaitingToCancel { state3 },
+                            state,
                             is_target_state,
                             swarm,
                             bitcoin_wallet,
                             monero_wallet,
                             config,
+                            swap_id,
+                            db,
                         )
                         .await;
                     }
@@ -324,13 +453,18 @@ pub async fn run_until(
                 )
                 .await?;
 
+                let state = AliceState::BtcRedeemed;
+                let db_state = (&state).try_into()?;
+                db.insert_latest_state(swap_id, db_state).await?;
                 run_until(
-                    AliceState::BtcRedeemed,
+                    state,
                     is_target_state,
                     swarm,
                     bitcoin_wallet,
                     monero_wallet,
                     config,
+                    swap_id,
+                    db,
                 )
                 .await
             }
@@ -345,13 +479,18 @@ pub async fn run_until(
                 )
                 .await?;
 
+                let state = AliceState::BtcCancelled { state3, tx_cancel };
+                let db_state = (&state).try_into()?;
+                db.insert_latest_state(swap_id, db_state).await?;
                 run_until(
-                    AliceState::BtcCancelled { state3, tx_cancel },
+                    state,
                     is_target_state,
                     swarm,
                     bitcoin_wallet,
                     monero_wallet,
                     config,
+                    swap_id,
+                    db,
                 )
                 .await
             }
@@ -372,13 +511,17 @@ pub async fn run_until(
                 // TODO(Franck): Review error handling
                 match published_refund_tx {
                     None => {
-                        run_until(
-                            AliceState::BtcPunishable { tx_refund, state3 },
-                            is_target_state,
+                        let state = AliceState::BtcPunishable { tx_refund, state3 };
+                        let db_state = (&state).try_into()?;
+                        db.insert_latest_state(swap_id, db_state).await?;
+                        swap(
+                            state,
                             swarm,
                             bitcoin_wallet.clone(),
                             monero_wallet,
                             config,
+                            swap_id,
+                            db,
                         )
                         .await
                     }
@@ -391,13 +534,18 @@ pub async fn run_until(
                             state3.S_b_bitcoin,
                         )?;
 
+                        let state = AliceState::BtcRefunded { spend_key, state3 };
+                        let db_state = (&state).try_into()?;
+                        db.insert_latest_state(swap_id, db_state).await?;
                         run_until(
-                            AliceState::BtcRefunded { spend_key, state3 },
+                            state,
                             is_target_state,
                             swarm,
                             bitcoin_wallet.clone(),
                             monero_wallet,
                             config,
+                            swap_id,
+                            db,
                         )
                         .await
                     }
@@ -410,7 +558,10 @@ pub async fn run_until(
                     .create_and_load_wallet_for_output(spend_key, view_key)
                     .await?;
 
-                Ok((AliceState::XmrRefunded, swarm))
+                let state = AliceState::XmrRefunded;
+                let db_state = (&state).try_into()?;
+                db.insert_latest_state(swap_id, db_state).await?;
+                Ok((state, swarm))
             }
             AliceState::BtcPunishable { tx_refund, state3 } => {
                 let signed_tx_punish = build_bitcoin_punish_transaction(
@@ -436,13 +587,18 @@ pub async fn run_until(
 
                 match select(punish_tx_finalised, refund_tx_seen).await {
                     Either::Left(_) => {
+                        let state = AliceState::Punished;
+                        let db_state = (&state).try_into()?;
+                        db.insert_latest_state(swap_id, db_state).await?;
                         run_until(
-                            AliceState::Punished,
+                            state,
                             is_target_state,
                             swarm,
                             bitcoin_wallet.clone(),
                             monero_wallet,
                             config,
+                            swap_id,
+                            db,
                         )
                         .await
                     }
@@ -454,14 +610,18 @@ pub async fn run_until(
                             state3.a.clone(),
                             state3.S_b_bitcoin,
                         )?;
-
+                        let state = AliceState::BtcRefunded { spend_key, state3 };
+                        let db_state = (&state).try_into()?;
+                        db.insert_latest_state(swap_id, db_state).await?;
                         run_until(
-                            AliceState::BtcRefunded { spend_key, state3 },
+                            state,
                             is_target_state,
                             swarm,
                             bitcoin_wallet.clone(),
                             monero_wallet,
                             config,
+                            swap_id,
+                            db,
                         )
                         .await
                     }

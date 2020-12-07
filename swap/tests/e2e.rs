@@ -74,12 +74,17 @@ async fn happy_path() {
         )
         .await;
 
+    let alice_db_datadir = tempdir().unwrap();
+    let alice_db = Database::open(alice_db_datadir.path()).unwrap();
+
     let alice_swap_fut = alice::swap::swap(
         alice_state,
         alice_swarm_handle,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),
         Config::regtest(),
+        Uuid::new_v4(),
+        alice_db,
     );
 
     let _alice_swarm_fut = tokio::spawn(async move { alice_swarm_driver.run().await });
@@ -184,12 +189,17 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
 
     let _bob_swarm_fut = tokio::spawn(async move { bob_swarm_driver.run().await });
 
+    let alice_db_datadir = tempdir().unwrap();
+    let alice_db = Database::open(alice_db_datadir.path()).unwrap();
+
     let alice_fut = alice::swap::swap(
         alice_state,
         alice_swarm_handle,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),
         Config::regtest(),
+        Uuid::new_v4(),
+        alice_db,
     );
 
     let _alice_swarm_fut = tokio::spawn(async move { alice_swarm.run().await });
@@ -238,8 +248,8 @@ async fn init_alice(
         xmr: xmr_to_swap,
     };
 
+    let rng = &mut OsRng;
     let (alice_state, alice_behaviour) = {
-        let rng = &mut OsRng;
         let a = bitcoin::SecretKey::new_random(rng);
         let s_a = cross_curve_dleq::Scalar::random(rng);
         let v_a = xmr_btc::monero::PrivateViewKey::new_random(rng);
@@ -257,7 +267,6 @@ async fn init_alice(
             punish_address,
         );
 
-        // let msg0 = AliceToBob::Message0(self.state.next_message(&mut OsRng));
         (
             AliceState::Started {
                 amounts,
