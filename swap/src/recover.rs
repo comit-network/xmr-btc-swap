@@ -157,6 +157,8 @@ pub async fn alice_recover(
                 }
             };
         }
+        Alice::EncSignLearned { .. } => unimplemented!("recover method is deprecated"),
+        Alice::BtcCancelled { .. } => unimplemented!("recover method is deprecated"),
         Alice::BtcRedeemable { redeem_tx, state } => {
             info!("Have the means to redeem the Bitcoin");
 

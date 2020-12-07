@@ -117,12 +117,17 @@ async fn main() -> Result<()> {
             let (mut event_loop, handle) =
                 alice::event_loop::EventLoop::new(alice_transport, alice_behaviour, listen_addr)?;
 
+            let swap_id = Uuid::new_v4();
+            info!("Swap id: {}", swap_id);
+
             let swap = alice::swap::swap(
                 alice_state,
                 handle,
                 bitcoin_wallet.clone(),
                 monero_wallet.clone(),
                 config,
+                swap_id,
+                db,
             );
 
             let _event_loop = tokio::spawn(async move { event_loop.run().await });
