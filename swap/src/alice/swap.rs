@@ -125,7 +125,6 @@ pub async fn swap(
     .await
 }
 
-// TODO: use macro or generics
 pub fn is_complete(state: &AliceState) -> bool {
     matches!(
         state,
@@ -153,7 +152,7 @@ pub async fn run_until(
     monero_wallet: Arc<crate::monero::Wallet>,
     config: Config,
 ) -> Result<(AliceState, Swarm)> {
-    info!("{}", state);
+    info!("Current state:{}", state);
     if is_target_state(&state) {
         Ok((state, swarm))
     } else {

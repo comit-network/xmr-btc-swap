@@ -26,15 +26,15 @@ async fn happy_path() {
             .await
             .unwrap();
 
-    let btc = bitcoin::Amount::from_sat(1_000_000);
+    let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
     let btc_alice = bitcoin::Amount::ZERO;
-    let btc_bob = btc * 10;
+    let btc_bob = btc_to_swap * 10;
 
     // this xmr value matches the logic of alice::calculate_amounts i.e. btc *
     // 10_000 * 100
-    let xmr = 1_000_000_000_000;
-    let xmr_alice = xmr * 10;
-    let xmr_bob = 0;
+    let xmr_to_swap = xmr_btc::monero::Amount::from_piconero(1_000_000_000_000);
+    let xmr_alice = xmr_to_swap * xmr_btc::monero::Amount::from_piconero(10);
+    let xmr_bob = xmr_btc::monero::Amount::from_piconero(0);
 
     let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9876"
         .parse()
@@ -43,9 +43,9 @@ async fn happy_path() {
     let (alice_state, alice_swarm, alice_btc_wallet, alice_xmr_wallet, alice_peer_id) = init_alice(
         &bitcoind,
         &monero,
-        btc,
+        btc_to_swap,
         btc_alice,
-        xmr,
+        xmr_to_swap,
         xmr_alice,
         alice_multiaddr.clone(),
     )
@@ -56,9 +56,9 @@ async fn happy_path() {
         alice_peer_id,
         &bitcoind,
         &monero,
-        btc,
+        btc_to_swap,
         btc_bob,
-        xmr,
+        xmr_to_swap,
         xmr_bob,
     )
     .await;
@@ -93,12 +93,12 @@ async fn happy_path() {
 
     assert_eq!(
         btc_alice_final,
-        btc_alice + btc - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
+        btc_alice + btc_to_swap - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
     );
-    assert!(btc_bob_final <= btc_bob - btc);
+    assert!(btc_bob_final <= btc_bob - btc_to_swap);
 
-    assert!(xmr_alice_final.as_piconero() <= xmr_alice - xmr);
-    assert_eq!(xmr_bob_final.as_piconero(), xmr_bob + xmr);
+    assert!(xmr_alice_final <= xmr_alice - xmr_to_swap);
+    assert_eq!(xmr_bob_final, xmr_bob + xmr_to_swap);
 }
 
 /// Bob locks Btc and Alice locks Xmr. Bob does not act; he fails to send Alice
@@ -115,13 +115,13 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
             .unwrap();
 
     let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
-    let xmr_to_swap = 1_000_000_000_000;
+    let xmr_to_swap = xmr_btc::monero::Amount::from_piconero(1_000_000_000_000);
 
     let bob_btc_starting_balance = btc_to_swap * 10;
-    let bob_xmr_starting_balance = 0;
+    let bob_xmr_starting_balance = xmr_btc::monero::Amount::from_piconero(0);
 
     let alice_btc_starting_balance = bitcoin::Amount::ZERO;
-    let alice_xmr_starting_balance = xmr_to_swap * 10;
+    let alice_xmr_starting_balance = xmr_to_swap * xmr_btc::monero::Amount::from_piconero(10);
 
     let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9877"
         .parse()
@@ -197,8 +197,8 @@ async fn init_alice(
     monero: &Monero,
     btc_to_swap: bitcoin::Amount,
     _btc_starting_balance: bitcoin::Amount,
-    xmr_to_swap: u64,
-    xmr_starting_balance: u64,
+    xmr_to_swap: xmr_btc::monero::Amount,
+    xmr_starting_balance: xmr_btc::monero::Amount,
     alice_multiaddr: Multiaddr,
 ) -> (
     AliceState,
@@ -208,7 +208,7 @@ async fn init_alice(
     PeerId,
 ) {
     monero
-        .init(vec![("alice", xmr_starting_balance)])
+        .init(vec![("alice", xmr_starting_balance.as_piconero())])
         .await
         .unwrap();
 
@@ -224,7 +224,7 @@ async fn init_alice(
 
     let amounts = SwapAmounts {
         btc: btc_to_swap,
-        xmr: xmr_btc::monero::Amount::from_piconero(xmr_to_swap),
+        xmr: xmr_to_swap,
     };
 
     let alice_behaviour = alice::Behaviour::default();
@@ -262,8 +262,8 @@ async fn init_bob(
     monero: &Monero,
     btc_to_swap: bitcoin::Amount,
     btc_starting_balance: bitcoin::Amount,
-    xmr_to_swap: u64,
-    xmr_stating_balance: u64,
+    xmr_to_swap: xmr_btc::monero::Amount,
+    xmr_stating_balance: xmr_btc::monero::Amount,
 ) -> (
     BobState,
     bob::Swarm,
@@ -285,7 +285,7 @@ async fn init_bob(
         .unwrap();
 
     monero
-        .init(vec![("bob", xmr_stating_balance)])
+        .init(vec![("bob", xmr_stating_balance.as_piconero())])
         .await
         .unwrap();
 
@@ -293,10 +293,8 @@ async fn init_bob(
 
     let amounts = SwapAmounts {
         btc: btc_to_swap,
-        xmr: xmr_btc::monero::Amount::from_piconero(xmr_to_swap),
+        xmr: xmr_to_swap,
     };
-
-    let rng = &mut OsRng;
 
     let bob_db_dir = tempdir().unwrap();
     let bob_db = Database::open(bob_db_dir.path()).unwrap();
@@ -305,9 +303,9 @@ async fn init_bob(
 
     let refund_address = bob_btc_wallet.new_address().await.unwrap();
     let state0 = xmr_btc::bob::State0::new(
-        rng,
+        &mut OsRng,
         btc_to_swap,
-        xmr_btc::monero::Amount::from_piconero(xmr_to_swap),
+        xmr_to_swap,
         REFUND_TIMELOCK,
         PUNISH_TIMELOCK,
         refund_address,

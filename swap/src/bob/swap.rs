@@ -76,7 +76,6 @@ where
     .await
 }
 
-// TODO: use macro or generics
 pub fn is_complete(state: &BobState) -> bool {
     matches!(
         state,
@@ -111,7 +110,7 @@ pub async fn run_until<R>(
 where
     R: RngCore + CryptoRng + Send,
 {
-    info!("{}", state);
+    info!("Current state: {}", state);
     if is_target_state(&state) {
         Ok(state)
     } else {
@@ -303,62 +302,3 @@ where
         }
     }
 }
-
-// // State machine driver for recovery execution
-// #[async_recursion]
-// pub async fn abort(state: BobState, io: Io) -> Result<BobState> {
-//     match state {
-//         BobState::Started => {
-//             // Nothing has been commited by either party, abort swap.
-//             abort(BobState::SafelyAborted, io).await
-//         }
-//         BobState::Negotiated => {
-//             // Nothing has been commited by either party, abort swap.
-//             abort(BobState::SafelyAborted, io).await
-//         }
-//         BobState::BtcLocked => {
-//             // Bob has locked BTC and must refund it
-//             // Bob waits for alice to publish TxRedeem or t1
-//             if unimplemented!("TxRedeemSeen") {
-//                 // Alice has redeemed revealing s_a
-//                 abort(BobState::BtcRedeemed, io).await
-//             } else if unimplemented!("T1Elapsed") {
-//                 // publish TxCancel or see if it has been published
-//                 abort(BobState::Cancelled, io).await
-//             } else {
-//                 Err(unimplemented!())
-//             }
-//         }
-//         BobState::XmrLocked => {
-//             // Alice has locked Xmr
-//             // Wait until t1
-//             if unimplemented!(">t1 and <t2") {
-//                 // Bob publishes TxCancel
-//                 abort(BobState::Cancelled, io).await
-//             } else {
-//                 // >t2
-//                 // submit TxCancel
-//                 abort(BobState::Punished, io).await
-//             }
-//         }
-//         BobState::Cancelled => {
-//             // Bob has cancelled the swap
-//             // If <t2 Bob refunds
-//             if unimplemented!("<t2") {
-//                 // Submit TxRefund
-//                 abort(BobState::BtcRefunded, io).await
-//             } else {
-//                 // Bob failed to refund in time and has been punished
-//                 abort(BobState::Punished, io).await
-//             }
-//         }
-//         BobState::BtcRedeemed => {
-//             // Bob uses revealed s_a to redeem XMR
-//             abort(BobState::XmrRedeemed, io).await
-//         }
-//         BobState::BtcRefunded => Ok(BobState::BtcRefunded),
-//         BobState::Punished => Ok(BobState::Punished),
-//         BobState::SafelyAborted => Ok(BobState::SafelyAborted),
-//         BobState::XmrRedeemed => Ok(BobState::XmrRedeemed),
-//     }
-// }
