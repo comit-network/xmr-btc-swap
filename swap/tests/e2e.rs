@@ -39,7 +39,7 @@ async fn happy_path() {
     // 10_000 * 100
     let xmr_to_swap = xmr_btc::monero::Amount::from_piconero(1_000_000_000_000);
     let xmr_alice = xmr_to_swap * 10;
-    let xmr_bob = xmr_btc::monero::Amount::from_piconero(0);
+    let xmr_bob = xmr_btc::monero::Amount::ZERO;
 
     let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9876"
         .parse()
@@ -143,7 +143,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
     let xmr_to_swap = xmr_btc::monero::Amount::from_piconero(1_000_000_000_000);
 
     let bob_btc_starting_balance = btc_to_swap * 10;
-    let bob_xmr_starting_balance = xmr_btc::monero::Amount::from_piconero(0);
+    let bob_xmr_starting_balance = xmr_btc::monero::Amount::ZERO;
 
     let alice_btc_starting_balance = bitcoin::Amount::ZERO;
     let alice_xmr_starting_balance = xmr_to_swap * 10;
