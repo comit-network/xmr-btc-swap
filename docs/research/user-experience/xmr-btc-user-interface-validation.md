@@ -154,3 +154,19 @@ More research is needed to evaluate if reliable services exist.
 Once the daemon of the party receiving the Bitcoin sees the Bitcoin transaction of the sender, the address has to be evaluated to ensure the correct address has been used for funding.
 This can be done automated.
 In case a tainted address was used the swap execution should halt and give a warning to the receiving party.
+
+####  Improve Anonymity 
+
+Monero is a privacy focused coin, anonymity is important to the community. 
+This section focuses on hiding your IP address when doind trades.
+
+Mention happened in user interviews, mentions:
+
+* 03.12.2020, PM
+
+[Running Tor](https://web.getmonero.org/resources/user-guides/tor_wallet.html) is not the only possibility to to achieve levels of anonymity using Monero. 
+Here is a collection of other tools/possibilities:
+
+* [Run Monero node through I2P using I2P-zero](https://web.getmonero.org/resources/user-guides/node-i2p-zero.html)
+* [Dandelion++](https://www.monerooutreach.org/stories/dandelion.html)
+
