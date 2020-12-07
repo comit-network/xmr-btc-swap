@@ -8,7 +8,7 @@ use crate::{
             publish_bitcoin_redeem_transaction, publish_cancel_transaction,
             wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund, wait_for_locked_bitcoin,
         },
-        Swarm,
+        swarm_driver::SwarmDriver,
     },
     bitcoin,
     bitcoin::EncryptedSignature,
@@ -109,11 +109,11 @@ impl fmt::Display for AliceState {
 
 pub async fn swap(
     state: AliceState,
-    swarm: Swarm,
+    swarm: SwarmDriver,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
     config: Config,
-) -> Result<(AliceState, Swarm)> {
+) -> Result<(AliceState, SwarmDriver)> {
     run_until(
         state,
         is_complete,
@@ -147,11 +147,11 @@ pub fn is_xmr_locked(state: &AliceState) -> bool {
 pub async fn run_until(
     state: AliceState,
     is_target_state: fn(&AliceState) -> bool,
-    mut swarm: Swarm,
+    mut swarm: SwarmDriver,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
     config: Config,
-) -> Result<(AliceState, Swarm)> {
+) -> Result<(AliceState, SwarmDriver)> {
     info!("Current state:{}", state);
     if is_target_state(&state) {
         Ok((state, swarm))

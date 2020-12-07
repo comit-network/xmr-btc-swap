@@ -23,6 +23,7 @@ mod message1;
 mod message2;
 mod message3;
 pub mod swap;
+pub mod swarm_driver;
 
 use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
 use crate::{

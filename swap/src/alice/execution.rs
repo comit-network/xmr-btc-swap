@@ -1,7 +1,5 @@
 use crate::{
-    alice::{amounts, OutEvent, Swarm},
-    bitcoin, monero,
-    network::request_response::AliceToBob,
+    alice::swarm_driver::SwarmDriver, bitcoin, monero, network::request_response::AliceToBob,
     SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use anyhow::{bail, Context, Result};
@@ -33,36 +31,28 @@ pub async fn negotiate(
     a: bitcoin::SecretKey,
     s_a: cross_curve_dleq::Scalar,
     v_a: monero::PrivateViewKey,
-    swarm: &mut Swarm,
+    swarm: &mut SwarmDriver,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     config: Config,
 ) -> Result<(ResponseChannel<AliceToBob>, State3)> {
     trace!("Starting negotiate");
-    let event = timeout(config.bob_time_to_act, swarm.next())
+    let _peer_id = timeout(config.bob_time_to_act, swarm.recv_conn_established())
         .await
-        .context("Failed to receive dial connection from Bob")?;
-    match event {
-        OutEvent::ConnectionEstablished(_bob_peer_id) => {}
-        other => bail!("Unexpected event received: {:?}", other),
-    }
+        .context("Failed to receive dial connection from Bob")??;
 
-    let event = timeout(config.bob_time_to_act, swarm.next())
+    let event = timeout(config.bob_time_to_act, swarm.recv_request())
         .await
-        .context("Failed to receive amounts from Bob")?;
-    let (btc, channel) = match event {
-        OutEvent::Request(amounts::OutEvent::Btc { btc, channel }) => (btc, channel),
-        other => bail!("Unexpected event received: {:?}", other),
-    };
+        .context("Failed to receive amounts from Bob")??;
 
-    if btc != amounts.btc {
+    if event.btc != amounts.btc {
         bail!(
             "Bob proposed a different amount; got {}, expected: {}",
-            btc,
+            event.btc,
             amounts.btc
         );
     }
-    // TODO: get an ack from libp2p2
-    swarm.send_amounts(channel, amounts);
+
+    swarm.send_amounts(event.channel, amounts);
 
     let redeem_address = bitcoin_wallet.as_ref().new_address().await?;
     let punish_address = redeem_address.clone();
@@ -80,40 +70,21 @@ pub async fn negotiate(
     );
 
     // TODO(Franck): Understand why this is needed.
-    swarm.set_state0(state0.clone());
+    swarm.swarm.set_state0(state0.clone());
 
-    let event = timeout(config.bob_time_to_act, swarm.next())
-        .await
-        .context("Failed to receive message 0 from Bob")?;
-    let message0 = match event {
-        OutEvent::Message0(msg) => msg,
-        other => bail!("Unexpected event received: {:?}", other),
-    };
+    let bob_message0 = timeout(config.bob_time_to_act, swarm.recv_message0()).await??;
 
-    let state1 = state0.receive(message0)?;
+    let state1 = state0.receive(bob_message0)?;
 
-    let event = timeout(config.bob_time_to_act, swarm.next())
-        .await
-        .context("Failed to receive message 1 from Bob")?;
-    let (msg, channel) = match event {
-        OutEvent::Message1 { msg, channel } => (msg, channel),
-        other => bail!("Unexpected event: {:?}", other),
-    };
+    let (bob_message1, channel) = timeout(config.bob_time_to_act, swarm.recv_message1()).await??;
 
-    let state2 = state1.receive(msg);
+    let state2 = state1.receive(bob_message1);
 
-    let message1 = state2.next_message();
-    swarm.send_message1(channel, message1);
+    swarm.send_message1(channel, state2.next_message());
 
-    let event = timeout(config.bob_time_to_act, swarm.next())
-        .await
-        .context("Failed to receive message 2 from Bob")?;
-    let (msg, channel) = match event {
-        OutEvent::Message2 { msg, channel } => (msg, channel),
-        other => bail!("Unexpected event: {:?}", other),
-    };
+    let (bob_message2, channel) = timeout(config.bob_time_to_act, swarm.recv_message2()).await??;
 
-    let state3 = state2.receive(msg)?;
+    let state3 = state2.receive(bob_message2)?;
 
     Ok((channel, state3))
 }
@@ -146,7 +117,7 @@ pub async fn lock_xmr<W>(
     channel: ResponseChannel<AliceToBob>,
     amounts: SwapAmounts,
     state3: State3,
-    swarm: &mut Swarm,
+    swarm: &mut SwarmDriver,
     monero_wallet: Arc<W>,
 ) -> Result<()>
 where
@@ -173,20 +144,13 @@ where
 }
 
 pub async fn wait_for_bitcoin_encrypted_signature(
-    swarm: &mut Swarm,
+    swarm: &mut SwarmDriver,
     timeout_duration: Duration,
 ) -> Result<EncryptedSignature> {
-    let event = timeout(timeout_duration, swarm.next())
+    let msg3 = timeout(timeout_duration, swarm.recv_message3())
         .await
-        .context("Failed to receive Bitcoin encrypted signature from Bob")?;
-
-    match event {
-        OutEvent::Message3(msg) => Ok(msg.tx_redeem_encsig),
-        other => bail!(
-            "Expected Bob's Bitcoin redeem encrypted signature, got: {:?}",
-            other
-        ),
-    }
+        .context("Failed to receive Bitcoin encrypted signature from Bob")??;
+    Ok(msg3.tx_redeem_encsig)
 }
 
 pub fn build_bitcoin_redeem_transaction(

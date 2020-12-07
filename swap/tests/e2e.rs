@@ -18,8 +18,10 @@ use xmr_btc::{bitcoin, config::Config, cross_curve_dleq};
 
 #[tokio::test]
 async fn happy_path() {
+    use tracing_subscriber::util::SubscriberInitExt as _;
     let _guard = tracing_subscriber::fmt()
-        .with_env_filter("trace,hyper=warn")
+        .with_env_filter("swap=info,xmr_btc=info")
+        .with_ansi(false)
         .set_default();
 
     let cli = Cli::default();
@@ -109,8 +111,10 @@ async fn happy_path() {
 /// the encsig and fail to refund or redeem. Alice punishes.
 #[tokio::test]
 async fn alice_punishes_if_bob_never_acts_after_fund() {
+    use tracing_subscriber::util::SubscriberInitExt as _;
     let _guard = tracing_subscriber::fmt()
-        .with_env_filter("trace,hyper=warn")
+        .with_env_filter("swap=info,xmr_btc=info")
+        .with_ansi(false)
         .set_default();
 
     let cli = Cli::default();
@@ -192,10 +196,10 @@ async fn init_alice(
     _btc_starting_balance: bitcoin::Amount,
     xmr_to_swap: xmr_btc::monero::Amount,
     xmr_starting_balance: xmr_btc::monero::Amount,
-    alice_multiaddr: Multiaddr,
+    listen: Multiaddr,
 ) -> (
     AliceState,
-    alice::Swarm,
+    alice::swarm_driver::SwarmDriver,
     Arc<swap::bitcoin::Wallet>,
     Arc<swap::monero::Wallet>,
     PeerId,
@@ -236,7 +240,9 @@ async fn init_alice(
         }
     };
 
-    let alice_swarm = alice::new_swarm(alice_multiaddr, alice_transport, alice_behaviour).unwrap();
+    let alice_swarm =
+        alice::swarm_driver::SwarmDriver::new(alice_transport, alice_behaviour, listen)
+            .expect("Could not init alice");
 
     (
         alice_state,
@@ -259,7 +265,7 @@ async fn init_bob(
     xmr_stating_balance: xmr_btc::monero::Amount,
 ) -> (
     BobState,
-    bob::Swarm,
+    bob::swarm_driver::SwarmDriver,
     Arc<swap::bitcoin::Wallet>,
     Arc<swap::monero::Wallet>,
     Database,
@@ -309,7 +315,8 @@ async fn init_bob(
         peer_id: alice_peer_id,
         addr: alice_multiaddr,
     };
-    let bob_swarm = bob::new_swarm(bob_transport, bob_behaviour).unwrap();
+
+    let bob_swarm = bob::swarm_driver::SwarmDriver::new(bob_transport, bob_behaviour);
 
     (bob_state, bob_swarm, bob_btc_wallet, bob_xmr_wallet, bob_db)
 }

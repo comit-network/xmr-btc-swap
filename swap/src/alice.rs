@@ -43,6 +43,7 @@ mod message1;
 mod message2;
 mod message3;
 pub mod swap;
+pub mod swarm_driver;
 
 pub async fn swap(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
@@ -117,7 +118,7 @@ pub async fn swap(
             OutEvent::ConnectionEstablished(bob) => {
                 info!("Connection established with: {}", bob);
             }
-            OutEvent::Request(amounts::OutEvent::Btc { btc, channel }) => {
+            OutEvent::Request(amounts::OutEvent { btc, channel }) => {
                 let amounts = calculate_amounts(btc);
                 last_amounts = Some(amounts);
                 swarm.send_amounts(channel, amounts);
