@@ -161,32 +161,18 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         Uuid::new_v4(),
     );
 
-    let alice_xmr_locked_fut = alice::swap::run_until(
+    let alice_fut = alice::swap::swap(
         alice_state,
-        alice::swap::is_xmr_locked,
         alice_swarm,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),
         Config::regtest(),
     );
 
-    // Wait until alice has locked xmr and bob has locked btc
-    let ((alice_state, alice_swarm), _bob_state) =
-        try_join(alice_xmr_locked_fut, bob_xmr_locked_fut)
-            .await
-            .unwrap();
+    // Wait until alice has locked xmr and bob h  as locked btc
+    let ((alice_state, _), _bob_state) = try_join(alice_fut, bob_xmr_locked_fut).await.unwrap();
 
-    let (punished, _) = alice::swap::swap(
-        alice_state,
-        alice_swarm,
-        alice_btc_wallet.clone(),
-        alice_xmr_wallet.clone(),
-        Config::regtest(),
-    )
-    .await
-    .unwrap();
-
-    assert!(matches!(punished, AliceState::Punished));
+    assert!(matches!(alice_state, AliceState::Punished));
 
     // todo: Add balance assertions
 }
