@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
-use xmr_btc::{alice, bob, monero, serde::monero_private_key};
+use xmr_btc::{alice, bitcoin::EncryptedSignature, bob, monero, serde::monero_private_key};
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -15,10 +15,16 @@ pub enum Alice {
     Negotiated(alice::State3),
     BtcLocked(alice::State3),
     XmrLocked(alice::State3),
+    // TODO(Franck): Delete this state as it is not used in alice::swap
     BtcRedeemable {
         state: alice::State3,
         redeem_tx: bitcoin::Transaction,
     },
+    EncSignLearned {
+        state: alice::State3,
+        encrypted_signature: EncryptedSignature,
+    },
+    BtcCancelled(alice::State3),
     BtcPunishable(alice::State3),
     BtcRefunded {
         state: alice::State3,
@@ -67,9 +73,11 @@ impl Display for Alice {
             Alice::BtcLocked(_) => f.write_str("Bitcoin locked"),
             Alice::XmrLocked(_) => f.write_str("Monero locked"),
             Alice::BtcRedeemable { .. } => f.write_str("Bitcoin redeemable"),
+            Alice::BtcCancelled(_) => f.write_str("Bitcoin cancel transaction published"),
             Alice::BtcPunishable(_) => f.write_str("Bitcoin punishable"),
             Alice::BtcRefunded { .. } => f.write_str("Monero refundable"),
             Alice::SwapComplete => f.write_str("Swap complete"),
+            Alice::EncSignLearned { .. } => f.write_str("Encrypted signature learned"),
         }
     }
 }
