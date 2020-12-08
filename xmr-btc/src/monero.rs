@@ -97,11 +97,11 @@ impl Sub for Amount {
     }
 }
 
-impl Mul for Amount {
+impl Mul<u64> for Amount {
     type Output = Amount;
 
-    fn mul(self, rhs: Self) -> Self::Output {
-        Self(self.0 * rhs.0)
+    fn mul(self, rhs: u64) -> Self::Output {
+        Self(self.0 * rhs)
     }
 }
 
