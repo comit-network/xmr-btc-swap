@@ -1,3 +1,5 @@
+use crate::SwapAmounts;
+use libp2p::{core::Multiaddr, PeerId};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use xmr_btc::{alice, bitcoin::EncryptedSignature, bob, monero, serde::monero_private_key};
@@ -37,11 +39,33 @@ pub enum Alice {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Bob {
-    Handshaken(bob::State2),
-    BtcLocked(bob::State2),
-    XmrLocked(bob::State2),
-    BtcRedeemed(bob::State2),
-    BtcRefundable(bob::State2),
+    Started {
+        state0: bob::State0,
+        amounts: SwapAmounts,
+        addr: Multiaddr,
+    },
+    Negotiated {
+        state2: bob::State2,
+        #[serde(with = "crate::serde::peer_id")]
+        peer_id: PeerId,
+    },
+    BtcLocked {
+        state3: bob::State3,
+        #[serde(with = "crate::serde::peer_id")]
+        peer_id: PeerId,
+    },
+    XmrLocked {
+        state4: bob::State4,
+        #[serde(with = "crate::serde::peer_id")]
+        peer_id: PeerId,
+    },
+    EncSigSent {
+        state4: bob::State4,
+        #[serde(with = "crate::serde::peer_id")]
+        peer_id: PeerId,
+    },
+    BtcRedeemed(bob::State5),
+    BtcCancelled(bob::State4),
     SwapComplete,
 }
 
@@ -85,12 +109,14 @@ impl Display for Alice {
 impl Display for Bob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Bob::Handshaken(_) => f.write_str("Handshake complete"),
-            Bob::BtcLocked(_) | Bob::XmrLocked(_) | Bob::BtcRefundable(_) => {
+            Bob::Negotiated { .. } => f.write_str("Handshake complete"),
+            Bob::BtcLocked { .. } | Bob::XmrLocked { .. } | Bob::BtcCancelled(_) => {
                 f.write_str("Bitcoin refundable")
             }
             Bob::BtcRedeemed(_) => f.write_str("Monero redeemable"),
             Bob::SwapComplete => f.write_str("Swap complete"),
+            Bob::Started { .. } => f.write_str("Swap started"),
+            Bob::EncSigSent { .. } => f.write_str("Encrypted signature sent"),
         }
     }
 }
