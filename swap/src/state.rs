@@ -2,7 +2,9 @@ use crate::SwapAmounts;
 use libp2p::{core::Multiaddr, PeerId};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
-use xmr_btc::{alice, bitcoin::EncryptedSignature, bob, monero, serde::monero_private_key};
+use xmr_btc::{
+    alice, bitcoin::EncryptedSignature, bob, cross_curve_dleq, monero, serde::monero_private_key,
+};
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -14,6 +16,12 @@ pub enum Swap {
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Alice {
+    Started {
+        amounts: SwapAmounts,
+        a: crate::bitcoin::SecretKey,
+        s_a: cross_curve_dleq::Scalar,
+        v_a: monero::PrivateViewKey,
+    },
     Negotiated(alice::State3),
     BtcLocked(alice::State3),
     XmrLocked(alice::State3),
@@ -93,6 +101,7 @@ impl Display for Swap {
 impl Display for Alice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Alice::Started { .. } => f.write_str("Swap started"),
             Alice::Negotiated(_) => f.write_str("Handshake complete"),
             Alice::BtcLocked(_) => f.write_str("Bitcoin locked"),
             Alice::XmrLocked(_) => f.write_str("Monero locked"),
