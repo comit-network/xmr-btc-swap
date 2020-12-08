@@ -82,6 +82,29 @@ impl From<BobState> for state::Bob {
     }
 }
 
+impl From<state::Bob> for BobState {
+    fn from(bob: Bob) -> Self {
+        match bob {
+            Bob::Started {
+                state0,
+                amounts,
+                addr,
+            } => BobState::Started {
+                state0,
+                amounts,
+                addr,
+            },
+            Bob::Negotiated { state2, peer_id } => BobState::Negotiated(state2, peer_id),
+            Bob::BtcLocked { state3, peer_id } => BobState::BtcLocked(state3, peer_id),
+            Bob::XmrLocked { state4, peer_id } => BobState::XmrLocked(state4, peer_id),
+            Bob::EncSigSent { state4, peer_id } => BobState::EncSigSent(state4, peer_id),
+            Bob::BtcRedeemed(state5) => BobState::BtcRedeemed(state5),
+            Bob::BtcCancelled(state4) => BobState::Cancelled(state4),
+            Bob::SwapComplete => BobState::SafelyAborted,
+        }
+    }
+}
+
 pub async fn swap<R>(
     state: BobState,
     event_loop_handle: EventLoopHandle,
