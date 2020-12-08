@@ -1,5 +1,7 @@
 use crate::{
     bob::{event_loop::EventLoopHandle, execution::negotiate},
+    state,
+    state::Bob,
     storage::Database,
     SwapAmounts,
 };
@@ -17,6 +19,7 @@ use xmr_btc::{
 
 // The same data structure is used for swap execution and recovery.
 // This allows for a seamless transition from a failed swap to recovery.
+#[derive(Debug, Clone)]
 pub enum BobState {
     Started {
         state0: bob::State0,
@@ -49,6 +52,32 @@ impl fmt::Display for BobState {
             BobState::XmrRedeemed => write!(f, "xmr_redeemed"),
             BobState::Punished => write!(f, "punished"),
             BobState::SafelyAborted => write!(f, "safely_aborted"),
+        }
+    }
+}
+
+impl From<BobState> for state::Bob {
+    fn from(bob_state: BobState) -> Self {
+        match bob_state {
+            BobState::Started {
+                state0,
+                amounts,
+                addr,
+            } => Bob::Started {
+                state0,
+                amounts,
+                addr,
+            },
+            BobState::Negotiated(state2, peer_id) => Bob::Negotiated { state2, peer_id },
+            BobState::BtcLocked(state3, peer_id) => Bob::BtcLocked { state3, peer_id },
+            BobState::XmrLocked(state4, peer_id) => Bob::XmrLocked { state4, peer_id },
+            BobState::EncSigSent(state4, peer_id) => Bob::EncSigSent { state4, peer_id },
+            BobState::BtcRedeemed(state5) => Bob::BtcRedeemed(state5),
+            BobState::Cancelled(state4) => Bob::BtcCancelled(state4),
+            BobState::BtcRefunded(_)
+            | BobState::XmrRedeemed
+            | BobState::Punished
+            | BobState::SafelyAborted => Bob::SwapComplete,
         }
     }
 }
@@ -131,8 +160,13 @@ where
                     bitcoin_wallet.clone(),
                 )
                 .await?;
+
+                let state = BobState::Negotiated(state2, alice_peer_id);
+                let db_state = state.clone().into();
+                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                    .await?;
                 run_until(
-                    BobState::Negotiated(state2, alice_peer_id),
+                    state,
                     is_target_state,
                     event_loop_handle,
                     db,
@@ -146,9 +180,13 @@ where
             BobState::Negotiated(state2, alice_peer_id) => {
                 // Alice and Bob have exchanged info
                 let state3 = state2.lock_btc(bitcoin_wallet.as_ref()).await?;
-                // db.insert_latest_state(state);
+
+                let state = BobState::BtcLocked(state3, alice_peer_id);
+                let db_state = state.clone().into();
+                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                    .await?;
                 run_until(
-                    BobState::BtcLocked(state3, alice_peer_id),
+                    state,
                     is_target_state,
                     event_loop_handle,
                     db,
@@ -168,8 +206,12 @@ where
                     .watch_for_lock_xmr(monero_wallet.as_ref(), msg2)
                     .await?;
 
+                let state = BobState::XmrLocked(state4, alice_peer_id);
+                let db_state = state.clone().into();
+                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                    .await?;
                 run_until(
-                    BobState::XmrLocked(state4, alice_peer_id),
+                    state,
                     is_target_state,
                     event_loop_handle,
                     db,
@@ -192,8 +234,12 @@ where
                     .send_message3(alice_peer_id.clone(), tx_redeem_encsig)
                     .await?;
 
+                let state = BobState::EncSigSent(state, alice_peer_id);
+                let db_state = state.clone().into();
+                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                    .await?;
                 run_until(
-                    BobState::EncSigSent(state, alice_peer_id),
+                    state,
                     is_target_state,
                     event_loop_handle,
                     db,
@@ -209,10 +255,14 @@ where
                 let redeem_watcher = state.watch_for_redeem_btc(bitcoin_wallet.as_ref());
                 let t1_timeout = state.wait_for_t1(bitcoin_wallet.as_ref());
 
+                // TODO(Franck): Check if db save and run_until can be factorized
                 tokio::select! {
                     val = redeem_watcher => {
+                        let state = BobState::BtcRedeemed(val?);
+                        let db_state = state.clone().into();
+                        db.insert_latest_state(swap_id, state::Swap::Bob(db_state)).await?;
                         run_until(
-                            BobState::BtcRedeemed(val?),
+                            state,
                                  is_target_state,
                             event_loop_handle,
                             db,
@@ -230,15 +280,18 @@ where
                             state.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
                         }
 
+                        let state = BobState::Cancelled(state);
+                        let db_state = state.clone().into();
+                        db.insert_latest_state(swap_id, state::Swap::Bob(db_state)).await?;
                         run_until(
-                            BobState::Cancelled(state),
-                                 is_target_state,
+                            state,
+                            is_target_state,
                             event_loop_handle,
                             db,
                             bitcoin_wallet,
                             monero_wallet,
                             rng,
-                     swap_id
+                            swap_id
                         )
                         .await
 
@@ -248,8 +301,13 @@ where
             BobState::BtcRedeemed(state) => {
                 // Bob redeems XMR using revealed s_a
                 state.claim_xmr(monero_wallet.as_ref()).await?;
+
+                let state = BobState::XmrRedeemed;
+                let db_state = state.clone().into();
+                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                    .await?;
                 run_until(
-                    BobState::XmrRedeemed,
+                    state,
                     is_target_state,
                     event_loop_handle,
                     db,
@@ -261,37 +319,31 @@ where
                 .await
             }
             BobState::Cancelled(state) => {
+                // TODO
                 // Bob has cancelled the swap
-                match state.current_epoch(bitcoin_wallet.as_ref()).await? {
+                let state = match state.current_epoch(bitcoin_wallet.as_ref()).await? {
                     Epoch::T0 => panic!("Cancelled before t1??? Something is really wrong"),
                     Epoch::T1 => {
                         state.refund_btc(bitcoin_wallet.as_ref()).await?;
-                        run_until(
-                            BobState::BtcRefunded(state),
-                            is_target_state,
-                            event_loop_handle,
-                            db,
-                            bitcoin_wallet,
-                            monero_wallet,
-                            rng,
-                            swap_id,
-                        )
-                        .await
+                        BobState::BtcRefunded(state)
                     }
-                    Epoch::T2 => {
-                        run_until(
-                            BobState::Punished,
-                            is_target_state,
-                            event_loop_handle,
-                            db,
-                            bitcoin_wallet,
-                            monero_wallet,
-                            rng,
-                            swap_id,
-                        )
-                        .await
-                    }
-                }
+                    Epoch::T2 => BobState::Punished,
+                };
+
+                let db_state = state.clone().into();
+                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                    .await?;
+                run_until(
+                    state,
+                    is_target_state,
+                    event_loop_handle,
+                    db,
+                    bitcoin_wallet,
+                    monero_wallet,
+                    rng,
+                    swap_id,
+                )
+                .await
             }
             BobState::BtcRefunded(state4) => Ok(BobState::BtcRefunded(state4)),
             BobState::Punished => Ok(BobState::Punished),

@@ -24,9 +24,12 @@ use futures::{
 };
 use sha2::Sha256;
 use tracing::info;
-use xmr_btc::bitcoin::{
-    poll_until_block_height_is_gte, BroadcastSignedTransaction, TransactionBlockHeight,
-    WatchForRawTransaction,
+use xmr_btc::{
+    bitcoin::{
+        poll_until_block_height_is_gte, BroadcastSignedTransaction, TransactionBlockHeight,
+        WatchForRawTransaction,
+    },
+    bob::{State3, State4},
 };
 
 pub async fn recover(
@@ -366,18 +369,53 @@ pub async fn bob_recover(
     state: Bob,
 ) -> Result<()> {
     match state {
-        Bob::Handshaken(_) | Bob::SwapComplete => {
+        Bob::Negotiated { .. } | Bob::SwapComplete => {
             info!("Nothing to do");
         }
-        Bob::BtcLocked(state) | Bob::XmrLocked(state) | Bob::BtcRefundable(state) => {
+        Bob::BtcLocked {
+            state3:
+                State3 {
+                    A,
+                    b,
+                    s_b,
+                    refund_timelock,
+                    refund_address,
+                    tx_lock,
+                    tx_cancel_sig_a,
+                    tx_refund_encsig,
+                    ..
+                },
+            ..
+        }
+        | Bob::XmrLocked {
+            state4:
+                State4 {
+                    A,
+                    b,
+                    s_b,
+                    refund_timelock,
+                    refund_address,
+                    tx_lock,
+                    tx_cancel_sig_a,
+                    tx_refund_encsig,
+                    ..
+                },
+            ..
+        }
+        | Bob::BtcCancelled(State4 {
+            A,
+            b,
+            s_b,
+            refund_timelock,
+            refund_address,
+            tx_lock,
+            tx_cancel_sig_a,
+            tx_refund_encsig,
+            ..
+        }) => {
             info!("Bitcoin may still be locked up, attempting to refund");
 
-            let tx_cancel = bitcoin::TxCancel::new(
-                &state.tx_lock,
-                state.refund_timelock,
-                state.A,
-                state.b.public(),
-            );
+            let tx_cancel = bitcoin::TxCancel::new(&tx_lock, refund_timelock, A, b.public());
 
             info!("Checking if the Bitcoin cancel transaction has been published");
             if bitcoin_wallet
@@ -389,20 +427,17 @@ pub async fn bob_recover(
                 info!("Bitcoin cancel transaction not yet published");
 
                 let tx_lock_height = bitcoin_wallet
-                    .transaction_block_height(state.tx_lock.txid())
+                    .transaction_block_height(tx_lock.txid())
                     .await;
-                poll_until_block_height_is_gte(
-                    &bitcoin_wallet,
-                    tx_lock_height + state.refund_timelock,
-                )
-                .await;
+                poll_until_block_height_is_gte(&bitcoin_wallet, tx_lock_height + refund_timelock)
+                    .await;
 
-                let sig_a = state.tx_cancel_sig_a.clone();
-                let sig_b = state.b.sign(tx_cancel.digest());
+                let sig_a = tx_cancel_sig_a.clone();
+                let sig_b = b.sign(tx_cancel.digest());
 
                 let tx_cancel = tx_cancel
                     .clone()
-                    .add_signatures(&state.tx_lock, (state.A, sig_a), (state.b.public(), sig_b))
+                    .add_signatures(&tx_lock, (A, sig_a), (b.public(), sig_b))
                     .expect("sig_{a,b} to be valid signatures for tx_cancel");
 
                 // TODO: We should not fail if the transaction is already on the blockchain
@@ -413,15 +448,15 @@ pub async fn bob_recover(
 
             info!("Confirmed that Bitcoin cancel transaction is on the blockchain");
 
-            let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &state.refund_address);
+            let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &refund_address);
             let signed_tx_refund = {
                 let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
-                let sig_a = adaptor
-                    .decrypt_signature(&state.s_b.into_secp256k1(), state.tx_refund_encsig.clone());
-                let sig_b = state.b.sign(tx_refund.digest());
+                let sig_a =
+                    adaptor.decrypt_signature(&s_b.into_secp256k1(), tx_refund_encsig.clone());
+                let sig_b = b.sign(tx_refund.digest());
 
                 tx_refund
-                    .add_signatures(&tx_cancel, (state.A, sig_a), (state.b.public(), sig_b))
+                    .add_signatures(&tx_cancel, (A, sig_a), (b.public(), sig_b))
                     .expect("sig_{a,b} to be valid signatures for tx_refund")
             };
 
@@ -459,6 +494,8 @@ pub async fn bob_recover(
                 .await?;
             info!("Successfully redeemed monero")
         }
+        Bob::Started { .. } => todo!(),
+        Bob::EncSigSent { .. } => todo!(),
     };
 
     Ok(())
