@@ -3,7 +3,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
-use std::ops::{Add, Sub};
+use std::ops::{Add, Mul, Sub};
 
 pub use curve25519_dalek::scalar::Scalar;
 pub use monero::*;
@@ -94,6 +94,14 @@ impl Sub for Amount {
 
     fn sub(self, rhs: Self) -> Self::Output {
         Self(self.0 - rhs.0)
+    }
+}
+
+impl Mul<u64> for Amount {
+    type Output = Amount;
+
+    fn mul(self, rhs: u64) -> Self::Output {
+        Self(self.0 * rhs)
     }
 }
 

@@ -799,6 +799,9 @@ impl State4 {
         t1_timeout.await;
         Ok(())
     }
+    pub fn tx_lock_id(&self) -> bitcoin::Txid {
+        self.tx_lock.txid()
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

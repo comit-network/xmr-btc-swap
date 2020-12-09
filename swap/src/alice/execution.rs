@@ -5,7 +5,6 @@ use crate::{
     SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use anyhow::{bail, Context, Result};
-use conquer_once::Lazy;
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
 use futures::{
     future::{select, Either},
@@ -28,13 +27,6 @@ use xmr_btc::{
     cross_curve_dleq,
     monero::Transfer,
 };
-
-// The maximum we assume we need to wait from the moment the monero transaction
-// is mined to the moment it reaches finality. We set 15 confirmations for now
-// (based on Kraken). 1.5 multiplier in case the blockchain is slower than
-// usually. Average of 2 minutes block time
-static MONERO_MAX_FINALITY_TIME: Lazy<Duration> =
-    Lazy::new(|| Duration::from_secs_f64(15f64 * 1.5 * 2f64 * 60f64));
 
 pub async fn negotiate(
     amounts: SwapAmounts,
@@ -180,8 +172,11 @@ where
     Ok(())
 }
 
-pub async fn wait_for_bitcoin_encrypted_signature(swarm: &mut Swarm) -> Result<EncryptedSignature> {
-    let event = timeout(*MONERO_MAX_FINALITY_TIME, swarm.next())
+pub async fn wait_for_bitcoin_encrypted_signature(
+    swarm: &mut Swarm,
+    timeout_duration: Duration,
+) -> Result<EncryptedSignature> {
+    let event = timeout(timeout_duration, swarm.next())
         .await
         .context("Failed to receive Bitcoin encrypted signature from Bob")?;
 
