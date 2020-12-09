@@ -1,5 +1,5 @@
 use crate::{
-    alice::swarm_driver::SwarmDriver, bitcoin, monero, network::request_response::AliceToBob,
+    alice::swarm_driver::SwarmDriverHandle, bitcoin, monero, network::request_response::AliceToBob,
     SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use anyhow::{bail, Context, Result};
@@ -31,7 +31,7 @@ pub async fn negotiate(
     a: bitcoin::SecretKey,
     s_a: cross_curve_dleq::Scalar,
     v_a: monero::PrivateViewKey,
-    swarm: &mut SwarmDriver,
+    swarm: &mut SwarmDriverHandle,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     config: Config,
 ) -> Result<(ResponseChannel<AliceToBob>, State3)> {
@@ -52,7 +52,7 @@ pub async fn negotiate(
         );
     }
 
-    swarm.send_amounts(event.channel, amounts);
+    swarm.send_amounts(event.channel, amounts).await?;
 
     let redeem_address = bitcoin_wallet.as_ref().new_address().await?;
     let punish_address = redeem_address.clone();
@@ -70,7 +70,7 @@ pub async fn negotiate(
     );
 
     // TODO(Franck): Understand why this is needed.
-    swarm.swarm.set_state0(state0.clone());
+    // swarm.swarm.set_state0(state0.clone());
 
     let bob_message0 = timeout(config.bob_time_to_act, swarm.recv_message0()).await??;
 
@@ -80,7 +80,7 @@ pub async fn negotiate(
 
     let state2 = state1.receive(bob_message1);
 
-    swarm.send_message1(channel, state2.next_message());
+    swarm.send_message1(channel, state2.next_message()).await?;
 
     let (bob_message2, channel) = timeout(config.bob_time_to_act, swarm.recv_message2()).await??;
 
@@ -117,7 +117,7 @@ pub async fn lock_xmr<W>(
     channel: ResponseChannel<AliceToBob>,
     amounts: SwapAmounts,
     state3: State3,
-    swarm: &mut SwarmDriver,
+    swarm: &mut SwarmDriverHandle,
     monero_wallet: Arc<W>,
 ) -> Result<()>
 where
@@ -136,15 +136,17 @@ where
 
     // TODO(Franck): Wait for Monero to be confirmed once
 
-    swarm.send_message2(channel, alice::Message2 {
-        tx_lock_proof: transfer_proof,
-    });
+    swarm
+        .send_message2(channel, alice::Message2 {
+            tx_lock_proof: transfer_proof,
+        })
+        .await?;
 
     Ok(())
 }
 
 pub async fn wait_for_bitcoin_encrypted_signature(
-    swarm: &mut SwarmDriver,
+    swarm: &mut SwarmDriverHandle,
     timeout_duration: Duration,
 ) -> Result<EncryptedSignature> {
     let msg3 = timeout(timeout_duration, swarm.recv_message3())

@@ -1,5 +1,5 @@
 use crate::{
-    bob::{execution::negotiate, swarm_driver::SwarmDriver},
+    bob::{execution::negotiate, swarm_driver::SwarmDriverHandle},
     storage::Database,
     SwapAmounts,
 };
@@ -53,7 +53,7 @@ impl fmt::Display for BobState {
 
 pub async fn swap<R>(
     state: BobState,
-    swarm: SwarmDriver,
+    swarm: SwarmDriverHandle,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
@@ -100,7 +100,7 @@ pub fn is_xmr_locked(state: &BobState) -> bool {
 pub async fn run_until<R>(
     state: BobState,
     is_target_state: fn(&BobState) -> bool,
-    mut swarm: SwarmDriver,
+    mut swarm: SwarmDriverHandle,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
@@ -187,7 +187,9 @@ where
                 // What if Alice fails to receive this? Should we always resend?
                 // todo: If we cannot dial Alice we should go to EncSigSent. Maybe dialing
                 // should happen in this arm?
-                swarm.send_message3(alice_peer_id.clone(), tx_redeem_encsig);
+                swarm
+                    .send_message3(alice_peer_id.clone(), tx_redeem_encsig)
+                    .await?;
 
                 run_until(
                     BobState::EncSigSent(state, alice_peer_id),
