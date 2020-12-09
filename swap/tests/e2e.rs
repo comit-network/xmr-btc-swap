@@ -20,7 +20,7 @@ use xmr_btc::{bitcoin, config::Config, cross_curve_dleq};
 async fn happy_path() {
     use tracing_subscriber::util::SubscriberInitExt as _;
     let _guard = tracing_subscriber::fmt()
-        .with_env_filter("swap=info,xmr_btc=info")
+        .with_env_filter("swap=trace,xmr_btc=trace")
         .with_ansi(false)
         .set_default();
 
@@ -48,7 +48,7 @@ async fn happy_path() {
 
     let (
         alice_state,
-        mut alice_swarm,
+        mut alice_swarm_driver,
         alice_swarm_handle,
         alice_btc_wallet,
         alice_xmr_wallet,
@@ -85,7 +85,7 @@ async fn happy_path() {
         Config::regtest(),
     );
 
-    let _alice_swarm_fut = tokio::spawn(async move { alice_swarm.run().await });
+    let _alice_swarm_fut = tokio::spawn(async move { alice_swarm_driver.run().await });
 
     let bob_swap_fut = bob::swap::swap(
         bob_state,

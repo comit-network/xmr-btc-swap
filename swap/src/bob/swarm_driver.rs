@@ -3,8 +3,12 @@ use crate::{
     network::{transport::SwapTransport, TokioExecutor},
 };
 use anyhow::Result;
+use futures::FutureExt;
 use libp2p::{core::Multiaddr, PeerId};
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::{
+    stream::StreamExt,
+    sync::mpsc::{Receiver, Sender},
+};
 use tracing::info;
 use xmr_btc::{alice, bitcoin::EncryptedSignature, bob};
 
@@ -69,6 +73,7 @@ impl SwarmDriverHandle {
     }
 
     pub async fn dial_alice(&mut self, addr: Multiaddr) -> Result<()> {
+        info!("sending msg to ourselves to dial alice: {}", addr);
         let _ = self.dial_alice.send(addr).await?;
         Ok(())
     }
@@ -177,45 +182,58 @@ impl SwarmDriver {
 
     pub async fn run(mut self) {
         loop {
-            match self.swarm.next().await {
-                OutEvent::ConnectionEstablished(alice) => {
-                    let _ = self.conn_established.send(alice).await;
+            tokio::select! {
+                swarm_event = self.swarm.next().fuse() => {
+                    match swarm_event {
+                        OutEvent::ConnectionEstablished(alice) => {
+                            let _ = self.conn_established.send(alice).await;
+                        }
+                        OutEvent::Amounts(_amounts) => info!("Amounts received from Alice"),
+                        OutEvent::Message0(msg) => {
+                            let _ = self.msg0.send(msg).await;
+                        }
+                        OutEvent::Message1(msg) => {
+                            let _ = self.msg1.send(msg).await;
+                        }
+                        OutEvent::Message2(msg) => {
+                            let _ = self.msg2.send(msg).await;
+                        }
+                        OutEvent::Message3 => info!("Alice acknowledged message 3 received"),
+                    }
+                },
+                addr = self.dial_alice.next().fuse() => {
+                    if let Some(addr) = addr {
+                        info!("dialing alice: {}", addr);
+                        libp2p::Swarm::dial_addr(&mut self.swarm, addr).expect("Could not dial alice");
+                    }
+                },
+                amounts = self.request_amounts.next().fuse() =>  {
+                    if let Some((peer_id, btc_amount)) = amounts {
+                        self.swarm.request_amounts(peer_id, btc_amount.as_sat());
+                    }
+                },
+
+                msg0 = self.send_msg0.next().fuse() => {
+                    if let Some((peer_id, msg)) = msg0 {
+                        self.swarm.send_message0(peer_id, msg);
+                    }
                 }
-                OutEvent::Amounts(_amounts) => info!("Amounts received from Alice"),
-                OutEvent::Message0(msg) => {
-                    let _ = self.msg0.send(msg).await;
+
+                msg1 = self.send_msg1.next().fuse() => {
+                    if let Some((peer_id, msg)) = msg1 {
+                        self.swarm.send_message1(peer_id, msg);
+                    }
+                },
+                msg2 = self.send_msg2.next().fuse() => {
+                    if let Some((peer_id, msg)) = msg2 {
+                        self.swarm.send_message2(peer_id, msg);
+                    }
+                },
+                msg3 = self.send_msg3.next().fuse() => {
+                    if let Some((peer_id, tx_redeem_encsig)) = msg3 {
+                        self.swarm.send_message3(peer_id, tx_redeem_encsig);
+                    }
                 }
-                OutEvent::Message1(msg) => {
-                    let _ = self.msg1.send(msg).await;
-                }
-                OutEvent::Message2(msg) => {
-                    let _ = self.msg2.send(msg).await;
-                }
-                OutEvent::Message3 => info!("Alice acknowledged message 3 received"),
-            };
-
-            if let Ok(addr) = self.dial_alice.try_recv() {
-                libp2p::Swarm::dial_addr(&mut self.swarm, addr).expect("Could not dial alice");
-            }
-
-            if let Ok((peer_id, btc_amount)) = self.request_amounts.try_recv() {
-                self.swarm.request_amounts(peer_id, btc_amount.as_sat());
-            }
-
-            if let Ok((peer_id, msg)) = self.send_msg0.try_recv() {
-                self.swarm.send_message0(peer_id, msg);
-            }
-
-            if let Ok((peer_id, msg)) = self.send_msg1.try_recv() {
-                self.swarm.send_message1(peer_id, msg);
-            }
-
-            if let Ok((peer_id, msg)) = self.send_msg2.try_recv() {
-                self.swarm.send_message2(peer_id, msg);
-            }
-
-            if let Ok((peer_id, tx_redeem_encsig)) = self.send_msg3.try_recv() {
-                self.swarm.send_message3(peer_id, tx_redeem_encsig);
             }
         }
     }

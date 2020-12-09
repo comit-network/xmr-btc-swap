@@ -16,6 +16,7 @@ pub async fn negotiate<R>(
 where
     R: RngCore + CryptoRng + Send,
 {
+    tracing::trace!("Starting negotiate");
     swarm.dial_alice(addr).await?;
 
     let alice = swarm.recv_conn_established().await?;

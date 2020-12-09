@@ -4,7 +4,10 @@ use crate::{
     SwapAmounts,
 };
 use anyhow::{Context, Result};
-use libp2p::{core::Multiaddr, request_response::ResponseChannel, PeerId, Swarm};
+use futures::FutureExt;
+use libp2p::{
+    core::Multiaddr, futures::StreamExt, request_response::ResponseChannel, PeerId, Swarm,
+};
 use tokio::sync::mpsc::{Receiver, Sender};
 use xmr_btc::{alice, bob};
 
@@ -178,37 +181,44 @@ impl SwarmDriver {
 
     pub async fn run(&mut self) {
         loop {
-            match self.swarm.next().await {
-                OutEvent::ConnectionEstablished(alice) => {
-                    let _ = self.conn_established.send(alice).await;
-                }
-                OutEvent::Message0(msg) => {
-                    let _ = self.msg0.send(msg).await;
-                }
-                OutEvent::Message1 { msg, channel } => {
-                    let _ = self.msg1.send((msg, channel)).await;
-                }
-                OutEvent::Message2 { msg, channel } => {
-                    let _ = self.msg2.send((msg, channel)).await;
-                }
-                OutEvent::Message3(msg) => {
-                    let _ = self.msg3.send(msg).await;
-                }
-                OutEvent::Request(event) => {
-                    let _ = self.request.send(event).await;
-                }
-            };
-
-            if let Ok((channel, amounts)) = self.send_amounts.try_recv() {
-                self.swarm.send_amounts(channel, amounts);
-            }
-
-            if let Ok((channel, msg)) = self.send_msg1.try_recv() {
-                self.swarm.send_message1(channel, msg);
-            }
-
-            if let Ok((channel, msg)) = self.send_msg2.try_recv() {
-                self.swarm.send_message2(channel, msg);
+            tokio::select! {
+                swarm_event = self.swarm.next().fuse() => {
+                    match swarm_event {
+                        OutEvent::ConnectionEstablished(alice) => {
+                            let _ = self.conn_established.send(alice).await;
+                        }
+                        OutEvent::Message0(msg) => {
+                            let _ = self.msg0.send(msg).await;
+                        }
+                        OutEvent::Message1 { msg, channel } => {
+                            let _ = self.msg1.send((msg, channel)).await;
+                        }
+                        OutEvent::Message2 { msg, channel } => {
+                            let _ = self.msg2.send((msg, channel)).await;
+                        }
+                        OutEvent::Message3(msg) => {
+                            let _ = self.msg3.send(msg).await;
+                        }
+                        OutEvent::Request(event) => {
+                            let _ = self.request.send(event).await;
+                        }
+                    }
+                },
+                amounts = self.send_amounts.next().fuse() => {
+                    if let Some((channel, amounts)) = amounts  {
+                        self.swarm.send_amounts(channel, amounts);
+                    }
+                },
+                msg1 = self.send_msg1.next().fuse() => {
+                    if let Some((channel, msg)) = msg1  {
+                        self.swarm.send_message1(channel, msg);
+                    }
+                },
+                msg2 = self.send_msg2.next().fuse() => {
+                    if let Some((channel, msg)) = msg2  {
+                        self.swarm.send_message2(channel, msg);
+                    }
+                },
             }
         }
     }
