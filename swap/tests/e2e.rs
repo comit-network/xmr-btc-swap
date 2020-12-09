@@ -10,9 +10,9 @@ use swap::{
 };
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
+use tracing_subscriber::util::SubscriberInitExt as _;
 use uuid::Uuid;
 use xmr_btc::{bitcoin, config::Config, cross_curve_dleq};
-use tracing_subscriber::util::SubscriberInitExt as _;
 
 /// Run the following tests with RUST_MIN_STACK=10000000
 
@@ -109,7 +109,6 @@ async fn happy_path() {
 /// the encsig and fail to refund or redeem. Alice punishes.
 #[tokio::test]
 async fn alice_punishes_if_bob_never_acts_after_fund() {
-
     let _guard = tracing_subscriber::fmt()
         .with_env_filter("trace,hyper=warn")
         .set_default();
