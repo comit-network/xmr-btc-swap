@@ -12,12 +12,16 @@ use tempfile::tempdir;
 use testcontainers::clients::Cli;
 use uuid::Uuid;
 use xmr_btc::{bitcoin, config::Config, cross_curve_dleq};
+use tracing_subscriber::util::SubscriberInitExt as _;
 
 /// Run the following tests with RUST_MIN_STACK=10000000
 
 #[tokio::test]
 async fn happy_path() {
-    init_tracing();
+    let _guard = tracing_subscriber::fmt()
+        .with_env_filter("trace,hyper=warn")
+        .set_default();
+
     let cli = Cli::default();
     let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
     let _ = bitcoind.init(5).await;
@@ -105,7 +109,11 @@ async fn happy_path() {
 /// the encsig and fail to refund or redeem. Alice punishes.
 #[tokio::test]
 async fn alice_punishes_if_bob_never_acts_after_fund() {
-    init_tracing();
+
+    let _guard = tracing_subscriber::fmt()
+        .with_env_filter("trace,hyper=warn")
+        .set_default();
+
     let cli = Cli::default();
     let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
     let _ = bitcoind.init(5).await;
@@ -305,12 +313,4 @@ async fn init_bob(
     let bob_swarm = bob::new_swarm(bob_transport, bob_behaviour).unwrap();
 
     (bob_state, bob_swarm, bob_btc_wallet, bob_xmr_wallet, bob_db)
-}
-
-fn init_tracing() {
-    use tracing_subscriber::util::SubscriberInitExt as _;
-    let _guard = tracing_subscriber::fmt()
-        .with_env_filter("swap=info,xmr_btc=info")
-        .with_ansi(false)
-        .set_default();
 }
