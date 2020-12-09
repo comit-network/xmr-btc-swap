@@ -80,7 +80,7 @@ async fn setup_wallets(
 }
 
 #[tokio::test]
-async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
+renamasync fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     setup_tracing();
 
     let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9876"
