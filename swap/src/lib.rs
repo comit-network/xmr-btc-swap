@@ -14,9 +14,6 @@ pub mod state;
 pub mod storage;
 pub mod tor;
 
-pub const REFUND_TIMELOCK: u32 = 50; // Relative timelock, this is number of blocks. TODO: What should it be?
-pub const PUNISH_TIMELOCK: u32 = 50; // FIXME: What should this be?
-
 pub type Never = std::convert::Infallible;
 
 /// Commands sent from Bob to the main task.

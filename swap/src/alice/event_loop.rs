@@ -3,7 +3,7 @@ use crate::{
     network::{request_response::AliceToBob, transport::SwapTransport, TokioExecutor},
     SwapAmounts,
 };
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use futures::FutureExt;
 use libp2p::{
     core::Multiaddr, futures::StreamExt, request_response::ResponseChannel, PeerId, Swarm,
@@ -30,15 +30,15 @@ impl<T> Default for Channels<T> {
 }
 
 pub struct EventLoopHandle {
-    pub msg0: Receiver<bob::Message0>,
-    pub msg1: Receiver<(bob::Message1, ResponseChannel<AliceToBob>)>,
-    pub msg2: Receiver<(bob::Message2, ResponseChannel<AliceToBob>)>,
-    pub msg3: Receiver<bob::Message3>,
-    pub request: Receiver<crate::alice::amounts::OutEvent>,
-    pub conn_established: Receiver<PeerId>,
-    pub send_amounts: Sender<(ResponseChannel<AliceToBob>, SwapAmounts)>,
-    pub send_msg1: Sender<(ResponseChannel<AliceToBob>, alice::Message1)>,
-    pub send_msg2: Sender<(ResponseChannel<AliceToBob>, alice::Message2)>,
+    msg0: Receiver<bob::Message0>,
+    msg1: Receiver<(bob::Message1, ResponseChannel<AliceToBob>)>,
+    msg2: Receiver<(bob::Message2, ResponseChannel<AliceToBob>)>,
+    msg3: Receiver<bob::Message3>,
+    request: Receiver<crate::alice::amounts::OutEvent>,
+    conn_established: Receiver<PeerId>,
+    send_amounts: Sender<(ResponseChannel<AliceToBob>, SwapAmounts)>,
+    send_msg1: Sender<(ResponseChannel<AliceToBob>, alice::Message1)>,
+    send_msg2: Sender<(ResponseChannel<AliceToBob>, alice::Message2)>,
 }
 
 impl EventLoopHandle {
@@ -46,41 +46,42 @@ impl EventLoopHandle {
         self.conn_established
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed to receive connection established from Bob"))
+            .ok_or_else(|| anyhow!("Failed to receive connection established from Bob"))
     }
 
     pub async fn recv_message0(&mut self) -> Result<bob::Message0> {
         self.msg0
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed to receive message 0 from Bob"))
+            .ok_or_else(|| anyhow!("Failed to receive message 0 from Bob"))
     }
 
     pub async fn recv_message1(&mut self) -> Result<(bob::Message1, ResponseChannel<AliceToBob>)> {
         self.msg1
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed to receive message 1 from Bob"))
+            .ok_or_else(|| anyhow!("Failed to receive message 1 from Bob"))
     }
 
     pub async fn recv_message2(&mut self) -> Result<(bob::Message2, ResponseChannel<AliceToBob>)> {
         self.msg2
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed o receive message 2 from Bob"))
+            .ok_or_else(|| anyhow!("Failed o receive message 2 from Bob"))
     }
 
     pub async fn recv_message3(&mut self) -> Result<bob::Message3> {
-        self.msg3.recv().await.ok_or_else(|| {
-            anyhow::Error::msg("Failed to receive Bitcoin encrypted signature from Bob")
-        })
+        self.msg3
+            .recv()
+            .await
+            .ok_or_else(|| anyhow!("Failed to receive Bitcoin encrypted signature from Bob"))
     }
 
     pub async fn recv_request(&mut self) -> Result<crate::alice::amounts::OutEvent> {
         self.request
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed to receive amounts request from Bob"))
+            .ok_or_else(|| anyhow!("Failed to receive amounts request from Bob"))
     }
 
     pub async fn send_amounts(
@@ -112,16 +113,16 @@ impl EventLoopHandle {
 }
 
 pub struct EventLoop {
-    pub swarm: libp2p::Swarm<Behaviour>,
-    pub msg0: Sender<bob::Message0>,
-    pub msg1: Sender<(bob::Message1, ResponseChannel<AliceToBob>)>,
-    pub msg2: Sender<(bob::Message2, ResponseChannel<AliceToBob>)>,
-    pub msg3: Sender<bob::Message3>,
-    pub request: Sender<crate::alice::amounts::OutEvent>,
-    pub conn_established: Sender<PeerId>,
-    pub send_amounts: Receiver<(ResponseChannel<AliceToBob>, SwapAmounts)>,
-    pub send_msg1: Receiver<(ResponseChannel<AliceToBob>, alice::Message1)>,
-    pub send_msg2: Receiver<(ResponseChannel<AliceToBob>, alice::Message2)>,
+    swarm: libp2p::Swarm<Behaviour>,
+    msg0: Sender<bob::Message0>,
+    msg1: Sender<(bob::Message1, ResponseChannel<AliceToBob>)>,
+    msg2: Sender<(bob::Message2, ResponseChannel<AliceToBob>)>,
+    msg3: Sender<bob::Message3>,
+    request: Sender<crate::alice::amounts::OutEvent>,
+    conn_established: Sender<PeerId>,
+    send_amounts: Receiver<(ResponseChannel<AliceToBob>, SwapAmounts)>,
+    send_msg1: Receiver<(ResponseChannel<AliceToBob>, alice::Message1)>,
+    send_msg2: Receiver<(ResponseChannel<AliceToBob>, alice::Message2)>,
 }
 
 impl EventLoop {

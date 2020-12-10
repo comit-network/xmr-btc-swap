@@ -2,7 +2,7 @@ use crate::{
     bob::{Behaviour, OutEvent},
     network::{transport::SwapTransport, TokioExecutor},
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use futures::FutureExt;
 use libp2p::{core::Multiaddr, PeerId};
 use tokio::{
@@ -31,16 +31,16 @@ impl<T> Default for Channels<T> {
 }
 
 pub struct EventLoopHandle {
-    pub msg0: Receiver<alice::Message0>,
-    pub msg1: Receiver<alice::Message1>,
-    pub msg2: Receiver<alice::Message2>,
-    pub request_amounts: Sender<(PeerId, ::bitcoin::Amount)>,
-    pub conn_established: Receiver<PeerId>,
-    pub dial_alice: Sender<Multiaddr>,
-    pub send_msg0: Sender<(PeerId, bob::Message0)>,
-    pub send_msg1: Sender<(PeerId, bob::Message1)>,
-    pub send_msg2: Sender<(PeerId, bob::Message2)>,
-    pub send_msg3: Sender<(PeerId, EncryptedSignature)>,
+    msg0: Receiver<alice::Message0>,
+    msg1: Receiver<alice::Message1>,
+    msg2: Receiver<alice::Message2>,
+    request_amounts: Sender<(PeerId, ::bitcoin::Amount)>,
+    conn_established: Receiver<PeerId>,
+    dial_alice: Sender<Multiaddr>,
+    send_msg0: Sender<(PeerId, bob::Message0)>,
+    send_msg1: Sender<(PeerId, bob::Message1)>,
+    send_msg2: Sender<(PeerId, bob::Message2)>,
+    send_msg3: Sender<(PeerId, EncryptedSignature)>,
 }
 
 impl EventLoopHandle {
@@ -48,28 +48,28 @@ impl EventLoopHandle {
         self.conn_established
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed to receive connection established from Bob"))
+            .ok_or_else(|| anyhow!("Failed to receive connection established from Bob"))
     }
 
     pub async fn recv_message0(&mut self) -> Result<alice::Message0> {
         self.msg0
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed to receive message 0 from Bob"))
+            .ok_or_else(|| anyhow!("Failed to receive message 0 from Bob"))
     }
 
     pub async fn recv_message1(&mut self) -> Result<alice::Message1> {
         self.msg1
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed to receive message 1 from Bob"))
+            .ok_or_else(|| anyhow!("Failed to receive message 1 from Bob"))
     }
 
     pub async fn recv_message2(&mut self) -> Result<alice::Message2> {
         self.msg2
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed o receive message 2 from Bob"))
+            .ok_or_else(|| anyhow!("Failed o receive message 2 from Bob"))
     }
 
     pub async fn dial_alice(&mut self, addr: Multiaddr) -> Result<()> {
@@ -113,17 +113,17 @@ impl EventLoopHandle {
 }
 
 pub struct EventLoop {
-    pub swarm: libp2p::Swarm<Behaviour>,
-    pub msg0: Sender<alice::Message0>,
-    pub msg1: Sender<alice::Message1>,
-    pub msg2: Sender<alice::Message2>,
-    pub conn_established: Sender<PeerId>,
-    pub request_amounts: Receiver<(PeerId, ::bitcoin::Amount)>,
-    pub dial_alice: Receiver<Multiaddr>,
-    pub send_msg0: Receiver<(PeerId, bob::Message0)>,
-    pub send_msg1: Receiver<(PeerId, bob::Message1)>,
-    pub send_msg2: Receiver<(PeerId, bob::Message2)>,
-    pub send_msg3: Receiver<(PeerId, EncryptedSignature)>,
+    swarm: libp2p::Swarm<Behaviour>,
+    msg0: Sender<alice::Message0>,
+    msg1: Sender<alice::Message1>,
+    msg2: Sender<alice::Message2>,
+    conn_established: Sender<PeerId>,
+    request_amounts: Receiver<(PeerId, ::bitcoin::Amount)>,
+    dial_alice: Receiver<Multiaddr>,
+    send_msg0: Receiver<(PeerId, bob::Message0)>,
+    send_msg1: Receiver<(PeerId, bob::Message1)>,
+    send_msg2: Receiver<(PeerId, bob::Message2)>,
+    send_msg3: Receiver<(PeerId, EncryptedSignature)>,
 }
 
 impl EventLoop {
