@@ -1,6 +1,6 @@
 use bitcoin_harness::Bitcoind;
 use futures::future::try_join;
-use libp2p::{Multiaddr, PeerId};
+use libp2p::Multiaddr;
 use monero_harness::Monero;
 use rand::rngs::OsRng;
 use std::sync::Arc;
@@ -51,7 +51,6 @@ async fn happy_path() {
         alice_swarm_handle,
         alice_btc_wallet,
         alice_xmr_wallet,
-        alice_peer_id,
     ) = init_alice(
         &bitcoind,
         &monero,
@@ -66,7 +65,6 @@ async fn happy_path() {
     let (bob_state, bob_swarm_driver, bob_swarm_handle, bob_btc_wallet, bob_xmr_wallet, bob_db) =
         init_bob(
             alice_multiaddr,
-            alice_peer_id,
             &bitcoind,
             &monero,
             btc_to_swap,
@@ -149,28 +147,21 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         .parse()
         .expect("failed to parse Alice's address");
 
-    let (
-        alice_state,
-        mut alice_swarm,
-        alice_swarm_handle,
-        alice_btc_wallet,
-        alice_xmr_wallet,
-        alice_peer_id,
-    ) = init_alice(
-        &bitcoind,
-        &monero,
-        btc_to_swap,
-        alice_btc_starting_balance,
-        xmr_to_swap,
-        alice_xmr_starting_balance,
-        alice_multiaddr.clone(),
-    )
-    .await;
+    let (alice_state, mut alice_swarm, alice_swarm_handle, alice_btc_wallet, alice_xmr_wallet) =
+        init_alice(
+            &bitcoind,
+            &monero,
+            btc_to_swap,
+            alice_btc_starting_balance,
+            xmr_to_swap,
+            alice_xmr_starting_balance,
+            alice_multiaddr.clone(),
+        )
+        .await;
 
     let (bob_state, bob_swarm_driver, bob_swarm_handle, bob_btc_wallet, bob_xmr_wallet, bob_db) =
         init_bob(
             alice_multiaddr,
-            alice_peer_id,
             &bitcoind,
             &monero,
             btc_to_swap,
@@ -226,7 +217,6 @@ async fn init_alice(
     alice::event_loop::EventLoopHandle,
     Arc<swap::bitcoin::Wallet>,
     Arc<swap::monero::Wallet>,
-    PeerId,
 ) {
     monero
         .init(vec![("alice", xmr_starting_balance.as_piconero())])
@@ -277,7 +267,6 @@ async fn init_alice(
         )
     };
 
-    let alice_peer_id = alice_behaviour.peer_id();
     let alice_transport = build(alice_behaviour.identity()).unwrap();
 
     let (swarm_driver, handle) =
@@ -289,14 +278,12 @@ async fn init_alice(
         handle,
         alice_btc_wallet,
         alice_xmr_wallet,
-        alice_peer_id,
     )
 }
 
 #[allow(clippy::too_many_arguments)]
 async fn init_bob(
     alice_multiaddr: Multiaddr,
-    alice_peer_id: PeerId,
     bitcoind: &Bitcoind<'_>,
     monero: &Monero,
     btc_to_swap: bitcoin::Amount,
@@ -353,7 +340,6 @@ async fn init_bob(
     let bob_state = BobState::Started {
         state0,
         amounts,
-        peer_id: alice_peer_id,
         addr: alice_multiaddr,
     };
 
