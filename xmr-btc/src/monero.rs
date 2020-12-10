@@ -5,8 +5,11 @@ use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Mul, Sub};
 
+use bitcoin::hashes::core::fmt::Formatter;
 pub use curve25519_dalek::scalar::Scalar;
 pub use monero::*;
+use rust_decimal::{prelude::FromPrimitive, Decimal};
+use std::fmt::Display;
 
 pub const MIN_CONFIRMATIONS: u32 = 10;
 
@@ -76,8 +79,18 @@ impl Amount {
     pub fn from_piconero(amount: u64) -> Self {
         Amount(amount)
     }
+
     pub fn as_piconero(&self) -> u64 {
         self.0
+    }
+
+    /// Maximum piconero value that can be converted is currently i64 maximum
+    /// value. This should only be used for Display purposes and not for
+    /// calculations!
+    pub fn as_monero(&self) -> Result<String> {
+        let piconero_as_i64 = i64::from_u64(self.0).ok_or_else(|| OverflowError(self.0))?;
+        let dec = Decimal::new(piconero_as_i64, 12);
+        Ok(dec.to_string())
     }
 }
 
@@ -108,6 +121,17 @@ impl Mul<u64> for Amount {
 impl From<Amount> for u64 {
     fn from(from: Amount) -> u64 {
         from.0
+    }
+}
+
+impl Display for Amount {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let monero = self.as_monero();
+
+        match monero {
+            Ok(monero) => write!(f, "{} XMR", monero),
+            Err(_) => write!(f, "{} piconero", self.as_piconero()),
+        }
     }
 }
 
@@ -176,4 +200,81 @@ pub trait CreateWalletForOutput {
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
     ) -> anyhow::Result<()>;
+}
+
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq)]
+#[error("Overflow, cannot convert {0} to i64")]
+pub struct OverflowError(pub u64);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn one_piconero_as_monero() {
+        let one_piconero = 1;
+        let amount = Amount::from_piconero(one_piconero);
+        let monero = amount.as_monero().unwrap();
+        assert_eq!("0.000000000001", monero);
+    }
+
+    #[test]
+    fn one_monero_as_monero() {
+        let one_monero_in_pics = 1000000000000;
+        let amount = Amount::from_piconero(one_monero_in_pics);
+        let monero = amount.as_monero().unwrap();
+        assert_eq!("1.000000000000", monero);
+    }
+
+    #[test]
+    fn monero_with_i64_max_returns_monero() {
+        let max_pics = 9_223_372_036_854_775_807;
+        let amount = Amount::from_piconero(max_pics);
+        let monero = amount.as_monero().unwrap();
+        assert_eq!("9223372.036854775807", monero);
+    }
+
+    #[test]
+    fn monero_with_i64_overflow_returns_error() {
+        let max_pics = 9_223_372_036_854_775_808;
+        let amount = Amount::from_piconero(max_pics);
+
+        let error = amount.as_monero().unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<OverflowError>().unwrap(),
+            &OverflowError(9_223_372_036_854_775_808)
+        );
+    }
+
+    #[test]
+    fn display_one_monero_as_xmr() {
+        let one_monero_in_pics = 1000000000000;
+        let amount = Amount::from_piconero(one_monero_in_pics);
+        let monero = amount.to_string();
+        assert_eq!("1.000000000000 XMR", monero);
+    }
+
+    #[test]
+    fn display_i64_max_as_xmr() {
+        let max_pics = 9_223_372_036_854_775_807;
+        let amount = Amount::from_piconero(max_pics);
+        let monero = amount.to_string();
+        assert_eq!("9223372.036854775807 XMR", monero);
+    }
+
+    #[test]
+    fn display_i64_overflow_as_piconero() {
+        let max_pics = 9_223_372_036_854_775_808;
+        let amount = Amount::from_piconero(max_pics);
+        let monero = amount.to_string();
+        assert_eq!("9223372036854775808 piconero", monero);
+    }
+
+    #[test]
+    fn display_u64_max_as_piconero() {
+        let max_pics = 18_446_744_073_709_551_615;
+        let amount = Amount::from_piconero(max_pics);
+        let monero = amount.to_string();
+        assert_eq!("18446744073709551615 piconero", monero);
+    }
 }

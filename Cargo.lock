@@ -2889,6 +2889,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rust_decimal"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9e81662973c7a8d9663e64a0de4cd642b89a21d64966e3d99606efdc5fb0cc6"
+dependencies = [
+ "num-traits",
+ "serde",
+]
+
+[[package]]
 name = "rustc-hex"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4182,6 +4192,7 @@ dependencies = [
  "monero-harness",
  "rand 0.7.3",
  "reqwest",
+ "rust_decimal",
  "serde",
  "serde_cbor",
  "sha2 0.9.2",

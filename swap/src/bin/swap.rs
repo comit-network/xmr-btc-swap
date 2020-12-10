@@ -113,9 +113,8 @@ async fn main() -> Result<()> {
 
             let monero_wallet = monero::Wallet::new(monero_wallet_rpc_url);
             let monero_balance = monero_wallet.get_balance().await?;
-            // TODO: impl Display for monero wallet to display proper monero balance
             info!(
-                "Connection to Monero wallet succeeded, balance: {:?}",
+                "Connection to Monero wallet succeeded, balance: {}",
                 monero_balance
             );
             let monero_wallet = Arc::new(monero_wallet);
@@ -184,7 +183,7 @@ async fn main() -> Result<()> {
             let monero_wallet = monero::Wallet::new(monero_wallet_rpc_url);
             let monero_balance = monero_wallet.get_balance().await?;
             info!(
-                "Connection to Monero wallet succeeded, balance: {:?}",
+                "Connection to Monero wallet succeeded, balance: {}",
                 monero_balance
             );
             let monero_wallet = Arc::new(monero_wallet);
