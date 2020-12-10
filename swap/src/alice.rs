@@ -37,6 +37,7 @@ use xmr_btc::{
 };
 
 mod amounts;
+pub mod event_loop;
 mod execution;
 mod message0;
 mod message1;
@@ -117,7 +118,7 @@ pub async fn swap(
             OutEvent::ConnectionEstablished(bob) => {
                 info!("Connection established with: {}", bob);
             }
-            OutEvent::Request(amounts::OutEvent::Btc { btc, channel }) => {
+            OutEvent::Request(amounts::OutEvent { btc, channel }) => {
                 let amounts = calculate_amounts(btc);
                 last_amounts = Some(amounts);
                 swarm.send_amounts(channel, amounts);
@@ -143,9 +144,6 @@ pub async fn swap(
                     redeem_address,
                     punish_address,
                 );
-
-                info!("Commencing handshake");
-                swarm.set_state0(state.clone());
 
                 state0 = Some(state)
             }
@@ -386,6 +384,20 @@ pub struct Behaviour {
 }
 
 impl Behaviour {
+    pub fn new(state: State0) -> Self {
+        let identity = Keypair::generate_ed25519();
+
+        Self {
+            pt: PeerTracker::default(),
+            amounts: Amounts::default(),
+            message0: Message0::new(state),
+            message1: Message1::default(),
+            message2: Message2::default(),
+            message3: Message3::default(),
+            identity,
+        }
+    }
+
     pub fn identity(&self) -> Keypair {
         self.identity.clone()
     }
@@ -399,13 +411,6 @@ impl Behaviour {
         let msg = AliceToBob::Amounts(amounts);
         self.amounts.send(channel, msg);
         info!("Sent amounts response");
-    }
-
-    // TODO(Franck) remove
-    /// Message0 gets sent within the network layer using this state0.
-    pub fn set_state0(&mut self, state: State0) {
-        debug!("Set state 0");
-        let _ = self.message0.set_state(state);
     }
 
     /// Send Message1 to Bob in response to receiving his Message1.
@@ -426,22 +431,6 @@ impl Behaviour {
     ) {
         self.message2.send(channel, msg);
         debug!("Sent Message2");
-    }
-}
-
-impl Default for Behaviour {
-    fn default() -> Self {
-        let identity = Keypair::generate_ed25519();
-
-        Self {
-            pt: PeerTracker::default(),
-            amounts: Amounts::default(),
-            message0: Message0::default(),
-            message1: Message1::default(),
-            message2: Message2::default(),
-            message3: Message3::default(),
-            identity,
-        }
     }
 }
 

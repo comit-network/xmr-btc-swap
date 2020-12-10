@@ -13,14 +13,15 @@ use std::{
 };
 use tracing::{debug, error};
 
-use crate::network::request_response::{AliceToBob, AmountsProtocol, BobToAlice, Codec, TIMEOUT};
+use crate::{
+    alice::amounts,
+    network::request_response::{AliceToBob, AmountsProtocol, BobToAlice, Codec, TIMEOUT},
+};
 
 #[derive(Debug)]
-pub enum OutEvent {
-    Btc {
-        btc: ::bitcoin::Amount,
-        channel: ResponseChannel<AliceToBob>,
-    },
+pub struct OutEvent {
+    pub btc: ::bitcoin::Amount,
+    pub channel: ResponseChannel<AliceToBob>,
 }
 
 /// A `NetworkBehaviour` that represents getting the amounts of an XMR/BTC swap.
@@ -82,7 +83,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             } => {
                 if let BobToAlice::AmountsFromBtc(btc) = request {
                     debug!("Received amounts request");
-                    self.events.push_back(OutEvent::Btc { btc, channel })
+                    self.events.push_back(amounts::OutEvent { btc, channel })
                 }
             }
             RequestResponseEvent::Message {

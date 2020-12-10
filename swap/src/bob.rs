@@ -17,6 +17,7 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 mod amounts;
+pub mod event_loop;
 mod execution;
 mod message0;
 mod message1;

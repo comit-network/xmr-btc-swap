@@ -2,17 +2,15 @@
 //! Alice holds XMR and wishes receive BTC.
 use crate::{
     alice::{
+        event_loop::EventLoopHandle,
         execution::{
             build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
             extract_monero_private_key, lock_xmr, negotiate, publish_bitcoin_punish_transaction,
             publish_bitcoin_redeem_transaction, publish_cancel_transaction,
             wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund, wait_for_locked_bitcoin,
         },
-        Swarm,
     },
-    bitcoin,
     bitcoin::EncryptedSignature,
-    monero,
     network::request_response::AliceToBob,
     SwapAmounts,
 };
@@ -27,10 +25,9 @@ use rand::{CryptoRng, RngCore};
 use std::{fmt, sync::Arc};
 use tracing::info;
 use xmr_btc::{
-    alice::State3,
+    alice::{State0, State3},
     bitcoin::{TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction},
     config::Config,
-    cross_curve_dleq,
     monero::CreateWalletForOutput,
 };
 
@@ -44,9 +41,7 @@ impl<T> Rng for T where T: RngCore + CryptoRng + Send {}
 pub enum AliceState {
     Started {
         amounts: SwapAmounts,
-        a: bitcoin::SecretKey,
-        s_a: cross_curve_dleq::Scalar,
-        v_a: monero::PrivateViewKey,
+        state0: State0,
     },
     Negotiated {
         channel: ResponseChannel<AliceToBob>,
@@ -109,11 +104,11 @@ impl fmt::Display for AliceState {
 
 pub async fn swap(
     state: AliceState,
-    swarm: Swarm,
+    swarm: EventLoopHandle,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
     config: Config,
-) -> Result<(AliceState, Swarm)> {
+) -> Result<(AliceState, EventLoopHandle)> {
     run_until(
         state,
         is_complete,
@@ -147,32 +142,18 @@ pub fn is_xmr_locked(state: &AliceState) -> bool {
 pub async fn run_until(
     state: AliceState,
     is_target_state: fn(&AliceState) -> bool,
-    mut swarm: Swarm,
+    mut swarm: EventLoopHandle,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
     config: Config,
-) -> Result<(AliceState, Swarm)> {
+) -> Result<(AliceState, EventLoopHandle)> {
     info!("Current state:{}", state);
     if is_target_state(&state) {
         Ok((state, swarm))
     } else {
         match state {
-            AliceState::Started {
-                amounts,
-                a,
-                s_a,
-                v_a,
-            } => {
-                let (channel, state3) = negotiate(
-                    amounts,
-                    a,
-                    s_a,
-                    v_a,
-                    &mut swarm,
-                    bitcoin_wallet.clone(),
-                    config,
-                )
-                .await?;
+            AliceState::Started { amounts, state0 } => {
+                let (channel, state3) = negotiate(state0, amounts, &mut swarm, config).await?;
 
                 run_until(
                     AliceState::Negotiated {

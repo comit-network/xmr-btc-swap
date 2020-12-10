@@ -1,5 +1,5 @@
 use crate::{
-    bob::{execution::negotiate, OutEvent, Swarm},
+    bob::{event_loop::EventLoopHandle, execution::negotiate},
     storage::Database,
     SwapAmounts,
 };
@@ -8,7 +8,7 @@ use async_recursion::async_recursion;
 use libp2p::{core::Multiaddr, PeerId};
 use rand::{CryptoRng, RngCore};
 use std::{fmt, sync::Arc};
-use tracing::{debug, info};
+use tracing::info;
 use uuid::Uuid;
 use xmr_btc::bob::{self};
 
@@ -53,7 +53,7 @@ impl fmt::Display for BobState {
 
 pub async fn swap<R>(
     state: BobState,
-    swarm: Swarm,
+    swarm: EventLoopHandle,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
@@ -100,7 +100,7 @@ pub fn is_xmr_locked(state: &BobState) -> bool {
 pub async fn run_until<R>(
     state: BobState,
     is_target_state: fn(&BobState) -> bool,
-    mut swarm: Swarm,
+    mut swarm: EventLoopHandle,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
@@ -162,14 +162,11 @@ where
             // Watch for Alice to Lock Xmr or for t1 to elapse
             BobState::BtcLocked(state3, alice_peer_id) => {
                 // todo: watch until t1, not indefinetely
-                let state4 = match swarm.next().await {
-                    OutEvent::Message2(msg) => {
-                        state3
-                            .watch_for_lock_xmr(monero_wallet.as_ref(), msg)
-                            .await?
-                    }
-                    other => panic!("unexpected event: {:?}", other),
-                };
+                let msg2 = swarm.recv_message2().await?;
+                let state4 = state3
+                    .watch_for_lock_xmr(monero_wallet.as_ref(), msg2)
+                    .await?;
+
                 run_until(
                     BobState::XmrLocked(state4, alice_peer_id),
                     is_target_state,
@@ -190,18 +187,9 @@ where
                 // What if Alice fails to receive this? Should we always resend?
                 // todo: If we cannot dial Alice we should go to EncSigSent. Maybe dialing
                 // should happen in this arm?
-                swarm.send_message3(alice_peer_id.clone(), tx_redeem_encsig);
-
-                // Sadly we have to poll the swarm to get make sure the message is sent?
-                // FIXME: Having to wait for Alice's response here is a big problem, because
-                // we're stuck if she doesn't send her response back. I believe this is
-                // currently necessary, so we may have to rework this and/or how we use libp2p
-                match swarm.next().await {
-                    OutEvent::Message3 => {
-                        debug!("Got Message3 empty response");
-                    }
-                    other => panic!("unexpected event: {:?}", other),
-                };
+                swarm
+                    .send_message3(alice_peer_id.clone(), tx_redeem_encsig)
+                    .await?;
 
                 run_until(
                     BobState::EncSigSent(state, alice_peer_id),
@@ -283,22 +271,10 @@ where
                 // }
                 Ok(BobState::BtcRefunded)
             }
-            BobState::BtcRefunded => {
-                info!("btc refunded");
-                Ok(BobState::BtcRefunded)
-            }
-            BobState::Punished => {
-                info!("punished");
-                Ok(BobState::Punished)
-            }
-            BobState::SafelyAborted => {
-                info!("safely aborted");
-                Ok(BobState::SafelyAborted)
-            }
-            BobState::XmrRedeemed => {
-                info!("xmr redeemed");
-                Ok(BobState::XmrRedeemed)
-            }
+            BobState::BtcRefunded => Ok(BobState::BtcRefunded),
+            BobState::Punished => Ok(BobState::Punished),
+            BobState::SafelyAborted => Ok(BobState::SafelyAborted),
+            BobState::XmrRedeemed => Ok(BobState::XmrRedeemed),
         }
     }
 }

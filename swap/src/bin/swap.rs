@@ -16,6 +16,7 @@ use anyhow::Result;
 use futures::{channel::mpsc, StreamExt};
 use libp2p::Multiaddr;
 use prettytable::{row, Table};
+use rand::rngs::OsRng;
 use std::{io, io::Write, process, sync::Arc};
 use structopt::StructOpt;
 use swap::{
@@ -25,9 +26,10 @@ use swap::{
     network::transport::{build, build_tor, SwapTransport},
     recover::recover,
     storage::Database,
-    Cmd, Rsp, SwapAmounts,
+    Cmd, Rsp, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
 use tracing::info;
+use xmr_btc::{alice::State0, cross_curve_dleq};
 
 #[macro_use]
 extern crate prettytable;
@@ -50,7 +52,34 @@ async fn main() -> Result<()> {
         } => {
             info!("running swap node as Alice ...");
 
-            let behaviour = alice::Behaviour::default();
+            let bitcoin_wallet = bitcoin::Wallet::new("alice", bitcoind_url)
+                .await
+                .expect("failed to create bitcoin wallet");
+            let bitcoin_wallet = Arc::new(bitcoin_wallet);
+
+            let monero_wallet = Arc::new(monero::Wallet::new(monerod_url));
+
+            let rng = &mut OsRng;
+            let a = bitcoin::SecretKey::new_random(rng);
+            let s_a = cross_curve_dleq::Scalar::random(rng);
+            let v_a = xmr_btc::monero::PrivateViewKey::new_random(rng);
+            let redeem_address = bitcoin_wallet.as_ref().new_address().await?;
+            let punish_address = redeem_address.clone();
+            let state0 = State0::new(
+                a,
+                s_a,
+                v_a,
+                // todo: get from CLI args
+                bitcoin::Amount::from_sat(100),
+                // todo: get from CLI args
+                monero::Amount::from_piconero(1000000),
+                REFUND_TIMELOCK,
+                PUNISH_TIMELOCK,
+                redeem_address,
+                punish_address,
+            );
+
+            let behaviour = alice::Behaviour::new(state0);
             let local_key_pair = behaviour.identity();
 
             let (listen_addr, _ac, transport) = match tor_port {
@@ -71,13 +100,6 @@ async fn main() -> Result<()> {
                     (listen_addr, None, transport)
                 }
             };
-
-            let bitcoin_wallet = bitcoin::Wallet::new("alice", bitcoind_url)
-                .await
-                .expect("failed to create bitcoin wallet");
-            let bitcoin_wallet = Arc::new(bitcoin_wallet);
-
-            let monero_wallet = Arc::new(monero::Wallet::new(monerod_url));
 
             swap_as_alice(
                 bitcoin_wallet,
