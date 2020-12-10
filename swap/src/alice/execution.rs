@@ -30,11 +30,7 @@ use xmr_btc::{
 pub async fn negotiate(
     state0: xmr_btc::alice::State0,
     amounts: SwapAmounts,
-    // a: bitcoin::SecretKey,
-    // s_a: cross_curve_dleq::Scalar,
-    // v_a: monero::PrivateViewKey,
     swarm_handle: &mut EventLoopHandle,
-    // bitcoin_wallet: Arc<bitcoin::Wallet>,
     config: Config,
 ) -> Result<(ResponseChannel<AliceToBob>, State3)> {
     trace!("Starting negotiate");
