@@ -6,7 +6,7 @@ use uuid::Uuid;
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(name = "xmr-btc-swap", about = "Trustless XMR BTC swaps")]
 pub enum Options {
-    Alice {
+    SellXmr {
         #[structopt(
             short = "b",
             long = "bitcoind",
@@ -40,7 +40,7 @@ pub enum Options {
         #[structopt(short = "r", long = "receive-sats", parse(try_from_str = parse_sats))]
         receive_bitcoin: bitcoin::Amount,
     },
-    Bob {
+    BuyXmr {
         #[structopt(short = "a", long = "alice-addr")]
         alice_addr: Multiaddr,
 

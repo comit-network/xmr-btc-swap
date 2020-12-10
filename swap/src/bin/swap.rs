@@ -52,7 +52,7 @@ async fn main() -> Result<()> {
     let rng = &mut OsRng;
 
     match opt {
-        Options::Alice {
+        Options::SellXmr {
             bitcoind_url,
             bitcoin_wallet_name,
             monero_wallet_rpc_url,
@@ -61,7 +61,7 @@ async fn main() -> Result<()> {
             send_monero,
             receive_bitcoin,
         } => {
-            info!("running swap node as Alice ...");
+            info!("running swap node as Alice for selling XMR ...");
 
             let behaviour = alice::Behaviour::default();
             let alice_peer_id = behaviour.peer_id().clone();
@@ -142,7 +142,7 @@ async fn main() -> Result<()> {
             )
             .await?;
         }
-        Options::Bob {
+        Options::BuyXmr {
             alice_addr,
             alice_peer_id,
             bitcoind_url,
@@ -152,7 +152,7 @@ async fn main() -> Result<()> {
             send_bitcoin,
             receive_monero,
         } => {
-            info!("running swap node as Bob ...");
+            info!("running swap node as Bob for buying XMR ...");
 
             let behaviour = bob::Behaviour::default();
             let local_key_pair = behaviour.identity();
