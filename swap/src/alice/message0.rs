@@ -76,7 +76,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             } => {
                 if let BobToAlice::Message0(msg) = request {
                     debug!("Received Message0");
-
+                    // TODO(Franck): Move this business logic out of the network behaviour.
                     let response = AliceToBob::Message0(self.state.next_message(&mut OsRng));
 
                     self.rr.send_response(channel, response);
