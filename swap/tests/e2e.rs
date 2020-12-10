@@ -10,7 +10,6 @@ use swap::{
 };
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
-use tracing_subscriber::util::SubscriberInitExt as _;
 use uuid::Uuid;
 use xmr_btc::{alice::State0, bitcoin, config::Config, cross_curve_dleq};
 

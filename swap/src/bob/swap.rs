@@ -271,22 +271,10 @@ where
                 // }
                 Ok(BobState::BtcRefunded)
             }
-            BobState::BtcRefunded => {
-                info!("btc refunded");
-                Ok(BobState::BtcRefunded)
-            }
-            BobState::Punished => {
-                info!("punished");
-                Ok(BobState::Punished)
-            }
-            BobState::SafelyAborted => {
-                info!("safely aborted");
-                Ok(BobState::SafelyAborted)
-            }
-            BobState::XmrRedeemed => {
-                info!("xmr redeemed");
-                Ok(BobState::XmrRedeemed)
-            }
+            BobState::BtcRefunded => Ok(BobState::BtcRefunded),
+            BobState::Punished => Ok(BobState::Punished),
+            BobState::SafelyAborted => Ok(BobState::SafelyAborted),
+            BobState::XmrRedeemed => Ok(BobState::XmrRedeemed),
         }
     }
 }

@@ -13,7 +13,7 @@ use libp2p::request_response::ResponseChannel;
 use sha2::Sha256;
 use std::{sync::Arc, time::Duration};
 use tokio::time::timeout;
-use tracing::trace;
+use tracing::{info, trace};
 use xmr_btc::{
     alice,
     alice::State3,
@@ -183,6 +183,7 @@ pub async fn publish_bitcoin_redeem_transaction<W>(
 where
     W: BroadcastSignedTransaction + WaitForTransactionFinality,
 {
+    info!("Attempting to publish bitcoin redeem txn");
     let tx_id = bitcoin_wallet
         .broadcast_signed_transaction(redeem_tx)
         .await?;
