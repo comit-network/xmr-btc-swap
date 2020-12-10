@@ -28,11 +28,10 @@ use swap::{
     network::transport::{build, build_tor},
     recover::recover,
     storage::Database,
+    trace::init_tracing,
     SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
 };
-use tracing::{info, log::LevelFilter, subscriber};
-use tracing_log::LogTracer;
-use tracing_subscriber::FmtSubscriber;
+use tracing::{info, log::LevelFilter};
 use uuid::Uuid;
 use xmr_btc::{config::Config, cross_curve_dleq};
 
@@ -269,28 +268,4 @@ async fn create_tor_service(
     tracing::info!("Tor service added.");
 
     Ok(authenticated_connection)
-}
-
-pub fn init_tracing(level: log::LevelFilter) -> anyhow::Result<()> {
-    if level == LevelFilter::Off {
-        return Ok(());
-    }
-
-    // We want upstream library log messages, just only at Info level.
-    LogTracer::init_with_filter(LevelFilter::Info)?;
-
-    let is_terminal = atty::is(atty::Stream::Stderr);
-    let subscriber = FmtSubscriber::builder()
-        .with_env_filter(format!(
-            "swap={},xmr-btc={},http=info,warp=info",
-            level, level
-        ))
-        .with_writer(std::io::stderr)
-        .with_ansi(is_terminal)
-        .finish();
-
-    subscriber::set_global_default(subscriber)?;
-    info!("Initialized tracing with level: {}", level);
-
-    Ok(())
 }

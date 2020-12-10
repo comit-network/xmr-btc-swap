@@ -13,6 +13,7 @@ pub mod recover;
 pub mod state;
 pub mod storage;
 pub mod tor;
+pub mod trace;
 
 // REFUND_TIMELOCK determines the interval between lock-time until TX_cancel is
 // allowed, PUNISH_TIMELOCK determines the interval between TX_cancel and
