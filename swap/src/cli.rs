@@ -1,4 +1,4 @@
-use libp2p::{core::Multiaddr, PeerId};
+use libp2p::core::Multiaddr;
 use url::Url;
 use uuid::Uuid;
 
@@ -39,9 +39,6 @@ pub enum Options {
     BuyXmr {
         #[structopt(short = "a", long = "connect-addr")]
         alice_addr: Multiaddr,
-
-        #[structopt(short = "p", long = "connect-peer-id")]
-        alice_peer_id: PeerId,
 
         #[structopt(
             short = "b",

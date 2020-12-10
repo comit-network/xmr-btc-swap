@@ -76,6 +76,7 @@ pub struct PublicViewKey(PublicKey);
 pub struct Amount(u64);
 
 impl Amount {
+    pub const ZERO: Self = Self(0);
     /// Create an [Amount] with piconero precision and the given number of
     /// piconeros.
     ///

@@ -435,9 +435,9 @@ impl State {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct State0 {
-    a: bitcoin::SecretKey,
-    s_a: cross_curve_dleq::Scalar,
-    v_a: monero::PrivateViewKey,
+    pub a: bitcoin::SecretKey,
+    pub s_a: cross_curve_dleq::Scalar,
+    pub v_a: monero::PrivateViewKey,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
