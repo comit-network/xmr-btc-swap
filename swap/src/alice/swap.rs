@@ -259,6 +259,13 @@ pub fn is_xmr_locked(state: &AliceState) -> bool {
     )
 }
 
+pub fn is_encsig_learned(state: &AliceState) -> bool {
+    matches!(
+        state,
+        AliceState::EncSignLearned{..}
+    )
+}
+
 // State machine driver for swap execution
 #[async_recursion]
 #[allow(clippy::too_many_arguments)]

@@ -118,7 +118,10 @@ async fn main() -> Result<()> {
                 alice::event_loop::EventLoop::new(alice_transport, alice_behaviour, listen_addr)?;
 
             let swap_id = Uuid::new_v4();
-            info!("Swap id: {}", swap_id);
+            info!(
+                "Swap sending {} and receiving {} started with ID {}",
+                send_monero, receive_bitcoin, swap_id
+            );
 
             let swap = alice::swap::swap(
                 alice_state,
@@ -135,7 +138,6 @@ async fn main() -> Result<()> {
         }
         Options::BuyXmr {
             alice_addr,
-            alice_peer_id: _,
             bitcoind_url,
             bitcoin_wallet_name,
             monero_wallet_rpc_url,
@@ -193,6 +195,12 @@ async fn main() -> Result<()> {
             let (event_loop, handle) =
                 bob::event_loop::EventLoop::new(bob_transport, bob_behaviour).unwrap();
 
+            let swap_id = Uuid::new_v4();
+            info!(
+                "Swap sending {} and receiving {} started with ID {}",
+                send_bitcoin, receive_monero, swap_id
+            );
+
             let swap = bob::swap::swap(
                 bob_state,
                 handle,
@@ -200,7 +208,7 @@ async fn main() -> Result<()> {
                 bitcoin_wallet.clone(),
                 monero_wallet.clone(),
                 OsRng,
-                Uuid::new_v4(),
+                swap_id,
             );
 
             let _event_loop = tokio::spawn(async move { event_loop.run().await });
