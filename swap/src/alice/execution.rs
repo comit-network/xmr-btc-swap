@@ -30,17 +30,20 @@ use xmr_btc::{
 pub async fn negotiate(
     state0: xmr_btc::alice::State0,
     amounts: SwapAmounts,
-    swarm_handle: &mut EventLoopHandle,
+    event_loop_handle: &mut EventLoopHandle,
     config: Config,
 ) -> Result<(ResponseChannel<AliceToBob>, State3)> {
     trace!("Starting negotiate");
 
     // todo: we can move this out, we dont need to timeout here
-    let _peer_id = timeout(config.bob_time_to_act, swarm_handle.recv_conn_established())
-        .await
-        .context("Failed to receive dial connection from Bob")??;
+    let _peer_id = timeout(
+        config.bob_time_to_act,
+        event_loop_handle.recv_conn_established(),
+    )
+    .await
+    .context("Failed to receive dial connection from Bob")??;
 
-    let event = timeout(config.bob_time_to_act, swarm_handle.recv_request())
+    let event = timeout(config.bob_time_to_act, event_loop_handle.recv_request())
         .await
         .context("Failed to receive amounts from Bob")??;
 
@@ -52,23 +55,25 @@ pub async fn negotiate(
         );
     }
 
-    swarm_handle.send_amounts(event.channel, amounts).await?;
+    event_loop_handle
+        .send_amounts(event.channel, amounts)
+        .await?;
 
-    let bob_message0 = timeout(config.bob_time_to_act, swarm_handle.recv_message0()).await??;
+    let bob_message0 = timeout(config.bob_time_to_act, event_loop_handle.recv_message0()).await??;
 
     let state1 = state0.receive(bob_message0)?;
 
     let (bob_message1, channel) =
-        timeout(config.bob_time_to_act, swarm_handle.recv_message1()).await??;
+        timeout(config.bob_time_to_act, event_loop_handle.recv_message1()).await??;
 
     let state2 = state1.receive(bob_message1);
 
-    swarm_handle
+    event_loop_handle
         .send_message1(channel, state2.next_message())
         .await?;
 
     let (bob_message2, channel) =
-        timeout(config.bob_time_to_act, swarm_handle.recv_message2()).await??;
+        timeout(config.bob_time_to_act, event_loop_handle.recv_message2()).await??;
 
     let state3 = state2.receive(bob_message2)?;
 
@@ -103,7 +108,7 @@ pub async fn lock_xmr<W>(
     channel: ResponseChannel<AliceToBob>,
     amounts: SwapAmounts,
     state3: State3,
-    swarm: &mut EventLoopHandle,
+    event_loop_handle: &mut EventLoopHandle,
     monero_wallet: Arc<W>,
 ) -> Result<()>
 where
@@ -122,7 +127,7 @@ where
 
     // TODO(Franck): Wait for Monero to be confirmed once
 
-    swarm
+    event_loop_handle
         .send_message2(channel, alice::Message2 {
             tx_lock_proof: transfer_proof,
         })
@@ -132,10 +137,10 @@ where
 }
 
 pub async fn wait_for_bitcoin_encrypted_signature(
-    swarm: &mut EventLoopHandle,
+    event_loop_handle: &mut EventLoopHandle,
     timeout_duration: Duration,
 ) -> Result<EncryptedSignature> {
-    let msg3 = timeout(timeout_duration, swarm.recv_message3())
+    let msg3 = timeout(timeout_duration, event_loop_handle.recv_message3())
         .await
         .context("Failed to receive Bitcoin encrypted signature from Bob")??;
     Ok(msg3.tx_redeem_encsig)

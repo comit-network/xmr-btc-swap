@@ -104,7 +104,7 @@ impl fmt::Display for AliceState {
 
 pub async fn swap(
     state: AliceState,
-    swarm: EventLoopHandle,
+    event_loop_handle: EventLoopHandle,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
     config: Config,
@@ -112,7 +112,7 @@ pub async fn swap(
     run_until(
         state,
         is_complete,
-        swarm,
+        event_loop_handle,
         bitcoin_wallet,
         monero_wallet,
         config,
@@ -142,18 +142,19 @@ pub fn is_xmr_locked(state: &AliceState) -> bool {
 pub async fn run_until(
     state: AliceState,
     is_target_state: fn(&AliceState) -> bool,
-    mut swarm: EventLoopHandle,
+    mut event_loop_handle: EventLoopHandle,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
     config: Config,
 ) -> Result<(AliceState, EventLoopHandle)> {
     info!("Current state:{}", state);
     if is_target_state(&state) {
-        Ok((state, swarm))
+        Ok((state, event_loop_handle))
     } else {
         match state {
             AliceState::Started { amounts, state0 } => {
-                let (channel, state3) = negotiate(state0, amounts, &mut swarm, config).await?;
+                let (channel, state3) =
+                    negotiate(state0, amounts, &mut event_loop_handle, config).await?;
 
                 run_until(
                     AliceState::Negotiated {
@@ -162,7 +163,7 @@ pub async fn run_until(
                         state3,
                     },
                     is_target_state,
-                    swarm,
+                    event_loop_handle,
                     bitcoin_wallet,
                     monero_wallet,
                     config,
@@ -185,7 +186,7 @@ pub async fn run_until(
                         state3,
                     },
                     is_target_state,
-                    swarm,
+                    event_loop_handle,
                     bitcoin_wallet,
                     monero_wallet,
                     config,
@@ -201,7 +202,7 @@ pub async fn run_until(
                     channel,
                     amounts,
                     state3.clone(),
-                    &mut swarm,
+                    &mut event_loop_handle,
                     monero_wallet.clone(),
                 )
                 .await?;
@@ -209,7 +210,7 @@ pub async fn run_until(
                 run_until(
                     AliceState::XmrLocked { state3 },
                     is_target_state,
-                    swarm,
+                    event_loop_handle,
                     bitcoin_wallet,
                     monero_wallet,
                     config,
@@ -220,7 +221,7 @@ pub async fn run_until(
                 // Our Monero is locked, we need to go through the cancellation process if this
                 // step fails
                 match wait_for_bitcoin_encrypted_signature(
-                    &mut swarm,
+                    &mut event_loop_handle,
                     config.monero_max_finality_time,
                 )
                 .await
@@ -232,7 +233,7 @@ pub async fn run_until(
                                 encrypted_signature,
                             },
                             is_target_state,
-                            swarm,
+                            event_loop_handle,
                             bitcoin_wallet,
                             monero_wallet,
                             config,
@@ -243,7 +244,7 @@ pub async fn run_until(
                         run_until(
                             AliceState::WaitingToCancel { state3 },
                             is_target_state,
-                            swarm,
+                            event_loop_handle,
                             bitcoin_wallet,
                             monero_wallet,
                             config,
@@ -269,7 +270,7 @@ pub async fn run_until(
                         return run_until(
                             AliceState::WaitingToCancel { state3 },
                             is_target_state,
-                            swarm,
+                            event_loop_handle,
                             bitcoin_wallet,
                             monero_wallet,
                             config,
@@ -291,7 +292,7 @@ pub async fn run_until(
                 run_until(
                     AliceState::BtcRedeemed,
                     is_target_state,
-                    swarm,
+                    event_loop_handle,
                     bitcoin_wallet,
                     monero_wallet,
                     config,
@@ -312,7 +313,7 @@ pub async fn run_until(
                 run_until(
                     AliceState::BtcCancelled { state3, tx_cancel },
                     is_target_state,
-                    swarm,
+                    event_loop_handle,
                     bitcoin_wallet,
                     monero_wallet,
                     config,
@@ -339,7 +340,7 @@ pub async fn run_until(
                         run_until(
                             AliceState::BtcPunishable { tx_refund, state3 },
                             is_target_state,
-                            swarm,
+                            event_loop_handle,
                             bitcoin_wallet.clone(),
                             monero_wallet,
                             config,
@@ -354,7 +355,7 @@ pub async fn run_until(
                                 state3,
                             },
                             is_target_state,
-                            swarm,
+                            event_loop_handle,
                             bitcoin_wallet.clone(),
                             monero_wallet,
                             config,
@@ -381,7 +382,7 @@ pub async fn run_until(
                     .create_and_load_wallet_for_output(spend_key, view_key)
                     .await?;
 
-                Ok((AliceState::XmrRefunded, swarm))
+                Ok((AliceState::XmrRefunded, event_loop_handle))
             }
             AliceState::BtcPunishable { tx_refund, state3 } => {
                 let signed_tx_punish = build_bitcoin_punish_transaction(
@@ -410,7 +411,7 @@ pub async fn run_until(
                         run_until(
                             AliceState::Punished,
                             is_target_state,
-                            swarm,
+                            event_loop_handle,
                             bitcoin_wallet.clone(),
                             monero_wallet,
                             config,
@@ -425,7 +426,7 @@ pub async fn run_until(
                                 state3,
                             },
                             is_target_state,
-                            swarm,
+                            event_loop_handle,
                             bitcoin_wallet.clone(),
                             monero_wallet,
                             config,
@@ -434,10 +435,10 @@ pub async fn run_until(
                     }
                 }
             }
-            AliceState::XmrRefunded => Ok((AliceState::XmrRefunded, swarm)),
-            AliceState::BtcRedeemed => Ok((AliceState::BtcRedeemed, swarm)),
-            AliceState::Punished => Ok((AliceState::Punished, swarm)),
-            AliceState::SafelyAborted => Ok((AliceState::SafelyAborted, swarm)),
+            AliceState::XmrRefunded => Ok((AliceState::XmrRefunded, event_loop_handle)),
+            AliceState::BtcRedeemed => Ok((AliceState::BtcRedeemed, event_loop_handle)),
+            AliceState::Punished => Ok((AliceState::Punished, event_loop_handle)),
+            AliceState::SafelyAborted => Ok((AliceState::SafelyAborted, event_loop_handle)),
         }
     }
 }

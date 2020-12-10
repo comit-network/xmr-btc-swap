@@ -53,7 +53,7 @@ impl fmt::Display for BobState {
 
 pub async fn swap<R>(
     state: BobState,
-    swarm: EventLoopHandle,
+    event_loop_handle: EventLoopHandle,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
@@ -66,7 +66,7 @@ where
     run_until(
         state,
         is_complete,
-        swarm,
+        event_loop_handle,
         db,
         bitcoin_wallet,
         monero_wallet,
@@ -100,7 +100,7 @@ pub fn is_xmr_locked(state: &BobState) -> bool {
 pub async fn run_until<R>(
     state: BobState,
     is_target_state: fn(&BobState) -> bool,
-    mut swarm: EventLoopHandle,
+    mut event_loop_handle: EventLoopHandle,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
@@ -124,7 +124,7 @@ where
                 let state2 = negotiate(
                     state0,
                     amounts,
-                    &mut swarm,
+                    &mut event_loop_handle,
                     addr,
                     &mut rng,
                     bitcoin_wallet.clone(),
@@ -133,7 +133,7 @@ where
                 run_until(
                     BobState::Negotiated(state2, peer_id),
                     is_target_state,
-                    swarm,
+                    event_loop_handle,
                     db,
                     bitcoin_wallet,
                     monero_wallet,
@@ -149,7 +149,7 @@ where
                 run_until(
                     BobState::BtcLocked(state3, alice_peer_id),
                     is_target_state,
-                    swarm,
+                    event_loop_handle,
                     db,
                     bitcoin_wallet,
                     monero_wallet,
@@ -162,7 +162,7 @@ where
             // Watch for Alice to Lock Xmr or for t1 to elapse
             BobState::BtcLocked(state3, alice_peer_id) => {
                 // todo: watch until t1, not indefinetely
-                let msg2 = swarm.recv_message2().await?;
+                let msg2 = event_loop_handle.recv_message2().await?;
                 let state4 = state3
                     .watch_for_lock_xmr(monero_wallet.as_ref(), msg2)
                     .await?;
@@ -170,7 +170,7 @@ where
                 run_until(
                     BobState::XmrLocked(state4, alice_peer_id),
                     is_target_state,
-                    swarm,
+                    event_loop_handle,
                     db,
                     bitcoin_wallet,
                     monero_wallet,
@@ -187,14 +187,14 @@ where
                 // What if Alice fails to receive this? Should we always resend?
                 // todo: If we cannot dial Alice we should go to EncSigSent. Maybe dialing
                 // should happen in this arm?
-                swarm
+                event_loop_handle
                     .send_message3(alice_peer_id.clone(), tx_redeem_encsig)
                     .await?;
 
                 run_until(
                     BobState::EncSigSent(state, alice_peer_id),
                     is_target_state,
-                    swarm,
+                    event_loop_handle,
                     db,
                     bitcoin_wallet,
                     monero_wallet,
@@ -213,7 +213,7 @@ where
                         run_until(
                             BobState::BtcRedeemed(val?),
                                  is_target_state,
-                            swarm,
+                            event_loop_handle,
                             db,
                             bitcoin_wallet,
                             monero_wallet,
@@ -232,7 +232,7 @@ where
                         run_until(
                             BobState::Cancelled(state),
                                  is_target_state,
-                            swarm,
+                            event_loop_handle,
                             db,
                             bitcoin_wallet,
                             monero_wallet,
@@ -250,7 +250,7 @@ where
                 run_until(
                     BobState::XmrRedeemed,
                     is_target_state,
-                    swarm,
+                    event_loop_handle,
                     db,
                     bitcoin_wallet,
                     monero_wallet,
