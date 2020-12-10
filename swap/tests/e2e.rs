@@ -6,7 +6,7 @@ use rand::rngs::OsRng;
 use std::sync::Arc;
 use swap::{
     alice, alice::swap::AliceState, bob, bob::swap::BobState, network::transport::build,
-    storage::Database, SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
+    storage::Database, SwapAmounts,
 };
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
@@ -45,6 +45,8 @@ async fn happy_path() {
         .parse()
         .expect("failed to parse Alice's address");
 
+    let config = Config::regtest();
+
     let (
         alice_state,
         mut alice_swarm_driver,
@@ -60,6 +62,7 @@ async fn happy_path() {
         xmr_to_swap,
         xmr_alice,
         alice_multiaddr.clone(),
+        config,
     )
     .await;
 
@@ -73,6 +76,7 @@ async fn happy_path() {
             btc_bob,
             xmr_to_swap,
             xmr_bob,
+            config,
         )
         .await;
 
@@ -81,7 +85,7 @@ async fn happy_path() {
         alice_swarm_handle,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),
-        Config::regtest(),
+        config,
     );
 
     let _alice_swarm_fut = tokio::spawn(async move { alice_swarm_driver.run().await });
@@ -149,6 +153,8 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         .parse()
         .expect("failed to parse Alice's address");
 
+    let config = Config::regtest();
+
     let (
         alice_state,
         mut alice_swarm,
@@ -164,6 +170,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         xmr_to_swap,
         alice_xmr_starting_balance,
         alice_multiaddr.clone(),
+        config,
     )
     .await;
 
@@ -177,6 +184,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
             bob_btc_starting_balance,
             xmr_to_swap,
             bob_xmr_starting_balance,
+            config,
         )
         .await;
 
@@ -220,6 +228,7 @@ async fn init_alice(
     xmr_to_swap: xmr_btc::monero::Amount,
     xmr_starting_balance: xmr_btc::monero::Amount,
     listen: Multiaddr,
+    config: Config,
 ) -> (
     AliceState,
     alice::event_loop::EventLoop,
@@ -261,8 +270,8 @@ async fn init_alice(
             v_a,
             amounts.btc,
             amounts.xmr,
-            REFUND_TIMELOCK,
-            PUNISH_TIMELOCK,
+            config.bitcoin_refund_timelock,
+            config.bitcoin_punish_timelock,
             redeem_address,
             punish_address,
         );
@@ -303,6 +312,7 @@ async fn init_bob(
     btc_starting_balance: bitcoin::Amount,
     xmr_to_swap: xmr_btc::monero::Amount,
     xmr_stating_balance: xmr_btc::monero::Amount,
+    config: Config,
 ) -> (
     BobState,
     bob::event_loop::EventLoop,
@@ -346,8 +356,8 @@ async fn init_bob(
         &mut OsRng,
         btc_to_swap,
         xmr_to_swap,
-        REFUND_TIMELOCK,
-        PUNISH_TIMELOCK,
+        config.bitcoin_refund_timelock,
+        config.bitcoin_punish_timelock,
         refund_address,
     );
     let bob_state = BobState::Started {
