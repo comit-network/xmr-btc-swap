@@ -1,4 +1,5 @@
 status = [
     "static_analysis",
-    "build_test",
+    "build_test (x86_64-unknown-linux-gnu)",
+    "build_test (x86_64-apple-darwin)"
 ]
