@@ -1,6 +1,6 @@
 use crate::{
     alice::swarm_driver::SwarmDriverHandle, bitcoin, monero, network::request_response::AliceToBob,
-    SwapAmounts, PUNISH_TIMELOCK, REFUND_TIMELOCK,
+    SwapAmounts,
 };
 use anyhow::{bail, Context, Result};
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
@@ -9,13 +9,14 @@ use futures::{
     pin_mut,
 };
 use libp2p::request_response::ResponseChannel;
+
 use sha2::Sha256;
 use std::{sync::Arc, time::Duration};
 use tokio::time::timeout;
 use tracing::trace;
 use xmr_btc::{
     alice,
-    alice::{State0, State3},
+    alice::State3,
     bitcoin::{
         poll_until_block_height_is_gte, BlockHeight, BroadcastSignedTransaction,
         EncryptedSignature, GetRawTransaction, TransactionBlockHeight, TxCancel, TxLock, TxRefund,
@@ -27,20 +28,23 @@ use xmr_btc::{
 };
 
 pub async fn negotiate(
+    state0: xmr_btc::alice::State0,
     amounts: SwapAmounts,
-    a: bitcoin::SecretKey,
-    s_a: cross_curve_dleq::Scalar,
-    v_a: monero::PrivateViewKey,
-    swarm: &mut SwarmDriverHandle,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    // a: bitcoin::SecretKey,
+    // s_a: cross_curve_dleq::Scalar,
+    // v_a: monero::PrivateViewKey,
+    swarm_handle: &mut SwarmDriverHandle,
+    // bitcoin_wallet: Arc<bitcoin::Wallet>,
     config: Config,
 ) -> Result<(ResponseChannel<AliceToBob>, State3)> {
     trace!("Starting negotiate");
-    let _peer_id = timeout(config.bob_time_to_act, swarm.recv_conn_established())
+
+    // todo: we can move this out, we dont need to timeout here
+    let _peer_id = timeout(config.bob_time_to_act, swarm_handle.recv_conn_established())
         .await
         .context("Failed to receive dial connection from Bob")??;
 
-    let event = timeout(config.bob_time_to_act, swarm.recv_request())
+    let event = timeout(config.bob_time_to_act, swarm_handle.recv_request())
         .await
         .context("Failed to receive amounts from Bob")??;
 
@@ -52,37 +56,23 @@ pub async fn negotiate(
         );
     }
 
-    swarm.send_amounts(event.channel, amounts).await?;
+    swarm_handle.send_amounts(event.channel, amounts).await?;
 
-    let redeem_address = bitcoin_wallet.as_ref().new_address().await?;
-    let punish_address = redeem_address.clone();
-
-    let state0 = State0::new(
-        a,
-        s_a,
-        v_a,
-        amounts.btc,
-        amounts.xmr,
-        REFUND_TIMELOCK,
-        PUNISH_TIMELOCK,
-        redeem_address,
-        punish_address,
-    );
-
-    // TODO(Franck): Understand why this is needed.
-    // swarm.swarm.set_state0(state0.clone());
-
-    let bob_message0 = timeout(config.bob_time_to_act, swarm.recv_message0()).await??;
+    let bob_message0 = timeout(config.bob_time_to_act, swarm_handle.recv_message0()).await??;
 
     let state1 = state0.receive(bob_message0)?;
 
-    let (bob_message1, channel) = timeout(config.bob_time_to_act, swarm.recv_message1()).await??;
+    let (bob_message1, channel) =
+        timeout(config.bob_time_to_act, swarm_handle.recv_message1()).await??;
 
     let state2 = state1.receive(bob_message1);
 
-    swarm.send_message1(channel, state2.next_message()).await?;
+    swarm_handle
+        .send_message1(channel, state2.next_message())
+        .await?;
 
-    let (bob_message2, channel) = timeout(config.bob_time_to_act, swarm.recv_message2()).await??;
+    let (bob_message2, channel) =
+        timeout(config.bob_time_to_act, swarm_handle.recv_message2()).await??;
 
     let state3 = state2.receive(bob_message2)?;
 

@@ -10,9 +10,7 @@ use crate::{
         },
         swarm_driver::SwarmDriverHandle,
     },
-    bitcoin,
     bitcoin::EncryptedSignature,
-    monero,
     network::request_response::AliceToBob,
     SwapAmounts,
 };
@@ -27,10 +25,9 @@ use rand::{CryptoRng, RngCore};
 use std::{fmt, sync::Arc};
 use tracing::info;
 use xmr_btc::{
-    alice::State3,
+    alice::{State0, State3},
     bitcoin::{TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction},
     config::Config,
-    cross_curve_dleq,
     monero::CreateWalletForOutput,
 };
 
@@ -44,9 +41,7 @@ impl<T> Rng for T where T: RngCore + CryptoRng + Send {}
 pub enum AliceState {
     Started {
         amounts: SwapAmounts,
-        a: bitcoin::SecretKey,
-        s_a: cross_curve_dleq::Scalar,
-        v_a: monero::PrivateViewKey,
+        state0: State0,
     },
     Negotiated {
         channel: ResponseChannel<AliceToBob>,
@@ -157,22 +152,8 @@ pub async fn run_until(
         Ok((state, swarm))
     } else {
         match state {
-            AliceState::Started {
-                amounts,
-                a,
-                s_a,
-                v_a,
-            } => {
-                let (channel, state3) = negotiate(
-                    amounts,
-                    a,
-                    s_a,
-                    v_a,
-                    &mut swarm,
-                    bitcoin_wallet.clone(),
-                    config,
-                )
-                .await?;
+            AliceState::Started { amounts, state0 } => {
+                let (channel, state3) = negotiate(state0, amounts, &mut swarm, config).await?;
 
                 run_until(
                     AliceState::Negotiated {

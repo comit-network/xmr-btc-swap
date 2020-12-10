@@ -1,4 +1,3 @@
-use anyhow::{bail, Result};
 use libp2p::{
     request_response::{
         handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
@@ -32,17 +31,24 @@ pub struct Message0 {
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
     #[behaviour(ignore)]
-    state: Option<State0>,
+    state: State0,
 }
 
 impl Message0 {
-    pub fn set_state(&mut self, state: State0) -> Result<()> {
-        if self.state.is_some() {
-            bail!("Trying to set state a second time");
-        }
-        self.state = Some(state);
+    pub fn new(state: State0) -> Self {
+        let timeout = Duration::from_secs(TIMEOUT);
+        let mut config = RequestResponseConfig::default();
+        config.set_request_timeout(timeout);
 
-        Ok(())
+        Self {
+            rr: RequestResponse::new(
+                Codec::default(),
+                vec![(Message0Protocol, ProtocolSupport::Full)],
+                config,
+            ),
+            events: Default::default(),
+            state,
+        }
     }
 
     fn poll(
@@ -58,24 +64,6 @@ impl Message0 {
     }
 }
 
-impl Default for Message0 {
-    fn default() -> Self {
-        let timeout = Duration::from_secs(TIMEOUT);
-        let mut config = RequestResponseConfig::default();
-        config.set_request_timeout(timeout);
-
-        Self {
-            rr: RequestResponse::new(
-                Codec::default(),
-                vec![(Message0Protocol, ProtocolSupport::Full)],
-                config,
-            ),
-            events: Default::default(),
-            state: None,
-        }
-    }
-}
-
 impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Message0 {
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
@@ -88,13 +76,9 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             } => {
                 if let BobToAlice::Message0(msg) = request {
                     debug!("Received Message0");
-                    let response = match &self.state {
-                        None => panic!("No state, did you forget to set it?"),
-                        Some(state) => {
-                            // TODO: Get OsRng from somewhere?
-                            AliceToBob::Message0(state.next_message(&mut OsRng))
-                        }
-                    };
+
+                    let response = AliceToBob::Message0(self.state.next_message(&mut OsRng));
+
                     self.rr.send_response(channel, response);
                     debug!("Sent Message0");
 

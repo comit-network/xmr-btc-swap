@@ -12,7 +12,7 @@ use tempfile::tempdir;
 use testcontainers::clients::Cli;
 use tracing_subscriber::util::SubscriberInitExt as _;
 use uuid::Uuid;
-use xmr_btc::{bitcoin, config::Config, cross_curve_dleq};
+use xmr_btc::{alice::State0, bitcoin, config::Config, cross_curve_dleq};
 
 /// Run the following tests with RUST_MIN_STACK=10000000
 
@@ -20,7 +20,7 @@ use xmr_btc::{bitcoin, config::Config, cross_curve_dleq};
 async fn happy_path() {
     use tracing_subscriber::util::SubscriberInitExt as _;
     let _guard = tracing_subscriber::fmt()
-        .with_env_filter("swap=trace,xmr_btc=trace")
+        .with_env_filter("swap=trace,xmr_btc=trace,monero_harness=info")
         .with_ansi(false)
         .set_default();
 
@@ -249,21 +249,37 @@ async fn init_alice(
         xmr: xmr_to_swap,
     };
 
-    let alice_behaviour = alice::Behaviour::default();
-    let alice_peer_id = alice_behaviour.peer_id();
-    let alice_transport = build(alice_behaviour.identity()).unwrap();
-    let rng = &mut OsRng;
-    let alice_state = {
+    let (alice_state, alice_behaviour) = {
+        let rng = &mut OsRng;
         let a = bitcoin::SecretKey::new_random(rng);
         let s_a = cross_curve_dleq::Scalar::random(rng);
         let v_a = xmr_btc::monero::PrivateViewKey::new_random(rng);
-        AliceState::Started {
-            amounts,
+        let redeem_address = alice_btc_wallet.as_ref().new_address().await.unwrap();
+        let punish_address = redeem_address.clone();
+        let state0 = State0::new(
             a,
             s_a,
             v_a,
-        }
+            amounts.btc,
+            amounts.xmr,
+            REFUND_TIMELOCK,
+            PUNISH_TIMELOCK,
+            redeem_address,
+            punish_address,
+        );
+
+        // let msg0 = AliceToBob::Message0(self.state.next_message(&mut OsRng));
+        (
+            AliceState::Started {
+                amounts,
+                state0: state0.clone(),
+            },
+            alice::Behaviour::new(state0),
+        )
     };
+
+    let alice_peer_id = alice_behaviour.peer_id();
+    let alice_transport = build(alice_behaviour.identity()).unwrap();
 
     let (swarm_driver, handle) =
         alice::swarm_driver::SwarmDriver::new(alice_transport, alice_behaviour, listen).unwrap();
