@@ -2,7 +2,7 @@ use crate::{
     bob::{Behaviour, OutEvent},
     network::{transport::SwapTransport, TokioExecutor},
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use futures::FutureExt;
 use libp2p::{core::Multiaddr, PeerId};
 use tokio::{
@@ -48,28 +48,28 @@ impl EventLoopHandle {
         self.conn_established
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed to receive connection established from Bob"))
+            .ok_or_else(|| anyhow!("Failed to receive connection established from Bob"))
     }
 
     pub async fn recv_message0(&mut self) -> Result<alice::Message0> {
         self.msg0
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed to receive message 0 from Bob"))
+            .ok_or_else(|| anyhow!("Failed to receive message 0 from Bob"))
     }
 
     pub async fn recv_message1(&mut self) -> Result<alice::Message1> {
         self.msg1
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed to receive message 1 from Bob"))
+            .ok_or_else(|| anyhow!("Failed to receive message 1 from Bob"))
     }
 
     pub async fn recv_message2(&mut self) -> Result<alice::Message2> {
         self.msg2
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed o receive message 2 from Bob"))
+            .ok_or_else(|| anyhow!("Failed o receive message 2 from Bob"))
     }
 
     pub async fn dial_alice(&mut self, addr: Multiaddr) -> Result<()> {

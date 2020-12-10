@@ -3,7 +3,7 @@ use crate::{
     network::{request_response::AliceToBob, transport::SwapTransport, TokioExecutor},
     SwapAmounts,
 };
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use futures::FutureExt;
 use libp2p::{
     core::Multiaddr, futures::StreamExt, request_response::ResponseChannel, PeerId, Swarm,
@@ -46,41 +46,42 @@ impl EventLoopHandle {
         self.conn_established
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed to receive connection established from Bob"))
+            .ok_or_else(|| anyhow!("Failed to receive connection established from Bob"))
     }
 
     pub async fn recv_message0(&mut self) -> Result<bob::Message0> {
         self.msg0
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed to receive message 0 from Bob"))
+            .ok_or_else(|| anyhow!("Failed to receive message 0 from Bob"))
     }
 
     pub async fn recv_message1(&mut self) -> Result<(bob::Message1, ResponseChannel<AliceToBob>)> {
         self.msg1
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed to receive message 1 from Bob"))
+            .ok_or_else(|| anyhow!("Failed to receive message 1 from Bob"))
     }
 
     pub async fn recv_message2(&mut self) -> Result<(bob::Message2, ResponseChannel<AliceToBob>)> {
         self.msg2
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed o receive message 2 from Bob"))
+            .ok_or_else(|| anyhow!("Failed o receive message 2 from Bob"))
     }
 
     pub async fn recv_message3(&mut self) -> Result<bob::Message3> {
-        self.msg3.recv().await.ok_or_else(|| {
-            anyhow::Error::msg("Failed to receive Bitcoin encrypted signature from Bob")
-        })
+        self.msg3
+            .recv()
+            .await
+            .ok_or_else(|| anyhow!("Failed to receive Bitcoin encrypted signature from Bob"))
     }
 
     pub async fn recv_request(&mut self) -> Result<crate::alice::amounts::OutEvent> {
         self.request
             .recv()
             .await
-            .ok_or_else(|| anyhow::Error::msg("Failed to receive amounts request from Bob"))
+            .ok_or_else(|| anyhow!("Failed to receive amounts request from Bob"))
     }
 
     pub async fn send_amounts(
