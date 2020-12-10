@@ -182,9 +182,9 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         )
         .await;
 
-    let bob_xmr_locked_fut = bob::swap::run_until(
+    let bob_btc_locked_fut = bob::swap::run_until(
         bob_state,
-        bob::swap::is_xmr_locked,
+        bob::swap::is_btc_locked,
         bob_swarm_handle,
         bob_db,
         bob_btc_wallet.clone(),
@@ -205,12 +205,35 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
 
     let _alice_swarm_fut = tokio::spawn(async move { alice_swarm.run().await });
 
-    // Wait until alice has locked xmr and bob h  as locked btc
-    let ((alice_state, _), _bob_state) = try_join(alice_fut, bob_xmr_locked_fut).await.unwrap();
+    // Wait until alice has locked xmr and bob has locked btc
+    let ((alice_state, _), bob_state) = try_join(alice_fut, bob_btc_locked_fut).await.unwrap();
 
     assert!(matches!(alice_state, AliceState::Punished));
+    let bob_state3 = if let BobState::BtcLocked(state3, ..) = bob_state {
+        state3
+    } else {
+        panic!("Bob in unexpected state");
+    };
 
-    // todo: Add balance assertions
+    let btc_alice_final = alice_btc_wallet.as_ref().balance().await.unwrap();
+    let btc_bob_final = bob_btc_wallet.as_ref().balance().await.unwrap();
+
+    // lock_tx_bitcoin_fee is determined by the wallet, it is not necessarily equal
+    // to TX_FEE
+    let lock_tx_bitcoin_fee = bob_btc_wallet
+        .transaction_fee(bob_state3.tx_lock_id())
+        .await
+        .unwrap();
+
+    assert_eq!(
+        btc_alice_final,
+        alice_btc_starting_balance + btc_to_swap - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE)
+    );
+
+    assert_eq!(
+        btc_bob_final,
+        bob_btc_starting_balance - btc_to_swap - lock_tx_bitcoin_fee
+    );
 }
 
 #[allow(clippy::too_many_arguments)]
