@@ -21,7 +21,6 @@ pub enum BobState {
     Started {
         state0: bob::State0,
         amounts: SwapAmounts,
-        peer_id: PeerId,
         addr: Multiaddr,
     },
     Negotiated(bob::State2, PeerId),
@@ -121,10 +120,9 @@ where
             BobState::Started {
                 state0,
                 amounts,
-                peer_id,
                 addr,
             } => {
-                let state2 = negotiate(
+                let (state2, alice_peer_id) = negotiate(
                     state0,
                     amounts,
                     &mut event_loop_handle,
@@ -134,7 +132,7 @@ where
                 )
                 .await?;
                 run_until(
-                    BobState::Negotiated(state2, peer_id),
+                    BobState::Negotiated(state2, alice_peer_id),
                     is_target_state,
                     event_loop_handle,
                     db,

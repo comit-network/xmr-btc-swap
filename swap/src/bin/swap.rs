@@ -130,7 +130,7 @@ async fn main() -> Result<()> {
         }
         Options::BuyXmr {
             alice_addr,
-            alice_peer_id,
+            alice_peer_id: _,
             bitcoind_url,
             bitcoin_wallet_name,
             monero_wallet_rpc_url,
@@ -182,7 +182,6 @@ async fn main() -> Result<()> {
             let bob_state = BobState::Started {
                 state0,
                 amounts,
-                peer_id: alice_peer_id,
                 addr: alice_addr,
             };
 
