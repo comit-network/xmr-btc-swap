@@ -29,7 +29,7 @@ impl<T> Default for Channels<T> {
     }
 }
 
-pub struct SwarmDriverHandle {
+pub struct EventLoopHandle {
     pub msg0: Receiver<bob::Message0>,
     pub msg1: Receiver<(bob::Message1, ResponseChannel<AliceToBob>)>,
     pub msg2: Receiver<(bob::Message2, ResponseChannel<AliceToBob>)>,
@@ -41,7 +41,7 @@ pub struct SwarmDriverHandle {
     pub send_msg2: Sender<(ResponseChannel<AliceToBob>, alice::Message2)>,
 }
 
-impl SwarmDriverHandle {
+impl EventLoopHandle {
     pub async fn recv_conn_established(&mut self) -> Result<PeerId> {
         self.conn_established
             .recv()
@@ -111,7 +111,7 @@ impl SwarmDriverHandle {
     }
 }
 
-pub struct SwarmDriver {
+pub struct EventLoop {
     pub swarm: libp2p::Swarm<Behaviour>,
     pub msg0: Sender<bob::Message0>,
     pub msg1: Sender<(bob::Message1, ResponseChannel<AliceToBob>)>,
@@ -124,12 +124,12 @@ pub struct SwarmDriver {
     pub send_msg2: Receiver<(ResponseChannel<AliceToBob>, alice::Message2)>,
 }
 
-impl SwarmDriver {
+impl EventLoop {
     pub fn new(
         transport: SwapTransport,
         behaviour: Behaviour,
         listen: Multiaddr,
-    ) -> Result<(Self, SwarmDriverHandle)> {
+    ) -> Result<(Self, EventLoopHandle)> {
         let local_peer_id = behaviour.peer_id();
 
         let mut swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id)
@@ -151,7 +151,7 @@ impl SwarmDriver {
         let send_msg1 = Channels::new();
         let send_msg2 = Channels::new();
 
-        let driver = SwarmDriver {
+        let driver = EventLoop {
             swarm,
             msg0: msg0.sender,
             msg1: msg1.sender,
@@ -164,7 +164,7 @@ impl SwarmDriver {
             send_msg2: send_msg2.receiver,
         };
 
-        let handle = SwarmDriverHandle {
+        let handle = EventLoopHandle {
             msg0: msg0.receiver,
             msg1: msg1.receiver,
             msg2: msg2.receiver,

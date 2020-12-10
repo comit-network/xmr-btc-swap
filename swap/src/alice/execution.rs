@@ -1,5 +1,5 @@
 use crate::{
-    alice::swarm_driver::SwarmDriverHandle, bitcoin, monero, network::request_response::AliceToBob,
+    alice::event_loop::EventLoopHandle, bitcoin, monero, network::request_response::AliceToBob,
     SwapAmounts,
 };
 use anyhow::{bail, Context, Result};
@@ -33,7 +33,7 @@ pub async fn negotiate(
     // a: bitcoin::SecretKey,
     // s_a: cross_curve_dleq::Scalar,
     // v_a: monero::PrivateViewKey,
-    swarm_handle: &mut SwarmDriverHandle,
+    swarm_handle: &mut EventLoopHandle,
     // bitcoin_wallet: Arc<bitcoin::Wallet>,
     config: Config,
 ) -> Result<(ResponseChannel<AliceToBob>, State3)> {
@@ -107,7 +107,7 @@ pub async fn lock_xmr<W>(
     channel: ResponseChannel<AliceToBob>,
     amounts: SwapAmounts,
     state3: State3,
-    swarm: &mut SwarmDriverHandle,
+    swarm: &mut EventLoopHandle,
     monero_wallet: Arc<W>,
 ) -> Result<()>
 where
@@ -136,7 +136,7 @@ where
 }
 
 pub async fn wait_for_bitcoin_encrypted_signature(
-    swarm: &mut SwarmDriverHandle,
+    swarm: &mut EventLoopHandle,
     timeout_duration: Duration,
 ) -> Result<EncryptedSignature> {
     let msg3 = timeout(timeout_duration, swarm.recv_message3())

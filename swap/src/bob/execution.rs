@@ -1,4 +1,4 @@
-use crate::{bob::swarm_driver::SwarmDriverHandle, SwapAmounts};
+use crate::{bob::event_loop::EventLoopHandle, SwapAmounts};
 use anyhow::Result;
 use libp2p::core::Multiaddr;
 use rand::{CryptoRng, RngCore};
@@ -8,7 +8,7 @@ use xmr_btc::bob::State2;
 pub async fn negotiate<R>(
     state0: xmr_btc::bob::State0,
     amounts: SwapAmounts,
-    swarm: &mut SwarmDriverHandle,
+    swarm: &mut EventLoopHandle,
     addr: Multiaddr,
     mut rng: R,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,

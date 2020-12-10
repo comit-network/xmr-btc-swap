@@ -37,13 +37,13 @@ use xmr_btc::{
 };
 
 mod amounts;
+pub mod event_loop;
 mod execution;
 mod message0;
 mod message1;
 mod message2;
 mod message3;
 pub mod swap;
-pub mod swarm_driver;
 
 pub async fn swap(
     bitcoin_wallet: Arc<bitcoin::Wallet>,

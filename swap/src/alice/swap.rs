@@ -2,13 +2,13 @@
 //! Alice holds XMR and wishes receive BTC.
 use crate::{
     alice::{
+        event_loop::EventLoopHandle,
         execution::{
             build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
             extract_monero_private_key, lock_xmr, negotiate, publish_bitcoin_punish_transaction,
             publish_bitcoin_redeem_transaction, publish_cancel_transaction,
             wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund, wait_for_locked_bitcoin,
         },
-        swarm_driver::SwarmDriverHandle,
     },
     bitcoin::EncryptedSignature,
     network::request_response::AliceToBob,
@@ -104,11 +104,11 @@ impl fmt::Display for AliceState {
 
 pub async fn swap(
     state: AliceState,
-    swarm: SwarmDriverHandle,
+    swarm: EventLoopHandle,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
     config: Config,
-) -> Result<(AliceState, SwarmDriverHandle)> {
+) -> Result<(AliceState, EventLoopHandle)> {
     run_until(
         state,
         is_complete,
@@ -142,11 +142,11 @@ pub fn is_xmr_locked(state: &AliceState) -> bool {
 pub async fn run_until(
     state: AliceState,
     is_target_state: fn(&AliceState) -> bool,
-    mut swarm: SwarmDriverHandle,
+    mut swarm: EventLoopHandle,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
     config: Config,
-) -> Result<(AliceState, SwarmDriverHandle)> {
+) -> Result<(AliceState, EventLoopHandle)> {
     info!("Current state:{}", state);
     if is_target_state(&state) {
         Ok((state, swarm))

@@ -1,5 +1,5 @@
 use crate::{
-    bob::{execution::negotiate, swarm_driver::SwarmDriverHandle},
+    bob::{event_loop::EventLoopHandle, execution::negotiate},
     storage::Database,
     SwapAmounts,
 };
@@ -53,7 +53,7 @@ impl fmt::Display for BobState {
 
 pub async fn swap<R>(
     state: BobState,
-    swarm: SwarmDriverHandle,
+    swarm: EventLoopHandle,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
@@ -100,7 +100,7 @@ pub fn is_xmr_locked(state: &BobState) -> bool {
 pub async fn run_until<R>(
     state: BobState,
     is_target_state: fn(&BobState) -> bool,
-    mut swarm: SwarmDriverHandle,
+    mut swarm: EventLoopHandle,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,

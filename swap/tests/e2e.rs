@@ -222,8 +222,8 @@ async fn init_alice(
     listen: Multiaddr,
 ) -> (
     AliceState,
-    alice::swarm_driver::SwarmDriver,
-    alice::swarm_driver::SwarmDriverHandle,
+    alice::event_loop::EventLoop,
+    alice::event_loop::EventLoopHandle,
     Arc<swap::bitcoin::Wallet>,
     Arc<swap::monero::Wallet>,
     PeerId,
@@ -281,7 +281,7 @@ async fn init_alice(
     let alice_transport = build(alice_behaviour.identity()).unwrap();
 
     let (swarm_driver, handle) =
-        alice::swarm_driver::SwarmDriver::new(alice_transport, alice_behaviour, listen).unwrap();
+        alice::event_loop::EventLoop::new(alice_transport, alice_behaviour, listen).unwrap();
 
     (
         alice_state,
@@ -305,8 +305,8 @@ async fn init_bob(
     xmr_stating_balance: xmr_btc::monero::Amount,
 ) -> (
     BobState,
-    bob::swarm_driver::SwarmDriver,
-    bob::swarm_driver::SwarmDriverHandle,
+    bob::event_loop::EventLoop,
+    bob::event_loop::EventLoopHandle,
     Arc<swap::bitcoin::Wallet>,
     Arc<swap::monero::Wallet>,
     Database,
@@ -358,7 +358,7 @@ async fn init_bob(
     };
 
     let (swarm_driver, swarm_handle) =
-        bob::swarm_driver::SwarmDriver::new(bob_transport, bob_behaviour).unwrap();
+        bob::event_loop::EventLoop::new(bob_transport, bob_behaviour).unwrap();
 
     (
         bob_state,
