@@ -10,7 +10,7 @@ use rand::{CryptoRng, RngCore};
 use std::{fmt, sync::Arc};
 use tracing::info;
 use uuid::Uuid;
-use xmr_btc::bob::{self};
+use xmr_btc::bob::{self, Epoch};
 
 // The same data structure is used for swap execution and recovery.
 // This allows for a seamless transition from a failed swap to recovery.
@@ -259,17 +259,41 @@ where
                 )
                 .await
             }
-            BobState::Cancelled(_state) => {
+            BobState::Cancelled(state) => {
                 // Bob has cancelled the swap
-                // If <t2 Bob refunds
-                // if unimplemented!("<t2") {
-                //     // Submit TxRefund
-                //     abort(BobState::BtcRefunded, io).await
-                // } else {
-                //     // Bob failed to refund in time and has been punished
-                //     abort(BobState::Punished, io).await
-                // }
-                Ok(BobState::BtcRefunded)
+                match state.current_epoch(bitcoin_wallet.as_ref()).await? {
+                    // todo: Is this an invalid state?. Should I remove the T0 match branch
+                    Epoch::T0 => panic!("Cancelled before t1??? Something is really wrong"),
+                    Epoch::T1 => {
+                        state.refund_btc(bitcoin_wallet.as_ref()).await?;
+                        run_until(
+                            BobState::BtcRefunded,
+                            is_target_state,
+                            swarm,
+                            db,
+                            bitcoin_wallet,
+                            monero_wallet,
+                            rng,
+                            swap_id,
+                        )
+                        .await
+                    }
+                    Epoch::T2 => {
+                        // todo: If t2 has elapsed should we check whether Alice has punished? If
+                        // not can we still refund?
+                        run_until(
+                            BobState::Punished,
+                            is_target_state,
+                            swarm,
+                            db,
+                            bitcoin_wallet,
+                            monero_wallet,
+                            rng,
+                            swap_id,
+                        )
+                        .await
+                    }
+                }
             }
             BobState::BtcRefunded => Ok(BobState::BtcRefunded),
             BobState::Punished => Ok(BobState::Punished),
