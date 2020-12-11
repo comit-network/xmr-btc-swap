@@ -10,6 +10,8 @@ use swap::{
 };
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
+use tracing_core::dispatcher::DefaultGuard;
+use tracing_log::LogTracer;
 use uuid::Uuid;
 use xmr_btc::{alice::State0, bitcoin, config::Config, cross_curve_dleq};
 
@@ -17,11 +19,7 @@ use xmr_btc::{alice::State0, bitcoin, config::Config, cross_curve_dleq};
 
 #[tokio::test]
 async fn happy_path() {
-    use tracing_subscriber::util::SubscriberInitExt as _;
-    let _guard = tracing_subscriber::fmt()
-        .with_env_filter("swap=trace,xmr_btc=trace,monero_harness=info")
-        .with_ansi(false)
-        .set_default();
+    let _guard = init_tracing();
 
     let cli = Cli::default();
     let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
@@ -126,11 +124,7 @@ async fn happy_path() {
 /// the encsig and fail to refund or redeem. Alice punishes.
 #[tokio::test]
 async fn alice_punishes_if_bob_never_acts_after_fund() {
-    use tracing_subscriber::util::SubscriberInitExt as _;
-    let _guard = tracing_subscriber::fmt()
-        .with_env_filter("swap=info,xmr_btc=info")
-        .with_ansi(false)
-        .set_default();
+    let _guard = init_tracing();
 
     let cli = Cli::default();
     let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
@@ -378,4 +372,35 @@ async fn init_bob(
         bob_xmr_wallet,
         bob_db,
     )
+}
+
+/// Utility function to initialize logging in the test environment.
+/// Note that you have to keep the `_guard` in scope after calling in test:
+///
+/// ```rust
+/// let _guard = init_tracing();
+/// ```
+fn init_tracing() -> DefaultGuard {
+    // converts all log records into tracing events
+    // Note: Make sure to initialize without unwrapping, otherwise this causes
+    // trouble when running multiple tests.
+    let _ = LogTracer::init();
+
+    let global_filter = tracing::Level::WARN;
+    let swap_filter = tracing::Level::DEBUG;
+    let xmr_btc_filter = tracing::Level::DEBUG;
+    let monero_harness_filter = tracing::Level::INFO;
+    let bitcoin_harness_filter = tracing::Level::INFO;
+
+    use tracing_subscriber::util::SubscriberInitExt as _;
+    tracing_subscriber::fmt()
+        .with_env_filter(format!(
+            "{},swap={},xmr-btc={},monero_harness={},bitcoin_harness={}",
+            global_filter,
+            swap_filter,
+            xmr_btc_filter,
+            monero_harness_filter,
+            bitcoin_harness_filter,
+        ))
+        .set_default()
 }
