@@ -13,6 +13,7 @@ pub mod recover;
 pub mod state;
 pub mod storage;
 pub mod tor;
+pub mod trace;
 
 pub type Never = std::convert::Infallible;
 

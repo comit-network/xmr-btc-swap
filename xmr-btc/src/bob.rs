@@ -33,7 +33,7 @@ use tracing::error;
 
 pub mod message;
 use crate::{
-    bitcoin::{BlockHeight, GetRawTransaction, TransactionBlockHeight},
+    bitcoin::{BlockHeight, GetRawTransaction, Network, TransactionBlockHeight},
     monero::{CreateWalletForOutput, WatchForTransfer},
 };
 use ::bitcoin::{Transaction, Txid};
@@ -267,7 +267,7 @@ where
 // send to one receive in the correct order.
 pub async fn next_state<
     R: RngCore + CryptoRng,
-    B: WatchForRawTransaction + SignTxLock + BuildTxLockPsbt + BroadcastSignedTransaction,
+    B: WatchForRawTransaction + SignTxLock + BuildTxLockPsbt + BroadcastSignedTransaction + Network,
     M: CreateWalletForOutput + WatchForTransfer,
     T: SendMessage<Message> + ReceiveMessage<alice::Message>,
 >(
@@ -401,7 +401,7 @@ impl State0 {
 
     pub async fn receive<W>(self, wallet: &W, msg: alice::Message0) -> anyhow::Result<State1>
     where
-        W: BuildTxLockPsbt,
+        W: BuildTxLockPsbt + Network,
     {
         msg.dleq_proof_s_a.verify(
             msg.S_a_bitcoin.clone().into(),

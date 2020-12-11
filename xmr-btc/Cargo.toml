@@ -20,6 +20,7 @@ genawaiter = "0.99.1"
 miniscript = { version = "4", features = ["serde"] }
 monero = { version = "0.9", features = ["serde_support"] }
 rand = "0.7"
+rust_decimal = "1.8"
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.9"
 thiserror = "1"

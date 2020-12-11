@@ -5,10 +5,17 @@ use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Mul, Sub};
 
+use bitcoin::hashes::core::fmt::Formatter;
 pub use curve25519_dalek::scalar::Scalar;
 pub use monero::*;
+use rust_decimal::{
+    prelude::{FromPrimitive, ToPrimitive},
+    Decimal,
+};
+use std::{fmt::Display, str::FromStr};
 
 pub const MIN_CONFIRMATIONS: u32 = 10;
+pub const PICONERO_OFFSET: u64 = 1_000_000_000_000;
 
 pub fn random_private_key<R: RngCore + CryptoRng>(rng: &mut R) -> PrivateKey {
     let scalar = Scalar::random(rng);
@@ -76,8 +83,19 @@ impl Amount {
     pub fn from_piconero(amount: u64) -> Self {
         Amount(amount)
     }
+
     pub fn as_piconero(&self) -> u64 {
         self.0
+    }
+
+    pub fn parse_monero(amount: &str) -> Result<Self> {
+        let decimal = Decimal::from_str(amount)?;
+        let piconeros_dec =
+            decimal.mul(Decimal::from_u64(PICONERO_OFFSET).expect("constant to fit into u64"));
+        let piconeros = piconeros_dec
+            .to_u64()
+            .ok_or_else(|| OverflowError(amount.to_owned()))?;
+        Ok(Amount(piconeros))
     }
 }
 
@@ -108,6 +126,16 @@ impl Mul<u64> for Amount {
 impl From<Amount> for u64 {
     fn from(from: Amount) -> u64 {
         from.0
+    }
+}
+
+impl Display for Amount {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut decimal = Decimal::from(self.0);
+        decimal
+            .set_scale(12)
+            .expect("12 is smaller than max precision of 28");
+        write!(f, "{} XMR", decimal)
     }
 }
 
@@ -176,4 +204,71 @@ pub trait CreateWalletForOutput {
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
     ) -> anyhow::Result<()>;
+}
+
+#[derive(thiserror::Error, Debug, Clone, PartialEq)]
+#[error("Overflow, cannot convert {0} to u64")]
+pub struct OverflowError(pub String);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_monero_min() {
+        let min_pics = 1;
+        let amount = Amount::from_piconero(min_pics);
+        let monero = amount.to_string();
+        assert_eq!("0.000000000001 XMR", monero);
+    }
+
+    #[test]
+    fn display_monero_one() {
+        let min_pics = 1000000000000;
+        let amount = Amount::from_piconero(min_pics);
+        let monero = amount.to_string();
+        assert_eq!("1.000000000000 XMR", monero);
+    }
+
+    #[test]
+    fn display_monero_max() {
+        let max_pics = 18_446_744_073_709_551_615;
+        let amount = Amount::from_piconero(max_pics);
+        let monero = amount.to_string();
+        assert_eq!("18446744.073709551615 XMR", monero);
+    }
+
+    #[test]
+    fn parse_monero_min() {
+        let monero_min = "0.000000000001";
+        let amount = Amount::parse_monero(monero_min).unwrap();
+        let pics = amount.0;
+        assert_eq!(1, pics);
+    }
+
+    #[test]
+    fn parse_monero() {
+        let monero = "123";
+        let amount = Amount::parse_monero(monero).unwrap();
+        let pics = amount.0;
+        assert_eq!(123000000000000, pics);
+    }
+
+    #[test]
+    fn parse_monero_max() {
+        let monero = "18446744.073709551615";
+        let amount = Amount::parse_monero(monero).unwrap();
+        let pics = amount.0;
+        assert_eq!(18446744073709551615, pics);
+    }
+
+    #[test]
+    fn parse_monero_overflows() {
+        let overflow_pics = "18446744.073709551616";
+        let error = Amount::parse_monero(overflow_pics).unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<OverflowError>().unwrap(),
+            &OverflowError(overflow_pics.to_owned())
+        );
+    }
 }

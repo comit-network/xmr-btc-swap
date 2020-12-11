@@ -9,6 +9,7 @@ pub struct Config {
     pub monero_max_finality_time: Duration,
     pub bitcoin_refund_timelock: u32,
     pub bitcoin_punish_timelock: u32,
+    pub bitcoin_network: ::bitcoin::Network,
 }
 
 impl Config {
@@ -23,6 +24,7 @@ impl Config {
                 * mainnet::MONERO_FINALITY_CONFIRMATIONS,
             bitcoin_refund_timelock: mainnet::BITCOIN_REFUND_TIMELOCK,
             bitcoin_punish_timelock: mainnet::BITCOIN_PUNISH_TIMELOCK,
+            bitcoin_network: ::bitcoin::Network::Bitcoin,
         }
     }
 
@@ -37,6 +39,7 @@ impl Config {
                 * regtest::MONERO_FINALITY_CONFIRMATIONS,
             bitcoin_refund_timelock: regtest::BITCOIN_REFUND_TIMELOCK,
             bitcoin_punish_timelock: regtest::BITCOIN_PUNISH_TIMELOCK,
+            bitcoin_network: ::bitcoin::Network::Regtest,
         }
     }
 }
