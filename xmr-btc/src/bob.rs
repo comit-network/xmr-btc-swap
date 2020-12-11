@@ -7,6 +7,7 @@ use crate::{
     monero,
     serde::monero_private_key,
     transport::{ReceiveMessage, SendMessage},
+    Epoch,
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -708,7 +709,6 @@ impl State4 {
         let tx_cancel =
             bitcoin::TxCancel::new(&self.tx_lock, self.refund_timelock, self.A, self.b.public());
 
-        // todo: check if this is correct
         let sig_a = self.tx_cancel_sig_a.clone();
         let sig_b = self.b.sign(tx_cancel.digest());
 
@@ -732,7 +732,6 @@ impl State4 {
         let tx_cancel =
             bitcoin::TxCancel::new(&self.tx_lock, self.refund_timelock, self.A, self.b.public());
 
-        // todo: check if this is correct
         let sig_a = self.tx_cancel_sig_a.clone();
         let sig_b = self.b.sign(tx_cancel.digest());
 
@@ -864,13 +863,6 @@ impl State4 {
     pub fn tx_lock_id(&self) -> bitcoin::Txid {
         self.tx_lock.txid()
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum Epoch {
-    T0,
-    T1,
-    T2,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

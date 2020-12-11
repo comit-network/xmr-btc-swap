@@ -29,6 +29,7 @@ use xmr_btc::{
     bitcoin::{TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction},
     config::Config,
     monero::CreateWalletForOutput,
+    Epoch,
 };
 
 trait Rng: RngCore + CryptoRng + Send {}
@@ -75,7 +76,7 @@ pub enum AliceState {
         state3: State3,
     },
     XmrRefunded,
-    WaitingToCancel {
+    Cancelling {
         state3: State3,
     },
     Punished,
@@ -89,7 +90,7 @@ impl fmt::Display for AliceState {
             AliceState::Negotiated { .. } => write!(f, "negotiated"),
             AliceState::BtcLocked { .. } => write!(f, "btc_locked"),
             AliceState::XmrLocked { .. } => write!(f, "xmr_locked"),
-            AliceState::EncSignLearned { .. } => write!(f, "encsig_sent"),
+            AliceState::EncSignLearned { .. } => write!(f, "encsig_learnt"),
             AliceState::BtcRedeemed => write!(f, "btc_redeemed"),
             AliceState::BtcCancelled { .. } => write!(f, "btc_cancelled"),
             AliceState::BtcRefunded { .. } => write!(f, "btc_refunded"),
@@ -97,7 +98,7 @@ impl fmt::Display for AliceState {
             AliceState::SafelyAborted => write!(f, "safely_aborted"),
             AliceState::BtcPunishable { .. } => write!(f, "btc_punishable"),
             AliceState::XmrRefunded => write!(f, "xmr_refunded"),
-            AliceState::WaitingToCancel { .. } => write!(f, "waiting_to_cancel"),
+            AliceState::Cancelling { .. } => write!(f, "cancelling"),
         }
     }
 }
@@ -218,31 +219,46 @@ pub async fn run_until(
                 .await
             }
             AliceState::XmrLocked { state3 } => {
-                // Our Monero is locked, we need to go through the cancellation process if this
-                // step fails
-                match wait_for_bitcoin_encrypted_signature(
-                    &mut event_loop_handle,
-                    config.monero_max_finality_time,
-                )
-                .await
-                {
-                    Ok(encrypted_signature) => {
-                        run_until(
-                            AliceState::EncSignLearned {
-                                state3,
-                                encrypted_signature,
-                            },
-                            is_target_state,
-                            event_loop_handle,
-                            bitcoin_wallet,
-                            monero_wallet,
-                            config,
-                        )
-                        .await
+                // todo: match statement and wait for t1 can probably expressed more cleanly
+                match state3.current_epoch(bitcoin_wallet.as_ref()).await? {
+                    Epoch::T0 => {
+                        let wait_for_enc_sig = wait_for_bitcoin_encrypted_signature(
+                            &mut event_loop_handle,
+                            config.monero_max_finality_time,
+                        );
+                        let t1_timeout = state3.wait_for_t1(bitcoin_wallet.as_ref());
+
+                        tokio::select! {
+                            _ = t1_timeout => {
+                                run_until(
+                                    AliceState::Cancelling { state3 },
+                                    is_target_state,
+                                    event_loop_handle,
+                                    bitcoin_wallet,
+                                    monero_wallet,
+                                    config,
+                                )
+                                .await
+                            }
+                            enc_sig = wait_for_enc_sig => {
+                                  run_until(
+                                        AliceState::EncSignLearned {
+                                            state3,
+                                            encrypted_signature: enc_sig?,
+                                        },
+                                        is_target_state,
+                                        event_loop_handle,
+                                        bitcoin_wallet,
+                                        monero_wallet,
+                                        config,
+                                    )
+                                    .await
+                            }
+                        }
                     }
-                    Err(_) => {
+                    _ => {
                         run_until(
-                            AliceState::WaitingToCancel { state3 },
+                            AliceState::Cancelling { state3 },
                             is_target_state,
                             event_loop_handle,
                             bitcoin_wallet,
@@ -253,6 +269,7 @@ pub async fn run_until(
                     }
                 }
             }
+
             AliceState::EncSignLearned {
                 state3,
                 encrypted_signature,
@@ -268,7 +285,7 @@ pub async fn run_until(
                     Ok(tx) => tx,
                     Err(_) => {
                         return run_until(
-                            AliceState::WaitingToCancel { state3 },
+                            AliceState::Cancelling { state3 },
                             is_target_state,
                             event_loop_handle,
                             bitcoin_wallet,
@@ -299,7 +316,7 @@ pub async fn run_until(
                 )
                 .await
             }
-            AliceState::WaitingToCancel { state3 } => {
+            AliceState::Cancelling { state3 } => {
                 let tx_cancel = publish_cancel_transaction(
                     state3.tx_lock.clone(),
                     state3.a.clone(),
