@@ -236,6 +236,96 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
     );
 }
 
+// Bob locks btc and Alice locks xmr. Alice fails to act so Bob refunds. Alice
+// then also refunds.
+#[tokio::test]
+async fn both_refund() {
+    use tracing_subscriber::util::SubscriberInitExt as _;
+    let _guard = tracing_subscriber::fmt()
+        .with_env_filter("swap=info,xmr_btc=info")
+        .with_ansi(false)
+        .set_default();
+
+    let cli = Cli::default();
+    let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
+    let _ = bitcoind.init(5).await;
+    let (monero, _container) =
+        Monero::new(&cli, None, vec!["alice".to_string(), "bob".to_string()])
+            .await
+            .unwrap();
+
+    let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
+    let xmr_to_swap = xmr_btc::monero::Amount::from_piconero(1_000_000_000_000);
+
+    let bob_btc_starting_balance = btc_to_swap * 10;
+    let bob_xmr_starting_balance = xmr_btc::monero::Amount::from_piconero(0);
+
+    let alice_btc_starting_balance = bitcoin::Amount::ZERO;
+    let alice_xmr_starting_balance = xmr_to_swap * 10;
+
+    let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9877"
+        .parse()
+        .expect("failed to parse Alice's address");
+
+    let (
+        alice_state,
+        mut alice_swarm,
+        alice_swarm_handle,
+        alice_btc_wallet,
+        alice_xmr_wallet,
+        alice_peer_id,
+    ) = init_alice(
+        &bitcoind,
+        &monero,
+        btc_to_swap,
+        alice_btc_starting_balance,
+        xmr_to_swap,
+        alice_xmr_starting_balance,
+        alice_multiaddr.clone(),
+    )
+    .await;
+
+    let (bob_state, bob_swarm_driver, bob_swarm_handle, bob_btc_wallet, bob_xmr_wallet, bob_db) =
+        init_bob(
+            alice_multiaddr,
+            alice_peer_id,
+            &bitcoind,
+            &monero,
+            btc_to_swap,
+            bob_btc_starting_balance,
+            xmr_to_swap,
+            bob_xmr_starting_balance,
+        )
+        .await;
+
+    let bob_fut = bob::swap::swap(
+        bob_state,
+        bob_swarm_handle,
+        bob_db,
+        bob_btc_wallet.clone(),
+        bob_xmr_wallet.clone(),
+        OsRng,
+        Uuid::new_v4(),
+    );
+
+    tokio::spawn(async move { bob_swarm_driver.run().await });
+
+    let alice_fut = alice::swap::run_until(
+        alice_state,
+        alice::swap::is_xmr_locked,
+        alice_swarm_handle,
+        alice_btc_wallet.clone(),
+        alice_xmr_wallet.clone(),
+        Config::regtest(),
+    );
+
+    tokio::spawn(async move { alice_swarm.run().await });
+
+    let ((_alice_state, _), bob_state) = try_join(alice_fut, bob_fut).await.unwrap();
+
+    assert!(matches!(bob_state, BobState::BtcRefunded));
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn init_alice(
     bitcoind: &Bitcoind<'_>,
