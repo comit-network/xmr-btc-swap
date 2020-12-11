@@ -39,6 +39,7 @@ async fn happy_path() {
     let xmr_alice = xmr_to_swap * 10;
     let xmr_bob = xmr_btc::monero::Amount::from_piconero(0);
 
+    // todo: This should not be hardcoded
     let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9876"
         .parse()
         .expect("failed to parse Alice's address");
@@ -143,6 +144,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
     let alice_btc_starting_balance = bitcoin::Amount::ZERO;
     let alice_xmr_starting_balance = xmr_to_swap * 10;
 
+    // todo: This should not be hardcoded
     let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9877"
         .parse()
         .expect("failed to parse Alice's address");
@@ -263,7 +265,8 @@ async fn both_refund() {
     let alice_btc_starting_balance = bitcoin::Amount::ZERO;
     let alice_xmr_starting_balance = xmr_to_swap * 10;
 
-    let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9877"
+    // todo: This should not be hardcoded
+    let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9879"
         .parse()
         .expect("failed to parse Alice's address");
 
