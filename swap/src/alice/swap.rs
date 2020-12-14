@@ -90,7 +90,7 @@ impl fmt::Display for AliceState {
             AliceState::Negotiated { .. } => write!(f, "negotiated"),
             AliceState::BtcLocked { .. } => write!(f, "btc_locked"),
             AliceState::XmrLocked { .. } => write!(f, "xmr_locked"),
-            AliceState::EncSignLearned { .. } => write!(f, "encsig_learnt"),
+            AliceState::EncSignLearned { .. } => write!(f, "encsig_learned"),
             AliceState::BtcRedeemed => write!(f, "btc_redeemed"),
             AliceState::BtcCancelled { .. } => write!(f, "btc_cancelled"),
             AliceState::BtcRefunded { .. } => write!(f, "btc_refunded"),
@@ -219,7 +219,7 @@ pub async fn run_until(
                 .await
             }
             AliceState::XmrLocked { state3 } => {
-                // todo: match statement and wait for t1 can probably expressed more cleanly
+                // todo: match statement and wait for t1 can probably be expressed more cleanly
                 match state3.current_epoch(bitcoin_wallet.as_ref()).await? {
                     Epoch::T0 => {
                         let wait_for_enc_sig = wait_for_bitcoin_encrypted_signature(

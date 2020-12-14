@@ -265,7 +265,6 @@ where
             BobState::Cancelled(state) => {
                 // Bob has cancelled the swap
                 match state.current_epoch(bitcoin_wallet.as_ref()).await? {
-                    // todo: Is this an invalid state?. Should I remove the T0 match branch
                     Epoch::T0 => panic!("Cancelled before t1??? Something is really wrong"),
                     Epoch::T1 => {
                         state.refund_btc(bitcoin_wallet.as_ref()).await?;
@@ -282,8 +281,6 @@ where
                         .await
                     }
                     Epoch::T2 => {
-                        // todo: If t2 has elapsed should we check whether Alice has punished? If
-                        // not can we still refund?
                         run_until(
                             BobState::Punished,
                             is_target_state,
