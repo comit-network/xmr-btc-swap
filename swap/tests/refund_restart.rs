@@ -46,6 +46,7 @@ async fn both_refund() {
         alice_event_loop_handle,
         alice_btc_wallet,
         alice_xmr_wallet,
+        _,
     ) = init_alice(
         &bitcoind,
         &monero,
