@@ -1,8 +1,6 @@
 use crate::testutils::{init_alice, init_bob};
-use bitcoin_harness::Bitcoind;
 use futures::future::try_join;
 use libp2p::Multiaddr;
-use monero_harness::Monero;
 use rand::rngs::OsRng;
 use swap::{alice, alice::swap::AliceState, bob, bob::swap::BobState, storage::Database};
 use tempfile::tempdir;
@@ -19,19 +17,14 @@ pub mod testutils;
 async fn both_refund() {
     let _guard = init_tracing();
 
-    use tracing_subscriber::util::SubscriberInitExt as _;
-    let _guard = tracing_subscriber::fmt()
-        .with_env_filter("swap=info,xmr_btc=info")
-        .with_ansi(false)
-        .set_default();
-
     let cli = Cli::default();
-    let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
-    let _ = bitcoind.init(5).await;
-    let (monero, _container) =
-        Monero::new(&cli, None, vec!["alice".to_string(), "bob".to_string()])
-            .await
-            .unwrap();
+    let (
+        monero,
+        testutils::Containers {
+            bitcoind,
+            monerods: _monerods,
+        },
+    ) = testutils::init_containers(&cli).await;
 
     let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
     let xmr_to_swap = xmr_btc::monero::Amount::from_piconero(1_000_000_000_000);
@@ -72,7 +65,6 @@ async fn both_refund() {
             btc_to_swap,
             bob_btc_starting_balance,
             xmr_to_swap,
-            bob_xmr_starting_balance,
             Config::regtest(),
         )
         .await;
