@@ -1,6 +1,4 @@
-use bitcoin_harness::Bitcoind;
 use libp2p::Multiaddr;
-use monero_harness::Monero;
 use rand::rngs::OsRng;
 use swap::{alice, alice::swap::AliceState, bitcoin, bob, storage::Database};
 use tempfile::tempdir;
@@ -18,19 +16,18 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     let _guard = init_tracing();
 
     let cli = Cli::default();
-    let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
-    let _ = bitcoind.init(5).await;
-    let (monero, _container) =
-        Monero::new(&cli, None, vec!["alice".to_string(), "bob".to_string()])
-            .await
-            .unwrap();
+    let (
+        monero,
+        testutils::Containers {
+            bitcoind,
+            monerods: _monerods,
+        },
+    ) = testutils::init_containers(&cli).await;
 
     let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
     let xmr_to_swap = xmr_btc::monero::Amount::from_piconero(1_000_000_000_000);
 
     let bob_btc_starting_balance = btc_to_swap * 10;
-    let bob_xmr_starting_balance = xmr_btc::monero::Amount::ZERO;
-
     let alice_xmr_starting_balance = xmr_to_swap * 10;
 
     let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9877"
@@ -64,7 +61,6 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
             btc_to_swap,
             bob_btc_starting_balance,
             xmr_to_swap,
-            bob_xmr_starting_balance,
             config,
         )
         .await;
@@ -113,15 +109,8 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
         assert!(matches!(state, swap::state::Alice::EncSignLearned {..}));
     }
 
-    let (_, mut event_loop_after_restart, event_loop_handle_after_restart) =
-        testutils::init_alice_eventloop(
-            btc_to_swap,
-            xmr_to_swap,
-            alice_btc_wallet.clone(),
-            alice_multiaddr,
-            config,
-        )
-        .await;
+    let (mut event_loop_after_restart, event_loop_handle_after_restart) =
+        testutils::init_alice_eventloop(alice_multiaddr);
     let _alice_swarm_fut = tokio::spawn(async move { event_loop_after_restart.run().await });
 
     let alice_state = alice::swap::recover(
@@ -136,4 +125,6 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     .unwrap();
 
     assert!(matches!(alice_state, AliceState::BtcRedeemed {..}));
+
+    // TODO: Additionally assert balances
 }

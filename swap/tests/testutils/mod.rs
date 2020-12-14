@@ -21,7 +21,6 @@ pub async fn init_bob(
     btc_to_swap: bitcoin::Amount,
     btc_starting_balance: bitcoin::Amount,
     xmr_to_swap: xmr_btc::monero::Amount,
-    xmr_stating_balance: xmr_btc::monero::Amount,
     config: Config,
 ) -> (
     BobState,
@@ -31,25 +30,15 @@ pub async fn init_bob(
     Arc<swap::monero::Wallet>,
     Database,
 ) {
-    let bob_btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new("bob", bitcoind.node_url.clone(), config.bitcoin_network)
-            .await
-            .unwrap(),
-    );
-    bitcoind
-        .mint(
-            bob_btc_wallet.inner.new_address().await.unwrap(),
-            btc_starting_balance,
-        )
-        .await
-        .unwrap();
-
-    monero
-        .init(vec![("bob", xmr_stating_balance.as_piconero())])
-        .await
-        .unwrap();
-
-    let bob_xmr_wallet = Arc::new(swap::monero::Wallet(monero.wallet("bob").unwrap().client()));
+    let (bob_btc_wallet, bob_xmr_wallet) = init_wallets(
+        "bob",
+        bitcoind,
+        monero,
+        Some(btc_starting_balance),
+        None,
+        config,
+    )
+    .await;
 
     let amounts = SwapAmounts {
         btc: btc_to_swap,
@@ -89,17 +78,12 @@ pub async fn init_bob(
     )
 }
 
-pub async fn init_alice_eventloop(
+pub async fn init_alice_state(
     btc_to_swap: bitcoin::Amount,
     xmr_to_swap: monero::Amount,
     alice_btc_wallet: Arc<bitcoin::Wallet>,
-    listen: Multiaddr,
     config: Config,
-) -> (
-    AliceState,
-    alice::event_loop::EventLoop,
-    alice::event_loop::EventLoopHandle,
-) {
+) -> AliceState {
     let rng = &mut OsRng;
 
     let amounts = SwapAmounts {
@@ -123,39 +107,74 @@ pub async fn init_alice_eventloop(
         redeem_address,
         punish_address,
     );
-    let start_state = AliceState::Started { amounts, state0 };
 
+    AliceState::Started { amounts, state0 }
+}
+
+pub fn init_alice_eventloop(
+    listen: Multiaddr,
+) -> (
+    alice::event_loop::EventLoop,
+    alice::event_loop::EventLoopHandle,
+) {
     let alice_behaviour = alice::Behaviour::default();
     let alice_transport = build(alice_behaviour.identity()).unwrap();
 
     let (swarm_driver, handle) =
         alice::event_loop::EventLoop::new(alice_transport, alice_behaviour, listen).unwrap();
 
-    (start_state, swarm_driver, handle)
+    (swarm_driver, handle)
 }
 
-pub async fn init_alice_wallets(
-    bitcoind: &Bitcoind<'_>,
-    monero: &Monero,
-    xmr_starting_balance: xmr_btc::monero::Amount,
-    config: Config,
-) -> (Arc<monero::Wallet>, Arc<bitcoin::Wallet>) {
-    monero
-        .init(vec![("alice", xmr_starting_balance.as_piconero())])
+pub async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
+    let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
+    let _ = bitcoind.init(5).await;
+    let (monero, monerods) = Monero::new(&cli, None, vec!["alice".to_string(), "bob".to_string()])
         .await
         .unwrap();
 
-    let alice_xmr_wallet = Arc::new(swap::monero::Wallet(
-        monero.wallet("alice").unwrap().client(),
-    ));
+    (monero, Containers { bitcoind, monerods })
+}
 
-    let alice_btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new("alice", bitcoind.node_url.clone(), config.bitcoin_network)
+pub async fn init_wallets(
+    name: &str,
+    bitcoind: &Bitcoind<'_>,
+    monero: &Monero,
+    btc_starting_balance: Option<xmr_btc::bitcoin::Amount>,
+    xmr_starting_balance: Option<xmr_btc::monero::Amount>,
+    config: Config,
+) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {
+    match xmr_starting_balance {
+        Some(amount) => {
+            monero
+                .init(vec![(name, amount.as_piconero())])
+                .await
+                .unwrap();
+        }
+        None => {
+            monero
+                .init(vec![(name, monero::Amount::ZERO.as_piconero())])
+                .await
+                .unwrap();
+        }
+    };
+
+    let xmr_wallet = Arc::new(swap::monero::Wallet(monero.wallet(name).unwrap().client()));
+
+    let btc_wallet = Arc::new(
+        swap::bitcoin::Wallet::new(name, bitcoind.node_url.clone(), config.bitcoin_network)
             .await
             .unwrap(),
     );
 
-    (alice_xmr_wallet, alice_btc_wallet)
+    if let Some(amount) = btc_starting_balance {
+        bitcoind
+            .mint(btc_wallet.inner.new_address().await.unwrap(), amount)
+            .await
+            .unwrap();
+    }
+
+    (btc_wallet, xmr_wallet)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -174,17 +193,21 @@ pub async fn init_alice(
     Arc<swap::bitcoin::Wallet>,
     Arc<swap::monero::Wallet>,
 ) {
-    let (alice_xmr_wallet, alice_btc_wallet) =
-        init_alice_wallets(bitcoind, monero, xmr_starting_balance, config).await;
-
-    let (alice_start_state, swarm_driver, handle) = init_alice_eventloop(
-        btc_to_swap,
-        xmr_to_swap,
-        alice_btc_wallet.clone(),
-        listen,
+    let (alice_btc_wallet, alice_xmr_wallet) = init_wallets(
+        "alice",
+        bitcoind,
+        monero,
+        None,
+        Some(xmr_starting_balance),
         config,
     )
     .await;
+
+    let alice_start_state =
+        init_alice_state(btc_to_swap, xmr_to_swap, alice_btc_wallet.clone(), config).await;
+
+    let (swarm_driver, handle) = init_alice_eventloop(listen);
+
     (
         alice_start_state,
         swarm_driver,
@@ -197,8 +220,8 @@ pub async fn init_alice(
 // This is just to keep the containers alive
 #[allow(dead_code)]
 pub struct Containers<'a> {
-    bitcoind: Bitcoind<'a>,
-    monerods: Vec<Container<'a, Cli, image::Monero>>,
+    pub bitcoind: Bitcoind<'a>,
+    pub monerods: Vec<Container<'a, Cli, image::Monero>>,
 }
 
 /// Utility function to initialize logging in the test environment.
