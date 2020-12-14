@@ -9,7 +9,6 @@ pub mod bob;
 pub mod cli;
 pub mod monero;
 pub mod network;
-pub mod recover;
 pub mod serde;
 pub mod state;
 pub mod storage;

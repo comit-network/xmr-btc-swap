@@ -136,7 +136,7 @@ impl From<&AliceState> for state::Alice {
             AliceState::XmrRefunded => Alice::SwapComplete,
             // TODO(Franck): it may be more efficient to store the fact that we already want to
             // abort
-            AliceState::Cancelling { state3 } => Alice::XmrLocked(state3.clone()),
+            AliceState::Cancelling { state3 } => Alice::Cancelling(state3.clone()),
             AliceState::Punished => Alice::SwapComplete,
             AliceState::SafelyAborted => Alice::SwapComplete,
         }
@@ -176,6 +176,7 @@ impl TryFrom<state::Swap> for AliceState {
                     state3: state,
                     encrypted_signature,
                 },
+                Alice::Cancelling(state3) => AliceState::Cancelling { state3 },
                 Alice::BtcCancelled(state) => {
                     let tx_cancel = bitcoin::TxCancel::new(
                         &state.tx_lock,
@@ -405,10 +406,11 @@ pub async fn run_until(
 
                         tokio::select! {
                             _ = t1_timeout => {
+                                let state = AliceState::Cancelling { state3: state3.clone() };
                                 let db_state = (&state).into();
                                 db.insert_latest_state(swap_id, Swap::Alice(db_state)).await?;
                                 run_until(
-                                    AliceState::Cancelling { state3: state3.clone() },
+                                    state,
                                     is_target_state,
                                     event_loop_handle,
                                     bitcoin_wallet,
@@ -420,13 +422,11 @@ pub async fn run_until(
                                 .await
                             }
                             enc_sig = wait_for_enc_sig => {
+                                let state = AliceState::EncSignLearned{state3: state3.clone(), encrypted_signature: enc_sig?};
                                 let db_state = (&state).into();
                                 db.insert_latest_state(swap_id, Swap::Alice(db_state)).await?;
                                 run_until(
-                                    AliceState::EncSignLearned {
-                                        state3: state3.clone(),
-                                        encrypted_signature: enc_sig?,
-                                    },
+                                    state,
                                     is_target_state,
                                     event_loop_handle,
                                     bitcoin_wallet,
@@ -440,13 +440,14 @@ pub async fn run_until(
                         }
                     }
                     _ => {
+                        let state = AliceState::Cancelling {
+                            state3: state3.clone(),
+                        };
                         let db_state = (&state).into();
                         db.insert_latest_state(swap_id, Swap::Alice(db_state))
                             .await?;
                         run_until(
-                            AliceState::Cancelling {
-                                state3: state3.clone(),
-                            },
+                            state,
                             is_target_state,
                             event_loop_handle,
                             bitcoin_wallet,

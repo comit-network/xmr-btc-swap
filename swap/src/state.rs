@@ -34,6 +34,7 @@ pub enum Alice {
         state: alice::State3,
         encrypted_signature: EncryptedSignature,
     },
+    Cancelling(alice::State3),
     BtcCancelled(alice::State3),
     BtcPunishable(alice::State3),
     BtcRefunded {
@@ -106,6 +107,7 @@ impl Display for Alice {
             Alice::BtcLocked(_) => f.write_str("Bitcoin locked"),
             Alice::XmrLocked(_) => f.write_str("Monero locked"),
             Alice::BtcRedeemable { .. } => f.write_str("Bitcoin redeemable"),
+            Alice::Cancelling(_) => f.write_str("Submitting TxCancel"),
             Alice::BtcCancelled(_) => f.write_str("Bitcoin cancel transaction published"),
             Alice::BtcPunishable(_) => f.write_str("Bitcoin punishable"),
             Alice::BtcRefunded { .. } => f.write_str("Monero refundable"),
