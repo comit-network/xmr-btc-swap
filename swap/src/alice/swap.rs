@@ -112,9 +112,7 @@ impl From<&AliceState> for state::Alice {
         match alice_state {
             AliceState::Started {
                 amounts,
-                a,
-                s_a,
-                v_a,
+                state0: State0 { a, s_a, v_a, .. },
             } => Alice::Started {
                 amounts: *amounts,
                 a: a.clone(),
