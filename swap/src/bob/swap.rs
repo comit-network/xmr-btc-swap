@@ -1,5 +1,5 @@
 use crate::{
-    bob::{event_loop::EventLoopHandle, execution::negotiate},
+    bob::{event_loop::EventLoopHandle, negotiate::negotiate},
     state,
     state::Bob,
     storage::Database,
@@ -59,15 +59,10 @@ impl fmt::Display for BobState {
 impl From<BobState> for state::Bob {
     fn from(bob_state: BobState) -> Self {
         match bob_state {
-            BobState::Started {
-                state0,
-                amounts,
-                addr,
-            } => Bob::Started {
-                state0,
-                amounts,
-                addr,
-            },
+            BobState::Started { .. } => {
+                // TODO: Do we want to resume just started swaps
+                unimplemented!("Cannot save a swap that has just started")
+            }
             BobState::Negotiated(state2, peer_id) => Bob::Negotiated { state2, peer_id },
             BobState::BtcLocked(state3, peer_id) => Bob::BtcLocked { state3, peer_id },
             BobState::XmrLocked(state4, peer_id) => Bob::XmrLocked { state4, peer_id },
@@ -85,15 +80,6 @@ impl From<BobState> for state::Bob {
 impl From<state::Bob> for BobState {
     fn from(bob: Bob) -> Self {
         match bob {
-            Bob::Started {
-                state0,
-                amounts,
-                addr,
-            } => BobState::Started {
-                state0,
-                amounts,
-                addr,
-            },
             Bob::Negotiated { state2, peer_id } => BobState::Negotiated(state2, peer_id),
             Bob::BtcLocked { state3, peer_id } => BobState::BtcLocked(state3, peer_id),
             Bob::XmrLocked { state4, peer_id } => BobState::XmrLocked(state4, peer_id),

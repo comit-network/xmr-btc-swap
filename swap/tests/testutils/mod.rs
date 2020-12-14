@@ -123,12 +123,9 @@ pub async fn init_alice_eventloop(
         redeem_address,
         punish_address,
     );
-    let start_state = AliceState::Started {
-        amounts,
-        state0: state0.clone(),
-    };
+    let start_state = AliceState::Started { amounts, state0 };
 
-    let alice_behaviour = alice::Behaviour::new(state0);
+    let alice_behaviour = alice::Behaviour::default();
     let alice_transport = build(alice_behaviour.identity()).unwrap();
 
     let (swarm_driver, handle) =

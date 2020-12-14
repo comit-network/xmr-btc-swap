@@ -30,13 +30,14 @@ impl<T> Default for Channels<T> {
 }
 
 pub struct EventLoopHandle {
-    msg0: Receiver<bob::Message0>,
+    msg0: Receiver<(bob::Message0, ResponseChannel<AliceToBob>)>,
     msg1: Receiver<(bob::Message1, ResponseChannel<AliceToBob>)>,
     msg2: Receiver<(bob::Message2, ResponseChannel<AliceToBob>)>,
     msg3: Receiver<bob::Message3>,
     request: Receiver<crate::alice::amounts::OutEvent>,
     conn_established: Receiver<PeerId>,
     send_amounts: Sender<(ResponseChannel<AliceToBob>, SwapAmounts)>,
+    send_msg0: Sender<(ResponseChannel<AliceToBob>, alice::Message0)>,
     send_msg1: Sender<(ResponseChannel<AliceToBob>, alice::Message1)>,
     send_msg2: Sender<(ResponseChannel<AliceToBob>, alice::Message2)>,
 }
@@ -49,7 +50,7 @@ impl EventLoopHandle {
             .ok_or_else(|| anyhow!("Failed to receive connection established from Bob"))
     }
 
-    pub async fn recv_message0(&mut self) -> Result<bob::Message0> {
+    pub async fn recv_message0(&mut self) -> Result<(bob::Message0, ResponseChannel<AliceToBob>)> {
         self.msg0
             .recv()
             .await
@@ -93,6 +94,15 @@ impl EventLoopHandle {
         Ok(())
     }
 
+    pub async fn send_message0(
+        &mut self,
+        channel: ResponseChannel<AliceToBob>,
+        msg: alice::Message0,
+    ) -> Result<()> {
+        let _ = self.send_msg0.send((channel, msg)).await?;
+        Ok(())
+    }
+
     pub async fn send_message1(
         &mut self,
         channel: ResponseChannel<AliceToBob>,
@@ -114,13 +124,14 @@ impl EventLoopHandle {
 
 pub struct EventLoop {
     swarm: libp2p::Swarm<Behaviour>,
-    msg0: Sender<bob::Message0>,
+    msg0: Sender<(bob::Message0, ResponseChannel<AliceToBob>)>,
     msg1: Sender<(bob::Message1, ResponseChannel<AliceToBob>)>,
     msg2: Sender<(bob::Message2, ResponseChannel<AliceToBob>)>,
     msg3: Sender<bob::Message3>,
     request: Sender<crate::alice::amounts::OutEvent>,
     conn_established: Sender<PeerId>,
     send_amounts: Receiver<(ResponseChannel<AliceToBob>, SwapAmounts)>,
+    send_msg0: Receiver<(ResponseChannel<AliceToBob>, alice::Message0)>,
     send_msg1: Receiver<(ResponseChannel<AliceToBob>, alice::Message1)>,
     send_msg2: Receiver<(ResponseChannel<AliceToBob>, alice::Message2)>,
 }
@@ -149,6 +160,7 @@ impl EventLoop {
         let request = Channels::new();
         let conn_established = Channels::new();
         let send_amounts = Channels::new();
+        let send_msg0 = Channels::new();
         let send_msg1 = Channels::new();
         let send_msg2 = Channels::new();
 
@@ -161,6 +173,7 @@ impl EventLoop {
             request: request.sender,
             conn_established: conn_established.sender,
             send_amounts: send_amounts.receiver,
+            send_msg0: send_msg0.receiver,
             send_msg1: send_msg1.receiver,
             send_msg2: send_msg2.receiver,
         };
@@ -173,6 +186,7 @@ impl EventLoop {
             request: request.receiver,
             conn_established: conn_established.receiver,
             send_amounts: send_amounts.sender,
+            send_msg0: send_msg0.sender,
             send_msg1: send_msg1.sender,
             send_msg2: send_msg2.sender,
         };
@@ -188,8 +202,8 @@ impl EventLoop {
                         OutEvent::ConnectionEstablished(alice) => {
                             let _ = self.conn_established.send(alice).await;
                         }
-                        OutEvent::Message0(msg) => {
-                            let _ = self.msg0.send(msg).await;
+                        OutEvent::Message0 { msg, channel } => {
+                            let _ = self.msg0.send((msg, channel)).await;
                         }
                         OutEvent::Message1 { msg, channel } => {
                             let _ = self.msg1.send((msg, channel)).await;
@@ -208,6 +222,11 @@ impl EventLoop {
                 amounts = self.send_amounts.next().fuse() => {
                     if let Some((channel, amounts)) = amounts  {
                         self.swarm.send_amounts(channel, amounts);
+                    }
+                },
+                msg0 = self.send_msg0.next().fuse() => {
+                    if let Some((channel, msg)) = msg0  {
+                        self.swarm.send_message0(channel, msg);
                     }
                 },
                 msg1 = self.send_msg1.next().fuse() => {
