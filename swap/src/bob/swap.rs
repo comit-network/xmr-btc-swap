@@ -10,7 +10,10 @@ use rand::{CryptoRng, RngCore};
 use std::{fmt, sync::Arc};
 use tracing::info;
 use uuid::Uuid;
-use xmr_btc::bob::{self};
+use xmr_btc::{
+    bob::{self},
+    Epoch,
+};
 
 // The same data structure is used for swap execution and recovery.
 // This allows for a seamless transition from a failed swap to recovery.
@@ -27,7 +30,7 @@ pub enum BobState {
     EncSigSent(bob::State4, PeerId),
     BtcRedeemed(bob::State5),
     Cancelled(bob::State4),
-    BtcRefunded,
+    BtcRefunded(bob::State4),
     XmrRedeemed,
     Punished,
     SafelyAborted,
@@ -41,9 +44,9 @@ impl fmt::Display for BobState {
             BobState::BtcLocked(..) => write!(f, "btc_locked"),
             BobState::XmrLocked(..) => write!(f, "xmr_locked"),
             BobState::EncSigSent(..) => write!(f, "encsig_sent"),
-            BobState::BtcRedeemed(_) => write!(f, "btc_redeemed"),
-            BobState::Cancelled(_) => write!(f, "cancelled"),
-            BobState::BtcRefunded => write!(f, "btc_refunded"),
+            BobState::BtcRedeemed(..) => write!(f, "btc_redeemed"),
+            BobState::Cancelled(..) => write!(f, "cancelled"),
+            BobState::BtcRefunded(..) => write!(f, "btc_refunded"),
             BobState::XmrRedeemed => write!(f, "xmr_redeemed"),
             BobState::Punished => write!(f, "punished"),
             BobState::SafelyAborted => write!(f, "safely_aborted"),
@@ -79,7 +82,7 @@ where
 pub fn is_complete(state: &BobState) -> bool {
     matches!(
         state,
-        BobState::BtcRefunded
+        BobState::BtcRefunded(..)
             | BobState::XmrRedeemed
             | BobState::Punished
             | BobState::SafelyAborted
@@ -259,19 +262,40 @@ where
                 )
                 .await
             }
-            BobState::Cancelled(_state) => {
+            BobState::Cancelled(state) => {
                 // Bob has cancelled the swap
-                // If <t2 Bob refunds
-                // if unimplemented!("<t2") {
-                //     // Submit TxRefund
-                //     abort(BobState::BtcRefunded, io).await
-                // } else {
-                //     // Bob failed to refund in time and has been punished
-                //     abort(BobState::Punished, io).await
-                // }
-                Ok(BobState::BtcRefunded)
+                match state.current_epoch(bitcoin_wallet.as_ref()).await? {
+                    Epoch::T0 => panic!("Cancelled before t1??? Something is really wrong"),
+                    Epoch::T1 => {
+                        state.refund_btc(bitcoin_wallet.as_ref()).await?;
+                        run_until(
+                            BobState::BtcRefunded(state),
+                            is_target_state,
+                            event_loop_handle,
+                            db,
+                            bitcoin_wallet,
+                            monero_wallet,
+                            rng,
+                            swap_id,
+                        )
+                        .await
+                    }
+                    Epoch::T2 => {
+                        run_until(
+                            BobState::Punished,
+                            is_target_state,
+                            event_loop_handle,
+                            db,
+                            bitcoin_wallet,
+                            monero_wallet,
+                            rng,
+                            swap_id,
+                        )
+                        .await
+                    }
+                }
             }
-            BobState::BtcRefunded => Ok(BobState::BtcRefunded),
+            BobState::BtcRefunded(state4) => Ok(BobState::BtcRefunded(state4)),
             BobState::Punished => Ok(BobState::Punished),
             BobState::SafelyAborted => Ok(BobState::SafelyAborted),
             BobState::XmrRedeemed => Ok(BobState::XmrRedeemed),

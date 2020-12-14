@@ -14,6 +14,13 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
+#[derive(Debug, Clone, Copy)]
+pub enum Epoch {
+    T0,
+    T1,
+    T2,
+}
+
 #[macro_use]
 mod utils {
 
