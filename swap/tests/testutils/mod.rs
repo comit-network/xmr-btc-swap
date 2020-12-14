@@ -124,6 +124,7 @@ pub async fn init_alice(
     alice::event_loop::EventLoopHandle,
     Arc<swap::bitcoin::Wallet>,
     Arc<swap::monero::Wallet>,
+    Database,
 ) {
     let (alice_btc_wallet, alice_xmr_wallet) = init_wallets(
         "alice",
@@ -138,14 +139,18 @@ pub async fn init_alice(
     let alice_start_state =
         init_alice_state(btc_to_swap, xmr_to_swap, alice_btc_wallet.clone(), config).await;
 
-    let (swarm_driver, handle) = init_alice_event_loop(listen);
+    let (event_loop, event_loop_handle) = init_alice_event_loop(listen);
+
+    let alice_db_datadir = tempdir().unwrap();
+    let alice_db = Database::open(alice_db_datadir.path()).unwrap();
 
     (
         alice_start_state,
-        swarm_driver,
-        handle,
+        event_loop,
+        event_loop_handle,
         alice_btc_wallet,
         alice_xmr_wallet,
+        alice_db,
     )
 }
 

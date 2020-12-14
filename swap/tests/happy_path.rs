@@ -2,8 +2,7 @@ use crate::testutils::{init_alice, init_bob};
 use futures::future::try_join;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, bob, storage::Database};
-use tempfile::tempdir;
+use swap::{alice, bob};
 use testcontainers::clients::Cli;
 use testutils::init_tracing;
 use uuid::Uuid;
@@ -49,6 +48,7 @@ async fn happy_path() {
         alice_event_loop_handle,
         alice_btc_wallet,
         alice_xmr_wallet,
+        alice_db,
     ) = init_alice(
         &bitcoind,
         &monero,
@@ -71,9 +71,6 @@ async fn happy_path() {
             config,
         )
         .await;
-
-    let alice_db_datadir = tempdir().unwrap();
-    let alice_db = Database::open(alice_db_datadir.path()).unwrap();
 
     let alice_swap_fut = alice::swap::swap(
         alice_state,

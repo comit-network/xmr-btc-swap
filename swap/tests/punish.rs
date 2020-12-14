@@ -2,8 +2,7 @@ use crate::testutils::{init_alice, init_bob};
 use futures::future::try_join;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, alice::swap::AliceState, bob, bob::swap::BobState, storage::Database};
-use tempfile::tempdir;
+use swap::{alice, alice::swap::AliceState, bob, bob::swap::BobState};
 use testcontainers::clients::Cli;
 use testutils::init_tracing;
 use uuid::Uuid;
@@ -47,6 +46,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         alice_event_loop_handle,
         alice_btc_wallet,
         alice_xmr_wallet,
+        alice_db,
     ) = init_alice(
         &bitcoind,
         &monero,
@@ -82,9 +82,6 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
     );
 
     let _bob_swarm_fut = tokio::spawn(async move { bob_event_loop.run().await });
-
-    let alice_db_datadir = tempdir().unwrap();
-    let alice_db = Database::open(alice_db_datadir.path()).unwrap();
 
     let alice_fut = alice::swap::swap(
         alice_state,
