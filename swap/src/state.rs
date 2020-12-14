@@ -18,9 +18,15 @@ pub enum Swap {
 pub enum Alice {
     Started {
         amounts: SwapAmounts,
+        // TODO: This should not be saved, instead always derive it from a seed (and that seed file
+        // is the only thing that has to be kept secure)
         a: crate::bitcoin::SecretKey,
         s_a: cross_curve_dleq::Scalar,
         v_a: monero::PrivateViewKey,
+        refund_timelock: u32,
+        punish_timelock: u32,
+        redeem_address: ::bitcoin::Address,
+        punish_address: ::bitcoin::Address,
     },
     Negotiated(alice::State3),
     BtcLocked(alice::State3),

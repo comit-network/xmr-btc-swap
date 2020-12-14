@@ -439,12 +439,12 @@ pub struct State0 {
     pub s_a: cross_curve_dleq::Scalar,
     pub v_a: monero::PrivateViewKey,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
-    btc: bitcoin::Amount,
-    xmr: monero::Amount,
-    refund_timelock: u32,
-    punish_timelock: u32,
-    redeem_address: bitcoin::Address,
-    punish_address: bitcoin::Address,
+    pub btc: bitcoin::Amount,
+    pub xmr: monero::Amount,
+    pub refund_timelock: u32,
+    pub punish_timelock: u32,
+    pub redeem_address: bitcoin::Address,
+    pub punish_address: bitcoin::Address,
 }
 
 impl State0 {

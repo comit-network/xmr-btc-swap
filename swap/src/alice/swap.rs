@@ -112,12 +112,26 @@ impl From<&AliceState> for state::Alice {
         match alice_state {
             AliceState::Started {
                 amounts,
-                state0: State0 { a, s_a, v_a, .. },
+                state0:
+                    State0 {
+                        a,
+                        s_a,
+                        v_a,
+                        refund_timelock,
+                        punish_timelock,
+                        redeem_address,
+                        punish_address,
+                        ..
+                    },
             } => Alice::Started {
                 amounts: *amounts,
                 a: a.clone(),
                 s_a: *s_a,
                 v_a: *v_a,
+                refund_timelock: *refund_timelock,
+                punish_timelock: *punish_timelock,
+                redeem_address: redeem_address.clone(),
+                punish_address: punish_address.clone(),
             },
             AliceState::Negotiated { state3, .. } => Alice::Negotiated(state3.clone()),
             AliceState::BtcLocked { state3, .. } => Alice::BtcLocked(state3.clone()),
@@ -150,7 +164,29 @@ impl TryFrom<state::Swap> for AliceState {
         use AliceState::*;
         if let Swap::Alice(state) = db_state {
             let alice_state = match state {
-                Alice::Started { .. } => todo!(),
+                Alice::Started {
+                    amounts,
+                    a,
+                    s_a,
+                    v_a,
+                    refund_timelock,
+                    punish_timelock,
+                    redeem_address,
+                    punish_address,
+                } => Started {
+                    amounts,
+                    state0: State0 {
+                        a,
+                        s_a,
+                        v_a,
+                        btc: amounts.btc,
+                        xmr: amounts.xmr,
+                        refund_timelock,
+                        punish_timelock,
+                        redeem_address,
+                        punish_address,
+                    },
+                },
                 Alice::Negotiated(state3) => Negotiated {
                     channel: None,
                     amounts: SwapAmounts {
@@ -243,6 +279,29 @@ pub async fn swap(
     .await
 }
 
+pub async fn recover(
+    event_loop_handle: EventLoopHandle,
+    bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
+    monero_wallet: Arc<crate::monero::Wallet>,
+    config: Config,
+    swap_id: Uuid,
+    db: Database,
+) -> Result<AliceState> {
+    let db_swap = db.get_state(swap_id)?;
+    let start_state = AliceState::try_from(db_swap)?;
+    let (state, _) = swap(
+        start_state,
+        event_loop_handle,
+        bitcoin_wallet,
+        monero_wallet,
+        config,
+        swap_id,
+        db,
+    )
+    .await?;
+    Ok(state)
+}
+
 pub fn is_complete(state: &AliceState) -> bool {
     matches!(
         state,
@@ -279,6 +338,7 @@ pub async fn run_until(
     config: Config,
     swap_id: Uuid,
     db: Database,
+    // TODO: Remove EventLoopHandle!
 ) -> Result<(AliceState, EventLoopHandle)> {
     info!("Current state:{}", state);
     if is_target_state(&state) {
