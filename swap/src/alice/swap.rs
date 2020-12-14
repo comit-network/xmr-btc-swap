@@ -3,7 +3,7 @@
 use crate::{
     alice::{
         event_loop::EventLoopHandle,
-        execution::{
+        negotiate::{
             build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
             extract_monero_private_key, lock_xmr, negotiate, publish_bitcoin_punish_transaction,
             publish_bitcoin_redeem_transaction, publish_cancel_transaction,
@@ -110,29 +110,6 @@ impl fmt::Display for AliceState {
 impl From<&AliceState> for state::Alice {
     fn from(alice_state: &AliceState) -> Self {
         match alice_state {
-            AliceState::Started {
-                amounts,
-                state0:
-                    State0 {
-                        a,
-                        s_a,
-                        v_a,
-                        refund_timelock,
-                        punish_timelock,
-                        redeem_address,
-                        punish_address,
-                        ..
-                    },
-            } => Alice::Started {
-                amounts: *amounts,
-                a: a.clone(),
-                s_a: *s_a,
-                v_a: *v_a,
-                refund_timelock: *refund_timelock,
-                punish_timelock: *punish_timelock,
-                redeem_address: redeem_address.clone(),
-                punish_address: punish_address.clone(),
-            },
             AliceState::Negotiated { state3, .. } => Alice::Negotiated(state3.clone()),
             AliceState::BtcLocked { state3, .. } => Alice::BtcLocked(state3.clone()),
             AliceState::XmrLocked { state3 } => Alice::XmrLocked(state3.clone()),
@@ -153,6 +130,10 @@ impl From<&AliceState> for state::Alice {
             AliceState::Cancelling { state3 } => Alice::Cancelling(state3.clone()),
             AliceState::Punished => Alice::SwapComplete,
             AliceState::SafelyAborted => Alice::SwapComplete,
+            // todo: we may want to swap recovering from swaps that have not been negotiated
+            AliceState::Started { .. } => {
+                panic!("Alice attempted to save swap before being negotiated")
+            }
         }
     }
 }
@@ -164,29 +145,6 @@ impl TryFrom<state::Swap> for AliceState {
         use AliceState::*;
         if let Swap::Alice(state) = db_state {
             let alice_state = match state {
-                Alice::Started {
-                    amounts,
-                    a,
-                    s_a,
-                    v_a,
-                    refund_timelock,
-                    punish_timelock,
-                    redeem_address,
-                    punish_address,
-                } => Started {
-                    amounts,
-                    state0: State0 {
-                        a,
-                        s_a,
-                        v_a,
-                        btc: amounts.btc,
-                        xmr: amounts.xmr,
-                        refund_timelock,
-                        punish_timelock,
-                        redeem_address,
-                        punish_address,
-                    },
-                },
                 Alice::Negotiated(state3) => Negotiated {
                     channel: None,
                     amounts: SwapAmounts {

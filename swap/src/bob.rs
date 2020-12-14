@@ -20,11 +20,11 @@ use xmr_btc::{
 
 mod amounts;
 pub mod event_loop;
-mod execution;
 mod message0;
 mod message1;
 mod message2;
 mod message3;
+mod negotiate;
 pub mod swap;
 
 pub type Swarm = libp2p::Swarm<Behaviour>;

@@ -97,11 +97,8 @@ async fn main() -> Result<()> {
                 );
 
                 (
-                    AliceState::Started {
-                        amounts,
-                        state0: state0.clone(),
-                    },
-                    alice::Behaviour::new(state0),
+                    AliceState::Started { amounts, state0 },
+                    alice::Behaviour::default(),
                 )
             };
 

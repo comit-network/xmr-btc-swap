@@ -10,6 +10,7 @@ use futures::{
 };
 use libp2p::request_response::ResponseChannel;
 
+use rand::rngs::OsRng;
 use sha2::Sha256;
 use std::{sync::Arc, time::Duration};
 use tokio::time::timeout;
@@ -59,7 +60,13 @@ pub async fn negotiate(
         .send_amounts(event.channel, amounts)
         .await?;
 
-    let bob_message0 = timeout(config.bob_time_to_act, event_loop_handle.recv_message0()).await??;
+    let (bob_message0, channel) =
+        timeout(config.bob_time_to_act, event_loop_handle.recv_message0()).await??;
+
+    let alice_message0 = state0.next_message(&mut OsRng);
+    event_loop_handle
+        .send_message0(channel, alice_message0)
+        .await?;
 
     let state1 = state0.receive(bob_message0)?;
 

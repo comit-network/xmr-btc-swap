@@ -1,10 +1,7 @@
-use crate::SwapAmounts;
-use libp2p::{core::Multiaddr, PeerId};
+use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
-use xmr_btc::{
-    alice, bitcoin::EncryptedSignature, bob, cross_curve_dleq, monero, serde::monero_private_key,
-};
+use xmr_btc::{alice, bitcoin::EncryptedSignature, bob, monero, serde::monero_private_key};
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -16,18 +13,6 @@ pub enum Swap {
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Alice {
-    Started {
-        amounts: SwapAmounts,
-        // TODO: This should not be saved, instead always derive it from a seed (and that seed file
-        // is the only thing that has to be kept secure)
-        a: crate::bitcoin::SecretKey,
-        s_a: cross_curve_dleq::Scalar,
-        v_a: monero::PrivateViewKey,
-        refund_timelock: u32,
-        punish_timelock: u32,
-        redeem_address: ::bitcoin::Address,
-        punish_address: ::bitcoin::Address,
-    },
     Negotiated(alice::State3),
     BtcLocked(alice::State3),
     XmrLocked(alice::State3),
@@ -54,11 +39,6 @@ pub enum Alice {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Bob {
-    Started {
-        state0: bob::State0,
-        amounts: SwapAmounts,
-        addr: Multiaddr,
-    },
     Negotiated {
         state2: bob::State2,
         #[serde(with = "crate::serde::peer_id")]
@@ -108,7 +88,6 @@ impl Display for Swap {
 impl Display for Alice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Alice::Started { .. } => f.write_str("Swap started"),
             Alice::Negotiated(_) => f.write_str("Handshake complete"),
             Alice::BtcLocked(_) => f.write_str("Bitcoin locked"),
             Alice::XmrLocked(_) => f.write_str("Monero locked"),
@@ -132,7 +111,6 @@ impl Display for Bob {
             }
             Bob::BtcRedeemed(_) => f.write_str("Monero redeemable"),
             Bob::SwapComplete => f.write_str("Swap complete"),
-            Bob::Started { .. } => f.write_str("Swap started"),
             Bob::EncSigSent { .. } => f.write_str("Encrypted signature sent"),
         }
     }

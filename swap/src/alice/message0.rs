@@ -6,7 +6,6 @@ use libp2p::{
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
     NetworkBehaviour,
 };
-use rand::rngs::OsRng;
 use std::{
     collections::VecDeque,
     task::{Context, Poll},
@@ -15,11 +14,15 @@ use std::{
 use tracing::{debug, error};
 
 use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Message0Protocol, TIMEOUT};
-use xmr_btc::{alice::State0, bob};
+use libp2p::request_response::ResponseChannel;
+use xmr_btc::bob;
 
 #[derive(Debug)]
 pub enum OutEvent {
-    Msg(bob::Message0),
+    Msg {
+        msg: bob::Message0,
+        channel: ResponseChannel<AliceToBob>,
+    },
 }
 
 /// A `NetworkBehaviour` that represents send/recv of message 0.
@@ -30,12 +33,28 @@ pub struct Message0 {
     rr: RequestResponse<Codec<Message0Protocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
-    #[behaviour(ignore)]
-    state: State0,
 }
 
 impl Message0 {
-    pub fn new(state: State0) -> Self {
+    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: xmr_btc::alice::Message0) {
+        let msg = AliceToBob::Message0(msg);
+        self.rr.send_response(channel, msg);
+    }
+    fn poll(
+        &mut self,
+        _: &mut Context<'_>,
+        _: &mut impl PollParameters,
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message0Protocol>>, OutEvent>> {
+        if let Some(event) = self.events.pop_front() {
+            return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
+        }
+
+        Poll::Pending
+    }
+}
+
+impl Default for Message0 {
+    fn default() -> Self {
         let timeout = Duration::from_secs(TIMEOUT);
         let mut config = RequestResponseConfig::default();
         config.set_request_timeout(timeout);
@@ -47,20 +66,7 @@ impl Message0 {
                 config,
             ),
             events: Default::default(),
-            state,
         }
-    }
-
-    fn poll(
-        &mut self,
-        _: &mut Context<'_>,
-        _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message0Protocol>>, OutEvent>> {
-        if let Some(event) = self.events.pop_front() {
-            return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
-        }
-
-        Poll::Pending
     }
 }
 
@@ -76,13 +82,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             } => {
                 if let BobToAlice::Message0(msg) = request {
                     debug!("Received Message0");
-                    // TODO(Franck): Move this business logic out of the network behaviour.
-                    let response = AliceToBob::Message0(self.state.next_message(&mut OsRng));
-
-                    self.rr.send_response(channel, response);
-                    debug!("Sent Message0");
-
-                    self.events.push_back(OutEvent::Msg(msg));
+                    self.events.push_back(OutEvent::Msg { msg, channel });
                 }
             }
             RequestResponseEvent::Message {
