@@ -80,7 +80,7 @@ pub enum AliceState {
         state3: State3,
     },
     XmrRefunded,
-    Cancelling {
+    T1Expired {
         state3: State3,
     },
     Punished,
@@ -102,7 +102,7 @@ impl fmt::Display for AliceState {
             AliceState::SafelyAborted => write!(f, "safely_aborted"),
             AliceState::BtcPunishable { .. } => write!(f, "btc_punishable"),
             AliceState::XmrRefunded => write!(f, "xmr_refunded"),
-            AliceState::Cancelling { .. } => write!(f, "cancelling"),
+            AliceState::T1Expired { .. } => write!(f, "t1 is expired"),
         }
     }
 }
@@ -125,7 +125,7 @@ impl From<&AliceState> for state::Alice {
             AliceState::BtcRefunded { .. } => Alice::SwapComplete,
             AliceState::BtcPunishable { state3, .. } => Alice::BtcPunishable(state3.clone()),
             AliceState::XmrRefunded => Alice::SwapComplete,
-            AliceState::Cancelling { state3 } => Alice::Cancelling(state3.clone()),
+            AliceState::T1Expired { state3 } => Alice::T1Expired(state3.clone()),
             AliceState::Punished => Alice::SwapComplete,
             AliceState::SafelyAborted => Alice::SwapComplete,
             // TODO: Potentially add support to recover swaps that are not Negotiated
@@ -168,7 +168,7 @@ impl TryFrom<state::Swap> for AliceState {
                     state3: state,
                     encrypted_signature,
                 },
-                Alice::Cancelling(state3) => AliceState::Cancelling { state3 },
+                Alice::T1Expired(state3) => AliceState::T1Expired { state3 },
                 Alice::BtcCancelled(state) => {
                     let tx_cancel = bitcoin::TxCancel::new(
                         &state.tx_lock,
@@ -425,14 +425,14 @@ pub async fn run_until(
                         pin_mut!(t1_timeout);
 
                         match select(t1_timeout, wait_for_enc_sig).await {
-                            Either::Left(_) => AliceState::Cancelling { state3 },
+                            Either::Left(_) => AliceState::T1Expired { state3 },
                             Either::Right((enc_sig, _)) => AliceState::EncSignLearned {
                                 state3,
                                 encrypted_signature: enc_sig?,
                             },
                         }
                     }
-                    _ => AliceState::Cancelling { state3 },
+                    _ => AliceState::T1Expired { state3 },
                 };
 
                 let db_state = (&state).into();
@@ -464,7 +464,9 @@ pub async fn run_until(
                 ) {
                     Ok(tx) => tx,
                     Err(_) => {
-                        let state = AliceState::Cancelling { state3 };
+                        state3.wait_for_t1(bitcoin_wallet.as_ref()).await?;
+
+                        let state = AliceState::T1Expired { state3 };
                         let db_state = (&state).into();
                         db.insert_latest_state(swap_id, Swap::Alice(db_state))
                             .await?;
@@ -508,7 +510,7 @@ pub async fn run_until(
                 )
                 .await
             }
-            AliceState::Cancelling { state3 } => {
+            AliceState::T1Expired { state3 } => {
                 let tx_cancel = publish_cancel_transaction(
                     state3.tx_lock.clone(),
                     state3.a.clone(),
