@@ -109,9 +109,12 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
 
     assert!(matches!(alice_state, AliceState::EncSignLearned {..}));
 
-    // todo: add db code here
     let alice_db = Database::open(alice_db_datadir.path()).unwrap();
     let alice_state = alice_db.get_state(alice_swap_id).unwrap();
+
+    if let swap::state::Swap::Alice(state) = alice_state.clone() {
+        assert!(matches!(state, swap::state::Alice::EncSignLearned {..}));
+    }
 
     let (alice_state, _) = alice::swap::swap(
         AliceState::try_from(alice_state).unwrap(),

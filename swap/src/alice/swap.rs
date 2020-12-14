@@ -136,7 +136,7 @@ impl From<&AliceState> for state::Alice {
             AliceState::XmrRefunded => Alice::SwapComplete,
             // TODO(Franck): it may be more efficient to store the fact that we already want to
             // abort
-            AliceState::Cancelling { state3 } => Alice::XmrLocked(state3.clone()),
+            AliceState::Cancelling { state3 } => Alice::Cancelling(state3.clone()),
             AliceState::Punished => Alice::SwapComplete,
             AliceState::SafelyAborted => Alice::SwapComplete,
         }
@@ -176,6 +176,7 @@ impl TryFrom<state::Swap> for AliceState {
                     state3: state,
                     encrypted_signature,
                 },
+                Alice::Cancelling(state3) => AliceState::Cancelling { state3 },
                 Alice::BtcCancelled(state) => {
                     let tx_cancel = bitcoin::TxCancel::new(
                         &state.tx_lock,

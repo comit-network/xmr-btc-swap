@@ -19,8 +19,7 @@ use std::sync::Arc;
 use structopt::StructOpt;
 use swap::{
     alice, alice::swap::AliceState, bitcoin, bob, bob::swap::BobState, cli::Options, monero,
-    network::transport::build, recover::recover, storage::Database, trace::init_tracing,
-    SwapAmounts,
+    network::transport::build, storage::Database, trace::init_tracing, SwapAmounts,
 };
 use tracing::{info, log::LevelFilter};
 use uuid::Uuid;
@@ -226,24 +225,7 @@ async fn main() -> Result<()> {
             // Print the table to stdout
             table.printstd();
         }
-        Options::Recover {
-            swap_id,
-            bitcoind_url,
-            monerod_url,
-            bitcoin_wallet_name,
-        } => {
-            let state = db.get_state(swap_id)?;
-            let bitcoin_wallet = bitcoin::Wallet::new(
-                bitcoin_wallet_name.as_ref(),
-                bitcoind_url,
-                config.bitcoin_network,
-            )
-            .await
-            .expect("failed to create bitcoin wallet");
-            let monero_wallet = monero::Wallet::new(monerod_url);
-
-            recover(bitcoin_wallet, monero_wallet, state).await?;
-        }
+        Options::Recover { .. } => todo!("implement this"),
     }
 
     Ok(())
