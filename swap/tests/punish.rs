@@ -99,7 +99,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
     let _alice_swarm_fut = tokio::spawn(async move { alice_event_loop.run().await });
 
     // Wait until alice has locked xmr and bob has locked btc
-    let ((alice_state, _), bob_state) = try_join(alice_fut, bob_btc_locked_fut).await.unwrap();
+    let (alice_state, bob_state) = try_join(alice_fut, bob_btc_locked_fut).await.unwrap();
 
     assert!(matches!(alice_state, AliceState::Punished));
     let bob_state3 = if let BobState::BtcLocked(state3, ..) = bob_state {

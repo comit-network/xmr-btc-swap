@@ -125,12 +125,10 @@ impl From<&AliceState> for state::Alice {
             AliceState::BtcRefunded { .. } => Alice::SwapComplete,
             AliceState::BtcPunishable { state3, .. } => Alice::BtcPunishable(state3.clone()),
             AliceState::XmrRefunded => Alice::SwapComplete,
-            // TODO(Franck): it may be more efficient to store the fact that we already want to
-            // abort
             AliceState::Cancelling { state3 } => Alice::Cancelling(state3.clone()),
             AliceState::Punished => Alice::SwapComplete,
             AliceState::SafelyAborted => Alice::SwapComplete,
-            // todo: we may want to swap recovering from swaps that have not been negotiated
+            // TODO: Potentially add support to recover swaps that are not Negotiated
             AliceState::Started { .. } => {
                 panic!("Alice attempted to save swap before being negotiated")
             }
@@ -223,7 +221,7 @@ pub async fn swap(
     config: Config,
     swap_id: Uuid,
     db: Database,
-) -> Result<(AliceState, EventLoopHandle)> {
+) -> Result<AliceState> {
     run_until(
         state,
         is_complete,
@@ -247,7 +245,7 @@ pub async fn recover(
 ) -> Result<AliceState> {
     let db_swap = db.get_state(swap_id)?;
     let start_state = AliceState::try_from(db_swap)?;
-    let (state, _) = swap(
+    let state = swap(
         start_state,
         event_loop_handle,
         bitcoin_wallet,
@@ -297,10 +295,10 @@ pub async fn run_until(
     swap_id: Uuid,
     db: Database,
     // TODO: Remove EventLoopHandle!
-) -> Result<(AliceState, EventLoopHandle)> {
+) -> Result<AliceState> {
     info!("Current state:{}", state);
     if is_target_state(&state) {
-        Ok((state, event_loop_handle))
+        Ok(state)
     } else {
         match state {
             AliceState::Started { amounts, state0 } => {
@@ -607,7 +605,7 @@ pub async fn run_until(
                 let db_state = (&state).into();
                 db.insert_latest_state(swap_id, Swap::Alice(db_state))
                     .await?;
-                Ok((state, event_loop_handle))
+                Ok(state)
             }
             AliceState::BtcPunishable { tx_refund, state3 } => {
                 let signed_tx_punish = build_bitcoin_punish_transaction(
@@ -675,10 +673,10 @@ pub async fn run_until(
                     }
                 }
             }
-            AliceState::XmrRefunded => Ok((AliceState::XmrRefunded, event_loop_handle)),
-            AliceState::BtcRedeemed => Ok((AliceState::BtcRedeemed, event_loop_handle)),
-            AliceState::Punished => Ok((AliceState::Punished, event_loop_handle)),
-            AliceState::SafelyAborted => Ok((AliceState::SafelyAborted, event_loop_handle)),
+            AliceState::XmrRefunded => Ok(AliceState::XmrRefunded),
+            AliceState::BtcRedeemed => Ok(AliceState::BtcRedeemed),
+            AliceState::Punished => Ok(AliceState::Punished),
+            AliceState::SafelyAborted => Ok(AliceState::SafelyAborted),
         }
     }
 }

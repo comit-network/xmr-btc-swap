@@ -42,8 +42,8 @@ async fn both_refund() {
 
     let (
         alice_state,
-        mut alice_swarm_driver,
-        alice_swarm_handle,
+        mut alice_event_loop,
+        alice_event_loop_handle,
         alice_btc_wallet,
         alice_xmr_wallet,
     ) = init_alice(
@@ -57,9 +57,9 @@ async fn both_refund() {
     )
     .await;
 
-    let (bob_state, bob_swarm_driver, bob_swarm_handle, bob_btc_wallet, bob_xmr_wallet, bob_db) =
+    let (bob_state, bob_event_loop, bob_event_loop_handle, bob_btc_wallet, bob_xmr_wallet, bob_db) =
         init_bob(
-            alice_multiaddr,
+            alice_multiaddr.clone(),
             &bitcoind,
             &monero,
             btc_to_swap,
@@ -71,7 +71,7 @@ async fn both_refund() {
 
     let bob_fut = bob::swap::swap(
         bob_state,
-        bob_swarm_handle,
+        bob_event_loop_handle,
         bob_db,
         bob_btc_wallet.clone(),
         bob_xmr_wallet.clone(),
@@ -79,7 +79,7 @@ async fn both_refund() {
         Uuid::new_v4(),
     );
 
-    tokio::spawn(async move { bob_swarm_driver.run().await });
+    tokio::spawn(async move { bob_event_loop.run().await });
 
     let alice_swap_id = Uuid::new_v4();
     let alice_db_datadir = tempdir().unwrap();
@@ -88,7 +88,7 @@ async fn both_refund() {
     let alice_xmr_locked_fut = alice::swap::run_until(
         alice_state,
         alice::swap::is_xmr_locked,
-        alice_swarm_handle,
+        alice_event_loop_handle,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),
         Config::regtest(),
@@ -96,11 +96,10 @@ async fn both_refund() {
         alice_db,
     );
 
-    tokio::spawn(async move { alice_swarm_driver.run().await });
+    tokio::spawn(async move { alice_event_loop.run().await });
 
     // Wait until alice has locked xmr and bob has locked btc
-    let (bob_state, (alice_state, alice_swarm_handle)) =
-        try_join(bob_fut, alice_xmr_locked_fut).await.unwrap();
+    let (bob_state, alice_state) = try_join(bob_fut, alice_xmr_locked_fut).await.unwrap();
 
     let bob_state4 = if let BobState::BtcRefunded(state4) = bob_state {
         state4
@@ -109,10 +108,12 @@ async fn both_refund() {
     };
 
     let alice_db = Database::open(alice_db_datadir.path()).unwrap();
+    let (mut alice_event_loop, alice_event_loop_handle) =
+        testutils::init_alice_eventloop(alice_multiaddr);
 
-    let (alice_state, _) = alice::swap::swap(
+    let alice_state = alice::swap::swap(
         alice_state,
-        alice_swarm_handle,
+        alice_event_loop_handle,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),
         Config::regtest(),
@@ -121,6 +122,7 @@ async fn both_refund() {
     )
     .await
     .unwrap();
+    tokio::spawn(async move { alice_event_loop.run().await });
 
     assert!(matches!(alice_state, AliceState::XmrRefunded));
 
