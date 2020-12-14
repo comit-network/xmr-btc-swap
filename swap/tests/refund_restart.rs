@@ -109,7 +109,7 @@ async fn both_refund() {
 
     let alice_db = Database::open(alice_db_datadir.path()).unwrap();
     let (mut alice_event_loop, alice_event_loop_handle) =
-        testutils::init_alice_eventloop(alice_multiaddr);
+        testutils::init_alice_event_loop(alice_multiaddr);
 
     let alice_state = alice::swap::swap(
         alice_state,

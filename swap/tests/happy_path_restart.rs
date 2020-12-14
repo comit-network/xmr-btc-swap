@@ -110,7 +110,7 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     }
 
     let (mut event_loop_after_restart, event_loop_handle_after_restart) =
-        testutils::init_alice_eventloop(alice_multiaddr);
+        testutils::init_alice_event_loop(alice_multiaddr);
     let _alice_swarm_fut = tokio::spawn(async move { event_loop_after_restart.run().await });
 
     let alice_state = alice::swap::recover(
