@@ -9,7 +9,6 @@ use futures::{
     pin_mut,
 };
 use libp2p::request_response::ResponseChannel;
-
 use rand::rngs::OsRng;
 use sha2::Sha256;
 use std::{sync::Arc, time::Duration};
