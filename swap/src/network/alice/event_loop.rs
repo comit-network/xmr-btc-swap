@@ -1,6 +1,10 @@
 use crate::{
-    alice::{Behaviour, OutEvent},
-    network::{request_response::AliceToBob, transport::SwapTransport, TokioExecutor},
+    network::{
+        alice::{Behaviour, OutEvent},
+        request_response::AliceToBob,
+        transport::SwapTransport,
+        TokioExecutor,
+    },
     SwapAmounts,
 };
 use anyhow::{anyhow, Context, Result};
@@ -34,7 +38,7 @@ pub struct EventLoopHandle {
     msg1: Receiver<(bob::Message1, ResponseChannel<AliceToBob>)>,
     msg2: Receiver<(bob::Message2, ResponseChannel<AliceToBob>)>,
     msg3: Receiver<bob::Message3>,
-    request: Receiver<crate::alice::amounts::OutEvent>,
+    request: Receiver<crate::network::alice::amounts::OutEvent>,
     conn_established: Receiver<PeerId>,
     send_amounts: Sender<(ResponseChannel<AliceToBob>, SwapAmounts)>,
     send_msg0: Sender<(ResponseChannel<AliceToBob>, alice::Message0)>,
@@ -78,7 +82,7 @@ impl EventLoopHandle {
             .ok_or_else(|| anyhow!("Failed to receive Bitcoin encrypted signature from Bob"))
     }
 
-    pub async fn recv_request(&mut self) -> Result<crate::alice::amounts::OutEvent> {
+    pub async fn recv_request(&mut self) -> Result<crate::network::alice::amounts::OutEvent> {
         self.request
             .recv()
             .await
@@ -128,7 +132,7 @@ pub struct EventLoop {
     msg1: Sender<(bob::Message1, ResponseChannel<AliceToBob>)>,
     msg2: Sender<(bob::Message2, ResponseChannel<AliceToBob>)>,
     msg3: Sender<bob::Message3>,
-    request: Sender<crate::alice::amounts::OutEvent>,
+    request: Sender<crate::network::alice::amounts::OutEvent>,
     conn_established: Sender<PeerId>,
     send_amounts: Receiver<(ResponseChannel<AliceToBob>, SwapAmounts)>,
     send_msg0: Receiver<(ResponseChannel<AliceToBob>, alice::Message0)>,

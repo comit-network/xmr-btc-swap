@@ -3,6 +3,8 @@ use libp2p::core::Executor;
 use std::pin::Pin;
 use tokio::runtime::Handle;
 
+pub mod alice;
+pub mod bob;
 pub mod peer_tracker;
 pub mod request_response;
 pub mod transport;

@@ -2,7 +2,10 @@ use crate::testutils::{init_alice, init_bob};
 use futures::future::try_join;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, alice::swap::AliceState, bob, bob::swap::BobState, storage::Database};
+use swap::{
+    protocol::{alice, alice::AliceState, bob, bob::BobState},
+    storage::Database,
+};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
 use testutils::init_tracing;
@@ -70,7 +73,7 @@ async fn both_refund() {
         )
         .await;
 
-    let bob_fut = bob::swap::swap(
+    let bob_fut = bob::swap(
         bob_state,
         bob_event_loop_handle,
         bob_db,
@@ -86,9 +89,9 @@ async fn both_refund() {
     let alice_db_datadir = tempdir().unwrap();
     let alice_db = Database::open(alice_db_datadir.path()).unwrap();
 
-    let alice_xmr_locked_fut = alice::swap::run_until(
+    let alice_xmr_locked_fut = alice::run_until(
         alice_state,
-        alice::swap::is_xmr_locked,
+        alice::is_xmr_locked,
         alice_event_loop_handle,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),
@@ -112,7 +115,7 @@ async fn both_refund() {
     let (mut alice_event_loop, alice_event_loop_handle) =
         testutils::init_alice_event_loop(alice_multiaddr);
 
-    let alice_state = alice::swap::swap(
+    let alice_state = alice::swap(
         alice_state,
         alice_event_loop_handle,
         alice_btc_wallet.clone(),

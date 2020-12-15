@@ -4,8 +4,11 @@ use monero_harness::{image, Monero};
 use rand::rngs::OsRng;
 use std::sync::Arc;
 use swap::{
-    alice, alice::swap::AliceState, bitcoin, bob, bob::swap::BobState, monero,
-    network::transport::build, storage::Database, SwapAmounts,
+    bitcoin, monero,
+    network::{alice, bob, transport::build},
+    protocol::{alice::AliceState, bob::BobState},
+    storage::Database,
+    SwapAmounts,
 };
 use tempfile::tempdir;
 use testcontainers::{clients::Cli, Container};
@@ -77,7 +80,7 @@ pub async fn init_alice_state(
         xmr: xmr_to_swap,
     };
 
-    let a = crate::bitcoin::SecretKey::new_random(rng);
+    let a = bitcoin::SecretKey::new_random(rng);
     let s_a = cross_curve_dleq::Scalar::random(rng);
     let v_a = xmr_btc::monero::PrivateViewKey::new_random(rng);
     let redeem_address = alice_btc_wallet.as_ref().new_address().await.unwrap();

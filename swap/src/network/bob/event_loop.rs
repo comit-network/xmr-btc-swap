@@ -1,6 +1,7 @@
-use crate::{
+use crate::network::{
     bob::{Behaviour, OutEvent},
-    network::{transport::SwapTransport, TokioExecutor},
+    transport::SwapTransport,
+    TokioExecutor,
 };
 use anyhow::{anyhow, Result};
 use futures::FutureExt;

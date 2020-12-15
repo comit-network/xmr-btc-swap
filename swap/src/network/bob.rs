@@ -2,14 +2,9 @@
 //! Bob holds BTC and wishes receive XMR.
 use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
 use crate::{
-    network::{
-        peer_tracker::{self, PeerTracker},
-        transport::SwapTransport,
-        TokioExecutor,
-    },
+    network::peer_tracker::{self, PeerTracker},
     SwapAmounts,
 };
-use anyhow::Result;
 use libp2p::{core::identity::Keypair, NetworkBehaviour, PeerId};
 use tracing::{debug, info};
 use xmr_btc::{
@@ -24,23 +19,8 @@ mod message0;
 mod message1;
 mod message2;
 mod message3;
-pub mod swap;
 
 pub type Swarm = libp2p::Swarm<Behaviour>;
-
-pub fn new_swarm(transport: SwapTransport, behaviour: Behaviour) -> Result<Swarm> {
-    let local_peer_id = behaviour.peer_id();
-
-    let swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id.clone())
-        .executor(Box::new(TokioExecutor {
-            handle: tokio::runtime::Handle::current(),
-        }))
-        .build();
-
-    info!("Initialized swarm with identity {}", local_peer_id);
-
-    Ok(swarm)
-}
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]

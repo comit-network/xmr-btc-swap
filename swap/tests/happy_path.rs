@@ -2,7 +2,7 @@ use crate::testutils::{init_alice, init_bob};
 use futures::future::try_join;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, bob};
+use swap::protocol::{alice, bob};
 use testcontainers::clients::Cli;
 use testutils::init_tracing;
 use uuid::Uuid;
@@ -72,7 +72,7 @@ async fn happy_path() {
         )
         .await;
 
-    let alice_swap_fut = alice::swap::swap(
+    let alice_swap_fut = alice::swap(
         alice_state,
         alice_event_loop_handle,
         alice_btc_wallet.clone(),
@@ -84,7 +84,7 @@ async fn happy_path() {
 
     let _alice_swarm_fut = tokio::spawn(async move { alice_event_loop.run().await });
 
-    let bob_swap_fut = bob::swap::swap(
+    let bob_swap_fut = bob::swap(
         bob_state,
         bob_event_loop_handle,
         bob_db,

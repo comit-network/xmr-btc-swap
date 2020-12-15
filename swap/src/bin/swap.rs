@@ -18,8 +18,15 @@ use rand::rngs::OsRng;
 use std::sync::Arc;
 use structopt::StructOpt;
 use swap::{
-    alice, alice::swap::AliceState, bitcoin, bob, bob::swap::BobState, cli::Options, monero,
-    network::transport::build, storage::Database, trace::init_tracing, SwapAmounts,
+    bitcoin,
+    cli::Options,
+    monero,
+    network::{alice, bob, transport::build},
+    protocol,
+    protocol::{alice::AliceState, bob::BobState},
+    storage::Database,
+    trace::init_tracing,
+    SwapAmounts,
 };
 use tracing::{info, log::LevelFilter};
 use uuid::Uuid;
@@ -119,7 +126,7 @@ async fn main() -> Result<()> {
                 send_monero, receive_bitcoin, swap_id
             );
 
-            let swap = alice::swap::swap(
+            let swap = protocol::alice::swap(
                 alice_state,
                 handle,
                 bitcoin_wallet.clone(),
@@ -197,7 +204,7 @@ async fn main() -> Result<()> {
                 send_bitcoin, receive_monero, swap_id
             );
 
-            let swap = bob::swap::swap(
+            let swap = protocol::bob::swap(
                 bob_state,
                 handle,
                 db,
@@ -222,7 +229,7 @@ async fn main() -> Result<()> {
             // Print the table to stdout
             table.printstd();
         }
-        Options::Resume { .. } => todo!("implement this"),
+        Options::Resume { .. } => todo!("resume from db"),
     }
 
     Ok(())

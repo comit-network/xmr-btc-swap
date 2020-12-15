@@ -1,3 +1,4 @@
+use crate::network::request_response::{AliceToBob, AmountsProtocol, BobToAlice, Codec, TIMEOUT};
 use libp2p::{
     request_response::{
         handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
@@ -12,11 +13,6 @@ use std::{
     time::Duration,
 };
 use tracing::{debug, error};
-
-use crate::{
-    alice::amounts,
-    network::request_response::{AliceToBob, AmountsProtocol, BobToAlice, Codec, TIMEOUT},
-};
 
 #[derive(Debug)]
 pub struct OutEvent {
@@ -83,7 +79,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             } => {
                 if let BobToAlice::AmountsFromBtc(btc) = request {
                     debug!("Received amounts request");
-                    self.events.push_back(amounts::OutEvent { btc, channel })
+                    self.events.push_back(OutEvent { btc, channel })
                 }
             }
             RequestResponseEvent::Message {

@@ -1,20 +1,15 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
+pub use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
 use crate::{
     network::{
         peer_tracker::{self, PeerTracker},
         request_response::AliceToBob,
-        transport::SwapTransport,
-        TokioExecutor,
     },
     SwapAmounts,
 };
-use anyhow::Result;
 use libp2p::{
-    core::{identity::Keypair, Multiaddr},
-    request_response::ResponseChannel,
-    NetworkBehaviour, PeerId,
+    core::identity::Keypair, request_response::ResponseChannel, NetworkBehaviour, PeerId,
 };
 use tracing::{debug, info};
 use xmr_btc::bob;
@@ -25,33 +20,8 @@ mod message0;
 mod message1;
 mod message2;
 mod message3;
-mod steps;
-pub mod swap;
 
 pub type Swarm = libp2p::Swarm<Behaviour>;
-
-pub fn new_swarm(
-    listen: Multiaddr,
-    transport: SwapTransport,
-    behaviour: Behaviour,
-) -> Result<Swarm> {
-    use anyhow::Context as _;
-
-    let local_peer_id = behaviour.peer_id();
-
-    let mut swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id.clone())
-        .executor(Box::new(TokioExecutor {
-            handle: tokio::runtime::Handle::current(),
-        }))
-        .build();
-
-    Swarm::listen_on(&mut swarm, listen.clone())
-        .with_context(|| format!("Address is not supported: {:#}", listen))?;
-
-    tracing::info!("Initialized swarm: {}", local_peer_id);
-
-    Ok(swarm)
-}
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]

@@ -1,8 +1,6 @@
 use crate::{
-    bob::event_loop::EventLoopHandle,
-    state,
-    state::{Bob, Swap},
-    storage::Database,
+    network::bob::event_loop::EventLoopHandle,
+    storage::{model, Database},
     SwapAmounts,
 };
 use anyhow::{bail, Result};
@@ -16,10 +14,7 @@ use rand::{CryptoRng, RngCore};
 use std::{convert::TryFrom, fmt, sync::Arc};
 use tracing::info;
 use uuid::Uuid;
-use xmr_btc::{
-    bob::{self, State2},
-    Epoch,
-};
+use xmr_btc::{bob, Epoch};
 
 #[derive(Debug, Clone)]
 pub enum BobState {
@@ -43,9 +38,9 @@ pub enum BobState {
 impl fmt::Display for BobState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BobState::Started { .. } => write!(f, "started"),
             BobState::Negotiated(..) => write!(f, "negotiated"),
             BobState::BtcLocked(..) => write!(f, "btc_locked"),
+            BobState::Started { .. } => write!(f, "started"),
             BobState::XmrLocked(..) => write!(f, "xmr_locked"),
             BobState::EncSigSent(..) => write!(f, "encsig_sent"),
             BobState::BtcRedeemed(..) => write!(f, "btc_redeemed"),
@@ -58,40 +53,40 @@ impl fmt::Display for BobState {
     }
 }
 
-impl From<BobState> for state::Bob {
+impl From<BobState> for model::Bob {
     fn from(bob_state: BobState) -> Self {
         match bob_state {
             BobState::Started { .. } => {
                 // TODO: Do we want to resume just started swaps
                 unimplemented!("Cannot save a swap that has just started")
             }
-            BobState::Negotiated(state2, peer_id) => Bob::Negotiated { state2, peer_id },
-            BobState::BtcLocked(state3, peer_id) => Bob::BtcLocked { state3, peer_id },
-            BobState::XmrLocked(state4, peer_id) => Bob::XmrLocked { state4, peer_id },
-            BobState::EncSigSent(state4, peer_id) => Bob::EncSigSent { state4, peer_id },
-            BobState::BtcRedeemed(state5) => Bob::BtcRedeemed(state5),
-            BobState::Cancelled(state4) => Bob::BtcCancelled(state4),
+            BobState::Negotiated(state2, peer_id) => model::Bob::Negotiated { state2, peer_id },
+            BobState::BtcLocked(state3, peer_id) => model::Bob::BtcLocked { state3, peer_id },
+            BobState::XmrLocked(state4, peer_id) => model::Bob::XmrLocked { state4, peer_id },
+            BobState::EncSigSent(state4, peer_id) => model::Bob::EncSigSent { state4, peer_id },
+            BobState::BtcRedeemed(state5) => model::Bob::BtcRedeemed(state5),
+            BobState::Cancelled(state4) => model::Bob::BtcCancelled(state4),
             BobState::BtcRefunded(_)
             | BobState::XmrRedeemed
             | BobState::Punished
-            | BobState::SafelyAborted => Bob::SwapComplete,
+            | BobState::SafelyAborted => model::Bob::SwapComplete,
         }
     }
 }
 
-impl TryFrom<state::Swap> for BobState {
+impl TryFrom<model::Swap> for BobState {
     type Error = anyhow::Error;
 
-    fn try_from(db_state: state::Swap) -> Result<Self, Self::Error> {
-        if let Swap::Bob(state) = db_state {
+    fn try_from(db_state: model::Swap) -> Result<Self, Self::Error> {
+        if let model::Swap::Bob(state) = db_state {
             let bob_State = match state {
-                Bob::Negotiated { state2, peer_id } => BobState::Negotiated(state2, peer_id),
-                Bob::BtcLocked { state3, peer_id } => BobState::BtcLocked(state3, peer_id),
-                Bob::XmrLocked { state4, peer_id } => BobState::XmrLocked(state4, peer_id),
-                Bob::EncSigSent { state4, peer_id } => BobState::EncSigSent(state4, peer_id),
-                Bob::BtcRedeemed(state5) => BobState::BtcRedeemed(state5),
-                Bob::BtcCancelled(state4) => BobState::Cancelled(state4),
-                Bob::SwapComplete => BobState::SafelyAborted,
+                model::Bob::Negotiated { state2, peer_id } => BobState::Negotiated(state2, peer_id),
+                model::Bob::BtcLocked { state3, peer_id } => BobState::BtcLocked(state3, peer_id),
+                model::Bob::XmrLocked { state4, peer_id } => BobState::XmrLocked(state4, peer_id),
+                model::Bob::EncSigSent { state4, peer_id } => BobState::EncSigSent(state4, peer_id),
+                model::Bob::BtcRedeemed(state5) => BobState::BtcRedeemed(state5),
+                model::Bob::BtcCancelled(state4) => BobState::Cancelled(state4),
+                model::Bob::SwapComplete => BobState::SafelyAborted,
             };
 
             Ok(bob_State)
@@ -212,7 +207,7 @@ where
 
                 let state = BobState::Negotiated(state2, alice_peer_id);
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                db.insert_latest_state(swap_id, model::Swap::Bob(db_state))
                     .await?;
                 run_until(
                     state,
@@ -232,7 +227,7 @@ where
 
                 let state = BobState::BtcLocked(state3, alice_peer_id);
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                db.insert_latest_state(swap_id, model::Swap::Bob(db_state))
                     .await?;
                 run_until(
                     state,
@@ -257,7 +252,7 @@ where
 
                 let state = BobState::XmrLocked(state4, alice_peer_id);
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                db.insert_latest_state(swap_id, model::Swap::Bob(db_state))
                     .await?;
                 run_until(
                     state,
@@ -285,7 +280,7 @@ where
 
                 let state = BobState::EncSigSent(state, alice_peer_id);
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                db.insert_latest_state(swap_id, model::Swap::Bob(db_state))
                     .await?;
                 run_until(
                     state,
@@ -325,7 +320,7 @@ where
                 };
 
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                db.insert_latest_state(swap_id, model::Swap::Bob(db_state))
                     .await?;
                 run_until(
                     state,
@@ -345,7 +340,7 @@ where
 
                 let state = BobState::XmrRedeemed;
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                db.insert_latest_state(swap_id, model::Swap::Bob(db_state))
                     .await?;
                 run_until(
                     state,
@@ -372,7 +367,7 @@ where
                 };
 
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                db.insert_latest_state(swap_id, model::Swap::Bob(db_state))
                     .await?;
                 run_until(
                     state,
@@ -401,7 +396,7 @@ pub async fn negotiate<R>(
     addr: Multiaddr,
     mut rng: R,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
-) -> Result<(State2, PeerId)>
+) -> Result<(bob::State2, PeerId)>
 where
     R: RngCore + CryptoRng + Send,
 {

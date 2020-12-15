@@ -1,6 +1,10 @@
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, bitcoin, bob, storage::Database};
+use swap::{
+    bitcoin,
+    protocol::{alice, bob, bob::BobState},
+    storage::Database,
+};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
 use uuid::Uuid;
@@ -9,7 +13,7 @@ use xmr_btc::config::Config;
 pub mod testutils;
 
 use crate::testutils::{init_alice, init_bob};
-use swap::bob::swap::BobState;
+use swap::storage::model;
 use testutils::init_tracing;
 
 #[tokio::test]
@@ -78,7 +82,7 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     let bob_xmr_wallet_clone = bob_xmr_wallet.clone();
 
     let _ = tokio::spawn(async move {
-        alice::swap::swap(
+        alice::swap(
             alice_state,
             alice_event_loop_handle,
             alice_btc_wallet.clone(),
@@ -98,9 +102,9 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     let bob_db_datadir = tempdir().unwrap();
     let bob_db = Database::open(bob_db_datadir.path()).unwrap();
 
-    let bob_state = bob::swap::run_until(
+    let bob_state = bob::run_until(
         bob_state,
-        bob::swap::is_encsig_sent,
+        bob::is_encsig_sent,
         bob_event_loop_handle,
         bob_db,
         bob_btc_wallet.clone(),
@@ -116,15 +120,15 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     let bob_db = Database::open(bob_db_datadir.path()).unwrap();
     let state_before_restart = bob_db.get_state(bob_swap_id).unwrap();
 
-    if let swap::state::Swap::Bob(state) = state_before_restart.clone() {
-        assert!(matches!(state, swap::state::Bob::EncSigSent {..}));
+    if let model::Swap::Bob(state) = state_before_restart.clone() {
+        assert!(matches!(state, model::Bob::EncSigSent {..}));
     }
 
     let (event_loop_after_restart, event_loop_handle_after_restart) =
         testutils::init_bob_event_loop();
     let _alice_swarm_fut = tokio::spawn(async move { event_loop_after_restart.run().await });
 
-    let alice_state = bob::swap::resume_from_database(
+    let alice_state = bob::resume_from_database(
         event_loop_handle_after_restart,
         bob_db,
         bob_btc_wallet,

@@ -2,7 +2,7 @@ use crate::testutils::{init_alice, init_bob};
 use futures::future::try_join;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, alice::swap::AliceState, bob, bob::swap::BobState};
+use swap::protocol::{alice, alice::AliceState, bob, bob::BobState};
 use testcontainers::clients::Cli;
 use testutils::init_tracing;
 use uuid::Uuid;
@@ -70,9 +70,9 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         )
         .await;
 
-    let bob_btc_locked_fut = bob::swap::run_until(
+    let bob_btc_locked_fut = bob::run_until(
         bob_state,
-        bob::swap::is_btc_locked,
+        bob::is_btc_locked,
         bob_event_loop_handle,
         bob_db,
         bob_btc_wallet.clone(),
@@ -83,7 +83,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
 
     let _bob_swarm_fut = tokio::spawn(async move { bob_event_loop.run().await });
 
-    let alice_fut = alice::swap::swap(
+    let alice_fut = alice::swap(
         alice_state,
         alice_event_loop_handle,
         alice_btc_wallet.clone(),

@@ -1,6 +1,9 @@
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, alice::swap::AliceState, bitcoin, bob, storage::Database};
+use swap::{
+    protocol::{alice, alice::AliceState, bob},
+    storage::Database,
+};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
 use uuid::Uuid;
@@ -9,6 +12,7 @@ use xmr_btc::config::Config;
 pub mod testutils;
 
 use crate::testutils::{init_alice, init_bob};
+use swap::storage::model;
 use testutils::init_tracing;
 
 #[tokio::test]
@@ -72,7 +76,7 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     let bob_xmr_wallet_clone = bob_xmr_wallet.clone();
 
     let _ = tokio::spawn(async move {
-        bob::swap::swap(
+        bob::swap(
             bob_state,
             bob_event_loop_handle,
             bob_db,
@@ -93,9 +97,9 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
 
     let alice_swap_id = Uuid::new_v4();
 
-    let alice_state = alice::swap::run_until(
+    let alice_state = alice::run_until(
         start_state,
-        alice::swap::is_encsig_learned,
+        alice::is_encsig_learned,
         alice_event_loop_handle,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),
@@ -111,15 +115,15 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     let alice_db = Database::open(alice_db_datadir.path()).unwrap();
     let state_before_restart = alice_db.get_state(alice_swap_id).unwrap();
 
-    if let swap::state::Swap::Alice(state) = state_before_restart.clone() {
-        assert!(matches!(state, swap::state::Alice::EncSignLearned {..}));
+    if let model::Swap::Alice(state) = state_before_restart.clone() {
+        assert!(matches!(state, model::Alice::EncSignLearned {..}));
     }
 
     let (mut event_loop_after_restart, event_loop_handle_after_restart) =
         testutils::init_alice_event_loop(alice_multiaddr);
     let _alice_swarm_fut = tokio::spawn(async move { event_loop_after_restart.run().await });
 
-    let alice_state = alice::swap::resume_from_database(
+    let alice_state = alice::resume_from_database(
         event_loop_handle_after_restart,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),
@@ -137,7 +141,7 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
 
     assert_eq!(
         btc_alice_final,
-        btc_to_swap - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
+        btc_to_swap - bitcoin::Amount::from_sat(xmr_btc::bitcoin::TX_FEE)
     );
     assert!(btc_bob_final <= bob_btc_starting_balance - btc_to_swap);
 
