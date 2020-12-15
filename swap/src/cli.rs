@@ -3,8 +3,17 @@ use url::Url;
 use uuid::Uuid;
 
 #[derive(structopt::StructOpt, Debug)]
+pub struct Options {
+    #[structopt(short = "db", long = "database", default_value = "./.swap-db/")]
+    pub db_path: String,
+
+    #[structopt(subcommand)]
+    pub cmd: Command,
+}
+
+#[derive(structopt::StructOpt, Debug)]
 #[structopt(name = "xmr-btc-swap", about = "Trustless XMR BTC swaps")]
-pub enum Options {
+pub enum Command {
     SellXmr {
         #[structopt(
             short = "b",
@@ -65,17 +74,34 @@ pub enum Options {
     },
     History,
     Resume {
-        #[structopt(required = true)]
+        #[structopt(short = "id", long = "swap-id")]
         swap_id: Uuid,
 
-        #[structopt(default_value = "http://127.0.0.1:8332", long = "bitcoind")]
+        #[structopt(
+            short = "b",
+            long = "bitcoind",
+            default_value = "http://127.0.0.1:8332"
+        )]
         bitcoind_url: Url,
-
-        #[structopt(default_value = "http://127.0.0.1:18083/json_rpc", long = "monerod")]
-        monerod_url: Url,
 
         #[structopt(short = "n", long = "bitcoin-wallet-name")]
         bitcoin_wallet_name: String,
+
+        #[structopt(
+            short = "m",
+            long = "monero-wallet-rpc",
+            default_value = "http://127.0.0.1:18083/json_rpc"
+        )]
+        monero_wallet_rpc_url: Url,
+
+        // TODO: The listen address is only relevant for Alice, but should be role independent
+        //  see: https://github.com/comit-network/xmr-btc-swap/issues/77
+        #[structopt(
+            short = "a",
+            long = "listen-addr",
+            default_value = "/ip4/127.0.0.1/tcp/9876"
+        )]
+        listen_addr: Multiaddr,
     },
 }
 
