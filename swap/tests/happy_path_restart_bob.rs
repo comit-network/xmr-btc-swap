@@ -77,7 +77,8 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     let bob_btc_wallet_clone = bob_btc_wallet.clone();
     let bob_xmr_wallet_clone = bob_xmr_wallet.clone();
 
-    let _ = tokio::spawn(async move {
+    tokio::spawn(async move { alice_event_loop.run().await });
+    tokio::spawn(async move {
         alice::swap::swap(
             alice_state,
             alice_event_loop_handle,
@@ -90,26 +91,27 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
         .await
     });
 
-    let _alice_swarm_fut = tokio::spawn(async move { alice_event_loop.run().await });
-
-    let _bob_swarm_fut = tokio::spawn(async move { bob_event_loop.run().await });
+    tokio::spawn(async move { bob_event_loop.run().await });
 
     let bob_swap_id = Uuid::new_v4();
     let bob_db_datadir = tempdir().unwrap();
-    let bob_db = Database::open(bob_db_datadir.path()).unwrap();
 
-    let bob_state = bob::swap::run_until(
-        bob_state,
-        |state| matches!(state, BobState::EncSigSent(..)),
-        bob_event_loop_handle,
-        bob_db,
-        bob_btc_wallet.clone(),
-        bob_xmr_wallet.clone(),
-        OsRng,
-        bob_swap_id,
-    )
-    .await
-    .unwrap();
+    let bob_state = {
+        let bob_db = Database::open(bob_db_datadir.path()).unwrap();
+
+        bob::swap::run_until(
+            bob_state,
+            |state| matches!(state, BobState::EncSigSent(..)),
+            bob_event_loop_handle,
+            bob_db,
+            bob_btc_wallet.clone(),
+            bob_xmr_wallet.clone(),
+            OsRng,
+            bob_swap_id,
+        )
+        .await
+        .unwrap()
+    };
 
     assert!(matches!(bob_state, BobState::EncSigSent {..}));
 
@@ -122,8 +124,8 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
 
     let (event_loop_after_restart, event_loop_handle_after_restart) =
         testutils::init_bob_event_loop();
-    let _alice_swarm_fut = tokio::spawn(async move { event_loop_after_restart.run().await });
 
+    tokio::spawn(async move { event_loop_after_restart.run().await });
     let alice_state = bob::swap::resume_from_database(
         event_loop_handle_after_restart,
         bob_db,

@@ -71,7 +71,8 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     let bob_btc_wallet_clone = bob_btc_wallet.clone();
     let bob_xmr_wallet_clone = bob_xmr_wallet.clone();
 
-    let _ = tokio::spawn(async move {
+    tokio::spawn(async move { bob_event_loop.run().await });
+    tokio::spawn(async move {
         bob::swap::swap(
             bob_state,
             bob_event_loop_handle,
@@ -84,32 +85,29 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
         .await
     });
 
-    let _bob_swarm_fut = tokio::spawn(async move { bob_event_loop.run().await });
-
     let alice_db_datadir = tempdir().unwrap();
-    let alice_db = Database::open(alice_db_datadir.path()).unwrap();
-
-    let _alice_swarm_fut = tokio::spawn(async move { alice_event_loop.run().await });
-
     let alice_swap_id = Uuid::new_v4();
-
-    let alice_state = alice::swap::run_until(
-        start_state,
-        |state| {
-            matches!(
-                state,
-                AliceState::EncSignLearned{..}
-            )
-        },
-        alice_event_loop_handle,
-        alice_btc_wallet.clone(),
-        alice_xmr_wallet.clone(),
-        config,
-        alice_swap_id,
-        alice_db,
-    )
-    .await
-    .unwrap();
+    let alice_state = {
+        let alice_db = Database::open(alice_db_datadir.path()).unwrap();
+        tokio::spawn(async move { alice_event_loop.run().await });
+        alice::swap::run_until(
+            start_state,
+            |state| {
+                matches!(
+                    state,
+                    AliceState::EncSignLearned{..}
+                )
+            },
+            alice_event_loop_handle,
+            alice_btc_wallet.clone(),
+            alice_xmr_wallet.clone(),
+            config,
+            alice_swap_id,
+            alice_db,
+        )
+        .await
+        .unwrap()
+    };
 
     assert!(matches!(alice_state, AliceState::EncSignLearned {..}));
 
@@ -122,8 +120,8 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
 
     let (mut event_loop_after_restart, event_loop_handle_after_restart) =
         testutils::init_alice_event_loop(alice_multiaddr);
-    let _alice_swarm_fut = tokio::spawn(async move { event_loop_after_restart.run().await });
 
+    tokio::spawn(async move { event_loop_after_restart.run().await });
     let alice_state = alice::swap::resume_from_database(
         event_loop_handle_after_restart,
         alice_btc_wallet.clone(),

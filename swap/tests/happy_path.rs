@@ -82,8 +82,6 @@ async fn happy_path() {
         alice_db,
     );
 
-    let _alice_swarm_fut = tokio::spawn(async move { alice_event_loop.run().await });
-
     let bob_swap_fut = bob::swap::swap(
         bob_state,
         bob_event_loop_handle,
@@ -94,8 +92,8 @@ async fn happy_path() {
         Uuid::new_v4(),
     );
 
-    let _bob_swarm_fut = tokio::spawn(async move { bob_event_loop.run().await });
-
+    tokio::spawn(async move { alice_event_loop.run().await });
+    tokio::spawn(async move { bob_event_loop.run().await });
     try_join(alice_swap_fut, bob_swap_fut).await.unwrap();
 
     let btc_alice_final = alice_btc_wallet.as_ref().balance().await.unwrap();
