@@ -536,8 +536,9 @@ pub async fn run_until(
                         let db_state = (&state).into();
                         db.insert_latest_state(swap_id, state::Swap::Alice(db_state))
                             .await?;
-                        swap(
+                        run_until(
                             state,
+                            is_target_state,
                             event_loop_handle,
                             bitcoin_wallet.clone(),
                             monero_wallet,
