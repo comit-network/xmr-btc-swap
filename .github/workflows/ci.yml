@@ -105,7 +105,7 @@ jobs:
         run: cargo +nightly test --workspace --all-features -- -Z unstable-options --report-time
         env:
           MONERO_ADDITIONAL_SLEEP_PERIOD: 60000
-          RUST_MIN_STACK: 10000000
+          RUST_MIN_STACK: 20000000
 
       - name: Build binary
         run: |
