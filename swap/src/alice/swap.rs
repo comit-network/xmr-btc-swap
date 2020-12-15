@@ -3,7 +3,7 @@
 use crate::{
     alice::{
         event_loop::EventLoopHandle,
-        negotiate::{
+        steps::{
             build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
             extract_monero_private_key, lock_xmr, negotiate, publish_bitcoin_punish_transaction,
             publish_bitcoin_redeem_transaction, publish_cancel_transaction,

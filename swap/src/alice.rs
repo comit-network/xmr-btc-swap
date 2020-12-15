@@ -25,7 +25,7 @@ mod message0;
 mod message1;
 mod message2;
 mod message3;
-mod negotiate;
+mod steps;
 pub mod swap;
 
 pub type Swarm = libp2p::Swarm<Behaviour>;
