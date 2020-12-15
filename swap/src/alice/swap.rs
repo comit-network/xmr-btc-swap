@@ -41,8 +41,6 @@ trait Rng: RngCore + CryptoRng + Send {}
 
 impl<T> Rng for T where T: RngCore + CryptoRng + Send {}
 
-// The same data structure is used for swap execution and recovery.
-// This allows for a seamless transition from a failed swap to recovery.
 #[allow(clippy::large_enum_variant)]
 pub enum AliceState {
     Started {
@@ -128,7 +126,7 @@ impl From<&AliceState> for state::Alice {
             AliceState::T1Expired { state3 } => Alice::T1Expired(state3.clone()),
             AliceState::Punished => Alice::SwapComplete,
             AliceState::SafelyAborted => Alice::SwapComplete,
-            // TODO: Potentially add support to recover swaps that are not Negotiated
+            // TODO: Potentially add support to resume swaps that are not Negotiated
             AliceState::Started { .. } => {
                 panic!("Alice attempted to save swap before being negotiated")
             }
@@ -235,7 +233,7 @@ pub async fn swap(
     .await
 }
 
-pub async fn recover(
+pub async fn resume_from_database(
     event_loop_handle: EventLoopHandle,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,

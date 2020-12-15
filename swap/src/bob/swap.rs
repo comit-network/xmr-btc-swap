@@ -17,8 +17,6 @@ use xmr_btc::{
     Epoch,
 };
 
-// The same data structure is used for swap execution and recovery.
-// This allows for a seamless transition from a failed swap to recovery.
 #[derive(Debug, Clone)]
 pub enum BobState {
     Started {
@@ -124,7 +122,7 @@ where
     .await
 }
 
-pub async fn recover<R>(
+pub async fn resume_from_database<R>(
     event_loop_handle: EventLoopHandle,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,

@@ -114,7 +114,7 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
         testutils::init_alice_event_loop(alice_multiaddr);
     let _alice_swarm_fut = tokio::spawn(async move { event_loop_after_restart.run().await });
 
-    let alice_state = alice::swap::recover(
+    let alice_state = alice::swap::resume_from_database(
         event_loop_handle_after_restart,
         alice_btc_wallet,
         alice_xmr_wallet,

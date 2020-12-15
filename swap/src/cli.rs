@@ -64,7 +64,7 @@ pub enum Options {
         receive_monero: xmr_btc::monero::Amount,
     },
     History,
-    Recover {
+    Resume {
         #[structopt(required = true)]
         swap_id: Uuid,
 

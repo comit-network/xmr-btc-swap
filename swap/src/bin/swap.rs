@@ -222,7 +222,7 @@ async fn main() -> Result<()> {
             // Print the table to stdout
             table.printstd();
         }
-        Options::Recover { .. } => todo!("implement this"),
+        Options::Resume { .. } => todo!("implement this"),
     }
 
     Ok(())

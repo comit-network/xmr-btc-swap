@@ -114,7 +114,7 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
         testutils::init_bob_event_loop();
     let _alice_swarm_fut = tokio::spawn(async move { event_loop_after_restart.run().await });
 
-    let alice_state = bob::swap::recover(
+    let alice_state = bob::swap::resume_from_database(
         event_loop_handle_after_restart,
         bob_db,
         bob_btc_wallet,
