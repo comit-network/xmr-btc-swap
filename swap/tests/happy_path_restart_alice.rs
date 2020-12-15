@@ -66,11 +66,6 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
         )
         .await;
 
-    // TODO: we are making a clone of Bob's wallets here to keep them in scope after
-    // Bob's wallets are moved into an async task.
-    let bob_btc_wallet_clone = bob_btc_wallet.clone();
-    let bob_xmr_wallet_clone = bob_xmr_wallet.clone();
-
     let _ = tokio::spawn(async move {
         bob::swap::swap(
             bob_state,
@@ -133,18 +128,14 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     assert!(matches!(alice_state, AliceState::BtcRedeemed {..}));
 
     let btc_alice_final = alice_btc_wallet.as_ref().balance().await.unwrap();
-    let btc_bob_final = bob_btc_wallet_clone.as_ref().balance().await.unwrap();
 
     assert_eq!(
         btc_alice_final,
         btc_to_swap - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
     );
-    assert!(btc_bob_final <= bob_btc_starting_balance - btc_to_swap);
 
+    alice_xmr_wallet.as_ref().0.refresh().await.unwrap();
     let xmr_alice_final = alice_xmr_wallet.as_ref().get_balance().await.unwrap();
-    bob_xmr_wallet_clone.as_ref().0.refresh().await.unwrap();
-    let xmr_bob_final = bob_xmr_wallet_clone.as_ref().get_balance().await.unwrap();
 
     assert!(xmr_alice_final <= alice_xmr_starting_balance - xmr_to_swap);
-    assert_eq!(xmr_bob_final, xmr_to_swap);
 }
