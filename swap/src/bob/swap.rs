@@ -7,6 +7,10 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
+use futures::{
+    future::{select, Either},
+    pin_mut,
+};
 use libp2p::{core::Multiaddr, PeerId};
 use rand::{CryptoRng, RngCore};
 use std::{convert::TryFrom, fmt, sync::Arc};
@@ -296,52 +300,44 @@ where
                 .await
             }
             BobState::EncSigSent(state, ..) => {
-                // Watch for redeem
-                let redeem_watcher = state.watch_for_redeem_btc(bitcoin_wallet.as_ref());
-                let t1_timeout = state.wait_for_t1(bitcoin_wallet.as_ref());
+                let state_clone = state.clone();
+                let redeem_watcher = state_clone.watch_for_redeem_btc(bitcoin_wallet.as_ref());
+                let t1_timeout = state_clone.wait_for_t1(bitcoin_wallet.as_ref());
 
-                // TODO(Franck): Check if db save and run_until can be factorized
-                tokio::select! {
-                    val = redeem_watcher => {
-                        let state = BobState::BtcRedeemed(val?);
-                        let db_state = state.clone().into();
-                        db.insert_latest_state(swap_id, state::Swap::Bob(db_state)).await?;
-                        run_until(
-                            state,
-                                 is_target_state,
-                            event_loop_handle,
-                            db,
-                            bitcoin_wallet,
-                            monero_wallet,
-                                     rng,
-                                     swap_id,
-                        )
-                        .await
-                    }
-                    _ = t1_timeout => {
+                pin_mut!(redeem_watcher);
+                pin_mut!(t1_timeout);
+
+                let state = match select(redeem_watcher, t1_timeout).await {
+                    Either::Left((val, _)) => BobState::BtcRedeemed(val?),
+                    Either::Right((..)) => {
                         // Check whether TxCancel has been published.
                         // We should not fail if the transaction is already on the blockchain
-                        if state.check_for_tx_cancel(bitcoin_wallet.as_ref()).await.is_err() {
+                        if state
+                            .check_for_tx_cancel(bitcoin_wallet.as_ref())
+                            .await
+                            .is_err()
+                        {
                             state.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
                         }
 
-                        let state = BobState::Cancelled(state);
-                        let db_state = state.clone().into();
-                        db.insert_latest_state(swap_id, state::Swap::Bob(db_state)).await?;
-                        run_until(
-                            state,
-                            is_target_state,
-                            event_loop_handle,
-                            db,
-                            bitcoin_wallet,
-                            monero_wallet,
-                            rng,
-                            swap_id
-                        )
-                        .await
-
+                        BobState::Cancelled(state)
                     }
-                }
+                };
+
+                let db_state = state.clone().into();
+                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                    .await?;
+                run_until(
+                    state,
+                    is_target_state,
+                    event_loop_handle,
+                    db,
+                    bitcoin_wallet.clone(),
+                    monero_wallet,
+                    rng,
+                    swap_id,
+                )
+                .await
             }
             BobState::BtcRedeemed(state) => {
                 // Bob redeems XMR using revealed s_a
