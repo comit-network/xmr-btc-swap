@@ -95,7 +95,12 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
 
     let alice_state = alice::swap::run_until(
         start_state,
-        alice::swap::is_encsig_learned,
+        |state| {
+            matches!(
+                state,
+                AliceState::EncSignLearned{..}
+            )
+        },
         alice_event_loop_handle,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),

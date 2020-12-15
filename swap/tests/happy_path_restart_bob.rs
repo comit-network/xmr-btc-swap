@@ -100,7 +100,7 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
 
     let bob_state = bob::swap::run_until(
         bob_state,
-        bob::swap::is_encsig_sent,
+        |state| matches!(state, BobState::EncSigSent(..)),
         bob_event_loop_handle,
         bob_db,
         bob_btc_wallet.clone(),

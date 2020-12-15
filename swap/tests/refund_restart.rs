@@ -88,7 +88,12 @@ async fn both_refund() {
 
     let alice_xmr_locked_fut = alice::swap::run_until(
         alice_state,
-        alice::swap::is_xmr_locked,
+        |state| {
+            matches!(
+                state,
+                AliceState::XmrLocked{..}
+            )
+        },
         alice_event_loop_handle,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),

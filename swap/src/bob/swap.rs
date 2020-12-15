@@ -149,18 +149,6 @@ pub fn is_complete(state: &BobState) -> bool {
     )
 }
 
-pub fn is_btc_locked(state: &BobState) -> bool {
-    matches!(state, BobState::BtcLocked(..))
-}
-
-pub fn is_xmr_locked(state: &BobState) -> bool {
-    matches!(state, BobState::XmrLocked(..))
-}
-
-pub fn is_encsig_sent(state: &BobState) -> bool {
-    matches!(state, BobState::EncSigSent(..))
-}
-
 // State machine driver for swap execution
 #[allow(clippy::too_many_arguments)]
 #[async_recursion]

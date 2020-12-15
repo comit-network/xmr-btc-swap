@@ -72,7 +72,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
 
     let bob_btc_locked_fut = bob::swap::run_until(
         bob_state,
-        bob::swap::is_btc_locked,
+        |state| matches!(state, BobState::BtcLocked(..)),
         bob_event_loop_handle,
         bob_db,
         bob_btc_wallet.clone(),
