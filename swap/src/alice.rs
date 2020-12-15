@@ -17,15 +17,15 @@ use libp2p::{
     NetworkBehaviour, PeerId,
 };
 use tracing::{debug, info};
-use xmr_btc::{alice::State0, bob};
+use xmr_btc::bob;
 
 mod amounts;
 pub mod event_loop;
-mod execution;
 mod message0;
 mod message1;
 mod message2;
 mod message3;
+mod steps;
 pub mod swap;
 
 pub type Swarm = libp2p::Swarm<Behaviour>;
@@ -60,7 +60,10 @@ pub enum OutEvent {
     // TODO (Franck): Change this to get both amounts so parties can verify the amounts are
     // expected early on.
     Request(amounts::OutEvent), // Not-uniform with Bob on purpose, ready for adding Xmr event.
-    Message0(bob::Message0),
+    Message0 {
+        msg: bob::Message0,
+        channel: ResponseChannel<AliceToBob>,
+    },
     Message1 {
         msg: bob::Message1,
         channel: ResponseChannel<AliceToBob>,
@@ -91,7 +94,7 @@ impl From<amounts::OutEvent> for OutEvent {
 impl From<message0::OutEvent> for OutEvent {
     fn from(event: message0::OutEvent) -> Self {
         match event {
-            message0::OutEvent::Msg(msg) => OutEvent::Message0(msg),
+            message0::OutEvent::Msg { channel, msg } => OutEvent::Message0 { msg, channel },
         }
     }
 }
@@ -136,20 +139,6 @@ pub struct Behaviour {
 }
 
 impl Behaviour {
-    pub fn new(state: State0) -> Self {
-        let identity = Keypair::generate_ed25519();
-
-        Self {
-            pt: PeerTracker::default(),
-            amounts: Amounts::default(),
-            message0: Message0::new(state),
-            message1: Message1::default(),
-            message2: Message2::default(),
-            message3: Message3::default(),
-            identity,
-        }
-    }
-
     pub fn identity(&self) -> Keypair {
         self.identity.clone()
     }
@@ -163,6 +152,16 @@ impl Behaviour {
         let msg = AliceToBob::Amounts(amounts);
         self.amounts.send(channel, msg);
         info!("Sent amounts response");
+    }
+
+    /// Send Message0 to Bob in response to receiving his Message0.
+    pub fn send_message0(
+        &mut self,
+        channel: ResponseChannel<AliceToBob>,
+        msg: xmr_btc::alice::Message0,
+    ) {
+        self.message0.send(channel, msg);
+        debug!("Sent Message0");
     }
 
     /// Send Message1 to Bob in response to receiving his Message1.
@@ -183,5 +182,21 @@ impl Behaviour {
     ) {
         self.message2.send(channel, msg);
         debug!("Sent Message2");
+    }
+}
+
+impl Default for Behaviour {
+    fn default() -> Self {
+        let identity = Keypair::generate_ed25519();
+
+        Self {
+            pt: PeerTracker::default(),
+            amounts: Amounts::default(),
+            message0: Message0::default(),
+            message1: Message1::default(),
+            message2: Message2::default(),
+            message3: Message3::default(),
+            identity,
+        }
     }
 }

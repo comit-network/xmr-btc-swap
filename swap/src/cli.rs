@@ -1,4 +1,4 @@
-use libp2p::{core::Multiaddr, PeerId};
+use libp2p::core::Multiaddr;
 use url::Url;
 use uuid::Uuid;
 
@@ -40,9 +40,6 @@ pub enum Options {
         #[structopt(short = "a", long = "connect-addr")]
         alice_addr: Multiaddr,
 
-        #[structopt(short = "p", long = "connect-peer-id")]
-        alice_peer_id: PeerId,
-
         #[structopt(
             short = "b",
             long = "bitcoind",
@@ -67,7 +64,7 @@ pub enum Options {
         receive_monero: xmr_btc::monero::Amount,
     },
     History,
-    Recover {
+    Resume {
         #[structopt(required = true)]
         swap_id: Uuid,
 

@@ -20,7 +20,6 @@ use xmr_btc::{
 
 mod amounts;
 pub mod event_loop;
-mod execution;
 mod message0;
 mod message1;
 mod message2;

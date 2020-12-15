@@ -346,7 +346,7 @@ impl_from_child_enum!(State3, State);
 impl_from_child_enum!(State4, State);
 impl_from_child_enum!(State5, State);
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct State0 {
     b: bitcoin::SecretKey,
     s_b: cross_curve_dleq::Scalar,
@@ -560,25 +560,25 @@ impl State2 {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct State3 {
-    A: bitcoin::PublicKey,
-    b: bitcoin::SecretKey,
-    s_b: cross_curve_dleq::Scalar,
+    pub A: bitcoin::PublicKey,
+    pub b: bitcoin::SecretKey,
+    pub s_b: cross_curve_dleq::Scalar,
     S_a_monero: monero::PublicKey,
     S_a_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
-    refund_timelock: u32,
+    pub refund_timelock: u32,
     punish_timelock: u32,
-    refund_address: bitcoin::Address,
+    pub refund_address: bitcoin::Address,
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
-    tx_lock: bitcoin::TxLock,
-    tx_cancel_sig_a: Signature,
-    tx_refund_encsig: EncryptedSignature,
+    pub tx_lock: bitcoin::TxLock,
+    pub tx_cancel_sig_a: Signature,
+    pub tx_refund_encsig: EncryptedSignature,
 }
 
 impl State3 {
@@ -626,11 +626,11 @@ impl State3 {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct State4 {
     pub A: bitcoin::PublicKey,
     pub b: bitcoin::SecretKey,
-    s_b: cross_curve_dleq::Scalar,
+    pub s_b: cross_curve_dleq::Scalar,
     S_a_monero: monero::PublicKey,
     pub S_a_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
@@ -639,12 +639,12 @@ pub struct State4 {
     xmr: monero::Amount,
     pub refund_timelock: u32,
     punish_timelock: u32,
-    refund_address: bitcoin::Address,
+    pub refund_address: bitcoin::Address,
     pub redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
     pub tx_lock: bitcoin::TxLock,
-    tx_cancel_sig_a: Signature,
-    tx_refund_encsig: EncryptedSignature,
+    pub tx_cancel_sig_a: Signature,
+    pub tx_refund_encsig: EncryptedSignature,
 }
 
 impl State4 {
@@ -823,25 +823,25 @@ impl State4 {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct State5 {
     A: bitcoin::PublicKey,
-    b: bitcoin::SecretKey,
+    pub b: bitcoin::SecretKey,
     #[serde(with = "monero_private_key")]
     s_a: monero::PrivateKey,
-    s_b: cross_curve_dleq::Scalar,
+    pub s_b: cross_curve_dleq::Scalar,
     S_a_monero: monero::PublicKey,
-    S_a_bitcoin: bitcoin::PublicKey,
-    v: monero::PrivateViewKey,
+    pub S_a_bitcoin: bitcoin::PublicKey,
+    pub v: monero::PrivateViewKey,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     refund_timelock: u32,
     punish_timelock: u32,
     refund_address: bitcoin::Address,
-    redeem_address: bitcoin::Address,
+    pub redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
-    tx_lock: bitcoin::TxLock,
+    pub tx_lock: bitcoin::TxLock,
     tx_refund_encsig: EncryptedSignature,
     tx_cancel_sig: Signature,
 }
