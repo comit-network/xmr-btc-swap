@@ -87,6 +87,8 @@ pub async fn negotiate(
     Ok((channel, state3))
 }
 
+// TODO(Franck): Use helper functions from xmr-btc instead of re-writing them
+// here
 pub async fn wait_for_locked_bitcoin<W>(
     lock_bitcoin_txid: bitcoin::Txid,
     bitcoin_wallet: Arc<W>,
