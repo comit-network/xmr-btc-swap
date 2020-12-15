@@ -190,13 +190,8 @@ impl Default for Behaviour {
         let identity = Keypair::generate_ed25519();
 
         Self {
-            pt: PeerTracker::default(),
-            amounts: Amounts::default(),
-            message0: Message0::default(),
-            message1: Message1::default(),
-            message2: Message2::default(),
-            message3: Message3::default(),
             identity,
+            ..Default::default()
         }
     }
 }
