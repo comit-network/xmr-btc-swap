@@ -26,7 +26,7 @@ use futures::{
 };
 use libp2p::request_response::ResponseChannel;
 use rand::{CryptoRng, RngCore};
-use std::{convert::TryFrom, fmt, sync::Arc};
+use std::{fmt, sync::Arc};
 use tracing::info;
 use uuid::Uuid;
 use xmr_btc::{
@@ -134,79 +134,72 @@ impl From<&AliceState> for state::Alice {
     }
 }
 
-impl TryFrom<state::Swap> for AliceState {
-    type Error = anyhow::Error;
-
-    fn try_from(db_state: Swap) -> Result<Self, Self::Error> {
+impl From<state::Alice> for AliceState {
+    fn from(db_state: state::Alice) -> Self {
         use AliceState::*;
-        if let Swap::Alice(state) = db_state {
-            let alice_state = match state {
-                Alice::Negotiated(state3) => Negotiated {
-                    channel: None,
-                    amounts: SwapAmounts {
-                        btc: state3.btc,
-                        xmr: state3.xmr,
-                    },
-                    state3,
+        match db_state {
+            Alice::Negotiated(state3) => Negotiated {
+                channel: None,
+                amounts: SwapAmounts {
+                    btc: state3.btc,
+                    xmr: state3.xmr,
                 },
-                Alice::BtcLocked(state3) => BtcLocked {
-                    channel: None,
-                    amounts: SwapAmounts {
-                        btc: state3.btc,
-                        xmr: state3.xmr,
-                    },
-                    state3,
+                state3,
+            },
+            Alice::BtcLocked(state3) => BtcLocked {
+                channel: None,
+                amounts: SwapAmounts {
+                    btc: state3.btc,
+                    xmr: state3.xmr,
                 },
-                Alice::XmrLocked(state3) => XmrLocked { state3 },
-                Alice::BtcRedeemable { .. } => bail!("BtcRedeemable state is unexpected"),
-                Alice::EncSignLearned {
-                    state,
-                    encrypted_signature,
-                } => EncSignLearned {
-                    state3: state,
-                    encrypted_signature,
-                },
-                Alice::T1Expired(state3) => AliceState::T1Expired { state3 },
-                Alice::BtcCancelled(state) => {
-                    let tx_cancel = bitcoin::TxCancel::new(
-                        &state.tx_lock,
-                        state.refund_timelock,
-                        state.a.public(),
-                        state.B,
-                    );
+                state3,
+            },
+            Alice::XmrLocked(state3) => XmrLocked { state3 },
+            Alice::BtcRedeemable { .. } => panic!("BtcRedeemable state is unexpected"),
+            Alice::EncSignLearned {
+                state,
+                encrypted_signature,
+            } => EncSignLearned {
+                state3: state,
+                encrypted_signature,
+            },
+            Alice::T1Expired(state3) => AliceState::T1Expired { state3 },
+            Alice::BtcCancelled(state) => {
+                let tx_cancel = bitcoin::TxCancel::new(
+                    &state.tx_lock,
+                    state.refund_timelock,
+                    state.a.public(),
+                    state.B,
+                );
 
-                    BtcCancelled {
-                        state3: state,
-                        tx_cancel,
-                    }
-                }
-                Alice::BtcPunishable(state) => {
-                    let tx_cancel = bitcoin::TxCancel::new(
-                        &state.tx_lock,
-                        state.refund_timelock,
-                        state.a.public(),
-                        state.B,
-                    );
-                    let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &state.refund_address);
-                    BtcPunishable {
-                        tx_refund,
-                        state3: state,
-                    }
-                }
-                Alice::BtcRefunded {
-                    state, spend_key, ..
-                } => BtcRefunded {
-                    spend_key,
+                BtcCancelled {
                     state3: state,
-                },
-                Alice::SwapComplete => {
-                    // TODO(Franck): Better fine grain
-                    AliceState::SafelyAborted
+                    tx_cancel,
                 }
-            };
-            Ok(alice_state)
-        } else {
-            bail!("Alice swap state expected.")
+            }
+            Alice::BtcPunishable(state) => {
+                let tx_cancel = bitcoin::TxCancel::new(
+                    &state.tx_lock,
+                    state.refund_timelock,
+                    state.a.public(),
+                    state.B,
+                );
+                let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &state.refund_address);
+                BtcPunishable {
+                    tx_refund,
+                    state3: state,
+                }
+            }
+            Alice::BtcRefunded {
+                state, spend_key, ..
+            } => BtcRefunded {
+                spend_key,
+                state3: state,
+            },
+            Alice::SwapComplete => {
+                // TODO(Franck): Better fine grain
+                AliceState::SafelyAborted
+            }
         }
     }
 }
@@ -241,19 +234,20 @@ pub async fn resume_from_database(
     swap_id: Uuid,
     db: Database,
 ) -> Result<AliceState> {
-    let db_swap = db.get_state(swap_id)?;
-    let start_state = AliceState::try_from(db_swap)?;
-    let state = swap(
-        start_state,
-        event_loop_handle,
-        bitcoin_wallet,
-        monero_wallet,
-        config,
-        swap_id,
-        db,
-    )
-    .await?;
-    Ok(state)
+    if let state::Swap::Alice(db_state) = db.get_state(swap_id)? {
+        swap(
+            db_state.into(),
+            event_loop_handle,
+            bitcoin_wallet,
+            monero_wallet,
+            config,
+            swap_id,
+            db,
+        )
+        .await
+    } else {
+        bail!("Alice state expected.")
+    }
 }
 
 pub fn is_complete(state: &AliceState) -> bool {

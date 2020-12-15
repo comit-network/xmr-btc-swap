@@ -1,10 +1,4 @@
-use crate::{
-    bob::event_loop::EventLoopHandle,
-    state,
-    state::{Bob, Swap},
-    storage::Database,
-    SwapAmounts,
-};
+use crate::{bob::event_loop::EventLoopHandle, state, state::Bob, storage::Database, SwapAmounts};
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
 use futures::{
@@ -13,7 +7,7 @@ use futures::{
 };
 use libp2p::{core::Multiaddr, PeerId};
 use rand::{CryptoRng, RngCore};
-use std::{convert::TryFrom, fmt, sync::Arc};
+use std::{fmt, sync::Arc};
 use tracing::info;
 use uuid::Uuid;
 use xmr_btc::{
@@ -79,24 +73,16 @@ impl From<BobState> for state::Bob {
     }
 }
 
-impl TryFrom<state::Swap> for BobState {
-    type Error = anyhow::Error;
-
-    fn try_from(db_state: state::Swap) -> Result<Self, Self::Error> {
-        if let Swap::Bob(state) = db_state {
-            let bob_State = match state {
-                Bob::Negotiated { state2, peer_id } => BobState::Negotiated(state2, peer_id),
-                Bob::BtcLocked { state3, peer_id } => BobState::BtcLocked(state3, peer_id),
-                Bob::XmrLocked { state4, peer_id } => BobState::XmrLocked(state4, peer_id),
-                Bob::EncSigSent { state4, peer_id } => BobState::EncSigSent(state4, peer_id),
-                Bob::BtcRedeemed(state5) => BobState::BtcRedeemed(state5),
-                Bob::BtcCancelled(state4) => BobState::Cancelled(state4),
-                Bob::SwapComplete => BobState::SafelyAborted,
-            };
-
-            Ok(bob_State)
-        } else {
-            bail!("Bob swap state expected.")
+impl From<state::Bob> for BobState {
+    fn from(db_state: state::Bob) -> Self {
+        match db_state {
+            Bob::Negotiated { state2, peer_id } => BobState::Negotiated(state2, peer_id),
+            Bob::BtcLocked { state3, peer_id } => BobState::BtcLocked(state3, peer_id),
+            Bob::XmrLocked { state4, peer_id } => BobState::XmrLocked(state4, peer_id),
+            Bob::EncSigSent { state4, peer_id } => BobState::EncSigSent(state4, peer_id),
+            Bob::BtcRedeemed(state5) => BobState::BtcRedeemed(state5),
+            Bob::BtcCancelled(state4) => BobState::Cancelled(state4),
+            Bob::SwapComplete => BobState::SafelyAborted,
         }
     }
 }
@@ -137,19 +123,20 @@ pub async fn resume_from_database<R>(
 where
     R: RngCore + CryptoRng + Send,
 {
-    let db_swap = db.get_state(swap_id)?;
-    let start_state = BobState::try_from(db_swap)?;
-    let state = swap(
-        start_state,
-        event_loop_handle,
-        db,
-        bitcoin_wallet,
-        monero_wallet,
-        rng,
-        swap_id,
-    )
-    .await?;
-    Ok(state)
+    if let state::Swap::Bob(db_state) = db.get_state(swap_id)? {
+        swap(
+            db_state.into(),
+            event_loop_handle,
+            db,
+            bitcoin_wallet,
+            monero_wallet,
+            rng,
+            swap_id,
+        )
+        .await
+    } else {
+        bail!("Bob state expected.")
+    }
 }
 
 pub fn is_complete(state: &BobState) -> bool {
