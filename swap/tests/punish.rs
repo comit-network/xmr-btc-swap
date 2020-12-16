@@ -83,8 +83,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
 
     let _bob_swarm_fut = tokio::spawn(async move { bob_event_loop.run().await });
 
-    let alice_fut = alice::swap::swap(
-        alice_state,
+    let alice_swap = alice::swap::Swap::new(
         alice_event_loop_handle,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),
@@ -92,6 +91,8 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         Uuid::new_v4(),
         alice_db,
     );
+
+    let alice_fut = alice_swap.swap(alice_state);
 
     let _alice_swarm_fut = tokio::spawn(async move { alice_event_loop.run().await });
 

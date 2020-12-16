@@ -86,14 +86,7 @@ async fn both_refund() {
     let alice_db_datadir = tempdir().unwrap();
     let alice_db = Database::open(alice_db_datadir.path()).unwrap();
 
-    let alice_xmr_locked_fut = alice::swap::run_until(
-        alice_state,
-        |state| {
-            matches!(
-                state,
-                AliceState::XmrLocked{..}
-            )
-        },
+    let alice_swap = alice::swap::Swap::new(
         alice_event_loop_handle,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),
@@ -101,6 +94,13 @@ async fn both_refund() {
         alice_swap_id,
         alice_db,
     );
+
+    let alice_xmr_locked_fut = alice_swap.run_until(alice_state, |state| {
+        matches!(
+            state,
+            AliceState::XmrLocked{..}
+        )
+    });
 
     tokio::spawn(async move { alice_event_loop.run().await });
 
@@ -117,17 +117,16 @@ async fn both_refund() {
     let (mut alice_event_loop, alice_event_loop_handle) =
         testutils::init_alice_event_loop(alice_multiaddr);
 
-    let alice_state = alice::swap::swap(
-        alice_state,
+    let alice_swap = alice::swap::Swap::new(
         alice_event_loop_handle,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),
         Config::regtest(),
         alice_swap_id,
         alice_db,
-    )
-    .await
-    .unwrap();
+    );
+
+    let alice_state = alice_swap.swap(alice_state).await.unwrap();
     tokio::spawn(async move { alice_event_loop.run().await });
 
     assert!(matches!(alice_state, AliceState::XmrRefunded));

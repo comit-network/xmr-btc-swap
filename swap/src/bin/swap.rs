@@ -119,8 +119,7 @@ async fn main() -> Result<()> {
                 send_monero, receive_bitcoin, swap_id
             );
 
-            let swap = alice::swap::swap(
-                alice_state,
+            let alice_swap = alice::swap::Swap::new(
                 handle,
                 bitcoin_wallet.clone(),
                 monero_wallet.clone(),
@@ -128,6 +127,8 @@ async fn main() -> Result<()> {
                 swap_id,
                 db,
             );
+
+            let swap = alice_swap.swap(alice_state);
 
             let _event_loop = tokio::spawn(async move { event_loop.run().await });
             swap.await?;
