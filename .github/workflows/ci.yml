@@ -104,7 +104,6 @@ jobs:
         run: cargo test --workspace --all-features
         env:
           MONERO_ADDITIONAL_SLEEP_PERIOD: 60000
-          RUST_MIN_STACK: 20000000
 
       - name: Build binary
         run: |
