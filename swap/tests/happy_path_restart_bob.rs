@@ -1,5 +1,4 @@
 use libp2p::Multiaddr;
-use rand::rngs::OsRng;
 use swap::{alice, bitcoin, bob, storage::Database};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
@@ -106,7 +105,6 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
             bob_db,
             bob_btc_wallet.clone(),
             bob_xmr_wallet.clone(),
-            OsRng,
             bob_swap_id,
         )
         .await
@@ -131,7 +129,6 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
         bob_db,
         bob_btc_wallet,
         bob_xmr_wallet,
-        OsRng,
         bob_swap_id,
     )
     .await

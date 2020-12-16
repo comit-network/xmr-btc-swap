@@ -276,13 +276,10 @@ pub async fn next_state<
     monero_wallet: &M,
     transport: &mut T,
     state: State,
-    rng: &mut R,
 ) -> Result<State> {
     match state {
         State::State0(state0) => {
-            transport
-                .send_message(state0.next_message(rng).into())
-                .await?;
+            transport.send_message(state0.next_message().into()).await?;
             let message0 = transport.receive_message().await?.try_into()?;
             let state1 = state0.receive(bitcoin_wallet, message0).await?;
             Ok(state1.into())
@@ -357,6 +354,7 @@ pub struct State0 {
     refund_timelock: u32,
     punish_timelock: u32,
     refund_address: bitcoin::Address,
+    dleq_proof_s_b: cross_curve_dleq::Proof,
 }
 
 impl State0 {
@@ -373,6 +371,8 @@ impl State0 {
         let s_b = cross_curve_dleq::Scalar::random(rng);
         let v_b = monero::PrivateViewKey::new_random(rng);
 
+        let dleq_proof_s_b = cross_curve_dleq::Proof::new(rng, &s_b);
+
         Self {
             b,
             s_b,
@@ -382,19 +382,18 @@ impl State0 {
             refund_timelock,
             punish_timelock,
             refund_address,
+            dleq_proof_s_b,
         }
     }
 
-    pub fn next_message<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Message0 {
-        let dleq_proof_s_b = cross_curve_dleq::Proof::new(rng, &self.s_b);
-
+    pub fn next_message(&self) -> Message0 {
         Message0 {
             B: self.b.public(),
             S_b_monero: monero::PublicKey::from_private_key(&monero::PrivateKey {
                 scalar: self.s_b.into_ed25519(),
             }),
             S_b_bitcoin: self.s_b.into_secp256k1().into(),
-            dleq_proof_s_b,
+            dleq_proof_s_b: self.dleq_proof_s_b.clone(),
             v_b: self.v_b,
             refund_address: self.refund_address.clone(),
         }

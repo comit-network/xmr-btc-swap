@@ -1,7 +1,6 @@
 use crate::testutils::{init_alice, init_bob};
 use futures::future::try_join;
 use libp2p::Multiaddr;
-use rand::rngs::OsRng;
 use swap::{alice, alice::swap::AliceState, bob, bob::swap::BobState};
 use testcontainers::clients::Cli;
 use testutils::init_tracing;
@@ -77,7 +76,6 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         bob_db,
         bob_btc_wallet.clone(),
         bob_xmr_wallet.clone(),
-        OsRng,
         Uuid::new_v4(),
     );
 

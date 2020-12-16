@@ -6,7 +6,6 @@ use futures::{
     pin_mut,
 };
 use libp2p::{core::Multiaddr, PeerId};
-use rand::{CryptoRng, RngCore};
 use std::{fmt, sync::Arc};
 use tracing::info;
 use uuid::Uuid;
@@ -87,18 +86,14 @@ impl From<state::Bob> for BobState {
     }
 }
 
-pub async fn swap<R>(
+pub async fn swap(
     state: BobState,
     event_loop_handle: EventLoopHandle,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
-    rng: R,
     swap_id: Uuid,
-) -> Result<BobState>
-where
-    R: RngCore + CryptoRng + Send,
-{
+) -> Result<BobState> {
     run_until(
         state,
         is_complete,
@@ -106,23 +101,18 @@ where
         db,
         bitcoin_wallet,
         monero_wallet,
-        rng,
         swap_id,
     )
     .await
 }
 
-pub async fn resume_from_database<R>(
+pub async fn resume_from_database(
     event_loop_handle: EventLoopHandle,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
-    rng: R,
     swap_id: Uuid,
-) -> Result<BobState>
-where
-    R: RngCore + CryptoRng + Send,
-{
+) -> Result<BobState> {
     if let state::Swap::Bob(db_state) = db.get_state(swap_id)? {
         swap(
             db_state.into(),
@@ -130,7 +120,6 @@ where
             db,
             bitcoin_wallet,
             monero_wallet,
-            rng,
             swap_id,
         )
         .await
@@ -152,19 +141,15 @@ pub fn is_complete(state: &BobState) -> bool {
 // State machine driver for swap execution
 #[allow(clippy::too_many_arguments)]
 #[async_recursion]
-pub async fn run_until<R>(
+pub async fn run_until(
     state: BobState,
     is_target_state: fn(&BobState) -> bool,
     mut event_loop_handle: EventLoopHandle,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
-    mut rng: R,
     swap_id: Uuid,
-) -> Result<BobState>
-where
-    R: RngCore + CryptoRng + Send,
-{
+) -> Result<BobState> {
     info!("Current state: {}", state);
     if is_target_state(&state) {
         Ok(state)
@@ -180,7 +165,6 @@ where
                     amounts,
                     &mut event_loop_handle,
                     addr,
-                    &mut rng,
                     bitcoin_wallet.clone(),
                 )
                 .await?;
@@ -196,7 +180,6 @@ where
                     db,
                     bitcoin_wallet,
                     monero_wallet,
-                    rng,
                     swap_id,
                 )
                 .await
@@ -216,7 +199,6 @@ where
                     db,
                     bitcoin_wallet,
                     monero_wallet,
-                    rng,
                     swap_id,
                 )
                 .await
@@ -241,7 +223,6 @@ where
                     db,
                     bitcoin_wallet,
                     monero_wallet,
-                    rng,
                     swap_id,
                 )
                 .await
@@ -269,7 +250,6 @@ where
                     db,
                     bitcoin_wallet,
                     monero_wallet,
-                    rng,
                     swap_id,
                 )
                 .await
@@ -309,7 +289,6 @@ where
                     db,
                     bitcoin_wallet.clone(),
                     monero_wallet,
-                    rng,
                     swap_id,
                 )
                 .await
@@ -329,7 +308,6 @@ where
                     db,
                     bitcoin_wallet,
                     monero_wallet,
-                    rng,
                     swap_id,
                 )
                 .await
@@ -356,7 +334,6 @@ where
                     db,
                     bitcoin_wallet,
                     monero_wallet,
-                    rng,
                     swap_id,
                 )
                 .await
@@ -369,17 +346,13 @@ where
     }
 }
 
-pub async fn negotiate<R>(
+pub async fn negotiate(
     state0: xmr_btc::bob::State0,
     amounts: SwapAmounts,
     swarm: &mut EventLoopHandle,
     addr: Multiaddr,
-    mut rng: R,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
-) -> Result<(State2, PeerId)>
-where
-    R: RngCore + CryptoRng + Send,
-{
+) -> Result<(State2, PeerId)> {
     tracing::trace!("Starting negotiate");
     swarm.dial_alice(addr).await?;
 
@@ -390,7 +363,7 @@ where
         .await?;
 
     swarm
-        .send_message0(alice_peer_id.clone(), state0.next_message(&mut rng))
+        .send_message0(alice_peer_id.clone(), state0.next_message())
         .await?;
     let msg0 = swarm.recv_message0().await?;
     let state1 = state0.receive(bitcoin_wallet.as_ref(), msg0).await?;

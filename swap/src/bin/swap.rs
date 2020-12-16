@@ -204,7 +204,6 @@ async fn main() -> Result<()> {
                 db,
                 bitcoin_wallet.clone(),
                 monero_wallet.clone(),
-                OsRng,
                 swap_id,
             );
 
