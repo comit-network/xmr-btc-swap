@@ -198,14 +198,14 @@ async fn main() -> Result<()> {
                 send_bitcoin, receive_monero, swap_id
             );
 
-            let swap = bob::swap::swap(
-                bob_state,
+            let swap = bob::swap::Swap::new(
                 handle,
                 db,
                 bitcoin_wallet.clone(),
                 monero_wallet.clone(),
                 swap_id,
-            );
+            )
+            .swap(bob_state);
 
             let _event_loop = tokio::spawn(async move { event_loop.run().await });
             swap.await?;

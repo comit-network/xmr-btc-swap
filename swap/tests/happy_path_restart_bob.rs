@@ -98,15 +98,14 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     let bob_state = {
         let bob_db = Database::open(bob_db_datadir.path()).unwrap();
 
-        bob::swap::run_until(
-            bob_state,
-            |state| matches!(state, BobState::EncSigSent(..)),
+        bob::swap::Swap::new(
             bob_event_loop_handle,
             bob_db,
             bob_btc_wallet.clone(),
             bob_xmr_wallet.clone(),
             bob_swap_id,
         )
+        .run_until(bob_state, |state| matches!(state, BobState::EncSigSent(..)))
         .await
         .unwrap()
     };
@@ -124,13 +123,14 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
         testutils::init_bob_event_loop();
 
     tokio::spawn(async move { event_loop_after_restart.run().await });
-    let alice_state = bob::swap::resume_from_database(
+    let alice_state = bob::swap::Swap::new(
         event_loop_handle_after_restart,
         bob_db,
         bob_btc_wallet,
         bob_xmr_wallet,
         bob_swap_id,
     )
+    .resume_from_database()
     .await
     .unwrap();
 

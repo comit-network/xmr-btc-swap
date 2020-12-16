@@ -72,14 +72,14 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
 
     tokio::spawn(async move { bob_event_loop.run().await });
     tokio::spawn(async move {
-        bob::swap::swap(
-            bob_state,
+        bob::swap::Swap::new(
             bob_event_loop_handle,
             bob_db,
             bob_btc_wallet.clone(),
             bob_xmr_wallet.clone(),
             Uuid::new_v4(),
         )
+        .swap(bob_state)
         .await
     });
 

@@ -69,15 +69,14 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         )
         .await;
 
-    let bob_btc_locked_fut = bob::swap::run_until(
-        bob_state,
-        |state| matches!(state, BobState::BtcLocked(..)),
+    let bob_btc_locked_fut = bob::swap::Swap::new(
         bob_event_loop_handle,
         bob_db,
         bob_btc_wallet.clone(),
         bob_xmr_wallet.clone(),
         Uuid::new_v4(),
-    );
+    )
+    .run_until(bob_state, |state| matches!(state, BobState::BtcLocked(..)));
 
     let _bob_swarm_fut = tokio::spawn(async move { bob_event_loop.run().await });
 
