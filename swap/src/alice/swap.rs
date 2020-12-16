@@ -254,6 +254,18 @@ impl Swap {
         }
     }
 
+    pub async fn save_and_run_until(
+        self,
+        state: AliceState,
+        is_target_state: fn(&AliceState) -> bool,
+    ) -> Result<AliceState> {
+        let db_state = (&state).into();
+        self.db
+            .insert_latest_state(self.swap_id, state::Swap::Alice(db_state))
+            .await?;
+        self.run_until(state, is_target_state).await
+    }
+
     // State machine driver for swap execution
     #[async_recursion]
     pub async fn run_until(
@@ -271,17 +283,15 @@ impl Swap {
                         negotiate(state0, amounts, &mut self.event_loop_handle, self.config)
                             .await?;
 
-                    let state = AliceState::Negotiated {
-                        channel: Some(channel),
-                        amounts,
-                        state3,
-                    };
-
-                    let db_state = (&state).into();
-                    self.db
-                        .insert_latest_state(self.swap_id, state::Swap::Alice(db_state))
-                        .await?;
-                    self.run_until(state, is_target_state).await
+                    self.save_and_run_until(
+                        AliceState::Negotiated {
+                            channel: Some(channel),
+                            amounts,
+                            state3,
+                        },
+                        is_target_state,
+                    )
+                    .await
                 }
                 AliceState::Negotiated {
                     state3,
@@ -311,11 +321,7 @@ impl Swap {
                         }
                     };
 
-                    let db_state = (&state).into();
-                    self.db
-                        .insert_latest_state(self.swap_id, state::Swap::Alice(db_state))
-                        .await?;
-                    self.run_until(state, is_target_state).await
+                    self.save_and_run_until(state, is_target_state).await
                 }
                 AliceState::BtcLocked {
                     channel,
@@ -343,11 +349,7 @@ impl Swap {
                         }
                     };
 
-                    let db_state = (&state).into();
-                    self.db
-                        .insert_latest_state(self.swap_id, state::Swap::Alice(db_state))
-                        .await?;
-                    self.run_until(state, is_target_state).await
+                    self.save_and_run_until(state, is_target_state).await
                 }
                 AliceState::XmrLocked { state3 } => {
                     // todo: match statement and wait for t1 can probably be expressed more cleanly
@@ -374,11 +376,7 @@ impl Swap {
                         _ => AliceState::T1Expired { state3 },
                     };
 
-                    let db_state = (&state).into();
-                    self.db
-                        .insert_latest_state(self.swap_id, state::Swap::Alice(db_state))
-                        .await?;
-                    self.run_until(state, is_target_state).await
+                    self.save_and_run_until(state, is_target_state).await
                 }
                 AliceState::EncSignLearned {
                     state3,
@@ -395,13 +393,12 @@ impl Swap {
                         Ok(tx) => tx,
                         Err(_) => {
                             state3.wait_for_t1(self.bitcoin_wallet.as_ref()).await?;
-
-                            let state = AliceState::T1Expired { state3 };
-                            let db_state = (&state).into();
-                            self.db
-                                .insert_latest_state(self.swap_id, state::Swap::Alice(db_state))
-                                .await?;
-                            return self.run_until(state, is_target_state).await;
+                            return self
+                                .save_and_run_until(
+                                    AliceState::T1Expired { state3 },
+                                    is_target_state,
+                                )
+                                .await;
                         }
                     };
 
@@ -415,12 +412,8 @@ impl Swap {
                     )
                     .await?;
 
-                    let state = AliceState::BtcRedeemed;
-                    let db_state = (&state).into();
-                    self.db
-                        .insert_latest_state(self.swap_id, state::Swap::Alice(db_state))
-                        .await?;
-                    self.run_until(state, is_target_state).await
+                    self.save_and_run_until(AliceState::BtcRedeemed, is_target_state)
+                        .await
                 }
                 AliceState::T1Expired { state3 } => {
                     let tx_cancel = publish_cancel_transaction(
@@ -433,12 +426,11 @@ impl Swap {
                     )
                     .await?;
 
-                    let state = AliceState::BtcCancelled { state3, tx_cancel };
-                    let db_state = (&state).into();
-                    self.db
-                        .insert_latest_state(self.swap_id, state::Swap::Alice(db_state))
-                        .await?;
-                    self.run_until(state, is_target_state).await
+                    self.save_and_run_until(
+                        AliceState::BtcCancelled { state3, tx_cancel },
+                        is_target_state,
+                    )
+                    .await
                 }
                 AliceState::BtcCancelled { state3, tx_cancel } => {
                     let tx_cancel_height = self
@@ -458,12 +450,11 @@ impl Swap {
                     // TODO(Franck): Review error handling
                     match published_refund_tx {
                         None => {
-                            let state = AliceState::BtcPunishable { tx_refund, state3 };
-                            let db_state = (&state).into();
-                            self.db
-                                .insert_latest_state(self.swap_id, state::Swap::Alice(db_state))
-                                .await?;
-                            self.run_until(state, is_target_state).await
+                            self.save_and_run_until(
+                                AliceState::BtcPunishable { tx_refund, state3 },
+                                is_target_state,
+                            )
+                            .await
                         }
                         Some(published_refund_tx) => {
                             let spend_key = extract_monero_private_key(
@@ -474,12 +465,11 @@ impl Swap {
                                 state3.S_b_bitcoin,
                             )?;
 
-                            let state = AliceState::BtcRefunded { spend_key, state3 };
-                            let db_state = (&state).into();
-                            self.db
-                                .insert_latest_state(self.swap_id, state::Swap::Alice(db_state))
-                                .await?;
-                            self.run_until(state, is_target_state).await
+                            self.save_and_run_until(
+                                AliceState::BtcRefunded { spend_key, state3 },
+                                is_target_state,
+                            )
+                            .await
                         }
                     }
                 }
@@ -495,6 +485,7 @@ impl Swap {
                     self.db
                         .insert_latest_state(self.swap_id, state::Swap::Alice(db_state))
                         .await?;
+                    // TODO: This is inconsistent as we are not calling `run_until`.
                     Ok(state)
                 }
                 AliceState::BtcPunishable { tx_refund, state3 } => {
@@ -524,12 +515,8 @@ impl Swap {
 
                     match select(punish_tx_finalised, refund_tx_seen).await {
                         Either::Left(_) => {
-                            let state = AliceState::Punished;
-                            let db_state = (&state).into();
-                            self.db
-                                .insert_latest_state(self.swap_id, state::Swap::Alice(db_state))
-                                .await?;
-                            self.run_until(state, is_target_state).await
+                            self.save_and_run_until(AliceState::Punished, is_target_state)
+                                .await
                         }
                         Either::Right((published_refund_tx, _)) => {
                             let spend_key = extract_monero_private_key(
@@ -539,12 +526,11 @@ impl Swap {
                                 state3.a.clone(),
                                 state3.S_b_bitcoin,
                             )?;
-                            let state = AliceState::BtcRefunded { spend_key, state3 };
-                            let db_state = (&state).into();
-                            self.db
-                                .insert_latest_state(self.swap_id, state::Swap::Alice(db_state))
-                                .await?;
-                            self.run_until(state, is_target_state).await
+                            self.save_and_run_until(
+                                AliceState::BtcRefunded { spend_key, state3 },
+                                is_target_state,
+                            )
+                            .await
                         }
                     }
                 }
