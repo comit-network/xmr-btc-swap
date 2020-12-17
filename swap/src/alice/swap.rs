@@ -365,9 +365,7 @@ impl Swap {
                                     }
                                 }
                             }
-                            _ => {
-                                AliceState::T1Expired { state3 }
-                            }
+                            _ => AliceState::T1Expired { state3 },
                         };
 
                         self.db
@@ -501,7 +499,6 @@ impl Swap {
 
                         let refund_tx_seen =
                             bitcoin_wallet_clone.watch_for_raw_transaction(tx_refund.txid());
-
 
                         state = select! {
                             _ = punish_tx_finalised => {
