@@ -1,11 +1,8 @@
 use crate::{bob::event_loop::EventLoopHandle, state, state::Bob, storage::Database, SwapAmounts};
 use anyhow::{bail, Result};
-use futures::{
-    future::{select, Either},
-    pin_mut,
-};
 use libp2p::{core::Multiaddr, PeerId};
 use std::{fmt, sync::Arc};
+use tokio::select;
 use tracing::info;
 use uuid::Uuid;
 use xmr_btc::{
@@ -213,13 +210,12 @@ impl Swap {
                         let bitcoin_wallet = self.bitcoin_wallet.clone();
                         let t1_timeout = state4_clone.wait_for_t1(bitcoin_wallet.as_ref());
 
-                        pin_mut!(redeem_watcher);
-                        pin_mut!(t1_timeout);
-
-                        state = match select(redeem_watcher, t1_timeout).await {
-                            Either::Left((val, _)) => BobState::BtcRedeemed(val?),
-                            Either::Right((..)) => {
-                                // Check whether TxCancel has been published.
+                        select! {
+                            val = redeem_watcher => {
+                                state = BobState::BtcRedeemed(val?);
+                            },
+                            _ = t1_timeout => {
+                                 // Check whether TxCancel has been published.
                                 // We should not fail if the transaction is already on the
                                 // blockchain
                                 if state4
@@ -232,7 +228,7 @@ impl Swap {
                                         .await?;
                                 }
 
-                                BobState::Cancelled(state4)
+                                state = BobState::Cancelled(state4)
                             }
                         };
 
