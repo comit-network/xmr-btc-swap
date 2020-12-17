@@ -4,10 +4,6 @@ use crate::{
 };
 use anyhow::{bail, Context, Result};
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
-use futures::{
-    future::{select, Either},
-    pin_mut,
-};
 use libp2p::request_response::ResponseChannel;
 use rand::rngs::OsRng;
 use sha2::Sha256;
@@ -269,12 +265,13 @@ where
     // the transaction goes directly in a block
     let seen_refund_tx = bitcoin_wallet.watch_for_raw_transaction(tx_refund.txid());
 
-    pin_mut!(punish_timelock_expired);
-    pin_mut!(seen_refund_tx);
-
-    match select(punish_timelock_expired, seen_refund_tx).await {
-        Either::Left(_) => Ok((tx_refund, None)),
-        Either::Right((published_refund_tx, _)) => Ok((tx_refund, Some(published_refund_tx))),
+    tokio::select! {
+        _ = punish_timelock_expired => {
+            Ok((tx_refund, None))
+        },
+        published_refund_tx = seen_refund_tx => {
+            Ok((tx_refund, Some(published_refund_tx)))
+        }
     }
 }
 
