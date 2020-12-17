@@ -9,6 +9,7 @@ use xmr_btc::config::Config;
 pub mod testutils;
 
 use crate::testutils::{init_alice, init_bob};
+use std::convert::TryFrom;
 use swap::bob::swap::BobState;
 use testutils::init_tracing;
 
@@ -112,9 +113,13 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
 
     let (event_loop_after_restart, event_loop_handle_after_restart) =
         testutils::init_bob_event_loop();
-    let _alice_swarm_fut = tokio::spawn(async move { event_loop_after_restart.run().await });
+    let _bob_swarm_fut = tokio::spawn(async move { event_loop_after_restart.run().await });
 
-    let alice_state = bob::swap::resume_from_database(
+    let db_swap = bob_db.get_state(bob_swap_id).unwrap();
+    let resume_state = BobState::try_from(db_swap).unwrap();
+
+    let bob_state = bob::swap::swap(
+        resume_state,
         event_loop_handle_after_restart,
         bob_db,
         bob_btc_wallet,
@@ -125,7 +130,7 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     .await
     .unwrap();
 
-    assert!(matches!(alice_state, BobState::XmrRedeemed {..}));
+    assert!(matches!(bob_state, BobState::XmrRedeemed {..}));
 
     // TODO: Additionally assert balances
 }
