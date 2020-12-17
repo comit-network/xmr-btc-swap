@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 #[derive(structopt::StructOpt, Debug)]
 pub struct Options {
+    // TODO: Default value should points to proper configuration folder in home folder
     #[structopt(short = "db", long = "database", default_value = "./.swap-db/")]
     pub db_path: String,
 
@@ -12,12 +13,12 @@ pub struct Options {
 }
 
 #[derive(structopt::StructOpt, Debug)]
-#[structopt(name = "xmr-btc-swap", about = "Trustless XMR BTC swaps")]
+#[structopt(name = "xmr-btc-swap", about = "XMR BTC atomic swap")]
 pub enum Command {
     SellXmr {
         #[structopt(
             short = "b",
-            long = "bitcoind",
+            long = "bitcoind-rpc",
             default_value = "http://127.0.0.1:8332"
         )]
         bitcoind_url: Url,
@@ -34,7 +35,7 @@ pub enum Command {
 
         #[structopt(
             short = "a",
-            long = "listen-addr",
+            long = "p2p-address",
             default_value = "/ip4/127.0.0.1/tcp/9876"
         )]
         listen_addr: Multiaddr,
@@ -51,7 +52,7 @@ pub enum Command {
 
         #[structopt(
             short = "b",
-            long = "bitcoind",
+            long = "bitcoind-rpc",
             default_value = "http://127.0.0.1:8332"
         )]
         bitcoind_url: Url,
@@ -79,7 +80,7 @@ pub enum Command {
 
         #[structopt(
             short = "b",
-            long = "bitcoind",
+            long = "bitcoind-rpc",
             default_value = "http://127.0.0.1:8332"
         )]
         bitcoind_url: Url,
@@ -98,7 +99,7 @@ pub enum Command {
         //  see: https://github.com/comit-network/xmr-btc-swap/issues/77
         #[structopt(
             short = "a",
-            long = "listen-addr",
+            long = "p2p-address",
             default_value = "/ip4/127.0.0.1/tcp/9876"
         )]
         listen_addr: Multiaddr,

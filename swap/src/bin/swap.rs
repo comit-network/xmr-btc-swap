@@ -12,7 +12,7 @@
 )]
 #![forbid(unsafe_code)]
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use libp2p::core::Multiaddr;
 use prettytable::{row, Table};
 use rand::rngs::OsRng;
@@ -46,7 +46,8 @@ async fn main() -> Result<()> {
     let config = Config::mainnet();
 
     info!("Database: {}", opt.db_path);
-    let db = Database::open(std::path::Path::new(opt.db_path.as_str())).unwrap();
+    let db = Database::open(std::path::Path::new(opt.db_path.as_str()))
+        .context("Could not open database")?;
 
     match opt.cmd {
         Command::SellXmr {
@@ -57,8 +58,6 @@ async fn main() -> Result<()> {
             send_monero,
             receive_bitcoin,
         } => {
-            info!("Running swap node as Alice ...");
-
             let (bitcoin_wallet, monero_wallet) = setup_wallets(
                 bitcoind_url,
                 bitcoin_wallet_name.as_str(),
@@ -77,7 +76,7 @@ async fn main() -> Result<()> {
                 let a = bitcoin::SecretKey::new_random(rng);
                 let s_a = cross_curve_dleq::Scalar::random(rng);
                 let v_a = xmr_btc::monero::PrivateViewKey::new_random(rng);
-                let redeem_address = bitcoin_wallet.as_ref().new_address().await.unwrap();
+                let redeem_address = bitcoin_wallet.as_ref().new_address().await?;
                 let punish_address = redeem_address.clone();
                 let state0 = State0::new(
                     a,
@@ -119,8 +118,6 @@ async fn main() -> Result<()> {
             send_bitcoin,
             receive_monero,
         } => {
-            info!("Running swap node as Bob ...");
-
             let (bitcoin_wallet, monero_wallet) = setup_wallets(
                 bitcoind_url,
                 bitcoin_wallet_name.as_str(),
@@ -129,7 +126,7 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            let refund_address = bitcoin_wallet.new_address().await.unwrap();
+            let refund_address = bitcoin_wallet.new_address().await?;
             let state0 = xmr_btc::bob::State0::new(
                 &mut OsRng,
                 send_bitcoin,
@@ -222,9 +219,7 @@ async fn setup_wallets(
     config: Config,
 ) -> Result<(Arc<bitcoin::Wallet>, Arc<monero::Wallet>)> {
     let bitcoin_wallet =
-        bitcoin::Wallet::new(bitcoin_wallet_name, bitcoind_url, config.bitcoin_network)
-            .await
-            .expect("failed to create bitcoin wallet");
+        bitcoin::Wallet::new(bitcoin_wallet_name, bitcoind_url, config.bitcoin_network).await?;
     let bitcoin_balance = bitcoin_wallet.balance().await?;
     info!(
         "Connection to Bitcoin wallet succeeded, balance: {}",
@@ -272,8 +267,8 @@ async fn alice_swap(
         db,
     );
 
-    let _event_loop = tokio::spawn(async move { event_loop.run().await });
-    Ok(swap.await?)
+    tokio::spawn(async move { event_loop.run().await });
+    swap.await
 }
 
 async fn bob_swap(
@@ -286,8 +281,7 @@ async fn bob_swap(
     let bob_behaviour = bob::Behaviour::default();
     let bob_transport = build(bob_behaviour.identity())?;
 
-    let (event_loop, handle) =
-        bob::event_loop::EventLoop::new(bob_transport, bob_behaviour).unwrap();
+    let (event_loop, handle) = bob::event_loop::EventLoop::new(bob_transport, bob_behaviour)?;
 
     let swap = bob::swap::swap(
         state,
@@ -299,6 +293,6 @@ async fn bob_swap(
         swap_id,
     );
 
-    let _event_loop = tokio::spawn(async move { event_loop.run().await });
-    Ok(swap.await?)
+    tokio::spawn(async move { event_loop.run().await });
+    swap.await
 }
