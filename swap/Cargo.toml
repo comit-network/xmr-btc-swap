@@ -37,7 +37,6 @@ structopt = "0.3"
 tempfile = "3"
 time = "0.2"
 tokio = { version = "0.2", features = ["rt-threaded", "time", "macros", "sync"] }
-torut = { version = "0.1" }
 tracing = { version = "0.1", features = ["attributes"] }
 tracing-core = "0.1"
 tracing-futures = { version = "0.2", features = ["std-future", "futures-03"] }
