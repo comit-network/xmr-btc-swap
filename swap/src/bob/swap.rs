@@ -33,6 +33,7 @@ pub enum BobState {
     XmrLocked(bob::State4, PeerId),
     EncSigSent(bob::State4, PeerId),
     BtcRedeemed(bob::State5),
+    T1Expired(bob::State4),
     Cancelled(bob::State4),
     BtcRefunded(bob::State4),
     XmrRedeemed,
@@ -49,6 +50,7 @@ impl fmt::Display for BobState {
             BobState::XmrLocked(..) => write!(f, "xmr_locked"),
             BobState::EncSigSent(..) => write!(f, "encsig_sent"),
             BobState::BtcRedeemed(..) => write!(f, "btc_redeemed"),
+            BobState::T1Expired(..) => write!(f, "t1_expired"),
             BobState::Cancelled(..) => write!(f, "cancelled"),
             BobState::BtcRefunded(..) => write!(f, "btc_refunded"),
             BobState::XmrRedeemed => write!(f, "xmr_redeemed"),
@@ -70,6 +72,7 @@ impl From<BobState> for state::Bob {
             BobState::XmrLocked(state4, peer_id) => Bob::XmrLocked { state4, peer_id },
             BobState::EncSigSent(state4, peer_id) => Bob::EncSigSent { state4, peer_id },
             BobState::BtcRedeemed(state5) => Bob::BtcRedeemed(state5),
+            BobState::T1Expired(state4) => Bob::T1Expired(state4),
             BobState::Cancelled(state4) => Bob::BtcCancelled(state4),
             BobState::BtcRefunded(_)
             | BobState::XmrRedeemed
@@ -90,6 +93,7 @@ impl TryFrom<state::Swap> for BobState {
                 Bob::XmrLocked { state4, peer_id } => BobState::XmrLocked(state4, peer_id),
                 Bob::EncSigSent { state4, peer_id } => BobState::EncSigSent(state4, peer_id),
                 Bob::BtcRedeemed(state5) => BobState::BtcRedeemed(state5),
+                Bob::T1Expired(state4) => BobState::T1Expired(state4),
                 Bob::BtcCancelled(state4) => BobState::Cancelled(state4),
                 Bob::SwapComplete => BobState::SafelyAborted,
             };
@@ -272,18 +276,27 @@ where
                 .await
             }
             BobState::XmrLocked(state, alice_peer_id) => {
-                // Alice has locked Xmr
-                // Bob sends Alice his key
-                let tx_redeem_encsig = state.tx_redeem_encsig();
-                // Do we have to wait for a response?
-                // What if Alice fails to receive this? Should we always resend?
-                // todo: If we cannot dial Alice we should go to EncSigSent. Maybe dialing
-                // should happen in this arm?
-                event_loop_handle
-                    .send_message3(alice_peer_id.clone(), tx_redeem_encsig)
-                    .await?;
+                let state = if let Epoch::T0 = state.current_epoch(bitcoin_wallet.as_ref()).await? {
+                    // Alice has locked Xmr
+                    // Bob sends Alice his key
+                    let tx_redeem_encsig = state.tx_redeem_encsig();
 
-                let state = BobState::EncSigSent(state, alice_peer_id);
+                    let state4_clone = state.clone();
+                    let enc_sig_sent_watcher =
+                        event_loop_handle.send_message3(alice_peer_id.clone(), tx_redeem_encsig);
+                    let bitcoin_wallet = bitcoin_wallet.clone();
+                    let t1_timeout = state4_clone.wait_for_t1(bitcoin_wallet.as_ref());
+
+                    pin_mut!(enc_sig_sent_watcher);
+                    pin_mut!(t1_timeout);
+
+                    match select(enc_sig_sent_watcher, t1_timeout).await {
+                        Either::Left((..)) => BobState::EncSigSent(state, alice_peer_id),
+                        Either::Right((..)) => BobState::T1Expired(state),
+                    }
+                } else {
+                    BobState::T1Expired(state)
+                };
                 let db_state = state.clone().into();
                 db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
                     .await?;
@@ -300,28 +313,20 @@ where
                 .await
             }
             BobState::EncSigSent(state, ..) => {
-                let state_clone = state.clone();
-                let redeem_watcher = state_clone.watch_for_redeem_btc(bitcoin_wallet.as_ref());
-                let t1_timeout = state_clone.wait_for_t1(bitcoin_wallet.as_ref());
+                let state = if let Epoch::T0 = state.current_epoch(bitcoin_wallet.as_ref()).await? {
+                    let state_clone = state.clone();
+                    let redeem_watcher = state_clone.watch_for_redeem_btc(bitcoin_wallet.as_ref());
+                    let t1_timeout = state_clone.wait_for_t1(bitcoin_wallet.as_ref());
 
-                pin_mut!(redeem_watcher);
-                pin_mut!(t1_timeout);
+                    pin_mut!(redeem_watcher);
+                    pin_mut!(t1_timeout);
 
-                let state = match select(redeem_watcher, t1_timeout).await {
-                    Either::Left((val, _)) => BobState::BtcRedeemed(val?),
-                    Either::Right((..)) => {
-                        // Check whether TxCancel has been published.
-                        // We should not fail if the transaction is already on the blockchain
-                        if state
-                            .check_for_tx_cancel(bitcoin_wallet.as_ref())
-                            .await
-                            .is_err()
-                        {
-                            state.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
-                        }
-
-                        BobState::Cancelled(state)
+                    match select(redeem_watcher, t1_timeout).await {
+                        Either::Left((val, _)) => BobState::BtcRedeemed(val?),
+                        Either::Right((..)) => BobState::T1Expired(state),
                     }
+                } else {
+                    BobState::T1Expired(state)
                 };
 
                 let db_state = state.clone().into();
@@ -347,6 +352,31 @@ where
                 let db_state = state.clone().into();
                 db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
                     .await?;
+                run_until(
+                    state,
+                    is_target_state,
+                    event_loop_handle,
+                    db,
+                    bitcoin_wallet,
+                    monero_wallet,
+                    rng,
+                    swap_id,
+                )
+                .await
+            }
+            BobState::T1Expired(state4) => {
+                if state4
+                    .check_for_tx_cancel(bitcoin_wallet.as_ref())
+                    .await
+                    .is_err()
+                {
+                    state4.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
+                }
+
+                let state = BobState::Cancelled(state4);
+                db.insert_latest_state(swap_id, state::Swap::Bob(state.clone().into()))
+                    .await?;
+
                 run_until(
                     state,
                     is_target_state,

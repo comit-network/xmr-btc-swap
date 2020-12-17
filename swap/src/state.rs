@@ -60,6 +60,7 @@ pub enum Bob {
         peer_id: PeerId,
     },
     BtcRedeemed(bob::State5),
+    T1Expired(bob::State4),
     BtcCancelled(bob::State4),
     SwapComplete,
 }
@@ -106,9 +107,10 @@ impl Display for Bob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Bob::Negotiated { .. } => f.write_str("Handshake complete"),
-            Bob::BtcLocked { .. } | Bob::XmrLocked { .. } | Bob::BtcCancelled(_) => {
-                f.write_str("Bitcoin refundable")
-            }
+            Bob::BtcLocked { .. }
+            | Bob::XmrLocked { .. }
+            | Bob::T1Expired(_)
+            | Bob::BtcCancelled(_) => f.write_str("Bitcoin refundable"),
             Bob::BtcRedeemed(_) => f.write_str("Monero redeemable"),
             Bob::SwapComplete => f.write_str("Swap complete"),
             Bob::EncSigSent { .. } => f.write_str("Encrypted signature sent"),
