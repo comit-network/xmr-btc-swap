@@ -2,7 +2,7 @@ use crate::{bob::event_loop::EventLoopHandle, state, state::Bob, storage::Databa
 use anyhow::{bail, Result};
 use futures::{
     future::{select, Either},
-    pin_mut,
+    FutureExt,
 };
 use libp2p::{core::Multiaddr, PeerId};
 use std::{fmt, sync::Arc};
@@ -208,13 +208,11 @@ impl Swap {
                     BobState::EncSigSent(state4, ..) => {
                         let state4_clone = state4.clone();
                         let bitcoin_wallet = self.bitcoin_wallet.clone();
-                        let redeem_watcher =
-                            state4_clone.watch_for_redeem_btc(bitcoin_wallet.as_ref());
+                        let redeem_watcher = state4_clone
+                            .watch_for_redeem_btc(bitcoin_wallet.as_ref())
+                            .boxed();
                         let bitcoin_wallet = self.bitcoin_wallet.clone();
-                        let t1_timeout = state4_clone.wait_for_t1(bitcoin_wallet.as_ref());
-
-                        pin_mut!(redeem_watcher);
-                        pin_mut!(t1_timeout);
+                        let t1_timeout = state4_clone.wait_for_t1(bitcoin_wallet.as_ref()).boxed();
 
                         state = match select(redeem_watcher, t1_timeout).await {
                             Either::Left((val, _)) => BobState::BtcRedeemed(val?),

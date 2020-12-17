@@ -21,7 +21,7 @@ use crate::{
 use anyhow::{bail, Result};
 use futures::{
     future::{select, Either},
-    pin_mut,
+    FutureExt,
 };
 use libp2p::request_response::ResponseChannel;
 use rand::{CryptoRng, RngCore};
@@ -351,21 +351,22 @@ impl Swap {
                                 let wait_for_enc_sig = wait_for_bitcoin_encrypted_signature(
                                     &mut self.event_loop_handle,
                                     self.config.monero_max_finality_time,
-                                );
+                                )
+                                .boxed();
                                 let state3_clone = state3.clone();
-                                let t1_timeout =
-                                    state3_clone.wait_for_t1(self.bitcoin_wallet.as_ref());
+                                let t1_timeout = state3_clone
+                                    .wait_for_t1(self.bitcoin_wallet.as_ref())
+                                    .boxed();
 
-                                pin_mut!(wait_for_enc_sig);
-                                pin_mut!(t1_timeout);
-
-                                match select(t1_timeout, wait_for_enc_sig).await {
+                                let state = match select(t1_timeout, wait_for_enc_sig).await {
                                     Either::Left(_) => AliceState::T1Expired { state3 },
                                     Either::Right((enc_sig, _)) => AliceState::EncSignLearned {
                                         state3,
                                         encrypted_signature: enc_sig?,
                                     },
-                                }
+                                };
+
+                                state
                             }
                             _ => AliceState::T1Expired { state3 },
                         };
@@ -495,15 +496,14 @@ impl Swap {
                             signed_tx_punish,
                             self.bitcoin_wallet.clone(),
                             self.config,
-                        );
+                        )
+                        .boxed();
 
                         let bitcoin_wallet_clone = self.bitcoin_wallet.clone();
 
-                        let refund_tx_seen =
-                            bitcoin_wallet_clone.watch_for_raw_transaction(tx_refund.txid());
-
-                        pin_mut!(punish_tx_finalised);
-                        pin_mut!(refund_tx_seen);
+                        let refund_tx_seen = bitcoin_wallet_clone
+                            .watch_for_raw_transaction(tx_refund.txid())
+                            .boxed();
 
                         state = match select(punish_tx_finalised, refund_tx_seen).await {
                             Either::Left(_) => AliceState::Punished,
