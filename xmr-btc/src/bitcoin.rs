@@ -243,3 +243,37 @@ where
         tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
     }
 }
+
+pub async fn publish_cancel_transaction<W>(
+    tx_lock: TxLock,
+    secret_key: crate::bitcoin::SecretKey,
+    public_key: crate::bitcoin::PublicKey,
+    refund_timelock: u32,
+    tx_cancel_sig: crate::bitcoin::Signature,
+    bitcoin_wallet: &W,
+) -> Result<Txid>
+where
+    W: BroadcastSignedTransaction,
+{
+    let tx_cancel =
+        crate::bitcoin::TxCancel::new(&tx_lock, refund_timelock, public_key, secret_key.public());
+
+    let sig_theirs = tx_cancel_sig.clone();
+    let sig_ours = secret_key.sign(tx_cancel.digest());
+
+    let tx_cancel_txn = tx_cancel
+        .clone()
+        .add_signatures(
+            &tx_lock,
+            (public_key, sig_theirs),
+            (secret_key.public(), sig_ours),
+        )
+        .expect(
+            "sig_{a,b} to be valid signatures for
+                tx_cancel",
+        );
+
+    bitcoin_wallet
+        .broadcast_signed_transaction(tx_cancel_txn)
+        .await
+}

@@ -34,10 +34,10 @@ use tracing::error;
 
 pub mod message;
 use crate::{
-    bitcoin::{BlockHeight, GetRawTransaction, Network, TransactionBlockHeight},
+    bitcoin::{BlockHeight, Network, TransactionBlockHeight},
     monero::{CreateWalletForOutput, WatchForTransfer},
 };
-use ::bitcoin::{Transaction, Txid};
+use ::bitcoin::Txid;
 pub use message::{Message, Message0, Message1, Message2, Message3};
 
 #[allow(clippy::large_enum_variant)]
@@ -660,51 +660,19 @@ impl State4 {
         self.b.encsign(self.S_a_bitcoin, tx_redeem.digest())
     }
 
-    pub async fn check_for_tx_cancel<W>(&self, bitcoin_wallet: &W) -> Result<Transaction>
-    where
-        W: GetRawTransaction,
-    {
-        let tx_cancel =
-            bitcoin::TxCancel::new(&self.tx_lock, self.refund_timelock, self.A, self.b.public());
-
-        let sig_a = self.tx_cancel_sig_a.clone();
-        let sig_b = self.b.sign(tx_cancel.digest());
-
-        let tx_cancel = tx_cancel
-            .clone()
-            .add_signatures(&self.tx_lock, (self.A, sig_a), (self.b.public(), sig_b))
-            .expect(
-                "sig_{a,b} to be valid signatures for
-                tx_cancel",
-            );
-
-        let tx = bitcoin_wallet.get_raw_transaction(tx_cancel.txid()).await?;
-
-        Ok(tx)
-    }
-
     pub async fn submit_tx_cancel<W>(&self, bitcoin_wallet: &W) -> Result<Txid>
     where
         W: BroadcastSignedTransaction,
     {
-        let tx_cancel =
-            bitcoin::TxCancel::new(&self.tx_lock, self.refund_timelock, self.A, self.b.public());
-
-        let sig_a = self.tx_cancel_sig_a.clone();
-        let sig_b = self.b.sign(tx_cancel.digest());
-
-        let tx_cancel = tx_cancel
-            .clone()
-            .add_signatures(&self.tx_lock, (self.A, sig_a), (self.b.public(), sig_b))
-            .expect(
-                "sig_{a,b} to be valid signatures for
-                tx_cancel",
-            );
-
-        let tx_id = bitcoin_wallet
-            .broadcast_signed_transaction(tx_cancel)
-            .await?;
-        Ok(tx_id)
+        crate::bitcoin::publish_cancel_transaction(
+            self.tx_lock.clone(),
+            self.b.clone(),
+            self.A,
+            self.refund_timelock,
+            self.tx_cancel_sig_a.clone(),
+            bitcoin_wallet,
+        )
+        .await
     }
 
     pub async fn watch_for_redeem_btc<W>(&self, bitcoin_wallet: &W) -> Result<State5>

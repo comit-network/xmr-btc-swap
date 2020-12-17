@@ -3320,6 +3320,7 @@ dependencies = [
  "genawaiter",
  "get-port",
  "hyper",
+ "jsonrpc_client",
  "libp2p",
  "libp2p-tokio-socks5",
  "log",
