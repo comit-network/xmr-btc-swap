@@ -354,7 +354,7 @@ pub struct State0 {
     refund_timelock: u32,
     punish_timelock: u32,
     refund_address: bitcoin::Address,
-    dleq_proof_s_b: cross_curve_dleq::Proof,
+    dleq_proof_s_b: Box<cross_curve_dleq::Proof>,
 }
 
 impl State0 {
@@ -371,7 +371,7 @@ impl State0 {
         let s_b = cross_curve_dleq::Scalar::random(rng);
         let v_b = monero::PrivateViewKey::new_random(rng);
 
-        let dleq_proof_s_b = cross_curve_dleq::Proof::new(rng, &s_b);
+        let dleq_proof_s_b = Box::new(cross_curve_dleq::Proof::new(rng, &s_b));
 
         Self {
             b,
@@ -393,7 +393,7 @@ impl State0 {
                 scalar: self.s_b.into_ed25519(),
             }),
             S_b_bitcoin: self.s_b.into_secp256k1().into(),
-            dleq_proof_s_b: self.dleq_proof_s_b.clone(),
+            dleq_proof_s_b: *self.dleq_proof_s_b.clone(),
             v_b: self.v_b,
             refund_address: self.refund_address.clone(),
         }

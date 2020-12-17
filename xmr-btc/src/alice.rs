@@ -827,9 +827,7 @@ pub struct State5 {
     punish_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
     tx_lock_proof: monero::TransferProof,
-
     tx_punish_sig_bob: bitcoin::Signature,
-
     tx_cancel_sig_bob: bitcoin::Signature,
     lock_xmr_fee: monero::Amount,
 }
