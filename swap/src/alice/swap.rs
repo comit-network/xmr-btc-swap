@@ -6,8 +6,8 @@ use crate::{
         steps::{
             build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
             extract_monero_private_key, lock_xmr, negotiate, publish_bitcoin_punish_transaction,
-            publish_bitcoin_redeem_transaction, publish_cancel_transaction,
-            wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund, wait_for_locked_bitcoin,
+            publish_bitcoin_redeem_transaction, wait_for_bitcoin_encrypted_signature,
+            wait_for_bitcoin_refund, wait_for_locked_bitcoin,
         },
     },
     bitcoin,
@@ -16,9 +16,9 @@ use crate::{
     state,
     state::{Alice, Swap},
     storage::Database,
-    SwapAmounts,
+    SwapAmounts, TRANSACTION_ALREADY_IN_BLOCKCHAIN_ERROR_CODE,
 };
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use async_recursion::async_recursion;
 use futures::{
     future::{select, Either},
@@ -31,7 +31,7 @@ use tracing::info;
 use uuid::Uuid;
 use xmr_btc::{
     alice::{State0, State3},
-    bitcoin::{TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction},
+    bitcoin::{TransactionBlockHeight, TxRefund, WatchForRawTransaction},
     config::Config,
     monero::CreateWalletForOutput,
     Epoch,
@@ -67,7 +67,6 @@ pub enum AliceState {
     BtcRedeemed,
     BtcCancelled {
         state3: State3,
-        tx_cancel: TxCancel,
     },
     BtcRefunded {
         spend_key: monero::PrivateKey,
@@ -167,19 +166,7 @@ impl TryFrom<state::Swap> for AliceState {
                     encrypted_signature,
                 },
                 Alice::T1Expired(state3) => AliceState::T1Expired { state3 },
-                Alice::BtcCancelled(state) => {
-                    let tx_cancel = bitcoin::TxCancel::new(
-                        &state.tx_lock,
-                        state.refund_timelock,
-                        state.a.public(),
-                        state.B,
-                    );
-
-                    BtcCancelled {
-                        state3: state,
-                        tx_cancel,
-                    }
-                }
+                Alice::BtcCancelled(state3) => BtcCancelled { state3 },
                 Alice::BtcPunishable(state) => {
                     let tx_cancel = bitcoin::TxCancel::new(
                         &state.tx_lock,
@@ -486,20 +473,22 @@ pub async fn run_until(
                 .await
             }
             AliceState::T1Expired { state3 } => {
-                let tx_cancel = publish_cancel_transaction(
-                    state3.tx_lock.clone(),
-                    state3.a.clone(),
-                    state3.B,
-                    state3.refund_timelock,
-                    state3.tx_cancel_sig_bob.clone(),
-                    bitcoin_wallet.clone(),
-                )
-                .await?;
+                if let Err(error) = state3.submit_tx_cancel(bitcoin_wallet.as_ref()).await {
+                    let json_rpc_err = error
+                        .downcast_ref::<jsonrpc_client::JsonRpcError>()
+                        .ok_or_else(|| anyhow!("Failed to downcast JsonRpcError"))?;
+                    if json_rpc_err.code == TRANSACTION_ALREADY_IN_BLOCKCHAIN_ERROR_CODE {
+                        info!("Failed to send cancel transaction, assuming that is was already published by the other party...");
+                    } else {
+                        return Err(error);
+                    }
+                };
 
-                let state = AliceState::BtcCancelled { state3, tx_cancel };
+                let state = AliceState::BtcCancelled { state3 };
                 let db_state = (&state).into();
                 db.insert_latest_state(swap_id, Swap::Alice(db_state))
                     .await?;
+
                 run_until(
                     state,
                     is_target_state,
@@ -512,7 +501,8 @@ pub async fn run_until(
                 )
                 .await
             }
-            AliceState::BtcCancelled { state3, tx_cancel } => {
+            AliceState::BtcCancelled { state3 } => {
+                let tx_cancel = state3.tx_cancel();
                 let tx_cancel_height = bitcoin_wallet
                     .transaction_block_height(tx_cancel.txid())
                     .await;

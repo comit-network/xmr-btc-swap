@@ -28,7 +28,8 @@ use std::{
 use tokio::{sync::Mutex, time::timeout};
 use tracing::{error, info};
 pub mod message;
-use crate::bitcoin::{BlockHeight, TransactionBlockHeight};
+use crate::bitcoin::{BlockHeight, TransactionBlockHeight, TxCancel};
+use ::bitcoin::Txid;
 pub use message::{Message, Message0, Message1, Message2};
 
 #[derive(Debug)]
@@ -709,6 +710,25 @@ impl State3 {
             (false, true) => Ok(Epoch::T1),
             (false, false) => Ok(Epoch::T2),
         }
+    }
+
+    pub fn tx_cancel(&self) -> TxCancel {
+        crate::bitcoin::TxCancel::new(&self.tx_lock, self.refund_timelock, self.a.public(), self.B)
+    }
+
+    pub async fn submit_tx_cancel<W>(&self, bitcoin_wallet: &W) -> Result<Txid>
+    where
+        W: BroadcastSignedTransaction,
+    {
+        crate::bitcoin::publish_cancel_transaction(
+            self.tx_lock.clone(),
+            self.a.clone(),
+            self.B,
+            self.refund_timelock,
+            self.tx_punish_sig_bob.clone(),
+            bitcoin_wallet,
+        )
+        .await
     }
 }
 

@@ -3,9 +3,9 @@ use crate::{
     state,
     state::{Bob, Swap},
     storage::Database,
-    SwapAmounts,
+    SwapAmounts, TRANSACTION_ALREADY_IN_BLOCKCHAIN_ERROR_CODE,
 };
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use async_recursion::async_recursion;
 use rand::{CryptoRng, RngCore};
 use std::{convert::TryFrom, fmt, sync::Arc};
@@ -343,13 +343,17 @@ where
                 .await
             }
             BobState::T1Expired(state4) => {
-                if state4
-                    .check_for_tx_cancel(bitcoin_wallet.as_ref())
-                    .await
-                    .is_err()
-                {
-                    state4.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
-                }
+                let result = state4.submit_tx_cancel(bitcoin_wallet.as_ref()).await;
+                if let Err(error) = result {
+                    let json_rpc_err = error
+                        .downcast_ref::<jsonrpc_client::JsonRpcError>()
+                        .ok_or_else(|| anyhow!("Failed to downcast JsonRpcError"))?;
+                    if json_rpc_err.code == TRANSACTION_ALREADY_IN_BLOCKCHAIN_ERROR_CODE {
+                        info!("Failed to send cancel transaction, assuming that is was already included by the other party...");
+                    } else {
+                        return Err(error);
+                    }
+                };
 
                 let state = BobState::Cancelled(state4);
                 db.insert_latest_state(swap_id, state::Swap::Bob(state.clone().into()))

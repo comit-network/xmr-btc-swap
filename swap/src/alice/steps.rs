@@ -20,8 +20,8 @@ use xmr_btc::{
     alice::State3,
     bitcoin::{
         poll_until_block_height_is_gte, BlockHeight, BroadcastSignedTransaction,
-        EncryptedSignature, GetRawTransaction, TransactionBlockHeight, TxCancel, TxLock, TxRefund,
-        WaitForTransactionFinality, WatchForRawTransaction,
+        EncryptedSignature, TxCancel, TxLock, TxRefund, WaitForTransactionFinality,
+        WatchForRawTransaction,
     },
     config::Config,
     cross_curve_dleq,
@@ -201,54 +201,6 @@ where
     bitcoin_wallet
         .wait_for_transaction_finality(tx_id, config)
         .await
-}
-
-pub async fn publish_cancel_transaction<W>(
-    tx_lock: TxLock,
-    a: bitcoin::SecretKey,
-    B: bitcoin::PublicKey,
-    refund_timelock: u32,
-    tx_cancel_sig_bob: bitcoin::Signature,
-    bitcoin_wallet: Arc<W>,
-) -> Result<bitcoin::TxCancel>
-where
-    W: GetRawTransaction + TransactionBlockHeight + BlockHeight + BroadcastSignedTransaction,
-{
-    // First wait for t1 to expire
-    let tx_lock_height = bitcoin_wallet
-        .transaction_block_height(tx_lock.txid())
-        .await;
-    poll_until_block_height_is_gte(bitcoin_wallet.as_ref(), tx_lock_height + refund_timelock).await;
-
-    let tx_cancel = bitcoin::TxCancel::new(&tx_lock, refund_timelock, a.public(), B);
-
-    // If Bob hasn't yet broadcasted the tx cancel, we do it
-    if bitcoin_wallet
-        .get_raw_transaction(tx_cancel.txid())
-        .await
-        .is_err()
-    {
-        // TODO(Franck): Maybe the cancel transaction is already mined, in this case,
-        // the broadcast will error out.
-
-        let sig_a = a.sign(tx_cancel.digest());
-        let sig_b = tx_cancel_sig_bob.clone();
-
-        let tx_cancel = tx_cancel
-            .clone()
-            .add_signatures(&tx_lock, (a.public(), sig_a), (B, sig_b))
-            .expect("sig_{a,b} to be valid signatures for tx_cancel");
-
-        // TODO(Franck): Error handling is delicate, why can't we broadcast?
-        bitcoin_wallet
-            .broadcast_signed_transaction(tx_cancel)
-            .await?;
-
-        // TODO(Franck): Wait until transaction is mined and returned mined
-        // block height
-    }
-
-    Ok(tx_cancel)
 }
 
 pub async fn wait_for_bitcoin_refund<W>(
