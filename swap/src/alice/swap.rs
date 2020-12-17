@@ -343,7 +343,7 @@ impl Swap {
                             .await?;
                     }
                     AliceState::XmrLocked { state3 } => {
-                        match state3.current_epoch(self.bitcoin_wallet.as_ref()).await? {
+                        state = match state3.current_epoch(self.bitcoin_wallet.as_ref()).await? {
                             Epoch::T0 => {
                                 let wait_for_enc_sig = wait_for_bitcoin_encrypted_signature(
                                     &mut self.event_loop_handle,
@@ -354,19 +354,19 @@ impl Swap {
                                     state3_clone.wait_for_t1(self.bitcoin_wallet.as_ref());
 
                                 select! {
-                                    _ = t1_timeout => {
-                                        state = AliceState::T1Expired { state3 }
-                                    },
                                     enc_sig = wait_for_enc_sig => {
-                                        state = AliceState::EncSignLearned {
-                                                   state3,
-                                                   encrypted_signature: enc_sig?,
-                                        };
+                                        AliceState::EncSignLearned {
+                                            state3,
+                                            encrypted_signature: enc_sig?,
+                                        }
+                                    },
+                                    _t1_expired = t1_timeout => {
+                                        AliceState::T1Expired { state3 }
                                     }
-                                };
+                                }
                             }
                             _ => {
-                                state = AliceState::T1Expired { state3 };
+                                AliceState::T1Expired { state3 }
                             }
                         };
 
@@ -502,19 +502,19 @@ impl Swap {
                         let refund_tx_seen =
                             bitcoin_wallet_clone.watch_for_raw_transaction(tx_refund.txid());
 
-                        select! {
+
+                        state = select! {
                             _ = punish_tx_finalised => {
-                                state = AliceState::Punished
+                                AliceState::Punished
                             },
                             published_refund_tx = refund_tx_seen => {
                                 let spend_key = extract_monero_private_key(
-                                    published_refund_tx,
-                                    tx_refund,
-                                    state3.s_a,
-                                    state3.a.clone(),
-                                    state3.S_b_bitcoin,
-                                )?;
-                                state = AliceState::BtcRefunded { spend_key, state3 }
+                                published_refund_tx,
+                                tx_refund,
+                                state3.s_a,
+                                state3.a.clone(),
+                                state3.S_b_bitcoin)?;
+                                AliceState::BtcRefunded { spend_key, state3 }
                             }
                         };
 
