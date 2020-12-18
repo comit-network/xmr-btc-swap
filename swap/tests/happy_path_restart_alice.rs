@@ -1,16 +1,16 @@
+use crate::testutils::{init_alice, init_bob};
+use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
+use std::convert::TryFrom;
 use swap::{alice, alice::swap::AliceState, bitcoin, bob, storage::Database};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
+use testutils::init_tracing;
 use uuid::Uuid;
 use xmr_btc::config::Config;
 
 pub mod testutils;
-
-use crate::testutils::{init_alice, init_bob};
-use std::convert::TryFrom;
-use testutils::init_tracing;
 
 #[tokio::test]
 async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
@@ -31,7 +31,8 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     let bob_btc_starting_balance = btc_to_swap * 10;
     let alice_xmr_starting_balance = xmr_to_swap * 10;
 
-    let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9877"
+    let port = get_port().expect("Failed to find a free port");
+    let alice_multiaddr: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", port)
         .parse()
         .expect("failed to parse Alice's address");
 

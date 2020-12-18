@@ -1,5 +1,6 @@
 use crate::testutils::{init_alice, init_bob};
 use futures::future::try_join;
+use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
 use swap::{alice, bob};
@@ -35,8 +36,8 @@ async fn happy_path() {
     let xmr_alice = xmr_to_swap * 10;
     let xmr_bob = xmr_btc::monero::Amount::ZERO;
 
-    // todo: This should not be hardcoded
-    let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9876"
+    let port = get_port().expect("Failed to find a free port");
+    let alice_multiaddr: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", port)
         .parse()
         .expect("failed to parse Alice's address");
 
