@@ -60,6 +60,7 @@ pub enum Bob {
         peer_id: PeerId,
     },
     BtcRedeemed(bob::State5),
+    T1Expired(bob::State4),
     BtcCancelled(bob::State4),
     SwapComplete,
 }
@@ -92,7 +93,7 @@ impl Display for Alice {
             Alice::BtcLocked(_) => f.write_str("Bitcoin locked"),
             Alice::XmrLocked(_) => f.write_str("Monero locked"),
             Alice::BtcRedeemable { .. } => f.write_str("Bitcoin redeemable"),
-            Alice::T1Expired(_) => f.write_str("Submitting TxCancel"),
+            Alice::T1Expired(_) => f.write_str("Timelock T1 expired"),
             Alice::BtcCancelled(_) => f.write_str("Bitcoin cancel transaction published"),
             Alice::BtcPunishable(_) => f.write_str("Bitcoin punishable"),
             Alice::BtcRefunded { .. } => f.write_str("Monero refundable"),
@@ -106,9 +107,10 @@ impl Display for Bob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Bob::Negotiated { .. } => f.write_str("Handshake complete"),
-            Bob::BtcLocked { .. } | Bob::XmrLocked { .. } | Bob::BtcCancelled(_) => {
-                f.write_str("Bitcoin refundable")
-            }
+            Bob::BtcLocked { .. } => f.write_str("Bitcoin locked"),
+            Bob::XmrLocked { .. } => f.write_str("Monero locked"),
+            Bob::T1Expired(_) => f.write_str("Timelock T1 expired"),
+            Bob::BtcCancelled(_) => f.write_str("Bitcoin refundable"),
             Bob::BtcRedeemed(_) => f.write_str("Monero redeemable"),
             Bob::SwapComplete => f.write_str("Swap complete"),
             Bob::EncSigSent { .. } => f.write_str("Encrypted signature sent"),
