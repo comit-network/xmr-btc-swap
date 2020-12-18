@@ -62,6 +62,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
     let (bob_state, bob_event_loop, bob_event_loop_handle, bob_btc_wallet, bob_xmr_wallet, bob_db) =
         init_bob(
             alice_multiaddr,
+            alice_event_loop.peer_id(),
             &bitcoind,
             &monero,
             btc_to_swap,

@@ -56,9 +56,12 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     )
     .await;
 
+    let alice_peer_id = alice_event_loop.peer_id();
+
     let (bob_state, bob_event_loop, bob_event_loop_handle, bob_btc_wallet, bob_xmr_wallet, bob_db) =
         init_bob(
             alice_multiaddr.clone(),
+            alice_peer_id.clone(),
             &bitcoind,
             &monero,
             btc_to_swap,
@@ -73,18 +76,17 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     let bob_btc_wallet_clone = bob_btc_wallet.clone();
     let bob_xmr_wallet_clone = bob_xmr_wallet.clone();
 
-    let _ = tokio::spawn(async move {
-        bob::swap::swap(
-            bob_state,
-            bob_event_loop_handle,
-            bob_db,
-            bob_btc_wallet.clone(),
-            bob_xmr_wallet.clone(),
-            OsRng,
-            Uuid::new_v4(),
-        )
-        .await
-    });
+    let _ = tokio::spawn(bob::swap::swap(
+        bob_state,
+        bob_event_loop_handle,
+        bob_db,
+        bob_btc_wallet.clone(),
+        bob_xmr_wallet.clone(),
+        OsRng,
+        Uuid::new_v4(),
+        alice_peer_id,
+        alice_multiaddr.clone(),
+    ));
 
     let _bob_swarm_fut = tokio::spawn(async move { bob_event_loop.run().await });
 

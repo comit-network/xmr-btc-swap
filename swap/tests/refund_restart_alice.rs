@@ -63,6 +63,7 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
     let (bob_state, bob_event_loop, bob_event_loop_handle, bob_btc_wallet, bob_xmr_wallet, bob_db) =
         init_bob(
             alice_multiaddr.clone(),
+            alice_event_loop_1.peer_id(),
             &bitcoind,
             &monero,
             btc_to_swap,
@@ -80,6 +81,8 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
         bob_xmr_wallet.clone(),
         OsRng,
         Uuid::new_v4(),
+        alice_event_loop_1.peer_id(),
+        alice_multiaddr.clone(),
     );
 
     let alice_swap_id = Uuid::new_v4();

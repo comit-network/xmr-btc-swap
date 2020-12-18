@@ -56,8 +56,6 @@ pub enum Bob {
     },
     EncSigSent {
         state4: bob::State4,
-        #[serde(with = "crate::serde::peer_id")]
-        peer_id: PeerId,
     },
     BtcRedeemed(bob::State5),
     T1Expired(bob::State4),

@@ -63,7 +63,8 @@ async fn happy_path() {
 
     let (bob_state, bob_event_loop, bob_event_loop_handle, bob_btc_wallet, bob_xmr_wallet, bob_db) =
         init_bob(
-            alice_multiaddr,
+            alice_multiaddr.clone(),
+            alice_event_loop.peer_id(),
             &bitcoind,
             &monero,
             btc_to_swap,
@@ -83,6 +84,8 @@ async fn happy_path() {
         alice_db,
     );
 
+    let alice_peer_id = alice_event_loop.peer_id();
+
     let _alice_swarm_fut = tokio::spawn(async move { alice_event_loop.run().await });
 
     let bob_swap_fut = bob::swap::swap(
@@ -93,6 +96,8 @@ async fn happy_path() {
         bob_xmr_wallet.clone(),
         OsRng,
         Uuid::new_v4(),
+        alice_peer_id,
+        alice_multiaddr,
     );
 
     let _bob_swarm_fut = tokio::spawn(async move { bob_event_loop.run().await });
