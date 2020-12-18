@@ -13,13 +13,12 @@ atty = "0.2"
 backoff = { version = "0.2", features = ["tokio"] }
 base64 = "0.12"
 bitcoin = { version = "0.25", features = ["rand", "use-serde"] }
-bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "864b55fcba2e770105f135781dd2e3002c503d12" }
+bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "f3fbbba403e1d3329d8fd79d7549775183bcbc74" }
 conquer-once = "0.3"
 derivative = "2"
 ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", rev = "cdfbc766045ea678a41780919d6228dd5acee3be", features = ["libsecp_compat", "serde"] }
 futures = { version = "0.3", default-features = false }
 genawaiter = "0.99.1"
-jsonrpc_client = { git = "https://github.com/thomaseizinger/rust-jsonrpc-client", rev = "c7010817e0f86ab24b3dc10d6bb0463faa0aace4", features = ["reqwest"] }
 libp2p = { version = "0.29", default-features = false, features = ["tcp-tokio", "yamux", "mplex", "dns", "noise", "request-response"] }
 libp2p-tokio-socks5 = "0.4"
 log = { version = "0.4", features = ["serde"] }

@@ -7,6 +7,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use async_recursion::async_recursion;
+use bitcoin_harness::bitcoind_rpc::jsonrpc_client::JsonRpcError;
 use libp2p::{core::Multiaddr, PeerId};
 use rand::{CryptoRng, RngCore};
 use std::{convert::TryFrom, fmt, sync::Arc};
@@ -360,7 +361,7 @@ where
                 let result = state4.submit_tx_cancel(bitcoin_wallet.as_ref()).await;
                 if let Err(error) = result {
                     let json_rpc_err = error
-                        .downcast_ref::<jsonrpc_client::JsonRpcError>()
+                        .downcast_ref::<JsonRpcError>()
                         .ok_or_else(|| anyhow!("Failed to downcast JsonRpcError"))?;
                     if json_rpc_err.code == TRANSACTION_ALREADY_IN_BLOCKCHAIN_ERROR_CODE {
                         info!("Failed to send cancel transaction, assuming that is was already included by the other party...");

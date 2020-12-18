@@ -236,7 +236,7 @@ dependencies = [
 [[package]]
 name = "bitcoin-harness"
 version = "0.2.0"
-source = "git+https://github.com/coblox/bitcoin-harness-rs?rev=864b55fcba2e770105f135781dd2e3002c503d12#864b55fcba2e770105f135781dd2e3002c503d12"
+source = "git+https://github.com/coblox/bitcoin-harness-rs?rev=f3fbbba403e1d3329d8fd79d7549775183bcbc74#f3fbbba403e1d3329d8fd79d7549775183bcbc74"
 dependencies = [
  "async-trait",
  "base64 0.12.3",
@@ -3320,7 +3320,6 @@ dependencies = [
  "genawaiter",
  "get-port",
  "hyper",
- "jsonrpc_client",
  "libp2p",
  "libp2p-tokio-socks5",
  "log",
