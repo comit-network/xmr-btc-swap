@@ -50,6 +50,7 @@ xmr-btc = { path = "../xmr-btc" }
 [dev-dependencies]
 hyper = "0.13"
 port_check = "0.1"
+portpicker = "0.1.0"
 spectral = "0.6"
 tempfile = "3"
 testcontainers = "0.11"

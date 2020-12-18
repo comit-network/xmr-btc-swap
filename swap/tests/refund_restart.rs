@@ -1,6 +1,7 @@
 use crate::testutils::{init_alice, init_bob};
 use futures::future::try_join;
 use libp2p::Multiaddr;
+use portpicker::pick_unused_port;
 use rand::rngs::OsRng;
 use swap::{alice, alice::swap::AliceState, bob, bob::swap::BobState, storage::Database};
 use tempfile::tempdir;
@@ -35,8 +36,8 @@ async fn both_refund() {
     let alice_btc_starting_balance = bitcoin::Amount::ZERO;
     let alice_xmr_starting_balance = xmr_to_swap * 10;
 
-    // todo: This should not be hardcoded
-    let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9879"
+    let port = pick_unused_port().expect("No ports free");
+    let alice_multiaddr: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", port)
         .parse()
         .expect("failed to parse Alice's address");
 
