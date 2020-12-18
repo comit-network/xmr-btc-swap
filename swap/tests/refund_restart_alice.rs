@@ -14,7 +14,7 @@ pub mod testutils;
 // Bob locks btc and Alice locks xmr. Alice fails to act so Bob refunds. Alice
 // then also refunds.
 #[tokio::test]
-async fn both_refund() {
+async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
     let _guard = init_tracing();
 
     let cli = Cli::default();
