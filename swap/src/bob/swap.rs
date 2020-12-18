@@ -127,32 +127,6 @@ where
     .await
 }
 
-pub async fn resume_from_database<R>(
-    event_loop_handle: EventLoopHandle,
-    db: Database,
-    bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
-    monero_wallet: Arc<crate::monero::Wallet>,
-    rng: R,
-    swap_id: Uuid,
-) -> Result<BobState>
-where
-    R: RngCore + CryptoRng + Send,
-{
-    let db_swap = db.get_state(swap_id)?;
-    let start_state = BobState::try_from(db_swap)?;
-    let state = swap(
-        start_state,
-        event_loop_handle,
-        db,
-        bitcoin_wallet,
-        monero_wallet,
-        rng,
-        swap_id,
-    )
-    .await?;
-    Ok(state)
-}
-
 pub fn is_complete(state: &BobState) -> bool {
     matches!(
         state,

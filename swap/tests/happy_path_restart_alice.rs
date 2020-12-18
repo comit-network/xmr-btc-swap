@@ -9,6 +9,7 @@ use xmr_btc::config::Config;
 pub mod testutils;
 
 use crate::testutils::{init_alice, init_bob};
+use std::convert::TryFrom;
 use testutils::init_tracing;
 
 #[tokio::test]
@@ -119,7 +120,11 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
         testutils::init_alice_event_loop(alice_multiaddr);
     let _alice_swarm_fut = tokio::spawn(async move { event_loop_after_restart.run().await });
 
-    let alice_state = alice::swap::resume_from_database(
+    let db_swap = alice_db.get_state(alice_swap_id).unwrap();
+    let resume_state = AliceState::try_from(db_swap).unwrap();
+
+    let alice_state = alice::swap::swap(
+        resume_state,
         event_loop_handle_after_restart,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),

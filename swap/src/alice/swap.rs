@@ -233,29 +233,6 @@ pub async fn swap(
     .await
 }
 
-pub async fn resume_from_database(
-    event_loop_handle: EventLoopHandle,
-    bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
-    monero_wallet: Arc<crate::monero::Wallet>,
-    config: Config,
-    swap_id: Uuid,
-    db: Database,
-) -> Result<AliceState> {
-    let db_swap = db.get_state(swap_id)?;
-    let start_state = AliceState::try_from(db_swap)?;
-    let state = swap(
-        start_state,
-        event_loop_handle,
-        bitcoin_wallet,
-        monero_wallet,
-        config,
-        swap_id,
-        db,
-    )
-    .await?;
-    Ok(state)
-}
-
 pub fn is_complete(state: &AliceState) -> bool {
     matches!(
         state,
