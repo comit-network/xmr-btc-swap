@@ -108,8 +108,8 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
         _ = alice_event_loop_1.run() => panic!("The event loop should never finish")
     };
 
-    let bob_state4 = if let BobState::BtcRefunded(state4) = bob_state {
-        state4
+    let tx_lock_id = if let BobState::BtcRefunded(state4) = bob_state {
+        state4.tx_lock_id()
     } else {
         panic!("Bob in unexpected state");
     };
@@ -138,10 +138,7 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
     let btc_alice_final = alice_btc_wallet.as_ref().balance().await.unwrap();
     let btc_bob_final = bob_btc_wallet.as_ref().balance().await.unwrap();
 
-    let lock_tx_bitcoin_fee = bob_btc_wallet
-        .transaction_fee(bob_state4.tx_lock_id())
-        .await
-        .unwrap();
+    let lock_tx_bitcoin_fee = bob_btc_wallet.transaction_fee(tx_lock_id).await.unwrap();
 
     assert_eq!(btc_alice_final, alice_btc_starting_balance);
 
