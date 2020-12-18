@@ -84,18 +84,20 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
 
     let alice_swap_id = Uuid::new_v4();
     let alice_db_datadir = tempdir().unwrap();
-    let alice_db = Database::open(alice_db_datadir.path()).unwrap();
 
-    let alice_xmr_locked_fut = alice::swap::run_until(
-        alice_state,
-        alice::swap::is_xmr_locked,
-        alice_event_loop_handle_1,
-        alice_btc_wallet.clone(),
-        alice_xmr_wallet.clone(),
-        Config::regtest(),
-        alice_swap_id,
-        alice_db,
-    );
+    let alice_xmr_locked_fut = {
+        let alice_db = Database::open(alice_db_datadir.path()).unwrap();
+        alice::swap::run_until(
+            alice_state,
+            alice::swap::is_xmr_locked,
+            alice_event_loop_handle_1,
+            alice_btc_wallet.clone(),
+            alice_xmr_wallet.clone(),
+            Config::regtest(),
+            alice_swap_id,
+            alice_db,
+        )
+    };
 
     tokio::spawn(async move { bob_event_loop.run().await });
 
@@ -112,21 +114,23 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
         panic!("Bob in unexpected state");
     };
 
-    let alice_db = Database::open(alice_db_datadir.path()).unwrap();
     let (mut alice_event_loop_2, alice_event_loop_handle_2) =
         testutils::init_alice_event_loop(alice_multiaddr);
 
-    let alice_final_state = alice::swap::swap(
-        alice_restart_state,
-        alice_event_loop_handle_2,
-        alice_btc_wallet.clone(),
-        alice_xmr_wallet.clone(),
-        Config::regtest(),
-        alice_swap_id,
-        alice_db,
-    )
-    .await
-    .unwrap();
+    let alice_final_state = {
+        let alice_db = Database::open(alice_db_datadir.path()).unwrap();
+        alice::swap::swap(
+            alice_restart_state,
+            alice_event_loop_handle_2,
+            alice_btc_wallet.clone(),
+            alice_xmr_wallet.clone(),
+            Config::regtest(),
+            alice_swap_id,
+            alice_db,
+        )
+        .await
+        .unwrap()
+    };
     tokio::spawn(async move { alice_event_loop_2.run().await });
 
     assert!(matches!(alice_final_state, AliceState::XmrRefunded));
