@@ -39,7 +39,7 @@ impl Database {
         let encoded = self
             .0
             .get(&key)?
-            .ok_or_else(|| anyhow!("State does not exist {:?}", key))?;
+            .ok_or_else(|| anyhow!("Swap with id {} not found in database", swap_id))?;
 
         let state = deserialize(&encoded).context("Could not deserialize state")?;
         Ok(state)

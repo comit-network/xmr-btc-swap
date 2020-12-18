@@ -12,14 +12,23 @@
 )]
 #![forbid(unsafe_code)]
 
-use anyhow::Result;
+use anyhow::{Context, Result};
+use libp2p::core::Multiaddr;
 use prettytable::{row, Table};
 use rand::rngs::OsRng;
-use std::sync::Arc;
+use std::{convert::TryFrom, sync::Arc};
 use structopt::StructOpt;
 use swap::{
-    alice, alice::swap::AliceState, bitcoin, bob, bob::swap::BobState, cli::Options, monero,
-    network::transport::build, storage::Database, trace::init_tracing, SwapAmounts,
+    alice,
+    alice::swap::AliceState,
+    bitcoin, bob,
+    bob::swap::BobState,
+    cli::{Command, Options},
+    monero,
+    network::transport::build,
+    storage::Database,
+    trace::init_tracing,
+    SwapAmounts,
 };
 use tracing::{info, log::LevelFilter};
 use uuid::Uuid;
@@ -34,12 +43,14 @@ async fn main() -> Result<()> {
 
     let opt = Options::from_args();
 
-    // This currently creates the directory if it's not there in the first place
-    let db = Database::open(std::path::Path::new("./.swap-db/")).unwrap();
     let config = Config::mainnet();
 
-    match opt {
-        Options::SellXmr {
+    info!("Database: {}", opt.db_path);
+    let db = Database::open(std::path::Path::new(opt.db_path.as_str()))
+        .context("Could not open database")?;
+
+    match opt.cmd {
+        Command::SellXmr {
             bitcoind_url,
             bitcoin_wallet_name,
             monero_wallet_rpc_url,
@@ -47,42 +58,25 @@ async fn main() -> Result<()> {
             send_monero,
             receive_bitcoin,
         } => {
-            info!("running swap node as Alice ...");
-
-            let bitcoin_wallet = bitcoin::Wallet::new(
-                bitcoin_wallet_name.as_str(),
+            let (bitcoin_wallet, monero_wallet) = setup_wallets(
                 bitcoind_url,
-                config.bitcoin_network,
+                bitcoin_wallet_name.as_str(),
+                monero_wallet_rpc_url,
+                config,
             )
-            .await
-            .expect("failed to create bitcoin wallet");
-
-            let bitcoin_balance = bitcoin_wallet.balance().await?;
-            info!(
-                "Connection to Bitcoin wallet succeeded, balance: {}",
-                bitcoin_balance
-            );
-            let bitcoin_wallet = Arc::new(bitcoin_wallet);
-
-            let monero_wallet = monero::Wallet::new(monero_wallet_rpc_url);
-            let monero_balance = monero_wallet.get_balance().await?;
-            info!(
-                "Connection to Monero wallet succeeded, balance: {}",
-                monero_balance
-            );
-            let monero_wallet = Arc::new(monero_wallet);
+            .await?;
 
             let amounts = SwapAmounts {
                 btc: receive_bitcoin,
                 xmr: send_monero,
             };
 
-            let (alice_state, alice_behaviour) = {
+            let alice_state = {
                 let rng = &mut OsRng;
                 let a = bitcoin::SecretKey::new_random(rng);
                 let s_a = cross_curve_dleq::Scalar::random(rng);
                 let v_a = xmr_btc::monero::PrivateViewKey::new_random(rng);
-                let redeem_address = bitcoin_wallet.as_ref().new_address().await.unwrap();
+                let redeem_address = bitcoin_wallet.as_ref().new_address().await?;
                 let punish_address = redeem_address.clone();
                 let state0 = State0::new(
                     a,
@@ -96,22 +90,8 @@ async fn main() -> Result<()> {
                     punish_address,
                 );
 
-                (
-                    AliceState::Started { amounts, state0 },
-                    alice::Behaviour::default(),
-                )
+                AliceState::Started { amounts, state0 }
             };
-
-            let alice_peer_id = alice_behaviour.peer_id();
-            info!(
-                "Alice Peer ID (to be used by Bob to dial her): {}",
-                alice_peer_id
-            );
-
-            let alice_transport = build(alice_behaviour.identity())?;
-
-            let (mut event_loop, handle) =
-                alice::event_loop::EventLoop::new(alice_transport, alice_behaviour, listen_addr)?;
 
             let swap_id = Uuid::new_v4();
             info!(
@@ -119,20 +99,18 @@ async fn main() -> Result<()> {
                 send_monero, receive_bitcoin, swap_id
             );
 
-            let swap = alice::swap::swap(
-                alice_state,
-                handle,
-                bitcoin_wallet.clone(),
-                monero_wallet.clone(),
-                config,
+            alice_swap(
                 swap_id,
+                alice_state,
+                listen_addr,
+                bitcoin_wallet,
+                monero_wallet,
+                config,
                 db,
-            );
-
-            let _event_loop = tokio::spawn(async move { event_loop.run().await });
-            swap.await?;
+            )
+            .await?;
         }
-        Options::BuyXmr {
+        Command::BuyXmr {
             alice_addr,
             bitcoind_url,
             bitcoin_wallet_name,
@@ -140,34 +118,15 @@ async fn main() -> Result<()> {
             send_bitcoin,
             receive_monero,
         } => {
-            info!("running swap node as Bob ...");
-
-            let bob_behaviour = bob::Behaviour::default();
-            let bob_transport = build(bob_behaviour.identity())?;
-
-            let bitcoin_wallet = bitcoin::Wallet::new(
-                bitcoin_wallet_name.as_str(),
+            let (bitcoin_wallet, monero_wallet) = setup_wallets(
                 bitcoind_url,
-                config.bitcoin_network,
+                bitcoin_wallet_name.as_str(),
+                monero_wallet_rpc_url,
+                config,
             )
-            .await
-            .expect("failed to create bitcoin wallet");
-            let bitcoin_balance = bitcoin_wallet.balance().await?;
-            info!(
-                "Connection to Bitcoin wallet succeeded, balance: {}",
-                bitcoin_balance
-            );
-            let bitcoin_wallet = Arc::new(bitcoin_wallet);
+            .await?;
 
-            let monero_wallet = monero::Wallet::new(monero_wallet_rpc_url);
-            let monero_balance = monero_wallet.get_balance().await?;
-            info!(
-                "Connection to Monero wallet succeeded, balance: {}",
-                monero_balance
-            );
-            let monero_wallet = Arc::new(monero_wallet);
-
-            let refund_address = bitcoin_wallet.new_address().await.unwrap();
+            let refund_address = bitcoin_wallet.new_address().await?;
             let state0 = xmr_btc::bob::State0::new(
                 &mut OsRng,
                 send_bitcoin,
@@ -188,29 +147,15 @@ async fn main() -> Result<()> {
                 addr: alice_addr,
             };
 
-            let (event_loop, handle) =
-                bob::event_loop::EventLoop::new(bob_transport, bob_behaviour).unwrap();
-
             let swap_id = Uuid::new_v4();
             info!(
                 "Swap sending {} and receiving {} started with ID {}",
                 send_bitcoin, receive_monero, swap_id
             );
 
-            let swap = bob::swap::swap(
-                bob_state,
-                handle,
-                db,
-                bitcoin_wallet.clone(),
-                monero_wallet.clone(),
-                OsRng,
-                swap_id,
-            );
-
-            let _event_loop = tokio::spawn(async move { event_loop.run().await });
-            swap.await?;
+            bob_swap(swap_id, bob_state, bitcoin_wallet, monero_wallet, db).await?;
         }
-        Options::History => {
+        Command::History => {
             let mut table = Table::new();
 
             table.add_row(row!["SWAP ID", "STATE"]);
@@ -222,8 +167,132 @@ async fn main() -> Result<()> {
             // Print the table to stdout
             table.printstd();
         }
-        Options::Resume { .. } => todo!("implement this"),
+        Command::Resume {
+            swap_id,
+            bitcoind_url,
+            bitcoin_wallet_name,
+            monero_wallet_rpc_url,
+            listen_addr,
+        } => {
+            let db_swap = db.get_state(swap_id)?;
+
+            if let Ok(alice_state) = AliceState::try_from(db_swap.clone()) {
+                let (bitcoin_wallet, monero_wallet) = setup_wallets(
+                    bitcoind_url,
+                    bitcoin_wallet_name.as_str(),
+                    monero_wallet_rpc_url,
+                    config,
+                )
+                .await?;
+                alice_swap(
+                    swap_id,
+                    alice_state,
+                    listen_addr,
+                    bitcoin_wallet,
+                    monero_wallet,
+                    config,
+                    db,
+                )
+                .await?;
+            } else if let Ok(bob_state) = BobState::try_from(db_swap) {
+                let (bitcoin_wallet, monero_wallet) = setup_wallets(
+                    bitcoind_url,
+                    bitcoin_wallet_name.as_str(),
+                    monero_wallet_rpc_url,
+                    config,
+                )
+                .await?;
+                bob_swap(swap_id, bob_state, bitcoin_wallet, monero_wallet, db).await?;
+            } else {
+                anyhow::bail!("Unable to construct swap state for swap with id {}")
+            }
+        }
     }
 
     Ok(())
+}
+
+async fn setup_wallets(
+    bitcoind_url: url::Url,
+    bitcoin_wallet_name: &str,
+    monero_wallet_rpc_url: url::Url,
+    config: Config,
+) -> Result<(Arc<bitcoin::Wallet>, Arc<monero::Wallet>)> {
+    let bitcoin_wallet =
+        bitcoin::Wallet::new(bitcoin_wallet_name, bitcoind_url, config.bitcoin_network).await?;
+    let bitcoin_balance = bitcoin_wallet.balance().await?;
+    info!(
+        "Connection to Bitcoin wallet succeeded, balance: {}",
+        bitcoin_balance
+    );
+    let bitcoin_wallet = Arc::new(bitcoin_wallet);
+
+    let monero_wallet = monero::Wallet::new(monero_wallet_rpc_url);
+    let monero_balance = monero_wallet.get_balance().await?;
+    info!(
+        "Connection to Monero wallet succeeded, balance: {}",
+        monero_balance
+    );
+    let monero_wallet = Arc::new(monero_wallet);
+
+    Ok((bitcoin_wallet, monero_wallet))
+}
+
+async fn alice_swap(
+    swap_id: Uuid,
+    state: AliceState,
+    listen_addr: Multiaddr,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
+    config: Config,
+    db: Database,
+) -> Result<AliceState> {
+    let alice_behaviour = alice::Behaviour::default();
+
+    let alice_peer_id = alice_behaviour.peer_id();
+    info!("Own Peer-ID: {}", alice_peer_id);
+
+    let alice_transport = build(alice_behaviour.identity())?;
+
+    let (mut event_loop, handle) =
+        alice::event_loop::EventLoop::new(alice_transport, alice_behaviour, listen_addr)?;
+
+    let swap = alice::swap::swap(
+        state,
+        handle,
+        bitcoin_wallet.clone(),
+        monero_wallet.clone(),
+        config,
+        swap_id,
+        db,
+    );
+
+    tokio::spawn(async move { event_loop.run().await });
+    swap.await
+}
+
+async fn bob_swap(
+    swap_id: Uuid,
+    state: BobState,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
+    db: Database,
+) -> Result<BobState> {
+    let bob_behaviour = bob::Behaviour::default();
+    let bob_transport = build(bob_behaviour.identity())?;
+
+    let (event_loop, handle) = bob::event_loop::EventLoop::new(bob_transport, bob_behaviour)?;
+
+    let swap = bob::swap::swap(
+        state,
+        handle,
+        db,
+        bitcoin_wallet.clone(),
+        monero_wallet.clone(),
+        OsRng,
+        swap_id,
+    );
+
+    tokio::spawn(async move { event_loop.run().await });
+    swap.await
 }
