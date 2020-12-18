@@ -7,13 +7,10 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
-use futures::{
-    future::{select, Either},
-    pin_mut,
-};
 use libp2p::{core::Multiaddr, PeerId};
 use rand::{CryptoRng, RngCore};
 use std::{convert::TryFrom, fmt, sync::Arc};
+use tokio::select;
 use tracing::info;
 use uuid::Uuid;
 use xmr_btc::{
@@ -287,12 +284,13 @@ where
                     let bitcoin_wallet = bitcoin_wallet.clone();
                     let t1_timeout = state4_clone.wait_for_t1(bitcoin_wallet.as_ref());
 
-                    pin_mut!(enc_sig_sent_watcher);
-                    pin_mut!(t1_timeout);
-
-                    match select(enc_sig_sent_watcher, t1_timeout).await {
-                        Either::Left((..)) => BobState::EncSigSent(state, alice_peer_id),
-                        Either::Right((..)) => BobState::T1Expired(state),
+                    select! {
+                        _ = enc_sig_sent_watcher => {
+                            BobState::EncSigSent(state, alice_peer_id)
+                        },
+                        _ = t1_timeout => {
+                            BobState::T1Expired(state)
+                        }
                     }
                 } else {
                     BobState::T1Expired(state)
@@ -318,12 +316,13 @@ where
                     let redeem_watcher = state_clone.watch_for_redeem_btc(bitcoin_wallet.as_ref());
                     let t1_timeout = state_clone.wait_for_t1(bitcoin_wallet.as_ref());
 
-                    pin_mut!(redeem_watcher);
-                    pin_mut!(t1_timeout);
-
-                    match select(redeem_watcher, t1_timeout).await {
-                        Either::Left((val, _)) => BobState::BtcRedeemed(val?),
-                        Either::Right((..)) => BobState::T1Expired(state),
+                    select! {
+                        state5 = redeem_watcher => {
+                            BobState::BtcRedeemed(state5?)
+                        },
+                        _ = t1_timeout => {
+                            BobState::T1Expired(state)
+                        }
                     }
                 } else {
                     BobState::T1Expired(state)
