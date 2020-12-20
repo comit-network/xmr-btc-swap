@@ -69,6 +69,7 @@ impl EventLoopHandle {
     /// Dials other party and wait for the connection to be established.
     /// Do nothing if we are already connected
     pub async fn dial(&mut self, peer_id: PeerId) -> Result<()> {
+        debug!("Attempt to dial Alice {}", peer_id);
         let _ = self.dial_alice.send(peer_id).await?;
 
         std::thread::sleep(std::time::Duration::from_millis(100));
@@ -82,7 +83,7 @@ impl EventLoopHandle {
     }
 
     pub async fn add_address(&mut self, peer_id: PeerId, addr: Multiaddr) -> Result<()> {
-        debug!("Add address {} for peer id {}", addr, peer_id);
+        debug!("Attempt to add address {} for peer id {}", addr, peer_id);
         self.add_address.send((peer_id, addr)).await?;
         Ok(())
     }
