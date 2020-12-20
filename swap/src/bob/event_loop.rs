@@ -72,8 +72,6 @@ impl EventLoopHandle {
         debug!("Attempt to dial Alice {}", peer_id);
         let _ = self.dial_alice.send(peer_id).await?;
 
-        std::thread::sleep(std::time::Duration::from_millis(100));
-
         self.conn_established
             .recv()
             .await
