@@ -429,6 +429,10 @@ pub async fn run_until(
                 state3,
                 encrypted_signature,
             } => {
+                // TODO: Evaluate if it is correct for Alice to Redeem no matter what.
+                //  If T1 expired she should potentially not try redeem. (The implementation
+                //  gives her an advantage.)
+
                 let signed_tx_redeem = match build_bitcoin_redeem_transaction(
                     encrypted_signature,
                     &state3.tx_lock,

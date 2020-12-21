@@ -697,18 +697,13 @@ impl State3 {
     where
         W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
     {
-        let current_block_height = bitcoin_wallet.block_height().await;
-        let t0 = bitcoin_wallet
-            .transaction_block_height(self.tx_lock.txid())
-            .await;
-        let t1 = t0 + self.refund_timelock;
-        let t2 = t1 + self.punish_timelock;
-
-        match (current_block_height < t1, current_block_height < t2) {
-            (true, _) => Ok(Epoch::T0),
-            (false, true) => Ok(Epoch::T1),
-            (false, false) => Ok(Epoch::T2),
-        }
+        crate::current_epoch(
+            bitcoin_wallet,
+            self.refund_timelock,
+            self.punish_timelock,
+            self.tx_lock.txid(),
+        )
+        .await
     }
 }
 
