@@ -1,16 +1,20 @@
-use crate::testutils::{init_alice, init_bob};
+use crate::{
+    alice, bitcoin, bob,
+    bob::swap::BobState,
+    storage::Database,
+    tests::{
+        testutils,
+        testutils::{init_alice, init_bob, init_tracing},
+    },
+};
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
 use std::convert::TryFrom;
-use swap::{alice, bitcoin, bob, bob::swap::BobState, storage::Database};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
-use testutils::init_tracing;
 use uuid::Uuid;
 use xmr_btc::config::Config;
-
-pub mod testutils;
 
 #[tokio::test]
 async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
@@ -119,8 +123,8 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     let bob_db = Database::open(bob_db_datadir.path()).unwrap();
     let state_before_restart = bob_db.get_state(bob_swap_id).unwrap();
 
-    if let swap::state::Swap::Bob(state) = state_before_restart.clone() {
-        assert!(matches!(state, swap::state::Bob::EncSigSent {..}));
+    if let crate::state::Swap::Bob(state) = state_before_restart.clone() {
+        assert!(matches!(state, crate::state::Bob::EncSigSent {..}));
     }
 
     let (event_loop_after_restart, event_loop_handle_after_restart) =

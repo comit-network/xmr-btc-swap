@@ -14,6 +14,9 @@ pub mod state;
 pub mod storage;
 pub mod trace;
 
+#[cfg(test)]
+pub mod tests;
+
 pub type Never = std::convert::Infallible;
 
 /// Commands sent from Bob to the main task.

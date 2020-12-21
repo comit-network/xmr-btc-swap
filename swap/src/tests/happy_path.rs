@@ -1,4 +1,10 @@
-use crate::testutils::{init_alice, init_bob};
+use crate::{
+    alice, bob,
+    tests::{
+        testutils,
+        testutils::{init_alice, init_bob, init_tracing},
+    },
+};
 use futures::{
     future::{join, select},
     FutureExt,
@@ -6,13 +12,9 @@ use futures::{
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, bob};
 use testcontainers::clients::Cli;
-use testutils::init_tracing;
 use uuid::Uuid;
 use xmr_btc::{bitcoin, config::Config};
-
-pub mod testutils;
 
 /// Run the following tests with RUST_MIN_STACK=10000000
 

@@ -1,4 +1,13 @@
-use crate::testutils::{init_alice, init_bob};
+use crate::{
+    alice,
+    alice::swap::AliceState,
+    bob,
+    bob::swap::BobState,
+    tests::{
+        testutils,
+        testutils::{init_alice, init_bob, init_tracing},
+    },
+};
 use futures::{
     future::{join, select, Either},
     FutureExt,
@@ -6,13 +15,9 @@ use futures::{
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, alice::swap::AliceState, bob, bob::swap::BobState};
 use testcontainers::clients::Cli;
-use testutils::init_tracing;
 use uuid::Uuid;
 use xmr_btc::{bitcoin, config::Config};
-
-pub mod testutils;
 
 /// Bob locks Btc and Alice locks Xmr. Bob does not act; he fails to send Alice
 /// the encsig and fail to refund or redeem. Alice punishes.

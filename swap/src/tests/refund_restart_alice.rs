@@ -1,17 +1,23 @@
-use crate::testutils::{init_alice, init_bob};
+use crate::{
+    alice,
+    alice::swap::AliceState,
+    bob,
+    bob::swap::BobState,
+    storage::Database,
+    tests::{
+        testutils,
+        testutils::{init_alice, init_bob, init_tracing},
+    },
+};
 use futures::future::try_join;
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, alice::swap::AliceState, bob, bob::swap::BobState, storage::Database};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
-use testutils::init_tracing;
 use tokio::select;
 use uuid::Uuid;
 use xmr_btc::{bitcoin, config::Config};
-
-pub mod testutils;
 
 // Bob locks btc and Alice locks xmr. Alice fails to act so Bob refunds. Alice
 // then also refunds.

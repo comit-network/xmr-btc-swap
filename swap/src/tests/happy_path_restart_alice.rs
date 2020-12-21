@@ -1,16 +1,18 @@
-use crate::testutils::{init_alice, init_bob};
+use crate::{
+    alice,
+    alice::swap::AliceState,
+    bitcoin, bob,
+    storage::Database,
+    tests::testutils::{self, init_alice, init_bob, init_tracing},
+};
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
 use std::convert::TryFrom;
-use swap::{alice, alice::swap::AliceState, bitcoin, bob, storage::Database};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
-use testutils::init_tracing;
 use uuid::Uuid;
 use xmr_btc::config::Config;
-
-pub mod testutils;
 
 #[tokio::test]
 async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
@@ -115,8 +117,8 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     let alice_db = Database::open(alice_db_datadir.path()).unwrap();
     let state_before_restart = alice_db.get_state(alice_swap_id).unwrap();
 
-    if let swap::state::Swap::Alice(state) = state_before_restart.clone() {
-        assert!(matches!(state, swap::state::Alice::EncSignLearned {..}));
+    if let crate::state::Swap::Alice(state) = state_before_restart.clone() {
+        assert!(matches!(state, crate::state::Alice::EncSignLearned {..}));
     }
 
     let (mut event_loop_after_restart, event_loop_handle_after_restart) =
