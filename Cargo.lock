@@ -1152,6 +1152,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "get-port"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac6c41a39c60ae1fc5bf0e220347ce90fa1e4bb0fcdac65b09bb5f4576bebc84"
+
+[[package]]
 name = "get_if_addrs"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3312,6 +3318,7 @@ dependencies = [
  "ecdsa_fun",
  "futures",
  "genawaiter",
+ "get-port",
  "hyper",
  "libp2p",
  "libp2p-tokio-socks5",

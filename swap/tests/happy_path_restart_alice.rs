@@ -1,16 +1,16 @@
+use crate::testutils::{init_alice, init_bob};
+use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
+use std::convert::TryFrom;
 use swap::{alice, alice::swap::AliceState, bitcoin, bob, storage::Database};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
+use testutils::init_tracing;
 use uuid::Uuid;
 use xmr_btc::config::Config;
 
 pub mod testutils;
-
-use crate::testutils::{init_alice, init_bob};
-use std::convert::TryFrom;
-use testutils::init_tracing;
 
 #[tokio::test]
 async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
@@ -31,7 +31,8 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     let bob_btc_starting_balance = btc_to_swap * 10;
     let alice_xmr_starting_balance = xmr_to_swap * 10;
 
-    let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9877"
+    let port = get_port().expect("Failed to find a free port");
+    let alice_multiaddr: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", port)
         .parse()
         .expect("failed to parse Alice's address");
 
@@ -55,9 +56,12 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     )
     .await;
 
+    let alice_peer_id = alice_event_loop.peer_id();
+
     let (bob_state, bob_event_loop, bob_event_loop_handle, bob_btc_wallet, bob_xmr_wallet, bob_db) =
         init_bob(
             alice_multiaddr.clone(),
+            alice_peer_id.clone(),
             &bitcoind,
             &monero,
             btc_to_swap,
@@ -72,25 +76,24 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     let bob_btc_wallet_clone = bob_btc_wallet.clone();
     let bob_xmr_wallet_clone = bob_xmr_wallet.clone();
 
-    let _ = tokio::spawn(async move {
-        bob::swap::swap(
-            bob_state,
-            bob_event_loop_handle,
-            bob_db,
-            bob_btc_wallet.clone(),
-            bob_xmr_wallet.clone(),
-            OsRng,
-            Uuid::new_v4(),
-        )
-        .await
-    });
-
-    let _bob_swarm_fut = tokio::spawn(async move { bob_event_loop.run().await });
+    let bob_fut = bob::swap::swap(
+        bob_state,
+        bob_event_loop_handle,
+        bob_db,
+        bob_btc_wallet.clone(),
+        bob_xmr_wallet.clone(),
+        OsRng,
+        Uuid::new_v4(),
+        alice_peer_id,
+        alice_multiaddr.clone(),
+    );
 
     let alice_db_datadir = tempdir().unwrap();
     let alice_db = Database::open(alice_db_datadir.path()).unwrap();
 
-    let _alice_swarm_fut = tokio::spawn(async move { alice_event_loop.run().await });
+    tokio::spawn(async move { alice_event_loop.run().await });
+    tokio::spawn(bob_fut);
+    tokio::spawn(bob_event_loop.run());
 
     let alice_swap_id = Uuid::new_v4();
 

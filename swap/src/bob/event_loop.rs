@@ -9,7 +9,7 @@ use tokio::{
     stream::StreamExt,
     sync::mpsc::{Receiver, Sender},
 };
-use tracing::info;
+use tracing::{debug, error, info};
 use xmr_btc::{alice, bitcoin::EncryptedSignature, bob};
 
 pub struct Channels<T> {
@@ -36,7 +36,8 @@ pub struct EventLoopHandle {
     msg2: Receiver<alice::Message2>,
     request_amounts: Sender<(PeerId, ::bitcoin::Amount)>,
     conn_established: Receiver<PeerId>,
-    dial_alice: Sender<Multiaddr>,
+    dial_alice: Sender<PeerId>,
+    add_address: Sender<(PeerId, Multiaddr)>,
     send_msg0: Sender<(PeerId, bob::Message0)>,
     send_msg1: Sender<(PeerId, bob::Message1)>,
     send_msg2: Sender<(PeerId, bob::Message2)>,
@@ -44,13 +45,6 @@ pub struct EventLoopHandle {
 }
 
 impl EventLoopHandle {
-    pub async fn recv_conn_established(&mut self) -> Result<PeerId> {
-        self.conn_established
-            .recv()
-            .await
-            .ok_or_else(|| anyhow!("Failed to receive connection established from Bob"))
-    }
-
     pub async fn recv_message0(&mut self) -> Result<alice::Message0> {
         self.msg0
             .recv()
@@ -72,9 +66,23 @@ impl EventLoopHandle {
             .ok_or_else(|| anyhow!("Failed o receive message 2 from Bob"))
     }
 
-    pub async fn dial_alice(&mut self, addr: Multiaddr) -> Result<()> {
-        info!("sending msg to ourselves to dial alice: {}", addr);
-        let _ = self.dial_alice.send(addr).await?;
+    /// Dials other party and wait for the connection to be established.
+    /// Do nothing if we are already connected
+    pub async fn dial(&mut self, peer_id: PeerId) -> Result<()> {
+        debug!("Attempt to dial Alice {}", peer_id);
+        let _ = self.dial_alice.send(peer_id).await?;
+
+        self.conn_established
+            .recv()
+            .await
+            .ok_or_else(|| anyhow!("Failed to receive connection established from Alice"))?;
+
+        Ok(())
+    }
+
+    pub async fn add_address(&mut self, peer_id: PeerId, addr: Multiaddr) -> Result<()> {
+        debug!("Attempt to add address {} for peer id {}", addr, peer_id);
+        self.add_address.send((peer_id, addr)).await?;
         Ok(())
     }
 
@@ -119,7 +127,8 @@ pub struct EventLoop {
     msg2: Sender<alice::Message2>,
     conn_established: Sender<PeerId>,
     request_amounts: Receiver<(PeerId, ::bitcoin::Amount)>,
-    dial_alice: Receiver<Multiaddr>,
+    dial_alice: Receiver<PeerId>,
+    add_address: Receiver<(PeerId, Multiaddr)>,
     send_msg0: Receiver<(PeerId, bob::Message0)>,
     send_msg1: Receiver<(PeerId, bob::Message1)>,
     send_msg2: Receiver<(PeerId, bob::Message2)>,
@@ -142,6 +151,7 @@ impl EventLoop {
         let msg2 = Channels::new();
         let conn_established = Channels::new();
         let dial_alice = Channels::new();
+        let add_address = Channels::new();
         let send_msg0 = Channels::new();
         let send_msg1 = Channels::new();
         let send_msg2 = Channels::new();
@@ -155,6 +165,7 @@ impl EventLoop {
             msg2: msg2.sender,
             conn_established: conn_established.sender,
             dial_alice: dial_alice.receiver,
+            add_address: add_address.receiver,
             send_msg0: send_msg0.receiver,
             send_msg1: send_msg1.receiver,
             send_msg2: send_msg2.receiver,
@@ -168,6 +179,7 @@ impl EventLoop {
             msg2: msg2.receiver,
             conn_established: conn_established.receiver,
             dial_alice: dial_alice.sender,
+            add_address: add_address.sender,
             send_msg0: send_msg0.sender,
             send_msg1: send_msg1.sender,
             send_msg2: send_msg2.sender,
@@ -182,8 +194,8 @@ impl EventLoop {
             tokio::select! {
                 swarm_event = self.swarm.next().fuse() => {
                     match swarm_event {
-                        OutEvent::ConnectionEstablished(alice) => {
-                            let _ = self.conn_established.send(alice).await;
+                        OutEvent::ConnectionEstablished(peer_id) => {
+                            let _ = self.conn_established.send(peer_id).await;
                         }
                         OutEvent::Amounts(_amounts) => info!("Amounts received from Alice"),
                         OutEvent::Message0(msg) => {
@@ -198,10 +210,25 @@ impl EventLoop {
                         OutEvent::Message3 => info!("Alice acknowledged message 3 received"),
                     }
                 },
-                addr = self.dial_alice.next().fuse() => {
-                    if let Some(addr) = addr {
-                        info!("dialing alice: {}", addr);
-                        libp2p::Swarm::dial_addr(&mut self.swarm, addr).expect("Could not dial alice");
+                peer_id_addr = self.add_address.next().fuse() => {
+                    if let Some((peer_id, addr)) = peer_id_addr {
+                        debug!("Add address for {}: {}", peer_id, addr);
+                        self.swarm.add_address(peer_id, addr);
+                    }
+                },
+                peer_id = self.dial_alice.next().fuse() => {
+                    if let Some(peer_id) = peer_id {
+                        if self.swarm.pt.is_connected(&peer_id) {
+                            debug!("Already connected to Alice: {}", peer_id);
+                            let _ = self.conn_established.send(peer_id).await;
+                        } else {
+                            info!("dialing alice: {}", peer_id);
+                            if let Err(err) = libp2p::Swarm::dial(&mut self.swarm, &peer_id) {
+                                error!("Could not dial alice: {}", err);
+                                // TODO(Franck): If Dial fails then we should report it.
+                            }
+
+                        }
                     }
                 },
                 amounts = self.request_amounts.next().fuse() =>  {

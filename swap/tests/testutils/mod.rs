@@ -1,5 +1,5 @@
 use bitcoin_harness::Bitcoind;
-use libp2p::core::Multiaddr;
+use libp2p::{core::Multiaddr, PeerId};
 use monero_harness::{image, Monero};
 use rand::rngs::OsRng;
 use std::sync::Arc;
@@ -155,7 +155,7 @@ pub async fn init_alice(
 }
 
 pub async fn init_bob_state(
-    alice_multiaddr: Multiaddr,
+    alice_peer_id: PeerId,
     btc_to_swap: bitcoin::Amount,
     xmr_to_swap: xmr_btc::monero::Amount,
     bob_btc_wallet: Arc<bitcoin::Wallet>,
@@ -179,7 +179,7 @@ pub async fn init_bob_state(
     BobState::Started {
         state0,
         amounts,
-        addr: alice_multiaddr,
+        alice_peer_id,
     }
 }
 
@@ -192,6 +192,7 @@ pub fn init_bob_event_loop() -> (bob::event_loop::EventLoop, bob::event_loop::Ev
 #[allow(clippy::too_many_arguments)]
 pub async fn init_bob(
     alice_multiaddr: Multiaddr,
+    alice_peer_id: PeerId,
     bitcoind: &Bitcoind<'_>,
     monero: &Monero,
     btc_to_swap: bitcoin::Amount,
@@ -217,7 +218,7 @@ pub async fn init_bob(
     .await;
 
     let bob_state = init_bob_state(
-        alice_multiaddr,
+        alice_peer_id.clone(),
         btc_to_swap,
         xmr_to_swap,
         bob_btc_wallet.clone(),
@@ -225,7 +226,12 @@ pub async fn init_bob(
     )
     .await;
 
-    let (event_loop, event_loop_handle) = init_bob_event_loop();
+    let (event_loop, mut event_loop_handle) = init_bob_event_loop();
+
+    event_loop_handle
+        .add_address(alice_peer_id, alice_multiaddr)
+        .await
+        .unwrap();
 
     let bob_db_dir = tempdir().unwrap();
     let bob_db = Database::open(bob_db_dir.path()).unwrap();

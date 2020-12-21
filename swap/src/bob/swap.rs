@@ -23,12 +23,12 @@ pub enum BobState {
     Started {
         state0: bob::State0,
         amounts: SwapAmounts,
-        addr: Multiaddr,
+        alice_peer_id: PeerId,
     },
     Negotiated(bob::State2, PeerId),
     BtcLocked(bob::State3, PeerId),
     XmrLocked(bob::State4, PeerId),
-    EncSigSent(bob::State4, PeerId),
+    EncSigSent(bob::State4),
     BtcRedeemed(bob::State5),
     T1Expired(bob::State4),
     Cancelled(bob::State4),
@@ -67,7 +67,7 @@ impl From<BobState> for state::Bob {
             BobState::Negotiated(state2, peer_id) => Bob::Negotiated { state2, peer_id },
             BobState::BtcLocked(state3, peer_id) => Bob::BtcLocked { state3, peer_id },
             BobState::XmrLocked(state4, peer_id) => Bob::XmrLocked { state4, peer_id },
-            BobState::EncSigSent(state4, peer_id) => Bob::EncSigSent { state4, peer_id },
+            BobState::EncSigSent(state4) => Bob::EncSigSent { state4 },
             BobState::BtcRedeemed(state5) => Bob::BtcRedeemed(state5),
             BobState::T1Expired(state4) => Bob::T1Expired(state4),
             BobState::Cancelled(state4) => Bob::BtcCancelled(state4),
@@ -88,7 +88,7 @@ impl TryFrom<state::Swap> for BobState {
                 Bob::Negotiated { state2, peer_id } => BobState::Negotiated(state2, peer_id),
                 Bob::BtcLocked { state3, peer_id } => BobState::BtcLocked(state3, peer_id),
                 Bob::XmrLocked { state4, peer_id } => BobState::XmrLocked(state4, peer_id),
-                Bob::EncSigSent { state4, peer_id } => BobState::EncSigSent(state4, peer_id),
+                Bob::EncSigSent { state4 } => BobState::EncSigSent(state4),
                 Bob::BtcRedeemed(state5) => BobState::BtcRedeemed(state5),
                 Bob::T1Expired(state4) => BobState::T1Expired(state4),
                 Bob::BtcCancelled(state4) => BobState::Cancelled(state4),
@@ -102,18 +102,26 @@ impl TryFrom<state::Swap> for BobState {
     }
 }
 
+// TODO(Franck): Make this a method on a struct
+#[allow(clippy::too_many_arguments)]
 pub async fn swap<R>(
     state: BobState,
-    event_loop_handle: EventLoopHandle,
+    mut event_loop_handle: EventLoopHandle,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
     rng: R,
     swap_id: Uuid,
+    alice_peer_id: PeerId,
+    alice_addr: Multiaddr,
 ) -> Result<BobState>
 where
     R: RngCore + CryptoRng + Send,
 {
+    event_loop_handle
+        .add_address(alice_peer_id, alice_addr)
+        .await?;
+
     run_until(
         state,
         is_complete,
@@ -173,13 +181,15 @@ where
             BobState::Started {
                 state0,
                 amounts,
-                addr,
+                alice_peer_id,
             } => {
+                event_loop_handle.dial(alice_peer_id.clone()).await?;
+
                 let (state2, alice_peer_id) = negotiate(
                     state0,
                     amounts,
                     &mut event_loop_handle,
-                    addr,
+                    alice_peer_id.clone(),
                     &mut rng,
                     bitcoin_wallet.clone(),
                 )
@@ -202,6 +212,8 @@ where
                 .await
             }
             BobState::Negotiated(state2, alice_peer_id) => {
+                // Do not lock Bitcoin if not connected to Alice.
+                event_loop_handle.dial(alice_peer_id.clone()).await?;
                 // Alice and Bob have exchanged info
                 let state3 = state2.lock_btc(bitcoin_wallet.as_ref()).await?;
 
@@ -224,7 +236,10 @@ where
             // Bob has locked Btc
             // Watch for Alice to Lock Xmr or for t1 to elapse
             BobState::BtcLocked(state3, alice_peer_id) => {
-                // todo: watch until t1, not indefinetely
+                // TODO(Franck): Refund if cannot connect to Alice.
+                event_loop_handle.dial(alice_peer_id.clone()).await?;
+
+                // todo: watch until t1, not indefinitely
                 let msg2 = event_loop_handle.recv_message2().await?;
                 let state4 = state3
                     .watch_for_lock_xmr(monero_wallet.as_ref(), msg2)
@@ -247,12 +262,16 @@ where
                 .await
             }
             BobState::XmrLocked(state, alice_peer_id) => {
+                // TODO(Franck): Refund if cannot connect to Alice.
+                event_loop_handle.dial(alice_peer_id.clone()).await?;
+
                 let state = if let Epoch::T0 = state.current_epoch(bitcoin_wallet.as_ref()).await? {
                     // Alice has locked Xmr
                     // Bob sends Alice his key
                     let tx_redeem_encsig = state.tx_redeem_encsig();
 
                     let state4_clone = state.clone();
+                    // TODO(Franck): Refund if message cannot be sent.
                     let enc_sig_sent_watcher =
                         event_loop_handle.send_message3(alice_peer_id.clone(), tx_redeem_encsig);
                     let bitcoin_wallet = bitcoin_wallet.clone();
@@ -260,7 +279,7 @@ where
 
                     select! {
                         _ = enc_sig_sent_watcher => {
-                            BobState::EncSigSent(state, alice_peer_id)
+                            BobState::EncSigSent(state)
                         },
                         _ = t1_timeout => {
                             BobState::T1Expired(state)
@@ -284,7 +303,7 @@ where
                 )
                 .await
             }
-            BobState::EncSigSent(state, ..) => {
+            BobState::EncSigSent(state) => {
                 let state = if let Epoch::T0 = state.current_epoch(bitcoin_wallet.as_ref()).await? {
                     let state_clone = state.clone();
                     let redeem_watcher = state_clone.watch_for_redeem_btc(bitcoin_wallet.as_ref());
@@ -401,7 +420,7 @@ pub async fn negotiate<R>(
     state0: xmr_btc::bob::State0,
     amounts: SwapAmounts,
     swarm: &mut EventLoopHandle,
-    addr: Multiaddr,
+    alice_peer_id: PeerId,
     mut rng: R,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
 ) -> Result<(State2, PeerId)>
@@ -409,10 +428,6 @@ where
     R: RngCore + CryptoRng + Send,
 {
     tracing::trace!("Starting negotiate");
-    swarm.dial_alice(addr).await?;
-
-    let alice_peer_id = swarm.recv_conn_established().await?;
-
     swarm
         .request_amounts(alice_peer_id.clone(), amounts.btc)
         .await?;

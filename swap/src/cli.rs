@@ -1,4 +1,4 @@
-use libp2p::core::Multiaddr;
+use libp2p::{core::Multiaddr, PeerId};
 use url::Url;
 use uuid::Uuid;
 
@@ -47,6 +47,9 @@ pub enum Command {
         receive_bitcoin: bitcoin::Amount,
     },
     BuyXmr {
+        #[structopt(short = "p", long = "connect-peer-id")]
+        alice_peer_id: PeerId,
+
         #[structopt(short = "a", long = "connect-addr")]
         alice_addr: Multiaddr,
 
@@ -77,6 +80,12 @@ pub enum Command {
     Resume {
         #[structopt(short = "id", long = "swap-id")]
         swap_id: Uuid,
+
+        #[structopt(short = "p", long = "connect-peer-id")]
+        alice_peer_id: PeerId,
+
+        #[structopt(short = "a", long = "connect-addr")]
+        alice_addr: Multiaddr,
 
         #[structopt(
             short = "b",

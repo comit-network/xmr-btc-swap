@@ -48,6 +48,7 @@ void = "1"
 xmr-btc = { path = "../xmr-btc" }
 
 [dev-dependencies]
+get-port = "3"
 hyper = "0.13"
 port_check = "0.1"
 spectral = "0.6"

@@ -10,7 +10,10 @@ use crate::{
     SwapAmounts,
 };
 use anyhow::Result;
-use libp2p::{core::identity::Keypair, NetworkBehaviour, PeerId};
+use libp2p::{
+    core::{identity::Keypair, Multiaddr},
+    NetworkBehaviour, PeerId,
+};
 use tracing::{debug, info};
 use xmr_btc::{
     alice,
@@ -159,9 +162,9 @@ impl Behaviour {
         debug!("Sent Message3");
     }
 
-    /// Returns Alice's peer id if we are connected.
-    pub fn peer_id_of_alice(&self) -> Option<PeerId> {
-        self.pt.counterparty_peer_id()
+    /// Add a known address for the given peer
+    pub fn add_address(&mut self, peer_id: PeerId, address: Multiaddr) {
+        self.pt.add_address(peer_id, address)
     }
 }
 

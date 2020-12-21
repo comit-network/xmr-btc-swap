@@ -242,4 +242,8 @@ impl EventLoop {
             }
         }
     }
+
+    pub fn peer_id(&self) -> PeerId {
+        self.swarm.peer_id()
+    }
 }

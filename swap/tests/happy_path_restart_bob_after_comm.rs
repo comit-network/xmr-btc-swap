@@ -1,17 +1,16 @@
+use crate::testutils::{init_alice, init_bob};
+use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, bitcoin, bob, storage::Database};
+use std::convert::TryFrom;
+use swap::{alice, bitcoin, bob, bob::swap::BobState, storage::Database};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
+use testutils::init_tracing;
 use uuid::Uuid;
 use xmr_btc::config::Config;
 
 pub mod testutils;
-
-use crate::testutils::{init_alice, init_bob};
-use std::convert::TryFrom;
-use swap::bob::swap::BobState;
-use testutils::init_tracing;
 
 #[tokio::test]
 async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
@@ -32,7 +31,8 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     let bob_btc_starting_balance = btc_to_swap * 10;
     let alice_xmr_starting_balance = xmr_to_swap * 10;
 
-    let alice_multiaddr: Multiaddr = "/ip4/127.0.0.1/tcp/9877"
+    let port = get_port().expect("Failed to find a free port");
+    let alice_multiaddr: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", port)
         .parse()
         .expect("failed to parse Alice's address");
 
@@ -56,9 +56,11 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     )
     .await;
 
+    let alice_peer_id = alice_event_loop.peer_id();
     let (bob_state, bob_event_loop, bob_event_loop_handle, bob_btc_wallet, bob_xmr_wallet, _) =
         init_bob(
             alice_multiaddr.clone(),
+            alice_peer_id.clone(),
             &bitcoind,
             &monero,
             btc_to_swap,
@@ -136,6 +138,8 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
         bob_xmr_wallet,
         OsRng,
         bob_swap_id,
+        alice_peer_id,
+        alice_multiaddr,
     )
     .await
     .unwrap();

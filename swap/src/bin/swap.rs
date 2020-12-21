@@ -13,7 +13,7 @@
 #![forbid(unsafe_code)]
 
 use anyhow::{Context, Result};
-use libp2p::core::Multiaddr;
+use libp2p::{core::Multiaddr, PeerId};
 use prettytable::{row, Table};
 use rand::rngs::OsRng;
 use std::{convert::TryFrom, sync::Arc};
@@ -111,6 +111,7 @@ async fn main() -> Result<()> {
             .await?;
         }
         Command::BuyXmr {
+            alice_peer_id,
             alice_addr,
             bitcoind_url,
             bitcoin_wallet_name,
@@ -144,7 +145,7 @@ async fn main() -> Result<()> {
             let bob_state = BobState::Started {
                 state0,
                 amounts,
-                addr: alice_addr,
+                alice_peer_id: alice_peer_id.clone(),
             };
 
             let swap_id = Uuid::new_v4();
@@ -153,7 +154,16 @@ async fn main() -> Result<()> {
                 send_bitcoin, receive_monero, swap_id
             );
 
-            bob_swap(swap_id, bob_state, bitcoin_wallet, monero_wallet, db).await?;
+            bob_swap(
+                swap_id,
+                bob_state,
+                bitcoin_wallet,
+                monero_wallet,
+                db,
+                alice_peer_id,
+                alice_addr,
+            )
+            .await?;
         }
         Command::History => {
             let mut table = Table::new();
@@ -173,6 +183,8 @@ async fn main() -> Result<()> {
             bitcoin_wallet_name,
             monero_wallet_rpc_url,
             listen_addr,
+            alice_peer_id,
+            alice_addr,
         } => {
             let db_swap = db.get_state(swap_id)?;
 
@@ -202,7 +214,16 @@ async fn main() -> Result<()> {
                     config,
                 )
                 .await?;
-                bob_swap(swap_id, bob_state, bitcoin_wallet, monero_wallet, db).await?;
+                bob_swap(
+                    swap_id,
+                    bob_state,
+                    bitcoin_wallet,
+                    monero_wallet,
+                    db,
+                    alice_peer_id,
+                    alice_addr,
+                )
+                .await?;
             } else {
                 anyhow::bail!("Unable to construct swap state for swap with id {}")
             }
@@ -277,6 +298,8 @@ async fn bob_swap(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
     db: Database,
+    alice_peer_id: PeerId,
+    alice_addr: Multiaddr,
 ) -> Result<BobState> {
     let bob_behaviour = bob::Behaviour::default();
     let bob_transport = build(bob_behaviour.identity())?;
@@ -291,6 +314,8 @@ async fn bob_swap(
         monero_wallet.clone(),
         OsRng,
         swap_id,
+        alice_peer_id,
+        alice_addr,
     );
 
     tokio::spawn(async move { event_loop.run().await });
