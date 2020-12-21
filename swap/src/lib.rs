@@ -16,8 +16,6 @@ pub mod trace;
 
 pub type Never = std::convert::Infallible;
 
-const TRANSACTION_ALREADY_IN_BLOCKCHAIN_ERROR_CODE: i64 = -27;
-
 /// Commands sent from Bob to the main task.
 #[derive(Clone, Copy, Debug)]
 pub enum Cmd {
