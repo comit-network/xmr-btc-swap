@@ -320,6 +320,6 @@ async fn bob_swap(
         swap_id,
     );
 
-    tokio::spawn(async move { event_loop.run().await });
+    tokio::spawn(event_loop.run());
     swap.await
 }
