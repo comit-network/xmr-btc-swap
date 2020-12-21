@@ -60,15 +60,14 @@ pub enum Command {
         receive_monero: xmr_btc::monero::Amount,
     },
     History,
-    Resume {
+    Resume(Resume),
+}
+
+#[derive(structopt::StructOpt, Debug)]
+pub enum Resume {
+    SellXmr {
         #[structopt(long = "swap-id")]
         swap_id: Uuid,
-
-        #[structopt(long = "connect-peer-id")]
-        alice_peer_id: PeerId,
-
-        #[structopt(long = "connect-addr")]
-        alice_addr: Multiaddr,
 
         #[structopt(long = "bitcoind-rpc", default_value = "http://127.0.0.1:8332")]
         bitcoind_url: Url,
@@ -82,10 +81,30 @@ pub enum Command {
         )]
         monero_wallet_rpc_url: Url,
 
-        // TODO: The listen address is only relevant for Alice, but should be role independent
-        //  see: https://github.com/comit-network/xmr-btc-swap/issues/77
-        #[structopt(long = "p2p-address", default_value = "/ip4/127.0.0.1/tcp/9876")]
+        #[structopt(long = "listen-address", default_value = "/ip4/127.0.0.1/tcp/9876")]
         listen_addr: Multiaddr,
+    },
+    BuyXmr {
+        #[structopt(long = "swap-id")]
+        swap_id: Uuid,
+
+        #[structopt(long = "counterpart-peer-id")]
+        alice_peer_id: PeerId,
+
+        #[structopt(long = "counterpart-addr")]
+        alice_addr: Multiaddr,
+
+        #[structopt(long = "bitcoind-rpc", default_value = "http://127.0.0.1:8332")]
+        bitcoind_url: Url,
+
+        #[structopt(long = "bitcoin-wallet-name")]
+        bitcoin_wallet_name: String,
+
+        #[structopt(
+            long = "monero-wallet-rpc",
+            default_value = "http://127.0.0.1:18083/json_rpc"
+        )]
+        monero_wallet_rpc_url: Url,
     },
 }
 

@@ -23,7 +23,7 @@ use swap::{
     alice::swap::AliceState,
     bitcoin, bob,
     bob::swap::BobState,
-    cli::{Command, Options},
+    cli::{Command, Options, Resume},
     monero,
     network::transport::build,
     storage::Database,
@@ -173,58 +173,65 @@ async fn main() -> Result<()> {
             // Print the table to stdout
             table.printstd();
         }
-        Command::Resume {
+        Command::Resume(Resume::SellXmr {
             swap_id,
             bitcoind_url,
             bitcoin_wallet_name,
             monero_wallet_rpc_url,
             listen_addr,
-            alice_peer_id,
-            alice_addr,
-        } => {
+        }) => {
             let db_swap = db.get_state(swap_id)?;
 
-            if let Ok(alice_state) = AliceState::try_from(db_swap.clone()) {
-                let (bitcoin_wallet, monero_wallet) = setup_wallets(
-                    bitcoind_url,
-                    bitcoin_wallet_name.as_str(),
-                    monero_wallet_rpc_url,
-                    config,
-                )
-                .await?;
-                alice_swap(
-                    swap_id,
-                    alice_state,
-                    listen_addr,
-                    bitcoin_wallet,
-                    monero_wallet,
-                    config,
-                    db,
-                )
-                .await?;
-            } else if let Ok(bob_state) = BobState::try_from(db_swap) {
-                let (bitcoin_wallet, monero_wallet) = setup_wallets(
-                    bitcoind_url,
-                    bitcoin_wallet_name.as_str(),
-                    monero_wallet_rpc_url,
-                    config,
-                )
-                .await?;
-                bob_swap(
-                    swap_id,
-                    bob_state,
-                    bitcoin_wallet,
-                    monero_wallet,
-                    db,
-                    alice_peer_id,
-                    alice_addr,
-                )
-                .await?;
-            } else {
-                anyhow::bail!("Unable to construct swap state for swap with id {}")
-            }
+            let alice_state = AliceState::try_from(db_swap.clone())?;
+            let (bitcoin_wallet, monero_wallet) = setup_wallets(
+                bitcoind_url,
+                bitcoin_wallet_name.as_str(),
+                monero_wallet_rpc_url,
+                config,
+            )
+            .await?;
+            alice_swap(
+                swap_id,
+                alice_state,
+                listen_addr,
+                bitcoin_wallet,
+                monero_wallet,
+                config,
+                db,
+            )
+            .await?;
         }
-    }
+        Command::Resume(Resume::BuyXmr {
+            swap_id,
+            bitcoind_url,
+            bitcoin_wallet_name,
+            monero_wallet_rpc_url,
+            alice_peer_id,
+            alice_addr,
+        }) => {
+            let db_swap = db.get_state(swap_id)?;
+
+            let bob_state = BobState::try_from(db_swap)?;
+
+            let (bitcoin_wallet, monero_wallet) = setup_wallets(
+                bitcoind_url,
+                bitcoin_wallet_name.as_str(),
+                monero_wallet_rpc_url,
+                config,
+            )
+            .await?;
+            bob_swap(
+                swap_id,
+                bob_state,
+                bitcoin_wallet,
+                monero_wallet,
+                db,
+                alice_peer_id,
+                alice_addr,
+            )
+            .await?;
+        }
+    };
 
     Ok(())
 }
