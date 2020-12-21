@@ -3,8 +3,8 @@ use crate::{
     bob::swap::BobState,
     storage::Database,
     tests::{
-        testutils,
-        testutils::{init_alice, init_bob, init_tracing},
+        utils,
+        utils::{init_alice, init_bob, init_tracing},
     },
 };
 use get_port::get_port;
@@ -23,11 +23,11 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     let cli = Cli::default();
     let (
         monero,
-        testutils::Containers {
+        utils::Containers {
             bitcoind,
             monerods: _monerods,
         },
-    ) = testutils::init_containers(&cli).await;
+    ) = utils::init_containers(&cli).await;
 
     let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
     let xmr_to_swap = xmr_btc::monero::Amount::from_piconero(1_000_000_000_000);
@@ -127,8 +127,7 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
         assert!(matches!(state, crate::state::Bob::EncSigSent {..}));
     }
 
-    let (event_loop_after_restart, event_loop_handle_after_restart) =
-        testutils::init_bob_event_loop();
+    let (event_loop_after_restart, event_loop_handle_after_restart) = utils::init_bob_event_loop();
     let _bob_swarm_fut = tokio::spawn(async move { event_loop_after_restart.run().await });
 
     let db_swap = bob_db.get_state(bob_swap_id).unwrap();

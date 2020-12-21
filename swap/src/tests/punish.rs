@@ -4,8 +4,8 @@ use crate::{
     bob,
     bob::swap::BobState,
     tests::{
-        testutils,
-        testutils::{init_alice, init_bob, init_tracing},
+        utils,
+        utils::{init_alice, init_bob, init_tracing},
     },
 };
 use futures::{
@@ -28,11 +28,11 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
     let cli = Cli::default();
     let (
         monero,
-        testutils::Containers {
+        utils::Containers {
             bitcoind,
             monerods: _monerods,
         },
-    ) = testutils::init_containers(&cli).await;
+    ) = utils::init_containers(&cli).await;
 
     let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
     let xmr_to_swap = xmr_btc::monero::Amount::from_piconero(1_000_000_000_000);

@@ -1,8 +1,8 @@
 use crate::{
     alice, bob,
     tests::{
-        testutils,
-        testutils::{init_alice, init_bob, init_tracing},
+        utils,
+        utils::{init_alice, init_bob, init_tracing},
     },
 };
 use futures::{
@@ -25,11 +25,11 @@ async fn happy_path() {
     let cli = Cli::default();
     let (
         monero,
-        testutils::Containers {
+        utils::Containers {
             bitcoind,
             monerods: _monerods,
         },
-    ) = testutils::init_containers(&cli).await;
+    ) = utils::init_containers(&cli).await;
 
     let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
     let btc_alice = bitcoin::Amount::ZERO;

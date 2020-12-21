@@ -5,8 +5,8 @@ use crate::{
     bob::swap::BobState,
     storage::Database,
     tests::{
-        testutils,
-        testutils::{init_alice, init_bob, init_tracing},
+        utils,
+        utils::{init_alice, init_bob, init_tracing},
     },
 };
 use futures::future::try_join;
@@ -28,11 +28,11 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
     let cli = Cli::default();
     let (
         monero,
-        testutils::Containers {
+        utils::Containers {
             bitcoind,
             monerods: _monerods,
         },
-    ) = testutils::init_containers(&cli).await;
+    ) = utils::init_containers(&cli).await;
 
     let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
     let xmr_to_swap = xmr_btc::monero::Amount::from_piconero(1_000_000_000_000);
@@ -124,7 +124,7 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
     };
 
     let (mut alice_event_loop_2, alice_event_loop_handle_2) =
-        testutils::init_alice_event_loop(alice_multiaddr);
+        utils::init_alice_event_loop(alice_multiaddr);
 
     let alice_final_state = {
         let alice_db = Database::open(alice_db_datadir.path()).unwrap();

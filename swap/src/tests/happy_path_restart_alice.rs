@@ -3,7 +3,7 @@ use crate::{
     alice::swap::AliceState,
     bitcoin, bob,
     storage::Database,
-    tests::testutils::{self, init_alice, init_bob, init_tracing},
+    tests::utils::{self, init_alice, init_bob, init_tracing},
 };
 use get_port::get_port;
 use libp2p::Multiaddr;
@@ -21,11 +21,11 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     let cli = Cli::default();
     let (
         monero,
-        testutils::Containers {
+        utils::Containers {
             bitcoind,
             monerods: _monerods,
         },
-    ) = testutils::init_containers(&cli).await;
+    ) = utils::init_containers(&cli).await;
 
     let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
     let xmr_to_swap = xmr_btc::monero::Amount::from_piconero(1_000_000_000_000);
@@ -122,7 +122,7 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     }
 
     let (mut event_loop_after_restart, event_loop_handle_after_restart) =
-        testutils::init_alice_event_loop(alice_multiaddr);
+        utils::init_alice_event_loop(alice_multiaddr);
     let _alice_swarm_fut = tokio::spawn(async move { event_loop_after_restart.run().await });
 
     let db_swap = alice_db.get_state(alice_swap_id).unwrap();
