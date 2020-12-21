@@ -1,5 +1,8 @@
 use crate::testutils::{init_alice, init_bob};
-use futures::future::try_join;
+use futures::{
+    future::{join, select, Either},
+    FutureExt,
+};
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
@@ -81,9 +84,10 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         bob_xmr_wallet.clone(),
         OsRng,
         Uuid::new_v4(),
-    );
+    )
+    .boxed();
 
-    let _bob_swarm_fut = tokio::spawn(async move { bob_event_loop.run().await });
+    let bob_fut = select(bob_btc_locked_fut, bob_event_loop.run().boxed());
 
     let alice_fut = alice::swap::swap(
         alice_state,
@@ -93,12 +97,23 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         Config::regtest(),
         Uuid::new_v4(),
         alice_db,
-    );
+    )
+    .boxed();
 
-    let _alice_swarm_fut = tokio::spawn(async move { alice_event_loop.run().await });
+    let alice_fut = select(alice_fut, alice_event_loop.run().boxed());
 
     // Wait until alice has locked xmr and bob has locked btc
-    let (alice_state, bob_state) = try_join(alice_fut, bob_btc_locked_fut).await.unwrap();
+    let (alice_state, bob_state) = join(alice_fut, bob_fut).await;
+
+    let alice_state = match alice_state {
+        Either::Left((state, _)) => state.unwrap(),
+        Either::Right(_) => panic!("Alice event loop should not terminate."),
+    };
+
+    let bob_state = match bob_state {
+        Either::Left((state, _)) => state.unwrap(),
+        Either::Right(_) => panic!("Bob event loop should not terminate."),
+    };
 
     assert!(matches!(alice_state, AliceState::Punished));
     let bob_state3 = if let BobState::BtcLocked(state3, ..) = bob_state {

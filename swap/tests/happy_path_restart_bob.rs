@@ -261,12 +261,6 @@ async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {
         _ = bob_event_loop_1.run() => panic!("The event loop should never finish")
     };
 
-    // let tx_lock_id = if let AliceState::BtcRefunded { state3, .. } = alice_state
-    // {     state3.tx_lock.txid()
-    // } else {
-    //     panic!(format!("Alice in unexpected state: {}", alice_state));
-    // };
-
     let (bob_event_loop_2, bob_event_loop_handle_2) = testutils::init_bob_event_loop();
 
     let bob_fut = bob::swap::swap(

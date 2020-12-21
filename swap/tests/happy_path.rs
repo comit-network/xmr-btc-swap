@@ -1,5 +1,8 @@
 use crate::testutils::{init_alice, init_bob};
-use futures::future::try_join;
+use futures::{
+    future::{join, select},
+    FutureExt,
+};
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
@@ -82,11 +85,11 @@ async fn happy_path() {
         config,
         Uuid::new_v4(),
         alice_db,
-    );
+    )
+    .boxed();
 
     let alice_peer_id = alice_event_loop.peer_id();
-
-    let _alice_swarm_fut = tokio::spawn(async move { alice_event_loop.run().await });
+    let alice_fut = select(alice_swap_fut, alice_event_loop.run().boxed());
 
     let bob_swap_fut = bob::swap::swap(
         bob_state,
@@ -98,11 +101,12 @@ async fn happy_path() {
         Uuid::new_v4(),
         alice_peer_id,
         alice_multiaddr,
-    );
+    )
+    .boxed();
 
-    let _bob_swarm_fut = tokio::spawn(async move { bob_event_loop.run().await });
+    let bob_fut = select(bob_swap_fut, bob_event_loop.run().boxed());
 
-    try_join(alice_swap_fut, bob_swap_fut).await.unwrap();
+    join(alice_fut, bob_fut).await;
 
     let btc_alice_final = alice_btc_wallet.as_ref().balance().await.unwrap();
     let btc_bob_final = bob_btc_wallet.as_ref().balance().await.unwrap();
