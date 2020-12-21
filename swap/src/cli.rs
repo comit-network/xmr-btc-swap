@@ -107,7 +107,7 @@ pub enum Command {
         // TODO: The listen address is only relevant for Alice, but should be role independent
         //  see: https://github.com/comit-network/xmr-btc-swap/issues/77
         #[structopt(
-            short = "a",
+            short = "la",
             long = "p2p-address",
             default_value = "/ip4/127.0.0.1/tcp/9876"
         )]
