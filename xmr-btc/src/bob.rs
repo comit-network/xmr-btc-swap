@@ -660,19 +660,28 @@ impl State4 {
         self.b.encsign(self.S_a_bitcoin, tx_redeem.digest())
     }
 
+    pub fn tx_cancel(&self) -> TxCancel {
+        crate::bitcoin::TxCancel::new(&self.tx_lock, self.refund_timelock, self.A, self.b.public())
+    }
+
     pub async fn submit_tx_cancel<W>(&self, bitcoin_wallet: &W) -> Result<Txid>
     where
         W: BroadcastSignedTransaction,
     {
-        crate::bitcoin::publish_cancel_transaction(
-            self.tx_lock.clone(),
-            self.b.clone(),
-            self.A,
-            self.refund_timelock,
-            self.tx_cancel_sig_a.clone(),
-            bitcoin_wallet,
-        )
-        .await
+        let tx_cancel = self.tx_cancel();
+
+        let sig_b = self.b.sign(tx_cancel.digest());
+        let sig_a = self.tx_cancel_sig_a.clone();
+
+        let signed_tx_cancel = tx_cancel.clone().add_signatures(
+            &self.tx_lock,
+            (self.A, sig_a),
+            (self.b.public(), sig_b),
+        )?;
+
+        bitcoin_wallet
+            .broadcast_signed_transaction(signed_tx_cancel)
+            .await
     }
 
     pub async fn watch_for_redeem_btc<W>(&self, bitcoin_wallet: &W) -> Result<State5>
