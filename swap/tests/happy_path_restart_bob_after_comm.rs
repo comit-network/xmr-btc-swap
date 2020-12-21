@@ -80,7 +80,7 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     let bob_btc_wallet_clone = bob_btc_wallet.clone();
     let bob_xmr_wallet_clone = bob_xmr_wallet.clone();
 
-    let _ = tokio::spawn(async move {
+    let alice_swap_handle = tokio::spawn(async move {
         alice::swap::swap(
             alice_state,
             alice_event_loop_handle,
@@ -93,9 +93,9 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
         .await
     });
 
-    let _alice_swarm_fut = tokio::spawn(async move { alice_event_loop.run().await });
+    tokio::spawn(async move { alice_event_loop.run().await });
 
-    let _bob_swarm_fut = tokio::spawn(async move { bob_event_loop.run().await });
+    tokio::spawn(async move { bob_event_loop.run().await });
 
     let bob_swap_id = Uuid::new_v4();
     let bob_db_datadir = tempdir().unwrap();
@@ -141,6 +141,9 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     )
     .await
     .unwrap();
+
+    // Wait for Alice to finish too
+    alice_swap_handle.await.unwrap().unwrap();
 
     assert!(matches!(bob_state, BobState::XmrRedeemed {..}));
 
