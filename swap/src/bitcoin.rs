@@ -2,7 +2,11 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
 use bitcoin::util::psbt::PartiallySignedTransaction;
-use bitcoin_harness::{bitcoind_rpc::PsbtBase64, BitcoindRpcApi};
+use bitcoin_harness::{
+    bitcoind_rpc,
+    bitcoind_rpc::{jsonrpc_client, jsonrpc_client::JsonRpcError, PsbtBase64},
+    BitcoindRpcApi,
+};
 use reqwest::Url;
 use std::time::Duration;
 use tokio::time::interval;
@@ -18,6 +22,7 @@ pub use ::bitcoin::{Address, Transaction};
 pub use xmr_btc::bitcoin::*;
 
 pub const TX_LOCK_MINE_TIMEOUT: u64 = 3600;
+const TRANSACTION_ALREADY_IN_BLOCKCHAIN_ERROR_CODE: i64 = -27;
 
 #[derive(Debug)]
 pub struct Wallet {
@@ -105,9 +110,23 @@ impl SignTxLock for Wallet {
 #[async_trait]
 impl BroadcastSignedTransaction for Wallet {
     async fn broadcast_signed_transaction(&self, transaction: Transaction) -> Result<Txid> {
-        let txid = self.inner.send_raw_transaction(transaction).await?;
-        tracing::debug!("Bitcoin tx broadcasted! TXID = {}", txid);
-        Ok(txid)
+        let txid = transaction.txid();
+        match self.inner.send_raw_transaction(transaction).await {
+            Err(bitcoind_rpc::Error::JsonRpcClient(jsonrpc_client::Error::JsonRpc(
+                JsonRpcError {
+                    code: TRANSACTION_ALREADY_IN_BLOCKCHAIN_ERROR_CODE,
+                    ..
+                },
+            ))) => {
+                tracing::info!("Cancel transaction is already confirmed.");
+                Ok(txid)
+            }
+            Err(err) => Err(err.into()),
+            Ok(txid) => {
+                tracing::debug!("Bitcoin tx broadcasted! TXID = {}", txid);
+                Ok(txid)
+            }
+        }
     }
 }
 

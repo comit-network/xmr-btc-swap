@@ -16,11 +16,10 @@ use crate::{
     state,
     state::{Alice, Swap},
     storage::Database,
-    SwapAmounts, TRANSACTION_ALREADY_IN_BLOCKCHAIN_ERROR_CODE,
+    SwapAmounts,
 };
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
-use bitcoin_harness::bitcoind_rpc::jsonrpc_client::JsonRpcError;
 use futures::{
     future::{select, Either},
     pin_mut,
@@ -474,17 +473,7 @@ pub async fn run_until(
                 .await
             }
             AliceState::T1Expired { state3 } => {
-                if let Err(error) = state3.submit_tx_cancel(bitcoin_wallet.as_ref()).await {
-                    if let Some(json_rpc_err) = error.downcast_ref::<JsonRpcError>() {
-                        if json_rpc_err.code == TRANSACTION_ALREADY_IN_BLOCKCHAIN_ERROR_CODE {
-                            info!("Failed to send cancel transaction, assuming that is was already included by the other party...");
-                        } else {
-                            return Err(error);
-                        }
-                    } else {
-                        return Err(error);
-                    }
-                };
+                state3.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
 
                 let state = AliceState::BtcCancelled { state3 };
                 let db_state = (&state).into();
