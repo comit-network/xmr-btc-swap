@@ -1,6 +1,6 @@
 use crate::{
     alice::event_loop::EventLoopHandle, bitcoin, monero, network::request_response::AliceToBob,
-    SwapAmounts,
+    swap_amounts::SwapAmounts,
 };
 use anyhow::{bail, Context, Result};
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};

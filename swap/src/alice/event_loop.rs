@@ -1,7 +1,7 @@
 use crate::{
     alice::{Behaviour, OutEvent},
     network::{request_response::AliceToBob, transport::SwapTransport, TokioExecutor},
-    SwapAmounts,
+    swap_amounts::SwapAmounts,
 };
 use anyhow::{anyhow, Context, Result};
 use futures::FutureExt;

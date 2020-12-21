@@ -3,7 +3,7 @@ use crate::{
     state,
     state::{Bob, Swap},
     storage::Database,
-    SwapAmounts,
+    swap_amounts::SwapAmounts,
 };
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;

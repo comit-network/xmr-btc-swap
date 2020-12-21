@@ -1,6 +1,6 @@
 use crate::{
     alice, alice::swap::AliceState, bitcoin, bob, bob::swap::BobState, monero,
-    network::transport::build, storage::Database, SwapAmounts,
+    network::transport::build, storage::Database, swap_amounts::SwapAmounts,
 };
 use bitcoin_harness::Bitcoind;
 use libp2p::{core::Multiaddr, PeerId};

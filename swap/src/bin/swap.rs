@@ -27,8 +27,8 @@ use swap::{
     monero,
     network::transport::build,
     storage::Database,
+    swap_amounts::SwapAmounts,
     trace::init_tracing,
-    SwapAmounts,
 };
 use tracing::{info, log::LevelFilter};
 use uuid::Uuid;

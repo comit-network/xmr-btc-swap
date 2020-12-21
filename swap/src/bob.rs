@@ -7,7 +7,7 @@ use crate::{
         transport::SwapTransport,
         TokioExecutor,
     },
-    SwapAmounts,
+    swap_amounts::SwapAmounts,
 };
 use anyhow::Result;
 use libp2p::{
