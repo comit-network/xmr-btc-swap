@@ -48,6 +48,8 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   build_test:
+    env:
+      RUST_TEST_TASKS: 2
     strategy:
       matrix:
         target: [ x86_64-unknown-linux-gnu, x86_64-apple-darwin ]
