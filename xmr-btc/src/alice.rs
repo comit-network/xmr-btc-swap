@@ -720,15 +720,19 @@ impl State3 {
     where
         W: BroadcastSignedTransaction,
     {
-        crate::bitcoin::publish_cancel_transaction(
-            self.tx_lock.clone(),
-            self.a.clone(),
-            self.B,
-            self.refund_timelock,
-            self.tx_punish_sig_bob.clone(),
-            bitcoin_wallet,
-        )
-        .await
+        let tx_cancel = self.tx_cancel();
+
+        let sig_a = self.a.sign(tx_cancel.digest());
+        let sig_b = self.tx_cancel_sig_bob.clone();
+
+        let signed_tx_cancel = tx_cancel
+            .clone()
+            .add_signatures(&self.tx_lock, (self.a.public(), sig_a), (self.B, sig_b))
+            .expect("sig_{a,b} to be valid signatures for tx_cancel");
+
+        bitcoin_wallet
+            .broadcast_signed_transaction(signed_tx_cancel)
+            .await
     }
 }
 
