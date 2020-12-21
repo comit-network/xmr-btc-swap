@@ -83,7 +83,7 @@ pub fn action_generator<N, M, B>(
         redeem_address,
         refund_address,
         tx_lock,
-        tx_cancel_sig_a,
+        tx_cancel_sig_alice,
         tx_refund_encsig,
         ..
     }: State2,
@@ -225,7 +225,7 @@ where
             let tx_cancel = bitcoin::TxCancel::new(&tx_lock, refund_timelock, A, b.public());
             let tx_cancel_txid = tx_cancel.txid();
             let signed_tx_cancel = {
-                let sig_a = tx_cancel_sig_a.clone();
+                let sig_a = tx_cancel_sig_alice.clone();
                 let sig_b = b.sign(tx_cancel.digest());
 
                 tx_cancel
@@ -487,7 +487,7 @@ impl State1 {
             redeem_address: self.redeem_address,
             punish_address: self.punish_address,
             tx_lock: self.tx_lock,
-            tx_cancel_sig_a: msg.tx_cancel_sig,
+            tx_cancel_sig_alice: msg.tx_cancel_sig,
             tx_refund_encsig: msg.tx_refund_encsig,
         })
     }
@@ -510,7 +510,7 @@ pub struct State2 {
     pub redeem_address: bitcoin::Address,
     pub punish_address: bitcoin::Address,
     pub tx_lock: bitcoin::TxLock,
-    pub tx_cancel_sig_a: Signature,
+    pub tx_cancel_sig_alice: Signature,
     pub tx_refund_encsig: EncryptedSignature,
 }
 
@@ -554,7 +554,7 @@ impl State2 {
             redeem_address: self.redeem_address,
             punish_address: self.punish_address,
             tx_lock: self.tx_lock,
-            tx_cancel_sig_a: self.tx_cancel_sig_a,
+            tx_cancel_sig_alice: self.tx_cancel_sig_alice,
             tx_refund_encsig: self.tx_refund_encsig,
         })
     }
@@ -577,7 +577,7 @@ pub struct State3 {
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
     pub tx_lock: bitcoin::TxLock,
-    pub tx_cancel_sig_a: Signature,
+    pub tx_cancel_sig_alice: Signature,
     pub tx_refund_encsig: EncryptedSignature,
 }
 
@@ -616,7 +616,7 @@ impl State3 {
             redeem_address: self.redeem_address,
             punish_address: self.punish_address,
             tx_lock: self.tx_lock,
-            tx_cancel_sig_a: self.tx_cancel_sig_a,
+            tx_cancel_sig_alice: self.tx_cancel_sig_alice,
             tx_refund_encsig: self.tx_refund_encsig,
         })
     }
@@ -643,7 +643,7 @@ pub struct State4 {
     pub redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
     pub tx_lock: bitcoin::TxLock,
-    pub tx_cancel_sig_a: Signature,
+    pub tx_cancel_sig_alice: Signature,
     pub tx_refund_encsig: EncryptedSignature,
 }
 
@@ -671,7 +671,7 @@ impl State4 {
         let tx_cancel = self.tx_cancel();
 
         let sig_b = self.b.sign(tx_cancel.digest());
-        let sig_a = self.tx_cancel_sig_a.clone();
+        let sig_a = self.tx_cancel_sig_alice.clone();
 
         let signed_tx_cancel = tx_cancel.clone().add_signatures(
             &self.tx_lock,
@@ -717,7 +717,7 @@ impl State4 {
             punish_address: self.punish_address.clone(),
             tx_lock: self.tx_lock.clone(),
             tx_refund_encsig: self.tx_refund_encsig.clone(),
-            tx_cancel_sig: self.tx_cancel_sig_a.clone(),
+            tx_cancel_sig_alice: self.tx_cancel_sig_alice.clone(),
         })
     }
 
@@ -762,7 +762,7 @@ impl State4 {
 
         {
             let sig_b = self.b.sign(tx_cancel.digest());
-            let sig_a = self.tx_cancel_sig_a.clone();
+            let sig_a = self.tx_cancel_sig_alice.clone();
 
             let signed_tx_cancel = tx_cancel.clone().add_signatures(
                 &self.tx_lock,
@@ -820,7 +820,7 @@ pub struct State5 {
     punish_address: bitcoin::Address,
     pub tx_lock: bitcoin::TxLock,
     tx_refund_encsig: EncryptedSignature,
-    tx_cancel_sig: Signature,
+    tx_cancel_sig_alice: Signature,
 }
 
 impl State5 {
