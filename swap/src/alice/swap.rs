@@ -18,7 +18,7 @@ use crate::{
     storage::Database,
     SwapAmounts,
 };
-use anyhow::{bail, Result};
+use anyhow::Result;
 use async_recursion::async_recursion;
 use futures::{
     future::{select, Either},
@@ -26,7 +26,7 @@ use futures::{
 };
 use libp2p::request_response::ResponseChannel;
 use rand::{CryptoRng, RngCore};
-use std::{convert::TryFrom, fmt, sync::Arc};
+use std::{fmt, sync::Arc};
 use tracing::info;
 use uuid::Uuid;
 use xmr_btc::{
@@ -139,86 +139,76 @@ impl From<&AliceState> for state::Alice {
     }
 }
 
-impl TryFrom<state::Swap> for AliceState {
-    type Error = anyhow::Error;
-
-    fn try_from(db_state: Swap) -> Result<Self, Self::Error> {
+impl From<state::Alice> for AliceState {
+    fn from(db_state: state::Alice) -> Self {
         use AliceState::*;
-        if let Swap::Alice(state) = db_state {
-            let alice_state = match state {
-                Alice::Started { amounts, state0 } => Started { amounts, state0 },
-                Alice::Negotiated(state3) => Negotiated {
-                    channel: None,
-                    amounts: SwapAmounts {
-                        btc: state3.btc,
-                        xmr: state3.xmr,
-                    },
-                    state3,
+        match db_state {
+            Alice::Started { amounts, state0 } => Started { amounts, state0 },
+            Alice::Negotiated(state3) => Negotiated {
+                channel: None,
+                amounts: SwapAmounts {
+                    btc: state3.btc,
+                    xmr: state3.xmr,
                 },
-                Alice::BtcLocked(state3) => BtcLocked {
-                    channel: None,
-                    amounts: SwapAmounts {
-                        btc: state3.btc,
-                        xmr: state3.xmr,
-                    },
-                    state3,
+                state3,
+            },
+            Alice::BtcLocked(state3) => BtcLocked {
+                channel: None,
+                amounts: SwapAmounts {
+                    btc: state3.btc,
+                    xmr: state3.xmr,
                 },
-                Alice::XmrLocked(state3) => XmrLocked { state3 },
-                Alice::BtcRedeemable { .. } => bail!("BtcRedeemable state is unexpected"),
-                Alice::EncSigLearned {
-                    state,
-                    encrypted_signature,
-                } => EncSigLearned {
-                    state3: state,
-                    encrypted_signature,
-                },
-                Alice::CancelTimelockExpired(state3) => {
-                    AliceState::CancelTimelockExpired { state3 }
-                }
-                Alice::BtcCancelled(state) => {
-                    let tx_cancel = bitcoin::TxCancel::new(
-                        &state.tx_lock,
-                        state.cancel_timelock,
-                        state.a.public(),
-                        state.B,
-                    );
+                state3,
+            },
+            Alice::XmrLocked(state3) => XmrLocked { state3 },
+            Alice::EncSigLearned {
+                state,
+                encrypted_signature,
+            } => EncSigLearned {
+                state3: state,
+                encrypted_signature,
+            },
+            Alice::CancelTimelockExpired(state3) => AliceState::CancelTimelockExpired { state3 },
+            Alice::BtcCancelled(state) => {
+                let tx_cancel = bitcoin::TxCancel::new(
+                    &state.tx_lock,
+                    state.cancel_timelock,
+                    state.a.public(),
+                    state.B,
+                );
 
-                    BtcCancelled {
-                        state3: state,
-                        tx_cancel,
-                    }
-                }
-                Alice::BtcPunishable(state) => {
-                    let tx_cancel = bitcoin::TxCancel::new(
-                        &state.tx_lock,
-                        state.cancel_timelock,
-                        state.a.public(),
-                        state.B,
-                    );
-                    let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &state.refund_address);
-                    BtcPunishable {
-                        tx_refund,
-                        state3: state,
-                    }
-                }
-                Alice::BtcRefunded {
+                BtcCancelled {
                     state3: state,
-                    spend_key,
-                    ..
-                } => BtcRefunded {
-                    spend_key,
+                    tx_cancel,
+                }
+            }
+            Alice::BtcPunishable(state) => {
+                let tx_cancel = bitcoin::TxCancel::new(
+                    &state.tx_lock,
+                    state.cancel_timelock,
+                    state.a.public(),
+                    state.B,
+                );
+                let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &state.refund_address);
+                BtcPunishable {
+                    tx_refund,
                     state3: state,
-                },
-                Alice::Done(end_state) => match end_state {
-                    EndState::SafelyAborted => SafelyAborted,
-                    EndState::BtcRedeemed => BtcRedeemed,
-                    EndState::XmrRefunded => XmrRefunded,
-                    EndState::BtcPunished => BtcPunished,
-                },
-            };
-            Ok(alice_state)
-        } else {
-            bail!("Alice swap state expected.")
+                }
+            }
+            Alice::BtcRefunded {
+                state3: state,
+                spend_key,
+                ..
+            } => BtcRefunded {
+                spend_key,
+                state3: state,
+            },
+            Alice::Done(end_state) => match end_state {
+                EndState::SafelyAborted => SafelyAborted,
+                EndState::BtcRedeemed => BtcRedeemed,
+                EndState::XmrRefunded => XmrRefunded,
+                EndState::BtcPunished => BtcPunished,
+            },
         }
     }
 }

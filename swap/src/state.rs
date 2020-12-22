@@ -20,11 +20,6 @@ pub enum Alice {
     Negotiated(alice::State3),
     BtcLocked(alice::State3),
     XmrLocked(alice::State3),
-    // TODO(Franck): Delete this state as it is not used in alice::swap
-    BtcRedeemable {
-        state: alice::State3,
-        redeem_tx: bitcoin::Transaction,
-    },
     EncSigLearned {
         state: alice::State3,
         encrypted_signature: EncryptedSignature,
@@ -88,7 +83,6 @@ impl Display for Alice {
             Alice::Negotiated(_) => f.write_str("Handshake complete"),
             Alice::BtcLocked(_) => f.write_str("Bitcoin locked"),
             Alice::XmrLocked(_) => f.write_str("Monero locked"),
-            Alice::BtcRedeemable { .. } => f.write_str("Bitcoin redeemable"),
             Alice::CancelTimelockExpired(_) => f.write_str("Cancel timelock is expired"),
             Alice::BtcCancelled(_) => f.write_str("Bitcoin cancel transaction published"),
             Alice::BtcPunishable(_) => f.write_str("Bitcoin punishable"),

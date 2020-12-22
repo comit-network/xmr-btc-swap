@@ -12,7 +12,7 @@
 )]
 #![forbid(unsafe_code)]
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use libp2p::{core::Multiaddr, PeerId};
 use prettytable::{row, Table};
 use rand::rngs::OsRng;
@@ -26,6 +26,7 @@ use swap::{
     cli::{Command, Options, Resume},
     monero,
     network::transport::build,
+    state::Swap,
     storage::Database,
     trace::init_tracing,
     SwapAmounts,
@@ -180,9 +181,12 @@ async fn main() -> Result<()> {
             monero_wallet_rpc_url,
             listen_addr,
         }) => {
-            let db_swap = db.get_state(swap_id)?;
+            let db_state = if let Swap::Alice(db_state) = db.get_state(swap_id)? {
+                db_state
+            } else {
+                bail!("Swap {} is not sell xmr.", swap_id)
+            };
 
-            let alice_state = AliceState::try_from(db_swap.clone())?;
             let (bitcoin_wallet, monero_wallet) = setup_wallets(
                 bitcoind_url,
                 bitcoin_wallet_name.as_str(),
@@ -192,7 +196,7 @@ async fn main() -> Result<()> {
             .await?;
             alice_swap(
                 swap_id,
-                alice_state,
+                db_state.into(),
                 listen_addr,
                 bitcoin_wallet,
                 monero_wallet,

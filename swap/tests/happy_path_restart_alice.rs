@@ -2,7 +2,6 @@ use crate::testutils::{init_alice, init_bob};
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use std::convert::TryFrom;
 use swap::{alice, alice::swap::AliceState, bitcoin, bob, storage::Database};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
@@ -111,18 +110,18 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     assert!(matches!(alice_state, AliceState::EncSigLearned {..}));
 
     let alice_db = Database::open(alice_db_datadir.path()).unwrap();
-    let state_before_restart = alice_db.get_state(alice_swap_id).unwrap();
 
-    if let swap::state::Swap::Alice(state) = state_before_restart.clone() {
-        assert!(matches!(state, swap::state::Alice::EncSigLearned {..}));
-    }
+    let resume_state =
+        if let swap::state::Swap::Alice(state) = alice_db.get_state(alice_swap_id).unwrap() {
+            assert!(matches!(state, swap::state::Alice::EncSigLearned {..}));
+            state.into()
+        } else {
+            unreachable!()
+        };
 
     let (mut event_loop_after_restart, event_loop_handle_after_restart) =
         testutils::init_alice_event_loop(alice_multiaddr);
     tokio::spawn(async move { event_loop_after_restart.run().await });
-
-    let db_swap = alice_db.get_state(alice_swap_id).unwrap();
-    let resume_state = AliceState::try_from(db_swap).unwrap();
 
     let alice_state = alice::swap::swap(
         resume_state,
