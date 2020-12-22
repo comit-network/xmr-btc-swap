@@ -390,15 +390,24 @@ where
                 .await
             }
             BobState::Cancelled(state) => {
-                // TODO
                 // Bob has cancelled the swap
                 let state = match state.current_epoch(bitcoin_wallet.as_ref()).await? {
                     Epoch::T0 => panic!("Cancelled before t1??? Something is really wrong"),
                     Epoch::T1 => {
+                        // If T1 has expired but not T2 we must be able to refund
                         state.refund_btc(bitcoin_wallet.as_ref()).await?;
                         BobState::BtcRefunded(state)
                     }
-                    Epoch::T2 => BobState::Punished,
+                    Epoch::T2 => {
+                        // If T2 expired we still try to refund in case Alice has not acted.
+                        // This is especially important for scenarios where Alice is offline
+                        // indefinitely after starting the swap.
+                        let refund_result = state.refund_btc(bitcoin_wallet.as_ref()).await;
+                        match refund_result {
+                            Ok(()) => BobState::BtcRefunded(state),
+                            Err(_) => BobState::Punished,
+                        }
+                    }
                 };
 
                 let db_state = state.clone().into();
