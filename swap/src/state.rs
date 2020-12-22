@@ -20,7 +20,7 @@ pub enum Alice {
         state: alice::State3,
         redeem_tx: bitcoin::Transaction,
     },
-    EncSignLearned {
+    EncSigLearned {
         state: alice::State3,
         encrypted_signature: EncryptedSignature,
     },
@@ -81,7 +81,7 @@ impl Display for Alice {
             Alice::BtcPunishable(_) => f.write_str("Bitcoin punishable"),
             Alice::BtcRefunded { .. } => f.write_str("Monero refundable"),
             Alice::SwapComplete => f.write_str("Swap complete"),
-            Alice::EncSignLearned { .. } => f.write_str("Encrypted signature learned"),
+            Alice::EncSigLearned { .. } => f.write_str("Encrypted signature learned"),
         }
     }
 }

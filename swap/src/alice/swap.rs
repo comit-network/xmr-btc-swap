@@ -60,7 +60,7 @@ pub enum AliceState {
     XmrLocked {
         state3: State3,
     },
-    EncSignLearned {
+    EncSigLearned {
         state3: State3,
         encrypted_signature: EncryptedSignature,
     },
@@ -92,7 +92,7 @@ impl fmt::Display for AliceState {
             AliceState::Negotiated { .. } => write!(f, "negotiated"),
             AliceState::BtcLocked { .. } => write!(f, "btc_locked"),
             AliceState::XmrLocked { .. } => write!(f, "xmr_locked"),
-            AliceState::EncSignLearned { .. } => write!(f, "encsig_learned"),
+            AliceState::EncSigLearned { .. } => write!(f, "encsig_learned"),
             AliceState::BtcRedeemed => write!(f, "btc_redeemed"),
             AliceState::BtcCancelled { .. } => write!(f, "btc_cancelled"),
             AliceState::BtcRefunded { .. } => write!(f, "btc_refunded"),
@@ -111,10 +111,10 @@ impl From<&AliceState> for state::Alice {
             AliceState::Negotiated { state3, .. } => Alice::Negotiated(state3.clone()),
             AliceState::BtcLocked { state3, .. } => Alice::BtcLocked(state3.clone()),
             AliceState::XmrLocked { state3 } => Alice::XmrLocked(state3.clone()),
-            AliceState::EncSignLearned {
+            AliceState::EncSigLearned {
                 state3,
-                encrypted_signature,
-            } => Alice::EncSignLearned {
+                encrypted_signature,,
+            } => Alice::EncSigLearned {
                 state: state3.clone(),
                 encrypted_signature: encrypted_signature.clone(),
             },
@@ -159,10 +159,10 @@ impl TryFrom<state::Swap> for AliceState {
                 },
                 Alice::XmrLocked(state3) => XmrLocked { state3 },
                 Alice::BtcRedeemable { .. } => bail!("BtcRedeemable state is unexpected"),
-                Alice::EncSignLearned {
+                Alice::EncSigLearned {
                     state,
                     encrypted_signature,
-                } => EncSignLearned {
+                } => EncSigLearned {
                     state3: state,
                     encrypted_signature,
                 },
@@ -253,7 +253,7 @@ pub fn is_xmr_locked(state: &AliceState) -> bool {
 pub fn is_encsig_learned(state: &AliceState) -> bool {
     matches!(
         state,
-        AliceState::EncSignLearned{..}
+        AliceState::EncSigLearned{..}
     )
 }
 
@@ -401,7 +401,7 @@ pub async fn run_until(
 
                         match select(t1_timeout, wait_for_enc_sig).await {
                             Either::Left(_) => AliceState::T1Expired { state3 },
-                            Either::Right((enc_sig, _)) => AliceState::EncSignLearned {
+                            Either::Right((enc_sig, _)) => AliceState::EncSigLearned {
                                 state3,
                                 encrypted_signature: enc_sig?,
                             },
@@ -425,7 +425,7 @@ pub async fn run_until(
                 )
                 .await
             }
-            AliceState::EncSignLearned {
+            AliceState::EncSigLearned {
                 state3,
                 encrypted_signature,
             } => {

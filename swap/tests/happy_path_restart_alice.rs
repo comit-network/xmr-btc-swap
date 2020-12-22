@@ -108,13 +108,13 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     .await
     .unwrap();
 
-    assert!(matches!(alice_state, AliceState::EncSignLearned {..}));
+    assert!(matches!(alice_state, AliceState::EncSigLearned {..}));
 
     let alice_db = Database::open(alice_db_datadir.path()).unwrap();
     let state_before_restart = alice_db.get_state(alice_swap_id).unwrap();
 
     if let swap::state::Swap::Alice(state) = state_before_restart.clone() {
-        assert!(matches!(state, swap::state::Alice::EncSignLearned {..}));
+        assert!(matches!(state, swap::state::Alice::EncSigLearned {..}));
     }
 
     let (mut event_loop_after_restart, event_loop_handle_after_restart) =
