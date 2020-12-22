@@ -81,7 +81,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::state::{Alice, Bob};
+    use crate::state::{Alice, Bob, EndState};
 
     use super::*;
 
@@ -90,7 +90,7 @@ mod tests {
         let db_dir = tempfile::tempdir().unwrap();
         let db = Database::open(db_dir.path()).unwrap();
 
-        let state_1 = Swap::Alice(Alice::SwapComplete);
+        let state_1 = Swap::Alice(Alice::Done(EndState::BtcRedeemed));
         let swap_id_1 = Uuid::new_v4();
         db.insert_latest_state(swap_id_1, state_1.clone())
             .await
@@ -119,7 +119,7 @@ mod tests {
         let db_dir = tempfile::tempdir().unwrap();
         let db = Database::open(db_dir.path()).unwrap();
 
-        let state = Swap::Alice(Alice::SwapComplete);
+        let state = Swap::Alice(Alice::Done(EndState::SafelyAborted));
 
         let swap_id = Uuid::new_v4();
         db.insert_latest_state(swap_id, state.clone())
@@ -146,7 +146,7 @@ mod tests {
         let db_dir = tempfile::tempdir().unwrap();
         let db = Database::open(db_dir.path()).unwrap();
 
-        let state_1 = Swap::Alice(Alice::SwapComplete);
+        let state_1 = Swap::Alice(Alice::Done(EndState::BtcPunished));
         let swap_id_1 = Uuid::new_v4();
         db.insert_latest_state(swap_id_1, state_1.clone())
             .await

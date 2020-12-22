@@ -14,7 +14,7 @@ use crate::{
     bitcoin::EncryptedSignature,
     network::request_response::AliceToBob,
     state,
-    state::{Alice, Swap},
+    state::{Alice, EndState, Swap},
     storage::Database,
     SwapAmounts,
 };
@@ -118,20 +118,23 @@ impl From<&AliceState> for state::Alice {
                 state: state3.clone(),
                 encrypted_signature: encrypted_signature.clone(),
             },
-            AliceState::BtcRedeemed => Alice::SwapComplete,
+            AliceState::BtcRedeemed => Alice::Done(EndState::BtcRedeemed),
             AliceState::BtcCancelled { state3, .. } => Alice::BtcCancelled(state3.clone()),
-            AliceState::BtcRefunded { .. } => Alice::SwapComplete,
+            AliceState::BtcRefunded { spend_key, state3 } => Alice::BtcRefunded {
+                spend_key: *spend_key,
+                state3: state3.clone(),
+            },
             AliceState::BtcPunishable { state3, .. } => Alice::BtcPunishable(state3.clone()),
-            AliceState::XmrRefunded => Alice::SwapComplete,
+            AliceState::XmrRefunded => Alice::Done(EndState::XmrRefunded),
             AliceState::CancelTimelockExpired { state3 } => {
                 Alice::CancelTimelockExpired(state3.clone())
             }
-            AliceState::BtcPunished => Alice::SwapComplete,
-            AliceState::SafelyAborted => Alice::SwapComplete,
-            // TODO: Potentially add support to resume swaps that are not Negotiated
-            AliceState::Started { .. } => {
-                panic!("Alice attempted to save swap before being negotiated")
-            }
+            AliceState::BtcPunished => Alice::Done(EndState::BtcPunished),
+            AliceState::SafelyAborted => Alice::Done(EndState::SafelyAborted),
+            AliceState::Started { amounts, state0 } => Alice::Started {
+                amounts: *amounts,
+                state0: state0.clone(),
+            },
         }
     }
 }
@@ -143,6 +146,7 @@ impl TryFrom<state::Swap> for AliceState {
         use AliceState::*;
         if let Swap::Alice(state) = db_state {
             let alice_state = match state {
+                Alice::Started { amounts, state0 } => Started { amounts, state0 },
                 Alice::Negotiated(state3) => Negotiated {
                     channel: None,
                     amounts: SwapAmounts {
@@ -198,15 +202,19 @@ impl TryFrom<state::Swap> for AliceState {
                     }
                 }
                 Alice::BtcRefunded {
-                    state, spend_key, ..
+                    state3: state,
+                    spend_key,
+                    ..
                 } => BtcRefunded {
                     spend_key,
                     state3: state,
                 },
-                Alice::SwapComplete => {
-                    // TODO(Franck): Better fine grain
-                    AliceState::SafelyAborted
-                }
+                Alice::Done(end_state) => match end_state {
+                    EndState::SafelyAborted => SafelyAborted,
+                    EndState::BtcRedeemed => BtcRedeemed,
+                    EndState::XmrRefunded => XmrRefunded,
+                    EndState::BtcPunished => BtcPunished,
+                },
             };
             Ok(alice_state)
         } else {

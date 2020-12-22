@@ -34,6 +34,7 @@ serde_json = "1"
 sha2 = "0.9"
 sled = "0.34"
 structopt = "0.3"
+strum = { version = "0.20", features = ["derive"] }
 tempfile = "3"
 time = "0.2"
 tokio = { version = "0.2", features = ["rt-threaded", "time", "macros", "sync"] }

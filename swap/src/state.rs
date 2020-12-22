@@ -1,3 +1,4 @@
+use crate::SwapAmounts;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use xmr_btc::{alice, bitcoin::EncryptedSignature, bob, monero, serde::monero_private_key};
@@ -12,6 +13,10 @@ pub enum Swap {
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Alice {
+    Started {
+        amounts: SwapAmounts,
+        state0: alice::State0,
+    },
     Negotiated(alice::State3),
     BtcLocked(alice::State3),
     XmrLocked(alice::State3),
@@ -28,12 +33,19 @@ pub enum Alice {
     BtcCancelled(alice::State3),
     BtcPunishable(alice::State3),
     BtcRefunded {
-        state: alice::State3,
+        state3: alice::State3,
         #[serde(with = "monero_private_key")]
         spend_key: monero::PrivateKey,
-        view_key: monero::PrivateViewKey,
     },
-    SwapComplete,
+    Done(EndState),
+}
+
+#[derive(Clone, strum::Display, Debug, Deserialize, Serialize, PartialEq)]
+pub enum EndState {
+    SafelyAborted,
+    BtcRedeemed,
+    XmrRefunded,
+    BtcPunished,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -72,6 +84,7 @@ impl Display for Swap {
 impl Display for Alice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Alice::Started { .. } => write!(f, "Started"),
             Alice::Negotiated(_) => f.write_str("Handshake complete"),
             Alice::BtcLocked(_) => f.write_str("Bitcoin locked"),
             Alice::XmrLocked(_) => f.write_str("Monero locked"),
@@ -80,7 +93,7 @@ impl Display for Alice {
             Alice::BtcCancelled(_) => f.write_str("Bitcoin cancel transaction published"),
             Alice::BtcPunishable(_) => f.write_str("Bitcoin punishable"),
             Alice::BtcRefunded { .. } => f.write_str("Monero refundable"),
-            Alice::SwapComplete => f.write_str("Swap complete"),
+            Alice::Done(end_state) => write!(f, "Done: {}", end_state),
             Alice::EncSigLearned { .. } => f.write_str("Encrypted signature learned"),
         }
     }

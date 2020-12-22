@@ -435,7 +435,7 @@ impl State {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct State0 {
     pub a: bitcoin::SecretKey,
     pub s_a: cross_curve_dleq::Scalar,
