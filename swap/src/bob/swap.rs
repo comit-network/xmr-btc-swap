@@ -29,10 +29,10 @@ pub enum BobState {
     EncSigSent(bob::State4),
     BtcRedeemed(bob::State5),
     CancelTimelockExpired(bob::State4),
-    Cancelled(bob::State4),
+    BtcCancelled(bob::State4),
     BtcRefunded(bob::State4),
     XmrRedeemed,
-    Punished,
+    BtcPunished,
     SafelyAborted,
 }
 
@@ -41,16 +41,16 @@ impl fmt::Display for BobState {
         match self {
             BobState::Started { .. } => write!(f, "started"),
             BobState::Negotiated(..) => write!(f, "negotiated"),
-            BobState::BtcLocked(..) => write!(f, "btc_locked"),
-            BobState::XmrLocked(..) => write!(f, "xmr_locked"),
-            BobState::EncSigSent(..) => write!(f, "encsig_sent"),
-            BobState::BtcRedeemed(..) => write!(f, "btc_redeemed"),
-            BobState::CancelTimelockExpired(..) => write!(f, "cancel_timelock_expired"),
-            BobState::Cancelled(..) => write!(f, "cancelled"),
-            BobState::BtcRefunded(..) => write!(f, "btc_refunded"),
-            BobState::XmrRedeemed => write!(f, "xmr_redeemed"),
-            BobState::Punished => write!(f, "punished"),
-            BobState::SafelyAborted => write!(f, "safely_aborted"),
+            BobState::BtcLocked(..) => write!(f, "btc is locked"),
+            BobState::XmrLocked(..) => write!(f, "xmr is locked"),
+            BobState::EncSigSent(..) => write!(f, "encrypted signature is sent"),
+            BobState::BtcRedeemed(..) => write!(f, "btc is redeemed"),
+            BobState::CancelTimelockExpired(..) => write!(f, "cancel timelock is expired"),
+            BobState::BtcCancelled(..) => write!(f, "btc is cancelled"),
+            BobState::BtcRefunded(..) => write!(f, "btc is refunded"),
+            BobState::XmrRedeemed => write!(f, "xmr is redeemed"),
+            BobState::BtcPunished => write!(f, "btc is punished"),
+            BobState::SafelyAborted => write!(f, "safely aborted"),
         }
     }
 }
@@ -68,10 +68,10 @@ impl From<BobState> for state::Bob {
             BobState::EncSigSent(state4) => Bob::EncSigSent { state4 },
             BobState::BtcRedeemed(state5) => Bob::BtcRedeemed(state5),
             BobState::CancelTimelockExpired(state4) => Bob::CancelTimelockExpired(state4),
-            BobState::Cancelled(state4) => Bob::BtcCancelled(state4),
+            BobState::BtcCancelled(state4) => Bob::BtcCancelled(state4),
             BobState::BtcRefunded(_)
             | BobState::XmrRedeemed
-            | BobState::Punished
+            | BobState::BtcPunished
             | BobState::SafelyAborted => Bob::SwapComplete,
         }
     }
@@ -89,7 +89,7 @@ impl TryFrom<state::Swap> for BobState {
                 Bob::EncSigSent { state4 } => BobState::EncSigSent(state4),
                 Bob::BtcRedeemed(state5) => BobState::BtcRedeemed(state5),
                 Bob::CancelTimelockExpired(state4) => BobState::CancelTimelockExpired(state4),
-                Bob::BtcCancelled(state4) => BobState::Cancelled(state4),
+                Bob::BtcCancelled(state4) => BobState::BtcCancelled(state4),
                 Bob::SwapComplete => BobState::SafelyAborted,
             };
 
@@ -132,7 +132,7 @@ pub fn is_complete(state: &BobState) -> bool {
         state,
         BobState::BtcRefunded(..)
             | BobState::XmrRedeemed
-            | BobState::Punished
+            | BobState::BtcPunished
             | BobState::SafelyAborted
     )
 }
@@ -381,7 +381,7 @@ where
                     state4.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
                 }
 
-                let state = BobState::Cancelled(state4);
+                let state = BobState::BtcCancelled(state4);
                 db.insert_latest_state(swap_id, state::Swap::Bob(state.clone().into()))
                     .await?;
 
@@ -397,7 +397,7 @@ where
                 )
                 .await
             }
-            BobState::Cancelled(state) => {
+            BobState::BtcCancelled(state) => {
                 // Bob has cancelled the swap
                 let state = match state.expired_timelock(bitcoin_wallet.as_ref()).await? {
                     ExpiredTimelocks::None => {
@@ -407,7 +407,7 @@ where
                         state.refund_btc(bitcoin_wallet.as_ref()).await?;
                         BobState::BtcRefunded(state)
                     }
-                    ExpiredTimelocks::Punish => BobState::Punished,
+                    ExpiredTimelocks::Punish => BobState::BtcPunished,
                 };
 
                 let db_state = state.clone().into();
@@ -426,7 +426,7 @@ where
                 .await
             }
             BobState::BtcRefunded(state4) => Ok(BobState::BtcRefunded(state4)),
-            BobState::Punished => Ok(BobState::Punished),
+            BobState::BtcPunished => Ok(BobState::BtcPunished),
             BobState::SafelyAborted => Ok(BobState::SafelyAborted),
             BobState::XmrRedeemed => Ok(BobState::XmrRedeemed),
         }
