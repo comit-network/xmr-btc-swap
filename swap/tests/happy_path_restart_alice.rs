@@ -90,7 +90,7 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     let alice_db = Database::open(alice_db_datadir.path()).unwrap();
 
     tokio::spawn(async move { alice_event_loop.run().await });
-    tokio::spawn(bob_fut);
+    let bob_swap_handle = tokio::spawn(bob_fut);
     tokio::spawn(bob_event_loop.run());
 
     let alice_swap_id = Uuid::new_v4();
@@ -119,7 +119,7 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
 
     let (mut event_loop_after_restart, event_loop_handle_after_restart) =
         testutils::init_alice_event_loop(alice_multiaddr);
-    let _alice_swarm_fut = tokio::spawn(async move { event_loop_after_restart.run().await });
+    tokio::spawn(async move { event_loop_after_restart.run().await });
 
     let db_swap = alice_db.get_state(alice_swap_id).unwrap();
     let resume_state = AliceState::try_from(db_swap).unwrap();
@@ -135,6 +135,9 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     )
     .await
     .unwrap();
+
+    // Wait for Bob to finish
+    bob_swap_handle.await.unwrap().unwrap();
 
     assert!(matches!(alice_state, AliceState::BtcRedeemed {..}));
 

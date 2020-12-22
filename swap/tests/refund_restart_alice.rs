@@ -100,7 +100,7 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
         )
     };
 
-    tokio::spawn(async move { bob_event_loop.run().await });
+    tokio::spawn(bob_event_loop.run());
 
     // We are selecting with alice_event_loop_1 so that we stop polling on it once
     // the try_join is finished.
