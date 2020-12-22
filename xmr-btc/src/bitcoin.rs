@@ -14,6 +14,7 @@ use std::str::FromStr;
 pub use bitcoin::{util::psbt::PartiallySignedTransaction, *};
 pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
 pub use transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund};
+use crate::Epoch;
 
 // TODO: Configurable tx-fee (note: parties have to agree prior to swapping)
 // Current reasoning:
@@ -241,5 +242,27 @@ where
 {
     while client.block_height().await < target {
         tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+    }
+}
+
+
+pub async fn current_epoch<W>(
+    bitcoin_wallet: &W,
+    refund_timelock: u32,
+    punish_timelock: u32,
+    lock_tx_id: ::bitcoin::Txid,
+) -> anyhow::Result<Epoch>
+    where
+        W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
+{
+    let current_block_height = bitcoin_wallet.block_height().await;
+    let t0 = bitcoin_wallet.transaction_block_height(lock_tx_id).await;
+    let t1 = t0 + refund_timelock;
+    let t2 = t1 + punish_timelock;
+
+    match (current_block_height < t1, current_block_height < t2) {
+        (true, _) => Ok(Epoch::T0),
+        (false, true) => Ok(Epoch::T1),
+        (false, false) => Ok(Epoch::T2),
     }
 }

@@ -28,7 +28,7 @@ use std::{
 use tokio::{sync::Mutex, time::timeout};
 use tracing::{error, info};
 pub mod message;
-use crate::bitcoin::{BlockHeight, TransactionBlockHeight};
+use crate::bitcoin::{BlockHeight, TransactionBlockHeight, current_epoch};
 pub use message::{Message, Message0, Message1, Message2};
 
 #[derive(Debug)]
@@ -697,7 +697,7 @@ impl State3 {
     where
         W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
     {
-        crate::current_epoch(
+        current_epoch(
             bitcoin_wallet,
             self.refund_timelock,
             self.punish_timelock,

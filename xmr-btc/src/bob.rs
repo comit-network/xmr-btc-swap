@@ -39,6 +39,7 @@ use crate::{
 };
 use ::bitcoin::{Transaction, Txid};
 pub use message::{Message, Message0, Message1, Message2, Message3};
+use crate::bitcoin::current_epoch;
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
@@ -650,7 +651,7 @@ impl State3 {
     where
         W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
     {
-        crate::current_epoch(
+        current_epoch(
             bitcoin_wallet,
             self.refund_timelock,
             self.punish_timelock,
@@ -795,7 +796,7 @@ impl State4 {
     where
         W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
     {
-        crate::current_epoch(
+        current_epoch(
             bitcoin_wallet,
             self.refund_timelock,
             self.punish_timelock,
