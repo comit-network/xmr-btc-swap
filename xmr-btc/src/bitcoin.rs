@@ -11,10 +11,10 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
 
+use crate::Epoch;
 pub use bitcoin::{util::psbt::PartiallySignedTransaction, *};
 pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
 pub use transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund};
-use crate::Epoch;
 
 // TODO: Configurable tx-fee (note: parties have to agree prior to swapping)
 // Current reasoning:
@@ -245,15 +245,14 @@ where
     }
 }
 
-
 pub async fn current_epoch<W>(
     bitcoin_wallet: &W,
     refund_timelock: u32,
     punish_timelock: u32,
     lock_tx_id: ::bitcoin::Txid,
 ) -> anyhow::Result<Epoch>
-    where
-        W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
+where
+    W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
 {
     let current_block_height = bitcoin_wallet.block_height().await;
     let t0 = bitcoin_wallet.transaction_block_height(lock_tx_id).await;
@@ -265,4 +264,20 @@ pub async fn current_epoch<W>(
         (false, true) => Ok(Epoch::T1),
         (false, false) => Ok(Epoch::T2),
     }
+}
+
+pub async fn wait_for_t1<W>(
+    bitcoin_wallet: &W,
+    refund_timelock: u32,
+    lock_tx_id: ::bitcoin::Txid,
+) -> Result<()>
+where
+    W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
+{
+    let tx_lock_height = bitcoin_wallet.transaction_block_height(lock_tx_id).await;
+
+    let t1_timeout =
+        poll_until_block_height_is_gte(bitcoin_wallet, tx_lock_height + refund_timelock);
+    t1_timeout.await;
+    Ok(())
 }

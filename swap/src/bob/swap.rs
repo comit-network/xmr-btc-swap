@@ -227,13 +227,32 @@ where
                 {
                     event_loop_handle.dial().await?;
 
-                    // todo: watch until t1, not indefinitely
-                    let msg2 = event_loop_handle.recv_message2().await?;
-                    let state4 = state3
-                        .watch_for_lock_xmr(monero_wallet.as_ref(), msg2)
-                        .await?;
+                    let msg2_watcher = event_loop_handle.recv_message2();
+                    let t1_timeout = state3.wait_for_t1(bitcoin_wallet.as_ref());
 
-                    BobState::XmrLocked(state4)
+                    select! {
+                        msg2 = msg2_watcher => {
+
+                            let xmr_lock_watcher = state3.clone()
+                                .watch_for_lock_xmr(monero_wallet.as_ref(), msg2?);
+                            let t1_timeout = state3.wait_for_t1(bitcoin_wallet.as_ref());
+
+                            select! {
+                                state4 = xmr_lock_watcher => {
+                                    BobState::XmrLocked(state4?)
+                                },
+                                _ = t1_timeout => {
+                                    let state4 = state3.t1_expired();
+                                    BobState::T1Expired(state4)
+                                }
+                            }
+
+                        },
+                        _ = t1_timeout => {
+                            let state4 = state3.t1_expired();
+                            BobState::T1Expired(state4)
+                        }
+                    }
                 } else {
                     let state4 = state3.t1_expired();
                     BobState::T1Expired(state4)

@@ -34,12 +34,13 @@ use tracing::error;
 
 pub mod message;
 use crate::{
-    bitcoin::{BlockHeight, GetRawTransaction, Network, TransactionBlockHeight},
+    bitcoin::{
+        current_epoch, wait_for_t1, BlockHeight, GetRawTransaction, Network, TransactionBlockHeight,
+    },
     monero::{CreateWalletForOutput, WatchForTransfer},
 };
 use ::bitcoin::{Transaction, Txid};
 pub use message::{Message, Message0, Message1, Message2, Message3};
-use crate::bitcoin::current_epoch;
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
@@ -622,6 +623,13 @@ impl State3 {
         })
     }
 
+    pub async fn wait_for_t1<W>(&self, bitcoin_wallet: &W) -> Result<()>
+    where
+        W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
+    {
+        wait_for_t1(bitcoin_wallet, self.refund_timelock, self.tx_lock.txid()).await
+    }
+
     pub fn t1_expired(&self) -> State4 {
         State4 {
             A: self.A,
@@ -783,13 +791,7 @@ impl State4 {
     where
         W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
     {
-        let tx_id = self.tx_lock.txid();
-        let tx_lock_height = bitcoin_wallet.transaction_block_height(tx_id).await;
-
-        let t1_timeout =
-            poll_until_block_height_is_gte(bitcoin_wallet, tx_lock_height + self.refund_timelock);
-        t1_timeout.await;
-        Ok(())
+        wait_for_t1(bitcoin_wallet, self.refund_timelock, self.tx_lock.txid()).await
     }
 
     pub async fn current_epoch<W>(&self, bitcoin_wallet: &W) -> Result<Epoch>
