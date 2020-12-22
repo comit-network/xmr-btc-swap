@@ -34,14 +34,13 @@ pub struct EventLoopHandle {
     msg0: Receiver<alice::Message0>,
     msg1: Receiver<alice::Message1>,
     msg2: Receiver<alice::Message2>,
-    request_amounts: Sender<(PeerId, ::bitcoin::Amount)>,
+    request_amounts: Sender<::bitcoin::Amount>,
     conn_established: Receiver<PeerId>,
-    dial_alice: Sender<PeerId>,
-    add_address: Sender<(PeerId, Multiaddr)>,
-    send_msg0: Sender<(PeerId, bob::Message0)>,
-    send_msg1: Sender<(PeerId, bob::Message1)>,
-    send_msg2: Sender<(PeerId, bob::Message2)>,
-    send_msg3: Sender<(PeerId, EncryptedSignature)>,
+    dial_alice: Sender<()>,
+    send_msg0: Sender<bob::Message0>,
+    send_msg1: Sender<bob::Message1>,
+    send_msg2: Sender<bob::Message2>,
+    send_msg3: Sender<EncryptedSignature>,
 }
 
 impl EventLoopHandle {
@@ -68,9 +67,9 @@ impl EventLoopHandle {
 
     /// Dials other party and wait for the connection to be established.
     /// Do nothing if we are already connected
-    pub async fn dial(&mut self, peer_id: PeerId) -> Result<()> {
-        debug!("Attempt to dial Alice {}", peer_id);
-        let _ = self.dial_alice.send(peer_id).await?;
+    pub async fn dial(&mut self) -> Result<()> {
+        debug!("Attempt to dial Alice");
+        let _ = self.dial_alice.send(()).await?;
 
         self.conn_established
             .recv()
@@ -80,70 +79,63 @@ impl EventLoopHandle {
         Ok(())
     }
 
-    pub async fn add_address(&mut self, peer_id: PeerId, addr: Multiaddr) -> Result<()> {
-        debug!("Attempt to add address {} for peer id {}", addr, peer_id);
-        self.add_address.send((peer_id, addr)).await?;
+    pub async fn request_amounts(&mut self, btc_amount: ::bitcoin::Amount) -> Result<()> {
+        let _ = self.request_amounts.send(btc_amount).await?;
         Ok(())
     }
 
-    pub async fn request_amounts(
-        &mut self,
-        peer_id: PeerId,
-        btc_amount: ::bitcoin::Amount,
-    ) -> Result<()> {
-        let _ = self.request_amounts.send((peer_id, btc_amount)).await?;
+    pub async fn send_message0(&mut self, msg: bob::Message0) -> Result<()> {
+        let _ = self.send_msg0.send(msg).await?;
         Ok(())
     }
 
-    pub async fn send_message0(&mut self, peer_id: PeerId, msg: bob::Message0) -> Result<()> {
-        let _ = self.send_msg0.send((peer_id, msg)).await?;
+    pub async fn send_message1(&mut self, msg: bob::Message1) -> Result<()> {
+        let _ = self.send_msg1.send(msg).await?;
         Ok(())
     }
 
-    pub async fn send_message1(&mut self, peer_id: PeerId, msg: bob::Message1) -> Result<()> {
-        let _ = self.send_msg1.send((peer_id, msg)).await?;
+    pub async fn send_message2(&mut self, msg: bob::Message2) -> Result<()> {
+        let _ = self.send_msg2.send(msg).await?;
         Ok(())
     }
 
-    pub async fn send_message2(&mut self, peer_id: PeerId, msg: bob::Message2) -> Result<()> {
-        let _ = self.send_msg2.send((peer_id, msg)).await?;
-        Ok(())
-    }
-
-    pub async fn send_message3(
-        &mut self,
-        peer_id: PeerId,
-        tx_redeem_encsig: EncryptedSignature,
-    ) -> Result<()> {
-        let _ = self.send_msg3.send((peer_id, tx_redeem_encsig)).await?;
+    pub async fn send_message3(&mut self, tx_redeem_encsig: EncryptedSignature) -> Result<()> {
+        let _ = self.send_msg3.send(tx_redeem_encsig).await?;
         Ok(())
     }
 }
 
 pub struct EventLoop {
     swarm: libp2p::Swarm<Behaviour>,
+    alice_peer_id: PeerId,
     msg0: Sender<alice::Message0>,
     msg1: Sender<alice::Message1>,
     msg2: Sender<alice::Message2>,
     conn_established: Sender<PeerId>,
-    request_amounts: Receiver<(PeerId, ::bitcoin::Amount)>,
-    dial_alice: Receiver<PeerId>,
-    add_address: Receiver<(PeerId, Multiaddr)>,
-    send_msg0: Receiver<(PeerId, bob::Message0)>,
-    send_msg1: Receiver<(PeerId, bob::Message1)>,
-    send_msg2: Receiver<(PeerId, bob::Message2)>,
-    send_msg3: Receiver<(PeerId, EncryptedSignature)>,
+    request_amounts: Receiver<::bitcoin::Amount>,
+    dial_alice: Receiver<()>,
+    send_msg0: Receiver<bob::Message0>,
+    send_msg1: Receiver<bob::Message1>,
+    send_msg2: Receiver<bob::Message2>,
+    send_msg3: Receiver<EncryptedSignature>,
 }
 
 impl EventLoop {
-    pub fn new(transport: SwapTransport, behaviour: Behaviour) -> Result<(Self, EventLoopHandle)> {
+    pub fn new(
+        transport: SwapTransport,
+        behaviour: Behaviour,
+        alice_peer_id: PeerId,
+        alice_addr: Multiaddr,
+    ) -> Result<(Self, EventLoopHandle)> {
         let local_peer_id = behaviour.peer_id();
 
-        let swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id)
+        let mut swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id)
             .executor(Box::new(TokioExecutor {
                 handle: tokio::runtime::Handle::current(),
             }))
             .build();
+
+        swarm.add_address(alice_peer_id.clone(), alice_addr);
 
         let amounts = Channels::new();
         let msg0 = Channels::new();
@@ -151,21 +143,20 @@ impl EventLoop {
         let msg2 = Channels::new();
         let conn_established = Channels::new();
         let dial_alice = Channels::new();
-        let add_address = Channels::new();
         let send_msg0 = Channels::new();
         let send_msg1 = Channels::new();
         let send_msg2 = Channels::new();
         let send_msg3 = Channels::new();
 
-        let driver = EventLoop {
+        let event_loop = EventLoop {
             swarm,
+            alice_peer_id,
             request_amounts: amounts.receiver,
             msg0: msg0.sender,
             msg1: msg1.sender,
             msg2: msg2.sender,
             conn_established: conn_established.sender,
             dial_alice: dial_alice.receiver,
-            add_address: add_address.receiver,
             send_msg0: send_msg0.receiver,
             send_msg1: send_msg1.receiver,
             send_msg2: send_msg2.receiver,
@@ -179,14 +170,13 @@ impl EventLoop {
             msg2: msg2.receiver,
             conn_established: conn_established.receiver,
             dial_alice: dial_alice.sender,
-            add_address: add_address.sender,
             send_msg0: send_msg0.sender,
             send_msg1: send_msg1.sender,
             send_msg2: send_msg2.sender,
             send_msg3: send_msg3.sender,
         };
 
-        Ok((driver, handle))
+        Ok((event_loop, handle))
     }
 
     pub async fn run(mut self) {
@@ -210,14 +200,9 @@ impl EventLoop {
                         OutEvent::Message3 => info!("Alice acknowledged message 3 received"),
                     }
                 },
-                peer_id_addr = self.add_address.next().fuse() => {
-                    if let Some((peer_id, addr)) = peer_id_addr {
-                        debug!("Add address for {}: {}", peer_id, addr);
-                        self.swarm.add_address(peer_id, addr);
-                    }
-                },
-                peer_id = self.dial_alice.next().fuse() => {
-                    if let Some(peer_id) = peer_id {
+                option = self.dial_alice.next().fuse() => {
+                    if option.is_some() {
+                           let peer_id = self.alice_peer_id.clone();
                         if self.swarm.pt.is_connected(&peer_id) {
                             debug!("Already connected to Alice: {}", peer_id);
                             let _ = self.conn_established.send(peer_id).await;
@@ -232,30 +217,30 @@ impl EventLoop {
                     }
                 },
                 amounts = self.request_amounts.next().fuse() =>  {
-                    if let Some((peer_id, btc_amount)) = amounts {
-                        self.swarm.request_amounts(peer_id, btc_amount.as_sat());
+                    if let Some(btc_amount) = amounts {
+                        self.swarm.request_amounts(self.alice_peer_id.clone(), btc_amount.as_sat());
                     }
                 },
 
                 msg0 = self.send_msg0.next().fuse() => {
-                    if let Some((peer_id, msg)) = msg0 {
-                        self.swarm.send_message0(peer_id, msg);
+                    if let Some(msg) = msg0 {
+                        self.swarm.send_message0(self.alice_peer_id.clone(), msg);
                     }
                 }
 
                 msg1 = self.send_msg1.next().fuse() => {
-                    if let Some((peer_id, msg)) = msg1 {
-                        self.swarm.send_message1(peer_id, msg);
+                    if let Some(msg) = msg1 {
+                        self.swarm.send_message1(self.alice_peer_id.clone(), msg);
                     }
                 },
                 msg2 = self.send_msg2.next().fuse() => {
-                    if let Some((peer_id, msg)) = msg2 {
-                        self.swarm.send_message2(peer_id, msg);
+                    if let Some(msg) = msg2 {
+                        self.swarm.send_message2(self.alice_peer_id.clone(), msg);
                     }
                 },
                 msg3 = self.send_msg3.next().fuse() => {
-                    if let Some((peer_id, tx_redeem_encsig)) = msg3 {
-                        self.swarm.send_message3(peer_id, tx_redeem_encsig);
+                    if let Some(tx_redeem_encsig) = msg3 {
+                        self.swarm.send_message3(self.alice_peer_id.clone(), tx_redeem_encsig);
                     }
                 }
             }

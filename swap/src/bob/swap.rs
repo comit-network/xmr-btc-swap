@@ -7,7 +7,6 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
-use libp2p::{core::Multiaddr, PeerId};
 use rand::{CryptoRng, RngCore};
 use std::{convert::TryFrom, fmt, sync::Arc};
 use tokio::select;
@@ -23,11 +22,10 @@ pub enum BobState {
     Started {
         state0: bob::State0,
         amounts: SwapAmounts,
-        alice_peer_id: PeerId,
     },
-    Negotiated(bob::State2, PeerId),
-    BtcLocked(bob::State3, PeerId),
-    XmrLocked(bob::State4, PeerId),
+    Negotiated(bob::State2),
+    BtcLocked(bob::State3),
+    XmrLocked(bob::State4),
     EncSigSent(bob::State4),
     BtcRedeemed(bob::State5),
     T1Expired(bob::State4),
@@ -64,9 +62,9 @@ impl From<BobState> for state::Bob {
                 // TODO: Do we want to resume just started swaps
                 unimplemented!("Cannot save a swap that has just started")
             }
-            BobState::Negotiated(state2, peer_id) => Bob::Negotiated { state2, peer_id },
-            BobState::BtcLocked(state3, peer_id) => Bob::BtcLocked { state3, peer_id },
-            BobState::XmrLocked(state4, peer_id) => Bob::XmrLocked { state4, peer_id },
+            BobState::Negotiated(state2) => Bob::Negotiated { state2 },
+            BobState::BtcLocked(state3) => Bob::BtcLocked { state3 },
+            BobState::XmrLocked(state4) => Bob::XmrLocked { state4 },
             BobState::EncSigSent(state4) => Bob::EncSigSent { state4 },
             BobState::BtcRedeemed(state5) => Bob::BtcRedeemed(state5),
             BobState::T1Expired(state4) => Bob::T1Expired(state4),
@@ -85,9 +83,9 @@ impl TryFrom<state::Swap> for BobState {
     fn try_from(db_state: state::Swap) -> Result<Self, Self::Error> {
         if let Swap::Bob(state) = db_state {
             let bob_State = match state {
-                Bob::Negotiated { state2, peer_id } => BobState::Negotiated(state2, peer_id),
-                Bob::BtcLocked { state3, peer_id } => BobState::BtcLocked(state3, peer_id),
-                Bob::XmrLocked { state4, peer_id } => BobState::XmrLocked(state4, peer_id),
+                Bob::Negotiated { state2 } => BobState::Negotiated(state2),
+                Bob::BtcLocked { state3 } => BobState::BtcLocked(state3),
+                Bob::XmrLocked { state4 } => BobState::XmrLocked(state4),
                 Bob::EncSigSent { state4 } => BobState::EncSigSent(state4),
                 Bob::BtcRedeemed(state5) => BobState::BtcRedeemed(state5),
                 Bob::T1Expired(state4) => BobState::T1Expired(state4),
@@ -106,22 +104,16 @@ impl TryFrom<state::Swap> for BobState {
 #[allow(clippy::too_many_arguments)]
 pub async fn swap<R>(
     state: BobState,
-    mut event_loop_handle: EventLoopHandle,
+    event_loop_handle: EventLoopHandle,
     db: Database,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     monero_wallet: Arc<crate::monero::Wallet>,
     rng: R,
     swap_id: Uuid,
-    alice_peer_id: PeerId,
-    alice_addr: Multiaddr,
 ) -> Result<BobState>
 where
     R: RngCore + CryptoRng + Send,
 {
-    event_loop_handle
-        .add_address(alice_peer_id, alice_addr)
-        .await?;
-
     run_until(
         state,
         is_complete,
@@ -178,24 +170,19 @@ where
         Ok(state)
     } else {
         match state {
-            BobState::Started {
-                state0,
-                amounts,
-                alice_peer_id,
-            } => {
-                event_loop_handle.dial(alice_peer_id.clone()).await?;
+            BobState::Started { state0, amounts } => {
+                event_loop_handle.dial().await?;
 
-                let (state2, alice_peer_id) = negotiate(
+                let state2 = negotiate(
                     state0,
                     amounts,
                     &mut event_loop_handle,
-                    alice_peer_id.clone(),
                     &mut rng,
                     bitcoin_wallet.clone(),
                 )
                 .await?;
 
-                let state = BobState::Negotiated(state2, alice_peer_id);
+                let state = BobState::Negotiated(state2);
                 let db_state = state.clone().into();
                 db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
                     .await?;
@@ -211,13 +198,13 @@ where
                 )
                 .await
             }
-            BobState::Negotiated(state2, alice_peer_id) => {
+            BobState::Negotiated(state2) => {
                 // Do not lock Bitcoin if not connected to Alice.
-                event_loop_handle.dial(alice_peer_id.clone()).await?;
+                event_loop_handle.dial().await?;
                 // Alice and Bob have exchanged info
                 let state3 = state2.lock_btc(bitcoin_wallet.as_ref()).await?;
 
-                let state = BobState::BtcLocked(state3, alice_peer_id);
+                let state = BobState::BtcLocked(state3);
                 let db_state = state.clone().into();
                 db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
                     .await?;
@@ -235,9 +222,9 @@ where
             }
             // Bob has locked Btc
             // Watch for Alice to Lock Xmr or for t1 to elapse
-            BobState::BtcLocked(state3, alice_peer_id) => {
+            BobState::BtcLocked(state3) => {
                 // TODO(Franck): Refund if cannot connect to Alice.
-                event_loop_handle.dial(alice_peer_id.clone()).await?;
+                event_loop_handle.dial().await?;
 
                 // todo: watch until t1, not indefinitely
                 let msg2 = event_loop_handle.recv_message2().await?;
@@ -245,7 +232,7 @@ where
                     .watch_for_lock_xmr(monero_wallet.as_ref(), msg2)
                     .await?;
 
-                let state = BobState::XmrLocked(state4, alice_peer_id);
+                let state = BobState::XmrLocked(state4);
                 let db_state = state.clone().into();
                 db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
                     .await?;
@@ -261,9 +248,9 @@ where
                 )
                 .await
             }
-            BobState::XmrLocked(state, alice_peer_id) => {
+            BobState::XmrLocked(state) => {
                 // TODO(Franck): Refund if cannot connect to Alice.
-                event_loop_handle.dial(alice_peer_id.clone()).await?;
+                event_loop_handle.dial().await?;
 
                 let state = if let Epoch::T0 = state.current_epoch(bitcoin_wallet.as_ref()).await? {
                     // Alice has locked Xmr
@@ -272,8 +259,7 @@ where
 
                     let state4_clone = state.clone();
                     // TODO(Franck): Refund if message cannot be sent.
-                    let enc_sig_sent_watcher =
-                        event_loop_handle.send_message3(alice_peer_id.clone(), tx_redeem_encsig);
+                    let enc_sig_sent_watcher = event_loop_handle.send_message3(tx_redeem_encsig);
                     let bitcoin_wallet = bitcoin_wallet.clone();
                     let t1_timeout = state4_clone.wait_for_t1(bitcoin_wallet.as_ref());
 
@@ -420,33 +406,24 @@ pub async fn negotiate<R>(
     state0: xmr_btc::bob::State0,
     amounts: SwapAmounts,
     swarm: &mut EventLoopHandle,
-    alice_peer_id: PeerId,
     mut rng: R,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
-) -> Result<(State2, PeerId)>
+) -> Result<State2>
 where
     R: RngCore + CryptoRng + Send,
 {
     tracing::trace!("Starting negotiate");
-    swarm
-        .request_amounts(alice_peer_id.clone(), amounts.btc)
-        .await?;
+    swarm.request_amounts(amounts.btc).await?;
 
-    swarm
-        .send_message0(alice_peer_id.clone(), state0.next_message(&mut rng))
-        .await?;
+    swarm.send_message0(state0.next_message(&mut rng)).await?;
     let msg0 = swarm.recv_message0().await?;
     let state1 = state0.receive(bitcoin_wallet.as_ref(), msg0).await?;
 
-    swarm
-        .send_message1(alice_peer_id.clone(), state1.next_message())
-        .await?;
+    swarm.send_message1(state1.next_message()).await?;
     let msg1 = swarm.recv_message1().await?;
     let state2 = state1.receive(msg1)?;
 
-    swarm
-        .send_message2(alice_peer_id.clone(), state2.next_message())
-        .await?;
+    swarm.send_message2(state2.next_message()).await?;
 
-    Ok((state2, alice_peer_id))
+    Ok(state2)
 }

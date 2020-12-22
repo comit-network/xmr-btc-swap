@@ -155,7 +155,6 @@ pub async fn init_alice(
 }
 
 pub async fn init_bob_state(
-    alice_peer_id: PeerId,
     btc_to_swap: bitcoin::Amount,
     xmr_to_swap: xmr_btc::monero::Amount,
     bob_btc_wallet: Arc<bitcoin::Wallet>,
@@ -176,17 +175,17 @@ pub async fn init_bob_state(
         refund_address,
     );
 
-    BobState::Started {
-        state0,
-        amounts,
-        alice_peer_id,
-    }
+    BobState::Started { state0, amounts }
 }
 
-pub fn init_bob_event_loop() -> (bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle) {
+pub fn init_bob_event_loop(
+    alice_peer_id: PeerId,
+    alice_addr: Multiaddr,
+) -> (bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle) {
     let bob_behaviour = bob::Behaviour::default();
     let bob_transport = build(bob_behaviour.identity()).unwrap();
-    bob::event_loop::EventLoop::new(bob_transport, bob_behaviour).unwrap()
+    bob::event_loop::EventLoop::new(bob_transport, bob_behaviour, alice_peer_id, alice_addr)
+        .unwrap()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -217,21 +216,9 @@ pub async fn init_bob(
     )
     .await;
 
-    let bob_state = init_bob_state(
-        alice_peer_id.clone(),
-        btc_to_swap,
-        xmr_to_swap,
-        bob_btc_wallet.clone(),
-        config,
-    )
-    .await;
+    let bob_state = init_bob_state(btc_to_swap, xmr_to_swap, bob_btc_wallet.clone(), config).await;
 
-    let (event_loop, mut event_loop_handle) = init_bob_event_loop();
-
-    event_loop_handle
-        .add_address(alice_peer_id, alice_multiaddr)
-        .await
-        .unwrap();
+    let (event_loop, event_loop_handle) = init_bob_event_loop(alice_peer_id, alice_multiaddr);
 
     let bob_db_dir = tempdir().unwrap();
     let bob_db = Database::open(bob_db_dir.path()).unwrap();

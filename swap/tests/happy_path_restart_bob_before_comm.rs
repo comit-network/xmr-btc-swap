@@ -109,7 +109,8 @@ async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {
         _ = bob_event_loop_1.run() => panic!("The event loop should never finish")
     };
 
-    let (bob_event_loop_2, bob_event_loop_handle_2) = testutils::init_bob_event_loop();
+    let (bob_event_loop_2, bob_event_loop_handle_2) =
+        testutils::init_bob_event_loop(alice_peer_id, alice_multiaddr);
 
     let bob_fut = bob::swap::swap(
         bob_restart_state,
@@ -119,8 +120,6 @@ async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {
         bob_xmr_wallet.clone(),
         OsRng,
         bob_swap_id,
-        alice_peer_id,
-        alice_multiaddr,
     );
 
     let bob_final_state = select! {

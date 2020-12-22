@@ -1,4 +1,3 @@
-use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use xmr_btc::{alice, bitcoin::EncryptedSignature, bob, monero, serde::monero_private_key};
@@ -39,24 +38,10 @@ pub enum Alice {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Bob {
-    Negotiated {
-        state2: bob::State2,
-        #[serde(with = "crate::serde::peer_id")]
-        peer_id: PeerId,
-    },
-    BtcLocked {
-        state3: bob::State3,
-        #[serde(with = "crate::serde::peer_id")]
-        peer_id: PeerId,
-    },
-    XmrLocked {
-        state4: bob::State4,
-        #[serde(with = "crate::serde::peer_id")]
-        peer_id: PeerId,
-    },
-    EncSigSent {
-        state4: bob::State4,
-    },
+    Negotiated { state2: bob::State2 },
+    BtcLocked { state3: bob::State3 },
+    XmrLocked { state4: bob::State4 },
+    EncSigSent { state4: bob::State4 },
     BtcRedeemed(bob::State5),
     T1Expired(bob::State4),
     BtcCancelled(bob::State4),

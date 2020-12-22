@@ -84,8 +84,6 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
         bob_xmr_wallet.clone(),
         OsRng,
         Uuid::new_v4(),
-        alice_peer_id,
-        alice_multiaddr.clone(),
     );
 
     let alice_db_datadir = tempdir().unwrap();

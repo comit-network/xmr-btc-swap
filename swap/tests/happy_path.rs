@@ -88,7 +88,6 @@ async fn happy_path() {
     )
     .boxed();
 
-    let alice_peer_id = alice_event_loop.peer_id();
     let alice_fut = select(alice_swap_fut, alice_event_loop.run().boxed());
 
     let bob_swap_fut = bob::swap::swap(
@@ -99,8 +98,6 @@ async fn happy_path() {
         bob_xmr_wallet.clone(),
         OsRng,
         Uuid::new_v4(),
-        alice_peer_id,
-        alice_multiaddr,
     )
     .boxed();
 
