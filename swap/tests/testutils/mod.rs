@@ -274,7 +274,7 @@ pub fn init_tracing() -> DefaultGuard {
     use tracing_subscriber::util::SubscriberInitExt as _;
     tracing_subscriber::fmt()
         .with_env_filter(format!(
-            "{},swap={},xmr-btc={},monero_harness={},bitcoin_harness={}",
+            "{},swap={},xmr_btc={},monero_harness={},bitcoin_harness={}",
             global_filter,
             swap_filter,
             xmr_btc_filter,
