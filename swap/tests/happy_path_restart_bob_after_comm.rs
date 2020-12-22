@@ -124,7 +124,7 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     }
 
     let (event_loop_after_restart, event_loop_handle_after_restart) =
-        testutils::init_bob_event_loop();
+        testutils::init_bob_event_loop(alice_peer_id, alice_multiaddr);
     let _bob_swarm_fut = tokio::spawn(async move { event_loop_after_restart.run().await });
 
     let db_swap = bob_db.get_state(bob_swap_id).unwrap();
@@ -138,8 +138,6 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
         bob_xmr_wallet,
         OsRng,
         bob_swap_id,
-        alice_peer_id,
-        alice_multiaddr,
     )
     .await
     .unwrap();

@@ -81,8 +81,6 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
         bob_xmr_wallet.clone(),
         OsRng,
         Uuid::new_v4(),
-        alice_event_loop_1.peer_id(),
-        alice_multiaddr.clone(),
     );
 
     let alice_swap_id = Uuid::new_v4();

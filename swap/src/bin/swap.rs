@@ -142,11 +142,7 @@ async fn main() -> Result<()> {
                 xmr: receive_monero,
             };
 
-            let bob_state = BobState::Started {
-                state0,
-                amounts,
-                alice_peer_id: alice_peer_id.clone(),
-            };
+            let bob_state = BobState::Started { state0, amounts };
 
             let swap_id = Uuid::new_v4();
             info!(
@@ -304,7 +300,8 @@ async fn bob_swap(
     let bob_behaviour = bob::Behaviour::default();
     let bob_transport = build(bob_behaviour.identity())?;
 
-    let (event_loop, handle) = bob::event_loop::EventLoop::new(bob_transport, bob_behaviour)?;
+    let (event_loop, handle) =
+        bob::event_loop::EventLoop::new(bob_transport, bob_behaviour, alice_peer_id, alice_addr)?;
 
     let swap = bob::swap::swap(
         state,
@@ -314,8 +311,6 @@ async fn bob_swap(
         monero_wallet.clone(),
         OsRng,
         swap_id,
-        alice_peer_id,
-        alice_addr,
     );
 
     tokio::spawn(async move { event_loop.run().await });
