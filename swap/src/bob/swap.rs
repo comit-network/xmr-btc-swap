@@ -10,7 +10,7 @@ use async_recursion::async_recursion;
 use rand::{CryptoRng, RngCore};
 use std::{convert::TryFrom, fmt, sync::Arc};
 use tokio::select;
-use tracing::info;
+use tracing::{info, warn};
 use uuid::Uuid;
 use xmr_btc::{
     bob::{self, State2},
@@ -395,17 +395,21 @@ where
                     Epoch::T0 => panic!("Cancelled before t1??? Something is really wrong"),
                     Epoch::T1 => {
                         // If T1 has expired but not T2 we must be able to refund
-                        state.refund_btc(bitcoin_wallet.as_ref()).await?;
+                        state.submit_tx_refund(bitcoin_wallet.as_ref()).await?;
                         BobState::BtcRefunded(state)
                     }
                     Epoch::T2 => {
                         // If T2 expired we still try to refund in case Alice has not acted.
                         // This is especially important for scenarios where Alice is offline
                         // indefinitely after starting the swap.
-                        let refund_result = state.refund_btc(bitcoin_wallet.as_ref()).await;
+                        info!("Trying to refund even though T2 has passed...");
+                        let refund_result = state.submit_tx_refund(bitcoin_wallet.as_ref()).await;
                         match refund_result {
                             Ok(()) => BobState::BtcRefunded(state),
-                            Err(_) => BobState::Punished,
+                            Err(err) => {
+                                warn!("Bob tried to refund after T2 has passed, but sending the refund tx errored with {}", err);
+                                BobState::Punished
+                            }
                         }
                     }
                 };
