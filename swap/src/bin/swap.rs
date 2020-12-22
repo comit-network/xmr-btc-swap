@@ -84,7 +84,7 @@ async fn main() -> Result<()> {
                     v_a,
                     amounts.btc,
                     amounts.xmr,
-                    config.bitcoin_refund_timelock,
+                    config.bitcoin_cancel_timelock,
                     config.bitcoin_punish_timelock,
                     redeem_address,
                     punish_address,
@@ -132,7 +132,7 @@ async fn main() -> Result<()> {
                 &mut OsRng,
                 send_bitcoin,
                 receive_monero,
-                config.bitcoin_refund_timelock,
+                config.bitcoin_cancel_timelock,
                 config.bitcoin_punish_timelock,
                 refund_address,
             );

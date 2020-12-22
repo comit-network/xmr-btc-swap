@@ -14,7 +14,7 @@ use tracing::info;
 use uuid::Uuid;
 use xmr_btc::{
     bob::{self, State2},
-    Epoch,
+    ExpiredTimelocks,
 };
 
 #[derive(Debug, Clone)]
@@ -28,7 +28,7 @@ pub enum BobState {
     XmrLocked(bob::State4),
     EncSigSent(bob::State4),
     BtcRedeemed(bob::State5),
-    T1Expired(bob::State4),
+    CancelTimelockExpired(bob::State4),
     Cancelled(bob::State4),
     BtcRefunded(bob::State4),
     XmrRedeemed,
@@ -45,7 +45,7 @@ impl fmt::Display for BobState {
             BobState::XmrLocked(..) => write!(f, "xmr_locked"),
             BobState::EncSigSent(..) => write!(f, "encsig_sent"),
             BobState::BtcRedeemed(..) => write!(f, "btc_redeemed"),
-            BobState::T1Expired(..) => write!(f, "t1_expired"),
+            BobState::CancelTimelockExpired(..) => write!(f, "cancel_timelock_expired"),
             BobState::Cancelled(..) => write!(f, "cancelled"),
             BobState::BtcRefunded(..) => write!(f, "btc_refunded"),
             BobState::XmrRedeemed => write!(f, "xmr_redeemed"),
@@ -67,7 +67,7 @@ impl From<BobState> for state::Bob {
             BobState::XmrLocked(state4) => Bob::XmrLocked { state4 },
             BobState::EncSigSent(state4) => Bob::EncSigSent { state4 },
             BobState::BtcRedeemed(state5) => Bob::BtcRedeemed(state5),
-            BobState::T1Expired(state4) => Bob::T1Expired(state4),
+            BobState::CancelTimelockExpired(state4) => Bob::CancelTimelockExpired(state4),
             BobState::Cancelled(state4) => Bob::BtcCancelled(state4),
             BobState::BtcRefunded(_)
             | BobState::XmrRedeemed
@@ -88,7 +88,7 @@ impl TryFrom<state::Swap> for BobState {
                 Bob::XmrLocked { state4 } => BobState::XmrLocked(state4),
                 Bob::EncSigSent { state4 } => BobState::EncSigSent(state4),
                 Bob::BtcRedeemed(state5) => BobState::BtcRedeemed(state5),
-                Bob::T1Expired(state4) => BobState::T1Expired(state4),
+                Bob::CancelTimelockExpired(state4) => BobState::CancelTimelockExpired(state4),
                 Bob::BtcCancelled(state4) => BobState::Cancelled(state4),
                 Bob::SwapComplete => BobState::SafelyAborted,
             };
@@ -221,41 +221,43 @@ where
                 .await
             }
             // Bob has locked Btc
-            // Watch for Alice to Lock Xmr or for t1 to elapse
+            // Watch for Alice to Lock Xmr or for cancel timelock to elapse
             BobState::BtcLocked(state3) => {
-                let state = if let Epoch::T0 = state3.current_epoch(bitcoin_wallet.as_ref()).await?
+                let state = if let ExpiredTimelocks::None =
+                    state3.current_epoch(bitcoin_wallet.as_ref()).await?
                 {
                     event_loop_handle.dial().await?;
 
                     let msg2_watcher = event_loop_handle.recv_message2();
-                    let t1_timeout = state3.wait_for_t1(bitcoin_wallet.as_ref());
+                    let cancel_timelock_expires =
+                        state3.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
 
                     select! {
                         msg2 = msg2_watcher => {
 
                             let xmr_lock_watcher = state3.clone()
                                 .watch_for_lock_xmr(monero_wallet.as_ref(), msg2?);
-                            let t1_timeout = state3.wait_for_t1(bitcoin_wallet.as_ref());
+                            let cancel_timelock_expires = state3.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
 
                             select! {
                                 state4 = xmr_lock_watcher => {
                                     BobState::XmrLocked(state4?)
                                 },
-                                _ = t1_timeout => {
-                                    let state4 = state3.t1_expired();
-                                    BobState::T1Expired(state4)
+                                _ = cancel_timelock_expires => {
+                                    let state4 = state3.state4();
+                                    BobState::CancelTimelockExpired(state4)
                                 }
                             }
 
                         },
-                        _ = t1_timeout => {
-                            let state4 = state3.t1_expired();
-                            BobState::T1Expired(state4)
+                        _ = cancel_timelock_expires => {
+                            let state4 = state3.state4();
+                            BobState::CancelTimelockExpired(state4)
                         }
                     }
                 } else {
-                    let state4 = state3.t1_expired();
-                    BobState::T1Expired(state4)
+                    let state4 = state3.state4();
+                    BobState::CancelTimelockExpired(state4)
                 };
                 let db_state = state.clone().into();
                 db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
@@ -273,7 +275,9 @@ where
                 .await
             }
             BobState::XmrLocked(state) => {
-                let state = if let Epoch::T0 = state.current_epoch(bitcoin_wallet.as_ref()).await? {
+                let state = if let ExpiredTimelocks::None =
+                    state.expired_timelock(bitcoin_wallet.as_ref()).await?
+                {
                     event_loop_handle.dial().await?;
                     // Alice has locked Xmr
                     // Bob sends Alice his key
@@ -283,18 +287,19 @@ where
                     // TODO(Franck): Refund if message cannot be sent.
                     let enc_sig_sent_watcher = event_loop_handle.send_message3(tx_redeem_encsig);
                     let bitcoin_wallet = bitcoin_wallet.clone();
-                    let t1_timeout = state4_clone.wait_for_t1(bitcoin_wallet.as_ref());
+                    let cancel_timelock_expires =
+                        state4_clone.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
 
                     select! {
                         _ = enc_sig_sent_watcher => {
                             BobState::EncSigSent(state)
                         },
-                        _ = t1_timeout => {
-                            BobState::T1Expired(state)
+                        _ = cancel_timelock_expires => {
+                            BobState::CancelTimelockExpired(state)
                         }
                     }
                 } else {
-                    BobState::T1Expired(state)
+                    BobState::CancelTimelockExpired(state)
                 };
                 let db_state = state.clone().into();
                 db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
@@ -312,21 +317,24 @@ where
                 .await
             }
             BobState::EncSigSent(state) => {
-                let state = if let Epoch::T0 = state.current_epoch(bitcoin_wallet.as_ref()).await? {
+                let state = if let ExpiredTimelocks::None =
+                    state.expired_timelock(bitcoin_wallet.as_ref()).await?
+                {
                     let state_clone = state.clone();
                     let redeem_watcher = state_clone.watch_for_redeem_btc(bitcoin_wallet.as_ref());
-                    let t1_timeout = state_clone.wait_for_t1(bitcoin_wallet.as_ref());
+                    let cancel_timelock_expires =
+                        state_clone.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
 
                     select! {
                         state5 = redeem_watcher => {
                             BobState::BtcRedeemed(state5?)
                         },
-                        _ = t1_timeout => {
-                            BobState::T1Expired(state)
+                        _ = cancel_timelock_expires => {
+                            BobState::CancelTimelockExpired(state)
                         }
                     }
                 } else {
-                    BobState::T1Expired(state)
+                    BobState::CancelTimelockExpired(state)
                 };
 
                 let db_state = state.clone().into();
@@ -364,7 +372,7 @@ where
                 )
                 .await
             }
-            BobState::T1Expired(state4) => {
+            BobState::CancelTimelockExpired(state4) => {
                 if state4
                     .check_for_tx_cancel(bitcoin_wallet.as_ref())
                     .await
@@ -390,15 +398,16 @@ where
                 .await
             }
             BobState::Cancelled(state) => {
-                // TODO
                 // Bob has cancelled the swap
-                let state = match state.current_epoch(bitcoin_wallet.as_ref()).await? {
-                    Epoch::T0 => panic!("Cancelled before t1??? Something is really wrong"),
-                    Epoch::T1 => {
+                let state = match state.expired_timelock(bitcoin_wallet.as_ref()).await? {
+                    ExpiredTimelocks::None => {
+                        bail!("Internal error: canceled state reached before cancel timelock was expired");
+                    }
+                    ExpiredTimelocks::Cancel => {
                         state.refund_btc(bitcoin_wallet.as_ref()).await?;
                         BobState::BtcRefunded(state)
                     }
-                    Epoch::T2 => BobState::Punished,
+                    ExpiredTimelocks::Punish => BobState::Punished,
                 };
 
                 let db_state = state.clone().into();

@@ -34,7 +34,7 @@ use xmr_btc::{
     bitcoin::{TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction},
     config::Config,
     monero::CreateWalletForOutput,
-    Epoch,
+    ExpiredTimelocks,
 };
 
 trait Rng: RngCore + CryptoRng + Send {}
@@ -78,7 +78,7 @@ pub enum AliceState {
         state3: State3,
     },
     XmrRefunded,
-    T1Expired {
+    CancelTimelockExpired {
         state3: State3,
     },
     Punished,
@@ -100,7 +100,7 @@ impl fmt::Display for AliceState {
             AliceState::SafelyAborted => write!(f, "safely_aborted"),
             AliceState::BtcPunishable { .. } => write!(f, "btc_punishable"),
             AliceState::XmrRefunded => write!(f, "xmr_refunded"),
-            AliceState::T1Expired { .. } => write!(f, "t1 is expired"),
+            AliceState::CancelTimelockExpired { .. } => write!(f, "cancel timelock is expired"),
         }
     }
 }
@@ -113,7 +113,7 @@ impl From<&AliceState> for state::Alice {
             AliceState::XmrLocked { state3 } => Alice::XmrLocked(state3.clone()),
             AliceState::EncSigLearned {
                 state3,
-                encrypted_signature,,
+                encrypted_signature,
             } => Alice::EncSigLearned {
                 state: state3.clone(),
                 encrypted_signature: encrypted_signature.clone(),
@@ -123,7 +123,9 @@ impl From<&AliceState> for state::Alice {
             AliceState::BtcRefunded { .. } => Alice::SwapComplete,
             AliceState::BtcPunishable { state3, .. } => Alice::BtcPunishable(state3.clone()),
             AliceState::XmrRefunded => Alice::SwapComplete,
-            AliceState::T1Expired { state3 } => Alice::T1Expired(state3.clone()),
+            AliceState::CancelTimelockExpired { state3 } => {
+                Alice::CancelTimelockExpired(state3.clone())
+            }
             AliceState::Punished => Alice::SwapComplete,
             AliceState::SafelyAborted => Alice::SwapComplete,
             // TODO: Potentially add support to resume swaps that are not Negotiated
@@ -166,11 +168,13 @@ impl TryFrom<state::Swap> for AliceState {
                     state3: state,
                     encrypted_signature,
                 },
-                Alice::T1Expired(state3) => AliceState::T1Expired { state3 },
+                Alice::CancelTimelockExpired(state3) => {
+                    AliceState::CancelTimelockExpired { state3 }
+                }
                 Alice::BtcCancelled(state) => {
                     let tx_cancel = bitcoin::TxCancel::new(
                         &state.tx_lock,
-                        state.refund_timelock,
+                        state.cancel_timelock,
                         state.a.public(),
                         state.B,
                     );
@@ -183,7 +187,7 @@ impl TryFrom<state::Swap> for AliceState {
                 Alice::BtcPunishable(state) => {
                     let tx_cancel = bitcoin::TxCancel::new(
                         &state.tx_lock,
-                        state.refund_timelock,
+                        state.cancel_timelock,
                         state.a.public(),
                         state.B,
                     );
@@ -386,28 +390,30 @@ pub async fn run_until(
                 .await
             }
             AliceState::XmrLocked { state3 } => {
-                // todo: match statement and wait for t1 can probably be expressed more cleanly
-                let state = match state3.current_epoch(bitcoin_wallet.as_ref()).await? {
-                    Epoch::T0 => {
+                // todo: match statement and wait for cancel timelock to expire can probably be
+                // expressed more cleanly
+                let state = match state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {
+                    ExpiredTimelocks::None => {
                         let wait_for_enc_sig = wait_for_bitcoin_encrypted_signature(
                             &mut event_loop_handle,
                             config.monero_max_finality_time,
                         );
                         let state3_clone = state3.clone();
-                        let t1_timeout = state3_clone.wait_for_t1(bitcoin_wallet.as_ref());
+                        let cancel_timelock_expires = state3_clone
+                            .wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
 
                         pin_mut!(wait_for_enc_sig);
-                        pin_mut!(t1_timeout);
+                        pin_mut!(cancel_timelock_expires);
 
-                        match select(t1_timeout, wait_for_enc_sig).await {
-                            Either::Left(_) => AliceState::T1Expired { state3 },
+                        match select(cancel_timelock_expires, wait_for_enc_sig).await {
+                            Either::Left(_) => AliceState::CancelTimelockExpired { state3 },
                             Either::Right((enc_sig, _)) => AliceState::EncSigLearned {
                                 state3,
                                 encrypted_signature: enc_sig?,
                             },
                         }
                     }
-                    _ => AliceState::T1Expired { state3 },
+                    _ => AliceState::CancelTimelockExpired { state3 },
                 };
 
                 let db_state = (&state).into();
@@ -430,8 +436,8 @@ pub async fn run_until(
                 encrypted_signature,
             } => {
                 // TODO: Evaluate if it is correct for Alice to Redeem no matter what.
-                //  If T1 expired she should potentially not try redeem. (The implementation
-                //  gives her an advantage.)
+                //  If cancel timelock expired she should potentially not try redeem. (The
+                // implementation  gives her an advantage.)
 
                 let signed_tx_redeem = match build_bitcoin_redeem_transaction(
                     encrypted_signature,
@@ -443,9 +449,11 @@ pub async fn run_until(
                 ) {
                     Ok(tx) => tx,
                     Err(_) => {
-                        state3.wait_for_t1(bitcoin_wallet.as_ref()).await?;
+                        state3
+                            .wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref())
+                            .await?;
 
-                        let state = AliceState::T1Expired { state3 };
+                        let state = AliceState::CancelTimelockExpired { state3 };
                         let db_state = (&state).into();
                         db.insert_latest_state(swap_id, Swap::Alice(db_state))
                             .await?;
@@ -489,12 +497,12 @@ pub async fn run_until(
                 )
                 .await
             }
-            AliceState::T1Expired { state3 } => {
+            AliceState::CancelTimelockExpired { state3 } => {
                 let tx_cancel = publish_cancel_transaction(
                     state3.tx_lock.clone(),
                     state3.a.clone(),
                     state3.B,
-                    state3.refund_timelock,
+                    state3.cancel_timelock,
                     state3.tx_cancel_sig_bob.clone(),
                     bitcoin_wallet.clone(),
                 )
@@ -591,7 +599,7 @@ pub async fn run_until(
             AliceState::BtcPunishable { tx_refund, state3 } => {
                 let signed_tx_punish = build_bitcoin_punish_transaction(
                     &state3.tx_lock,
-                    state3.refund_timelock,
+                    state3.cancel_timelock,
                     &state3.punish_address,
                     state3.punish_timelock,
                     state3.tx_punish_sig_bob.clone(),

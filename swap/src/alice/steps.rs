@@ -207,20 +207,20 @@ pub async fn publish_cancel_transaction<W>(
     tx_lock: TxLock,
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
-    refund_timelock: u32,
+    cancel_timelock: u32,
     tx_cancel_sig_bob: bitcoin::Signature,
     bitcoin_wallet: Arc<W>,
 ) -> Result<bitcoin::TxCancel>
 where
     W: GetRawTransaction + TransactionBlockHeight + BlockHeight + BroadcastSignedTransaction,
 {
-    // First wait for t1 to expire
+    // First wait for cancel timelock to expire
     let tx_lock_height = bitcoin_wallet
         .transaction_block_height(tx_lock.txid())
         .await;
-    poll_until_block_height_is_gte(bitcoin_wallet.as_ref(), tx_lock_height + refund_timelock).await;
+    poll_until_block_height_is_gte(bitcoin_wallet.as_ref(), tx_lock_height + cancel_timelock).await;
 
-    let tx_cancel = bitcoin::TxCancel::new(&tx_lock, refund_timelock, a.public(), B);
+    let tx_cancel = bitcoin::TxCancel::new(&tx_lock, cancel_timelock, a.public(), B);
 
     // If Bob hasn't yet broadcasted the tx cancel, we do it
     if bitcoin_wallet
@@ -306,14 +306,14 @@ pub fn extract_monero_private_key(
 
 pub fn build_bitcoin_punish_transaction(
     tx_lock: &TxLock,
-    refund_timelock: u32,
+    cancel_timelock: u32,
     punish_address: &bitcoin::Address,
     punish_timelock: u32,
     tx_punish_sig_bob: bitcoin::Signature,
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
 ) -> Result<bitcoin::Transaction> {
-    let tx_cancel = bitcoin::TxCancel::new(&tx_lock, refund_timelock, a.public(), B);
+    let tx_cancel = bitcoin::TxCancel::new(&tx_lock, cancel_timelock, a.public(), B);
     let tx_punish = bitcoin::TxPunish::new(&tx_cancel, &punish_address, punish_timelock);
 
     let sig_a = a.sign(tx_punish.digest());
