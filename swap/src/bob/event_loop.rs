@@ -200,8 +200,8 @@ impl EventLoop {
                         OutEvent::Message3 => info!("Alice acknowledged message 3 received"),
                     }
                 },
-                null = self.dial_alice.next().fuse() => {
-                    if let Some(_) = null {
+                option = self.dial_alice.next().fuse() => {
+                    if option.is_some() {
                            let peer_id = self.alice_peer_id.clone();
                         if self.swarm.pt.is_connected(&peer_id) {
                             debug!("Already connected to Alice: {}", peer_id);
