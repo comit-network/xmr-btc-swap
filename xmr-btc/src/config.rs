@@ -75,7 +75,7 @@ mod regtest {
 
     pub static MONERO_FINALITY_CONFIRMATIONS: u32 = 1;
 
-    pub static MONERO_AVG_BLOCK_TIME: Lazy<Duration> = Lazy::new(|| Duration::from_secs(60));
+    pub static MONERO_AVG_BLOCK_TIME: Lazy<Duration> = Lazy::new(|| Duration::from_secs(1));
 
     pub static BITCOIN_REFUND_TIMELOCK: u32 = 50;
 

@@ -7,7 +7,6 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
-use libp2p::{core::Multiaddr, PeerId};
 use rand::{CryptoRng, RngCore};
 use std::{convert::TryFrom, fmt, sync::Arc};
 use tokio::select;
