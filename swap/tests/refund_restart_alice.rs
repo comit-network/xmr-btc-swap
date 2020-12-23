@@ -3,7 +3,7 @@ use futures::future::try_join;
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, alice::swap::AliceState, bob, bob::swap::BobState, storage::Database};
+use swap::{alice, alice::swap::AliceState, bob, bob::swap::BobState, database::Database};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
 use testutils::init_tracing;

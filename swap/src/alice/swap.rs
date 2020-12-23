@@ -11,9 +11,9 @@ use crate::{
         },
     },
     bitcoin::EncryptedSignature,
+    database::Database,
     network::request_response::AliceToBob,
     state::Swap,
-    storage::Database,
     SwapAmounts,
 };
 use anyhow::Result;

@@ -2,7 +2,7 @@ use crate::testutils::{init_alice, init_bob};
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, bitcoin, bob, bob::swap::BobState, storage::Database};
+use swap::{alice, bitcoin, bob, bob::swap::BobState, database::Database};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
 use testutils::init_tracing;

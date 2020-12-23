@@ -4,8 +4,8 @@ use monero_harness::{image, Monero};
 use rand::rngs::OsRng;
 use std::sync::Arc;
 use swap::{
-    alice, alice::swap::AliceState, bitcoin, bob, bob::swap::BobState, monero,
-    network::transport::build, storage::Database, SwapAmounts,
+    alice, alice::swap::AliceState, bitcoin, bob, bob::swap::BobState, database::Database, monero,
+    network::transport::build, SwapAmounts,
 };
 use tempfile::tempdir;
 use testcontainers::{clients::Cli, Container};
