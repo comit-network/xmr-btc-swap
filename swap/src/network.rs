@@ -7,6 +7,7 @@ pub mod peer_tracker;
 pub mod request_response;
 pub mod transport;
 
+#[allow(missing_debug_implementations)]
 pub struct TokioExecutor {
     pub handle: Handle,
 }

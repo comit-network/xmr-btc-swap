@@ -35,7 +35,7 @@ pub enum Alice {
     Done(AliceEndState),
 }
 
-#[derive(Clone, strum::Display, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Copy, Clone, strum::Display, Debug, Deserialize, Serialize, PartialEq)]
 pub enum AliceEndState {
     SafelyAborted,
     BtcRedeemed,

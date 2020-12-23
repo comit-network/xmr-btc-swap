@@ -11,6 +11,7 @@
     clippy::dbg_macro
 )]
 #![forbid(unsafe_code)]
+#![allow(non_snake_case)]
 
 use anyhow::{bail, Context, Result};
 use libp2p::{core::Multiaddr, PeerId};

@@ -41,6 +41,7 @@ trait Rng: RngCore + CryptoRng + Send {}
 
 impl<T> Rng for T where T: RngCore + CryptoRng + Send {}
 
+#[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum AliceState {
     Started {

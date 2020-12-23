@@ -4,6 +4,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::path::Path;
 use uuid::Uuid;
 
+#[derive(Debug)]
 pub struct Database(sled::Db);
 
 impl Database {
