@@ -23,7 +23,6 @@ pub mod cli;
 pub mod database;
 pub mod monero;
 pub mod network;
-pub mod state;
 pub mod trace;
 
 pub type Never = std::convert::Infallible;

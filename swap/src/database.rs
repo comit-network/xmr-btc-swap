@@ -1,8 +1,10 @@
-use crate::state::Swap;
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{de::DeserializeOwned, Serialize};
+use state::Swap;
 use std::path::Path;
 use uuid::Uuid;
+
+pub mod state;
 
 #[derive(Debug)]
 pub struct Database(sled::Db);
@@ -82,7 +84,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::state::{Alice, AliceEndState, Bob, BobEndState};
+    use crate::database::state::{Alice, AliceEndState, Bob, BobEndState};
 
     use super::*;
 

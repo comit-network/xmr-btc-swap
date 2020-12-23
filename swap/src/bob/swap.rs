@@ -1,4 +1,8 @@
-use crate::{bob::event_loop::EventLoopHandle, database::Database, state, SwapAmounts};
+use crate::{
+    bob::event_loop::EventLoopHandle,
+    database::{state, Database},
+    SwapAmounts,
+};
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
 use rand::{CryptoRng, RngCore};
