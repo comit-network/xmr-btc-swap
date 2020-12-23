@@ -10,7 +10,7 @@ use async_recursion::async_recursion;
 use rand::{CryptoRng, RngCore};
 use std::{convert::TryFrom, fmt, sync::Arc};
 use tokio::select;
-use tracing::{info, warn};
+use tracing::{error, info};
 use uuid::Uuid;
 use xmr_btc::{
     bob::{self, State2},
@@ -407,7 +407,7 @@ where
                         match refund_result {
                             Ok(()) => BobState::BtcRefunded(state),
                             Err(err) => {
-                                warn!("Bob tried to refund after T2 has passed, but sending the refund tx errored with {}", err);
+                                error!("Bob tried to refund after T2 has passed, but sending the refund tx errored with {}", err);
                                 BobState::Punished
                             }
                         }
