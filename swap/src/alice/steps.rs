@@ -19,8 +19,8 @@ use xmr_btc::{
     alice,
     alice::State3,
     bitcoin::{
-        poll_until_block_height_is_gte, BlockHeight, BroadcastSignedTransaction,
-        EncryptedSignature, GetRawTransaction, TransactionBlockHeight, TxCancel, TxLock, TxRefund,
+        poll_until_block_height_is_gte, BroadcastSignedTransaction, EncryptedSignature,
+        GetBlockHeight, GetRawTransaction, TransactionBlockHeight, TxCancel, TxLock, TxRefund,
         WaitForTransactionFinality, WatchForRawTransaction,
     },
     config::Config,
@@ -212,7 +212,7 @@ pub async fn publish_cancel_transaction<W>(
     bitcoin_wallet: Arc<W>,
 ) -> Result<bitcoin::TxCancel>
 where
-    W: GetRawTransaction + TransactionBlockHeight + BlockHeight + BroadcastSignedTransaction,
+    W: GetRawTransaction + TransactionBlockHeight + GetBlockHeight + BroadcastSignedTransaction,
 {
     // First wait for cancel timelock to expire
     let tx_lock_height = bitcoin_wallet
@@ -259,7 +259,7 @@ pub async fn wait_for_bitcoin_refund<W>(
     bitcoin_wallet: Arc<W>,
 ) -> Result<(bitcoin::TxRefund, Option<bitcoin::Transaction>)>
 where
-    W: BlockHeight + WatchForRawTransaction,
+    W: GetBlockHeight + WatchForRawTransaction,
 {
     let punish_timelock_expired =
         poll_until_block_height_is_gte(bitcoin_wallet.as_ref(), cancel_tx_height + punish_timelock);

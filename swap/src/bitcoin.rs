@@ -8,7 +8,7 @@ use std::time::Duration;
 use tokio::time::interval;
 use xmr_btc::{
     bitcoin::{
-        BlockHeight, BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock,
+        BroadcastSignedTransaction, BuildTxLockPsbt, GetBlockHeight, SignTxLock,
         TransactionBlockHeight, WatchForRawTransaction,
     },
     config::Config,
@@ -132,8 +132,8 @@ impl GetRawTransaction for Wallet {
 }
 
 #[async_trait]
-impl BlockHeight for Wallet {
-    async fn block_height(&self) -> u32 {
+impl GetBlockHeight for Wallet {
+    async fn get_block_height(&self) -> u32 {
         (|| async { Ok(self.inner.client.getblockcount().await?) })
             .retry(ConstantBackoff::new(Duration::from_secs(1)))
             .await

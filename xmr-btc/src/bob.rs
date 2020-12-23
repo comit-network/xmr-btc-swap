@@ -35,8 +35,8 @@ use tracing::error;
 pub mod message;
 use crate::{
     bitcoin::{
-        current_epoch, wait_for_cancel_timelock_to_expire, BlockHeight, GetRawTransaction, Network,
-        TransactionBlockHeight,
+        current_epoch, wait_for_cancel_timelock_to_expire, GetBlockHeight, GetRawTransaction,
+        Network, TransactionBlockHeight,
     },
     monero::{CreateWalletForOutput, WatchForTransfer},
 };
@@ -95,7 +95,7 @@ pub fn action_generator<N, M, B>(
 where
     N: ReceiveTransferProof + Send + 'static,
     M: monero::WatchForTransfer + Send + Sync + 'static,
-    B: bitcoin::BlockHeight
+    B: bitcoin::GetBlockHeight
         + bitcoin::TransactionBlockHeight
         + bitcoin::WatchForRawTransaction
         + Send
@@ -626,7 +626,7 @@ impl State3 {
 
     pub async fn wait_for_cancel_timelock_to_expire<W>(&self, bitcoin_wallet: &W) -> Result<()>
     where
-        W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
+        W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
     {
         wait_for_cancel_timelock_to_expire(
             bitcoin_wallet,
@@ -663,7 +663,7 @@ impl State3 {
 
     pub async fn current_epoch<W>(&self, bitcoin_wallet: &W) -> Result<ExpiredTimelocks>
     where
-        W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
+        W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
     {
         current_epoch(
             bitcoin_wallet,
@@ -795,7 +795,7 @@ impl State4 {
 
     pub async fn wait_for_cancel_timelock_to_expire<W>(&self, bitcoin_wallet: &W) -> Result<()>
     where
-        W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
+        W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
     {
         wait_for_cancel_timelock_to_expire(
             bitcoin_wallet,
@@ -807,7 +807,7 @@ impl State4 {
 
     pub async fn expired_timelock<W>(&self, bitcoin_wallet: &W) -> Result<ExpiredTimelocks>
     where
-        W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
+        W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
     {
         current_epoch(
             bitcoin_wallet,
