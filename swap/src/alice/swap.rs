@@ -14,11 +14,11 @@ use crate::{
     bitcoin::EncryptedSignature,
     network::request_response::AliceToBob,
     state,
-    state::{Alice, Swap},
+    state::{Alice, AliceEndState, Swap},
     storage::Database,
     SwapAmounts,
 };
-use anyhow::{bail, Result};
+use anyhow::Result;
 use async_recursion::async_recursion;
 use futures::{
     future::{select, Either},
@@ -26,7 +26,7 @@ use futures::{
 };
 use libp2p::request_response::ResponseChannel;
 use rand::{CryptoRng, RngCore};
-use std::{convert::TryFrom, fmt, sync::Arc};
+use std::{fmt, sync::Arc};
 use tracing::info;
 use uuid::Uuid;
 use xmr_btc::{
@@ -34,7 +34,7 @@ use xmr_btc::{
     bitcoin::{TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction},
     config::Config,
     monero::CreateWalletForOutput,
-    Epoch,
+    ExpiredTimelocks,
 };
 
 trait Rng: RngCore + CryptoRng + Send {}
@@ -60,7 +60,7 @@ pub enum AliceState {
     XmrLocked {
         state3: State3,
     },
-    EncSignLearned {
+    EncSigLearned {
         state3: State3,
         encrypted_signature: EncryptedSignature,
     },
@@ -78,10 +78,10 @@ pub enum AliceState {
         state3: State3,
     },
     XmrRefunded,
-    T1Expired {
+    CancelTimelockExpired {
         state3: State3,
     },
-    Punished,
+    BtcPunished,
     SafelyAborted,
 }
 
@@ -90,17 +90,17 @@ impl fmt::Display for AliceState {
         match self {
             AliceState::Started { .. } => write!(f, "started"),
             AliceState::Negotiated { .. } => write!(f, "negotiated"),
-            AliceState::BtcLocked { .. } => write!(f, "btc_locked"),
-            AliceState::XmrLocked { .. } => write!(f, "xmr_locked"),
-            AliceState::EncSignLearned { .. } => write!(f, "encsig_learned"),
-            AliceState::BtcRedeemed => write!(f, "btc_redeemed"),
-            AliceState::BtcCancelled { .. } => write!(f, "btc_cancelled"),
-            AliceState::BtcRefunded { .. } => write!(f, "btc_refunded"),
-            AliceState::Punished => write!(f, "punished"),
-            AliceState::SafelyAborted => write!(f, "safely_aborted"),
-            AliceState::BtcPunishable { .. } => write!(f, "btc_punishable"),
-            AliceState::XmrRefunded => write!(f, "xmr_refunded"),
-            AliceState::T1Expired { .. } => write!(f, "t1 is expired"),
+            AliceState::BtcLocked { .. } => write!(f, "btc is locked"),
+            AliceState::XmrLocked { .. } => write!(f, "xmr is locked"),
+            AliceState::EncSigLearned { .. } => write!(f, "encrypted signature is learned"),
+            AliceState::BtcRedeemed => write!(f, "btc is redeemed"),
+            AliceState::BtcCancelled { .. } => write!(f, "btc is cancelled"),
+            AliceState::BtcRefunded { .. } => write!(f, "btc is refunded"),
+            AliceState::BtcPunished => write!(f, "btc is punished"),
+            AliceState::SafelyAborted => write!(f, "safely aborted"),
+            AliceState::BtcPunishable { .. } => write!(f, "btc is punishable"),
+            AliceState::XmrRefunded => write!(f, "xmr is refunded"),
+            AliceState::CancelTimelockExpired { .. } => write!(f, "cancel timelock is expired"),
         }
     }
 }
@@ -111,102 +111,104 @@ impl From<&AliceState> for state::Alice {
             AliceState::Negotiated { state3, .. } => Alice::Negotiated(state3.clone()),
             AliceState::BtcLocked { state3, .. } => Alice::BtcLocked(state3.clone()),
             AliceState::XmrLocked { state3 } => Alice::XmrLocked(state3.clone()),
-            AliceState::EncSignLearned {
+            AliceState::EncSigLearned {
                 state3,
                 encrypted_signature,
-            } => Alice::EncSignLearned {
+            } => Alice::EncSigLearned {
                 state: state3.clone(),
                 encrypted_signature: encrypted_signature.clone(),
             },
-            AliceState::BtcRedeemed => Alice::SwapComplete,
+            AliceState::BtcRedeemed => Alice::Done(AliceEndState::BtcRedeemed),
             AliceState::BtcCancelled { state3, .. } => Alice::BtcCancelled(state3.clone()),
-            AliceState::BtcRefunded { .. } => Alice::SwapComplete,
+            AliceState::BtcRefunded { spend_key, state3 } => Alice::BtcRefunded {
+                spend_key: *spend_key,
+                state3: state3.clone(),
+            },
             AliceState::BtcPunishable { state3, .. } => Alice::BtcPunishable(state3.clone()),
-            AliceState::XmrRefunded => Alice::SwapComplete,
-            AliceState::T1Expired { state3 } => Alice::T1Expired(state3.clone()),
-            AliceState::Punished => Alice::SwapComplete,
-            AliceState::SafelyAborted => Alice::SwapComplete,
-            // TODO: Potentially add support to resume swaps that are not Negotiated
-            AliceState::Started { .. } => {
-                panic!("Alice attempted to save swap before being negotiated")
+            AliceState::XmrRefunded => Alice::Done(AliceEndState::XmrRefunded),
+            AliceState::CancelTimelockExpired { state3 } => {
+                Alice::CancelTimelockExpired(state3.clone())
             }
+            AliceState::BtcPunished => Alice::Done(AliceEndState::BtcPunished),
+            AliceState::SafelyAborted => Alice::Done(AliceEndState::SafelyAborted),
+            AliceState::Started { amounts, state0 } => Alice::Started {
+                amounts: *amounts,
+                state0: state0.clone(),
+            },
         }
     }
 }
 
-impl TryFrom<state::Swap> for AliceState {
-    type Error = anyhow::Error;
-
-    fn try_from(db_state: Swap) -> Result<Self, Self::Error> {
+impl From<state::Alice> for AliceState {
+    fn from(db_state: state::Alice) -> Self {
         use AliceState::*;
-        if let Swap::Alice(state) = db_state {
-            let alice_state = match state {
-                Alice::Negotiated(state3) => Negotiated {
-                    channel: None,
-                    amounts: SwapAmounts {
-                        btc: state3.btc,
-                        xmr: state3.xmr,
-                    },
-                    state3,
+        match db_state {
+            Alice::Started { amounts, state0 } => Started { amounts, state0 },
+            Alice::Negotiated(state3) => Negotiated {
+                channel: None,
+                amounts: SwapAmounts {
+                    btc: state3.btc,
+                    xmr: state3.xmr,
                 },
-                Alice::BtcLocked(state3) => BtcLocked {
-                    channel: None,
-                    amounts: SwapAmounts {
-                        btc: state3.btc,
-                        xmr: state3.xmr,
-                    },
-                    state3,
+                state3,
+            },
+            Alice::BtcLocked(state3) => BtcLocked {
+                channel: None,
+                amounts: SwapAmounts {
+                    btc: state3.btc,
+                    xmr: state3.xmr,
                 },
-                Alice::XmrLocked(state3) => XmrLocked { state3 },
-                Alice::BtcRedeemable { .. } => bail!("BtcRedeemable state is unexpected"),
-                Alice::EncSignLearned {
-                    state,
-                    encrypted_signature,
-                } => EncSignLearned {
-                    state3: state,
-                    encrypted_signature,
-                },
-                Alice::T1Expired(state3) => AliceState::T1Expired { state3 },
-                Alice::BtcCancelled(state) => {
-                    let tx_cancel = bitcoin::TxCancel::new(
-                        &state.tx_lock,
-                        state.refund_timelock,
-                        state.a.public(),
-                        state.B,
-                    );
+                state3,
+            },
+            Alice::XmrLocked(state3) => XmrLocked { state3 },
+            Alice::EncSigLearned {
+                state,
+                encrypted_signature,
+            } => EncSigLearned {
+                state3: state,
+                encrypted_signature,
+            },
+            Alice::CancelTimelockExpired(state3) => AliceState::CancelTimelockExpired { state3 },
+            Alice::BtcCancelled(state) => {
+                let tx_cancel = bitcoin::TxCancel::new(
+                    &state.tx_lock,
+                    state.cancel_timelock,
+                    state.a.public(),
+                    state.B,
+                );
 
-                    BtcCancelled {
-                        state3: state,
-                        tx_cancel,
-                    }
-                }
-                Alice::BtcPunishable(state) => {
-                    let tx_cancel = bitcoin::TxCancel::new(
-                        &state.tx_lock,
-                        state.refund_timelock,
-                        state.a.public(),
-                        state.B,
-                    );
-                    let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &state.refund_address);
-                    BtcPunishable {
-                        tx_refund,
-                        state3: state,
-                    }
-                }
-                Alice::BtcRefunded {
-                    state, spend_key, ..
-                } => BtcRefunded {
-                    spend_key,
+                BtcCancelled {
                     state3: state,
-                },
-                Alice::SwapComplete => {
-                    // TODO(Franck): Better fine grain
-                    AliceState::SafelyAborted
+                    tx_cancel,
                 }
-            };
-            Ok(alice_state)
-        } else {
-            bail!("Alice swap state expected.")
+            }
+            Alice::BtcPunishable(state) => {
+                let tx_cancel = bitcoin::TxCancel::new(
+                    &state.tx_lock,
+                    state.cancel_timelock,
+                    state.a.public(),
+                    state.B,
+                );
+                let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &state.refund_address);
+                BtcPunishable {
+                    tx_refund,
+                    state3: state,
+                }
+            }
+            Alice::BtcRefunded {
+                state3: state,
+                spend_key,
+                ..
+            } => BtcRefunded {
+                spend_key,
+                state3: state,
+            },
+            Alice::Done(end_state) => match end_state {
+                AliceEndState::SafelyAborted => SafelyAborted,
+                AliceEndState::BtcRedeemed => BtcRedeemed,
+                AliceEndState::XmrRefunded => XmrRefunded,
+                AliceEndState::BtcPunished => BtcPunished,
+            },
         }
     }
 }
@@ -238,7 +240,7 @@ pub fn is_complete(state: &AliceState) -> bool {
         state,
         AliceState::XmrRefunded
             | AliceState::BtcRedeemed
-            | AliceState::Punished
+            | AliceState::BtcPunished
             | AliceState::SafelyAborted
     )
 }
@@ -253,7 +255,7 @@ pub fn is_xmr_locked(state: &AliceState) -> bool {
 pub fn is_encsig_learned(state: &AliceState) -> bool {
     matches!(
         state,
-        AliceState::EncSignLearned{..}
+        AliceState::EncSigLearned{..}
     )
 }
 
@@ -386,28 +388,30 @@ pub async fn run_until(
                 .await
             }
             AliceState::XmrLocked { state3 } => {
-                // todo: match statement and wait for t1 can probably be expressed more cleanly
-                let state = match state3.current_epoch(bitcoin_wallet.as_ref()).await? {
-                    Epoch::T0 => {
+                // todo: match statement and wait for cancel timelock to expire can probably be
+                // expressed more cleanly
+                let state = match state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {
+                    ExpiredTimelocks::None => {
                         let wait_for_enc_sig = wait_for_bitcoin_encrypted_signature(
                             &mut event_loop_handle,
                             config.monero_max_finality_time,
                         );
                         let state3_clone = state3.clone();
-                        let t1_timeout = state3_clone.wait_for_t1(bitcoin_wallet.as_ref());
+                        let cancel_timelock_expires = state3_clone
+                            .wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
 
                         pin_mut!(wait_for_enc_sig);
-                        pin_mut!(t1_timeout);
+                        pin_mut!(cancel_timelock_expires);
 
-                        match select(t1_timeout, wait_for_enc_sig).await {
-                            Either::Left(_) => AliceState::T1Expired { state3 },
-                            Either::Right((enc_sig, _)) => AliceState::EncSignLearned {
+                        match select(cancel_timelock_expires, wait_for_enc_sig).await {
+                            Either::Left(_) => AliceState::CancelTimelockExpired { state3 },
+                            Either::Right((enc_sig, _)) => AliceState::EncSigLearned {
                                 state3,
                                 encrypted_signature: enc_sig?,
                             },
                         }
                     }
-                    _ => AliceState::T1Expired { state3 },
+                    _ => AliceState::CancelTimelockExpired { state3 },
                 };
 
                 let db_state = (&state).into();
@@ -425,13 +429,13 @@ pub async fn run_until(
                 )
                 .await
             }
-            AliceState::EncSignLearned {
+            AliceState::EncSigLearned {
                 state3,
                 encrypted_signature,
             } => {
                 // TODO: Evaluate if it is correct for Alice to Redeem no matter what.
-                //  If T1 expired she should potentially not try redeem. (The implementation
-                //  gives her an advantage.)
+                //  If cancel timelock expired she should potentially not try redeem. (The
+                // implementation  gives her an advantage.)
 
                 let signed_tx_redeem = match build_bitcoin_redeem_transaction(
                     encrypted_signature,
@@ -443,9 +447,11 @@ pub async fn run_until(
                 ) {
                     Ok(tx) => tx,
                     Err(_) => {
-                        state3.wait_for_t1(bitcoin_wallet.as_ref()).await?;
+                        state3
+                            .wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref())
+                            .await?;
 
-                        let state = AliceState::T1Expired { state3 };
+                        let state = AliceState::CancelTimelockExpired { state3 };
                         let db_state = (&state).into();
                         db.insert_latest_state(swap_id, Swap::Alice(db_state))
                             .await?;
@@ -489,12 +495,12 @@ pub async fn run_until(
                 )
                 .await
             }
-            AliceState::T1Expired { state3 } => {
+            AliceState::CancelTimelockExpired { state3 } => {
                 let tx_cancel = publish_cancel_transaction(
                     state3.tx_lock.clone(),
                     state3.a.clone(),
                     state3.B,
-                    state3.refund_timelock,
+                    state3.cancel_timelock,
                     state3.tx_cancel_sig_bob.clone(),
                     bitcoin_wallet.clone(),
                 )
@@ -591,7 +597,7 @@ pub async fn run_until(
             AliceState::BtcPunishable { tx_refund, state3 } => {
                 let signed_tx_punish = build_bitcoin_punish_transaction(
                     &state3.tx_lock,
-                    state3.refund_timelock,
+                    state3.cancel_timelock,
                     &state3.punish_address,
                     state3.punish_timelock,
                     state3.tx_punish_sig_bob.clone(),
@@ -612,7 +618,7 @@ pub async fn run_until(
 
                 match select(punish_tx_finalised, refund_tx_seen).await {
                     Either::Left(_) => {
-                        let state = AliceState::Punished;
+                        let state = AliceState::BtcPunished;
                         let db_state = (&state).into();
                         db.insert_latest_state(swap_id, Swap::Alice(db_state))
                             .await?;
@@ -656,7 +662,7 @@ pub async fn run_until(
             }
             AliceState::XmrRefunded => Ok(AliceState::XmrRefunded),
             AliceState::BtcRedeemed => Ok(AliceState::BtcRedeemed),
-            AliceState::Punished => Ok(AliceState::Punished),
+            AliceState::BtcPunished => Ok(AliceState::BtcPunished),
             AliceState::SafelyAborted => Ok(AliceState::SafelyAborted),
         }
     }

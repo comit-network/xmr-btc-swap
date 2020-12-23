@@ -81,7 +81,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::state::{Alice, Bob};
+    use crate::state::{Alice, AliceEndState, Bob, BobEndState};
 
     use super::*;
 
@@ -90,13 +90,13 @@ mod tests {
         let db_dir = tempfile::tempdir().unwrap();
         let db = Database::open(db_dir.path()).unwrap();
 
-        let state_1 = Swap::Alice(Alice::SwapComplete);
+        let state_1 = Swap::Alice(Alice::Done(AliceEndState::BtcRedeemed));
         let swap_id_1 = Uuid::new_v4();
         db.insert_latest_state(swap_id_1, state_1.clone())
             .await
             .expect("Failed to save second state");
 
-        let state_2 = Swap::Bob(Bob::SwapComplete);
+        let state_2 = Swap::Bob(Bob::Done(BobEndState::XmrRedeemed));
         let swap_id_2 = Uuid::new_v4();
         db.insert_latest_state(swap_id_2, state_2.clone())
             .await
@@ -119,7 +119,7 @@ mod tests {
         let db_dir = tempfile::tempdir().unwrap();
         let db = Database::open(db_dir.path()).unwrap();
 
-        let state = Swap::Alice(Alice::SwapComplete);
+        let state = Swap::Alice(Alice::Done(AliceEndState::SafelyAborted));
 
         let swap_id = Uuid::new_v4();
         db.insert_latest_state(swap_id, state.clone())
@@ -146,13 +146,13 @@ mod tests {
         let db_dir = tempfile::tempdir().unwrap();
         let db = Database::open(db_dir.path()).unwrap();
 
-        let state_1 = Swap::Alice(Alice::SwapComplete);
+        let state_1 = Swap::Alice(Alice::Done(AliceEndState::BtcPunished));
         let swap_id_1 = Uuid::new_v4();
         db.insert_latest_state(swap_id_1, state_1.clone())
             .await
             .expect("Failed to save second state");
 
-        let state_2 = Swap::Bob(Bob::SwapComplete);
+        let state_2 = Swap::Bob(Bob::Done(BobEndState::BtcPunished));
         let swap_id_2 = Uuid::new_v4();
         db.insert_latest_state(swap_id_2, state_2.clone())
             .await

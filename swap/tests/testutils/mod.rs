@@ -88,7 +88,7 @@ pub async fn init_alice_state(
         v_a,
         amounts.btc,
         amounts.xmr,
-        config.bitcoin_refund_timelock,
+        config.bitcoin_cancel_timelock,
         config.bitcoin_punish_timelock,
         redeem_address,
         punish_address,
@@ -170,7 +170,7 @@ pub async fn init_bob_state(
         &mut OsRng,
         btc_to_swap,
         xmr_to_swap,
-        config.bitcoin_refund_timelock,
+        config.bitcoin_cancel_timelock,
         config.bitcoin_punish_timelock,
         refund_address,
     );

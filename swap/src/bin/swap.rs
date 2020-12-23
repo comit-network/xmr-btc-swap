@@ -12,11 +12,11 @@
 )]
 #![forbid(unsafe_code)]
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use libp2p::{core::Multiaddr, PeerId};
 use prettytable::{row, Table};
 use rand::rngs::OsRng;
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 use structopt::StructOpt;
 use swap::{
     alice,
@@ -26,6 +26,7 @@ use swap::{
     cli::{Command, Options, Resume},
     monero,
     network::transport::build,
+    state::Swap,
     storage::Database,
     trace::init_tracing,
     SwapAmounts,
@@ -84,7 +85,7 @@ async fn main() -> Result<()> {
                     v_a,
                     amounts.btc,
                     amounts.xmr,
-                    config.bitcoin_refund_timelock,
+                    config.bitcoin_cancel_timelock,
                     config.bitcoin_punish_timelock,
                     redeem_address,
                     punish_address,
@@ -132,7 +133,7 @@ async fn main() -> Result<()> {
                 &mut OsRng,
                 send_bitcoin,
                 receive_monero,
-                config.bitcoin_refund_timelock,
+                config.bitcoin_cancel_timelock,
                 config.bitcoin_punish_timelock,
                 refund_address,
             );
@@ -180,9 +181,12 @@ async fn main() -> Result<()> {
             monero_wallet_rpc_url,
             listen_addr,
         }) => {
-            let db_swap = db.get_state(swap_id)?;
+            let db_state = if let Swap::Alice(db_state) = db.get_state(swap_id)? {
+                db_state
+            } else {
+                bail!("Swap {} is not sell xmr.", swap_id)
+            };
 
-            let alice_state = AliceState::try_from(db_swap.clone())?;
             let (bitcoin_wallet, monero_wallet) = setup_wallets(
                 bitcoind_url,
                 bitcoin_wallet_name.as_str(),
@@ -192,7 +196,7 @@ async fn main() -> Result<()> {
             .await?;
             alice_swap(
                 swap_id,
-                alice_state,
+                db_state.into(),
                 listen_addr,
                 bitcoin_wallet,
                 monero_wallet,
@@ -209,9 +213,11 @@ async fn main() -> Result<()> {
             alice_peer_id,
             alice_addr,
         }) => {
-            let db_swap = db.get_state(swap_id)?;
-
-            let bob_state = BobState::try_from(db_swap)?;
+            let db_state = if let Swap::Bob(db_state) = db.get_state(swap_id)? {
+                db_state
+            } else {
+                bail!("Swap {} is not buy xmr.", swap_id)
+            };
 
             let (bitcoin_wallet, monero_wallet) = setup_wallets(
                 bitcoind_url,
@@ -222,7 +228,7 @@ async fn main() -> Result<()> {
             .await?;
             bob_swap(
                 swap_id,
-                bob_state,
+                db_state.into(),
                 bitcoin_wallet,
                 monero_wallet,
                 db,

@@ -4,7 +4,7 @@ use crate::{
     bob, monero,
     monero::{CreateWalletForOutput, Transfer},
     transport::{ReceiveMessage, SendMessage},
-    Epoch,
+    ExpiredTimelocks,
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -28,7 +28,9 @@ use std::{
 use tokio::{sync::Mutex, time::timeout};
 use tracing::{error, info};
 pub mod message;
-use crate::bitcoin::{current_epoch, wait_for_t1, BlockHeight, TransactionBlockHeight};
+use crate::bitcoin::{
+    current_epoch, wait_for_cancel_timelock_to_expire, BlockHeight, TransactionBlockHeight,
+};
 pub use message::{Message, Message0, Message1, Message2};
 
 #[derive(Debug)]
@@ -74,7 +76,7 @@ pub fn action_generator<N, B>(
         S_b_bitcoin,
         v,
         xmr,
-        refund_timelock,
+        cancel_timelock,
         punish_timelock,
         refund_address,
         redeem_address,
@@ -138,7 +140,7 @@ where
                 .await;
             let poll_until_btc_has_expired = poll_until_block_height_is_gte(
                 bitcoin_client.as_ref(),
-                tx_lock_height + refund_timelock,
+                tx_lock_height + cancel_timelock,
             )
             .shared();
             pin_mut!(poll_until_btc_has_expired);
@@ -221,7 +223,7 @@ where
 
         if let Err(SwapFailed::AfterXmrLock(Reason::BtcExpired)) = swap_result {
             let refund_result: Result<(), RefundFailed> = async {
-                let tx_cancel = bitcoin::TxCancel::new(&tx_lock, refund_timelock, a.public(), B);
+                let tx_cancel = bitcoin::TxCancel::new(&tx_lock, cancel_timelock, a.public(), B);
                 let signed_tx_cancel = {
                     let sig_a = a.sign(tx_cancel.digest());
                     let sig_b = tx_cancel_sig_bob.clone();
@@ -292,7 +294,7 @@ where
             // with the refund on Monero. Doing so may be too verbose with the current,
             // linear approach. A different design may be required
             if let Err(RefundFailed::BtcPunishable) = refund_result {
-                let tx_cancel = bitcoin::TxCancel::new(&tx_lock, refund_timelock, a.public(), B);
+                let tx_cancel = bitcoin::TxCancel::new(&tx_lock, cancel_timelock, a.public(), B);
                 let tx_punish =
                     bitcoin::TxPunish::new(&tx_cancel, &punish_address, punish_timelock);
                 let tx_punish_txid = tx_punish.txid();
@@ -410,7 +412,7 @@ impl State {
         rng: &mut R,
         btc: bitcoin::Amount,
         xmr: monero::Amount,
-        refund_timelock: u32,
+        cancel_timelock: u32,
         punish_timelock: u32,
         redeem_address: bitcoin::Address,
         punish_address: bitcoin::Address,
@@ -425,7 +427,7 @@ impl State {
             v_a,
             btc,
             xmr,
-            refund_timelock,
+            cancel_timelock,
             punish_timelock,
             redeem_address,
             punish_address,
@@ -433,7 +435,7 @@ impl State {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct State0 {
     pub a: bitcoin::SecretKey,
     pub s_a: cross_curve_dleq::Scalar,
@@ -441,7 +443,7 @@ pub struct State0 {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub btc: bitcoin::Amount,
     pub xmr: monero::Amount,
-    pub refund_timelock: u32,
+    pub cancel_timelock: u32,
     pub punish_timelock: u32,
     pub redeem_address: bitcoin::Address,
     pub punish_address: bitcoin::Address,
@@ -455,7 +457,7 @@ impl State0 {
         v_a: monero::PrivateViewKey,
         btc: bitcoin::Amount,
         xmr: monero::Amount,
-        refund_timelock: u32,
+        cancel_timelock: u32,
         punish_timelock: u32,
         redeem_address: bitcoin::Address,
         punish_address: bitcoin::Address,
@@ -468,7 +470,7 @@ impl State0 {
             punish_address,
             btc,
             xmr,
-            refund_timelock,
+            cancel_timelock,
             punish_timelock,
         }
     }
@@ -510,7 +512,7 @@ impl State0 {
             v,
             btc: self.btc,
             xmr: self.xmr,
-            refund_timelock: self.refund_timelock,
+            cancel_timelock: self.cancel_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: msg.refund_address,
             redeem_address: self.redeem_address,
@@ -530,7 +532,7 @@ pub struct State1 {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
-    refund_timelock: u32,
+    cancel_timelock: u32,
     punish_timelock: u32,
     refund_address: bitcoin::Address,
     redeem_address: bitcoin::Address,
@@ -548,7 +550,7 @@ impl State1 {
             v: self.v,
             btc: self.btc,
             xmr: self.xmr,
-            refund_timelock: self.refund_timelock,
+            cancel_timelock: self.cancel_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: self.refund_address,
             redeem_address: self.redeem_address,
@@ -569,7 +571,7 @@ pub struct State2 {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
-    refund_timelock: u32,
+    cancel_timelock: u32,
     punish_timelock: u32,
     refund_address: bitcoin::Address,
     redeem_address: bitcoin::Address,
@@ -580,7 +582,7 @@ pub struct State2 {
 impl State2 {
     pub fn next_message(&self) -> Message1 {
         let tx_cancel =
-            bitcoin::TxCancel::new(&self.tx_lock, self.refund_timelock, self.a.public(), self.B);
+            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
 
         let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &self.refund_address);
         // Alice encsigns the refund transaction(bitcoin) digest with Bob's monero
@@ -599,7 +601,7 @@ impl State2 {
 
     pub fn receive(self, msg: bob::Message2) -> Result<State3> {
         let tx_cancel =
-            bitcoin::TxCancel::new(&self.tx_lock, self.refund_timelock, self.a.public(), self.B);
+            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
         bitcoin::verify_sig(&self.B, &tx_cancel.digest(), &msg.tx_cancel_sig)?;
         let tx_punish =
             bitcoin::TxPunish::new(&tx_cancel, &self.punish_address, self.punish_timelock);
@@ -615,7 +617,7 @@ impl State2 {
             // TODO(Franck): Review if these amounts are actually needed
             btc: self.btc,
             xmr: self.xmr,
-            refund_timelock: self.refund_timelock,
+            cancel_timelock: self.cancel_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: self.refund_address,
             redeem_address: self.redeem_address,
@@ -638,7 +640,7 @@ pub struct State3 {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub btc: bitcoin::Amount,
     pub xmr: monero::Amount,
-    pub refund_timelock: u32,
+    pub cancel_timelock: u32,
     pub punish_timelock: u32,
     pub refund_address: bitcoin::Address,
     pub redeem_address: bitcoin::Address,
@@ -669,7 +671,7 @@ impl State3 {
             v: self.v,
             btc: self.btc,
             xmr: self.xmr,
-            refund_timelock: self.refund_timelock,
+            cancel_timelock: self.cancel_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: self.refund_address,
             redeem_address: self.redeem_address,
@@ -680,20 +682,25 @@ impl State3 {
         })
     }
 
-    pub async fn wait_for_t1<W>(&self, bitcoin_wallet: &W) -> Result<()>
+    pub async fn wait_for_cancel_timelock_to_expire<W>(&self, bitcoin_wallet: &W) -> Result<()>
     where
         W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
     {
-        wait_for_t1(bitcoin_wallet, self.refund_timelock, self.tx_lock.txid()).await
+        wait_for_cancel_timelock_to_expire(
+            bitcoin_wallet,
+            self.cancel_timelock,
+            self.tx_lock.txid(),
+        )
+        .await
     }
 
-    pub async fn current_epoch<W>(&self, bitcoin_wallet: &W) -> Result<Epoch>
+    pub async fn expired_timelocks<W>(&self, bitcoin_wallet: &W) -> Result<ExpiredTimelocks>
     where
         W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
     {
         current_epoch(
             bitcoin_wallet,
-            self.refund_timelock,
+            self.cancel_timelock,
             self.punish_timelock,
             self.tx_lock.txid(),
         )
@@ -712,7 +719,7 @@ pub struct State4 {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
-    refund_timelock: u32,
+    cancel_timelock: u32,
     punish_timelock: u32,
     refund_address: bitcoin::Address,
     redeem_address: bitcoin::Address,
@@ -745,7 +752,7 @@ impl State4 {
             v: self.v,
             btc: self.btc,
             xmr: self.xmr,
-            refund_timelock: self.refund_timelock,
+            cancel_timelock: self.cancel_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: self.refund_address,
             redeem_address: self.redeem_address,
@@ -763,7 +770,7 @@ impl State4 {
         bitcoin_wallet: &W,
     ) -> Result<()> {
         let tx_cancel =
-            bitcoin::TxCancel::new(&self.tx_lock, self.refund_timelock, self.a.public(), self.B);
+            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
         let tx_punish =
             bitcoin::TxPunish::new(&tx_cancel, &self.punish_address, self.punish_timelock);
 
@@ -809,7 +816,7 @@ pub struct State5 {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
-    refund_timelock: u32,
+    cancel_timelock: u32,
     punish_timelock: u32,
     refund_address: bitcoin::Address,
     redeem_address: bitcoin::Address,
@@ -840,7 +847,7 @@ impl State5 {
             v: self.v,
             btc: self.btc,
             xmr: self.xmr,
-            refund_timelock: self.refund_timelock,
+            cancel_timelock: self.cancel_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: self.refund_address,
             redeem_address: self.redeem_address,
@@ -859,7 +866,7 @@ impl State5 {
         M: CreateWalletForOutput,
     {
         let tx_cancel =
-            bitcoin::TxCancel::new(&self.tx_lock, self.refund_timelock, self.a.public(), self.B);
+            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
 
         let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &self.refund_address);
 
@@ -898,7 +905,7 @@ pub struct State6 {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
-    refund_timelock: u32,
+    cancel_timelock: u32,
     punish_timelock: u32,
     refund_address: bitcoin::Address,
     redeem_address: bitcoin::Address,

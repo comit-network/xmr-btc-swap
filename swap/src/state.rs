@@ -1,3 +1,4 @@
+use crate::SwapAmounts;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use xmr_btc::{alice, bitcoin::EncryptedSignature, bob, monero, serde::monero_private_key};
@@ -12,40 +13,66 @@ pub enum Swap {
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Alice {
+    Started {
+        amounts: SwapAmounts,
+        state0: alice::State0,
+    },
     Negotiated(alice::State3),
     BtcLocked(alice::State3),
     XmrLocked(alice::State3),
-    // TODO(Franck): Delete this state as it is not used in alice::swap
-    BtcRedeemable {
-        state: alice::State3,
-        redeem_tx: bitcoin::Transaction,
-    },
-    EncSignLearned {
+    EncSigLearned {
         state: alice::State3,
         encrypted_signature: EncryptedSignature,
     },
-    T1Expired(alice::State3),
+    CancelTimelockExpired(alice::State3),
     BtcCancelled(alice::State3),
     BtcPunishable(alice::State3),
     BtcRefunded {
-        state: alice::State3,
+        state3: alice::State3,
         #[serde(with = "monero_private_key")]
         spend_key: monero::PrivateKey,
-        view_key: monero::PrivateViewKey,
     },
-    SwapComplete,
+    Done(AliceEndState),
+}
+
+#[derive(Clone, strum::Display, Debug, Deserialize, Serialize, PartialEq)]
+pub enum AliceEndState {
+    SafelyAborted,
+    BtcRedeemed,
+    XmrRefunded,
+    BtcPunished,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Bob {
-    Negotiated { state2: bob::State2 },
-    BtcLocked { state3: bob::State3 },
-    XmrLocked { state4: bob::State4 },
-    EncSigSent { state4: bob::State4 },
+    Started {
+        state0: bob::State0,
+        amounts: SwapAmounts,
+    },
+    Negotiated {
+        state2: bob::State2,
+    },
+    BtcLocked {
+        state3: bob::State3,
+    },
+    XmrLocked {
+        state4: bob::State4,
+    },
+    EncSigSent {
+        state4: bob::State4,
+    },
     BtcRedeemed(bob::State5),
-    T1Expired(bob::State4),
+    CancelTimelockExpired(bob::State4),
     BtcCancelled(bob::State4),
-    SwapComplete,
+    Done(BobEndState),
+}
+
+#[derive(Clone, strum::Display, Debug, Deserialize, Serialize, PartialEq)]
+pub enum BobEndState {
+    SafelyAborted,
+    XmrRedeemed,
+    BtcRefunded(Box<bob::State4>),
+    BtcPunished,
 }
 
 impl From<Alice> for Swap {
@@ -72,16 +99,16 @@ impl Display for Swap {
 impl Display for Alice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Alice::Negotiated(_) => f.write_str("Handshake complete"),
+            Alice::Started { .. } => write!(f, "Started"),
+            Alice::Negotiated(_) => f.write_str("Negotiated"),
             Alice::BtcLocked(_) => f.write_str("Bitcoin locked"),
             Alice::XmrLocked(_) => f.write_str("Monero locked"),
-            Alice::BtcRedeemable { .. } => f.write_str("Bitcoin redeemable"),
-            Alice::T1Expired(_) => f.write_str("Timelock T1 expired"),
+            Alice::CancelTimelockExpired(_) => f.write_str("Cancel timelock is expired"),
             Alice::BtcCancelled(_) => f.write_str("Bitcoin cancel transaction published"),
             Alice::BtcPunishable(_) => f.write_str("Bitcoin punishable"),
             Alice::BtcRefunded { .. } => f.write_str("Monero refundable"),
-            Alice::SwapComplete => f.write_str("Swap complete"),
-            Alice::EncSignLearned { .. } => f.write_str("Encrypted signature learned"),
+            Alice::Done(end_state) => write!(f, "Done: {}", end_state),
+            Alice::EncSigLearned { .. } => f.write_str("Encrypted signature learned"),
         }
     }
 }
@@ -89,13 +116,14 @@ impl Display for Alice {
 impl Display for Bob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Bob::Negotiated { .. } => f.write_str("Handshake complete"),
+            Bob::Started { .. } => write!(f, "Started"),
+            Bob::Negotiated { .. } => f.write_str("Negotiated"),
             Bob::BtcLocked { .. } => f.write_str("Bitcoin locked"),
             Bob::XmrLocked { .. } => f.write_str("Monero locked"),
-            Bob::T1Expired(_) => f.write_str("Timelock T1 expired"),
+            Bob::CancelTimelockExpired(_) => f.write_str("Cancel timelock is expired"),
             Bob::BtcCancelled(_) => f.write_str("Bitcoin refundable"),
             Bob::BtcRedeemed(_) => f.write_str("Monero redeemable"),
-            Bob::SwapComplete => f.write_str("Swap complete"),
+            Bob::Done(end_state) => write!(f, "Done: {}", end_state),
             Bob::EncSigSent { .. } => f.write_str("Encrypted signature sent"),
         }
     }

@@ -15,10 +15,10 @@
 #![allow(non_snake_case)]
 
 #[derive(Debug, Clone, Copy)]
-pub enum Epoch {
-    T0,
-    T1,
-    T2,
+pub enum ExpiredTimelocks {
+    None,
+    Cancel,
+    Punish,
 }
 
 #[macro_use]

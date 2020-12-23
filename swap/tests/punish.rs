@@ -115,7 +115,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         Either::Right(_) => panic!("Bob event loop should not terminate."),
     };
 
-    assert!(matches!(alice_state, AliceState::Punished));
+    assert!(matches!(alice_state, AliceState::BtcPunished));
     let bob_state3 = if let BobState::BtcLocked(state3, ..) = bob_state {
         state3
     } else {

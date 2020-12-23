@@ -2,7 +2,6 @@ use crate::testutils::{init_alice, init_bob};
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use std::convert::TryFrom;
 use swap::{alice, bitcoin, bob, bob::swap::BobState, storage::Database};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
@@ -114,18 +113,18 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     assert!(matches!(bob_state, BobState::EncSigSent {..}));
 
     let bob_db = Database::open(bob_db_datadir.path()).unwrap();
-    let state_before_restart = bob_db.get_state(bob_swap_id).unwrap();
 
-    if let swap::state::Swap::Bob(state) = state_before_restart.clone() {
+    let resume_state = if let swap::state::Swap::Bob(state) = bob_db.get_state(bob_swap_id).unwrap()
+    {
         assert!(matches!(state, swap::state::Bob::EncSigSent {..}));
-    }
+        state.into()
+    } else {
+        unreachable!()
+    };
 
     let (event_loop_after_restart, event_loop_handle_after_restart) =
         testutils::init_bob_event_loop(alice_peer_id, alice_multiaddr);
     tokio::spawn(event_loop_after_restart.run());
-
-    let db_swap = bob_db.get_state(bob_swap_id).unwrap();
-    let resume_state = BobState::try_from(db_swap).unwrap();
 
     let bob_state = bob::swap::swap(
         resume_state,

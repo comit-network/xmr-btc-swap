@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
 
-use crate::Epoch;
+use crate::ExpiredTimelocks;
 pub use bitcoin::{util::psbt::PartiallySignedTransaction, *};
 pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
 pub use transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund};
@@ -247,28 +247,31 @@ where
 
 pub async fn current_epoch<W>(
     bitcoin_wallet: &W,
-    refund_timelock: u32,
+    cancel_timelock: u32,
     punish_timelock: u32,
     lock_tx_id: ::bitcoin::Txid,
-) -> anyhow::Result<Epoch>
+) -> anyhow::Result<ExpiredTimelocks>
 where
     W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
 {
     let current_block_height = bitcoin_wallet.block_height().await;
-    let t0 = bitcoin_wallet.transaction_block_height(lock_tx_id).await;
-    let t1 = t0 + refund_timelock;
-    let t2 = t1 + punish_timelock;
+    let lock_tx_height = bitcoin_wallet.transaction_block_height(lock_tx_id).await;
+    let cancel_timelock_height = lock_tx_height + cancel_timelock;
+    let punish_timelock_height = cancel_timelock_height + punish_timelock;
 
-    match (current_block_height < t1, current_block_height < t2) {
-        (true, _) => Ok(Epoch::T0),
-        (false, true) => Ok(Epoch::T1),
-        (false, false) => Ok(Epoch::T2),
+    match (
+        current_block_height < cancel_timelock_height,
+        current_block_height < punish_timelock_height,
+    ) {
+        (true, _) => Ok(ExpiredTimelocks::None),
+        (false, true) => Ok(ExpiredTimelocks::Cancel),
+        (false, false) => Ok(ExpiredTimelocks::Punish),
     }
 }
 
-pub async fn wait_for_t1<W>(
+pub async fn wait_for_cancel_timelock_to_expire<W>(
     bitcoin_wallet: &W,
-    refund_timelock: u32,
+    cancel_timelock: u32,
     lock_tx_id: ::bitcoin::Txid,
 ) -> Result<()>
 where
@@ -276,8 +279,6 @@ where
 {
     let tx_lock_height = bitcoin_wallet.transaction_block_height(lock_tx_id).await;
 
-    let t1_timeout =
-        poll_until_block_height_is_gte(bitcoin_wallet, tx_lock_height + refund_timelock);
-    t1_timeout.await;
+    poll_until_block_height_is_gte(bitcoin_wallet, tx_lock_height + cancel_timelock).await;
     Ok(())
 }
