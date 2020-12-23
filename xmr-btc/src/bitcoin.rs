@@ -1,6 +1,7 @@
+mod timelocks;
 pub mod transactions;
 
-use crate::config::Config;
+use crate::{config::Config, ExpiredTimelocks};
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
 use bitcoin::hashes::{hex::ToHex, Hash};
@@ -11,9 +12,9 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
 
-use crate::ExpiredTimelocks;
 pub use bitcoin::{util::psbt::PartiallySignedTransaction, *};
 pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
+pub use timelocks::*;
 pub use transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund};
 
 // TODO: Configurable tx-fee (note: parties have to agree prior to swapping)
@@ -202,17 +203,17 @@ pub trait WaitForTransactionFinality {
 
 #[async_trait]
 pub trait GetBlockHeight {
-    async fn get_block_height(&self) -> u32;
+    async fn get_block_height(&self) -> BlockHeight;
 }
 
 #[async_trait]
 pub trait TransactionBlockHeight {
-    async fn transaction_block_height(&self, txid: Txid) -> u32;
+    async fn transaction_block_height(&self, txid: Txid) -> BlockHeight;
 }
 
 #[async_trait]
 pub trait WaitForBlockHeight {
-    async fn wait_for_block_height(&self, height: u32);
+    async fn wait_for_block_height(&self, height: BlockHeight);
 }
 
 #[async_trait]
@@ -236,7 +237,7 @@ pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Resu
     Ok(s)
 }
 
-pub async fn poll_until_block_height_is_gte<B>(client: &B, target: u32)
+pub async fn poll_until_block_height_is_gte<B>(client: &B, target: BlockHeight)
 where
     B: GetBlockHeight,
 {
@@ -247,8 +248,8 @@ where
 
 pub async fn current_epoch<W>(
     bitcoin_wallet: &W,
-    cancel_timelock: u32,
-    punish_timelock: u32,
+    cancel_timelock: Timelock,
+    punish_timelock: Timelock,
     lock_tx_id: ::bitcoin::Txid,
 ) -> anyhow::Result<ExpiredTimelocks>
 where
@@ -271,7 +272,7 @@ where
 
 pub async fn wait_for_cancel_timelock_to_expire<W>(
     bitcoin_wallet: &W,
-    cancel_timelock: u32,
+    cancel_timelock: Timelock,
     lock_tx_id: ::bitcoin::Txid,
 ) -> Result<()>
 where
