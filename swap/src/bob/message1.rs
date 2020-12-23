@@ -80,7 +80,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             } => {
                 if let AliceToBob::Message1(msg) = response {
                     debug!("Received Message1");
-                    self.events.push_back(OutEvent::Msg(msg));
+                    self.events.push_back(OutEvent::Msg(*msg));
                 }
             }
             RequestResponseEvent::InboundFailure { error, .. } => {

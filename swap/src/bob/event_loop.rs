@@ -192,10 +192,10 @@ impl EventLoop {
                         }
                         OutEvent::Amounts(_amounts) => info!("Amounts received from Alice"),
                         OutEvent::Message0(msg) => {
-                            let _ = self.msg0.send(msg).await;
+                            let _ = self.msg0.send(*msg).await;
                         }
                         OutEvent::Message1(msg) => {
-                            let _ = self.msg1.send(msg).await;
+                            let _ = self.msg1.send(*msg).await;
                         }
                         OutEvent::Message2(msg) => {
                             let _ = self.msg2.send(msg).await;

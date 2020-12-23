@@ -50,6 +50,8 @@ impl TxLock {
     }
 
     pub fn as_outpoint(&self) -> OutPoint {
+        // This is fine because a transaction that has that many outputs is not
+        // realistic
         #[allow(clippy::cast_possible_truncation)]
         OutPoint::new(self.inner.txid(), self.lock_output_vout() as u32)
     }

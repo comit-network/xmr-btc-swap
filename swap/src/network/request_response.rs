@@ -22,12 +22,11 @@ const BUF_SIZE: usize = 1024 * 1024;
 
 /// Messages Bob sends to Alice.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[allow(clippy::large_enum_variant)]
 pub enum BobToAlice {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     AmountsFromBtc(::bitcoin::Amount),
     AmountsFromXmr(monero::Amount),
-    Message0(bob::Message0),
+    Message0(Box<bob::Message0>),
     Message1(bob::Message1),
     Message2(bob::Message2),
     Message3(bob::Message3),
@@ -35,11 +34,10 @@ pub enum BobToAlice {
 
 /// Messages Alice sends to Bob.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[allow(clippy::large_enum_variant)]
 pub enum AliceToBob {
     Amounts(SwapAmounts),
-    Message0(alice::Message0),
-    Message1(alice::Message1),
+    Message0(Box<alice::Message0>),
+    Message1(Box<alice::Message1>),
     Message2(alice::Message2),
     Message3, // empty response
 }

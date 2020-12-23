@@ -206,7 +206,7 @@ impl EventLoop {
                             let _ = self.conn_established.send(alice).await;
                         }
                         OutEvent::Message0 { msg, channel } => {
-                            let _ = self.msg0.send((msg, channel)).await;
+                            let _ = self.msg0.send((*msg, channel)).await;
                         }
                         OutEvent::Message1 { msg, channel } => {
                             let _ = self.msg1.send((msg, channel)).await;
@@ -218,7 +218,7 @@ impl EventLoop {
                             let _ = self.msg3.send(msg).await;
                         }
                         OutEvent::Request(event) => {
-                            let _ = self.request.send(event).await;
+                            let _ = self.request.send(*event).await;
                         }
                     }
                 },

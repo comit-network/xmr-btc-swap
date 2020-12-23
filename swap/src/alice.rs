@@ -53,15 +53,15 @@ pub fn new_swarm(
     Ok(swarm)
 }
 
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
     // TODO (Franck): Change this to get both amounts so parties can verify the amounts are
     // expected early on.
-    Request(amounts::OutEvent), // Not-uniform with Bob on purpose, ready for adding Xmr event.
+    Request(Box<amounts::OutEvent>), /* Not-uniform with Bob on purpose, ready for adding Xmr
+                                      * event. */
     Message0 {
-        msg: bob::Message0,
+        msg: Box<bob::Message0>,
         channel: ResponseChannel<AliceToBob>,
     },
     Message1 {
@@ -87,14 +87,17 @@ impl From<peer_tracker::OutEvent> for OutEvent {
 
 impl From<amounts::OutEvent> for OutEvent {
     fn from(event: amounts::OutEvent) -> Self {
-        OutEvent::Request(event)
+        OutEvent::Request(Box::new(event))
     }
 }
 
 impl From<message0::OutEvent> for OutEvent {
     fn from(event: message0::OutEvent) -> Self {
         match event {
-            message0::OutEvent::Msg { channel, msg } => OutEvent::Message0 { msg, channel },
+            message0::OutEvent::Msg { channel, msg } => OutEvent::Message0 {
+                msg: Box::new(msg),
+                channel,
+            },
         }
     }
 }

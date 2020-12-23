@@ -375,11 +375,10 @@ pub async fn next_state<
             state6.redeem_btc(bitcoin_wallet).await?;
             Ok(state6.into())
         }
-        State::State6(state6) => Ok(state6.into()),
+        State::State6(state6) => Ok((*state6).into()),
     }
 }
 
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Deserialize, Serialize)]
 pub enum State {
     State0(State0),
@@ -388,7 +387,7 @@ pub enum State {
     State3(State3),
     State4(State4),
     State5(State5),
-    State6(State6),
+    State6(Box<State6>),
 }
 
 impl_try_from_parent_enum!(State0, State);
@@ -397,7 +396,7 @@ impl_try_from_parent_enum!(State2, State);
 impl_try_from_parent_enum!(State3, State);
 impl_try_from_parent_enum!(State4, State);
 impl_try_from_parent_enum!(State5, State);
-impl_try_from_parent_enum!(State6, State);
+impl_try_from_parent_enum_for_boxed!(State6, State);
 
 impl_from_child_enum!(State0, State);
 impl_from_child_enum!(State1, State);
@@ -405,7 +404,7 @@ impl_from_child_enum!(State2, State);
 impl_from_child_enum!(State3, State);
 impl_from_child_enum!(State4, State);
 impl_from_child_enum!(State5, State);
-impl_from_child_enum!(State6, State);
+impl_from_child_enum_for_boxed!(State6, State);
 
 impl State {
     pub fn new<R: RngCore + CryptoRng>(

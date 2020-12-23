@@ -3,13 +3,14 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use xmr_btc::{alice, bitcoin::EncryptedSignature, bob, monero, serde::monero_private_key};
 
-#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Swap {
     Alice(Alice),
     Bob(Bob),
 }
 
+// Large enum variant is fine because this is only used for storage
+// and is dropped once written in DB.
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Alice {
@@ -21,8 +22,8 @@ pub enum Alice {
     BtcLocked(alice::State3),
     XmrLocked(alice::State3),
     EncSigLearned {
-        state: alice::State3,
         encrypted_signature: EncryptedSignature,
+        state3: alice::State3,
     },
     CancelTimelockExpired(alice::State3),
     BtcCancelled(alice::State3),

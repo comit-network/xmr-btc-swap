@@ -38,7 +38,7 @@ pub struct Message1 {
 
 impl Message1 {
     pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: xmr_btc::alice::Message1) {
-        let msg = AliceToBob::Message1(msg);
+        let msg = AliceToBob::Message1(Box::new(msg));
         self.rr.send_response(channel, msg);
     }
 

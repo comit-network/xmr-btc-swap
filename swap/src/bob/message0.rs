@@ -33,7 +33,7 @@ pub struct Message0 {
 
 impl Message0 {
     pub fn send(&mut self, alice: PeerId, msg: bob::Message0) {
-        let msg = BobToAlice::Message0(msg);
+        let msg = BobToAlice::Message0(Box::new(msg));
         let _id = self.rr.send_request(&alice, msg);
     }
 
@@ -80,7 +80,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             } => {
                 if let AliceToBob::Message0(msg) = response {
                     debug!("Received Message0");
-                    self.events.push_back(OutEvent::Msg(msg));
+                    self.events.push_back(OutEvent::Msg(*msg));
                 }
             }
             RequestResponseEvent::InboundFailure { error, .. } => {
