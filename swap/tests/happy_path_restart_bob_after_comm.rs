@@ -115,7 +115,7 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     let bob_db = Database::open(bob_db_datadir.path()).unwrap();
 
     let resume_state =
-        if let swap::database::state::Swap::Bob(state) = bob_db.get_state(bob_swap_id).unwrap() {
+        if let swap::database::Swap::Bob(state) = bob_db.get_state(bob_swap_id).unwrap() {
             assert!(matches!(state, swap::database::Bob::EncSigSent {..}));
             state.into()
         } else {

@@ -25,7 +25,7 @@ use swap::{
     bitcoin, bob,
     bob::swap::BobState,
     cli::{Command, Options, Resume},
-    database::{state::Swap, Database},
+    database::{Database, Swap},
     monero,
     network::transport::build,
     trace::init_tracing,

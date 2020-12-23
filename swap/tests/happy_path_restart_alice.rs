@@ -111,14 +111,13 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
 
     let alice_db = Database::open(alice_db_datadir.path()).unwrap();
 
-    let resume_state = if let swap::database::state::Swap::Alice(state) =
-        alice_db.get_state(alice_swap_id).unwrap()
-    {
-        assert!(matches!(state, swap::database::Alice::EncSigLearned {..}));
-        state.into()
-    } else {
-        unreachable!()
-    };
+    let resume_state =
+        if let swap::database::Swap::Alice(state) = alice_db.get_state(alice_swap_id).unwrap() {
+            assert!(matches!(state, swap::database::Alice::EncSigLearned {..}));
+            state.into()
+        } else {
+            unreachable!()
+        };
 
     let (mut event_loop_after_restart, event_loop_handle_after_restart) =
         testutils::init_alice_event_loop(alice_multiaddr);
