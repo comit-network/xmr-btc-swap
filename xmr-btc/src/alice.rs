@@ -28,7 +28,7 @@ use std::{
 use tokio::{sync::Mutex, time::timeout};
 use tracing::{error, info};
 pub mod message;
-use crate::bitcoin::{BlockHeight, TransactionBlockHeight};
+use crate::bitcoin::{current_epoch, wait_for_t1, BlockHeight, TransactionBlockHeight};
 pub use message::{Message, Message0, Message1, Message2};
 
 #[derive(Debug)]
@@ -684,31 +684,20 @@ impl State3 {
     where
         W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
     {
-        let tx_id = self.tx_lock.txid();
-        let tx_lock_height = bitcoin_wallet.transaction_block_height(tx_id).await;
-
-        let t1_timeout =
-            poll_until_block_height_is_gte(bitcoin_wallet, tx_lock_height + self.refund_timelock);
-        t1_timeout.await;
-        Ok(())
+        wait_for_t1(bitcoin_wallet, self.refund_timelock, self.tx_lock.txid()).await
     }
 
     pub async fn current_epoch<W>(&self, bitcoin_wallet: &W) -> Result<Epoch>
     where
         W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
     {
-        let current_block_height = bitcoin_wallet.block_height().await;
-        let t0 = bitcoin_wallet
-            .transaction_block_height(self.tx_lock.txid())
-            .await;
-        let t1 = t0 + self.refund_timelock;
-        let t2 = t1 + self.punish_timelock;
-
-        match (current_block_height < t1, current_block_height < t2) {
-            (true, _) => Ok(Epoch::T0),
-            (false, true) => Ok(Epoch::T1),
-            (false, false) => Ok(Epoch::T2),
-        }
+        current_epoch(
+            bitcoin_wallet,
+            self.refund_timelock,
+            self.punish_timelock,
+            self.tx_lock.txid(),
+        )
+        .await
     }
 }
 
