@@ -14,7 +14,7 @@ use crate::{
     bitcoin::EncryptedSignature,
     network::request_response::AliceToBob,
     state,
-    state::{Alice, EndState, Swap},
+    state::{Alice, AliceEndState, Swap},
     storage::Database,
     SwapAmounts,
 };
@@ -118,19 +118,19 @@ impl From<&AliceState> for state::Alice {
                 state: state3.clone(),
                 encrypted_signature: encrypted_signature.clone(),
             },
-            AliceState::BtcRedeemed => Alice::Done(EndState::BtcRedeemed),
+            AliceState::BtcRedeemed => Alice::Done(AliceEndState::BtcRedeemed),
             AliceState::BtcCancelled { state3, .. } => Alice::BtcCancelled(state3.clone()),
             AliceState::BtcRefunded { spend_key, state3 } => Alice::BtcRefunded {
                 spend_key: *spend_key,
                 state3: state3.clone(),
             },
             AliceState::BtcPunishable { state3, .. } => Alice::BtcPunishable(state3.clone()),
-            AliceState::XmrRefunded => Alice::Done(EndState::XmrRefunded),
+            AliceState::XmrRefunded => Alice::Done(AliceEndState::XmrRefunded),
             AliceState::CancelTimelockExpired { state3 } => {
                 Alice::CancelTimelockExpired(state3.clone())
             }
-            AliceState::BtcPunished => Alice::Done(EndState::BtcPunished),
-            AliceState::SafelyAborted => Alice::Done(EndState::SafelyAborted),
+            AliceState::BtcPunished => Alice::Done(AliceEndState::BtcPunished),
+            AliceState::SafelyAborted => Alice::Done(AliceEndState::SafelyAborted),
             AliceState::Started { amounts, state0 } => Alice::Started {
                 amounts: *amounts,
                 state0: state0.clone(),
@@ -204,10 +204,10 @@ impl From<state::Alice> for AliceState {
                 state3: state,
             },
             Alice::Done(end_state) => match end_state {
-                EndState::SafelyAborted => SafelyAborted,
-                EndState::BtcRedeemed => BtcRedeemed,
-                EndState::XmrRefunded => XmrRefunded,
-                EndState::BtcPunished => BtcPunished,
+                AliceEndState::SafelyAborted => SafelyAborted,
+                AliceEndState::BtcRedeemed => BtcRedeemed,
+                AliceEndState::XmrRefunded => XmrRefunded,
+                AliceEndState::BtcPunished => BtcPunished,
             },
         }
     }
