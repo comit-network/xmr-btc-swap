@@ -4,7 +4,12 @@ use state::Swap;
 use std::path::Path;
 use uuid::Uuid;
 
+mod alice;
+mod bob;
 pub mod state;
+
+pub use alice::*;
+pub use bob::*;
 
 #[derive(Debug)]
 pub struct Database(sled::Db);
@@ -84,9 +89,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::database::state::{Alice, AliceEndState, Bob, BobEndState};
-
     use super::*;
+    use crate::database::{Alice, AliceEndState, Bob, BobEndState};
 
     #[tokio::test]
     async fn can_write_and_read_to_multiple_keys() {

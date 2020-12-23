@@ -114,7 +114,7 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     let resume_state = if let swap::database::state::Swap::Alice(state) =
         alice_db.get_state(alice_swap_id).unwrap()
     {
-        assert!(matches!(state, swap::database::state::Alice::EncSigLearned {..}));
+        assert!(matches!(state, swap::database::Alice::EncSigLearned {..}));
         state.into()
     } else {
         unreachable!()
