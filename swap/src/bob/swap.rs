@@ -1,14 +1,14 @@
 use crate::{
     bob::event_loop::EventLoopHandle,
     state,
-    state::{Bob, BobEndState, Swap},
+    state::{Bob, BobEndState},
     storage::Database,
     SwapAmounts,
 };
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
 use rand::{CryptoRng, RngCore};
-use std::{convert::TryFrom, fmt, sync::Arc};
+use std::{fmt, sync::Arc};
 use tokio::select;
 use tracing::info;
 use uuid::Uuid;
@@ -74,31 +74,23 @@ impl From<BobState> for state::Bob {
     }
 }
 
-impl TryFrom<state::Swap> for BobState {
-    type Error = anyhow::Error;
-
-    fn try_from(db_state: state::Swap) -> Result<Self, Self::Error> {
-        if let Swap::Bob(state) = db_state {
-            let bob_State = match state {
-                Bob::Started { state0, amounts } => BobState::Started { state0, amounts },
-                Bob::Negotiated { state2 } => BobState::Negotiated(state2),
-                Bob::BtcLocked { state3 } => BobState::BtcLocked(state3),
-                Bob::XmrLocked { state4 } => BobState::XmrLocked(state4),
-                Bob::EncSigSent { state4 } => BobState::EncSigSent(state4),
-                Bob::BtcRedeemed(state5) => BobState::BtcRedeemed(state5),
-                Bob::CancelTimelockExpired(state4) => BobState::CancelTimelockExpired(state4),
-                Bob::BtcCancelled(state4) => BobState::BtcCancelled(state4),
-                Bob::Done(end_state) => match end_state {
-                    BobEndState::SafelyAborted => BobState::SafelyAborted,
-                    BobEndState::XmrRedeemed => BobState::XmrRedeemed,
-                    BobEndState::BtcRefunded(state4) => BobState::BtcRefunded(*state4),
-                    BobEndState::BtcPunished => BobState::BtcPunished,
-                },
-            };
-
-            Ok(bob_State)
-        } else {
-            bail!("Bob swap state expected.")
+impl From<state::Bob> for BobState {
+    fn from(db_state: state::Bob) -> Self {
+        match db_state {
+            Bob::Started { state0, amounts } => BobState::Started { state0, amounts },
+            Bob::Negotiated { state2 } => BobState::Negotiated(state2),
+            Bob::BtcLocked { state3 } => BobState::BtcLocked(state3),
+            Bob::XmrLocked { state4 } => BobState::XmrLocked(state4),
+            Bob::EncSigSent { state4 } => BobState::EncSigSent(state4),
+            Bob::BtcRedeemed(state5) => BobState::BtcRedeemed(state5),
+            Bob::CancelTimelockExpired(state4) => BobState::CancelTimelockExpired(state4),
+            Bob::BtcCancelled(state4) => BobState::BtcCancelled(state4),
+            Bob::Done(end_state) => match end_state {
+                BobEndState::SafelyAborted => BobState::SafelyAborted,
+                BobEndState::XmrRedeemed => BobState::XmrRedeemed,
+                BobEndState::BtcRefunded(state4) => BobState::BtcRefunded(*state4),
+                BobEndState::BtcPunished => BobState::BtcPunished,
+            },
         }
     }
 }

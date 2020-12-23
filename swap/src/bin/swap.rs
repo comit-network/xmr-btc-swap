@@ -16,7 +16,7 @@ use anyhow::{bail, Context, Result};
 use libp2p::{core::Multiaddr, PeerId};
 use prettytable::{row, Table};
 use rand::rngs::OsRng;
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 use structopt::StructOpt;
 use swap::{
     alice,
@@ -213,9 +213,11 @@ async fn main() -> Result<()> {
             alice_peer_id,
             alice_addr,
         }) => {
-            let db_swap = db.get_state(swap_id)?;
-
-            let bob_state = BobState::try_from(db_swap)?;
+            let db_state = if let Swap::Bob(db_state) = db.get_state(swap_id)? {
+                db_state
+            } else {
+                bail!("Swap {} is not buy xmr.", swap_id)
+            };
 
             let (bitcoin_wallet, monero_wallet) = setup_wallets(
                 bitcoind_url,
@@ -226,7 +228,7 @@ async fn main() -> Result<()> {
             .await?;
             bob_swap(
                 swap_id,
-                bob_state,
+                db_state.into(),
                 bitcoin_wallet,
                 monero_wallet,
                 db,
