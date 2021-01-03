@@ -11,6 +11,7 @@ use libp2p::{
 use tokio::sync::mpsc::{Receiver, Sender};
 use xmr_btc::{alice, bob};
 
+#[allow(missing_debug_implementations)]
 pub struct Channels<T> {
     sender: Sender<T>,
     receiver: Receiver<T>,
@@ -29,6 +30,7 @@ impl<T> Default for Channels<T> {
     }
 }
 
+#[derive(Debug)]
 pub struct EventLoopHandle {
     msg0: Receiver<(bob::Message0, ResponseChannel<AliceToBob>)>,
     msg1: Receiver<(bob::Message1, ResponseChannel<AliceToBob>)>,
@@ -122,6 +124,7 @@ impl EventLoopHandle {
     }
 }
 
+#[allow(missing_debug_implementations)]
 pub struct EventLoop {
     swarm: libp2p::Swarm<Behaviour>,
     msg0: Sender<(bob::Message0, ResponseChannel<AliceToBob>)>,
@@ -203,7 +206,7 @@ impl EventLoop {
                             let _ = self.conn_established.send(alice).await;
                         }
                         OutEvent::Message0 { msg, channel } => {
-                            let _ = self.msg0.send((msg, channel)).await;
+                            let _ = self.msg0.send((*msg, channel)).await;
                         }
                         OutEvent::Message1 { msg, channel } => {
                             let _ = self.msg1.send((msg, channel)).await;
@@ -215,7 +218,7 @@ impl EventLoop {
                             let _ = self.msg3.send(msg).await;
                         }
                         OutEvent::Request(event) => {
-                            let _ = self.request.send(event).await;
+                            let _ = self.request.send(*event).await;
                         }
                     }
                 },

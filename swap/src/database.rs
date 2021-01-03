@@ -1,9 +1,15 @@
-use crate::state::Swap;
 use anyhow::{anyhow, bail, Context, Result};
-use serde::{de::DeserializeOwned, Serialize};
-use std::path::Path;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::{fmt::Display, path::Path};
 use uuid::Uuid;
 
+mod alice;
+mod bob;
+
+pub use alice::*;
+pub use bob::*;
+
+#[derive(Debug)]
 pub struct Database(sled::Db);
 
 impl Database {
@@ -79,11 +85,37 @@ where
     Ok(serde_cbor::from_slice(&v)?)
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub enum Swap {
+    Alice(Alice),
+    Bob(Bob),
+}
+
+impl From<Alice> for Swap {
+    fn from(from: Alice) -> Self {
+        Swap::Alice(from)
+    }
+}
+
+impl From<Bob> for Swap {
+    fn from(from: Bob) -> Self {
+        Swap::Bob(from)
+    }
+}
+
+impl Display for Swap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Swap::Alice(alice) => Display::fmt(alice, f),
+            Swap::Bob(bob) => Display::fmt(bob, f),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::state::{Alice, AliceEndState, Bob, BobEndState};
-
     use super::*;
+    use crate::database::{Alice, AliceEndState, Bob, BobEndState};
 
     #[tokio::test]
     async fn can_write_and_read_to_multiple_keys() {

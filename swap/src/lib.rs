@@ -1,3 +1,16 @@
+#![warn(
+    unused_extern_crates,
+    missing_debug_implementations,
+    missing_copy_implementations,
+    rust_2018_idioms,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::fallible_impl_from,
+    clippy::cast_precision_loss,
+    clippy::cast_possible_wrap,
+    clippy::dbg_macro
+)]
+#![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
 use ::serde::{Deserialize, Serialize};
@@ -7,10 +20,9 @@ pub mod alice;
 pub mod bitcoin;
 pub mod bob;
 pub mod cli;
+pub mod database;
 pub mod monero;
 pub mod network;
-pub mod state;
-pub mod storage;
 pub mod trace;
 
 pub type Never = std::convert::Infallible;
@@ -42,7 +54,7 @@ pub struct SwapAmounts {
 
 // TODO: Display in XMR and BTC (not picos and sats).
 impl Display for SwapAmounts {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{} sats for {} piconeros",

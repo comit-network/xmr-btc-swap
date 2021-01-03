@@ -7,6 +7,7 @@ use url::Url;
 
 pub use xmr_btc::monero::*;
 
+#[derive(Debug)]
 pub struct Wallet(pub wallet::Client);
 
 impl Wallet {

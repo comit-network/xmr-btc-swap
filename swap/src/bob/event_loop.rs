@@ -12,6 +12,7 @@ use tokio::{
 use tracing::{debug, error, info};
 use xmr_btc::{alice, bitcoin::EncryptedSignature, bob};
 
+#[derive(Debug)]
 pub struct Channels<T> {
     sender: Sender<T>,
     receiver: Receiver<T>,
@@ -30,6 +31,7 @@ impl<T> Default for Channels<T> {
     }
 }
 
+#[derive(Debug)]
 pub struct EventLoopHandle {
     msg0: Receiver<alice::Message0>,
     msg1: Receiver<alice::Message1>,
@@ -105,6 +107,7 @@ impl EventLoopHandle {
     }
 }
 
+#[allow(missing_debug_implementations)]
 pub struct EventLoop {
     swarm: libp2p::Swarm<Behaviour>,
     alice_peer_id: PeerId,
@@ -189,10 +192,10 @@ impl EventLoop {
                         }
                         OutEvent::Amounts(_amounts) => info!("Amounts received from Alice"),
                         OutEvent::Message0(msg) => {
-                            let _ = self.msg0.send(msg).await;
+                            let _ = self.msg0.send(*msg).await;
                         }
                         OutEvent::Message1(msg) => {
-                            let _ = self.msg1.send(msg).await;
+                            let _ = self.msg1.send(*msg).await;
                         }
                         OutEvent::Message2(msg) => {
                             let _ = self.msg2.send(msg).await;

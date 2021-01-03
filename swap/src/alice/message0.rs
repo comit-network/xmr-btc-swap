@@ -37,7 +37,7 @@ pub struct Message0 {
 
 impl Message0 {
     pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: xmr_btc::alice::Message0) {
-        let msg = AliceToBob::Message0(msg);
+        let msg = AliceToBob::Message0(Box::new(msg));
         self.rr.send_response(channel, msg);
     }
     fn poll(
@@ -82,7 +82,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             } => {
                 if let BobToAlice::Message0(msg) = request {
                     debug!("Received Message0");
-                    self.events.push_back(OutEvent::Msg { msg, channel });
+                    self.events.push_back(OutEvent::Msg { msg: *msg, channel });
                 }
             }
             RequestResponseEvent::Message {

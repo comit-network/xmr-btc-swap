@@ -43,7 +43,6 @@ use crate::{
 use ::bitcoin::{Transaction, Txid};
 pub use message::{Message, Message0, Message1, Message2, Message3};
 
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum Action {
     LockBtc(bitcoin::TxLock),

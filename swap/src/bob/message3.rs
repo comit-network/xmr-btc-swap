@@ -16,7 +16,7 @@ use tracing::error;
 use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Message3Protocol, TIMEOUT};
 use xmr_btc::bob;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum OutEvent {
     Msg,
 }

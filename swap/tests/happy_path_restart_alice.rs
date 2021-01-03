@@ -2,7 +2,7 @@ use crate::testutils::{init_alice, init_bob};
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, alice::swap::AliceState, bitcoin, bob, storage::Database};
+use swap::{alice, alice::swap::AliceState, bitcoin, bob, database::Database};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
 use testutils::init_tracing;
@@ -112,8 +112,8 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     let alice_db = Database::open(alice_db_datadir.path()).unwrap();
 
     let resume_state =
-        if let swap::state::Swap::Alice(state) = alice_db.get_state(alice_swap_id).unwrap() {
-            assert!(matches!(state, swap::state::Alice::EncSigLearned {..}));
+        if let swap::database::Swap::Alice(state) = alice_db.get_state(alice_swap_id).unwrap() {
+            assert!(matches!(state, swap::database::Alice::EncSigLearned {..}));
             state.into()
         } else {
             unreachable!()

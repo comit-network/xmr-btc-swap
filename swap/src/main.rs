@@ -11,6 +11,7 @@
     clippy::dbg_macro
 )]
 #![forbid(unsafe_code)]
+#![allow(non_snake_case)]
 
 use anyhow::{bail, Context, Result};
 use libp2p::{core::Multiaddr, PeerId};
@@ -24,10 +25,9 @@ use swap::{
     bitcoin, bob,
     bob::swap::BobState,
     cli::{Command, Options, Resume},
+    database::{Database, Swap},
     monero,
     network::transport::build,
-    state::Swap,
-    storage::Database,
     trace::init_tracing,
     SwapAmounts,
 };

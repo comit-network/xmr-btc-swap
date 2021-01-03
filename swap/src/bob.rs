@@ -45,13 +45,12 @@ pub fn new_swarm(transport: SwapTransport, behaviour: Behaviour) -> Result<Swarm
     Ok(swarm)
 }
 
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
     Amounts(SwapAmounts),
-    Message0(alice::Message0),
-    Message1(alice::Message1),
+    Message0(Box<alice::Message0>),
+    Message1(Box<alice::Message1>),
     Message2(alice::Message2),
     Message3,
 }
@@ -77,7 +76,7 @@ impl From<amounts::OutEvent> for OutEvent {
 impl From<message0::OutEvent> for OutEvent {
     fn from(event: message0::OutEvent) -> Self {
         match event {
-            message0::OutEvent::Msg(msg) => OutEvent::Message0(msg),
+            message0::OutEvent::Msg(msg) => OutEvent::Message0(Box::new(msg)),
         }
     }
 }
@@ -85,7 +84,7 @@ impl From<message0::OutEvent> for OutEvent {
 impl From<message1::OutEvent> for OutEvent {
     fn from(event: message1::OutEvent) -> Self {
         match event {
-            message1::OutEvent::Msg(msg) => OutEvent::Message1(msg),
+            message1::OutEvent::Msg(msg) => OutEvent::Message1(Box::new(msg)),
         }
     }
 }

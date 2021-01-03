@@ -1,10 +1,4 @@
-use crate::{
-    bob::event_loop::EventLoopHandle,
-    state,
-    state::{Bob, BobEndState},
-    storage::Database,
-    SwapAmounts,
-};
+use crate::{bob::event_loop::EventLoopHandle, database, database::Database, SwapAmounts};
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
 use rand::{CryptoRng, RngCore};
@@ -51,46 +45,6 @@ impl fmt::Display for BobState {
             BobState::XmrRedeemed => write!(f, "xmr is redeemed"),
             BobState::BtcPunished => write!(f, "btc is punished"),
             BobState::SafelyAborted => write!(f, "safely aborted"),
-        }
-    }
-}
-
-impl From<BobState> for state::Bob {
-    fn from(bob_state: BobState) -> Self {
-        match bob_state {
-            BobState::Started { state0, amounts } => Bob::Started { state0, amounts },
-            BobState::Negotiated(state2) => Bob::Negotiated { state2 },
-            BobState::BtcLocked(state3) => Bob::BtcLocked { state3 },
-            BobState::XmrLocked(state4) => Bob::XmrLocked { state4 },
-            BobState::EncSigSent(state4) => Bob::EncSigSent { state4 },
-            BobState::BtcRedeemed(state5) => Bob::BtcRedeemed(state5),
-            BobState::CancelTimelockExpired(state4) => Bob::CancelTimelockExpired(state4),
-            BobState::BtcCancelled(state4) => Bob::BtcCancelled(state4),
-            BobState::BtcRefunded(state4) => Bob::Done(BobEndState::BtcRefunded(Box::new(state4))),
-            BobState::XmrRedeemed => Bob::Done(BobEndState::XmrRedeemed),
-            BobState::BtcPunished => Bob::Done(BobEndState::BtcPunished),
-            BobState::SafelyAborted => Bob::Done(BobEndState::SafelyAborted),
-        }
-    }
-}
-
-impl From<state::Bob> for BobState {
-    fn from(db_state: state::Bob) -> Self {
-        match db_state {
-            Bob::Started { state0, amounts } => BobState::Started { state0, amounts },
-            Bob::Negotiated { state2 } => BobState::Negotiated(state2),
-            Bob::BtcLocked { state3 } => BobState::BtcLocked(state3),
-            Bob::XmrLocked { state4 } => BobState::XmrLocked(state4),
-            Bob::EncSigSent { state4 } => BobState::EncSigSent(state4),
-            Bob::BtcRedeemed(state5) => BobState::BtcRedeemed(state5),
-            Bob::CancelTimelockExpired(state4) => BobState::CancelTimelockExpired(state4),
-            Bob::BtcCancelled(state4) => BobState::BtcCancelled(state4),
-            Bob::Done(end_state) => match end_state {
-                BobEndState::SafelyAborted => BobState::SafelyAborted,
-                BobEndState::XmrRedeemed => BobState::XmrRedeemed,
-                BobEndState::BtcRefunded(state4) => BobState::BtcRefunded(*state4),
-                BobEndState::BtcPunished => BobState::BtcPunished,
-            },
         }
     }
 }
@@ -179,7 +133,7 @@ where
 
                 let state = BobState::Negotiated(state2);
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                db.insert_latest_state(swap_id, database::Swap::Bob(db_state))
                     .await?;
                 run_until(
                     state,
@@ -201,7 +155,7 @@ where
 
                 let state = BobState::BtcLocked(state3);
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                db.insert_latest_state(swap_id, database::Swap::Bob(db_state))
                     .await?;
                 run_until(
                     state,
@@ -255,7 +209,7 @@ where
                     BobState::CancelTimelockExpired(state4)
                 };
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                db.insert_latest_state(swap_id, database::Swap::Bob(db_state))
                     .await?;
                 run_until(
                     state,
@@ -297,7 +251,7 @@ where
                     BobState::CancelTimelockExpired(state)
                 };
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                db.insert_latest_state(swap_id, database::Swap::Bob(db_state))
                     .await?;
                 run_until(
                     state,
@@ -333,7 +287,7 @@ where
                 };
 
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                db.insert_latest_state(swap_id, database::Swap::Bob(db_state))
                     .await?;
                 run_until(
                     state,
@@ -353,7 +307,7 @@ where
 
                 let state = BobState::XmrRedeemed;
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                db.insert_latest_state(swap_id, database::Swap::Bob(db_state))
                     .await?;
                 run_until(
                     state,
@@ -377,7 +331,7 @@ where
                 }
 
                 let state = BobState::BtcCancelled(state4);
-                db.insert_latest_state(swap_id, state::Swap::Bob(state.clone().into()))
+                db.insert_latest_state(swap_id, database::Swap::Bob(state.clone().into()))
                     .await?;
 
                 run_until(
@@ -406,7 +360,7 @@ where
                 };
 
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, state::Swap::Bob(db_state))
+                db.insert_latest_state(swap_id, database::Swap::Bob(db_state))
                     .await?;
                 run_until(
                     state,

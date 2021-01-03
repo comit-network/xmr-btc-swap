@@ -2,7 +2,7 @@ use crate::testutils::{init_alice, init_bob};
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, bitcoin, bob, bob::swap::BobState, storage::Database};
+use swap::{alice, bitcoin, bob, bob::swap::BobState, database::Database};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
 use testutils::init_tracing;
@@ -114,13 +114,13 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
 
     let bob_db = Database::open(bob_db_datadir.path()).unwrap();
 
-    let resume_state = if let swap::state::Swap::Bob(state) = bob_db.get_state(bob_swap_id).unwrap()
-    {
-        assert!(matches!(state, swap::state::Bob::EncSigSent {..}));
-        state.into()
-    } else {
-        unreachable!()
-    };
+    let resume_state =
+        if let swap::database::Swap::Bob(state) = bob_db.get_state(bob_swap_id).unwrap() {
+            assert!(matches!(state, swap::database::Bob::EncSigSent {..}));
+            state.into()
+        } else {
+            unreachable!()
+        };
 
     let (event_loop_after_restart, event_loop_handle_after_restart) =
         testutils::init_bob_event_loop(alice_peer_id, alice_multiaddr);

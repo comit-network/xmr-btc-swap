@@ -19,7 +19,7 @@ use crate::{
     SwapAmounts,
 };
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum OutEvent {
     Amounts(SwapAmounts),
 }
