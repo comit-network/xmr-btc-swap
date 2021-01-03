@@ -1,3 +1,4 @@
+use crate::bitcoin::Timelock;
 use conquer_once::Lazy;
 use std::time::Duration;
 
@@ -7,8 +8,8 @@ pub struct Config {
     pub bitcoin_finality_confirmations: u32,
     pub bitcoin_avg_block_time: Duration,
     pub monero_max_finality_time: Duration,
-    pub bitcoin_cancel_timelock: u32,
-    pub bitcoin_punish_timelock: u32,
+    pub bitcoin_cancel_timelock: Timelock,
+    pub bitcoin_punish_timelock: Timelock,
     pub bitcoin_network: ::bitcoin::Network,
 }
 
@@ -59,8 +60,8 @@ mod mainnet {
     pub static MONERO_AVG_BLOCK_TIME: Lazy<Duration> = Lazy::new(|| Duration::from_secs(2 * 60));
 
     // Set to 12 hours, arbitrary value to be reviewed properly
-    pub static BITCOIN_CANCEL_TIMELOCK: u32 = 72;
-    pub static BITCOIN_PUNISH_TIMELOCK: u32 = 72;
+    pub static BITCOIN_CANCEL_TIMELOCK: Timelock = Timelock::new(72);
+    pub static BITCOIN_PUNISH_TIMELOCK: Timelock = Timelock::new(72);
 }
 
 mod regtest {
@@ -77,7 +78,7 @@ mod regtest {
 
     pub static MONERO_AVG_BLOCK_TIME: Lazy<Duration> = Lazy::new(|| Duration::from_secs(60));
 
-    pub static BITCOIN_CANCEL_TIMELOCK: u32 = 50;
+    pub static BITCOIN_CANCEL_TIMELOCK: Timelock = Timelock::new(50);
 
-    pub static BITCOIN_PUNISH_TIMELOCK: u32 = 50;
+    pub static BITCOIN_PUNISH_TIMELOCK: Timelock = Timelock::new(50);
 }

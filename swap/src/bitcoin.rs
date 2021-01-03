@@ -8,7 +8,7 @@ use std::time::Duration;
 use tokio::time::interval;
 use xmr_btc::{
     bitcoin::{
-        BlockHeight, BroadcastSignedTransaction, BuildTxLockPsbt, SignTxLock,
+        BroadcastSignedTransaction, BuildTxLockPsbt, GetBlockHeight, SignTxLock,
         TransactionBlockHeight, WatchForRawTransaction,
     },
     config::Config,
@@ -132,25 +132,27 @@ impl GetRawTransaction for Wallet {
 }
 
 #[async_trait]
-impl BlockHeight for Wallet {
-    async fn block_height(&self) -> u32 {
-        (|| async { Ok(self.inner.client.getblockcount().await?) })
+impl GetBlockHeight for Wallet {
+    async fn get_block_height(&self) -> BlockHeight {
+        let height = (|| async { Ok(self.inner.client.getblockcount().await?) })
             .retry(ConstantBackoff::new(Duration::from_secs(1)))
             .await
-            .expect("transient errors to be retried")
+            .expect("transient errors to be retried");
+
+        BlockHeight::new(height)
     }
 }
 
 #[async_trait]
 impl TransactionBlockHeight for Wallet {
-    async fn transaction_block_height(&self, txid: Txid) -> u32 {
+    async fn transaction_block_height(&self, txid: Txid) -> BlockHeight {
         #[derive(Debug)]
         enum Error {
             Io,
             NotYetMined,
         }
 
-        (|| async {
+        let height = (|| async {
             let block_height = self
                 .inner
                 .transaction_block_height(txid)
@@ -164,7 +166,9 @@ impl TransactionBlockHeight for Wallet {
         })
         .retry(ConstantBackoff::new(Duration::from_secs(1)))
         .await
-        .expect("transient errors to be retried")
+        .expect("transient errors to be retried");
+
+        BlockHeight::new(height)
     }
 }
 

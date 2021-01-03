@@ -29,7 +29,8 @@ use tokio::{sync::Mutex, time::timeout};
 use tracing::{error, info};
 pub mod message;
 use crate::bitcoin::{
-    current_epoch, wait_for_cancel_timelock_to_expire, BlockHeight, TransactionBlockHeight,
+    current_epoch, wait_for_cancel_timelock_to_expire, GetBlockHeight, Timelock,
+    TransactionBlockHeight,
 };
 pub use message::{Message, Message0, Message1, Message2};
 
@@ -90,7 +91,7 @@ pub fn action_generator<N, B>(
 ) -> GenBoxed<Action, (), ()>
 where
     N: ReceiveBitcoinRedeemEncsig + Send + 'static,
-    B: bitcoin::BlockHeight
+    B: bitcoin::GetBlockHeight
         + bitcoin::TransactionBlockHeight
         + bitcoin::WatchForRawTransaction
         + Send
@@ -412,8 +413,8 @@ impl State {
         rng: &mut R,
         btc: bitcoin::Amount,
         xmr: monero::Amount,
-        cancel_timelock: u32,
-        punish_timelock: u32,
+        cancel_timelock: Timelock,
+        punish_timelock: Timelock,
         redeem_address: bitcoin::Address,
         punish_address: bitcoin::Address,
     ) -> Self {
@@ -443,8 +444,8 @@ pub struct State0 {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub btc: bitcoin::Amount,
     pub xmr: monero::Amount,
-    pub cancel_timelock: u32,
-    pub punish_timelock: u32,
+    pub cancel_timelock: Timelock,
+    pub punish_timelock: Timelock,
     pub redeem_address: bitcoin::Address,
     pub punish_address: bitcoin::Address,
 }
@@ -457,8 +458,8 @@ impl State0 {
         v_a: monero::PrivateViewKey,
         btc: bitcoin::Amount,
         xmr: monero::Amount,
-        cancel_timelock: u32,
-        punish_timelock: u32,
+        cancel_timelock: Timelock,
+        punish_timelock: Timelock,
         redeem_address: bitcoin::Address,
         punish_address: bitcoin::Address,
     ) -> Self {
@@ -532,8 +533,8 @@ pub struct State1 {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
-    cancel_timelock: u32,
-    punish_timelock: u32,
+    cancel_timelock: Timelock,
+    punish_timelock: Timelock,
     refund_address: bitcoin::Address,
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
@@ -571,8 +572,8 @@ pub struct State2 {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
-    cancel_timelock: u32,
-    punish_timelock: u32,
+    cancel_timelock: Timelock,
+    punish_timelock: Timelock,
     refund_address: bitcoin::Address,
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
@@ -640,8 +641,8 @@ pub struct State3 {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub btc: bitcoin::Amount,
     pub xmr: monero::Amount,
-    pub cancel_timelock: u32,
-    pub punish_timelock: u32,
+    pub cancel_timelock: Timelock,
+    pub punish_timelock: Timelock,
     pub refund_address: bitcoin::Address,
     pub redeem_address: bitcoin::Address,
     pub punish_address: bitcoin::Address,
@@ -684,7 +685,7 @@ impl State3 {
 
     pub async fn wait_for_cancel_timelock_to_expire<W>(&self, bitcoin_wallet: &W) -> Result<()>
     where
-        W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
+        W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
     {
         wait_for_cancel_timelock_to_expire(
             bitcoin_wallet,
@@ -696,7 +697,7 @@ impl State3 {
 
     pub async fn expired_timelocks<W>(&self, bitcoin_wallet: &W) -> Result<ExpiredTimelocks>
     where
-        W: WatchForRawTransaction + TransactionBlockHeight + BlockHeight,
+        W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
     {
         current_epoch(
             bitcoin_wallet,
@@ -719,8 +720,8 @@ pub struct State4 {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
-    cancel_timelock: u32,
-    punish_timelock: u32,
+    cancel_timelock: Timelock,
+    punish_timelock: Timelock,
     refund_address: bitcoin::Address,
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
@@ -816,8 +817,8 @@ pub struct State5 {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
-    cancel_timelock: u32,
-    punish_timelock: u32,
+    cancel_timelock: Timelock,
+    punish_timelock: Timelock,
     refund_address: bitcoin::Address,
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
@@ -905,8 +906,8 @@ pub struct State6 {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
-    cancel_timelock: u32,
-    punish_timelock: u32,
+    cancel_timelock: Timelock,
+    punish_timelock: Timelock,
     refund_address: bitcoin::Address,
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,

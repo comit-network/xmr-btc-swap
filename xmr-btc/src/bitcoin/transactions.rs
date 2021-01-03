@@ -1,6 +1,6 @@
 use crate::bitcoin::{
     build_shared_output_descriptor, verify_sig, BuildTxLockPsbt, Network, OutPoint, PublicKey,
-    Txid, TX_FEE,
+    Timelock, Txid, TX_FEE,
 };
 use anyhow::{bail, Context, Result};
 use bitcoin::{
@@ -228,13 +228,13 @@ pub struct TxCancel {
 }
 
 impl TxCancel {
-    pub fn new(tx_lock: &TxLock, cancel_timelock: u32, A: PublicKey, B: PublicKey) -> Self {
+    pub fn new(tx_lock: &TxLock, cancel_timelock: Timelock, A: PublicKey, B: PublicKey) -> Self {
         let cancel_output_descriptor = build_shared_output_descriptor(A.0, B.0);
 
         let tx_in = TxIn {
             previous_output: tx_lock.as_outpoint(),
             script_sig: Default::default(),
-            sequence: cancel_timelock,
+            sequence: cancel_timelock.into(),
             witness: Vec::new(),
         };
 
@@ -316,14 +316,14 @@ impl TxCancel {
     fn build_spend_transaction(
         &self,
         spend_address: &Address,
-        sequence: Option<u32>,
+        sequence: Option<Timelock>,
     ) -> Transaction {
         let previous_output = self.as_outpoint();
 
         let tx_in = TxIn {
             previous_output,
             script_sig: Default::default(),
-            sequence: sequence.unwrap_or(0xFFFF_FFFF),
+            sequence: sequence.map(Into::into).unwrap_or(0xFFFF_FFFF),
             witness: Vec::new(),
         };
 
@@ -450,7 +450,7 @@ pub struct TxPunish {
 }
 
 impl TxPunish {
-    pub fn new(tx_cancel: &TxCancel, punish_address: &Address, punish_timelock: u32) -> Self {
+    pub fn new(tx_cancel: &TxCancel, punish_address: &Address, punish_timelock: Timelock) -> Self {
         let tx_punish = tx_cancel.build_spend_transaction(punish_address, Some(punish_timelock));
 
         let digest = SigHashCache::new(&tx_punish).signature_hash(

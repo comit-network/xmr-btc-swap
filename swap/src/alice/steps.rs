@@ -9,7 +9,6 @@ use futures::{
     pin_mut,
 };
 use libp2p::request_response::ResponseChannel;
-
 use rand::rngs::OsRng;
 use sha2::Sha256;
 use std::{sync::Arc, time::Duration};
@@ -20,8 +19,8 @@ use xmr_btc::{
     alice::State3,
     bitcoin::{
         poll_until_block_height_is_gte, BlockHeight, BroadcastSignedTransaction,
-        EncryptedSignature, GetRawTransaction, TransactionBlockHeight, TxCancel, TxLock, TxRefund,
-        WaitForTransactionFinality, WatchForRawTransaction,
+        EncryptedSignature, GetBlockHeight, GetRawTransaction, Timelock, TransactionBlockHeight,
+        TxCancel, TxLock, TxRefund, WaitForTransactionFinality, WatchForRawTransaction,
     },
     config::Config,
     cross_curve_dleq,
@@ -207,12 +206,12 @@ pub async fn publish_cancel_transaction<W>(
     tx_lock: TxLock,
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
-    cancel_timelock: u32,
+    cancel_timelock: Timelock,
     tx_cancel_sig_bob: bitcoin::Signature,
     bitcoin_wallet: Arc<W>,
 ) -> Result<bitcoin::TxCancel>
 where
-    W: GetRawTransaction + TransactionBlockHeight + BlockHeight + BroadcastSignedTransaction,
+    W: GetRawTransaction + TransactionBlockHeight + GetBlockHeight + BroadcastSignedTransaction,
 {
     // First wait for cancel timelock to expire
     let tx_lock_height = bitcoin_wallet
@@ -253,13 +252,13 @@ where
 
 pub async fn wait_for_bitcoin_refund<W>(
     tx_cancel: &TxCancel,
-    cancel_tx_height: u32,
-    punish_timelock: u32,
+    cancel_tx_height: BlockHeight,
+    punish_timelock: Timelock,
     refund_address: &bitcoin::Address,
     bitcoin_wallet: Arc<W>,
 ) -> Result<(bitcoin::TxRefund, Option<bitcoin::Transaction>)>
 where
-    W: BlockHeight + WatchForRawTransaction,
+    W: GetBlockHeight + WatchForRawTransaction,
 {
     let punish_timelock_expired =
         poll_until_block_height_is_gte(bitcoin_wallet.as_ref(), cancel_tx_height + punish_timelock);
@@ -306,9 +305,9 @@ pub fn extract_monero_private_key(
 
 pub fn build_bitcoin_punish_transaction(
     tx_lock: &TxLock,
-    cancel_timelock: u32,
+    cancel_timelock: Timelock,
     punish_address: &bitcoin::Address,
-    punish_timelock: u32,
+    punish_timelock: Timelock,
     tx_punish_sig_bob: bitcoin::Signature,
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
