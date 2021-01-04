@@ -110,7 +110,7 @@ async fn happy_path() {
 
     let xmr_alice_final = alice_xmr_wallet.as_ref().get_balance().await.unwrap();
 
-    bob_xmr_wallet.as_ref().0.refresh().await.unwrap();
+    bob_xmr_wallet.as_ref().inner.refresh().await.unwrap();
     let xmr_bob_final = bob_xmr_wallet.as_ref().get_balance().await.unwrap();
 
     assert_eq!(

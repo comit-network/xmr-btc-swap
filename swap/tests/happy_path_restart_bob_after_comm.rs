@@ -153,7 +153,7 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     assert!(btc_bob_final <= bob_btc_starting_balance - btc_to_swap);
 
     let xmr_alice_final = alice_xmr_wallet_clone.as_ref().get_balance().await.unwrap();
-    bob_xmr_wallet_clone.as_ref().0.refresh().await.unwrap();
+    bob_xmr_wallet_clone.as_ref().inner.refresh().await.unwrap();
     let xmr_bob_final = bob_xmr_wallet_clone.as_ref().get_balance().await.unwrap();
 
     assert!(xmr_alice_final <= alice_xmr_starting_balance - xmr_to_swap);
