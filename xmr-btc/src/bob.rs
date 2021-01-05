@@ -901,8 +901,6 @@ impl State5 {
 
         // NOTE: This actually generates and opens a new wallet, closing the currently
         // open one.
-        // TODO: This means that the wallet-rpc HAS to be started with the --wallet-dir
-        //  flag, but that is mutually exclusive with --wallet-file !
         monero_wallet
             .create_and_load_wallet_for_output(s, self.v)
             .await?;
