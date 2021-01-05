@@ -105,9 +105,9 @@ where
     .context("Failed to find lock Bitcoin tx")?;
 
     // // We saw the transaction in the mempool, waiting for it to be confirmed.
-    // bitcoin_wallet
-    //     .wait_for_transaction_finality(lock_bitcoin_txid, config)
-    //     .await;
+    bitcoin_wallet
+        .wait_for_transaction_finality(lock_bitcoin_txid, config)
+        .await?;
 
     Ok(())
 }

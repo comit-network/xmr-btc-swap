@@ -40,11 +40,11 @@ extern crate prettytable;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    init_tracing(LevelFilter::Trace).expect("initialize tracing");
+    init_tracing(LevelFilter::Info).expect("initialize tracing");
 
     let opt = Options::from_args();
 
-    let config = Config::mainnet();
+    let config = Config::testnet();
 
     info!("Database: {}", opt.db_path);
     let db = Database::open(std::path::Path::new(opt.db_path.as_str()))
@@ -257,7 +257,7 @@ async fn setup_wallets(
     );
     let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
-    let monero_wallet = monero::Wallet::new(monero_wallet_rpc_url);
+    let monero_wallet = monero::Wallet::new(monero_wallet_rpc_url, config.monero_network);
     let monero_balance = monero_wallet.get_balance().await?;
     info!(
         "Connection to Monero wallet succeeded, balance: {}",

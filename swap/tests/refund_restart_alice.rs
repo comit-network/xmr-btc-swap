@@ -156,11 +156,11 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
             - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE);
     assert!(btc_bob_final_alice_submitted_cancel || btc_bob_final_bob_submitted_cancel);
 
-    alice_xmr_wallet.as_ref().0.refresh().await.unwrap();
+    alice_xmr_wallet.as_ref().inner.refresh().await.unwrap();
     let xmr_alice_final = alice_xmr_wallet.as_ref().get_balance().await.unwrap();
     assert_eq!(xmr_alice_final, xmr_to_swap);
 
-    bob_xmr_wallet.as_ref().0.refresh().await.unwrap();
+    bob_xmr_wallet.as_ref().inner.refresh().await.unwrap();
     let xmr_bob_final = bob_xmr_wallet.as_ref().get_balance().await.unwrap();
     assert_eq!(xmr_bob_final, bob_xmr_starting_balance);
 }

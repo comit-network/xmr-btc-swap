@@ -50,7 +50,10 @@ pub enum Command {
         #[structopt(long = "bitcoin-wallet-name")]
         bitcoin_wallet_name: String,
 
-        #[structopt(long = "monerod", default_value = "http://127.0.0.1:18083/json_rpc")]
+        #[structopt(
+            long = "monero-wallet-rpc",
+            default_value = "http://127.0.0.1:18083/json_rpc"
+        )]
         monero_wallet_rpc_url: Url,
 
         #[structopt(long = "send-btc", help = "Bitcoin amount as floating point nr without denomination (e.g. 1.25)", parse(try_from_str = parse_btc))]

@@ -11,6 +11,7 @@ pub struct Config {
     pub bitcoin_cancel_timelock: Timelock,
     pub bitcoin_punish_timelock: Timelock,
     pub bitcoin_network: ::bitcoin::Network,
+    pub monero_network: ::monero::Network,
 }
 
 impl Config {
@@ -26,6 +27,23 @@ impl Config {
             bitcoin_cancel_timelock: mainnet::BITCOIN_CANCEL_TIMELOCK,
             bitcoin_punish_timelock: mainnet::BITCOIN_PUNISH_TIMELOCK,
             bitcoin_network: ::bitcoin::Network::Bitcoin,
+            monero_network: ::monero::Network::Mainnet,
+        }
+    }
+
+    pub fn testnet() -> Self {
+        Self {
+            bob_time_to_act: *testnet::BOB_TIME_TO_ACT,
+            bitcoin_finality_confirmations: testnet::BITCOIN_FINALITY_CONFIRMATIONS,
+            bitcoin_avg_block_time: *testnet::BITCOIN_AVG_BLOCK_TIME,
+            // We apply a scaling factor (1.5) so that the swap is not aborted when the
+            // blockchain is slow
+            monero_max_finality_time: (*testnet::MONERO_AVG_BLOCK_TIME).mul_f64(1.5)
+                * testnet::MONERO_FINALITY_CONFIRMATIONS,
+            bitcoin_cancel_timelock: testnet::BITCOIN_CANCEL_TIMELOCK,
+            bitcoin_punish_timelock: testnet::BITCOIN_PUNISH_TIMELOCK,
+            bitcoin_network: ::bitcoin::Network::Testnet,
+            monero_network: ::monero::Network::Stagenet,
         }
     }
 
@@ -41,6 +59,7 @@ impl Config {
             bitcoin_cancel_timelock: regtest::BITCOIN_CANCEL_TIMELOCK,
             bitcoin_punish_timelock: regtest::BITCOIN_PUNISH_TIMELOCK,
             bitcoin_network: ::bitcoin::Network::Regtest,
+            monero_network: ::monero::Network::default(),
         }
     }
 }
@@ -62,6 +81,26 @@ mod mainnet {
     // Set to 12 hours, arbitrary value to be reviewed properly
     pub static BITCOIN_CANCEL_TIMELOCK: Timelock = Timelock::new(72);
     pub static BITCOIN_PUNISH_TIMELOCK: Timelock = Timelock::new(72);
+}
+
+mod testnet {
+    use super::*;
+
+    pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(5 * 60));
+
+    // This does not reflect recommended values for mainnet!
+    pub static BITCOIN_FINALITY_CONFIRMATIONS: u32 = 1;
+
+    pub static BITCOIN_AVG_BLOCK_TIME: Lazy<Duration> = Lazy::new(|| Duration::from_secs(5 * 60));
+
+    // This does not reflect recommended values for mainnet!
+    pub static MONERO_FINALITY_CONFIRMATIONS: u32 = 5;
+
+    pub static MONERO_AVG_BLOCK_TIME: Lazy<Duration> = Lazy::new(|| Duration::from_secs(2 * 60));
+
+    // This does not reflect recommended values for mainnet!
+    pub static BITCOIN_CANCEL_TIMELOCK: Timelock = Timelock::new(6);
+    pub static BITCOIN_PUNISH_TIMELOCK: Timelock = Timelock::new(6);
 }
 
 mod regtest {

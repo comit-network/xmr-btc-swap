@@ -106,7 +106,7 @@ impl SignTxLock for Wallet {
 impl BroadcastSignedTransaction for Wallet {
     async fn broadcast_signed_transaction(&self, transaction: Transaction) -> Result<Txid> {
         let txid = self.inner.send_raw_transaction(transaction).await?;
-        tracing::debug!("Bitcoin tx broadcasted! TXID = {}", txid);
+        tracing::info!("Bitcoin tx broadcasted! TXID = {}", txid);
         Ok(txid)
     }
 }

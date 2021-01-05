@@ -46,7 +46,10 @@ pub async fn init_wallets(
         }
     };
 
-    let xmr_wallet = Arc::new(swap::monero::Wallet(monero.wallet(name).unwrap().client()));
+    let xmr_wallet = Arc::new(swap::monero::Wallet {
+        inner: monero.wallet(name).unwrap().client(),
+        network: config.monero_network,
+    });
 
     let btc_wallet = Arc::new(
         swap::bitcoin::Wallet::new(name, bitcoind.node_url.clone(), config.bitcoin_network)

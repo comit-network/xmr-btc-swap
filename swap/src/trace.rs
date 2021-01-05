@@ -15,8 +15,8 @@ pub fn init_tracing(level: log::LevelFilter) -> anyhow::Result<()> {
     let is_terminal = atty::is(atty::Stream::Stderr);
     let subscriber = FmtSubscriber::builder()
         .with_env_filter(format!(
-            "swap={},xmr_btc={},http=warn,warp=warn",
-            level, level
+            "swap={},xmr_btc={},monero_harness={},bitcoin_harness={},http=warn,warp=warn",
+            level, level, level, level
         ))
         .with_writer(std::io::stderr)
         .with_ansi(is_terminal)

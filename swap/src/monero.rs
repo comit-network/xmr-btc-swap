@@ -8,16 +8,22 @@ use url::Url;
 pub use xmr_btc::monero::*;
 
 #[derive(Debug)]
-pub struct Wallet(pub wallet::Client);
+pub struct Wallet {
+    pub inner: wallet::Client,
+    pub network: Network,
+}
 
 impl Wallet {
-    pub fn new(url: Url) -> Self {
-        Self(wallet::Client::new(url))
+    pub fn new(url: Url, network: Network) -> Self {
+        Self {
+            inner: wallet::Client::new(url),
+            network,
+        }
     }
 
     /// Get the balance of the primary account.
     pub async fn get_balance(&self) -> Result<Amount> {
-        let amount = self.0.get_balance(0).await?;
+        let amount = self.inner.get_balance(0).await?;
 
         Ok(Amount::from_piconero(amount))
     }
@@ -32,15 +38,15 @@ impl Transfer for Wallet {
         amount: Amount,
     ) -> Result<(TransferProof, Amount)> {
         let destination_address =
-            Address::standard(Network::Mainnet, public_spend_key, public_view_key.into());
+            Address::standard(self.network, public_spend_key, public_view_key.into());
 
         let res = self
-            .0
+            .inner
             .transfer(0, amount.as_piconero(), &destination_address.to_string())
             .await?;
 
         let tx_hash = TxHash(res.tx_hash);
-        tracing::debug!("Monero tx broadcasted!, tx hash: {:?}", tx_hash);
+        tracing::info!("Monero tx broadcasted!, tx hash: {:?}", tx_hash);
         let tx_key = PrivateKey::from_str(&res.tx_key)?;
 
         let fee = Amount::from_piconero(res.fee);
@@ -62,10 +68,10 @@ impl CreateWalletForOutput for Wallet {
         let public_spend_key = PublicKey::from_private_key(&private_spend_key);
         let public_view_key = PublicKey::from_private_key(&private_view_key.into());
 
-        let address = Address::standard(Network::Mainnet, public_spend_key, public_view_key);
+        let address = Address::standard(self.network, public_spend_key, public_view_key);
 
         let _ = self
-            .0
+            .inner
             .generate_from_keys(
                 &address.to_string(),
                 &private_spend_key.to_string(),
@@ -96,14 +102,14 @@ impl WatchForTransfer for Wallet {
             InsufficientFunds { expected: Amount, actual: Amount },
         }
 
-        let address = Address::standard(Network::Mainnet, public_spend_key, public_view_key.into());
+        let address = Address::standard(self.network, public_spend_key, public_view_key.into());
 
         let res = (|| async {
             // NOTE: Currently, this is conflating IO errors with the transaction not being
             // in the blockchain yet, or not having enough confirmations on it. All these
             // errors warrant a retry, but the strategy should probably differ per case
             let proof = self
-                .0
+                .inner
                 .check_tx_key(
                     &String::from(transfer_proof.tx_hash()),
                     &transfer_proof.tx_key().to_string(),
