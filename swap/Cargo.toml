@@ -15,18 +15,22 @@ base64 = "0.12"
 bitcoin = { version = "0.25", features = ["rand", "use-serde"] }
 bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "864b55fcba2e770105f135781dd2e3002c503d12" }
 conquer-once = "0.3"
+cross-curve-dleq = { git = "https://github.com/comit-network/cross-curve-dleq", rev = "eddcdea1d1f16fa33ef581d1744014ece535c920", features = ["serde"] }
+curve25519-dalek = "2"
 derivative = "2"
 ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", rev = "cdfbc766045ea678a41780919d6228dd5acee3be", features = ["libsecp_compat", "serde"] }
+ed25519-dalek = { version = "1.0.0-pre.4", features = ["serde"] }# Cannot be 1 because they depend on curve25519-dalek version 3
 futures = { version = "0.3", default-features = false }
-genawaiter = "0.99.1"
 libp2p = { version = "0.29", default-features = false, features = ["tcp-tokio", "yamux", "mplex", "dns", "noise", "request-response"] }
 libp2p-tokio-socks5 = "0.4"
 log = { version = "0.4", features = ["serde"] }
+miniscript = { version = "4", features = ["serde"] }
 monero = { version = "0.9", features = ["serde_support"] }
 monero-harness = { path = "../monero-harness" }
 prettytable-rs = "0.8"
 rand = "0.7"
 reqwest = { version = "0.10", default-features = false, features = ["socks"] }
+rust_decimal = "1.8"
 serde = { version = "1", features = ["derive"] }
 serde_cbor = "0.11"
 serde_derive = "1.0"
@@ -36,6 +40,7 @@ sled = "0.34"
 structopt = "0.3"
 strum = { version = "0.20", features = ["derive"] }
 tempfile = "3"
+thiserror = "1"
 time = "0.2"
 tokio = { version = "0.2", features = ["rt-threaded", "time", "macros", "sync"] }
 tracing = { version = "0.1", features = ["attributes"] }
@@ -46,12 +51,12 @@ tracing-subscriber = { version = "0.2", default-features = false, features = ["f
 url = "2.1"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 void = "1"
-xmr-btc = { path = "../xmr-btc" }
 
 [dev-dependencies]
 get-port = "3"
 hyper = "0.13"
 port_check = "0.1"
+serde_cbor = "0.11"
 spectral = "0.6"
 tempfile = "3"
 testcontainers = "0.11"

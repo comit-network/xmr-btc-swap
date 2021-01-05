@@ -1,11 +1,12 @@
 use libp2p::{
     request_response::{
         handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
-        RequestResponseEvent, RequestResponseMessage,
+        RequestResponseEvent, RequestResponseMessage, ResponseChannel,
     },
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
-    NetworkBehaviour, PeerId,
+    NetworkBehaviour,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
     task::{Context, Poll},
@@ -13,28 +14,41 @@ use std::{
 };
 use tracing::{debug, error};
 
-use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Message2Protocol, TIMEOUT};
-use xmr_btc::{alice, bob};
+use crate::{
+    monero,
+    network::request_response::{AliceToBob, BobToAlice, Codec, Message2Protocol, TIMEOUT},
+    protocol::bob,
+};
 
 #[derive(Debug)]
 pub enum OutEvent {
-    Msg(alice::Message2),
+    Msg {
+        /// Received message from Bob.
+        msg: bob::Message2,
+        /// Channel to send back Alice's message 2.
+        channel: ResponseChannel<AliceToBob>,
+    },
 }
 
-/// A `NetworkBehaviour` that represents sending message 2 to Alice.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message2 {
+    pub tx_lock_proof: monero::TransferProof,
+}
+
+/// A `NetworkBehaviour` that represents receiving of message 2 from Bob.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
-pub struct Message2 {
+pub struct Message2Behaviour {
     rr: RequestResponse<Codec<Message2Protocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
-impl Message2 {
-    pub fn send(&mut self, alice: PeerId, msg: bob::Message2) {
-        let msg = BobToAlice::Message2(msg);
-        let _id = self.rr.send_request(&alice, msg);
+impl Message2Behaviour {
+    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: Message2) {
+        let msg = AliceToBob::Message2(msg);
+        self.rr.send_response(channel, msg);
     }
 
     fn poll(
@@ -50,7 +64,7 @@ impl Message2 {
     }
 }
 
-impl Default for Message2 {
+impl Default for Message2Behaviour {
     fn default() -> Self {
         let timeout = Duration::from_secs(TIMEOUT);
         let mut config = RequestResponseConfig::default();
@@ -62,27 +76,32 @@ impl Default for Message2 {
                 vec![(Message2Protocol, ProtocolSupport::Full)],
                 config,
             ),
-            events: VecDeque::default(),
+            events: Default::default(),
         }
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Message2 {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>>
+    for Message2Behaviour
+{
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
             RequestResponseEvent::Message {
-                message: RequestResponseMessage::Request { .. },
-                ..
-            } => panic!("Bob should never get a request from Alice"),
-            RequestResponseEvent::Message {
-                message: RequestResponseMessage::Response { response, .. },
+                message:
+                    RequestResponseMessage::Request {
+                        request, channel, ..
+                    },
                 ..
             } => {
-                if let AliceToBob::Message2(msg) = response {
+                if let BobToAlice::Message2(msg) = request {
                     debug!("Received Message2");
-                    self.events.push_back(OutEvent::Msg(msg));
+                    self.events.push_back(OutEvent::Msg { msg, channel });
                 }
             }
+            RequestResponseEvent::Message {
+                message: RequestResponseMessage::Response { .. },
+                ..
+            } => panic!("Alice should not get a Response"),
             RequestResponseEvent::InboundFailure { error, .. } => {
                 error!("Inbound failure: {:?}", error);
             }

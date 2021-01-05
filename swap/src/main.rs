@@ -20,20 +20,18 @@ use rand::rngs::OsRng;
 use std::sync::Arc;
 use structopt::StructOpt;
 use swap::{
-    alice,
-    alice::swap::AliceState,
-    bitcoin, bob,
-    bob::swap::BobState,
+    bitcoin,
     cli::{Command, Options, Resume},
+    config::Config,
     database::{Database, Swap},
     monero,
     network::transport::build,
+    protocol::{alice, alice::swap::AliceState, bob, bob::swap::BobState},
     trace::init_tracing,
     SwapAmounts,
 };
 use tracing::{info, log::LevelFilter};
 use uuid::Uuid;
-use xmr_btc::{alice::State0, config::Config, cross_curve_dleq};
 
 #[macro_use]
 extern crate prettytable;
@@ -76,10 +74,10 @@ async fn main() -> Result<()> {
                 let rng = &mut OsRng;
                 let a = bitcoin::SecretKey::new_random(rng);
                 let s_a = cross_curve_dleq::Scalar::random(rng);
-                let v_a = xmr_btc::monero::PrivateViewKey::new_random(rng);
+                let v_a = monero::PrivateViewKey::new_random(rng);
                 let redeem_address = bitcoin_wallet.as_ref().new_address().await?;
                 let punish_address = redeem_address.clone();
-                let state0 = State0::new(
+                let state0 = alice::state::State0::new(
                     a,
                     s_a,
                     v_a,
@@ -129,7 +127,7 @@ async fn main() -> Result<()> {
             .await?;
 
             let refund_address = bitcoin_wallet.new_address().await?;
-            let state0 = xmr_btc::bob::State0::new(
+            let state0 = bob::state::State0::new(
                 &mut OsRng,
                 send_bitcoin,
                 receive_monero,
@@ -248,9 +246,10 @@ async fn setup_wallets(
     bitcoin_wallet_name: &str,
     monero_wallet_rpc_url: url::Url,
     config: Config,
-) -> Result<(Arc<bitcoin::Wallet>, Arc<monero::Wallet>)> {
+) -> Result<(Arc<swap::bitcoin::Wallet>, Arc<swap::monero::Wallet>)> {
     let bitcoin_wallet =
-        bitcoin::Wallet::new(bitcoin_wallet_name, bitcoind_url, config.bitcoin_network).await?;
+        swap::bitcoin::Wallet::new(bitcoin_wallet_name, bitcoind_url, config.bitcoin_network)
+            .await?;
     let bitcoin_balance = bitcoin_wallet.balance().await?;
     info!(
         "Connection to Bitcoin wallet succeeded, balance: {}",
@@ -273,8 +272,8 @@ async fn alice_swap(
     swap_id: Uuid,
     state: AliceState,
     listen_addr: Multiaddr,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Wallet>,
+    bitcoin_wallet: Arc<swap::bitcoin::Wallet>,
+    monero_wallet: Arc<swap::monero::Wallet>,
     config: Config,
     db: Database,
 ) -> Result<AliceState> {
@@ -306,8 +305,8 @@ async fn alice_swap(
 async fn bob_swap(
     swap_id: Uuid,
     state: BobState,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Wallet>,
+    bitcoin_wallet: Arc<swap::bitcoin::Wallet>,
+    monero_wallet: Arc<swap::monero::Wallet>,
     db: Database,
     alice_peer_id: PeerId,
     alice_addr: Multiaddr,

@@ -1,52 +1,55 @@
 use libp2p::{
     request_response::{
         handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
-        RequestResponseEvent, RequestResponseMessage, ResponseChannel,
+        RequestResponseEvent, RequestResponseMessage,
     },
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
-    NetworkBehaviour,
+    NetworkBehaviour, PeerId,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
     task::{Context, Poll},
     time::Duration,
 };
-use tracing::{debug, error};
+use tracing::error;
 
-use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Message2Protocol, TIMEOUT};
-use xmr_btc::bob;
+use crate::{
+    bitcoin::EncryptedSignature,
+    network::request_response::{AliceToBob, BobToAlice, Codec, Message3Protocol, TIMEOUT},
+};
 
-#[derive(Debug)]
-pub enum OutEvent {
-    Msg {
-        /// Received message from Bob.
-        msg: bob::Message2,
-        /// Channel to send back Alice's message 2.
-        channel: ResponseChannel<AliceToBob>,
-    },
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message3 {
+    pub tx_redeem_encsig: EncryptedSignature,
 }
 
-/// A `NetworkBehaviour` that represents receiving of message 2 from Bob.
+#[derive(Debug, Copy, Clone)]
+pub enum OutEvent {
+    Msg,
+}
+
+/// A `NetworkBehaviour` that represents sending message 3 to Alice.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
-pub struct Message2 {
-    rr: RequestResponse<Codec<Message2Protocol>>,
+pub struct Message3Behaviour {
+    rr: RequestResponse<Codec<Message3Protocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
-impl Message2 {
-    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: xmr_btc::alice::Message2) {
-        let msg = AliceToBob::Message2(msg);
-        self.rr.send_response(channel, msg);
+impl Message3Behaviour {
+    pub fn send(&mut self, alice: PeerId, msg: Message3) {
+        let msg = BobToAlice::Message3(msg);
+        let _id = self.rr.send_request(&alice, msg);
     }
 
     fn poll(
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message2Protocol>>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message3Protocol>>, OutEvent>> {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -55,7 +58,7 @@ impl Message2 {
     }
 }
 
-impl Default for Message2 {
+impl Default for Message3Behaviour {
     fn default() -> Self {
         let timeout = Duration::from_secs(TIMEOUT);
         let mut config = RequestResponseConfig::default();
@@ -64,7 +67,7 @@ impl Default for Message2 {
         Self {
             rr: RequestResponse::new(
                 Codec::default(),
-                vec![(Message2Protocol, ProtocolSupport::Full)],
+                vec![(Message3Protocol, ProtocolSupport::Full)],
                 config,
             ),
             events: Default::default(),
@@ -72,25 +75,23 @@ impl Default for Message2 {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Message2 {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>>
+    for Message3Behaviour
+{
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
             RequestResponseEvent::Message {
-                message:
-                    RequestResponseMessage::Request {
-                        request, channel, ..
-                    },
+                message: RequestResponseMessage::Request { .. },
+                ..
+            } => panic!("Bob should never get a request from Alice"),
+            RequestResponseEvent::Message {
+                message: RequestResponseMessage::Response { response, .. },
                 ..
             } => {
-                if let BobToAlice::Message2(msg) = request {
-                    debug!("Received Message2");
-                    self.events.push_back(OutEvent::Msg { msg, channel });
+                if let AliceToBob::Message3 = response {
+                    self.events.push_back(OutEvent::Msg);
                 }
             }
-            RequestResponseEvent::Message {
-                message: RequestResponseMessage::Response { .. },
-                ..
-            } => panic!("Alice should not get a Response"),
             RequestResponseEvent::InboundFailure { error, .. } => {
                 error!("Inbound failure: {:?}", error);
             }

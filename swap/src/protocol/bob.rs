@@ -1,24 +1,22 @@
 //! Run an XMR/BTC swap in the role of Bob.
 //! Bob holds BTC and wishes receive XMR.
-use self::{amounts::*, message0::*, message1::*, message2::*, message3::*};
-use crate::{
-    network::{
-        peer_tracker::{self, PeerTracker},
-        transport::SwapTransport,
-        TokioExecutor,
-    },
-    SwapAmounts,
-};
+pub use self::{amounts::*, message0::*, message1::*, message2::*, message3::*, state::*};
 use anyhow::Result;
 use libp2p::{
     core::{identity::Keypair, Multiaddr},
     NetworkBehaviour, PeerId,
 };
 use tracing::{debug, info};
-use xmr_btc::{
-    alice,
+
+use crate::{
     bitcoin::EncryptedSignature,
-    bob::{self},
+    network::{
+        peer_tracker::{self, PeerTracker},
+        transport::SwapTransport,
+        TokioExecutor,
+    },
+    protocol::{alice, bob},
+    SwapAmounts,
 };
 
 mod amounts;
@@ -27,6 +25,7 @@ mod message0;
 mod message1;
 mod message2;
 mod message3;
+pub mod state;
 pub mod swap;
 
 pub type Swarm = libp2p::Swarm<Behaviour>;
@@ -112,10 +111,10 @@ impl From<message3::OutEvent> for OutEvent {
 pub struct Behaviour {
     pt: PeerTracker,
     amounts: Amounts,
-    message0: Message0,
-    message1: Message1,
-    message2: Message2,
-    message3: Message3,
+    message0: Message0Behaviour,
+    message1: Message1Behaviour,
+    message2: Message2Behaviour,
+    message3: Message3Behaviour,
     #[behaviour(ignore)]
     identity: Keypair,
 }
@@ -174,10 +173,10 @@ impl Default for Behaviour {
         Self {
             pt: PeerTracker::default(),
             amounts: Amounts::default(),
-            message0: Message0::default(),
-            message1: Message1::default(),
-            message2: Message2::default(),
-            message3: Message3::default(),
+            message0: Message0Behaviour::default(),
+            message1: Message1Behaviour::default(),
+            message2: Message2Behaviour::default(),
+            message3: Message3Behaviour::default(),
             identity,
         }
     }

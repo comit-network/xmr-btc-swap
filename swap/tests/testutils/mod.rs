@@ -4,14 +4,18 @@ use monero_harness::{image, Monero};
 use rand::rngs::OsRng;
 use std::sync::Arc;
 use swap::{
-    alice, alice::swap::AliceState, bitcoin, bob, bob::swap::BobState, database::Database, monero,
-    network::transport::build, SwapAmounts,
+    bitcoin,
+    config::Config,
+    database::Database,
+    monero,
+    network::transport::build,
+    protocol::{alice, alice::swap::AliceState, bob, bob::swap::BobState},
+    SwapAmounts,
 };
 use tempfile::tempdir;
 use testcontainers::{clients::Cli, Container};
 use tracing_core::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
-use xmr_btc::{alice::State0, config::Config, cross_curve_dleq};
 
 pub async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
     let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
@@ -27,8 +31,8 @@ pub async fn init_wallets(
     name: &str,
     bitcoind: &Bitcoind<'_>,
     monero: &Monero,
-    btc_starting_balance: Option<xmr_btc::bitcoin::Amount>,
-    xmr_starting_balance: Option<xmr_btc::monero::Amount>,
+    btc_starting_balance: Option<::bitcoin::Amount>,
+    xmr_starting_balance: Option<monero::Amount>,
     config: Config,
 ) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {
     match xmr_starting_balance {
@@ -80,12 +84,12 @@ pub async fn init_alice_state(
         xmr: xmr_to_swap,
     };
 
-    let a = crate::bitcoin::SecretKey::new_random(rng);
+    let a = bitcoin::SecretKey::new_random(rng);
     let s_a = cross_curve_dleq::Scalar::random(rng);
-    let v_a = xmr_btc::monero::PrivateViewKey::new_random(rng);
+    let v_a = monero::PrivateViewKey::new_random(rng);
     let redeem_address = alice_btc_wallet.as_ref().new_address().await.unwrap();
     let punish_address = redeem_address.clone();
-    let state0 = State0::new(
+    let state0 = alice::State0::new(
         a,
         s_a,
         v_a,
@@ -118,7 +122,7 @@ pub async fn init_alice(
     monero: &Monero,
     btc_to_swap: bitcoin::Amount,
     xmr_to_swap: monero::Amount,
-    xmr_starting_balance: xmr_btc::monero::Amount,
+    xmr_starting_balance: monero::Amount,
     listen: Multiaddr,
     config: Config,
 ) -> (
@@ -159,7 +163,7 @@ pub async fn init_alice(
 
 pub async fn init_bob_state(
     btc_to_swap: bitcoin::Amount,
-    xmr_to_swap: xmr_btc::monero::Amount,
+    xmr_to_swap: monero::Amount,
     bob_btc_wallet: Arc<bitcoin::Wallet>,
     config: Config,
 ) -> BobState {
@@ -169,7 +173,7 @@ pub async fn init_bob_state(
     };
 
     let refund_address = bob_btc_wallet.new_address().await.unwrap();
-    let state0 = xmr_btc::bob::State0::new(
+    let state0 = bob::State0::new(
         &mut OsRng,
         btc_to_swap,
         xmr_to_swap,
@@ -200,7 +204,7 @@ pub async fn init_bob(
     monero: &Monero,
     btc_to_swap: bitcoin::Amount,
     btc_starting_balance: bitcoin::Amount,
-    xmr_to_swap: xmr_btc::monero::Amount,
+    xmr_to_swap: monero::Amount,
     config: Config,
 ) -> (
     BobState,

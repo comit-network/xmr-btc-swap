@@ -1,7 +1,3 @@
-use crate::{
-    alice::event_loop::EventLoopHandle, bitcoin, monero, network::request_response::AliceToBob,
-    SwapAmounts,
-};
 use anyhow::{bail, Context, Result};
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
 use futures::{
@@ -14,25 +10,30 @@ use sha2::Sha256;
 use std::{sync::Arc, time::Duration};
 use tokio::time::timeout;
 use tracing::{info, trace};
-use xmr_btc::{
-    alice,
-    alice::State3,
+
+use crate::{
+    bitcoin,
     bitcoin::{
-        poll_until_block_height_is_gte, BlockHeight, BroadcastSignedTransaction,
-        EncryptedSignature, GetBlockHeight, GetRawTransaction, Timelock, TransactionBlockHeight,
-        TxCancel, TxLock, TxRefund, WaitForTransactionFinality, WatchForRawTransaction,
+        poll_until_block_height_is_gte,
+        timelocks::{BlockHeight, Timelock},
+        BroadcastSignedTransaction, EncryptedSignature, GetBlockHeight, GetRawTransaction,
+        TransactionBlockHeight, TxCancel, TxLock, TxRefund, WaitForTransactionFinality,
+        WatchForRawTransaction,
     },
     config::Config,
-    cross_curve_dleq,
+    monero,
     monero::Transfer,
+    network::request_response::AliceToBob,
+    protocol::{alice, alice::event_loop::EventLoopHandle},
+    SwapAmounts,
 };
 
 pub async fn negotiate(
-    state0: xmr_btc::alice::State0,
+    state0: alice::State0,
     amounts: SwapAmounts,
     event_loop_handle: &mut EventLoopHandle,
     config: Config,
-) -> Result<(ResponseChannel<AliceToBob>, State3)> {
+) -> Result<(ResponseChannel<AliceToBob>, alice::State3)> {
     trace!("Starting negotiate");
 
     // todo: we can move this out, we dont need to timeout here
@@ -115,7 +116,7 @@ where
 pub async fn lock_xmr<W>(
     channel: ResponseChannel<AliceToBob>,
     amounts: SwapAmounts,
-    state3: State3,
+    state3: alice::State3,
     event_loop_handle: &mut EventLoopHandle,
     monero_wallet: Arc<W>,
 ) -> Result<()>

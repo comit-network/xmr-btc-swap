@@ -1,3 +1,4 @@
+use crate::monero;
 use async_trait::async_trait;
 use futures::prelude::*;
 use libp2p::{
@@ -8,8 +9,10 @@ use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, io, marker::PhantomData};
 use tracing::debug;
 
-use crate::SwapAmounts;
-use xmr_btc::{alice, bob, monero};
+use crate::{
+    protocol::{alice, bob},
+    SwapAmounts,
+};
 
 /// Time to wait for a response back once we send a request.
 pub const TIMEOUT: u64 = 3600; // One hour.

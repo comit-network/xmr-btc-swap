@@ -1,20 +1,5 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use crate::{
-    alice::{
-        event_loop::EventLoopHandle,
-        steps::{
-            build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
-            extract_monero_private_key, lock_xmr, negotiate, publish_bitcoin_punish_transaction,
-            publish_bitcoin_redeem_transaction, publish_cancel_transaction,
-            wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund, wait_for_locked_bitcoin,
-        },
-    },
-    bitcoin::EncryptedSignature,
-    database::{Database, Swap},
-    network::request_response::AliceToBob,
-    SwapAmounts,
-};
 use anyhow::Result;
 use async_recursion::async_recursion;
 use futures::{
@@ -26,12 +11,28 @@ use rand::{CryptoRng, RngCore};
 use std::{fmt, sync::Arc};
 use tracing::info;
 use uuid::Uuid;
-use xmr_btc::{
-    alice::{State0, State3},
-    bitcoin::{TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction},
+
+use crate::{
+    bitcoin,
+    bitcoin::{
+        EncryptedSignature, TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction,
+    },
     config::Config,
+    database::{Database, Swap},
+    monero,
     monero::CreateWalletForOutput,
-    ExpiredTimelocks,
+    network::request_response::AliceToBob,
+    protocol::alice::{
+        event_loop::EventLoopHandle,
+        state::{State0, State3},
+        steps::{
+            build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
+            extract_monero_private_key, lock_xmr, negotiate, publish_bitcoin_punish_transaction,
+            publish_bitcoin_redeem_transaction, publish_cancel_transaction,
+            wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund, wait_for_locked_bitcoin,
+        },
+    },
+    ExpiredTimelocks, SwapAmounts,
 };
 
 trait Rng: RngCore + CryptoRng + Send {}
@@ -105,8 +106,8 @@ impl fmt::Display for AliceState {
 pub async fn swap(
     state: AliceState,
     event_loop_handle: EventLoopHandle,
-    bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
-    monero_wallet: Arc<crate::monero::Wallet>,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
     config: Config,
     swap_id: Uuid,
     db: Database,

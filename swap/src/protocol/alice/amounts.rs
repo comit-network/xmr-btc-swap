@@ -13,32 +13,30 @@ use std::{
 };
 use tracing::{debug, error};
 
-use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Message1Protocol, TIMEOUT};
-use xmr_btc::bob;
+use crate::{
+    network::request_response::{AliceToBob, AmountsProtocol, BobToAlice, Codec, TIMEOUT},
+    protocol::alice::amounts,
+};
 
 #[derive(Debug)]
-pub enum OutEvent {
-    Msg {
-        /// Received message from Bob.
-        msg: bob::Message1,
-        /// Channel to send back Alice's message 1.
-        channel: ResponseChannel<AliceToBob>,
-    },
+pub struct OutEvent {
+    pub btc: ::bitcoin::Amount,
+    pub channel: ResponseChannel<AliceToBob>,
 }
 
-/// A `NetworkBehaviour` that represents send/recv of message 1.
+/// A `NetworkBehaviour` that represents getting the amounts of an XMR/BTC swap.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
-pub struct Message1 {
-    rr: RequestResponse<Codec<Message1Protocol>>,
+pub struct Amounts {
+    rr: RequestResponse<Codec<AmountsProtocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
-impl Message1 {
-    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: xmr_btc::alice::Message1) {
-        let msg = AliceToBob::Message1(Box::new(msg));
+impl Amounts {
+    /// Alice always sends her messages as a response to a request from Bob.
+    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: AliceToBob) {
         self.rr.send_response(channel, msg);
     }
 
@@ -46,7 +44,7 @@ impl Message1 {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message1Protocol>>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<AmountsProtocol>>, OutEvent>> {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -55,16 +53,17 @@ impl Message1 {
     }
 }
 
-impl Default for Message1 {
+impl Default for Amounts {
     fn default() -> Self {
         let timeout = Duration::from_secs(TIMEOUT);
+
         let mut config = RequestResponseConfig::default();
         config.set_request_timeout(timeout);
 
         Self {
             rr: RequestResponse::new(
                 Codec::default(),
-                vec![(Message1Protocol, ProtocolSupport::Full)],
+                vec![(AmountsProtocol, ProtocolSupport::Full)],
                 config,
             ),
             events: Default::default(),
@@ -72,7 +71,7 @@ impl Default for Message1 {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Message1 {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Amounts {
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
             RequestResponseEvent::Message {
@@ -82,9 +81,9 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                     },
                 ..
             } => {
-                if let BobToAlice::Message1(msg) = request {
-                    debug!("Received Message1");
-                    self.events.push_back(OutEvent::Msg { msg, channel });
+                if let BobToAlice::AmountsFromBtc(btc) = request {
+                    debug!("Received amounts request");
+                    self.events.push_back(amounts::OutEvent { btc, channel })
                 }
             }
             RequestResponseEvent::Message {

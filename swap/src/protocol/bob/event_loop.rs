@@ -1,7 +1,3 @@
-use crate::{
-    bob::{Behaviour, OutEvent},
-    network::{transport::SwapTransport, TokioExecutor},
-};
 use anyhow::{anyhow, Result};
 use futures::FutureExt;
 use libp2p::{core::Multiaddr, PeerId};
@@ -10,7 +6,15 @@ use tokio::{
     sync::mpsc::{Receiver, Sender},
 };
 use tracing::{debug, error, info};
-use xmr_btc::{alice, bitcoin::EncryptedSignature, bob};
+
+use crate::{
+    bitcoin::EncryptedSignature,
+    network::{transport::SwapTransport, TokioExecutor},
+    protocol::{
+        alice,
+        bob::{self, Behaviour, OutEvent},
+    },
+};
 
 #[derive(Debug)]
 pub struct Channels<T> {

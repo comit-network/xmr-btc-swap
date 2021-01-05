@@ -1,4 +1,3 @@
-use crate::{bob::event_loop::EventLoopHandle, database, database::Database, SwapAmounts};
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
 use rand::{CryptoRng, RngCore};
@@ -6,25 +5,28 @@ use std::{fmt, sync::Arc};
 use tokio::select;
 use tracing::info;
 use uuid::Uuid;
-use xmr_btc::{
-    bob::{self, State2},
-    ExpiredTimelocks,
+
+use crate::{
+    config::Config,
+    database::{Database, Swap},
+    protocol::bob::{self, event_loop::EventLoopHandle, state::*},
+    ExpiredTimelocks, SwapAmounts,
 };
 
 #[derive(Debug, Clone)]
 pub enum BobState {
     Started {
-        state0: bob::State0,
+        state0: State0,
         amounts: SwapAmounts,
     },
-    Negotiated(bob::State2),
-    BtcLocked(bob::State3),
-    XmrLocked(bob::State4),
-    EncSigSent(bob::State4),
-    BtcRedeemed(bob::State5),
-    CancelTimelockExpired(bob::State4),
-    BtcCancelled(bob::State4),
-    BtcRefunded(bob::State4),
+    Negotiated(State2),
+    BtcLocked(State3),
+    XmrLocked(State4),
+    EncSigSent(State4),
+    BtcRedeemed(State5),
+    CancelTimelockExpired(State4),
+    BtcCancelled(State4),
+    BtcRefunded(State4),
     XmrRedeemed,
     BtcPunished,
     SafelyAborted,
@@ -133,8 +135,7 @@ where
 
                 let state = BobState::Negotiated(state2);
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, database::Swap::Bob(db_state))
-                    .await?;
+                db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
                 run_until(
                     state,
                     is_target_state,
@@ -155,8 +156,7 @@ where
 
                 let state = BobState::BtcLocked(state3);
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, database::Swap::Bob(db_state))
-                    .await?;
+                db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
                 run_until(
                     state,
                     is_target_state,
@@ -209,8 +209,7 @@ where
                     BobState::CancelTimelockExpired(state4)
                 };
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, database::Swap::Bob(db_state))
-                    .await?;
+                db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
                 run_until(
                     state,
                     is_target_state,
@@ -251,8 +250,7 @@ where
                     BobState::CancelTimelockExpired(state)
                 };
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, database::Swap::Bob(db_state))
-                    .await?;
+                db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
                 run_until(
                     state,
                     is_target_state,
@@ -287,8 +285,7 @@ where
                 };
 
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, database::Swap::Bob(db_state))
-                    .await?;
+                db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
                 run_until(
                     state,
                     is_target_state,
@@ -307,8 +304,7 @@ where
 
                 let state = BobState::XmrRedeemed;
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, database::Swap::Bob(db_state))
-                    .await?;
+                db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
                 run_until(
                     state,
                     is_target_state,
@@ -331,7 +327,7 @@ where
                 }
 
                 let state = BobState::BtcCancelled(state4);
-                db.insert_latest_state(swap_id, database::Swap::Bob(state.clone().into()))
+                db.insert_latest_state(swap_id, Swap::Bob(state.clone().into()))
                     .await?;
 
                 run_until(
@@ -360,8 +356,7 @@ where
                 };
 
                 let db_state = state.clone().into();
-                db.insert_latest_state(swap_id, database::Swap::Bob(db_state))
-                    .await?;
+                db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
                 run_until(
                     state,
                     is_target_state,
@@ -383,12 +378,12 @@ where
 }
 
 pub async fn negotiate<R>(
-    state0: xmr_btc::bob::State0,
+    state0: crate::protocol::bob::state::State0,
     amounts: SwapAmounts,
     swarm: &mut EventLoopHandle,
     mut rng: R,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
-) -> Result<State2>
+) -> Result<bob::state::State2>
 where
     R: RngCore + CryptoRng + Send,
 {

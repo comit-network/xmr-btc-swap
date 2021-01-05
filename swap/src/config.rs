@@ -1,4 +1,4 @@
-use crate::bitcoin::Timelock;
+use crate::bitcoin::timelocks::Timelock;
 use conquer_once::Lazy;
 use std::time::Duration;
 

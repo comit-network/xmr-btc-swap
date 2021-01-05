@@ -3,13 +3,18 @@ use futures::future::try_join;
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, alice::swap::AliceState, bob, bob::swap::BobState, database::Database};
+use swap::{
+    bitcoin,
+    config::Config,
+    database::Database,
+    monero,
+    protocol::{alice, alice::swap::AliceState, bob, bob::swap::BobState},
+};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
 use testutils::init_tracing;
 use tokio::select;
 use uuid::Uuid;
-use xmr_btc::{bitcoin, config::Config};
 
 pub mod testutils;
 
@@ -29,10 +34,10 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
     ) = testutils::init_containers(&cli).await;
 
     let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
-    let xmr_to_swap = xmr_btc::monero::Amount::from_piconero(1_000_000_000_000);
+    let xmr_to_swap = monero::Amount::from_piconero(1_000_000_000_000);
 
     let bob_btc_starting_balance = btc_to_swap * 10;
-    let bob_xmr_starting_balance = xmr_btc::monero::Amount::from_piconero(0);
+    let bob_xmr_starting_balance = monero::Amount::from_piconero(0);
 
     let alice_btc_starting_balance = bitcoin::Amount::ZERO;
     let alice_xmr_starting_balance = xmr_to_swap * 10;

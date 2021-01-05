@@ -1,11 +1,13 @@
+use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
 use libp2p::{
     request_response::{
         handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
-        RequestResponseEvent, RequestResponseMessage,
+        RequestResponseEvent, RequestResponseMessage, ResponseChannel,
     },
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
     NetworkBehaviour,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
     task::{Context, Poll},
@@ -13,38 +15,48 @@ use std::{
 };
 use tracing::{debug, error};
 
-use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Message0Protocol, TIMEOUT};
-use libp2p::request_response::ResponseChannel;
-use xmr_btc::bob;
+use crate::{
+    network::request_response::{AliceToBob, BobToAlice, Codec, Message1Protocol, TIMEOUT},
+    protocol::bob,
+};
 
 #[derive(Debug)]
 pub enum OutEvent {
     Msg {
-        msg: bob::Message0,
+        /// Received message from Bob.
+        msg: bob::Message1,
+        /// Channel to send back Alice's message 1.
         channel: ResponseChannel<AliceToBob>,
     },
 }
 
-/// A `NetworkBehaviour` that represents send/recv of message 0.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message1 {
+    pub(crate) tx_cancel_sig: Signature,
+    pub(crate) tx_refund_encsig: EncryptedSignature,
+}
+
+/// A `NetworkBehaviour` that represents send/recv of message 1.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
-pub struct Message0 {
-    rr: RequestResponse<Codec<Message0Protocol>>,
+pub struct Message1Behaviour {
+    rr: RequestResponse<Codec<Message1Protocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
-impl Message0 {
-    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: xmr_btc::alice::Message0) {
-        let msg = AliceToBob::Message0(Box::new(msg));
+impl Message1Behaviour {
+    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: Message1) {
+        let msg = AliceToBob::Message1(Box::new(msg));
         self.rr.send_response(channel, msg);
     }
+
     fn poll(
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message0Protocol>>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message1Protocol>>, OutEvent>> {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -53,7 +65,7 @@ impl Message0 {
     }
 }
 
-impl Default for Message0 {
+impl Default for Message1Behaviour {
     fn default() -> Self {
         let timeout = Duration::from_secs(TIMEOUT);
         let mut config = RequestResponseConfig::default();
@@ -62,7 +74,7 @@ impl Default for Message0 {
         Self {
             rr: RequestResponse::new(
                 Codec::default(),
-                vec![(Message0Protocol, ProtocolSupport::Full)],
+                vec![(Message1Protocol, ProtocolSupport::Full)],
                 config,
             ),
             events: Default::default(),
@@ -70,7 +82,9 @@ impl Default for Message0 {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Message0 {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>>
+    for Message1Behaviour
+{
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
             RequestResponseEvent::Message {
@@ -80,9 +94,9 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                     },
                 ..
             } => {
-                if let BobToAlice::Message0(msg) = request {
-                    debug!("Received Message0");
-                    self.events.push_back(OutEvent::Msg { msg: *msg, channel });
+                if let BobToAlice::Message1(msg) = request {
+                    debug!("Received Message1");
+                    self.events.push_back(OutEvent::Msg { msg, channel });
                 }
             }
             RequestResponseEvent::Message {

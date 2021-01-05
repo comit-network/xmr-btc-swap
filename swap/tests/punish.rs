@@ -6,11 +6,15 @@ use futures::{
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, alice::swap::AliceState, bob, bob::swap::BobState};
+use swap::{
+    bitcoin,
+    config::Config,
+    monero,
+    protocol::{alice, alice::swap::AliceState, bob, bob::swap::BobState},
+};
 use testcontainers::clients::Cli;
 use testutils::init_tracing;
 use uuid::Uuid;
-use xmr_btc::{bitcoin, config::Config};
 
 pub mod testutils;
 
@@ -30,7 +34,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
     ) = testutils::init_containers(&cli).await;
 
     let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
-    let xmr_to_swap = xmr_btc::monero::Amount::from_piconero(1_000_000_000_000);
+    let xmr_to_swap = monero::Amount::from_piconero(1_000_000_000_000);
 
     let bob_btc_starting_balance = btc_to_swap * 10;
 

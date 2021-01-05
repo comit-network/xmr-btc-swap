@@ -2,6 +2,8 @@ use libp2p::{core::Multiaddr, PeerId};
 use url::Url;
 use uuid::Uuid;
 
+use crate::monero;
+
 #[derive(structopt::StructOpt, Debug)]
 pub struct Options {
     // TODO: Default value should points to proper configuration folder in home folder
@@ -13,7 +15,7 @@ pub struct Options {
 }
 
 #[derive(structopt::StructOpt, Debug)]
-#[structopt(name = "xmr-btc-swap", about = "XMR BTC atomic swap")]
+#[structopt(name = "xmr_btc-swap", about = "XMR BTC atomic swap")]
 pub enum Command {
     SellXmr {
         #[structopt(long = "bitcoind-rpc", default_value = "http://127.0.0.1:8332")]
@@ -32,10 +34,10 @@ pub enum Command {
         listen_addr: Multiaddr,
 
         #[structopt(long = "send-xmr",  help = "Monero amount as floating point nr without denomination (e.g. 125.1)", parse(try_from_str = parse_xmr))]
-        send_monero: xmr_btc::monero::Amount,
+        send_monero: monero::Amount,
 
         #[structopt(long = "receive-btc", help = "Bitcoin amount as floating point nr without denomination (e.g. 1.25)", parse(try_from_str = parse_btc))]
-        receive_bitcoin: bitcoin::Amount,
+        receive_bitcoin: ::bitcoin::Amount,
     },
     BuyXmr {
         #[structopt(long = "connect-peer-id")]
@@ -57,10 +59,10 @@ pub enum Command {
         monero_wallet_rpc_url: Url,
 
         #[structopt(long = "send-btc", help = "Bitcoin amount as floating point nr without denomination (e.g. 1.25)", parse(try_from_str = parse_btc))]
-        send_bitcoin: bitcoin::Amount,
+        send_bitcoin: ::bitcoin::Amount,
 
         #[structopt(long = "receive-xmr", help = "Monero amount as floating point nr without denomination (e.g. 125.1)", parse(try_from_str = parse_xmr))]
-        receive_monero: xmr_btc::monero::Amount,
+        receive_monero: monero::Amount,
     },
     History,
     Resume(Resume),
@@ -116,7 +118,7 @@ fn parse_btc(str: &str) -> anyhow::Result<bitcoin::Amount> {
     Ok(amount)
 }
 
-fn parse_xmr(str: &str) -> anyhow::Result<xmr_btc::monero::Amount> {
-    let amount = xmr_btc::monero::Amount::parse_monero(str)?;
+fn parse_xmr(str: &str) -> anyhow::Result<monero::Amount> {
+    let amount = monero::Amount::parse_monero(str)?;
     Ok(amount)
 }

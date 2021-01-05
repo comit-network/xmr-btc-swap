@@ -6,6 +6,7 @@ use libp2p::{
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
     NetworkBehaviour,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
     task::{Context, Poll},
@@ -14,37 +15,50 @@ use std::{
 use tracing::{debug, error};
 
 use crate::{
-    alice::amounts,
-    network::request_response::{AliceToBob, AmountsProtocol, BobToAlice, Codec, TIMEOUT},
+    bitcoin, monero,
+    network::request_response::{AliceToBob, BobToAlice, Codec, Message0Protocol, TIMEOUT},
+    protocol::bob,
 };
 
 #[derive(Debug)]
-pub struct OutEvent {
-    pub btc: ::bitcoin::Amount,
-    pub channel: ResponseChannel<AliceToBob>,
+pub enum OutEvent {
+    Msg {
+        msg: bob::Message0,
+        channel: ResponseChannel<AliceToBob>,
+    },
 }
 
-/// A `NetworkBehaviour` that represents getting the amounts of an XMR/BTC swap.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message0 {
+    pub(crate) A: bitcoin::PublicKey,
+    pub(crate) S_a_monero: monero::PublicKey,
+    pub(crate) S_a_bitcoin: bitcoin::PublicKey,
+    pub(crate) dleq_proof_s_a: cross_curve_dleq::Proof,
+    pub(crate) v_a: monero::PrivateViewKey,
+    pub(crate) redeem_address: bitcoin::Address,
+    pub(crate) punish_address: bitcoin::Address,
+}
+
+/// A `NetworkBehaviour` that represents send/recv of message 0.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
-pub struct Amounts {
-    rr: RequestResponse<Codec<AmountsProtocol>>,
+pub struct Message0Behaviour {
+    rr: RequestResponse<Codec<Message0Protocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
-impl Amounts {
-    /// Alice always sends her messages as a response to a request from Bob.
-    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: AliceToBob) {
+impl Message0Behaviour {
+    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: Message0) {
+        let msg = AliceToBob::Message0(Box::new(msg));
         self.rr.send_response(channel, msg);
     }
-
     fn poll(
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<AmountsProtocol>>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message0Protocol>>, OutEvent>> {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -53,17 +67,16 @@ impl Amounts {
     }
 }
 
-impl Default for Amounts {
+impl Default for Message0Behaviour {
     fn default() -> Self {
         let timeout = Duration::from_secs(TIMEOUT);
-
         let mut config = RequestResponseConfig::default();
         config.set_request_timeout(timeout);
 
         Self {
             rr: RequestResponse::new(
                 Codec::default(),
-                vec![(AmountsProtocol, ProtocolSupport::Full)],
+                vec![(Message0Protocol, ProtocolSupport::Full)],
                 config,
             ),
             events: Default::default(),
@@ -71,7 +84,9 @@ impl Default for Amounts {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Amounts {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>>
+    for Message0Behaviour
+{
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
             RequestResponseEvent::Message {
@@ -81,9 +96,9 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                     },
                 ..
             } => {
-                if let BobToAlice::AmountsFromBtc(btc) = request {
-                    debug!("Received amounts request");
-                    self.events.push_back(amounts::OutEvent { btc, channel })
+                if let BobToAlice::Message0(msg) = request {
+                    debug!("Received Message0");
+                    self.events.push_back(OutEvent::Msg { msg: *msg, channel });
                 }
             }
             RequestResponseEvent::Message {

@@ -1,7 +1,3 @@
-use crate::bitcoin::{
-    build_shared_output_descriptor, verify_sig, BuildTxLockPsbt, Network, OutPoint, PublicKey,
-    Timelock, Txid, TX_FEE,
-};
 use anyhow::{bail, Context, Result};
 use bitcoin::{
     util::{bip143::SigHashCache, psbt::PartiallySignedTransaction},
@@ -11,6 +7,11 @@ use ecdsa_fun::Signature;
 use miniscript::{Descriptor, NullCtx};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+use crate::bitcoin::{
+    build_shared_output_descriptor, timelocks::Timelock, verify_sig, BuildTxLockPsbt, Network,
+    OutPoint, PublicKey, Txid, TX_FEE,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TxLock {

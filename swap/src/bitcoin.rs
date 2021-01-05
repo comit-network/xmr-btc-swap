@@ -1,202 +1,288 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
-use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
-use bitcoin::util::psbt::PartiallySignedTransaction;
-use bitcoin_harness::{bitcoind_rpc::PsbtBase64, BitcoindRpcApi};
-use reqwest::Url;
-use std::time::Duration;
-use tokio::time::interval;
-use xmr_btc::{
-    bitcoin::{
-        BroadcastSignedTransaction, BuildTxLockPsbt, GetBlockHeight, SignTxLock,
-        TransactionBlockHeight, WatchForRawTransaction,
-    },
-    config::Config,
-};
+use bitcoin::hashes::{hex::ToHex, Hash};
+use ecdsa_fun::{adaptor::Adaptor, fun::Point, nonce::Deterministic, ECDSA};
+use miniscript::{Descriptor, Segwitv0};
+use rand::{CryptoRng, RngCore};
+use serde::{Deserialize, Serialize};
+use sha2::Sha256;
+use std::str::FromStr;
 
-pub use ::bitcoin::{Address, Transaction};
-pub use xmr_btc::bitcoin::*;
+use crate::{config::Config, ExpiredTimelocks};
 
-pub const TX_LOCK_MINE_TIMEOUT: u64 = 3600;
+use crate::bitcoin::timelocks::{BlockHeight, Timelock};
+pub use crate::bitcoin::transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund};
+pub use ::bitcoin::{util::psbt::PartiallySignedTransaction, *};
+pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
+pub use wallet::Wallet;
 
-#[derive(Debug)]
-pub struct Wallet {
-    pub inner: bitcoin_harness::Wallet,
-    pub network: bitcoin::Network,
+pub mod timelocks;
+pub mod transactions;
+pub mod wallet;
+
+// TODO: Configurable tx-fee (note: parties have to agree prior to swapping)
+// Current reasoning:
+// tx with largest weight (as determined by get_weight() upon broadcast in e2e
+// test) = 609 assuming segwit and 60 sat/vB:
+// (609 / 4) * 60 (sat/vB) = 9135 sats
+// Recommended: Overpay a bit to ensure we don't have to wait too long for test
+// runs.
+pub const TX_FEE: u64 = 15_000;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub struct SecretKey {
+    inner: Scalar,
+    public: Point,
 }
 
-impl Wallet {
-    pub async fn new(name: &str, url: Url, network: bitcoin::Network) -> Result<Self> {
-        let wallet = bitcoin_harness::Wallet::new(name, url).await?;
+impl SecretKey {
+    pub fn new_random<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
+        let scalar = Scalar::random(rng);
 
-        Ok(Self {
-            inner: wallet,
-            network,
-        })
+        let ecdsa = ECDSA::<()>::default();
+        let public = ecdsa.verification_key_for(&scalar);
+
+        Self {
+            inner: scalar,
+            public,
+        }
     }
 
-    pub async fn balance(&self) -> Result<Amount> {
-        let balance = self.inner.balance().await?;
-        Ok(balance)
+    pub fn public(&self) -> PublicKey {
+        PublicKey(self.public)
     }
 
-    pub async fn new_address(&self) -> Result<Address> {
-        self.inner.new_address().await.map_err(Into::into)
+    pub fn to_bytes(&self) -> [u8; 32] {
+        self.inner.to_bytes()
     }
 
-    pub async fn transaction_fee(&self, txid: Txid) -> Result<Amount> {
-        let fee = self
-            .inner
-            .get_wallet_transaction(txid)
-            .await
-            .map(|res| {
-                res.fee.map(|signed_amount| {
-                    signed_amount
-                        .abs()
-                        .to_unsigned()
-                        .expect("Absolute value is always positive")
-                })
-            })?
-            .context("Rpc response did not contain a fee")?;
+    pub fn sign(&self, digest: SigHash) -> Signature {
+        let ecdsa = ECDSA::<Deterministic<Sha256>>::default();
 
-        Ok(fee)
+        ecdsa.sign(&self.inner, &digest.into_inner())
     }
+
+    // TxRefund encsigning explanation:
+    //
+    // A and B, are the Bitcoin Public Keys which go on the joint output for
+    // TxLock_Bitcoin. S_a and S_b, are the Monero Public Keys which go on the
+    // joint output for TxLock_Monero
+
+    // tx_refund: multisig(A, B), published by bob
+    // bob can produce sig on B for tx_refund using b
+    // alice sends over an encrypted signature on A for tx_refund using a encrypted
+    // with S_b we want to leak s_b
+
+    // produced (by Alice) encsig - published (by Bob) sig = s_b (it's not really
+    // subtraction, it's recover)
+
+    // self = a, Y = S_b, digest = tx_refund
+    pub fn encsign(&self, Y: PublicKey, digest: SigHash) -> EncryptedSignature {
+        let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
+
+        adaptor.encrypted_sign(&self.inner, &Y.0, &digest.into_inner())
+    }
+}
+
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PublicKey(Point);
+
+impl From<PublicKey> for Point {
+    fn from(from: PublicKey) -> Self {
+        from.0
+    }
+}
+
+impl From<Scalar> for SecretKey {
+    fn from(scalar: Scalar) -> Self {
+        let ecdsa = ECDSA::<()>::default();
+        let public = ecdsa.verification_key_for(&scalar);
+
+        Self {
+            inner: scalar,
+            public,
+        }
+    }
+}
+
+impl From<SecretKey> for Scalar {
+    fn from(sk: SecretKey) -> Self {
+        sk.inner
+    }
+}
+
+impl From<Scalar> for PublicKey {
+    fn from(scalar: Scalar) -> Self {
+        let ecdsa = ECDSA::<()>::default();
+        PublicKey(ecdsa.verification_key_for(&scalar))
+    }
+}
+
+pub fn verify_sig(
+    verification_key: &PublicKey,
+    transaction_sighash: &SigHash,
+    sig: &Signature,
+) -> Result<()> {
+    let ecdsa = ECDSA::verify_only();
+
+    if ecdsa.verify(&verification_key.0, &transaction_sighash.into_inner(), &sig) {
+        Ok(())
+    } else {
+        bail!(InvalidSignature)
+    }
+}
+
+#[derive(Debug, Clone, Copy, thiserror::Error)]
+#[error("signature is invalid")]
+pub struct InvalidSignature;
+
+pub fn verify_encsig(
+    verification_key: PublicKey,
+    encryption_key: PublicKey,
+    digest: &SigHash,
+    encsig: &EncryptedSignature,
+) -> Result<()> {
+    let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
+
+    if adaptor.verify_encrypted_signature(
+        &verification_key.0,
+        &encryption_key.0,
+        &digest.into_inner(),
+        &encsig,
+    ) {
+        Ok(())
+    } else {
+        bail!(InvalidEncryptedSignature)
+    }
+}
+
+#[derive(Clone, Copy, Debug, thiserror::Error)]
+#[error("encrypted signature is invalid")]
+pub struct InvalidEncryptedSignature;
+
+pub fn build_shared_output_descriptor(A: Point, B: Point) -> Descriptor<bitcoin::PublicKey> {
+    const MINISCRIPT_TEMPLATE: &str = "c:and_v(v:pk(A),pk_k(B))";
+
+    // NOTE: This shouldn't be a source of error, but maybe it is
+    let A = ToHex::to_hex(&secp256k1::PublicKey::from(A));
+    let B = ToHex::to_hex(&secp256k1::PublicKey::from(B));
+
+    let miniscript = MINISCRIPT_TEMPLATE.replace("A", &A).replace("B", &B);
+
+    let miniscript = miniscript::Miniscript::<bitcoin::PublicKey, Segwitv0>::from_str(&miniscript)
+        .expect("a valid miniscript");
+
+    Descriptor::Wsh(miniscript)
 }
 
 #[async_trait]
-impl BuildTxLockPsbt for Wallet {
+pub trait BuildTxLockPsbt {
     async fn build_tx_lock_psbt(
         &self,
         output_address: Address,
         output_amount: Amount,
-    ) -> Result<PartiallySignedTransaction> {
-        let psbt = self.inner.fund_psbt(output_address, output_amount).await?;
-        let as_hex = base64::decode(psbt)?;
-
-        let psbt = bitcoin::consensus::deserialize(&as_hex)?;
-
-        Ok(psbt)
-    }
+    ) -> Result<PartiallySignedTransaction>;
 }
 
 #[async_trait]
-impl SignTxLock for Wallet {
-    async fn sign_tx_lock(&self, tx_lock: TxLock) -> Result<Transaction> {
-        let psbt = PartiallySignedTransaction::from(tx_lock);
-
-        let psbt = bitcoin::consensus::serialize(&psbt);
-        let as_base64 = base64::encode(psbt);
-
-        let psbt = self
-            .inner
-            .wallet_process_psbt(PsbtBase64(as_base64))
-            .await?;
-        let PsbtBase64(signed_psbt) = PsbtBase64::from(psbt);
-
-        let as_hex = base64::decode(signed_psbt)?;
-        let psbt: PartiallySignedTransaction = bitcoin::consensus::deserialize(&as_hex)?;
-
-        let tx = psbt.extract_tx();
-
-        Ok(tx)
-    }
+pub trait SignTxLock {
+    async fn sign_tx_lock(&self, tx_lock: TxLock) -> Result<Transaction>;
 }
 
 #[async_trait]
-impl BroadcastSignedTransaction for Wallet {
-    async fn broadcast_signed_transaction(&self, transaction: Transaction) -> Result<Txid> {
-        let txid = self.inner.send_raw_transaction(transaction).await?;
-        tracing::info!("Bitcoin tx broadcasted! TXID = {}", txid);
-        Ok(txid)
-    }
-}
-
-// TODO: For retry, use `backoff::ExponentialBackoff` in production as opposed
-// to `ConstantBackoff`.
-#[async_trait]
-impl WatchForRawTransaction for Wallet {
-    async fn watch_for_raw_transaction(&self, txid: Txid) -> Transaction {
-        (|| async { Ok(self.inner.get_raw_transaction(txid).await?) })
-            .retry(ConstantBackoff::new(Duration::from_secs(1)))
-            .await
-            .expect("transient errors to be retried")
-    }
+pub trait BroadcastSignedTransaction {
+    async fn broadcast_signed_transaction(&self, transaction: Transaction) -> Result<Txid>;
 }
 
 #[async_trait]
-impl GetRawTransaction for Wallet {
-    // todo: potentially replace with option
-    async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
-        Ok(self.inner.get_raw_transaction(txid).await?)
-    }
+pub trait WatchForRawTransaction {
+    async fn watch_for_raw_transaction(&self, txid: Txid) -> Transaction;
 }
 
 #[async_trait]
-impl GetBlockHeight for Wallet {
-    async fn get_block_height(&self) -> BlockHeight {
-        let height = (|| async { Ok(self.inner.client.getblockcount().await?) })
-            .retry(ConstantBackoff::new(Duration::from_secs(1)))
-            .await
-            .expect("transient errors to be retried");
-
-        BlockHeight::new(height)
-    }
+pub trait WaitForTransactionFinality {
+    async fn wait_for_transaction_finality(&self, txid: Txid, config: Config) -> Result<()>;
 }
 
 #[async_trait]
-impl TransactionBlockHeight for Wallet {
-    async fn transaction_block_height(&self, txid: Txid) -> BlockHeight {
-        #[derive(Debug)]
-        enum Error {
-            Io,
-            NotYetMined,
-        }
-
-        let height = (|| async {
-            let block_height = self
-                .inner
-                .transaction_block_height(txid)
-                .await
-                .map_err(|_| backoff::Error::Transient(Error::Io))?;
-
-            let block_height =
-                block_height.ok_or_else(|| backoff::Error::Transient(Error::NotYetMined))?;
-
-            Result::<_, backoff::Error<Error>>::Ok(block_height)
-        })
-        .retry(ConstantBackoff::new(Duration::from_secs(1)))
-        .await
-        .expect("transient errors to be retried");
-
-        BlockHeight::new(height)
-    }
+pub trait GetBlockHeight {
+    async fn get_block_height(&self) -> BlockHeight;
 }
 
 #[async_trait]
-impl WaitForTransactionFinality for Wallet {
-    async fn wait_for_transaction_finality(&self, txid: Txid, config: Config) -> Result<()> {
-        // TODO(Franck): This assumes that bitcoind runs with txindex=1
+pub trait TransactionBlockHeight {
+    async fn transaction_block_height(&self, txid: Txid) -> BlockHeight;
+}
 
-        // Divide by 4 to not check too often yet still be aware of the new block early
-        // on.
-        let mut interval = interval(config.bitcoin_avg_block_time / 4);
+#[async_trait]
+pub trait WaitForBlockHeight {
+    async fn wait_for_block_height(&self, height: BlockHeight);
+}
 
-        loop {
-            let tx = self.inner.client.get_raw_transaction_verbose(txid).await?;
-            if let Some(confirmations) = tx.confirmations {
-                if confirmations >= config.bitcoin_finality_confirmations {
-                    break;
-                }
-            }
-            interval.tick().await;
-        }
+#[async_trait]
+pub trait GetRawTransaction {
+    async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction>;
+}
 
-        Ok(())
+#[async_trait]
+pub trait Network {
+    fn get_network(&self) -> bitcoin::Network;
+}
+
+pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Result<SecretKey> {
+    let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
+
+    let s = adaptor
+        .recover_decryption_key(&S.0, &sig, &encsig)
+        .map(SecretKey::from)
+        .ok_or_else(|| anyhow!("secret recovery failure"))?;
+
+    Ok(s)
+}
+
+pub async fn poll_until_block_height_is_gte<B>(client: &B, target: BlockHeight)
+where
+    B: GetBlockHeight,
+{
+    while client.get_block_height().await < target {
+        tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
     }
 }
 
-impl Network for Wallet {
-    fn get_network(&self) -> bitcoin::Network {
-        self.network
+pub async fn current_epoch<W>(
+    bitcoin_wallet: &W,
+    cancel_timelock: Timelock,
+    punish_timelock: Timelock,
+    lock_tx_id: ::bitcoin::Txid,
+) -> anyhow::Result<ExpiredTimelocks>
+where
+    W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
+{
+    let current_block_height = bitcoin_wallet.get_block_height().await;
+    let lock_tx_height = bitcoin_wallet.transaction_block_height(lock_tx_id).await;
+    let cancel_timelock_height = lock_tx_height + cancel_timelock;
+    let punish_timelock_height = cancel_timelock_height + punish_timelock;
+
+    match (
+        current_block_height < cancel_timelock_height,
+        current_block_height < punish_timelock_height,
+    ) {
+        (true, _) => Ok(ExpiredTimelocks::None),
+        (false, true) => Ok(ExpiredTimelocks::Cancel),
+        (false, false) => Ok(ExpiredTimelocks::Punish),
     }
+}
+
+pub async fn wait_for_cancel_timelock_to_expire<W>(
+    bitcoin_wallet: &W,
+    cancel_timelock: Timelock,
+    lock_tx_id: ::bitcoin::Txid,
+) -> Result<()>
+where
+    W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
+{
+    let tx_lock_height = bitcoin_wallet.transaction_block_height(lock_tx_id).await;
+
+    poll_until_block_height_is_gte(bitcoin_wallet, tx_lock_height + cancel_timelock).await;
+    Ok(())
 }

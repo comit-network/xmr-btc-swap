@@ -6,6 +6,7 @@ use libp2p::{
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
     NetworkBehaviour, PeerId,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
     task::{Context, Poll},
@@ -13,27 +14,40 @@ use std::{
 };
 use tracing::{debug, error};
 
-use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Message1Protocol, TIMEOUT};
-use xmr_btc::{alice, bob};
+use crate::{
+    bitcoin, monero,
+    network::request_response::{AliceToBob, BobToAlice, Codec, Message0Protocol, TIMEOUT},
+    protocol::{alice, bob},
+};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message0 {
+    pub(crate) B: bitcoin::PublicKey,
+    pub(crate) S_b_monero: monero::PublicKey,
+    pub(crate) S_b_bitcoin: bitcoin::PublicKey,
+    pub(crate) dleq_proof_s_b: cross_curve_dleq::Proof,
+    pub(crate) v_b: monero::PrivateViewKey,
+    pub(crate) refund_address: bitcoin::Address,
+}
 
 #[derive(Debug)]
 pub enum OutEvent {
-    Msg(alice::Message1),
+    Msg(alice::Message0),
 }
 
-/// A `NetworkBehaviour` that represents send/recv of message 1.
+/// A `NetworkBehaviour` that represents send/recv of message 0.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
-pub struct Message1 {
-    rr: RequestResponse<Codec<Message1Protocol>>,
+pub struct Message0Behaviour {
+    rr: RequestResponse<Codec<Message0Protocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
-impl Message1 {
-    pub fn send(&mut self, alice: PeerId, msg: bob::Message1) {
-        let msg = BobToAlice::Message1(msg);
+impl Message0Behaviour {
+    pub fn send(&mut self, alice: PeerId, msg: bob::Message0) {
+        let msg = BobToAlice::Message0(Box::new(msg));
         let _id = self.rr.send_request(&alice, msg);
     }
 
@@ -41,7 +55,7 @@ impl Message1 {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message1Protocol>>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message0Protocol>>, OutEvent>> {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -50,7 +64,7 @@ impl Message1 {
     }
 }
 
-impl Default for Message1 {
+impl Default for Message0Behaviour {
     fn default() -> Self {
         let timeout = Duration::from_secs(TIMEOUT);
         let mut config = RequestResponseConfig::default();
@@ -59,7 +73,7 @@ impl Default for Message1 {
         Self {
             rr: RequestResponse::new(
                 Codec::default(),
-                vec![(Message1Protocol, ProtocolSupport::Full)],
+                vec![(Message0Protocol, ProtocolSupport::Full)],
                 config,
             ),
             events: Default::default(),
@@ -67,7 +81,9 @@ impl Default for Message1 {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Message1 {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>>
+    for Message0Behaviour
+{
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
             RequestResponseEvent::Message {
@@ -78,8 +94,8 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                 message: RequestResponseMessage::Response { response, .. },
                 ..
             } => {
-                if let AliceToBob::Message1(msg) = response {
-                    debug!("Received Message1");
+                if let AliceToBob::Message0(msg) = response {
+                    debug!("Received Message0");
                     self.events.push_back(OutEvent::Msg(*msg));
                 }
             }
