@@ -359,6 +359,7 @@ pub struct State0 {
     cancel_timelock: Timelock,
     punish_timelock: Timelock,
     refund_address: bitcoin::Address,
+    min_monero_confirmations: u32,
 }
 
 impl State0 {
@@ -369,6 +370,7 @@ impl State0 {
         cancel_timelock: Timelock,
         punish_timelock: Timelock,
         refund_address: bitcoin::Address,
+        min_monero_confirmations: u32,
     ) -> Self {
         let b = bitcoin::SecretKey::new_random(rng);
 
@@ -384,6 +386,7 @@ impl State0 {
             cancel_timelock,
             punish_timelock,
             refund_address,
+            min_monero_confirmations,
         }
     }
 
@@ -432,6 +435,7 @@ impl State0 {
             redeem_address: msg.redeem_address,
             punish_address: msg.punish_address,
             tx_lock,
+            min_monero_confirmations: self.min_monero_confirmations,
         })
     }
 }
@@ -453,6 +457,7 @@ pub struct State1 {
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
+    min_monero_confirmations: u32,
 }
 
 impl State1 {
@@ -491,6 +496,7 @@ impl State1 {
             tx_lock: self.tx_lock,
             tx_cancel_sig_a: msg.tx_cancel_sig,
             tx_refund_encsig: msg.tx_refund_encsig,
+            min_monero_confirmations: self.min_monero_confirmations,
         })
     }
 }
@@ -514,6 +520,7 @@ pub struct State2 {
     pub tx_lock: bitcoin::TxLock,
     pub tx_cancel_sig_a: Signature,
     pub tx_refund_encsig: EncryptedSignature,
+    pub min_monero_confirmations: u32,
 }
 
 impl State2 {
@@ -558,6 +565,7 @@ impl State2 {
             tx_lock: self.tx_lock,
             tx_cancel_sig_a: self.tx_cancel_sig_a,
             tx_refund_encsig: self.tx_refund_encsig,
+            min_monero_confirmations: self.min_monero_confirmations,
         })
     }
 }
@@ -581,6 +589,7 @@ pub struct State3 {
     pub tx_lock: bitcoin::TxLock,
     pub tx_cancel_sig_a: Signature,
     pub tx_refund_encsig: EncryptedSignature,
+    pub min_monero_confirmations: u32,
 }
 
 impl State3 {
@@ -599,7 +608,7 @@ impl State3 {
                 self.v.public(),
                 msg.tx_lock_proof,
                 self.xmr,
-                monero::MIN_CONFIRMATIONS,
+                self.min_monero_confirmations,
             )
             .await?;
 

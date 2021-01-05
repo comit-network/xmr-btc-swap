@@ -98,6 +98,7 @@ async fn happy_path() {
         bob_xmr_wallet.clone(),
         OsRng,
         Uuid::new_v4(),
+        config,
     )
     .boxed();
 

@@ -136,6 +136,7 @@ async fn main() -> Result<()> {
                 config.bitcoin_cancel_timelock,
                 config.bitcoin_punish_timelock,
                 refund_address,
+                config.monero_finality_confirmations,
             );
 
             let amounts = SwapAmounts {
@@ -159,6 +160,7 @@ async fn main() -> Result<()> {
                 db,
                 alice_peer_id,
                 alice_addr,
+                config,
             )
             .await?;
         }
@@ -234,6 +236,7 @@ async fn main() -> Result<()> {
                 db,
                 alice_peer_id,
                 alice_addr,
+                config,
             )
             .await?;
         }
@@ -301,6 +304,7 @@ async fn alice_swap(
     swap.await
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn bob_swap(
     swap_id: Uuid,
     state: BobState,
@@ -309,6 +313,7 @@ async fn bob_swap(
     db: Database,
     alice_peer_id: PeerId,
     alice_addr: Multiaddr,
+    config: Config,
 ) -> Result<BobState> {
     let bob_behaviour = bob::Behaviour::default();
     let bob_transport = build(bob_behaviour.identity())?;
@@ -324,6 +329,7 @@ async fn bob_swap(
         monero_wallet.clone(),
         OsRng,
         swap_id,
+        config,
     );
 
     tokio::spawn(event_loop.run());

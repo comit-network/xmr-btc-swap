@@ -176,6 +176,7 @@ pub async fn init_bob_state(
         config.bitcoin_cancel_timelock,
         config.bitcoin_punish_timelock,
         refund_address,
+        config.monero_finality_confirmations,
     );
 
     BobState::Started { state0, amounts }

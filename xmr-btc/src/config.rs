@@ -8,6 +8,7 @@ pub struct Config {
     pub bitcoin_finality_confirmations: u32,
     pub bitcoin_avg_block_time: Duration,
     pub monero_max_finality_time: Duration,
+    pub monero_finality_confirmations: u32,
     pub bitcoin_cancel_timelock: Timelock,
     pub bitcoin_punish_timelock: Timelock,
     pub bitcoin_network: ::bitcoin::Network,
@@ -24,6 +25,7 @@ impl Config {
             // blockchain is slow
             monero_max_finality_time: (*mainnet::MONERO_AVG_BLOCK_TIME).mul_f64(1.5)
                 * mainnet::MONERO_FINALITY_CONFIRMATIONS,
+            monero_finality_confirmations: mainnet::MONERO_FINALITY_CONFIRMATIONS,
             bitcoin_cancel_timelock: mainnet::BITCOIN_CANCEL_TIMELOCK,
             bitcoin_punish_timelock: mainnet::BITCOIN_PUNISH_TIMELOCK,
             bitcoin_network: ::bitcoin::Network::Bitcoin,
@@ -40,6 +42,7 @@ impl Config {
             // blockchain is slow
             monero_max_finality_time: (*testnet::MONERO_AVG_BLOCK_TIME).mul_f64(1.5)
                 * testnet::MONERO_FINALITY_CONFIRMATIONS,
+            monero_finality_confirmations: testnet::MONERO_FINALITY_CONFIRMATIONS,
             bitcoin_cancel_timelock: testnet::BITCOIN_CANCEL_TIMELOCK,
             bitcoin_punish_timelock: testnet::BITCOIN_PUNISH_TIMELOCK,
             bitcoin_network: ::bitcoin::Network::Testnet,
@@ -56,6 +59,7 @@ impl Config {
             // blockchain is slow
             monero_max_finality_time: (*regtest::MONERO_AVG_BLOCK_TIME).mul_f64(1.5)
                 * regtest::MONERO_FINALITY_CONFIRMATIONS,
+            monero_finality_confirmations: regtest::MONERO_FINALITY_CONFIRMATIONS,
             bitcoin_cancel_timelock: regtest::BITCOIN_CANCEL_TIMELOCK,
             bitcoin_punish_timelock: regtest::BITCOIN_PUNISH_TIMELOCK,
             bitcoin_network: ::bitcoin::Network::Regtest,
@@ -96,7 +100,9 @@ mod testnet {
     // This does not reflect recommended values for mainnet!
     pub static MONERO_FINALITY_CONFIRMATIONS: u32 = 5;
 
-    pub static MONERO_AVG_BLOCK_TIME: Lazy<Duration> = Lazy::new(|| Duration::from_secs(2 * 60));
+    // The average blocktime on Monero stagenet is not as constant as on mainnet,
+    // hence 4 minutes it set
+    pub static MONERO_AVG_BLOCK_TIME: Lazy<Duration> = Lazy::new(|| Duration::from_secs(4 * 60));
 
     // This does not reflect recommended values for mainnet!
     pub static BITCOIN_CANCEL_TIMELOCK: Timelock = Timelock::new(6);
