@@ -210,6 +210,7 @@ pub trait CreateWalletForOutput {
         &self,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
+        restore_height: Option<u32>,
     ) -> anyhow::Result<()>;
 }
 

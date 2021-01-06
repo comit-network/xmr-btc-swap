@@ -304,7 +304,12 @@ pub struct State3 {
 }
 
 impl State3 {
-    pub async fn watch_for_lock_xmr<W>(self, xmr_wallet: &W, msg: alice::Message2) -> Result<State4>
+    pub async fn watch_for_lock_xmr<W>(
+        self,
+        xmr_wallet: &W,
+        msg: alice::Message2,
+        monero_wallet_restore_blockheight: u32,
+    ) -> Result<State4>
     where
         W: monero::WatchForTransfer,
     {
@@ -340,6 +345,7 @@ impl State3 {
             tx_lock: self.tx_lock,
             tx_cancel_sig_a: self.tx_cancel_sig_a,
             tx_refund_encsig: self.tx_refund_encsig,
+            monero_wallet_restore_blockheight,
         })
     }
 
@@ -373,6 +379,7 @@ impl State3 {
             tx_lock: self.tx_lock.clone(),
             tx_cancel_sig_a: self.tx_cancel_sig_a.clone(),
             tx_refund_encsig: self.tx_refund_encsig.clone(),
+            monero_wallet_restore_blockheight: 0u32,
         }
     }
 
@@ -413,6 +420,7 @@ pub struct State4 {
     pub tx_lock: bitcoin::TxLock,
     pub tx_cancel_sig_a: Signature,
     pub tx_refund_encsig: EncryptedSignature,
+    pub monero_wallet_restore_blockheight: u32,
 }
 
 impl State4 {
@@ -509,6 +517,7 @@ impl State4 {
             tx_lock: self.tx_lock.clone(),
             tx_refund_encsig: self.tx_refund_encsig.clone(),
             tx_cancel_sig: self.tx_cancel_sig_a.clone(),
+            monero_wallet_restore_blockheight: self.monero_wallet_restore_blockheight,
         })
     }
 
@@ -606,6 +615,7 @@ pub struct State5 {
     pub tx_lock: bitcoin::TxLock,
     tx_refund_encsig: EncryptedSignature,
     tx_cancel_sig: Signature,
+    pub monero_wallet_restore_blockheight: u32,
 }
 
 impl State5 {
@@ -622,7 +632,11 @@ impl State5 {
         // NOTE: This actually generates and opens a new wallet, closing the currently
         // open one.
         monero_wallet
-            .create_and_load_wallet_for_output(s, self.v)
+            .create_and_load_wallet_for_output(
+                s,
+                self.v,
+                Some(self.monero_wallet_restore_blockheight),
+            )
             .await?;
 
         Ok(())
