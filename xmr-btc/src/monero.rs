@@ -14,7 +14,6 @@ use rust_decimal::{
 };
 use std::{fmt::Display, str::FromStr};
 
-pub const MIN_CONFIRMATIONS: u32 = 10;
 pub const PICONERO_OFFSET: u64 = 1_000_000_000_000;
 
 pub fn random_private_key<R: RngCore + CryptoRng>(rng: &mut R) -> PrivateKey {
