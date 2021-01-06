@@ -14,7 +14,7 @@ use rust_decimal::{
 };
 use std::{fmt::Display, str::FromStr};
 
-pub const MIN_CONFIRMATIONS: u32 = 10;
+pub const MIN_CONFIRMATIONS: u32 = 1;
 pub const PICONERO_OFFSET: u64 = 1_000_000_000_000;
 
 pub fn random_private_key<R: RngCore + CryptoRng>(rng: &mut R) -> PrivateKey {
@@ -147,6 +147,11 @@ pub struct TransferProof {
     tx_key: PrivateKey,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TransferInfo {
+    pub first_confirmation_block_height: u32,
+}
+
 impl TransferProof {
     pub fn new(tx_hash: TxHash, tx_key: PrivateKey) -> Self {
         Self { tx_hash, tx_key }
@@ -188,7 +193,7 @@ pub trait WatchForTransfer {
         transfer_proof: TransferProof,
         amount: Amount,
         expected_confirmations: u32,
-    ) -> Result<(), InsufficientFunds>;
+    ) -> Result<TransferInfo>;
 }
 
 #[derive(Debug, Clone, Copy, thiserror::Error)]
@@ -198,12 +203,19 @@ pub struct InsufficientFunds {
     pub actual: Amount,
 }
 
+#[derive(Debug, Clone, thiserror::Error)]
+#[error("Transfer with id {txid:?} not found.")]
+pub struct TransferNotFound {
+    pub txid: String,
+}
+
 #[async_trait]
 pub trait CreateWalletForOutput {
     async fn create_and_load_wallet_for_output(
         &self,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
+        restore_height: Option<u32>,
     ) -> anyhow::Result<()>;
 }
 

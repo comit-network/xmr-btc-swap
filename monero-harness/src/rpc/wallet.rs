@@ -186,7 +186,7 @@ impl Client {
     }
 
     /// Get wallet block height, this might be behind monerod height.
-    pub(crate) async fn block_height(&self) -> Result<BlockHeight> {
+    pub async fn block_height(&self) -> Result<BlockHeight> {
         let request = Request::new("get_height", "");
 
         let response = self
@@ -233,14 +233,43 @@ impl Client {
         Ok(r.result)
     }
 
+    pub async fn get_transfer_by_txid(&self, tx_id: &str) -> Result<GetTransferByTxid> {
+        let params = GetTransferByTxidParams {
+            tx_id: tx_id.to_owned(),
+        };
+
+        let request = Request::new("get_transfer_by_txid", params);
+
+        let response = self
+            .inner
+            .post(self.url.clone())
+            .json(&request)
+            .send()
+            .await?
+            .text()
+            .await?;
+
+        debug!("transfer RPC response: {}", response);
+
+        let r: Response<GetTransferByTxid> = serde_json::from_str(&response)?;
+        Ok(r.result)
+    }
+
     pub async fn generate_from_keys(
         &self,
         address: &str,
         spend_key: &str,
         view_key: &str,
+        restore_height: Option<u32>,
     ) -> Result<GenerateFromKeys> {
+        let restore_height = if let Some(restore_height) = restore_height {
+            restore_height
+        } else {
+            0
+        };
+
         let params = GenerateFromKeysParams {
-            restore_height: 0,
+            restore_height,
             filename: view_key.into(),
             address: address.into(),
             spendkey: spend_key.into(),
@@ -393,6 +422,17 @@ pub struct CheckTxKey {
     pub confirmations: u32,
     pub in_pool: bool,
     pub received: u64,
+}
+
+#[derive(Serialize, Debug, Clone)]
+struct GetTransferByTxidParams {
+    #[serde(rename = "txid")]
+    tx_id: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+pub struct GetTransferByTxid {
+    pub height: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]

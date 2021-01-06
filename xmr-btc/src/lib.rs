@@ -1,7 +1,6 @@
 #![warn(
     unused_extern_crates,
     missing_debug_implementations,
-    missing_copy_implementations,
     rust_2018_idioms,
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,

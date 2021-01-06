@@ -64,6 +64,7 @@ impl CreateWalletForOutput for Wallet {
         &self,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
+        restore_height: Option<u32>,
     ) -> Result<()> {
         let public_spend_key = PublicKey::from_private_key(&private_spend_key);
         let public_view_key = PublicKey::from_private_key(&private_view_key.into());
@@ -76,6 +77,7 @@ impl CreateWalletForOutput for Wallet {
                 &address.to_string(),
                 &private_spend_key.to_string(),
                 &PrivateKey::from(private_view_key).to_string(),
+                restore_height,
             )
             .await?;
 
@@ -95,16 +97,17 @@ impl WatchForTransfer for Wallet {
         transfer_proof: TransferProof,
         expected_amount: Amount,
         expected_confirmations: u32,
-    ) -> Result<(), InsufficientFunds> {
+    ) -> Result<TransferInfo> {
         enum Error {
             TxNotFound,
+            TransferNotFound { txid: String },
             InsufficientConfirmations,
             InsufficientFunds { expected: Amount, actual: Amount },
         }
 
         let address = Address::standard(self.network, public_spend_key, public_view_key.into());
 
-        let res = (|| async {
+        let result = (|| async {
             // NOTE: Currently, this is conflating IO errors with the transaction not being
             // in the blockchain yet, or not having enough confirmations on it. All these
             // errors warrant a retry, but the strategy should probably differ per case
@@ -129,15 +132,35 @@ impl WatchForTransfer for Wallet {
                 return Err(backoff::Error::Transient(Error::InsufficientConfirmations));
             }
 
-            Ok(proof)
+            let tx_hash = transfer_proof.tx_hash();
+            let get_transfer_by_tx_id =
+                self.inner
+                    .get_transfer_by_txid(&tx_hash.0)
+                    .await
+                    .map_err(|_| {
+                        backoff::Error::Permanent(Error::TransferNotFound { txid: tx_hash.0 })
+                    })?;
+            let transfer_info = TransferInfo {
+                first_confirmation_block_height: get_transfer_by_tx_id.height,
+            };
+
+            Ok((proof, transfer_info))
         })
         .retry(ConstantBackoff::new(Duration::from_secs(1)))
         .await;
 
-        if let Err(Error::InsufficientFunds { expected, actual }) = res {
-            return Err(InsufficientFunds { expected, actual });
-        };
-
-        Ok(())
+        match result {
+            Ok((_, transfer_info)) => Ok(transfer_info),
+            Err(Error::InsufficientFunds { expected, actual }) => {
+                anyhow::bail!(InsufficientFunds { expected, actual })
+            }
+            Err(Error::TransferNotFound { txid }) => anyhow::bail!(TransferNotFound { txid }),
+            Err(Error::TxNotFound) => {
+                unreachable!("Transient backoff error will never be returned")
+            }
+            Err(Error::InsufficientConfirmations) => {
+                unreachable!("Transient backoff error will never be returned")
+            }
+        }
     }
 }
