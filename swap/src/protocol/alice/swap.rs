@@ -214,10 +214,8 @@ pub async fn run_until(
                 // expressed more cleanly
                 let state = match state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {
                     ExpiredTimelocks::None => {
-                        let wait_for_enc_sig = wait_for_bitcoin_encrypted_signature(
-                            &mut event_loop_handle,
-                            config.monero_max_finality_time,
-                        );
+                        let wait_for_enc_sig =
+                            wait_for_bitcoin_encrypted_signature(&mut event_loop_handle);
                         let state3_clone = state3.clone();
                         let cancel_timelock_expires = state3_clone
                             .wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
