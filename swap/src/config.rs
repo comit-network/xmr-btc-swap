@@ -86,7 +86,7 @@ mod testnet {
     pub static MONERO_FINALITY_CONFIRMATIONS: u32 = 5;
 
     // This does not reflect recommended values for mainnet!
-    pub static BITCOIN_CANCEL_TIMELOCK: Timelock = Timelock::new(6);
+    pub static BITCOIN_CANCEL_TIMELOCK: Timelock = Timelock::new(12);
     pub static BITCOIN_PUNISH_TIMELOCK: Timelock = Timelock::new(6);
 }
 
