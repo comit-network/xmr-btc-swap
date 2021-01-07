@@ -160,7 +160,6 @@ async fn main() -> Result<()> {
                 db,
                 alice_peer_id,
                 alice_addr,
-                config,
             )
             .await?;
         }
@@ -236,7 +235,6 @@ async fn main() -> Result<()> {
                 db,
                 alice_peer_id,
                 alice_addr,
-                config,
             )
             .await?;
         }
@@ -313,7 +311,6 @@ async fn bob_swap(
     db: Database,
     alice_peer_id: PeerId,
     alice_addr: Multiaddr,
-    config: Config,
 ) -> Result<BobState> {
     let bob_behaviour = bob::Behaviour::default();
     let bob_transport = build(bob_behaviour.identity())?;
@@ -329,7 +326,6 @@ async fn bob_swap(
         monero_wallet.clone(),
         OsRng,
         swap_id,
-        config,
     );
 
     tokio::spawn(event_loop.run());
