@@ -15,8 +15,8 @@ use crate::{
         Transaction, TransactionBlockHeight, TxCancel, Txid, WatchForRawTransaction,
     },
     monero,
+    monero::monero_private_key,
     protocol::{alice, bob},
-    serde::monero_private_key,
     ExpiredTimelocks,
 };
 

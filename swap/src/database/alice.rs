@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bitcoin::{EncryptedSignature, TxCancel, TxRefund},
     monero,
+    monero::monero_private_key,
     protocol::{alice, alice::swap::AliceState},
-    serde::monero_private_key,
     SwapAmounts,
 };
 

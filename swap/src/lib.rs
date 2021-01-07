@@ -16,7 +16,7 @@
     missing_copy_implementations
 )]
 
-use ::serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
 pub mod bitcoin;
@@ -26,7 +26,6 @@ pub mod database;
 pub mod monero;
 pub mod network;
 pub mod protocol;
-pub mod serde;
 pub mod trace;
 
 pub type Never = std::convert::Infallible;
@@ -52,7 +51,7 @@ pub struct SwapAmounts {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub btc: bitcoin::Amount,
     /// Amount of XMR to swap.
-    #[serde(with = "serde::monero_amount")]
+    #[serde(with = "monero::monero_amount")]
     pub xmr: monero::Amount,
 }
 
