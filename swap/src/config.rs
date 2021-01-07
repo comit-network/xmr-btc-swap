@@ -1,4 +1,4 @@
-use crate::bitcoin::timelocks::Timelock;
+use crate::bitcoin::Timelock;
 use conquer_once::Lazy;
 use std::time::Duration;
 
@@ -11,8 +11,8 @@ pub struct Config {
     pub monero_finality_confirmations: u32,
     pub bitcoin_cancel_timelock: Timelock,
     pub bitcoin_punish_timelock: Timelock,
-    pub bitcoin_network: ::bitcoin::Network,
-    pub monero_network: ::monero::Network,
+    pub bitcoin_network: bitcoin::Network,
+    pub monero_network: monero::Network,
 }
 
 impl Config {
@@ -28,8 +28,8 @@ impl Config {
             monero_finality_confirmations: mainnet::MONERO_FINALITY_CONFIRMATIONS,
             bitcoin_cancel_timelock: mainnet::BITCOIN_CANCEL_TIMELOCK,
             bitcoin_punish_timelock: mainnet::BITCOIN_PUNISH_TIMELOCK,
-            bitcoin_network: ::bitcoin::Network::Bitcoin,
-            monero_network: ::monero::Network::Mainnet,
+            bitcoin_network: bitcoin::Network::Bitcoin,
+            monero_network: monero::Network::Mainnet,
         }
     }
 
@@ -45,8 +45,8 @@ impl Config {
             monero_finality_confirmations: testnet::MONERO_FINALITY_CONFIRMATIONS,
             bitcoin_cancel_timelock: testnet::BITCOIN_CANCEL_TIMELOCK,
             bitcoin_punish_timelock: testnet::BITCOIN_PUNISH_TIMELOCK,
-            bitcoin_network: ::bitcoin::Network::Testnet,
-            monero_network: ::monero::Network::Stagenet,
+            bitcoin_network: bitcoin::Network::Testnet,
+            monero_network: monero::Network::Stagenet,
         }
     }
 
@@ -62,8 +62,8 @@ impl Config {
             monero_finality_confirmations: regtest::MONERO_FINALITY_CONFIRMATIONS,
             bitcoin_cancel_timelock: regtest::BITCOIN_CANCEL_TIMELOCK,
             bitcoin_punish_timelock: regtest::BITCOIN_PUNISH_TIMELOCK,
-            bitcoin_network: ::bitcoin::Network::Regtest,
-            monero_network: ::monero::Network::default(),
+            bitcoin_network: bitcoin::Network::Regtest,
+            monero_network: monero::Network::default(),
         }
     }
 }

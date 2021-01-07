@@ -1,4 +1,4 @@
-use ::bitcoin::{util::psbt::PartiallySignedTransaction, Address, Amount, Transaction, Txid};
+use ::bitcoin::{util::psbt::PartiallySignedTransaction, Txid};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
@@ -9,9 +9,9 @@ use tokio::time::interval;
 
 use crate::{
     bitcoin::{
-        timelocks::BlockHeight, BroadcastSignedTransaction, BuildTxLockPsbt, GetBlockHeight,
-        GetRawTransaction, Network, SignTxLock, TransactionBlockHeight, TxLock,
-        WaitForTransactionFinality, WatchForRawTransaction,
+        timelocks::BlockHeight, Address, Amount, BroadcastSignedTransaction, BuildTxLockPsbt,
+        GetBlockHeight, GetNetwork, GetRawTransaction, SignTxLock, Transaction,
+        TransactionBlockHeight, TxLock, WaitForTransactionFinality, WatchForRawTransaction,
     },
     config::Config,
 };
@@ -194,7 +194,7 @@ impl WaitForTransactionFinality for Wallet {
     }
 }
 
-impl Network for Wallet {
+impl GetNetwork for Wallet {
     fn get_network(&self) -> bitcoin::Network {
         self.network
     }

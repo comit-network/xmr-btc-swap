@@ -2,7 +2,7 @@ use libp2p::{core::Multiaddr, PeerId};
 use url::Url;
 use uuid::Uuid;
 
-use crate::monero;
+use crate::{bitcoin, monero};
 
 #[derive(structopt::StructOpt, Debug)]
 pub struct Options {
@@ -37,7 +37,7 @@ pub enum Command {
         send_monero: monero::Amount,
 
         #[structopt(long = "receive-btc", help = "Bitcoin amount as floating point nr without denomination (e.g. 1.25)", parse(try_from_str = parse_btc))]
-        receive_bitcoin: ::bitcoin::Amount,
+        receive_bitcoin: bitcoin::Amount,
     },
     BuyXmr {
         #[structopt(long = "connect-peer-id")]
@@ -59,7 +59,7 @@ pub enum Command {
         monero_wallet_rpc_url: Url,
 
         #[structopt(long = "send-btc", help = "Bitcoin amount as floating point nr without denomination (e.g. 1.25)", parse(try_from_str = parse_btc))]
-        send_bitcoin: ::bitcoin::Amount,
+        send_bitcoin: bitcoin::Amount,
 
         #[structopt(long = "receive-xmr", help = "Monero amount as floating point nr without denomination (e.g. 125.1)", parse(try_from_str = parse_xmr))]
         receive_monero: monero::Amount,

@@ -1,4 +1,4 @@
-use bitcoin::hashes::core::fmt::Display;
+use ::bitcoin::hashes::core::fmt::Display;
 use serde::{Deserialize, Serialize};
 
 use crate::{

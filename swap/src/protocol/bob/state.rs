@@ -1,4 +1,3 @@
-use ::bitcoin::{Transaction, Txid};
 use anyhow::{anyhow, Result};
 use ecdsa_fun::{
     adaptor::{Adaptor, EncryptedSignature},
@@ -12,8 +11,8 @@ use sha2::Sha256;
 use crate::{
     bitcoin::{
         self, current_epoch, timelocks::Timelock, wait_for_cancel_timelock_to_expire,
-        BroadcastSignedTransaction, BuildTxLockPsbt, GetBlockHeight, GetRawTransaction, Network,
-        TransactionBlockHeight, TxCancel, WatchForRawTransaction,
+        BroadcastSignedTransaction, BuildTxLockPsbt, GetBlockHeight, GetNetwork, GetRawTransaction,
+        Transaction, TransactionBlockHeight, TxCancel, Txid, WatchForRawTransaction,
     },
     monero,
     protocol::{alice, bob},
@@ -80,7 +79,7 @@ impl State0 {
 
     pub async fn receive<W>(self, wallet: &W, msg: alice::Message0) -> anyhow::Result<State1>
     where
-        W: BuildTxLockPsbt + Network,
+        W: BuildTxLockPsbt + GetNetwork,
     {
         msg.dleq_proof_s_a.verify(
             msg.S_a_bitcoin.clone().into(),

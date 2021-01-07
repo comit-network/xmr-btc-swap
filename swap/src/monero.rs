@@ -17,8 +17,8 @@ use std::{
 
 use crate::{bitcoin, serde::monero_private_key};
 
+pub use ::monero::{Network, PrivateKey, PublicKey};
 pub use curve25519_dalek::scalar::Scalar;
-pub use monero::*;
 pub use wallet::Wallet;
 
 pub const PICONERO_OFFSET: u64 = 1_000_000_000_000;

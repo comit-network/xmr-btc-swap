@@ -1,6 +1,11 @@
+use ::bitcoin::{
+    hashes::{hex::ToHex, Hash},
+    secp256k1,
+    util::psbt::PartiallySignedTransaction,
+    SigHash,
+};
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
-use bitcoin::hashes::{hex::ToHex, Hash};
 use ecdsa_fun::{adaptor::Adaptor, fun::Point, nonce::Deterministic, ECDSA};
 use miniscript::{Descriptor, Segwitv0};
 use rand::{CryptoRng, RngCore};
@@ -8,11 +13,13 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
 
-use crate::{config::Config, ExpiredTimelocks};
+use crate::{bitcoin::timelocks::BlockHeight, config::Config, ExpiredTimelocks};
 
-use crate::bitcoin::timelocks::{BlockHeight, Timelock};
-pub use crate::bitcoin::transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund};
-pub use ::bitcoin::{util::psbt::PartiallySignedTransaction, *};
+pub use crate::bitcoin::{
+    timelocks::Timelock,
+    transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund},
+};
+pub use ::bitcoin::{util::amount::Amount, Address, Network, Transaction, Txid};
 pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
 pub use wallet::Wallet;
 
@@ -225,8 +232,8 @@ pub trait GetRawTransaction {
 }
 
 #[async_trait]
-pub trait Network {
-    fn get_network(&self) -> bitcoin::Network;
+pub trait GetNetwork {
+    fn get_network(&self) -> Network;
 }
 
 pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Result<SecretKey> {
