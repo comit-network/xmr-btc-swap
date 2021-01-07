@@ -10,7 +10,7 @@ use swap::{
     bitcoin,
     config::Config,
     monero,
-    protocol::{alice, alice::swap::AliceState, bob, bob::swap::BobState},
+    protocol::{alice, alice::AliceState, bob, bob::BobState},
 };
 use testcontainers::clients::Cli;
 use testutils::init_tracing;

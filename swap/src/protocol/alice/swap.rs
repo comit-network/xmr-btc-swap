@@ -6,102 +6,34 @@ use futures::{
     future::{select, Either},
     pin_mut,
 };
-use libp2p::request_response::ResponseChannel;
 use rand::{CryptoRng, RngCore};
-use std::{fmt, sync::Arc};
+use std::sync::Arc;
 use tracing::info;
 use uuid::Uuid;
 
 use crate::{
     bitcoin,
-    bitcoin::{
-        EncryptedSignature, TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction,
-    },
+    bitcoin::{TransactionBlockHeight, WatchForRawTransaction},
     config::Config,
     database::{Database, Swap},
     monero,
     monero::CreateWalletForOutput,
-    network::request_response::AliceToBob,
     protocol::alice::{
         event_loop::EventLoopHandle,
-        state::{State0, State3},
         steps::{
             build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
             extract_monero_private_key, lock_xmr, negotiate, publish_bitcoin_punish_transaction,
             publish_bitcoin_redeem_transaction, publish_cancel_transaction,
             wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund, wait_for_locked_bitcoin,
         },
+        AliceState,
     },
-    ExpiredTimelocks, SwapAmounts,
+    ExpiredTimelocks,
 };
 
 trait Rng: RngCore + CryptoRng + Send {}
 
 impl<T> Rng for T where T: RngCore + CryptoRng + Send {}
-
-#[derive(Debug)]
-pub enum AliceState {
-    Started {
-        amounts: SwapAmounts,
-        state0: State0,
-    },
-    Negotiated {
-        channel: Option<ResponseChannel<AliceToBob>>,
-        amounts: SwapAmounts,
-        state3: Box<State3>,
-    },
-    BtcLocked {
-        channel: Option<ResponseChannel<AliceToBob>>,
-        amounts: SwapAmounts,
-        state3: Box<State3>,
-    },
-    XmrLocked {
-        state3: Box<State3>,
-    },
-    EncSigLearned {
-        encrypted_signature: EncryptedSignature,
-        state3: Box<State3>,
-    },
-    BtcRedeemed,
-    BtcCancelled {
-        tx_cancel: TxCancel,
-        state3: Box<State3>,
-    },
-    BtcRefunded {
-        spend_key: monero::PrivateKey,
-        state3: Box<State3>,
-    },
-    BtcPunishable {
-        tx_refund: TxRefund,
-        state3: Box<State3>,
-    },
-    XmrRefunded,
-    CancelTimelockExpired {
-        state3: Box<State3>,
-    },
-    BtcPunished,
-    SafelyAborted,
-}
-
-impl fmt::Display for AliceState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            AliceState::Started { .. } => write!(f, "started"),
-            AliceState::Negotiated { .. } => write!(f, "negotiated"),
-            AliceState::BtcLocked { .. } => write!(f, "btc is locked"),
-            AliceState::XmrLocked { .. } => write!(f, "xmr is locked"),
-            AliceState::EncSigLearned { .. } => write!(f, "encrypted signature is learned"),
-            AliceState::BtcRedeemed => write!(f, "btc is redeemed"),
-            AliceState::BtcCancelled { .. } => write!(f, "btc is cancelled"),
-            AliceState::BtcRefunded { .. } => write!(f, "btc is refunded"),
-            AliceState::BtcPunished => write!(f, "btc is punished"),
-            AliceState::SafelyAborted => write!(f, "safely aborted"),
-            AliceState::BtcPunishable { .. } => write!(f, "btc is punishable"),
-            AliceState::XmrRefunded => write!(f, "xmr is refunded"),
-            AliceState::CancelTimelockExpired { .. } => write!(f, "cancel timelock is expired"),
-        }
-    }
-}
 
 pub async fn swap(
     state: AliceState,

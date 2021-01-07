@@ -26,7 +26,7 @@ use swap::{
     database::{Database, Swap},
     monero,
     network::transport::build,
-    protocol::{alice, alice::swap::AliceState, bob, bob::swap::BobState},
+    protocol::{alice, alice::AliceState, bob, bob::BobState},
     trace::init_tracing,
     SwapAmounts,
 };

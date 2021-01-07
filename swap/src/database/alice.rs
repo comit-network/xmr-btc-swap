@@ -5,7 +5,7 @@ use crate::{
     bitcoin::{EncryptedSignature, TxCancel, TxRefund},
     monero,
     monero::monero_private_key,
-    protocol::{alice, alice::swap::AliceState},
+    protocol::{alice, alice::AliceState},
     SwapAmounts,
 };
 

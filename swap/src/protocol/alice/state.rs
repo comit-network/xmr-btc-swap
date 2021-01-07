@@ -3,23 +3,89 @@ use ecdsa_fun::{
     adaptor::{Adaptor, EncryptedSignature},
     nonce::Deterministic,
 };
+use libp2p::request_response::ResponseChannel;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-
+use std::fmt;
 use tracing::info;
 
 use crate::{
     bitcoin,
     bitcoin::{
         current_epoch, timelocks::Timelock, wait_for_cancel_timelock_to_expire, GetBlockHeight,
-        TransactionBlockHeight, WatchForRawTransaction,
+        TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction,
     },
     monero,
     monero::CreateWalletForOutput,
+    network::request_response::AliceToBob,
     protocol::{alice, bob},
-    ExpiredTimelocks,
+    ExpiredTimelocks, SwapAmounts,
 };
+
+#[derive(Debug)]
+pub enum AliceState {
+    Started {
+        amounts: SwapAmounts,
+        state0: State0,
+    },
+    Negotiated {
+        channel: Option<ResponseChannel<AliceToBob>>,
+        amounts: SwapAmounts,
+        state3: Box<State3>,
+    },
+    BtcLocked {
+        channel: Option<ResponseChannel<AliceToBob>>,
+        amounts: SwapAmounts,
+        state3: Box<State3>,
+    },
+    XmrLocked {
+        state3: Box<State3>,
+    },
+    EncSigLearned {
+        encrypted_signature: EncryptedSignature,
+        state3: Box<State3>,
+    },
+    BtcRedeemed,
+    BtcCancelled {
+        tx_cancel: TxCancel,
+        state3: Box<State3>,
+    },
+    BtcRefunded {
+        spend_key: monero::PrivateKey,
+        state3: Box<State3>,
+    },
+    BtcPunishable {
+        tx_refund: TxRefund,
+        state3: Box<State3>,
+    },
+    XmrRefunded,
+    CancelTimelockExpired {
+        state3: Box<State3>,
+    },
+    BtcPunished,
+    SafelyAborted,
+}
+
+impl fmt::Display for AliceState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AliceState::Started { .. } => write!(f, "started"),
+            AliceState::Negotiated { .. } => write!(f, "negotiated"),
+            AliceState::BtcLocked { .. } => write!(f, "btc is locked"),
+            AliceState::XmrLocked { .. } => write!(f, "xmr is locked"),
+            AliceState::EncSigLearned { .. } => write!(f, "encrypted signature is learned"),
+            AliceState::BtcRedeemed => write!(f, "btc is redeemed"),
+            AliceState::BtcCancelled { .. } => write!(f, "btc is cancelled"),
+            AliceState::BtcRefunded { .. } => write!(f, "btc is refunded"),
+            AliceState::BtcPunished => write!(f, "btc is punished"),
+            AliceState::SafelyAborted => write!(f, "safely aborted"),
+            AliceState::BtcPunishable { .. } => write!(f, "btc is punishable"),
+            AliceState::XmrRefunded => write!(f, "xmr is refunded"),
+            AliceState::CancelTimelockExpired { .. } => write!(f, "cancel timelock is expired"),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct State0 {

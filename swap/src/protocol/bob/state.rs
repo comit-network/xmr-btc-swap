@@ -7,6 +7,7 @@ use ecdsa_fun::{
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
+use std::fmt;
 
 use crate::{
     bitcoin::{
@@ -17,8 +18,46 @@ use crate::{
     monero,
     monero::monero_private_key,
     protocol::{alice, bob},
-    ExpiredTimelocks,
+    ExpiredTimelocks, SwapAmounts,
 };
+
+#[derive(Debug, Clone)]
+pub enum BobState {
+    Started {
+        state0: State0,
+        amounts: SwapAmounts,
+    },
+    Negotiated(State2),
+    BtcLocked(State3),
+    XmrLocked(State4),
+    EncSigSent(State4),
+    BtcRedeemed(State5),
+    CancelTimelockExpired(State4),
+    BtcCancelled(State4),
+    BtcRefunded(State4),
+    XmrRedeemed,
+    BtcPunished,
+    SafelyAborted,
+}
+
+impl fmt::Display for BobState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BobState::Started { .. } => write!(f, "started"),
+            BobState::Negotiated(..) => write!(f, "negotiated"),
+            BobState::BtcLocked(..) => write!(f, "btc is locked"),
+            BobState::XmrLocked(..) => write!(f, "xmr is locked"),
+            BobState::EncSigSent(..) => write!(f, "encrypted signature is sent"),
+            BobState::BtcRedeemed(..) => write!(f, "btc is redeemed"),
+            BobState::CancelTimelockExpired(..) => write!(f, "cancel timelock is expired"),
+            BobState::BtcCancelled(..) => write!(f, "btc is cancelled"),
+            BobState::BtcRefunded(..) => write!(f, "btc is refunded"),
+            BobState::XmrRedeemed => write!(f, "xmr is redeemed"),
+            BobState::BtcPunished => write!(f, "btc is punished"),
+            BobState::SafelyAborted => write!(f, "safely aborted"),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct State0 {

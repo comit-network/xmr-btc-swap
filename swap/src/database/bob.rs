@@ -2,7 +2,7 @@ use ::bitcoin::hashes::core::fmt::Display;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    protocol::{bob, bob::swap::BobState},
+    protocol::{bob, bob::BobState},
     SwapAmounts,
 };
 

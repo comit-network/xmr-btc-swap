@@ -7,7 +7,7 @@ use swap::{
     config::Config,
     database::Database,
     monero,
-    protocol::{alice, bob, bob::swap::BobState},
+    protocol::{alice, bob, bob::BobState},
 };
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
