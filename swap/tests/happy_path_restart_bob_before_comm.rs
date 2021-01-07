@@ -95,7 +95,6 @@ async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {
             bob_xmr_wallet.clone(),
             OsRng,
             bob_swap_id,
-            Config::regtest(),
         )
     };
 
@@ -121,7 +120,6 @@ async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {
         bob_xmr_wallet.clone(),
         OsRng,
         bob_swap_id,
-        Config::regtest(),
     );
 
     let bob_final_state = select! {

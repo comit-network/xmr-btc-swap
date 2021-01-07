@@ -8,7 +8,6 @@ use tracing::info;
 use uuid::Uuid;
 use xmr_btc::{
     bob::{self, State2},
-    config::Config,
     ExpiredTimelocks,
 };
 
@@ -60,7 +59,6 @@ pub async fn swap<R>(
     monero_wallet: Arc<crate::monero::Wallet>,
     rng: R,
     swap_id: Uuid,
-    config: Config,
 ) -> Result<BobState>
 where
     R: RngCore + CryptoRng + Send,
@@ -74,7 +72,6 @@ where
         monero_wallet,
         rng,
         swap_id,
-        config,
     )
     .await
 }
@@ -113,7 +110,6 @@ pub async fn run_until<R>(
     monero_wallet: Arc<crate::monero::Wallet>,
     mut rng: R,
     swap_id: Uuid,
-    config: Config,
 ) -> Result<BobState>
 where
     R: RngCore + CryptoRng + Send,
@@ -148,7 +144,6 @@ where
                     monero_wallet,
                     rng,
                     swap_id,
-                    config,
                 )
                 .await
             }
@@ -171,7 +166,6 @@ where
                     monero_wallet,
                     rng,
                     swap_id,
-                    config,
                 )
                 .await
             }
@@ -226,7 +220,6 @@ where
                     monero_wallet,
                     rng,
                     swap_id,
-                    config,
                 )
                 .await
             }
@@ -269,7 +262,6 @@ where
                     monero_wallet,
                     rng,
                     swap_id,
-                    config,
                 )
                 .await
             }
@@ -306,7 +298,6 @@ where
                     monero_wallet,
                     rng,
                     swap_id,
-                    config,
                 )
                 .await
             }
@@ -327,7 +318,6 @@ where
                     monero_wallet,
                     rng,
                     swap_id,
-                    config,
                 )
                 .await
             }
@@ -353,7 +343,6 @@ where
                     monero_wallet,
                     rng,
                     swap_id,
-                    config,
                 )
                 .await
             }
@@ -382,7 +371,6 @@ where
                     monero_wallet,
                     rng,
                     swap_id,
-                    config,
                 )
                 .await
             }
