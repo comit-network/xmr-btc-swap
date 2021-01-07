@@ -90,7 +90,7 @@ mod mainnet {
 mod testnet {
     use super::*;
 
-    pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(5 * 60));
+    pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(60 * 60));
 
     // This does not reflect recommended values for mainnet!
     pub static BITCOIN_FINALITY_CONFIRMATIONS: u32 = 1;
