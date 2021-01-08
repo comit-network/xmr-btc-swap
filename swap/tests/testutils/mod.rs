@@ -188,8 +188,9 @@ pub fn init_bob_event_loop(
     alice_peer_id: PeerId,
     alice_addr: Multiaddr,
 ) -> (bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle) {
+    let seed = Seed::random().unwrap();
     let bob_behaviour = bob::Behaviour::default();
-    let bob_transport = build(bob_behaviour.identity()).unwrap();
+    let bob_transport = build(bob_behaviour.identity(network::Seed::new(seed.bytes()))).unwrap();
     bob::event_loop::EventLoop::new(bob_transport, bob_behaviour, alice_peer_id, alice_addr)
         .unwrap()
 }
