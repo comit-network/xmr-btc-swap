@@ -1,6 +1,5 @@
 pub mod wallet;
 
-use ::bitcoin::hashes::core::fmt::Formatter;
 use anyhow::Result;
 use async_trait::async_trait;
 use rand::{CryptoRng, RngCore};
@@ -10,7 +9,7 @@ use rust_decimal::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    fmt::Display,
+    fmt::{Display, Formatter},
     ops::{Add, Mul, Sub},
     str::FromStr,
 };

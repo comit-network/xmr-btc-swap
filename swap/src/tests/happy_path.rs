@@ -6,7 +6,6 @@ use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
 use testcontainers::clients::Cli;
-
 use uuid::Uuid;
 
 use crate::{
