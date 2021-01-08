@@ -24,9 +24,10 @@ use swap::{
     cli::{Command, Options, Resume},
     config::Config,
     database::{Database, Swap},
-    monero,
+    monero, network,
     network::transport::build,
     protocol::{alice, alice::AliceState, bob, bob::BobState},
+    seed::Seed,
     trace::init_tracing,
     SwapAmounts,
 };
@@ -41,12 +42,19 @@ async fn main() -> Result<()> {
     init_tracing(LevelFilter::Info).expect("initialize tracing");
 
     let opt = Options::from_args();
-
     let config = Config::testnet();
 
-    info!("Database: {}", opt.db_path);
-    let db = Database::open(std::path::Path::new(opt.db_path.as_str()))
-        .context("Could not open database")?;
+    info!(
+        "Database and Seed will be stored in directory: {}",
+        opt.data_dir
+    );
+    let data_dir = std::path::Path::new(opt.data_dir.as_str()).to_path_buf();
+    let db =
+        Database::open(data_dir.join("database").as_path()).context("Could not open database")?;
+
+    let seed = swap::config::seed::Seed::from_file_or_generate(&data_dir)
+        .expect("Could not retrieve/initialize seed")
+        .into();
 
     match opt.cmd {
         Command::SellXmr {
@@ -106,6 +114,7 @@ async fn main() -> Result<()> {
                 monero_wallet,
                 config,
                 db,
+                &seed,
             )
             .await?;
         }
@@ -201,6 +210,7 @@ async fn main() -> Result<()> {
                 monero_wallet,
                 config,
                 db,
+                &seed,
             )
             .await?;
         }
@@ -267,7 +277,7 @@ async fn setup_wallets(
 
     Ok((bitcoin_wallet, monero_wallet))
 }
-
+#[allow(clippy::too_many_arguments)]
 async fn alice_swap(
     swap_id: Uuid,
     state: AliceState,
@@ -276,12 +286,11 @@ async fn alice_swap(
     monero_wallet: Arc<swap::monero::Wallet>,
     config: Config,
     db: Database,
+    seed: &Seed,
 ) -> Result<AliceState> {
-    let alice_behaviour = alice::Behaviour::default();
-
+    let alice_behaviour = alice::Behaviour::new(network::Seed::new(seed.bytes()));
     let alice_peer_id = alice_behaviour.peer_id();
     info!("Own Peer-ID: {}", alice_peer_id);
-
     let alice_transport = build(alice_behaviour.identity())?;
 
     let (mut event_loop, handle) =

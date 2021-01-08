@@ -11,6 +11,7 @@ use swap::{
     config::Config,
     monero,
     protocol::{alice, bob},
+    seed::Seed,
 };
 use testcontainers::clients::Cli;
 use testutils::init_tracing;
@@ -65,6 +66,7 @@ async fn happy_path() {
         xmr_alice,
         alice_multiaddr.clone(),
         config,
+        &Seed::random().unwrap(),
     )
     .await;
 

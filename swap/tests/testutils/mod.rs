@@ -7,9 +7,10 @@ use swap::{
     bitcoin,
     config::Config,
     database::Database,
-    monero,
+    monero, network,
     network::transport::build,
     protocol::{alice, alice::AliceState, bob, bob::BobState},
+    seed::Seed,
     SwapAmounts,
 };
 use tempfile::tempdir;
@@ -106,13 +107,13 @@ pub async fn init_alice_state(
 
 pub fn init_alice_event_loop(
     listen: Multiaddr,
+    seed: &Seed,
 ) -> (
     alice::event_loop::EventLoop,
     alice::event_loop::EventLoopHandle,
 ) {
-    let alice_behaviour = alice::Behaviour::default();
+    let alice_behaviour = alice::Behaviour::new(network::Seed::new(seed.bytes()));
     let alice_transport = build(alice_behaviour.identity()).unwrap();
-
     alice::event_loop::EventLoop::new(alice_transport, alice_behaviour, listen).unwrap()
 }
 
@@ -125,6 +126,7 @@ pub async fn init_alice(
     xmr_starting_balance: monero::Amount,
     listen: Multiaddr,
     config: Config,
+    seed: &Seed,
 ) -> (
     AliceState,
     alice::event_loop::EventLoop,
@@ -146,7 +148,7 @@ pub async fn init_alice(
     let alice_start_state =
         init_alice_state(btc_to_swap, xmr_to_swap, alice_btc_wallet.clone(), config).await;
 
-    let (event_loop, event_loop_handle) = init_alice_event_loop(listen);
+    let (event_loop, event_loop_handle) = init_alice_event_loop(listen, seed);
 
     let alice_db_datadir = tempdir().unwrap();
     let alice_db = Database::open(alice_db_datadir.path()).unwrap();
