@@ -10,9 +10,8 @@ use crate::{
     protocol::{
         alice,
         alice::{Behaviour, OutEvent},
-        bob,
+        bob, SwapAmounts,
     },
-    SwapAmounts,
 };
 
 #[allow(missing_debug_implementations)]

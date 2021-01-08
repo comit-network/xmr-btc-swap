@@ -18,17 +18,20 @@ use crate::{
     database::{Database, Swap},
     monero,
     monero::CreateWalletForOutput,
-    protocol::alice::{
-        event_loop::EventLoopHandle,
-        steps::{
-            build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
-            extract_monero_private_key, lock_xmr, negotiate, publish_bitcoin_punish_transaction,
-            publish_bitcoin_redeem_transaction, publish_cancel_transaction,
-            wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund, wait_for_locked_bitcoin,
+    protocol::{
+        alice::{
+            event_loop::EventLoopHandle,
+            steps::{
+                build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
+                extract_monero_private_key, lock_xmr, negotiate,
+                publish_bitcoin_punish_transaction, publish_bitcoin_redeem_transaction,
+                publish_cancel_transaction, wait_for_bitcoin_encrypted_signature,
+                wait_for_bitcoin_refund, wait_for_locked_bitcoin,
+            },
+            AliceState,
         },
-        AliceState,
+        ExpiredTimelocks,
     },
-    ExpiredTimelocks,
 };
 
 trait Rng: RngCore + CryptoRng + Send {}

@@ -3,20 +3,27 @@ use libp2p::{core::Multiaddr, PeerId};
 use monero_harness::{image, Monero};
 use rand::rngs::OsRng;
 use std::sync::Arc;
-use swap::{
+use tempfile::tempdir;
+use testcontainers::{clients::Cli, Container};
+use tracing_core::dispatcher::DefaultGuard;
+use tracing_log::LogTracer;
+
+use crate::{
     bitcoin,
     config::Config,
     database::Database,
     monero, network,
     network::transport::build,
-    protocol::{alice, alice::AliceState, bob, bob::BobState},
-    seed::Seed,
-    SwapAmounts,
+    protocol::{alice, alice::AliceState, bob, bob::BobState,seed::Seed,
+    SwapAmounts},
 };
-use tempfile::tempdir;
-use testcontainers::{clients::Cli, Container};
-use tracing_core::dispatcher::DefaultGuard;
-use tracing_log::LogTracer;
+
+mod happy_path;
+mod happy_path_restart_alice;
+mod happy_path_restart_bob_after_comm;
+mod happy_path_restart_bob_before_comm;
+mod punish;
+mod refund_restart_alice;
 
 pub async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
     let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
@@ -51,13 +58,13 @@ pub async fn init_wallets(
         }
     };
 
-    let xmr_wallet = Arc::new(swap::monero::Wallet {
+    let xmr_wallet = Arc::new(monero::Wallet {
         inner: monero.wallet(name).unwrap().client(),
         network: config.monero_network,
     });
 
     let btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new(name, bitcoind.node_url.clone(), config.bitcoin_network)
+        bitcoin::Wallet::new(name, bitcoind.node_url.clone(), config.bitcoin_network)
             .await
             .unwrap(),
     );
@@ -131,8 +138,8 @@ pub async fn init_alice(
     AliceState,
     alice::event_loop::EventLoop,
     alice::event_loop::EventLoopHandle,
-    Arc<swap::bitcoin::Wallet>,
-    Arc<swap::monero::Wallet>,
+    Arc<bitcoin::Wallet>,
+    Arc<monero::Wallet>,
     Database,
 ) {
     let (alice_btc_wallet, alice_xmr_wallet) = init_wallets(
@@ -213,8 +220,8 @@ pub async fn init_bob(
     BobState,
     bob::event_loop::EventLoop,
     bob::event_loop::EventLoopHandle,
-    Arc<swap::bitcoin::Wallet>,
-    Arc<swap::monero::Wallet>,
+    Arc<bitcoin::Wallet>,
+    Arc<monero::Wallet>,
     Database,
 ) {
     let (bob_btc_wallet, bob_xmr_wallet) = init_wallets(

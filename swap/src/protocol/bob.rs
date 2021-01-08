@@ -14,8 +14,7 @@ use crate::{
         transport::SwapTransport,
         Seed, TokioExecutor,
     },
-    protocol::{alice, bob},
-    SwapAmounts,
+    protocol::{alice, bob, SwapAmounts},
 };
 
 pub use self::{

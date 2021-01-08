@@ -14,25 +14,30 @@
 #![allow(non_snake_case)]
 
 use anyhow::{bail, Context, Result};
+use cli::{Command, Options, Resume};
+use config::Config;
+use database::{Database, Swap};
 use libp2p::{core::Multiaddr, PeerId};
+use network::transport::build;
 use prettytable::{row, Table};
+use protocol::{alice, alice::AliceState, bob, bob::BobState, SwapAmounts};
 use rand::rngs::OsRng;
 use std::sync::Arc;
 use structopt::StructOpt;
-use swap::{
-    bitcoin,
-    cli::{Command, Options, Resume},
-    config::Config,
-    database::{Database, Swap},
-    monero, network,
-    network::transport::build,
-    protocol::{alice, alice::AliceState, bob, bob::BobState},
-    seed::Seed,
-    trace::init_tracing,
-    SwapAmounts,
-};
+use trace::init_tracing;
 use tracing::{info, log::LevelFilter};
 use uuid::Uuid;
+
+pub mod bitcoin;
+pub mod cli;
+pub mod config;
+pub mod database;
+pub mod monero;
+pub mod network;
+pub mod protocol;
+#[cfg(test)]
+mod tests;
+pub mod trace;
 
 #[macro_use]
 extern crate prettytable;
@@ -258,10 +263,9 @@ async fn setup_wallets(
     bitcoin_wallet_name: &str,
     monero_wallet_rpc_url: url::Url,
     config: Config,
-) -> Result<(Arc<swap::bitcoin::Wallet>, Arc<swap::monero::Wallet>)> {
+) -> Result<(Arc<bitcoin::Wallet>, Arc<monero::Wallet>)> {
     let bitcoin_wallet =
-        swap::bitcoin::Wallet::new(bitcoin_wallet_name, bitcoind_url, config.bitcoin_network)
-            .await?;
+        bitcoin::Wallet::new(bitcoin_wallet_name, bitcoind_url, config.bitcoin_network).await?;
     let bitcoin_balance = bitcoin_wallet.balance().await?;
     info!(
         "Connection to Bitcoin wallet succeeded, balance: {}",
@@ -284,8 +288,8 @@ async fn alice_swap(
     swap_id: Uuid,
     state: AliceState,
     listen_addr: Multiaddr,
-    bitcoin_wallet: Arc<swap::bitcoin::Wallet>,
-    monero_wallet: Arc<swap::monero::Wallet>,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
     config: Config,
     db: Database,
     seed: Seed,
@@ -316,8 +320,8 @@ async fn alice_swap(
 async fn bob_swap(
     swap_id: Uuid,
     state: BobState,
-    bitcoin_wallet: Arc<swap::bitcoin::Wallet>,
-    monero_wallet: Arc<swap::monero::Wallet>,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
     db: Database,
     alice_peer_id: PeerId,
     alice_addr: Multiaddr,

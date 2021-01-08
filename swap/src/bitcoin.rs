@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
 
-use crate::{bitcoin::timelocks::BlockHeight, config::Config, ExpiredTimelocks};
+use crate::{bitcoin::timelocks::BlockHeight, config::Config, protocol::ExpiredTimelocks};
 
 pub use crate::bitcoin::{
     timelocks::Timelock,

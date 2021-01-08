@@ -36,6 +36,7 @@ impl Display for Swap {
     }
 }
 
+#[derive(Debug)]
 pub struct Database(sled::Db);
 
 impl Database {

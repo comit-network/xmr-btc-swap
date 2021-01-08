@@ -17,8 +17,7 @@ use crate::{
     },
     monero,
     monero::monero_private_key,
-    protocol::{alice, bob},
-    ExpiredTimelocks, SwapAmounts,
+    protocol::{alice, bob, ExpiredTimelocks, SwapAmounts},
 };
 
 #[derive(Debug, Clone)]

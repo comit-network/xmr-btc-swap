@@ -24,8 +24,7 @@ use crate::{
     monero,
     monero::Transfer,
     network::request_response::AliceToBob,
-    protocol::{alice, alice::event_loop::EventLoopHandle},
-    SwapAmounts,
+    protocol::{alice, alice::event_loop::EventLoopHandle, SwapAmounts},
 };
 
 pub async fn negotiate(

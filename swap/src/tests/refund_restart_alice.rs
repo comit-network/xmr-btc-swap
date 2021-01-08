@@ -1,23 +1,23 @@
-use crate::testutils::{init_alice, init_bob};
 use futures::future::try_join;
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{
+use tempfile::tempdir;
+use testcontainers::clients::Cli;
+use tokio::select;
+use uuid::Uuid;
+
+use crate::{
     bitcoin,
     config::Config,
     database::Database,
     monero,
     protocol::{alice, alice::AliceState, bob, bob::BobState},
     seed::Seed,
+    tests::{
+        init_alice, init_alice_event_loop, init_bob, init_containers, init_tracing, Containers,
+    },
 };
-use tempfile::tempdir;
-use testcontainers::clients::Cli;
-use testutils::init_tracing;
-use tokio::select;
-use uuid::Uuid;
-
-pub mod testutils;
 
 // Bob locks btc and Alice locks xmr. Alice fails to act so Bob refunds. Alice
 // then also refunds.
@@ -28,11 +28,11 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
     let cli = Cli::default();
     let (
         monero,
-        testutils::Containers {
+        Containers {
             bitcoind,
             monerods: _monerods,
         },
-    ) = testutils::init_containers(&cli).await;
+    ) = init_containers(&cli).await;
 
     let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
     let xmr_to_swap = monero::Amount::from_piconero(1_000_000_000_000);
@@ -124,7 +124,7 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
     };
 
     let (mut alice_event_loop_2, alice_event_loop_handle_2) =
-        testutils::init_alice_event_loop(alice_multiaddr, alice_seed);
+        init_alice_event_loop(alice_multiaddr, alice_seed);
 
     let alice_final_state = {
         let alice_db = Database::open(alice_db_datadir.path()).unwrap();

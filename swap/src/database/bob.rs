@@ -1,10 +1,7 @@
 use ::bitcoin::hashes::core::fmt::Display;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    protocol::{bob, bob::BobState},
-    SwapAmounts,
-};
+use crate::protocol::{bob, bob::BobState, SwapAmounts};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Bob {

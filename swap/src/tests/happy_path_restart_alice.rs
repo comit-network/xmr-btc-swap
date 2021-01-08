@@ -1,21 +1,21 @@
-use crate::testutils::{init_alice, init_bob};
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{
+use tempfile::tempdir;
+use testcontainers::clients::Cli;
+use uuid::Uuid;
+
+use crate::{
     bitcoin,
     config::Config,
+    database,
     database::Database,
     monero,
     protocol::{alice, alice::AliceState, bob},
     seed::Seed,
+    tests,
+    tests::{init_alice, init_bob, init_tracing},
 };
-use tempfile::tempdir;
-use testcontainers::clients::Cli;
-use testutils::init_tracing;
-use uuid::Uuid;
-
-pub mod testutils;
 
 #[tokio::test]
 async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
@@ -24,11 +24,11 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     let cli = Cli::default();
     let (
         monero,
-        testutils::Containers {
+        tests::Containers {
             bitcoind,
             monerods: _monerods,
         },
-    ) = testutils::init_containers(&cli).await;
+    ) = tests::init_containers(&cli).await;
 
     let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
     let xmr_to_swap = monero::Amount::from_piconero(1_000_000_000_000);
@@ -120,15 +120,15 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
     let alice_db = Database::open(alice_db_datadir.path()).unwrap();
 
     let resume_state =
-        if let swap::database::Swap::Alice(state) = alice_db.get_state(alice_swap_id).unwrap() {
-            assert!(matches!(state, swap::database::Alice::EncSigLearned {..}));
+        if let database::Swap::Alice(state) = alice_db.get_state(alice_swap_id).unwrap() {
+            assert!(matches!(state, database::Alice::EncSigLearned {..}));
             state.into()
         } else {
             unreachable!()
         };
 
     let (mut event_loop_after_restart, event_loop_handle_after_restart) =
-        testutils::init_alice_event_loop(alice_multiaddr, alice_seed);
+        tests::init_alice_event_loop(alice_multiaddr, alice_seed);
     tokio::spawn(async move { event_loop_after_restart.run().await });
 
     let alice_state = alice::swap::swap(

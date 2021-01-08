@@ -1,4 +1,3 @@
-use crate::testutils::{init_alice, init_bob};
 use futures::{
     future::{join, select, Either},
     FutureExt,
@@ -6,18 +5,17 @@ use futures::{
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{
+use testcontainers::clients::Cli;
+use uuid::Uuid;
+
+use crate::{
     bitcoin,
     config::Config,
     monero,
     protocol::{alice, alice::AliceState, bob, bob::BobState},
     seed::Seed,
+    tests::{init_alice, init_bob, init_containers, init_tracing, Containers},
 };
-use testcontainers::clients::Cli;
-use testutils::init_tracing;
-use uuid::Uuid;
-
-pub mod testutils;
 
 /// Bob locks Btc and Alice locks Xmr. Bob does not act; he fails to send Alice
 /// the encsig and fail to refund or redeem. Alice punishes.
@@ -28,11 +26,11 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
     let cli = Cli::default();
     let (
         monero,
-        testutils::Containers {
+        Containers {
             bitcoind,
             monerods: _monerods,
         },
-    ) = testutils::init_containers(&cli).await;
+    ) = init_containers(&cli).await;
 
     let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
     let xmr_to_swap = monero::Amount::from_piconero(1_000_000_000_000);

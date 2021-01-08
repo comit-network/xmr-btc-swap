@@ -1,4 +1,3 @@
-use crate::testutils::{init_alice, init_bob};
 use futures::{
     future::{join, select},
     FutureExt,
@@ -6,18 +5,17 @@ use futures::{
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{
+use testcontainers::clients::Cli;
+
+use uuid::Uuid;
+
+use crate::{
     bitcoin,
     config::Config,
     monero,
     protocol::{alice, bob},
     seed::Seed,
 };
-use testcontainers::clients::Cli;
-use testutils::init_tracing;
-use uuid::Uuid;
-
-pub mod testutils;
 
 /// Run the following tests with RUST_MIN_STACK=10000000
 
@@ -28,11 +26,11 @@ async fn happy_path() {
     let cli = Cli::default();
     let (
         monero,
-        testutils::Containers {
+        tests::Containers {
             bitcoind,
             monerods: _monerods,
         },
-    ) = testutils::init_containers(&cli).await;
+    ) = tests::init_containers(&cli).await;
 
     let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
     let btc_alice = bitcoin::Amount::ZERO;

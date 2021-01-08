@@ -16,7 +16,7 @@ use tracing::{debug, error};
 
 use crate::{
     network::request_response::{AliceToBob, AmountsProtocol, BobToAlice, Codec, TIMEOUT},
-    SwapAmounts,
+    protocol::SwapAmounts,
 };
 
 #[derive(Copy, Clone, Debug)]

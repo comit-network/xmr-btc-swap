@@ -1,21 +1,20 @@
-use crate::testutils::{init_alice, init_bob};
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{
+use tempfile::tempdir;
+use testcontainers::clients::Cli;
+use uuid::Uuid;
+
+use crate::{
     bitcoin,
     config::Config,
+    database,
     database::Database,
     monero,
     protocol::{alice, bob, bob::BobState},
     seed::Seed,
+    tests::{init_alice, init_bob, init_bob_event_loop, init_containers, init_tracing, Containers},
 };
-use tempfile::tempdir;
-use testcontainers::clients::Cli;
-use testutils::init_tracing;
-use uuid::Uuid;
-
-pub mod testutils;
 
 #[tokio::test]
 async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
@@ -24,11 +23,11 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     let cli = Cli::default();
     let (
         monero,
-        testutils::Containers {
+        Containers {
             bitcoind,
             monerods: _monerods,
         },
-    ) = testutils::init_containers(&cli).await;
+    ) = init_containers(&cli).await;
 
     let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
     let xmr_to_swap = monero::Amount::from_piconero(1_000_000_000_000);
@@ -121,16 +120,15 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
 
     let bob_db = Database::open(bob_db_datadir.path()).unwrap();
 
-    let resume_state =
-        if let swap::database::Swap::Bob(state) = bob_db.get_state(bob_swap_id).unwrap() {
-            assert!(matches!(state, swap::database::Bob::EncSigSent {..}));
-            state.into()
-        } else {
-            unreachable!()
-        };
+    let resume_state = if let database::Swap::Bob(state) = bob_db.get_state(bob_swap_id).unwrap() {
+        assert!(matches!(state, database::Bob::EncSigSent {..}));
+        state.into()
+    } else {
+        unreachable!()
+    };
 
     let (event_loop_after_restart, event_loop_handle_after_restart) =
-        testutils::init_bob_event_loop(alice_peer_id, alice_multiaddr);
+        init_bob_event_loop(alice_peer_id, alice_multiaddr);
     tokio::spawn(event_loop_after_restart.run());
 
     let bob_state = bob::swap::swap(

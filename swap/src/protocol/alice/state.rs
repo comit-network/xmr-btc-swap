@@ -19,8 +19,7 @@ use crate::{
     monero,
     monero::CreateWalletForOutput,
     network::request_response::AliceToBob,
-    protocol::{alice, bob},
-    ExpiredTimelocks, SwapAmounts,
+    protocol::{alice, bob, ExpiredTimelocks, SwapAmounts},
 };
 
 #[derive(Debug)]

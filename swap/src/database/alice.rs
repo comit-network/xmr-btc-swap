@@ -5,8 +5,7 @@ use crate::{
     bitcoin::{EncryptedSignature, TxCancel, TxRefund},
     monero,
     monero::monero_private_key,
-    protocol::{alice, alice::AliceState},
-    SwapAmounts,
+    protocol::{alice, alice::AliceState, SwapAmounts},
 };
 
 // Large enum variant is fine because this is only used for database

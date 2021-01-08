@@ -8,8 +8,10 @@ use uuid::Uuid;
 
 use crate::{
     database::{Database, Swap},
-    protocol::bob::{self, event_loop::EventLoopHandle, state::*},
-    ExpiredTimelocks, SwapAmounts,
+    protocol::{
+        bob::{self, event_loop::EventLoopHandle, state::*},
+        ExpiredTimelocks, SwapAmounts,
+    },
 };
 
 // TODO(Franck): Make this a method on a struct
