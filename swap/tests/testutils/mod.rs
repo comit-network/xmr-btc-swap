@@ -5,7 +5,7 @@ use rand::rngs::OsRng;
 use std::sync::Arc;
 use swap::{
     alice, alice::swap::AliceState, bitcoin, bob, bob::swap::BobState, database::Database, monero,
-    network::transport::build, SwapAmounts,
+    network, network::transport::build, seed::Seed, SwapAmounts,
 };
 use tempfile::tempdir;
 use testcontainers::{clients::Cli, Container};
@@ -106,8 +106,10 @@ pub fn init_alice_event_loop(
     alice::event_loop::EventLoop,
     alice::event_loop::EventLoopHandle,
 ) {
+    let seed = Seed::random().unwrap();
     let alice_behaviour = alice::Behaviour::default();
-    let alice_transport = build(alice_behaviour.identity()).unwrap();
+    let alice_transport =
+        build(alice_behaviour.identity(network::Seed::new(seed.bytes()))).unwrap();
 
     alice::event_loop::EventLoop::new(alice_transport, alice_behaviour, listen).unwrap()
 }

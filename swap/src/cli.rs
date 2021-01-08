@@ -5,8 +5,8 @@ use uuid::Uuid;
 #[derive(structopt::StructOpt, Debug)]
 pub struct Options {
     // TODO: Default value should points to proper configuration folder in home folder
-    #[structopt(long = "database", default_value = "./.swap-db/")]
-    pub db_path: String,
+    #[structopt(long = "data-dir", default_value = "./.swap-data/")]
+    pub data_dir: String,
 
     #[structopt(subcommand)]
     pub cmd: Command,

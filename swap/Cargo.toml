@@ -24,6 +24,7 @@ libp2p-tokio-socks5 = "0.4"
 log = { version = "0.4", features = ["serde"] }
 monero = { version = "0.9", features = ["serde_support"] }
 monero-harness = { path = "../monero-harness" }
+pem = "0.8"
 prettytable-rs = "0.8"
 rand = "0.7"
 reqwest = { version = "0.10", default-features = false, features = ["socks"] }
@@ -36,6 +37,7 @@ sled = "0.34"
 structopt = "0.3"
 strum = { version = "0.20", features = ["derive"] }
 tempfile = "3"
+thiserror = "1"
 time = "0.2"
 tokio = { version = "0.2", features = ["rt-threaded", "time", "macros", "sync"] }
 tracing = { version = "0.1", features = ["attributes"] }

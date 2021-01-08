@@ -2243,6 +2243,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pem"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4c220d01f863d13d96ca82359d1e81e64a7c6bf0637bcde7b2349630addf0c6"
+dependencies = [
+ "base64 0.13.0",
+ "once_cell",
+ "regex",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3346,6 +3357,7 @@ dependencies = [
  "log",
  "monero",
  "monero-harness",
+ "pem",
  "port_check",
  "prettytable-rs",
  "rand 0.7.3",
@@ -3361,6 +3373,7 @@ dependencies = [
  "strum",
  "tempfile",
  "testcontainers",
+ "thiserror",
  "time",
  "tokio",
  "tracing",

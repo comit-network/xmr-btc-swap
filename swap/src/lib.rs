@@ -20,9 +20,12 @@ pub mod alice;
 pub mod bitcoin;
 pub mod bob;
 pub mod cli;
+pub mod config;
 pub mod database;
+pub mod fs;
 pub mod monero;
 pub mod network;
+pub mod seed;
 pub mod trace;
 
 pub type Never = std::convert::Infallible;
