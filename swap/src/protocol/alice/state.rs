@@ -259,7 +259,7 @@ impl State2 {
         let tx_punish =
             bitcoin::TxPunish::new(&tx_cancel, &self.punish_address, self.punish_timelock);
         bitcoin::verify_sig(&self.B, &tx_punish.digest(), &msg.tx_punish_sig)
-            .context("Failed to verify Punish Transaction")?;
+            .context("Failed to verify punish transaction")?;
 
         Ok(State3 {
             a: self.a,
