@@ -167,6 +167,7 @@ async fn main() -> Result<()> {
                 db,
                 alice_peer_id,
                 alice_addr,
+                &seed,
             )
             .await?;
         }
@@ -243,6 +244,7 @@ async fn main() -> Result<()> {
                 db,
                 alice_peer_id,
                 alice_addr,
+                &seed,
             )
             .await?;
         }
@@ -319,8 +321,9 @@ async fn bob_swap(
     db: Database,
     alice_peer_id: PeerId,
     alice_addr: Multiaddr,
+    seed: &Seed,
 ) -> Result<BobState> {
-    let bob_behaviour = bob::Behaviour::default();
+    let bob_behaviour = bob::Behaviour::new(network::Seed::new(seed.bytes()));
     let bob_transport = build(bob_behaviour.identity())?;
 
     let (event_loop, handle) =

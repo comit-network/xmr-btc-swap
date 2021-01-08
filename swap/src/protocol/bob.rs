@@ -12,7 +12,7 @@ use crate::{
     network::{
         peer_tracker::{self, PeerTracker},
         transport::SwapTransport,
-        TokioExecutor,
+        Seed, TokioExecutor,
     },
     protocol::{alice, bob},
     SwapAmounts,
@@ -124,6 +124,20 @@ pub struct Behaviour {
 }
 
 impl Behaviour {
+    pub fn new(seed: Seed) -> Self {
+        let identity = seed.derive_libp2p_identity();
+
+        Self {
+            pt: PeerTracker::default(),
+            amounts: Amounts::default(),
+            message0: message0::Behaviour::default(),
+            message1: message1::Behaviour::default(),
+            message2: message2::Behaviour::default(),
+            message3: message3::Behaviour::default(),
+            identity,
+        }
+    }
+
     pub fn identity(&self) -> Keypair {
         self.identity.clone()
     }
