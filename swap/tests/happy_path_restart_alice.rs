@@ -59,7 +59,7 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
         alice_xmr_starting_balance,
         alice_multiaddr.clone(),
         config,
-        &alice_seed,
+        alice_seed,
     )
     .await;
 
@@ -128,7 +128,7 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
         };
 
     let (mut event_loop_after_restart, event_loop_handle_after_restart) =
-        testutils::init_alice_event_loop(alice_multiaddr, &alice_seed);
+        testutils::init_alice_event_loop(alice_multiaddr, alice_seed);
     tokio::spawn(async move { event_loop_after_restart.run().await });
 
     let alice_state = alice::swap::swap(

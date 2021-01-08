@@ -58,7 +58,7 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
         alice_xmr_starting_balance,
         alice_multiaddr.clone(),
         config,
-        &Seed::random().unwrap(),
+        Seed::random().unwrap(),
     )
     .await;
 

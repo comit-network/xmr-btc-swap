@@ -107,12 +107,12 @@ pub async fn init_alice_state(
 
 pub fn init_alice_event_loop(
     listen: Multiaddr,
-    seed: &Seed,
+    seed: Seed,
 ) -> (
     alice::event_loop::EventLoop,
     alice::event_loop::EventLoopHandle,
 ) {
-    let alice_behaviour = alice::Behaviour::new(network::Seed::new(seed.bytes()));
+    let alice_behaviour = alice::Behaviour::new(network::Seed::new(seed));
     let alice_transport = build(alice_behaviour.identity()).unwrap();
     alice::event_loop::EventLoop::new(alice_transport, alice_behaviour, listen).unwrap()
 }
@@ -126,7 +126,7 @@ pub async fn init_alice(
     xmr_starting_balance: monero::Amount,
     listen: Multiaddr,
     config: Config,
-    seed: &Seed,
+    seed: Seed,
 ) -> (
     AliceState,
     alice::event_loop::EventLoop,
@@ -193,7 +193,7 @@ pub fn init_bob_event_loop(
     alice_addr: Multiaddr,
 ) -> (bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle) {
     let seed = Seed::random().unwrap();
-    let bob_behaviour = bob::Behaviour::new(network::Seed::new(seed.bytes()));
+    let bob_behaviour = bob::Behaviour::new(network::Seed::new(seed));
     let bob_transport = build(bob_behaviour.identity()).unwrap();
     bob::event_loop::EventLoop::new(bob_transport, bob_behaviour, alice_peer_id, alice_addr)
         .unwrap()

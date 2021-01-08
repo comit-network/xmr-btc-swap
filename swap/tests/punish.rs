@@ -64,7 +64,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         alice_xmr_starting_balance,
         alice_multiaddr.clone(),
         config,
-        &Seed::random().unwrap(),
+        Seed::random().unwrap(),
     )
     .await;
 

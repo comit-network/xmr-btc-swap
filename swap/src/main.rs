@@ -114,7 +114,7 @@ async fn main() -> Result<()> {
                 monero_wallet,
                 config,
                 db,
-                &seed,
+                seed,
             )
             .await?;
         }
@@ -167,7 +167,7 @@ async fn main() -> Result<()> {
                 db,
                 alice_peer_id,
                 alice_addr,
-                &seed,
+                seed,
             )
             .await?;
         }
@@ -211,7 +211,7 @@ async fn main() -> Result<()> {
                 monero_wallet,
                 config,
                 db,
-                &seed,
+                seed,
             )
             .await?;
         }
@@ -244,7 +244,7 @@ async fn main() -> Result<()> {
                 db,
                 alice_peer_id,
                 alice_addr,
-                &seed,
+                seed,
             )
             .await?;
         }
@@ -288,9 +288,9 @@ async fn alice_swap(
     monero_wallet: Arc<swap::monero::Wallet>,
     config: Config,
     db: Database,
-    seed: &Seed,
+    seed: Seed,
 ) -> Result<AliceState> {
-    let alice_behaviour = alice::Behaviour::new(network::Seed::new(seed.bytes()));
+    let alice_behaviour = alice::Behaviour::new(network::Seed::new(seed));
     let alice_peer_id = alice_behaviour.peer_id();
     info!("Own Peer-ID: {}", alice_peer_id);
     let alice_transport = build(alice_behaviour.identity())?;
@@ -321,9 +321,9 @@ async fn bob_swap(
     db: Database,
     alice_peer_id: PeerId,
     alice_addr: Multiaddr,
-    seed: &Seed,
+    seed: Seed,
 ) -> Result<BobState> {
-    let bob_behaviour = bob::Behaviour::new(network::Seed::new(seed.bytes()));
+    let bob_behaviour = bob::Behaviour::new(network::Seed::new(seed));
     let bob_transport = build(bob_behaviour.identity())?;
 
     let (event_loop, handle) =

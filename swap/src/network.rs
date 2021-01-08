@@ -25,17 +25,17 @@ pub struct Seed([u8; SEED_LENGTH]);
 
 impl Seed {
     /// prefix "NETWORK" to the provided seed and apply sha256
-    pub fn new(seed: [u8; crate::seed::SEED_LENGTH]) -> Self {
+    pub fn new(seed: crate::seed::Seed) -> Self {
         let mut engine = sha256::HashEngine::default();
 
-        engine.input(&seed);
+        engine.input(&seed.bytes());
         engine.input(b"NETWORK");
 
         let hash = sha256::Hash::from_engine(engine);
         Self(hash.into_inner())
     }
 
-    pub fn bytes(&self) -> [u8; SEED_LENGTH] {
+    fn bytes(&self) -> [u8; SEED_LENGTH] {
         self.0
     }
 

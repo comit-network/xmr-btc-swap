@@ -66,7 +66,7 @@ async fn happy_path() {
         xmr_alice,
         alice_multiaddr.clone(),
         config,
-        &Seed::random().unwrap(),
+        Seed::random().unwrap(),
     )
     .await;
 
