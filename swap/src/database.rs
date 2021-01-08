@@ -3,8 +3,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{fmt::Display, path::Path};
 use uuid::Uuid;
 
-pub mod alice;
-pub mod bob;
+mod alice;
+mod bob;
 
 pub use alice::Alice;
 pub use bob::Bob;
