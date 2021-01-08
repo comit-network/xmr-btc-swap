@@ -12,7 +12,6 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-
 use tracing::{debug, error};
 
 use crate::{
@@ -35,13 +34,13 @@ pub enum OutEvent {
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
-pub struct Message1Behaviour {
+pub struct Behaviour {
     rr: RequestResponse<Codec<Message1Protocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
-impl Message1Behaviour {
+impl Behaviour {
     pub fn send(&mut self, alice: PeerId, msg: Message1) {
         let msg = BobToAlice::Message1(msg);
         let _id = self.rr.send_request(&alice, msg);
@@ -60,7 +59,7 @@ impl Message1Behaviour {
     }
 }
 
-impl Default for Message1Behaviour {
+impl Default for Behaviour {
     fn default() -> Self {
         let timeout = Duration::from_secs(TIMEOUT);
         let mut config = RequestResponseConfig::default();
@@ -77,9 +76,7 @@ impl Default for Message1Behaviour {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>>
-    for Message1Behaviour
-{
+impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Behaviour {
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
             RequestResponseEvent::Message {

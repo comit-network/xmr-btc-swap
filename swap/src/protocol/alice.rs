@@ -1,6 +1,5 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-pub use self::{amounts::*, message0::*, message1::*, message2::*, message3::*, state::*};
 use anyhow::Result;
 use libp2p::{
     core::{identity::Keypair, Multiaddr},
@@ -19,6 +18,8 @@ use crate::{
     protocol::bob,
     SwapAmounts,
 };
+
+pub use self::{amounts::*, message0::Message0, message1::Message1, message2::Message2, state::*};
 
 mod amounts;
 pub mod event_loop;
@@ -135,10 +136,10 @@ impl From<message3::OutEvent> for OutEvent {
 pub struct Behaviour {
     pt: PeerTracker,
     amounts: Amounts,
-    message0: Message0Behaviour,
-    message1: Message1Behaviour,
-    message2: Message2Behaviour,
-    message3: Message3Behaviour,
+    message0: message0::Behaviour,
+    message1: message1::Behaviour,
+    message2: message2::Behaviour,
+    message3: message3::Behaviour,
     #[behaviour(ignore)]
     identity: Keypair,
 }
@@ -185,10 +186,10 @@ impl Default for Behaviour {
         Self {
             pt: PeerTracker::default(),
             amounts: Amounts::default(),
-            message0: Message0Behaviour::default(),
-            message1: Message1Behaviour::default(),
-            message2: Message2Behaviour::default(),
-            message3: Message3Behaviour::default(),
+            message0: message0::Behaviour::default(),
+            message1: message1::Behaviour::default(),
+            message2: message2::Behaviour::default(),
+            message3: message3::Behaviour::default(),
             identity,
         }
     }

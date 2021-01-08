@@ -40,13 +40,13 @@ pub struct Message1 {
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
-pub struct Message1Behaviour {
+pub struct Behaviour {
     rr: RequestResponse<Codec<Message1Protocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
-impl Message1Behaviour {
+impl Behaviour {
     pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: Message1) {
         let msg = AliceToBob::Message1(Box::new(msg));
         self.rr.send_response(channel, msg);
@@ -65,7 +65,7 @@ impl Message1Behaviour {
     }
 }
 
-impl Default for Message1Behaviour {
+impl Default for Behaviour {
     fn default() -> Self {
         let timeout = Duration::from_secs(TIMEOUT);
         let mut config = RequestResponseConfig::default();
@@ -82,9 +82,7 @@ impl Default for Message1Behaviour {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>>
-    for Message1Behaviour
-{
+impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Behaviour {
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
             RequestResponseEvent::Message {
