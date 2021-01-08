@@ -7,7 +7,6 @@ use tracing::info;
 use uuid::Uuid;
 
 use crate::{
-    config::Config,
     database::{Database, Swap},
     protocol::bob::{self, event_loop::EventLoopHandle, state::*},
     ExpiredTimelocks, SwapAmounts,
