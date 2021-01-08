@@ -185,7 +185,7 @@ impl Client {
         Ok(r.result)
     }
 
-    /// Get wallet block height, this might be behind monerod height.
+    /// Get wallet block height.
     pub async fn block_height(&self) -> Result<BlockHeight> {
         let request = Request::new("get_height", "");
 

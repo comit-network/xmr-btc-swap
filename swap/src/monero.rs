@@ -100,7 +100,7 @@ impl WatchForTransfer for Wallet {
     ) -> Result<TransferInfo> {
         enum Error {
             TxNotFound,
-            TransferNotFound { txid: String },
+            BlockHeight,
             InsufficientConfirmations,
             InsufficientFunds { expected: Amount, actual: Amount },
         }
@@ -111,7 +111,7 @@ impl WatchForTransfer for Wallet {
             // NOTE: Currently, this is conflating IO errors with the transaction not being
             // in the blockchain yet, or not having enough confirmations on it. All these
             // errors warrant a retry, but the strategy should probably differ per case
-            let proof = self
+            let check_tx_pay_response = self
                 .inner
                 .check_tx_key(
                     &String::from(transfer_proof.tx_hash()),
@@ -121,30 +121,33 @@ impl WatchForTransfer for Wallet {
                 .await
                 .map_err(|_| backoff::Error::Transient(Error::TxNotFound))?;
 
-            if proof.received != expected_amount.as_piconero() {
+            if check_tx_pay_response.received != expected_amount.as_piconero() {
                 return Err(backoff::Error::Permanent(Error::InsufficientFunds {
                     expected: expected_amount,
-                    actual: Amount::from_piconero(proof.received),
+                    actual: Amount::from_piconero(check_tx_pay_response.received),
                 }));
             }
 
-            if proof.confirmations < expected_confirmations {
+            if check_tx_pay_response.confirmations < expected_confirmations {
                 return Err(backoff::Error::Transient(Error::InsufficientConfirmations));
             }
 
-            let tx_hash = transfer_proof.tx_hash();
-            let get_transfer_by_tx_id =
-                self.inner
-                    .get_transfer_by_txid(&tx_hash.0)
-                    .await
-                    .map_err(|_| {
-                        backoff::Error::Permanent(Error::TransferNotFound { txid: tx_hash.0 })
-                    })?;
+            let current_block_height = self
+                .inner
+                .block_height()
+                .await
+                .map_err(|_| backoff::Error::Transient(Error::BlockHeight))?;
+
             let transfer_info = TransferInfo {
-                first_confirmation_block_height: get_transfer_by_tx_id.height,
+                // Substract 1 just in case a block got mined between the two rpc calls.
+                // This is a hack as we know this is going to be used to set the wallet's block
+                // height.
+                first_confirmation_block_height: current_block_height.height
+                    - check_tx_pay_response.confirmations
+                    - 1,
             };
 
-            Ok((proof, transfer_info))
+            Ok((check_tx_pay_response, transfer_info))
         })
         .retry(ConstantBackoff::new(Duration::from_secs(1)))
         .await;
@@ -154,11 +157,9 @@ impl WatchForTransfer for Wallet {
             Err(Error::InsufficientFunds { expected, actual }) => {
                 anyhow::bail!(InsufficientFunds { expected, actual })
             }
-            Err(Error::TransferNotFound { txid }) => anyhow::bail!(TransferNotFound { txid }),
-            Err(Error::TxNotFound) => {
-                unreachable!("Transient backoff error will never be returned")
-            }
-            Err(Error::InsufficientConfirmations) => {
+            Err(Error::BlockHeight)
+            | Err(Error::TxNotFound)
+            | Err(Error::InsufficientConfirmations) => {
                 unreachable!("Transient backoff error will never be returned")
             }
         }
