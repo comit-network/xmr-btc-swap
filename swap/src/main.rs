@@ -302,7 +302,7 @@ async fn alice_swap(
     let (mut event_loop, handle) =
         alice::event_loop::EventLoop::new(alice_transport, alice_behaviour, listen_addr)?;
 
-    let swap = alice::swap::swap(
+    let swap = alice::swap(
         state,
         handle,
         bitcoin_wallet.clone(),
@@ -333,7 +333,7 @@ async fn bob_swap(
     let (event_loop, handle) =
         bob::event_loop::EventLoop::new(bob_transport, bob_behaviour, alice_peer_id, alice_addr)?;
 
-    let swap = bob::swap::swap(
+    let swap = bob::swap(
         state,
         handle,
         db,

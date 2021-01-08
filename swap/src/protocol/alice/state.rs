@@ -86,6 +86,30 @@ impl fmt::Display for AliceState {
     }
 }
 
+pub fn is_complete(state: &AliceState) -> bool {
+    matches!(
+        state,
+        AliceState::XmrRefunded
+            | AliceState::BtcRedeemed
+            | AliceState::BtcPunished
+            | AliceState::SafelyAborted
+    )
+}
+
+pub fn is_xmr_locked(state: &AliceState) -> bool {
+    matches!(
+        state,
+        AliceState::XmrLocked{..}
+    )
+}
+
+pub fn is_encsig_learned(state: &AliceState) -> bool {
+    matches!(
+        state,
+        AliceState::EncSigLearned{..}
+    )
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct State0 {
     pub a: bitcoin::SecretKey,

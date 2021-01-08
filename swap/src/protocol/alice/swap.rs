@@ -21,6 +21,7 @@ use crate::{
     protocol::{
         alice::{
             event_loop::EventLoopHandle,
+            is_complete,
             steps::{
                 build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
                 extract_monero_private_key, lock_xmr, negotiate,
@@ -58,30 +59,6 @@ pub async fn swap(
         db,
     )
     .await
-}
-
-pub fn is_complete(state: &AliceState) -> bool {
-    matches!(
-        state,
-        AliceState::XmrRefunded
-            | AliceState::BtcRedeemed
-            | AliceState::BtcPunished
-            | AliceState::SafelyAborted
-    )
-}
-
-pub fn is_xmr_locked(state: &AliceState) -> bool {
-    matches!(
-        state,
-        AliceState::XmrLocked{..}
-    )
-}
-
-pub fn is_encsig_learned(state: &AliceState) -> bool {
-    matches!(
-        state,
-        AliceState::EncSigLearned{..}
-    )
 }
 
 // State machine driver for swap execution

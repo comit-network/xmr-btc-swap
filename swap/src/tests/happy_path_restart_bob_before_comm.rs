@@ -76,7 +76,7 @@ async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {
         )
         .await;
 
-    let alice_fut = alice::swap::swap(
+    let alice_fut = alice::swap(
         alice_state,
         alice_event_loop_handle,
         alice_btc_wallet.clone(),
@@ -91,9 +91,9 @@ async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {
 
     let bob_xmr_locked_fut = {
         let bob_db = Database::open(bob_db_datadir.path()).unwrap();
-        bob::swap::run_until(
+        bob::run_until(
             bob_state,
-            bob::swap::is_xmr_locked,
+            bob::is_xmr_locked,
             bob_event_loop_handle_1,
             bob_db,
             bob_btc_wallet.clone(),
@@ -117,7 +117,7 @@ async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {
     let (bob_event_loop_2, bob_event_loop_handle_2) =
         init_bob_event_loop(alice_peer_id, alice_multiaddr);
 
-    let bob_fut = bob::swap::swap(
+    let bob_fut = bob::swap(
         bob_restart_state,
         bob_event_loop_handle_2,
         Database::open(bob_db_datadir.path()).unwrap(),

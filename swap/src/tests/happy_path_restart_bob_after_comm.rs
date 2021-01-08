@@ -85,7 +85,7 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     let bob_btc_wallet_clone = bob_btc_wallet.clone();
     let bob_xmr_wallet_clone = bob_xmr_wallet.clone();
 
-    let alice_swap_handle = tokio::spawn(alice::swap::swap(
+    let alice_swap_handle = tokio::spawn(alice::swap(
         alice_state,
         alice_event_loop_handle,
         alice_btc_wallet.clone(),
@@ -103,9 +103,9 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
     let bob_db_datadir = tempdir().unwrap();
     let bob_db = Database::open(bob_db_datadir.path()).unwrap();
 
-    let bob_state = bob::swap::run_until(
+    let bob_state = bob::run_until(
         bob_state,
-        bob::swap::is_encsig_sent,
+        bob::is_encsig_sent,
         bob_event_loop_handle,
         bob_db,
         bob_btc_wallet.clone(),
@@ -131,7 +131,7 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
         init_bob_event_loop(alice_peer_id, alice_multiaddr);
     tokio::spawn(event_loop_after_restart.run());
 
-    let bob_state = bob::swap::swap(
+    let bob_state = bob::swap(
         resume_state,
         event_loop_handle_after_restart,
         bob_db,

@@ -81,7 +81,7 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
         )
         .await;
 
-    let bob_fut = bob::swap::swap(
+    let bob_fut = bob::swap(
         bob_state,
         bob_event_loop_handle,
         bob_db,
@@ -96,9 +96,9 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
 
     let alice_xmr_locked_fut = {
         let alice_db = Database::open(alice_db_datadir.path()).unwrap();
-        alice::swap::run_until(
+        alice::run_until(
             alice_state,
-            alice::swap::is_xmr_locked,
+            alice::is_xmr_locked,
             alice_event_loop_handle_1,
             alice_btc_wallet.clone(),
             alice_xmr_wallet.clone(),
@@ -128,7 +128,7 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
 
     let alice_final_state = {
         let alice_db = Database::open(alice_db_datadir.path()).unwrap();
-        alice::swap::swap(
+        alice::swap(
             alice_restart_state,
             alice_event_loop_handle_2,
             alice_btc_wallet.clone(),

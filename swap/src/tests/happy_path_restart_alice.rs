@@ -102,9 +102,9 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
 
     let alice_swap_id = Uuid::new_v4();
 
-    let alice_state = alice::swap::run_until(
+    let alice_state = alice::run_until(
         start_state,
-        alice::swap::is_encsig_learned,
+        alice::is_encsig_learned,
         alice_event_loop_handle,
         alice_btc_wallet.clone(),
         alice_xmr_wallet.clone(),

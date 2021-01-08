@@ -80,7 +80,7 @@ async fn happy_path() {
         )
         .await;
 
-    let alice_swap_fut = alice::swap::swap(
+    let alice_swap_fut = alice::swap(
         alice_state,
         alice_event_loop_handle,
         alice_btc_wallet.clone(),
@@ -93,7 +93,7 @@ async fn happy_path() {
 
     let alice_fut = select(alice_swap_fut, alice_event_loop.run().boxed());
 
-    let bob_swap_fut = bob::swap::swap(
+    let bob_swap_fut = bob::swap(
         bob_state,
         bob_event_loop_handle,
         bob_db,

@@ -58,6 +58,28 @@ impl fmt::Display for BobState {
     }
 }
 
+pub fn is_complete(state: &BobState) -> bool {
+    matches!(
+        state,
+        BobState::BtcRefunded(..)
+            | BobState::XmrRedeemed
+            | BobState::BtcPunished
+            | BobState::SafelyAborted
+    )
+}
+
+pub fn is_btc_locked(state: &BobState) -> bool {
+    matches!(state, BobState::BtcLocked(..))
+}
+
+pub fn is_xmr_locked(state: &BobState) -> bool {
+    matches!(state, BobState::XmrLocked(..))
+}
+
+pub fn is_encsig_sent(state: &BobState) -> bool {
+    matches!(state, BobState::EncSigSent(..))
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct State0 {
     b: bitcoin::SecretKey,
