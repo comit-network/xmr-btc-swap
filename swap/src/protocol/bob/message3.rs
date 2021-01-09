@@ -6,34 +6,42 @@ use libp2p::{
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
     NetworkBehaviour, PeerId,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
     task::{Context, Poll},
     time::Duration,
 };
-use tracing::{debug, error};
+use tracing::error;
 
-use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Message2Protocol, TIMEOUT};
-use xmr_btc::{alice, bob};
+use crate::{
+    bitcoin::EncryptedSignature,
+    network::request_response::{AliceToBob, BobToAlice, Codec, Message3Protocol, TIMEOUT},
+};
 
-#[derive(Debug)]
-pub enum OutEvent {
-    Msg(alice::Message2),
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message3 {
+    pub tx_redeem_encsig: EncryptedSignature,
 }
 
-/// A `NetworkBehaviour` that represents sending message 2 to Alice.
+#[derive(Debug, Copy, Clone)]
+pub enum OutEvent {
+    Msg,
+}
+
+/// A `NetworkBehaviour` that represents sending message 3 to Alice.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
-pub struct Message2 {
-    rr: RequestResponse<Codec<Message2Protocol>>,
+pub struct Behaviour {
+    rr: RequestResponse<Codec<Message3Protocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
-impl Message2 {
-    pub fn send(&mut self, alice: PeerId, msg: bob::Message2) {
-        let msg = BobToAlice::Message2(msg);
+impl Behaviour {
+    pub fn send(&mut self, alice: PeerId, msg: Message3) {
+        let msg = BobToAlice::Message3(msg);
         let _id = self.rr.send_request(&alice, msg);
     }
 
@@ -41,7 +49,7 @@ impl Message2 {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message2Protocol>>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message3Protocol>>, OutEvent>> {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -50,7 +58,7 @@ impl Message2 {
     }
 }
 
-impl Default for Message2 {
+impl Default for Behaviour {
     fn default() -> Self {
         let timeout = Duration::from_secs(TIMEOUT);
         let mut config = RequestResponseConfig::default();
@@ -59,15 +67,15 @@ impl Default for Message2 {
         Self {
             rr: RequestResponse::new(
                 Codec::default(),
-                vec![(Message2Protocol, ProtocolSupport::Full)],
+                vec![(Message3Protocol, ProtocolSupport::Full)],
                 config,
             ),
-            events: VecDeque::default(),
+            events: Default::default(),
         }
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Message2 {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Behaviour {
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
             RequestResponseEvent::Message {
@@ -78,9 +86,8 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                 message: RequestResponseMessage::Response { response, .. },
                 ..
             } => {
-                if let AliceToBob::Message2(msg) = response {
-                    debug!("Received Message2");
-                    self.events.push_back(OutEvent::Msg(msg));
+                if let AliceToBob::Message3 = response {
+                    self.events.push_back(OutEvent::Msg);
                 }
             }
             RequestResponseEvent::InboundFailure { error, .. } => {

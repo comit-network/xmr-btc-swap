@@ -1,14 +1,15 @@
-use crate::{alice::swap::AliceState, SwapAmounts};
-use bitcoin::hashes::core::fmt::Display;
+use ::bitcoin::hashes::core::fmt::Display;
 use serde::{Deserialize, Serialize};
-use xmr_btc::{
-    alice,
+
+use crate::{
     bitcoin::{EncryptedSignature, TxCancel, TxRefund},
     monero,
-    serde::monero_private_key,
+    monero::monero_private_key,
+    protocol::{alice, alice::AliceState},
+    SwapAmounts,
 };
 
-// Large enum variant is fine because this is only used for storage
+// Large enum variant is fine because this is only used for database
 // and is dropped once written in DB.
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]

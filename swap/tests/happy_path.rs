@@ -6,11 +6,15 @@ use futures::{
 use get_port::get_port;
 use libp2p::Multiaddr;
 use rand::rngs::OsRng;
-use swap::{alice, bob};
+use swap::{
+    bitcoin,
+    config::Config,
+    monero,
+    protocol::{alice, bob},
+};
 use testcontainers::clients::Cli;
 use testutils::init_tracing;
 use uuid::Uuid;
-use xmr_btc::{bitcoin, config::Config};
 
 pub mod testutils;
 
@@ -35,9 +39,9 @@ async fn happy_path() {
 
     // this xmr value matches the logic of alice::calculate_amounts i.e. btc *
     // 10_000 * 100
-    let xmr_to_swap = xmr_btc::monero::Amount::from_piconero(1_000_000_000_000);
+    let xmr_to_swap = monero::Amount::from_piconero(1_000_000_000_000);
     let xmr_alice = xmr_to_swap * 10;
-    let xmr_bob = xmr_btc::monero::Amount::ZERO;
+    let xmr_bob = monero::Amount::ZERO;
 
     let port = get_port().expect("Failed to find a free port");
     let alice_multiaddr: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", port)

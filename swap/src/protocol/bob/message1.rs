@@ -1,11 +1,12 @@
 use libp2p::{
     request_response::{
         handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
-        RequestResponseEvent, RequestResponseMessage, ResponseChannel,
+        RequestResponseEvent, RequestResponseMessage,
     },
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
-    NetworkBehaviour,
+    NetworkBehaviour, PeerId,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
     task::{Context, Poll},
@@ -14,37 +15,42 @@ use std::{
 use tracing::{debug, error};
 
 use crate::{
-    alice::amounts,
-    network::request_response::{AliceToBob, AmountsProtocol, BobToAlice, Codec, TIMEOUT},
+    bitcoin,
+    network::request_response::{AliceToBob, BobToAlice, Codec, Message1Protocol, TIMEOUT},
+    protocol::alice,
 };
 
-#[derive(Debug)]
-pub struct OutEvent {
-    pub btc: ::bitcoin::Amount,
-    pub channel: ResponseChannel<AliceToBob>,
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message1 {
+    pub(crate) tx_lock: bitcoin::TxLock,
 }
 
-/// A `NetworkBehaviour` that represents getting the amounts of an XMR/BTC swap.
+#[derive(Debug)]
+pub enum OutEvent {
+    Msg(alice::Message1),
+}
+
+/// A `NetworkBehaviour` that represents send/recv of message 1.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
-pub struct Amounts {
-    rr: RequestResponse<Codec<AmountsProtocol>>,
+pub struct Behaviour {
+    rr: RequestResponse<Codec<Message1Protocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
-impl Amounts {
-    /// Alice always sends her messages as a response to a request from Bob.
-    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: AliceToBob) {
-        self.rr.send_response(channel, msg);
+impl Behaviour {
+    pub fn send(&mut self, alice: PeerId, msg: Message1) {
+        let msg = BobToAlice::Message1(msg);
+        let _id = self.rr.send_request(&alice, msg);
     }
 
     fn poll(
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<AmountsProtocol>>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message1Protocol>>, OutEvent>> {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -53,17 +59,16 @@ impl Amounts {
     }
 }
 
-impl Default for Amounts {
+impl Default for Behaviour {
     fn default() -> Self {
         let timeout = Duration::from_secs(TIMEOUT);
-
         let mut config = RequestResponseConfig::default();
         config.set_request_timeout(timeout);
 
         Self {
             rr: RequestResponse::new(
                 Codec::default(),
-                vec![(AmountsProtocol, ProtocolSupport::Full)],
+                vec![(Message1Protocol, ProtocolSupport::Full)],
                 config,
             ),
             events: Default::default(),
@@ -71,25 +76,22 @@ impl Default for Amounts {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Amounts {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Behaviour {
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
             RequestResponseEvent::Message {
-                message:
-                    RequestResponseMessage::Request {
-                        request, channel, ..
-                    },
+                message: RequestResponseMessage::Request { .. },
+                ..
+            } => panic!("Bob should never get a request from Alice"),
+            RequestResponseEvent::Message {
+                message: RequestResponseMessage::Response { response, .. },
                 ..
             } => {
-                if let BobToAlice::AmountsFromBtc(btc) = request {
-                    debug!("Received amounts request");
-                    self.events.push_back(amounts::OutEvent { btc, channel })
+                if let AliceToBob::Message1(msg) = response {
+                    debug!("Received Message1");
+                    self.events.push_back(OutEvent::Msg(*msg));
                 }
             }
-            RequestResponseEvent::Message {
-                message: RequestResponseMessage::Response { .. },
-                ..
-            } => panic!("Alice should not get a Response"),
             RequestResponseEvent::InboundFailure { error, .. } => {
                 error!("Inbound failure: {:?}", error);
             }

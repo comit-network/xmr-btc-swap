@@ -1,16 +1,17 @@
-use crate::bitcoin::{
-    build_shared_output_descriptor, verify_sig, BuildTxLockPsbt, Network, OutPoint, PublicKey,
-    Timelock, Txid, TX_FEE,
+use ::bitcoin::{
+    util::{bip143::SigHashCache, psbt::PartiallySignedTransaction},
+    OutPoint, SigHash, SigHashType, TxIn, TxOut, Txid,
 };
 use anyhow::{bail, Context, Result};
-use bitcoin::{
-    util::{bip143::SigHashCache, psbt::PartiallySignedTransaction},
-    Address, Amount, SigHash, SigHashType, Transaction, TxIn, TxOut,
-};
 use ecdsa_fun::Signature;
 use miniscript::{Descriptor, NullCtx};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+use crate::bitcoin::{
+    build_shared_output_descriptor, timelocks::Timelock, verify_sig, Address, Amount,
+    BuildTxLockPsbt, GetNetwork, PublicKey, Transaction, TX_FEE,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TxLock {
@@ -21,7 +22,7 @@ pub struct TxLock {
 impl TxLock {
     pub async fn new<W>(wallet: &W, amount: Amount, A: PublicKey, B: PublicKey) -> Result<Self>
     where
-        W: BuildTxLockPsbt + Network,
+        W: BuildTxLockPsbt + GetNetwork,
     {
         let lock_output_descriptor = build_shared_output_descriptor(A.0, B.0);
         let address = lock_output_descriptor

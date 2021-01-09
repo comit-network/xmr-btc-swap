@@ -1,143 +1,377 @@
+pub mod wallet;
+
+use ::bitcoin::hashes::core::fmt::Formatter;
 use anyhow::Result;
 use async_trait::async_trait;
-use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
-use monero_harness::rpc::wallet;
-use std::{str::FromStr, time::Duration};
-use url::Url;
+use rand::{CryptoRng, RngCore};
+use rust_decimal::{
+    prelude::{FromPrimitive, ToPrimitive},
+    Decimal,
+};
+use serde::{Deserialize, Serialize};
+use std::{
+    fmt::Display,
+    ops::{Add, Mul, Sub},
+    str::FromStr,
+};
 
-pub use xmr_btc::monero::*;
+use crate::bitcoin;
 
-#[derive(Debug)]
-pub struct Wallet {
-    pub inner: wallet::Client,
-    pub network: Network,
+pub use ::monero::{Network, PrivateKey, PublicKey};
+pub use curve25519_dalek::scalar::Scalar;
+pub use wallet::Wallet;
+
+pub const PICONERO_OFFSET: u64 = 1_000_000_000_000;
+
+pub fn random_private_key<R: RngCore + CryptoRng>(rng: &mut R) -> PrivateKey {
+    let scalar = Scalar::random(rng);
+
+    PrivateKey::from_scalar(scalar)
 }
 
-impl Wallet {
-    pub fn new(url: Url, network: Network) -> Self {
-        Self {
-            inner: wallet::Client::new(url),
-            network,
-        }
+pub fn private_key_from_secp256k1_scalar(scalar: bitcoin::Scalar) -> PrivateKey {
+    let mut bytes = scalar.to_bytes();
+
+    // we must reverse the bytes because a secp256k1 scalar is big endian, whereas a
+    // ed25519 scalar is little endian
+    bytes.reverse();
+
+    PrivateKey::from_scalar(Scalar::from_bytes_mod_order(bytes))
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+pub struct PrivateViewKey(#[serde(with = "monero_private_key")] PrivateKey);
+
+impl PrivateViewKey {
+    pub fn new_random<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
+        let scalar = Scalar::random(rng);
+        let private_key = PrivateKey::from_scalar(scalar);
+
+        Self(private_key)
     }
 
-    /// Get the balance of the primary account.
-    pub async fn get_balance(&self) -> Result<Amount> {
-        let amount = self.inner.get_balance(0).await?;
+    pub fn public(&self) -> PublicViewKey {
+        PublicViewKey(PublicKey::from_private_key(&self.0))
+    }
+}
 
-        Ok(Amount::from_piconero(amount))
+impl Add for PrivateViewKey {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl From<PrivateViewKey> for PrivateKey {
+    fn from(from: PrivateViewKey) -> Self {
+        from.0
+    }
+}
+
+impl From<PublicViewKey> for PublicKey {
+    fn from(from: PublicViewKey) -> Self {
+        from.0
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct PublicViewKey(PublicKey);
+
+#[derive(Debug, Copy, Clone, Deserialize, Serialize, PartialEq, PartialOrd)]
+pub struct Amount(u64);
+
+impl Amount {
+    pub const ZERO: Self = Self(0);
+    /// Create an [Amount] with piconero precision and the given number of
+    /// piconeros.
+    ///
+    /// A piconero (a.k.a atomic unit) is equal to 1e-12 XMR.
+    pub fn from_piconero(amount: u64) -> Self {
+        Amount(amount)
+    }
+
+    pub fn as_piconero(&self) -> u64 {
+        self.0
+    }
+
+    pub fn parse_monero(amount: &str) -> Result<Self> {
+        let decimal = Decimal::from_str(amount)?;
+        let piconeros_dec =
+            decimal.mul(Decimal::from_u64(PICONERO_OFFSET).expect("constant to fit into u64"));
+        let piconeros = piconeros_dec
+            .to_u64()
+            .ok_or_else(|| OverflowError(amount.to_owned()))?;
+        Ok(Amount(piconeros))
+    }
+}
+
+impl Add for Amount {
+    type Output = Amount;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl Sub for Amount {
+    type Output = Amount;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(self.0 - rhs.0)
+    }
+}
+
+impl Mul<u64> for Amount {
+    type Output = Amount;
+
+    fn mul(self, rhs: u64) -> Self::Output {
+        Self(self.0 * rhs)
+    }
+}
+
+impl From<Amount> for u64 {
+    fn from(from: Amount) -> u64 {
+        from.0
+    }
+}
+
+impl Display for Amount {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut decimal = Decimal::from(self.0);
+        decimal
+            .set_scale(12)
+            .expect("12 is smaller than max precision of 28");
+        write!(f, "{} XMR", decimal)
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TransferProof {
+    tx_hash: TxHash,
+    #[serde(with = "monero_private_key")]
+    tx_key: PrivateKey,
+}
+
+impl TransferProof {
+    pub fn new(tx_hash: TxHash, tx_key: PrivateKey) -> Self {
+        Self { tx_hash, tx_key }
+    }
+    pub fn tx_hash(&self) -> TxHash {
+        self.tx_hash.clone()
+    }
+    pub fn tx_key(&self) -> PrivateKey {
+        self.tx_key
+    }
+}
+
+// TODO: add constructor/ change String to fixed length byte array
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TxHash(pub String);
+
+impl From<TxHash> for String {
+    fn from(from: TxHash) -> Self {
+        from.0
     }
 }
 
 #[async_trait]
-impl Transfer for Wallet {
+pub trait Transfer {
     async fn transfer(
         &self,
         public_spend_key: PublicKey,
         public_view_key: PublicViewKey,
         amount: Amount,
-    ) -> Result<(TransferProof, Amount)> {
-        let destination_address =
-            Address::standard(self.network, public_spend_key, public_view_key.into());
-
-        let res = self
-            .inner
-            .transfer(0, amount.as_piconero(), &destination_address.to_string())
-            .await?;
-
-        let tx_hash = TxHash(res.tx_hash);
-        tracing::info!("Monero tx broadcasted!, tx hash: {:?}", tx_hash);
-        let tx_key = PrivateKey::from_str(&res.tx_key)?;
-
-        let fee = Amount::from_piconero(res.fee);
-
-        let transfer_proof = TransferProof::new(tx_hash, tx_key);
-        tracing::debug!("  Transfer proof: {:?}", transfer_proof);
-
-        Ok((transfer_proof, fee))
-    }
+    ) -> anyhow::Result<(TransferProof, Amount)>;
 }
 
 #[async_trait]
-impl CreateWalletForOutput for Wallet {
-    async fn create_and_load_wallet_for_output(
-        &self,
-        private_spend_key: PrivateKey,
-        private_view_key: PrivateViewKey,
-    ) -> Result<()> {
-        let public_spend_key = PublicKey::from_private_key(&private_spend_key);
-        let public_view_key = PublicKey::from_private_key(&private_view_key.into());
-
-        let address = Address::standard(self.network, public_spend_key, public_view_key);
-
-        let _ = self
-            .inner
-            .generate_from_keys(
-                &address.to_string(),
-                &private_spend_key.to_string(),
-                &PrivateKey::from(private_view_key).to_string(),
-            )
-            .await?;
-
-        Ok(())
-    }
-}
-
-// TODO: For retry, use `backoff::ExponentialBackoff` in production as opposed
-// to `ConstantBackoff`.
-
-#[async_trait]
-impl WatchForTransfer for Wallet {
+pub trait WatchForTransfer {
     async fn watch_for_transfer(
         &self,
         public_spend_key: PublicKey,
         public_view_key: PublicViewKey,
         transfer_proof: TransferProof,
-        expected_amount: Amount,
+        amount: Amount,
         expected_confirmations: u32,
-    ) -> Result<(), InsufficientFunds> {
-        enum Error {
-            TxNotFound,
-            InsufficientConfirmations,
-            InsufficientFunds { expected: Amount, actual: Amount },
+    ) -> Result<(), InsufficientFunds>;
+}
+
+#[derive(Debug, Clone, Copy, thiserror::Error)]
+#[error("transaction does not pay enough: expected {expected:?}, got {actual:?}")]
+pub struct InsufficientFunds {
+    pub expected: Amount,
+    pub actual: Amount,
+}
+
+#[async_trait]
+pub trait CreateWalletForOutput {
+    async fn create_and_load_wallet_for_output(
+        &self,
+        private_spend_key: PrivateKey,
+        private_view_key: PrivateViewKey,
+    ) -> anyhow::Result<()>;
+}
+
+#[derive(thiserror::Error, Debug, Clone, PartialEq)]
+#[error("Overflow, cannot convert {0} to u64")]
+pub struct OverflowError(pub String);
+
+pub mod monero_private_key {
+    use monero::{
+        consensus::{Decodable, Encodable},
+        PrivateKey,
+    };
+    use serde::{de, de::Visitor, ser::Error, Deserializer, Serializer};
+    use std::{fmt, io::Cursor};
+
+    struct BytesVisitor;
+
+    impl<'de> Visitor<'de> for BytesVisitor {
+        type Value = PrivateKey;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(formatter, "a byte array representing a Monero private key")
         }
 
-        let address = Address::standard(self.network, public_spend_key, public_view_key.into());
+        fn visit_bytes<E>(self, s: &[u8]) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            let mut s = s;
+            PrivateKey::consensus_decode(&mut s).map_err(|err| E::custom(format!("{:?}", err)))
+        }
+    }
 
-        let res = (|| async {
-            // NOTE: Currently, this is conflating IO errors with the transaction not being
-            // in the blockchain yet, or not having enough confirmations on it. All these
-            // errors warrant a retry, but the strategy should probably differ per case
-            let proof = self
-                .inner
-                .check_tx_key(
-                    &String::from(transfer_proof.tx_hash()),
-                    &transfer_proof.tx_key().to_string(),
-                    &address.to_string(),
-                )
-                .await
-                .map_err(|_| backoff::Error::Transient(Error::TxNotFound))?;
+    pub fn serialize<S>(x: &PrivateKey, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut bytes = Cursor::new(vec![]);
+        x.consensus_encode(&mut bytes)
+            .map_err(|err| S::Error::custom(format!("{:?}", err)))?;
+        s.serialize_bytes(bytes.into_inner().as_ref())
+    }
 
-            if proof.received != expected_amount.as_piconero() {
-                return Err(backoff::Error::Permanent(Error::InsufficientFunds {
-                    expected: expected_amount,
-                    actual: Amount::from_piconero(proof.received),
-                }));
-            }
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<PrivateKey, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let key = deserializer.deserialize_bytes(BytesVisitor)?;
+        Ok(key)
+    }
+}
 
-            if proof.confirmations < expected_confirmations {
-                return Err(backoff::Error::Transient(Error::InsufficientConfirmations));
-            }
+pub mod monero_amount {
+    use crate::monero::Amount;
+    use serde::{Deserialize, Deserializer, Serializer};
 
-            Ok(proof)
-        })
-        .retry(ConstantBackoff::new(Duration::from_secs(1)))
-        .await;
+    pub fn serialize<S>(x: &Amount, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        s.serialize_u64(x.as_piconero())
+    }
 
-        if let Err(Error::InsufficientFunds { expected, actual }) = res {
-            return Err(InsufficientFunds { expected, actual });
-        };
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Amount, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let picos = u64::deserialize(deserializer)?;
+        let amount = Amount::from_piconero(picos);
 
-        Ok(())
+        Ok(amount)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_monero_min() {
+        let min_pics = 1;
+        let amount = Amount::from_piconero(min_pics);
+        let monero = amount.to_string();
+        assert_eq!("0.000000000001 XMR", monero);
+    }
+
+    #[test]
+    fn display_monero_one() {
+        let min_pics = 1000000000000;
+        let amount = Amount::from_piconero(min_pics);
+        let monero = amount.to_string();
+        assert_eq!("1.000000000000 XMR", monero);
+    }
+
+    #[test]
+    fn display_monero_max() {
+        let max_pics = 18_446_744_073_709_551_615;
+        let amount = Amount::from_piconero(max_pics);
+        let monero = amount.to_string();
+        assert_eq!("18446744.073709551615 XMR", monero);
+    }
+
+    #[test]
+    fn parse_monero_min() {
+        let monero_min = "0.000000000001";
+        let amount = Amount::parse_monero(monero_min).unwrap();
+        let pics = amount.0;
+        assert_eq!(1, pics);
+    }
+
+    #[test]
+    fn parse_monero() {
+        let monero = "123";
+        let amount = Amount::parse_monero(monero).unwrap();
+        let pics = amount.0;
+        assert_eq!(123000000000000, pics);
+    }
+
+    #[test]
+    fn parse_monero_max() {
+        let monero = "18446744.073709551615";
+        let amount = Amount::parse_monero(monero).unwrap();
+        let pics = amount.0;
+        assert_eq!(18446744073709551615, pics);
+    }
+
+    #[test]
+    fn parse_monero_overflows() {
+        let overflow_pics = "18446744.073709551616";
+        let error = Amount::parse_monero(overflow_pics).unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<OverflowError>().unwrap(),
+            &OverflowError(overflow_pics.to_owned())
+        );
+    }
+
+    use rand::rngs::OsRng;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    pub struct MoneroPrivateKey(#[serde(with = "monero_private_key")] crate::monero::PrivateKey);
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    pub struct MoneroAmount(#[serde(with = "monero_amount")] crate::monero::Amount);
+
+    #[test]
+    fn serde_monero_private_key() {
+        let key = MoneroPrivateKey(monero::PrivateKey::from_scalar(
+            crate::monero::Scalar::random(&mut OsRng),
+        ));
+        let encoded = serde_cbor::to_vec(&key).unwrap();
+        let decoded: MoneroPrivateKey = serde_cbor::from_slice(&encoded).unwrap();
+        assert_eq!(key, decoded);
+    }
+
+    #[test]
+    fn serde_monero_amount() {
+        let amount = MoneroAmount(crate::monero::Amount::from_piconero(1000));
+        let encoded = serde_cbor::to_vec(&amount).unwrap();
+        let decoded: MoneroAmount = serde_cbor::from_slice(&encoded).unwrap();
+        assert_eq!(amount, decoded);
     }
 }

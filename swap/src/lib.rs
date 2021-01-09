@@ -1,7 +1,5 @@
 #![warn(
     unused_extern_crates,
-    missing_debug_implementations,
-    missing_copy_implementations,
     rust_2018_idioms,
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
@@ -10,19 +8,24 @@
     clippy::cast_possible_wrap,
     clippy::dbg_macro
 )]
+#![cfg_attr(not(test), warn(clippy::unwrap_used))]
 #![forbid(unsafe_code)]
-#![allow(non_snake_case)]
+#![allow(
+    non_snake_case,
+    missing_debug_implementations,
+    missing_copy_implementations
+)]
 
-use ::serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
-pub mod alice;
 pub mod bitcoin;
-pub mod bob;
 pub mod cli;
+pub mod config;
 pub mod database;
 pub mod monero;
 pub mod network;
+pub mod protocol;
 pub mod trace;
 
 pub type Never = std::convert::Infallible;
@@ -48,7 +51,7 @@ pub struct SwapAmounts {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub btc: bitcoin::Amount,
     /// Amount of XMR to swap.
-    #[serde(with = "xmr_btc::serde::monero_amount")]
+    #[serde(with = "monero::monero_amount")]
     pub xmr: monero::Amount,
 }
 
@@ -62,4 +65,11 @@ impl Display for SwapAmounts {
             self.xmr.as_piconero()
         )
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ExpiredTimelocks {
+    None,
+    Cancel,
+    Punish,
 }

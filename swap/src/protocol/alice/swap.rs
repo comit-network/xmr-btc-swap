@@ -1,7 +1,24 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
+use anyhow::Result;
+use async_recursion::async_recursion;
+use futures::{
+    future::{select, Either},
+    pin_mut,
+};
+use rand::{CryptoRng, RngCore};
+use std::sync::Arc;
+use tracing::info;
+use uuid::Uuid;
+
 use crate::{
-    alice::{
+    bitcoin,
+    bitcoin::{TransactionBlockHeight, WatchForRawTransaction},
+    config::Config,
+    database::{Database, Swap},
+    monero,
+    monero::CreateWalletForOutput,
+    protocol::alice::{
         event_loop::EventLoopHandle,
         steps::{
             build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
@@ -9,28 +26,8 @@ use crate::{
             publish_bitcoin_redeem_transaction, publish_cancel_transaction,
             wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund, wait_for_locked_bitcoin,
         },
+        AliceState,
     },
-    bitcoin::EncryptedSignature,
-    database::{Database, Swap},
-    network::request_response::AliceToBob,
-    SwapAmounts,
-};
-use anyhow::Result;
-use async_recursion::async_recursion;
-use futures::{
-    future::{select, Either},
-    pin_mut,
-};
-use libp2p::request_response::ResponseChannel;
-use rand::{CryptoRng, RngCore};
-use std::{fmt, sync::Arc};
-use tracing::info;
-use uuid::Uuid;
-use xmr_btc::{
-    alice::{State0, State3},
-    bitcoin::{TransactionBlockHeight, TxCancel, TxRefund, WatchForRawTransaction},
-    config::Config,
-    monero::CreateWalletForOutput,
     ExpiredTimelocks,
 };
 
@@ -38,75 +35,11 @@ trait Rng: RngCore + CryptoRng + Send {}
 
 impl<T> Rng for T where T: RngCore + CryptoRng + Send {}
 
-#[derive(Debug)]
-pub enum AliceState {
-    Started {
-        amounts: SwapAmounts,
-        state0: State0,
-    },
-    Negotiated {
-        channel: Option<ResponseChannel<AliceToBob>>,
-        amounts: SwapAmounts,
-        state3: Box<State3>,
-    },
-    BtcLocked {
-        channel: Option<ResponseChannel<AliceToBob>>,
-        amounts: SwapAmounts,
-        state3: Box<State3>,
-    },
-    XmrLocked {
-        state3: Box<State3>,
-    },
-    EncSigLearned {
-        encrypted_signature: EncryptedSignature,
-        state3: Box<State3>,
-    },
-    BtcRedeemed,
-    BtcCancelled {
-        tx_cancel: TxCancel,
-        state3: Box<State3>,
-    },
-    BtcRefunded {
-        spend_key: monero::PrivateKey,
-        state3: Box<State3>,
-    },
-    BtcPunishable {
-        tx_refund: TxRefund,
-        state3: Box<State3>,
-    },
-    XmrRefunded,
-    CancelTimelockExpired {
-        state3: Box<State3>,
-    },
-    BtcPunished,
-    SafelyAborted,
-}
-
-impl fmt::Display for AliceState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            AliceState::Started { .. } => write!(f, "started"),
-            AliceState::Negotiated { .. } => write!(f, "negotiated"),
-            AliceState::BtcLocked { .. } => write!(f, "btc is locked"),
-            AliceState::XmrLocked { .. } => write!(f, "xmr is locked"),
-            AliceState::EncSigLearned { .. } => write!(f, "encrypted signature is learned"),
-            AliceState::BtcRedeemed => write!(f, "btc is redeemed"),
-            AliceState::BtcCancelled { .. } => write!(f, "btc is cancelled"),
-            AliceState::BtcRefunded { .. } => write!(f, "btc is refunded"),
-            AliceState::BtcPunished => write!(f, "btc is punished"),
-            AliceState::SafelyAborted => write!(f, "safely aborted"),
-            AliceState::BtcPunishable { .. } => write!(f, "btc is punishable"),
-            AliceState::XmrRefunded => write!(f, "xmr is refunded"),
-            AliceState::CancelTimelockExpired { .. } => write!(f, "cancel timelock is expired"),
-        }
-    }
-}
-
 pub async fn swap(
     state: AliceState,
     event_loop_handle: EventLoopHandle,
-    bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
-    monero_wallet: Arc<crate::monero::Wallet>,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
     config: Config,
     swap_id: Uuid,
     db: Database,
