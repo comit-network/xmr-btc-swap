@@ -14,8 +14,8 @@ use crate::{
     database::Database,
     monero, network,
     network::transport::build,
-    protocol::{alice, alice::AliceState, bob, bob::BobState,seed::Seed,
-    SwapAmounts},
+    protocol::{alice, alice::AliceState, bob, bob::BobState, SwapAmounts},
+    seed::Seed,
 };
 
 mod happy_path;
@@ -272,19 +272,14 @@ pub fn init_tracing() -> DefaultGuard {
 
     let global_filter = tracing::Level::WARN;
     let swap_filter = tracing::Level::DEBUG;
-    let xmr_btc_filter = tracing::Level::DEBUG;
     let monero_harness_filter = tracing::Level::INFO;
     let bitcoin_harness_filter = tracing::Level::INFO;
 
     use tracing_subscriber::util::SubscriberInitExt as _;
     tracing_subscriber::fmt()
         .with_env_filter(format!(
-            "{},swap={},xmr_btc={},monero_harness={},bitcoin_harness={}",
-            global_filter,
-            swap_filter,
-            xmr_btc_filter,
-            monero_harness_filter,
-            bitcoin_harness_filter,
+            "{}, swap={}, monero_harness={},bitcoin_harness={}",
+            global_filter, swap_filter, monero_harness_filter, bitcoin_harness_filter,
         ))
         .set_default()
 }

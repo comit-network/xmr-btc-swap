@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
+use crate::seed::Seed;
 use anyhow::{bail, Context, Result};
 use cli::{Command, Options, Resume};
 use config::Config;
@@ -32,9 +33,11 @@ pub mod bitcoin;
 pub mod cli;
 pub mod config;
 pub mod database;
+pub mod fs;
 pub mod monero;
 pub mod network;
 pub mod protocol;
+pub mod seed;
 #[cfg(test)]
 mod tests;
 pub mod trace;
@@ -57,7 +60,7 @@ async fn main() -> Result<()> {
     let db =
         Database::open(data_dir.join("database").as_path()).context("Could not open database")?;
 
-    let seed = swap::config::seed::Seed::from_file_or_generate(&data_dir)
+    let seed = config::seed::Seed::from_file_or_generate(&data_dir)
         .expect("Could not retrieve/initialize seed")
         .into();
 

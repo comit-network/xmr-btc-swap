@@ -14,6 +14,7 @@ use crate::{
     monero,
     protocol::{alice, bob},
     seed::Seed,
+    tests::{init_alice, init_bob, init_containers, init_tracing, Containers},
 };
 
 /// Run the following tests with RUST_MIN_STACK=10000000
@@ -25,11 +26,11 @@ async fn happy_path() {
     let cli = Cli::default();
     let (
         monero,
-        tests::Containers {
+        Containers {
             bitcoind,
             monerods: _monerods,
         },
-    ) = tests::init_containers(&cli).await;
+    ) = init_containers(&cli).await;
 
     let btc_to_swap = bitcoin::Amount::from_sat(1_000_000);
     let btc_alice = bitcoin::Amount::ZERO;
