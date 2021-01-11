@@ -3,7 +3,7 @@ use async_recursion::async_recursion;
 use rand::{CryptoRng, RngCore};
 use std::sync::Arc;
 use tokio::select;
-use tracing::info;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 use crate::{
@@ -153,8 +153,12 @@ where
                     select! {
                         msg2 = msg2_watcher => {
 
+                            let msg2 = msg2?;
+                            info!("Received XMR lock transaction transfer proof from Alice, watching for transfer confirmations");
+                            debug!("Transfer proof: {:?}", msg2.tx_lock_proof);
+
                             let xmr_lock_watcher = state3.clone()
-                                .watch_for_lock_xmr(monero_wallet.as_ref(), msg2?, monero_wallet_restore_blockheight.height);
+                                .watch_for_lock_xmr(monero_wallet.as_ref(), msg2, monero_wallet_restore_blockheight.height);
                             let cancel_timelock_expires = state3.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
 
                             select! {
