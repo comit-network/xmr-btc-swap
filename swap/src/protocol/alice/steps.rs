@@ -135,6 +135,9 @@ where
         .await?;
 
     // TODO(Franck): Wait for Monero to be confirmed once
+    //  Waiting for XMR confirmations should not be done in here, but in a separate
+    //  state! We have to record that Alice has already sent the transaction.
+    //  Otherwise Alice might publish the lock tx twice!
 
     event_loop_handle
         .send_message2(channel, alice::Message2 {
