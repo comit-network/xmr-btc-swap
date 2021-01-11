@@ -205,7 +205,7 @@ where
                     let tx_redeem_encsig = state.tx_redeem_encsig();
 
                     let state4_clone = state.clone();
-                    // TODO(Franck): Refund if message cannot be sent.
+
                     let enc_sig_sent_watcher = event_loop_handle.send_message3(tx_redeem_encsig);
                     let bitcoin_wallet = bitcoin_wallet.clone();
                     let cancel_timelock_expires =
