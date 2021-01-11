@@ -1,11 +1,16 @@
+use crate::testutils::init_tracing;
 use monero_harness::Monero;
 use spectral::prelude::*;
 use std::time::Duration;
 use testcontainers::clients::Cli;
 use tokio::time;
 
+mod testutils;
+
 #[tokio::test]
 async fn init_miner_and_mine_to_miner_address() {
+    let _guard = init_tracing();
+
     let tc = Cli::default();
     let (monero, _monerod_container) = Monero::new(&tc, None, vec![]).await.unwrap();
 

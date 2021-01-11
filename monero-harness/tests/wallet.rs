@@ -1,9 +1,14 @@
+use crate::testutils::init_tracing;
 use monero_harness::Monero;
 use spectral::prelude::*;
 use testcontainers::clients::Cli;
 
+mod testutils;
+
 #[tokio::test]
 async fn fund_transfer_and_check_tx_key() {
+    let _guard = init_tracing();
+
     let fund_alice: u64 = 1_000_000_000_000;
     let fund_bob = 0;
     let send_to_bob = 5_000_000_000;

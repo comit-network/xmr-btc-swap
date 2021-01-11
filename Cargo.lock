@@ -1945,6 +1945,8 @@ dependencies = [
  "testcontainers",
  "tokio",
  "tracing",
+ "tracing-log",
+ "tracing-subscriber",
  "url",
 ]
 
