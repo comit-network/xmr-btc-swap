@@ -7,7 +7,7 @@ use futures::{
 use libp2p::request_response::ResponseChannel;
 use rand::rngs::OsRng;
 use sha2::Sha256;
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 use tokio::time::timeout;
 use tracing::{info, trace};
 
@@ -147,11 +147,11 @@ where
 
 pub async fn wait_for_bitcoin_encrypted_signature(
     event_loop_handle: &mut EventLoopHandle,
-    timeout_duration: Duration,
 ) -> Result<EncryptedSignature> {
-    let msg3 = timeout(timeout_duration, event_loop_handle.recv_message3())
+    let msg3 = event_loop_handle
+        .recv_message3()
         .await
-        .context("Failed to receive Bitcoin encrypted signature from Bob")??;
+        .context("Failed to receive Bitcoin encrypted signature from Bob")?;
     Ok(msg3.tx_redeem_encsig)
 }
 

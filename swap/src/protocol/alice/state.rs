@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use ecdsa_fun::{
     adaptor::{Adaptor, EncryptedSignature},
     nonce::Deterministic,
@@ -254,10 +254,12 @@ impl State2 {
     pub fn receive(self, msg: bob::Message2) -> Result<State3> {
         let tx_cancel =
             bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
-        bitcoin::verify_sig(&self.B, &tx_cancel.digest(), &msg.tx_cancel_sig)?;
+        bitcoin::verify_sig(&self.B, &tx_cancel.digest(), &msg.tx_cancel_sig)
+            .context("Failed to verify cancel transaction")?;
         let tx_punish =
             bitcoin::TxPunish::new(&tx_cancel, &self.punish_address, self.punish_timelock);
-        bitcoin::verify_sig(&self.B, &tx_punish.digest(), &msg.tx_punish_sig)?;
+        bitcoin::verify_sig(&self.B, &tx_punish.digest(), &msg.tx_punish_sig)
+            .context("Failed to verify punish transaction")?;
 
         Ok(State3 {
             a: self.a,

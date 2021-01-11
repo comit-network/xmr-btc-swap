@@ -30,7 +30,7 @@ pub enum Command {
         )]
         monero_wallet_rpc_url: Url,
 
-        #[structopt(long = "p2p-address", default_value = "/ip4/127.0.0.1/tcp/9876")]
+        #[structopt(long = "p2p-address", default_value = "/ip4/0.0.0.0/tcp/9876")]
         listen_addr: Multiaddr,
 
         #[structopt(long = "send-xmr",  help = "Monero amount as floating point nr without denomination (e.g. 125.1)", parse(try_from_str = parse_xmr))]
