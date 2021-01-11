@@ -8,6 +8,7 @@ use swap::{
     database::Database,
     monero,
     protocol::{alice, alice::AliceState, bob, bob::BobState},
+    seed::Seed,
 };
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
@@ -59,6 +60,7 @@ async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {
         alice_xmr_starting_balance,
         alice_multiaddr.clone(),
         Config::regtest(),
+        Seed::random().unwrap(),
     )
     .await;
 

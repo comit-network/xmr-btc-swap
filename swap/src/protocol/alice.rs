@@ -13,7 +13,7 @@ use crate::{
         peer_tracker::{self, PeerTracker},
         request_response::AliceToBob,
         transport::SwapTransport,
-        TokioExecutor,
+        Seed, TokioExecutor,
     },
     protocol::bob,
     SwapAmounts,
@@ -145,6 +145,20 @@ pub struct Behaviour {
 }
 
 impl Behaviour {
+    pub fn new(seed: Seed) -> Self {
+        let identity = seed.derive_libp2p_identity();
+
+        Self {
+            pt: PeerTracker::default(),
+            amounts: Amounts::default(),
+            message0: message0::Behaviour::default(),
+            message1: message1::Behaviour::default(),
+            message2: message2::Behaviour::default(),
+            message3: message3::Behaviour::default(),
+            identity,
+        }
+    }
+
     pub fn identity(&self) -> Keypair {
         self.identity.clone()
     }
@@ -176,21 +190,5 @@ impl Behaviour {
     pub fn send_message2(&mut self, channel: ResponseChannel<AliceToBob>, msg: Message2) {
         self.message2.send(channel, msg);
         debug!("Sent Message2");
-    }
-}
-
-impl Default for Behaviour {
-    fn default() -> Self {
-        let identity = Keypair::generate_ed25519();
-
-        Self {
-            pt: PeerTracker::default(),
-            amounts: Amounts::default(),
-            message0: message0::Behaviour::default(),
-            message1: message1::Behaviour::default(),
-            message2: message2::Behaviour::default(),
-            message3: message3::Behaviour::default(),
-            identity,
-        }
     }
 }

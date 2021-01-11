@@ -8,6 +8,7 @@ use swap::{
     database::Database,
     monero,
     protocol::{alice, bob, bob::BobState},
+    seed::Seed,
 };
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
@@ -57,6 +58,7 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
         alice_xmr_starting_balance,
         alice_multiaddr.clone(),
         config,
+        Seed::random().unwrap(),
     )
     .await;
 

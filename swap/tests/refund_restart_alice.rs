@@ -9,6 +9,7 @@ use swap::{
     database::Database,
     monero,
     protocol::{alice, alice::AliceState, bob, bob::BobState},
+    seed::Seed,
 };
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
@@ -47,6 +48,7 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
         .parse()
         .expect("failed to parse Alice's address");
 
+    let alice_seed = Seed::random().unwrap();
     let (
         alice_state,
         mut alice_event_loop_1,
@@ -62,6 +64,7 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
         alice_xmr_starting_balance,
         alice_multiaddr.clone(),
         Config::regtest(),
+        alice_seed,
     )
     .await;
 
@@ -121,7 +124,7 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
     };
 
     let (mut alice_event_loop_2, alice_event_loop_handle_2) =
-        testutils::init_alice_event_loop(alice_multiaddr);
+        testutils::init_alice_event_loop(alice_multiaddr, alice_seed);
 
     let alice_final_state = {
         let alice_db = Database::open(alice_db_datadir.path()).unwrap();

@@ -17,4 +17,6 @@ spectral = "0.6"
 testcontainers = "0.11"
 tokio = { version = "0.2", default-features = false, features = ["blocking", "macros", "rt-core", "time"] }
 tracing = "0.1"
+tracing-log = "0.1"
+tracing-subscriber = { version = "0.2", default-features = false, features = ["fmt", "ansi", "env-filter"] }
 url = "2"

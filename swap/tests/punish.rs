@@ -11,6 +11,7 @@ use swap::{
     config::Config,
     monero,
     protocol::{alice, alice::AliceState, bob, bob::BobState},
+    seed::Seed,
 };
 use testcontainers::clients::Cli;
 use testutils::init_tracing;
@@ -63,6 +64,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         alice_xmr_starting_balance,
         alice_multiaddr.clone(),
         config,
+        Seed::random().unwrap(),
     )
     .await;
 
