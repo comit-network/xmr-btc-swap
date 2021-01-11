@@ -39,7 +39,7 @@ extern crate prettytable;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    init_tracing(LevelFilter::Trace).expect("initialize tracing");
+    init_tracing(LevelFilter::Info).expect("initialize tracing");
 
     let opt = Options::from_args();
     let config = Config::testnet();
