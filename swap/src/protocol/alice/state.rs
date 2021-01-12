@@ -538,10 +538,11 @@ impl State5 {
 
         let s = s_b.scalar + self.s_a.into_ed25519();
 
+        // TODO: Optimized rescan height should be passed for refund as well.
         // NOTE: This actually generates and opens a new wallet, closing the currently
         // open one.
         monero_wallet
-            .create_and_load_wallet_for_output(monero::PrivateKey::from_scalar(s), self.v)
+            .create_and_load_wallet_for_output(monero::PrivateKey::from_scalar(s), self.v, None)
             .await?;
 
         Ok(())

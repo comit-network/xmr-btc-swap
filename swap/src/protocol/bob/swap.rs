@@ -142,11 +142,19 @@ where
                     let cancel_timelock_expires =
                         state3.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
 
+                    // Record the current monero wallet block height so we don't have to scan from
+                    // block 0 once we create the redeem wallet.
+                    // TODO: This can be optimized further by extracting the block height when
+                    //  tx-lock was included. However, scanning a few more blocks won't do any harm
+                    //  and is simpler.
+                    let monero_wallet_restore_blockheight =
+                        monero_wallet.inner.block_height().await?;
+
                     select! {
                         msg2 = msg2_watcher => {
 
                             let xmr_lock_watcher = state3.clone()
-                                .watch_for_lock_xmr(monero_wallet.as_ref(), msg2?);
+                                .watch_for_lock_xmr(monero_wallet.as_ref(), msg2?, monero_wallet_restore_blockheight.height);
                             let cancel_timelock_expires = state3.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
 
                             select! {

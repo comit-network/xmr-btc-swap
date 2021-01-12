@@ -68,6 +68,7 @@ impl CreateWalletForOutput for Wallet {
         &self,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
+        restore_height: Option<u32>,
     ) -> Result<()> {
         let public_spend_key = PublicKey::from_private_key(&private_spend_key);
         let public_view_key = PublicKey::from_private_key(&private_view_key.into());
@@ -80,6 +81,7 @@ impl CreateWalletForOutput for Wallet {
                 &address.to_string(),
                 &private_spend_key.to_string(),
                 &PrivateKey::from(private_view_key).to_string(),
+                restore_height,
             )
             .await?;
 

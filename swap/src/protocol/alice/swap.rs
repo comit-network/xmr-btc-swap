@@ -405,7 +405,7 @@ pub async fn run_until(
                 let view_key = state3.v;
 
                 monero_wallet
-                    .create_and_load_wallet_for_output(spend_key, view_key)
+                    .create_and_load_wallet_for_output(spend_key, view_key, None)
                     .await?;
 
                 let state = AliceState::XmrRefunded;

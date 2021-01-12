@@ -186,7 +186,7 @@ impl Client {
     }
 
     /// Get wallet block height, this might be behind monerod height.
-    pub(crate) async fn block_height(&self) -> Result<BlockHeight> {
+    pub async fn block_height(&self) -> Result<BlockHeight> {
         let request = Request::new("get_height", "");
 
         let response = self
@@ -238,9 +238,16 @@ impl Client {
         address: &str,
         spend_key: &str,
         view_key: &str,
+        restore_height: Option<u32>,
     ) -> Result<GenerateFromKeys> {
+        let restore_height = if let Some(restore_height) = restore_height {
+            restore_height
+        } else {
+            0
+        };
+
         let params = GenerateFromKeysParams {
-            restore_height: 0,
+            restore_height,
             filename: view_key.into(),
             address: address.into(),
             spendkey: spend_key.into(),
