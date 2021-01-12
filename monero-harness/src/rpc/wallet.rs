@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 /// JSON RPC client for monero-wallet-rpc.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Client {
     pub inner: reqwest::Client,
     pub url: Url,
