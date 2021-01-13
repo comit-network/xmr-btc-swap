@@ -16,10 +16,10 @@ end
 
 group Request Response Channel
     Bob -> Alice: bob::Message0
-    note left: Pubkeys\ndleq proof sb\nxmr viewkey vb\nbtc refund addr
+    note left: Pubkeys\ndleq proof s_b\nxmr viewkey v_b\nbtc refund addr
 
     Alice --> Bob: alice::Message0
-    note right: Pubkeys\ndleq proof sa\nxmr view key va\nbtc redeem addr\nbtc punish addr
+    note right: Pubkeys\ndleq proof s_a\nxmr view key v_a\nbtc redeem addr\nbtc punish addr
 end
 
 group Request Response Channel
@@ -27,7 +27,7 @@ group Request Response Channel
     note left: btc lock tx
 
     Alice --> Bob: alice::Message1
-    note right: cancel tx sig\ntx refund enc sig
+    note right: cancel tx sig\nrefund tx enc sig S_b
 end
 
 group Request Response Channel
@@ -41,17 +41,17 @@ group Request Response Channel
     Alice ->> Monero: Lock
 
     Alice --> Bob: alice::Message2
-    note right: xm transfer proof
+    note right: xmr lock tx transfer proof
 end
 
     Bob -> Alice: bob::Message3
-    note left: Enc sig
+    note left: redeem tx enc sig S_a
 
     Alice ->> Bitcoin: Redeem
 
     Bitcoin ->> Bob: Signature
 
-    Bob -> Bob: Extract Monero key
+    Bob -> Bob: Extract s_a
 
     Bob ->> Monero: Redeem
 
