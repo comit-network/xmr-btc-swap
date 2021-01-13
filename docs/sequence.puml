@@ -1,0 +1,58 @@
+@startuml
+database Bitcoin
+actor Bob
+Actor Alice
+database Monero
+
+Bob --> Alice: Establish connection
+
+group Request Response Channel
+    Bob -> Alice: Request Amounts
+    note left: Btc Amount
+
+    Alice --> Bob: Send Amounts
+    note right: Btc & Xmr Amounts
+end
+
+group Request Response Channel
+    Bob -> Alice: bob::Message0
+    note left: Pubkeys\ndleq proof sb\nxmr viewkey vb\nbtc refund addr
+
+    Alice --> Bob: alice::Message0
+    note right: Pubkeys\ndleq proof sa\nxmr view key va\nbtc redeem addr\nbtc punish addr
+end
+
+group Request Response Channel
+    Bob -> Alice: bob::Message1
+    note left: btc lock tx
+
+    Alice --> Bob: alice::Message1
+    note right: cancel tx sig\ntx refund enc sig
+end
+
+group Request Response Channel
+    Bob -> Alice: bob::Message2
+    note left: punish tx sig\ncancel tx sig
+
+== Negotiated ==
+
+    Bob ->> Bitcoin: Lock
+
+    Alice ->> Monero: Lock
+
+    Alice --> Bob: alice::Message2
+    note right: xm transfer proof
+end
+
+    Bob -> Alice: bob::Message3
+    note left: Enc sig
+
+    Alice ->> Bitcoin: Redeem
+
+    Bitcoin ->> Bob: Signature
+
+    Bob -> Bob: Extract Monero key
+
+    Bob ->> Monero: Redeem
+
+@enduml
