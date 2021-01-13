@@ -14,7 +14,7 @@ group Negotiation
         note right: Alice stores peer id & address hints\nto contact Bob
 
         Alice --> Bob: Swap response
-        note right: ACK or NACK\n Exact XMR amount
+        note right: Exact XMR amount
     end
 end
 
