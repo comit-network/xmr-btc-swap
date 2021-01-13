@@ -14,7 +14,7 @@ group Negotiation
         note right: Alice stores peer id & address hints\nto contact Bob
 
         Alice --> Bob: Swap response
-        note right: ACK or NACK\n Approx. XMR amount
+        note right: ACK or NACK\n Exact XMR amount
     end
 end
 
@@ -47,7 +47,7 @@ group Execution
     Alice ->> Monero: Lock
 
     Alice -> Bob: Message5
-    note right: Exact xmr amount\nzxmr lock tx transfer proof\nThis can be removed if Bob watches the blockchain.
+    note right: xmr lock tx transfer proof\nThis can be removed if Bob watches the blockchain.
 
     Bob -> Alice: Message6
     note left: redeem tx enc sig S_a
