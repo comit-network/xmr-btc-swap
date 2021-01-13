@@ -44,8 +44,12 @@ group Request Response Channel
     note right: xmr lock tx transfer proof
 end
 
+group Request Response Channel
     Bob -> Alice: bob::Message3
     note left: redeem tx enc sig S_a
+    Alice --> Bob: alice::Message3
+    note right: Empty
+end
 
     Alice ->> Bitcoin: Redeem
 
