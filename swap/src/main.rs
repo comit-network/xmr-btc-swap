@@ -26,7 +26,12 @@ use swap::{
     database::{Database, Swap},
     monero, network,
     network::transport::build,
-    protocol::{alice, alice::AliceState, bob, bob::BobState},
+    protocol::{
+        alice,
+        alice::{swap::AliceActor, AliceState},
+        bob,
+        bob::BobState,
+    },
     seed::Seed,
     trace::init_tracing,
     SwapAmounts,
@@ -295,18 +300,19 @@ async fn alice_swap(
     info!("Own Peer-ID: {}", alice_peer_id);
     let alice_transport = build(alice_behaviour.identity())?;
 
-    let (mut event_loop, handle) =
+    let (mut event_loop, event_loop_handle) =
         alice::event_loop::EventLoop::new(alice_transport, alice_behaviour, listen_addr)?;
 
-    let swap = alice::swap::swap(
-        state,
-        handle,
-        bitcoin_wallet.clone(),
-        monero_wallet.clone(),
+    let alice_actor = AliceActor::new(
+        event_loop_handle,
+        bitcoin_wallet,
+        monero_wallet,
+        db,
         config,
         swap_id,
-        db,
     );
+
+    let swap = alice_actor.swap(state);
 
     tokio::spawn(async move { event_loop.run().await });
     swap.await

@@ -344,3 +344,13 @@ where
 
     Ok(txid)
 }
+
+pub async fn watch_for_tx_refund<W>(
+    tx_id: bitcoin::Txid,
+    bitcoin_wallet: Arc<W>,
+) -> bitcoin::Transaction
+where
+    W: WatchForRawTransaction,
+{
+    bitcoin_wallet.watch_for_raw_transaction(tx_id).await
+}
