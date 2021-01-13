@@ -26,7 +26,8 @@ impl<'a> Test<'a> {
     pub async fn new(btc_to_swap: bitcoin::Amount, xmr_to_swap: monero::Amount) -> Test<'a> {
         let _guard = init_tracing();
 
-        let (monero, containers) = testutils::init_containers().await;
+        let cli = Cli::default();
+        let (monero, containers) = testutils::init_containers(&cli).await;
 
         let bob_btc_starting_balance = btc_to_swap * 10;
         let alice_xmr_starting_balance = xmr_to_swap * 10;
@@ -72,21 +73,18 @@ impl<'a> Test<'a> {
 // This is just to keep the containers alive
 #[allow(dead_code)]
 pub struct Containers<'a> {
-    cli: Cli,
     pub bitcoind: Bitcoind<'a>,
     pub monerods: Vec<Container<'a, Cli, image::Monero>>,
 }
 
-pub async fn init_containers<'a>() -> (Monero, Containers<'a>) {
-    let cli = Cli::default();
-    let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
+pub async fn init_containers<'a>(cli: &'a Cli) -> (Monero, Containers<'a>) {
+    let bitcoind = Bitcoind::new(cli, "0.19.1").unwrap();
     let _ = bitcoind.init(5).await;
     let (monero, monerods) = Monero::new(&cli, None, vec!["alice".to_string(), "bob".to_string()])
         .await
         .unwrap();
 
     (monero, Containers {
-        cli,
         bitcoind,
         monerods,
     })
