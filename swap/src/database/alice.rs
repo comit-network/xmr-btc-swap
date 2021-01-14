@@ -1,6 +1,3 @@
-use ::bitcoin::hashes::core::fmt::Display;
-use serde::{Deserialize, Serialize};
-
 use crate::{
     bitcoin::{EncryptedSignature, TxCancel, TxRefund},
     monero,
@@ -8,6 +5,8 @@ use crate::{
     protocol::{alice, alice::AliceState},
     SwapAmounts,
 };
+use ::bitcoin::hashes::core::fmt::Display;
+use serde::{Deserialize, Serialize};
 
 // Large enum variant is fine because this is only used for database
 // and is dropped once written in DB.

@@ -1,3 +1,12 @@
+use crate::{
+    bitcoin::EncryptedSignature,
+    network::{transport::SwapTransport, TokioExecutor},
+    protocol::{
+        alice,
+        alice::SwapResponse,
+        bob::{self, Behaviour, OutEvent, SwapRequest},
+    },
+};
 use anyhow::{anyhow, Result};
 use futures::FutureExt;
 use libp2p::{core::Multiaddr, PeerId};
@@ -6,15 +15,6 @@ use tokio::{
     sync::mpsc::{Receiver, Sender},
 };
 use tracing::{debug, error, info};
-
-use crate::{
-    bitcoin::EncryptedSignature,
-    network::{transport::SwapTransport, TokioExecutor},
-    protocol::{
-        alice,
-        bob::{self, Behaviour, OutEvent},
-    },
-};
 
 #[derive(Debug)]
 pub struct Channels<T> {
@@ -37,12 +37,13 @@ impl<T> Default for Channels<T> {
 
 #[derive(Debug)]
 pub struct EventLoopHandle {
+    swap_response: Receiver<SwapResponse>,
     msg0: Receiver<alice::Message0>,
     msg1: Receiver<alice::Message1>,
     msg2: Receiver<alice::Message2>,
-    request_amounts: Sender<::bitcoin::Amount>,
     conn_established: Receiver<PeerId>,
     dial_alice: Sender<()>,
+    send_swap_request: Sender<SwapRequest>,
     send_msg0: Sender<bob::Message0>,
     send_msg1: Sender<bob::Message1>,
     send_msg2: Sender<bob::Message2>,
@@ -50,25 +51,32 @@ pub struct EventLoopHandle {
 }
 
 impl EventLoopHandle {
+    pub async fn recv_swap_response(&mut self) -> Result<SwapResponse> {
+        self.swap_response
+            .recv()
+            .await
+            .ok_or_else(|| anyhow!("Failed to receive swap response from Alice"))
+    }
+
     pub async fn recv_message0(&mut self) -> Result<alice::Message0> {
         self.msg0
             .recv()
             .await
-            .ok_or_else(|| anyhow!("Failed to receive message 0 from Bob"))
+            .ok_or_else(|| anyhow!("Failed to receive message 0 from Alice"))
     }
 
     pub async fn recv_message1(&mut self) -> Result<alice::Message1> {
         self.msg1
             .recv()
             .await
-            .ok_or_else(|| anyhow!("Failed to receive message 1 from Bob"))
+            .ok_or_else(|| anyhow!("Failed to receive message 1 from Alice"))
     }
 
     pub async fn recv_message2(&mut self) -> Result<alice::Message2> {
         self.msg2
             .recv()
             .await
-            .ok_or_else(|| anyhow!("Failed o receive message 2 from Bob"))
+            .ok_or_else(|| anyhow!("Failed o receive message 2 from Alice"))
     }
 
     /// Dials other party and wait for the connection to be established.
@@ -85,8 +93,8 @@ impl EventLoopHandle {
         Ok(())
     }
 
-    pub async fn request_amounts(&mut self, btc_amount: ::bitcoin::Amount) -> Result<()> {
-        let _ = self.request_amounts.send(btc_amount).await?;
+    pub async fn send_swap_request(&mut self, swap_request: SwapRequest) -> Result<()> {
+        let _ = self.send_swap_request.send(swap_request).await?;
         Ok(())
     }
 
@@ -115,12 +123,13 @@ impl EventLoopHandle {
 pub struct EventLoop {
     swarm: libp2p::Swarm<Behaviour>,
     alice_peer_id: PeerId,
+    swap_response: Sender<SwapResponse>,
     msg0: Sender<alice::Message0>,
     msg1: Sender<alice::Message1>,
     msg2: Sender<alice::Message2>,
     conn_established: Sender<PeerId>,
-    request_amounts: Receiver<::bitcoin::Amount>,
     dial_alice: Receiver<()>,
+    send_swap_request: Receiver<SwapRequest>,
     send_msg0: Receiver<bob::Message0>,
     send_msg1: Receiver<bob::Message1>,
     send_msg2: Receiver<bob::Message2>,
@@ -143,12 +152,13 @@ impl EventLoop {
 
         swarm.add_address(alice_peer_id.clone(), alice_addr);
 
-        let amounts = Channels::new();
+        let swap_response = Channels::new();
         let msg0 = Channels::new();
         let msg1 = Channels::new();
         let msg2 = Channels::new();
         let conn_established = Channels::new();
         let dial_alice = Channels::new();
+        let send_swap_request = Channels::new();
         let send_msg0 = Channels::new();
         let send_msg1 = Channels::new();
         let send_msg2 = Channels::new();
@@ -157,12 +167,13 @@ impl EventLoop {
         let event_loop = EventLoop {
             swarm,
             alice_peer_id,
-            request_amounts: amounts.receiver,
+            swap_response: swap_response.sender,
             msg0: msg0.sender,
             msg1: msg1.sender,
             msg2: msg2.sender,
             conn_established: conn_established.sender,
             dial_alice: dial_alice.receiver,
+            send_swap_request: send_swap_request.receiver,
             send_msg0: send_msg0.receiver,
             send_msg1: send_msg1.receiver,
             send_msg2: send_msg2.receiver,
@@ -170,12 +181,13 @@ impl EventLoop {
         };
 
         let handle = EventLoopHandle {
-            request_amounts: amounts.sender,
+            swap_response: swap_response.receiver,
             msg0: msg0.receiver,
             msg1: msg1.receiver,
             msg2: msg2.receiver,
             conn_established: conn_established.receiver,
             dial_alice: dial_alice.sender,
+            send_swap_request: send_swap_request.sender,
             send_msg0: send_msg0.sender,
             send_msg1: send_msg1.sender,
             send_msg2: send_msg2.sender,
@@ -193,7 +205,9 @@ impl EventLoop {
                         OutEvent::ConnectionEstablished(peer_id) => {
                             let _ = self.conn_established.send(peer_id).await;
                         }
-                        OutEvent::Amounts(_amounts) => info!("Amounts received from Alice"),
+                        OutEvent::SwapResponse(msg) => {
+                            let _ = self.swap_response.send(msg).await;
+                        },
                         OutEvent::Message0(msg) => {
                             let _ = self.msg0.send(*msg).await;
                         }
@@ -222,9 +236,9 @@ impl EventLoop {
                         }
                     }
                 },
-                amounts = self.request_amounts.next().fuse() =>  {
-                    if let Some(btc_amount) = amounts {
-                        self.swarm.request_amounts(self.alice_peer_id.clone(), btc_amount.as_sat());
+                swap_request = self.send_swap_request.next().fuse() =>  {
+                    if let Some(swap_request) = swap_request {
+                        self.swarm.send_swap_request(self.alice_peer_id.clone(), swap_request);
                     }
                 },
 

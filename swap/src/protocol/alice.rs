@@ -1,36 +1,40 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use anyhow::{bail, Result};
-use libp2p::{request_response::ResponseChannel, NetworkBehaviour, PeerId};
-use tracing::{debug, info};
-
 use crate::{
-    bitcoin, database, monero,
+    bitcoin,
+    config::Config,
+    database,
+    database::Database,
+    monero,
     network::{
         peer_tracker::{self, PeerTracker},
         request_response::AliceToBob,
+        transport::build,
         Seed as NetworkSeed,
     },
     protocol::bob,
+    seed::Seed,
     SwapAmounts,
 };
+use anyhow::{bail, Result};
+use libp2p::{
+    core::Multiaddr, identity::Keypair, request_response::ResponseChannel, NetworkBehaviour, PeerId,
+};
+use rand::rngs::OsRng;
+use std::{path::PathBuf, sync::Arc};
+use tracing::{debug, info};
+use uuid::Uuid;
 
 pub use self::{
-    amounts::*,
     event_loop::{EventLoop, EventLoopHandle},
     message0::Message0,
     message1::Message1,
     message2::Message2,
     state::*,
     swap::{run, run_until},
+    swap_response::*,
 };
-use crate::{config::Config, database::Database, network::transport::build, seed::Seed};
-use libp2p::{core::Multiaddr, identity::Keypair};
-use rand::rngs::OsRng;
-use std::{path::PathBuf, sync::Arc};
-use uuid::Uuid;
 
-mod amounts;
 pub mod event_loop;
 mod message0;
 mod message1;
@@ -39,6 +43,7 @@ mod message3;
 pub mod state;
 mod steps;
 pub mod swap;
+mod swap_response;
 
 pub struct Swap {
     pub state: AliceState,
@@ -217,8 +222,9 @@ pub enum OutEvent {
     ConnectionEstablished(PeerId),
     // TODO (Franck): Change this to get both amounts so parties can verify the amounts are
     // expected early on.
-    Request(Box<amounts::OutEvent>), /* Not-uniform with Bob on purpose, ready for adding Xmr
-                                      * event. */
+    Request(Box<swap_response::OutEvent>), /* Not-uniform with Bob on purpose, ready for adding
+                                            * Xmr
+                                            * event. */
     Message0 {
         msg: Box<bob::Message0>,
         channel: ResponseChannel<AliceToBob>,
@@ -244,8 +250,8 @@ impl From<peer_tracker::OutEvent> for OutEvent {
     }
 }
 
-impl From<amounts::OutEvent> for OutEvent {
-    fn from(event: amounts::OutEvent) -> Self {
+impl From<swap_response::OutEvent> for OutEvent {
+    fn from(event: swap_response::OutEvent) -> Self {
         OutEvent::Request(Box::new(event))
     }
 }
@@ -291,7 +297,7 @@ impl From<message3::OutEvent> for OutEvent {
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
     pt: PeerTracker,
-    amounts: Amounts,
+    amounts: swap_response::Behaviour,
     message0: message0::Behaviour,
     message1: message1::Behaviour,
     message2: message2::Behaviour,
@@ -300,9 +306,12 @@ pub struct Behaviour {
 
 impl Behaviour {
     /// Alice always sends her messages as a response to a request from Bob.
-    pub fn send_amounts(&mut self, channel: ResponseChannel<AliceToBob>, amounts: SwapAmounts) {
-        let msg = AliceToBob::Amounts(amounts);
-        self.amounts.send(channel, msg);
+    pub fn send_swap_response(
+        &mut self,
+        channel: ResponseChannel<AliceToBob>,
+        swap_response: SwapResponse,
+    ) {
+        self.amounts.send(channel, swap_response);
         info!("Sent amounts response");
     }
 

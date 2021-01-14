@@ -105,7 +105,7 @@ async fn run_until_internal(
         match state {
             AliceState::Started { amounts, state0 } => {
                 let (channel, state3) =
-                    negotiate(state0, amounts, &mut event_loop_handle, config).await?;
+                    negotiate(state0, amounts.xmr, &mut event_loop_handle, config).await?;
 
                 let state = AliceState::Negotiated {
                     channel: Some(channel),

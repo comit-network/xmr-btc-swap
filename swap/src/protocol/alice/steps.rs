@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
 use futures::{
     future::{select, Either},
@@ -24,13 +24,16 @@ use crate::{
     monero,
     monero::Transfer,
     network::request_response::AliceToBob,
-    protocol::{alice, alice::event_loop::EventLoopHandle},
+    protocol::{
+        alice,
+        alice::{event_loop::EventLoopHandle, SwapResponse},
+    },
     SwapAmounts,
 };
 
 pub async fn negotiate(
     state0: alice::State0,
-    amounts: SwapAmounts,
+    xmr_amount: monero::Amount,
     event_loop_handle: &mut EventLoopHandle,
     config: Config,
 ) -> Result<(ResponseChannel<AliceToBob>, alice::State3)> {
@@ -46,18 +49,10 @@ pub async fn negotiate(
 
     let event = timeout(config.bob_time_to_act, event_loop_handle.recv_request())
         .await
-        .context("Failed to receive amounts from Bob")??;
-
-    if event.btc != amounts.btc {
-        bail!(
-            "Bob proposed a different amount; got {}, expected: {}",
-            event.btc,
-            amounts.btc
-        );
-    }
+        .context("Failed to receive swap request from Bob")??;
 
     event_loop_handle
-        .send_amounts(event.channel, amounts)
+        .send_swap_response(event.channel, SwapResponse { xmr_amount })
         .await?;
 
     let (bob_message0, channel) =
