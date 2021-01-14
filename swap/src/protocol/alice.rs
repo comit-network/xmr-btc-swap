@@ -20,7 +20,8 @@ use crate::{
 };
 
 pub use self::{
-    amounts::*, message0::Message0, message1::Message1, message2::Message2, state::*, swap::swap,
+    amounts::*, event_loop::EventLoop, message0::Message0, message1::Message1, message2::Message2,
+    state::*, swap::swap,
 };
 
 mod amounts;
