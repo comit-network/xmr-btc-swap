@@ -8,14 +8,10 @@ pub mod testutils;
 
 #[tokio::test]
 async fn happy_path() {
-    let mut test = Test::new(
-        bitcoin::Amount::from_sat(1_000_000),
-        monero::Amount::from_piconero(1_000_000_000_000),
-    )
-    .await;
+    testutils::test(|alice, bob| async move {
+        join!(alice.swap(), bob.swap());
 
-    join!(test.alice.swap(), test.bob.swap());
-
-    test.alice.assert_btc_redeemed();
-    test.bob.assert_btc_redeemed();
+        alice.assert_btc_redeemed();
+        bob.assert_btc_redeemed();
+    }).await;
 }

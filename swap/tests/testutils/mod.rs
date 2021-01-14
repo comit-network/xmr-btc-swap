@@ -12,9 +12,27 @@ use monero_harness::{image, Monero};
 use std::sync::Arc;
 use swap::{bitcoin, config::Config, monero, seed::Seed};
 
+use std::future::Future;
 use testcontainers::{clients::Cli, Container};
 use tracing_core::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
+
+pub async fn test<T, F>(testfn: T)
+where
+    T: Fn(Alice, Bob) -> F,
+    F: Future<Output = ()>,
+{
+    let cli = Cli::default();
+
+    let test = Test::new(
+        bitcoin::Amount::from_sat(1_000_000),
+        monero::Amount::from_piconero(1_000_000_000_000),
+        &cli,
+    )
+    .await;
+
+    testfn(test.alice, test.bob).await
+}
 
 pub struct Test<'a> {
     pub alice: Alice,
@@ -23,10 +41,13 @@ pub struct Test<'a> {
 }
 
 impl<'a> Test<'a> {
-    pub async fn new(btc_to_swap: bitcoin::Amount, xmr_to_swap: monero::Amount) -> Test<'a> {
+    pub async fn new(
+        btc_to_swap: bitcoin::Amount,
+        xmr_to_swap: monero::Amount,
+        cli: &'a Cli,
+    ) -> Test<'a> {
         let _guard = init_tracing();
 
-        let cli = Cli::default();
         let (monero, containers) = testutils::init_containers(&cli).await;
 
         let bob_btc_starting_balance = btc_to_swap * 10;
@@ -84,10 +105,7 @@ pub async fn init_containers<'a>(cli: &'a Cli) -> (Monero, Containers<'a>) {
         .await
         .unwrap();
 
-    (monero, Containers {
-        bitcoind,
-        monerods,
-    })
+    (monero, Containers { bitcoind, monerods })
 }
 
 pub async fn init_wallets(
