@@ -32,7 +32,7 @@ pub async fn init_wallets(
     name: &str,
     bitcoind: &Bitcoind<'_>,
     monero: &Monero,
-    btc_starting_balance: Option<::bitcoin::Amount>,
+    btc_starting_balance: Option<bitcoin::Amount>,
     xmr_starting_balance: Option<monero::Amount>,
     config: Config,
 ) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {

@@ -88,12 +88,11 @@ pub async fn run_until(
     state: AliceState,
     is_target_state: fn(&AliceState) -> bool,
     mut event_loop_handle: EventLoopHandle,
-    bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
-    monero_wallet: Arc<crate::monero::Wallet>,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
     config: Config,
     swap_id: Uuid,
     db: Database,
-    // TODO: Remove EventLoopHandle!
 ) -> Result<AliceState> {
     info!("Current state:{}", state);
     if is_target_state(&state) {

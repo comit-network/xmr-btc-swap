@@ -7,7 +7,9 @@ use tracing::info;
 use uuid::Uuid;
 
 use crate::{
+    bitcoin,
     database::{Database, Swap},
+    monero,
     protocol::bob::{self, event_loop::EventLoopHandle, state::*},
     ExpiredTimelocks, SwapAmounts,
 };
@@ -18,8 +20,8 @@ pub async fn swap<R>(
     state: BobState,
     event_loop_handle: EventLoopHandle,
     db: Database,
-    bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
-    monero_wallet: Arc<crate::monero::Wallet>,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
     rng: R,
     swap_id: Uuid,
 ) -> Result<BobState>
@@ -69,8 +71,8 @@ pub async fn run_until<R>(
     is_target_state: fn(&BobState) -> bool,
     mut event_loop_handle: EventLoopHandle,
     db: Database,
-    bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
-    monero_wallet: Arc<crate::monero::Wallet>,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
     mut rng: R,
     swap_id: Uuid,
 ) -> Result<BobState>
