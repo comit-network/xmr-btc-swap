@@ -23,12 +23,6 @@ pub use wallet::Wallet;
 
 pub const PICONERO_OFFSET: u64 = 1_000_000_000_000;
 
-pub fn random_private_key<R: RngCore + CryptoRng>(rng: &mut R) -> PrivateKey {
-    let scalar = Scalar::random(rng);
-
-    PrivateKey::from_scalar(scalar)
-}
-
 pub fn private_key_from_secp256k1_scalar(scalar: bitcoin::Scalar) -> PrivateKey {
     let mut bytes = scalar.to_bytes();
 

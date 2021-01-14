@@ -1,4 +1,3 @@
-use crate::monero;
 use async_trait::async_trait;
 use futures::prelude::*;
 use libp2p::{
@@ -28,7 +27,6 @@ const BUF_SIZE: usize = 1024 * 1024;
 pub enum BobToAlice {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     AmountsFromBtc(::bitcoin::Amount),
-    AmountsFromXmr(monero::Amount),
     Message0(Box<bob::Message0>),
     Message1(bob::Message1),
     Message2(bob::Message2),
