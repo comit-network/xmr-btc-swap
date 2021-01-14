@@ -20,10 +20,9 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
 pub mod bitcoin;
-pub mod cli;
 pub mod config;
 pub mod database;
-pub mod fs;
+mod fs;
 pub mod monero;
 pub mod network;
 pub mod protocol;

@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
+use crate::cli::{Command, Options, Resume};
 use anyhow::{bail, Context, Result};
 use libp2p::{core::Multiaddr, PeerId};
 use prettytable::{row, Table};
@@ -21,7 +22,6 @@ use std::sync::Arc;
 use structopt::StructOpt;
 use swap::{
     bitcoin,
-    cli::{Command, Options, Resume},
     config::Config,
     database::{Database, Swap},
     monero, network,
@@ -33,6 +33,8 @@ use swap::{
 };
 use tracing::{info, log::LevelFilter};
 use uuid::Uuid;
+
+mod cli;
 
 #[macro_use]
 extern crate prettytable;

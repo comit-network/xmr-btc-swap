@@ -16,8 +16,6 @@ use crate::{
     config::Config,
 };
 
-pub const TX_LOCK_MINE_TIMEOUT: u64 = 3600;
-
 #[derive(Debug)]
 pub struct Wallet {
     pub inner: bitcoin_harness::Wallet,
