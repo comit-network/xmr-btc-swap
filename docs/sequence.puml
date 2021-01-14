@@ -20,22 +20,22 @@ end
 
 group Execution Setup
     group Phase A [Messages can be exchanged in any order]
-        Bob -> Alice: Message0
+        Bob -> Alice: bob::Message0
         note left: Pubkeys\ndleq proof s_b\nxmr viewkey v_b\nbtc refund addr
 
-        Alice -> Bob: Message1
+        Alice -> Bob: alice::Message0
         note right: Pubkeys\ndleq proof s_a\nxmr view key v_a\nbtc redeem addr\nbtc punish addr
     end
 
     group Phase B [Messages must be exchanged in the given order]
 
-        Bob -> Alice: Message2
+        Bob -> Alice: Message1
         note left: unsigned btc lock tx
 
-        Alice -> Bob: Message3
+        Alice -> Bob: Message2
         note right: btc cancel tx sig\nbtc refund tx enc sig S_b
 
-        Bob -> Alice: Message4
+        Bob -> Alice: Message3
         note left: btc punish tx sig\nbtc cancel tx sig
 
     end
@@ -46,10 +46,10 @@ group Execution
 
     Alice ->> Monero: Lock
 
-    Alice -> Bob: Message5
+    Alice -> Bob: Message4
     note right: xmr lock tx transfer proof\nThis can be removed if Bob watches the blockchain.
 
-    Bob -> Alice: Message6
+    Bob -> Alice: Message5
     note left: redeem tx enc sig S_a
 
     Alice ->> Bitcoin: Redeem
