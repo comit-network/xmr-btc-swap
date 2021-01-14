@@ -59,6 +59,7 @@ impl AliceActor {
         }
     }
 
+    // TODO: Make a swap abstraction that contains the state and swap id
     pub async fn swap(self, start_state: AliceState) -> Result<AliceState> {
         self.run_until(start_state, is_complete).await
     }

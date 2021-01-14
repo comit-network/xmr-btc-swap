@@ -23,7 +23,6 @@ use tokio::select;
 use uuid::Uuid;
 
 pub struct Alice {
-    state: AliceState,
     actor: AliceActor,
     event_loop: EventLoop,
 }
@@ -39,7 +38,7 @@ impl Alice {
         listen: Multiaddr,
         config: Config,
         seed: Seed,
-    ) -> Alice {
+    ) -> (Alice, AliceState) {
         let (alice_btc_wallet, alice_xmr_wallet) = init_wallets(
             "alice",
             bitcoind,
@@ -66,23 +65,25 @@ impl Alice {
             Uuid::new_v4(),
         );
 
-        Alice {
-            state: alice_start_state,
-            actor: alice_actor,
-            event_loop,
-        }
+        (
+            Alice {
+                actor: alice_actor,
+                event_loop,
+            },
+            alice_start_state,
+        )
     }
 
     pub fn peer_id(&self) -> PeerId {
         self.event_loop.peer_id()
     }
 
-    pub async fn swap(mut self) -> Result<()> {
+    pub async fn swap(&mut self) -> Result<()> {
         let final_state = select! {
             res = self.actor.swap(self.state) => res.unwrap(),
             _ = self.event_loop.run() => panic!("The event loop should never finish")
         };
-        self.state = final_state;
+        self.final_state = Some(final_state);
         Ok(())
     }
 

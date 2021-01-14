@@ -30,7 +30,7 @@ use swap::{
         alice,
         alice::{swap::AliceActor, AliceState},
         bob,
-        bob::BobState,
+        bob::{swap::BobActor, BobState},
     },
     seed::Seed,
     trace::init_tracing,
@@ -332,18 +332,12 @@ async fn bob_swap(
     let bob_behaviour = bob::Behaviour::new(network::Seed::new(seed));
     let bob_transport = build(bob_behaviour.identity())?;
 
-    let (event_loop, handle) =
+    let (event_loop, event_loop_handle) =
         bob::event_loop::EventLoop::new(bob_transport, bob_behaviour, alice_peer_id, alice_addr)?;
 
-    let swap = bob::swap::swap(
-        state,
-        handle,
-        db,
-        bitcoin_wallet.clone(),
-        monero_wallet.clone(),
-        OsRng,
-        swap_id,
-    );
+    let mut bob_actor = BobActor::new(event_loop_handle, bitcoin_wallet, monero_wallet, db);
+
+    let swap = bob_actor.swap(state, swap_id);
 
     tokio::spawn(event_loop.run());
     swap.await
