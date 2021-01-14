@@ -19,7 +19,9 @@ use crate::{
     SwapAmounts,
 };
 
-pub use self::{amounts::*, message0::Message0, message1::Message1, message2::Message2, state::*};
+pub use self::{
+    amounts::*, message0::Message0, message1::Message1, message2::Message2, state::*, swap::swap,
+};
 
 mod amounts;
 pub mod event_loop;
