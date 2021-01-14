@@ -6,7 +6,6 @@ use futures::{
     future::{select, Either},
     pin_mut,
 };
-use rand::{CryptoRng, RngCore};
 use std::sync::Arc;
 use tracing::info;
 use uuid::Uuid;
@@ -31,10 +30,6 @@ use crate::{
     },
     ExpiredTimelocks,
 };
-
-trait Rng: RngCore + CryptoRng + Send {}
-
-impl<T> Rng for T where T: RngCore + CryptoRng + Send {}
 
 pub struct AliceActor {
     event_loop_handle: EventLoopHandle,

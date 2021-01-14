@@ -1,5 +1,3 @@
-use crate::testutils::Test;
-use swap::{bitcoin, monero};
 use tokio::join;
 
 pub mod testutils;
@@ -13,5 +11,6 @@ async fn happy_path() {
 
         alice.assert_btc_redeemed();
         bob.assert_btc_redeemed();
-    }).await;
+    })
+    .await;
 }
