@@ -1,7 +1,7 @@
 @startuml
 database Bitcoin
-actor Bob
-Actor Alice
+actor Bob as "Bob (User)"
+Actor Alice as "Alice (Service Provider)"
 database Monero
 
 group Negotiation
