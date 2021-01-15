@@ -22,20 +22,19 @@ use tracing_core::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
 use uuid::Uuid;
 
+pub struct StartingBalances {
+    pub xmr: monero::Amount,
+    pub btc: bitcoin::Amount,
+}
+
 pub struct Alice {
-    pub event_loop_handle: alice::EventLoopHandle,
-    pub btc_wallet: Arc<bitcoin::Wallet>,
-    pub xmr_wallet: Arc<monero::Wallet>,
-    pub config: Config,
-    pub db: Database,
-
     pub state: AliceState,
-
-    pub xmr_starting_balance: monero::Amount,
-    pub btc_starting_balance: bitcoin::Amount,
-
-    // test context (state we have to keep to simulate restart)
+    pub event_loop_handle: alice::EventLoopHandle,
+    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
+    pub monero_wallet: Arc<monero::Wallet>,
+    pub config: Config,
     pub swap_id: Uuid,
+    pub db: Database,
 }
 
 pub struct Bob {
@@ -49,7 +48,7 @@ pub struct Bob {
     pub xmr_starting_balance: monero::Amount,
 }
 
-pub struct AliceFactory {
+pub struct AliceHarness {
     listen_address: Multiaddr,
     peer_id: PeerId,
 
@@ -62,11 +61,10 @@ pub struct AliceFactory {
     btc_wallet: Arc<bitcoin::Wallet>,
     xmr_wallet: Arc<monero::Wallet>,
     config: Config,
-    xmr_starting_balance: monero::Amount,
-    btc_starting_balance: bitcoin::Amount,
+    starting_balances: StartingBalances,
 }
 
-impl AliceFactory {
+impl AliceHarness {
     pub fn peer_id(&self) -> PeerId {
         self.peer_id.clone()
     }
@@ -75,14 +73,28 @@ impl AliceFactory {
         self.listen_address.clone()
     }
 
+    pub async fn assert_redeemed(&self, state: AliceState) {
+        assert!(matches!(state, AliceState::BtcRedeemed));
+
+        let btc_alice_final = self.btc_wallet.as_ref().balance().await.unwrap();
+
+        assert_eq!(
+            btc_alice_final,
+            self.starting_balances.btc + self.swap_amounts.btc
+                - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
+        );
+
+        let xmr_alice_final = self.xmr_wallet.as_ref().get_balance().await.unwrap();
+        assert!(xmr_alice_final <= self.starting_balances.xmr - self.swap_amounts.xmr);
+    }
+
     pub async fn new(
         config: Config,
         swap_amounts: SwapAmounts,
         swap_id: Uuid,
         monero: &Monero,
         bitcoind: &Bitcoind<'_>,
-        xmr_starting_balance: monero::Amount,
-        btc_starting_balance: bitcoin::Amount,
+        starting_balances: StartingBalances,
     ) -> Self {
         let port = get_port().expect("Failed to find a free port");
 
@@ -94,13 +106,13 @@ impl AliceFactory {
 
         let db_path = tempdir().unwrap().path().to_path_buf();
 
-        let alice_xmr_starting_balance = swap_amounts.xmr * 10;
+        let xmr_starting_balance = swap_amounts.xmr * 10;
         let (btc_wallet, xmr_wallet) = init_wallets(
             "alice",
             bitcoind,
             monero,
             None,
-            Some(alice_xmr_starting_balance),
+            Some(xmr_starting_balance),
             config,
         )
         .await;
@@ -120,8 +132,7 @@ impl AliceFactory {
             btc_wallet,
             xmr_wallet,
             config,
-            xmr_starting_balance,
-            btc_starting_balance,
+            starting_balances,
         }
     }
 
@@ -143,13 +154,11 @@ impl AliceFactory {
 
         Alice {
             event_loop_handle,
-            btc_wallet: self.btc_wallet.clone(),
-            xmr_wallet: self.xmr_wallet.clone(),
+            bitcoin_wallet: self.btc_wallet.clone(),
+            monero_wallet: self.xmr_wallet.clone(),
             config: self.config,
             db,
             state: initial_state,
-            xmr_starting_balance: self.xmr_starting_balance,
-            btc_starting_balance: self.btc_starting_balance,
             swap_id: self.swap_id,
         }
     }
@@ -178,20 +187,18 @@ impl AliceFactory {
         Alice {
             state: resume_state,
             event_loop_handle,
-            btc_wallet: self.btc_wallet.clone(),
-            xmr_wallet: self.xmr_wallet.clone(),
+            bitcoin_wallet: self.btc_wallet.clone(),
+            monero_wallet: self.xmr_wallet.clone(),
             config: self.config,
             swap_id: self.swap_id,
             db,
-            xmr_starting_balance: self.xmr_starting_balance,
-            btc_starting_balance: self.btc_starting_balance,
         }
     }
 }
 
 pub async fn test<T, F>(testfn: T)
 where
-    T: Fn(AliceFactory, Bob, SwapAmounts) -> F,
+    T: Fn(AliceHarness, Bob, SwapAmounts) -> F,
     F: Future<Output = ()>,
 {
     let cli = Cli::default();
@@ -207,14 +214,17 @@ where
 
     let config = Config::regtest();
 
-    let alice_factory = AliceFactory::new(
+    let alice_starting_balances = StartingBalances {
+        xmr: swap_amounts.xmr * 10,
+        btc: bitcoin::Amount::ZERO,
+    };
+    let alice_factory = AliceHarness::new(
         config,
         swap_amounts,
         Uuid::new_v4(),
         &monero,
         &containers.bitcoind,
-        swap_amounts.xmr * 10,
-        bitcoin::Amount::ZERO,
+        alice_starting_balances,
     )
     .await;
 
