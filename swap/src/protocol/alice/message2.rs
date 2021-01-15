@@ -3,6 +3,7 @@ use crate::{
     network::request_response::{AliceToBob, BobToAlice, Codec, Message2Protocol, TIMEOUT},
     protocol::bob,
 };
+use anyhow::{anyhow, Result};
 use libp2p::{
     request_response::{
         handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
@@ -45,9 +46,11 @@ pub struct Behaviour {
 }
 
 impl Behaviour {
-    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: Message2) {
+    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: Message2) -> Result<()> {
         let msg = AliceToBob::Message2(msg);
-        self.rr.send_response(channel, msg);
+        self.rr
+            .send_response(channel, msg)
+            .map_err(|_| anyhow!("Sending Amounts response failed"))
     }
 
     fn poll(
@@ -104,6 +107,9 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             }
             RequestResponseEvent::OutboundFailure { error, .. } => {
                 error!("Outbound failure: {:?}", error);
+            }
+            RequestResponseEvent::ResponseSent { .. } => {
+                debug!("Alice has sent an Message2 response to Bob");
             }
         }
     }

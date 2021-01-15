@@ -2,6 +2,7 @@ use crate::{
     network::request_response::{AliceToBob, BobToAlice, Codec, Message1Protocol, TIMEOUT},
     protocol::bob,
 };
+use anyhow::{anyhow, Result};
 use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
 use libp2p::{
     request_response::{
@@ -46,9 +47,11 @@ pub struct Behaviour {
 }
 
 impl Behaviour {
-    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: Message1) {
+    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: Message1) -> Result<()> {
         let msg = AliceToBob::Message1(Box::new(msg));
-        self.rr.send_response(channel, msg);
+        self.rr
+            .send_response(channel, msg)
+            .map_err(|_| anyhow!("Sending Amounts response failed"))
     }
 
     fn poll(
@@ -105,6 +108,9 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             }
             RequestResponseEvent::OutboundFailure { error, .. } => {
                 error!("Outbound failure: {:?}", error);
+            }
+            RequestResponseEvent::ResponseSent { .. } => {
+                debug!("Alice has sent an Message1 response to Bob");
             }
         }
     }

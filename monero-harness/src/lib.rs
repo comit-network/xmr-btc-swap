@@ -266,7 +266,7 @@ impl<'c> MoneroWalletRpc {
                 // ~30 seconds
                 bail!("Wallet could not catch up with monerod after 30 retries.")
             }
-            time::delay_for(Duration::from_millis(WAIT_WALLET_SYNC_MILLIS)).await;
+            time::sleep(Duration::from_millis(WAIT_WALLET_SYNC_MILLIS)).await;
             retry += 1;
         }
         Ok(())
@@ -293,7 +293,7 @@ impl<'c> MoneroWalletRpc {
 /// Mine a block ever BLOCK_TIME_SECS seconds.
 async fn mine(monerod: monerod::Client, reward_address: String) -> Result<()> {
     loop {
-        time::delay_for(Duration::from_secs(BLOCK_TIME_SECS)).await;
+        time::sleep(Duration::from_secs(BLOCK_TIME_SECS)).await;
         monerod.generate_blocks(1, &reward_address).await?;
     }
 }

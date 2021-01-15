@@ -7,9 +7,8 @@ use crate::{
     },
 };
 use anyhow::{anyhow, Context, Result};
-use futures::FutureExt;
 use libp2p::{
-    core::Multiaddr, futures::StreamExt, request_response::ResponseChannel, PeerId, Swarm,
+    core::Multiaddr, futures::FutureExt, request_response::ResponseChannel, PeerId, Swarm,
 };
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -228,24 +227,24 @@ impl EventLoop {
                         }
                     }
                 },
-                swap_response = self.send_swap_response.next().fuse() => {
+                swap_response = self.send_swap_response.recv().fuse() => {
                     if let Some((channel, swap_response)) = swap_response  {
-                        self.swarm.send_swap_response(channel, swap_response);
+                        self.swarm.send_swap_response(channel, swap_response).expect("Could not send amounts message");
                     }
                 },
-                msg0 = self.send_msg0.next().fuse() => {
+                msg0 = self.send_msg0.recv().fuse() => {
                     if let Some((channel, msg)) = msg0  {
-                        self.swarm.send_message0(channel, msg);
+                        self.swarm.send_message0(channel, msg).expect("Could not send message0");
                     }
                 },
-                msg1 = self.send_msg1.next().fuse() => {
+                msg1 = self.send_msg1.recv().fuse() => {
                     if let Some((channel, msg)) = msg1  {
-                        self.swarm.send_message1(channel, msg);
+                        self.swarm.send_message1(channel, msg).expect("Could not send message1");
                     }
                 },
-                msg2 = self.send_msg2.next().fuse() => {
+                msg2 = self.send_msg2.recv().fuse() => {
                     if let Some((channel, msg)) = msg2  {
-                        self.swarm.send_message2(channel, msg);
+                        self.swarm.send_message2(channel, msg).expect("Could not send message2");
                     }
                 },
             }

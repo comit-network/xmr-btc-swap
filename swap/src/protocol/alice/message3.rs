@@ -77,7 +77,9 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                     debug!("Received Message3");
                     self.events.push_back(OutEvent::Msg(msg));
                     // Send back empty response so that the request/response protocol completes.
-                    self.rr.send_response(channel, AliceToBob::Message3);
+                    if let Err(error) = self.rr.send_response(channel, AliceToBob::Message3) {
+                        error!("Send Message3 response failure: {:?}", error);
+                    }
                 }
             }
             RequestResponseEvent::Message {
@@ -89,6 +91,9 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             }
             RequestResponseEvent::OutboundFailure { error, .. } => {
                 error!("Outbound failure: {:?}", error);
+            }
+            RequestResponseEvent::ResponseSent { .. } => {
+                debug!("Alice has sent an Message3 response to Bob");
             }
         }
     }

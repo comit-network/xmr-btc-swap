@@ -31,7 +31,7 @@ pub fn build(id_keys: identity::Keypair) -> Result<SwapTransport> {
         .upgrade(Version::V1)
         .authenticate(noise)
         .multiplex(SelectUpgrade::new(
-            yamux::Config::default(),
+            yamux::YamuxConfig::default(),
             MplexConfig::new(),
         ))
         .map(|(peer, muxer), _| (peer, StreamMuxerBox::new(muxer)))

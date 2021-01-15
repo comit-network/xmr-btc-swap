@@ -73,7 +73,7 @@ impl BobParams {
             self.bitcoin_wallet.clone(),
             self.monero_wallet.clone(),
             self.alice_address.clone(),
-            self.alice_peer_id.clone(),
+            self.alice_peer_id,
             self.config,
         )
     }

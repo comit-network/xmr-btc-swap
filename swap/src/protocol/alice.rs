@@ -164,7 +164,7 @@ impl Builder {
     }
 
     pub fn peer_id(&self) -> PeerId {
-        self.peer_id.clone()
+        self.peer_id
     }
 
     pub fn listen_address(&self) -> Multiaddr {
@@ -210,7 +210,7 @@ impl Builder {
             alice_transport,
             alice_behaviour,
             self.listen_address.clone(),
-            self.peer_id.clone(),
+            self.peer_id,
         )
     }
 }
@@ -308,26 +308,42 @@ impl Behaviour {
         &mut self,
         channel: ResponseChannel<AliceToBob>,
         swap_response: SwapResponse,
-    ) {
-        self.amounts.send(channel, swap_response);
+    ) -> Result<()> {
+        let _ = self.amounts.send(channel, swap_response)?;
         info!("Sent amounts response");
+        Ok(())
     }
 
     /// Send Message0 to Bob in response to receiving his Message0.
-    pub fn send_message0(&mut self, channel: ResponseChannel<AliceToBob>, msg: Message0) {
-        self.message0.send(channel, msg);
+    pub fn send_message0(
+        &mut self,
+        channel: ResponseChannel<AliceToBob>,
+        msg: Message0,
+    ) -> Result<()> {
+        let _ = self.message0.send(channel, msg)?;
         debug!("Sent Message0");
+        Ok(())
     }
 
     /// Send Message1 to Bob in response to receiving his Message1.
-    pub fn send_message1(&mut self, channel: ResponseChannel<AliceToBob>, msg: Message1) {
-        self.message1.send(channel, msg);
+    pub fn send_message1(
+        &mut self,
+        channel: ResponseChannel<AliceToBob>,
+        msg: Message1,
+    ) -> Result<()> {
+        let _ = self.message1.send(channel, msg)?;
         debug!("Sent Message1");
+        Ok(())
     }
 
     /// Send Message2 to Bob in response to receiving his Message2.
-    pub fn send_message2(&mut self, channel: ResponseChannel<AliceToBob>, msg: Message2) {
-        self.message2.send(channel, msg);
+    pub fn send_message2(
+        &mut self,
+        channel: ResponseChannel<AliceToBob>,
+        msg: Message2,
+    ) -> Result<()> {
+        let _ = self.message2.send(channel, msg)?;
         debug!("Sent Message2");
+        Ok(())
     }
 }
