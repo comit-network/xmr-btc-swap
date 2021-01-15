@@ -173,8 +173,8 @@ impl Builder {
         bob::event_loop::EventLoop::new(
             bob_transport,
             bob_behaviour,
-            self.peer_id.clone(),
-            self.alice_peer_id.clone(),
+            self.peer_id,
+            self.alice_peer_id,
             self.alice_address.clone(),
         )
     }
@@ -289,7 +289,7 @@ pub struct Behaviour {
 impl Behaviour {
     /// Sends a swap request to Alice to negotiate the swap.
     pub fn send_swap_request(&mut self, alice: PeerId, swap_request: SwapRequest) {
-        let _id = self.swap_request.send(alice.clone(), swap_request);
+        let _id = self.swap_request.send(alice, swap_request);
         info!("Requesting swap from: {}", alice);
     }
 

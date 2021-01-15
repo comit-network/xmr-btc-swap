@@ -8,12 +8,11 @@ use crate::{
     },
 };
 use anyhow::{anyhow, Context, Result};
-use futures::FutureExt;
 use libp2p::{
-    core::Multiaddr, futures::StreamExt, request_response::ResponseChannel, PeerId, Swarm,
+    core::Multiaddr, futures::FutureExt, request_response::ResponseChannel, PeerId, Swarm,
 };
 use tokio::sync::mpsc::{Receiver, Sender};
-use tracing::trace;
+use tracing::{error, trace};
 
 #[allow(missing_debug_implementations)]
 pub struct Channels<T> {
@@ -227,24 +226,33 @@ impl EventLoop {
                         }
                     }
                 },
-                swap_response = self.send_swap_response.next().fuse() => {
+                swap_response = self.send_swap_response.recv().fuse() => {
                     if let Some((channel, swap_response)) = swap_response  {
-                        self.swarm.send_swap_response(channel, swap_response);
+                        let _ = self
+                            .swarm
+                            .send_swap_response(channel, swap_response)
+                            .map_err(|err|error!("Failed to send swap response: {:#}", err));
                     }
                 },
-                msg0 = self.send_message0.next().fuse() => {
+                msg0 = self.send_message0.recv().fuse() => {
                     if let Some((channel, msg)) = msg0  {
-                        self.swarm.send_message0(channel, msg);
+                        let _ = self
+                            .swarm
+                            .send_message0(channel, msg)
+                            .map_err(|err|error!("Failed to send message0: {:#}", err));
                     }
                 },
-                msg1 = self.send_message1.next().fuse() => {
+                msg1 = self.send_message1.recv().fuse() => {
                     if let Some((channel, msg)) = msg1  {
-                        self.swarm.send_message1(channel, msg);
+                        let _ = self
+                            .swarm
+                            .send_message1(channel, msg)
+                            .map_err(|err|error!("Failed to send message1: {:#}", err));
                     }
                 },
-                transfer_proof = self.send_transfer_proof.next().fuse() => {
+                transfer_proof = self.send_transfer_proof.recv().fuse() => {
                     if let Some((bob_peer_id, msg)) = transfer_proof  {
-                        self.swarm.send_transfer_proof(bob_peer_id, msg);
+                      self.swarm.send_transfer_proof(bob_peer_id, msg)
                     }
                 },
             }

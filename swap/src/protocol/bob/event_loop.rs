@@ -10,10 +10,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use futures::FutureExt;
 use libp2p::{core::Multiaddr, PeerId};
-use tokio::{
-    stream::StreamExt,
-    sync::mpsc::{Receiver, Sender},
-};
+use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{debug, error, info};
 
 #[derive(Debug)]
@@ -153,7 +150,7 @@ impl EventLoop {
             }))
             .build();
 
-        swarm.add_address(alice_peer_id.clone(), alice_addr);
+        swarm.add_address(alice_peer_id, alice_addr);
 
         let swap_response = Channels::new();
         let recv_message0 = Channels::new();
@@ -224,9 +221,9 @@ impl EventLoop {
                         OutEvent::EncryptedSignature => info!("Alice acknowledged encrypted signature received"),
                     }
                 },
-                option = self.dial_alice.next().fuse() => {
+                option = self.dial_alice.recv().fuse() => {
                     if option.is_some() {
-                           let peer_id = self.alice_peer_id.clone();
+                           let peer_id = self.alice_peer_id;
                         if self.swarm.pt.is_connected(&peer_id) {
                             debug!("Already connected to Alice: {}", peer_id);
                             let _ = self.conn_established.send(peer_id).await;
@@ -240,31 +237,31 @@ impl EventLoop {
                         }
                     }
                 },
-                swap_request = self.send_swap_request.next().fuse() =>  {
+                swap_request = self.send_swap_request.recv().fuse() =>  {
                     if let Some(swap_request) = swap_request {
-                        self.swarm.send_swap_request(self.alice_peer_id.clone(), swap_request);
+                        self.swarm.send_swap_request(self.alice_peer_id, swap_request);
                     }
                 },
 
-                msg0 = self.send_message0.next().fuse() => {
+                msg0 = self.send_message0.recv().fuse() => {
                     if let Some(msg) = msg0 {
-                        self.swarm.send_message0(self.alice_peer_id.clone(), msg);
+                        self.swarm.send_message0(self.alice_peer_id, msg);
                     }
                 }
 
-                msg1 = self.send_message1.next().fuse() => {
+                msg1 = self.send_message1.recv().fuse() => {
                     if let Some(msg) = msg1 {
-                        self.swarm.send_message1(self.alice_peer_id.clone(), msg);
+                        self.swarm.send_message1(self.alice_peer_id, msg);
                     }
                 },
-                msg2 = self.send_message2.next().fuse() => {
+                msg2 = self.send_message2.recv().fuse() => {
                     if let Some(msg) = msg2 {
-                        self.swarm.send_message2(self.alice_peer_id.clone(), msg);
+                        self.swarm.send_message2(self.alice_peer_id, msg);
                     }
                 },
-                encrypted_signature = self.send_encrypted_signature.next().fuse() => {
+                encrypted_signature = self.send_encrypted_signature.recv().fuse() => {
                     if let Some(tx_redeem_encsig) = encrypted_signature {
-                        self.swarm.send_encrypted_signature(self.alice_peer_id.clone(), tx_redeem_encsig);
+                        self.swarm.send_encrypted_signature(self.alice_peer_id, tx_redeem_encsig);
                     }
                 }
             }

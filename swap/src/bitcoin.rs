@@ -252,7 +252,7 @@ where
     B: GetBlockHeight,
 {
     while client.get_block_height().await < target {
-        tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
 }
 

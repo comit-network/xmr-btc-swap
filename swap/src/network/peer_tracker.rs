@@ -12,7 +12,7 @@ use std::{
     task::Poll,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
 }
@@ -42,7 +42,7 @@ impl PeerTracker {
     /// Returns the peer id of counterparty if we are connected.
     pub fn counterparty_peer_id(&self) -> Option<PeerId> {
         if let Some((id, _)) = &self.connected {
-            return Some(id.clone());
+            return Some(*id);
         }
         None
     }
@@ -50,7 +50,7 @@ impl PeerTracker {
     /// Returns the peer_id and multiaddr of counterparty if we are connected.
     pub fn counterparty(&self) -> Option<(PeerId, Multiaddr)> {
         if let Some((peer_id, addr)) = &self.connected {
-            return Some((peer_id.clone(), addr.clone()));
+            return Some((*peer_id, addr.clone()));
         }
         None
     }
@@ -97,18 +97,18 @@ impl NetworkBehaviour for PeerTracker {
     ) {
         match point {
             ConnectedPoint::Dialer { address } => {
-                self.connected = Some((peer.clone(), address.clone()));
+                self.connected = Some((*peer, address.clone()));
             }
             ConnectedPoint::Listener {
                 local_addr: _,
                 send_back_addr,
             } => {
-                self.connected = Some((peer.clone(), send_back_addr.clone()));
+                self.connected = Some((*peer, send_back_addr.clone()));
             }
         }
 
         self.events
-            .push_back(OutEvent::ConnectionEstablished(peer.clone()));
+            .push_back(OutEvent::ConnectionEstablished(*peer));
     }
 
     fn inject_connection_closed(&mut self, _: &PeerId, _: &ConnectionId, _: &ConnectedPoint) {

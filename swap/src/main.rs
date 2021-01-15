@@ -16,12 +16,13 @@ use crate::cli::{Command, Options, Resume};
 use anyhow::{Context, Result};
 use config::Config;
 use database::Database;
+use log::LevelFilter;
 use prettytable::{row, Table};
 use protocol::{alice, bob, bob::Builder, SwapAmounts};
 use std::sync::Arc;
 use structopt::StructOpt;
 use trace::init_tracing;
-use tracing::{info, log::LevelFilter};
+use tracing::info;
 use uuid::Uuid;
 
 pub mod bitcoin;

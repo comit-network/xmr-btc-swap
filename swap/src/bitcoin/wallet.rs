@@ -9,7 +9,7 @@ use crate::{
 use ::bitcoin::{util::psbt::PartiallySignedTransaction, Txid};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
+use backoff::{backoff::Constant as ConstantBackoff, tokio::retry};
 use bitcoin_harness::{bitcoind_rpc::PsbtBase64, BitcoindRpcApi};
 use reqwest::Url;
 use std::time::Duration;
@@ -112,10 +112,11 @@ impl BroadcastSignedTransaction for Wallet {
 #[async_trait]
 impl WatchForRawTransaction for Wallet {
     async fn watch_for_raw_transaction(&self, txid: Txid) -> Transaction {
-        (|| async { Ok(self.inner.get_raw_transaction(txid).await?) })
-            .retry(ConstantBackoff::new(Duration::from_secs(1)))
-            .await
-            .expect("transient errors to be retried")
+        retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
+            Ok(self.inner.get_raw_transaction(txid).await?)
+        })
+        .await
+        .expect("transient errors to be retried")
     }
 }
 
@@ -130,10 +131,11 @@ impl GetRawTransaction for Wallet {
 #[async_trait]
 impl GetBlockHeight for Wallet {
     async fn get_block_height(&self) -> BlockHeight {
-        let height = (|| async { Ok(self.inner.client.getblockcount().await?) })
-            .retry(ConstantBackoff::new(Duration::from_secs(1)))
-            .await
-            .expect("transient errors to be retried");
+        let height = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
+            Ok(self.inner.client.getblockcount().await?)
+        })
+        .await
+        .expect("transient errors to be retried");
 
         BlockHeight::new(height)
     }
@@ -148,7 +150,7 @@ impl TransactionBlockHeight for Wallet {
             NotYetMined,
         }
 
-        let height = (|| async {
+        let height = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
             let block_height = self
                 .inner
                 .transaction_block_height(txid)
@@ -160,7 +162,6 @@ impl TransactionBlockHeight for Wallet {
 
             Result::<_, backoff::Error<Error>>::Ok(block_height)
         })
-        .retry(ConstantBackoff::new(Duration::from_secs(1)))
         .await
         .expect("transient errors to be retried");
 

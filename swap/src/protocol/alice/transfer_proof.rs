@@ -97,6 +97,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for B
             RequestResponseEvent::OutboundFailure { error, .. } => {
                 error!("Outbound failure: {:?}", error);
             }
+            RequestResponseEvent::ResponseSent { .. } => {}
         }
     }
 }

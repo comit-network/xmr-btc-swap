@@ -5,7 +5,7 @@ use crate::monero::{
 use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::Result;
 use async_trait::async_trait;
-use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
+use backoff::{backoff::Constant as ConstantBackoff, tokio::retry};
 use bitcoin::hashes::core::sync::atomic::AtomicU32;
 use monero_harness::rpc::wallet;
 use std::{
@@ -96,7 +96,6 @@ impl CreateWalletForOutput for Wallet {
 
 // TODO: For retry, use `backoff::ExponentialBackoff` in production as opposed
 // to `ConstantBackoff`.
-
 #[async_trait]
 impl WatchForTransfer for Wallet {
     async fn watch_for_transfer(
@@ -117,46 +116,41 @@ impl WatchForTransfer for Wallet {
         let wallet = self.inner.clone();
 
         let confirmations = Arc::new(AtomicU32::new(0u32));
-        let res = (move || {
-            let confirmations = confirmations.clone();
-            let transfer_proof = transfer_proof.clone();
-            let wallet = wallet.clone();
-            async move {
-                // NOTE: Currently, this is conflicting IO errors with the transaction not being
-                // in the blockchain yet, or not having enough confirmations on it. All these
-                // errors warrant a retry, but the strategy should probably differ per case
-                let proof = wallet
-                    .check_tx_key(
-                        &String::from(transfer_proof.tx_hash()),
-                        &transfer_proof.tx_key().to_string(),
-                        &address.to_string(),
-                    )
-                    .await
-                    .map_err(|_| backoff::Error::Transient(Error::TxNotFound))?;
 
-                if proof.received != expected_amount.as_piconero() {
-                    return Err(backoff::Error::Permanent(Error::InsufficientFunds {
-                        expected: expected_amount,
-                        actual: Amount::from_piconero(proof.received),
-                    }));
-                }
+        let res = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
+            // NOTE: Currently, this is conflicting IO errors with the transaction not being
+            // in the blockchain yet, or not having enough confirmations on it. All these
+            // errors warrant a retry, but the strategy should probably differ per case
+            let proof = wallet
+                .check_tx_key(
+                    &String::from(transfer_proof.tx_hash()),
+                    &transfer_proof.tx_key().to_string(),
+                    &address.to_string(),
+                )
+                .await
+                .map_err(|_| backoff::Error::Transient(Error::TxNotFound))?;
 
-                if proof.confirmations > confirmations.load(Ordering::SeqCst) {
-                    confirmations.store(proof.confirmations, Ordering::SeqCst);
-                    info!(
-                        "Monero lock tx received {} out of {} confirmations",
-                        proof.confirmations, expected_confirmations
-                    );
-                }
-
-                if proof.confirmations < expected_confirmations {
-                    return Err(backoff::Error::Transient(Error::InsufficientConfirmations));
-                }
-
-                Ok(proof)
+            if proof.received != expected_amount.as_piconero() {
+                return Err(backoff::Error::Permanent(Error::InsufficientFunds {
+                    expected: expected_amount,
+                    actual: Amount::from_piconero(proof.received),
+                }));
             }
+
+            if proof.confirmations > confirmations.load(Ordering::SeqCst) {
+                confirmations.store(proof.confirmations, Ordering::SeqCst);
+                info!(
+                    "Monero lock tx received {} out of {} confirmations",
+                    proof.confirmations, expected_confirmations
+                );
+            }
+
+            if proof.confirmations < expected_confirmations {
+                return Err(backoff::Error::Transient(Error::InsufficientConfirmations));
+            }
+
+            Ok(proof)
         })
-        .retry(ConstantBackoff::new(Duration::from_secs(1)))
         .await;
 
         if let Err(Error::InsufficientFunds { expected, actual }) = res {

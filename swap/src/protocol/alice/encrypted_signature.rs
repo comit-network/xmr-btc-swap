@@ -82,7 +82,10 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for B
                     debug!("Received encrypted signature");
                     self.events.push_back(OutEvent::Msg(*msg));
                     // Send back empty response so that the request/response protocol completes.
-                    let _ = self.rr.send_response(channel, Response::EncryptedSignature);
+                    if let Err(error) = self.rr.send_response(channel, Response::EncryptedSignature)
+                    {
+                        error!("Failed to sen Encrypted Signature ack: {:?}", error);
+                    }
                 }
             }
             RequestResponseEvent::Message {
@@ -94,6 +97,9 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for B
             }
             RequestResponseEvent::OutboundFailure { error, .. } => {
                 error!("Outbound failure: {:?}", error);
+            }
+            RequestResponseEvent::ResponseSent { .. } => {
+                debug!("Alice has sent an Message3 response to Bob");
             }
         }
     }

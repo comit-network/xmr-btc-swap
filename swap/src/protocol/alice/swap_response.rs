@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use libp2p::{
     request_response::{
         handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
@@ -44,9 +45,11 @@ pub struct Behaviour {
 
 impl Behaviour {
     /// Alice always sends her messages as a response to a request from Bob.
-    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: SwapResponse) {
+    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: SwapResponse) -> Result<()> {
         let msg = AliceToBob::SwapResponse(Box::new(msg));
-        self.rr.send_response(channel, msg);
+        self.rr
+            .send_response(channel, msg)
+            .map_err(|_| anyhow!("Sending swap response failed"))
     }
 
     fn poll(
@@ -104,6 +107,9 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             }
             RequestResponseEvent::OutboundFailure { error, .. } => {
                 error!("Outbound failure: {:?}", error);
+            }
+            RequestResponseEvent::ResponseSent { .. } => {
+                debug!("Alice has sent an Amounts response to Bob");
             }
         }
     }

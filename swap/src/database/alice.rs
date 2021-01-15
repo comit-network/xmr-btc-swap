@@ -60,7 +60,7 @@ impl From<&AliceState> for Alice {
                 ..
             } => Alice::Negotiated {
                 state3: state3.as_ref().clone(),
-                bob_peer_id: bob_peer_id.clone(),
+                bob_peer_id: *bob_peer_id,
             },
             AliceState::BtcLocked {
                 state3,
@@ -68,7 +68,7 @@ impl From<&AliceState> for Alice {
                 ..
             } => Alice::BtcLocked {
                 state3: state3.as_ref().clone(),
-                bob_peer_id: bob_peer_id.clone(),
+                bob_peer_id: *bob_peer_id,
             },
             AliceState::XmrLocked { state3 } => Alice::XmrLocked(state3.as_ref().clone()),
             AliceState::EncSigLearned {
