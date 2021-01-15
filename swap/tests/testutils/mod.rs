@@ -1,4 +1,7 @@
+use crate::testutils;
 use bitcoin_harness::Bitcoind;
+use futures::Future;
+use get_port::get_port;
 use libp2p::{core::Multiaddr, PeerId};
 use monero_harness::{image, Monero};
 use rand::rngs::OsRng;
@@ -17,6 +20,136 @@ use tempfile::tempdir;
 use testcontainers::{clients::Cli, Container};
 use tracing_core::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
+use uuid::Uuid;
+
+pub struct Alice {
+    pub state: AliceState,
+    pub event_loop_handle: alice::EventLoopHandle,
+    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
+    pub monero_wallet: Arc<monero::Wallet>,
+    pub config: Config,
+    pub swap_id: Uuid,
+    pub db: Database,
+    pub xmr_starting_balance: monero::Amount,
+    pub btc_starting_balance: bitcoin::Amount,
+}
+
+pub struct Bob {
+    pub state: BobState,
+    pub event_loop_handle: bob::EventLoopHandle,
+    pub db: Database,
+    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
+    pub monero_wallet: Arc<monero::Wallet>,
+    pub swap_id: Uuid,
+    pub btc_starting_balance: bitcoin::Amount,
+    pub xmr_starting_balance: monero::Amount,
+}
+
+pub async fn test<T, F>(testfn: T)
+where
+    T: Fn(Alice, Bob, SwapAmounts) -> F,
+    F: Future<Output = ()>,
+{
+    let cli = Cli::default();
+
+    let _guard = init_tracing();
+
+    let (monero, containers) = testutils::init_containers(&cli).await;
+
+    let swap_amounts = SwapAmounts {
+        btc: bitcoin::Amount::from_sat(1_000_000),
+        xmr: monero::Amount::from_piconero(1_000_000_000_000),
+    };
+
+    let bob_btc_starting_balance = swap_amounts.btc * 10;
+    let alice_xmr_starting_balance = swap_amounts.xmr * 10;
+
+    let port = get_port().expect("Failed to find a free port");
+
+    let alice_multiaddr: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", port)
+        .parse()
+        .expect("failed to parse Alice's address");
+
+    let config = Config::regtest();
+
+    let alice_seed = Seed::random().unwrap();
+
+    let (alice_btc_wallet, alice_xmr_wallet) = init_wallets(
+        "alice",
+        &containers.bitcoind,
+        &monero,
+        None,
+        Some(alice_xmr_starting_balance),
+        config,
+    )
+    .await;
+
+    let alice_state = init_alice_state(
+        swap_amounts.btc,
+        swap_amounts.xmr,
+        alice_btc_wallet.clone(),
+        config,
+    )
+    .await;
+
+    let (mut alice_event_loop, alice_event_loop_handle) =
+        init_alice_event_loop(alice_multiaddr.clone(), alice_seed);
+
+    let alice_db_datadir = tempdir().unwrap();
+    let alice_db = Database::open(alice_db_datadir.path()).unwrap();
+
+    let (bob_btc_wallet, bob_xmr_wallet) = init_wallets(
+        "bob",
+        &containers.bitcoind,
+        &monero,
+        Some(bob_btc_starting_balance),
+        None,
+        config,
+    )
+    .await;
+
+    let bob_state = init_bob_state(
+        swap_amounts.btc,
+        swap_amounts.xmr,
+        bob_btc_wallet.clone(),
+        config,
+    )
+    .await;
+
+    let (bob_event_loop, bob_event_loop_handle) =
+        init_bob_event_loop(alice_event_loop.peer_id(), alice_multiaddr);
+
+    let bob_db_dir = tempdir().unwrap();
+    let bob_db = Database::open(bob_db_dir.path()).unwrap();
+
+    tokio::spawn(async move { alice_event_loop.run().await });
+    tokio::spawn(async move { bob_event_loop.run().await });
+
+    let alice = Alice {
+        state: alice_state,
+        event_loop_handle: alice_event_loop_handle,
+        bitcoin_wallet: alice_btc_wallet,
+        monero_wallet: alice_xmr_wallet,
+        config,
+        swap_id: Uuid::new_v4(),
+        db: alice_db,
+        xmr_starting_balance: alice_xmr_starting_balance,
+        btc_starting_balance: bitcoin::Amount::ZERO,
+    };
+
+    let bob = Bob {
+        state: bob_state,
+        event_loop_handle: bob_event_loop_handle,
+        db: bob_db,
+        bitcoin_wallet: bob_btc_wallet,
+        monero_wallet: bob_xmr_wallet,
+        swap_id: Uuid::new_v4(),
+        xmr_starting_balance: monero::Amount::ZERO,
+        btc_starting_balance: bob_btc_starting_balance,
+    };
+
+    testfn(alice, bob, swap_amounts).await
+}
 
 pub async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
     let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
