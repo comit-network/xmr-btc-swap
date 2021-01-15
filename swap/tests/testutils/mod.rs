@@ -22,6 +22,7 @@ use tracing_core::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
 use uuid::Uuid;
 
+#[derive(Debug, Clone)]
 pub struct StartingBalances {
     pub xmr: monero::Amount,
     pub btc: bitcoin::Amount,
@@ -106,16 +107,8 @@ impl AliceHarness {
 
         let db_path = tempdir().unwrap().path().to_path_buf();
 
-        let xmr_starting_balance = swap_amounts.xmr * 10;
-        let (btc_wallet, xmr_wallet) = init_wallets(
-            "alice",
-            bitcoind,
-            monero,
-            None,
-            Some(xmr_starting_balance),
-            config,
-        )
-        .await;
+        let (btc_wallet, xmr_wallet) =
+            init_wallets("alice", bitcoind, monero, starting_balances.clone(), config).await;
 
         // TODO: This should be done by changing the production code
         let network_seed = network::Seed::new(seed);
@@ -228,14 +221,16 @@ where
     )
     .await;
 
-    let bob_btc_starting_balance = swap_amounts.btc * 10;
+    let bob_starting_balances = StartingBalances {
+        xmr: monero::Amount::ZERO,
+        btc: swap_amounts.btc * 10,
+    };
 
     let (bob_btc_wallet, bob_xmr_wallet) = init_wallets(
         "bob",
         &containers.bitcoind,
         &monero,
-        Some(bob_btc_starting_balance),
-        None,
+        bob_starting_balances.clone(),
         config,
     )
     .await;
@@ -263,8 +258,8 @@ where
         bitcoin_wallet: bob_btc_wallet,
         monero_wallet: bob_xmr_wallet,
         swap_id: Uuid::new_v4(),
-        xmr_starting_balance: monero::Amount::ZERO,
-        btc_starting_balance: bob_btc_starting_balance,
+        xmr_starting_balance: bob_starting_balances.xmr,
+        btc_starting_balance: bob_starting_balances.btc,
     };
 
     testfn(alice_factory, bob, swap_amounts).await
@@ -284,24 +279,13 @@ pub async fn init_wallets(
     name: &str,
     bitcoind: &Bitcoind<'_>,
     monero: &Monero,
-    btc_starting_balance: Option<bitcoin::Amount>,
-    xmr_starting_balance: Option<monero::Amount>,
+    starting_balances: StartingBalances,
     config: Config,
 ) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {
-    match xmr_starting_balance {
-        Some(amount) => {
-            monero
-                .init(vec![(name, amount.as_piconero())])
-                .await
-                .unwrap();
-        }
-        None => {
-            monero
-                .init(vec![(name, monero::Amount::ZERO.as_piconero())])
-                .await
-                .unwrap();
-        }
-    };
+    monero
+        .init(vec![(name, starting_balances.xmr.as_piconero())])
+        .await
+        .unwrap();
 
     let xmr_wallet = Arc::new(swap::monero::Wallet {
         inner: monero.wallet(name).unwrap().client(),
@@ -314,9 +298,12 @@ pub async fn init_wallets(
             .unwrap(),
     );
 
-    if let Some(amount) = btc_starting_balance {
+    if starting_balances.btc != bitcoin::Amount::ZERO {
         bitcoind
-            .mint(btc_wallet.inner.new_address().await.unwrap(), amount)
+            .mint(
+                btc_wallet.inner.new_address().await.unwrap(),
+                starting_balances.btc,
+            )
             .await
             .unwrap();
     }
@@ -391,8 +378,10 @@ pub async fn init_alice(
         "alice",
         bitcoind,
         monero,
-        None,
-        Some(xmr_starting_balance),
+        StartingBalances {
+            xmr: xmr_starting_balance,
+            btc: bitcoin::Amount::ZERO,
+        },
         config,
     )
     .await;
@@ -473,8 +462,10 @@ pub async fn init_bob(
         "bob",
         bitcoind,
         monero,
-        Some(btc_starting_balance),
-        None,
+        StartingBalances {
+            xmr: monero::Amount::ZERO,
+            btc: btc_starting_balance,
+        },
         config,
     )
     .await;
