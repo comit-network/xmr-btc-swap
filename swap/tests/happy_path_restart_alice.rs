@@ -9,7 +9,7 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
         let alice = alice_harness.new_alice().await;
         let bob = bob_harness.new_bob().await;
 
-        let bob_swap_fut = bob::swap(
+        let bob_swap = bob::swap(
             bob.state,
             bob.event_loop_handle,
             bob.db,
@@ -18,7 +18,7 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
             OsRng,
             bob.swap_id,
         );
-        let bob_swap_handle = tokio::spawn(bob_swap_fut);
+        let bob_swap_handle = tokio::spawn(bob_swap);
 
         let alice_state = alice::run_until(
             alice.state,

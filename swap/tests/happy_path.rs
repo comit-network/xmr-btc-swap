@@ -10,7 +10,9 @@ pub mod testutils;
 async fn happy_path() {
     testutils::test(|alice_harness, bob_harness| async move {
         let alice = alice_harness.new_alice().await;
-        let alice_swap_fut = alice::swap(
+        let bob = bob_harness.new_bob().await;
+
+        let alice_swap = alice::swap(
             alice.state,
             alice.event_loop_handle,
             alice.bitcoin_wallet.clone(),
@@ -20,8 +22,7 @@ async fn happy_path() {
             alice.db,
         );
 
-        let bob = bob_harness.new_bob().await;
-        let bob_swap_fut = bob::swap(
+        let bob_swap = bob::swap(
             bob.state,
             bob.event_loop_handle,
             bob.db,
@@ -30,7 +31,7 @@ async fn happy_path() {
             OsRng,
             bob.swap_id,
         );
-        let (alice_state, bob_state) = join!(alice_swap_fut, bob_swap_fut);
+        let (alice_state, bob_state) = join!(alice_swap, bob_swap);
 
         alice_harness.assert_redeemed(alice_state.unwrap()).await;
         bob_harness.assert_redeemed(bob_state.unwrap()).await;

@@ -47,8 +47,8 @@ pub struct AliceHarness {
     swap_id: Uuid,
 
     swap_amounts: SwapAmounts,
-    btc_wallet: Arc<bitcoin::Wallet>,
-    xmr_wallet: Arc<monero::Wallet>,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
     config: Config,
     starting_balances: StartingBalances,
 }
@@ -65,7 +65,7 @@ impl AliceHarness {
     pub async fn assert_redeemed(&self, state: AliceState) {
         assert!(matches!(state, AliceState::BtcRedeemed));
 
-        let btc_alice_final = self.btc_wallet.as_ref().balance().await.unwrap();
+        let btc_alice_final = self.bitcoin_wallet.as_ref().balance().await.unwrap();
 
         assert_eq!(
             btc_alice_final,
@@ -73,7 +73,7 @@ impl AliceHarness {
                 - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
         );
 
-        let xmr_alice_final = self.xmr_wallet.as_ref().get_balance().await.unwrap();
+        let xmr_alice_final = self.monero_wallet.as_ref().get_balance().await.unwrap();
         assert!(xmr_alice_final <= self.starting_balances.xmr - self.swap_amounts.xmr);
     }
 
@@ -95,7 +95,7 @@ impl AliceHarness {
 
         let db_path = tempdir().unwrap().path().to_path_buf();
 
-        let (btc_wallet, xmr_wallet) =
+        let (bitcoin_wallet, monero_wallet) =
             init_wallets("alice", bitcoind, monero, starting_balances.clone(), config).await;
 
         // TODO: This should be done by changing the production code
@@ -110,8 +110,8 @@ impl AliceHarness {
             peer_id,
             swap_id,
             swap_amounts,
-            btc_wallet,
-            xmr_wallet,
+            bitcoin_wallet,
+            monero_wallet,
             config,
             starting_balances,
         }
@@ -121,7 +121,7 @@ impl AliceHarness {
         let initial_state = init_alice_state(
             self.swap_amounts.btc,
             self.swap_amounts.xmr,
-            self.btc_wallet.clone(),
+            self.bitcoin_wallet.clone(),
             self.config,
         )
         .await;
@@ -135,8 +135,8 @@ impl AliceHarness {
 
         Alice {
             event_loop_handle,
-            bitcoin_wallet: self.btc_wallet.clone(),
-            monero_wallet: self.xmr_wallet.clone(),
+            bitcoin_wallet: self.bitcoin_wallet.clone(),
+            monero_wallet: self.monero_wallet.clone(),
             config: self.config,
             db,
             state: initial_state,
@@ -168,8 +168,8 @@ impl AliceHarness {
         Alice {
             state: resume_state,
             event_loop_handle,
-            bitcoin_wallet: self.btc_wallet.clone(),
-            monero_wallet: self.xmr_wallet.clone(),
+            bitcoin_wallet: self.bitcoin_wallet.clone(),
+            monero_wallet: self.monero_wallet.clone(),
             config: self.config,
             swap_id: self.swap_id,
             db,
@@ -191,8 +191,8 @@ pub struct BobHarness {
     swap_id: Uuid,
 
     swap_amounts: SwapAmounts,
-    btc_wallet: Arc<bitcoin::Wallet>,
-    xmr_wallet: Arc<monero::Wallet>,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
     config: Config,
     starting_balances: StartingBalances,
 
@@ -214,15 +214,15 @@ impl BobHarness {
     ) -> Self {
         let db_path = tempdir().unwrap().path().to_path_buf();
 
-        let (btc_wallet, xmr_wallet) =
+        let (bitcoin_wallet, monero_wallet) =
             init_wallets("bob", bitcoind, monero, starting_balances.clone(), config).await;
 
         Self {
             db_path,
             swap_id,
             swap_amounts,
-            btc_wallet,
-            xmr_wallet,
+            bitcoin_wallet,
+            monero_wallet,
             config,
             starting_balances,
             alice_connect_address,
@@ -234,7 +234,7 @@ impl BobHarness {
         let initial_state = init_bob_state(
             self.swap_amounts.btc,
             self.swap_amounts.xmr,
-            self.btc_wallet.clone(),
+            self.bitcoin_wallet.clone(),
             self.config,
         )
         .await;
@@ -252,8 +252,8 @@ impl BobHarness {
             state: initial_state,
             event_loop_handle,
             db,
-            bitcoin_wallet: self.btc_wallet.clone(),
-            monero_wallet: self.xmr_wallet.clone(),
+            bitcoin_wallet: self.bitcoin_wallet.clone(),
+            monero_wallet: self.monero_wallet.clone(),
             swap_id: self.swap_id,
         }
     }
@@ -285,8 +285,8 @@ impl BobHarness {
             state: resume_state,
             event_loop_handle,
             db,
-            bitcoin_wallet: self.btc_wallet.clone(),
-            monero_wallet: self.xmr_wallet.clone(),
+            bitcoin_wallet: self.bitcoin_wallet.clone(),
+            monero_wallet: self.monero_wallet.clone(),
             swap_id: self.swap_id,
         }
     }
@@ -294,9 +294,9 @@ impl BobHarness {
     pub async fn assert_redeemed(&self, state: BobState) {
         assert!(matches!(state, BobState::XmrRedeemed));
 
-        let btc_bob_final = self.btc_wallet.as_ref().balance().await.unwrap();
-        self.xmr_wallet.as_ref().inner.refresh().await.unwrap();
-        let xmr_bob_final = self.xmr_wallet.as_ref().get_balance().await.unwrap();
+        let btc_bob_final = self.bitcoin_wallet.as_ref().balance().await.unwrap();
+        self.monero_wallet.as_ref().inner.refresh().await.unwrap();
+        let xmr_bob_final = self.monero_wallet.as_ref().get_balance().await.unwrap();
         assert!(btc_bob_final <= self.starting_balances.btc - self.swap_amounts.btc);
         assert_eq!(
             xmr_bob_final,
