@@ -26,7 +26,7 @@ pub use self::{
     message1::Message1,
     message2::Message2,
     state::*,
-    swap::swap,
+    swap::{run_until, swap},
 };
 
 mod amounts;
