@@ -5,7 +5,7 @@ use get_port::get_port;
 use libp2p::{core::Multiaddr, PeerId};
 use monero_harness::{image, Monero};
 use rand::rngs::OsRng;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 use swap::{
     bitcoin,
     config::Config,
@@ -23,15 +23,19 @@ use tracing_log::LogTracer;
 use uuid::Uuid;
 
 pub struct Alice {
-    pub state: AliceState,
     pub event_loop_handle: alice::EventLoopHandle,
-    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
-    pub monero_wallet: Arc<monero::Wallet>,
+    pub btc_wallet: Arc<bitcoin::Wallet>,
+    pub xmr_wallet: Arc<monero::Wallet>,
     pub config: Config,
-    pub swap_id: Uuid,
     pub db: Database,
+
+    pub state: AliceState,
+
     pub xmr_starting_balance: monero::Amount,
     pub btc_starting_balance: bitcoin::Amount,
+
+    // test context (state we have to keep to simulate restart)
+    pub swap_id: Uuid,
 }
 
 pub struct Bob {
@@ -45,9 +49,149 @@ pub struct Bob {
     pub xmr_starting_balance: monero::Amount,
 }
 
+pub struct AliceFactory {
+    listen_address: Multiaddr,
+    peer_id: PeerId,
+
+    seed: Seed,
+    db_path: PathBuf,
+    swap_id: Uuid,
+
+    // Stuff that should probably not be in here...
+    swap_amounts: SwapAmounts,
+    btc_wallet: Arc<bitcoin::Wallet>,
+    xmr_wallet: Arc<monero::Wallet>,
+    config: Config,
+    xmr_starting_balance: monero::Amount,
+    btc_starting_balance: bitcoin::Amount,
+}
+
+impl AliceFactory {
+    pub fn peer_id(&self) -> PeerId {
+        self.peer_id.clone()
+    }
+
+    pub fn listen_address(&self) -> Multiaddr {
+        self.listen_address.clone()
+    }
+
+    pub async fn new(
+        config: Config,
+        swap_amounts: SwapAmounts,
+        swap_id: Uuid,
+        monero: &Monero,
+        bitcoind: &Bitcoind<'_>,
+        xmr_starting_balance: monero::Amount,
+        btc_starting_balance: bitcoin::Amount,
+    ) -> Self {
+        let port = get_port().expect("Failed to find a free port");
+
+        let listen_address: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", port)
+            .parse()
+            .expect("failed to parse Alice's address");
+
+        let seed = Seed::random().unwrap();
+
+        let db_path = tempdir().unwrap().path().to_path_buf();
+
+        let alice_xmr_starting_balance = swap_amounts.xmr * 10;
+        let (btc_wallet, xmr_wallet) = init_wallets(
+            "alice",
+            bitcoind,
+            monero,
+            None,
+            Some(alice_xmr_starting_balance),
+            config,
+        )
+        .await;
+
+        // TODO: This should be done by changing the production code
+        let network_seed = network::Seed::new(seed);
+        let identity = network_seed.derive_libp2p_identity();
+        let peer_id = PeerId::from(identity.public());
+
+        Self {
+            seed,
+            db_path,
+            listen_address,
+            peer_id,
+            swap_id,
+            swap_amounts,
+            btc_wallet,
+            xmr_wallet,
+            config,
+            xmr_starting_balance,
+            btc_starting_balance,
+        }
+    }
+
+    pub async fn new_alice(&self) -> Alice {
+        let initial_state = init_alice_state(
+            self.swap_amounts.btc,
+            self.swap_amounts.xmr,
+            self.btc_wallet.clone(),
+            self.config,
+        )
+        .await;
+
+        let (mut event_loop, event_loop_handle) =
+            init_alice_event_loop(self.listen_address.clone(), self.seed);
+
+        tokio::spawn(async move { event_loop.run().await });
+
+        let db = Database::open(self.db_path.as_path()).unwrap();
+
+        Alice {
+            event_loop_handle,
+            btc_wallet: self.btc_wallet.clone(),
+            xmr_wallet: self.xmr_wallet.clone(),
+            config: self.config,
+            db,
+            state: initial_state,
+            xmr_starting_balance: self.xmr_starting_balance,
+            btc_starting_balance: self.btc_starting_balance,
+            swap_id: self.swap_id,
+        }
+    }
+
+    pub async fn recover_alice_from_db(&self) -> Alice {
+        // TODO: "simulated restart" issues:
+        //  - create new wallets instead of reusing (hard because of container
+        //    lifetimes)
+        //  - consider aborting the old event loop (currently just keeps running)
+
+        // reopen the existing database
+        let db = Database::open(self.db_path.clone().as_path()).unwrap();
+
+        let resume_state =
+            if let swap::database::Swap::Alice(state) = db.get_state(self.swap_id).unwrap() {
+                state.into()
+            } else {
+                unreachable!()
+            };
+
+        let (mut event_loop, event_loop_handle) =
+            init_alice_event_loop(self.listen_address.clone(), self.seed);
+
+        tokio::spawn(async move { event_loop.run().await });
+
+        Alice {
+            state: resume_state,
+            event_loop_handle,
+            btc_wallet: self.btc_wallet.clone(),
+            xmr_wallet: self.xmr_wallet.clone(),
+            config: self.config,
+            swap_id: self.swap_id,
+            db,
+            xmr_starting_balance: self.xmr_starting_balance,
+            btc_starting_balance: self.btc_starting_balance,
+        }
+    }
+}
+
 pub async fn test<T, F>(testfn: T)
 where
-    T: Fn(Alice, Bob, SwapAmounts) -> F,
+    T: Fn(AliceFactory, Bob, SwapAmounts) -> F,
     F: Future<Output = ()>,
 {
     let cli = Cli::default();
@@ -61,42 +205,20 @@ where
         xmr: monero::Amount::from_piconero(1_000_000_000_000),
     };
 
-    let bob_btc_starting_balance = swap_amounts.btc * 10;
-    let alice_xmr_starting_balance = swap_amounts.xmr * 10;
-
-    let port = get_port().expect("Failed to find a free port");
-
-    let alice_multiaddr: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", port)
-        .parse()
-        .expect("failed to parse Alice's address");
-
     let config = Config::regtest();
 
-    let alice_seed = Seed::random().unwrap();
-
-    let (alice_btc_wallet, alice_xmr_wallet) = init_wallets(
-        "alice",
-        &containers.bitcoind,
+    let alice_factory = AliceFactory::new(
+        config,
+        swap_amounts,
+        Uuid::new_v4(),
         &monero,
-        None,
-        Some(alice_xmr_starting_balance),
-        config,
+        &containers.bitcoind,
+        swap_amounts.xmr * 10,
+        bitcoin::Amount::ZERO,
     )
     .await;
 
-    let alice_state = init_alice_state(
-        swap_amounts.btc,
-        swap_amounts.xmr,
-        alice_btc_wallet.clone(),
-        config,
-    )
-    .await;
-
-    let (mut alice_event_loop, alice_event_loop_handle) =
-        init_alice_event_loop(alice_multiaddr.clone(), alice_seed);
-
-    let alice_db_datadir = tempdir().unwrap();
-    let alice_db = Database::open(alice_db_datadir.path()).unwrap();
+    let bob_btc_starting_balance = swap_amounts.btc * 10;
 
     let (bob_btc_wallet, bob_xmr_wallet) = init_wallets(
         "bob",
@@ -117,25 +239,12 @@ where
     .await;
 
     let (bob_event_loop, bob_event_loop_handle) =
-        init_bob_event_loop(alice_event_loop.peer_id(), alice_multiaddr);
+        init_bob_event_loop(alice_factory.peer_id(), alice_factory.listen_address());
 
     let bob_db_dir = tempdir().unwrap();
     let bob_db = Database::open(bob_db_dir.path()).unwrap();
 
-    tokio::spawn(async move { alice_event_loop.run().await });
     tokio::spawn(async move { bob_event_loop.run().await });
-
-    let alice = Alice {
-        state: alice_state,
-        event_loop_handle: alice_event_loop_handle,
-        bitcoin_wallet: alice_btc_wallet,
-        monero_wallet: alice_xmr_wallet,
-        config,
-        swap_id: Uuid::new_v4(),
-        db: alice_db,
-        xmr_starting_balance: alice_xmr_starting_balance,
-        btc_starting_balance: bitcoin::Amount::ZERO,
-    };
 
     let bob = Bob {
         state: bob_state,
@@ -148,7 +257,7 @@ where
         btc_starting_balance: bob_btc_starting_balance,
     };
 
-    testfn(alice, bob, swap_amounts).await
+    testfn(alice_factory, bob, swap_amounts).await
 }
 
 pub async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {

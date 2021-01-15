@@ -11,12 +11,13 @@ pub mod testutils;
 
 #[tokio::test]
 async fn happy_path() {
-    testutils::test(|alice, bob, swap_amounts| async move {
+    testutils::test(|alice_factory, bob, swap_amounts| async move {
+        let alice = alice_factory.new_alice().await;
         let alice_swap_fut = alice::swap(
             alice.state,
             alice.event_loop_handle,
-            alice.bitcoin_wallet.clone(),
-            alice.monero_wallet.clone(),
+            alice.btc_wallet.clone(),
+            alice.xmr_wallet.clone(),
             alice.config,
             alice.swap_id,
             alice.db,
@@ -32,10 +33,10 @@ async fn happy_path() {
         );
         let (alice_state, bob_state) = join!(alice_swap_fut, bob_swap_fut);
 
-        let btc_alice_final = alice.bitcoin_wallet.as_ref().balance().await.unwrap();
+        let btc_alice_final = alice.btc_wallet.as_ref().balance().await.unwrap();
         let btc_bob_final = bob.bitcoin_wallet.as_ref().balance().await.unwrap();
 
-        let xmr_alice_final = alice.monero_wallet.as_ref().get_balance().await.unwrap();
+        let xmr_alice_final = alice.xmr_wallet.as_ref().get_balance().await.unwrap();
 
         bob.monero_wallet.as_ref().inner.refresh().await.unwrap();
         let xmr_bob_final = bob.monero_wallet.as_ref().get_balance().await.unwrap();
