@@ -38,17 +38,6 @@ pub struct Alice {
     pub db: Database,
 }
 
-pub struct Bob {
-    pub state: BobState,
-    pub event_loop_handle: bob::EventLoopHandle,
-    pub db: Database,
-    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
-    pub monero_wallet: Arc<monero::Wallet>,
-    pub swap_id: Uuid,
-    pub btc_starting_balance: bitcoin::Amount,
-    pub xmr_starting_balance: monero::Amount,
-}
-
 pub struct AliceHarness {
     listen_address: Multiaddr,
     peer_id: PeerId,
@@ -57,7 +46,6 @@ pub struct AliceHarness {
     db_path: PathBuf,
     swap_id: Uuid,
 
-    // Stuff that should probably not be in here...
     swap_amounts: SwapAmounts,
     btc_wallet: Arc<bitcoin::Wallet>,
     xmr_wallet: Arc<monero::Wallet>,
@@ -189,9 +177,137 @@ impl AliceHarness {
     }
 }
 
+pub struct Bob {
+    pub state: BobState,
+    pub event_loop_handle: bob::EventLoopHandle,
+    pub db: Database,
+    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
+    pub monero_wallet: Arc<monero::Wallet>,
+    pub swap_id: Uuid,
+}
+
+pub struct BobHarness {
+    db_path: PathBuf,
+    swap_id: Uuid,
+
+    swap_amounts: SwapAmounts,
+    btc_wallet: Arc<bitcoin::Wallet>,
+    xmr_wallet: Arc<monero::Wallet>,
+    config: Config,
+    starting_balances: StartingBalances,
+
+    alice_connect_address: Multiaddr,
+    alice_connect_peer_id: PeerId,
+}
+
+impl BobHarness {
+    #[allow(clippy::too_many_arguments)]
+    pub async fn new(
+        config: Config,
+        swap_amounts: SwapAmounts,
+        swap_id: Uuid,
+        monero: &Monero,
+        bitcoind: &Bitcoind<'_>,
+        starting_balances: StartingBalances,
+        alice_connect_address: Multiaddr,
+        alice_connect_peer_id: PeerId,
+    ) -> Self {
+        let db_path = tempdir().unwrap().path().to_path_buf();
+
+        let (btc_wallet, xmr_wallet) =
+            init_wallets("bob", bitcoind, monero, starting_balances.clone(), config).await;
+
+        Self {
+            db_path,
+            swap_id,
+            swap_amounts,
+            btc_wallet,
+            xmr_wallet,
+            config,
+            starting_balances,
+            alice_connect_address,
+            alice_connect_peer_id,
+        }
+    }
+
+    pub async fn new_bob(&self) -> Bob {
+        let initial_state = init_bob_state(
+            self.swap_amounts.btc,
+            self.swap_amounts.xmr,
+            self.btc_wallet.clone(),
+            self.config,
+        )
+        .await;
+
+        let (event_loop, event_loop_handle) = init_bob_event_loop(
+            self.alice_connect_peer_id.clone(),
+            self.alice_connect_address.clone(),
+        );
+
+        tokio::spawn(async move { event_loop.run().await });
+
+        let db = Database::open(self.db_path.as_path()).unwrap();
+
+        Bob {
+            state: initial_state,
+            event_loop_handle,
+            db,
+            bitcoin_wallet: self.btc_wallet.clone(),
+            monero_wallet: self.xmr_wallet.clone(),
+            swap_id: self.swap_id,
+        }
+    }
+
+    pub async fn recover_bob_from_db(&self) -> Bob {
+        // TODO: "simulated restart" issues:
+        //  - create new wallets instead of reusing (hard because of container
+        //    lifetimes)
+        //  - consider aborting the old event loop (currently just keeps running)
+
+        // reopen the existing database
+        let db = Database::open(self.db_path.clone().as_path()).unwrap();
+
+        let resume_state =
+            if let swap::database::Swap::Bob(state) = db.get_state(self.swap_id).unwrap() {
+                state.into()
+            } else {
+                unreachable!()
+            };
+
+        let (event_loop, event_loop_handle) = init_bob_event_loop(
+            self.alice_connect_peer_id.clone(),
+            self.alice_connect_address.clone(),
+        );
+
+        tokio::spawn(async move { event_loop.run().await });
+
+        Bob {
+            state: resume_state,
+            event_loop_handle,
+            db,
+            bitcoin_wallet: self.btc_wallet.clone(),
+            monero_wallet: self.xmr_wallet.clone(),
+            swap_id: self.swap_id,
+        }
+    }
+
+    pub async fn assert_redeemed(&self, state: BobState) {
+        assert!(matches!(state, BobState::XmrRedeemed));
+
+        let btc_bob_final = self.btc_wallet.as_ref().balance().await.unwrap();
+        self.xmr_wallet.as_ref().inner.refresh().await.unwrap();
+        let xmr_bob_final = self.xmr_wallet.as_ref().get_balance().await.unwrap();
+        assert!(btc_bob_final <= self.starting_balances.btc - self.swap_amounts.btc);
+        assert_eq!(
+            xmr_bob_final,
+            self.starting_balances.xmr + self.swap_amounts.xmr
+        );
+    }
+}
+
 pub async fn test<T, F>(testfn: T)
 where
-    T: Fn(AliceHarness, Bob, SwapAmounts) -> F,
+    T: Fn(AliceHarness, BobHarness) -> F,
     F: Future<Output = ()>,
 {
     let cli = Cli::default();
@@ -211,7 +327,7 @@ where
         xmr: swap_amounts.xmr * 10,
         btc: bitcoin::Amount::ZERO,
     };
-    let alice_factory = AliceHarness::new(
+    let alice_harness = AliceHarness::new(
         config,
         swap_amounts,
         Uuid::new_v4(),
@@ -226,43 +342,19 @@ where
         btc: swap_amounts.btc * 10,
     };
 
-    let (bob_btc_wallet, bob_xmr_wallet) = init_wallets(
-        "bob",
-        &containers.bitcoind,
+    let bob_harness = BobHarness::new(
+        config,
+        swap_amounts,
+        Uuid::new_v4(),
         &monero,
-        bob_starting_balances.clone(),
-        config,
+        &containers.bitcoind,
+        bob_starting_balances,
+        alice_harness.listen_address(),
+        alice_harness.peer_id(),
     )
     .await;
 
-    let bob_state = init_bob_state(
-        swap_amounts.btc,
-        swap_amounts.xmr,
-        bob_btc_wallet.clone(),
-        config,
-    )
-    .await;
-
-    let (bob_event_loop, bob_event_loop_handle) =
-        init_bob_event_loop(alice_factory.peer_id(), alice_factory.listen_address());
-
-    let bob_db_dir = tempdir().unwrap();
-    let bob_db = Database::open(bob_db_dir.path()).unwrap();
-
-    tokio::spawn(async move { bob_event_loop.run().await });
-
-    let bob = Bob {
-        state: bob_state,
-        event_loop_handle: bob_event_loop_handle,
-        db: bob_db,
-        bitcoin_wallet: bob_btc_wallet,
-        monero_wallet: bob_xmr_wallet,
-        swap_id: Uuid::new_v4(),
-        xmr_starting_balance: bob_starting_balances.xmr,
-        btc_starting_balance: bob_starting_balances.btc,
-    };
-
-    testfn(alice_factory, bob, swap_amounts).await
+    testfn(alice_harness, bob_harness).await
 }
 
 pub async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {

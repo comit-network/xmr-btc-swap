@@ -1,12 +1,13 @@
 use rand::rngs::OsRng;
-use swap::protocol::{alice, alice::AliceState, bob, bob::BobState};
+use swap::protocol::{alice, alice::AliceState, bob};
 
 pub mod testutils;
 
 #[tokio::test]
 async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
-    testutils::test(|alice_harness, bob, swap_amounts| async move {
+    testutils::test(|alice_harness, bob_harness| async move {
         let alice = alice_harness.new_alice().await;
+        let bob = bob_harness.new_bob().await;
 
         let bob_swap_fut = bob::swap(
             bob.state,
@@ -51,12 +52,7 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
         alice_harness.assert_redeemed(alice_state).await;
 
         let bob_state = bob_swap_handle.await.unwrap();
-        let btc_bob_final = bob.bitcoin_wallet.as_ref().balance().await.unwrap();
-        bob.monero_wallet.as_ref().inner.refresh().await.unwrap();
-        let xmr_bob_final = bob.monero_wallet.as_ref().get_balance().await.unwrap();
-        assert!(matches!(bob_state.unwrap(), BobState::XmrRedeemed));
-        assert!(btc_bob_final <= bob.btc_starting_balance - swap_amounts.btc);
-        assert_eq!(xmr_bob_final, bob.xmr_starting_balance + swap_amounts.xmr);
+        bob_harness.assert_redeemed(bob_state.unwrap()).await
     })
     .await;
 }

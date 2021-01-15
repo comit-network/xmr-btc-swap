@@ -1,5 +1,5 @@
 use rand::rngs::OsRng;
-use swap::protocol::{alice, bob, bob::BobState};
+use swap::protocol::{alice, bob};
 use tokio::join;
 
 pub mod testutils;
@@ -8,7 +8,7 @@ pub mod testutils;
 
 #[tokio::test]
 async fn happy_path() {
-    testutils::test(|alice_harness, bob, swap_amounts| async move {
+    testutils::test(|alice_harness, bob_harness| async move {
         let alice = alice_harness.new_alice().await;
         let alice_swap_fut = alice::swap(
             alice.state,
@@ -19,6 +19,8 @@ async fn happy_path() {
             alice.swap_id,
             alice.db,
         );
+
+        let bob = bob_harness.new_bob().await;
         let bob_swap_fut = bob::swap(
             bob.state,
             bob.event_loop_handle,
@@ -31,15 +33,7 @@ async fn happy_path() {
         let (alice_state, bob_state) = join!(alice_swap_fut, bob_swap_fut);
 
         alice_harness.assert_redeemed(alice_state.unwrap()).await;
-
-        let btc_bob_final = bob.bitcoin_wallet.as_ref().balance().await.unwrap();
-
-        bob.monero_wallet.as_ref().inner.refresh().await.unwrap();
-
-        let xmr_bob_final = bob.monero_wallet.as_ref().get_balance().await.unwrap();
-        assert!(matches!(bob_state.unwrap(), BobState::XmrRedeemed));
-        assert!(btc_bob_final <= bob.btc_starting_balance - swap_amounts.btc);
-        assert_eq!(xmr_bob_final, bob.xmr_starting_balance + swap_amounts.xmr);
+        bob_harness.assert_redeemed(bob_state.unwrap()).await;
     })
     .await;
 }
