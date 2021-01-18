@@ -23,7 +23,7 @@ use tracing_log::LogTracer;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
-pub struct StartingBalances {
+struct StartingBalances {
     pub xmr: monero::Amount,
     pub btc: bitcoin::Amount,
 }
@@ -102,7 +102,7 @@ impl AliceHarness {
         assert!(xnr_balance_after_swap <= self.starting_balances.xmr - self.swap_amounts.xmr);
     }
 
-    pub async fn new(
+    async fn new(
         config: Config,
         swap_amounts: SwapAmounts,
         swap_id: Uuid,
@@ -227,7 +227,7 @@ pub struct BobHarness {
 
 impl BobHarness {
     #[allow(clippy::too_many_arguments)]
-    pub async fn new(
+    async fn new(
         config: Config,
         swap_amounts: SwapAmounts,
         swap_id: Uuid,
@@ -435,7 +435,7 @@ where
     testfn(alice_harness, bob_harness).await
 }
 
-pub async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
+async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
     let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
     let _ = bitcoind.init(5).await;
     let (monero, monerods) = Monero::new(&cli, None, vec!["alice".to_string(), "bob".to_string()])
@@ -445,7 +445,7 @@ pub async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
     (monero, Containers { bitcoind, monerods })
 }
 
-pub async fn init_wallets(
+async fn init_wallets(
     name: &str,
     bitcoind: &Bitcoind<'_>,
     monero: &Monero,
@@ -481,7 +481,7 @@ pub async fn init_wallets(
     (btc_wallet, xmr_wallet)
 }
 
-pub async fn init_alice_state(
+async fn init_alice_state(
     btc_to_swap: bitcoin::Amount,
     xmr_to_swap: monero::Amount,
     alice_btc_wallet: Arc<bitcoin::Wallet>,
@@ -514,7 +514,7 @@ pub async fn init_alice_state(
     AliceState::Started { amounts, state0 }
 }
 
-pub fn init_alice_event_loop(
+fn init_alice_event_loop(
     listen: Multiaddr,
     seed: Seed,
 ) -> (
@@ -526,55 +526,7 @@ pub fn init_alice_event_loop(
     alice::event_loop::EventLoop::new(alice_transport, alice_behaviour, listen).unwrap()
 }
 
-#[allow(clippy::too_many_arguments)]
-pub async fn init_alice(
-    bitcoind: &Bitcoind<'_>,
-    monero: &Monero,
-    btc_to_swap: bitcoin::Amount,
-    xmr_to_swap: monero::Amount,
-    xmr_starting_balance: monero::Amount,
-    listen: Multiaddr,
-    config: Config,
-    seed: Seed,
-) -> (
-    AliceState,
-    alice::event_loop::EventLoop,
-    alice::event_loop::EventLoopHandle,
-    Arc<swap::bitcoin::Wallet>,
-    Arc<swap::monero::Wallet>,
-    Database,
-) {
-    let (alice_btc_wallet, alice_xmr_wallet) = init_wallets(
-        "alice",
-        bitcoind,
-        monero,
-        StartingBalances {
-            xmr: xmr_starting_balance,
-            btc: bitcoin::Amount::ZERO,
-        },
-        config,
-    )
-    .await;
-
-    let alice_start_state =
-        init_alice_state(btc_to_swap, xmr_to_swap, alice_btc_wallet.clone(), config).await;
-
-    let (event_loop, event_loop_handle) = init_alice_event_loop(listen, seed);
-
-    let alice_db_datadir = tempdir().unwrap();
-    let alice_db = Database::open(alice_db_datadir.path()).unwrap();
-
-    (
-        alice_start_state,
-        event_loop,
-        event_loop_handle,
-        alice_btc_wallet,
-        alice_xmr_wallet,
-        alice_db,
-    )
-}
-
-pub async fn init_bob_state(
+async fn init_bob_state(
     btc_to_swap: bitcoin::Amount,
     xmr_to_swap: monero::Amount,
     bob_btc_wallet: Arc<bitcoin::Wallet>,
@@ -599,7 +551,7 @@ pub async fn init_bob_state(
     BobState::Started { state0, amounts }
 }
 
-pub fn init_bob_event_loop(
+fn init_bob_event_loop(
     alice_peer_id: PeerId,
     alice_addr: Multiaddr,
 ) -> (bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle) {
@@ -610,58 +562,11 @@ pub fn init_bob_event_loop(
         .unwrap()
 }
 
-#[allow(clippy::too_many_arguments)]
-pub async fn init_bob(
-    alice_multiaddr: Multiaddr,
-    alice_peer_id: PeerId,
-    bitcoind: &Bitcoind<'_>,
-    monero: &Monero,
-    btc_to_swap: bitcoin::Amount,
-    btc_starting_balance: bitcoin::Amount,
-    xmr_to_swap: monero::Amount,
-    config: Config,
-) -> (
-    BobState,
-    bob::event_loop::EventLoop,
-    bob::event_loop::EventLoopHandle,
-    Arc<swap::bitcoin::Wallet>,
-    Arc<swap::monero::Wallet>,
-    Database,
-) {
-    let (bob_btc_wallet, bob_xmr_wallet) = init_wallets(
-        "bob",
-        bitcoind,
-        monero,
-        StartingBalances {
-            xmr: monero::Amount::ZERO,
-            btc: btc_starting_balance,
-        },
-        config,
-    )
-    .await;
-
-    let bob_state = init_bob_state(btc_to_swap, xmr_to_swap, bob_btc_wallet.clone(), config).await;
-
-    let (event_loop, event_loop_handle) = init_bob_event_loop(alice_peer_id, alice_multiaddr);
-
-    let bob_db_dir = tempdir().unwrap();
-    let bob_db = Database::open(bob_db_dir.path()).unwrap();
-
-    (
-        bob_state,
-        event_loop,
-        event_loop_handle,
-        bob_btc_wallet,
-        bob_xmr_wallet,
-        bob_db,
-    )
-}
-
 // This is just to keep the containers alive
 #[allow(dead_code)]
-pub struct Containers<'a> {
-    pub bitcoind: Bitcoind<'a>,
-    pub monerods: Vec<Container<'a, Cli, image::Monero>>,
+struct Containers<'a> {
+    bitcoind: Bitcoind<'a>,
+    monerods: Vec<Container<'a, Cli, image::Monero>>,
 }
 
 /// Utility function to initialize logging in the test environment.
@@ -670,7 +575,7 @@ pub struct Containers<'a> {
 /// ```rust
 /// let _guard = init_tracing();
 /// ```
-pub fn init_tracing() -> DefaultGuard {
+fn init_tracing() -> DefaultGuard {
     // converts all log records into tracing events
     // Note: Make sure to initialize without unwrapping, otherwise this causes
     // trouble when running multiple tests.
