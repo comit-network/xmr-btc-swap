@@ -1,4 +1,3 @@
-use rand::rngs::OsRng;
 use swap::protocol::{alice, bob};
 use tokio::join;
 
@@ -8,33 +7,17 @@ pub mod testutils;
 
 #[tokio::test]
 async fn happy_path() {
-    testutils::test(|alice_harness, bob_harness| async move {
-        let alice = alice_harness.new_alice().await;
-        let bob = bob_harness.new_bob().await;
+    testutils::init(|test| async move {
+        let alice_swap = test.new_swap_as_alice().await;
+        let bob_swap = test.new_swap_as_bob().await;
 
-        let alice_swap = alice::swap(
-            alice.state,
-            alice.event_loop_handle,
-            alice.bitcoin_wallet.clone(),
-            alice.monero_wallet.clone(),
-            alice.config,
-            alice.swap_id,
-            alice.db,
-        );
+        let alice = alice::run(alice_swap);
 
-        let bob_swap = bob::swap(
-            bob.state,
-            bob.event_loop_handle,
-            bob.db,
-            bob.bitcoin_wallet.clone(),
-            bob.monero_wallet.clone(),
-            OsRng,
-            bob.swap_id,
-        );
-        let (alice_state, bob_state) = join!(alice_swap, bob_swap);
+        let bob = bob::run(bob_swap);
+        let (alice_state, bob_state) = join!(alice, bob);
 
-        alice_harness.assert_redeemed(alice_state.unwrap()).await;
-        bob_harness.assert_redeemed(bob_state.unwrap()).await;
+        test.assert_alice_redeemed(alice_state.unwrap()).await;
+        test.assert_bob_redeemed(bob_state.unwrap()).await;
     })
     .await;
 }

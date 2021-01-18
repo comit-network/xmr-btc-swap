@@ -15,18 +15,23 @@ use crate::{
     bitcoin,
     bitcoin::{TransactionBlockHeight, WatchForRawTransaction},
     config::Config,
-    database::{Database, Swap},
+    database,
+    database::Database,
     monero,
     monero::CreateWalletForOutput,
-    protocol::alice::{
-        event_loop::EventLoopHandle,
-        steps::{
-            build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
-            extract_monero_private_key, lock_xmr, negotiate, publish_bitcoin_punish_transaction,
-            publish_bitcoin_redeem_transaction, publish_cancel_transaction,
-            wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund, wait_for_locked_bitcoin,
+    protocol::{
+        alice,
+        alice::{
+            event_loop::EventLoopHandle,
+            steps::{
+                build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
+                extract_monero_private_key, lock_xmr, negotiate,
+                publish_bitcoin_punish_transaction, publish_bitcoin_redeem_transaction,
+                publish_cancel_transaction, wait_for_bitcoin_encrypted_signature,
+                wait_for_bitcoin_refund, wait_for_locked_bitcoin,
+            },
+            AliceState,
         },
-        AliceState,
     },
     ExpiredTimelocks,
 };
@@ -34,28 +39,6 @@ use crate::{
 trait Rng: RngCore + CryptoRng + Send {}
 
 impl<T> Rng for T where T: RngCore + CryptoRng + Send {}
-
-pub async fn swap(
-    state: AliceState,
-    event_loop_handle: EventLoopHandle,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Wallet>,
-    config: Config,
-    swap_id: Uuid,
-    db: Database,
-) -> Result<AliceState> {
-    run_until(
-        state,
-        is_complete,
-        event_loop_handle,
-        bitcoin_wallet,
-        monero_wallet,
-        config,
-        swap_id,
-        db,
-    )
-    .await
-}
 
 pub fn is_complete(state: &AliceState) -> bool {
     matches!(
@@ -81,10 +64,31 @@ pub fn is_encsig_learned(state: &AliceState) -> bool {
     )
 }
 
+pub async fn run(swap: alice::Swap) -> Result<AliceState> {
+    run_until(swap, is_complete).await
+}
+
+pub async fn run_until(
+    swap: alice::Swap,
+    is_target_state: fn(&AliceState) -> bool,
+) -> Result<AliceState> {
+    do_run_until(
+        swap.state,
+        is_target_state,
+        swap.event_loop_handle,
+        swap.bitcoin_wallet,
+        swap.monero_wallet,
+        swap.config,
+        swap.swap_id,
+        swap.db,
+    )
+    .await
+}
+
 // State machine driver for swap execution
 #[async_recursion]
 #[allow(clippy::too_many_arguments)]
-pub async fn run_until(
+async fn do_run_until(
     state: AliceState,
     is_target_state: fn(&AliceState) -> bool,
     mut event_loop_handle: EventLoopHandle,
@@ -110,9 +114,9 @@ pub async fn run_until(
                 };
 
                 let db_state = (&state).into();
-                db.insert_latest_state(swap_id, Swap::Alice(db_state))
+                db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                     .await?;
-                run_until(
+                do_run_until(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -153,9 +157,9 @@ pub async fn run_until(
                 };
 
                 let db_state = (&state).into();
-                db.insert_latest_state(swap_id, Swap::Alice(db_state))
+                db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                     .await?;
-                run_until(
+                do_run_until(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -194,9 +198,9 @@ pub async fn run_until(
                 };
 
                 let db_state = (&state).into();
-                db.insert_latest_state(swap_id, Swap::Alice(db_state))
+                db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                     .await?;
-                run_until(
+                do_run_until(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -232,9 +236,9 @@ pub async fn run_until(
                 };
 
                 let db_state = (&state).into();
-                db.insert_latest_state(swap_id, Swap::Alice(db_state))
+                db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                     .await?;
-                run_until(
+                do_run_until(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -270,9 +274,9 @@ pub async fn run_until(
 
                         let state = AliceState::CancelTimelockExpired { state3 };
                         let db_state = (&state).into();
-                        db.insert_latest_state(swap_id, Swap::Alice(db_state))
+                        db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                             .await?;
-                        return run_until(
+                        return do_run_until(
                             state,
                             is_target_state,
                             event_loop_handle,
@@ -298,9 +302,9 @@ pub async fn run_until(
 
                 let state = AliceState::BtcRedeemed;
                 let db_state = (&state).into();
-                db.insert_latest_state(swap_id, Swap::Alice(db_state))
+                db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                     .await?;
-                run_until(
+                do_run_until(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -325,9 +329,9 @@ pub async fn run_until(
 
                 let state = AliceState::BtcCancelled { state3, tx_cancel };
                 let db_state = (&state).into();
-                db.insert_latest_state(swap_id, Swap::Alice(db_state))
+                db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                     .await?;
-                run_until(
+                do_run_until(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -358,10 +362,10 @@ pub async fn run_until(
                     None => {
                         let state = AliceState::BtcPunishable { tx_refund, state3 };
                         let db_state = (&state).into();
-                        db.insert_latest_state(swap_id, Swap::Alice(db_state))
+                        db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                             .await?;
 
-                        run_until(
+                        do_run_until(
                             state,
                             is_target_state,
                             event_loop_handle,
@@ -384,9 +388,9 @@ pub async fn run_until(
 
                         let state = AliceState::BtcRefunded { spend_key, state3 };
                         let db_state = (&state).into();
-                        db.insert_latest_state(swap_id, Swap::Alice(db_state))
+                        db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                             .await?;
-                        run_until(
+                        do_run_until(
                             state,
                             is_target_state,
                             event_loop_handle,
@@ -409,7 +413,7 @@ pub async fn run_until(
 
                 let state = AliceState::XmrRefunded;
                 let db_state = (&state).into();
-                db.insert_latest_state(swap_id, Swap::Alice(db_state))
+                db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                     .await?;
                 Ok(state)
             }
@@ -439,9 +443,9 @@ pub async fn run_until(
                     Either::Left(_) => {
                         let state = AliceState::BtcPunished;
                         let db_state = (&state).into();
-                        db.insert_latest_state(swap_id, Swap::Alice(db_state))
+                        db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                             .await?;
-                        run_until(
+                        do_run_until(
                             state,
                             is_target_state,
                             event_loop_handle,
@@ -463,9 +467,9 @@ pub async fn run_until(
                         )?;
                         let state = AliceState::BtcRefunded { spend_key, state3 };
                         let db_state = (&state).into();
-                        db.insert_latest_state(swap_id, Swap::Alice(db_state))
+                        db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                             .await?;
-                        run_until(
+                        do_run_until(
                             state,
                             is_target_state,
                             event_loop_handle,

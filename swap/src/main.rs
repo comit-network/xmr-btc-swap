@@ -300,15 +300,17 @@ async fn alice_swap(
     let (mut event_loop, handle) =
         alice::event_loop::EventLoop::new(alice_transport, alice_behaviour, listen_addr)?;
 
-    let swap = alice::swap::swap(
+    let swap = alice::Swap {
         state,
-        handle,
-        bitcoin_wallet.clone(),
-        monero_wallet.clone(),
+        event_loop_handle: handle,
+        bitcoin_wallet,
+        monero_wallet,
         config,
         swap_id,
         db,
-    );
+    };
+
+    let swap = alice::swap::run(swap);
 
     tokio::spawn(async move { event_loop.run().await });
     swap.await
@@ -331,15 +333,16 @@ async fn bob_swap(
     let (event_loop, handle) =
         bob::event_loop::EventLoop::new(bob_transport, bob_behaviour, alice_peer_id, alice_addr)?;
 
-    let swap = bob::swap::swap(
+    let swap = bob::Swap {
         state,
-        handle,
+        event_loop_handle: handle,
         db,
-        bitcoin_wallet.clone(),
-        monero_wallet.clone(),
-        OsRng,
+        bitcoin_wallet,
+        monero_wallet,
         swap_id,
-    );
+    };
+
+    let swap = bob::swap::run(swap);
 
     tokio::spawn(event_loop.run());
     swap.await

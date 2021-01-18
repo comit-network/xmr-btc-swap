@@ -8,7 +8,9 @@ use libp2p::{
 use tracing::{debug, info};
 
 use crate::{
+    bitcoin,
     bitcoin::EncryptedSignature,
+    monero,
     network::{
         peer_tracker::{self, PeerTracker},
         transport::SwapTransport,
@@ -26,8 +28,11 @@ pub use self::{
     message2::Message2,
     message3::Message3,
     state::*,
-    swap::{run_until, swap},
+    swap::{run, run_until},
 };
+use crate::database::Database;
+use std::sync::Arc;
+use uuid::Uuid;
 
 mod amounts;
 pub mod event_loop;
@@ -37,6 +42,15 @@ mod message2;
 mod message3;
 pub mod state;
 pub mod swap;
+
+pub struct Swap {
+    pub state: BobState,
+    pub event_loop_handle: bob::EventLoopHandle,
+    pub db: Database,
+    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
+    pub monero_wallet: Arc<monero::Wallet>,
+    pub swap_id: Uuid,
+}
 
 pub type Swarm = libp2p::Swarm<Behaviour>;
 
