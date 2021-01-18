@@ -1,16 +1,15 @@
 use libp2p::swarm::{ProtocolsHandler, ProtocolsHandlerEvent, ProtocolsHandlerUpgrErr, KeepAlive, SubstreamProtocol, NegotiatedSubstream, NetworkBehaviour, NetworkBehaviourAction, PollParameters, NotifyHandler};
 use libp2p::futures::task::{Context, Poll};
 use libp2p::{InboundUpgrade, PeerId, OutboundUpgrade};
-use libp2p::core::{UpgradeInfo, Multiaddr};
+use libp2p::core::{UpgradeInfo, Multiaddr, ConnectedPoint};
 use libp2p::futures::{FutureExt};
 use std::future::{Ready, Future};
 use std::convert::Infallible;
 use libp2p::futures::future::BoxFuture;
-use std::collections::VecDeque;
+use std::collections::{VecDeque, HashMap};
 use libp2p::swarm::protocols_handler::OutboundUpgradeSend;
-use libp2p::core::connection::ConnectionId;
+use libp2p::core::connection::{ConnectionId};
 use std::iter;
-use std::task::Waker;
 
 #[cfg(test)]
 mod swarm_harness;
@@ -113,8 +112,6 @@ impl<TInboundOut, TOutboundOut, TErr> ProtocolsHandler for NMessageHandler<TInbo
     }
 
     fn inject_fully_negotiated_inbound(&mut self, protocol: NegotiatedSubstream, _: Self::InboundOpenInfo) {
-        log::info!("inject_fully_negotiated_inbound");
-
         if let Some(future_fn) = self.inbound_future_fn.take() {
             self.inbound_future = Some(future_fn(protocol))
         } else {
@@ -123,8 +120,6 @@ impl<TInboundOut, TOutboundOut, TErr> ProtocolsHandler for NMessageHandler<TInbo
     }
 
     fn inject_fully_negotiated_outbound(&mut self, protocol: NegotiatedSubstream, _: Self::OutboundOpenInfo) {
-        log::info!("inject_fully_negotiated_outbound");
-
         if let Some(future_fn) = self.outbound_future_fn.take() {
             self.outbound_future = Some(future_fn(protocol))
         } else {
@@ -135,12 +130,8 @@ impl<TInboundOut, TOutboundOut, TErr> ProtocolsHandler for NMessageHandler<TInbo
     fn inject_event(&mut self, event: Self::InEvent) {
         match event {
             ProtocolInEvent::ExecuteInbound(protocol_fn) => {
-                log::trace!("got execute inbound event");
-
                 match self.inbound_substream.take() {
                     Some(substream) => {
-                        log::trace!("got inbound substream, upgrading with custom protocol");
-
                         self.inbound_future = Some(protocol_fn(substream))
                     }
                     None => {
@@ -149,14 +140,10 @@ impl<TInboundOut, TOutboundOut, TErr> ProtocolsHandler for NMessageHandler<TInbo
                 }
             }
             ProtocolInEvent::ExecuteOutbound(protocol_fn) => {
-                log::trace!("got execute outbound event");
-
                 self.substream_request = Some(SubstreamProtocol::new(NMessageProtocol::new(self.info), ()));
 
                 match self.outbound_substream.take() {
                     Some(substream) => {
-                        log::trace!("got outbound substream, upgrading with custom protocol");
-
                         self.outbound_future = Some(protocol_fn(substream));
                     }
                     None => {
@@ -183,7 +170,7 @@ impl<TInboundOut, TOutboundOut, TErr> ProtocolsHandler for NMessageHandler<TInbo
             return Poll::Ready(ProtocolsHandlerEvent::OutboundSubstreamRequest { protocol })
         }
 
-        if let Some(future) = self.inbound_future.as_mut() {
+        if let Some(mut future) = self.inbound_future.take() {
             match future.poll_unpin(cx) {
                 Poll::Ready(Ok(value)) => {
                     return Poll::Ready(ProtocolsHandlerEvent::Custom(ProtocolOutEvent::InboundFinished(value)))
@@ -191,11 +178,14 @@ impl<TInboundOut, TOutboundOut, TErr> ProtocolsHandler for NMessageHandler<TInbo
                 Poll::Ready(Err(e)) => {
                     return Poll::Ready(ProtocolsHandlerEvent::Custom(ProtocolOutEvent::InboundFailed(e)))
                 }
-                Poll::Pending => {}
+                Poll::Pending => {
+                    self.inbound_future = Some(future);
+                    return Poll::Pending
+                }
             }
         }
 
-        if let Some(future) = self.outbound_future.as_mut() {
+        if let Some(mut future) = self.outbound_future.take() {
             match future.poll_unpin(cx) {
                 Poll::Ready(Ok(value)) => {
                     return Poll::Ready(ProtocolsHandlerEvent::Custom(ProtocolOutEvent::OutboundFinished(value)))
@@ -203,7 +193,10 @@ impl<TInboundOut, TOutboundOut, TErr> ProtocolsHandler for NMessageHandler<TInbo
                 Poll::Ready(Err(e)) => {
                     return Poll::Ready(ProtocolsHandlerEvent::Custom(ProtocolOutEvent::OutboundFailed(e)))
                 }
-                Poll::Pending => {}
+                Poll::Pending => {
+                    self.outbound_future = Some(future);
+                    return Poll::Pending
+                }
             }
         }
 
@@ -215,11 +208,9 @@ pub struct NMessageBehaviour<I, O, E> {
     protocol_in_events: VecDeque<(PeerId, ProtocolInEvent<I, O, E>)>,
     protocol_out_events: VecDeque<(PeerId, ProtocolOutEvent<I, O, E>)>,
 
-    waker: Option<Waker>,
+    connected_peers: HashMap<PeerId, Vec<Multiaddr>>,
 
-    connected_peers: Vec<PeerId>,
-
-    info: &'static [u8]
+    info: &'static [u8],
 }
 
 impl<I, O, E> NMessageBehaviour<I, O, E> {
@@ -234,10 +225,9 @@ impl<I, O, E> NMessageBehaviour<I, O, E> {
     /// ```
     pub fn new(info: &'static [u8]) -> Self {
         Self {
-            protocol_in_events: Default::default(),
-            protocol_out_events: Default::default(),
-            waker: None,
-            connected_peers: vec![],
+            protocol_in_events: VecDeque::default(),
+            protocol_out_events: VecDeque::default(),
+            connected_peers: HashMap::default(),
             info
         }
     }
@@ -246,22 +236,10 @@ impl<I, O, E> NMessageBehaviour<I, O, E> {
 impl<I, O, E> NMessageBehaviour<I, O, E> {
     pub fn do_protocol_listener<F>(&mut self, peer: PeerId, protocol: impl FnOnce(NegotiatedSubstream) -> F + Send + 'static ) where F: Future<Output = Result<I, E>> + Send + 'static {
         self.protocol_in_events.push_back((peer, ProtocolInEvent::ExecuteInbound(Box::new(move |substream| protocol(substream).boxed()))));
-
-        log::info!("pushing ExecuteInbound event");
-
-        if let Some(waker) = self.waker.take() {
-            log::trace!("waking task");
-
-            waker.wake();
-        }
     }
 
     pub fn do_protocol_dialer<F>(&mut self, peer: PeerId, protocol: impl FnOnce(NegotiatedSubstream) -> F + Send + 'static ) where F: Future<Output = Result<O, E>> + Send + 'static  {
         self.protocol_in_events.push_back((peer, ProtocolInEvent::ExecuteOutbound(Box::new(move |substream| protocol(substream).boxed()))));
-
-        if let Some(waker) = self.waker.take() {
-            waker.wake();
-        }
     }
 }
 
@@ -281,32 +259,38 @@ impl<I, O, E> NetworkBehaviour for NMessageBehaviour<I, O, E> where I: Send + 's
         NMessageHandler::new(self.info)
     }
 
-    fn addresses_of_peer(&mut self, _: &PeerId) -> Vec<Multiaddr> {
-        Vec::new()
+    fn addresses_of_peer(&mut self, peer: &PeerId) -> Vec<Multiaddr> {
+        self.connected_peers.get(peer).cloned().unwrap_or_default()
     }
 
-    fn inject_connected(&mut self, peer: &PeerId) {
-        self.connected_peers.push(peer.clone());
+    fn inject_connected(&mut self, _: &PeerId) {
     }
 
-    fn inject_disconnected(&mut self, peer: &PeerId) {
-        self.connected_peers.retain(|p| p != peer)
+    fn inject_disconnected(&mut self, _: &PeerId) {
+    }
+
+    fn inject_connection_established(&mut self, peer: &PeerId, _: &ConnectionId, point: &ConnectedPoint) {
+        let multiaddr = point.get_remote_address().clone();
+
+        self.connected_peers.entry(*peer).or_default().push(multiaddr);
+    }
+
+    fn inject_connection_closed(&mut self, peer: &PeerId, _: &ConnectionId, point: &ConnectedPoint) {
+        let multiaddr = point.get_remote_address();
+
+        self.connected_peers.entry(*peer).or_default().retain(|addr| addr != multiaddr);
     }
 
     fn inject_event(&mut self, peer: PeerId, _: ConnectionId, event: ProtocolOutEvent<I, O, E>) {
         self.protocol_out_events.push_back((peer, event));
     }
 
-    fn poll(&mut self, cx: &mut Context<'_>, params: &mut impl PollParameters) -> Poll<NetworkBehaviourAction<ProtocolInEvent<I, O, E>, Self::OutEvent>> {
-        log::debug!("peer {}, no. events {}", params.local_peer_id(), self.protocol_in_events.len());
-
+    fn poll(&mut self, _: &mut Context<'_>, _: &mut impl PollParameters) -> Poll<NetworkBehaviourAction<ProtocolInEvent<I, O, E>, Self::OutEvent>> {
         if let Some((peer, event)) = self.protocol_in_events.pop_front() {
-            log::debug!("notifying handler");
-
-            if !self.connected_peers.contains(&peer) {
-                log::info!("not connected to peer {}, waiting ...", peer);
+            if !self.connected_peers.contains_key(&peer) {
                 self.protocol_in_events.push_back((peer, event));
             } else {
+
                 return Poll::Ready(NetworkBehaviourAction::NotifyHandler { peer_id: peer, handler: NotifyHandler::Any, event})
             }
         }
@@ -320,8 +304,6 @@ impl<I, O, E> NetworkBehaviour for NMessageBehaviour<I, O, E> where I: Send + 's
             }))
         }
 
-        self.waker = Some(cx.waker().clone());
-
         Poll::Pending
     }
 }
@@ -333,7 +315,8 @@ mod tests {
     use anyhow::{Context, Error};
     use swarm_harness::new_connected_swarm_pair;
     use libp2p::swarm::SwarmEvent;
-    use libp2p::futures::future::join;
+    use crate::swarm_harness::await_events_or_timeout;
+    use tokio::runtime::Handle;
 
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Debug)]
@@ -395,26 +378,16 @@ mod tests {
     impl MyBehaviour {
         fn alice_do_protocol(&mut self, bob: PeerId, foo: u32, baz: u32) {
             self.inner.do_protocol_dialer(bob, move |mut substream| async move {
-                log::trace!("alice starting protocol");
-
-                upgrade::write_one(&mut substream, serde_cbor::to_vec(&Message0 {
+                upgrade::write_with_len_prefix(&mut substream, serde_cbor::to_vec(&Message0 {
                     foo
                 }).context("failed to serialize Message0")?).await?;
-
-                log::trace!("alice sent message0");
 
                 let bytes = upgrade::read_one(&mut substream, 1024).await?;
                 let message1 = serde_cbor::from_slice::<Message1>(&bytes)?;
 
-                log::trace!("alice read message1");
-
-                upgrade::write_one(&mut substream, serde_cbor::to_vec(&Message2 {
+                upgrade::write_with_len_prefix(&mut substream, serde_cbor::to_vec(&Message2 {
                     baz
                 }).context("failed to serialize Message2")?).await?;
-
-                log::trace!("alice sent message2");
-
-                log::trace!("alice finished");
 
                 Ok(AliceResult {
                     bar: message1.bar
@@ -424,25 +397,15 @@ mod tests {
 
         fn bob_do_protocol(&mut self, alice: PeerId, bar: u32) {
             self.inner.do_protocol_listener(alice, move |mut substream| async move {
-                log::trace!("bob start protocol");
-
                 let bytes = upgrade::read_one(&mut substream, 1024).await?;
                 let message0 = serde_cbor::from_slice::<Message0>(&bytes)?;
 
-                log::trace!("bob read message0");
-
-                upgrade::write_one(&mut substream, serde_cbor::to_vec(&Message1 {
+                upgrade::write_with_len_prefix(&mut substream, serde_cbor::to_vec(&Message1 {
                     bar
                 }).context("failed to serialize Message1")?).await?;
 
-                log::trace!("bob sent message1");
-
                 let bytes = upgrade::read_one(&mut substream, 1024).await?;
                 let message2 = serde_cbor::from_slice::<Message2>(&bytes)?;
-
-                log::trace!("bob read message2");
-
-                log::trace!("bob finished");
 
                 Ok(BobResult {
                     foo: message0.foo,
@@ -456,23 +419,17 @@ mod tests {
     async fn it_works() {
         let _ = env_logger::try_init();
 
-        let (mut alice, mut bob) = new_connected_swarm_pair(|_, _| MyBehaviour::new()).await;
-
-        log::info!("alice = {}", alice.peer_id);
-        log::info!("bob = {}", bob.peer_id);
+        let (mut alice, mut bob) = new_connected_swarm_pair(|_, _| MyBehaviour::new(), Handle::current()).await;
 
         alice.swarm.alice_do_protocol(bob.peer_id, 10, 42);
         bob.swarm.bob_do_protocol(alice.peer_id, 1337);
 
-        let alice_handle = tokio::spawn(async move { alice.swarm.next_event().await });
-        let bob_handle = tokio::spawn(async move { bob.swarm.next_event().await });
+        let (alice_event, bob_event) = await_events_or_timeout(alice.swarm.next_event(), bob.swarm.next_event()).await;
 
-        let (alice_event, bob_event) = join(alice_handle, bob_handle).await;
-
-        assert!(matches!(dbg!(alice_event.unwrap()), SwarmEvent::Behaviour(MyOutEvent::Alice(AliceResult {
+        assert!(matches!(alice_event, SwarmEvent::Behaviour(MyOutEvent::Alice(AliceResult {
             bar: 1337
         }))));
-        assert!(matches!(dbg!(bob_event.unwrap()), SwarmEvent::Behaviour(MyOutEvent::Bob(BobResult {
+        assert!(matches!(bob_event, SwarmEvent::Behaviour(MyOutEvent::Bob(BobResult {
             foo: 10,
             baz: 42
         }))));

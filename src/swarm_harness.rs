@@ -1,7 +1,7 @@
 use libp2p::futures::future;
 use libp2p::{
     core::{
-        muxing::StreamMuxerBox, transport::memory::MemoryTransport, upgrade::Version, Executor,
+        muxing::StreamMuxerBox, transport::memory::MemoryTransport, upgrade::Version,
     },
     identity,
     noise::{self, NoiseConfig, X25519Spec},
@@ -9,18 +9,10 @@ use libp2p::{
     yamux::YamuxConfig,
     Multiaddr, PeerId, Swarm, Transport,
 };
-use std::{fmt::Debug, future::Future, pin::Pin, time::Duration};
+use std::{fmt::Debug, future::Future, time::Duration};
 use tokio::time;
-
-/// An adaptor struct for libp2p that spawns futures into the current
-/// thread-local runtime.
-struct GlobalSpawnTokioExecutor;
-
-impl Executor for GlobalSpawnTokioExecutor {
-    fn exec(&self, future: Pin<Box<dyn Future<Output = ()> + Send>>) {
-        let _ = tokio::spawn(future);
-    }
-}
+use tokio::runtime::Handle;
+use libp2p::futures::future::FutureExt;
 
 #[allow(missing_debug_implementations)]
 pub struct Actor<B: NetworkBehaviour> {
@@ -29,19 +21,19 @@ pub struct Actor<B: NetworkBehaviour> {
     pub peer_id: PeerId,
 }
 
-pub async fn new_connected_swarm_pair<B, F>(behaviour_fn: F) -> (Actor<B>, Actor<B>)
+pub async fn new_connected_swarm_pair<B, F>(behaviour_fn: F, handle: Handle) -> (Actor<B>, Actor<B>)
 where
     B: NetworkBehaviour,
     F: Fn(PeerId, identity::Keypair) -> B + Clone,
 <B as NetworkBehaviour>::OutEvent: Debug{
-    let (swarm, addr, peer_id) = new_swarm(behaviour_fn.clone());
+    let (swarm, addr, peer_id) = new_swarm(behaviour_fn.clone(), handle.clone());
     let mut alice = Actor {
         swarm,
         addr,
         peer_id,
     };
 
-    let (swarm, addr, peer_id) = new_swarm(behaviour_fn);
+    let (swarm, addr, peer_id) = new_swarm(behaviour_fn, handle);
     let mut bob = Actor {
         swarm,
         addr,
@@ -53,7 +45,7 @@ where
     (alice, bob)
 }
 
-pub fn new_swarm<B: NetworkBehaviour, F: Fn(PeerId, identity::Keypair) -> B>(behaviour_fn: F) -> (Swarm<B>, Multiaddr, PeerId) {
+pub fn new_swarm<B: NetworkBehaviour, F: Fn(PeerId, identity::Keypair) -> B>(behaviour_fn: F, handle: Handle) -> (Swarm<B>, Multiaddr, PeerId) {
     let id_keys = identity::Keypair::generate_ed25519();
     let peer_id = PeerId::from(id_keys.public());
 
@@ -74,7 +66,9 @@ pub fn new_swarm<B: NetworkBehaviour, F: Fn(PeerId, identity::Keypair) -> B>(beh
         behaviour_fn(peer_id.clone(), id_keys),
         peer_id.clone(),
     )
-    .executor(Box::new(GlobalSpawnTokioExecutor))
+    .executor(Box::new(move |f| {
+        handle.spawn(f);
+    }))
     .build();
 
     let address_port = rand::random::<u64>();
@@ -116,35 +110,42 @@ pub async fn connect<B>(alice: &mut Swarm<B>, bob: &mut Swarm<B>)
     let mut alice_connected = false;
     let mut bob_connected = false;
 
-    while !alice_connected && !bob_connected {
-        let (alice_event, bob_event) = future::join(alice.next_event(), bob.next_event()).await;
+    while !(alice_connected && bob_connected) {
+        libp2p::futures::select! {
+            alice_event = alice.next_event().fuse() => {
+                match alice_event {
+                    SwarmEvent::ConnectionEstablished { .. } => {
+                        log::info!("alice connected");
+                        alice_connected = true;
+                    }
+                    SwarmEvent::Behaviour(event) => {
+                        panic!(
+                            "alice unexpectedly emitted a behaviour event during connection: {:?}",
+                            event
+                        );
+                    }
+                    _ => {}
+                }
+            }
 
-        match alice_event {
-            SwarmEvent::ConnectionEstablished { .. } => {
-                alice_connected = true;
+            bob_event = bob.next_event().fuse() => {
+                match bob_event {
+                    SwarmEvent::ConnectionEstablished { .. } => {
+                        log::info!("bob connected");
+                        bob_connected = true;
+                    }
+                    SwarmEvent::NewListenAddr(addr) => {
+                        Swarm::dial_addr(alice, addr).unwrap();
+                    }
+                    SwarmEvent::Behaviour(event) => {
+                        panic!(
+                            "bob unexpectedly emitted a behaviour event during connection: {:?}",
+                            event
+                        );
+                    }
+                    _ => {}
+                }
             }
-            SwarmEvent::Behaviour(event) => {
-                panic!(
-                    "alice unexpectedly emitted a behaviour event during connection: {:?}",
-                    event
-                );
-            }
-            _ => {}
-        }
-        match bob_event {
-            SwarmEvent::ConnectionEstablished { .. } => {
-                bob_connected = true;
-            }
-            SwarmEvent::NewListenAddr(addr) => {
-                Swarm::dial_addr(alice, addr).unwrap();
-            }
-            SwarmEvent::Behaviour(event) => {
-                panic!(
-                    "bob unexpectedly emitted a behaviour event during connection: {:?}",
-                    event
-                );
-            }
-            _ => {}
         }
     }
 }
