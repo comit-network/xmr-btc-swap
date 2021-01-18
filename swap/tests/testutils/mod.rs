@@ -22,10 +22,56 @@ use tracing_core::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
 use uuid::Uuid;
 
-#[derive(Debug, Clone)]
-struct StartingBalances {
-    pub xmr: monero::Amount,
-    pub btc: bitcoin::Amount,
+pub async fn test<T, F>(testfn: T)
+where
+    T: Fn(AliceHarness, BobHarness) -> F,
+    F: Future<Output = ()>,
+{
+    let cli = Cli::default();
+
+    let _guard = init_tracing();
+
+    let (monero, containers) = testutils::init_containers(&cli).await;
+
+    let swap_amounts = SwapAmounts {
+        btc: bitcoin::Amount::from_sat(1_000_000),
+        xmr: monero::Amount::from_piconero(1_000_000_000_000),
+    };
+
+    let config = Config::regtest();
+
+    let alice_starting_balances = StartingBalances {
+        xmr: swap_amounts.xmr * 10,
+        btc: bitcoin::Amount::ZERO,
+    };
+    let alice_harness = AliceHarness::new(
+        config,
+        swap_amounts,
+        Uuid::new_v4(),
+        &monero,
+        &containers.bitcoind,
+        alice_starting_balances,
+    )
+    .await;
+
+    let bob_starting_balances = StartingBalances {
+        xmr: monero::Amount::ZERO,
+        btc: swap_amounts.btc * 10,
+    };
+
+    let bob_harness = BobHarness::new(
+        config,
+        swap_amounts,
+        Uuid::new_v4(),
+        &monero,
+        &containers.bitcoind,
+        bob_starting_balances,
+        alice_harness.listen_address(),
+        alice_harness.peer_id(),
+    )
+    .await;
+
+    testfn(alice_harness, bob_harness).await
 }
 
 pub struct Alice {
@@ -54,54 +100,6 @@ pub struct AliceHarness {
 }
 
 impl AliceHarness {
-    pub fn peer_id(&self) -> PeerId {
-        self.peer_id.clone()
-    }
-
-    pub fn listen_address(&self) -> Multiaddr {
-        self.listen_address.clone()
-    }
-
-    pub async fn assert_redeemed(&self, state: AliceState) {
-        assert!(matches!(state, AliceState::BtcRedeemed));
-
-        let btc_balance_after_swap = self.bitcoin_wallet.as_ref().balance().await.unwrap();
-        assert_eq!(
-            btc_balance_after_swap,
-            self.starting_balances.btc + self.swap_amounts.btc
-                - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
-        );
-
-        let xmr_balance_after_swap = self.monero_wallet.as_ref().get_balance().await.unwrap();
-        assert!(xmr_balance_after_swap <= self.starting_balances.xmr - self.swap_amounts.xmr);
-    }
-
-    pub async fn assert_refunded(&self, state: AliceState) {
-        assert!(matches!(state, AliceState::XmrRefunded));
-
-        let btc_balance_after_swap = self.bitcoin_wallet.as_ref().balance().await.unwrap();
-        assert_eq!(btc_balance_after_swap, self.starting_balances.btc);
-
-        // Ensure that Alice's balance is refreshed as we use a newly created wallet
-        self.monero_wallet.as_ref().inner.refresh().await.unwrap();
-        let xmr_balance_after_swap = self.monero_wallet.as_ref().get_balance().await.unwrap();
-        assert_eq!(xmr_balance_after_swap, self.swap_amounts.xmr);
-    }
-
-    pub async fn assert_punished(&self, state: AliceState) {
-        assert!(matches!(state, AliceState::BtcPunished));
-
-        let btc_balance_after_swap = self.bitcoin_wallet.as_ref().balance().await.unwrap();
-        assert_eq!(
-            btc_balance_after_swap,
-            self.starting_balances.btc + self.swap_amounts.btc
-                - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE)
-        );
-
-        let xnr_balance_after_swap = self.monero_wallet.as_ref().get_balance().await.unwrap();
-        assert!(xnr_balance_after_swap <= self.starting_balances.xmr - self.swap_amounts.xmr);
-    }
-
     async fn new(
         config: Config,
         swap_amounts: SwapAmounts,
@@ -199,6 +197,54 @@ impl AliceHarness {
             swap_id: self.swap_id,
             db,
         }
+    }
+
+    pub async fn assert_redeemed(&self, state: AliceState) {
+        assert!(matches!(state, AliceState::BtcRedeemed));
+
+        let btc_balance_after_swap = self.bitcoin_wallet.as_ref().balance().await.unwrap();
+        assert_eq!(
+            btc_balance_after_swap,
+            self.starting_balances.btc + self.swap_amounts.btc
+                - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
+        );
+
+        let xmr_balance_after_swap = self.monero_wallet.as_ref().get_balance().await.unwrap();
+        assert!(xmr_balance_after_swap <= self.starting_balances.xmr - self.swap_amounts.xmr);
+    }
+
+    pub async fn assert_refunded(&self, state: AliceState) {
+        assert!(matches!(state, AliceState::XmrRefunded));
+
+        let btc_balance_after_swap = self.bitcoin_wallet.as_ref().balance().await.unwrap();
+        assert_eq!(btc_balance_after_swap, self.starting_balances.btc);
+
+        // Ensure that Alice's balance is refreshed as we use a newly created wallet
+        self.monero_wallet.as_ref().inner.refresh().await.unwrap();
+        let xmr_balance_after_swap = self.monero_wallet.as_ref().get_balance().await.unwrap();
+        assert_eq!(xmr_balance_after_swap, self.swap_amounts.xmr);
+    }
+
+    pub async fn assert_punished(&self, state: AliceState) {
+        assert!(matches!(state, AliceState::BtcPunished));
+
+        let btc_balance_after_swap = self.bitcoin_wallet.as_ref().balance().await.unwrap();
+        assert_eq!(
+            btc_balance_after_swap,
+            self.starting_balances.btc + self.swap_amounts.btc
+                - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE)
+        );
+
+        let xnr_balance_after_swap = self.monero_wallet.as_ref().get_balance().await.unwrap();
+        assert!(xnr_balance_after_swap <= self.starting_balances.xmr - self.swap_amounts.xmr);
+    }
+
+    pub fn peer_id(&self) -> PeerId {
+        self.peer_id.clone()
+    }
+
+    pub fn listen_address(&self) -> Multiaddr {
+        self.listen_address.clone()
     }
 }
 
@@ -383,56 +429,10 @@ impl BobHarness {
     }
 }
 
-pub async fn test<T, F>(testfn: T)
-where
-    T: Fn(AliceHarness, BobHarness) -> F,
-    F: Future<Output = ()>,
-{
-    let cli = Cli::default();
-
-    let _guard = init_tracing();
-
-    let (monero, containers) = testutils::init_containers(&cli).await;
-
-    let swap_amounts = SwapAmounts {
-        btc: bitcoin::Amount::from_sat(1_000_000),
-        xmr: monero::Amount::from_piconero(1_000_000_000_000),
-    };
-
-    let config = Config::regtest();
-
-    let alice_starting_balances = StartingBalances {
-        xmr: swap_amounts.xmr * 10,
-        btc: bitcoin::Amount::ZERO,
-    };
-    let alice_harness = AliceHarness::new(
-        config,
-        swap_amounts,
-        Uuid::new_v4(),
-        &monero,
-        &containers.bitcoind,
-        alice_starting_balances,
-    )
-    .await;
-
-    let bob_starting_balances = StartingBalances {
-        xmr: monero::Amount::ZERO,
-        btc: swap_amounts.btc * 10,
-    };
-
-    let bob_harness = BobHarness::new(
-        config,
-        swap_amounts,
-        Uuid::new_v4(),
-        &monero,
-        &containers.bitcoind,
-        bob_starting_balances,
-        alice_harness.listen_address(),
-        alice_harness.peer_id(),
-    )
-    .await;
-
-    testfn(alice_harness, bob_harness).await
+#[derive(Debug, Clone)]
+struct StartingBalances {
+    pub xmr: monero::Amount,
+    pub btc: bitcoin::Amount,
 }
 
 async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
