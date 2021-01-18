@@ -35,8 +35,8 @@ pub enum BobState {
     CancelTimelockExpired(State4),
     BtcCancelled(State4),
     BtcRefunded(State4),
-    XmrRedeemed,
-    BtcPunished,
+    XmrRedeemed(State6),
+    BtcPunished(State6),
     SafelyAborted,
 }
 
@@ -52,8 +52,8 @@ impl fmt::Display for BobState {
             BobState::CancelTimelockExpired(..) => write!(f, "cancel timelock is expired"),
             BobState::BtcCancelled(..) => write!(f, "btc is cancelled"),
             BobState::BtcRefunded(..) => write!(f, "btc is refunded"),
-            BobState::XmrRedeemed => write!(f, "xmr is redeemed"),
-            BobState::BtcPunished => write!(f, "btc is punished"),
+            BobState::XmrRedeemed(..) => write!(f, "xmr is redeemed"),
+            BobState::BtcPunished(..) => write!(f, "btc is punished"),
             BobState::SafelyAborted => write!(f, "safely aborted"),
         }
     }
@@ -592,6 +592,12 @@ impl State4 {
     pub fn tx_lock_id(&self) -> bitcoin::Txid {
         self.tx_lock.txid()
     }
+
+    pub fn state6(&self) -> State6 {
+        State6 {
+            tx_lock_id: self.tx_lock.txid(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -643,5 +649,22 @@ impl State5 {
     }
     pub fn tx_lock_id(&self) -> bitcoin::Txid {
         self.tx_lock.txid()
+    }
+
+    pub fn state6(&self) -> State6 {
+        State6 {
+            tx_lock_id: self.tx_lock.txid(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub struct State6 {
+    pub tx_lock_id: Txid,
+}
+
+impl State6 {
+    pub fn tx_lock_id(&self) -> bitcoin::Txid {
+        self.tx_lock_id
     }
 }

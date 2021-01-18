@@ -130,7 +130,7 @@ mod tests {
             .await
             .expect("Failed to save second state");
 
-        let state_2 = Swap::Bob(Bob::Done(BobEndState::XmrRedeemed));
+        let state_2 = Swap::Bob(Bob::Done(BobEndState::SafelyAborted));
         let swap_id_2 = Uuid::new_v4();
         db.insert_latest_state(swap_id_2, state_2.clone())
             .await
@@ -186,7 +186,7 @@ mod tests {
             .await
             .expect("Failed to save second state");
 
-        let state_2 = Swap::Bob(Bob::Done(BobEndState::BtcPunished));
+        let state_2 = Swap::Bob(Bob::Done(BobEndState::SafelyAborted));
         let swap_id_2 = Uuid::new_v4();
         db.insert_latest_state(swap_id_2, state_2.clone())
             .await

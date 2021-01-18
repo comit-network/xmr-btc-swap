@@ -45,13 +45,6 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         let bob = bob_harness.recover_bob_from_db().await;
         assert!(matches!(bob.state, BobState::BtcLocked {..}));
 
-        // TODO: make lock-tx-id available in final states
-        let lock_tx_id = if let BobState::BtcLocked(state3) = bob_state {
-            state3.tx_lock_id()
-        } else {
-            panic!("Bob in unexpected state");
-        };
-
         let bob_state = bob::swap(
             bob.state,
             bob.event_loop_handle,
@@ -64,7 +57,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         .await
         .unwrap();
 
-        bob_harness.assert_punished(bob_state, lock_tx_id).await;
+        bob_harness.assert_punished(bob_state).await;
     })
     .await;
 }

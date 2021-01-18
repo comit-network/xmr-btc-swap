@@ -33,9 +33,9 @@ pub enum Bob {
 #[derive(Clone, strum::Display, Debug, Deserialize, Serialize, PartialEq)]
 pub enum BobEndState {
     SafelyAborted,
-    XmrRedeemed,
+    XmrRedeemed(Box<bob::State6>),
     BtcRefunded(Box<bob::State4>),
-    BtcPunished,
+    BtcPunished(Box<bob::State6>),
 }
 
 impl From<BobState> for Bob {
@@ -50,8 +50,8 @@ impl From<BobState> for Bob {
             BobState::CancelTimelockExpired(state4) => Bob::CancelTimelockExpired(state4),
             BobState::BtcCancelled(state4) => Bob::BtcCancelled(state4),
             BobState::BtcRefunded(state4) => Bob::Done(BobEndState::BtcRefunded(Box::new(state4))),
-            BobState::XmrRedeemed => Bob::Done(BobEndState::XmrRedeemed),
-            BobState::BtcPunished => Bob::Done(BobEndState::BtcPunished),
+            BobState::XmrRedeemed(state6) => Bob::Done(BobEndState::XmrRedeemed(Box::new(state6))),
+            BobState::BtcPunished(state6) => Bob::Done(BobEndState::BtcPunished(Box::new(state6))),
             BobState::SafelyAborted => Bob::Done(BobEndState::SafelyAborted),
         }
     }
@@ -70,9 +70,9 @@ impl From<Bob> for BobState {
             Bob::BtcCancelled(state4) => BobState::BtcCancelled(state4),
             Bob::Done(end_state) => match end_state {
                 BobEndState::SafelyAborted => BobState::SafelyAborted,
-                BobEndState::XmrRedeemed => BobState::XmrRedeemed,
+                BobEndState::XmrRedeemed(state6) => BobState::XmrRedeemed(*state6),
                 BobEndState::BtcRefunded(state4) => BobState::BtcRefunded(*state4),
-                BobEndState::BtcPunished => BobState::BtcPunished,
+                BobEndState::BtcPunished(state6) => BobState::BtcPunished(*state6),
             },
         }
     }
