@@ -14,20 +14,16 @@
 #![allow(non_snake_case)]
 
 use crate::cli::{Command, Options, Resume};
-use anyhow::{bail, Context, Result};
-use libp2p::{core::Multiaddr, PeerId};
+use anyhow::{Context, Result};
 use prettytable::{row, Table};
-use rand::rngs::OsRng;
 use std::sync::Arc;
 use structopt::StructOpt;
 use swap::{
     bitcoin,
     config::Config,
-    database::{Database, Swap},
-    monero, network,
-    network::transport::build,
-    protocol::{alice, bob, bob::BobState},
-    seed::Seed,
+    database::Database,
+    monero,
+    protocol::{alice, bob, bob::BobSwapFactory},
     trace::init_tracing,
     StartingBalances, SwapAmounts,
 };
@@ -52,8 +48,6 @@ async fn main() -> Result<()> {
     );
     let data_dir = std::path::Path::new(opt.data_dir.as_str()).to_path_buf();
     let db_path = data_dir.join("database");
-
-    let db = Database::open(db_path.as_path()).context("Could not open database")?;
 
     let seed = swap::config::seed::Seed::from_file_or_generate(&data_dir)
         .expect("Could not retrieve/initialize seed")
@@ -83,6 +77,11 @@ async fn main() -> Result<()> {
 
             let swap_id = Uuid::new_v4();
 
+            info!(
+                "Swap sending {} and receiving {} starting with ID {}",
+                send_monero, receive_bitcoin, swap_id
+            );
+
             let alice_factory = alice::AliceSwapFactory::new(
                 seed,
                 config,
@@ -108,7 +107,12 @@ async fn main() -> Result<()> {
             send_bitcoin,
             receive_monero,
         } => {
-            let (bitcoin_wallet, monero_wallet, _) = setup_wallets(
+            let swap_amounts = SwapAmounts {
+                btc: send_bitcoin,
+                xmr: receive_monero,
+            };
+
+            let (bitcoin_wallet, monero_wallet, starting_balances) = setup_wallets(
                 bitcoind_url,
                 bitcoin_wallet_name.as_str(),
                 monero_wallet_rpc_url,
@@ -116,46 +120,35 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            let refund_address = bitcoin_wallet.new_address().await?;
-            let state0 = bob::state::State0::new(
-                &mut OsRng,
-                send_bitcoin,
-                receive_monero,
-                config.bitcoin_cancel_timelock,
-                config.bitcoin_punish_timelock,
-                refund_address,
-                config.monero_finality_confirmations,
-            );
-
-            let amounts = SwapAmounts {
-                btc: send_bitcoin,
-                xmr: receive_monero,
-            };
-
-            let bob_state = BobState::Started { state0, amounts };
-
             let swap_id = Uuid::new_v4();
+
             info!(
-                "Swap sending {} and receiving {} started with ID {}",
+                "Swap sending {} and receiving {} starting with ID {}",
                 send_bitcoin, receive_monero, swap_id
             );
 
-            bob_swap(
+            let bob_factory = BobSwapFactory::new(
+                seed,
+                db_path,
                 swap_id,
-                bob_state,
                 bitcoin_wallet,
                 monero_wallet,
-                db,
-                alice_peer_id,
+                config,
+                starting_balances,
                 alice_addr,
-                seed,
-            )
-            .await?;
+                alice_peer_id,
+            );
+            let (swap, event_loop) = bob_factory.new_swap_as_bob(swap_amounts).await?;
+
+            tokio::spawn(async move { event_loop.run().await });
+            bob::run(swap).await?;
         }
         Command::History => {
             let mut table = Table::new();
 
             table.add_row(row!["SWAP ID", "STATE"]);
+
+            let db = Database::open(db_path.as_path()).context("Could not open database")?;
 
             for (swap_id, state) in db.all()? {
                 table.add_row(row![swap_id, state]);
@@ -203,30 +196,29 @@ async fn main() -> Result<()> {
             alice_peer_id,
             alice_addr,
         }) => {
-            let db_state = if let Swap::Bob(db_state) = db.get_state(swap_id)? {
-                db_state
-            } else {
-                bail!("Swap {} is not buy xmr.", swap_id)
-            };
-
-            let (bitcoin_wallet, monero_wallet, _) = setup_wallets(
+            let (bitcoin_wallet, monero_wallet, starting_balances) = setup_wallets(
                 bitcoind_url,
                 bitcoin_wallet_name.as_str(),
                 monero_wallet_rpc_url,
                 config,
             )
             .await?;
-            bob_swap(
+
+            let bob_factory = BobSwapFactory::new(
+                seed,
+                db_path,
                 swap_id,
-                db_state.into(),
                 bitcoin_wallet,
                 monero_wallet,
-                db,
-                alice_peer_id,
+                config,
+                starting_balances,
                 alice_addr,
-                seed,
-            )
-            .await?;
+                alice_peer_id,
+            );
+            let (swap, event_loop) = bob_factory.recover_bob_from_db().await?;
+
+            tokio::spawn(async move { event_loop.run().await });
+            bob::run(swap).await?;
         }
     };
 
@@ -267,44 +259,4 @@ async fn setup_wallets(
     };
 
     Ok((bitcoin_wallet, monero_wallet, starting_balances))
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn bob_swap(
-    swap_id: Uuid,
-    state: BobState,
-    bitcoin_wallet: Arc<swap::bitcoin::Wallet>,
-    monero_wallet: Arc<swap::monero::Wallet>,
-    db: Database,
-    alice_peer_id: PeerId,
-    alice_addr: Multiaddr,
-    seed: Seed,
-) -> Result<BobState> {
-    let identity = network::Seed::new(seed).derive_libp2p_identity();
-    let peer_id = identity.public().into_peer_id();
-
-    let bob_behaviour = bob::Behaviour::default();
-    let bob_transport = build(identity)?;
-
-    let (event_loop, handle) = bob::event_loop::EventLoop::new(
-        bob_transport,
-        bob_behaviour,
-        peer_id,
-        alice_peer_id,
-        alice_addr,
-    )?;
-
-    let swap = bob::Swap {
-        state,
-        event_loop_handle: handle,
-        db,
-        bitcoin_wallet,
-        monero_wallet,
-        swap_id,
-    };
-
-    let swap = bob::swap::run(swap);
-
-    tokio::spawn(event_loop.run());
-    swap.await
 }
