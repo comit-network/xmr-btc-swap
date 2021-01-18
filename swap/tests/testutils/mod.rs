@@ -363,10 +363,23 @@ impl BobHarness {
     }
 
     pub async fn assert_redeemed(&self, state: BobState) {
-        assert!(matches!(state, BobState::XmrRedeemed));
+        let lock_tx_id = if let BobState::XmrRedeemed { tx_lock_id } = state {
+            tx_lock_id
+        } else {
+            panic!("Bob in unexpected state");
+        };
+
+        let lock_tx_bitcoin_fee = self
+            .bitcoin_wallet
+            .transaction_fee(lock_tx_id)
+            .await
+            .unwrap();
 
         let btc_balance_after_swap = self.bitcoin_wallet.as_ref().balance().await.unwrap();
-        assert!(btc_balance_after_swap <= self.starting_balances.btc - self.swap_amounts.btc);
+        assert_eq!(
+            btc_balance_after_swap,
+            self.starting_balances.btc - self.swap_amounts.btc - lock_tx_bitcoin_fee
+        );
 
         // Ensure that Bob's balance is refreshed as we use a newly created wallet
         self.monero_wallet.as_ref().inner.refresh().await.unwrap();
@@ -409,8 +422,12 @@ impl BobHarness {
         assert_eq!(xmr_balance_after_swap, self.starting_balances.xmr);
     }
 
-    pub async fn assert_punished(&self, state: BobState, lock_tx_id: ::bitcoin::Txid) {
-        assert!(matches!(state, BobState::BtcPunished));
+    pub async fn assert_punished(&self, state: BobState) {
+        let lock_tx_id = if let BobState::BtcPunished { tx_lock_id } = state {
+            tx_lock_id
+        } else {
+            panic!("Bob in unexpected state");
+        };
 
         let lock_tx_bitcoin_fee = self
             .bitcoin_wallet

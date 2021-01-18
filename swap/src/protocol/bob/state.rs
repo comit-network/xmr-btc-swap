@@ -35,8 +35,12 @@ pub enum BobState {
     CancelTimelockExpired(State4),
     BtcCancelled(State4),
     BtcRefunded(State4),
-    XmrRedeemed,
-    BtcPunished,
+    XmrRedeemed {
+        tx_lock_id: bitcoin::Txid,
+    },
+    BtcPunished {
+        tx_lock_id: bitcoin::Txid,
+    },
     SafelyAborted,
 }
 
@@ -52,8 +56,8 @@ impl fmt::Display for BobState {
             BobState::CancelTimelockExpired(..) => write!(f, "cancel timelock is expired"),
             BobState::BtcCancelled(..) => write!(f, "btc is cancelled"),
             BobState::BtcRefunded(..) => write!(f, "btc is refunded"),
-            BobState::XmrRedeemed => write!(f, "xmr is redeemed"),
-            BobState::BtcPunished => write!(f, "btc is punished"),
+            BobState::XmrRedeemed { .. } => write!(f, "xmr is redeemed"),
+            BobState::BtcPunished { .. } => write!(f, "btc is punished"),
             BobState::SafelyAborted => write!(f, "safely aborted"),
         }
     }

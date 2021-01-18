@@ -45,8 +45,8 @@ pub fn is_complete(state: &BobState) -> bool {
     matches!(
         state,
         BobState::BtcRefunded(..)
-            | BobState::XmrRedeemed
-            | BobState::BtcPunished
+            | BobState::XmrRedeemed { .. }
+            | BobState::BtcPunished { .. }
             | BobState::SafelyAborted
     )
 }
@@ -277,7 +277,9 @@ where
                 // Bob redeems XMR using revealed s_a
                 state.claim_xmr(monero_wallet.as_ref()).await?;
 
-                let state = BobState::XmrRedeemed;
+                let state = BobState::XmrRedeemed {
+                    tx_lock_id: state.tx_lock_id(),
+                };
                 let db_state = state.clone().into();
                 db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
                 run_until(
@@ -327,7 +329,9 @@ where
                         state.refund_btc(bitcoin_wallet.as_ref()).await?;
                         BobState::BtcRefunded(state)
                     }
-                    ExpiredTimelocks::Punish => BobState::BtcPunished,
+                    ExpiredTimelocks::Punish => BobState::BtcPunished {
+                        tx_lock_id: state.tx_lock_id(),
+                    },
                 };
 
                 let db_state = state.clone().into();
@@ -345,9 +349,9 @@ where
                 .await
             }
             BobState::BtcRefunded(state4) => Ok(BobState::BtcRefunded(state4)),
-            BobState::BtcPunished => Ok(BobState::BtcPunished),
+            BobState::BtcPunished { tx_lock_id } => Ok(BobState::BtcPunished { tx_lock_id }),
             BobState::SafelyAborted => Ok(BobState::SafelyAborted),
-            BobState::XmrRedeemed => Ok(BobState::XmrRedeemed),
+            BobState::XmrRedeemed { tx_lock_id } => Ok(BobState::XmrRedeemed { tx_lock_id }),
         }
     }
 }
