@@ -210,8 +210,6 @@ pub async fn run_until(
                 .await
             }
             AliceState::XmrLocked { state3 } => {
-                // todo: match statement and wait for cancel timelock to expire can probably be
-                // expressed more cleanly
                 let state = match state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {
                     ExpiredTimelocks::None => {
                         let wait_for_enc_sig =
