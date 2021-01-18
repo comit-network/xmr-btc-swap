@@ -23,7 +23,7 @@ use swap::{
     config::Config,
     database::Database,
     monero,
-    protocol::{alice, bob, bob::BobSwapFactory},
+    protocol::{alice, bob, bob::SwapFactory},
     trace::init_tracing,
     StartingBalances, SwapAmounts,
 };
@@ -82,7 +82,7 @@ async fn main() -> Result<()> {
                 send_monero, receive_bitcoin, swap_id
             );
 
-            let alice_factory = alice::AliceSwapFactory::new(
+            let alice_factory = alice::SwapFactory::new(
                 seed,
                 config,
                 swap_id,
@@ -127,7 +127,7 @@ async fn main() -> Result<()> {
                 send_bitcoin, receive_monero, swap_id
             );
 
-            let bob_factory = BobSwapFactory::new(
+            let bob_factory = SwapFactory::new(
                 seed,
                 db_path,
                 swap_id,
@@ -172,7 +172,7 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            let alice_factory = alice::AliceSwapFactory::new(
+            let alice_factory = alice::SwapFactory::new(
                 seed,
                 config,
                 swap_id,
@@ -204,7 +204,7 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            let bob_factory = BobSwapFactory::new(
+            let bob_factory = SwapFactory::new(
                 seed,
                 db_path,
                 swap_id,

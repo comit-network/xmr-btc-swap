@@ -47,23 +47,22 @@ pub struct Swap {
     pub swap_id: Uuid,
 }
 
-pub struct BobSwapFactory {
+pub struct SwapFactory {
+    swap_id: Uuid,
     identity: Keypair,
     peer_id: PeerId,
-
     db_path: PathBuf,
-    swap_id: Uuid,
-
-    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
-    pub monero_wallet: Arc<monero::Wallet>,
     config: Config,
-    pub starting_balances: StartingBalances,
 
     alice_connect_address: Multiaddr,
     alice_connect_peer_id: PeerId,
+
+    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
+    pub monero_wallet: Arc<monero::Wallet>,
+    pub starting_balances: StartingBalances,
 }
 
-impl BobSwapFactory {
+impl SwapFactory {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         seed: Seed,
@@ -80,16 +79,16 @@ impl BobSwapFactory {
         let peer_id = identity.public().into_peer_id();
 
         Self {
+            swap_id,
             identity,
             peer_id,
             db_path,
-            swap_id,
-            bitcoin_wallet,
-            monero_wallet,
             config,
-            starting_balances,
             alice_connect_address,
             alice_connect_peer_id,
+            bitcoin_wallet,
+            monero_wallet,
+            starting_balances,
         }
     }
 

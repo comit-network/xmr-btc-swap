@@ -50,21 +50,21 @@ pub struct Swap {
     pub db: Database,
 }
 
-pub struct AliceSwapFactory {
-    listen_address: Multiaddr,
+pub struct SwapFactory {
+    swap_id: Uuid,
     identity: Keypair,
     peer_id: PeerId,
-
     db_path: PathBuf,
-    swap_id: Uuid,
+    config: Config,
+
+    listen_address: Multiaddr,
 
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
-    config: Config,
     pub starting_balances: StartingBalances,
 }
 
-impl AliceSwapFactory {
+impl SwapFactory {
     #[allow(clippy::too_many_arguments)]
     pub async fn new(
         seed: Seed,
@@ -81,14 +81,14 @@ impl AliceSwapFactory {
         let peer_id = PeerId::from(identity.public());
 
         Self {
-            listen_address,
+            swap_id,
             identity,
             peer_id,
             db_path,
-            swap_id,
+            config,
+            listen_address,
             bitcoin_wallet,
             monero_wallet,
-            config,
             starting_balances,
         }
     }

@@ -9,12 +9,7 @@ use swap::{
     bitcoin,
     config::Config,
     monero,
-    protocol::{
-        alice,
-        alice::{AliceState, AliceSwapFactory},
-        bob,
-        bob::{BobState, BobSwapFactory},
-    },
+    protocol::{alice, alice::AliceState, bob, bob::BobState},
     seed::Seed,
     StartingBalances, SwapAmounts,
 };
@@ -27,8 +22,8 @@ use uuid::Uuid;
 pub struct Test {
     swap_amounts: SwapAmounts,
 
-    alice_swap_factory: AliceSwapFactory,
-    bob_swap_factory: BobSwapFactory,
+    alice_swap_factory: alice::SwapFactory,
+    bob_swap_factory: bob::SwapFactory,
 }
 
 impl Test {
@@ -344,7 +339,7 @@ where
     )
     .await;
 
-    let alice_swap_factory = AliceSwapFactory::new(
+    let alice_swap_factory = alice::SwapFactory::new(
         Seed::random().unwrap(),
         config,
         Uuid::new_v4(),
@@ -370,7 +365,7 @@ where
     )
     .await;
 
-    let bob_swap_factory = BobSwapFactory::new(
+    let bob_swap_factory = bob::SwapFactory::new(
         Seed::random().unwrap(),
         tempdir().unwrap().path().to_path_buf(),
         Uuid::new_v4(),
