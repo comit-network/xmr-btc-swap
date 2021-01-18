@@ -206,8 +206,6 @@ fn init_alice_event_loop(
     EventLoop::new(alice_transport, alice_behaviour, listen, peer_id)
 }
 
-pub type Swarm = libp2p::Swarm<Behaviour>;
-
 #[derive(Debug)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),

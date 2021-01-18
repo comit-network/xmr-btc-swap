@@ -44,8 +44,6 @@ pub struct Swap {
     pub swap_id: Uuid,
 }
 
-pub type Swarm = libp2p::Swarm<Behaviour>;
-
 #[derive(Debug, Clone)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
