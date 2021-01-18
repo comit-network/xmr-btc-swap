@@ -330,11 +330,19 @@ async fn bob_swap(
     alice_addr: Multiaddr,
     seed: Seed,
 ) -> Result<BobState> {
-    let bob_behaviour = bob::Behaviour::new(network::Seed::new(seed));
-    let bob_transport = build(bob_behaviour.identity())?;
+    let identity = network::Seed::new(seed).derive_libp2p_identity();
+    let peer_id = identity.public().into_peer_id();
 
-    let (event_loop, handle) =
-        bob::event_loop::EventLoop::new(bob_transport, bob_behaviour, alice_peer_id, alice_addr)?;
+    let bob_behaviour = bob::Behaviour::default();
+    let bob_transport = build(identity)?;
+
+    let (event_loop, handle) = bob::event_loop::EventLoop::new(
+        bob_transport,
+        bob_behaviour,
+        peer_id,
+        alice_peer_id,
+        alice_addr,
+    )?;
 
     let swap = bob::Swap {
         state,

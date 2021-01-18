@@ -1,21 +1,13 @@
 //! Run an XMR/BTC swap in the role of Bob.
 //! Bob holds BTC and wishes receive XMR.
-use anyhow::Result;
-use libp2p::{
-    core::{identity::Keypair, Multiaddr},
-    NetworkBehaviour, PeerId,
-};
+use libp2p::{core::Multiaddr, NetworkBehaviour, PeerId};
 use tracing::{debug, info};
 
 use crate::{
     bitcoin,
     bitcoin::EncryptedSignature,
     monero,
-    network::{
-        peer_tracker::{self, PeerTracker},
-        transport::SwapTransport,
-        Seed, TokioExecutor,
-    },
+    network::peer_tracker::{self, PeerTracker},
     protocol::{alice, bob},
     SwapAmounts,
 };
@@ -53,20 +45,6 @@ pub struct Swap {
 }
 
 pub type Swarm = libp2p::Swarm<Behaviour>;
-
-pub fn new_swarm(transport: SwapTransport, behaviour: Behaviour) -> Result<Swarm> {
-    let local_peer_id = behaviour.peer_id();
-
-    let swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id.clone())
-        .executor(Box::new(TokioExecutor {
-            handle: tokio::runtime::Handle::current(),
-        }))
-        .build();
-
-    info!("Initialized swarm with identity {}", local_peer_id);
-
-    Ok(swarm)
-}
 
 #[derive(Debug, Clone)]
 pub enum OutEvent {
@@ -139,33 +117,9 @@ pub struct Behaviour {
     message1: message1::Behaviour,
     message2: message2::Behaviour,
     message3: message3::Behaviour,
-    #[behaviour(ignore)]
-    identity: Keypair,
 }
 
 impl Behaviour {
-    pub fn new(seed: Seed) -> Self {
-        let identity = seed.derive_libp2p_identity();
-
-        Self {
-            pt: PeerTracker::default(),
-            amounts: Amounts::default(),
-            message0: message0::Behaviour::default(),
-            message1: message1::Behaviour::default(),
-            message2: message2::Behaviour::default(),
-            message3: message3::Behaviour::default(),
-            identity,
-        }
-    }
-
-    pub fn identity(&self) -> Keypair {
-        self.identity.clone()
-    }
-
-    pub fn peer_id(&self) -> PeerId {
-        PeerId::from(self.identity.public())
-    }
-
     /// Sends a message to Alice to get current amounts based on `btc`.
     pub fn request_amounts(&mut self, alice: PeerId, btc: u64) {
         let btc = ::bitcoin::Amount::from_sat(btc);
@@ -206,8 +160,6 @@ impl Behaviour {
 
 impl Default for Behaviour {
     fn default() -> Behaviour {
-        let identity = Keypair::generate_ed25519();
-
         Self {
             pt: PeerTracker::default(),
             amounts: Amounts::default(),
@@ -215,7 +167,6 @@ impl Default for Behaviour {
             message1: message1::Behaviour::default(),
             message2: message2::Behaviour::default(),
             message3: message3::Behaviour::default(),
-            identity,
         }
     }
 }

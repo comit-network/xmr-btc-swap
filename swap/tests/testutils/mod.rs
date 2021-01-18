@@ -334,7 +334,10 @@ where
         btc: swap_amounts.btc * 10,
     };
 
+    let bob_seed = Seed::random().unwrap();
+
     let bob_swap_factory = BobSwapFactory::new(
+        bob_seed,
         config,
         Uuid::new_v4(),
         &monero,
@@ -475,6 +478,8 @@ impl AliceSwapFactory {
 }
 
 pub struct BobSwapFactory {
+    seed: Seed,
+
     db_path: PathBuf,
     swap_id: Uuid,
 
@@ -490,6 +495,7 @@ pub struct BobSwapFactory {
 impl BobSwapFactory {
     #[allow(clippy::too_many_arguments)]
     async fn new(
+        seed: Seed,
         config: Config,
         swap_id: Uuid,
         monero: &Monero,
@@ -504,6 +510,7 @@ impl BobSwapFactory {
             init_wallets("bob", bitcoind, monero, starting_balances.clone(), config).await;
 
         Self {
+            seed,
             db_path,
             swap_id,
             bitcoin_wallet,
@@ -525,6 +532,7 @@ impl BobSwapFactory {
         .await;
 
         let (event_loop, event_loop_handle) = init_bob_event_loop(
+            self.seed,
             self.alice_connect_peer_id.clone(),
             self.alice_connect_address.clone(),
         );
@@ -556,6 +564,7 @@ impl BobSwapFactory {
             };
 
         let (event_loop, event_loop_handle) = init_bob_event_loop(
+            self.seed,
             self.alice_connect_peer_id.clone(),
             self.alice_connect_address.clone(),
         );
@@ -701,14 +710,23 @@ async fn init_bob_state(
 }
 
 fn init_bob_event_loop(
+    seed: Seed,
     alice_peer_id: PeerId,
     alice_addr: Multiaddr,
 ) -> (bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle) {
-    let seed = Seed::random().unwrap();
-    let bob_behaviour = bob::Behaviour::new(network::Seed::new(seed));
-    let bob_transport = build(bob_behaviour.identity()).unwrap();
-    bob::event_loop::EventLoop::new(bob_transport, bob_behaviour, alice_peer_id, alice_addr)
-        .unwrap()
+    let identity = network::Seed::new(seed).derive_libp2p_identity();
+    let peer_id = identity.public().into_peer_id();
+
+    let bob_behaviour = bob::Behaviour::default();
+    let bob_transport = build(identity).unwrap();
+    bob::event_loop::EventLoop::new(
+        bob_transport,
+        bob_behaviour,
+        peer_id,
+        alice_peer_id,
+        alice_addr,
+    )
+    .unwrap()
 }
 
 // This is just to keep the containers alive
