@@ -24,14 +24,14 @@ type OutboundProtocolFn<O, E> =
     Box<dyn FnOnce(OutboundSubstream) -> Protocol<O, E> + Send + 'static>;
 
 enum InboundProtocolState<T, E> {
-    PendingSubstream(InboundProtocolFn<T, E>),
-    PendingProtocolFn(InboundSubstream),
+    GotFunctionNeedSubstream(InboundProtocolFn<T, E>),
+    GotSubstreamNeedFunction(InboundSubstream),
     Executing(Protocol<T, E>),
 }
 
 enum OutboundProtocolState<T, E> {
-    PendingSubstream(OutboundProtocolFn<T, E>),
-    PendingProtocolFn(OutboundSubstream),
+    GotFunctionNeedSubstream(OutboundProtocolFn<T, E>),
+    GotSubstreamNeedFunction(OutboundSubstream),
     Executing(Protocol<T, E>),
 }
 
@@ -145,10 +145,11 @@ where
     ) {
         match mem::replace(&mut self.state, ProtocolState::Poisoned) {
             ProtocolState::None => {
-                self.state =
-                    ProtocolState::Inbound(InboundProtocolState::PendingProtocolFn(substream));
+                self.state = ProtocolState::Inbound(
+                    InboundProtocolState::GotSubstreamNeedFunction(substream),
+                );
             }
-            ProtocolState::Inbound(InboundProtocolState::PendingSubstream(protocol_fn)) => {
+            ProtocolState::Inbound(InboundProtocolState::GotFunctionNeedSubstream(protocol_fn)) => {
                 self.state =
                     ProtocolState::Inbound(InboundProtocolState::Executing(protocol_fn(substream)));
             }
@@ -171,10 +172,13 @@ where
     ) {
         match mem::replace(&mut self.state, ProtocolState::Poisoned) {
             ProtocolState::None => {
-                self.state =
-                    ProtocolState::Outbound(OutboundProtocolState::PendingProtocolFn(substream));
+                self.state = ProtocolState::Outbound(
+                    OutboundProtocolState::GotSubstreamNeedFunction(substream),
+                );
             }
-            ProtocolState::Outbound(OutboundProtocolState::PendingSubstream(protocol_fn)) => {
+            ProtocolState::Outbound(OutboundProtocolState::GotFunctionNeedSubstream(
+                protocol_fn,
+            )) => {
                 self.state = ProtocolState::Outbound(OutboundProtocolState::Executing(
                     protocol_fn(substream),
                 ));
@@ -197,10 +201,12 @@ where
                 match mem::replace(&mut self.state, ProtocolState::Poisoned) {
                     ProtocolState::None => {
                         self.state = ProtocolState::Inbound(
-                            InboundProtocolState::PendingSubstream(protocol_fn),
+                            InboundProtocolState::GotFunctionNeedSubstream(protocol_fn),
                         );
                     }
-                    ProtocolState::Inbound(InboundProtocolState::PendingProtocolFn(substream)) => {
+                    ProtocolState::Inbound(InboundProtocolState::GotSubstreamNeedFunction(
+                        substream,
+                    )) => {
                         self.state = ProtocolState::Inbound(InboundProtocolState::Executing(
                             protocol_fn(substream),
                         ));
@@ -223,10 +229,10 @@ where
                 match mem::replace(&mut self.state, ProtocolState::Poisoned) {
                     ProtocolState::None => {
                         self.state = ProtocolState::Outbound(
-                            OutboundProtocolState::PendingSubstream(protocol_fn),
+                            OutboundProtocolState::GotFunctionNeedSubstream(protocol_fn),
                         );
                     }
-                    ProtocolState::Outbound(OutboundProtocolState::PendingProtocolFn(
+                    ProtocolState::Outbound(OutboundProtocolState::GotSubstreamNeedFunction(
                         substream,
                     )) => {
                         self.state = ProtocolState::Outbound(OutboundProtocolState::Executing(
