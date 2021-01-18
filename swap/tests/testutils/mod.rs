@@ -363,8 +363,8 @@ impl BobHarness {
     }
 
     pub async fn assert_redeemed(&self, state: BobState) {
-        let lock_tx_id = if let BobState::XmrRedeemed(state6) = state {
-            state6.tx_lock_id()
+        let lock_tx_id = if let BobState::XmrRedeemed { tx_lock_id } = state {
+            tx_lock_id
         } else {
             panic!("Bob in unexpected state");
         };
@@ -423,8 +423,8 @@ impl BobHarness {
     }
 
     pub async fn assert_punished(&self, state: BobState) {
-        let lock_tx_id = if let BobState::BtcPunished(state6) = state {
-            state6.tx_lock_id()
+        let lock_tx_id = if let BobState::BtcPunished { tx_lock_id } = state {
+            tx_lock_id
         } else {
             panic!("Bob in unexpected state");
         };
