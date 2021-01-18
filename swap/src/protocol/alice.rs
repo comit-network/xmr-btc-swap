@@ -1,11 +1,6 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use anyhow::Result;
-use libp2p::{
-    core::{identity::Keypair, Multiaddr},
-    request_response::ResponseChannel,
-    NetworkBehaviour, PeerId,
-};
+use libp2p::{request_response::ResponseChannel, NetworkBehaviour, PeerId};
 use tracing::{debug, info};
 
 use crate::{
@@ -13,8 +8,6 @@ use crate::{
     network::{
         peer_tracker::{self, PeerTracker},
         request_response::AliceToBob,
-        transport::SwapTransport,
-        Seed, TokioExecutor,
     },
     protocol::bob,
     SwapAmounts,
@@ -54,29 +47,6 @@ pub struct Swap {
 }
 
 pub type Swarm = libp2p::Swarm<Behaviour>;
-
-pub fn new_swarm(
-    listen: Multiaddr,
-    transport: SwapTransport,
-    behaviour: Behaviour,
-) -> Result<Swarm> {
-    use anyhow::Context as _;
-
-    let local_peer_id = behaviour.peer_id();
-
-    let mut swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id.clone())
-        .executor(Box::new(TokioExecutor {
-            handle: tokio::runtime::Handle::current(),
-        }))
-        .build();
-
-    Swarm::listen_on(&mut swarm, listen.clone())
-        .with_context(|| format!("Address is not supported: {:#}", listen))?;
-
-    tracing::info!("Initialized swarm: {}", local_peer_id);
-
-    Ok(swarm)
-}
 
 #[derive(Debug)]
 pub enum OutEvent {
@@ -162,33 +132,9 @@ pub struct Behaviour {
     message1: message1::Behaviour,
     message2: message2::Behaviour,
     message3: message3::Behaviour,
-    #[behaviour(ignore)]
-    identity: Keypair,
 }
 
 impl Behaviour {
-    pub fn new(seed: Seed) -> Self {
-        let identity = seed.derive_libp2p_identity();
-
-        Self {
-            pt: PeerTracker::default(),
-            amounts: Amounts::default(),
-            message0: message0::Behaviour::default(),
-            message1: message1::Behaviour::default(),
-            message2: message2::Behaviour::default(),
-            message3: message3::Behaviour::default(),
-            identity,
-        }
-    }
-
-    pub fn identity(&self) -> Keypair {
-        self.identity.clone()
-    }
-
-    pub fn peer_id(&self) -> PeerId {
-        PeerId::from(self.identity.public())
-    }
-
     /// Alice always sends her messages as a response to a request from Bob.
     pub fn send_amounts(&mut self, channel: ResponseChannel<AliceToBob>, amounts: SwapAmounts) {
         let msg = AliceToBob::Amounts(amounts);
@@ -212,5 +158,18 @@ impl Behaviour {
     pub fn send_message2(&mut self, channel: ResponseChannel<AliceToBob>, msg: Message2) {
         self.message2.send(channel, msg);
         debug!("Sent Message2");
+    }
+}
+
+impl Default for Behaviour {
+    fn default() -> Self {
+        Self {
+            pt: PeerTracker::default(),
+            amounts: Amounts::default(),
+            message0: message0::Behaviour::default(),
+            message1: message1::Behaviour::default(),
+            message2: message2::Behaviour::default(),
+            message3: message3::Behaviour::default(),
+        }
     }
 }

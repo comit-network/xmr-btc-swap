@@ -666,9 +666,13 @@ fn init_alice_event_loop(
     alice::event_loop::EventLoop,
     alice::event_loop::EventLoopHandle,
 ) {
-    let alice_behaviour = alice::Behaviour::new(network::Seed::new(seed));
-    let alice_transport = build(alice_behaviour.identity()).unwrap();
-    alice::event_loop::EventLoop::new(alice_transport, alice_behaviour, listen).unwrap()
+    let identity = network::Seed::new(seed).derive_libp2p_identity();
+
+    let peer_id = identity.public().into_peer_id();
+
+    let alice_behaviour = alice::Behaviour::default();
+    let alice_transport = build(identity).unwrap();
+    alice::event_loop::EventLoop::new(alice_transport, alice_behaviour, listen, peer_id).unwrap()
 }
 
 async fn init_bob_state(

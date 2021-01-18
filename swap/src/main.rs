@@ -292,13 +292,16 @@ async fn alice_swap(
     db: Database,
     seed: Seed,
 ) -> Result<AliceState> {
-    let alice_behaviour = alice::Behaviour::new(network::Seed::new(seed));
-    let alice_peer_id = alice_behaviour.peer_id();
-    info!("Own Peer-ID: {}", alice_peer_id);
-    let alice_transport = build(alice_behaviour.identity())?;
+    let identity = network::Seed::new(seed).derive_libp2p_identity();
+
+    let peer_id = identity.public().into_peer_id();
+
+    let alice_behaviour = alice::Behaviour::default();
+    info!("Own Peer-ID: {}", peer_id);
+    let alice_transport = build(identity)?;
 
     let (mut event_loop, handle) =
-        alice::event_loop::EventLoop::new(alice_transport, alice_behaviour, listen_addr)?;
+        alice::event_loop::EventLoop::new(alice_transport, alice_behaviour, listen_addr, peer_id)?;
 
     let swap = alice::Swap {
         state,
