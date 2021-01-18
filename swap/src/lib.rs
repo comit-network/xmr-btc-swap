@@ -56,6 +56,12 @@ pub struct SwapAmounts {
     pub xmr: monero::Amount,
 }
 
+#[derive(Debug, Clone)]
+pub struct StartingBalances {
+    pub xmr: monero::Amount,
+    pub btc: bitcoin::Amount,
+}
+
 // TODO: Display in XMR and BTC (not picos and sats).
 impl Display for SwapAmounts {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

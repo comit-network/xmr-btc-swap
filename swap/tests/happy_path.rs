@@ -7,7 +7,7 @@ pub mod testutils;
 
 #[tokio::test]
 async fn happy_path() {
-    testutils::init(|test| async move {
+    testutils::setup_test(|test| async move {
         let alice_swap = test.new_swap_as_alice().await;
         let bob_swap = test.new_swap_as_bob().await;
 
