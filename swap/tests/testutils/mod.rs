@@ -76,6 +76,18 @@ impl AliceHarness {
         assert!(xmr_balance_after_swap <= self.starting_balances.xmr - self.swap_amounts.xmr);
     }
 
+    pub async fn assert_refunded(&self, state: AliceState) {
+        assert!(matches!(state, AliceState::XmrRefunded));
+
+        let btc_balance_after_swap = self.bitcoin_wallet.as_ref().balance().await.unwrap();
+        assert_eq!(btc_balance_after_swap, self.starting_balances.btc);
+
+        // Ensure that Alice's balance is refreshed as we use a newly created wallet
+        self.monero_wallet.as_ref().inner.refresh().await.unwrap();
+        let xmr_balance_after_swap = self.monero_wallet.as_ref().get_balance().await.unwrap();
+        assert_eq!(xmr_balance_after_swap, self.swap_amounts.xmr);
+    }
+
     pub async fn assert_punished(&self, state: AliceState) {
         assert!(matches!(state, AliceState::BtcPunished));
 
@@ -319,11 +331,41 @@ impl BobHarness {
         );
     }
 
+    pub async fn assert_refunded(&self, state: BobState) {
+        let lock_tx_id = if let BobState::BtcRefunded(state4) = state {
+            state4.tx_lock_id()
+        } else {
+            panic!("Bob in unexpected state");
+        };
+        let lock_tx_bitcoin_fee = self
+            .bitcoin_wallet
+            .transaction_fee(lock_tx_id)
+            .await
+            .unwrap();
+
+        let btc_balance_after_swap = self.bitcoin_wallet.as_ref().balance().await.unwrap();
+
+        let alice_submitted_cancel = btc_balance_after_swap
+            == self.starting_balances.btc
+                - lock_tx_bitcoin_fee
+                - bitcoin::Amount::from_sat(bitcoin::TX_FEE);
+
+        let bob_submitted_cancel = btc_balance_after_swap
+            == self.starting_balances.btc
+                - lock_tx_bitcoin_fee
+                - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE);
+
+        // The cancel tx can be submitted by both Alice and Bob.
+        // Since we cannot be sure who submitted it we have to assert accordingly
+        assert!(alice_submitted_cancel || bob_submitted_cancel);
+
+        let xmr_balance_after_swap = self.monero_wallet.as_ref().get_balance().await.unwrap();
+        assert_eq!(xmr_balance_after_swap, self.starting_balances.xmr);
+    }
+
     pub async fn assert_punished(&self, state: BobState, lock_tx_id: ::bitcoin::Txid) {
         assert!(matches!(state, BobState::BtcPunished));
 
-        // lock_tx_bitcoin_fee is determined by the wallet, it is not necessarily equal
-        // to TX_FEE
         let lock_tx_bitcoin_fee = self
             .bitcoin_wallet
             .transaction_fee(lock_tx_id)
