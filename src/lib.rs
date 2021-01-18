@@ -26,13 +26,13 @@ type OutboundProtocolFn<O, E> =
 enum InboundProtocolState<T, E> {
     PendingSubstream(InboundProtocolFn<T, E>),
     PendingProtocolFn(InboundSubstream),
-    ReadyToPoll(Protocol<T, E>),
+    Executing(Protocol<T, E>),
 }
 
 enum OutboundProtocolState<T, E> {
     PendingSubstream(OutboundProtocolFn<T, E>),
     PendingProtocolFn(OutboundSubstream),
-    ReadyToPoll(Protocol<T, E>),
+    Executing(Protocol<T, E>),
 }
 
 enum ProtocolState<I, O, E> {
@@ -149,9 +149,8 @@ where
                     ProtocolState::Inbound(InboundProtocolState::PendingProtocolFn(substream));
             }
             ProtocolState::Inbound(InboundProtocolState::PendingSubstream(protocol_fn)) => {
-                self.state = ProtocolState::Inbound(InboundProtocolState::ReadyToPoll(
-                    protocol_fn(substream),
-                ));
+                self.state =
+                    ProtocolState::Inbound(InboundProtocolState::Executing(protocol_fn(substream)));
             }
             ProtocolState::Inbound(_) | ProtocolState::Done => {
                 panic!("Illegal state, substream is already present.");
@@ -176,7 +175,7 @@ where
                     ProtocolState::Outbound(OutboundProtocolState::PendingProtocolFn(substream));
             }
             ProtocolState::Outbound(OutboundProtocolState::PendingSubstream(protocol_fn)) => {
-                self.state = ProtocolState::Outbound(OutboundProtocolState::ReadyToPoll(
+                self.state = ProtocolState::Outbound(OutboundProtocolState::Executing(
                     protocol_fn(substream),
                 ));
             }
@@ -202,7 +201,7 @@ where
                         );
                     }
                     ProtocolState::Inbound(InboundProtocolState::PendingProtocolFn(substream)) => {
-                        self.state = ProtocolState::Inbound(InboundProtocolState::ReadyToPoll(
+                        self.state = ProtocolState::Inbound(InboundProtocolState::Executing(
                             protocol_fn(substream),
                         ));
                     }
@@ -230,7 +229,7 @@ where
                     ProtocolState::Outbound(OutboundProtocolState::PendingProtocolFn(
                         substream,
                     )) => {
-                        self.state = ProtocolState::Outbound(OutboundProtocolState::ReadyToPoll(
+                        self.state = ProtocolState::Outbound(OutboundProtocolState::Executing(
                             protocol_fn(substream),
                         ));
                     }
@@ -276,28 +275,27 @@ where
         }
 
         match mem::replace(&mut self.state, ProtocolState::Poisoned) {
-            ProtocolState::Inbound(InboundProtocolState::ReadyToPoll(mut protocol)) => {
-                match protocol.poll_unpin(cx) {
-                    Poll::Ready(Ok(value)) => {
-                        self.state = ProtocolState::Done;
-                        Poll::Ready(ProtocolsHandlerEvent::Custom(
-                            ProtocolOutEvent::InboundFinished(value),
-                        ))
-                    }
-                    Poll::Ready(Err(e)) => {
-                        self.state = ProtocolState::Done;
-                        Poll::Ready(ProtocolsHandlerEvent::Custom(
-                            ProtocolOutEvent::InboundFailed(e),
-                        ))
-                    }
-                    Poll::Pending => {
-                        self.state =
-                            ProtocolState::Inbound(InboundProtocolState::ReadyToPoll(protocol));
-                        Poll::Pending
-                    }
+            ProtocolState::Inbound(InboundProtocolState::Executing(mut protocol)) => match protocol
+                .poll_unpin(cx)
+            {
+                Poll::Ready(Ok(value)) => {
+                    self.state = ProtocolState::Done;
+                    Poll::Ready(ProtocolsHandlerEvent::Custom(
+                        ProtocolOutEvent::InboundFinished(value),
+                    ))
                 }
-            }
-            ProtocolState::Outbound(OutboundProtocolState::ReadyToPoll(mut protocol)) => {
+                Poll::Ready(Err(e)) => {
+                    self.state = ProtocolState::Done;
+                    Poll::Ready(ProtocolsHandlerEvent::Custom(
+                        ProtocolOutEvent::InboundFailed(e),
+                    ))
+                }
+                Poll::Pending => {
+                    self.state = ProtocolState::Inbound(InboundProtocolState::Executing(protocol));
+                    Poll::Pending
+                }
+            },
+            ProtocolState::Outbound(OutboundProtocolState::Executing(mut protocol)) => {
                 match protocol.poll_unpin(cx) {
                     Poll::Ready(Ok(value)) => {
                         self.state = ProtocolState::Done;
@@ -313,7 +311,7 @@ where
                     }
                     Poll::Pending => {
                         self.state =
-                            ProtocolState::Outbound(OutboundProtocolState::ReadyToPoll(protocol));
+                            ProtocolState::Outbound(OutboundProtocolState::Executing(protocol));
                         Poll::Pending
                     }
                 }
