@@ -72,7 +72,7 @@ pub async fn run_until(
     swap: alice::Swap,
     is_target_state: fn(&AliceState) -> bool,
 ) -> Result<AliceState> {
-    do_run_until(
+    run_until_internal(
         swap.state,
         is_target_state,
         swap.event_loop_handle,
@@ -88,7 +88,7 @@ pub async fn run_until(
 // State machine driver for swap execution
 #[async_recursion]
 #[allow(clippy::too_many_arguments)]
-async fn do_run_until(
+async fn run_until_internal(
     state: AliceState,
     is_target_state: fn(&AliceState) -> bool,
     mut event_loop_handle: EventLoopHandle,
@@ -116,7 +116,7 @@ async fn do_run_until(
                 let db_state = (&state).into();
                 db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                     .await?;
-                do_run_until(
+                run_until_internal(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -159,7 +159,7 @@ async fn do_run_until(
                 let db_state = (&state).into();
                 db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                     .await?;
-                do_run_until(
+                run_until_internal(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -200,7 +200,7 @@ async fn do_run_until(
                 let db_state = (&state).into();
                 db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                     .await?;
-                do_run_until(
+                run_until_internal(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -238,7 +238,7 @@ async fn do_run_until(
                 let db_state = (&state).into();
                 db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                     .await?;
-                do_run_until(
+                run_until_internal(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -276,7 +276,7 @@ async fn do_run_until(
                         let db_state = (&state).into();
                         db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                             .await?;
-                        return do_run_until(
+                        return run_until_internal(
                             state,
                             is_target_state,
                             event_loop_handle,
@@ -304,7 +304,7 @@ async fn do_run_until(
                 let db_state = (&state).into();
                 db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                     .await?;
-                do_run_until(
+                run_until_internal(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -331,7 +331,7 @@ async fn do_run_until(
                 let db_state = (&state).into();
                 db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                     .await?;
-                do_run_until(
+                run_until_internal(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -365,7 +365,7 @@ async fn do_run_until(
                         db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                             .await?;
 
-                        do_run_until(
+                        run_until_internal(
                             state,
                             is_target_state,
                             event_loop_handle,
@@ -390,7 +390,7 @@ async fn do_run_until(
                         let db_state = (&state).into();
                         db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                             .await?;
-                        do_run_until(
+                        run_until_internal(
                             state,
                             is_target_state,
                             event_loop_handle,
@@ -445,7 +445,7 @@ async fn do_run_until(
                         let db_state = (&state).into();
                         db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                             .await?;
-                        do_run_until(
+                        run_until_internal(
                             state,
                             is_target_state,
                             event_loop_handle,
@@ -469,7 +469,7 @@ async fn do_run_until(
                         let db_state = (&state).into();
                         db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                             .await?;
-                        do_run_until(
+                        run_until_internal(
                             state,
                             is_target_state,
                             event_loop_handle,
