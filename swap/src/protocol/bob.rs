@@ -88,7 +88,7 @@ impl SwapFactory {
         }
     }
 
-    pub async fn new_swap_as_bob(
+    pub async fn new_swap(
         &self,
         swap_amounts: SwapAmounts,
         config: Config,

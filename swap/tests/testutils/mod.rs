@@ -42,7 +42,7 @@ impl TestContext {
     pub async fn new_swap_as_bob(&self) -> bob::Swap {
         let (swap, event_loop) = self
             .bob_swap_factory
-            .new_swap_as_bob(self.swap_amounts, Config::regtest())
+            .new_swap(self.swap_amounts, Config::regtest())
             .await
             .unwrap();
 
