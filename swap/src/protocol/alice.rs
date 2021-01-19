@@ -62,8 +62,8 @@ pub struct SwapFactory {
 
     listen_address: Multiaddr,
 
-    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
-    pub monero_wallet: Arc<monero::Wallet>,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
 }
 
 impl SwapFactory {
