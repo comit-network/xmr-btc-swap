@@ -107,12 +107,7 @@ impl SwapFactory {
         )
         .await?;
 
-        let (event_loop, event_loop_handle) = init_bob_event_loop(
-            self.identity.clone(),
-            self.peer_id.clone(),
-            self.alice_connect_peer_id.clone(),
-            self.alice_connect_address.clone(),
-        )?;
+        let (event_loop, event_loop_handle) = self.init_event_loop()?;
 
         let db = Database::open(self.db_path.as_path())?;
 
@@ -142,12 +137,7 @@ impl SwapFactory {
             )
         };
 
-        let (event_loop, event_loop_handle) = init_bob_event_loop(
-            self.identity.clone(),
-            self.peer_id.clone(),
-            self.alice_connect_peer_id.clone(),
-            self.alice_connect_address.clone(),
-        )?;
+        let (event_loop, event_loop_handle) = self.init_event_loop()?;
 
         Ok((
             Swap {
@@ -160,6 +150,21 @@ impl SwapFactory {
             },
             event_loop,
         ))
+    }
+
+    fn init_event_loop(
+        &self,
+    ) -> Result<(bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle)> {
+        let bob_behaviour = bob::Behaviour::default();
+        let bob_transport = build(self.identity.clone())?;
+
+        bob::event_loop::EventLoop::new(
+            bob_transport,
+            bob_behaviour,
+            self.peer_id.clone(),
+            self.alice_connect_peer_id.clone(),
+            self.alice_connect_address.clone(),
+        )
     }
 }
 
@@ -186,24 +191,6 @@ async fn init_bob_state(
     );
 
     Ok(BobState::Started { state0, amounts })
-}
-
-fn init_bob_event_loop(
-    identity: Keypair,
-    peer_id: PeerId,
-    alice_peer_id: PeerId,
-    alice_addr: Multiaddr,
-) -> Result<(bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle)> {
-    let bob_behaviour = bob::Behaviour::default();
-    let bob_transport = build(identity)?;
-
-    bob::event_loop::EventLoop::new(
-        bob_transport,
-        bob_behaviour,
-        peer_id,
-        alice_peer_id,
-        alice_addr,
-    )
 }
 
 #[derive(Debug, Clone)]
