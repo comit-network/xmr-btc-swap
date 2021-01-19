@@ -19,14 +19,14 @@ use tracing_core::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
 use uuid::Uuid;
 
-pub struct Test {
+pub struct TestContext {
     swap_amounts: SwapAmounts,
 
     alice_swap_factory: alice::SwapFactory,
     bob_swap_factory: bob::SwapFactory,
 }
 
-impl Test {
+impl TestContext {
     pub async fn new_swap_as_alice(&self) -> alice::Swap {
         let (swap, mut event_loop) = self
             .alice_swap_factory
@@ -303,7 +303,7 @@ impl Test {
 
 pub async fn setup_test<T, F>(testfn: T)
 where
-    T: Fn(Test) -> F,
+    T: Fn(TestContext) -> F,
     F: Future<Output = ()>,
 {
     let cli = Cli::default();
@@ -377,7 +377,7 @@ where
         alice_swap_factory.peer_id(),
     );
 
-    let test = Test {
+    let test = TestContext {
         swap_amounts,
         alice_swap_factory,
         bob_swap_factory,

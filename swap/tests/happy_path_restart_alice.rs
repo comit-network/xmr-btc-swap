@@ -4,9 +4,9 @@ pub mod testutils;
 
 #[tokio::test]
 async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
-    testutils::setup_test(|test| async move {
-        let alice_swap = test.new_swap_as_alice().await;
-        let bob_swap = test.new_swap_as_bob().await;
+    testutils::setup_test(|ctx| async move {
+        let alice_swap = ctx.new_swap_as_alice().await;
+        let bob_swap = ctx.new_swap_as_bob().await;
 
         let bob = bob::run(bob_swap);
         let bob_handle = tokio::spawn(bob);
@@ -16,15 +16,15 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
             .unwrap();
         assert!(matches!(alice_state, AliceState::EncSigLearned {..}));
 
-        let alice_swap = test.recover_alice_from_db().await;
+        let alice_swap = ctx.recover_alice_from_db().await;
         assert!(matches!(alice_swap.state, AliceState::EncSigLearned {..}));
 
         let alice_state = alice::run(alice_swap).await.unwrap();
 
-        test.assert_alice_redeemed(alice_state).await;
+        ctx.assert_alice_redeemed(alice_state).await;
 
         let bob_state = bob_handle.await.unwrap();
-        test.assert_bob_redeemed(bob_state.unwrap()).await
+        ctx.assert_bob_redeemed(bob_state.unwrap()).await
     })
     .await;
 }

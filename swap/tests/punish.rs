@@ -9,9 +9,9 @@ pub mod testutils;
 /// the encsig and fail to refund or redeem. Alice punishes.
 #[tokio::test]
 async fn alice_punishes_if_bob_never_acts_after_fund() {
-    testutils::setup_test(|test| async move {
-        let alice_swap = test.new_swap_as_alice().await;
-        let bob_swap = test.new_swap_as_bob().await;
+    testutils::setup_test(|ctx| async move {
+        let alice_swap = ctx.new_swap_as_alice().await;
+        let bob_swap = ctx.new_swap_as_bob().await;
 
         let alice = alice::run(alice_swap);
         let alice_handle = tokio::spawn(alice);
@@ -21,16 +21,16 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         assert!(matches!(bob_state, BobState::BtcLocked {..}));
 
         let alice_state = alice_handle.await.unwrap();
-        test.assert_alice_punished(alice_state.unwrap()).await;
+        ctx.assert_alice_punished(alice_state.unwrap()).await;
 
         // Restart Bob after Alice punished to ensure Bob transitions to
         // punished and does not run indefinitely
-        let bob_swap = test.recover_bob_from_db().await;
+        let bob_swap = ctx.recover_bob_from_db().await;
         assert!(matches!(bob_swap.state, BobState::BtcLocked {..}));
 
         let bob_state = bob::run(bob_swap).await.unwrap();
 
-        test.assert_bob_punished(bob_state).await;
+        ctx.assert_bob_punished(bob_state).await;
     })
     .await;
 }

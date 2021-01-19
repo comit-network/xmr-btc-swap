@@ -7,17 +7,17 @@ pub mod testutils;
 
 #[tokio::test]
 async fn happy_path() {
-    testutils::setup_test(|test| async move {
-        let alice_swap = test.new_swap_as_alice().await;
-        let bob_swap = test.new_swap_as_bob().await;
+    testutils::setup_test(|ctx| async move {
+        let alice_swap = ctx.new_swap_as_alice().await;
+        let bob_swap = ctx.new_swap_as_bob().await;
 
         let alice = alice::run(alice_swap);
 
         let bob = bob::run(bob_swap);
         let (alice_state, bob_state) = join!(alice, bob);
 
-        test.assert_alice_redeemed(alice_state.unwrap()).await;
-        test.assert_bob_redeemed(bob_state.unwrap()).await;
+        ctx.assert_alice_redeemed(alice_state.unwrap()).await;
+        ctx.assert_bob_redeemed(bob_state.unwrap()).await;
     })
     .await;
 }

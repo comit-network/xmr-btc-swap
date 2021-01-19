@@ -7,9 +7,9 @@ pub mod testutils;
 
 #[tokio::test]
 async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {
-    testutils::setup_test(|test| async move {
-        let alice_swap = test.new_swap_as_alice().await;
-        let bob_swap = test.new_swap_as_bob().await;
+    testutils::setup_test(|ctx| async move {
+        let alice_swap = ctx.new_swap_as_alice().await;
+        let bob_swap = ctx.new_swap_as_bob().await;
 
         let alice_handle = alice::run(alice_swap);
         let alice_swap_handle = tokio::spawn(alice_handle);
@@ -18,15 +18,15 @@ async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {
 
         assert!(matches!(bob_state, BobState::XmrLocked {..}));
 
-        let bob_swap = test.recover_bob_from_db().await;
+        let bob_swap = ctx.recover_bob_from_db().await;
         assert!(matches!(bob_swap.state, BobState::XmrLocked {..}));
 
         let bob_state = bob::run(bob_swap).await.unwrap();
 
-        test.assert_bob_redeemed(bob_state).await;
+        ctx.assert_bob_redeemed(bob_state).await;
 
         let alice_state = alice_swap_handle.await.unwrap();
-        test.assert_alice_redeemed(alice_state.unwrap()).await;
+        ctx.assert_alice_redeemed(alice_state.unwrap()).await;
     })
     .await;
 }
