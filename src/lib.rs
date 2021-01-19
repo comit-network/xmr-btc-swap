@@ -322,6 +322,9 @@ where
     }
 }
 
+/// A behaviour that can execute await/.async protocols.
+///
+/// Note: It is not possible to execute the same protocol with the same peer several simultaneous times.
 pub struct Behaviour<I, O, E> {
     protocol_in_events: VecDeque<(PeerId, ProtocolInEvent<I, O, E>)>,
     protocol_out_events: VecDeque<(PeerId, ProtocolOutEvent<I, O, E>)>,
