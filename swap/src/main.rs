@@ -112,7 +112,7 @@ async fn main() -> Result<()> {
                 xmr: receive_monero,
             };
 
-            let (bitcoin_wallet, monero_wallet, starting_balances) = setup_wallets(
+            let (bitcoin_wallet, monero_wallet, _starting_balances) = setup_wallets(
                 bitcoind_url,
                 bitcoin_wallet_name.as_str(),
                 monero_wallet_rpc_url,
@@ -133,12 +133,10 @@ async fn main() -> Result<()> {
                 swap_id,
                 bitcoin_wallet,
                 monero_wallet,
-                config,
-                starting_balances,
                 alice_addr,
                 alice_peer_id,
             );
-            let (swap, event_loop) = bob_factory.new_swap_as_bob(swap_amounts).await?;
+            let (swap, event_loop) = bob_factory.new_swap_as_bob(swap_amounts, config).await?;
 
             tokio::spawn(async move { event_loop.run().await });
             bob::run(swap).await?;
@@ -196,7 +194,7 @@ async fn main() -> Result<()> {
             alice_peer_id,
             alice_addr,
         }) => {
-            let (bitcoin_wallet, monero_wallet, starting_balances) = setup_wallets(
+            let (bitcoin_wallet, monero_wallet, _starting_balances) = setup_wallets(
                 bitcoind_url,
                 bitcoin_wallet_name.as_str(),
                 monero_wallet_rpc_url,
@@ -210,8 +208,6 @@ async fn main() -> Result<()> {
                 swap_id,
                 bitcoin_wallet,
                 monero_wallet,
-                config,
-                starting_balances,
                 alice_addr,
                 alice_peer_id,
             );

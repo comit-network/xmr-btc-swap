@@ -21,9 +21,9 @@ use uuid::Uuid;
 
 pub struct TestContext {
     swap_amounts: SwapAmounts,
-
     alice_swap_factory: alice::SwapFactory,
     bob_swap_factory: bob::SwapFactory,
+    bob_starting_balances: StartingBalances,
 }
 
 impl TestContext {
@@ -42,7 +42,7 @@ impl TestContext {
     pub async fn new_swap_as_bob(&self) -> bob::Swap {
         let (swap, event_loop) = self
             .bob_swap_factory
-            .new_swap_as_bob(self.swap_amounts)
+            .new_swap_as_bob(self.swap_amounts, Config::regtest())
             .await
             .unwrap();
 
@@ -185,9 +185,7 @@ impl TestContext {
             .unwrap();
         assert_eq!(
             btc_balance_after_swap,
-            self.bob_swap_factory.starting_balances.btc
-                - self.swap_amounts.btc
-                - lock_tx_bitcoin_fee
+            self.bob_starting_balances.btc - self.swap_amounts.btc - lock_tx_bitcoin_fee
         );
 
         // Ensure that Bob's balance is refreshed as we use a newly created wallet
@@ -207,7 +205,7 @@ impl TestContext {
             .unwrap();
         assert_eq!(
             xmr_balance_after_swap,
-            self.bob_swap_factory.starting_balances.xmr + self.swap_amounts.xmr
+            self.bob_starting_balances.xmr + self.swap_amounts.xmr
         );
     }
 
@@ -233,12 +231,12 @@ impl TestContext {
             .unwrap();
 
         let alice_submitted_cancel = btc_balance_after_swap
-            == self.bob_swap_factory.starting_balances.btc
+            == self.bob_starting_balances.btc
                 - lock_tx_bitcoin_fee
                 - bitcoin::Amount::from_sat(bitcoin::TX_FEE);
 
         let bob_submitted_cancel = btc_balance_after_swap
-            == self.bob_swap_factory.starting_balances.btc
+            == self.bob_starting_balances.btc
                 - lock_tx_bitcoin_fee
                 - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE);
 
@@ -253,10 +251,7 @@ impl TestContext {
             .get_balance()
             .await
             .unwrap();
-        assert_eq!(
-            xmr_balance_after_swap,
-            self.bob_swap_factory.starting_balances.xmr
-        );
+        assert_eq!(xmr_balance_after_swap, self.bob_starting_balances.xmr);
     }
 
     pub async fn assert_bob_punished(&self, state: BobState) {
@@ -282,9 +277,7 @@ impl TestContext {
             .unwrap();
         assert_eq!(
             btc_balance_after_swap,
-            self.bob_swap_factory.starting_balances.btc
-                - self.swap_amounts.btc
-                - lock_tx_bitcoin_fee
+            self.bob_starting_balances.btc - self.swap_amounts.btc - lock_tx_bitcoin_fee
         );
 
         let xmr_balance_after_swap = self
@@ -294,10 +287,7 @@ impl TestContext {
             .get_balance()
             .await
             .unwrap();
-        assert_eq!(
-            xmr_balance_after_swap,
-            self.bob_swap_factory.starting_balances.xmr
-        );
+        assert_eq!(xmr_balance_after_swap, self.bob_starting_balances.xmr);
     }
 }
 
@@ -371,8 +361,6 @@ where
         Uuid::new_v4(),
         bob_bitcoin_wallet,
         bob_monero_wallet,
-        config,
-        bob_starting_balances,
         alice_swap_factory.listen_address(),
         alice_swap_factory.peer_id(),
     );
@@ -381,6 +369,7 @@ where
         swap_amounts,
         alice_swap_factory,
         bob_swap_factory,
+        bob_starting_balances,
     };
 
     testfn(test).await

@@ -55,26 +55,21 @@ pub struct SwapFactory {
     identity: Keypair,
     peer_id: PeerId,
     db_path: PathBuf,
-    config: Config,
 
     alice_connect_address: Multiaddr,
     alice_connect_peer_id: PeerId,
 
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
-    pub starting_balances: StartingBalances,
 }
 
 impl SwapFactory {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         seed: Seed,
         db_path: PathBuf,
         swap_id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
-        config: Config,
-        starting_balances: StartingBalances,
         alice_connect_address: Multiaddr,
         alice_connect_peer_id: PeerId,
     ) -> Self {
@@ -86,24 +81,23 @@ impl SwapFactory {
             identity,
             peer_id,
             db_path,
-            config,
             alice_connect_address,
             alice_connect_peer_id,
             bitcoin_wallet,
             monero_wallet,
-            starting_balances,
         }
     }
 
     pub async fn new_swap_as_bob(
         &self,
         swap_amounts: SwapAmounts,
+        config: Config,
     ) -> Result<(bob::Swap, bob::EventLoop)> {
         let initial_state = init_bob_state(
             swap_amounts.btc,
             swap_amounts.xmr,
             self.bitcoin_wallet.clone(),
-            self.config,
+            config,
         )
         .await?;
 
