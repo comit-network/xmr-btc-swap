@@ -215,7 +215,7 @@ async fn main() -> Result<()> {
                 alice_addr,
                 alice_peer_id,
             );
-            let (swap, event_loop) = bob_factory.recover_bob_from_db().await?;
+            let (swap, event_loop) = bob_factory.resume().await?;
 
             tokio::spawn(async move { event_loop.run().await });
             bob::run(swap).await?;

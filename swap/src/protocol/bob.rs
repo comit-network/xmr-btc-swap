@@ -129,7 +129,7 @@ impl SwapFactory {
         ))
     }
 
-    pub async fn recover_bob_from_db(&self) -> Result<(bob::Swap, bob::EventLoop)> {
+    pub async fn resume(&self) -> Result<(bob::Swap, bob::EventLoop)> {
         // reopen the existing database
         let db = Database::open(self.db_path.clone().as_path())?;
 

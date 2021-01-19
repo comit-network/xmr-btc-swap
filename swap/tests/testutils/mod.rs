@@ -64,7 +64,7 @@ impl TestContext {
     }
 
     pub async fn recover_bob_from_db(&self) -> bob::Swap {
-        let (swap, event_loop) = self.bob_swap_factory.recover_bob_from_db().await.unwrap();
+        let (swap, event_loop) = self.bob_swap_factory.resume().await.unwrap();
 
         tokio::spawn(async move { event_loop.run().await });
 
