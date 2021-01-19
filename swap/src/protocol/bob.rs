@@ -261,7 +261,7 @@ impl From<message3::OutEvent> for OutEvent {
 }
 
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Bob.
-#[derive(NetworkBehaviour)]
+#[derive(NetworkBehaviour, Default)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
@@ -309,18 +309,5 @@ impl Behaviour {
     /// Add a known address for the given peer
     pub fn add_address(&mut self, peer_id: PeerId, address: Multiaddr) {
         self.pt.add_address(peer_id, address)
-    }
-}
-
-impl Default for Behaviour {
-    fn default() -> Behaviour {
-        Self {
-            pt: PeerTracker::default(),
-            amounts: Amounts::default(),
-            message0: message0::Behaviour::default(),
-            message1: message1::Behaviour::default(),
-            message2: message2::Behaviour::default(),
-            message3: message3::Behaviour::default(),
-        }
     }
 }

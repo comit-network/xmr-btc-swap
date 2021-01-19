@@ -280,7 +280,7 @@ impl From<message3::OutEvent> for OutEvent {
 }
 
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Alice.
-#[derive(NetworkBehaviour)]
+#[derive(NetworkBehaviour, Default)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
@@ -316,18 +316,5 @@ impl Behaviour {
     pub fn send_message2(&mut self, channel: ResponseChannel<AliceToBob>, msg: Message2) {
         self.message2.send(channel, msg);
         debug!("Sent Message2");
-    }
-}
-
-impl Default for Behaviour {
-    fn default() -> Self {
-        Self {
-            pt: PeerTracker::default(),
-            amounts: Amounts::default(),
-            message0: message0::Behaviour::default(),
-            message1: message1::Behaviour::default(),
-            message2: message2::Behaviour::default(),
-            message3: message3::Behaviour::default(),
-        }
     }
 }
