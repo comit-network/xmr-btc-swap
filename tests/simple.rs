@@ -5,7 +5,7 @@ use harness::await_events_or_timeout;
 use harness::new_connected_swarm_pair;
 use libp2p::swarm::SwarmEvent;
 use libp2p::PeerId;
-use libp2p_nmessage::{BehaviourOutEvent, NMessageBehaviour};
+use libp2p_async_await::{Behaviour, BehaviourOutEvent};
 use tokio::runtime::Handle;
 
 mod harness;
@@ -55,13 +55,13 @@ impl From<BehaviourOutEvent<BobResult, AliceResult, anyhow::Error>> for MyOutEve
 #[derive(libp2p::NetworkBehaviour)]
 #[behaviour(out_event = "MyOutEvent", event_process = false)]
 struct MyBehaviour {
-    inner: NMessageBehaviour<BobResult, AliceResult, anyhow::Error>,
+    inner: Behaviour<BobResult, AliceResult, anyhow::Error>,
 }
 
 impl MyBehaviour {
     pub fn new() -> Self {
         Self {
-            inner: NMessageBehaviour::new(b"/foo/bar/1.0.0"),
+            inner: Behaviour::new(b"/foo/bar/1.0.0"),
         }
     }
 }

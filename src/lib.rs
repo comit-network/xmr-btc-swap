@@ -40,12 +40,12 @@ enum ProtocolState<I, O, E> {
     Poisoned,
 }
 
-pub struct NMessageHandler<TInboundOut, TOutboundOut, TErr> {
+pub struct Handler<TInboundOut, TOutboundOut, TErr> {
     state: ProtocolState<TInboundOut, TOutboundOut, TErr>,
     info: &'static [u8],
 }
 
-impl<TInboundOut, TOutboundOut, TErr> NMessageHandler<TInboundOut, TOutboundOut, TErr> {
+impl<TInboundOut, TOutboundOut, TErr> Handler<TInboundOut, TOutboundOut, TErr> {
     pub fn new(info: &'static [u8]) -> Self {
         Self {
             state: ProtocolState::None,
@@ -54,17 +54,17 @@ impl<TInboundOut, TOutboundOut, TErr> NMessageHandler<TInboundOut, TOutboundOut,
     }
 }
 
-pub struct NMessageProtocol {
+pub struct ProtocolInfo {
     info: &'static [u8],
 }
 
-impl NMessageProtocol {
+impl ProtocolInfo {
     fn new(info: &'static [u8]) -> Self {
         Self { info }
     }
 }
 
-impl UpgradeInfo for NMessageProtocol {
+impl UpgradeInfo for ProtocolInfo {
     type Info = &'static [u8];
     type InfoIter = iter::Once<&'static [u8]>;
 
@@ -97,7 +97,7 @@ macro_rules! impl_read_write {
 impl_read_write!(InboundSubstream);
 impl_read_write!(OutboundSubstream);
 
-impl InboundUpgrade<NegotiatedSubstream> for NMessageProtocol {
+impl InboundUpgrade<NegotiatedSubstream> for ProtocolInfo {
     type Output = InboundSubstream;
     type Error = Infallible;
     type Future = Ready<Result<Self::Output, Self::Error>>;
@@ -107,7 +107,7 @@ impl InboundUpgrade<NegotiatedSubstream> for NMessageProtocol {
     }
 }
 
-impl OutboundUpgrade<NegotiatedSubstream> for NMessageProtocol {
+impl OutboundUpgrade<NegotiatedSubstream> for ProtocolInfo {
     type Output = OutboundSubstream;
     type Error = Infallible;
     type Future = Ready<Result<Self::Output, Self::Error>>;
@@ -127,8 +127,7 @@ pub enum ProtocolOutEvent<I, O, E> {
     Outbound(Result<O, E>),
 }
 
-impl<TInboundOut, TOutboundOut, TErr> ProtocolsHandler
-    for NMessageHandler<TInboundOut, TOutboundOut, TErr>
+impl<TInboundOut, TOutboundOut, TErr> ProtocolsHandler for Handler<TInboundOut, TOutboundOut, TErr>
 where
     TInboundOut: Send + 'static,
     TOutboundOut: Send + 'static,
@@ -136,14 +135,14 @@ where
 {
     type InEvent = ProtocolInEvent<TInboundOut, TOutboundOut, TErr>;
     type OutEvent = ProtocolOutEvent<TInboundOut, TOutboundOut, TErr>;
-    type Error = std::io::Error;
-    type InboundProtocol = NMessageProtocol;
-    type OutboundProtocol = NMessageProtocol;
+    type Error = Infallible;
+    type InboundProtocol = ProtocolInfo;
+    type OutboundProtocol = ProtocolInfo;
     type InboundOpenInfo = ();
     type OutboundOpenInfo = ();
 
     fn listen_protocol(&self) -> SubstreamProtocol<Self::InboundProtocol, Self::InboundOpenInfo> {
-        SubstreamProtocol::new(NMessageProtocol::new(self.info), ())
+        SubstreamProtocol::new(ProtocolInfo::new(self.info), ())
     }
 
     fn inject_fully_negotiated_inbound(
@@ -309,7 +308,7 @@ where
                     OutboundProtocolState::GotFunctionRequestedSubstream(protocol),
                 );
                 Poll::Ready(ProtocolsHandlerEvent::OutboundSubstreamRequest {
-                    protocol: SubstreamProtocol::new(NMessageProtocol::new(self.info), ()),
+                    protocol: SubstreamProtocol::new(ProtocolInfo::new(self.info), ()),
                 })
             }
             ProtocolState::Poisoned => {
@@ -323,7 +322,7 @@ where
     }
 }
 
-pub struct NMessageBehaviour<I, O, E> {
+pub struct Behaviour<I, O, E> {
     protocol_in_events: VecDeque<(PeerId, ProtocolInEvent<I, O, E>)>,
     protocol_out_events: VecDeque<(PeerId, ProtocolOutEvent<I, O, E>)>,
 
@@ -332,15 +331,15 @@ pub struct NMessageBehaviour<I, O, E> {
     info: &'static [u8],
 }
 
-impl<I, O, E> NMessageBehaviour<I, O, E> {
-    /// Constructs a new [`NMessageBehaviour`] with the given protocol info.
+impl<I, O, E> Behaviour<I, O, E> {
+    /// Constructs a new [`Behaviour`] with the given protocol info.
     ///
     /// # Example
     ///
     /// ```
-    /// # use libp2p_nmessage::NMessageBehaviour;
+    /// # use libp2p_async_await::Behaviour;
     ///
-    /// let _ = NMessageBehaviour::new(b"/foo/bar/1.0.0");
+    /// let _ = Behaviour::new(b"/foo/bar/1.0.0");
     /// ```
     pub fn new(info: &'static [u8]) -> Self {
         Self {
@@ -352,7 +351,7 @@ impl<I, O, E> NMessageBehaviour<I, O, E> {
     }
 }
 
-impl<I, O, E> NMessageBehaviour<I, O, E> {
+impl<I, O, E> Behaviour<I, O, E> {
     pub fn do_protocol_listener<F>(
         &mut self,
         peer: PeerId,
@@ -388,17 +387,17 @@ pub enum BehaviourOutEvent<I, O, E> {
     Outbound(PeerId, Result<O, E>),
 }
 
-impl<I, O, E> NetworkBehaviour for NMessageBehaviour<I, O, E>
+impl<I, O, E> NetworkBehaviour for Behaviour<I, O, E>
 where
     I: Send + 'static,
     O: Send + 'static,
     E: Send + 'static,
 {
-    type ProtocolsHandler = NMessageHandler<I, O, E>;
+    type ProtocolsHandler = Handler<I, O, E>;
     type OutEvent = BehaviourOutEvent<I, O, E>;
 
     fn new_handler(&mut self) -> Self::ProtocolsHandler {
-        NMessageHandler::new(self.info)
+        Handler::new(self.info)
     }
 
     fn addresses_of_peer(&mut self, peer: &PeerId) -> Vec<Multiaddr> {

@@ -1,5 +1,5 @@
 [package]
-name = "libp2p-nmessage"
+name = "libp2p-async-await"
 version = "0.1.0"
 authors = ["Thomas Eizinger <thomas@eizinger.io>"]
 edition = "2018"
