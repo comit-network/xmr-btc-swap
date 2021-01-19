@@ -93,13 +93,9 @@ impl SwapFactory {
         swap_amounts: SwapAmounts,
         config: Config,
     ) -> Result<(bob::Swap, bob::EventLoop)> {
-        let initial_state = init_bob_state(
-            swap_amounts.btc,
-            swap_amounts.xmr,
-            self.bitcoin_wallet.clone(),
-            config,
-        )
-        .await?;
+        let initial_state = self
+            .make_initial_state(swap_amounts.btc, swap_amounts.xmr, config)
+            .await?;
 
         let (event_loop, event_loop_handle) = self.init_event_loop()?;
 
@@ -160,31 +156,31 @@ impl SwapFactory {
             self.alice_address.clone(),
         )
     }
-}
 
-async fn init_bob_state(
-    btc_to_swap: bitcoin::Amount,
-    xmr_to_swap: monero::Amount,
-    bob_btc_wallet: Arc<bitcoin::Wallet>,
-    config: Config,
-) -> Result<BobState> {
-    let amounts = SwapAmounts {
-        btc: btc_to_swap,
-        xmr: xmr_to_swap,
-    };
+    async fn make_initial_state(
+        &self,
+        btc_to_swap: bitcoin::Amount,
+        xmr_to_swap: monero::Amount,
+        config: Config,
+    ) -> Result<BobState> {
+        let amounts = SwapAmounts {
+            btc: btc_to_swap,
+            xmr: xmr_to_swap,
+        };
 
-    let refund_address = bob_btc_wallet.new_address().await?;
-    let state0 = bob::State0::new(
-        &mut OsRng,
-        btc_to_swap,
-        xmr_to_swap,
-        config.bitcoin_cancel_timelock,
-        config.bitcoin_punish_timelock,
-        refund_address,
-        config.monero_finality_confirmations,
-    );
+        let refund_address = self.bitcoin_wallet.new_address().await?;
+        let state0 = bob::State0::new(
+            &mut OsRng,
+            btc_to_swap,
+            xmr_to_swap,
+            config.bitcoin_cancel_timelock,
+            config.bitcoin_punish_timelock,
+            refund_address,
+            config.monero_finality_confirmations,
+        );
 
-    Ok(BobState::Started { state0, amounts })
+        Ok(BobState::Started { state0, amounts })
+    }
 }
 
 #[derive(Debug, Clone)]
