@@ -30,7 +30,7 @@ impl TestContext {
     pub async fn new_swap_as_alice(&self) -> alice::Swap {
         let (swap, mut event_loop) = self
             .alice_swap_factory
-            .new_swap_as_alice(self.swap_amounts)
+            .new_swap(self.swap_amounts)
             .await
             .unwrap();
 
@@ -52,11 +52,7 @@ impl TestContext {
     }
 
     pub async fn recover_alice_from_db(&self) -> alice::Swap {
-        let (swap, mut event_loop) = self
-            .alice_swap_factory
-            .recover_alice_from_db()
-            .await
-            .unwrap();
+        let (swap, mut event_loop) = self.alice_swap_factory.resume().await.unwrap();
 
         tokio::spawn(async move { event_loop.run().await });
 
