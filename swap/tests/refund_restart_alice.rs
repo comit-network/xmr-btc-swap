@@ -5,7 +5,7 @@ pub mod testutils;
 /// Bob locks btc and Alice locks xmr. Alice fails to act so Bob refunds. Alice
 /// then also refunds.
 #[tokio::test]
-async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
+async fn given_alice_restarts_after_xmr_is_locked_refund_swap() {
     testutils::setup_test(|mut ctx| async move {
         let alice_swap = ctx.new_swap_as_alice().await;
         let bob_swap = ctx.new_swap_as_bob().await;
@@ -20,6 +20,7 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
 
         // Alice does not act, Bob refunds
         let bob_state = bob_handle.await.unwrap();
+        ctx.assert_bob_refunded(bob_state.unwrap()).await;
 
         // Once bob has finished Alice is restarted and refunds as well
         let alice_swap = ctx.recover_alice_from_db().await;
@@ -27,11 +28,6 @@ async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
 
         let alice_state = alice::run(alice_swap).await.unwrap();
 
-        // TODO: The test passes like this, but the assertion should be done after Bob
-        // refunded, not at the end because this can cause side-effects!
-        //  We have to properly wait for the refund tx's finality inside the assertion,
-        // which requires storing the refund_tx_id in the the state!
-        ctx.assert_bob_refunded(bob_state.unwrap()).await;
         ctx.assert_alice_refunded(alice_state).await;
     })
     .await;
