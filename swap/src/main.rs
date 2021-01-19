@@ -67,7 +67,7 @@ async fn main() -> Result<()> {
                 btc: receive_bitcoin,
             };
 
-            let (bitcoin_wallet, monero_wallet, starting_balances) = setup_wallets(
+            let (bitcoin_wallet, monero_wallet) = setup_wallets(
                 bitcoind_url,
                 bitcoin_wallet_name.as_str(),
                 monero_wallet_rpc_url,
@@ -88,7 +88,6 @@ async fn main() -> Result<()> {
                 swap_id,
                 bitcoin_wallet,
                 monero_wallet,
-                starting_balances,
                 db_path,
                 listen_addr,
             )
@@ -112,7 +111,7 @@ async fn main() -> Result<()> {
                 xmr: receive_monero,
             };
 
-            let (bitcoin_wallet, monero_wallet, _starting_balances) = setup_wallets(
+            let (bitcoin_wallet, monero_wallet) = setup_wallets(
                 bitcoind_url,
                 bitcoin_wallet_name.as_str(),
                 monero_wallet_rpc_url,
@@ -162,7 +161,7 @@ async fn main() -> Result<()> {
             monero_wallet_rpc_url,
             listen_addr,
         }) => {
-            let (bitcoin_wallet, monero_wallet, starting_balances) = setup_wallets(
+            let (bitcoin_wallet, monero_wallet) = setup_wallets(
                 bitcoind_url,
                 bitcoin_wallet_name.as_str(),
                 monero_wallet_rpc_url,
@@ -176,7 +175,6 @@ async fn main() -> Result<()> {
                 swap_id,
                 bitcoin_wallet,
                 monero_wallet,
-                starting_balances,
                 db_path,
                 listen_addr,
             )
@@ -194,7 +192,7 @@ async fn main() -> Result<()> {
             alice_peer_id,
             alice_addr,
         }) => {
-            let (bitcoin_wallet, monero_wallet, _starting_balances) = setup_wallets(
+            let (bitcoin_wallet, monero_wallet) = setup_wallets(
                 bitcoind_url,
                 bitcoin_wallet_name.as_str(),
                 monero_wallet_rpc_url,
@@ -226,11 +224,7 @@ async fn setup_wallets(
     bitcoin_wallet_name: &str,
     monero_wallet_rpc_url: url::Url,
     config: Config,
-) -> Result<(
-    Arc<swap::bitcoin::Wallet>,
-    Arc<swap::monero::Wallet>,
-    StartingBalances,
-)> {
+) -> Result<(Arc<swap::bitcoin::Wallet>, Arc<swap::monero::Wallet>)> {
     let bitcoin_wallet =
         swap::bitcoin::Wallet::new(bitcoin_wallet_name, bitcoind_url, config.bitcoin_network)
             .await?;
@@ -249,10 +243,5 @@ async fn setup_wallets(
     );
     let monero_wallet = Arc::new(monero_wallet);
 
-    let starting_balances = StartingBalances {
-        btc: bitcoin_balance,
-        xmr: monero_balance,
-    };
-
-    Ok((bitcoin_wallet, monero_wallet, starting_balances))
+    Ok((bitcoin_wallet, monero_wallet))
 }

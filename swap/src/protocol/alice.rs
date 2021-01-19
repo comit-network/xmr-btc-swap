@@ -64,7 +64,6 @@ pub struct SwapFactory {
 
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
-    pub starting_balances: StartingBalances,
 }
 
 impl SwapFactory {
@@ -75,7 +74,6 @@ impl SwapFactory {
         swap_id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
-        starting_balances: StartingBalances,
         db_path: PathBuf,
         listen_address: Multiaddr,
     ) -> Self {
@@ -92,7 +90,6 @@ impl SwapFactory {
             listen_address,
             bitcoin_wallet,
             monero_wallet,
-            starting_balances,
         }
     }
 

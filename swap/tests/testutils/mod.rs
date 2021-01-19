@@ -19,9 +19,16 @@ use tracing_core::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
 use uuid::Uuid;
 
+#[derive(Debug, Clone)]
+pub struct StartingBalances {
+    pub xmr: monero::Amount,
+    pub btc: bitcoin::Amount,
+}
+
 pub struct TestContext {
     swap_amounts: SwapAmounts,
     alice_swap_factory: alice::SwapFactory,
+    alice_starting_balances: StartingBalances,
     bob_swap_factory: bob::SwapFactory,
     bob_starting_balances: StartingBalances,
 }
@@ -79,7 +86,7 @@ impl TestContext {
             .unwrap();
         assert_eq!(
             btc_balance_after_swap,
-            self.alice_swap_factory.starting_balances.btc + self.swap_amounts.btc
+            self.alice_starting_balances.btc + self.swap_amounts.btc
                 - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
         );
 
@@ -90,10 +97,7 @@ impl TestContext {
             .get_balance()
             .await
             .unwrap();
-        assert!(
-            xmr_balance_after_swap
-                <= self.alice_swap_factory.starting_balances.xmr - self.swap_amounts.xmr
-        );
+        assert!(xmr_balance_after_swap <= self.alice_starting_balances.xmr - self.swap_amounts.xmr);
     }
 
     pub async fn assert_alice_refunded(&self, state: AliceState) {
@@ -106,10 +110,7 @@ impl TestContext {
             .balance()
             .await
             .unwrap();
-        assert_eq!(
-            btc_balance_after_swap,
-            self.alice_swap_factory.starting_balances.btc
-        );
+        assert_eq!(btc_balance_after_swap, self.alice_starting_balances.btc);
 
         // Ensure that Alice's balance is refreshed as we use a newly created wallet
         self.alice_swap_factory
@@ -141,7 +142,7 @@ impl TestContext {
             .unwrap();
         assert_eq!(
             btc_balance_after_swap,
-            self.alice_swap_factory.starting_balances.btc + self.swap_amounts.btc
+            self.alice_starting_balances.btc + self.swap_amounts.btc
                 - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE)
         );
 
@@ -152,10 +153,7 @@ impl TestContext {
             .get_balance()
             .await
             .unwrap();
-        assert!(
-            xmr_balance_after_swap
-                <= self.alice_swap_factory.starting_balances.xmr - self.swap_amounts.xmr
-        );
+        assert!(xmr_balance_after_swap <= self.alice_starting_balances.xmr - self.swap_amounts.xmr);
     }
 
     pub async fn assert_bob_redeemed(&self, state: BobState) {
@@ -331,7 +329,6 @@ where
         Uuid::new_v4(),
         alice_bitcoin_wallet,
         alice_monero_wallet,
-        alice_starting_balances,
         tempdir().unwrap().path().to_path_buf(),
         listen_address,
     )
@@ -364,6 +361,7 @@ where
     let test = TestContext {
         swap_amounts,
         alice_swap_factory,
+        alice_starting_balances,
         bob_swap_factory,
         bob_starting_balances,
     };
