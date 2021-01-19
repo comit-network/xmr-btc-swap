@@ -67,7 +67,6 @@ pub struct SwapFactory {
 }
 
 impl SwapFactory {
-    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         seed: Seed,
         config: Config,
