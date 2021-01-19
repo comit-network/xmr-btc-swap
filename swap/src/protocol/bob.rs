@@ -56,8 +56,8 @@ pub struct SwapFactory {
     peer_id: PeerId,
     db_path: PathBuf,
 
-    alice_connect_address: Multiaddr,
-    alice_connect_peer_id: PeerId,
+    alice_address: Multiaddr,
+    alice_peer_id: PeerId,
 
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
@@ -70,8 +70,8 @@ impl SwapFactory {
         swap_id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
-        alice_connect_address: Multiaddr,
-        alice_connect_peer_id: PeerId,
+        alice_address: Multiaddr,
+        alice_peer_id: PeerId,
     ) -> Self {
         let identity = network::Seed::new(seed).derive_libp2p_identity();
         let peer_id = identity.public().into_peer_id();
@@ -81,8 +81,8 @@ impl SwapFactory {
             identity,
             peer_id,
             db_path,
-            alice_connect_address,
-            alice_connect_peer_id,
+            alice_address,
+            alice_peer_id,
             bitcoin_wallet,
             monero_wallet,
         }
@@ -156,8 +156,8 @@ impl SwapFactory {
             bob_transport,
             bob_behaviour,
             self.peer_id.clone(),
-            self.alice_connect_peer_id.clone(),
-            self.alice_connect_address.clone(),
+            self.alice_peer_id.clone(),
+            self.alice_address.clone(),
         )
     }
 }
