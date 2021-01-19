@@ -105,12 +105,9 @@ pub enum ProtocolInEvent<I, O, E> {
     ExecuteOutbound(OutboundProtocolFn<O, E>),
 }
 
-// TODO: Remove Finished/Failed and just wrap a Result
 pub enum ProtocolOutEvent<I, O, E> {
-    InboundFinished(I),
-    OutboundFinished(O),
-    InboundFailed(E),
-    OutboundFailed(E),
+    Inbound(Result<I, E>),
+    Outbound(Result<O, E>),
 }
 
 impl<TInboundOut, TOutboundOut, TErr> ProtocolsHandler
@@ -264,17 +261,11 @@ where
             ProtocolState::Inbound(InboundProtocolState::Executing(mut protocol)) => match protocol
                 .poll_unpin(cx)
             {
-                Poll::Ready(Ok(value)) => {
+                Poll::Ready(res) => {
                     self.state = ProtocolState::Done;
-                    Poll::Ready(ProtocolsHandlerEvent::Custom(
-                        ProtocolOutEvent::InboundFinished(value),
-                    ))
-                }
-                Poll::Ready(Err(e)) => {
-                    self.state = ProtocolState::Done;
-                    Poll::Ready(ProtocolsHandlerEvent::Custom(
-                        ProtocolOutEvent::InboundFailed(e),
-                    ))
+                    Poll::Ready(ProtocolsHandlerEvent::Custom(ProtocolOutEvent::Inbound(
+                        res,
+                    )))
                 }
                 Poll::Pending => {
                     self.state = ProtocolState::Inbound(InboundProtocolState::Executing(protocol));
@@ -283,17 +274,11 @@ where
             },
             ProtocolState::Outbound(OutboundProtocolState::Executing(mut protocol)) => {
                 match protocol.poll_unpin(cx) {
-                    Poll::Ready(Ok(value)) => {
+                    Poll::Ready(res) => {
                         self.state = ProtocolState::Done;
-                        Poll::Ready(ProtocolsHandlerEvent::Custom(
-                            ProtocolOutEvent::OutboundFinished(value),
-                        ))
-                    }
-                    Poll::Ready(Err(e)) => {
-                        self.state = ProtocolState::Done;
-                        Poll::Ready(ProtocolsHandlerEvent::Custom(
-                            ProtocolOutEvent::OutboundFailed(e),
-                        ))
+                        Poll::Ready(ProtocolsHandlerEvent::Custom(ProtocolOutEvent::Outbound(
+                            res,
+                        )))
                     }
                     Poll::Pending => {
                         self.state =
@@ -382,10 +367,8 @@ impl<I, O, E> NMessageBehaviour<I, O, E> {
 
 #[derive(Clone)]
 pub enum BehaviourOutEvent<I, O, E> {
-    InboundFinished(PeerId, I),
-    OutboundFinished(PeerId, O),
-    InboundFailed(PeerId, E),
-    OutboundFailed(PeerId, E),
+    Inbound(PeerId, Result<I, E>),
+    Outbound(PeerId, Result<O, E>),
 }
 
 impl<I, O, E> NetworkBehaviour for NMessageBehaviour<I, O, E>
@@ -460,14 +443,8 @@ where
 
         if let Some((peer, event)) = self.protocol_out_events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(match event {
-                ProtocolOutEvent::InboundFinished(event) => {
-                    BehaviourOutEvent::InboundFinished(peer, event)
-                }
-                ProtocolOutEvent::OutboundFinished(event) => {
-                    BehaviourOutEvent::OutboundFinished(peer, event)
-                }
-                ProtocolOutEvent::InboundFailed(e) => BehaviourOutEvent::InboundFailed(peer, e),
-                ProtocolOutEvent::OutboundFailed(e) => BehaviourOutEvent::OutboundFailed(peer, e),
+                ProtocolOutEvent::Inbound(res) => BehaviourOutEvent::Inbound(peer, res),
+                ProtocolOutEvent::Outbound(res) => BehaviourOutEvent::Outbound(peer, res),
             }));
         }
 
@@ -519,10 +496,11 @@ mod tests {
     impl From<BehaviourOutEvent<BobResult, AliceResult, anyhow::Error>> for MyOutEvent {
         fn from(event: BehaviourOutEvent<BobResult, AliceResult, Error>) -> Self {
             match event {
-                BehaviourOutEvent::InboundFinished(_, bob) => MyOutEvent::Bob(bob),
-                BehaviourOutEvent::OutboundFinished(_, alice) => MyOutEvent::Alice(alice),
-                BehaviourOutEvent::InboundFailed(_, e)
-                | BehaviourOutEvent::OutboundFailed(_, e) => MyOutEvent::Failed(e),
+                BehaviourOutEvent::Inbound(_, Ok(bob)) => MyOutEvent::Bob(bob),
+                BehaviourOutEvent::Outbound(_, Ok(alice)) => MyOutEvent::Alice(alice),
+                BehaviourOutEvent::Inbound(_, Err(e)) | BehaviourOutEvent::Outbound(_, Err(e)) => {
+                    MyOutEvent::Failed(e)
+                }
             }
         }
     }
