@@ -1,6 +1,6 @@
 //! Run an XMR/BTC swap in the role of Bob.
 //! Bob holds BTC and wishes receive XMR.
-use anyhow::Result;
+use anyhow::{bail, Result};
 use libp2p::{core::Multiaddr, NetworkBehaviour, PeerId};
 use tracing::{debug, info};
 
@@ -133,7 +133,10 @@ impl SwapFactory {
         let resume_state = if let database::Swap::Bob(state) = db.get_state(self.swap_id)? {
             state.into()
         } else {
-            unreachable!()
+            bail!(
+                "Trying to load swap with id {} for the wrong direction.",
+                self.swap_id
+            )
         };
 
         let (event_loop, event_loop_handle) = init_bob_event_loop(
