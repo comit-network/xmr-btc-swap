@@ -1,5 +1,5 @@
 use libp2p::core::connection::ConnectionId;
-use libp2p::core::{ConnectedPoint, Multiaddr, UpgradeInfo};
+use libp2p::core::{upgrade, ConnectedPoint, Multiaddr, UpgradeInfo};
 use libp2p::futures::future::BoxFuture;
 use libp2p::futures::task::{Context, Poll};
 use libp2p::futures::FutureExt;
@@ -13,7 +13,7 @@ use libp2p::{InboundUpgrade, OutboundUpgrade, PeerId};
 use std::collections::{HashMap, VecDeque};
 use std::convert::Infallible;
 use std::future::{Future, Ready};
-use std::{iter, mem};
+use std::{io, iter, mem};
 
 #[cfg(test)]
 mod swarm_harness;
@@ -79,6 +79,26 @@ impl UpgradeInfo for NMessageProtocol {
 pub struct InboundSubstream(NegotiatedSubstream);
 
 pub struct OutboundSubstream(NegotiatedSubstream);
+
+macro_rules! impl_read_write {
+    ($t:ty) => {
+        impl $t {
+            pub async fn write_message(&mut self, msg: &[u8]) -> Result<(), io::Error> {
+                upgrade::write_with_len_prefix(&mut self.0, msg).await
+            }
+
+            pub async fn read_message(
+                &mut self,
+                max_size: usize,
+            ) -> Result<Vec<u8>, upgrade::ReadOneError> {
+                upgrade::read_one(&mut self.0, max_size).await
+            }
+        }
+    };
+}
+
+impl_read_write!(InboundSubstream);
+impl_read_write!(OutboundSubstream);
 
 impl InboundUpgrade<NegotiatedSubstream> for NMessageProtocol {
     type Output = InboundSubstream;
@@ -458,7 +478,6 @@ mod tests {
     use super::*;
     use crate::swarm_harness::await_events_or_timeout;
     use anyhow::{Context, Error};
-    use libp2p::core::upgrade;
     use libp2p::swarm::SwarmEvent;
     use swarm_harness::new_connected_swarm_pair;
     use tokio::runtime::Handle;
@@ -523,22 +542,23 @@ mod tests {
         fn alice_do_protocol(&mut self, bob: PeerId, foo: u32, baz: u32) {
             self.inner
                 .do_protocol_dialer(bob, move |mut substream| async move {
-                    upgrade::write_with_len_prefix(
-                        &mut substream.0,
-                        serde_cbor::to_vec(&Message0 { foo })
-                            .context("failed to serialize Message0")?,
-                    )
-                    .await?;
+                    substream
+                        .write_message(
+                            &serde_cbor::to_vec(&Message0 { foo })
+                                .context("failed to serialize Message0")?,
+                        )
+                        .await?;
 
-                    let bytes = upgrade::read_one(&mut substream.0, 1024).await?;
+                    let bytes = substream.read_message(1024).await?;
+
                     let message1 = serde_cbor::from_slice::<Message1>(&bytes)?;
 
-                    upgrade::write_with_len_prefix(
-                        &mut substream.0,
-                        serde_cbor::to_vec(&Message2 { baz })
-                            .context("failed to serialize Message2")?,
-                    )
-                    .await?;
+                    substream
+                        .write_message(
+                            &serde_cbor::to_vec(&Message2 { baz })
+                                .context("failed to serialize Message2")?,
+                        )
+                        .await?;
 
                     Ok(AliceResult { bar: message1.bar })
                 })
@@ -547,17 +567,17 @@ mod tests {
         fn bob_do_protocol(&mut self, alice: PeerId, bar: u32) {
             self.inner
                 .do_protocol_listener(alice, move |mut substream| async move {
-                    let bytes = upgrade::read_one(&mut substream.0, 1024).await?;
+                    let bytes = substream.read_message(1024).await?;
                     let message0 = serde_cbor::from_slice::<Message0>(&bytes)?;
 
-                    upgrade::write_with_len_prefix(
-                        &mut substream.0,
-                        serde_cbor::to_vec(&Message1 { bar })
-                            .context("failed to serialize Message1")?,
-                    )
-                    .await?;
+                    substream
+                        .write_message(
+                            &serde_cbor::to_vec(&Message1 { bar })
+                                .context("failed to serialize Message1")?,
+                        )
+                        .await?;
 
-                    let bytes = upgrade::read_one(&mut substream.0, 1024).await?;
+                    let bytes = substream.read_message(1024).await?;
                     let message2 = serde_cbor::from_slice::<Message2>(&bytes)?;
 
                     Ok(BobResult {
