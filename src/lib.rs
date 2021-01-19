@@ -236,9 +236,9 @@ where
     fn inject_dial_upgrade_error(
         &mut self,
         _: Self::OutboundOpenInfo,
-        _: ProtocolsHandlerUpgrErr<<Self::OutboundProtocol as OutboundUpgradeSend>::Error>,
+        err: ProtocolsHandlerUpgrErr<<Self::OutboundProtocol as OutboundUpgradeSend>::Error>,
     ) {
-        unimplemented!("TODO: handle this")
+        log::error!("Failed to upgrade: {}", err);
     }
 
     fn connection_keep_alive(&self) -> KeepAlive {
