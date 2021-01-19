@@ -27,16 +27,22 @@ pub struct StartingBalances {
 
 pub struct TestContext {
     swap_amounts: SwapAmounts,
-    alice_swap_factory: alice::SwapFactory,
+
+    alice_swap_factory: Option<alice::SwapFactory>,
     alice_starting_balances: StartingBalances,
+    alice_bitcoin_wallet: Arc<bitcoin::Wallet>,
+    alice_monero_wallet: Arc<monero::Wallet>,
+
     bob_swap_factory: bob::SwapFactory,
     bob_starting_balances: StartingBalances,
 }
 
 impl TestContext {
-    pub async fn new_swap_as_alice(&self) -> alice::Swap {
+    pub async fn new_swap_as_alice(&mut self) -> alice::Swap {
         let (swap, mut event_loop) = self
             .alice_swap_factory
+            .take()
+            .unwrap()
             .new_swap(self.swap_amounts)
             .await
             .unwrap();
@@ -58,8 +64,14 @@ impl TestContext {
         swap
     }
 
-    pub async fn recover_alice_from_db(&self) -> alice::Swap {
-        let (swap, mut event_loop) = self.alice_swap_factory.resume().await.unwrap();
+    pub async fn recover_alice_from_db(&mut self) -> alice::Swap {
+        let (swap, mut event_loop) = self
+            .alice_swap_factory
+            .take()
+            .unwrap()
+            .resume()
+            .await
+            .unwrap();
 
         tokio::spawn(async move { event_loop.run().await });
 
@@ -77,13 +89,7 @@ impl TestContext {
     pub async fn assert_alice_redeemed(&self, state: AliceState) {
         assert!(matches!(state, AliceState::BtcRedeemed));
 
-        let btc_balance_after_swap = self
-            .alice_swap_factory
-            .bitcoin_wallet
-            .as_ref()
-            .balance()
-            .await
-            .unwrap();
+        let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
         assert_eq!(
             btc_balance_after_swap,
             self.alice_starting_balances.btc + self.swap_amounts.btc
@@ -91,8 +97,7 @@ impl TestContext {
         );
 
         let xmr_balance_after_swap = self
-            .alice_swap_factory
-            .monero_wallet
+            .alice_monero_wallet
             .as_ref()
             .get_balance()
             .await
@@ -103,26 +108,18 @@ impl TestContext {
     pub async fn assert_alice_refunded(&self, state: AliceState) {
         assert!(matches!(state, AliceState::XmrRefunded));
 
-        let btc_balance_after_swap = self
-            .alice_swap_factory
-            .bitcoin_wallet
-            .as_ref()
-            .balance()
-            .await
-            .unwrap();
+        let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
         assert_eq!(btc_balance_after_swap, self.alice_starting_balances.btc);
 
         // Ensure that Alice's balance is refreshed as we use a newly created wallet
-        self.alice_swap_factory
-            .monero_wallet
+        self.alice_monero_wallet
             .as_ref()
             .inner
             .refresh()
             .await
             .unwrap();
         let xmr_balance_after_swap = self
-            .alice_swap_factory
-            .monero_wallet
+            .alice_monero_wallet
             .as_ref()
             .get_balance()
             .await
@@ -133,13 +130,7 @@ impl TestContext {
     pub async fn assert_alice_punished(&self, state: AliceState) {
         assert!(matches!(state, AliceState::BtcPunished));
 
-        let btc_balance_after_swap = self
-            .alice_swap_factory
-            .bitcoin_wallet
-            .as_ref()
-            .balance()
-            .await
-            .unwrap();
+        let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
         assert_eq!(
             btc_balance_after_swap,
             self.alice_starting_balances.btc + self.swap_amounts.btc
@@ -147,8 +138,7 @@ impl TestContext {
         );
 
         let xmr_balance_after_swap = self
-            .alice_swap_factory
-            .monero_wallet
+            .alice_monero_wallet
             .as_ref()
             .get_balance()
             .await
@@ -327,8 +317,8 @@ where
         Seed::random().unwrap(),
         config,
         Uuid::new_v4(),
-        alice_bitcoin_wallet,
-        alice_monero_wallet,
+        alice_bitcoin_wallet.clone(),
+        alice_monero_wallet.clone(),
         tempdir().unwrap().path().to_path_buf(),
         listen_address,
     )
@@ -360,8 +350,10 @@ where
 
     let test = TestContext {
         swap_amounts,
-        alice_swap_factory,
+        alice_swap_factory: Some(alice_swap_factory),
         alice_starting_balances,
+        alice_bitcoin_wallet,
+        alice_monero_wallet,
         bob_swap_factory,
         bob_starting_balances,
     };

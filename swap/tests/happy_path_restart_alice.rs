@@ -4,7 +4,7 @@ pub mod testutils;
 
 #[tokio::test]
 async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
-    testutils::setup_test(|ctx| async move {
+    testutils::setup_test(|mut ctx| async move {
         let alice_swap = ctx.new_swap_as_alice().await;
         let bob_swap = ctx.new_swap_as_bob().await;
 

@@ -92,7 +92,7 @@ impl SwapFactory {
         }
     }
 
-    pub async fn new_swap(&self, swap_amounts: SwapAmounts) -> Result<(Swap, EventLoop)> {
+    pub async fn new_swap(self, swap_amounts: SwapAmounts) -> Result<(Swap, EventLoop)> {
         let initial_state = init_alice_state(
             swap_amounts.btc,
             swap_amounts.xmr,
@@ -123,9 +123,9 @@ impl SwapFactory {
         ))
     }
 
-    pub async fn resume(&self) -> Result<(Swap, EventLoop)> {
+    pub async fn resume(self) -> Result<(Swap, EventLoop)> {
         // reopen the existing database
-        let db = Database::open(self.db_path.clone().as_path())?;
+        let db = Database::open(self.db_path.as_path())?;
 
         let resume_state = if let database::Swap::Alice(state) = db.get_state(self.swap_id)? {
             state.into()

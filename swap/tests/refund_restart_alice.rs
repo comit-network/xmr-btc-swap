@@ -6,7 +6,7 @@ pub mod testutils;
 /// then also refunds.
 #[tokio::test]
 async fn given_alice_restarts_after_xmr_is_locked_abort_swap() {
-    testutils::setup_test(|ctx| async move {
+    testutils::setup_test(|mut ctx| async move {
         let alice_swap = ctx.new_swap_as_alice().await;
         let bob_swap = ctx.new_swap_as_bob().await;
 
