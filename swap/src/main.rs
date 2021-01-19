@@ -23,7 +23,7 @@ use swap::{
     config::Config,
     database::Database,
     monero,
-    protocol::{alice, bob, bob::SwapFactory, StartingBalances},
+    protocol::{alice, bob, bob::Builder},
     trace::init_tracing,
     SwapAmounts,
 };
@@ -82,7 +82,7 @@ async fn main() -> Result<()> {
                 send_monero, receive_bitcoin, swap_id
             );
 
-            let alice_factory = alice::SwapFactory::new(
+            let alice_factory = alice::Builder::new(
                 seed,
                 config,
                 swap_id,
@@ -92,7 +92,8 @@ async fn main() -> Result<()> {
                 listen_addr,
             )
             .await;
-            let (swap, mut event_loop) = alice_factory.new_swap(swap_amounts).await?;
+            let (swap, mut event_loop) =
+                alice_factory.with_init_params(swap_amounts).build().await?;
 
             tokio::spawn(async move { event_loop.run().await });
             alice::run(swap).await?;
@@ -126,7 +127,7 @@ async fn main() -> Result<()> {
                 send_bitcoin, receive_monero, swap_id
             );
 
-            let bob_factory = SwapFactory::new(
+            let bob_factory = Builder::new(
                 seed,
                 db_path,
                 swap_id,
@@ -135,7 +136,10 @@ async fn main() -> Result<()> {
                 alice_addr,
                 alice_peer_id,
             );
-            let (swap, event_loop) = bob_factory.new_swap(swap_amounts, config).await?;
+            let (swap, event_loop) = bob_factory
+                .with_init_params(swap_amounts, config)
+                .build()
+                .await?;
 
             tokio::spawn(async move { event_loop.run().await });
             bob::run(swap).await?;
@@ -169,7 +173,7 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            let alice_factory = alice::SwapFactory::new(
+            let alice_factory = alice::Builder::new(
                 seed,
                 config,
                 swap_id,
@@ -179,7 +183,7 @@ async fn main() -> Result<()> {
                 listen_addr,
             )
             .await;
-            let (swap, mut event_loop) = alice_factory.resume().await?;
+            let (swap, mut event_loop) = alice_factory.build().await?;
 
             tokio::spawn(async move { event_loop.run().await });
             alice::run(swap).await?;
@@ -200,7 +204,7 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            let bob_factory = SwapFactory::new(
+            let bob_factory = Builder::new(
                 seed,
                 db_path,
                 swap_id,
@@ -209,7 +213,7 @@ async fn main() -> Result<()> {
                 alice_addr,
                 alice_peer_id,
             );
-            let (swap, event_loop) = bob_factory.resume().await?;
+            let (swap, event_loop) = bob_factory.build().await?;
 
             tokio::spawn(async move { event_loop.run().await });
             bob::run(swap).await?;

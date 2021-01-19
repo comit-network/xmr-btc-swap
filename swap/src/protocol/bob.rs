@@ -23,10 +23,7 @@ pub use self::{
     state::*,
     swap::{run, run_until},
 };
-use crate::{
-    config::Config, database::Database, network::transport::build, protocol::StartingBalances,
-    seed::Seed,
-};
+use crate::{config::Config, database::Database, network::transport::build, seed::Seed};
 use libp2p::identity::Keypair;
 use rand::rngs::OsRng;
 use std::{path::PathBuf, sync::Arc};
@@ -50,7 +47,7 @@ pub struct Swap {
     pub swap_id: Uuid,
 }
 
-pub struct SwapFactory {
+pub struct Builder {
     swap_id: Uuid,
     identity: Keypair,
     peer_id: PeerId,
@@ -61,9 +58,19 @@ pub struct SwapFactory {
 
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
+
+    init_params: InitParams,
 }
 
-impl SwapFactory {
+enum InitParams {
+    None,
+    New {
+        swap_amounts: SwapAmounts,
+        config: Config,
+    },
+}
+
+impl Builder {
     pub fn new(
         seed: Seed,
         db_path: PathBuf,
@@ -85,63 +92,75 @@ impl SwapFactory {
             alice_peer_id,
             bitcoin_wallet,
             monero_wallet,
+            init_params: InitParams::None,
         }
     }
 
-    pub async fn new_swap(
-        self,
-        swap_amounts: SwapAmounts,
-        config: Config,
-    ) -> Result<(bob::Swap, bob::EventLoop)> {
-        let initial_state = self
-            .make_initial_state(swap_amounts.btc, swap_amounts.xmr, config)
-            .await?;
-
-        let (event_loop, event_loop_handle) = self.init_event_loop()?;
-
-        let db = Database::open(self.db_path.as_path())?;
-
-        Ok((
-            Swap {
-                state: initial_state,
-                event_loop_handle,
-                db,
-                bitcoin_wallet: self.bitcoin_wallet.clone(),
-                monero_wallet: self.monero_wallet.clone(),
-                swap_id: self.swap_id,
+    pub fn with_init_params(self, swap_amounts: SwapAmounts, config: Config) -> Self {
+        Self {
+            init_params: InitParams::New {
+                swap_amounts,
+                config,
             },
-            event_loop,
-        ))
+            ..self
+        }
     }
 
-    pub async fn resume(self) -> Result<(bob::Swap, bob::EventLoop)> {
-        // reopen the existing database
-        let db = Database::open(self.db_path.as_path())?;
+    pub async fn build(self) -> Result<(bob::Swap, bob::EventLoop)> {
+        match self.init_params {
+            InitParams::New {
+                swap_amounts,
+                config,
+            } => {
+                let initial_state = self
+                    .make_initial_state(swap_amounts.btc, swap_amounts.xmr, config)
+                    .await?;
 
-        let resume_state = if let database::Swap::Bob(state) = db.get_state(self.swap_id)? {
-            state.into()
-        } else {
-            bail!(
-                "Trying to load swap with id {} for the wrong direction.",
-                self.swap_id
-            )
-        };
+                let (event_loop, event_loop_handle) = self.init_event_loop()?;
 
-        let (event_loop, event_loop_handle) = self.init_event_loop()?;
+                let db = Database::open(self.db_path.as_path())?;
 
-        Ok((
-            Swap {
-                state: resume_state,
-                event_loop_handle,
-                db,
-                bitcoin_wallet: self.bitcoin_wallet.clone(),
-                monero_wallet: self.monero_wallet.clone(),
-                swap_id: self.swap_id,
-            },
-            event_loop,
-        ))
+                Ok((
+                    Swap {
+                        state: initial_state,
+                        event_loop_handle,
+                        db,
+                        bitcoin_wallet: self.bitcoin_wallet.clone(),
+                        monero_wallet: self.monero_wallet.clone(),
+                        swap_id: self.swap_id,
+                    },
+                    event_loop,
+                ))
+            }
+            InitParams::None => {
+                // reopen the existing database
+                let db = Database::open(self.db_path.as_path())?;
+
+                let resume_state = if let database::Swap::Bob(state) = db.get_state(self.swap_id)? {
+                    state.into()
+                } else {
+                    bail!(
+                        "Trying to load swap with id {} for the wrong direction.",
+                        self.swap_id
+                    )
+                };
+
+                let (event_loop, event_loop_handle) = self.init_event_loop()?;
+
+                Ok((
+                    Swap {
+                        state: resume_state,
+                        event_loop_handle,
+                        db,
+                        bitcoin_wallet: self.bitcoin_wallet.clone(),
+                        monero_wallet: self.monero_wallet.clone(),
+                        swap_id: self.swap_id,
+                    },
+                    event_loop,
+                ))
+            }
+        }
     }
-
     fn init_event_loop(
         &self,
     ) -> Result<(bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle)> {

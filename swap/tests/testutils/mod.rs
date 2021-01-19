@@ -9,7 +9,7 @@ use swap::{
     bitcoin,
     config::Config,
     monero,
-    protocol::{alice, alice::AliceState, bob, bob::BobState, StartingBalances},
+    protocol::{alice, alice::AliceState, bob, bob::BobState},
     seed::Seed,
     SwapAmounts,
 };
@@ -28,12 +28,12 @@ pub struct StartingBalances {
 pub struct TestContext {
     swap_amounts: SwapAmounts,
 
-    alice_swap_factory: Option<alice::SwapFactory>,
+    alice_swap_factory: Option<alice::Builder>,
     alice_starting_balances: StartingBalances,
     alice_bitcoin_wallet: Arc<bitcoin::Wallet>,
     alice_monero_wallet: Arc<monero::Wallet>,
 
-    bob_swap_factory: Option<bob::SwapFactory>,
+    bob_swap_factory: Option<bob::Builder>,
     bob_starting_balances: StartingBalances,
     bob_bitcoin_wallet: Arc<bitcoin::Wallet>,
     bob_monero_wallet: Arc<monero::Wallet>,
@@ -45,7 +45,8 @@ impl TestContext {
             .alice_swap_factory
             .take()
             .unwrap()
-            .new_swap(self.swap_amounts)
+            .with_init_params(self.swap_amounts)
+            .build()
             .await
             .unwrap();
 
@@ -59,7 +60,8 @@ impl TestContext {
             .bob_swap_factory
             .take()
             .unwrap()
-            .new_swap(self.swap_amounts, Config::regtest())
+            .with_init_params(self.swap_amounts, Config::regtest())
+            .build()
             .await
             .unwrap();
 
@@ -73,7 +75,7 @@ impl TestContext {
             .alice_swap_factory
             .take()
             .unwrap()
-            .resume()
+            .build()
             .await
             .unwrap();
 
@@ -83,13 +85,7 @@ impl TestContext {
     }
 
     pub async fn recover_bob_from_db(&mut self) -> bob::Swap {
-        let (swap, event_loop) = self
-            .bob_swap_factory
-            .take()
-            .unwrap()
-            .resume()
-            .await
-            .unwrap();
+        let (swap, event_loop) = self.bob_swap_factory.take().unwrap().build().await.unwrap();
 
         tokio::spawn(async move { event_loop.run().await });
 
@@ -283,7 +279,7 @@ where
     )
     .await;
 
-    let alice_swap_factory = alice::SwapFactory::new(
+    let alice_swap_factory = alice::Builder::new(
         Seed::random().unwrap(),
         config,
         Uuid::new_v4(),
@@ -308,7 +304,7 @@ where
     )
     .await;
 
-    let bob_swap_factory = bob::SwapFactory::new(
+    let bob_swap_factory = bob::Builder::new(
         Seed::random().unwrap(),
         tempdir().unwrap().path().to_path_buf(),
         Uuid::new_v4(),
