@@ -31,7 +31,7 @@ enum InboundProtocolState<T, E> {
 
 enum OutboundProtocolState<T, E> {
     GotFunctionNeedSubstream(OutboundProtocolFn<T, E>),
-    GotSubstreamNeedFunction(OutboundSubstream),
+    GotFunctionRequestedSubstream(OutboundProtocolFn<T, E>),
     Executing(Protocol<T, E>),
 }
 
@@ -45,11 +45,6 @@ enum ProtocolState<I, O, E> {
 
 pub struct NMessageHandler<TInboundOut, TOutboundOut, TErr> {
     state: ProtocolState<TInboundOut, TOutboundOut, TErr>,
-
-    // TODO: See if it can be included in OutboundProtocolState.
-    // Or it can be inferred from OutboundProtocolState current variant.
-    substream_request: Option<SubstreamProtocol<NMessageProtocol, ()>>,
-
     info: &'static [u8],
 }
 
@@ -57,7 +52,6 @@ impl<TInboundOut, TOutboundOut, TErr> NMessageHandler<TInboundOut, TOutboundOut,
     pub fn new(info: &'static [u8]) -> Self {
         Self {
             state: ProtocolState::None,
-            substream_request: None,
             info,
         }
     }
@@ -171,17 +165,16 @@ where
         _: Self::OutboundOpenInfo,
     ) {
         match mem::replace(&mut self.state, ProtocolState::Poisoned) {
-            ProtocolState::None => {
-                self.state = ProtocolState::Outbound(
-                    OutboundProtocolState::GotSubstreamNeedFunction(substream),
-                );
-            }
-            ProtocolState::Outbound(OutboundProtocolState::GotFunctionNeedSubstream(
+            ProtocolState::Outbound(OutboundProtocolState::GotFunctionRequestedSubstream(
                 protocol_fn,
             )) => {
                 self.state = ProtocolState::Outbound(OutboundProtocolState::Executing(
                     protocol_fn(substream),
                 ));
+            }
+            ProtocolState::None
+            | ProtocolState::Outbound(OutboundProtocolState::GotFunctionNeedSubstream(_)) => {
+                panic!("Illegal state, receiving substream means it was requested.");
             }
             ProtocolState::Outbound(_) | ProtocolState::Done => {
                 panic!("Illegal state, substream is already present.");
@@ -223,21 +216,11 @@ where
                 }
             }
             ProtocolInEvent::ExecuteOutbound(protocol_fn) => {
-                self.substream_request =
-                    Some(SubstreamProtocol::new(NMessageProtocol::new(self.info), ()));
-
                 match mem::replace(&mut self.state, ProtocolState::Poisoned) {
                     ProtocolState::None => {
                         self.state = ProtocolState::Outbound(
                             OutboundProtocolState::GotFunctionNeedSubstream(protocol_fn),
                         );
-                    }
-                    ProtocolState::Outbound(OutboundProtocolState::GotSubstreamNeedFunction(
-                        substream,
-                    )) => {
-                        self.state = ProtocolState::Outbound(OutboundProtocolState::Executing(
-                            protocol_fn(substream),
-                        ));
                     }
                     ProtocolState::Outbound(_) | ProtocolState::Done => {
                         panic!("Illegal state, protocol fn is already present.");
@@ -276,10 +259,6 @@ where
             Self::Error,
         >,
     > {
-        if let Some(protocol) = self.substream_request.take() {
-            return Poll::Ready(ProtocolsHandlerEvent::OutboundSubstreamRequest { protocol });
-        }
-
         match mem::replace(&mut self.state, ProtocolState::Poisoned) {
             ProtocolState::Inbound(InboundProtocolState::Executing(mut protocol)) => match protocol
                 .poll_unpin(cx)
@@ -321,6 +300,14 @@ where
                         Poll::Pending
                     }
                 }
+            }
+            ProtocolState::Outbound(OutboundProtocolState::GotFunctionNeedSubstream(protocol)) => {
+                self.state = ProtocolState::Outbound(
+                    OutboundProtocolState::GotFunctionRequestedSubstream(protocol),
+                );
+                Poll::Ready(ProtocolsHandlerEvent::OutboundSubstreamRequest {
+                    protocol: SubstreamProtocol::new(NMessageProtocol::new(self.info), ()),
+                })
             }
             ProtocolState::Poisoned => {
                 unreachable!("Protocol is poisoned (transient state)")
