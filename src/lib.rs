@@ -248,6 +248,7 @@ where
         KeepAlive::Yes
     }
 
+    #[allow(clippy::type_complexity)]
     fn poll(
         &mut self,
         cx: &mut Context<'_>,
@@ -475,6 +476,7 @@ where
 }
 
 #[cfg(test)]
+#[allow(clippy::blacklisted_name)]
 mod tests {
     use super::*;
     use crate::swarm_harness::await_events_or_timeout;
