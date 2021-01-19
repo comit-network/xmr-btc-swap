@@ -33,8 +33,10 @@ pub struct TestContext {
     alice_bitcoin_wallet: Arc<bitcoin::Wallet>,
     alice_monero_wallet: Arc<monero::Wallet>,
 
-    bob_swap_factory: bob::SwapFactory,
+    bob_swap_factory: Option<bob::SwapFactory>,
     bob_starting_balances: StartingBalances,
+    bob_bitcoin_wallet: Arc<bitcoin::Wallet>,
+    bob_monero_wallet: Arc<monero::Wallet>,
 }
 
 impl TestContext {
@@ -52,9 +54,11 @@ impl TestContext {
         swap
     }
 
-    pub async fn new_swap_as_bob(&self) -> bob::Swap {
+    pub async fn new_swap_as_bob(&mut self) -> bob::Swap {
         let (swap, event_loop) = self
             .bob_swap_factory
+            .take()
+            .unwrap()
             .new_swap(self.swap_amounts, Config::regtest())
             .await
             .unwrap();
@@ -78,8 +82,14 @@ impl TestContext {
         swap
     }
 
-    pub async fn recover_bob_from_db(&self) -> bob::Swap {
-        let (swap, event_loop) = self.bob_swap_factory.resume().await.unwrap();
+    pub async fn recover_bob_from_db(&mut self) -> bob::Swap {
+        let (swap, event_loop) = self
+            .bob_swap_factory
+            .take()
+            .unwrap()
+            .resume()
+            .await
+            .unwrap();
 
         tokio::spawn(async move { event_loop.run().await });
 
@@ -154,39 +164,25 @@ impl TestContext {
         };
 
         let lock_tx_bitcoin_fee = self
-            .bob_swap_factory
-            .bitcoin_wallet
+            .bob_bitcoin_wallet
             .transaction_fee(lock_tx_id)
             .await
             .unwrap();
 
-        let btc_balance_after_swap = self
-            .bob_swap_factory
-            .bitcoin_wallet
-            .as_ref()
-            .balance()
-            .await
-            .unwrap();
+        let btc_balance_after_swap = self.bob_bitcoin_wallet.as_ref().balance().await.unwrap();
         assert_eq!(
             btc_balance_after_swap,
             self.bob_starting_balances.btc - self.swap_amounts.btc - lock_tx_bitcoin_fee
         );
 
         // Ensure that Bob's balance is refreshed as we use a newly created wallet
-        self.bob_swap_factory
-            .monero_wallet
+        self.bob_monero_wallet
             .as_ref()
             .inner
             .refresh()
             .await
             .unwrap();
-        let xmr_balance_after_swap = self
-            .bob_swap_factory
-            .monero_wallet
-            .as_ref()
-            .get_balance()
-            .await
-            .unwrap();
+        let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().get_balance().await.unwrap();
         assert_eq!(
             xmr_balance_after_swap,
             self.bob_starting_balances.xmr + self.swap_amounts.xmr
@@ -200,19 +196,12 @@ impl TestContext {
             panic!("Bob in unexpected state");
         };
         let lock_tx_bitcoin_fee = self
-            .bob_swap_factory
-            .bitcoin_wallet
+            .bob_bitcoin_wallet
             .transaction_fee(lock_tx_id)
             .await
             .unwrap();
 
-        let btc_balance_after_swap = self
-            .bob_swap_factory
-            .bitcoin_wallet
-            .as_ref()
-            .balance()
-            .await
-            .unwrap();
+        let btc_balance_after_swap = self.bob_bitcoin_wallet.as_ref().balance().await.unwrap();
 
         let alice_submitted_cancel = btc_balance_after_swap
             == self.bob_starting_balances.btc
@@ -228,13 +217,7 @@ impl TestContext {
         // Since we cannot be sure who submitted it we have to assert accordingly
         assert!(alice_submitted_cancel || bob_submitted_cancel);
 
-        let xmr_balance_after_swap = self
-            .bob_swap_factory
-            .monero_wallet
-            .as_ref()
-            .get_balance()
-            .await
-            .unwrap();
+        let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().get_balance().await.unwrap();
         assert_eq!(xmr_balance_after_swap, self.bob_starting_balances.xmr);
     }
 
@@ -246,31 +229,18 @@ impl TestContext {
         };
 
         let lock_tx_bitcoin_fee = self
-            .bob_swap_factory
-            .bitcoin_wallet
+            .bob_bitcoin_wallet
             .transaction_fee(lock_tx_id)
             .await
             .unwrap();
 
-        let btc_balance_after_swap = self
-            .bob_swap_factory
-            .bitcoin_wallet
-            .as_ref()
-            .balance()
-            .await
-            .unwrap();
+        let btc_balance_after_swap = self.bob_bitcoin_wallet.as_ref().balance().await.unwrap();
         assert_eq!(
             btc_balance_after_swap,
             self.bob_starting_balances.btc - self.swap_amounts.btc - lock_tx_bitcoin_fee
         );
 
-        let xmr_balance_after_swap = self
-            .bob_swap_factory
-            .monero_wallet
-            .as_ref()
-            .get_balance()
-            .await
-            .unwrap();
+        let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().get_balance().await.unwrap();
         assert_eq!(xmr_balance_after_swap, self.bob_starting_balances.xmr);
     }
 }
@@ -342,8 +312,8 @@ where
         Seed::random().unwrap(),
         tempdir().unwrap().path().to_path_buf(),
         Uuid::new_v4(),
-        bob_bitcoin_wallet,
-        bob_monero_wallet,
+        bob_bitcoin_wallet.clone(),
+        bob_monero_wallet.clone(),
         alice_swap_factory.listen_address(),
         alice_swap_factory.peer_id(),
     );
@@ -354,8 +324,10 @@ where
         alice_starting_balances,
         alice_bitcoin_wallet,
         alice_monero_wallet,
-        bob_swap_factory,
+        bob_swap_factory: Some(bob_swap_factory),
         bob_starting_balances,
+        bob_bitcoin_wallet,
+        bob_monero_wallet,
     };
 
     testfn(test).await

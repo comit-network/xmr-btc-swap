@@ -59,8 +59,8 @@ pub struct SwapFactory {
     alice_address: Multiaddr,
     alice_peer_id: PeerId,
 
-    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
-    pub monero_wallet: Arc<monero::Wallet>,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
 }
 
 impl SwapFactory {
@@ -89,7 +89,7 @@ impl SwapFactory {
     }
 
     pub async fn new_swap(
-        &self,
+        self,
         swap_amounts: SwapAmounts,
         config: Config,
     ) -> Result<(bob::Swap, bob::EventLoop)> {
@@ -114,9 +114,9 @@ impl SwapFactory {
         ))
     }
 
-    pub async fn resume(&self) -> Result<(bob::Swap, bob::EventLoop)> {
+    pub async fn resume(self) -> Result<(bob::Swap, bob::EventLoop)> {
         // reopen the existing database
-        let db = Database::open(self.db_path.clone().as_path())?;
+        let db = Database::open(self.db_path.as_path())?;
 
         let resume_state = if let database::Swap::Bob(state) = db.get_state(self.swap_id)? {
             state.into()
