@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
-use rand::{CryptoRng, RngCore};
+use rand::{rngs::OsRng, CryptoRng, RngCore};
 use std::sync::Arc;
 use tokio::select;
 use tracing::{debug, info};
@@ -13,7 +13,6 @@ use crate::{
     protocol::bob::{self, event_loop::EventLoopHandle, state::*},
     ExpiredTimelocks, SwapAmounts,
 };
-use ecdsa_fun::fun::rand_core::OsRng;
 
 pub fn is_complete(state: &BobState) -> bool {
     matches!(
