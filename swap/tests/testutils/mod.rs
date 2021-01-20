@@ -2,9 +2,9 @@ use crate::testutils;
 use bitcoin_harness::Bitcoind;
 use futures::Future;
 use get_port::get_port;
-use libp2p::core::Multiaddr;
+use libp2p::{core::Multiaddr, PeerId};
 use monero_harness::{image, Monero};
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 use swap::{
     bitcoin,
     config::Config,
@@ -25,15 +25,68 @@ pub struct StartingBalances {
     pub btc: bitcoin::Amount,
 }
 
+struct AliceParams {
+    seed: Seed,
+    config: Config,
+    swap_id: Uuid,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
+    db_path: PathBuf,
+    listen_address: Multiaddr,
+}
+
+impl AliceParams {
+    pub async fn builder(&self) -> alice::Builder {
+        alice::Builder::new(
+            self.seed,
+            self.config,
+            self.swap_id,
+            self.bitcoin_wallet.clone(),
+            self.monero_wallet.clone(),
+            self.db_path.clone(),
+            self.listen_address.clone(),
+        )
+        .await
+    }
+
+    async fn peer_id(&self) -> PeerId {
+        self.builder().await.peer_id()
+    }
+}
+
+struct BobParams {
+    seed: Seed,
+    db_path: PathBuf,
+    swap_id: Uuid,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
+    alice_address: Multiaddr,
+    alice_peer_id: PeerId,
+}
+
+impl BobParams {
+    pub fn builder(&self) -> bob::Builder {
+        bob::Builder::new(
+            self.seed,
+            self.db_path.clone(),
+            self.swap_id,
+            self.bitcoin_wallet.clone(),
+            self.monero_wallet.clone(),
+            self.alice_address.clone(),
+            self.alice_peer_id.clone(),
+        )
+    }
+}
+
 pub struct TestContext {
     swap_amounts: SwapAmounts,
 
-    alice_swap_factory: Option<alice::Builder>,
+    alice_params: AliceParams,
     alice_starting_balances: StartingBalances,
     alice_bitcoin_wallet: Arc<bitcoin::Wallet>,
     alice_monero_wallet: Arc<monero::Wallet>,
 
-    bob_swap_factory: Option<bob::Builder>,
+    bob_params: BobParams,
     bob_starting_balances: StartingBalances,
     bob_bitcoin_wallet: Arc<bitcoin::Wallet>,
     bob_monero_wallet: Arc<monero::Wallet>,
@@ -42,9 +95,9 @@ pub struct TestContext {
 impl TestContext {
     pub async fn new_swap_as_alice(&mut self) -> alice::Swap {
         let (swap, mut event_loop) = self
-            .alice_swap_factory
-            .take()
-            .unwrap()
+            .alice_params
+            .builder()
+            .await
             .with_init_params(self.swap_amounts)
             .build()
             .await
@@ -57,9 +110,8 @@ impl TestContext {
 
     pub async fn new_swap_as_bob(&mut self) -> bob::Swap {
         let (swap, event_loop) = self
-            .bob_swap_factory
-            .take()
-            .unwrap()
+            .bob_params
+            .builder()
             .with_init_params(self.swap_amounts, Config::regtest())
             .build()
             .await
@@ -71,13 +123,7 @@ impl TestContext {
     }
 
     pub async fn recover_alice_from_db(&mut self) -> alice::Swap {
-        let (swap, mut event_loop) = self
-            .alice_swap_factory
-            .take()
-            .unwrap()
-            .build()
-            .await
-            .unwrap();
+        let (swap, mut event_loop) = self.alice_params.builder().await.build().await.unwrap();
 
         tokio::spawn(async move { event_loop.run().await });
 
@@ -85,7 +131,7 @@ impl TestContext {
     }
 
     pub async fn recover_bob_from_db(&mut self) -> bob::Swap {
-        let (swap, event_loop) = self.bob_swap_factory.take().unwrap().build().await.unwrap();
+        let (swap, event_loop) = self.bob_params.builder().build().await.unwrap();
 
         tokio::spawn(async move { event_loop.run().await });
 
@@ -279,16 +325,15 @@ where
     )
     .await;
 
-    let alice_swap_factory = alice::Builder::new(
-        Seed::random().unwrap(),
+    let alice_params = AliceParams {
+        seed: Seed::random().unwrap(),
         config,
-        Uuid::new_v4(),
-        alice_bitcoin_wallet.clone(),
-        alice_monero_wallet.clone(),
-        tempdir().unwrap().path().to_path_buf(),
+        swap_id: Uuid::new_v4(),
+        bitcoin_wallet: alice_bitcoin_wallet.clone(),
+        monero_wallet: alice_monero_wallet.clone(),
+        db_path: tempdir().unwrap().path().to_path_buf(),
         listen_address,
-    )
-    .await;
+    };
 
     let bob_starting_balances = StartingBalances {
         xmr: monero::Amount::ZERO,
@@ -304,23 +349,23 @@ where
     )
     .await;
 
-    let bob_swap_factory = bob::Builder::new(
-        Seed::random().unwrap(),
-        tempdir().unwrap().path().to_path_buf(),
-        Uuid::new_v4(),
-        bob_bitcoin_wallet.clone(),
-        bob_monero_wallet.clone(),
-        alice_swap_factory.listen_address(),
-        alice_swap_factory.peer_id(),
-    );
+    let bob_params = BobParams {
+        seed: Seed::random().unwrap(),
+        db_path: tempdir().unwrap().path().to_path_buf(),
+        swap_id: Uuid::new_v4(),
+        bitcoin_wallet: bob_bitcoin_wallet.clone(),
+        monero_wallet: bob_monero_wallet.clone(),
+        alice_address: alice_params.listen_address.clone(),
+        alice_peer_id: alice_params.peer_id().await,
+    };
 
     let test = TestContext {
         swap_amounts,
-        alice_swap_factory: Some(alice_swap_factory),
+        alice_params,
         alice_starting_balances,
         alice_bitcoin_wallet,
         alice_monero_wallet,
-        bob_swap_factory: Some(bob_swap_factory),
+        bob_params,
         bob_starting_balances,
         bob_bitcoin_wallet,
         bob_monero_wallet,
