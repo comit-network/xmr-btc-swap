@@ -107,19 +107,11 @@ impl Builder {
     pub async fn build(self) -> Result<(Swap, EventLoop)> {
         match self.init_params {
             InitParams::New { swap_amounts } => {
-                let initial_state = init_alice_state(
-                    swap_amounts.btc,
-                    swap_amounts.xmr,
-                    self.bitcoin_wallet.clone(),
-                    self.config,
-                )
-                .await?;
+                let initial_state = self
+                    .make_initial_state(swap_amounts.btc, swap_amounts.xmr)
+                    .await?;
 
-                let (event_loop, event_loop_handle) = init_alice_event_loop(
-                    self.listen_address.clone(),
-                    self.identity.clone(),
-                    self.peer_id.clone(),
-                )?;
+                let (event_loop, event_loop_handle) = self.init_event_loop()?;
 
                 let db = Database::open(self.db_path.as_path())?;
 
@@ -150,11 +142,7 @@ impl Builder {
                         )
                     };
 
-                let (event_loop, event_loop_handle) = init_alice_event_loop(
-                    self.listen_address.clone(),
-                    self.identity.clone(),
-                    self.peer_id.clone(),
-                )?;
+                let (event_loop, event_loop_handle) = self.init_event_loop()?;
 
                 Ok((
                     Swap {
@@ -179,49 +167,49 @@ impl Builder {
     pub fn listen_address(&self) -> Multiaddr {
         self.listen_address.clone()
     }
-}
 
-async fn init_alice_state(
-    btc_to_swap: bitcoin::Amount,
-    xmr_to_swap: monero::Amount,
-    alice_btc_wallet: Arc<bitcoin::Wallet>,
-    config: Config,
-) -> Result<AliceState> {
-    let rng = &mut OsRng;
+    async fn make_initial_state(
+        &self,
+        btc_to_swap: bitcoin::Amount,
+        xmr_to_swap: monero::Amount,
+    ) -> Result<AliceState> {
+        let rng = &mut OsRng;
 
-    let amounts = SwapAmounts {
-        btc: btc_to_swap,
-        xmr: xmr_to_swap,
-    };
+        let amounts = SwapAmounts {
+            btc: btc_to_swap,
+            xmr: xmr_to_swap,
+        };
 
-    let a = bitcoin::SecretKey::new_random(rng);
-    let s_a = cross_curve_dleq::Scalar::random(rng);
-    let v_a = monero::PrivateViewKey::new_random(rng);
-    let redeem_address = alice_btc_wallet.as_ref().new_address().await?;
-    let punish_address = redeem_address.clone();
-    let state0 = State0::new(
-        a,
-        s_a,
-        v_a,
-        amounts.btc,
-        amounts.xmr,
-        config.bitcoin_cancel_timelock,
-        config.bitcoin_punish_timelock,
-        redeem_address,
-        punish_address,
-    );
+        let a = bitcoin::SecretKey::new_random(rng);
+        let s_a = cross_curve_dleq::Scalar::random(rng);
+        let v_a = monero::PrivateViewKey::new_random(rng);
+        let redeem_address = self.bitcoin_wallet.as_ref().new_address().await?;
+        let punish_address = redeem_address.clone();
+        let state0 = State0::new(
+            a,
+            s_a,
+            v_a,
+            amounts.btc,
+            amounts.xmr,
+            self.config.bitcoin_cancel_timelock,
+            self.config.bitcoin_punish_timelock,
+            redeem_address,
+            punish_address,
+        );
 
-    Ok(AliceState::Started { amounts, state0 })
-}
+        Ok(AliceState::Started { amounts, state0 })
+    }
 
-fn init_alice_event_loop(
-    listen: Multiaddr,
-    identity: Keypair,
-    peer_id: PeerId,
-) -> Result<(EventLoop, EventLoopHandle)> {
-    let alice_behaviour = Behaviour::default();
-    let alice_transport = build(identity)?;
-    EventLoop::new(alice_transport, alice_behaviour, listen, peer_id)
+    fn init_event_loop(&self) -> Result<(EventLoop, EventLoopHandle)> {
+        let alice_behaviour = Behaviour::default();
+        let alice_transport = build(self.identity.clone())?;
+        EventLoop::new(
+            alice_transport,
+            alice_behaviour,
+            self.listen_address.clone(),
+            self.peer_id.clone(),
+        )
+    }
 }
 
 #[derive(Debug)]
