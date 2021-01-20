@@ -23,9 +23,9 @@ use swap::{
     config::Config,
     database::Database,
     monero,
-    protocol::{alice, bob, bob::SwapFactory},
+    protocol::{alice, bob, bob::SwapFactory, StartingBalances},
     trace::init_tracing,
-    StartingBalances, SwapAmounts,
+    SwapAmounts,
 };
 use tracing::{info, log::LevelFilter};
 use uuid::Uuid;

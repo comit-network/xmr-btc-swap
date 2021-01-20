@@ -12,7 +12,7 @@ use crate::{
         Seed as NetworkSeed,
     },
     protocol::bob,
-    StartingBalances, SwapAmounts,
+    SwapAmounts,
 };
 
 pub use self::{
@@ -24,7 +24,10 @@ pub use self::{
     state::*,
     swap::{run, run_until},
 };
-use crate::{config::Config, database::Database, network::transport::build, seed::Seed};
+use crate::{
+    config::Config, database::Database, network::transport::build, protocol::StartingBalances,
+    seed::Seed,
+};
 use libp2p::{core::Multiaddr, identity::Keypair};
 use rand::rngs::OsRng;
 use std::{path::PathBuf, sync::Arc};

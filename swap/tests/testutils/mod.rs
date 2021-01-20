@@ -9,9 +9,9 @@ use swap::{
     bitcoin,
     config::Config,
     monero,
-    protocol::{alice, alice::AliceState, bob, bob::BobState},
+    protocol::{alice, alice::AliceState, bob, bob::BobState, StartingBalances},
     seed::Seed,
-    StartingBalances, SwapAmounts,
+    SwapAmounts,
 };
 use tempfile::tempdir;
 use testcontainers::{clients::Cli, Container};
