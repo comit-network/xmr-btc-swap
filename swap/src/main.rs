@@ -78,7 +78,7 @@ async fn main() -> Result<()> {
             let swap_id = Uuid::new_v4();
 
             info!(
-                "Swap sending {} and receiving {} starting with ID {}",
+                "Swap sending {} and receiving {} started with ID {}",
                 send_monero, receive_bitcoin, swap_id
             );
 
@@ -123,7 +123,7 @@ async fn main() -> Result<()> {
             let swap_id = Uuid::new_v4();
 
             info!(
-                "Swap sending {} and receiving {} starting with ID {}",
+                "Swap sending {} and receiving {} started with ID {}",
                 send_bitcoin, receive_monero, swap_id
             );
 
