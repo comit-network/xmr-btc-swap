@@ -23,7 +23,7 @@ use swap::{
     config::Config,
     database::Database,
     monero,
-    protocol::{alice, bob, bob::SwapFactory, StartingBalances},
+    protocol::{alice, bob, bob::Builder},
     trace::init_tracing,
     SwapAmounts,
 };
@@ -67,7 +67,7 @@ async fn main() -> Result<()> {
                 btc: receive_bitcoin,
             };
 
-            let (bitcoin_wallet, monero_wallet, starting_balances) = setup_wallets(
+            let (bitcoin_wallet, monero_wallet) = setup_wallets(
                 bitcoind_url,
                 bitcoin_wallet_name.as_str(),
                 monero_wallet_rpc_url,
@@ -82,18 +82,18 @@ async fn main() -> Result<()> {
                 send_monero, receive_bitcoin, swap_id
             );
 
-            let alice_factory = alice::SwapFactory::new(
+            let alice_factory = alice::Builder::new(
                 seed,
                 config,
                 swap_id,
-                bitcoin_wallet,
-                monero_wallet,
-                starting_balances,
+                Arc::new(bitcoin_wallet),
+                Arc::new(monero_wallet),
                 db_path,
                 listen_addr,
             )
             .await;
-            let (swap, mut event_loop) = alice_factory.new_swap_as_alice(swap_amounts).await?;
+            let (swap, mut event_loop) =
+                alice_factory.with_init_params(swap_amounts).build().await?;
 
             tokio::spawn(async move { event_loop.run().await });
             alice::run(swap).await?;
@@ -112,7 +112,7 @@ async fn main() -> Result<()> {
                 xmr: receive_monero,
             };
 
-            let (bitcoin_wallet, monero_wallet, starting_balances) = setup_wallets(
+            let (bitcoin_wallet, monero_wallet) = setup_wallets(
                 bitcoind_url,
                 bitcoin_wallet_name.as_str(),
                 monero_wallet_rpc_url,
@@ -127,18 +127,19 @@ async fn main() -> Result<()> {
                 send_bitcoin, receive_monero, swap_id
             );
 
-            let bob_factory = SwapFactory::new(
+            let bob_factory = Builder::new(
                 seed,
                 db_path,
                 swap_id,
-                bitcoin_wallet,
-                monero_wallet,
-                config,
-                starting_balances,
+                Arc::new(bitcoin_wallet),
+                Arc::new(monero_wallet),
                 alice_addr,
                 alice_peer_id,
             );
-            let (swap, event_loop) = bob_factory.new_swap_as_bob(swap_amounts).await?;
+            let (swap, event_loop) = bob_factory
+                .with_init_params(swap_amounts, config)
+                .build()
+                .await?;
 
             tokio::spawn(async move { event_loop.run().await });
             bob::run(swap).await?;
@@ -164,7 +165,7 @@ async fn main() -> Result<()> {
             monero_wallet_rpc_url,
             listen_addr,
         }) => {
-            let (bitcoin_wallet, monero_wallet, starting_balances) = setup_wallets(
+            let (bitcoin_wallet, monero_wallet) = setup_wallets(
                 bitcoind_url,
                 bitcoin_wallet_name.as_str(),
                 monero_wallet_rpc_url,
@@ -172,18 +173,17 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            let alice_factory = alice::SwapFactory::new(
+            let alice_factory = alice::Builder::new(
                 seed,
                 config,
                 swap_id,
-                bitcoin_wallet,
-                monero_wallet,
-                starting_balances,
+                Arc::new(bitcoin_wallet),
+                Arc::new(monero_wallet),
                 db_path,
                 listen_addr,
             )
             .await;
-            let (swap, mut event_loop) = alice_factory.recover_alice_from_db().await?;
+            let (swap, mut event_loop) = alice_factory.build().await?;
 
             tokio::spawn(async move { event_loop.run().await });
             alice::run(swap).await?;
@@ -196,7 +196,7 @@ async fn main() -> Result<()> {
             alice_peer_id,
             alice_addr,
         }) => {
-            let (bitcoin_wallet, monero_wallet, starting_balances) = setup_wallets(
+            let (bitcoin_wallet, monero_wallet) = setup_wallets(
                 bitcoind_url,
                 bitcoin_wallet_name.as_str(),
                 monero_wallet_rpc_url,
@@ -204,18 +204,16 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            let bob_factory = SwapFactory::new(
+            let bob_factory = Builder::new(
                 seed,
                 db_path,
                 swap_id,
-                bitcoin_wallet,
-                monero_wallet,
-                config,
-                starting_balances,
+                Arc::new(bitcoin_wallet),
+                Arc::new(monero_wallet),
                 alice_addr,
                 alice_peer_id,
             );
-            let (swap, event_loop) = bob_factory.recover_bob_from_db().await?;
+            let (swap, event_loop) = bob_factory.build().await?;
 
             tokio::spawn(async move { event_loop.run().await });
             bob::run(swap).await?;
@@ -230,11 +228,7 @@ async fn setup_wallets(
     bitcoin_wallet_name: &str,
     monero_wallet_rpc_url: url::Url,
     config: Config,
-) -> Result<(
-    Arc<swap::bitcoin::Wallet>,
-    Arc<swap::monero::Wallet>,
-    StartingBalances,
-)> {
+) -> Result<(swap::bitcoin::Wallet, swap::monero::Wallet)> {
     let bitcoin_wallet =
         swap::bitcoin::Wallet::new(bitcoin_wallet_name, bitcoind_url, config.bitcoin_network)
             .await?;
@@ -243,7 +237,6 @@ async fn setup_wallets(
         "Connection to Bitcoin wallet succeeded, balance: {}",
         bitcoin_balance
     );
-    let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
     let monero_wallet = monero::Wallet::new(monero_wallet_rpc_url, config.monero_network);
     let monero_balance = monero_wallet.get_balance().await?;
@@ -251,12 +244,6 @@ async fn setup_wallets(
         "Connection to Monero wallet succeeded, balance: {}",
         monero_balance
     );
-    let monero_wallet = Arc::new(monero_wallet);
 
-    let starting_balances = StartingBalances {
-        btc: bitcoin_balance,
-        xmr: monero_balance,
-    };
-
-    Ok((bitcoin_wallet, monero_wallet, starting_balances))
+    Ok((bitcoin_wallet, monero_wallet))
 }

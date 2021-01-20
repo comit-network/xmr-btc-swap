@@ -24,10 +24,7 @@ pub use self::{
     state::*,
     swap::{run, run_until},
 };
-use crate::{
-    config::Config, database::Database, network::transport::build, protocol::StartingBalances,
-    seed::Seed,
-};
+use crate::{config::Config, database::Database, network::transport::build, seed::Seed};
 use libp2p::{core::Multiaddr, identity::Keypair};
 use rand::rngs::OsRng;
 use std::{path::PathBuf, sync::Arc};
@@ -53,7 +50,7 @@ pub struct Swap {
     pub db: Database,
 }
 
-pub struct SwapFactory {
+pub struct Builder {
     swap_id: Uuid,
     identity: Keypair,
     peer_id: PeerId,
@@ -62,20 +59,24 @@ pub struct SwapFactory {
 
     listen_address: Multiaddr,
 
-    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
-    pub monero_wallet: Arc<monero::Wallet>,
-    pub starting_balances: StartingBalances,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
+
+    init_params: InitParams,
 }
 
-impl SwapFactory {
-    #[allow(clippy::too_many_arguments)]
+enum InitParams {
+    None,
+    New { swap_amounts: SwapAmounts },
+}
+
+impl Builder {
     pub async fn new(
         seed: Seed,
         config: Config,
         swap_id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
-        starting_balances: StartingBalances,
         db_path: PathBuf,
         listen_address: Multiaddr,
     ) -> Self {
@@ -92,72 +93,71 @@ impl SwapFactory {
             listen_address,
             bitcoin_wallet,
             monero_wallet,
-            starting_balances,
+            init_params: InitParams::None,
         }
     }
 
-    pub async fn new_swap_as_alice(&self, swap_amounts: SwapAmounts) -> Result<(Swap, EventLoop)> {
-        let initial_state = init_alice_state(
-            swap_amounts.btc,
-            swap_amounts.xmr,
-            self.bitcoin_wallet.clone(),
-            self.config,
-        )
-        .await?;
-
-        let (event_loop, event_loop_handle) = init_alice_event_loop(
-            self.listen_address.clone(),
-            self.identity.clone(),
-            self.peer_id.clone(),
-        )?;
-
-        let db = Database::open(self.db_path.as_path())?;
-
-        Ok((
-            Swap {
-                event_loop_handle,
-                bitcoin_wallet: self.bitcoin_wallet.clone(),
-                monero_wallet: self.monero_wallet.clone(),
-                config: self.config,
-                db,
-                state: initial_state,
-                swap_id: self.swap_id,
-            },
-            event_loop,
-        ))
+    pub fn with_init_params(self, swap_amounts: SwapAmounts) -> Self {
+        Self {
+            init_params: InitParams::New { swap_amounts },
+            ..self
+        }
     }
 
-    pub async fn recover_alice_from_db(&self) -> Result<(Swap, EventLoop)> {
-        // reopen the existing database
-        let db = Database::open(self.db_path.clone().as_path())?;
+    pub async fn build(self) -> Result<(Swap, EventLoop)> {
+        match self.init_params {
+            InitParams::New { swap_amounts } => {
+                let initial_state = self
+                    .make_initial_state(swap_amounts.btc, swap_amounts.xmr)
+                    .await?;
 
-        let resume_state = if let database::Swap::Alice(state) = db.get_state(self.swap_id)? {
-            state.into()
-        } else {
-            bail!(
-                "Trying to load swap with id {} for the wrong direction.",
-                self.swap_id
-            )
-        };
+                let (event_loop, event_loop_handle) = self.init_event_loop()?;
 
-        let (event_loop, event_loop_handle) = init_alice_event_loop(
-            self.listen_address.clone(),
-            self.identity.clone(),
-            self.peer_id.clone(),
-        )?;
+                let db = Database::open(self.db_path.as_path())?;
 
-        Ok((
-            Swap {
-                state: resume_state,
-                event_loop_handle,
-                bitcoin_wallet: self.bitcoin_wallet.clone(),
-                monero_wallet: self.monero_wallet.clone(),
-                config: self.config,
-                swap_id: self.swap_id,
-                db,
-            },
-            event_loop,
-        ))
+                Ok((
+                    Swap {
+                        event_loop_handle,
+                        bitcoin_wallet: self.bitcoin_wallet,
+                        monero_wallet: self.monero_wallet,
+                        config: self.config,
+                        db,
+                        state: initial_state,
+                        swap_id: self.swap_id,
+                    },
+                    event_loop,
+                ))
+            }
+            InitParams::None => {
+                // reopen the existing database
+                let db = Database::open(self.db_path.as_path())?;
+
+                let resume_state =
+                    if let database::Swap::Alice(state) = db.get_state(self.swap_id)? {
+                        state.into()
+                    } else {
+                        bail!(
+                            "Trying to load swap with id {} for the wrong direction.",
+                            self.swap_id
+                        )
+                    };
+
+                let (event_loop, event_loop_handle) = self.init_event_loop()?;
+
+                Ok((
+                    Swap {
+                        state: resume_state,
+                        event_loop_handle,
+                        bitcoin_wallet: self.bitcoin_wallet,
+                        monero_wallet: self.monero_wallet,
+                        config: self.config,
+                        swap_id: self.swap_id,
+                        db,
+                    },
+                    event_loop,
+                ))
+            }
+        }
     }
 
     pub fn peer_id(&self) -> PeerId {
@@ -167,49 +167,49 @@ impl SwapFactory {
     pub fn listen_address(&self) -> Multiaddr {
         self.listen_address.clone()
     }
-}
 
-async fn init_alice_state(
-    btc_to_swap: bitcoin::Amount,
-    xmr_to_swap: monero::Amount,
-    alice_btc_wallet: Arc<bitcoin::Wallet>,
-    config: Config,
-) -> Result<AliceState> {
-    let rng = &mut OsRng;
+    async fn make_initial_state(
+        &self,
+        btc_to_swap: bitcoin::Amount,
+        xmr_to_swap: monero::Amount,
+    ) -> Result<AliceState> {
+        let rng = &mut OsRng;
 
-    let amounts = SwapAmounts {
-        btc: btc_to_swap,
-        xmr: xmr_to_swap,
-    };
+        let amounts = SwapAmounts {
+            btc: btc_to_swap,
+            xmr: xmr_to_swap,
+        };
 
-    let a = bitcoin::SecretKey::new_random(rng);
-    let s_a = cross_curve_dleq::Scalar::random(rng);
-    let v_a = monero::PrivateViewKey::new_random(rng);
-    let redeem_address = alice_btc_wallet.as_ref().new_address().await?;
-    let punish_address = redeem_address.clone();
-    let state0 = State0::new(
-        a,
-        s_a,
-        v_a,
-        amounts.btc,
-        amounts.xmr,
-        config.bitcoin_cancel_timelock,
-        config.bitcoin_punish_timelock,
-        redeem_address,
-        punish_address,
-    );
+        let a = bitcoin::SecretKey::new_random(rng);
+        let s_a = cross_curve_dleq::Scalar::random(rng);
+        let v_a = monero::PrivateViewKey::new_random(rng);
+        let redeem_address = self.bitcoin_wallet.new_address().await?;
+        let punish_address = redeem_address.clone();
+        let state0 = State0::new(
+            a,
+            s_a,
+            v_a,
+            amounts.btc,
+            amounts.xmr,
+            self.config.bitcoin_cancel_timelock,
+            self.config.bitcoin_punish_timelock,
+            redeem_address,
+            punish_address,
+        );
 
-    Ok(AliceState::Started { amounts, state0 })
-}
+        Ok(AliceState::Started { amounts, state0 })
+    }
 
-fn init_alice_event_loop(
-    listen: Multiaddr,
-    identity: Keypair,
-    peer_id: PeerId,
-) -> Result<(EventLoop, EventLoopHandle)> {
-    let alice_behaviour = Behaviour::default();
-    let alice_transport = build(identity)?;
-    EventLoop::new(alice_transport, alice_behaviour, listen, peer_id)
+    fn init_event_loop(&self) -> Result<(EventLoop, EventLoopHandle)> {
+        let alice_behaviour = Behaviour::default();
+        let alice_transport = build(self.identity.clone())?;
+        EventLoop::new(
+            alice_transport,
+            alice_behaviour,
+            self.listen_address.clone(),
+            self.peer_id.clone(),
+        )
+    }
 }
 
 #[derive(Debug)]

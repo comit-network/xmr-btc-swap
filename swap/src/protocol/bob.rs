@@ -23,10 +23,7 @@ pub use self::{
     state::*,
     swap::{run, run_until},
 };
-use crate::{
-    config::Config, database::Database, network::transport::build, protocol::StartingBalances,
-    seed::Seed,
-};
+use crate::{config::Config, database::Database, network::transport::build, seed::Seed};
 use libp2p::identity::Keypair;
 use rand::rngs::OsRng;
 use std::{path::PathBuf, sync::Arc};
@@ -50,33 +47,38 @@ pub struct Swap {
     pub swap_id: Uuid,
 }
 
-pub struct SwapFactory {
+pub struct Builder {
     swap_id: Uuid,
     identity: Keypair,
     peer_id: PeerId,
     db_path: PathBuf,
-    config: Config,
 
-    alice_connect_address: Multiaddr,
-    alice_connect_peer_id: PeerId,
+    alice_address: Multiaddr,
+    alice_peer_id: PeerId,
 
-    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
-    pub monero_wallet: Arc<monero::Wallet>,
-    pub starting_balances: StartingBalances,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
+
+    init_params: InitParams,
 }
 
-impl SwapFactory {
-    #[allow(clippy::too_many_arguments)]
+enum InitParams {
+    None,
+    New {
+        swap_amounts: SwapAmounts,
+        config: Config,
+    },
+}
+
+impl Builder {
     pub fn new(
         seed: Seed,
         db_path: PathBuf,
         swap_id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
-        config: Config,
-        starting_balances: StartingBalances,
-        alice_connect_address: Multiaddr,
-        alice_connect_peer_id: PeerId,
+        alice_address: Multiaddr,
+        alice_peer_id: PeerId,
     ) -> Self {
         let identity = network::Seed::new(seed).derive_libp2p_identity();
         let peer_id = identity.public().into_peer_id();
@@ -86,124 +88,118 @@ impl SwapFactory {
             identity,
             peer_id,
             db_path,
-            config,
-            alice_connect_address,
-            alice_connect_peer_id,
+            alice_address,
+            alice_peer_id,
             bitcoin_wallet,
             monero_wallet,
-            starting_balances,
+            init_params: InitParams::None,
         }
     }
 
-    pub async fn new_swap_as_bob(
-        &self,
-        swap_amounts: SwapAmounts,
-    ) -> Result<(bob::Swap, bob::EventLoop)> {
-        let initial_state = init_bob_state(
-            swap_amounts.btc,
-            swap_amounts.xmr,
-            self.bitcoin_wallet.clone(),
-            self.config,
-        )
-        .await?;
-
-        let (event_loop, event_loop_handle) = init_bob_event_loop(
-            self.identity.clone(),
-            self.peer_id.clone(),
-            self.alice_connect_peer_id.clone(),
-            self.alice_connect_address.clone(),
-        )?;
-
-        let db = Database::open(self.db_path.as_path())?;
-
-        Ok((
-            Swap {
-                state: initial_state,
-                event_loop_handle,
-                db,
-                bitcoin_wallet: self.bitcoin_wallet.clone(),
-                monero_wallet: self.monero_wallet.clone(),
-                swap_id: self.swap_id,
+    pub fn with_init_params(self, swap_amounts: SwapAmounts, config: Config) -> Self {
+        Self {
+            init_params: InitParams::New {
+                swap_amounts,
+                config,
             },
-            event_loop,
-        ))
+            ..self
+        }
     }
 
-    pub async fn recover_bob_from_db(&self) -> Result<(bob::Swap, bob::EventLoop)> {
-        // reopen the existing database
-        let db = Database::open(self.db_path.clone().as_path())?;
+    pub async fn build(self) -> Result<(bob::Swap, bob::EventLoop)> {
+        match self.init_params {
+            InitParams::New {
+                swap_amounts,
+                config,
+            } => {
+                let initial_state = self
+                    .make_initial_state(swap_amounts.btc, swap_amounts.xmr, config)
+                    .await?;
 
-        let resume_state = if let database::Swap::Bob(state) = db.get_state(self.swap_id)? {
-            state.into()
-        } else {
-            bail!(
-                "Trying to load swap with id {} for the wrong direction.",
-                self.swap_id
-            )
+                let (event_loop, event_loop_handle) = self.init_event_loop()?;
+
+                let db = Database::open(self.db_path.as_path())?;
+
+                Ok((
+                    Swap {
+                        state: initial_state,
+                        event_loop_handle,
+                        db,
+                        bitcoin_wallet: self.bitcoin_wallet.clone(),
+                        monero_wallet: self.monero_wallet.clone(),
+                        swap_id: self.swap_id,
+                    },
+                    event_loop,
+                ))
+            }
+            InitParams::None => {
+                // reopen the existing database
+                let db = Database::open(self.db_path.as_path())?;
+
+                let resume_state = if let database::Swap::Bob(state) = db.get_state(self.swap_id)? {
+                    state.into()
+                } else {
+                    bail!(
+                        "Trying to load swap with id {} for the wrong direction.",
+                        self.swap_id
+                    )
+                };
+
+                let (event_loop, event_loop_handle) = self.init_event_loop()?;
+
+                Ok((
+                    Swap {
+                        state: resume_state,
+                        event_loop_handle,
+                        db,
+                        bitcoin_wallet: self.bitcoin_wallet.clone(),
+                        monero_wallet: self.monero_wallet.clone(),
+                        swap_id: self.swap_id,
+                    },
+                    event_loop,
+                ))
+            }
+        }
+    }
+    fn init_event_loop(
+        &self,
+    ) -> Result<(bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle)> {
+        let bob_behaviour = bob::Behaviour::default();
+        let bob_transport = build(self.identity.clone())?;
+
+        bob::event_loop::EventLoop::new(
+            bob_transport,
+            bob_behaviour,
+            self.peer_id.clone(),
+            self.alice_peer_id.clone(),
+            self.alice_address.clone(),
+        )
+    }
+
+    async fn make_initial_state(
+        &self,
+        btc_to_swap: bitcoin::Amount,
+        xmr_to_swap: monero::Amount,
+        config: Config,
+    ) -> Result<BobState> {
+        let amounts = SwapAmounts {
+            btc: btc_to_swap,
+            xmr: xmr_to_swap,
         };
 
-        let (event_loop, event_loop_handle) = init_bob_event_loop(
-            self.identity.clone(),
-            self.peer_id.clone(),
-            self.alice_connect_peer_id.clone(),
-            self.alice_connect_address.clone(),
-        )?;
+        let refund_address = self.bitcoin_wallet.new_address().await?;
+        let state0 = bob::State0::new(
+            &mut OsRng,
+            btc_to_swap,
+            xmr_to_swap,
+            config.bitcoin_cancel_timelock,
+            config.bitcoin_punish_timelock,
+            refund_address,
+            config.monero_finality_confirmations,
+        );
 
-        Ok((
-            Swap {
-                state: resume_state,
-                event_loop_handle,
-                db,
-                bitcoin_wallet: self.bitcoin_wallet.clone(),
-                monero_wallet: self.monero_wallet.clone(),
-                swap_id: self.swap_id,
-            },
-            event_loop,
-        ))
+        Ok(BobState::Started { state0, amounts })
     }
-}
-
-async fn init_bob_state(
-    btc_to_swap: bitcoin::Amount,
-    xmr_to_swap: monero::Amount,
-    bob_btc_wallet: Arc<bitcoin::Wallet>,
-    config: Config,
-) -> Result<BobState> {
-    let amounts = SwapAmounts {
-        btc: btc_to_swap,
-        xmr: xmr_to_swap,
-    };
-
-    let refund_address = bob_btc_wallet.new_address().await?;
-    let state0 = bob::State0::new(
-        &mut OsRng,
-        btc_to_swap,
-        xmr_to_swap,
-        config.bitcoin_cancel_timelock,
-        config.bitcoin_punish_timelock,
-        refund_address,
-        config.monero_finality_confirmations,
-    );
-
-    Ok(BobState::Started { state0, amounts })
-}
-
-fn init_bob_event_loop(
-    identity: Keypair,
-    peer_id: PeerId,
-    alice_peer_id: PeerId,
-    alice_addr: Multiaddr,
-) -> Result<(bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle)> {
-    let bob_behaviour = bob::Behaviour::default();
-    let bob_transport = build(identity)?;
-
-    bob::event_loop::EventLoop::new(
-        bob_transport,
-        bob_behaviour,
-        peer_id,
-        alice_peer_id,
-        alice_addr,
-    )
 }
 
 #[derive(Debug, Clone)]
