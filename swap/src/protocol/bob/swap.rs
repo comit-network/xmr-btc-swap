@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
-use rand::{CryptoRng, RngCore};
+use rand::{rngs::OsRng, CryptoRng, RngCore};
 use std::sync::Arc;
 use tokio::select;
 use tracing::{debug, info};
@@ -13,33 +13,6 @@ use crate::{
     protocol::bob::{self, event_loop::EventLoopHandle, state::*},
     ExpiredTimelocks, SwapAmounts,
 };
-
-// TODO(Franck): Make this a method on a struct
-#[allow(clippy::too_many_arguments)]
-pub async fn swap<R>(
-    state: BobState,
-    event_loop_handle: EventLoopHandle,
-    db: Database,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Wallet>,
-    rng: R,
-    swap_id: Uuid,
-) -> Result<BobState>
-where
-    R: RngCore + CryptoRng + Send,
-{
-    run_until(
-        state,
-        is_complete,
-        event_loop_handle,
-        db,
-        bitcoin_wallet,
-        monero_wallet,
-        rng,
-        swap_id,
-    )
-    .await
-}
 
 pub fn is_complete(state: &BobState) -> bool {
     matches!(
@@ -63,10 +36,32 @@ pub fn is_encsig_sent(state: &BobState) -> bool {
     matches!(state, BobState::EncSigSent(..))
 }
 
+#[allow(clippy::too_many_arguments)]
+pub async fn run(swap: bob::Swap) -> Result<BobState> {
+    run_until(swap, is_complete).await
+}
+
+pub async fn run_until(
+    swap: bob::Swap,
+    is_target_state: fn(&BobState) -> bool,
+) -> Result<BobState> {
+    run_until_internal(
+        swap.state,
+        is_target_state,
+        swap.event_loop_handle,
+        swap.db,
+        swap.bitcoin_wallet,
+        swap.monero_wallet,
+        OsRng,
+        swap.swap_id,
+    )
+    .await
+}
+
 // State machine driver for swap execution
 #[allow(clippy::too_many_arguments)]
 #[async_recursion]
-pub async fn run_until<R>(
+async fn run_until_internal<R>(
     state: BobState,
     is_target_state: fn(&BobState) -> bool,
     mut event_loop_handle: EventLoopHandle,
@@ -99,7 +94,7 @@ where
                 let state = BobState::Negotiated(state2);
                 let db_state = state.clone().into();
                 db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
-                run_until(
+                run_until_internal(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -120,7 +115,7 @@ where
                 let state = BobState::BtcLocked(state3);
                 let db_state = state.clone().into();
                 db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
-                run_until(
+                run_until_internal(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -185,7 +180,7 @@ where
                 };
                 let db_state = state.clone().into();
                 db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
-                run_until(
+                run_until_internal(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -226,7 +221,7 @@ where
                 };
                 let db_state = state.clone().into();
                 db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
-                run_until(
+                run_until_internal(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -261,7 +256,7 @@ where
 
                 let db_state = state.clone().into();
                 db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
-                run_until(
+                run_until_internal(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -282,7 +277,7 @@ where
                 };
                 let db_state = state.clone().into();
                 db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
-                run_until(
+                run_until_internal(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -307,7 +302,7 @@ where
                 db.insert_latest_state(swap_id, Swap::Bob(state.clone().into()))
                     .await?;
 
-                run_until(
+                run_until_internal(
                     state,
                     is_target_state,
                     event_loop_handle,
@@ -336,7 +331,7 @@ where
 
                 let db_state = state.clone().into();
                 db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
-                run_until(
+                run_until_internal(
                     state,
                     is_target_state,
                     event_loop_handle,

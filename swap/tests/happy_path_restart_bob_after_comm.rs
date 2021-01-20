@@ -1,59 +1,31 @@
-use rand::rngs::OsRng;
 use swap::protocol::{alice, bob, bob::BobState};
 
 pub mod testutils;
 
 #[tokio::test]
 async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
-    testutils::test(|alice_harness, bob_harness| async move {
-        let alice = alice_harness.new_alice().await;
-        let bob = bob_harness.new_bob().await;
+    testutils::setup_test(|ctx| async move {
+        let alice_swap = ctx.new_swap_as_alice().await;
+        let bob_swap = ctx.new_swap_as_bob().await;
 
-        let alice_swap = alice::swap(
-            alice.state,
-            alice.event_loop_handle,
-            alice.bitcoin_wallet.clone(),
-            alice.monero_wallet.clone(),
-            alice.config,
-            alice.swap_id,
-            alice.db,
-        );
-        let alice_swap_handle = tokio::spawn(alice_swap);
+        let alice = alice::run(alice_swap);
+        let alice_handle = tokio::spawn(alice);
 
-        let bob_state = bob::run_until(
-            bob.state,
-            bob::swap::is_encsig_sent,
-            bob.event_loop_handle,
-            bob.db,
-            bob.bitcoin_wallet.clone(),
-            bob.monero_wallet.clone(),
-            OsRng,
-            bob.swap_id,
-        )
-        .await
-        .unwrap();
+        let bob_state = bob::run_until(bob_swap, bob::swap::is_encsig_sent)
+            .await
+            .unwrap();
 
         assert!(matches!(bob_state, BobState::EncSigSent {..}));
 
-        let bob = bob_harness.recover_bob_from_db().await;
-        assert!(matches!(bob.state, BobState::EncSigSent {..}));
+        let bob_swap = ctx.recover_bob_from_db().await;
+        assert!(matches!(bob_swap.state, BobState::EncSigSent {..}));
 
-        let bob_state = bob::swap(
-            bob.state,
-            bob.event_loop_handle,
-            bob.db,
-            bob.bitcoin_wallet.clone(),
-            bob.monero_wallet.clone(),
-            OsRng,
-            bob.swap_id,
-        )
-        .await
-        .unwrap();
+        let bob_state = bob::run(bob_swap).await.unwrap();
 
-        bob_harness.assert_redeemed(bob_state).await;
+        ctx.assert_bob_redeemed(bob_state).await;
 
-        let alice_state = alice_swap_handle.await.unwrap();
-        alice_harness.assert_redeemed(alice_state.unwrap()).await;
+        let alice_state = alice_handle.await.unwrap();
+        ctx.assert_alice_redeemed(alice_state.unwrap()).await;
     })
     .await;
 }

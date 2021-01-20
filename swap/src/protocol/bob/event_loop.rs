@@ -131,12 +131,11 @@ impl EventLoop {
     pub fn new(
         transport: SwapTransport,
         behaviour: Behaviour,
+        peer_id: PeerId,
         alice_peer_id: PeerId,
         alice_addr: Multiaddr,
     ) -> Result<(Self, EventLoopHandle)> {
-        let local_peer_id = behaviour.peer_id();
-
-        let mut swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id)
+        let mut swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, peer_id)
             .executor(Box::new(TokioExecutor {
                 handle: tokio::runtime::Handle::current(),
             }))

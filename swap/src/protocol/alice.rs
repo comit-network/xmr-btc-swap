@@ -1,19 +1,15 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use anyhow::Result;
-use libp2p::{
-    core::{identity::Keypair, Multiaddr},
-    request_response::ResponseChannel,
-    NetworkBehaviour, PeerId,
-};
+use anyhow::{bail, Result};
+use libp2p::{request_response::ResponseChannel, NetworkBehaviour, PeerId};
 use tracing::{debug, info};
 
 use crate::{
+    bitcoin, database, monero,
     network::{
         peer_tracker::{self, PeerTracker},
         request_response::AliceToBob,
-        transport::SwapTransport,
-        Seed, TokioExecutor,
+        Seed as NetworkSeed,
     },
     protocol::bob,
     SwapAmounts,
@@ -26,8 +22,16 @@ pub use self::{
     message1::Message1,
     message2::Message2,
     state::*,
-    swap::{run_until, swap},
+    swap::{run, run_until},
 };
+use crate::{
+    config::Config, database::Database, network::transport::build, protocol::StartingBalances,
+    seed::Seed,
+};
+use libp2p::{core::Multiaddr, identity::Keypair};
+use rand::rngs::OsRng;
+use std::{path::PathBuf, sync::Arc};
+use uuid::Uuid;
 
 mod amounts;
 pub mod event_loop;
@@ -39,29 +43,173 @@ pub mod state;
 mod steps;
 pub mod swap;
 
-pub type Swarm = libp2p::Swarm<Behaviour>;
+pub struct Swap {
+    pub state: AliceState,
+    pub event_loop_handle: EventLoopHandle,
+    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
+    pub monero_wallet: Arc<monero::Wallet>,
+    pub config: Config,
+    pub swap_id: Uuid,
+    pub db: Database,
+}
 
-pub fn new_swarm(
+pub struct SwapFactory {
+    swap_id: Uuid,
+    identity: Keypair,
+    peer_id: PeerId,
+    db_path: PathBuf,
+    config: Config,
+
+    listen_address: Multiaddr,
+
+    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
+    pub monero_wallet: Arc<monero::Wallet>,
+    pub starting_balances: StartingBalances,
+}
+
+impl SwapFactory {
+    #[allow(clippy::too_many_arguments)]
+    pub async fn new(
+        seed: Seed,
+        config: Config,
+        swap_id: Uuid,
+        bitcoin_wallet: Arc<bitcoin::Wallet>,
+        monero_wallet: Arc<monero::Wallet>,
+        starting_balances: StartingBalances,
+        db_path: PathBuf,
+        listen_address: Multiaddr,
+    ) -> Self {
+        let network_seed = NetworkSeed::new(seed);
+        let identity = network_seed.derive_libp2p_identity();
+        let peer_id = PeerId::from(identity.public());
+
+        Self {
+            swap_id,
+            identity,
+            peer_id,
+            db_path,
+            config,
+            listen_address,
+            bitcoin_wallet,
+            monero_wallet,
+            starting_balances,
+        }
+    }
+
+    pub async fn new_swap_as_alice(&self, swap_amounts: SwapAmounts) -> Result<(Swap, EventLoop)> {
+        let initial_state = init_alice_state(
+            swap_amounts.btc,
+            swap_amounts.xmr,
+            self.bitcoin_wallet.clone(),
+            self.config,
+        )
+        .await?;
+
+        let (event_loop, event_loop_handle) = init_alice_event_loop(
+            self.listen_address.clone(),
+            self.identity.clone(),
+            self.peer_id.clone(),
+        )?;
+
+        let db = Database::open(self.db_path.as_path())?;
+
+        Ok((
+            Swap {
+                event_loop_handle,
+                bitcoin_wallet: self.bitcoin_wallet.clone(),
+                monero_wallet: self.monero_wallet.clone(),
+                config: self.config,
+                db,
+                state: initial_state,
+                swap_id: self.swap_id,
+            },
+            event_loop,
+        ))
+    }
+
+    pub async fn recover_alice_from_db(&self) -> Result<(Swap, EventLoop)> {
+        // reopen the existing database
+        let db = Database::open(self.db_path.clone().as_path())?;
+
+        let resume_state = if let database::Swap::Alice(state) = db.get_state(self.swap_id)? {
+            state.into()
+        } else {
+            bail!(
+                "Trying to load swap with id {} for the wrong direction.",
+                self.swap_id
+            )
+        };
+
+        let (event_loop, event_loop_handle) = init_alice_event_loop(
+            self.listen_address.clone(),
+            self.identity.clone(),
+            self.peer_id.clone(),
+        )?;
+
+        Ok((
+            Swap {
+                state: resume_state,
+                event_loop_handle,
+                bitcoin_wallet: self.bitcoin_wallet.clone(),
+                monero_wallet: self.monero_wallet.clone(),
+                config: self.config,
+                swap_id: self.swap_id,
+                db,
+            },
+            event_loop,
+        ))
+    }
+
+    pub fn peer_id(&self) -> PeerId {
+        self.peer_id.clone()
+    }
+
+    pub fn listen_address(&self) -> Multiaddr {
+        self.listen_address.clone()
+    }
+}
+
+async fn init_alice_state(
+    btc_to_swap: bitcoin::Amount,
+    xmr_to_swap: monero::Amount,
+    alice_btc_wallet: Arc<bitcoin::Wallet>,
+    config: Config,
+) -> Result<AliceState> {
+    let rng = &mut OsRng;
+
+    let amounts = SwapAmounts {
+        btc: btc_to_swap,
+        xmr: xmr_to_swap,
+    };
+
+    let a = bitcoin::SecretKey::new_random(rng);
+    let s_a = cross_curve_dleq::Scalar::random(rng);
+    let v_a = monero::PrivateViewKey::new_random(rng);
+    let redeem_address = alice_btc_wallet.as_ref().new_address().await?;
+    let punish_address = redeem_address.clone();
+    let state0 = State0::new(
+        a,
+        s_a,
+        v_a,
+        amounts.btc,
+        amounts.xmr,
+        config.bitcoin_cancel_timelock,
+        config.bitcoin_punish_timelock,
+        redeem_address,
+        punish_address,
+    );
+
+    Ok(AliceState::Started { amounts, state0 })
+}
+
+fn init_alice_event_loop(
     listen: Multiaddr,
-    transport: SwapTransport,
-    behaviour: Behaviour,
-) -> Result<Swarm> {
-    use anyhow::Context as _;
-
-    let local_peer_id = behaviour.peer_id();
-
-    let mut swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, local_peer_id.clone())
-        .executor(Box::new(TokioExecutor {
-            handle: tokio::runtime::Handle::current(),
-        }))
-        .build();
-
-    Swarm::listen_on(&mut swarm, listen.clone())
-        .with_context(|| format!("Address is not supported: {:#}", listen))?;
-
-    tracing::info!("Initialized swarm: {}", local_peer_id);
-
-    Ok(swarm)
+    identity: Keypair,
+    peer_id: PeerId,
+) -> Result<(EventLoop, EventLoopHandle)> {
+    let alice_behaviour = Behaviour::default();
+    let alice_transport = build(identity)?;
+    EventLoop::new(alice_transport, alice_behaviour, listen, peer_id)
 }
 
 #[derive(Debug)]
@@ -138,7 +286,7 @@ impl From<message3::OutEvent> for OutEvent {
 }
 
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Alice.
-#[derive(NetworkBehaviour)]
+#[derive(NetworkBehaviour, Default)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
@@ -148,33 +296,9 @@ pub struct Behaviour {
     message1: message1::Behaviour,
     message2: message2::Behaviour,
     message3: message3::Behaviour,
-    #[behaviour(ignore)]
-    identity: Keypair,
 }
 
 impl Behaviour {
-    pub fn new(seed: Seed) -> Self {
-        let identity = seed.derive_libp2p_identity();
-
-        Self {
-            pt: PeerTracker::default(),
-            amounts: Amounts::default(),
-            message0: message0::Behaviour::default(),
-            message1: message1::Behaviour::default(),
-            message2: message2::Behaviour::default(),
-            message3: message3::Behaviour::default(),
-            identity,
-        }
-    }
-
-    pub fn identity(&self) -> Keypair {
-        self.identity.clone()
-    }
-
-    pub fn peer_id(&self) -> PeerId {
-        PeerId::from(self.identity.public())
-    }
-
     /// Alice always sends her messages as a response to a request from Bob.
     pub fn send_amounts(&mut self, channel: ResponseChannel<AliceToBob>, amounts: SwapAmounts) {
         let msg = AliceToBob::Amounts(amounts);

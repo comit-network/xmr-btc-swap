@@ -1,5 +1,7 @@
-use rand::rngs::OsRng;
-use swap::protocol::{alice, bob, bob::BobState};
+use swap::protocol::{
+    alice, bob,
+    bob::{swap::is_btc_locked, BobState},
+};
 
 pub mod testutils;
 
@@ -7,57 +9,28 @@ pub mod testutils;
 /// the encsig and fail to refund or redeem. Alice punishes.
 #[tokio::test]
 async fn alice_punishes_if_bob_never_acts_after_fund() {
-    testutils::test(|alice_harness, bob_harness| async move {
-        let alice = alice_harness.new_alice().await;
-        let bob = bob_harness.new_bob().await;
+    testutils::setup_test(|ctx| async move {
+        let alice_swap = ctx.new_swap_as_alice().await;
+        let bob_swap = ctx.new_swap_as_bob().await;
 
-        let alice_swap = alice::swap(
-            alice.state,
-            alice.event_loop_handle,
-            alice.bitcoin_wallet.clone(),
-            alice.monero_wallet.clone(),
-            alice.config,
-            alice.swap_id,
-            alice.db,
-        );
-        let alice_swap_handle = tokio::spawn(alice_swap);
+        let alice = alice::run(alice_swap);
+        let alice_handle = tokio::spawn(alice);
 
-        let bob_state = bob::run_until(
-            bob.state,
-            bob::swap::is_btc_locked,
-            bob.event_loop_handle,
-            bob.db,
-            bob.bitcoin_wallet.clone(),
-            bob.monero_wallet.clone(),
-            OsRng,
-            bob.swap_id,
-        )
-        .await
-        .unwrap();
+        let bob_state = bob::run_until(bob_swap, is_btc_locked).await.unwrap();
 
         assert!(matches!(bob_state, BobState::BtcLocked {..}));
 
-        let alice_state = alice_swap_handle.await.unwrap();
-        alice_harness.assert_punished(alice_state.unwrap()).await;
+        let alice_state = alice_handle.await.unwrap();
+        ctx.assert_alice_punished(alice_state.unwrap()).await;
 
         // Restart Bob after Alice punished to ensure Bob transitions to
         // punished and does not run indefinitely
-        let bob = bob_harness.recover_bob_from_db().await;
-        assert!(matches!(bob.state, BobState::BtcLocked {..}));
+        let bob_swap = ctx.recover_bob_from_db().await;
+        assert!(matches!(bob_swap.state, BobState::BtcLocked {..}));
 
-        let bob_state = bob::swap(
-            bob.state,
-            bob.event_loop_handle,
-            bob.db,
-            bob.bitcoin_wallet.clone(),
-            bob.monero_wallet.clone(),
-            OsRng,
-            bob.swap_id,
-        )
-        .await
-        .unwrap();
+        let bob_state = bob::run(bob_swap).await.unwrap();
 
-        bob_harness.assert_punished(bob_state).await;
+        ctx.assert_bob_punished(bob_state).await;
     })
     .await;
 }
