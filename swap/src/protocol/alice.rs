@@ -118,8 +118,8 @@ impl Builder {
                 Ok((
                     Swap {
                         event_loop_handle,
-                        bitcoin_wallet: self.bitcoin_wallet.clone(),
-                        monero_wallet: self.monero_wallet.clone(),
+                        bitcoin_wallet: self.bitcoin_wallet,
+                        monero_wallet: self.monero_wallet,
                         config: self.config,
                         db,
                         state: initial_state,
@@ -148,8 +148,8 @@ impl Builder {
                     Swap {
                         state: resume_state,
                         event_loop_handle,
-                        bitcoin_wallet: self.bitcoin_wallet.clone(),
-                        monero_wallet: self.monero_wallet.clone(),
+                        bitcoin_wallet: self.bitcoin_wallet,
+                        monero_wallet: self.monero_wallet,
                         config: self.config,
                         swap_id: self.swap_id,
                         db,
@@ -183,7 +183,7 @@ impl Builder {
         let a = bitcoin::SecretKey::new_random(rng);
         let s_a = cross_curve_dleq::Scalar::random(rng);
         let v_a = monero::PrivateViewKey::new_random(rng);
-        let redeem_address = self.bitcoin_wallet.as_ref().new_address().await?;
+        let redeem_address = self.bitcoin_wallet.new_address().await?;
         let punish_address = redeem_address.clone();
         let state0 = State0::new(
             a,

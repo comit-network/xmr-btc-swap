@@ -86,8 +86,8 @@ async fn main() -> Result<()> {
                 seed,
                 config,
                 swap_id,
-                bitcoin_wallet,
-                monero_wallet,
+                Arc::new(bitcoin_wallet),
+                Arc::new(monero_wallet),
                 db_path,
                 listen_addr,
             )
@@ -131,8 +131,8 @@ async fn main() -> Result<()> {
                 seed,
                 db_path,
                 swap_id,
-                bitcoin_wallet,
-                monero_wallet,
+                Arc::new(bitcoin_wallet),
+                Arc::new(monero_wallet),
                 alice_addr,
                 alice_peer_id,
             );
@@ -177,8 +177,8 @@ async fn main() -> Result<()> {
                 seed,
                 config,
                 swap_id,
-                bitcoin_wallet,
-                monero_wallet,
+                Arc::new(bitcoin_wallet),
+                Arc::new(monero_wallet),
                 db_path,
                 listen_addr,
             )
@@ -208,8 +208,8 @@ async fn main() -> Result<()> {
                 seed,
                 db_path,
                 swap_id,
-                bitcoin_wallet,
-                monero_wallet,
+                Arc::new(bitcoin_wallet),
+                Arc::new(monero_wallet),
                 alice_addr,
                 alice_peer_id,
             );
@@ -228,7 +228,7 @@ async fn setup_wallets(
     bitcoin_wallet_name: &str,
     monero_wallet_rpc_url: url::Url,
     config: Config,
-) -> Result<(Arc<swap::bitcoin::Wallet>, Arc<swap::monero::Wallet>)> {
+) -> Result<(swap::bitcoin::Wallet, swap::monero::Wallet)> {
     let bitcoin_wallet =
         swap::bitcoin::Wallet::new(bitcoin_wallet_name, bitcoind_url, config.bitcoin_network)
             .await?;
@@ -237,7 +237,6 @@ async fn setup_wallets(
         "Connection to Bitcoin wallet succeeded, balance: {}",
         bitcoin_balance
     );
-    let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
     let monero_wallet = monero::Wallet::new(monero_wallet_rpc_url, config.monero_network);
     let monero_balance = monero_wallet.get_balance().await?;
@@ -245,7 +244,6 @@ async fn setup_wallets(
         "Connection to Monero wallet succeeded, balance: {}",
         monero_balance
     );
-    let monero_wallet = Arc::new(monero_wallet);
 
     Ok((bitcoin_wallet, monero_wallet))
 }
