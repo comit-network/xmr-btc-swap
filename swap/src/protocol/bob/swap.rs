@@ -1,10 +1,13 @@
 use crate::{
     bitcoin,
+    bitcoin::timelocks::ExpiredTimelocks,
     config::Config,
     database::{Database, Swap},
     monero,
-    protocol::bob::{self, event_loop::EventLoopHandle, state::*, SwapRequest},
-    ExpiredTimelocks, SwapAmounts,
+    protocol::{
+        bob::{self, event_loop::EventLoopHandle, state::*, SwapRequest},
+        SwapAmounts,
+    },
 };
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;

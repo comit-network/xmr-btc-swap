@@ -1,5 +1,6 @@
-use serde::{Deserialize, Serialize};
 use std::ops::Add;
+
+use serde::{Deserialize, Serialize};
 
 /// Represent a timelock, expressed in relative block height as defined in
 /// [BIP68](https://github.com/bitcoin/bips/blob/master/bip-0068.mediawiki).
@@ -46,4 +47,11 @@ impl Add<Timelock> for BlockHeight {
     fn add(self, rhs: Timelock) -> Self::Output {
         BlockHeight(self.0 + rhs.0)
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ExpiredTimelocks {
+    None,
+    Cancel,
+    Punish,
 }

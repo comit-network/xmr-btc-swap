@@ -1,7 +1,6 @@
 use crate::{
     monero::TransferProof,
-    protocol::{bob, bob::BobState},
-    SwapAmounts,
+    protocol::{bob, bob::BobState, SwapAmounts},
 };
 use ::bitcoin::hashes::core::fmt::Display;
 use monero_harness::rpc::wallet::BlockHeight;

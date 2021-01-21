@@ -13,22 +13,24 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
-use crate::cli::{Command, Options, Resume};
+use std::sync::Arc;
+
 use anyhow::{Context, Result};
 use prettytable::{row, Table};
-use std::sync::Arc;
 use structopt::StructOpt;
+use tracing::{info, log::LevelFilter};
+use uuid::Uuid;
+
 use swap::{
     bitcoin,
     config::Config,
     database::Database,
     monero,
-    protocol::{alice, bob, bob::Builder},
+    protocol::{alice, bob, bob::Builder, SwapAmounts},
     trace::init_tracing,
-    SwapAmounts,
 };
-use tracing::{info, log::LevelFilter};
-use uuid::Uuid;
+
+use crate::cli::{Command, Options, Resume};
 
 mod cli;
 

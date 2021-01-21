@@ -2,7 +2,10 @@
 //! Alice holds XMR and wishes receive BTC.
 use crate::{
     bitcoin,
-    bitcoin::{TransactionBlockHeight, WaitForTransactionFinality, WatchForRawTransaction},
+    bitcoin::{
+        timelocks::ExpiredTimelocks, TransactionBlockHeight, WaitForTransactionFinality,
+        WatchForRawTransaction,
+    },
     config::Config,
     database,
     database::Database,
@@ -22,7 +25,6 @@ use crate::{
             AliceState,
         },
     },
-    ExpiredTimelocks,
 };
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
