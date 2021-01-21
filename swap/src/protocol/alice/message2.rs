@@ -1,3 +1,8 @@
+use crate::{
+    monero,
+    network::request_response::{AliceToBob, BobToAlice, Codec, Message2Protocol, TIMEOUT},
+    protocol::bob,
+};
 use libp2p::{
     request_response::{
         handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
@@ -13,12 +18,6 @@ use std::{
     time::Duration,
 };
 use tracing::{debug, error};
-
-use crate::{
-    monero,
-    network::request_response::{AliceToBob, BobToAlice, Codec, Message2Protocol, TIMEOUT},
-    protocol::bob,
-};
 
 #[derive(Debug)]
 pub enum OutEvent {

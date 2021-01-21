@@ -1,5 +1,10 @@
 pub mod wallet;
 
+pub use ::monero::{Network, PrivateKey, PublicKey};
+pub use curve25519_dalek::scalar::Scalar;
+pub use wallet::Wallet;
+
+use crate::bitcoin;
 use ::bitcoin::hashes::core::fmt::Formatter;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -14,12 +19,6 @@ use std::{
     ops::{Add, Mul, Sub},
     str::FromStr,
 };
-
-use crate::bitcoin;
-
-pub use ::monero::{Network, PrivateKey, PublicKey};
-pub use curve25519_dalek::scalar::Scalar;
-pub use wallet::Wallet;
 
 pub const PICONERO_OFFSET: u64 = 1_000_000_000_000;
 

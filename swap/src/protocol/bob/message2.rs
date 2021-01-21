@@ -1,3 +1,7 @@
+use crate::{
+    network::request_response::{AliceToBob, BobToAlice, Codec, Message2Protocol, TIMEOUT},
+    protocol::alice,
+};
 use ecdsa_fun::Signature;
 use libp2p::{
     request_response::{
@@ -14,11 +18,6 @@ use std::{
     time::Duration,
 };
 use tracing::{debug, error};
-
-use crate::{
-    network::request_response::{AliceToBob, BobToAlice, Codec, Message2Protocol, TIMEOUT},
-    protocol::alice,
-};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message2 {

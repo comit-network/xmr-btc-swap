@@ -1,3 +1,7 @@
+use crate::monero::{
+    Amount, CreateWalletForOutput, InsufficientFunds, PrivateViewKey, PublicViewKey, Transfer,
+    TransferProof, TxHash, WatchForTransfer,
+};
 use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -11,11 +15,6 @@ use std::{
 };
 use tracing::info;
 use url::Url;
-
-use crate::monero::{
-    Amount, CreateWalletForOutput, InsufficientFunds, PrivateViewKey, PublicViewKey, Transfer,
-    TransferProof, TxHash, WatchForTransfer,
-};
 
 #[derive(Debug)]
 pub struct Wallet {

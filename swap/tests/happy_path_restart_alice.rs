@@ -1,6 +1,6 @@
-use swap::protocol::{alice, alice::AliceState, bob};
-
 pub mod testutils;
+
+use swap::protocol::{alice, alice::AliceState, bob};
 
 #[tokio::test]
 async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {

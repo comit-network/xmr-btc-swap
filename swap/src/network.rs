@@ -1,13 +1,13 @@
+pub mod peer_tracker;
+pub mod request_response;
+pub mod transport;
+
 use crate::seed::SEED_LENGTH;
 use bitcoin::hashes::{sha256, Hash, HashEngine};
 use futures::prelude::*;
 use libp2p::{core::Executor, identity::ed25519};
 use std::pin::Pin;
 use tokio::runtime::Handle;
-
-pub mod peer_tracker;
-pub mod request_response;
-pub mod transport;
 
 #[allow(missing_debug_implementations)]
 pub struct TokioExecutor {

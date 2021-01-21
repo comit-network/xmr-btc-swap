@@ -1,15 +1,3 @@
-use anyhow::{anyhow, Context, Result};
-use ecdsa_fun::{
-    adaptor::{Adaptor, EncryptedSignature},
-    nonce::Deterministic,
-};
-use libp2p::request_response::ResponseChannel;
-use rand::{CryptoRng, RngCore};
-use serde::{Deserialize, Serialize};
-use sha2::Sha256;
-use std::fmt;
-use tracing::info;
-
 use crate::{
     bitcoin,
     bitcoin::{
@@ -22,6 +10,17 @@ use crate::{
     protocol::{alice, bob},
     ExpiredTimelocks, SwapAmounts,
 };
+use anyhow::{anyhow, Context, Result};
+use ecdsa_fun::{
+    adaptor::{Adaptor, EncryptedSignature},
+    nonce::Deterministic,
+};
+use libp2p::request_response::ResponseChannel;
+use rand::{CryptoRng, RngCore};
+use serde::{Deserialize, Serialize};
+use sha2::Sha256;
+use std::fmt;
+use tracing::info;
 
 #[derive(Debug)]
 pub enum AliceState {

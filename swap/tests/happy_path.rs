@@ -1,7 +1,7 @@
+pub mod testutils;
+
 use swap::protocol::{alice, bob};
 use tokio::join;
-
-pub mod testutils;
 
 /// Run the following tests with RUST_MIN_STACK=10000000
 

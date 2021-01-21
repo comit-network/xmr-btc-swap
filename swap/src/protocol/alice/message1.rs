@@ -1,3 +1,7 @@
+use crate::{
+    network::request_response::{AliceToBob, BobToAlice, Codec, Message1Protocol, TIMEOUT},
+    protocol::bob,
+};
 use ecdsa_fun::{adaptor::EncryptedSignature, Signature};
 use libp2p::{
     request_response::{
@@ -14,11 +18,6 @@ use std::{
     time::Duration,
 };
 use tracing::{debug, error};
-
-use crate::{
-    network::request_response::{AliceToBob, BobToAlice, Codec, Message1Protocol, TIMEOUT},
-    protocol::bob,
-};
 
 #[derive(Debug)]
 pub enum OutEvent {

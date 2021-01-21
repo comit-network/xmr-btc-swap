@@ -1,10 +1,3 @@
-use anyhow::{anyhow, Context, Result};
-use futures::FutureExt;
-use libp2p::{
-    core::Multiaddr, futures::StreamExt, request_response::ResponseChannel, PeerId, Swarm,
-};
-use tokio::sync::mpsc::{Receiver, Sender};
-
 use crate::{
     network::{request_response::AliceToBob, transport::SwapTransport, TokioExecutor},
     protocol::{
@@ -13,6 +6,12 @@ use crate::{
         bob,
     },
 };
+use anyhow::{anyhow, Context, Result};
+use futures::FutureExt;
+use libp2p::{
+    core::Multiaddr, futures::StreamExt, request_response::ResponseChannel, PeerId, Swarm,
+};
+use tokio::sync::mpsc::{Receiver, Sender};
 
 #[allow(missing_debug_implementations)]
 pub struct Channels<T> {

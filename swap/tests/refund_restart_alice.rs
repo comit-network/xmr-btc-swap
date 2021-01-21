@@ -1,6 +1,6 @@
-use swap::protocol::{alice, alice::AliceState, bob};
-
 pub mod testutils;
+
+use swap::protocol::{alice, alice::AliceState, bob};
 
 /// Bob locks btc and Alice locks xmr. Alice fails to act so Bob refunds. Alice
 /// then also refunds.

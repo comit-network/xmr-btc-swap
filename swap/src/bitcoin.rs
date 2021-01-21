@@ -1,3 +1,16 @@
+pub mod timelocks;
+pub mod transactions;
+pub mod wallet;
+
+pub use crate::bitcoin::{
+    timelocks::Timelock,
+    transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund},
+};
+pub use ::bitcoin::{util::amount::Amount, Address, Network, Transaction, Txid};
+pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
+pub use wallet::Wallet;
+
+use crate::{bitcoin::timelocks::BlockHeight, config::Config, ExpiredTimelocks};
 use ::bitcoin::{
     hashes::{hex::ToHex, Hash},
     secp256k1,
@@ -12,20 +25,6 @@ use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
-
-use crate::{bitcoin::timelocks::BlockHeight, config::Config, ExpiredTimelocks};
-
-pub use crate::bitcoin::{
-    timelocks::Timelock,
-    transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund},
-};
-pub use ::bitcoin::{util::amount::Amount, Address, Network, Transaction, Txid};
-pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
-pub use wallet::Wallet;
-
-pub mod timelocks;
-pub mod transactions;
-pub mod wallet;
 
 // TODO: Configurable tx-fee (note: parties have to agree prior to swapping)
 // Current reasoning:

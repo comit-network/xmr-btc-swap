@@ -16,18 +16,19 @@
     missing_copy_implementations
 )]
 
-use serde::{Deserialize, Serialize};
-use std::fmt::{self, Display};
-
 pub mod bitcoin;
 pub mod config;
 pub mod database;
-mod fs;
 pub mod monero;
 pub mod network;
 pub mod protocol;
 pub mod seed;
 pub mod trace;
+
+mod fs;
+
+use serde::{Deserialize, Serialize};
+use std::fmt::{self, Display};
 
 pub type Never = std::convert::Infallible;
 

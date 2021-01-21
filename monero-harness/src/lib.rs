@@ -20,14 +20,8 @@
 //! every BLOCK_TIME_SECS seconds.
 //!
 //! Also provides standalone JSON RPC clients for monerod and monero-wallet-rpc.
-
 pub mod image;
 pub mod rpc;
-
-use anyhow::{anyhow, bail, Result};
-use std::time::Duration;
-use testcontainers::{clients::Cli, core::Port, Container, Docker, RunArgs};
-use tokio::time;
 
 use crate::{
     image::{
@@ -38,6 +32,10 @@ use crate::{
         wallet::{self, GetAddress, Refreshed, Transfer},
     },
 };
+use anyhow::{anyhow, bail, Result};
+use std::time::Duration;
+use testcontainers::{clients::Cli, core::Port, Container, Docker, RunArgs};
+use tokio::time;
 
 /// How often we mine a block.
 const BLOCK_TIME_SECS: u64 = 1;
