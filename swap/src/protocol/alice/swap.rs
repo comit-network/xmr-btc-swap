@@ -1,16 +1,5 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use anyhow::{bail, Result};
-use async_recursion::async_recursion;
-use futures::{
-    future::{select, Either},
-    pin_mut,
-};
-use rand::{CryptoRng, RngCore};
-use std::sync::Arc;
-use tracing::{error, info};
-use uuid::Uuid;
-
 use crate::{
     bitcoin,
     bitcoin::{TransactionBlockHeight, WaitForTransactionFinality, WatchForRawTransaction},
@@ -35,6 +24,16 @@ use crate::{
     },
     ExpiredTimelocks,
 };
+use anyhow::{bail, Result};
+use async_recursion::async_recursion;
+use futures::{
+    future::{select, Either},
+    pin_mut,
+};
+use rand::{CryptoRng, RngCore};
+use std::sync::Arc;
+use tracing::{error, info};
+use uuid::Uuid;
 
 trait Rng: RngCore + CryptoRng + Send {}
 

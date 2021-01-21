@@ -1,14 +1,3 @@
-use anyhow::{anyhow, Result};
-use ecdsa_fun::{
-    adaptor::{Adaptor, EncryptedSignature},
-    nonce::Deterministic,
-    Signature,
-};
-use rand::{CryptoRng, RngCore};
-use serde::{Deserialize, Serialize};
-use sha2::Sha256;
-use std::fmt;
-
 use crate::{
     bitcoin::{
         self, current_epoch, timelocks::Timelock, wait_for_cancel_timelock_to_expire,
@@ -21,6 +10,16 @@ use crate::{
     protocol::{alice, bob},
     ExpiredTimelocks, SwapAmounts,
 };
+use anyhow::{anyhow, Result};
+use ecdsa_fun::{
+    adaptor::{Adaptor, EncryptedSignature},
+    nonce::Deterministic,
+    Signature,
+};
+use rand::{CryptoRng, RngCore};
+use serde::{Deserialize, Serialize};
+use sha2::Sha256;
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum BobState {

@@ -1,11 +1,3 @@
-use anyhow::{bail, Result};
-use async_recursion::async_recursion;
-use rand::{rngs::OsRng, CryptoRng, RngCore};
-use std::sync::Arc;
-use tokio::select;
-use tracing::{debug, info};
-use uuid::Uuid;
-
 use crate::{
     bitcoin,
     config::Config,
@@ -14,6 +6,13 @@ use crate::{
     protocol::bob::{self, event_loop::EventLoopHandle, state::*, SwapRequest},
     ExpiredTimelocks, SwapAmounts,
 };
+use anyhow::{bail, Result};
+use async_recursion::async_recursion;
+use rand::{rngs::OsRng, CryptoRng, RngCore};
+use std::sync::Arc;
+use tokio::select;
+use tracing::{debug, info};
+use uuid::Uuid;
 
 pub fn is_complete(state: &BobState) -> bool {
     matches!(

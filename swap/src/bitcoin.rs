@@ -1,26 +1,24 @@
+pub use crate::bitcoin::{
+    timelocks::Timelock,
+    transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund},
+};
+use crate::{bitcoin::timelocks::BlockHeight, config::Config, ExpiredTimelocks};
 use ::bitcoin::{
     hashes::{hex::ToHex, Hash},
     secp256k1,
     util::psbt::PartiallySignedTransaction,
     SigHash,
 };
+pub use ::bitcoin::{util::amount::Amount, Address, Network, Transaction, Txid};
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
 use ecdsa_fun::{adaptor::Adaptor, fun::Point, nonce::Deterministic, ECDSA};
+pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
 use miniscript::{Descriptor, Segwitv0};
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
-
-use crate::{bitcoin::timelocks::BlockHeight, config::Config, ExpiredTimelocks};
-
-pub use crate::bitcoin::{
-    timelocks::Timelock,
-    transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund},
-};
-pub use ::bitcoin::{util::amount::Amount, Address, Network, Transaction, Txid};
-pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
 pub use wallet::Wallet;
 
 pub mod timelocks;

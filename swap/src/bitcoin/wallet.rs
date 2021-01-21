@@ -1,12 +1,3 @@
-use ::bitcoin::{util::psbt::PartiallySignedTransaction, Txid};
-use anyhow::{Context, Result};
-use async_trait::async_trait;
-use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
-use bitcoin_harness::{bitcoind_rpc::PsbtBase64, BitcoindRpcApi};
-use reqwest::Url;
-use std::time::Duration;
-use tokio::time::interval;
-
 use crate::{
     bitcoin::{
         timelocks::BlockHeight, Address, Amount, BroadcastSignedTransaction, BuildTxLockPsbt,
@@ -15,6 +6,14 @@ use crate::{
     },
     config::Config,
 };
+use ::bitcoin::{util::psbt::PartiallySignedTransaction, Txid};
+use anyhow::{Context, Result};
+use async_trait::async_trait;
+use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
+use bitcoin_harness::{bitcoind_rpc::PsbtBase64, BitcoindRpcApi};
+use reqwest::Url;
+use std::time::Duration;
+use tokio::time::interval;
 
 #[derive(Debug)]
 pub struct Wallet {

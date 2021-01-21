@@ -1,8 +1,7 @@
+use crate::{bitcoin, monero};
 use libp2p::{core::Multiaddr, PeerId};
 use url::Url;
 use uuid::Uuid;
-
-use crate::{bitcoin, monero};
 
 #[derive(structopt::StructOpt, Debug)]
 pub struct Options {

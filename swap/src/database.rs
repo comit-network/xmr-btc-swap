@@ -5,7 +5,6 @@ use uuid::Uuid;
 
 mod alice;
 mod bob;
-
 pub use alice::Alice;
 pub use bob::Bob;
 

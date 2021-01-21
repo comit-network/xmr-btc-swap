@@ -1,5 +1,4 @@
 pub mod seed;
-
 use crate::bitcoin::Timelock;
 use conquer_once::Lazy;
 use std::time::Duration;

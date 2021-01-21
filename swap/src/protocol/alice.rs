@@ -1,5 +1,14 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
+pub use self::{
+    event_loop::{EventLoop, EventLoopHandle},
+    message0::Message0,
+    message1::Message1,
+    message2::Message2,
+    state::*,
+    swap::{run, run_until},
+    swap_response::*,
+};
 use crate::{
     bitcoin,
     config::Config,
@@ -24,16 +33,6 @@ use rand::rngs::OsRng;
 use std::{path::PathBuf, sync::Arc};
 use tracing::{debug, info};
 use uuid::Uuid;
-
-pub use self::{
-    event_loop::{EventLoop, EventLoopHandle},
-    message0::Message0,
-    message1::Message1,
-    message2::Message2,
-    state::*,
-    swap::{run, run_until},
-    swap_response::*,
-};
 
 pub mod event_loop;
 mod message0;

@@ -1,3 +1,8 @@
+use crate::{
+    bitcoin,
+    network::request_response::{AliceToBob, BobToAlice, Codec, Message1Protocol, TIMEOUT},
+    protocol::alice,
+};
 use libp2p::{
     request_response::{
         handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
@@ -13,12 +18,6 @@ use std::{
     time::Duration,
 };
 use tracing::{debug, error};
-
-use crate::{
-    bitcoin,
-    network::request_response::{AliceToBob, BobToAlice, Codec, Message1Protocol, TIMEOUT},
-    protocol::alice,
-};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message1 {

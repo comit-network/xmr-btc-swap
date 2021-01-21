@@ -1,8 +1,11 @@
 pub mod wallet;
 
+use crate::bitcoin;
 use ::bitcoin::hashes::core::fmt::Formatter;
+pub use ::monero::{Network, PrivateKey, PublicKey};
 use anyhow::Result;
 use async_trait::async_trait;
+pub use curve25519_dalek::scalar::Scalar;
 use rand::{CryptoRng, RngCore};
 use rust_decimal::{
     prelude::{FromPrimitive, ToPrimitive},
@@ -14,11 +17,6 @@ use std::{
     ops::{Add, Mul, Sub},
     str::FromStr,
 };
-
-use crate::bitcoin;
-
-pub use ::monero::{Network, PrivateKey, PublicKey};
-pub use curve25519_dalek::scalar::Scalar;
 pub use wallet::Wallet;
 
 pub const PICONERO_OFFSET: u64 = 1_000_000_000_000;

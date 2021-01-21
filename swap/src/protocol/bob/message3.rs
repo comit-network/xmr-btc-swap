@@ -1,3 +1,7 @@
+use crate::{
+    bitcoin::EncryptedSignature,
+    network::request_response::{AliceToBob, BobToAlice, Codec, Message3Protocol, TIMEOUT},
+};
 use libp2p::{
     request_response::{
         handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
@@ -13,11 +17,6 @@ use std::{
     time::Duration,
 };
 use tracing::error;
-
-use crate::{
-    bitcoin::EncryptedSignature,
-    network::request_response::{AliceToBob, BobToAlice, Codec, Message3Protocol, TIMEOUT},
-};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message3 {
