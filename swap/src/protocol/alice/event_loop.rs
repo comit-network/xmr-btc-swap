@@ -265,7 +265,7 @@ impl EventLoop {
                 },
                 transfer_proof = self.send_transfer_proof.recv().fuse() => {
                     if let Some((bob_peer_id, msg)) = transfer_proof  {
-                      self.swarm.send_transfer_proof(bob_peer_id, msg)
+                      self.swarm.send_transfer_proof(bob_peer_id, msg);
                     }
                 },
             }

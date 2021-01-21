@@ -79,7 +79,10 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for B
                     debug!("Received Transfer Proof");
                     self.events.push_back(OutEvent::Msg(*msg));
                     // Send back empty response so that the request/response protocol completes.
-                    let _ = self.rr.send_response(channel, Response::TransferProof);
+                    let _ = self
+                        .rr
+                        .send_response(channel, Response::TransferProof)
+                        .map_err(|err| error!("Failed to send message 3: {:?}", err));
                 }
             }
             RequestResponseEvent::Message {

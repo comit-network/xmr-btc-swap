@@ -97,7 +97,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for B
                 error!("Outbound failure: {:?}", error);
             }
             RequestResponseEvent::ResponseSent { .. } => {
-                unreachable!("Bob should never send a Amounts response to Alice");
+                unreachable!("Bob does not send the encrypted signature response to Alice");
             }
         }
     }
