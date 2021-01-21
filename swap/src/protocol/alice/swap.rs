@@ -1,6 +1,6 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use anyhow::Result;
+use anyhow::{bail, Result};
 use async_recursion::async_recursion;
 use futures::{
     future::{select, Either},
@@ -8,12 +8,12 @@ use futures::{
 };
 use rand::{CryptoRng, RngCore};
 use std::sync::Arc;
-use tracing::info;
+use tracing::{error, info};
 use uuid::Uuid;
 
 use crate::{
     bitcoin,
-    bitcoin::{TransactionBlockHeight, WatchForRawTransaction},
+    bitcoin::{TransactionBlockHeight, WaitForTransactionFinality, WatchForRawTransaction},
     config::Config,
     database,
     database::Database,
@@ -254,53 +254,59 @@ async fn run_until_internal(
                 state3,
                 encrypted_signature,
             } => {
-                // TODO: Evaluate if it is correct for Alice to Redeem no matter what.
-                //  If cancel timelock expired she should potentially not try redeem. (The
-                // implementation  gives her an advantage.)
+                let state = match state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {
+                    ExpiredTimelocks::None => {
+                        match build_bitcoin_redeem_transaction(
+                            encrypted_signature,
+                            &state3.tx_lock,
+                            state3.a.clone(),
+                            state3.s_a,
+                            state3.B,
+                            &state3.redeem_address,
+                        ) {
+                            Ok(tx) => {
+                                match publish_bitcoin_redeem_transaction(tx, bitcoin_wallet.clone())
+                                    .await
+                                {
+                                    Ok(txid) => {
+                                        let publishded_redeem_tx = bitcoin_wallet
+                                            .wait_for_transaction_finality(txid, config)
+                                            .await;
 
-                let signed_tx_redeem = match build_bitcoin_redeem_transaction(
-                    encrypted_signature,
-                    &state3.tx_lock,
-                    state3.a.clone(),
-                    state3.s_a,
-                    state3.B,
-                    &state3.redeem_address,
-                ) {
-                    Ok(tx) => tx,
-                    Err(_) => {
-                        state3
-                            .wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref())
-                            .await?;
+                                        match publishded_redeem_tx {
+                                            Ok(_) => {
+                                                AliceState::BtcRedeemed
+                                            }
+                                            Err(e) => {
+                                                bail!("Waiting for Bitcoin transaction finality failed with {}! The redeem transaction was published, but it is not ensured that the transaction was included! You're screwed.", e)
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        error!("Publishing the redeem transaction failed with {}, attempting to wait for cancellation now. If you restart the application before the timelock is expired publishing the redeem transaction will be retried.", e);
+                                        state3
+                                            .wait_for_cancel_timelock_to_expire(
+                                                bitcoin_wallet.as_ref(),
+                                            )
+                                            .await?;
 
-                        let state = AliceState::CancelTimelockExpired { state3 };
-                        let db_state = (&state).into();
-                        db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
-                            .await?;
-                        return run_until_internal(
-                            state,
-                            is_target_state,
-                            event_loop_handle,
-                            bitcoin_wallet,
-                            monero_wallet,
-                            config,
-                            swap_id,
-                            db,
-                        )
-                        .await;
+                                        AliceState::CancelTimelockExpired { state3 }
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                error!("Constructing the redeem transaction failed with {}, attempting to wait for cancellation now.", e);
+                                state3
+                                    .wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref())
+                                    .await?;
+
+                                AliceState::CancelTimelockExpired { state3 }
+                            }
+                        }
                     }
+                    _ => AliceState::CancelTimelockExpired { state3 },
                 };
 
-                // TODO(Franck): Error handling is delicate here.
-                // If Bob sees this transaction he can redeem Monero
-                // e.g. If the Bitcoin node is down then the user needs to take action.
-                publish_bitcoin_redeem_transaction(
-                    signed_tx_redeem,
-                    bitcoin_wallet.clone(),
-                    config,
-                )
-                .await?;
-
-                let state = AliceState::BtcRedeemed;
                 let db_state = (&state).into();
                 db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                     .await?;

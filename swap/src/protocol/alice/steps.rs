@@ -186,19 +186,16 @@ pub fn build_bitcoin_redeem_transaction(
 pub async fn publish_bitcoin_redeem_transaction<W>(
     redeem_tx: bitcoin::Transaction,
     bitcoin_wallet: Arc<W>,
-    config: Config,
-) -> Result<()>
+) -> Result<::bitcoin::Txid>
 where
     W: BroadcastSignedTransaction + WaitForTransactionFinality,
 {
     info!("Attempting to publish bitcoin redeem txn");
-    let tx_id = bitcoin_wallet
+    let txid = bitcoin_wallet
         .broadcast_signed_transaction(redeem_tx)
         .await?;
 
-    bitcoin_wallet
-        .wait_for_transaction_finality(tx_id, config)
-        .await
+    Ok(txid)
 }
 
 pub async fn publish_cancel_transaction<W>(
