@@ -1,11 +1,11 @@
-pub mod testutils;
-
-use swap::protocol::{alice, bob, bob::BobState};
-use testutils::bob_run_until::is_lock_proof_received;
+use crate::{
+    protocol::{alice, bob, bob::BobState},
+    tests::{bob_run_until::is_lock_proof_received, setup_test},
+};
 
 #[tokio::test]
 async fn given_bob_restarts_after_lock_proof_received_resume_swap() {
-    testutils::setup_test(|mut ctx| async move {
+    setup_test(|mut ctx| async move {
         let alice_swap = ctx.new_swap_as_alice().await;
         let bob_swap = ctx.new_swap_as_bob().await;
 

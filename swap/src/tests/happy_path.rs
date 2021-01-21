@@ -1,13 +1,14 @@
-pub mod testutils;
-
-use swap::protocol::{alice, bob};
+use crate::{
+    protocol::{alice, bob},
+    tests::setup_test,
+};
 use tokio::join;
 
 /// Run the following tests with RUST_MIN_STACK=10000000
 
 #[tokio::test]
 async fn happy_path() {
-    testutils::setup_test(|mut ctx| async move {
+    setup_test(|mut ctx| async move {
         let alice_swap = ctx.new_swap_as_alice().await;
         let bob_swap = ctx.new_swap_as_bob().await;
 

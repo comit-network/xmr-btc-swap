@@ -1,14 +1,14 @@
-pub mod testutils;
-
-use swap::protocol::{alice, alice::AliceState, bob};
-use testutils::alice_run_until::is_encsig_learned;
+use crate::{
+    protocol::{alice, alice::AliceState, bob},
+    tests::{alice_run_until::is_encsig_learned, setup_test},
+};
 
 /// Bob locks btc and Alice locks xmr. Alice fails to act so Bob refunds. Alice
 /// is forced to refund even though she learned the secret and would be able to
 /// redeem had the timelock not expired.
 #[tokio::test]
 async fn given_alice_restarts_after_enc_sig_learned_and_bob_already_cancelled_refund_swap() {
-    testutils::setup_test(|mut ctx| async move {
+    setup_test(|mut ctx| async move {
         let alice_swap = ctx.new_swap_as_alice().await;
         let bob_swap = ctx.new_swap_as_bob().await;
 

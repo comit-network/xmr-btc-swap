@@ -1,11 +1,11 @@
-pub mod testutils;
-
-use swap::protocol::{alice, alice::AliceState, bob};
-use testutils::alice_run_until::is_encsig_learned;
+use crate::{
+    protocol::{alice, alice::AliceState, bob},
+    tests::{alice_run_until::is_encsig_learned, setup_test},
+};
 
 #[tokio::test]
 async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
-    testutils::setup_test(|mut ctx| async move {
+    setup_test(|mut ctx| async move {
         let alice_swap = ctx.new_swap_as_alice().await;
         let bob_swap = ctx.new_swap_as_bob().await;
 
