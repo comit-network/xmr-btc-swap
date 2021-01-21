@@ -1,6 +1,5 @@
 #![warn(
     unused_extern_crates,
-    missing_debug_implementations,
     missing_copy_implementations,
     rust_2018_idioms,
     clippy::cast_possible_truncation,
@@ -13,26 +12,28 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
-use std::sync::Arc;
-
+use crate::cli::{Command, Options, Resume};
 use anyhow::{Context, Result};
+use config::Config;
+use database::Database;
 use prettytable::{row, Table};
+use protocol::{alice, bob, bob::Builder, SwapAmounts};
+use std::sync::Arc;
 use structopt::StructOpt;
+use trace::init_tracing;
 use tracing::{info, log::LevelFilter};
 use uuid::Uuid;
 
-use swap::{
-    bitcoin,
-    config::Config,
-    database::Database,
-    monero,
-    protocol::{alice, bob, bob::Builder, SwapAmounts},
-    trace::init_tracing,
-};
-
-use crate::cli::{Command, Options, Resume};
-
+pub mod bitcoin;
 mod cli;
+pub mod config;
+pub mod database;
+mod fs;
+pub mod monero;
+pub mod network;
+pub mod protocol;
+pub mod seed;
+pub mod trace;
 
 #[macro_use]
 extern crate prettytable;
@@ -51,7 +52,7 @@ async fn main() -> Result<()> {
     let data_dir = std::path::Path::new(opt.data_dir.as_str()).to_path_buf();
     let db_path = data_dir.join("database");
 
-    let seed = swap::config::seed::Seed::from_file_or_generate(&data_dir)
+    let seed = config::seed::Seed::from_file_or_generate(&data_dir)
         .expect("Could not retrieve/initialize seed")
         .into();
 
@@ -229,10 +230,9 @@ async fn setup_wallets(
     bitcoin_wallet_name: &str,
     monero_wallet_rpc_url: url::Url,
     config: Config,
-) -> Result<(swap::bitcoin::Wallet, swap::monero::Wallet)> {
+) -> Result<(bitcoin::Wallet, monero::Wallet)> {
     let bitcoin_wallet =
-        swap::bitcoin::Wallet::new(bitcoin_wallet_name, bitcoind_url, config.bitcoin_network)
-            .await?;
+        bitcoin::Wallet::new(bitcoin_wallet_name, bitcoind_url, config.bitcoin_network).await?;
     let bitcoin_balance = bitcoin_wallet.balance().await?;
     info!(
         "Connection to Bitcoin wallet succeeded, balance: {}",

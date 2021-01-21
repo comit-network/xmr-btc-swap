@@ -19,7 +19,7 @@ use std::{
 };
 use tracing::{debug, error};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct SwapRequest {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub btc_amount: bitcoin::Amount,
