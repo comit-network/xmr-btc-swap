@@ -4,6 +4,7 @@ use crate::{
         alice,
         alice::{Behaviour, OutEvent, SwapResponse},
         bob,
+        bob::Message5,
     },
 };
 use anyhow::{anyhow, Context, Result};
@@ -37,7 +38,7 @@ pub struct EventLoopHandle {
     msg0: Receiver<(bob::Message0, ResponseChannel<AliceToBob>)>,
     msg1: Receiver<(bob::Message1, ResponseChannel<AliceToBob>)>,
     msg2: Receiver<(bob::Message2, ResponseChannel<AliceToBob>)>,
-    msg3: Receiver<bob::Message3>,
+    msg5: Receiver<Message5>,
     request: Receiver<crate::protocol::alice::swap_response::OutEvent>,
     conn_established: Receiver<PeerId>,
     send_swap_response: Sender<(ResponseChannel<AliceToBob>, SwapResponse)>,
@@ -75,8 +76,8 @@ impl EventLoopHandle {
             .ok_or_else(|| anyhow!("Failed o receive message 2 from Bob"))
     }
 
-    pub async fn recv_message3(&mut self) -> Result<bob::Message3> {
-        self.msg3
+    pub async fn recv_message5(&mut self) -> Result<Message5> {
+        self.msg5
             .recv()
             .await
             .ok_or_else(|| anyhow!("Failed to receive Bitcoin encrypted signature from Bob"))
@@ -137,7 +138,7 @@ pub struct EventLoop {
     msg0: Sender<(bob::Message0, ResponseChannel<AliceToBob>)>,
     msg1: Sender<(bob::Message1, ResponseChannel<AliceToBob>)>,
     msg2: Sender<(bob::Message2, ResponseChannel<AliceToBob>)>,
-    msg3: Sender<bob::Message3>,
+    msg5: Sender<Message5>,
     request: Sender<crate::protocol::alice::swap_response::OutEvent>,
     conn_established: Sender<PeerId>,
     send_swap_response: Receiver<(ResponseChannel<AliceToBob>, SwapResponse)>,
@@ -165,7 +166,7 @@ impl EventLoop {
         let msg0 = Channels::new();
         let msg1 = Channels::new();
         let msg2 = Channels::new();
-        let msg3 = Channels::new();
+        let msg5 = Channels::new();
         let request = Channels::new();
         let conn_established = Channels::new();
         let send_swap_response = Channels::new();
@@ -178,7 +179,7 @@ impl EventLoop {
             msg0: msg0.sender,
             msg1: msg1.sender,
             msg2: msg2.sender,
-            msg3: msg3.sender,
+            msg5: msg5.sender,
             request: request.sender,
             conn_established: conn_established.sender,
             send_swap_response: send_swap_response.receiver,
@@ -191,7 +192,7 @@ impl EventLoop {
             msg0: msg0.receiver,
             msg1: msg1.receiver,
             msg2: msg2.receiver,
-            msg3: msg3.receiver,
+            msg5: msg5.receiver,
             request: request.receiver,
             conn_established: conn_established.receiver,
             send_swap_response: send_swap_response.sender,
@@ -220,8 +221,8 @@ impl EventLoop {
                         OutEvent::Message2 { msg, channel } => {
                             let _ = self.msg2.send((msg, channel)).await;
                         }
-                        OutEvent::Message3(msg) => {
-                            let _ = self.msg3.send(msg).await;
+                        OutEvent::Message5(msg) => {
+                            let _ = self.msg5.send(msg).await;
                         }
                         OutEvent::Request(event) => {
                             let _ = self.request.send(*event).await;

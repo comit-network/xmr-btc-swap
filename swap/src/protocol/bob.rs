@@ -26,7 +26,7 @@ pub use self::{
     message0::Message0,
     message1::Message1,
     message2::Message2,
-    message3::Message3,
+    message5::Message5,
     state::*,
     swap::{run, run_until},
     swap_request::*,
@@ -36,7 +36,7 @@ pub mod event_loop;
 mod message0;
 mod message1;
 mod message2;
-mod message3;
+mod message5;
 pub mod state;
 pub mod swap;
 mod swap_request;
@@ -211,7 +211,7 @@ pub enum OutEvent {
     Message0(Box<alice::Message0>),
     Message1(Box<alice::Message1>),
     Message2(alice::Message2),
-    Message3,
+    Message5,
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -254,10 +254,10 @@ impl From<message2::OutEvent> for OutEvent {
     }
 }
 
-impl From<message3::OutEvent> for OutEvent {
-    fn from(event: message3::OutEvent) -> Self {
+impl From<message5::OutEvent> for OutEvent {
+    fn from(event: message5::OutEvent) -> Self {
         match event {
-            message3::OutEvent::Msg => OutEvent::Message3,
+            message5::OutEvent::Msg => OutEvent::Message5,
         }
     }
 }
@@ -272,7 +272,7 @@ pub struct Behaviour {
     message0: message0::Behaviour,
     message1: message1::Behaviour,
     message2: message2::Behaviour,
-    message3: message3::Behaviour,
+    message5: message5::Behaviour,
 }
 
 impl Behaviour {
@@ -302,8 +302,8 @@ impl Behaviour {
 
     /// Sends Bob's fourth message to Alice.
     pub fn send_message3(&mut self, alice: PeerId, tx_redeem_encsig: EncryptedSignature) {
-        let msg = bob::Message3 { tx_redeem_encsig };
-        self.message3.send(alice, msg);
+        let msg = Message5 { tx_redeem_encsig };
+        self.message5.send(alice, msg);
         debug!("Sent Message3");
     }
 

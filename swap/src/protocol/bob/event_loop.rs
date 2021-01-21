@@ -217,7 +217,7 @@ impl EventLoop {
                         OutEvent::Message2(msg) => {
                             let _ = self.msg2.send(msg).await;
                         }
-                        OutEvent::Message3 => info!("Alice acknowledged message 3 received"),
+                        OutEvent::Message5 => info!("Alice acknowledged message 5 received"),
                     }
                 },
                 option = self.dial_alice.next().fuse() => {

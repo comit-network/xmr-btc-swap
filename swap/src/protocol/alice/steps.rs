@@ -146,7 +146,7 @@ pub async fn wait_for_bitcoin_encrypted_signature(
     event_loop_handle: &mut EventLoopHandle,
 ) -> Result<EncryptedSignature> {
     let msg3 = event_loop_handle
-        .recv_message3()
+        .recv_message5()
         .await
         .context("Failed to receive Bitcoin encrypted signature from Bob")?;
 

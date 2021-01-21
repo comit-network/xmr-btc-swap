@@ -9,7 +9,7 @@ use crate::{
     config::Config,
     monero,
     monero::{monero_private_key, TransferProof},
-    protocol::{alice, bob, SwapAmounts},
+    protocol::{alice, bob, bob::Message5, SwapAmounts},
 };
 use anyhow::{anyhow, Result};
 use ecdsa_fun::{
@@ -438,11 +438,11 @@ pub struct State4 {
 }
 
 impl State4 {
-    pub fn next_message(&self) -> bob::Message3 {
+    pub fn next_message(&self) -> Message5 {
         let tx_redeem = bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address);
         let tx_redeem_encsig = self.b.encsign(self.S_a_bitcoin, tx_redeem.digest());
 
-        bob::Message3 { tx_redeem_encsig }
+        Message5 { tx_redeem_encsig }
     }
 
     pub fn tx_redeem_encsig(&self) -> EncryptedSignature {

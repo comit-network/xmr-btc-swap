@@ -9,7 +9,7 @@ use crate::{
     monero,
     monero::CreateWalletForOutput,
     network::request_response::AliceToBob,
-    protocol::{alice, bob, SwapAmounts},
+    protocol::{alice, bob, bob::Message5, SwapAmounts},
 };
 use anyhow::{anyhow, Context, Result};
 use ecdsa_fun::{
@@ -482,7 +482,7 @@ impl State5 {
         }
     }
 
-    pub fn receive(self, msg: bob::Message3) -> State6 {
+    pub fn receive(self, msg: Message5) -> State6 {
         State6 {
             a: self.a,
             B: self.B,

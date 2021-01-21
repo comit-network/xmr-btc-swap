@@ -21,7 +21,7 @@ use crate::{
         transport::build,
         Seed as NetworkSeed,
     },
-    protocol::{bob, SwapAmounts},
+    protocol::{bob, bob::Message5, SwapAmounts},
     seed::Seed,
 };
 use anyhow::{bail, Result};
@@ -37,7 +37,7 @@ pub mod event_loop;
 mod message0;
 mod message1;
 mod message2;
-mod message3;
+mod message5;
 pub mod state;
 mod steps;
 pub mod swap;
@@ -235,7 +235,7 @@ pub enum OutEvent {
         msg: bob::Message2,
         channel: ResponseChannel<AliceToBob>,
     },
-    Message3(bob::Message3),
+    Message5(Message5),
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -281,10 +281,10 @@ impl From<message2::OutEvent> for OutEvent {
     }
 }
 
-impl From<message3::OutEvent> for OutEvent {
-    fn from(event: message3::OutEvent) -> Self {
+impl From<message5::OutEvent> for OutEvent {
+    fn from(event: message5::OutEvent) -> Self {
         match event {
-            message3::OutEvent::Msg(msg) => OutEvent::Message3(msg),
+            message5::OutEvent::Msg(msg) => OutEvent::Message5(msg),
         }
     }
 }
@@ -299,7 +299,7 @@ pub struct Behaviour {
     message0: message0::Behaviour,
     message1: message1::Behaviour,
     message2: message2::Behaviour,
-    message3: message3::Behaviour,
+    message5: message5::Behaviour,
 }
 
 impl Behaviour {
