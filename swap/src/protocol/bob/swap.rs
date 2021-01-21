@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     bitcoin,
+    config::Config,
     database::{Database, Swap},
     monero,
     protocol::bob::{self, event_loop::EventLoopHandle, state::*},
@@ -54,6 +55,7 @@ pub async fn run_until(
         swap.monero_wallet,
         OsRng,
         swap.swap_id,
+        swap.config,
     )
     .await
 }
@@ -70,6 +72,7 @@ async fn run_until_internal<R>(
     monero_wallet: Arc<monero::Wallet>,
     mut rng: R,
     swap_id: Uuid,
+    config: Config,
 ) -> Result<BobState>
 where
     R: RngCore + CryptoRng + Send,
@@ -103,6 +106,7 @@ where
                     monero_wallet,
                     rng,
                     swap_id,
+                    config,
                 )
                 .await
             }
@@ -124,6 +128,7 @@ where
                     monero_wallet,
                     rng,
                     swap_id,
+                    config,
                 )
                 .await
             }
@@ -189,6 +194,7 @@ where
                     monero_wallet,
                     rng,
                     swap_id,
+                    config,
                 )
                 .await
             }
@@ -230,6 +236,7 @@ where
                     monero_wallet,
                     rng,
                     swap_id,
+                    config,
                 )
                 .await
             }
@@ -265,6 +272,7 @@ where
                     monero_wallet,
                     rng,
                     swap_id,
+                    config,
                 )
                 .await
             }
@@ -286,6 +294,7 @@ where
                     monero_wallet,
                     rng,
                     swap_id,
+                    config,
                 )
                 .await
             }
@@ -311,6 +320,7 @@ where
                     monero_wallet,
                     rng,
                     swap_id,
+                    config,
                 )
                 .await
             }
@@ -321,7 +331,7 @@ where
                         bail!("Internal error: canceled state reached before cancel timelock was expired");
                     }
                     ExpiredTimelocks::Cancel => {
-                        state.refund_btc(bitcoin_wallet.as_ref()).await?;
+                        state.refund_btc(bitcoin_wallet.as_ref(), config).await?;
                         BobState::BtcRefunded(state)
                     }
                     ExpiredTimelocks::Punish => BobState::BtcPunished {
@@ -340,6 +350,7 @@ where
                     monero_wallet,
                     rng,
                     swap_id,
+                    config,
                 )
                 .await
             }

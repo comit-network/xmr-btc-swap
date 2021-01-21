@@ -135,11 +135,9 @@ async fn main() -> Result<()> {
                 Arc::new(monero_wallet),
                 alice_addr,
                 alice_peer_id,
+                config,
             );
-            let (swap, event_loop) = bob_factory
-                .with_init_params(swap_amounts, config)
-                .build()
-                .await?;
+            let (swap, event_loop) = bob_factory.with_init_params(swap_amounts).build().await?;
 
             tokio::spawn(async move { event_loop.run().await });
             bob::run(swap).await?;
@@ -212,6 +210,7 @@ async fn main() -> Result<()> {
                 Arc::new(monero_wallet),
                 alice_addr,
                 alice_peer_id,
+                config,
             );
             let (swap, event_loop) = bob_factory.build().await?;
 

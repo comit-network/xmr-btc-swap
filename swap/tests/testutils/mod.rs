@@ -62,6 +62,7 @@ struct BobParams {
     monero_wallet: Arc<monero::Wallet>,
     alice_address: Multiaddr,
     alice_peer_id: PeerId,
+    config: Config,
 }
 
 impl BobParams {
@@ -74,6 +75,7 @@ impl BobParams {
             self.monero_wallet.clone(),
             self.alice_address.clone(),
             self.alice_peer_id.clone(),
+            self.config,
         )
     }
 }
@@ -112,7 +114,7 @@ impl TestContext {
         let (swap, event_loop) = self
             .bob_params
             .builder()
-            .with_init_params(self.swap_amounts, Config::regtest())
+            .with_init_params(self.swap_amounts)
             .build()
             .await
             .unwrap();
@@ -357,6 +359,7 @@ where
         monero_wallet: bob_monero_wallet.clone(),
         alice_address: alice_params.listen_address.clone(),
         alice_peer_id: alice_params.peer_id().await,
+        config,
     };
 
     let test = TestContext {

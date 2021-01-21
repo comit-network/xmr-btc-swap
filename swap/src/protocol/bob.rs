@@ -44,6 +44,7 @@ pub struct Swap {
     pub db: Database,
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
+    pub config: Config,
     pub swap_id: Uuid,
 }
 
@@ -60,17 +61,16 @@ pub struct Builder {
     monero_wallet: Arc<monero::Wallet>,
 
     init_params: InitParams,
+    config: Config,
 }
 
 enum InitParams {
     None,
-    New {
-        swap_amounts: SwapAmounts,
-        config: Config,
-    },
+    New { swap_amounts: SwapAmounts },
 }
 
 impl Builder {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         seed: Seed,
         db_path: PathBuf,
@@ -79,6 +79,7 @@ impl Builder {
         monero_wallet: Arc<monero::Wallet>,
         alice_address: Multiaddr,
         alice_peer_id: PeerId,
+        config: Config,
     ) -> Self {
         let identity = network::Seed::new(seed).derive_libp2p_identity();
         let peer_id = identity.public().into_peer_id();
@@ -93,27 +94,22 @@ impl Builder {
             bitcoin_wallet,
             monero_wallet,
             init_params: InitParams::None,
+            config,
         }
     }
 
-    pub fn with_init_params(self, swap_amounts: SwapAmounts, config: Config) -> Self {
+    pub fn with_init_params(self, swap_amounts: SwapAmounts) -> Self {
         Self {
-            init_params: InitParams::New {
-                swap_amounts,
-                config,
-            },
+            init_params: InitParams::New { swap_amounts },
             ..self
         }
     }
 
     pub async fn build(self) -> Result<(bob::Swap, bob::EventLoop)> {
         match self.init_params {
-            InitParams::New {
-                swap_amounts,
-                config,
-            } => {
+            InitParams::New { swap_amounts } => {
                 let initial_state = self
-                    .make_initial_state(swap_amounts.btc, swap_amounts.xmr, config)
+                    .make_initial_state(swap_amounts.btc, swap_amounts.xmr, self.config)
                     .await?;
 
                 let (event_loop, event_loop_handle) = self.init_event_loop()?;
@@ -128,10 +124,12 @@ impl Builder {
                         bitcoin_wallet: self.bitcoin_wallet.clone(),
                         monero_wallet: self.monero_wallet.clone(),
                         swap_id: self.swap_id,
+                        config: self.config,
                     },
                     event_loop,
                 ))
             }
+
             InitParams::None => {
                 // reopen the existing database
                 let db = Database::open(self.db_path.as_path())?;
@@ -155,6 +153,7 @@ impl Builder {
                         bitcoin_wallet: self.bitcoin_wallet.clone(),
                         monero_wallet: self.monero_wallet.clone(),
                         swap_id: self.swap_id,
+                        config: self.config,
                     },
                     event_loop,
                 ))
