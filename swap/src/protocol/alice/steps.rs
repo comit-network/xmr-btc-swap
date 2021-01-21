@@ -150,6 +150,9 @@ pub async fn wait_for_bitcoin_encrypted_signature(
         .recv_message3()
         .await
         .context("Failed to receive Bitcoin encrypted signature from Bob")?;
+
+    tracing::debug!("Message 3 received, returning it");
+
     Ok(msg3.tx_redeem_encsig)
 }
 

@@ -49,20 +49,6 @@ pub fn is_complete(state: &AliceState) -> bool {
     )
 }
 
-pub fn is_xmr_locked(state: &AliceState) -> bool {
-    matches!(
-        state,
-        AliceState::XmrLocked{..}
-    )
-}
-
-pub fn is_encsig_learned(state: &AliceState) -> bool {
-    matches!(
-        state,
-        AliceState::EncSigLearned{..}
-    )
-}
-
 pub async fn run(swap: alice::Swap) -> Result<AliceState> {
     run_until(swap, is_complete).await
 }

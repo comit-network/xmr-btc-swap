@@ -1,10 +1,10 @@
 pub mod testutils;
 
 use swap::protocol::{alice, bob, bob::BobState};
-use testutils::bob_run_until::is_xmr_locked;
+use testutils::bob_run_until::is_lock_proof_received;
 
 #[tokio::test]
-async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {
+async fn given_bob_restarts_after_lock_proof_received_resume_swap() {
     testutils::setup_test(|mut ctx| async move {
         let alice_swap = ctx.new_swap_as_alice().await;
         let bob_swap = ctx.new_swap_as_bob().await;
@@ -12,19 +12,21 @@ async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {
         let alice_handle = alice::run(alice_swap);
         let alice_swap_handle = tokio::spawn(alice_handle);
 
-        let bob_state = bob::run_until(bob_swap, is_xmr_locked).await.unwrap();
+        let bob_state = bob::run_until(bob_swap, is_lock_proof_received)
+            .await
+            .unwrap();
 
-        assert!(matches!(bob_state, BobState::XmrLocked {..}));
+        assert!(matches!(bob_state, BobState::XmrLockProofReceived {..}));
 
         let bob_swap = ctx.recover_bob_from_db().await;
-        assert!(matches!(bob_swap.state, BobState::XmrLocked {..}));
+        assert!(matches!(bob_swap.state, BobState::XmrLockProofReceived {..}));
 
         let bob_state = bob::run(bob_swap).await.unwrap();
 
         ctx.assert_bob_redeemed(bob_state).await;
 
-        let alice_state = alice_swap_handle.await.unwrap();
-        ctx.assert_alice_redeemed(alice_state.unwrap()).await;
+        let alice_state = alice_swap_handle.await.unwrap().unwrap();
+        ctx.assert_alice_redeemed(alice_state).await;
     })
     .await;
 }

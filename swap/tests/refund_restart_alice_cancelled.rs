@@ -1,6 +1,7 @@
-use swap::protocol::{alice, alice::AliceState, bob};
-
 pub mod testutils;
+
+use swap::protocol::{alice, alice::AliceState, bob};
+use testutils::alice_run_until::is_encsig_learned;
 
 /// Bob locks btc and Alice locks xmr. Alice fails to act so Bob refunds. Alice
 /// is forced to refund even though she learned the secret and would be able to
@@ -14,7 +15,7 @@ async fn given_alice_restarts_after_enc_sig_learned_and_bob_already_cancelled_re
         let bob = bob::run(bob_swap);
         let bob_handle = tokio::spawn(bob);
 
-        let alice_state = alice::run_until(alice_swap, alice::swap::is_encsig_learned)
+        let alice_state = alice::run_until(alice_swap, is_encsig_learned)
             .await
             .unwrap();
         assert!(matches!(alice_state, AliceState::EncSigLearned {..}));

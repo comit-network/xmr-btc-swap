@@ -1,6 +1,7 @@
 pub mod testutils;
 
 use swap::protocol::{alice, bob, bob::BobState};
+use testutils::bob_run_until::is_encsig_sent;
 
 #[tokio::test]
 async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
@@ -11,9 +12,7 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
         let alice = alice::run(alice_swap);
         let alice_handle = tokio::spawn(alice);
 
-        let bob_state = bob::run_until(bob_swap, bob::swap::is_encsig_sent)
-            .await
-            .unwrap();
+        let bob_state = bob::run_until(bob_swap, is_encsig_sent).await.unwrap();
 
         assert!(matches!(bob_state, BobState::EncSigSent {..}));
 

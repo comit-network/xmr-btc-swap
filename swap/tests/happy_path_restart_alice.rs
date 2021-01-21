@@ -1,6 +1,7 @@
 pub mod testutils;
 
 use swap::protocol::{alice, alice::AliceState, bob};
+use testutils::alice_run_until::is_encsig_learned;
 
 #[tokio::test]
 async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
@@ -11,7 +12,7 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
         let bob = bob::run(bob_swap);
         let bob_handle = tokio::spawn(bob);
 
-        let alice_state = alice::run_until(alice_swap, alice::swap::is_encsig_learned)
+        let alice_state = alice::run_until(alice_swap, is_encsig_learned)
             .await
             .unwrap();
         assert!(matches!(alice_state, AliceState::EncSigLearned {..}));

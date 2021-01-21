@@ -6,7 +6,7 @@ use crate::{
     },
     config::Config,
     monero,
-    monero::monero_private_key,
+    monero::{monero_private_key, TransferProof},
     protocol::{alice, bob},
     ExpiredTimelocks, SwapAmounts,
 };
@@ -16,6 +16,7 @@ use ecdsa_fun::{
     nonce::Deterministic,
     Signature,
 };
+use monero_harness::rpc::wallet::BlockHeight;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
@@ -29,6 +30,11 @@ pub enum BobState {
     },
     Negotiated(State2),
     BtcLocked(State3),
+    XmrLockProofReceived {
+        state: State3,
+        lock_transfer_proof: TransferProof,
+        monero_wallet_restore_blockheight: BlockHeight,
+    },
     XmrLocked(State4),
     EncSigSent(State4),
     BtcRedeemed(State5),
@@ -50,6 +56,9 @@ impl fmt::Display for BobState {
             BobState::Started { .. } => write!(f, "started"),
             BobState::Negotiated(..) => write!(f, "negotiated"),
             BobState::BtcLocked(..) => write!(f, "btc is locked"),
+            BobState::XmrLockProofReceived { .. } => {
+                write!(f, "XMR lock transaction transfer proof received")
+            }
             BobState::XmrLocked(..) => write!(f, "xmr is locked"),
             BobState::EncSigSent(..) => write!(f, "encrypted signature is sent"),
             BobState::BtcRedeemed(..) => write!(f, "btc is redeemed"),
@@ -311,7 +320,7 @@ impl State3 {
     pub async fn watch_for_lock_xmr<W>(
         self,
         xmr_wallet: &W,
-        msg: alice::Message2,
+        transfer_proof: TransferProof,
         monero_wallet_restore_blockheight: u32,
     ) -> Result<State4>
     where
@@ -326,7 +335,7 @@ impl State3 {
             .watch_for_transfer(
                 S,
                 self.v.public(),
-                msg.tx_lock_proof,
+                transfer_proof,
                 self.xmr,
                 self.min_monero_confirmations,
             )
