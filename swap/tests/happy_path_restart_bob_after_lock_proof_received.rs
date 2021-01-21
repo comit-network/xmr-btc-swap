@@ -1,9 +1,7 @@
-use swap::protocol::{
-    alice, bob,
-    bob::{swap::is_lock_proof_received, BobState},
-};
-
 pub mod testutils;
+
+use swap::protocol::{alice, bob, bob::BobState};
+use testutils::bob_run_until::is_lock_proof_received;
 
 #[tokio::test]
 async fn given_bob_restarts_after_lock_proof_received_resume_swap() {

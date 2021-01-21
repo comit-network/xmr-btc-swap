@@ -1,6 +1,7 @@
 pub mod testutils;
 
 use swap::protocol::{alice, alice::AliceState, bob};
+use testutils::alice_run_until::is_xmr_locked;
 
 /// Bob locks btc and Alice locks xmr. Alice fails to act so Bob refunds. Alice
 /// then also refunds.
@@ -13,9 +14,7 @@ async fn given_alice_restarts_after_xmr_is_locked_refund_swap() {
         let bob = bob::run(bob_swap);
         let bob_handle = tokio::spawn(bob);
 
-        let alice_state = alice::run_until(alice_swap, alice::swap::is_xmr_locked)
-            .await
-            .unwrap();
+        let alice_state = alice::run_until(alice_swap, is_xmr_locked).await.unwrap();
         assert!(matches!(alice_state, AliceState::XmrLocked {..}));
 
         // Alice does not act, Bob refunds

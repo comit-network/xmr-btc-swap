@@ -460,3 +460,41 @@ fn init_tracing() -> DefaultGuard {
         ))
         .set_default()
 }
+
+pub mod alice_run_until {
+    use swap::protocol::alice::AliceState;
+
+    pub fn is_xmr_locked(state: &AliceState) -> bool {
+        matches!(
+            state,
+            AliceState::XmrLocked{..}
+        )
+    }
+
+    pub fn is_encsig_learned(state: &AliceState) -> bool {
+        matches!(
+            state,
+            AliceState::EncSigLearned{..}
+        )
+    }
+}
+
+pub mod bob_run_until {
+    use swap::protocol::bob::BobState;
+
+    pub fn is_btc_locked(state: &BobState) -> bool {
+        matches!(state, BobState::BtcLocked(..))
+    }
+
+    pub fn is_lock_proof_received(state: &BobState) -> bool {
+        matches!(state, BobState::XmrLockProofReceived { .. })
+    }
+
+    pub fn is_xmr_locked(state: &BobState) -> bool {
+        matches!(state, BobState::XmrLocked(..))
+    }
+
+    pub fn is_encsig_sent(state: &BobState) -> bool {
+        matches!(state, BobState::EncSigSent(..))
+    }
+}

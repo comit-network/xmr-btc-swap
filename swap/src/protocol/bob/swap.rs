@@ -24,22 +24,6 @@ pub fn is_complete(state: &BobState) -> bool {
     )
 }
 
-pub fn is_btc_locked(state: &BobState) -> bool {
-    matches!(state, BobState::BtcLocked(..))
-}
-
-pub fn is_lock_proof_received(state: &BobState) -> bool {
-    matches!(state, BobState::XmrLockProofReceived { .. })
-}
-
-pub fn is_xmr_locked(state: &BobState) -> bool {
-    matches!(state, BobState::XmrLocked(..))
-}
-
-pub fn is_encsig_sent(state: &BobState) -> bool {
-    matches!(state, BobState::EncSigSent(..))
-}
-
 #[allow(clippy::too_many_arguments)]
 pub async fn run(swap: bob::Swap) -> Result<BobState> {
     run_until(swap, is_complete).await

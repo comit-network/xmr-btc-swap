@@ -1,9 +1,7 @@
 pub mod testutils;
 
-use swap::protocol::{
-    alice, bob,
-    bob::{swap::is_xmr_locked, BobState},
-};
+use swap::protocol::{alice, bob, bob::BobState};
+use testutils::bob_run_until::is_xmr_locked;
 
 #[tokio::test]
 async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {

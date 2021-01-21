@@ -1,9 +1,7 @@
 pub mod testutils;
 
-use swap::protocol::{
-    alice, bob,
-    bob::{swap::is_btc_locked, BobState},
-};
+use swap::protocol::{alice, bob, bob::BobState};
+use testutils::bob_run_until::is_btc_locked;
 
 /// Bob locks Btc and Alice locks Xmr. Bob does not act; he fails to send Alice
 /// the encsig and fail to refund or redeem. Alice punishes.
