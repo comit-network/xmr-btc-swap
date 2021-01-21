@@ -30,8 +30,6 @@ mod fs;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
-pub type Never = std::convert::Infallible;
-
 /// XMR/BTC swap amounts.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 // TODO(Franck): review necessity of this struct
