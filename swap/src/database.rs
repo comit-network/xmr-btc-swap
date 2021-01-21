@@ -1,3 +1,6 @@
+pub use alice::Alice;
+pub use bob::Bob;
+
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{fmt::Display, path::Path};
@@ -5,8 +8,6 @@ use uuid::Uuid;
 
 mod alice;
 mod bob;
-pub use alice::Alice;
-pub use bob::Bob;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Swap {

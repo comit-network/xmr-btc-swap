@@ -20,7 +20,6 @@
 //! every BLOCK_TIME_SECS seconds.
 //!
 //! Also provides standalone JSON RPC clients for monerod and monero-wallet-rpc.
-
 pub mod image;
 pub mod rpc;
 

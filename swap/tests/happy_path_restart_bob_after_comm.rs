@@ -1,6 +1,6 @@
-use swap::protocol::{alice, bob, bob::BobState};
-
 pub mod testutils;
+
+use swap::protocol::{alice, bob, bob::BobState};
 
 #[tokio::test]
 async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {

@@ -12,6 +12,7 @@
 )]
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
+
 use crate::cli::{Command, Options, Resume};
 use anyhow::{Context, Result};
 use prettytable::{row, Table};
