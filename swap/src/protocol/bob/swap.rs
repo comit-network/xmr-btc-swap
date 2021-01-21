@@ -11,7 +11,7 @@ use async_recursion::async_recursion;
 use rand::{rngs::OsRng, CryptoRng, RngCore};
 use std::sync::Arc;
 use tokio::select;
-use tracing::{debug, info};
+use tracing::info;
 use uuid::Uuid;
 
 pub fn is_complete(state: &BobState) -> bool {
@@ -26,6 +26,10 @@ pub fn is_complete(state: &BobState) -> bool {
 
 pub fn is_btc_locked(state: &BobState) -> bool {
     matches!(state, BobState::BtcLocked(..))
+}
+
+pub fn is_lock_proof_received(state: &BobState) -> bool {
+    matches!(state, BobState::XmrLockProofReceived { .. })
 }
 
 pub fn is_xmr_locked(state: &BobState) -> bool {
@@ -155,23 +159,12 @@ where
                         msg2 = msg2_watcher => {
 
                             let msg2 = msg2?;
-                            info!("Received XMR lock transaction transfer proof from Alice, watching for transfer confirmations");
-                            debug!("Transfer proof: {:?}", msg2.tx_lock_proof);
 
-                            let xmr_lock_watcher = state3.clone()
-                                .watch_for_lock_xmr(monero_wallet.as_ref(), msg2, monero_wallet_restore_blockheight.height);
-                            let cancel_timelock_expires = state3.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
-
-                            select! {
-                                state4 = xmr_lock_watcher => {
-                                    BobState::XmrLocked(state4?)
-                                },
-                                _ = cancel_timelock_expires => {
-                                    let state4 = state3.state4();
-                                    BobState::CancelTimelockExpired(state4)
-                                }
+                            BobState::XmrLockProofReceived {
+                                state: state3,
+                                lock_transfer_proof: msg2.tx_lock_proof,
+                                monero_wallet_restore_blockheight
                             }
-
                         },
                         _ = cancel_timelock_expires => {
                             let state4 = state3.state4();
@@ -182,6 +175,53 @@ where
                     let state4 = state3.state4();
                     BobState::CancelTimelockExpired(state4)
                 };
+                let db_state = state.clone().into();
+                db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
+                run_until_internal(
+                    state,
+                    is_target_state,
+                    event_loop_handle,
+                    db,
+                    bitcoin_wallet,
+                    monero_wallet,
+                    rng,
+                    swap_id,
+                    config,
+                )
+                .await
+            }
+            BobState::XmrLockProofReceived {
+                state,
+                lock_transfer_proof,
+                monero_wallet_restore_blockheight,
+            } => {
+                let state = if let ExpiredTimelocks::None =
+                    state.current_epoch(bitcoin_wallet.as_ref()).await?
+                {
+                    event_loop_handle.dial().await?;
+
+                    let xmr_lock_watcher = state.clone().watch_for_lock_xmr(
+                        monero_wallet.as_ref(),
+                        lock_transfer_proof,
+                        monero_wallet_restore_blockheight.height,
+                    );
+                    let cancel_timelock_expires =
+                        state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
+
+                    select! {
+                        state4 = xmr_lock_watcher => {
+                            BobState::XmrLocked(state4?)
+                        },
+                        _ = cancel_timelock_expires => {
+                            let state4 = state.state4();
+                            BobState::CancelTimelockExpired(state4)
+                        }
+                    }
+                } else {
+                    let state4 = state.state4();
+                    BobState::CancelTimelockExpired(state4)
+                };
+
                 let db_state = state.clone().into();
                 db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
                 run_until_internal(

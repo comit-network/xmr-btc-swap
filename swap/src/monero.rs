@@ -139,7 +139,7 @@ impl Display for Amount {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct TransferProof {
     tx_hash: TxHash,
     #[serde(with = "monero_private_key")]
@@ -159,7 +159,7 @@ impl TransferProof {
 }
 
 // TODO: add constructor/ change String to fixed length byte array
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct TxHash(pub String);
 
 impl From<TxHash> for String {

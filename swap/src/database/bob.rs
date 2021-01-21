@@ -1,8 +1,10 @@
 use crate::{
+    monero::TransferProof,
     protocol::{bob, bob::BobState},
     SwapAmounts,
 };
 use ::bitcoin::hashes::core::fmt::Display;
+use monero_harness::rpc::wallet::BlockHeight;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -16,6 +18,11 @@ pub enum Bob {
     },
     BtcLocked {
         state3: bob::State3,
+    },
+    XmrLockProofReceived {
+        state: bob::State3,
+        lock_transfer_proof: TransferProof,
+        monero_wallet_restore_blockheight: BlockHeight,
     },
     XmrLocked {
         state4: bob::State4,
@@ -43,6 +50,15 @@ impl From<BobState> for Bob {
             BobState::Started { state0, amounts } => Bob::Started { state0, amounts },
             BobState::Negotiated(state2) => Bob::Negotiated { state2 },
             BobState::BtcLocked(state3) => Bob::BtcLocked { state3 },
+            BobState::XmrLockProofReceived {
+                state,
+                lock_transfer_proof,
+                monero_wallet_restore_blockheight,
+            } => Bob::XmrLockProofReceived {
+                state,
+                lock_transfer_proof,
+                monero_wallet_restore_blockheight,
+            },
             BobState::XmrLocked(state4) => Bob::XmrLocked { state4 },
             BobState::EncSigSent(state4) => Bob::EncSigSent { state4 },
             BobState::BtcRedeemed(state5) => Bob::BtcRedeemed(state5),
@@ -66,6 +82,15 @@ impl From<Bob> for BobState {
             Bob::Started { state0, amounts } => BobState::Started { state0, amounts },
             Bob::Negotiated { state2 } => BobState::Negotiated(state2),
             Bob::BtcLocked { state3 } => BobState::BtcLocked(state3),
+            Bob::XmrLockProofReceived {
+                state,
+                lock_transfer_proof,
+                monero_wallet_restore_blockheight,
+            } => BobState::XmrLockProofReceived {
+                state,
+                lock_transfer_proof,
+                monero_wallet_restore_blockheight,
+            },
             Bob::XmrLocked { state4 } => BobState::XmrLocked(state4),
             Bob::EncSigSent { state4 } => BobState::EncSigSent(state4),
             Bob::BtcRedeemed(state5) => BobState::BtcRedeemed(state5),
@@ -87,6 +112,9 @@ impl Display for Bob {
             Bob::Started { .. } => write!(f, "Started"),
             Bob::Negotiated { .. } => f.write_str("Negotiated"),
             Bob::BtcLocked { .. } => f.write_str("Bitcoin locked"),
+            Bob::XmrLockProofReceived { .. } => {
+                f.write_str("XMR lock transaction transfer proof received")
+            }
             Bob::XmrLocked { .. } => f.write_str("Monero locked"),
             Bob::CancelTimelockExpired(_) => f.write_str("Cancel timelock is expired"),
             Bob::BtcCancelled(_) => f.write_str("Bitcoin refundable"),
