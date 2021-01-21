@@ -95,8 +95,9 @@ mod testnet {
 mod regtest {
     use super::*;
 
-    // In test, we set a shorter time to fail fast
-    pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(30));
+    // In test, we set a shorter time to fail fast but not so short that it makes
+    // the test fail
+    pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(10 * 60));
 
     pub static BITCOIN_FINALITY_CONFIRMATIONS: u32 = 1;
 
