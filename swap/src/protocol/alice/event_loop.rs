@@ -9,10 +9,9 @@ use crate::{
     network::{request_response::AliceToBob, transport::SwapTransport, TokioExecutor},
     protocol::{
         alice,
-        alice::{Behaviour, OutEvent},
+        alice::{Behaviour, OutEvent, SwapResponse},
         bob,
     },
-    SwapAmounts,
 };
 
 #[allow(missing_debug_implementations)]
@@ -40,9 +39,9 @@ pub struct EventLoopHandle {
     msg1: Receiver<(bob::Message1, ResponseChannel<AliceToBob>)>,
     msg2: Receiver<(bob::Message2, ResponseChannel<AliceToBob>)>,
     msg3: Receiver<bob::Message3>,
-    request: Receiver<crate::protocol::alice::amounts::OutEvent>,
+    request: Receiver<crate::protocol::alice::swap_response::OutEvent>,
     conn_established: Receiver<PeerId>,
-    send_amounts: Sender<(ResponseChannel<AliceToBob>, SwapAmounts)>,
+    send_swap_response: Sender<(ResponseChannel<AliceToBob>, SwapResponse)>,
     send_msg0: Sender<(ResponseChannel<AliceToBob>, alice::Message0)>,
     send_msg1: Sender<(ResponseChannel<AliceToBob>, alice::Message1)>,
     send_msg2: Sender<(ResponseChannel<AliceToBob>, alice::Message2)>,
@@ -84,19 +83,24 @@ impl EventLoopHandle {
             .ok_or_else(|| anyhow!("Failed to receive Bitcoin encrypted signature from Bob"))
     }
 
-    pub async fn recv_request(&mut self) -> Result<crate::protocol::alice::amounts::OutEvent> {
+    pub async fn recv_request(
+        &mut self,
+    ) -> Result<crate::protocol::alice::swap_response::OutEvent> {
         self.request
             .recv()
             .await
             .ok_or_else(|| anyhow!("Failed to receive amounts request from Bob"))
     }
 
-    pub async fn send_amounts(
+    pub async fn send_swap_response(
         &mut self,
         channel: ResponseChannel<AliceToBob>,
-        amounts: SwapAmounts,
+        swap_response: SwapResponse,
     ) -> Result<()> {
-        let _ = self.send_amounts.send((channel, amounts)).await?;
+        let _ = self
+            .send_swap_response
+            .send((channel, swap_response))
+            .await?;
         Ok(())
     }
 
@@ -135,9 +139,9 @@ pub struct EventLoop {
     msg1: Sender<(bob::Message1, ResponseChannel<AliceToBob>)>,
     msg2: Sender<(bob::Message2, ResponseChannel<AliceToBob>)>,
     msg3: Sender<bob::Message3>,
-    request: Sender<crate::protocol::alice::amounts::OutEvent>,
+    request: Sender<crate::protocol::alice::swap_response::OutEvent>,
     conn_established: Sender<PeerId>,
-    send_amounts: Receiver<(ResponseChannel<AliceToBob>, SwapAmounts)>,
+    send_swap_response: Receiver<(ResponseChannel<AliceToBob>, SwapResponse)>,
     send_msg0: Receiver<(ResponseChannel<AliceToBob>, alice::Message0)>,
     send_msg1: Receiver<(ResponseChannel<AliceToBob>, alice::Message1)>,
     send_msg2: Receiver<(ResponseChannel<AliceToBob>, alice::Message2)>,
@@ -165,7 +169,7 @@ impl EventLoop {
         let msg3 = Channels::new();
         let request = Channels::new();
         let conn_established = Channels::new();
-        let send_amounts = Channels::new();
+        let send_swap_response = Channels::new();
         let send_msg0 = Channels::new();
         let send_msg1 = Channels::new();
         let send_msg2 = Channels::new();
@@ -178,7 +182,7 @@ impl EventLoop {
             msg3: msg3.sender,
             request: request.sender,
             conn_established: conn_established.sender,
-            send_amounts: send_amounts.receiver,
+            send_swap_response: send_swap_response.receiver,
             send_msg0: send_msg0.receiver,
             send_msg1: send_msg1.receiver,
             send_msg2: send_msg2.receiver,
@@ -191,7 +195,7 @@ impl EventLoop {
             msg3: msg3.receiver,
             request: request.receiver,
             conn_established: conn_established.receiver,
-            send_amounts: send_amounts.sender,
+            send_swap_response: send_swap_response.sender,
             send_msg0: send_msg0.sender,
             send_msg1: send_msg1.sender,
             send_msg2: send_msg2.sender,
@@ -225,9 +229,9 @@ impl EventLoop {
                         }
                     }
                 },
-                amounts = self.send_amounts.next().fuse() => {
-                    if let Some((channel, amounts)) = amounts  {
-                        self.swarm.send_amounts(channel, amounts);
+                swap_response = self.send_swap_response.next().fuse() => {
+                    if let Some((channel, swap_response)) = swap_response  {
+                        self.swarm.send_swap_response(channel, swap_response);
                     }
                 },
                 msg0 = self.send_msg0.next().fuse() => {

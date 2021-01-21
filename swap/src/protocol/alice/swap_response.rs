@@ -6,6 +6,7 @@ use libp2p::{
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
     NetworkBehaviour,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
     task::{Context, Poll},
@@ -14,29 +15,37 @@ use std::{
 use tracing::{debug, error};
 
 use crate::{
-    network::request_response::{AliceToBob, AmountsProtocol, BobToAlice, Codec, TIMEOUT},
-    protocol::alice::amounts,
+    monero,
+    network::request_response::{AliceToBob, BobToAlice, Codec, Swap, TIMEOUT},
+    protocol::bob,
 };
 
 #[derive(Debug)]
 pub struct OutEvent {
-    pub btc: ::bitcoin::Amount,
+    pub msg: bob::SwapRequest,
     pub channel: ResponseChannel<AliceToBob>,
 }
 
-/// A `NetworkBehaviour` that represents getting the amounts of an XMR/BTC swap.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub struct SwapResponse {
+    pub xmr_amount: monero::Amount,
+}
+
+/// A `NetworkBehaviour` that represents negotiate a swap using Swap
+/// request/response.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
-pub struct Amounts {
-    rr: RequestResponse<Codec<AmountsProtocol>>,
+pub struct Behaviour {
+    rr: RequestResponse<Codec<Swap>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
-impl Amounts {
+impl Behaviour {
     /// Alice always sends her messages as a response to a request from Bob.
-    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: AliceToBob) {
+    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: SwapResponse) {
+        let msg = AliceToBob::SwapResponse(msg);
         self.rr.send_response(channel, msg);
     }
 
@@ -44,7 +53,7 @@ impl Amounts {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<AmountsProtocol>>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Swap>>, OutEvent>> {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -53,7 +62,7 @@ impl Amounts {
     }
 }
 
-impl Default for Amounts {
+impl Default for Behaviour {
     fn default() -> Self {
         let timeout = Duration::from_secs(TIMEOUT);
 
@@ -63,7 +72,7 @@ impl Default for Amounts {
         Self {
             rr: RequestResponse::new(
                 Codec::default(),
-                vec![(AmountsProtocol, ProtocolSupport::Full)],
+                vec![(Swap, ProtocolSupport::Full)],
                 config,
             ),
             events: Default::default(),
@@ -71,7 +80,7 @@ impl Default for Amounts {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Amounts {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Behaviour {
     fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
         match event {
             RequestResponseEvent::Message {
@@ -81,9 +90,9 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                     },
                 ..
             } => {
-                if let BobToAlice::AmountsFromBtc(btc) = request {
-                    debug!("Received amounts request");
-                    self.events.push_back(amounts::OutEvent { btc, channel })
+                if let BobToAlice::SwapRequest(msg) = request {
+                    debug!("Received swap request");
+                    self.events.push_back(OutEvent { msg, channel })
                 }
             }
             RequestResponseEvent::Message {

@@ -31,19 +31,6 @@ pub mod trace;
 
 pub type Never = std::convert::Infallible;
 
-/// Commands sent from Bob to the main task.
-#[derive(Clone, Copy, Debug)]
-pub enum Cmd {
-    VerifyAmounts(SwapAmounts),
-}
-
-/// Responses sent from the main task back to Bob.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Rsp {
-    VerifiedAmounts,
-    Abort,
-}
-
 /// XMR/BTC swap amounts.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 // TODO(Franck): review necessity of this struct

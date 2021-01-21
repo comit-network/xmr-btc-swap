@@ -8,10 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, io, marker::PhantomData};
 use tracing::debug;
 
-use crate::{
-    protocol::{alice, bob},
-    SwapAmounts,
-};
+use crate::protocol::{alice, bob};
 
 /// Time to wait for a response back once we send a request.
 pub const TIMEOUT: u64 = 3600; // One hour.
@@ -25,8 +22,7 @@ const BUF_SIZE: usize = 1024 * 1024;
 /// Messages Bob sends to Alice.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum BobToAlice {
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
-    AmountsFromBtc(::bitcoin::Amount),
+    SwapRequest(bob::SwapRequest),
     Message0(Box<bob::Message0>),
     Message1(bob::Message1),
     Message2(bob::Message2),
@@ -36,7 +32,7 @@ pub enum BobToAlice {
 /// Messages Alice sends to Bob.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum AliceToBob {
-    Amounts(SwapAmounts),
+    SwapResponse(alice::SwapResponse),
     Message0(Box<alice::Message0>),
     Message1(Box<alice::Message1>),
     Message2(alice::Message2),
@@ -44,7 +40,7 @@ pub enum AliceToBob {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-pub struct AmountsProtocol;
+pub struct Swap;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Message0Protocol;
@@ -58,9 +54,9 @@ pub struct Message2Protocol;
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Message3Protocol;
 
-impl ProtocolName for AmountsProtocol {
+impl ProtocolName for Swap {
     fn protocol_name(&self) -> &[u8] {
-        b"/xmr/btc/amounts/1.0.0"
+        b"/xmr/btc/swap/1.0.0"
     }
 }
 

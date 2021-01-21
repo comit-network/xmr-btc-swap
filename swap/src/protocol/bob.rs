@@ -1,20 +1,28 @@
 //! Run an XMR/BTC swap in the role of Bob.
 //! Bob holds BTC and wishes receive XMR.
-use anyhow::{bail, Result};
-use libp2p::{core::Multiaddr, NetworkBehaviour, PeerId};
-use tracing::{debug, info};
-
 use crate::{
     bitcoin,
     bitcoin::EncryptedSignature,
-    database, monero, network,
-    network::peer_tracker::{self, PeerTracker},
+    config::Config,
+    database,
+    database::Database,
+    monero, network,
+    network::{
+        peer_tracker::{self, PeerTracker},
+        transport::build,
+    },
     protocol::{alice, bob},
+    seed::Seed,
     SwapAmounts,
 };
+use anyhow::{bail, Result};
+use libp2p::{core::Multiaddr, identity::Keypair, NetworkBehaviour, PeerId};
+use rand::rngs::OsRng;
+use std::{path::PathBuf, sync::Arc};
+use tracing::{debug, info};
+use uuid::Uuid;
 
 pub use self::{
-    amounts::*,
     event_loop::{EventLoop, EventLoopHandle},
     message0::Message0,
     message1::Message1,
@@ -22,14 +30,9 @@ pub use self::{
     message3::Message3,
     state::*,
     swap::{run, run_until},
+    swap_request::*,
 };
-use crate::{config::Config, database::Database, network::transport::build, seed::Seed};
-use libp2p::identity::Keypair;
-use rand::rngs::OsRng;
-use std::{path::PathBuf, sync::Arc};
-use uuid::Uuid;
 
-mod amounts;
 pub mod event_loop;
 mod message0;
 mod message1;
@@ -37,6 +40,7 @@ mod message2;
 mod message3;
 pub mod state;
 pub mod swap;
+mod swap_request;
 
 pub struct Swap {
     pub state: BobState,
@@ -204,7 +208,7 @@ impl Builder {
 #[derive(Debug, Clone)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
-    Amounts(SwapAmounts),
+    SwapResponse(alice::SwapResponse),
     Message0(Box<alice::Message0>),
     Message1(Box<alice::Message1>),
     Message2(alice::Message2),
@@ -221,11 +225,9 @@ impl From<peer_tracker::OutEvent> for OutEvent {
     }
 }
 
-impl From<amounts::OutEvent> for OutEvent {
-    fn from(event: amounts::OutEvent) -> Self {
-        match event {
-            amounts::OutEvent::Amounts(amounts) => OutEvent::Amounts(amounts),
-        }
+impl From<swap_request::OutEvent> for OutEvent {
+    fn from(event: swap_request::OutEvent) -> Self {
+        OutEvent::SwapResponse(event.swap_response)
     }
 }
 
@@ -267,7 +269,7 @@ impl From<message3::OutEvent> for OutEvent {
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
     pt: PeerTracker,
-    amounts: Amounts,
+    swap_request: swap_request::Behaviour,
     message0: message0::Behaviour,
     message1: message1::Behaviour,
     message2: message2::Behaviour,
@@ -275,11 +277,10 @@ pub struct Behaviour {
 }
 
 impl Behaviour {
-    /// Sends a message to Alice to get current amounts based on `btc`.
-    pub fn request_amounts(&mut self, alice: PeerId, btc: u64) {
-        let btc = ::bitcoin::Amount::from_sat(btc);
-        let _id = self.amounts.request_amounts(alice.clone(), btc);
-        info!("Requesting amounts from: {}", alice);
+    /// Sends a swap request to Alice to negotiate the swap.
+    pub fn send_swap_request(&mut self, alice: PeerId, swap_request: SwapRequest) {
+        let _id = self.swap_request.send(alice.clone(), swap_request);
+        info!("Requesting swap from: {}", alice);
     }
 
     /// Sends Bob's first message to Alice.

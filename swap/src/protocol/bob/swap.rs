@@ -11,7 +11,7 @@ use crate::{
     config::Config,
     database::{Database, Swap},
     monero,
-    protocol::bob::{self, event_loop::EventLoopHandle, state::*},
+    protocol::bob::{self, event_loop::EventLoopHandle, state::*, SwapRequest},
     ExpiredTimelocks, SwapAmounts,
 };
 
@@ -373,7 +373,15 @@ where
     R: RngCore + CryptoRng + Send,
 {
     tracing::trace!("Starting negotiate");
-    swarm.request_amounts(amounts.btc).await?;
+    swarm
+        .send_swap_request(SwapRequest {
+            btc_amount: amounts.btc,
+        })
+        .await?;
+
+    // TODO: Use this once Bob's CLI is modified to only pass xmr amount in
+    // argument.
+    let _swap_response = swarm.recv_swap_response().await?;
 
     swarm.send_message0(state0.next_message(&mut rng)).await?;
     let msg0 = swarm.recv_message0().await?;
