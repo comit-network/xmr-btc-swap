@@ -1,16 +1,3 @@
-use anyhow::{Context, Result};
-use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
-use futures::{
-    future::{select, Either},
-    pin_mut,
-};
-use libp2p::request_response::ResponseChannel;
-use rand::rngs::OsRng;
-use sha2::Sha256;
-use std::sync::Arc;
-use tokio::time::timeout;
-use tracing::{info, trace};
-
 use crate::{
     bitcoin,
     bitcoin::{
@@ -27,9 +14,21 @@ use crate::{
     protocol::{
         alice,
         alice::{event_loop::EventLoopHandle, SwapResponse},
+        SwapAmounts,
     },
-    SwapAmounts,
 };
+use anyhow::{Context, Result};
+use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
+use futures::{
+    future::{select, Either},
+    pin_mut,
+};
+use libp2p::request_response::ResponseChannel;
+use rand::rngs::OsRng;
+use sha2::Sha256;
+use std::sync::Arc;
+use tokio::time::timeout;
+use tracing::{info, trace};
 
 pub async fn negotiate(
     state0: alice::State0,

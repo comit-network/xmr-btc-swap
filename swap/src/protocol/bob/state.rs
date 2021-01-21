@@ -1,14 +1,15 @@
 use crate::{
     bitcoin::{
-        self, current_epoch, timelocks::Timelock, wait_for_cancel_timelock_to_expire,
-        BroadcastSignedTransaction, BuildTxLockPsbt, GetBlockHeight, GetNetwork, GetRawTransaction,
-        Transaction, TransactionBlockHeight, TxCancel, Txid, WatchForRawTransaction,
+        self, current_epoch,
+        timelocks::{ExpiredTimelocks, Timelock},
+        wait_for_cancel_timelock_to_expire, BroadcastSignedTransaction, BuildTxLockPsbt,
+        GetBlockHeight, GetNetwork, GetRawTransaction, Transaction, TransactionBlockHeight,
+        TxCancel, Txid, WatchForRawTransaction,
     },
     config::Config,
     monero,
     monero::{monero_private_key, TransferProof},
-    protocol::{alice, bob},
-    ExpiredTimelocks, SwapAmounts,
+    protocol::{alice, bob, SwapAmounts},
 };
 use anyhow::{anyhow, Result};
 use ecdsa_fun::{

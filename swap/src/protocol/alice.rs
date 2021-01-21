@@ -21,9 +21,8 @@ use crate::{
         transport::build,
         Seed as NetworkSeed,
     },
-    protocol::bob,
+    protocol::{bob, SwapAmounts},
     seed::Seed,
-    SwapAmounts,
 };
 use anyhow::{bail, Result};
 use libp2p::{

@@ -2,8 +2,7 @@ use crate::{
     bitcoin::{EncryptedSignature, TxCancel, TxRefund},
     monero,
     monero::monero_private_key,
-    protocol::{alice, alice::AliceState},
-    SwapAmounts,
+    protocol::{alice, alice::AliceState, SwapAmounts},
 };
 use ::bitcoin::hashes::core::fmt::Display;
 use serde::{Deserialize, Serialize};

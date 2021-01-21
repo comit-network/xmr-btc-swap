@@ -11,9 +11,8 @@ use crate::{
         peer_tracker::{self, PeerTracker},
         transport::build,
     },
-    protocol::{alice, bob},
+    protocol::{alice, bob, SwapAmounts},
     seed::Seed,
-    SwapAmounts,
 };
 use anyhow::{bail, Result};
 use libp2p::{core::Multiaddr, identity::Keypair, NetworkBehaviour, PeerId};
