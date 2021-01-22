@@ -94,10 +94,19 @@ mod testnet {
 
 mod regtest {
     use super::*;
+    use std::{env, str::FromStr};
 
     // In test, we set a shorter time to fail fast but not so short that it makes
     // the test fail
-    pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(10 * 60));
+    pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| {
+        let min = match env::var("BOB_TIME_TO_ACT_MIN_TEST") {
+            Ok(min) => u64::from_str(&min)
+                .expect("env BOB_TIME_TO_ACT_MIN_TEST must be an unsigned integer"),
+            Err(_) => 1,
+        };
+
+        Duration::from_secs(min * 60)
+    });
 
     pub static BITCOIN_FINALITY_CONFIRMATIONS: u32 = 1;
 
