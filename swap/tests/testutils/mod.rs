@@ -14,6 +14,7 @@ use swap::{
 };
 use tempfile::tempdir;
 use testcontainers::{clients::Cli, Container};
+use tokio::task::JoinHandle;
 use tracing_core::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
 use uuid::Uuid;
@@ -35,7 +36,7 @@ struct AliceParams {
 }
 
 impl AliceParams {
-    pub async fn builder(&self) -> alice::Builder {
+    pub fn builder(&self) -> alice::Builder {
         alice::Builder::new(
             self.seed,
             self.config,
@@ -45,14 +46,14 @@ impl AliceParams {
             self.db_path.clone(),
             self.listen_address.clone(),
         )
-        .await
     }
 
-    async fn peer_id(&self) -> PeerId {
-        self.builder().await.peer_id()
+    fn peer_id(&self) -> PeerId {
+        self.builder().peer_id()
     }
 }
 
+#[derive(Debug, Clone)]
 struct BobParams {
     seed: Seed,
     db_path: PathBuf,
@@ -79,6 +80,10 @@ impl BobParams {
     }
 }
 
+pub struct BobEventLoopJoinHandle(JoinHandle<()>);
+
+pub struct AliceEventLoopJoinHandle(JoinHandle<()>);
+
 pub struct TestContext {
     swap_amounts: SwapAmounts,
 
@@ -94,22 +99,21 @@ pub struct TestContext {
 }
 
 impl TestContext {
-    pub async fn new_swap_as_alice(&mut self) -> alice::Swap {
+    pub async fn new_swap_as_alice(&mut self) -> (alice::Swap, AliceEventLoopJoinHandle) {
         let (swap, mut event_loop) = self
             .alice_params
             .builder()
-            .await
             .with_init_params(self.swap_amounts)
             .build()
             .await
             .unwrap();
 
-        tokio::spawn(async move { event_loop.run().await });
+        let join_handle = tokio::spawn(async move { event_loop.run().await });
 
-        swap
+        (swap, AliceEventLoopJoinHandle(join_handle))
     }
 
-    pub async fn new_swap_as_bob(&mut self) -> bob::Swap {
+    pub async fn new_swap_as_bob(&mut self) -> (bob::Swap, BobEventLoopJoinHandle) {
         let (swap, event_loop) = self
             .bob_params
             .builder()
@@ -118,20 +122,30 @@ impl TestContext {
             .await
             .unwrap();
 
+        let join_handle = tokio::spawn(async move { event_loop.run().await });
+
+        (swap, BobEventLoopJoinHandle(join_handle))
+    }
+
+    pub async fn stop_and_resume_alice_from_db(
+        &mut self,
+        join_handle: AliceEventLoopJoinHandle,
+    ) -> alice::Swap {
+        join_handle.0.abort();
+
+        let (swap, mut event_loop) = self.alice_params.builder().build().await.unwrap();
+
         tokio::spawn(async move { event_loop.run().await });
 
         swap
     }
 
-    pub async fn recover_alice_from_db(&mut self) -> alice::Swap {
-        let (swap, mut event_loop) = self.alice_params.builder().await.build().await.unwrap();
+    pub async fn stop_and_resume_bob_from_db(
+        &mut self,
+        join_handle: BobEventLoopJoinHandle,
+    ) -> bob::Swap {
+        join_handle.0.abort();
 
-        tokio::spawn(async move { event_loop.run().await });
-
-        swap
-    }
-
-    pub async fn recover_bob_from_db(&mut self) -> bob::Swap {
         let (swap, event_loop) = self.bob_params.builder().build().await.unwrap();
 
         tokio::spawn(async move { event_loop.run().await });
@@ -357,7 +371,7 @@ where
         bitcoin_wallet: bob_bitcoin_wallet.clone(),
         monero_wallet: bob_monero_wallet.clone(),
         alice_address: alice_params.listen_address.clone(),
-        alice_peer_id: alice_params.peer_id().await,
+        alice_peer_id: alice_params.peer_id(),
         config,
     };
 

@@ -96,8 +96,7 @@ async fn main() -> Result<()> {
                 Arc::new(monero_wallet),
                 db_path,
                 listen_addr,
-            )
-            .await;
+            );
             let (swap, mut event_loop) =
                 alice_factory.with_init_params(swap_amounts).build().await?;
 
@@ -185,8 +184,7 @@ async fn main() -> Result<()> {
                 Arc::new(monero_wallet),
                 db_path,
                 listen_addr,
-            )
-            .await;
+            );
             let (swap, mut event_loop) = alice_factory.build().await?;
 
             tokio::spawn(async move { event_loop.run().await });
