@@ -14,10 +14,18 @@ async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
 
         let bob_state = bob::run_until(bob_swap, is_encsig_sent).await.unwrap();
 
-        assert!(matches!(bob_state, BobState::EncSigSent {..}));
+        assert!(
+            matches!(bob_state, BobState::EncSigSent {..}),
+            "bob_state: {:?}",
+            bob_state
+        );
 
         let bob_swap = ctx.recover_bob_from_db().await;
-        assert!(matches!(bob_swap.state, BobState::EncSigSent {..}));
+        assert!(
+            matches!(bob_swap.state, BobState::EncSigSent {..}),
+            "bob_swap.state: {:?}",
+            bob_swap.state
+        );
 
         let bob_state = bob::run(bob_swap).await.unwrap();
 
