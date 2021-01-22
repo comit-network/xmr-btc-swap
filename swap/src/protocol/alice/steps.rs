@@ -38,13 +38,10 @@ pub async fn negotiate(
 ) -> Result<(ResponseChannel<AliceToBob>, alice::State3)> {
     trace!("Starting negotiate");
 
-    // todo: we can move this out, we dont need to timeout here
-    let _peer_id = timeout(
-        config.bob_time_to_act,
-        event_loop_handle.recv_conn_established(),
-    )
-    .await
-    .context("Failed to receive dial connection from Bob")??;
+    let _peer_id = event_loop_handle
+        .recv_conn_established()
+        .await
+        .context("Failed to receive dial connection from Bob")?;
 
     let event = timeout(config.bob_time_to_act, event_loop_handle.recv_request())
         .await
