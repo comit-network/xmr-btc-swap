@@ -1,5 +1,5 @@
 use crate::{
-    network::request_response::{AliceToBob, BobToAlice, Codec, Message5Protocol, TIMEOUT},
+    network::request_response::{Message5Protocol, OneShotCodec, Request, Response, TIMEOUT},
     protocol::bob::Message5,
 };
 use libp2p::{
@@ -27,7 +27,7 @@ pub enum OutEvent {
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<Codec<Message5Protocol>>,
+    rr: RequestResponse<OneShotCodec<Message5Protocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
@@ -37,7 +37,8 @@ impl Behaviour {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message5Protocol>>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<OneShotCodec<Message5Protocol>>, OutEvent>>
+    {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -54,7 +55,7 @@ impl Default for Behaviour {
 
         Self {
             rr: RequestResponse::new(
-                Codec::default(),
+                OneShotCodec::default(),
                 vec![(Message5Protocol, ProtocolSupport::Full)],
                 config,
             ),
@@ -63,8 +64,8 @@ impl Default for Behaviour {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for Behaviour {
+    fn inject_event(&mut self, event: RequestResponseEvent<Request, Response>) {
         match event {
             RequestResponseEvent::Message {
                 message:
@@ -73,12 +74,11 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                     },
                 ..
             } => {
-                if let BobToAlice::Message5(msg) = request {
-                    debug!("Received message 5");
-                    self.events.push_back(OutEvent::Msg(msg));
-                    // Send back empty response so that the request/response protocol completes.
-                    self.rr.send_response(channel, AliceToBob::Message5);
-                }
+                let Request::Message5(msg) = request;
+                debug!("Received message 5");
+                self.events.push_back(OutEvent::Msg(msg));
+                // Send back empty response so that the request/response protocol completes.
+                let _ = self.rr.send_response(channel, Response::Message5);
             }
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { .. },

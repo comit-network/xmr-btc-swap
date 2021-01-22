@@ -1,6 +1,6 @@
 use crate::{
     bitcoin::EncryptedSignature,
-    network::request_response::{AliceToBob, BobToAlice, Codec, Message5Protocol, TIMEOUT},
+    network::request_response::{Message5Protocol, OneShotCodec, Request, Response, TIMEOUT},
 };
 use libp2p::{
     request_response::{
@@ -33,14 +33,14 @@ pub enum OutEvent {
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<Codec<Message5Protocol>>,
+    rr: RequestResponse<OneShotCodec<Message5Protocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
 impl Behaviour {
     pub fn send(&mut self, alice: PeerId, msg: Message5) {
-        let msg = BobToAlice::Message5(msg);
+        let msg = Request::Message5(msg);
         let _id = self.rr.send_request(&alice, msg);
     }
 
@@ -48,7 +48,8 @@ impl Behaviour {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message5Protocol>>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<OneShotCodec<Message5Protocol>>, OutEvent>>
+    {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -65,7 +66,7 @@ impl Default for Behaviour {
 
         Self {
             rr: RequestResponse::new(
-                Codec::default(),
+                OneShotCodec::default(),
                 vec![(Message5Protocol, ProtocolSupport::Full)],
                 config,
             ),
@@ -74,8 +75,8 @@ impl Default for Behaviour {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for Behaviour {
+    fn inject_event(&mut self, event: RequestResponseEvent<Request, Response>) {
         match event {
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Request { .. },
@@ -85,9 +86,8 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                 message: RequestResponseMessage::Response { response, .. },
                 ..
             } => {
-                if let AliceToBob::Message5 = response {
-                    self.events.push_back(OutEvent::Msg);
-                }
+                let Response::Message5 = response;
+                self.events.push_back(OutEvent::Msg);
             }
             RequestResponseEvent::InboundFailure { error, .. } => {
                 error!("Inbound failure: {:?}", error);

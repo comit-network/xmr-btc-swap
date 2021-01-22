@@ -19,13 +19,14 @@ const BUF_SIZE: usize = 1024 * 1024;
 // Codec for each Message and a macro that implements them.
 
 /// Messages Bob sends to Alice.
+// TODO: Remove this once network changes are done
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum BobToAlice {
     SwapRequest(bob::SwapRequest),
     Message0(Box<bob::Message0>),
     Message1(bob::Message1),
     Message2(bob::Message2),
-    Message5(Message5),
 }
 
 /// Messages Alice sends to Bob.
@@ -35,7 +36,19 @@ pub enum AliceToBob {
     Message0(Box<alice::Message0>),
     Message1(Box<alice::Message1>),
     Message2(alice::Message2),
-    Message5, // empty response
+}
+
+/// Messages sent from one party to the other.
+/// All responses are empty
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Request {
+    Message5(Message5),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+/// Response are only used for acknowledgement purposes.
+pub enum Response {
+    Message5,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -128,6 +141,95 @@ where
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         let mut de = serde_cbor::Deserializer::from_slice(&message);
         let msg = AliceToBob::deserialize(&mut de).map_err(|e| {
+            tracing::debug!("serde read_response error: {:?}", e);
+            io::Error::new(io::ErrorKind::InvalidData, e)
+        })?;
+
+        Ok(msg)
+    }
+
+    async fn write_request<T>(
+        &mut self,
+        _: &Self::Protocol,
+        io: &mut T,
+        req: Self::Request,
+    ) -> io::Result<()>
+    where
+        T: AsyncWrite + Unpin + Send,
+    {
+        let bytes =
+            serde_cbor::to_vec(&req).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+
+        upgrade::write_one(io, &bytes).await?;
+
+        Ok(())
+    }
+
+    async fn write_response<T>(
+        &mut self,
+        _: &Self::Protocol,
+        io: &mut T,
+        res: Self::Response,
+    ) -> io::Result<()>
+    where
+        T: AsyncWrite + Unpin + Send,
+    {
+        debug!("enter write_response");
+        let bytes = serde_cbor::to_vec(&res).map_err(|e| {
+            tracing::debug!("serde write_reponse error: {:?}", e);
+            io::Error::new(io::ErrorKind::InvalidData, e)
+        })?;
+        upgrade::write_one(io, &bytes).await?;
+
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct OneShotCodec<P> {
+    phantom: PhantomData<P>,
+}
+
+#[async_trait]
+impl<P> RequestResponseCodec for OneShotCodec<P>
+where
+    P: Send + Sync + Clone + ProtocolName,
+{
+    type Protocol = P;
+    type Request = Request;
+    type Response = Response;
+
+    async fn read_request<T>(&mut self, _: &Self::Protocol, io: &mut T) -> io::Result<Self::Request>
+    where
+        T: AsyncRead + Unpin + Send,
+    {
+        debug!("enter read_request");
+        let message = upgrade::read_one(io, BUF_SIZE)
+            .await
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let mut de = serde_cbor::Deserializer::from_slice(&message);
+        let msg = Request::deserialize(&mut de).map_err(|e| {
+            tracing::debug!("serde read_request error: {:?}", e);
+            io::Error::new(io::ErrorKind::Other, e)
+        })?;
+
+        Ok(msg)
+    }
+
+    async fn read_response<T>(
+        &mut self,
+        _: &Self::Protocol,
+        io: &mut T,
+    ) -> io::Result<Self::Response>
+    where
+        T: AsyncRead + Unpin + Send,
+    {
+        debug!("enter read_response");
+        let message = upgrade::read_one(io, BUF_SIZE)
+            .await
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let mut de = serde_cbor::Deserializer::from_slice(&message);
+        let msg = Response::deserialize(&mut de).map_err(|e| {
             tracing::debug!("serde read_response error: {:?}", e);
             io::Error::new(io::ErrorKind::InvalidData, e)
         })?;
