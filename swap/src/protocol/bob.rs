@@ -31,11 +31,13 @@ pub use self::{
     swap::{run, run_until},
     swap_request::*,
 };
+use crate::protocol::alice::Message4;
 
 pub mod event_loop;
 mod message0;
 mod message1;
 mod message2;
+mod message4;
 mod message5;
 pub mod state;
 pub mod swap;
@@ -210,7 +212,8 @@ pub enum OutEvent {
     SwapResponse(alice::SwapResponse),
     Message0(Box<alice::Message0>),
     Message1(Box<alice::Message1>),
-    Message2(alice::Message2),
+    Message2,
+    Message4(Box<Message4>),
     Message5,
 }
 
@@ -249,7 +252,15 @@ impl From<message1::OutEvent> for OutEvent {
 impl From<message2::OutEvent> for OutEvent {
     fn from(event: message2::OutEvent) -> Self {
         match event {
-            message2::OutEvent::Msg(msg) => OutEvent::Message2(msg),
+            message2::OutEvent::Msg => OutEvent::Message2,
+        }
+    }
+}
+
+impl From<message4::OutEvent> for OutEvent {
+    fn from(event: message4::OutEvent) -> Self {
+        match event {
+            message4::OutEvent::Msg(msg) => OutEvent::Message4(Box::new(msg)),
         }
     }
 }
@@ -272,6 +283,7 @@ pub struct Behaviour {
     message0: message0::Behaviour,
     message1: message1::Behaviour,
     message2: message2::Behaviour,
+    message4: message4::Behaviour,
     message5: message5::Behaviour,
 }
 

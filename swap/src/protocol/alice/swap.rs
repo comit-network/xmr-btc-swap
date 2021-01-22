@@ -91,11 +91,11 @@ async fn run_until_internal(
     } else {
         match state {
             AliceState::Started { amounts, state0 } => {
-                let (channel, state3) =
+                let (peer_id, state3) =
                     negotiate(state0, amounts.xmr, &mut event_loop_handle, config).await?;
 
                 let state = AliceState::Negotiated {
-                    channel: Some(channel),
+                    bob_peer_id: Some(peer_id),
                     amounts,
                     state3: Box::new(state3),
                 };
@@ -117,11 +117,11 @@ async fn run_until_internal(
             }
             AliceState::Negotiated {
                 state3,
-                channel,
+                bob_peer_id,
                 amounts,
             } => {
-                let state = match channel {
-                    Some(channel) => {
+                let state = match bob_peer_id {
+                    Some(bob_peer_id) => {
                         let _ = wait_for_locked_bitcoin(
                             state3.tx_lock.txid(),
                             bitcoin_wallet.clone(),
@@ -130,7 +130,7 @@ async fn run_until_internal(
                         .await?;
 
                         AliceState::BtcLocked {
-                            channel: Some(channel),
+                            bob_peer_id: Some(bob_peer_id),
                             amounts,
                             state3,
                         }
@@ -159,14 +159,14 @@ async fn run_until_internal(
                 .await
             }
             AliceState::BtcLocked {
-                channel,
+                bob_peer_id,
                 amounts,
                 state3,
             } => {
-                let state = match channel {
-                    Some(channel) => {
+                let state = match bob_peer_id {
+                    Some(bob_peer_id) => {
                         lock_xmr(
-                            channel,
+                            bob_peer_id,
                             amounts,
                             *state3.clone(),
                             &mut event_loop_handle,

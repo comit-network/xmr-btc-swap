@@ -1,6 +1,6 @@
 use crate::{
-    network::request_response::{AliceToBob, BobToAlice, Codec, Message2Protocol, TIMEOUT},
-    protocol::bob,
+    network::request_response::{Message4Protocol, OneShotCodec, Request, Response, TIMEOUT},
+    protocol::alice::Message4,
 };
 use libp2p::{
     request_response::{
@@ -8,7 +8,7 @@ use libp2p::{
         RequestResponseEvent, RequestResponseMessage,
     },
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
-    NetworkBehaviour, PeerId,
+    NetworkBehaviour,
 };
 use std::{
     collections::VecDeque,
@@ -19,18 +19,15 @@ use tracing::{debug, error};
 
 #[derive(Debug)]
 pub enum OutEvent {
-    Msg {
-        msg: bob::Message2,
-        bob_peer_id: PeerId,
-    },
+    Msg(Message4),
 }
 
-/// A `NetworkBehaviour` that represents receiving of message 2 from Bob.
+/// A `NetworkBehaviour` that represents receiving of message 4 from Alice.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<Codec<Message2Protocol>>,
+    rr: RequestResponse<OneShotCodec<Message4Protocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
@@ -40,7 +37,8 @@ impl Behaviour {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message2Protocol>>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<OneShotCodec<Message4Protocol>>, OutEvent>>
+    {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -57,8 +55,8 @@ impl Default for Behaviour {
 
         Self {
             rr: RequestResponse::new(
-                Codec::default(),
-                vec![(Message2Protocol, ProtocolSupport::Full)],
+                OneShotCodec::default(),
+                vec![(Message4Protocol, ProtocolSupport::Full)],
                 config,
             ),
             events: Default::default(),
@@ -66,30 +64,27 @@ impl Default for Behaviour {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for Behaviour {
+    fn inject_event(&mut self, event: RequestResponseEvent<Request, Response>) {
         match event {
             RequestResponseEvent::Message {
-                peer,
                 message:
                     RequestResponseMessage::Request {
                         request, channel, ..
                     },
+                ..
             } => {
-                if let BobToAlice::Message2(msg) = request {
-                    debug!("Received Message 2");
-                    self.events.push_back(OutEvent::Msg {
-                        msg,
-                        bob_peer_id: peer,
-                    });
+                if let Request::Message4(msg) = request {
+                    debug!("Received message 4");
+                    self.events.push_back(OutEvent::Msg(*msg));
                     // Send back empty response so that the request/response protocol completes.
-                    let _ = self.rr.send_response(channel, AliceToBob::Message2);
+                    let _ = self.rr.send_response(channel, Response::Message4);
                 }
             }
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { .. },
                 ..
-            } => panic!("Alice should not get a Response"),
+            } => panic!("Bob should not get a Response"),
             RequestResponseEvent::InboundFailure { error, .. } => {
                 error!("Inbound failure: {:?}", error);
             }

@@ -3,7 +3,7 @@ use crate::{
     network::{transport::SwapTransport, TokioExecutor},
     protocol::{
         alice,
-        alice::SwapResponse,
+        alice::{Message4, SwapResponse},
         bob::{self, Behaviour, OutEvent, SwapRequest},
     },
 };
@@ -40,7 +40,7 @@ pub struct EventLoopHandle {
     swap_response: Receiver<SwapResponse>,
     msg0: Receiver<alice::Message0>,
     msg1: Receiver<alice::Message1>,
-    msg2: Receiver<alice::Message2>,
+    msg4: Receiver<Message4>,
     conn_established: Receiver<PeerId>,
     dial_alice: Sender<()>,
     send_swap_request: Sender<SwapRequest>,
@@ -72,11 +72,11 @@ impl EventLoopHandle {
             .ok_or_else(|| anyhow!("Failed to receive message 1 from Alice"))
     }
 
-    pub async fn recv_message2(&mut self) -> Result<alice::Message2> {
-        self.msg2
+    pub async fn recv_message4(&mut self) -> Result<Message4> {
+        self.msg4
             .recv()
             .await
-            .ok_or_else(|| anyhow!("Failed o receive message 2 from Alice"))
+            .ok_or_else(|| anyhow!("Failed to receive message 4 from Alice"))
     }
 
     /// Dials other party and wait for the connection to be established.
@@ -126,7 +126,7 @@ pub struct EventLoop {
     swap_response: Sender<SwapResponse>,
     msg0: Sender<alice::Message0>,
     msg1: Sender<alice::Message1>,
-    msg2: Sender<alice::Message2>,
+    msg4: Sender<Message4>,
     conn_established: Sender<PeerId>,
     dial_alice: Receiver<()>,
     send_swap_request: Receiver<SwapRequest>,
@@ -155,7 +155,7 @@ impl EventLoop {
         let swap_response = Channels::new();
         let msg0 = Channels::new();
         let msg1 = Channels::new();
-        let msg2 = Channels::new();
+        let msg4 = Channels::new();
         let conn_established = Channels::new();
         let dial_alice = Channels::new();
         let send_swap_request = Channels::new();
@@ -170,7 +170,7 @@ impl EventLoop {
             swap_response: swap_response.sender,
             msg0: msg0.sender,
             msg1: msg1.sender,
-            msg2: msg2.sender,
+            msg4: msg4.sender,
             conn_established: conn_established.sender,
             dial_alice: dial_alice.receiver,
             send_swap_request: send_swap_request.receiver,
@@ -184,7 +184,7 @@ impl EventLoop {
             swap_response: swap_response.receiver,
             msg0: msg0.receiver,
             msg1: msg1.receiver,
-            msg2: msg2.receiver,
+            msg4: msg4.receiver,
             conn_established: conn_established.receiver,
             dial_alice: dial_alice.sender,
             send_swap_request: send_swap_request.sender,
@@ -214,8 +214,9 @@ impl EventLoop {
                         OutEvent::Message1(msg) => {
                             let _ = self.msg1.send(*msg).await;
                         }
-                        OutEvent::Message2(msg) => {
-                            let _ = self.msg2.send(msg).await;
+                        OutEvent::Message2 => info!("Alice acknowledged message 2 received"),
+                        OutEvent::Message4(msg) => {
+                            let _ = self.msg4.send(*msg).await;
                         }
                         OutEvent::Message5 => info!("Alice acknowledged message 5 received"),
                     }

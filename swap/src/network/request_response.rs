@@ -35,7 +35,7 @@ pub enum AliceToBob {
     SwapResponse(alice::SwapResponse),
     Message0(Box<alice::Message0>),
     Message1(Box<alice::Message1>),
-    Message2(alice::Message2),
+    Message2,
 }
 
 /// Messages sent from one party to the other.

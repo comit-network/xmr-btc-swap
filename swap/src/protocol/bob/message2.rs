@@ -1,7 +1,4 @@
-use crate::{
-    network::request_response::{AliceToBob, BobToAlice, Codec, Message2Protocol, TIMEOUT},
-    protocol::alice,
-};
+use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Message2Protocol, TIMEOUT};
 use ecdsa_fun::Signature;
 use libp2p::{
     request_response::{
@@ -25,9 +22,9 @@ pub struct Message2 {
     pub(crate) tx_cancel_sig: Signature,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum OutEvent {
-    Msg(alice::Message2),
+    Msg,
 }
 
 /// A `NetworkBehaviour` that represents sending message 2 to Alice.
@@ -87,9 +84,9 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                 message: RequestResponseMessage::Response { response, .. },
                 ..
             } => {
-                if let AliceToBob::Message2(msg) = response {
-                    debug!("Received Message2");
-                    self.events.push_back(OutEvent::Msg(msg));
+                if let AliceToBob::Message2 = response {
+                    debug!("Received Message 2 acknowledgement");
+                    self.events.push_back(OutEvent::Msg);
                 }
             }
             RequestResponseEvent::InboundFailure { error, .. } => {

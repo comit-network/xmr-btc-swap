@@ -2,7 +2,7 @@ use crate::{
     network::{request_response::AliceToBob, transport::SwapTransport, TokioExecutor},
     protocol::{
         alice,
-        alice::{Behaviour, OutEvent, SwapResponse},
+        alice::{Behaviour, Message4, OutEvent, SwapResponse},
         bob,
         bob::Message5,
     },
@@ -13,6 +13,7 @@ use libp2p::{
     core::Multiaddr, futures::StreamExt, request_response::ResponseChannel, PeerId, Swarm,
 };
 use tokio::sync::mpsc::{Receiver, Sender};
+use tracing::trace;
 
 #[allow(missing_debug_implementations)]
 pub struct Channels<T> {
@@ -37,14 +38,14 @@ impl<T> Default for Channels<T> {
 pub struct EventLoopHandle {
     msg0: Receiver<(bob::Message0, ResponseChannel<AliceToBob>)>,
     msg1: Receiver<(bob::Message1, ResponseChannel<AliceToBob>)>,
-    msg2: Receiver<(bob::Message2, ResponseChannel<AliceToBob>)>,
+    msg2: Receiver<bob::Message2>,
     msg5: Receiver<Message5>,
     request: Receiver<crate::protocol::alice::swap_response::OutEvent>,
     conn_established: Receiver<PeerId>,
     send_swap_response: Sender<(ResponseChannel<AliceToBob>, SwapResponse)>,
     send_msg0: Sender<(ResponseChannel<AliceToBob>, alice::Message0)>,
     send_msg1: Sender<(ResponseChannel<AliceToBob>, alice::Message1)>,
-    send_msg2: Sender<(ResponseChannel<AliceToBob>, alice::Message2)>,
+    send_msg4: Sender<(PeerId, Message4)>,
 }
 
 impl EventLoopHandle {
@@ -69,11 +70,11 @@ impl EventLoopHandle {
             .ok_or_else(|| anyhow!("Failed to receive message 1 from Bob"))
     }
 
-    pub async fn recv_message2(&mut self) -> Result<(bob::Message2, ResponseChannel<AliceToBob>)> {
+    pub async fn recv_message2(&mut self) -> Result<bob::Message2> {
         self.msg2
             .recv()
             .await
-            .ok_or_else(|| anyhow!("Failed o receive message 2 from Bob"))
+            .ok_or_else(|| anyhow!("Failed to receive message 2 from Bob"))
     }
 
     pub async fn recv_message5(&mut self) -> Result<Message5> {
@@ -122,12 +123,8 @@ impl EventLoopHandle {
         Ok(())
     }
 
-    pub async fn send_message2(
-        &mut self,
-        channel: ResponseChannel<AliceToBob>,
-        msg: alice::Message2,
-    ) -> Result<()> {
-        let _ = self.send_msg2.send((channel, msg)).await?;
+    pub async fn send_message4(&mut self, bob: PeerId, msg: Message4) -> Result<()> {
+        let _ = self.send_msg4.send((bob, msg)).await?;
         Ok(())
     }
 }
@@ -137,14 +134,14 @@ pub struct EventLoop {
     swarm: libp2p::Swarm<Behaviour>,
     msg0: Sender<(bob::Message0, ResponseChannel<AliceToBob>)>,
     msg1: Sender<(bob::Message1, ResponseChannel<AliceToBob>)>,
-    msg2: Sender<(bob::Message2, ResponseChannel<AliceToBob>)>,
+    msg2: Sender<bob::Message2>,
     msg5: Sender<Message5>,
     request: Sender<crate::protocol::alice::swap_response::OutEvent>,
     conn_established: Sender<PeerId>,
     send_swap_response: Receiver<(ResponseChannel<AliceToBob>, SwapResponse)>,
     send_msg0: Receiver<(ResponseChannel<AliceToBob>, alice::Message0)>,
     send_msg1: Receiver<(ResponseChannel<AliceToBob>, alice::Message1)>,
-    send_msg2: Receiver<(ResponseChannel<AliceToBob>, alice::Message2)>,
+    send_msg4: Receiver<(PeerId, Message4)>,
 }
 
 impl EventLoop {
@@ -172,7 +169,7 @@ impl EventLoop {
         let send_swap_response = Channels::new();
         let send_msg0 = Channels::new();
         let send_msg1 = Channels::new();
-        let send_msg2 = Channels::new();
+        let send_msg4 = Channels::new();
 
         let driver = EventLoop {
             swarm,
@@ -185,7 +182,7 @@ impl EventLoop {
             send_swap_response: send_swap_response.receiver,
             send_msg0: send_msg0.receiver,
             send_msg1: send_msg1.receiver,
-            send_msg2: send_msg2.receiver,
+            send_msg4: send_msg4.receiver,
         };
 
         let handle = EventLoopHandle {
@@ -198,7 +195,7 @@ impl EventLoop {
             send_swap_response: send_swap_response.sender,
             send_msg0: send_msg0.sender,
             send_msg1: send_msg1.sender,
-            send_msg2: send_msg2.sender,
+            send_msg4: send_msg4.sender,
         };
 
         Ok((driver, handle))
@@ -218,9 +215,10 @@ impl EventLoop {
                         OutEvent::Message1 { msg, channel } => {
                             let _ = self.msg1.send((msg, channel)).await;
                         }
-                        OutEvent::Message2 { msg, channel } => {
-                            let _ = self.msg2.send((msg, channel)).await;
+                        OutEvent::Message2 { msg, bob_peer_id : _} => {
+                            let _ = self.msg2.send(*msg).await;
                         }
+                        OutEvent::Message4 => trace!("Bob ack'd message 4"),
                         OutEvent::Message5(msg) => {
                             let _ = self.msg5.send(msg).await;
                         }
@@ -244,9 +242,9 @@ impl EventLoop {
                         self.swarm.send_message1(channel, msg);
                     }
                 },
-                msg2 = self.send_msg2.next().fuse() => {
-                    if let Some((channel, msg)) = msg2  {
-                        self.swarm.send_message2(channel, msg);
+                msg4 = self.send_msg4.next().fuse() => {
+                    if let Some((bob_peer_id, msg)) = msg4  {
+                        self.swarm.send_message4(bob_peer_id, msg);
                     }
                 },
             }

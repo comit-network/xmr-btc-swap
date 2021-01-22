@@ -8,15 +8,14 @@ use crate::{
     },
     monero,
     monero::CreateWalletForOutput,
-    network::request_response::AliceToBob,
-    protocol::{alice, bob, bob::Message5, SwapAmounts},
+    protocol::{alice, alice::Message4, bob, bob::Message5, SwapAmounts},
 };
 use anyhow::{anyhow, Context, Result};
 use ecdsa_fun::{
     adaptor::{Adaptor, EncryptedSignature},
     nonce::Deterministic,
 };
-use libp2p::request_response::ResponseChannel;
+use libp2p::PeerId;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
@@ -30,12 +29,14 @@ pub enum AliceState {
         state0: State0,
     },
     Negotiated {
-        channel: Option<ResponseChannel<AliceToBob>>,
+        // TODO: Remove option
+        bob_peer_id: Option<PeerId>,
         amounts: SwapAmounts,
         state3: Box<State3>,
     },
     BtcLocked {
-        channel: Option<ResponseChannel<AliceToBob>>,
+        // TODO: Remove option
+        bob_peer_id: Option<PeerId>,
         amounts: SwapAmounts,
         state3: Box<State3>,
     },
@@ -476,8 +477,8 @@ pub struct State5 {
 }
 
 impl State5 {
-    pub fn next_message(&self) -> alice::Message2 {
-        alice::Message2 {
+    pub fn next_message(&self) -> Message4 {
+        Message4 {
             tx_lock_proof: self.tx_lock_proof.clone(),
         }
     }

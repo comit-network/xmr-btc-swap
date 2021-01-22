@@ -4,7 +4,6 @@ pub use self::{
     event_loop::{EventLoop, EventLoopHandle},
     message0::Message0,
     message1::Message1,
-    message2::Message2,
     message4::Message4,
     state::*,
     swap::{run, run_until},
@@ -234,9 +233,10 @@ pub enum OutEvent {
         channel: ResponseChannel<AliceToBob>,
     },
     Message2 {
-        msg: bob::Message2,
-        channel: ResponseChannel<AliceToBob>,
+        msg: Box<bob::Message2>,
+        bob_peer_id: PeerId,
     },
+    Message4,
     Message5(Message5),
 }
 
@@ -278,7 +278,18 @@ impl From<message1::OutEvent> for OutEvent {
 impl From<message2::OutEvent> for OutEvent {
     fn from(event: message2::OutEvent) -> Self {
         match event {
-            message2::OutEvent::Msg { msg, channel } => OutEvent::Message2 { msg, channel },
+            message2::OutEvent::Msg { msg, bob_peer_id } => OutEvent::Message2 {
+                msg: Box::new(msg),
+                bob_peer_id,
+            },
+        }
+    }
+}
+
+impl From<message4::OutEvent> for OutEvent {
+    fn from(event: message4::OutEvent) -> Self {
+        match event {
+            message4::OutEvent::Msg => OutEvent::Message4,
         }
     }
 }
@@ -301,6 +312,7 @@ pub struct Behaviour {
     message0: message0::Behaviour,
     message1: message1::Behaviour,
     message2: message2::Behaviour,
+    message4: message4::Behaviour,
     message5: message5::Behaviour,
 }
 
@@ -327,9 +339,9 @@ impl Behaviour {
         debug!("Sent Message1");
     }
 
-    /// Send Message2 to Bob in response to receiving his Message2.
-    pub fn send_message2(&mut self, channel: ResponseChannel<AliceToBob>, msg: Message2) {
-        self.message2.send(channel, msg);
-        debug!("Sent Message2");
+    /// Send Message4 to Bob.
+    pub fn send_message4(&mut self, bob: PeerId, msg: Message4) {
+        self.message4.send(bob, msg);
+        debug!("Sent Message 4");
     }
 }

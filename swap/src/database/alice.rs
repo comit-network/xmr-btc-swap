@@ -83,7 +83,7 @@ impl From<Alice> for AliceState {
         match db_state {
             Alice::Started { amounts, state0 } => AliceState::Started { amounts, state0 },
             Alice::Negotiated(state3) => AliceState::Negotiated {
-                channel: None,
+                bob_peer_id: None,
                 amounts: SwapAmounts {
                     btc: state3.btc,
                     xmr: state3.xmr,
@@ -91,7 +91,7 @@ impl From<Alice> for AliceState {
                 state3: Box::new(state3),
             },
             Alice::BtcLocked(state3) => AliceState::BtcLocked {
-                channel: None,
+                bob_peer_id: None,
                 amounts: SwapAmounts {
                     btc: state3.btc,
                     xmr: state3.xmr,
