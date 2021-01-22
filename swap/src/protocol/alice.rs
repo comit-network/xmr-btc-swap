@@ -74,7 +74,7 @@ enum InitParams {
 }
 
 impl Builder {
-    pub async fn new(
+    pub fn new(
         seed: Seed,
         config: Config,
         swap_id: Uuid,
@@ -209,7 +209,7 @@ impl Builder {
         EventLoop::new(
             alice_transport,
             alice_behaviour,
-            self.listen_address.clone(),
+            self.listen_address(),
             self.peer_id,
         )
     }

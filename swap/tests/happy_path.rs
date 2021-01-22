@@ -8,12 +8,12 @@ use tokio::join;
 #[tokio::test]
 async fn happy_path() {
     testutils::setup_test(|mut ctx| async move {
-        let alice_swap = ctx.new_swap_as_alice().await;
-        let bob_swap = ctx.new_swap_as_bob().await;
+        let (alice_swap, _) = ctx.new_swap_as_alice().await;
+        let (bob_swap, _) = ctx.new_swap_as_bob().await;
 
         let alice = alice::run(alice_swap);
-
         let bob = bob::run(bob_swap);
+
         let (alice_state, bob_state) = join!(alice, bob);
 
         ctx.assert_alice_redeemed(alice_state.unwrap()).await;
