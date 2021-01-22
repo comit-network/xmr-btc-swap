@@ -5,6 +5,7 @@ pub use self::{
     message0::Message0,
     message1::Message1,
     message2::Message2,
+    message4::Message4,
     state::*,
     swap::{run, run_until},
     swap_response::*,
@@ -37,6 +38,7 @@ pub mod event_loop;
 mod message0;
 mod message1;
 mod message2;
+mod message4;
 mod message5;
 pub mod state;
 mod steps;

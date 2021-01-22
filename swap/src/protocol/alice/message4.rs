@@ -1,6 +1,6 @@
 use crate::{
-    bitcoin::EncryptedSignature,
-    network::request_response::{Message5Protocol, OneShotCodec, Request, Response, TIMEOUT},
+    monero,
+    network::request_response::{Message4Protocol, OneShotCodec, Request, Response, TIMEOUT},
 };
 use libp2p::{
     request_response::{
@@ -19,8 +19,8 @@ use std::{
 use tracing::error;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Message5 {
-    pub tx_redeem_encsig: EncryptedSignature,
+pub struct Message4 {
+    pub tx_lock_proof: monero::TransferProof,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -28,27 +28,27 @@ pub enum OutEvent {
     Msg,
 }
 
-/// A `NetworkBehaviour` that represents sending message 5 to Alice.
+/// A `NetworkBehaviour` that represents sending message 4 to Bob.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<OneShotCodec<Message5Protocol>>,
+    rr: RequestResponse<OneShotCodec<Message4Protocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
 impl Behaviour {
-    pub fn send(&mut self, alice: PeerId, msg: Message5) {
-        let msg = Request::Message5(Box::new(msg));
-        let _id = self.rr.send_request(&alice, msg);
+    pub fn send(&mut self, bob: PeerId, msg: Message4) {
+        let msg = Request::Message4(Box::new(msg));
+        let _id = self.rr.send_request(&bob, msg);
     }
 
     fn poll(
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<OneShotCodec<Message5Protocol>>, OutEvent>>
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<OneShotCodec<Message4Protocol>>, OutEvent>>
     {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
@@ -67,7 +67,7 @@ impl Default for Behaviour {
         Self {
             rr: RequestResponse::new(
                 OneShotCodec::default(),
-                vec![(Message5Protocol, ProtocolSupport::Full)],
+                vec![(Message4Protocol, ProtocolSupport::Full)],
                 config,
             ),
             events: Default::default(),
@@ -81,12 +81,12 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for B
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Request { .. },
                 ..
-            } => panic!("Bob should never get a request from Alice"),
+            } => panic!("Alice should never get a message 4 request from Bob"),
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { response, .. },
                 ..
             } => {
-                if let Response::Message5 = response {
+                if let Response::Message4 = response {
                     self.events.push_back(OutEvent::Msg);
                 }
             }

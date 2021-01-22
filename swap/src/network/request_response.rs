@@ -1,4 +1,4 @@
-use crate::protocol::{alice, bob, bob::Message5};
+use crate::protocol::{alice, alice::Message4, bob, bob::Message5};
 use async_trait::async_trait;
 use futures::prelude::*;
 use libp2p::{
@@ -42,12 +42,14 @@ pub enum AliceToBob {
 /// All responses are empty
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Request {
-    Message5(Message5),
+    Message4(Box<Message4>),
+    Message5(Box<Message5>),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 /// Response are only used for acknowledgement purposes.
 pub enum Response {
+    Message4,
     Message5,
 }
 
@@ -62,6 +64,9 @@ pub struct Message1Protocol;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Message2Protocol;
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Message4Protocol;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Message5Protocol;
@@ -87,6 +92,12 @@ impl ProtocolName for Message1Protocol {
 impl ProtocolName for Message2Protocol {
     fn protocol_name(&self) -> &[u8] {
         b"/xmr/btc/message2/1.0.0"
+    }
+}
+
+impl ProtocolName for Message4Protocol {
+    fn protocol_name(&self) -> &[u8] {
+        b"/xmr/btc/message4/1.0.0"
     }
 }
 

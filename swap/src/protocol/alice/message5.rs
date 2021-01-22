@@ -74,11 +74,12 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for B
                     },
                 ..
             } => {
-                let Request::Message5(msg) = request;
-                debug!("Received message 5");
-                self.events.push_back(OutEvent::Msg(msg));
-                // Send back empty response so that the request/response protocol completes.
-                let _ = self.rr.send_response(channel, Response::Message5);
+                if let Request::Message5(msg) = request {
+                    debug!("Received message 5");
+                    self.events.push_back(OutEvent::Msg(*msg));
+                    // Send back empty response so that the request/response protocol completes.
+                    let _ = self.rr.send_response(channel, Response::Message5);
+                }
             }
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { .. },
