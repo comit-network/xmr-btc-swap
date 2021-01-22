@@ -45,7 +45,7 @@ pub struct Behaviour {
 impl Behaviour {
     /// Alice always sends her messages as a response to a request from Bob.
     pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: SwapResponse) {
-        let msg = AliceToBob::SwapResponse(msg);
+        let msg = AliceToBob::SwapResponse(Box::new(msg));
         self.rr.send_response(channel, msg);
     }
 
@@ -92,7 +92,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             } => {
                 if let BobToAlice::SwapRequest(msg) = request {
                     debug!("Received swap request");
-                    self.events.push_back(OutEvent { msg, channel })
+                    self.events.push_back(OutEvent { msg: *msg, channel })
                 }
             }
             RequestResponseEvent::Message {

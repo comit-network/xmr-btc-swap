@@ -19,20 +19,18 @@ const BUF_SIZE: usize = 1024 * 1024;
 // Codec for each Message and a macro that implements them.
 
 /// Messages Bob sends to Alice.
-// TODO: Remove this once network changes are done
-#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum BobToAlice {
-    SwapRequest(bob::SwapRequest),
+    SwapRequest(Box<bob::SwapRequest>),
     Message0(Box<bob::Message0>),
-    Message1(bob::Message1),
-    Message2(bob::Message2),
+    Message1(Box<bob::Message1>),
+    Message2(Box<bob::Message2>),
 }
 
 /// Messages Alice sends to Bob.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum AliceToBob {
-    SwapResponse(alice::SwapResponse),
+    SwapResponse(Box<alice::SwapResponse>),
     Message0(Box<alice::Message0>),
     Message1(Box<alice::Message1>),
     Message2,

@@ -79,7 +79,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                 if let BobToAlice::Message2(msg) = request {
                     debug!("Received Message 2");
                     self.events.push_back(OutEvent::Msg {
-                        msg,
+                        msg: *msg,
                         bob_peer_id: peer,
                     });
                     // Send back empty response so that the request/response protocol completes.

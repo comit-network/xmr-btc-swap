@@ -39,7 +39,7 @@ pub struct Behaviour {
 
 impl Behaviour {
     pub fn send(&mut self, alice: PeerId, msg: Message2) {
-        let msg = BobToAlice::Message2(msg);
+        let msg = BobToAlice::Message2(Box::new(msg));
         let _id = self.rr.send_request(&alice, msg);
     }
 
