@@ -309,7 +309,7 @@ impl Behaviour {
         channel: ResponseChannel<AliceToBob>,
         swap_response: SwapResponse,
     ) -> Result<()> {
-        let _ = self.amounts.send(channel, swap_response)?;
+        self.amounts.send(channel, swap_response)?;
         info!("Sent amounts response");
         Ok(())
     }
@@ -320,7 +320,7 @@ impl Behaviour {
         channel: ResponseChannel<AliceToBob>,
         msg: Message0,
     ) -> Result<()> {
-        let _ = self.message0.send(channel, msg)?;
+        self.message0.send(channel, msg)?;
         debug!("Sent Message0");
         Ok(())
     }
@@ -331,7 +331,7 @@ impl Behaviour {
         channel: ResponseChannel<AliceToBob>,
         msg: Message1,
     ) -> Result<()> {
-        let _ = self.message1.send(channel, msg)?;
+        self.message1.send(channel, msg)?;
         debug!("Sent Message1");
         Ok(())
     }
@@ -342,7 +342,7 @@ impl Behaviour {
         channel: ResponseChannel<AliceToBob>,
         msg: Message2,
     ) -> Result<()> {
-        let _ = self.message2.send(channel, msg)?;
+        self.message2.send(channel, msg)?;
         debug!("Sent Message2");
         Ok(())
     }

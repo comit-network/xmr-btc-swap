@@ -118,10 +118,6 @@ impl WatchForTransfer for Wallet {
         let confirmations = Arc::new(AtomicU32::new(0u32));
 
         let res = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
-            let confirmations = confirmations.clone();
-            let transfer_proof = transfer_proof.clone();
-            let wallet = wallet.clone();
-
             // NOTE: Currently, this is conflicting IO errors with the transaction not being
             // in the blockchain yet, or not having enough confirmations on it. All these
             // errors warrant a retry, but the strategy should probably differ per case
