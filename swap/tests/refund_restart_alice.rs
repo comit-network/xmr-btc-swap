@@ -23,7 +23,7 @@ async fn given_alice_restarts_after_xmr_is_locked_refund_swap() {
         ctx.assert_bob_refunded(bob_state.unwrap()).await;
 
         // Once bob has finished Alice is restarted and refunds as well
-        let alice_swap = ctx.recover_alice_from_db(alice_join_handle).await;
+        let alice_swap = ctx.stop_and_resume_alice_from_db(alice_join_handle).await;
         assert!(matches!(alice_swap.state, AliceState::XmrLocked {..}));
 
         let alice_state = alice::run(alice_swap).await.unwrap();

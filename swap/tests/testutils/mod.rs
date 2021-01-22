@@ -127,7 +127,7 @@ impl TestContext {
         (swap, BobEventLoopJoinHandle(join_handle))
     }
 
-    pub async fn recover_alice_from_db(
+    pub async fn stop_and_resume_alice_from_db(
         &mut self,
         join_handle: AliceEventLoopJoinHandle,
     ) -> alice::Swap {
@@ -140,7 +140,10 @@ impl TestContext {
         swap
     }
 
-    pub async fn recover_bob_from_db(&mut self, join_handle: BobEventLoopJoinHandle) -> bob::Swap {
+    pub async fn stop_and_resume_bob_from_db(
+        &mut self,
+        join_handle: BobEventLoopJoinHandle,
+    ) -> bob::Swap {
         join_handle.0.abort();
 
         let (swap, event_loop) = self.bob_params.builder().build().await.unwrap();
