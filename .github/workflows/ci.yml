@@ -100,6 +100,9 @@ jobs:
       - name: Cargo check all features
         run: cargo check --workspace --all-targets --all-features
 
+      - name: Build tests
+        run: cargo build --tests --workspace --all-features
+
       - name: Cargo test
         if: (!matrix.skip_tests)
         run: cargo test --workspace --all-features
