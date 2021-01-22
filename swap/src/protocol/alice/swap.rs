@@ -91,11 +91,11 @@ async fn run_until_internal(
     } else {
         match state {
             AliceState::Started { amounts, state0 } => {
-                let (peer_id, state3) =
+                let (bob_peer_id, state3) =
                     negotiate(state0, amounts.xmr, &mut event_loop_handle, config).await?;
 
                 let state = AliceState::Negotiated {
-                    bob_peer_id: Some(peer_id),
+                    bob_peer_id,
                     amounts,
                     state3: Box::new(state3),
                 };
@@ -120,27 +120,14 @@ async fn run_until_internal(
                 bob_peer_id,
                 amounts,
             } => {
-                let state = match bob_peer_id {
-                    Some(bob_peer_id) => {
-                        let _ = wait_for_locked_bitcoin(
-                            state3.tx_lock.txid(),
-                            bitcoin_wallet.clone(),
-                            config,
-                        )
+                let _ =
+                    wait_for_locked_bitcoin(state3.tx_lock.txid(), bitcoin_wallet.clone(), config)
                         .await?;
 
-                        AliceState::BtcLocked {
-                            bob_peer_id: Some(bob_peer_id),
-                            amounts,
-                            state3,
-                        }
-                    }
-                    None => {
-                        tracing::info!("Cannot resume swap from negotiated state, aborting");
-
-                        // Alice did not lock Xmr yet
-                        AliceState::SafelyAborted
-                    }
+                let state = AliceState::BtcLocked {
+                    bob_peer_id,
+                    amounts,
+                    state3,
                 };
 
                 let db_state = (&state).into();
@@ -163,26 +150,16 @@ async fn run_until_internal(
                 amounts,
                 state3,
             } => {
-                let state = match bob_peer_id {
-                    Some(bob_peer_id) => {
-                        lock_xmr(
-                            bob_peer_id,
-                            amounts,
-                            *state3.clone(),
-                            &mut event_loop_handle,
-                            monero_wallet.clone(),
-                        )
-                        .await?;
+                lock_xmr(
+                    bob_peer_id,
+                    amounts,
+                    *state3.clone(),
+                    &mut event_loop_handle,
+                    monero_wallet.clone(),
+                )
+                .await?;
 
-                        AliceState::XmrLocked { state3 }
-                    }
-                    None => {
-                        tracing::info!("Cannot resume swap from BTC locked state, aborting");
-
-                        // Alice did not lock Xmr yet
-                        AliceState::SafelyAborted
-                    }
-                };
+                let state = AliceState::XmrLocked { state3 };
 
                 let db_state = (&state).into();
                 db.insert_latest_state(swap_id, database::Swap::Alice(db_state))

@@ -29,14 +29,12 @@ pub enum AliceState {
         state0: State0,
     },
     Negotiated {
-        // TODO: Remove option
-        bob_peer_id: Option<PeerId>,
+        bob_peer_id: PeerId,
         amounts: SwapAmounts,
         state3: Box<State3>,
     },
     BtcLocked {
-        // TODO: Remove option
-        bob_peer_id: Option<PeerId>,
+        bob_peer_id: PeerId,
         amounts: SwapAmounts,
         state3: Box<State3>,
     },

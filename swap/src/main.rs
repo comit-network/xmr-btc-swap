@@ -25,15 +25,17 @@ use tracing::{info, log::LevelFilter};
 use uuid::Uuid;
 
 pub mod bitcoin;
-mod cli;
 pub mod config;
 pub mod database;
-mod fs;
 pub mod monero;
 pub mod network;
 pub mod protocol;
 pub mod seed;
 pub mod trace;
+
+mod cli;
+mod fs;
+mod serde_peer_id;
 
 #[macro_use]
 extern crate prettytable;
