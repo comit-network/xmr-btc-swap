@@ -104,7 +104,7 @@ mod regtest {
 
     pub static MONERO_FINALITY_CONFIRMATIONS: u32 = 1;
 
-    pub static BITCOIN_CANCEL_TIMELOCK: Timelock = Timelock::new(50);
+    pub static BITCOIN_CANCEL_TIMELOCK: Timelock = Timelock::new(100);
 
     pub static BITCOIN_PUNISH_TIMELOCK: Timelock = Timelock::new(50);
 }

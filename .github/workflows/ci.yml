@@ -103,7 +103,7 @@ jobs:
 
       - name: Cargo test
         if: (!matrix.skip_tests)
-        run: cargo +nightly test --workspace --all-features -- -Z unstable-options --report-time
+        run: cargo +nightly test --workspace --all -- --test-threads=1 -Z unstable-options --report-time
         env:
           MONERO_ADDITIONAL_SLEEP_PERIOD: 60000
           RUST_MIN_STACK: 16777216 # 16 MB. Default is 8MB. This is fine as in tests we start 2 programs: Alice and Bob.
