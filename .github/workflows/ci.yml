@@ -103,7 +103,7 @@ jobs:
 
       - name: Cargo test
         if: (!matrix.skip_tests)
-        run: cargo test -j2 --workspace --all-features
+        run: cargo test --workspace --all-features -- --test-threads=2
         env:
           BOB_TIME_TO_ACT_MIN_TEST: 30
           MONERO_ADDITIONAL_SLEEP_PERIOD: 60000
