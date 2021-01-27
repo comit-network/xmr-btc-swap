@@ -78,7 +78,6 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
           profile: minimal
           override: true
 
@@ -96,14 +95,14 @@ jobs:
           key: rust-${{ matrix.target }}-${{ matrix.rust_toolchain }}-cargo-registry-directory-${{ hashFiles('Cargo.lock') }}-v1
 
       - name: Cargo check release code with default features
-        run: cargo +nightly check --workspace
+        run: cargo check --workspace
 
       - name: Cargo check all features
-        run: cargo +nightly check --workspace --all-targets --all-features
+        run: cargo check --workspace --all-targets --all-features
 
       - name: Cargo test
         if: (!matrix.skip_tests)
-        run: cargo +nightly test --workspace --all -- --test-threads=1 -Z unstable-options --report-time
+        run: cargo test --workspace --all-features
         env:
           MONERO_ADDITIONAL_SLEEP_PERIOD: 60000
           RUST_MIN_STACK: 16777216 # 16 MB. Default is 8MB. This is fine as in tests we start 2 programs: Alice and Bob.
