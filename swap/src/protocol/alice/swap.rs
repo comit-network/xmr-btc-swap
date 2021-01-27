@@ -55,6 +55,7 @@ pub async fn run(swap: alice::Swap) -> Result<AliceState> {
     run_until(swap, is_complete).await
 }
 
+#[tracing::instrument(name = "swap", skip(swap,is_target_state), fields(id = %swap.swap_id))]
 pub async fn run_until(
     swap: alice::Swap,
     is_target_state: fn(&AliceState) -> bool,
