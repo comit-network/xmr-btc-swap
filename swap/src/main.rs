@@ -17,6 +17,7 @@ use anyhow::{Context, Result};
 use database::Database;
 use prettytable::{row, Table};
 use protocol::{alice, bob, bob::Builder, SwapAmounts};
+use settings::Settings;
 use std::sync::Arc;
 use structopt::StructOpt;
 use trace::init_tracing;
@@ -45,7 +46,6 @@ async fn main() -> Result<()> {
     init_tracing(LevelFilter::Info).expect("initialize tracing");
 
     let opt = Options::from_args();
-    let settings = settings::Protocol::testnet();
 
     info!(
         "Database and Seed will be stored in directory: {}",
@@ -67,18 +67,15 @@ async fn main() -> Result<()> {
             send_monero,
             receive_bitcoin,
         } => {
+            let settings =
+                Settings::testnet(bitcoind_url, bitcoin_wallet_name, monero_wallet_rpc_url);
+
             let swap_amounts = SwapAmounts {
                 xmr: send_monero,
                 btc: receive_bitcoin,
             };
 
-            let (bitcoin_wallet, monero_wallet) = setup_wallets(
-                bitcoind_url,
-                bitcoin_wallet_name.as_str(),
-                monero_wallet_rpc_url,
-                settings,
-            )
-            .await?;
+            let (bitcoin_wallet, monero_wallet) = setup_wallets(settings.wallets).await?;
 
             let swap_id = Uuid::new_v4();
 
@@ -89,7 +86,7 @@ async fn main() -> Result<()> {
 
             let alice_factory = alice::Builder::new(
                 seed,
-                settings,
+                settings.protocol,
                 swap_id,
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
@@ -112,18 +109,15 @@ async fn main() -> Result<()> {
             send_bitcoin,
             receive_monero,
         } => {
+            let settings =
+                Settings::testnet(bitcoind_url, bitcoin_wallet_name, monero_wallet_rpc_url);
+
             let swap_amounts = SwapAmounts {
                 btc: send_bitcoin,
                 xmr: receive_monero,
             };
 
-            let (bitcoin_wallet, monero_wallet) = setup_wallets(
-                bitcoind_url,
-                bitcoin_wallet_name.as_str(),
-                monero_wallet_rpc_url,
-                settings,
-            )
-            .await?;
+            let (bitcoin_wallet, monero_wallet) = setup_wallets(settings.wallets).await?;
 
             let swap_id = Uuid::new_v4();
 
@@ -140,7 +134,7 @@ async fn main() -> Result<()> {
                 Arc::new(monero_wallet),
                 alice_addr,
                 alice_peer_id,
-                settings,
+                settings.protocol,
             );
             let (swap, event_loop) = bob_factory.with_init_params(swap_amounts).build().await?;
 
@@ -168,17 +162,14 @@ async fn main() -> Result<()> {
             monero_wallet_rpc_url,
             listen_addr,
         }) => {
-            let (bitcoin_wallet, monero_wallet) = setup_wallets(
-                bitcoind_url,
-                bitcoin_wallet_name.as_str(),
-                monero_wallet_rpc_url,
-                settings,
-            )
-            .await?;
+            let settings =
+                Settings::testnet(bitcoind_url, bitcoin_wallet_name, monero_wallet_rpc_url);
+
+            let (bitcoin_wallet, monero_wallet) = setup_wallets(settings.wallets).await?;
 
             let alice_factory = alice::Builder::new(
                 seed,
-                settings,
+                settings.protocol,
                 swap_id,
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
@@ -199,13 +190,10 @@ async fn main() -> Result<()> {
             alice_peer_id,
             alice_addr,
         }) => {
-            let (bitcoin_wallet, monero_wallet) = setup_wallets(
-                bitcoind_url,
-                bitcoin_wallet_name.as_str(),
-                monero_wallet_rpc_url,
-                settings,
-            )
-            .await?;
+            let settings =
+                Settings::testnet(bitcoind_url, bitcoin_wallet_name, monero_wallet_rpc_url);
+
+            let (bitcoin_wallet, monero_wallet) = setup_wallets(settings.wallets).await?;
 
             let bob_factory = Builder::new(
                 seed,
@@ -215,7 +203,7 @@ async fn main() -> Result<()> {
                 Arc::new(monero_wallet),
                 alice_addr,
                 alice_peer_id,
-                settings,
+                settings.protocol,
             );
             let (swap, event_loop) = bob_factory.build().await?;
 
@@ -227,21 +215,21 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn setup_wallets(
-    bitcoind_url: url::Url,
-    bitcoin_wallet_name: &str,
-    monero_wallet_rpc_url: url::Url,
-    settings: settings::Protocol,
-) -> Result<(bitcoin::Wallet, monero::Wallet)> {
-    let bitcoin_wallet =
-        bitcoin::Wallet::new(bitcoin_wallet_name, bitcoind_url, settings.bitcoin_network).await?;
+async fn setup_wallets(settings: settings::Wallets) -> Result<(bitcoin::Wallet, monero::Wallet)> {
+    let bitcoin_wallet = bitcoin::Wallet::new(
+        settings.bitcoin.wallet_name.as_str(),
+        settings.bitcoin.bitcoind_url,
+        settings.bitcoin.network,
+    )
+    .await?;
     let bitcoin_balance = bitcoin_wallet.balance().await?;
     info!(
         "Connection to Bitcoin wallet succeeded, balance: {}",
         bitcoin_balance
     );
 
-    let monero_wallet = monero::Wallet::new(monero_wallet_rpc_url, settings.monero_network);
+    let monero_wallet =
+        monero::Wallet::new(settings.monero.wallet_rpc_url, settings.monero.network);
     let monero_balance = monero_wallet.get_balance().await?;
     info!(
         "Connection to Monero wallet succeeded, balance: {}",

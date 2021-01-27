@@ -1,6 +1,79 @@
 use crate::bitcoin::Timelock;
 use conquer_once::Lazy;
 use std::time::Duration;
+use url::Url;
+
+pub struct Settings {
+    pub wallets: Wallets,
+    pub protocol: Protocol,
+}
+
+impl Settings {
+    pub fn testnet(
+        bitcoind_url: Url,
+        bitcoin_wallet_name: String,
+        monero_wallet_rpc_url: Url,
+    ) -> Self {
+        Self {
+            wallets: Wallets::testnet(bitcoind_url, bitcoin_wallet_name, monero_wallet_rpc_url),
+            protocol: Protocol::testnet(),
+        }
+    }
+}
+
+pub struct Wallets {
+    pub bitcoin: Bitcoin,
+    pub monero: Monero,
+}
+
+impl Wallets {
+    pub fn mainnet(
+        bitcoind_url: Url,
+        bitcoin_wallet_name: String,
+        monero_wallet_rpc_url: Url,
+    ) -> Self {
+        Self {
+            bitcoin: Bitcoin {
+                bitcoind_url,
+                wallet_name: bitcoin_wallet_name,
+                network: bitcoin::Network::Bitcoin,
+            },
+            monero: Monero {
+                wallet_rpc_url: monero_wallet_rpc_url,
+                network: monero::Network::Mainnet,
+            },
+        }
+    }
+
+    pub fn testnet(
+        bitcoind_url: Url,
+        bitcoin_wallet_name: String,
+        monero_wallet_rpc_url: Url,
+    ) -> Self {
+        Self {
+            bitcoin: Bitcoin {
+                bitcoind_url,
+                wallet_name: bitcoin_wallet_name,
+                network: bitcoin::Network::Testnet,
+            },
+            monero: Monero {
+                wallet_rpc_url: monero_wallet_rpc_url,
+                network: monero::Network::Stagenet,
+            },
+        }
+    }
+}
+
+pub struct Bitcoin {
+    pub bitcoind_url: Url,
+    pub wallet_name: String,
+    pub network: bitcoin::Network,
+}
+
+pub struct Monero {
+    pub wallet_rpc_url: Url,
+    pub network: monero::Network,
+}
 
 #[derive(Debug, Copy, Clone)]
 pub struct Protocol {
@@ -10,8 +83,6 @@ pub struct Protocol {
     pub monero_finality_confirmations: u32,
     pub bitcoin_cancel_timelock: Timelock,
     pub bitcoin_punish_timelock: Timelock,
-    pub bitcoin_network: bitcoin::Network,
-    pub monero_network: monero::Network,
 }
 
 impl Protocol {
@@ -23,8 +94,6 @@ impl Protocol {
             monero_finality_confirmations: mainnet::MONERO_FINALITY_CONFIRMATIONS,
             bitcoin_cancel_timelock: mainnet::BITCOIN_CANCEL_TIMELOCK,
             bitcoin_punish_timelock: mainnet::BITCOIN_PUNISH_TIMELOCK,
-            bitcoin_network: bitcoin::Network::Bitcoin,
-            monero_network: monero::Network::Mainnet,
         }
     }
 
@@ -36,8 +105,6 @@ impl Protocol {
             monero_finality_confirmations: testnet::MONERO_FINALITY_CONFIRMATIONS,
             bitcoin_cancel_timelock: testnet::BITCOIN_CANCEL_TIMELOCK,
             bitcoin_punish_timelock: testnet::BITCOIN_PUNISH_TIMELOCK,
-            bitcoin_network: bitcoin::Network::Testnet,
-            monero_network: monero::Network::Stagenet,
         }
     }
 
@@ -49,8 +116,6 @@ impl Protocol {
             monero_finality_confirmations: regtest::MONERO_FINALITY_CONFIRMATIONS,
             bitcoin_cancel_timelock: regtest::BITCOIN_CANCEL_TIMELOCK,
             bitcoin_punish_timelock: regtest::BITCOIN_PUNISH_TIMELOCK,
-            bitcoin_network: bitcoin::Network::Regtest,
-            monero_network: monero::Network::default(),
         }
     }
 }

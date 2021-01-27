@@ -316,12 +316,11 @@ where
         .parse()
         .expect("failed to parse Alice's address");
 
-    let (alice_bitcoin_wallet, alice_monero_wallet) = init_wallets(
+    let (alice_bitcoin_wallet, alice_monero_wallet) = init_test_wallets(
         "alice",
         &containers.bitcoind,
         &monero,
         alice_starting_balances.clone(),
-        settings,
     )
     .await;
 
@@ -340,12 +339,11 @@ where
         btc: swap_amounts.btc * 10,
     };
 
-    let (bob_bitcoin_wallet, bob_monero_wallet) = init_wallets(
+    let (bob_bitcoin_wallet, bob_monero_wallet) = init_test_wallets(
         "bob",
         &containers.bitcoind,
         &monero,
         bob_starting_balances.clone(),
-        settings,
     )
     .await;
 
@@ -385,12 +383,11 @@ async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
     (monero, Containers { bitcoind, monerods })
 }
 
-async fn init_wallets(
+async fn init_test_wallets(
     name: &str,
     bitcoind: &Bitcoind<'_>,
     monero: &Monero,
     starting_balances: StartingBalances,
-    settings: settings::Protocol,
 ) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {
     monero
         .init(vec![(name, starting_balances.xmr.as_piconero())])
@@ -399,11 +396,11 @@ async fn init_wallets(
 
     let xmr_wallet = Arc::new(swap::monero::Wallet {
         inner: monero.wallet(name).unwrap().client(),
-        network: settings.monero_network,
+        network: monero::Network::default(),
     });
 
     let btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new(name, bitcoind.node_url.clone(), settings.bitcoin_network)
+        swap::bitcoin::Wallet::new(name, bitcoind.node_url.clone(), bitcoin::Network::Regtest)
             .await
             .unwrap(),
     );
