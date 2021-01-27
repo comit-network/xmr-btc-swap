@@ -1,6 +1,5 @@
-use crate::{
-    bitcoin::EncryptedSignature,
-    network::request_response::{AliceToBob, BobToAlice, Codec, Message3Protocol, TIMEOUT},
+use crate::network::request_response::{
+    EncryptedSignatureProtocol, OneShotCodec, Request, Response, TIMEOUT,
 };
 use libp2p::{
     request_response::{
@@ -19,8 +18,8 @@ use std::{
 use tracing::error;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Message3 {
-    pub tx_redeem_encsig: EncryptedSignature,
+pub struct EncryptedSignature {
+    pub tx_redeem_encsig: crate::bitcoin::EncryptedSignature,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -28,19 +27,19 @@ pub enum OutEvent {
     Msg,
 }
 
-/// A `NetworkBehaviour` that represents sending message 3 to Alice.
+/// A `NetworkBehaviour` that represents sending encrypted signature to Alice.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<Codec<Message3Protocol>>,
+    rr: RequestResponse<OneShotCodec<EncryptedSignatureProtocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
 impl Behaviour {
-    pub fn send(&mut self, alice: PeerId, msg: Message3) {
-        let msg = BobToAlice::Message3(msg);
+    pub fn send(&mut self, alice: PeerId, msg: EncryptedSignature) {
+        let msg = Request::EncryptedSignature(Box::new(msg));
         let _id = self.rr.send_request(&alice, msg);
     }
 
@@ -48,7 +47,9 @@ impl Behaviour {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message3Protocol>>, OutEvent>> {
+    ) -> Poll<
+        NetworkBehaviourAction<RequestProtocol<OneShotCodec<EncryptedSignatureProtocol>>, OutEvent>,
+    > {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -65,8 +66,8 @@ impl Default for Behaviour {
 
         Self {
             rr: RequestResponse::new(
-                Codec::default(),
-                vec![(Message3Protocol, ProtocolSupport::Full)],
+                OneShotCodec::default(),
+                vec![(EncryptedSignatureProtocol, ProtocolSupport::Outbound)],
                 config,
             ),
             events: Default::default(),
@@ -74,8 +75,8 @@ impl Default for Behaviour {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for Behaviour {
+    fn inject_event(&mut self, event: RequestResponseEvent<Request, Response>) {
         match event {
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Request { .. },
@@ -85,7 +86,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                 message: RequestResponseMessage::Response { response, .. },
                 ..
             } => {
-                if let AliceToBob::Message3 = response {
+                if let Response::EncryptedSignature = response {
                     self.events.push_back(OutEvent::Msg);
                 }
             }

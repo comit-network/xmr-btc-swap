@@ -1,5 +1,7 @@
-use crate::network::request_response::{AliceToBob, BobToAlice, Codec, Message2Protocol, TIMEOUT};
-use ecdsa_fun::Signature;
+use crate::{
+    monero,
+    network::request_response::{OneShotCodec, Request, Response, TransferProofProtocol, TIMEOUT},
+};
 use libp2p::{
     request_response::{
         handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
@@ -14,40 +16,41 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tracing::{debug, error};
+use tracing::error;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Message2 {
-    pub(crate) tx_punish_sig: Signature,
-    pub(crate) tx_cancel_sig: Signature,
+pub struct TransferProof {
+    pub tx_lock_proof: monero::TransferProof,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum OutEvent {
     Msg,
 }
 
-/// A `NetworkBehaviour` that represents sending message 2 to Alice.
+/// A `NetworkBehaviour` that represents sending the Monero transfer proof to
+/// Bob.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<Codec<Message2Protocol>>,
+    rr: RequestResponse<OneShotCodec<TransferProofProtocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
 impl Behaviour {
-    pub fn send(&mut self, alice: PeerId, msg: Message2) {
-        let msg = BobToAlice::Message2(Box::new(msg));
-        let _id = self.rr.send_request(&alice, msg);
+    pub fn send(&mut self, bob: PeerId, msg: TransferProof) {
+        let msg = Request::TransferProof(Box::new(msg));
+        let _id = self.rr.send_request(&bob, msg);
     }
 
     fn poll(
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Message2Protocol>>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<OneShotCodec<TransferProofProtocol>>, OutEvent>>
+    {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -64,28 +67,27 @@ impl Default for Behaviour {
 
         Self {
             rr: RequestResponse::new(
-                Codec::default(),
-                vec![(Message2Protocol, ProtocolSupport::Full)],
+                OneShotCodec::default(),
+                vec![(TransferProofProtocol, ProtocolSupport::Outbound)],
                 config,
             ),
-            events: VecDeque::default(),
+            events: Default::default(),
         }
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for Behaviour {
+    fn inject_event(&mut self, event: RequestResponseEvent<Request, Response>) {
         match event {
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Request { .. },
                 ..
-            } => panic!("Bob should never get a request from Alice"),
+            } => panic!("Alice should never get a transfer proof request from Bob"),
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { response, .. },
                 ..
             } => {
-                if let AliceToBob::Message2 = response {
-                    debug!("Received Message 2 acknowledgement");
+                if let Response::TransferProof = response {
                     self.events.push_back(OutEvent::Msg);
                 }
             }

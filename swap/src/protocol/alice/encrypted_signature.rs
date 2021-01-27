@@ -1,12 +1,17 @@
+use crate::{
+    network::request_response::{
+        EncryptedSignatureProtocol, OneShotCodec, Request, Response, TIMEOUT,
+    },
+    protocol::bob::EncryptedSignature,
+};
 use libp2p::{
     request_response::{
         handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
-        RequestResponseEvent, RequestResponseMessage, ResponseChannel,
+        RequestResponseEvent, RequestResponseMessage,
     },
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
     NetworkBehaviour,
 };
-use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
     task::{Context, Poll},
@@ -14,46 +19,30 @@ use std::{
 };
 use tracing::{debug, error};
 
-use crate::{
-    monero,
-    network::request_response::{AliceToBob, BobToAlice, Codec, Swap, TIMEOUT},
-    protocol::bob,
-};
-
 #[derive(Debug)]
-pub struct OutEvent {
-    pub msg: bob::SwapRequest,
-    pub channel: ResponseChannel<AliceToBob>,
+pub enum OutEvent {
+    Msg(EncryptedSignature),
 }
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub struct SwapResponse {
-    pub xmr_amount: monero::Amount,
-}
-
-/// A `NetworkBehaviour` that represents negotiate a swap using Swap
-/// request/response.
+/// A `NetworkBehaviour` that represents receiving the Bitcoin encrypted
+/// signature from Bob.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<Codec<Swap>>,
+    rr: RequestResponse<OneShotCodec<EncryptedSignatureProtocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
 impl Behaviour {
-    /// Alice always sends her messages as a response to a request from Bob.
-    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: SwapResponse) {
-        let msg = AliceToBob::SwapResponse(Box::new(msg));
-        self.rr.send_response(channel, msg);
-    }
-
     fn poll(
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Swap>>, OutEvent>> {
+    ) -> Poll<
+        NetworkBehaviourAction<RequestProtocol<OneShotCodec<EncryptedSignatureProtocol>>, OutEvent>,
+    > {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -65,14 +54,13 @@ impl Behaviour {
 impl Default for Behaviour {
     fn default() -> Self {
         let timeout = Duration::from_secs(TIMEOUT);
-
         let mut config = RequestResponseConfig::default();
         config.set_request_timeout(timeout);
 
         Self {
             rr: RequestResponse::new(
-                Codec::default(),
-                vec![(Swap, ProtocolSupport::Full)],
+                OneShotCodec::default(),
+                vec![(EncryptedSignatureProtocol, ProtocolSupport::Inbound)],
                 config,
             ),
             events: Default::default(),
@@ -80,8 +68,8 @@ impl Default for Behaviour {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for Behaviour {
+    fn inject_event(&mut self, event: RequestResponseEvent<Request, Response>) {
         match event {
             RequestResponseEvent::Message {
                 message:
@@ -90,9 +78,11 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                     },
                 ..
             } => {
-                if let BobToAlice::SwapRequest(msg) = request {
-                    debug!("Received swap request");
-                    self.events.push_back(OutEvent { msg: *msg, channel })
+                if let Request::EncryptedSignature(msg) = request {
+                    debug!("Received encrypted signature");
+                    self.events.push_back(OutEvent::Msg(*msg));
+                    // Send back empty response so that the request/response protocol completes.
+                    let _ = self.rr.send_response(channel, Response::EncryptedSignature);
                 }
             }
             RequestResponseEvent::Message {

@@ -42,7 +42,7 @@ pub struct Behaviour {
 
 impl Behaviour {
     pub fn send(&mut self, alice: PeerId, swap_request: SwapRequest) -> Result<RequestId> {
-        let msg = BobToAlice::SwapRequest(swap_request);
+        let msg = BobToAlice::SwapRequest(Box::new(swap_request));
         let id = self.rr.send_request(&alice, msg);
 
         Ok(id)
@@ -71,7 +71,7 @@ impl Default for Behaviour {
         Self {
             rr: RequestResponse::new(
                 Codec::default(),
-                vec![(Swap, ProtocolSupport::Full)],
+                vec![(Swap, ProtocolSupport::Outbound)],
                 config,
             ),
             events: Default::default(),
@@ -92,7 +92,9 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             } => {
                 if let AliceToBob::SwapResponse(swap_response) = response {
                     debug!("Received swap response");
-                    self.events.push_back(OutEvent { swap_response });
+                    self.events.push_back(OutEvent {
+                        swap_response: *swap_response,
+                    });
                 }
             }
             RequestResponseEvent::InboundFailure { error, .. } => {

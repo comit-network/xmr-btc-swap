@@ -4,10 +4,10 @@ pub use self::{
     event_loop::{EventLoop, EventLoopHandle},
     message0::Message0,
     message1::Message1,
-    message2::Message2,
     state::*,
     swap::{run, run_until},
     swap_response::*,
+    transfer_proof::TransferProof,
 };
 use crate::{
     bitcoin,
@@ -21,7 +21,7 @@ use crate::{
         transport::build,
         Seed as NetworkSeed,
     },
-    protocol::{bob, SwapAmounts},
+    protocol::{bob, bob::EncryptedSignature, SwapAmounts},
     seed::Seed,
 };
 use anyhow::{bail, Result};
@@ -33,15 +33,16 @@ use std::{path::PathBuf, sync::Arc};
 use tracing::{debug, info};
 use uuid::Uuid;
 
+mod encrypted_signature;
 pub mod event_loop;
 mod message0;
 mod message1;
 mod message2;
-mod message3;
 pub mod state;
 mod steps;
 pub mod swap;
 mod swap_response;
+mod transfer_proof;
 
 pub struct Swap {
     pub state: AliceState,
@@ -232,10 +233,11 @@ pub enum OutEvent {
         channel: ResponseChannel<AliceToBob>,
     },
     Message2 {
-        msg: bob::Message2,
-        channel: ResponseChannel<AliceToBob>,
+        msg: Box<bob::Message2>,
+        bob_peer_id: PeerId,
     },
-    Message3(bob::Message3),
+    TransferProof,
+    EncryptedSignature(EncryptedSignature),
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -276,15 +278,26 @@ impl From<message1::OutEvent> for OutEvent {
 impl From<message2::OutEvent> for OutEvent {
     fn from(event: message2::OutEvent) -> Self {
         match event {
-            message2::OutEvent::Msg { msg, channel } => OutEvent::Message2 { msg, channel },
+            message2::OutEvent::Msg { msg, bob_peer_id } => OutEvent::Message2 {
+                msg: Box::new(msg),
+                bob_peer_id,
+            },
         }
     }
 }
 
-impl From<message3::OutEvent> for OutEvent {
-    fn from(event: message3::OutEvent) -> Self {
+impl From<transfer_proof::OutEvent> for OutEvent {
+    fn from(event: transfer_proof::OutEvent) -> Self {
         match event {
-            message3::OutEvent::Msg(msg) => OutEvent::Message3(msg),
+            transfer_proof::OutEvent::Msg => OutEvent::TransferProof,
+        }
+    }
+}
+
+impl From<encrypted_signature::OutEvent> for OutEvent {
+    fn from(event: encrypted_signature::OutEvent) -> Self {
+        match event {
+            encrypted_signature::OutEvent::Msg(msg) => OutEvent::EncryptedSignature(msg),
         }
     }
 }
@@ -299,7 +312,8 @@ pub struct Behaviour {
     message0: message0::Behaviour,
     message1: message1::Behaviour,
     message2: message2::Behaviour,
-    message3: message3::Behaviour,
+    transfer_proof: transfer_proof::Behaviour,
+    encrypted_signature: encrypted_signature::Behaviour,
 }
 
 impl Behaviour {
@@ -325,9 +339,9 @@ impl Behaviour {
         debug!("Sent Message1");
     }
 
-    /// Send Message2 to Bob in response to receiving his Message2.
-    pub fn send_message2(&mut self, channel: ResponseChannel<AliceToBob>, msg: Message2) {
-        self.message2.send(channel, msg);
-        debug!("Sent Message2");
+    /// Send Transfer Proof to Bob.
+    pub fn send_transfer_proof(&mut self, bob: PeerId, msg: TransferProof) {
+        self.transfer_proof.send(bob, msg);
+        debug!("Sent Transfer Proof");
     }
 }

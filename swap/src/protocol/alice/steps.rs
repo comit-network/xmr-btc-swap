@@ -10,10 +10,9 @@ use crate::{
     config::Config,
     monero,
     monero::Transfer,
-    network::request_response::AliceToBob,
     protocol::{
         alice,
-        alice::{event_loop::EventLoopHandle, SwapResponse},
+        alice::{event_loop::EventLoopHandle, SwapResponse, TransferProof},
         SwapAmounts,
     },
 };
@@ -23,7 +22,7 @@ use futures::{
     future::{select, Either},
     pin_mut,
 };
-use libp2p::request_response::ResponseChannel;
+use libp2p::PeerId;
 use rand::rngs::OsRng;
 use sha2::Sha256;
 use std::sync::Arc;
@@ -35,11 +34,11 @@ pub async fn negotiate(
     xmr_amount: monero::Amount,
     event_loop_handle: &mut EventLoopHandle,
     config: Config,
-) -> Result<(ResponseChannel<AliceToBob>, alice::State3)> {
+) -> Result<(PeerId, alice::State3)> {
     trace!("Starting negotiate");
 
     // todo: we can move this out, we dont need to timeout here
-    let _peer_id = timeout(
+    let bob_peer_id = timeout(
         config.bob_time_to_act,
         event_loop_handle.recv_conn_established(),
     )
@@ -73,12 +72,11 @@ pub async fn negotiate(
         .send_message1(channel, state2.next_message())
         .await?;
 
-    let (bob_message2, channel) =
-        timeout(config.bob_time_to_act, event_loop_handle.recv_message2()).await??;
+    let bob_message2 = timeout(config.bob_time_to_act, event_loop_handle.recv_message2()).await??;
 
     let state3 = state2.receive(bob_message2)?;
 
-    Ok((channel, state3))
+    Ok((bob_peer_id, state3))
 }
 
 // TODO(Franck): Use helper functions from xmr-btc instead of re-writing them
@@ -108,7 +106,7 @@ where
 }
 
 pub async fn lock_xmr<W>(
-    channel: ResponseChannel<AliceToBob>,
+    bob_peer_id: PeerId,
     amounts: SwapAmounts,
     state3: alice::State3,
     event_loop_handle: &mut EventLoopHandle,
@@ -134,7 +132,7 @@ where
     //  Otherwise Alice might publish the lock tx twice!
 
     event_loop_handle
-        .send_message2(channel, alice::Message2 {
+        .send_transfer_proof(bob_peer_id, TransferProof {
             tx_lock_proof: transfer_proof,
         })
         .await?;
@@ -146,7 +144,7 @@ pub async fn wait_for_bitcoin_encrypted_signature(
     event_loop_handle: &mut EventLoopHandle,
 ) -> Result<EncryptedSignature> {
     let msg3 = event_loop_handle
-        .recv_message3()
+        .recv_encrypted_signature()
         .await
         .context("Failed to receive Bitcoin encrypted signature from Bob")?;
 

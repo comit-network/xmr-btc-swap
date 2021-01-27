@@ -46,10 +46,10 @@ group Execution
 
     Alice ->> Monero: Lock
 
-    Alice -> Bob: Message4
+    Alice -> Bob: TransferProof
     note right: xmr lock tx transfer proof\nThis can be removed if Bob watches the blockchain.
 
-    Bob -> Alice: Message5
+    Bob -> Alice: EncryptedSignature
     note left: redeem tx enc sig S_a
 
     Alice ->> Bitcoin: Redeem

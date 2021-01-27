@@ -93,7 +93,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
             } => {
                 if let BobToAlice::Message1(msg) = request {
                     debug!("Received Message1");
-                    self.events.push_back(OutEvent::Msg { msg, channel });
+                    self.events.push_back(OutEvent::Msg { msg: *msg, channel });
                 }
             }
             RequestResponseEvent::Message {

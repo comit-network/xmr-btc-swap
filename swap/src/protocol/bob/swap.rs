@@ -130,7 +130,7 @@ where
                 {
                     event_loop_handle.dial().await?;
 
-                    let msg2_watcher = event_loop_handle.recv_message2();
+                    let transfer_proof_watcher = event_loop_handle.recv_transfer_proof();
                     let cancel_timelock_expires =
                         state3.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
 
@@ -143,13 +143,11 @@ where
                         monero_wallet.inner.block_height().await?;
 
                     select! {
-                        msg2 = msg2_watcher => {
-
-                            let msg2 = msg2?;
-
+                        transfer_proof = transfer_proof_watcher => {
+                            let transfer_proof = transfer_proof?;
                             BobState::XmrLockProofReceived {
                                 state: state3,
-                                lock_transfer_proof: msg2.tx_lock_proof,
+                                lock_transfer_proof: transfer_proof.tx_lock_proof,
                                 monero_wallet_restore_blockheight
                             }
                         },
@@ -235,7 +233,8 @@ where
 
                     let state4_clone = state.clone();
 
-                    let enc_sig_sent_watcher = event_loop_handle.send_message3(tx_redeem_encsig);
+                    let enc_sig_sent_watcher =
+                        event_loop_handle.send_encrypted_signature(tx_redeem_encsig);
                     let bitcoin_wallet = bitcoin_wallet.clone();
                     let cancel_timelock_expires =
                         state4_clone.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
