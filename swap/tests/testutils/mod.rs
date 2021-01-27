@@ -217,7 +217,7 @@ impl TestContext {
         let lock_tx_id = if let BobState::XmrRedeemed { tx_lock_id } = state {
             tx_lock_id
         } else {
-            panic!("Bob in unexpected state");
+            panic!("Bob in not in xmr redeemed state: {:?}", state);
         };
 
         let lock_tx_bitcoin_fee = self
@@ -250,7 +250,7 @@ impl TestContext {
         let lock_tx_id = if let BobState::BtcRefunded(state4) = state {
             state4.tx_lock_id()
         } else {
-            panic!("Bob in unexpected state");
+            panic!("Bob in not in btc refunded state: {:?}", state);
         };
         let lock_tx_bitcoin_fee = self
             .bob_bitcoin_wallet
@@ -282,7 +282,7 @@ impl TestContext {
         let lock_tx_id = if let BobState::BtcPunished { tx_lock_id } = state {
             tx_lock_id
         } else {
-            panic!("Bob in unexpected state");
+            panic!("Bob in not in btc punished state: {:?}", state);
         };
 
         let lock_tx_bitcoin_fee = self
