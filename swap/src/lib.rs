@@ -25,5 +25,4 @@ pub mod protocol;
 pub mod seed;
 pub mod trace;
 
-mod fs;
 mod serde_peer_id;

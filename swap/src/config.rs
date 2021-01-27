@@ -1,23 +1,19 @@
-pub mod seed;
-
 use crate::bitcoin::Timelock;
 use conquer_once::Lazy;
 use std::time::Duration;
 
 #[derive(Debug, Copy, Clone)]
-pub struct Config {
+pub struct ExecutionParams {
     pub bob_time_to_act: Duration,
     pub bitcoin_finality_confirmations: u32,
     pub bitcoin_avg_block_time: Duration,
     pub monero_finality_confirmations: u32,
     pub bitcoin_cancel_timelock: Timelock,
     pub bitcoin_punish_timelock: Timelock,
-    pub bitcoin_network: bitcoin::Network,
-    pub monero_network: monero::Network,
 }
 
-pub trait GetConfig {
-    fn get_config() -> Config;
+pub trait GetExecutionParams {
+    fn get_execution_params() -> ExecutionParams;
 }
 
 #[derive(Clone, Copy)]
@@ -29,53 +25,47 @@ pub struct Testnet;
 #[derive(Clone, Copy)]
 pub struct Regtest;
 
-impl GetConfig for Mainnet {
-    fn get_config() -> Config {
-        Config {
+impl GetExecutionParams for Mainnet {
+    fn get_execution_params() -> ExecutionParams {
+        ExecutionParams {
             bob_time_to_act: *mainnet::BOB_TIME_TO_ACT,
             bitcoin_finality_confirmations: mainnet::BITCOIN_FINALITY_CONFIRMATIONS,
             bitcoin_avg_block_time: *mainnet::BITCOIN_AVG_BLOCK_TIME,
             monero_finality_confirmations: mainnet::MONERO_FINALITY_CONFIRMATIONS,
             bitcoin_cancel_timelock: mainnet::BITCOIN_CANCEL_TIMELOCK,
             bitcoin_punish_timelock: mainnet::BITCOIN_PUNISH_TIMELOCK,
-            bitcoin_network: bitcoin::Network::Bitcoin,
-            monero_network: monero::Network::Mainnet,
         }
     }
 }
 
-impl GetConfig for Testnet {
-    fn get_config() -> Config {
-        Config {
+impl GetExecutionParams for Testnet {
+    fn get_execution_params() -> ExecutionParams {
+        ExecutionParams {
             bob_time_to_act: *testnet::BOB_TIME_TO_ACT,
             bitcoin_finality_confirmations: testnet::BITCOIN_FINALITY_CONFIRMATIONS,
             bitcoin_avg_block_time: *testnet::BITCOIN_AVG_BLOCK_TIME,
             monero_finality_confirmations: testnet::MONERO_FINALITY_CONFIRMATIONS,
             bitcoin_cancel_timelock: testnet::BITCOIN_CANCEL_TIMELOCK,
             bitcoin_punish_timelock: testnet::BITCOIN_PUNISH_TIMELOCK,
-            bitcoin_network: bitcoin::Network::Testnet,
-            monero_network: monero::Network::Stagenet,
         }
     }
 }
 
-impl GetConfig for Regtest {
-    fn get_config() -> Config {
-        Config {
+impl GetExecutionParams for Regtest {
+    fn get_execution_params() -> ExecutionParams {
+        ExecutionParams {
             bob_time_to_act: *regtest::BOB_TIME_TO_ACT,
             bitcoin_finality_confirmations: regtest::BITCOIN_FINALITY_CONFIRMATIONS,
             bitcoin_avg_block_time: *regtest::BITCOIN_AVG_BLOCK_TIME,
             monero_finality_confirmations: regtest::MONERO_FINALITY_CONFIRMATIONS,
             bitcoin_cancel_timelock: regtest::BITCOIN_CANCEL_TIMELOCK,
             bitcoin_punish_timelock: regtest::BITCOIN_PUNISH_TIMELOCK,
-            bitcoin_network: bitcoin::Network::Regtest,
-            monero_network: monero::Network::default(),
         }
     }
 }
 
 mod mainnet {
-    use super::*;
+    use crate::config::*;
 
     // For each step, we are giving Bob 10 minutes to act.
     pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(10 * 60));
@@ -92,7 +82,7 @@ mod mainnet {
 }
 
 mod testnet {
-    use super::*;
+    use crate::config::*;
 
     pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(60 * 60));
 
@@ -110,7 +100,7 @@ mod testnet {
 }
 
 mod regtest {
-    use super::*;
+    use crate::config::*;
 
     // In test, we set a shorter time to fail fast
     pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(30));

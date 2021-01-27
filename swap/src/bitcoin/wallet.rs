@@ -4,7 +4,7 @@ use crate::{
         GetBlockHeight, GetNetwork, GetRawTransaction, SignTxLock, Transaction,
         TransactionBlockHeight, TxLock, WaitForTransactionFinality, WatchForRawTransaction,
     },
-    config::Config,
+    config::ExecutionParams,
 };
 use ::bitcoin::{util::psbt::PartiallySignedTransaction, Txid};
 use anyhow::{Context, Result};
@@ -171,17 +171,21 @@ impl TransactionBlockHeight for Wallet {
 
 #[async_trait]
 impl WaitForTransactionFinality for Wallet {
-    async fn wait_for_transaction_finality(&self, txid: Txid, config: Config) -> Result<()> {
+    async fn wait_for_transaction_finality(
+        &self,
+        txid: Txid,
+        execution_params: ExecutionParams,
+    ) -> Result<()> {
         // TODO(Franck): This assumes that bitcoind runs with txindex=1
 
         // Divide by 4 to not check too often yet still be aware of the new block early
         // on.
-        let mut interval = interval(config.bitcoin_avg_block_time / 4);
+        let mut interval = interval(execution_params.bitcoin_avg_block_time / 4);
 
         loop {
             let tx = self.inner.client.get_raw_transaction_verbose(txid).await?;
             if let Some(confirmations) = tx.confirmations {
-                if confirmations >= config.bitcoin_finality_confirmations {
+                if confirmations >= execution_params.bitcoin_finality_confirmations {
                     break;
                 }
             }
