@@ -71,7 +71,7 @@ impl Default for Behaviour {
         Self {
             rr: RequestResponse::new(
                 Codec::default(),
-                vec![(Swap, ProtocolSupport::Full)],
+                vec![(Swap, ProtocolSupport::Outbound)],
                 config,
             ),
             events: Default::default(),

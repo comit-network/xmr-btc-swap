@@ -68,7 +68,7 @@ impl Default for Behaviour {
         Self {
             rr: RequestResponse::new(
                 OneShotCodec::default(),
-                vec![(TransferProofProtocol, ProtocolSupport::Full)],
+                vec![(TransferProofProtocol, ProtocolSupport::Outbound)],
                 config,
             ),
             events: Default::default(),

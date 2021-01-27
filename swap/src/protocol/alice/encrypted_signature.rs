@@ -60,7 +60,7 @@ impl Default for Behaviour {
         Self {
             rr: RequestResponse::new(
                 OneShotCodec::default(),
-                vec![(EncryptedSignatureProtocol, ProtocolSupport::Full)],
+                vec![(EncryptedSignatureProtocol, ProtocolSupport::Inbound)],
                 config,
             ),
             events: Default::default(),
