@@ -12,7 +12,7 @@ use crate::{
     monero::Transfer,
     protocol::{
         alice,
-        alice::{event_loop::EventLoopHandle, Message4, SwapResponse},
+        alice::{event_loop::EventLoopHandle, SwapResponse, TransferProof},
         SwapAmounts,
     },
 };
@@ -132,7 +132,7 @@ where
     //  Otherwise Alice might publish the lock tx twice!
 
     event_loop_handle
-        .send_message4(bob_peer_id, Message4 {
+        .send_transfer_proof(bob_peer_id, TransferProof {
             tx_lock_proof: transfer_proof,
         })
         .await?;
@@ -144,7 +144,7 @@ pub async fn wait_for_bitcoin_encrypted_signature(
     event_loop_handle: &mut EventLoopHandle,
 ) -> Result<EncryptedSignature> {
     let msg3 = event_loop_handle
-        .recv_message5()
+        .recv_encrypted_signature()
         .await
         .context("Failed to receive Bitcoin encrypted signature from Bob")?;
 

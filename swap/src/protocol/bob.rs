@@ -2,7 +2,6 @@
 //! Bob holds BTC and wishes receive XMR.
 use crate::{
     bitcoin,
-    bitcoin::EncryptedSignature,
     config::Config,
     database,
     database::Database,
@@ -22,26 +21,26 @@ use tracing::{debug, info};
 use uuid::Uuid;
 
 pub use self::{
+    encrypted_signature::EncryptedSignature,
     event_loop::{EventLoop, EventLoopHandle},
     message0::Message0,
     message1::Message1,
     message2::Message2,
-    message5::Message5,
     state::*,
     swap::{run, run_until},
     swap_request::*,
 };
-use crate::protocol::alice::Message4;
+use crate::protocol::alice::TransferProof;
 
+mod encrypted_signature;
 pub mod event_loop;
 mod message0;
 mod message1;
 mod message2;
-mod message4;
-mod message5;
 pub mod state;
 pub mod swap;
 mod swap_request;
+mod transfer_proof;
 
 pub struct Swap {
     pub state: BobState,
@@ -213,8 +212,8 @@ pub enum OutEvent {
     Message0(Box<alice::Message0>),
     Message1(Box<alice::Message1>),
     Message2,
-    Message4(Box<Message4>),
-    Message5,
+    TransferProof(Box<TransferProof>),
+    EncryptedSignature,
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -257,18 +256,18 @@ impl From<message2::OutEvent> for OutEvent {
     }
 }
 
-impl From<message4::OutEvent> for OutEvent {
-    fn from(event: message4::OutEvent) -> Self {
+impl From<transfer_proof::OutEvent> for OutEvent {
+    fn from(event: transfer_proof::OutEvent) -> Self {
         match event {
-            message4::OutEvent::Msg(msg) => OutEvent::Message4(Box::new(msg)),
+            transfer_proof::OutEvent::Msg(msg) => OutEvent::TransferProof(Box::new(msg)),
         }
     }
 }
 
-impl From<message5::OutEvent> for OutEvent {
-    fn from(event: message5::OutEvent) -> Self {
+impl From<encrypted_signature::OutEvent> for OutEvent {
+    fn from(event: encrypted_signature::OutEvent) -> Self {
         match event {
-            message5::OutEvent::Msg => OutEvent::Message5,
+            encrypted_signature::OutEvent::Msg => OutEvent::EncryptedSignature,
         }
     }
 }
@@ -283,8 +282,8 @@ pub struct Behaviour {
     message0: message0::Behaviour,
     message1: message1::Behaviour,
     message2: message2::Behaviour,
-    message4: message4::Behaviour,
-    message5: message5::Behaviour,
+    transfer_proof: transfer_proof::Behaviour,
+    encrypted_signature: encrypted_signature::Behaviour,
 }
 
 impl Behaviour {
@@ -313,9 +312,13 @@ impl Behaviour {
     }
 
     /// Sends Bob's fourth message to Alice.
-    pub fn send_message3(&mut self, alice: PeerId, tx_redeem_encsig: EncryptedSignature) {
-        let msg = Message5 { tx_redeem_encsig };
-        self.message5.send(alice, msg);
+    pub fn send_encrypted_signature(
+        &mut self,
+        alice: PeerId,
+        tx_redeem_encsig: bitcoin::EncryptedSignature,
+    ) {
+        let msg = EncryptedSignature { tx_redeem_encsig };
+        self.encrypted_signature.send(alice, msg);
         debug!("Sent Message3");
     }
 

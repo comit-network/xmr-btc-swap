@@ -2,9 +2,9 @@ use crate::{
     network::{request_response::AliceToBob, transport::SwapTransport, TokioExecutor},
     protocol::{
         alice,
-        alice::{Behaviour, Message4, OutEvent, SwapResponse},
+        alice::{Behaviour, OutEvent, SwapResponse, TransferProof},
         bob,
-        bob::Message5,
+        bob::EncryptedSignature,
     },
 };
 use anyhow::{anyhow, Context, Result};
@@ -39,13 +39,13 @@ pub struct EventLoopHandle {
     msg0: Receiver<(bob::Message0, ResponseChannel<AliceToBob>)>,
     msg1: Receiver<(bob::Message1, ResponseChannel<AliceToBob>)>,
     msg2: Receiver<bob::Message2>,
-    msg5: Receiver<Message5>,
+    r_encrypted_signature: Receiver<EncryptedSignature>,
     request: Receiver<crate::protocol::alice::swap_response::OutEvent>,
     conn_established: Receiver<PeerId>,
     send_swap_response: Sender<(ResponseChannel<AliceToBob>, SwapResponse)>,
     send_msg0: Sender<(ResponseChannel<AliceToBob>, alice::Message0)>,
     send_msg1: Sender<(ResponseChannel<AliceToBob>, alice::Message1)>,
-    send_msg4: Sender<(PeerId, Message4)>,
+    s_transfer_proof: Sender<(PeerId, TransferProof)>,
 }
 
 impl EventLoopHandle {
@@ -77,8 +77,8 @@ impl EventLoopHandle {
             .ok_or_else(|| anyhow!("Failed to receive message 2 from Bob"))
     }
 
-    pub async fn recv_message5(&mut self) -> Result<Message5> {
-        self.msg5
+    pub async fn recv_encrypted_signature(&mut self) -> Result<EncryptedSignature> {
+        self.r_encrypted_signature
             .recv()
             .await
             .ok_or_else(|| anyhow!("Failed to receive Bitcoin encrypted signature from Bob"))
@@ -123,8 +123,8 @@ impl EventLoopHandle {
         Ok(())
     }
 
-    pub async fn send_message4(&mut self, bob: PeerId, msg: Message4) -> Result<()> {
-        let _ = self.send_msg4.send((bob, msg)).await?;
+    pub async fn send_transfer_proof(&mut self, bob: PeerId, msg: TransferProof) -> Result<()> {
+        let _ = self.s_transfer_proof.send((bob, msg)).await?;
         Ok(())
     }
 }
@@ -135,13 +135,13 @@ pub struct EventLoop {
     msg0: Sender<(bob::Message0, ResponseChannel<AliceToBob>)>,
     msg1: Sender<(bob::Message1, ResponseChannel<AliceToBob>)>,
     msg2: Sender<bob::Message2>,
-    msg5: Sender<Message5>,
+    r_encrypted_signature: Sender<EncryptedSignature>,
     request: Sender<crate::protocol::alice::swap_response::OutEvent>,
     conn_established: Sender<PeerId>,
     send_swap_response: Receiver<(ResponseChannel<AliceToBob>, SwapResponse)>,
     send_msg0: Receiver<(ResponseChannel<AliceToBob>, alice::Message0)>,
     send_msg1: Receiver<(ResponseChannel<AliceToBob>, alice::Message1)>,
-    send_msg4: Receiver<(PeerId, Message4)>,
+    s_transfer_proof: Receiver<(PeerId, TransferProof)>,
 }
 
 impl EventLoop {
@@ -163,39 +163,39 @@ impl EventLoop {
         let msg0 = Channels::new();
         let msg1 = Channels::new();
         let msg2 = Channels::new();
-        let msg5 = Channels::new();
+        let r_encrypted_signature = Channels::new();
         let request = Channels::new();
         let conn_established = Channels::new();
         let send_swap_response = Channels::new();
         let send_msg0 = Channels::new();
         let send_msg1 = Channels::new();
-        let send_msg4 = Channels::new();
+        let s_transfer_proof = Channels::new();
 
         let driver = EventLoop {
             swarm,
             msg0: msg0.sender,
             msg1: msg1.sender,
             msg2: msg2.sender,
-            msg5: msg5.sender,
+            r_encrypted_signature: r_encrypted_signature.sender,
             request: request.sender,
             conn_established: conn_established.sender,
             send_swap_response: send_swap_response.receiver,
             send_msg0: send_msg0.receiver,
             send_msg1: send_msg1.receiver,
-            send_msg4: send_msg4.receiver,
+            s_transfer_proof: s_transfer_proof.receiver,
         };
 
         let handle = EventLoopHandle {
             msg0: msg0.receiver,
             msg1: msg1.receiver,
             msg2: msg2.receiver,
-            msg5: msg5.receiver,
+            r_encrypted_signature: r_encrypted_signature.receiver,
             request: request.receiver,
             conn_established: conn_established.receiver,
             send_swap_response: send_swap_response.sender,
             send_msg0: send_msg0.sender,
             send_msg1: send_msg1.sender,
-            send_msg4: send_msg4.sender,
+            s_transfer_proof: s_transfer_proof.sender,
         };
 
         Ok((driver, handle))
@@ -218,9 +218,9 @@ impl EventLoop {
                         OutEvent::Message2 { msg, bob_peer_id : _} => {
                             let _ = self.msg2.send(*msg).await;
                         }
-                        OutEvent::Message4 => trace!("Bob ack'd message 4"),
-                        OutEvent::Message5(msg) => {
-                            let _ = self.msg5.send(msg).await;
+                        OutEvent::TransferProof => trace!("Bob ack'd receiving the transfer proof"),
+                        OutEvent::EncryptedSignature(msg) => {
+                            let _ = self.r_encrypted_signature.send(msg).await;
                         }
                         OutEvent::Request(event) => {
                             let _ = self.request.send(*event).await;
@@ -242,9 +242,9 @@ impl EventLoop {
                         self.swarm.send_message1(channel, msg);
                     }
                 },
-                msg4 = self.send_msg4.next().fuse() => {
-                    if let Some((bob_peer_id, msg)) = msg4  {
-                        self.swarm.send_message4(bob_peer_id, msg);
+                transfer_proof = self.s_transfer_proof.next().fuse() => {
+                    if let Some((bob_peer_id, msg)) = transfer_proof  {
+                        self.swarm.send_transfer_proof(bob_peer_id, msg);
                     }
                 },
             }

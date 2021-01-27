@@ -1,4 +1,4 @@
-use crate::protocol::{alice, alice::Message4, bob, bob::Message5};
+use crate::protocol::{alice, alice::TransferProof, bob, bob::EncryptedSignature};
 use async_trait::async_trait;
 use futures::prelude::*;
 use libp2p::{
@@ -40,15 +40,15 @@ pub enum AliceToBob {
 /// All responses are empty
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Request {
-    Message4(Box<Message4>),
-    Message5(Box<Message5>),
+    TransferProof(Box<TransferProof>),
+    EncryptedSignature(Box<EncryptedSignature>),
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 /// Response are only used for acknowledgement purposes.
 pub enum Response {
-    Message4,
-    Message5,
+    TransferProof,
+    EncryptedSignature,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -64,10 +64,10 @@ pub struct Message1Protocol;
 pub struct Message2Protocol;
 
 #[derive(Debug, Clone, Copy, Default)]
-pub struct Message4Protocol;
+pub struct TransferProofProtocol;
 
 #[derive(Debug, Clone, Copy, Default)]
-pub struct Message5Protocol;
+pub struct EncryptedSignatureProtocol;
 
 impl ProtocolName for Swap {
     fn protocol_name(&self) -> &[u8] {
@@ -93,15 +93,15 @@ impl ProtocolName for Message2Protocol {
     }
 }
 
-impl ProtocolName for Message4Protocol {
+impl ProtocolName for TransferProofProtocol {
     fn protocol_name(&self) -> &[u8] {
-        b"/xmr/btc/message4/1.0.0"
+        b"/xmr/btc/transfer_proof/1.0.0"
     }
 }
 
-impl ProtocolName for Message5Protocol {
+impl ProtocolName for EncryptedSignatureProtocol {
     fn protocol_name(&self) -> &[u8] {
-        b"/xmr/btc/message5/1.0.0"
+        b"/xmr/btc/encrypted_signature/1.0.0"
     }
 }
 

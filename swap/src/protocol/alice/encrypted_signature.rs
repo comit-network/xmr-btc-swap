@@ -1,6 +1,8 @@
 use crate::{
-    network::request_response::{Message4Protocol, OneShotCodec, Request, Response, TIMEOUT},
-    protocol::alice::Message4,
+    network::request_response::{
+        EncryptedSignatureProtocol, OneShotCodec, Request, Response, TIMEOUT,
+    },
+    protocol::bob::EncryptedSignature,
 };
 use libp2p::{
     request_response::{
@@ -19,15 +21,16 @@ use tracing::{debug, error};
 
 #[derive(Debug)]
 pub enum OutEvent {
-    Msg(Message4),
+    Msg(EncryptedSignature),
 }
 
-/// A `NetworkBehaviour` that represents receiving of message 4 from Alice.
+/// A `NetworkBehaviour` that represents receiving the Bitcoin encrypted
+/// signature from Bob.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<OneShotCodec<Message4Protocol>>,
+    rr: RequestResponse<OneShotCodec<EncryptedSignatureProtocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
@@ -37,8 +40,9 @@ impl Behaviour {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<OneShotCodec<Message4Protocol>>, OutEvent>>
-    {
+    ) -> Poll<
+        NetworkBehaviourAction<RequestProtocol<OneShotCodec<EncryptedSignatureProtocol>>, OutEvent>,
+    > {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -56,7 +60,7 @@ impl Default for Behaviour {
         Self {
             rr: RequestResponse::new(
                 OneShotCodec::default(),
-                vec![(Message4Protocol, ProtocolSupport::Full)],
+                vec![(EncryptedSignatureProtocol, ProtocolSupport::Full)],
                 config,
             ),
             events: Default::default(),
@@ -74,17 +78,17 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for B
                     },
                 ..
             } => {
-                if let Request::Message4(msg) = request {
-                    debug!("Received message 4");
+                if let Request::EncryptedSignature(msg) = request {
+                    debug!("Received encrypted signature");
                     self.events.push_back(OutEvent::Msg(*msg));
                     // Send back empty response so that the request/response protocol completes.
-                    let _ = self.rr.send_response(channel, Response::Message4);
+                    let _ = self.rr.send_response(channel, Response::EncryptedSignature);
                 }
             }
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { .. },
                 ..
-            } => panic!("Bob should not get a Response"),
+            } => panic!("Alice should not get a Response"),
             RequestResponseEvent::InboundFailure { error, .. } => {
                 error!("Inbound failure: {:?}", error);
             }

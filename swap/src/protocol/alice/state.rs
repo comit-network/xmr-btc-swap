@@ -8,13 +8,10 @@ use crate::{
     },
     monero,
     monero::CreateWalletForOutput,
-    protocol::{alice, alice::Message4, bob, bob::Message5, SwapAmounts},
+    protocol::{alice, alice::TransferProof, bob, bob::EncryptedSignature, SwapAmounts},
 };
 use anyhow::{anyhow, Context, Result};
-use ecdsa_fun::{
-    adaptor::{Adaptor, EncryptedSignature},
-    nonce::Deterministic,
-};
+use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
 use libp2p::PeerId;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -42,7 +39,7 @@ pub enum AliceState {
         state3: Box<State3>,
     },
     EncSigLearned {
-        encrypted_signature: EncryptedSignature,
+        encrypted_signature: bitcoin::EncryptedSignature,
         state3: Box<State3>,
     },
     BtcRedeemed,
@@ -475,13 +472,13 @@ pub struct State5 {
 }
 
 impl State5 {
-    pub fn next_message(&self) -> Message4 {
-        Message4 {
+    pub fn next_message(&self) -> TransferProof {
+        TransferProof {
             tx_lock_proof: self.tx_lock_proof.clone(),
         }
     }
 
-    pub fn receive(self, msg: Message5) -> State6 {
+    pub fn receive(self, msg: EncryptedSignature) -> State6 {
         State6 {
             a: self.a,
             B: self.B,
@@ -553,7 +550,7 @@ pub struct State6 {
     tx_lock: bitcoin::TxLock,
 
     tx_punish_sig_bob: bitcoin::Signature,
-    tx_redeem_encsig: EncryptedSignature,
+    tx_redeem_encsig: bitcoin::EncryptedSignature,
     lock_xmr_fee: monero::Amount,
 }
 

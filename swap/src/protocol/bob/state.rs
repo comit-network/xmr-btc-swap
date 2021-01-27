@@ -9,14 +9,10 @@ use crate::{
     config::Config,
     monero,
     monero::{monero_private_key, TransferProof},
-    protocol::{alice, bob, bob::Message5, SwapAmounts},
+    protocol::{alice, bob, bob::EncryptedSignature, SwapAmounts},
 };
 use anyhow::{anyhow, Result};
-use ecdsa_fun::{
-    adaptor::{Adaptor, EncryptedSignature},
-    nonce::Deterministic,
-    Signature,
-};
+use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic, Signature};
 use monero_harness::rpc::wallet::BlockHeight;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -244,7 +240,7 @@ pub struct State2 {
     pub punish_address: bitcoin::Address,
     pub tx_lock: bitcoin::TxLock,
     pub tx_cancel_sig_a: Signature,
-    pub tx_refund_encsig: EncryptedSignature,
+    pub tx_refund_encsig: bitcoin::EncryptedSignature,
     pub min_monero_confirmations: u32,
 }
 
@@ -313,7 +309,7 @@ pub struct State3 {
     punish_address: bitcoin::Address,
     pub tx_lock: bitcoin::TxLock,
     pub tx_cancel_sig_a: Signature,
-    pub tx_refund_encsig: EncryptedSignature,
+    pub tx_refund_encsig: bitcoin::EncryptedSignature,
     pub min_monero_confirmations: u32,
 }
 
@@ -433,19 +429,19 @@ pub struct State4 {
     punish_address: bitcoin::Address,
     pub tx_lock: bitcoin::TxLock,
     pub tx_cancel_sig_a: Signature,
-    pub tx_refund_encsig: EncryptedSignature,
+    pub tx_refund_encsig: bitcoin::EncryptedSignature,
     pub monero_wallet_restore_blockheight: u32,
 }
 
 impl State4 {
-    pub fn next_message(&self) -> Message5 {
+    pub fn next_message(&self) -> EncryptedSignature {
         let tx_redeem = bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address);
         let tx_redeem_encsig = self.b.encsign(self.S_a_bitcoin, tx_redeem.digest());
 
-        Message5 { tx_redeem_encsig }
+        EncryptedSignature { tx_redeem_encsig }
     }
 
-    pub fn tx_redeem_encsig(&self) -> EncryptedSignature {
+    pub fn tx_redeem_encsig(&self) -> bitcoin::EncryptedSignature {
         let tx_redeem = bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address);
         self.b.encsign(self.S_a_bitcoin, tx_redeem.digest())
     }
@@ -615,7 +611,7 @@ pub struct State5 {
     pub redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
     pub tx_lock: bitcoin::TxLock,
-    tx_refund_encsig: EncryptedSignature,
+    tx_refund_encsig: bitcoin::EncryptedSignature,
     tx_cancel_sig: Signature,
     pub monero_wallet_restore_blockheight: u32,
 }
