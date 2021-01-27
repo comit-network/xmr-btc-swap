@@ -2,7 +2,7 @@ use crate::protocol::{alice, alice::TransferProof, bob, bob::EncryptedSignature}
 use async_trait::async_trait;
 use futures::prelude::*;
 use libp2p::{
-    core::upgrade,
+    core::{upgrade, upgrade::ReadOneError},
     request_response::{ProtocolName, RequestResponseCodec},
 };
 use serde::{Deserialize, Serialize};
@@ -213,9 +213,10 @@ where
         T: AsyncRead + Unpin + Send,
     {
         debug!("enter read_request");
-        let message = upgrade::read_one(io, BUF_SIZE)
-            .await
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let message = upgrade::read_one(io, BUF_SIZE).await.map_err(|e| match e {
+            ReadOneError::Io(err) => err,
+            e => io::Error::new(io::ErrorKind::Other, e),
+        })?;
         let mut de = serde_cbor::Deserializer::from_slice(&message);
         let msg = Request::deserialize(&mut de).map_err(|e| {
             tracing::debug!("serde read_request error: {:?}", e);
