@@ -37,43 +37,43 @@ impl<T> Default for Channels<T> {
 
 #[derive(Debug)]
 pub struct EventLoopHandle {
-    swap_response: Receiver<SwapResponse>,
-    msg0: Receiver<alice::Message0>,
-    msg1: Receiver<alice::Message1>,
-    r_transfer_proof: Receiver<TransferProof>,
+    recv_swap_response: Receiver<SwapResponse>,
+    recv_message0: Receiver<alice::Message0>,
+    recv_message1: Receiver<alice::Message1>,
+    recv_transfer_proof: Receiver<TransferProof>,
     conn_established: Receiver<PeerId>,
     dial_alice: Sender<()>,
     send_swap_request: Sender<SwapRequest>,
-    send_msg0: Sender<bob::Message0>,
-    send_msg1: Sender<bob::Message1>,
-    send_msg2: Sender<bob::Message2>,
-    s_encrypted_signature: Sender<EncryptedSignature>,
+    send_message0: Sender<bob::Message0>,
+    send_message1: Sender<bob::Message1>,
+    send_message2: Sender<bob::Message2>,
+    send_encrypted_signature: Sender<EncryptedSignature>,
 }
 
 impl EventLoopHandle {
     pub async fn recv_swap_response(&mut self) -> Result<SwapResponse> {
-        self.swap_response
+        self.recv_swap_response
             .recv()
             .await
             .ok_or_else(|| anyhow!("Failed to receive swap response from Alice"))
     }
 
     pub async fn recv_message0(&mut self) -> Result<alice::Message0> {
-        self.msg0
+        self.recv_message0
             .recv()
             .await
             .ok_or_else(|| anyhow!("Failed to receive message 0 from Alice"))
     }
 
     pub async fn recv_message1(&mut self) -> Result<alice::Message1> {
-        self.msg1
+        self.recv_message1
             .recv()
             .await
             .ok_or_else(|| anyhow!("Failed to receive message 1 from Alice"))
     }
 
     pub async fn recv_transfer_proof(&mut self) -> Result<TransferProof> {
-        self.r_transfer_proof
+        self.recv_transfer_proof
             .recv()
             .await
             .ok_or_else(|| anyhow!("Failed to receive transfer proof from Alice"))
@@ -99,22 +99,25 @@ impl EventLoopHandle {
     }
 
     pub async fn send_message0(&mut self, msg: bob::Message0) -> Result<()> {
-        let _ = self.send_msg0.send(msg).await?;
+        let _ = self.send_message0.send(msg).await?;
         Ok(())
     }
 
     pub async fn send_message1(&mut self, msg: bob::Message1) -> Result<()> {
-        let _ = self.send_msg1.send(msg).await?;
+        let _ = self.send_message1.send(msg).await?;
         Ok(())
     }
 
     pub async fn send_message2(&mut self, msg: bob::Message2) -> Result<()> {
-        let _ = self.send_msg2.send(msg).await?;
+        let _ = self.send_message2.send(msg).await?;
         Ok(())
     }
 
-    pub async fn send_message3(&mut self, tx_redeem_encsig: EncryptedSignature) -> Result<()> {
-        let _ = self.s_encrypted_signature.send(tx_redeem_encsig).await?;
+    pub async fn send_encrypted_signature(
+        &mut self,
+        tx_redeem_encsig: EncryptedSignature,
+    ) -> Result<()> {
+        let _ = self.send_encrypted_signature.send(tx_redeem_encsig).await?;
         Ok(())
     }
 }
@@ -123,17 +126,17 @@ impl EventLoopHandle {
 pub struct EventLoop {
     swarm: libp2p::Swarm<Behaviour>,
     alice_peer_id: PeerId,
-    swap_response: Sender<SwapResponse>,
-    msg0: Sender<alice::Message0>,
-    msg1: Sender<alice::Message1>,
-    r_transfer_proof: Sender<TransferProof>,
-    conn_established: Sender<PeerId>,
+    recv_swap_response: Sender<SwapResponse>,
+    recv_message0: Sender<alice::Message0>,
+    recv_message1: Sender<alice::Message1>,
+    recv_transfer_proof: Sender<TransferProof>,
     dial_alice: Receiver<()>,
+    conn_established: Sender<PeerId>,
     send_swap_request: Receiver<SwapRequest>,
-    send_msg0: Receiver<bob::Message0>,
-    send_msg1: Receiver<bob::Message1>,
-    send_msg2: Receiver<bob::Message2>,
-    s_encrypted_signature: Receiver<EncryptedSignature>,
+    send_message0: Receiver<bob::Message0>,
+    send_message1: Receiver<bob::Message1>,
+    send_message2: Receiver<bob::Message2>,
+    send_encrypted_signature: Receiver<EncryptedSignature>,
 }
 
 impl EventLoop {
@@ -153,45 +156,45 @@ impl EventLoop {
         swarm.add_address(alice_peer_id.clone(), alice_addr);
 
         let swap_response = Channels::new();
-        let msg0 = Channels::new();
-        let msg1 = Channels::new();
-        let r_transfer_proof = Channels::new();
-        let conn_established = Channels::new();
+        let recv_message0 = Channels::new();
+        let recv_message1 = Channels::new();
+        let recv_transfer_proof = Channels::new();
         let dial_alice = Channels::new();
+        let conn_established = Channels::new();
         let send_swap_request = Channels::new();
-        let send_msg0 = Channels::new();
-        let send_msg1 = Channels::new();
-        let send_msg2 = Channels::new();
-        let s_encrypted_signature = Channels::new();
+        let send_message0 = Channels::new();
+        let send_message1 = Channels::new();
+        let send_message2 = Channels::new();
+        let send_encrypted_signature = Channels::new();
 
         let event_loop = EventLoop {
             swarm,
             alice_peer_id,
-            swap_response: swap_response.sender,
-            msg0: msg0.sender,
-            msg1: msg1.sender,
-            r_transfer_proof: r_transfer_proof.sender,
+            recv_swap_response: swap_response.sender,
+            recv_message0: recv_message0.sender,
+            recv_message1: recv_message1.sender,
+            recv_transfer_proof: recv_transfer_proof.sender,
             conn_established: conn_established.sender,
             dial_alice: dial_alice.receiver,
             send_swap_request: send_swap_request.receiver,
-            send_msg0: send_msg0.receiver,
-            send_msg1: send_msg1.receiver,
-            send_msg2: send_msg2.receiver,
-            s_encrypted_signature: s_encrypted_signature.receiver,
+            send_message0: send_message0.receiver,
+            send_message1: send_message1.receiver,
+            send_message2: send_message2.receiver,
+            send_encrypted_signature: send_encrypted_signature.receiver,
         };
 
         let handle = EventLoopHandle {
-            swap_response: swap_response.receiver,
-            msg0: msg0.receiver,
-            msg1: msg1.receiver,
-            r_transfer_proof: r_transfer_proof.receiver,
+            recv_swap_response: swap_response.receiver,
+            recv_message0: recv_message0.receiver,
+            recv_message1: recv_message1.receiver,
+            recv_transfer_proof: recv_transfer_proof.receiver,
             conn_established: conn_established.receiver,
             dial_alice: dial_alice.sender,
             send_swap_request: send_swap_request.sender,
-            send_msg0: send_msg0.sender,
-            send_msg1: send_msg1.sender,
-            send_msg2: send_msg2.sender,
-            s_encrypted_signature: s_encrypted_signature.sender,
+            send_message0: send_message0.sender,
+            send_message1: send_message1.sender,
+            send_message2: send_message2.sender,
+            send_encrypted_signature: send_encrypted_signature.sender,
         };
 
         Ok((event_loop, handle))
@@ -206,17 +209,17 @@ impl EventLoop {
                             let _ = self.conn_established.send(peer_id).await;
                         }
                         OutEvent::SwapResponse(msg) => {
-                            let _ = self.swap_response.send(msg).await;
+                            let _ = self.recv_swap_response.send(msg).await;
                         },
                         OutEvent::Message0(msg) => {
-                            let _ = self.msg0.send(*msg).await;
+                            let _ = self.recv_message0.send(*msg).await;
                         }
                         OutEvent::Message1(msg) => {
-                            let _ = self.msg1.send(*msg).await;
+                            let _ = self.recv_message1.send(*msg).await;
                         }
                         OutEvent::Message2 => info!("Alice acknowledged message 2 received"),
                         OutEvent::TransferProof(msg) => {
-                            let _ = self.r_transfer_proof.send(*msg).await;
+                            let _ = self.recv_transfer_proof.send(*msg).await;
                         }
                         OutEvent::EncryptedSignature => info!("Alice acknowledged encrypted signature received"),
                     }
@@ -243,23 +246,23 @@ impl EventLoop {
                     }
                 },
 
-                msg0 = self.send_msg0.next().fuse() => {
+                msg0 = self.send_message0.next().fuse() => {
                     if let Some(msg) = msg0 {
                         self.swarm.send_message0(self.alice_peer_id.clone(), msg);
                     }
                 }
 
-                msg1 = self.send_msg1.next().fuse() => {
+                msg1 = self.send_message1.next().fuse() => {
                     if let Some(msg) = msg1 {
                         self.swarm.send_message1(self.alice_peer_id.clone(), msg);
                     }
                 },
-                msg2 = self.send_msg2.next().fuse() => {
+                msg2 = self.send_message2.next().fuse() => {
                     if let Some(msg) = msg2 {
                         self.swarm.send_message2(self.alice_peer_id.clone(), msg);
                     }
                 },
-                encrypted_signature = self.s_encrypted_signature.next().fuse() => {
+                encrypted_signature = self.send_encrypted_signature.next().fuse() => {
                     if let Some(tx_redeem_encsig) = encrypted_signature {
                         self.swarm.send_encrypted_signature(self.alice_peer_id.clone(), tx_redeem_encsig);
                     }

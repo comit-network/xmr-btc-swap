@@ -233,7 +233,8 @@ where
 
                     let state4_clone = state.clone();
 
-                    let enc_sig_sent_watcher = event_loop_handle.send_message3(tx_redeem_encsig);
+                    let enc_sig_sent_watcher =
+                        event_loop_handle.send_encrypted_signature(tx_redeem_encsig);
                     let bitcoin_wallet = bitcoin_wallet.clone();
                     let cancel_timelock_expires =
                         state4_clone.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
