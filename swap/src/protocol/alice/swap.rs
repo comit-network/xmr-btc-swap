@@ -6,7 +6,6 @@ use crate::{
         timelocks::ExpiredTimelocks, TransactionBlockHeight, WaitForTransactionFinality,
         WatchForRawTransaction,
     },
-    config::Config,
     database,
     database::Database,
     monero,
@@ -25,6 +24,7 @@ use crate::{
             AliceState,
         },
     },
+    settings,
 };
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
@@ -65,7 +65,7 @@ pub async fn run_until(
         swap.event_loop_handle,
         swap.bitcoin_wallet,
         swap.monero_wallet,
-        swap.config,
+        swap.settings,
         swap.swap_id,
         swap.db,
     )
@@ -81,7 +81,7 @@ async fn run_until_internal(
     mut event_loop_handle: EventLoopHandle,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
-    config: Config,
+    settings: settings::Protocol,
     swap_id: Uuid,
     db: Database,
 ) -> Result<AliceState> {
@@ -92,7 +92,7 @@ async fn run_until_internal(
         match state {
             AliceState::Started { amounts, state0 } => {
                 let (bob_peer_id, state3) =
-                    negotiate(state0, amounts.xmr, &mut event_loop_handle, config).await?;
+                    negotiate(state0, amounts.xmr, &mut event_loop_handle, settings).await?;
 
                 let state = AliceState::Negotiated {
                     bob_peer_id,
@@ -109,7 +109,7 @@ async fn run_until_internal(
                     event_loop_handle,
                     bitcoin_wallet,
                     monero_wallet,
-                    config,
+                    settings,
                     swap_id,
                     db,
                 )
@@ -120,9 +120,12 @@ async fn run_until_internal(
                 bob_peer_id,
                 amounts,
             } => {
-                let _ =
-                    wait_for_locked_bitcoin(state3.tx_lock.txid(), bitcoin_wallet.clone(), config)
-                        .await?;
+                let _ = wait_for_locked_bitcoin(
+                    state3.tx_lock.txid(),
+                    bitcoin_wallet.clone(),
+                    settings,
+                )
+                .await?;
 
                 let state = AliceState::BtcLocked {
                     bob_peer_id,
@@ -139,7 +142,7 @@ async fn run_until_internal(
                     event_loop_handle,
                     bitcoin_wallet,
                     monero_wallet,
-                    config,
+                    settings,
                     swap_id,
                     db,
                 )
@@ -170,7 +173,7 @@ async fn run_until_internal(
                     event_loop_handle,
                     bitcoin_wallet,
                     monero_wallet,
-                    config,
+                    settings,
                     swap_id,
                     db,
                 )
@@ -208,7 +211,7 @@ async fn run_until_internal(
                     event_loop_handle,
                     bitcoin_wallet.clone(),
                     monero_wallet,
-                    config,
+                    settings,
                     swap_id,
                     db,
                 )
@@ -234,7 +237,7 @@ async fn run_until_internal(
                                 {
                                     Ok(txid) => {
                                         let publishded_redeem_tx = bitcoin_wallet
-                                            .wait_for_transaction_finality(txid, config)
+                                            .wait_for_transaction_finality(txid, settings)
                                             .await;
 
                                         match publishded_redeem_tx {
@@ -280,7 +283,7 @@ async fn run_until_internal(
                     event_loop_handle,
                     bitcoin_wallet,
                     monero_wallet,
-                    config,
+                    settings,
                     swap_id,
                     db,
                 )
@@ -307,7 +310,7 @@ async fn run_until_internal(
                     event_loop_handle,
                     bitcoin_wallet,
                     monero_wallet,
-                    config,
+                    settings,
                     swap_id,
                     db,
                 )
@@ -341,7 +344,7 @@ async fn run_until_internal(
                             event_loop_handle,
                             bitcoin_wallet.clone(),
                             monero_wallet,
-                            config,
+                            settings,
                             swap_id,
                             db,
                         )
@@ -366,7 +369,7 @@ async fn run_until_internal(
                             event_loop_handle,
                             bitcoin_wallet.clone(),
                             monero_wallet,
-                            config,
+                            settings,
                             swap_id,
                             db,
                         )
@@ -401,7 +404,7 @@ async fn run_until_internal(
                 let punish_tx_finalised = publish_bitcoin_punish_transaction(
                     signed_tx_punish,
                     bitcoin_wallet.clone(),
-                    config,
+                    settings,
                 );
 
                 let refund_tx_seen = bitcoin_wallet.watch_for_raw_transaction(tx_refund.txid());
@@ -421,7 +424,7 @@ async fn run_until_internal(
                             event_loop_handle,
                             bitcoin_wallet.clone(),
                             monero_wallet,
-                            config,
+                            settings,
                             swap_id,
                             db,
                         )
@@ -445,7 +448,7 @@ async fn run_until_internal(
                             event_loop_handle,
                             bitcoin_wallet.clone(),
                             monero_wallet,
-                            config,
+                            settings,
                             swap_id,
                             db,
                         )

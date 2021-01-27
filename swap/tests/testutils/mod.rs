@@ -6,11 +6,10 @@ use libp2p::{core::Multiaddr, PeerId};
 use monero_harness::{image, Monero};
 use std::{path::PathBuf, sync::Arc};
 use swap::{
-    bitcoin,
-    config::Config,
-    monero,
+    bitcoin, monero,
     protocol::{alice, alice::AliceState, bob, bob::BobState, SwapAmounts},
     seed::Seed,
+    settings,
 };
 use tempfile::tempdir;
 use testcontainers::{clients::Cli, Container};
@@ -26,7 +25,7 @@ pub struct StartingBalances {
 
 struct AliceParams {
     seed: Seed,
-    config: Config,
+    settings: settings::Protocol,
     swap_id: Uuid,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
@@ -38,7 +37,7 @@ impl AliceParams {
     pub async fn builder(&self) -> alice::Builder {
         alice::Builder::new(
             self.seed,
-            self.config,
+            self.settings,
             self.swap_id,
             self.bitcoin_wallet.clone(),
             self.monero_wallet.clone(),
@@ -61,7 +60,7 @@ struct BobParams {
     monero_wallet: Arc<monero::Wallet>,
     alice_address: Multiaddr,
     alice_peer_id: PeerId,
-    config: Config,
+    settings: settings::Protocol,
 }
 
 impl BobParams {
@@ -74,7 +73,7 @@ impl BobParams {
             self.monero_wallet.clone(),
             self.alice_address.clone(),
             self.alice_peer_id.clone(),
-            self.config,
+            self.settings,
         )
     }
 }
@@ -304,7 +303,7 @@ where
         xmr: monero::Amount::from_piconero(1_000_000_000_000),
     };
 
-    let config = Config::regtest();
+    let settings = settings::Protocol::regtest();
 
     let alice_starting_balances = StartingBalances {
         xmr: swap_amounts.xmr * 10,
@@ -322,13 +321,13 @@ where
         &containers.bitcoind,
         &monero,
         alice_starting_balances.clone(),
-        config,
+        settings,
     )
     .await;
 
     let alice_params = AliceParams {
         seed: Seed::random().unwrap(),
-        config,
+        settings,
         swap_id: Uuid::new_v4(),
         bitcoin_wallet: alice_bitcoin_wallet.clone(),
         monero_wallet: alice_monero_wallet.clone(),
@@ -346,7 +345,7 @@ where
         &containers.bitcoind,
         &monero,
         bob_starting_balances.clone(),
-        config,
+        settings,
     )
     .await;
 
@@ -358,7 +357,7 @@ where
         monero_wallet: bob_monero_wallet.clone(),
         alice_address: alice_params.listen_address.clone(),
         alice_peer_id: alice_params.peer_id().await,
-        config,
+        settings,
     };
 
     let test = TestContext {
@@ -391,7 +390,7 @@ async fn init_wallets(
     bitcoind: &Bitcoind<'_>,
     monero: &Monero,
     starting_balances: StartingBalances,
-    config: Config,
+    settings: settings::Protocol,
 ) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {
     monero
         .init(vec![(name, starting_balances.xmr.as_piconero())])
@@ -400,11 +399,11 @@ async fn init_wallets(
 
     let xmr_wallet = Arc::new(swap::monero::Wallet {
         inner: monero.wallet(name).unwrap().client(),
-        network: config.monero_network,
+        network: settings.monero_network,
     });
 
     let btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new(name, bitcoind.node_url.clone(), config.bitcoin_network)
+        swap::bitcoin::Wallet::new(name, bitcoind.node_url.clone(), settings.bitcoin_network)
             .await
             .unwrap(),
     );

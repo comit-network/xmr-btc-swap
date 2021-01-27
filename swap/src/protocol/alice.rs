@@ -10,9 +10,7 @@ pub use self::{
     transfer_proof::TransferProof,
 };
 use crate::{
-    bitcoin,
-    config::Config,
-    database,
+    bitcoin, database,
     database::Database,
     monero,
     network::{
@@ -23,6 +21,7 @@ use crate::{
     },
     protocol::{bob, bob::EncryptedSignature, SwapAmounts},
     seed::Seed,
+    settings,
 };
 use anyhow::{bail, Result};
 use libp2p::{
@@ -49,7 +48,7 @@ pub struct Swap {
     pub event_loop_handle: EventLoopHandle,
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
-    pub config: Config,
+    pub settings: settings::Protocol,
     pub swap_id: Uuid,
     pub db: Database,
 }
@@ -59,7 +58,7 @@ pub struct Builder {
     identity: Keypair,
     peer_id: PeerId,
     db_path: PathBuf,
-    config: Config,
+    settings: settings::Protocol,
 
     listen_address: Multiaddr,
 
@@ -77,7 +76,7 @@ enum InitParams {
 impl Builder {
     pub async fn new(
         seed: Seed,
-        config: Config,
+        settings: settings::Protocol,
         swap_id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
@@ -93,7 +92,7 @@ impl Builder {
             identity,
             peer_id,
             db_path,
-            config,
+            settings,
             listen_address,
             bitcoin_wallet,
             monero_wallet,
@@ -124,7 +123,7 @@ impl Builder {
                         event_loop_handle,
                         bitcoin_wallet: self.bitcoin_wallet,
                         monero_wallet: self.monero_wallet,
-                        config: self.config,
+                        settings: self.settings,
                         db,
                         state: initial_state,
                         swap_id: self.swap_id,
@@ -154,7 +153,7 @@ impl Builder {
                         event_loop_handle,
                         bitcoin_wallet: self.bitcoin_wallet,
                         monero_wallet: self.monero_wallet,
-                        config: self.config,
+                        settings: self.settings,
                         swap_id: self.swap_id,
                         db,
                     },
@@ -195,8 +194,8 @@ impl Builder {
             v_a,
             amounts.btc,
             amounts.xmr,
-            self.config.bitcoin_cancel_timelock,
-            self.config.bitcoin_punish_timelock,
+            self.settings.bitcoin_cancel_timelock,
+            self.settings.bitcoin_punish_timelock,
             redeem_address,
             punish_address,
         );

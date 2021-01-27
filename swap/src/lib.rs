@@ -23,6 +23,7 @@ pub mod monero;
 pub mod network;
 pub mod protocol;
 pub mod seed;
+pub mod settings;
 pub mod trace;
 
 mod fs;

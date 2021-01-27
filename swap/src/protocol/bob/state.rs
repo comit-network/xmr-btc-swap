@@ -6,10 +6,10 @@ use crate::{
         GetBlockHeight, GetNetwork, GetRawTransaction, Transaction, TransactionBlockHeight,
         TxCancel, Txid, WatchForRawTransaction,
     },
-    config::Config,
     monero,
     monero::{monero_private_key, TransferProof},
     protocol::{alice, bob, bob::EncryptedSignature, SwapAmounts},
+    settings,
 };
 use anyhow::{anyhow, Result};
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic, Signature};
@@ -556,7 +556,11 @@ impl State4 {
         .await
     }
 
-    pub async fn refund_btc<W>(&self, bitcoin_wallet: &W, config: Config) -> Result<()>
+    pub async fn refund_btc<W>(
+        &self,
+        bitcoin_wallet: &W,
+        settings: settings::Protocol,
+    ) -> Result<()>
     where
         W: bitcoin::BroadcastSignedTransaction + bitcoin::WaitForTransactionFinality,
     {
@@ -581,7 +585,7 @@ impl State4 {
             .await?;
 
         bitcoin_wallet
-            .wait_for_transaction_finality(txid, config)
+            .wait_for_transaction_finality(txid, settings)
             .await?;
 
         Ok(())

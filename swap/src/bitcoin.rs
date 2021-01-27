@@ -10,7 +10,7 @@ pub use ::bitcoin::{util::amount::Amount, Address, Network, Transaction, Txid};
 pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
 pub use wallet::Wallet;
 
-use crate::{bitcoin::timelocks::BlockHeight, config::Config};
+use crate::{bitcoin::timelocks::BlockHeight, settings::Protocol};
 use ::bitcoin::{
     hashes::{hex::ToHex, Hash},
     secp256k1,
@@ -208,7 +208,7 @@ pub trait WatchForRawTransaction {
 
 #[async_trait]
 pub trait WaitForTransactionFinality {
-    async fn wait_for_transaction_finality(&self, txid: Txid, config: Config) -> Result<()>;
+    async fn wait_for_transaction_finality(&self, txid: Txid, settings: Protocol) -> Result<()>;
 }
 
 #[async_trait]
