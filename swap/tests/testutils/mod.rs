@@ -7,7 +7,9 @@ use monero_harness::{image, Monero};
 use std::{path::PathBuf, sync::Arc};
 use swap::{
     bitcoin,
-    config::Config,
+    bitcoin::Timelock,
+    config,
+    config::{Config, GetConfig},
     monero,
     protocol::{alice, alice::AliceState, bob, bob::BobState, SwapAmounts},
     seed::Seed,
@@ -302,7 +304,7 @@ impl TestContext {
     }
 }
 
-pub async fn setup_test<T, F>(testfn: T)
+pub async fn setup_test<T, F>(config: Config, testfn: T)
 where
     T: Fn(TestContext) -> F,
     F: Future<Output = ()>,
@@ -317,8 +319,6 @@ where
         btc: bitcoin::Amount::from_sat(1_000_000),
         xmr: monero::Amount::from_piconero(1_000_000_000_000),
     };
-
-    let config = Config::regtest();
 
     let alice_starting_balances = StartingBalances {
         xmr: swap_amounts.xmr * 10,
@@ -509,5 +509,39 @@ pub mod bob_run_until {
 
     pub fn is_encsig_sent(state: &BobState) -> bool {
         matches!(state, BobState::EncSigSent(..))
+    }
+}
+
+pub struct SlowCancelConfig;
+
+impl GetConfig for SlowCancelConfig {
+    fn get_config() -> Config {
+        Config {
+            bitcoin_cancel_timelock: Timelock::new(180),
+            ..config::Regtest::get_config()
+        }
+    }
+}
+
+pub struct FastCancelConfig;
+
+impl GetConfig for FastCancelConfig {
+    fn get_config() -> Config {
+        Config {
+            bitcoin_cancel_timelock: Timelock::new(1),
+            ..config::Regtest::get_config()
+        }
+    }
+}
+
+pub struct FastPunishConfig;
+
+impl GetConfig for FastPunishConfig {
+    fn get_config() -> Config {
+        Config {
+            bitcoin_cancel_timelock: Timelock::new(1),
+            bitcoin_punish_timelock: Timelock::new(1),
+            ..config::Regtest::get_config()
+        }
     }
 }

@@ -1,11 +1,14 @@
 pub mod testutils;
 
-use swap::protocol::{alice, bob, bob::BobState};
-use testutils::bob_run_until::is_lock_proof_received;
+use swap::{
+    config::GetConfig,
+    protocol::{alice, bob, bob::BobState},
+};
+use testutils::{bob_run_until::is_lock_proof_received, SlowCancelConfig};
 
 #[tokio::test]
 async fn given_bob_restarts_after_lock_proof_received_resume_swap() {
-    testutils::setup_test(|mut ctx| async move {
+    testutils::setup_test(SlowCancelConfig::get_config(), |mut ctx| async move {
         let (alice_swap, _) = ctx.new_swap_as_alice().await;
         let (bob_swap, bob_join_handle) = ctx.new_swap_as_bob().await;
 

@@ -1,13 +1,17 @@
 pub mod testutils;
 
-use swap::protocol::{alice, bob};
+use swap::{
+    config::GetConfig,
+    protocol::{alice, bob},
+};
+use testutils::SlowCancelConfig;
 use tokio::join;
 
 /// Run the following tests with RUST_MIN_STACK=10000000
 
 #[tokio::test]
 async fn happy_path() {
-    testutils::setup_test(|mut ctx| async move {
+    testutils::setup_test(SlowCancelConfig::get_config(), |mut ctx| async move {
         let (alice_swap, _) = ctx.new_swap_as_alice().await;
         let (bob_swap, _) = ctx.new_swap_as_bob().await;
 

@@ -14,7 +14,7 @@
 
 use crate::cli::{Command, Options, Resume};
 use anyhow::{Context, Result};
-use config::Config;
+use config::{Config, GetConfig};
 use database::Database;
 use log::LevelFilter;
 use prettytable::{row, Table};
@@ -46,7 +46,7 @@ async fn main() -> Result<()> {
     init_tracing(LevelFilter::Info).expect("initialize tracing");
 
     let opt = Options::from_args();
-    let config = Config::testnet();
+    let config = config::Testnet::get_config();
 
     info!(
         "Database and Seed will be stored in directory: {}",

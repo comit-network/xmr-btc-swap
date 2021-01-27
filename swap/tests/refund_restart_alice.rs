@@ -1,13 +1,16 @@
 pub mod testutils;
 
-use swap::protocol::{alice, alice::AliceState, bob};
-use testutils::alice_run_until::is_xmr_locked;
+use swap::{
+    config::GetConfig,
+    protocol::{alice, alice::AliceState, bob},
+};
+use testutils::{alice_run_until::is_xmr_locked, FastCancelConfig};
 
 /// Bob locks btc and Alice locks xmr. Alice fails to act so Bob refunds. Alice
 /// then also refunds.
 #[tokio::test]
 async fn given_alice_restarts_after_xmr_is_locked_refund_swap() {
-    testutils::setup_test(|mut ctx| async move {
+    testutils::setup_test(FastCancelConfig::get_config(), |mut ctx| async move {
         let (alice_swap, alice_join_handle) = ctx.new_swap_as_alice().await;
         let (bob_swap, _) = ctx.new_swap_as_bob().await;
 

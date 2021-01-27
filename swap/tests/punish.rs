@@ -1,13 +1,16 @@
 pub mod testutils;
 
-use swap::protocol::{alice, bob, bob::BobState};
-use testutils::bob_run_until::is_btc_locked;
+use swap::{
+    config::GetConfig,
+    protocol::{alice, bob, bob::BobState},
+};
+use testutils::{bob_run_until::is_btc_locked, FastPunishConfig};
 
 /// Bob locks Btc and Alice locks Xmr. Bob does not act; he fails to send Alice
 /// the encsig and fail to refund or redeem. Alice punishes.
 #[tokio::test]
 async fn alice_punishes_if_bob_never_acts_after_fund() {
-    testutils::setup_test(|mut ctx| async move {
+    testutils::setup_test(FastPunishConfig::get_config(), |mut ctx| async move {
         let (alice_swap, _) = ctx.new_swap_as_alice().await;
         let (bob_swap, bob_join_handle) = ctx.new_swap_as_bob().await;
 

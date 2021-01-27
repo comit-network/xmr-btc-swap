@@ -1,6 +1,10 @@
 pub mod testutils;
 
-use swap::protocol::{alice, alice::AliceState, bob};
+use swap::{
+    config,
+    config::GetConfig,
+    protocol::{alice, alice::AliceState, bob},
+};
 use testutils::alice_run_until::is_encsig_learned;
 
 /// Bob locks btc and Alice locks xmr. Alice fails to act so Bob refunds. Alice
@@ -8,7 +12,7 @@ use testutils::alice_run_until::is_encsig_learned;
 /// redeem had the timelock not expired.
 #[tokio::test]
 async fn given_alice_restarts_after_enc_sig_learned_and_bob_already_cancelled_refund_swap() {
-    testutils::setup_test(|mut ctx| async move {
+    testutils::setup_test(config::Regtest::get_config(), |mut ctx| async move {
         let (alice_swap, alice_join_handle) = ctx.new_swap_as_alice().await;
         let (bob_swap, _) = ctx.new_swap_as_bob().await;
 
@@ -18,7 +22,11 @@ async fn given_alice_restarts_after_enc_sig_learned_and_bob_already_cancelled_re
         let alice_state = alice::run_until(alice_swap, is_encsig_learned)
             .await
             .unwrap();
-        assert!(matches!(alice_state, AliceState::EncSigLearned {..}));
+        assert!(
+            matches!(alice_state, AliceState::EncSigLearned {..}),
+            "Alice state is not EncSigLearned: {:?}",
+            alice_state
+        );
 
         // Wait for Bob to refund, because Alice does not act
         let bob_state = bob_handle.await.unwrap();
@@ -26,8 +34,12 @@ async fn given_alice_restarts_after_enc_sig_learned_and_bob_already_cancelled_re
 
         // Once bob has finished Alice is restarted and refunds as well
         let alice_swap = ctx.stop_and_resume_alice_from_db(alice_join_handle).await;
-        assert!(matches!(alice_swap.state, AliceState::EncSigLearned
-        {..}));
+        assert!(
+            matches!(alice_swap.state, AliceState::EncSigLearned
+        {..}),
+            "Alice state is not EncSigLearned: {:?}",
+            alice_state
+        );
 
         let alice_state = alice::run(alice_swap).await.unwrap();
 
