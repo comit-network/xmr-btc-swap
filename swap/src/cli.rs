@@ -1,5 +1,6 @@
 use crate::{bitcoin, monero};
 use libp2p::{core::Multiaddr, PeerId};
+use std::path::PathBuf;
 use uuid::Uuid;
 
 #[derive(structopt::StructOpt, Debug)]
@@ -24,6 +25,9 @@ pub enum Command {
 
         #[structopt(long = "receive-btc", help = "Bitcoin amount as floating point nr without denomination (e.g. 1.25)", parse(try_from_str = parse_btc))]
         receive_bitcoin: bitcoin::Amount,
+
+        #[structopt(long = "config", parse(from_os_str))]
+        config_path: Option<PathBuf>,
     },
     BuyXmr {
         #[structopt(long = "connect-peer-id")]
@@ -37,6 +41,9 @@ pub enum Command {
 
         #[structopt(long = "receive-xmr", help = "Monero amount as floating point nr without denomination (e.g. 125.1)", parse(try_from_str = parse_xmr))]
         receive_monero: monero::Amount,
+
+        #[structopt(long = "config", parse(from_os_str))]
+        config_path: Option<PathBuf>,
     },
     History,
     Resume(Resume),
@@ -50,6 +57,9 @@ pub enum Resume {
 
         #[structopt(long = "listen-address", default_value = "/ip4/127.0.0.1/tcp/9876")]
         listen_addr: Multiaddr,
+
+        #[structopt(long = "config", parse(from_os_str))]
+        config_path: Option<PathBuf>,
     },
     BuyXmr {
         #[structopt(long = "swap-id")]
@@ -60,6 +70,9 @@ pub enum Resume {
 
         #[structopt(long = "counterpart-addr")]
         alice_addr: Multiaddr,
+
+        #[structopt(long = "config", parse(from_os_str))]
+        config_path: Option<PathBuf>,
     },
 }
 

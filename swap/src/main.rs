@@ -24,7 +24,7 @@ use fs::default_config_path;
 use prettytable::{row, Table};
 use protocol::{alice, bob, bob::Builder, SwapAmounts};
 use settings::Settings;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 use structopt::StructOpt;
 use trace::init_tracing;
 use tracing::{info, log::LevelFilter};
@@ -69,8 +69,9 @@ async fn main() -> Result<()> {
             listen_addr,
             send_monero,
             receive_bitcoin,
+            config_path,
         } => {
-            let settings = init_settings()?;
+            let settings = init_settings(config_path)?;
 
             let swap_amounts = SwapAmounts {
                 xmr: send_monero,
@@ -107,8 +108,9 @@ async fn main() -> Result<()> {
             alice_addr,
             send_bitcoin,
             receive_monero,
+            config_path,
         } => {
-            let settings = init_settings()?;
+            let settings = init_settings(config_path)?;
 
             let swap_amounts = SwapAmounts {
                 btc: send_bitcoin,
@@ -156,8 +158,9 @@ async fn main() -> Result<()> {
         Command::Resume(Resume::SellXmr {
             swap_id,
             listen_addr,
+            config_path,
         }) => {
-            let settings = init_settings()?;
+            let settings = init_settings(config_path)?;
 
             let (bitcoin_wallet, monero_wallet) = setup_wallets(settings.wallets).await?;
 
@@ -180,8 +183,9 @@ async fn main() -> Result<()> {
             swap_id,
             alice_peer_id,
             alice_addr,
+            config_path,
         }) => {
-            let settings = init_settings()?;
+            let settings = init_settings(config_path)?;
 
             let (bitcoin_wallet, monero_wallet) = setup_wallets(settings.wallets).await?;
 
@@ -205,8 +209,13 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn init_settings() -> Result<Settings> {
-    let config_path = default_config_path()?;
+fn init_settings(config_path: Option<PathBuf>) -> Result<Settings> {
+    let config_path = if let Some(config_path) = config_path {
+        config_path
+    } else {
+        default_config_path()?
+    };
+
     let config = match read_config(config_path.clone())? {
         Ok(config) => config,
         Err(ConfigNotInitialized {}) => {
