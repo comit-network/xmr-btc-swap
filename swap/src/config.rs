@@ -1,4 +1,4 @@
-use crate::fs::ensure_directory_exists;
+use crate::fs::{default_config_path, ensure_directory_exists};
 use anyhow::{Context, Result};
 use config::{Config, ConfigError};
 use dialoguer::{theme::ColorfulTheme, Input};
@@ -117,6 +117,21 @@ pub fn query_user_for_initial_testnet_config() -> Result<File> {
     })
 }
 
+pub fn reset_config(config_path: Option<PathBuf>) -> anyhow::Result<()> {
+    let config_path = if let Some(config_path) = config_path {
+        config_path
+    } else {
+        default_config_path()?
+    };
+
+    fs::remove_file(&config_path)
+        .with_context(|| format!("failed to remove config file {}", config_path.display()))?;
+
+    info!("Config file at {} was removed successfully. Initial setup will be re-triggered upon starting a swap.", config_path.as_path().display());
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -139,8 +154,10 @@ mod tests {
         };
 
         initial_setup(config_path.clone(), || Ok(expected.clone())).unwrap();
-        let actual = read_config(config_path).unwrap().unwrap();
-
+        let actual = read_config(config_path.clone()).unwrap().unwrap();
         assert_eq!(expected, actual);
+
+        reset_config(Some(config_path.clone())).unwrap();
+        assert!(!config_path.exists());
     }
 }

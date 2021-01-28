@@ -15,7 +15,8 @@
 use crate::{
     cli::{Command, Options, Resume},
     config::{
-        initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
+        initial_setup, query_user_for_initial_testnet_config, read_config, reset_config,
+        ConfigNotInitialized,
     },
 };
 use anyhow::{Context, Result};
@@ -204,6 +205,7 @@ async fn main() -> Result<()> {
             tokio::spawn(async move { event_loop.run().await });
             bob::run(swap).await?;
         }
+        Command::ResetConfig { config } => reset_config(config.config_path)?,
     };
 
     Ok(())

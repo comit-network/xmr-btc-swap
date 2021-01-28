@@ -47,6 +47,10 @@ pub enum Command {
     },
     History,
     Resume(Resume),
+    ResetConfig {
+        #[structopt(flatten)]
+        config: Config,
+    },
 }
 
 #[derive(structopt::StructOpt, Debug)]
