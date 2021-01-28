@@ -8,6 +8,7 @@ use crate::bitcoin;
 use ::bitcoin::hashes::core::fmt::Formatter;
 use anyhow::Result;
 use async_trait::async_trait;
+use monero_harness::rpc::wallet::BlockHeight;
 use rand::{CryptoRng, RngCore};
 use rust_decimal::{
     prelude::{FromPrimitive, ToPrimitive},
@@ -205,6 +206,22 @@ pub trait CreateWalletForOutput {
         private_view_key: PrivateViewKey,
         restore_height: Option<u32>,
     ) -> anyhow::Result<()>;
+}
+
+#[async_trait]
+pub trait Balance {
+    /// Get the balance of the primary account.
+    async fn balance(&self) -> Result<Amount>;
+}
+
+#[async_trait]
+pub trait Refresh {
+    async fn refresh(&self) -> Result<()>;
+}
+
+#[async_trait]
+pub trait FetchBlockHeight {
+    async fn block_height(&self) -> Result<BlockHeight>;
 }
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq)]

@@ -44,17 +44,27 @@ pub mod swap;
 mod swap_response;
 mod transfer_proof;
 
-pub struct Swap {
+pub trait BitcoinWallet: swap::BitcoinWallet + bitcoin::NewAddress {}
+impl BitcoinWallet for bitcoin::Wallet {}
+
+pub trait MoneroWallet: monero::Transfer + monero::CreateWalletForOutput + Send + Sync {}
+impl MoneroWallet for monero::Wallet {}
+
+pub struct Swap<B, M> {
     pub state: AliceState,
     pub event_loop_handle: EventLoopHandle,
-    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
-    pub monero_wallet: Arc<monero::Wallet>,
+    pub bitcoin_wallet: Arc<B>,
+    pub monero_wallet: Arc<M>,
     pub config: Config,
     pub swap_id: Uuid,
     pub db: Database,
 }
 
-pub struct Builder {
+pub struct Builder<B, M>
+where
+    B: BitcoinWallet + bitcoin::NewAddress,
+    M: MoneroWallet,
+{
     swap_id: Uuid,
     identity: Keypair,
     peer_id: PeerId,
@@ -63,8 +73,8 @@ pub struct Builder {
 
     listen_address: Multiaddr,
 
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Wallet>,
+    bitcoin_wallet: Arc<B>,
+    monero_wallet: Arc<M>,
 
     init_params: InitParams,
 }
@@ -74,13 +84,17 @@ enum InitParams {
     New { swap_amounts: SwapAmounts },
 }
 
-impl Builder {
+impl<B, M> Builder<B, M>
+where
+    B: BitcoinWallet + bitcoin::NewAddress,
+    M: MoneroWallet,
+{
     pub async fn new(
         seed: Seed,
         config: Config,
         swap_id: Uuid,
-        bitcoin_wallet: Arc<bitcoin::Wallet>,
-        monero_wallet: Arc<monero::Wallet>,
+        bitcoin_wallet: Arc<B>,
+        monero_wallet: Arc<M>,
         db_path: PathBuf,
         listen_address: Multiaddr,
     ) -> Self {
@@ -108,7 +122,7 @@ impl Builder {
         }
     }
 
-    pub async fn build(self) -> Result<(Swap, EventLoop)> {
+    pub async fn build(self) -> Result<(Swap<B, M>, EventLoop)> {
         match self.init_params {
             InitParams::New { swap_amounts } => {
                 let initial_state = self

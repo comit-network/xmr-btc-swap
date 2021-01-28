@@ -1,13 +1,13 @@
 use crate::monero::{
-    Amount, CreateWalletForOutput, InsufficientFunds, PrivateViewKey, PublicViewKey, Transfer,
-    TransferProof, TxHash, WatchForTransfer,
+    Amount, Balance, CreateWalletForOutput, FetchBlockHeight, InsufficientFunds, PrivateViewKey,
+    PublicViewKey, Refresh, Transfer, TransferProof, TxHash, WatchForTransfer,
 };
 use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::Result;
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::FutureOperation as _};
 use bitcoin::hashes::core::sync::atomic::AtomicU32;
-use monero_harness::rpc::wallet;
+use monero_harness::rpc::{wallet, wallet::BlockHeight};
 use std::{
     str::FromStr,
     sync::{atomic::Ordering, Arc},
@@ -28,13 +28,6 @@ impl Wallet {
             inner: wallet::Client::new(url),
             network,
         }
-    }
-
-    /// Get the balance of the primary account.
-    pub async fn get_balance(&self) -> Result<Amount> {
-        let amount = self.inner.get_balance(0).await?;
-
-        Ok(Amount::from_piconero(amount))
     }
 }
 
@@ -164,5 +157,29 @@ impl WatchForTransfer for Wallet {
         };
 
         Ok(())
+    }
+}
+
+#[async_trait]
+impl Balance for Wallet {
+    async fn balance(&self) -> Result<Amount> {
+        let amount = self.inner.get_balance(0).await?;
+
+        Ok(Amount::from_piconero(amount))
+    }
+}
+
+#[async_trait]
+impl Refresh for Wallet {
+    async fn refresh(&self) -> Result<()> {
+        self.inner.refresh().await?;
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl FetchBlockHeight for Wallet {
+    async fn block_height(&self) -> Result<BlockHeight> {
+        self.inner.block_height().await
     }
 }

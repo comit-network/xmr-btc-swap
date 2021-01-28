@@ -17,6 +17,28 @@ use tokio::select;
 use tracing::info;
 use uuid::Uuid;
 
+pub trait BitcoinWallet:
+    bitcoin::BuildTxLockPsbt
+    + bitcoin::GetNetwork
+    + bitcoin::SignTxLock
+    + bitcoin::BroadcastSignedTransaction
+    + bitcoin::WatchForRawTransaction
+    + bitcoin::TransactionBlockHeight
+    + bitcoin::GetBlockHeight
+    + bitcoin::GetRawTransaction
+    + bitcoin::WaitForTransactionFinality
+    + Send
+    + Sync
+{
+}
+impl BitcoinWallet for bitcoin::Wallet {}
+
+pub trait MoneroWallet:
+    monero::WatchForTransfer + monero::FetchBlockHeight + monero::CreateWalletForOutput + Send + Sync
+{
+}
+impl MoneroWallet for monero::Wallet {}
+
 pub fn is_complete(state: &BobState) -> bool {
     matches!(
         state,
@@ -28,14 +50,22 @@ pub fn is_complete(state: &BobState) -> bool {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn run(swap: bob::Swap) -> Result<BobState> {
+pub async fn run<B, M>(swap: bob::Swap<B, M>) -> Result<BobState>
+where
+    B: BitcoinWallet,
+    M: MoneroWallet,
+{
     run_until(swap, is_complete).await
 }
 
-pub async fn run_until(
-    swap: bob::Swap,
+pub async fn run_until<B, M>(
+    swap: bob::Swap<B, M>,
     is_target_state: fn(&BobState) -> bool,
-) -> Result<BobState> {
+) -> Result<BobState>
+where
+    B: BitcoinWallet,
+    M: MoneroWallet,
+{
     run_until_internal(
         swap.state,
         is_target_state,
@@ -53,19 +83,21 @@ pub async fn run_until(
 // State machine driver for swap execution
 #[allow(clippy::too_many_arguments)]
 #[async_recursion]
-async fn run_until_internal<R>(
+async fn run_until_internal<R, B, M>(
     state: BobState,
     is_target_state: fn(&BobState) -> bool,
     mut event_loop_handle: EventLoopHandle,
     db: Database,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Wallet>,
+    bitcoin_wallet: Arc<B>,
+    monero_wallet: Arc<M>,
     mut rng: R,
     swap_id: Uuid,
     config: Config,
 ) -> Result<BobState>
 where
     R: RngCore + CryptoRng + Send,
+    B: BitcoinWallet,
+    M: MoneroWallet,
 {
     info!("Current state: {}", state);
     if is_target_state(&state) {
@@ -139,8 +171,7 @@ where
                     // TODO: This can be optimized further by extracting the block height when
                     //  tx-lock was included. However, scanning a few more blocks won't do any harm
                     //  and is simpler.
-                    let monero_wallet_restore_blockheight =
-                        monero_wallet.inner.block_height().await?;
+                    let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
 
                     select! {
                         transfer_proof = transfer_proof_watcher => {
@@ -387,15 +418,16 @@ where
     }
 }
 
-pub async fn negotiate<R>(
+pub async fn negotiate<R, W>(
     state0: crate::protocol::bob::state::State0,
     amounts: SwapAmounts,
     swarm: &mut EventLoopHandle,
     mut rng: R,
-    bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
+    bitcoin_wallet: Arc<W>,
 ) -> Result<bob::state::State2>
 where
     R: RngCore + CryptoRng + Send,
+    W: bitcoin::BuildTxLockPsbt + bitcoin::GetNetwork,
 {
     tracing::trace!("Starting negotiate");
     swarm

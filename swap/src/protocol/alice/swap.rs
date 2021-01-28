@@ -2,15 +2,10 @@
 //! Alice holds XMR and wishes receive BTC.
 use crate::{
     bitcoin,
-    bitcoin::{
-        timelocks::ExpiredTimelocks, TransactionBlockHeight, WaitForTransactionFinality,
-        WatchForRawTransaction,
-    },
+    bitcoin::timelocks::ExpiredTimelocks,
     config::Config,
     database,
     database::Database,
-    monero,
-    monero::CreateWalletForOutput,
     protocol::{
         alice,
         alice::{
@@ -22,7 +17,7 @@ use crate::{
                 publish_cancel_transaction, wait_for_bitcoin_encrypted_signature,
                 wait_for_bitcoin_refund, wait_for_locked_bitcoin,
             },
-            AliceState,
+            AliceState, MoneroWallet,
         },
     },
 };
@@ -41,6 +36,20 @@ trait Rng: RngCore + CryptoRng + Send {}
 
 impl<T> Rng for T where T: RngCore + CryptoRng + Send {}
 
+pub trait BitcoinWallet:
+    bitcoin::WatchForRawTransaction
+    + bitcoin::WaitForTransactionFinality
+    + bitcoin::TransactionBlockHeight
+    + bitcoin::GetBlockHeight
+    + bitcoin::BroadcastSignedTransaction
+    + bitcoin::GetRawTransaction
+    + Send
+    + Sync
+{
+}
+
+impl BitcoinWallet for bitcoin::Wallet {}
+
 pub fn is_complete(state: &AliceState) -> bool {
     matches!(
         state,
@@ -51,14 +60,22 @@ pub fn is_complete(state: &AliceState) -> bool {
     )
 }
 
-pub async fn run(swap: alice::Swap) -> Result<AliceState> {
+pub async fn run<B, M>(swap: alice::Swap<B, M>) -> Result<AliceState>
+where
+    B: BitcoinWallet,
+    M: MoneroWallet,
+{
     run_until(swap, is_complete).await
 }
 
-pub async fn run_until(
-    swap: alice::Swap,
+pub async fn run_until<B, M>(
+    swap: alice::Swap<B, M>,
     is_target_state: fn(&AliceState) -> bool,
-) -> Result<AliceState> {
+) -> Result<AliceState>
+where
+    B: BitcoinWallet,
+    M: MoneroWallet,
+{
     run_until_internal(
         swap.state,
         is_target_state,
@@ -75,16 +92,20 @@ pub async fn run_until(
 // State machine driver for swap execution
 #[async_recursion]
 #[allow(clippy::too_many_arguments)]
-async fn run_until_internal(
+async fn run_until_internal<B, M>(
     state: AliceState,
     is_target_state: fn(&AliceState) -> bool,
     mut event_loop_handle: EventLoopHandle,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Wallet>,
+    bitcoin_wallet: Arc<B>,
+    monero_wallet: Arc<M>,
     config: Config,
     swap_id: Uuid,
     db: Database,
-) -> Result<AliceState> {
+) -> Result<AliceState>
+where
+    B: BitcoinWallet,
+    M: MoneroWallet,
+{
     info!("Current state:{}", state);
     if is_target_state(&state) {
         Ok(state)

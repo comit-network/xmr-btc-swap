@@ -24,18 +24,26 @@ pub struct StartingBalances {
     pub btc: bitcoin::Amount,
 }
 
-struct AliceParams {
+struct AliceParams<B, M>
+where
+    B: swap::protocol::alice::BitcoinWallet,
+    M: swap::protocol::alice::MoneroWallet,
+{
     seed: Seed,
     config: Config,
     swap_id: Uuid,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Wallet>,
+    bitcoin_wallet: Arc<B>,
+    monero_wallet: Arc<M>,
     db_path: PathBuf,
     listen_address: Multiaddr,
 }
 
-impl AliceParams {
-    pub async fn builder(&self) -> alice::Builder {
+impl<B, M> AliceParams<B, M>
+where
+    B: swap::protocol::alice::BitcoinWallet + bitcoin::NewAddress,
+    M: swap::protocol::alice::MoneroWallet,
+{
+    pub async fn builder(&self) -> alice::Builder<B, M> {
         alice::Builder::new(
             self.seed,
             self.config,
@@ -53,19 +61,22 @@ impl AliceParams {
     }
 }
 
-struct BobParams {
+struct BobParams<B, M> {
     seed: Seed,
     db_path: PathBuf,
     swap_id: Uuid,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Wallet>,
+    bitcoin_wallet: Arc<B>,
+    monero_wallet: Arc<M>,
     alice_address: Multiaddr,
     alice_peer_id: PeerId,
     config: Config,
 }
 
-impl BobParams {
-    pub fn builder(&self) -> bob::Builder {
+impl<B, M> BobParams<B, M>
+where
+    B: bitcoin::NewAddress,
+{
+    pub fn builder(&self) -> bob::Builder<B, M> {
         bob::Builder::new(
             self.seed,
             self.db_path.clone(),
@@ -79,22 +90,37 @@ impl BobParams {
     }
 }
 
-pub struct TestContext {
+pub struct TestContext<BA, MA, BB, MB>
+where
+    BA: swap::protocol::alice::BitcoinWallet,
+    MA: swap::protocol::alice::MoneroWallet,
+    BB: swap::protocol::bob::swap::BitcoinWallet,
+    MB: swap::protocol::bob::swap::MoneroWallet,
+{
     swap_amounts: SwapAmounts,
 
-    alice_params: AliceParams,
+    alice_params: AliceParams<BA, MA>,
     alice_starting_balances: StartingBalances,
-    alice_bitcoin_wallet: Arc<bitcoin::Wallet>,
-    alice_monero_wallet: Arc<monero::Wallet>,
+    alice_bitcoin_wallet: Arc<BA>,
+    alice_monero_wallet: Arc<MA>,
 
-    bob_params: BobParams,
+    bob_params: BobParams<BB, MB>,
     bob_starting_balances: StartingBalances,
-    bob_bitcoin_wallet: Arc<bitcoin::Wallet>,
-    bob_monero_wallet: Arc<monero::Wallet>,
+    bob_bitcoin_wallet: Arc<BB>,
+    bob_monero_wallet: Arc<MB>,
 }
 
-impl TestContext {
-    pub async fn new_swap_as_alice(&mut self) -> alice::Swap {
+impl<BA, MA, BB, MB> TestContext<BA, MA, BB, MB>
+where
+    BA: swap::protocol::alice::BitcoinWallet + swap::bitcoin::Balance,
+    MA: swap::protocol::alice::MoneroWallet + swap::monero::Balance + swap::monero::Refresh,
+    BB: swap::protocol::bob::swap::BitcoinWallet
+        + swap::bitcoin::NewAddress
+        + swap::bitcoin::FetchTransactionFee
+        + swap::bitcoin::Balance,
+    MB: swap::protocol::bob::swap::MoneroWallet + swap::monero::Balance + swap::monero::Refresh,
+{
+    pub async fn new_swap_as_alice(&mut self) -> alice::Swap<BA, MA> {
         let (swap, mut event_loop) = self
             .alice_params
             .builder()
@@ -109,7 +135,7 @@ impl TestContext {
         swap
     }
 
-    pub async fn new_swap_as_bob(&mut self) -> bob::Swap {
+    pub async fn new_swap_as_bob(&mut self) -> bob::Swap<BB, MB> {
         let (swap, event_loop) = self
             .bob_params
             .builder()
@@ -123,7 +149,7 @@ impl TestContext {
         swap
     }
 
-    pub async fn recover_alice_from_db(&mut self) -> alice::Swap {
+    pub async fn recover_alice_from_db(&mut self) -> alice::Swap<BA, MA> {
         let (swap, mut event_loop) = self.alice_params.builder().await.build().await.unwrap();
 
         tokio::spawn(async move { event_loop.run().await });
@@ -131,7 +157,7 @@ impl TestContext {
         swap
     }
 
-    pub async fn recover_bob_from_db(&mut self) -> bob::Swap {
+    pub async fn recover_bob_from_db(&mut self) -> bob::Swap<BB, MB> {
         let (swap, event_loop) = self.bob_params.builder().build().await.unwrap();
 
         tokio::spawn(async move { event_loop.run().await });
@@ -149,12 +175,7 @@ impl TestContext {
                 - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
         );
 
-        let xmr_balance_after_swap = self
-            .alice_monero_wallet
-            .as_ref()
-            .get_balance()
-            .await
-            .unwrap();
+        let xmr_balance_after_swap = self.alice_monero_wallet.as_ref().balance().await.unwrap();
         assert!(xmr_balance_after_swap <= self.alice_starting_balances.xmr - self.swap_amounts.xmr);
     }
 
@@ -165,18 +186,8 @@ impl TestContext {
         assert_eq!(btc_balance_after_swap, self.alice_starting_balances.btc);
 
         // Ensure that Alice's balance is refreshed as we use a newly created wallet
-        self.alice_monero_wallet
-            .as_ref()
-            .inner
-            .refresh()
-            .await
-            .unwrap();
-        let xmr_balance_after_swap = self
-            .alice_monero_wallet
-            .as_ref()
-            .get_balance()
-            .await
-            .unwrap();
+        self.alice_monero_wallet.as_ref().refresh().await.unwrap();
+        let xmr_balance_after_swap = self.alice_monero_wallet.as_ref().balance().await.unwrap();
         assert_eq!(xmr_balance_after_swap, self.swap_amounts.xmr);
     }
 
@@ -190,12 +201,7 @@ impl TestContext {
                 - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE)
         );
 
-        let xmr_balance_after_swap = self
-            .alice_monero_wallet
-            .as_ref()
-            .get_balance()
-            .await
-            .unwrap();
+        let xmr_balance_after_swap = self.alice_monero_wallet.as_ref().balance().await.unwrap();
         assert!(xmr_balance_after_swap <= self.alice_starting_balances.xmr - self.swap_amounts.xmr);
     }
 
@@ -219,13 +225,8 @@ impl TestContext {
         );
 
         // Ensure that Bob's balance is refreshed as we use a newly created wallet
-        self.bob_monero_wallet
-            .as_ref()
-            .inner
-            .refresh()
-            .await
-            .unwrap();
-        let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().get_balance().await.unwrap();
+        self.bob_monero_wallet.as_ref().refresh().await.unwrap();
+        let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().balance().await.unwrap();
         assert_eq!(
             xmr_balance_after_swap,
             self.bob_starting_balances.xmr + self.swap_amounts.xmr
@@ -260,7 +261,7 @@ impl TestContext {
         // Since we cannot be sure who submitted it we have to assert accordingly
         assert!(alice_submitted_cancel || bob_submitted_cancel);
 
-        let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().get_balance().await.unwrap();
+        let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().balance().await.unwrap();
         assert_eq!(xmr_balance_after_swap, self.bob_starting_balances.xmr);
     }
 
@@ -283,14 +284,14 @@ impl TestContext {
             self.bob_starting_balances.btc - self.swap_amounts.btc - lock_tx_bitcoin_fee
         );
 
-        let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().get_balance().await.unwrap();
+        let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().balance().await.unwrap();
         assert_eq!(xmr_balance_after_swap, self.bob_starting_balances.xmr);
     }
 }
 
 pub async fn setup_test<T, F>(testfn: T)
 where
-    T: Fn(TestContext) -> F,
+    T: Fn(TestContext<bitcoin::Wallet, monero::Wallet, bitcoin::Wallet, monero::Wallet>) -> F,
     F: Future<Output = ()>,
 {
     let cli = Cli::default();

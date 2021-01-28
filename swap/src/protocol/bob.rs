@@ -42,17 +42,20 @@ pub mod swap;
 mod swap_request;
 mod transfer_proof;
 
-pub struct Swap {
+pub struct Swap<B, M> {
     pub state: BobState,
     pub event_loop_handle: bob::EventLoopHandle,
     pub db: Database,
-    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
-    pub monero_wallet: Arc<monero::Wallet>,
+    pub bitcoin_wallet: Arc<B>,
+    pub monero_wallet: Arc<M>,
     pub config: Config,
     pub swap_id: Uuid,
 }
 
-pub struct Builder {
+pub struct Builder<B, M>
+where
+    B: bitcoin::NewAddress,
+{
     swap_id: Uuid,
     identity: Keypair,
     peer_id: PeerId,
@@ -61,8 +64,8 @@ pub struct Builder {
     alice_address: Multiaddr,
     alice_peer_id: PeerId,
 
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Wallet>,
+    bitcoin_wallet: Arc<B>,
+    monero_wallet: Arc<M>,
 
     init_params: InitParams,
     config: Config,
@@ -73,14 +76,17 @@ enum InitParams {
     New { swap_amounts: SwapAmounts },
 }
 
-impl Builder {
+impl<B, M> Builder<B, M>
+where
+    B: bitcoin::NewAddress,
+{
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         seed: Seed,
         db_path: PathBuf,
         swap_id: Uuid,
-        bitcoin_wallet: Arc<bitcoin::Wallet>,
-        monero_wallet: Arc<monero::Wallet>,
+        bitcoin_wallet: Arc<B>,
+        monero_wallet: Arc<M>,
         alice_address: Multiaddr,
         alice_peer_id: PeerId,
         config: Config,
@@ -109,7 +115,7 @@ impl Builder {
         }
     }
 
-    pub async fn build(self) -> Result<(bob::Swap, bob::EventLoop)> {
+    pub async fn build(self) -> Result<(bob::Swap<B, M>, bob::EventLoop)> {
         match self.init_params {
             InitParams::New { swap_amounts } => {
                 let initial_state = self
@@ -164,6 +170,7 @@ impl Builder {
             }
         }
     }
+
     fn init_event_loop(
         &self,
     ) -> Result<(bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle)> {

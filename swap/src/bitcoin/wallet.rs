@@ -1,8 +1,9 @@
 use crate::{
     bitcoin::{
-        timelocks::BlockHeight, Address, Amount, BroadcastSignedTransaction, BuildTxLockPsbt,
-        GetBlockHeight, GetNetwork, GetRawTransaction, SignTxLock, Transaction,
-        TransactionBlockHeight, TxLock, WaitForTransactionFinality, WatchForRawTransaction,
+        timelocks::BlockHeight, Address, Amount, Balance, BroadcastSignedTransaction,
+        BuildTxLockPsbt, FetchTransactionFee, GetBlockHeight, GetNetwork, GetRawTransaction,
+        NewAddress, SignTxLock, Transaction, TransactionBlockHeight, TxLock,
+        WaitForTransactionFinality, WatchForRawTransaction,
     },
     config::Config,
 };
@@ -29,33 +30,6 @@ impl Wallet {
             inner: wallet,
             network,
         })
-    }
-
-    pub async fn balance(&self) -> Result<Amount> {
-        let balance = self.inner.balance().await?;
-        Ok(balance)
-    }
-
-    pub async fn new_address(&self) -> Result<Address> {
-        self.inner.new_address().await.map_err(Into::into)
-    }
-
-    pub async fn transaction_fee(&self, txid: Txid) -> Result<Amount> {
-        let fee = self
-            .inner
-            .get_wallet_transaction(txid)
-            .await
-            .map(|res| {
-                res.fee.map(|signed_amount| {
-                    signed_amount
-                        .abs()
-                        .to_unsigned()
-                        .expect("Absolute value is always positive")
-                })
-            })?
-            .context("Rpc response did not contain a fee")?;
-
-        Ok(fee)
     }
 }
 
@@ -191,8 +165,44 @@ impl WaitForTransactionFinality for Wallet {
     }
 }
 
+#[async_trait]
+impl NewAddress for Wallet {
+    async fn new_address(&self) -> Result<Address> {
+        self.inner.new_address().await.map_err(Into::into)
+    }
+}
+
 impl GetNetwork for Wallet {
     fn get_network(&self) -> bitcoin::Network {
         self.network
+    }
+}
+
+#[async_trait]
+impl Balance for Wallet {
+    async fn balance(&self) -> Result<Amount> {
+        let balance = self.inner.balance().await?;
+        Ok(balance)
+    }
+}
+
+#[async_trait]
+impl FetchTransactionFee for Wallet {
+    async fn transaction_fee(&self, txid: Txid) -> Result<Amount> {
+        let fee = self
+            .inner
+            .get_wallet_transaction(txid)
+            .await
+            .map(|res| {
+                res.fee.map(|signed_amount| {
+                    signed_amount
+                        .abs()
+                        .to_unsigned()
+                        .expect("Absolute value is always positive")
+                })
+            })?
+            .context("Rpc response did not contain a fee")?;
+
+        Ok(fee)
     }
 }

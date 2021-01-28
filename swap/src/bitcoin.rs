@@ -232,8 +232,23 @@ pub trait GetRawTransaction {
 }
 
 #[async_trait]
+pub trait NewAddress {
+    async fn new_address(&self) -> Result<Address>;
+}
+
+#[async_trait]
 pub trait GetNetwork {
     fn get_network(&self) -> Network;
+}
+
+#[async_trait]
+pub trait Balance {
+    async fn balance(&self) -> Result<Amount>;
+}
+
+#[async_trait]
+pub trait FetchTransactionFee {
+    async fn transaction_fee(&self, txid: Txid) -> Result<Amount>;
 }
 
 pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Result<SecretKey> {

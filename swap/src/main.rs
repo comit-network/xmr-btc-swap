@@ -12,7 +12,11 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
-use crate::cli::{Command, Options, Resume};
+use crate::{
+    bitcoin::Balance as _,
+    cli::{Command, Options, Resume},
+    monero::Balance as _,
+};
 use anyhow::{Context, Result};
 use config::Config;
 use database::Database;
@@ -242,7 +246,7 @@ async fn setup_wallets(
     );
 
     let monero_wallet = monero::Wallet::new(monero_wallet_rpc_url, config.monero_network);
-    let monero_balance = monero_wallet.get_balance().await?;
+    let monero_balance = monero_wallet.balance().await?;
     info!(
         "Connection to Monero wallet succeeded, balance: {}",
         monero_balance
