@@ -20,7 +20,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use database::Database;
-use fs::default_config_path;
+use fs::{default_config_path, default_data_dir};
 use prettytable::{row, Table};
 use protocol::{alice, bob, bob::Builder, SwapAmounts};
 use settings::Settings;
@@ -53,13 +53,18 @@ async fn main() -> Result<()> {
 
     let opt = Options::from_args();
 
+    let data_dir = if let Some(data_dir) = opt.data_dir {
+        data_dir
+    } else {
+        default_data_dir().context("unable to determine default data path")?
+    };
+
     info!(
         "Database and Seed will be stored in directory: {}",
-        opt.data_dir
+        data_dir.display()
     );
-    let data_dir = std::path::Path::new(opt.data_dir.as_str()).to_path_buf();
-    let db_path = data_dir.join("database");
 
+    let db_path = data_dir.join("database");
     let seed = config::seed::Seed::from_file_or_generate(&data_dir)
         .expect("Could not retrieve/initialize seed")
         .into();
@@ -78,7 +83,7 @@ async fn main() -> Result<()> {
                 btc: receive_bitcoin,
             };
 
-            let (bitcoin_wallet, monero_wallet) = setup_wallets(settings.wallets).await?;
+            let (bitcoin_wallet, monero_wallet) = init_wallets(settings.wallets).await?;
 
             let swap_id = Uuid::new_v4();
 
@@ -117,7 +122,7 @@ async fn main() -> Result<()> {
                 xmr: receive_monero,
             };
 
-            let (bitcoin_wallet, monero_wallet) = setup_wallets(settings.wallets).await?;
+            let (bitcoin_wallet, monero_wallet) = init_wallets(settings.wallets).await?;
 
             let swap_id = Uuid::new_v4();
 
@@ -162,7 +167,7 @@ async fn main() -> Result<()> {
         }) => {
             let settings = init_settings(config.config_path)?;
 
-            let (bitcoin_wallet, monero_wallet) = setup_wallets(settings.wallets).await?;
+            let (bitcoin_wallet, monero_wallet) = init_wallets(settings.wallets).await?;
 
             let alice_factory = alice::Builder::new(
                 seed,
@@ -187,7 +192,7 @@ async fn main() -> Result<()> {
         }) => {
             let settings = init_settings(config.config_path)?;
 
-            let (bitcoin_wallet, monero_wallet) = setup_wallets(settings.wallets).await?;
+            let (bitcoin_wallet, monero_wallet) = init_wallets(settings.wallets).await?;
 
             let bob_factory = Builder::new(
                 seed,
@@ -229,7 +234,7 @@ fn init_settings(config_path: Option<PathBuf>) -> Result<Settings> {
     Ok(settings)
 }
 
-async fn setup_wallets(settings: settings::Wallets) -> Result<(bitcoin::Wallet, monero::Wallet)> {
+async fn init_wallets(settings: settings::Wallets) -> Result<(bitcoin::Wallet, monero::Wallet)> {
     let bitcoin_wallet = bitcoin::Wallet::new(
         settings.bitcoin.wallet_name.as_str(),
         settings.bitcoin.bitcoind_url,

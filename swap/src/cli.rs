@@ -5,9 +5,12 @@ use uuid::Uuid;
 
 #[derive(structopt::StructOpt, Debug)]
 pub struct Options {
-    // TODO: Default value should points to proper configuration folder in home folder
-    #[structopt(long = "data-dir", default_value = "./.swap-data/")]
-    pub data_dir: String,
+    #[structopt(
+        long = "data-dir",
+        help = "Provide a custom path to the data directory.",
+        parse(from_os_str)
+    )]
+    pub data_dir: Option<PathBuf>,
 
     #[structopt(subcommand)]
     pub cmd: Command,
@@ -80,7 +83,7 @@ pub enum Resume {
 pub struct Config {
     #[structopt(
         long = "config",
-        help = "Provide a custom path to a configuration file. The configuration file must be a toml file.",
+        help = "Provide a custom path to the configuration file. The configuration file must be a toml file.",
         parse(from_os_str)
     )]
     pub config_path: Option<PathBuf>,
