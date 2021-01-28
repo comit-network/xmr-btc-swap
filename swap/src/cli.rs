@@ -26,8 +26,8 @@ pub enum Command {
         #[structopt(long = "receive-btc", help = "Bitcoin amount as floating point nr without denomination (e.g. 1.25)", parse(try_from_str = parse_btc))]
         receive_bitcoin: bitcoin::Amount,
 
-        #[structopt(long = "config", parse(from_os_str))]
-        config_path: Option<PathBuf>,
+        #[structopt(flatten)]
+        config: Config,
     },
     BuyXmr {
         #[structopt(long = "connect-peer-id")]
@@ -42,8 +42,8 @@ pub enum Command {
         #[structopt(long = "receive-xmr", help = "Monero amount as floating point nr without denomination (e.g. 125.1)", parse(try_from_str = parse_xmr))]
         receive_monero: monero::Amount,
 
-        #[structopt(long = "config", parse(from_os_str))]
-        config_path: Option<PathBuf>,
+        #[structopt(flatten)]
+        config: Config,
     },
     History,
     Resume(Resume),
@@ -58,8 +58,8 @@ pub enum Resume {
         #[structopt(long = "listen-address", default_value = "/ip4/127.0.0.1/tcp/9876")]
         listen_addr: Multiaddr,
 
-        #[structopt(long = "config", parse(from_os_str))]
-        config_path: Option<PathBuf>,
+        #[structopt(flatten)]
+        config: Config,
     },
     BuyXmr {
         #[structopt(long = "swap-id")]
@@ -71,9 +71,19 @@ pub enum Resume {
         #[structopt(long = "counterpart-addr")]
         alice_addr: Multiaddr,
 
-        #[structopt(long = "config", parse(from_os_str))]
-        config_path: Option<PathBuf>,
+        #[structopt(flatten)]
+        config: Config,
     },
+}
+
+#[derive(structopt::StructOpt, Debug)]
+pub struct Config {
+    #[structopt(
+        long = "config",
+        help = "Provide a custom path to a configuration file. The configuration file must be a toml file.",
+        parse(from_os_str)
+    )]
+    pub config_path: Option<PathBuf>,
 }
 
 fn parse_btc(str: &str) -> anyhow::Result<bitcoin::Amount> {
