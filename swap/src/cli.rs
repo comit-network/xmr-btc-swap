@@ -1,6 +1,5 @@
 use crate::{bitcoin, monero};
 use libp2p::{core::Multiaddr, PeerId};
-use url::Url;
 use uuid::Uuid;
 
 #[derive(structopt::StructOpt, Debug)]
@@ -17,18 +16,6 @@ pub struct Options {
 #[structopt(name = "xmr_btc-swap", about = "XMR BTC atomic swap")]
 pub enum Command {
     SellXmr {
-        #[structopt(long = "bitcoind-rpc", default_value = "http://127.0.0.1:8332")]
-        bitcoind_url: Url,
-
-        #[structopt(long = "bitcoin-wallet-name")]
-        bitcoin_wallet_name: String,
-
-        #[structopt(
-            long = "monero-wallet-rpc",
-            default_value = "http://127.0.0.1:18083/json_rpc"
-        )]
-        monero_wallet_rpc_url: Url,
-
         #[structopt(long = "p2p-address", default_value = "/ip4/0.0.0.0/tcp/9876")]
         listen_addr: Multiaddr,
 
@@ -44,18 +31,6 @@ pub enum Command {
 
         #[structopt(long = "connect-addr")]
         alice_addr: Multiaddr,
-
-        #[structopt(long = "bitcoind-rpc", default_value = "http://127.0.0.1:8332")]
-        bitcoind_url: Url,
-
-        #[structopt(long = "bitcoin-wallet-name")]
-        bitcoin_wallet_name: String,
-
-        #[structopt(
-            long = "monero-wallet-rpc",
-            default_value = "http://127.0.0.1:18083/json_rpc"
-        )]
-        monero_wallet_rpc_url: Url,
 
         #[structopt(long = "send-btc", help = "Bitcoin amount as floating point nr without denomination (e.g. 1.25)", parse(try_from_str = parse_btc))]
         send_bitcoin: bitcoin::Amount,
@@ -73,18 +48,6 @@ pub enum Resume {
         #[structopt(long = "swap-id")]
         swap_id: Uuid,
 
-        #[structopt(long = "bitcoind-rpc", default_value = "http://127.0.0.1:8332")]
-        bitcoind_url: Url,
-
-        #[structopt(long = "bitcoin-wallet-name")]
-        bitcoin_wallet_name: String,
-
-        #[structopt(
-            long = "monero-wallet-rpc",
-            default_value = "http://127.0.0.1:18083/json_rpc"
-        )]
-        monero_wallet_rpc_url: Url,
-
         #[structopt(long = "listen-address", default_value = "/ip4/127.0.0.1/tcp/9876")]
         listen_addr: Multiaddr,
     },
@@ -97,18 +60,6 @@ pub enum Resume {
 
         #[structopt(long = "counterpart-addr")]
         alice_addr: Multiaddr,
-
-        #[structopt(long = "bitcoind-rpc", default_value = "http://127.0.0.1:8332")]
-        bitcoind_url: Url,
-
-        #[structopt(long = "bitcoin-wallet-name")]
-        bitcoin_wallet_name: String,
-
-        #[structopt(
-            long = "monero-wallet-rpc",
-            default_value = "http://127.0.0.1:18083/json_rpc"
-        )]
-        monero_wallet_rpc_url: Url,
     },
 }
 

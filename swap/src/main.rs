@@ -12,7 +12,10 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
-use crate::cli::{Command, Options, Resume};
+use crate::{
+    cli::{Command, Options, Resume},
+    config::read_config,
+};
 use anyhow::{Context, Result};
 use database::Database;
 use prettytable::{row, Table};
@@ -60,15 +63,11 @@ async fn main() -> Result<()> {
 
     match opt.cmd {
         Command::SellXmr {
-            bitcoind_url,
-            bitcoin_wallet_name,
-            monero_wallet_rpc_url,
             listen_addr,
             send_monero,
             receive_bitcoin,
         } => {
-            let settings =
-                Settings::testnet(bitcoind_url, bitcoin_wallet_name, monero_wallet_rpc_url);
+            let settings = Settings::from_config_file_and_defaults(read_config()?);
 
             let swap_amounts = SwapAmounts {
                 xmr: send_monero,
@@ -103,14 +102,10 @@ async fn main() -> Result<()> {
         Command::BuyXmr {
             alice_peer_id,
             alice_addr,
-            bitcoind_url,
-            bitcoin_wallet_name,
-            monero_wallet_rpc_url,
             send_bitcoin,
             receive_monero,
         } => {
-            let settings =
-                Settings::testnet(bitcoind_url, bitcoin_wallet_name, monero_wallet_rpc_url);
+            let settings = Settings::from_config_file_and_defaults(read_config()?);
 
             let swap_amounts = SwapAmounts {
                 btc: send_bitcoin,
@@ -157,13 +152,9 @@ async fn main() -> Result<()> {
         }
         Command::Resume(Resume::SellXmr {
             swap_id,
-            bitcoind_url,
-            bitcoin_wallet_name,
-            monero_wallet_rpc_url,
             listen_addr,
         }) => {
-            let settings =
-                Settings::testnet(bitcoind_url, bitcoin_wallet_name, monero_wallet_rpc_url);
+            let settings = Settings::from_config_file_and_defaults(read_config()?);
 
             let (bitcoin_wallet, monero_wallet) = setup_wallets(settings.wallets).await?;
 
@@ -184,14 +175,10 @@ async fn main() -> Result<()> {
         }
         Command::Resume(Resume::BuyXmr {
             swap_id,
-            bitcoind_url,
-            bitcoin_wallet_name,
-            monero_wallet_rpc_url,
             alice_peer_id,
             alice_addr,
         }) => {
-            let settings =
-                Settings::testnet(bitcoind_url, bitcoin_wallet_name, monero_wallet_rpc_url);
+            let settings = Settings::from_config_file_and_defaults(read_config()?);
 
             let (bitcoin_wallet, monero_wallet) = setup_wallets(settings.wallets).await?;
 
