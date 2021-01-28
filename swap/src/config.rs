@@ -1,4 +1,4 @@
-use crate::fs::{default_config_path, ensure_directory_exists};
+use crate::fs::ensure_directory_exists;
 use anyhow::{Context, Result};
 use config::{Config, ConfigError};
 use dialoguer::{theme::ColorfulTheme, Input};
@@ -49,29 +49,39 @@ pub struct Monero {
     pub wallet_rpc_url: Url,
 }
 
-pub fn read_config() -> anyhow::Result<File> {
-    let default_path = default_config_path()?;
-
-    if default_path.exists() {
-        info!(
-            "Using config file at default path: {}",
-            default_path.display()
-        );
-    } else {
-        initial_setup(default_path.clone())?;
-    }
-
-    File::read(&default_path)
-        .with_context(|| format!("failed to read config file {}", default_path.display()))
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("config not initialized")]
+    ConfigNotInitialized,
+    #[error("other error")]
+    Other(#[from] anyhow::Error),
 }
 
-fn initial_setup(config_path: PathBuf) -> Result<()> {
+pub fn read_config(config_path: PathBuf) -> anyhow::Result<File, Error> {
+    if config_path.exists() {
+        info!(
+            "Using config file at default path: {}",
+            config_path.display()
+        );
+    } else {
+        return Err(Error::ConfigNotInitialized);
+    }
+
+    File::read(&config_path)
+        .with_context(|| format!("failed to read config file {}", config_path.display()))
+        .map_err(Error::Other)
+}
+
+pub fn initial_setup<F>(config_path: PathBuf, config_file: F) -> Result<()>
+where
+    F: Fn() -> Result<File>,
+{
     info!("Config file not found, running initial setup...");
     ensure_directory_exists(config_path.as_path())?;
-    let initial_config = query_user_for_initial_testnet_config()?;
+    let initial_config = config_file()?;
 
     let toml = toml::to_string(&initial_config)?;
-    fs::write(config_path.clone(), toml)?;
+    fs::write(&config_path, toml)?;
 
     info!(
         "Initial setup complete, config file created at {} ",
@@ -80,7 +90,7 @@ fn initial_setup(config_path: PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn query_user_for_initial_testnet_config() -> Result<File> {
+pub fn query_user_for_initial_testnet_config() -> Result<File> {
     println!();
     let bitcoind_url: String = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter Bitcoind URL (including username and password if applicable) or hit return to use default")
@@ -108,4 +118,32 @@ fn query_user_for_initial_testnet_config() -> Result<File> {
             wallet_rpc_url: monero_wallet_rpc_url,
         },
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+    use tempfile::tempdir;
+
+    #[test]
+    fn config_roundtrip() {
+        let temp_dir = tempdir().unwrap().path().to_path_buf();
+        let config_path = Path::join(&temp_dir, "config.toml");
+
+        let expected = File {
+            bitcoin: Bitcoin {
+                bitcoind_url: Url::from_str("http://127.0.0.1:18332").unwrap(),
+                wallet_name: "alice".to_string(),
+            },
+            monero: Monero {
+                wallet_rpc_url: Url::from_str("http://127.0.0.1:38083/json_rpc").unwrap(),
+            },
+        };
+
+        initial_setup(config_path.clone(), || Ok(expected.clone())).unwrap();
+        let actual = read_config(config_path).unwrap();
+
+        assert_eq!(expected, actual);
+    }
 }

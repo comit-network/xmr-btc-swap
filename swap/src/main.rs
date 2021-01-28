@@ -16,13 +16,15 @@ use crate::{
     cli::{Command, Options, Resume},
     config::read_config,
 };
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use database::Database;
+use fs::default_config_path;
 use prettytable::{row, Table};
 use protocol::{alice, bob, bob::Builder, SwapAmounts};
 use settings::Settings;
 use std::sync::Arc;
 use structopt::StructOpt;
+use swap::config::{initial_setup, query_user_for_initial_testnet_config};
 use trace::init_tracing;
 use tracing::{info, log::LevelFilter};
 use uuid::Uuid;
@@ -67,7 +69,7 @@ async fn main() -> Result<()> {
             send_monero,
             receive_bitcoin,
         } => {
-            let settings = Settings::from_config_file_and_defaults(read_config()?);
+            let settings = init_settings()?;
 
             let swap_amounts = SwapAmounts {
                 xmr: send_monero,
@@ -105,7 +107,7 @@ async fn main() -> Result<()> {
             send_bitcoin,
             receive_monero,
         } => {
-            let settings = Settings::from_config_file_and_defaults(read_config()?);
+            let settings = init_settings()?;
 
             let swap_amounts = SwapAmounts {
                 btc: send_bitcoin,
@@ -154,7 +156,7 @@ async fn main() -> Result<()> {
             swap_id,
             listen_addr,
         }) => {
-            let settings = Settings::from_config_file_and_defaults(read_config()?);
+            let settings = init_settings()?;
 
             let (bitcoin_wallet, monero_wallet) = setup_wallets(settings.wallets).await?;
 
@@ -178,7 +180,7 @@ async fn main() -> Result<()> {
             alice_peer_id,
             alice_addr,
         }) => {
-            let settings = Settings::from_config_file_and_defaults(read_config()?);
+            let settings = init_settings()?;
 
             let (bitcoin_wallet, monero_wallet) = setup_wallets(settings.wallets).await?;
 
@@ -200,6 +202,22 @@ async fn main() -> Result<()> {
     };
 
     Ok(())
+}
+
+fn init_settings() -> Result<Settings> {
+    let config_path = default_config_path()?;
+    let config = match read_config(config_path.clone()) {
+        Ok(config) => config,
+        Err(config::Error::ConfigNotInitialized) => {
+            initial_setup(config_path.clone(), query_user_for_initial_testnet_config)?;
+            read_config(config_path)?
+        }
+        Err(e) => bail!(e),
+    };
+
+    let settings = Settings::from_config_file_and_defaults(config);
+
+    Ok(settings)
 }
 
 async fn setup_wallets(settings: settings::Wallets) -> Result<(bitcoin::Wallet, monero::Wallet)> {
