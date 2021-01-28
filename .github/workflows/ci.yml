@@ -86,13 +86,13 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         with:
           path: target
-          key: rust-${{ matrix.target }}-${{ matrix.rust_toolchain }}-target-directory-${{ hashFiles('Cargo.lock') }}-v1
+          key: rust-${{ matrix.target }}-target-directory-${{ hashFiles('Cargo.lock') }}-v1
 
       - name: Cache ~/.cargo/registry directory
         uses: actions/cache@v1
         with:
           path: ~/.cargo/registry
-          key: rust-${{ matrix.target }}-${{ matrix.rust_toolchain }}-cargo-registry-directory-${{ hashFiles('Cargo.lock') }}-v1
+          key: rust-${{ matrix.target }}-cargo-registry-directory-${{ hashFiles('Cargo.lock') }}-v1
 
       - name: Cargo check release code with default features
         run: cargo check --workspace
@@ -100,12 +100,15 @@ jobs:
       - name: Cargo check all features
         run: cargo check --workspace --all-targets --all-features
 
-      - name: Cargo test
-        if: (!matrix.skip_tests)
-        run: cargo test --workspace --all-features
-        env:
-          MONERO_ADDITIONAL_SLEEP_PERIOD: 60000
-          RUST_MIN_STACK: 16777216 # 16 MB. Default is 8MB. This is fine as in tests we start 2 programs: Alice and Bob.
+      - name: Build tests
+        run: cargo build --tests --workspace --all-features
+
+      - name: Run monero-harness tests
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo test --package monero-harness --all-features
+
+      - name: Run library tests for swap
+        run: cargo test --package swap --lib --all-features
 
       - name: Build binary
         run: |
@@ -116,3 +119,48 @@ jobs:
         with:
           name: swap-${{ matrix.target }}
           path: target/${{ matrix.target }}/debug/swap
+
+  docker_tests:
+    env:
+      TARGET: x86_64-unknown-linux-gnu
+    strategy:
+      matrix:
+        test_name: [
+            happy_path,
+            happy_path_restart_alice,
+            happy_path_restart_bob_after_comm,
+            happy_path_restart_bob_after_lock_proof_received,
+            happy_path_restart_bob_before_comm,
+            punish,
+            refund_restart_alice_cancelled,
+            refund_restart_alice,
+        ]
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          override: true
+
+      - name: Cache target directory
+        uses: actions/cache@v1
+        with:
+          path: target
+          key: rust-${{ env.TARGET }}-target-directory-${{ hashFiles('Cargo.lock') }}-v1
+
+      - name: Cache ~/.cargo/registry directory
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: rust-${{ env.TARGET }}-cargo-registry-directory-${{ hashFiles('Cargo.lock') }}-v1
+
+      - name: Run test ${{ matrix.test_name }}
+        run: cargo test --package swap --all-features --test ${{ matrix.test_name }} ""
+        env:
+          MONERO_ADDITIONAL_SLEEP_PERIOD: 60000
+          RUST_MIN_STACK: 16777216 # 16 MB. Default is 8MB. This is fine as in tests we start 2 programs: Alice and Bob.
