@@ -14,9 +14,11 @@
 
 use crate::{
     cli::{Command, Options, Resume},
-    config::read_config,
+    config::{
+        initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
+    },
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use database::Database;
 use fs::default_config_path;
 use prettytable::{row, Table};
@@ -24,7 +26,6 @@ use protocol::{alice, bob, bob::Builder, SwapAmounts};
 use settings::Settings;
 use std::sync::Arc;
 use structopt::StructOpt;
-use swap::config::{initial_setup, query_user_for_initial_testnet_config};
 use trace::init_tracing;
 use tracing::{info, log::LevelFilter};
 use uuid::Uuid;
@@ -206,13 +207,12 @@ async fn main() -> Result<()> {
 
 fn init_settings() -> Result<Settings> {
     let config_path = default_config_path()?;
-    let config = match read_config(config_path.clone()) {
+    let config = match read_config(config_path.clone())? {
         Ok(config) => config,
-        Err(config::Error::ConfigNotInitialized) => {
+        Err(ConfigNotInitialized {}) => {
             initial_setup(config_path.clone(), query_user_for_initial_testnet_config)?;
-            read_config(config_path)?
+            read_config(config_path)?.expect("after initial setup config can be read")
         }
-        Err(e) => bail!(e),
     };
 
     let settings = Settings::from_config_file_and_defaults(config);

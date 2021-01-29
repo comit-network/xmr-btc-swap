@@ -49,27 +49,24 @@ pub struct Monero {
     pub wallet_rpc_url: Url,
 }
 
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("config not initialized")]
-    ConfigNotInitialized,
-    #[error("other error")]
-    Other(#[from] anyhow::Error),
-}
+#[derive(thiserror::Error, Debug, Clone, Copy)]
+#[error("config not initialized")]
+pub struct ConfigNotInitialized {}
 
-pub fn read_config(config_path: PathBuf) -> anyhow::Result<File, Error> {
+pub fn read_config(config_path: PathBuf) -> Result<Result<File, ConfigNotInitialized>> {
     if config_path.exists() {
         info!(
             "Using config file at default path: {}",
             config_path.display()
         );
     } else {
-        return Err(Error::ConfigNotInitialized);
+        return Ok(Err(ConfigNotInitialized {}));
     }
 
-    File::read(&config_path)
-        .with_context(|| format!("failed to read config file {}", config_path.display()))
-        .map_err(Error::Other)
+    let file = File::read(&config_path)
+        .with_context(|| format!("failed to read config file {}", config_path.display()))?;
+
+    Ok(Ok(file))
 }
 
 pub fn initial_setup<F>(config_path: PathBuf, config_file: F) -> Result<()>
@@ -142,7 +139,7 @@ mod tests {
         };
 
         initial_setup(config_path.clone(), || Ok(expected.clone())).unwrap();
-        let actual = read_config(config_path).unwrap();
+        let actual = read_config(config_path).unwrap().unwrap();
 
         assert_eq!(expected, actual);
     }
