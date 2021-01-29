@@ -7,7 +7,6 @@ use libp2p::{
 };
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, io, marker::PhantomData};
-use tracing::debug;
 
 /// Time to wait for a response back once we send a request.
 pub const TIMEOUT: u64 = 3600; // One hour.
@@ -123,7 +122,6 @@ where
     where
         T: AsyncRead + Unpin + Send,
     {
-        debug!("enter read_request");
         let message = upgrade::read_one(io, BUF_SIZE)
             .await
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
@@ -144,7 +142,6 @@ where
     where
         T: AsyncRead + Unpin + Send,
     {
-        debug!("enter read_response");
         let message = upgrade::read_one(io, BUF_SIZE)
             .await
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
@@ -183,7 +180,6 @@ where
     where
         T: AsyncWrite + Unpin + Send,
     {
-        debug!("enter write_response");
         let bytes = serde_cbor::to_vec(&res).map_err(|e| {
             tracing::debug!("serde write_reponse error: {:?}", e);
             io::Error::new(io::ErrorKind::InvalidData, e)
@@ -212,7 +208,6 @@ where
     where
         T: AsyncRead + Unpin + Send,
     {
-        debug!("enter read_request");
         let message = upgrade::read_one(io, BUF_SIZE).await.map_err(|e| match e {
             ReadOneError::Io(err) => err,
             e => io::Error::new(io::ErrorKind::Other, e),
@@ -234,7 +229,6 @@ where
     where
         T: AsyncRead + Unpin + Send,
     {
-        debug!("enter read_response");
         let message = upgrade::read_one(io, BUF_SIZE)
             .await
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
@@ -273,7 +267,6 @@ where
     where
         T: AsyncWrite + Unpin + Send,
     {
-        debug!("enter write_response");
         let bytes = serde_cbor::to_vec(&res).map_err(|e| {
             tracing::debug!("serde write_reponse error: {:?}", e);
             io::Error::new(io::ErrorKind::InvalidData, e)
