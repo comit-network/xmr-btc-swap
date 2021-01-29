@@ -16,9 +16,23 @@ pub struct Config {
     pub monero_network: monero::Network,
 }
 
-impl Config {
-    pub fn mainnet() -> Self {
-        Self {
+// TODO: This trait is not needed
+pub trait GetConfig {
+    fn get_config() -> Config;
+}
+
+#[derive(Clone, Copy)]
+pub struct Mainnet;
+
+#[derive(Clone, Copy)]
+pub struct Testnet;
+
+#[derive(Clone, Copy)]
+pub struct Regtest;
+
+impl GetConfig for Mainnet {
+    fn get_config() -> Config {
+        Config {
             bob_time_to_act: *mainnet::BOB_TIME_TO_ACT,
             bitcoin_finality_confirmations: mainnet::BITCOIN_FINALITY_CONFIRMATIONS,
             bitcoin_avg_block_time: *mainnet::BITCOIN_AVG_BLOCK_TIME,
@@ -29,9 +43,11 @@ impl Config {
             monero_network: monero::Network::Mainnet,
         }
     }
+}
 
-    pub fn testnet() -> Self {
-        Self {
+impl GetConfig for Testnet {
+    fn get_config() -> Config {
+        Config {
             bob_time_to_act: *testnet::BOB_TIME_TO_ACT,
             bitcoin_finality_confirmations: testnet::BITCOIN_FINALITY_CONFIRMATIONS,
             bitcoin_avg_block_time: *testnet::BITCOIN_AVG_BLOCK_TIME,
@@ -42,9 +58,11 @@ impl Config {
             monero_network: monero::Network::Stagenet,
         }
     }
+}
 
-    pub fn regtest() -> Self {
-        Self {
+impl GetConfig for Regtest {
+    fn get_config() -> Config {
+        Config {
             bob_time_to_act: *regtest::BOB_TIME_TO_ACT,
             bitcoin_finality_confirmations: regtest::BITCOIN_FINALITY_CONFIRMATIONS,
             bitcoin_avg_block_time: *regtest::BITCOIN_AVG_BLOCK_TIME,
@@ -104,7 +122,7 @@ mod regtest {
 
     pub static MONERO_FINALITY_CONFIRMATIONS: u32 = 1;
 
-    pub static BITCOIN_CANCEL_TIMELOCK: Timelock = Timelock::new(50);
+    pub static BITCOIN_CANCEL_TIMELOCK: Timelock = Timelock::new(100);
 
     pub static BITCOIN_PUNISH_TIMELOCK: Timelock = Timelock::new(50);
 }

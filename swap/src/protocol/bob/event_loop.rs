@@ -10,10 +10,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use futures::FutureExt;
 use libp2p::{core::Multiaddr, PeerId};
-use tokio::{
-    stream::StreamExt,
-    sync::mpsc::{Receiver, Sender},
-};
+use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{debug, error, info};
 
 #[derive(Debug)]
@@ -48,6 +45,7 @@ pub struct EventLoopHandle {
     send_message1: Sender<bob::Message1>,
     send_message2: Sender<bob::Message2>,
     send_encrypted_signature: Sender<EncryptedSignature>,
+    recv_encrypted_signature_ack: Receiver<()>,
 }
 
 impl EventLoopHandle {
@@ -117,7 +115,12 @@ impl EventLoopHandle {
         &mut self,
         tx_redeem_encsig: EncryptedSignature,
     ) -> Result<()> {
-        let _ = self.send_encrypted_signature.send(tx_redeem_encsig).await?;
+        self.send_encrypted_signature.send(tx_redeem_encsig).await?;
+
+        self.recv_encrypted_signature_ack
+            .recv()
+            .await
+            .ok_or_else(|| anyhow!("Failed to receive encrypted signature ack from Alice"))?;
         Ok(())
     }
 }
@@ -137,6 +140,7 @@ pub struct EventLoop {
     send_message1: Receiver<bob::Message1>,
     send_message2: Receiver<bob::Message2>,
     send_encrypted_signature: Receiver<EncryptedSignature>,
+    recv_encrypted_signature_ack: Sender<()>,
 }
 
 impl EventLoop {
@@ -153,7 +157,7 @@ impl EventLoop {
             }))
             .build();
 
-        swarm.add_address(alice_peer_id.clone(), alice_addr);
+        swarm.add_address(alice_peer_id, alice_addr);
 
         let swap_response = Channels::new();
         let recv_message0 = Channels::new();
@@ -166,6 +170,7 @@ impl EventLoop {
         let send_message1 = Channels::new();
         let send_message2 = Channels::new();
         let send_encrypted_signature = Channels::new();
+        let recv_encrypted_signature_ack = Channels::new();
 
         let event_loop = EventLoop {
             swarm,
@@ -181,6 +186,7 @@ impl EventLoop {
             send_message1: send_message1.receiver,
             send_message2: send_message2.receiver,
             send_encrypted_signature: send_encrypted_signature.receiver,
+            recv_encrypted_signature_ack: recv_encrypted_signature_ack.sender,
         };
 
         let handle = EventLoopHandle {
@@ -195,6 +201,7 @@ impl EventLoop {
             send_message1: send_message1.sender,
             send_message2: send_message2.sender,
             send_encrypted_signature: send_encrypted_signature.sender,
+            recv_encrypted_signature_ack: recv_encrypted_signature_ack.receiver,
         };
 
         Ok((event_loop, handle))
@@ -221,12 +228,15 @@ impl EventLoop {
                         OutEvent::TransferProof(msg) => {
                             let _ = self.recv_transfer_proof.send(*msg).await;
                         }
-                        OutEvent::EncryptedSignature => info!("Alice acknowledged encrypted signature received"),
+                        OutEvent::EncryptedSignatureAcknowledged => {
+                            debug!("Alice acknowledged encrypted signature");
+                            let _ = self.recv_encrypted_signature_ack.send(()).await;
+                        }
                     }
                 },
-                option = self.dial_alice.next().fuse() => {
+                option = self.dial_alice.recv().fuse() => {
                     if option.is_some() {
-                           let peer_id = self.alice_peer_id.clone();
+                           let peer_id = self.alice_peer_id;
                         if self.swarm.pt.is_connected(&peer_id) {
                             debug!("Already connected to Alice: {}", peer_id);
                             let _ = self.conn_established.send(peer_id).await;
@@ -240,31 +250,31 @@ impl EventLoop {
                         }
                     }
                 },
-                swap_request = self.send_swap_request.next().fuse() =>  {
+                swap_request = self.send_swap_request.recv().fuse() =>  {
                     if let Some(swap_request) = swap_request {
-                        self.swarm.send_swap_request(self.alice_peer_id.clone(), swap_request);
+                        self.swarm.send_swap_request(self.alice_peer_id, swap_request);
                     }
                 },
 
-                msg0 = self.send_message0.next().fuse() => {
+                msg0 = self.send_message0.recv().fuse() => {
                     if let Some(msg) = msg0 {
-                        self.swarm.send_message0(self.alice_peer_id.clone(), msg);
+                        self.swarm.send_message0(self.alice_peer_id, msg);
                     }
                 }
 
-                msg1 = self.send_message1.next().fuse() => {
+                msg1 = self.send_message1.recv().fuse() => {
                     if let Some(msg) = msg1 {
-                        self.swarm.send_message1(self.alice_peer_id.clone(), msg);
+                        self.swarm.send_message1(self.alice_peer_id, msg);
                     }
                 },
-                msg2 = self.send_message2.next().fuse() => {
+                msg2 = self.send_message2.recv().fuse() => {
                     if let Some(msg) = msg2 {
-                        self.swarm.send_message2(self.alice_peer_id.clone(), msg);
+                        self.swarm.send_message2(self.alice_peer_id, msg);
                     }
                 },
-                encrypted_signature = self.send_encrypted_signature.next().fuse() => {
+                encrypted_signature = self.send_encrypted_signature.recv().fuse() => {
                     if let Some(tx_redeem_encsig) = encrypted_signature {
-                        self.swarm.send_encrypted_signature(self.alice_peer_id.clone(), tx_redeem_encsig);
+                        self.swarm.send_encrypted_signature(self.alice_peer_id, tx_redeem_encsig);
                     }
                 }
             }

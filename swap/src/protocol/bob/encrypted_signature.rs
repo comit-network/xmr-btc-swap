@@ -24,7 +24,7 @@ pub struct EncryptedSignature {
 
 #[derive(Debug, Copy, Clone)]
 pub enum OutEvent {
-    Msg,
+    Acknowledged,
 }
 
 /// A `NetworkBehaviour` that represents sending encrypted signature to Alice.
@@ -87,7 +87,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for B
                 ..
             } => {
                 if let Response::EncryptedSignature = response {
-                    self.events.push_back(OutEvent::Msg);
+                    self.events.push_back(OutEvent::Acknowledged);
                 }
             }
             RequestResponseEvent::InboundFailure { error, .. } => {
@@ -95,6 +95,9 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for B
             }
             RequestResponseEvent::OutboundFailure { error, .. } => {
                 error!("Outbound failure: {:?}", error);
+            }
+            RequestResponseEvent::ResponseSent { .. } => {
+                unreachable!("Bob should never send a Amounts response to Alice");
             }
         }
     }

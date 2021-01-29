@@ -7,13 +7,16 @@ use monero_harness::{image, Monero};
 use std::{path::PathBuf, sync::Arc};
 use swap::{
     bitcoin,
-    config::Config,
+    bitcoin::Timelock,
+    config,
+    config::{Config, GetConfig},
     monero,
     protocol::{alice, alice::AliceState, bob, bob::BobState, SwapAmounts},
     seed::Seed,
 };
 use tempfile::tempdir;
 use testcontainers::{clients::Cli, Container};
+use tokio::task::JoinHandle;
 use tracing_core::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
 use uuid::Uuid;
@@ -35,7 +38,7 @@ struct AliceParams {
 }
 
 impl AliceParams {
-    pub async fn builder(&self) -> alice::Builder {
+    pub fn builder(&self) -> alice::Builder {
         alice::Builder::new(
             self.seed,
             self.config,
@@ -45,14 +48,14 @@ impl AliceParams {
             self.db_path.clone(),
             self.listen_address.clone(),
         )
-        .await
     }
 
-    async fn peer_id(&self) -> PeerId {
-        self.builder().await.peer_id()
+    fn peer_id(&self) -> PeerId {
+        self.builder().peer_id()
     }
 }
 
+#[derive(Debug, Clone)]
 struct BobParams {
     seed: Seed,
     db_path: PathBuf,
@@ -73,11 +76,15 @@ impl BobParams {
             self.bitcoin_wallet.clone(),
             self.monero_wallet.clone(),
             self.alice_address.clone(),
-            self.alice_peer_id.clone(),
+            self.alice_peer_id,
             self.config,
         )
     }
 }
+
+pub struct BobEventLoopJoinHandle(JoinHandle<()>);
+
+pub struct AliceEventLoopJoinHandle(JoinHandle<()>);
 
 pub struct TestContext {
     swap_amounts: SwapAmounts,
@@ -94,22 +101,21 @@ pub struct TestContext {
 }
 
 impl TestContext {
-    pub async fn new_swap_as_alice(&mut self) -> alice::Swap {
+    pub async fn new_swap_as_alice(&mut self) -> (alice::Swap, AliceEventLoopJoinHandle) {
         let (swap, mut event_loop) = self
             .alice_params
             .builder()
-            .await
             .with_init_params(self.swap_amounts)
             .build()
             .await
             .unwrap();
 
-        tokio::spawn(async move { event_loop.run().await });
+        let join_handle = tokio::spawn(async move { event_loop.run().await });
 
-        swap
+        (swap, AliceEventLoopJoinHandle(join_handle))
     }
 
-    pub async fn new_swap_as_bob(&mut self) -> bob::Swap {
+    pub async fn new_swap_as_bob(&mut self) -> (bob::Swap, BobEventLoopJoinHandle) {
         let (swap, event_loop) = self
             .bob_params
             .builder()
@@ -118,20 +124,30 @@ impl TestContext {
             .await
             .unwrap();
 
+        let join_handle = tokio::spawn(async move { event_loop.run().await });
+
+        (swap, BobEventLoopJoinHandle(join_handle))
+    }
+
+    pub async fn stop_and_resume_alice_from_db(
+        &mut self,
+        join_handle: AliceEventLoopJoinHandle,
+    ) -> alice::Swap {
+        join_handle.0.abort();
+
+        let (swap, mut event_loop) = self.alice_params.builder().build().await.unwrap();
+
         tokio::spawn(async move { event_loop.run().await });
 
         swap
     }
 
-    pub async fn recover_alice_from_db(&mut self) -> alice::Swap {
-        let (swap, mut event_loop) = self.alice_params.builder().await.build().await.unwrap();
+    pub async fn stop_and_resume_bob_from_db(
+        &mut self,
+        join_handle: BobEventLoopJoinHandle,
+    ) -> bob::Swap {
+        join_handle.0.abort();
 
-        tokio::spawn(async move { event_loop.run().await });
-
-        swap
-    }
-
-    pub async fn recover_bob_from_db(&mut self) -> bob::Swap {
         let (swap, event_loop) = self.bob_params.builder().build().await.unwrap();
 
         tokio::spawn(async move { event_loop.run().await });
@@ -203,7 +219,7 @@ impl TestContext {
         let lock_tx_id = if let BobState::XmrRedeemed { tx_lock_id } = state {
             tx_lock_id
         } else {
-            panic!("Bob in unexpected state");
+            panic!("Bob in not in xmr redeemed state: {:?}", state);
         };
 
         let lock_tx_bitcoin_fee = self
@@ -236,7 +252,7 @@ impl TestContext {
         let lock_tx_id = if let BobState::BtcRefunded(state4) = state {
             state4.tx_lock_id()
         } else {
-            panic!("Bob in unexpected state");
+            panic!("Bob in not in btc refunded state: {:?}", state);
         };
         let lock_tx_bitcoin_fee = self
             .bob_bitcoin_wallet
@@ -268,7 +284,7 @@ impl TestContext {
         let lock_tx_id = if let BobState::BtcPunished { tx_lock_id } = state {
             tx_lock_id
         } else {
-            panic!("Bob in unexpected state");
+            panic!("Bob in not in btc punished state: {:?}", state);
         };
 
         let lock_tx_bitcoin_fee = self
@@ -288,14 +304,17 @@ impl TestContext {
     }
 }
 
-pub async fn setup_test<T, F>(testfn: T)
+pub async fn setup_test<T, F, C>(_config: C, testfn: T)
 where
     T: Fn(TestContext) -> F,
     F: Future<Output = ()>,
+    C: GetConfig,
 {
     let cli = Cli::default();
 
     let _guard = init_tracing();
+
+    let config = C::get_config();
 
     let (monero, containers) = testutils::init_containers(&cli).await;
 
@@ -303,8 +322,6 @@ where
         btc: bitcoin::Amount::from_sat(1_000_000),
         xmr: monero::Amount::from_piconero(1_000_000_000_000),
     };
-
-    let config = Config::regtest();
 
     let alice_starting_balances = StartingBalances {
         xmr: swap_amounts.xmr * 10,
@@ -357,7 +374,7 @@ where
         bitcoin_wallet: bob_bitcoin_wallet.clone(),
         monero_wallet: bob_monero_wallet.clone(),
         alice_address: alice_params.listen_address.clone(),
-        alice_peer_id: alice_params.peer_id().await,
+        alice_peer_id: alice_params.peer_id(),
         config,
     };
 
@@ -495,5 +512,39 @@ pub mod bob_run_until {
 
     pub fn is_encsig_sent(state: &BobState) -> bool {
         matches!(state, BobState::EncSigSent(..))
+    }
+}
+
+pub struct SlowCancelConfig;
+
+impl GetConfig for SlowCancelConfig {
+    fn get_config() -> Config {
+        Config {
+            bitcoin_cancel_timelock: Timelock::new(180),
+            ..config::Regtest::get_config()
+        }
+    }
+}
+
+pub struct FastCancelConfig;
+
+impl GetConfig for FastCancelConfig {
+    fn get_config() -> Config {
+        Config {
+            bitcoin_cancel_timelock: Timelock::new(1),
+            ..config::Regtest::get_config()
+        }
+    }
+}
+
+pub struct FastPunishConfig;
+
+impl GetConfig for FastPunishConfig {
+    fn get_config() -> Config {
+        Config {
+            bitcoin_cancel_timelock: Timelock::new(1),
+            bitcoin_punish_timelock: Timelock::new(1),
+            ..config::Regtest::get_config()
+        }
     }
 }

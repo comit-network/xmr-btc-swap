@@ -1,13 +1,13 @@
 pub mod testutils;
 
 use swap::protocol::{alice, bob, bob::BobState};
-use testutils::bob_run_until::is_xmr_locked;
+use testutils::{bob_run_until::is_xmr_locked, SlowCancelConfig};
 
 #[tokio::test]
 async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {
-    testutils::setup_test(|mut ctx| async move {
-        let alice_swap = ctx.new_swap_as_alice().await;
-        let bob_swap = ctx.new_swap_as_bob().await;
+    testutils::setup_test(SlowCancelConfig, |mut ctx| async move {
+        let (alice_swap, _) = ctx.new_swap_as_alice().await;
+        let (bob_swap, bob_join_handle) = ctx.new_swap_as_bob().await;
 
         let alice_handle = alice::run(alice_swap);
         let alice_swap_handle = tokio::spawn(alice_handle);
@@ -16,7 +16,7 @@ async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {
 
         assert!(matches!(bob_state, BobState::XmrLocked {..}));
 
-        let bob_swap = ctx.recover_bob_from_db().await;
+        let bob_swap = ctx.stop_and_resume_bob_from_db(bob_join_handle).await;
         assert!(matches!(bob_swap.state, BobState::XmrLocked {..}));
 
         let bob_state = bob::run(bob_swap).await.unwrap();

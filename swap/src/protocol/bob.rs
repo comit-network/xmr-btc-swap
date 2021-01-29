@@ -173,8 +173,8 @@ impl Builder {
         bob::event_loop::EventLoop::new(
             bob_transport,
             bob_behaviour,
-            self.peer_id.clone(),
-            self.alice_peer_id.clone(),
+            self.peer_id,
+            self.alice_peer_id,
             self.alice_address.clone(),
         )
     }
@@ -213,7 +213,7 @@ pub enum OutEvent {
     Message1(Box<alice::Message1>),
     Message2,
     TransferProof(Box<TransferProof>),
-    EncryptedSignature,
+    EncryptedSignatureAcknowledged,
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -267,7 +267,7 @@ impl From<transfer_proof::OutEvent> for OutEvent {
 impl From<encrypted_signature::OutEvent> for OutEvent {
     fn from(event: encrypted_signature::OutEvent) -> Self {
         match event {
-            encrypted_signature::OutEvent::Msg => OutEvent::EncryptedSignature,
+            encrypted_signature::OutEvent::Acknowledged => OutEvent::EncryptedSignatureAcknowledged,
         }
     }
 }
@@ -289,26 +289,26 @@ pub struct Behaviour {
 impl Behaviour {
     /// Sends a swap request to Alice to negotiate the swap.
     pub fn send_swap_request(&mut self, alice: PeerId, swap_request: SwapRequest) {
-        let _id = self.swap_request.send(alice.clone(), swap_request);
+        let _id = self.swap_request.send(alice, swap_request);
         info!("Requesting swap from: {}", alice);
     }
 
     /// Sends Bob's first message to Alice.
     pub fn send_message0(&mut self, alice: PeerId, msg: bob::Message0) {
         self.message0.send(alice, msg);
-        debug!("Sent Message0");
+        debug!("Message0 sent");
     }
 
     /// Sends Bob's second message to Alice.
     pub fn send_message1(&mut self, alice: PeerId, msg: bob::Message1) {
         self.message1.send(alice, msg);
-        debug!("Sent Message1");
+        debug!("Message1 sent");
     }
 
     /// Sends Bob's third message to Alice.
     pub fn send_message2(&mut self, alice: PeerId, msg: bob::Message2) {
         self.message2.send(alice, msg);
-        debug!("Sent Message2");
+        debug!("Message2 sent");
     }
 
     /// Sends Bob's fourth message to Alice.
@@ -319,7 +319,7 @@ impl Behaviour {
     ) {
         let msg = EncryptedSignature { tx_redeem_encsig };
         self.encrypted_signature.send(alice, msg);
-        debug!("Sent Message3");
+        debug!("Encrypted signature sent");
     }
 
     /// Add a known address for the given peer

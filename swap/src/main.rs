@@ -14,14 +14,15 @@
 
 use crate::cli::{Command, Options, Resume};
 use anyhow::{Context, Result};
-use config::Config;
+use config::{Config, GetConfig};
 use database::Database;
+use log::LevelFilter;
 use prettytable::{row, Table};
 use protocol::{alice, bob, bob::Builder, SwapAmounts};
 use std::sync::Arc;
 use structopt::StructOpt;
 use trace::init_tracing;
-use tracing::{info, log::LevelFilter};
+use tracing::info;
 use uuid::Uuid;
 
 pub mod bitcoin;
@@ -45,7 +46,7 @@ async fn main() -> Result<()> {
     init_tracing(LevelFilter::Info).expect("initialize tracing");
 
     let opt = Options::from_args();
-    let config = Config::testnet();
+    let config = config::Testnet::get_config();
 
     info!(
         "Database and Seed will be stored in directory: {}",
@@ -95,8 +96,7 @@ async fn main() -> Result<()> {
                 Arc::new(monero_wallet),
                 db_path,
                 listen_addr,
-            )
-            .await;
+            );
             let (swap, mut event_loop) =
                 alice_factory.with_init_params(swap_amounts).build().await?;
 
@@ -184,8 +184,7 @@ async fn main() -> Result<()> {
                 Arc::new(monero_wallet),
                 db_path,
                 listen_addr,
-            )
-            .await;
+            );
             let (swap, mut event_loop) = alice_factory.build().await?;
 
             tokio::spawn(async move { event_loop.run().await });
