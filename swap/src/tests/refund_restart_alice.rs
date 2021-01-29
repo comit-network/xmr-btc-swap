@@ -1,6 +1,7 @@
-pub mod testutils;
-
-use swap::protocol::{alice, alice::AliceState, bob};
+use crate::{
+    protocol::{alice, alice::AliceState, bob},
+    tests::testutils,
+};
 use testutils::{alice_run_until::is_xmr_locked, FastCancelConfig};
 
 /// Bob locks btc and Alice locks xmr. Alice fails to act so Bob refunds. Alice

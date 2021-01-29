@@ -107,8 +107,8 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: cargo test --package monero-harness --all-features
 
-      - name: Run library tests for swap
-        run: cargo test --package swap --lib --all-features
+      - name: Run library tests for swap (without test containers)
+        run: cargo test --package swap --lib
 
       - name: Build binary
         run: |
@@ -160,7 +160,7 @@ jobs:
           key: rust-${{ env.TARGET }}-cargo-registry-directory-${{ hashFiles('Cargo.lock') }}-v1
 
       - name: Run test ${{ matrix.test_name }}
-        run: cargo test --package swap --all-features --test ${{ matrix.test_name }} ""
+        run: cargo test --package swap --all-features --lib tests::${{ matrix.test_name }} ""
         env:
           MONERO_ADDITIONAL_SLEEP_PERIOD: 60000
           RUST_MIN_STACK: 16777216 # 16 MB. Default is 8MB. This is fine as in tests we start 2 programs: Alice and Bob.

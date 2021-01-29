@@ -1,6 +1,7 @@
-pub mod testutils;
-
-use swap::protocol::{alice, bob, bob::BobState};
+use crate::{
+    protocol::{alice, bob, bob::BobState},
+    tests::testutils,
+};
 use testutils::{bob_run_until::is_lock_proof_received, SlowCancelConfig};
 
 #[tokio::test]

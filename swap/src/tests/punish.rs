@@ -1,6 +1,7 @@
-pub mod testutils;
-
-use swap::protocol::{alice, bob, bob::BobState};
+use crate::{
+    protocol::{alice, bob, bob::BobState},
+    tests::testutils,
+};
 use testutils::{bob_run_until::is_btc_locked, FastPunishConfig};
 
 /// Bob locks Btc and Alice locks Xmr. Bob does not act; he fails to send Alice

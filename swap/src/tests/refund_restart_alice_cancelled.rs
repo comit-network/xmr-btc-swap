@@ -1,8 +1,7 @@
-pub mod testutils;
-
-use swap::{
+use crate::{
     config,
     protocol::{alice, alice::AliceState, bob},
+    tests::testutils,
 };
 use testutils::alice_run_until::is_encsig_learned;
 

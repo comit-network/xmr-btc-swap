@@ -1,6 +1,7 @@
-pub mod testutils;
-
-use swap::protocol::{alice, bob};
+use crate::{
+    protocol::{alice, bob},
+    tests::testutils,
+};
 use testutils::SlowCancelConfig;
 use tokio::join;
 

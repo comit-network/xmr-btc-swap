@@ -1,6 +1,7 @@
-pub mod testutils;
-
-use swap::protocol::{alice, alice::AliceState, bob};
+use crate::{
+    protocol::{alice, alice::AliceState, bob},
+    tests::testutils,
+};
 use testutils::{alice_run_until::is_encsig_learned, SlowCancelConfig};
 
 #[tokio::test]

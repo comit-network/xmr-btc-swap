@@ -1,11 +1,4 @@
-use crate::testutils;
-use bitcoin_harness::Bitcoind;
-use futures::Future;
-use get_port::get_port;
-use libp2p::{core::Multiaddr, PeerId};
-use monero_harness::{image, Monero};
-use std::{path::PathBuf, sync::Arc};
-use swap::{
+use crate::{
     bitcoin,
     bitcoin::Timelock,
     config,
@@ -13,7 +6,14 @@ use swap::{
     monero,
     protocol::{alice, alice::AliceState, bob, bob::BobState, SwapAmounts},
     seed::Seed,
+    tests::testutils,
 };
+use bitcoin_harness::Bitcoind;
+use futures::Future;
+use get_port::get_port;
+use libp2p::{core::Multiaddr, PeerId};
+use monero_harness::{image, Monero};
+use std::{path::PathBuf, sync::Arc};
 use tempfile::tempdir;
 use testcontainers::{clients::Cli, Container};
 use tokio::task::JoinHandle;
@@ -415,13 +415,13 @@ async fn init_wallets(
         .await
         .unwrap();
 
-    let xmr_wallet = Arc::new(swap::monero::Wallet {
+    let xmr_wallet = Arc::new(crate::monero::Wallet {
         inner: monero.wallet(name).unwrap().client(),
         network: config.monero_network,
     });
 
     let btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new(name, bitcoind.node_url.clone(), config.bitcoin_network)
+        crate::bitcoin::Wallet::new(name, bitcoind.node_url.clone(), config.bitcoin_network)
             .await
             .unwrap(),
     );
@@ -478,7 +478,7 @@ fn init_tracing() -> DefaultGuard {
 }
 
 pub mod alice_run_until {
-    use swap::protocol::alice::AliceState;
+    use crate::protocol::alice::AliceState;
 
     pub fn is_xmr_locked(state: &AliceState) -> bool {
         matches!(
@@ -496,7 +496,7 @@ pub mod alice_run_until {
 }
 
 pub mod bob_run_until {
-    use swap::protocol::bob::BobState;
+    use crate::protocol::bob::BobState;
 
     pub fn is_btc_locked(state: &BobState) -> bool {
         matches!(state, BobState::BtcLocked(..))

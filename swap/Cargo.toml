@@ -40,6 +40,7 @@ sled = "0.34"
 structopt = "0.3"
 strum = { version = "0.20", features = ["derive"] }
 tempfile = "3"
+testcontainers = { version = "0.11", optional = true }
 thiserror = "1"
 time = "0.2"
 tokio = { version = "1.0", features = ["rt-multi-thread", "time", "macros", "sync"] }
@@ -59,4 +60,6 @@ port_check = "0.1"
 serde_cbor = "0.11"
 spectral = "0.6"
 tempfile = "3"
-testcontainers = "0.11"
+
+[features]
+default = [ ]

@@ -37,6 +37,8 @@ pub mod trace;
 mod cli;
 mod fs;
 mod serde_peer_id;
+#[cfg(all(test, feature = "testcontainers"))]
+mod tests;
 
 #[macro_use]
 extern crate prettytable;

@@ -27,3 +27,6 @@ pub mod trace;
 
 mod fs;
 mod serde_peer_id;
+
+#[cfg(all(test, feature = "testcontainers"))]
+mod tests;
