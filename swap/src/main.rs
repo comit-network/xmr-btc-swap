@@ -14,7 +14,7 @@
 
 use crate::{
     cli::{Command, Options, Resume},
-    configuration::{
+    config::{
         initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
     },
     execution_params::GetExecutionParams,
@@ -32,7 +32,7 @@ use tracing::info;
 use uuid::Uuid;
 
 pub mod bitcoin;
-pub mod configuration;
+pub mod config;
 pub mod database;
 pub mod execution_params;
 pub mod monero;
@@ -66,7 +66,7 @@ async fn main() -> Result<()> {
     );
 
     let db_path = data_dir.join("database");
-    let seed = configuration::seed::Seed::from_file_or_generate(&data_dir)
+    let seed = config::seed::Seed::from_file_or_generate(&data_dir)
         .expect("Could not retrieve/initialize seed")
         .into();
 
