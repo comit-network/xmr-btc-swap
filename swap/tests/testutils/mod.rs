@@ -304,14 +304,17 @@ impl TestContext {
     }
 }
 
-pub async fn setup_test<T, F>(config: Config, testfn: T)
+pub async fn setup_test<T, F, C>(_config: C, testfn: T)
 where
     T: Fn(TestContext) -> F,
     F: Future<Output = ()>,
+    C: GetConfig,
 {
     let cli = Cli::default();
 
     let _guard = init_tracing();
+
+    let config = C::get_config();
 
     let (monero, containers) = testutils::init_containers(&cli).await;
 

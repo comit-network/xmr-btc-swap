@@ -1,14 +1,11 @@
 pub mod testutils;
 
-use swap::{
-    config::GetConfig,
-    protocol::{alice, bob, bob::BobState},
-};
+use swap::protocol::{alice, bob, bob::BobState};
 use testutils::{bob_run_until::is_encsig_sent, SlowCancelConfig};
 
 #[tokio::test]
 async fn given_bob_restarts_after_encsig_is_sent_resume_swap() {
-    testutils::setup_test(SlowCancelConfig::get_config(), |mut ctx| async move {
+    testutils::setup_test(SlowCancelConfig, |mut ctx| async move {
         let (alice_swap, _) = ctx.new_swap_as_alice().await;
         let (bob_swap, bob_join_handle) = ctx.new_swap_as_bob().await;
 

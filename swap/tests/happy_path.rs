@@ -1,9 +1,6 @@
 pub mod testutils;
 
-use swap::{
-    config::GetConfig,
-    protocol::{alice, bob},
-};
+use swap::protocol::{alice, bob};
 use testutils::SlowCancelConfig;
 use tokio::join;
 
@@ -11,7 +8,7 @@ use tokio::join;
 
 #[tokio::test]
 async fn happy_path() {
-    testutils::setup_test(SlowCancelConfig::get_config(), |mut ctx| async move {
+    testutils::setup_test(SlowCancelConfig, |mut ctx| async move {
         let (alice_swap, _) = ctx.new_swap_as_alice().await;
         let (bob_swap, _) = ctx.new_swap_as_bob().await;
 
