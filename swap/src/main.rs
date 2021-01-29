@@ -15,15 +15,16 @@
 use crate::{
     cli::{Command, Options, Resume},
     config::{
-        initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
+        initial_setup, query_user_for_initial_testnet_config, read_config,
+        settings_from_config_file_and_defaults, ConfigNotInitialized,
     },
+    settings::Settings,
 };
 use anyhow::{Context, Result};
 use database::Database;
 use fs::{default_config_path, default_data_dir};
 use prettytable::{row, Table};
 use protocol::{alice, bob, bob::Builder, SwapAmounts};
-use settings::Settings;
 use std::{path::PathBuf, sync::Arc};
 use structopt::StructOpt;
 use trace::init_tracing;
@@ -229,7 +230,7 @@ fn init_settings(config_path: Option<PathBuf>) -> Result<Settings> {
         }
     };
 
-    let settings = Settings::from_config_file_and_defaults(config);
+    let settings = settings_from_config_file_and_defaults(config);
 
     Ok(settings)
 }
