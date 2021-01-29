@@ -25,7 +25,7 @@ pub struct TransferProof {
 
 #[derive(Debug, Copy, Clone)]
 pub enum OutEvent {
-    Msg,
+    Acknowledged,
 }
 
 /// A `NetworkBehaviour` that represents sending the Monero transfer proof to
@@ -88,7 +88,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for B
                 ..
             } => {
                 if let Response::TransferProof = response {
-                    self.events.push_back(OutEvent::Msg);
+                    self.events.push_back(OutEvent::Acknowledged);
                 }
             }
             RequestResponseEvent::InboundFailure { error, .. } => {

@@ -236,7 +236,7 @@ pub enum OutEvent {
         msg: Box<bob::Message2>,
         bob_peer_id: PeerId,
     },
-    TransferProof,
+    TransferProofAcknowledged,
     EncryptedSignature(EncryptedSignature),
 }
 
@@ -289,7 +289,7 @@ impl From<message2::OutEvent> for OutEvent {
 impl From<transfer_proof::OutEvent> for OutEvent {
     fn from(event: transfer_proof::OutEvent) -> Self {
         match event {
-            transfer_proof::OutEvent::Msg => OutEvent::TransferProof,
+            transfer_proof::OutEvent::Acknowledged => OutEvent::TransferProofAcknowledged,
         }
     }
 }

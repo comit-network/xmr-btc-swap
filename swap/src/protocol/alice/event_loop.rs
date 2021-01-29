@@ -45,6 +45,7 @@ pub struct EventLoopHandle {
     send_message0: Sender<(ResponseChannel<AliceToBob>, alice::Message0)>,
     send_message1: Sender<(ResponseChannel<AliceToBob>, alice::Message1)>,
     send_transfer_proof: Sender<(PeerId, TransferProof)>,
+    recv_transfer_proof_ack: Receiver<()>,
 }
 
 impl EventLoopHandle {
@@ -124,6 +125,11 @@ impl EventLoopHandle {
 
     pub async fn send_transfer_proof(&mut self, bob: PeerId, msg: TransferProof) -> Result<()> {
         let _ = self.send_transfer_proof.send((bob, msg)).await?;
+
+        self.recv_transfer_proof_ack
+            .recv()
+            .await
+            .ok_or_else(|| anyhow!("Failed to receive transfer proof ack from Bob"))?;
         Ok(())
     }
 }
@@ -141,6 +147,7 @@ pub struct EventLoop {
     send_message0: Receiver<(ResponseChannel<AliceToBob>, alice::Message0)>,
     send_message1: Receiver<(ResponseChannel<AliceToBob>, alice::Message1)>,
     send_transfer_proof: Receiver<(PeerId, TransferProof)>,
+    recv_transfer_proof_ack: Sender<()>,
 }
 
 impl EventLoop {
@@ -169,6 +176,7 @@ impl EventLoop {
         let send_message0 = Channels::new();
         let send_message1 = Channels::new();
         let send_transfer_proof = Channels::new();
+        let recv_transfer_proof_ack = Channels::new();
 
         let driver = EventLoop {
             swarm,
@@ -182,6 +190,7 @@ impl EventLoop {
             send_message0: send_message0.receiver,
             send_message1: send_message1.receiver,
             send_transfer_proof: send_transfer_proof.receiver,
+            recv_transfer_proof_ack: recv_transfer_proof_ack.sender,
         };
 
         let handle = EventLoopHandle {
@@ -195,6 +204,7 @@ impl EventLoop {
             send_message0: send_message0.sender,
             send_message1: send_message1.sender,
             send_transfer_proof: send_transfer_proof.sender,
+            recv_transfer_proof_ack: recv_transfer_proof_ack.receiver,
         };
 
         Ok((driver, handle))
@@ -217,7 +227,10 @@ impl EventLoop {
                         OutEvent::Message2 { msg, bob_peer_id : _} => {
                             let _ = self.recv_message2.send(*msg).await;
                         }
-                        OutEvent::TransferProof => trace!("Bob ack'd receiving the transfer proof"),
+                        OutEvent::TransferProofAcknowledged => {
+                            trace!("Bob acknowledged transfer proof");
+                            let _ = self.recv_transfer_proof_ack.send(()).await;
+                        }
                         OutEvent::EncryptedSignature(msg) => {
                             let _ = self.recv_encrypted_signature.send(msg).await;
                         }
