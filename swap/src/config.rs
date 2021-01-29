@@ -1,4 +1,4 @@
-use crate::fs::ensure_directory_exists;
+use crate::{fs::ensure_directory_exists, settings::Settings};
 use anyhow::{Context, Result};
 use config::{Config, ConfigError};
 use dialoguer::{theme::ColorfulTheme, Input};
@@ -17,7 +17,6 @@ const DEFAULT_BITCOIND_TESTNET_URL: &str = "http://127.0.0.1:18332";
 const DEFAULT_MONERO_WALLET_RPC_TESTNET_URL: &str = "http://127.0.0.1:38083/json_rpc";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
 pub struct File {
     pub bitcoin: Bitcoin,
     pub monero: Monero,
@@ -115,6 +114,14 @@ pub fn query_user_for_initial_testnet_config() -> Result<File> {
             wallet_rpc_url: monero_wallet_rpc_url,
         },
     })
+}
+
+pub fn settings_from_config_file_and_defaults(config: File) -> Settings {
+    Settings::testnet(
+        config.bitcoin.bitcoind_url,
+        config.bitcoin.wallet_name,
+        config.monero.wallet_rpc_url,
+    )
 }
 
 #[cfg(test)]

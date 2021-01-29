@@ -17,7 +17,6 @@
 )]
 
 pub mod bitcoin;
-pub mod config;
 pub mod database;
 pub mod monero;
 pub mod network;
@@ -26,5 +25,4 @@ pub mod seed;
 pub mod settings;
 pub mod trace;
 
-mod fs;
 mod serde_peer_id;

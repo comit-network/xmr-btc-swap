@@ -1,4 +1,4 @@
-use crate::{bitcoin::Timelock, config::File};
+use crate::bitcoin::Timelock;
 use conquer_once::Lazy;
 use std::time::Duration;
 use url::Url;
@@ -9,15 +9,11 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_config_file_and_defaults(config: File) -> Self {
-        Settings::testnet(
-            config.bitcoin.bitcoind_url,
-            config.bitcoin.wallet_name,
-            config.monero.wallet_rpc_url,
-        )
-    }
-
-    fn testnet(bitcoind_url: Url, bitcoin_wallet_name: String, monero_wallet_rpc_url: Url) -> Self {
+    pub fn testnet(
+        bitcoind_url: Url,
+        bitcoin_wallet_name: String,
+        monero_wallet_rpc_url: Url,
+    ) -> Self {
         Self {
             wallets: Wallets::testnet(bitcoind_url, bitcoin_wallet_name, monero_wallet_rpc_url),
             protocol: Protocol::testnet(),
