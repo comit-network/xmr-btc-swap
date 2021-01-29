@@ -296,19 +296,19 @@ impl Behaviour {
     /// Sends Bob's first message to Alice.
     pub fn send_message0(&mut self, alice: PeerId, msg: bob::Message0) {
         self.message0.send(alice, msg);
-        debug!("Sent Message0");
+        debug!("Message0 sent");
     }
 
     /// Sends Bob's second message to Alice.
     pub fn send_message1(&mut self, alice: PeerId, msg: bob::Message1) {
         self.message1.send(alice, msg);
-        debug!("Sent Message1");
+        debug!("Message1 sent");
     }
 
     /// Sends Bob's third message to Alice.
     pub fn send_message2(&mut self, alice: PeerId, msg: bob::Message2) {
         self.message2.send(alice, msg);
-        debug!("Sent Message2");
+        debug!("Message2 sent");
     }
 
     /// Sends Bob's fourth message to Alice.
@@ -319,7 +319,7 @@ impl Behaviour {
     ) {
         let msg = EncryptedSignature { tx_redeem_encsig };
         self.encrypted_signature.send(alice, msg);
-        debug!("Sent Message3");
+        debug!("Encrypted signature sent");
     }
 
     /// Add a known address for the given peer
