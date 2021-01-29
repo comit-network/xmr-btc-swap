@@ -86,7 +86,7 @@ pub struct Config {
         help = "Provide a custom path to the configuration file. The configuration file must be a toml file.",
         parse(from_os_str)
     )]
-    pub config_path: Option<PathBuf>,
+    pub path: Option<PathBuf>,
 }
 
 fn parse_btc(str: &str) -> anyhow::Result<bitcoin::Amount> {

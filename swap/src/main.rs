@@ -77,7 +77,7 @@ async fn main() -> Result<()> {
             receive_bitcoin,
             config,
         } => {
-            let settings = init_settings(config.config_path)?;
+            let settings = init_settings(config.path)?;
 
             let swap_amounts = SwapAmounts {
                 xmr: send_monero,
@@ -116,7 +116,7 @@ async fn main() -> Result<()> {
             receive_monero,
             config,
         } => {
-            let settings = init_settings(config.config_path)?;
+            let settings = init_settings(config.path)?;
 
             let swap_amounts = SwapAmounts {
                 btc: send_bitcoin,
@@ -166,7 +166,7 @@ async fn main() -> Result<()> {
             listen_addr,
             config,
         }) => {
-            let settings = init_settings(config.config_path)?;
+            let settings = init_settings(config.path)?;
 
             let (bitcoin_wallet, monero_wallet) = init_wallets(settings.wallets).await?;
 
@@ -191,7 +191,7 @@ async fn main() -> Result<()> {
             alice_addr,
             config,
         }) => {
-            let settings = init_settings(config.config_path)?;
+            let settings = init_settings(config.path)?;
 
             let (bitcoin_wallet, monero_wallet) = init_wallets(settings.wallets).await?;
 
