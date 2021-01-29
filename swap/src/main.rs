@@ -14,10 +14,10 @@
 
 use crate::{
     cli::{Command, Options, Resume},
-    config::GetExecutionParams,
     configuration::{
         initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
     },
+    execution_params::GetExecutionParams,
 };
 use anyhow::{Context, Result};
 use database::Database;
@@ -32,9 +32,9 @@ use tracing::info;
 use uuid::Uuid;
 
 pub mod bitcoin;
-pub mod config;
 pub mod configuration;
 pub mod database;
+pub mod execution_params;
 pub mod monero;
 pub mod network;
 pub mod protocol;
@@ -73,7 +73,7 @@ async fn main() -> Result<()> {
     // hardcode to testnet/stagenet
     let bitcoin_network = bitcoin::Network::Testnet;
     let monero_network = monero::Network::Stagenet;
-    let execution_params = config::Testnet::get_execution_params();
+    let execution_params = execution_params::Testnet::get_execution_params();
 
     match opt.cmd {
         Command::SellXmr {

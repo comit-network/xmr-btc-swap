@@ -1,8 +1,8 @@
 use crate::{
     bitcoin,
     bitcoin::timelocks::ExpiredTimelocks,
-    config::ExecutionParams,
     database::{Database, Swap},
+    execution_params::ExecutionParams,
     monero,
     protocol::{
         bob::{self, event_loop::EventLoopHandle, state::*, SwapRequest},

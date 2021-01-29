@@ -65,7 +65,7 @@ impl GetExecutionParams for Regtest {
 }
 
 mod mainnet {
-    use crate::config::*;
+    use crate::execution_params::*;
 
     // For each step, we are giving Bob 10 minutes to act.
     pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(10 * 60));
@@ -82,7 +82,7 @@ mod mainnet {
 }
 
 mod testnet {
-    use crate::config::*;
+    use crate::execution_params::*;
 
     pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(60 * 60));
 
@@ -100,7 +100,7 @@ mod testnet {
 }
 
 mod regtest {
-    use crate::config::*;
+    use crate::execution_params::*;
 
     // In test, we set a shorter time to fail fast
     pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(30));

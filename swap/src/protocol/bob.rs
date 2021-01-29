@@ -28,7 +28,7 @@ pub use self::{
     swap::{run, run_until},
     swap_request::*,
 };
-use crate::{config::ExecutionParams, protocol::alice::TransferProof};
+use crate::{execution_params::ExecutionParams, protocol::alice::TransferProof};
 
 mod encrypted_signature;
 pub mod event_loop;

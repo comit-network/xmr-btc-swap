@@ -10,10 +10,9 @@ pub use self::{
     transfer_proof::TransferProof,
 };
 use crate::{
-    bitcoin,
-    config::ExecutionParams,
-    database,
+    bitcoin, database,
     database::Database,
+    execution_params::ExecutionParams,
     monero,
     network::{
         peer_tracker::{self, PeerTracker},

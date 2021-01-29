@@ -1,7 +1,7 @@
 pub mod testutils;
 
 use swap::{
-    config,
+    execution_params,
     protocol::{alice, alice::AliceState, bob},
 };
 use testutils::alice_run_until::is_encsig_learned;
@@ -11,7 +11,7 @@ use testutils::alice_run_until::is_encsig_learned;
 /// redeem had the timelock not expired.
 #[tokio::test]
 async fn given_alice_restarts_after_enc_sig_learned_and_bob_already_cancelled_refund_swap() {
-    testutils::setup_test(config::Regtest, |mut ctx| async move {
+    testutils::setup_test(execution_params::Regtest, |mut ctx| async move {
         let (alice_swap, alice_join_handle) = ctx.new_swap_as_alice().await;
         let (bob_swap, _) = ctx.new_swap_as_bob().await;
 

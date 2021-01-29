@@ -10,7 +10,7 @@ pub use ::bitcoin::{util::amount::Amount, Address, Network, Transaction, Txid};
 pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
 pub use wallet::Wallet;
 
-use crate::{bitcoin::timelocks::BlockHeight, config::ExecutionParams};
+use crate::{bitcoin::timelocks::BlockHeight, execution_params::ExecutionParams};
 use ::bitcoin::{
     hashes::{hex::ToHex, Hash},
     secp256k1,
