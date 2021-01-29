@@ -84,7 +84,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for B
                     // Send back empty response so that the request/response protocol completes.
                     if let Err(error) = self.rr.send_response(channel, Response::EncryptedSignature)
                     {
-                        error!("Failed to sen Encrypted Signature ack: {:?}", error);
+                        error!("Failed to send Encrypted Signature ack: {:?}", error);
                     }
                 }
             }

@@ -45,6 +45,7 @@ pub struct EventLoopHandle {
     send_message1: Sender<bob::Message1>,
     send_message2: Sender<bob::Message2>,
     send_encrypted_signature: Sender<EncryptedSignature>,
+    recv_encrypted_signature_ack: Receiver<()>,
 }
 
 impl EventLoopHandle {
@@ -114,7 +115,12 @@ impl EventLoopHandle {
         &mut self,
         tx_redeem_encsig: EncryptedSignature,
     ) -> Result<()> {
-        let _ = self.send_encrypted_signature.send(tx_redeem_encsig).await?;
+        self.send_encrypted_signature.send(tx_redeem_encsig).await?;
+
+        self.recv_encrypted_signature_ack
+            .recv()
+            .await
+            .ok_or_else(|| anyhow!("Failed to receive encrypted signature ack from Alice"))?;
         Ok(())
     }
 }
@@ -134,6 +140,7 @@ pub struct EventLoop {
     send_message1: Receiver<bob::Message1>,
     send_message2: Receiver<bob::Message2>,
     send_encrypted_signature: Receiver<EncryptedSignature>,
+    recv_encrypted_signature_ack: Sender<()>,
 }
 
 impl EventLoop {
@@ -163,6 +170,7 @@ impl EventLoop {
         let send_message1 = Channels::new();
         let send_message2 = Channels::new();
         let send_encrypted_signature = Channels::new();
+        let recv_encrypted_signature_ack = Channels::new();
 
         let event_loop = EventLoop {
             swarm,
@@ -178,6 +186,7 @@ impl EventLoop {
             send_message1: send_message1.receiver,
             send_message2: send_message2.receiver,
             send_encrypted_signature: send_encrypted_signature.receiver,
+            recv_encrypted_signature_ack: recv_encrypted_signature_ack.sender,
         };
 
         let handle = EventLoopHandle {
@@ -192,6 +201,7 @@ impl EventLoop {
             send_message1: send_message1.sender,
             send_message2: send_message2.sender,
             send_encrypted_signature: send_encrypted_signature.sender,
+            recv_encrypted_signature_ack: recv_encrypted_signature_ack.receiver,
         };
 
         Ok((event_loop, handle))
@@ -218,7 +228,10 @@ impl EventLoop {
                         OutEvent::TransferProof(msg) => {
                             let _ = self.recv_transfer_proof.send(*msg).await;
                         }
-                        OutEvent::EncryptedSignature => info!("Alice acknowledged encrypted signature received"),
+                        OutEvent::EncryptedSignatureAcknowledged => {
+                            debug!("Alice acknowledged encrypted signature");
+                            let _ = self.recv_encrypted_signature_ack.send(()).await;
+                        }
                     }
                 },
                 option = self.dial_alice.recv().fuse() => {

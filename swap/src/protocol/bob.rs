@@ -213,7 +213,7 @@ pub enum OutEvent {
     Message1(Box<alice::Message1>),
     Message2,
     TransferProof(Box<TransferProof>),
-    EncryptedSignature,
+    EncryptedSignatureAcknowledged,
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -267,7 +267,7 @@ impl From<transfer_proof::OutEvent> for OutEvent {
 impl From<encrypted_signature::OutEvent> for OutEvent {
     fn from(event: encrypted_signature::OutEvent) -> Self {
         match event {
-            encrypted_signature::OutEvent::Msg => OutEvent::EncryptedSignature,
+            encrypted_signature::OutEvent::Acknowledged => OutEvent::EncryptedSignatureAcknowledged,
         }
     }
 }
