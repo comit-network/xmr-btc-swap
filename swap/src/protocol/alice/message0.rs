@@ -54,7 +54,7 @@ impl Behaviour {
         let msg = AliceToBob::Message0(Box::new(msg));
         self.rr
             .send_response(channel, msg)
-            .map_err(|_| anyhow!("Sending Amounts response failed"))
+            .map_err(|alice_to_bob| anyhow!("Could not send response {:?}", alice_to_bob))
     }
     fn poll(
         &mut self,
@@ -112,7 +112,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                 error!("Outbound failure: {:?}", error);
             }
             RequestResponseEvent::ResponseSent { .. } => {
-                debug!("Alice has sent an Message0 response to Bob");
+                debug!("Alice has sent Message0 as response to Bob");
             }
         }
     }

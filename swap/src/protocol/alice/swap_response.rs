@@ -1,3 +1,8 @@
+use crate::{
+    monero,
+    network::request_response::{AliceToBob, BobToAlice, Codec, Swap, TIMEOUT},
+    protocol::bob,
+};
 use anyhow::{anyhow, Result};
 use libp2p::{
     request_response::{
@@ -14,12 +19,6 @@ use std::{
     time::Duration,
 };
 use tracing::{debug, error};
-
-use crate::{
-    monero,
-    network::request_response::{AliceToBob, BobToAlice, Codec, Swap, TIMEOUT},
-    protocol::bob,
-};
 
 #[derive(Debug)]
 pub struct OutEvent {
@@ -109,7 +108,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                 error!("Outbound failure: {:?}", error);
             }
             RequestResponseEvent::ResponseSent { .. } => {
-                debug!("Alice has sent an Amounts response to Bob");
+                debug!("Alice has sent a swap response to Bob");
             }
         }
     }

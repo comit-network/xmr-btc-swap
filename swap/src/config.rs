@@ -16,7 +16,6 @@ pub struct Config {
     pub monero_network: monero::Network,
 }
 
-// TODO: This trait is not needed
 pub trait GetConfig {
     fn get_config() -> Config;
 }

@@ -324,7 +324,7 @@ impl Behaviour {
         swap_response: SwapResponse,
     ) -> Result<()> {
         self.amounts.send(channel, swap_response)?;
-        info!("Sent amounts response");
+        info!("Sent swap response");
         Ok(())
     }
 

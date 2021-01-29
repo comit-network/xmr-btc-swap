@@ -51,7 +51,7 @@ impl Behaviour {
         let msg = AliceToBob::Message1(Box::new(msg));
         self.rr
             .send_response(channel, msg)
-            .map_err(|_| anyhow!("Sending Amounts response failed"))
+            .map_err(|alice_to_bob| anyhow!("Could not send response {:?}", alice_to_bob))
     }
 
     fn poll(
