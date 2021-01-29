@@ -6,7 +6,7 @@ use crate::{
     monero,
     protocol::{alice, alice::AliceState, bob, bob::BobState, SwapAmounts},
     seed::Seed,
-    tests::testutils,
+    tests::utils,
 };
 use bitcoin_harness::Bitcoind;
 use futures::Future;
@@ -316,7 +316,7 @@ where
 
     let config = C::get_config();
 
-    let (monero, containers) = testutils::init_containers(&cli).await;
+    let (monero, containers) = utils::init_containers(&cli).await;
 
     let swap_amounts = SwapAmounts {
         btc: bitcoin::Amount::from_sat(1_000_000),

@@ -1,12 +1,12 @@
 use crate::{
     protocol::{alice, bob, bob::BobState},
-    tests::testutils,
+    tests::utils,
 };
-use testutils::{bob_run_until::is_xmr_locked, SlowCancelConfig};
+use utils::{bob_run_until::is_xmr_locked, SlowCancelConfig};
 
 #[tokio::test]
 async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {
-    testutils::setup_test(SlowCancelConfig, |mut ctx| async move {
+    utils::setup_test(SlowCancelConfig, |mut ctx| async move {
         let (alice_swap, _) = ctx.new_swap_as_alice().await;
         let (bob_swap, bob_join_handle) = ctx.new_swap_as_bob().await;
 

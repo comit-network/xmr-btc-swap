@@ -1,12 +1,12 @@
 use crate::{
     protocol::{alice, alice::AliceState, bob},
-    tests::testutils,
+    tests::utils,
 };
-use testutils::{alice_run_until::is_encsig_learned, SlowCancelConfig};
+use utils::{alice_run_until::is_encsig_learned, SlowCancelConfig};
 
 #[tokio::test]
 async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
-    testutils::setup_test(SlowCancelConfig, |mut ctx| async move {
+    utils::setup_test(SlowCancelConfig, |mut ctx| async move {
         let (alice_swap, alice_join_handle) = ctx.new_swap_as_alice().await;
         let (bob_swap, _) = ctx.new_swap_as_bob().await;
 

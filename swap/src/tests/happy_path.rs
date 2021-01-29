@@ -1,15 +1,15 @@
 use crate::{
     protocol::{alice, bob},
-    tests::testutils,
+    tests::utils,
 };
-use testutils::SlowCancelConfig;
 use tokio::join;
+use utils::SlowCancelConfig;
 
 /// Run the following tests with RUST_MIN_STACK=10000000
 
 #[tokio::test]
 async fn happy_path() {
-    testutils::setup_test(SlowCancelConfig, |mut ctx| async move {
+    utils::setup_test(SlowCancelConfig, |mut ctx| async move {
         let (alice_swap, _) = ctx.new_swap_as_alice().await;
         let (bob_swap, _) = ctx.new_swap_as_bob().await;
 

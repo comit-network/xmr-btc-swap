@@ -1,16 +1,16 @@
 use crate::{
     config,
     protocol::{alice, alice::AliceState, bob},
-    tests::testutils,
+    tests::utils,
 };
-use testutils::alice_run_until::is_encsig_learned;
+use utils::alice_run_until::is_encsig_learned;
 
 /// Bob locks btc and Alice locks xmr. Alice fails to act so Bob refunds. Alice
 /// is forced to refund even though she learned the secret and would be able to
 /// redeem had the timelock not expired.
 #[tokio::test]
 async fn given_alice_restarts_after_enc_sig_learned_and_bob_already_cancelled_refund_swap() {
-    testutils::setup_test(config::Regtest, |mut ctx| async move {
+    utils::setup_test(config::Regtest, |mut ctx| async move {
         let (alice_swap, alice_join_handle) = ctx.new_swap_as_alice().await;
         let (bob_swap, _) = ctx.new_swap_as_bob().await;
 

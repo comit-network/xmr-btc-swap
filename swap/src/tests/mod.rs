@@ -6,4 +6,4 @@ mod happy_path_restart_bob_before_comm;
 mod punish;
 mod refund_restart_alice;
 mod refund_restart_alice_cancelled;
-pub mod testutils;
+pub mod utils;
