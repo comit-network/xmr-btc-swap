@@ -4,7 +4,7 @@ use crate::{
         GetBlockHeight, GetNetwork, GetRawTransaction, SignTxLock, Transaction,
         TransactionBlockHeight, TxLock, WaitForTransactionFinality, WatchForRawTransaction,
     },
-    config::ExecutionParams,
+    execution_params::ExecutionParams,
 };
 use ::bitcoin::{util::psbt::PartiallySignedTransaction, Txid};
 use anyhow::{Context, Result};

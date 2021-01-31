@@ -17,8 +17,8 @@
 )]
 
 pub mod bitcoin;
-pub mod config;
 pub mod database;
+pub mod execution_params;
 pub mod monero;
 pub mod network;
 pub mod protocol;

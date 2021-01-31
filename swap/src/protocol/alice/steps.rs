@@ -7,7 +7,7 @@ use crate::{
         TransactionBlockHeight, TxCancel, TxLock, TxRefund, WaitForTransactionFinality,
         WatchForRawTransaction,
     },
-    config::ExecutionParams,
+    execution_params::ExecutionParams,
     monero,
     monero::Transfer,
     protocol::{

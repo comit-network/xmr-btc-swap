@@ -6,7 +6,7 @@ use crate::{
         GetBlockHeight, GetNetwork, GetRawTransaction, Transaction, TransactionBlockHeight,
         TxCancel, Txid, WatchForRawTransaction,
     },
-    config::ExecutionParams,
+    execution_params::ExecutionParams,
     monero,
     monero::{monero_private_key, TransferProof},
     protocol::{alice, bob, bob::EncryptedSignature, SwapAmounts},

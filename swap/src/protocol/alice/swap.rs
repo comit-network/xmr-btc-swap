@@ -6,9 +6,9 @@ use crate::{
         timelocks::ExpiredTimelocks, TransactionBlockHeight, WaitForTransactionFinality,
         WatchForRawTransaction,
     },
-    config::ExecutionParams,
     database,
     database::Database,
+    execution_params::ExecutionParams,
     monero,
     monero::CreateWalletForOutput,
     protocol::{

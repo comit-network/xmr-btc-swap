@@ -8,8 +8,8 @@ use std::{path::PathBuf, sync::Arc};
 use swap::{
     bitcoin,
     bitcoin::Timelock,
-    config,
-    config::{ExecutionParams, GetExecutionParams},
+    execution_params,
+    execution_params::{ExecutionParams, GetExecutionParams},
     monero,
     protocol::{alice, alice::AliceState, bob, bob::BobState, SwapAmounts},
     seed::Seed,
@@ -518,7 +518,7 @@ impl GetExecutionParams for SlowCancelConfig {
     fn get_execution_params() -> ExecutionParams {
         ExecutionParams {
             bitcoin_cancel_timelock: Timelock::new(180),
-            ..config::Regtest::get_execution_params()
+            ..execution_params::Regtest::get_execution_params()
         }
     }
 }
@@ -529,7 +529,7 @@ impl GetExecutionParams for FastCancelConfig {
     fn get_execution_params() -> ExecutionParams {
         ExecutionParams {
             bitcoin_cancel_timelock: Timelock::new(1),
-            ..config::Regtest::get_execution_params()
+            ..execution_params::Regtest::get_execution_params()
         }
     }
 }
@@ -541,7 +541,7 @@ impl GetExecutionParams for FastPunishConfig {
         ExecutionParams {
             bitcoin_cancel_timelock: Timelock::new(1),
             bitcoin_punish_timelock: Timelock::new(1),
-            ..config::Regtest::get_execution_params()
+            ..execution_params::Regtest::get_execution_params()
         }
     }
 }

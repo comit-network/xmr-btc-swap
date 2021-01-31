@@ -1,117 +1,145 @@
-use crate::bitcoin::Timelock;
-use conquer_once::Lazy;
-use std::time::Duration;
+use crate::fs::ensure_directory_exists;
+use anyhow::{Context, Result};
+use config::{Config, ConfigError};
+use dialoguer::{theme::ColorfulTheme, Input};
+use serde::{Deserialize, Serialize};
+use std::{
+    ffi::OsStr,
+    fs,
+    path::{Path, PathBuf},
+};
+use tracing::info;
+use url::Url;
 
-#[derive(Debug, Copy, Clone)]
-pub struct ExecutionParams {
-    pub bob_time_to_act: Duration,
-    pub bitcoin_finality_confirmations: u32,
-    pub bitcoin_avg_block_time: Duration,
-    pub monero_finality_confirmations: u32,
-    pub bitcoin_cancel_timelock: Timelock,
-    pub bitcoin_punish_timelock: Timelock,
+pub mod seed;
+
+const DEFAULT_BITCOIND_TESTNET_URL: &str = "http://127.0.0.1:18332";
+const DEFAULT_MONERO_WALLET_RPC_TESTNET_URL: &str = "http://127.0.0.1:38083/json_rpc";
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct File {
+    pub bitcoin: Bitcoin,
+    pub monero: Monero,
 }
 
-pub trait GetExecutionParams {
-    fn get_execution_params() -> ExecutionParams;
-}
+impl File {
+    pub fn read<D>(config_file: D) -> Result<Self, ConfigError>
+    where
+        D: AsRef<OsStr>,
+    {
+        let config_file = Path::new(&config_file);
 
-#[derive(Clone, Copy)]
-pub struct Mainnet;
-
-#[derive(Clone, Copy)]
-pub struct Testnet;
-
-#[derive(Clone, Copy)]
-pub struct Regtest;
-
-impl GetExecutionParams for Mainnet {
-    fn get_execution_params() -> ExecutionParams {
-        ExecutionParams {
-            bob_time_to_act: *mainnet::BOB_TIME_TO_ACT,
-            bitcoin_finality_confirmations: mainnet::BITCOIN_FINALITY_CONFIRMATIONS,
-            bitcoin_avg_block_time: *mainnet::BITCOIN_AVG_BLOCK_TIME,
-            monero_finality_confirmations: mainnet::MONERO_FINALITY_CONFIRMATIONS,
-            bitcoin_cancel_timelock: mainnet::BITCOIN_CANCEL_TIMELOCK,
-            bitcoin_punish_timelock: mainnet::BITCOIN_PUNISH_TIMELOCK,
-        }
+        let mut config = Config::new();
+        config.merge(config::File::from(config_file))?;
+        config.try_into()
     }
 }
 
-impl GetExecutionParams for Testnet {
-    fn get_execution_params() -> ExecutionParams {
-        ExecutionParams {
-            bob_time_to_act: *testnet::BOB_TIME_TO_ACT,
-            bitcoin_finality_confirmations: testnet::BITCOIN_FINALITY_CONFIRMATIONS,
-            bitcoin_avg_block_time: *testnet::BITCOIN_AVG_BLOCK_TIME,
-            monero_finality_confirmations: testnet::MONERO_FINALITY_CONFIRMATIONS,
-            bitcoin_cancel_timelock: testnet::BITCOIN_CANCEL_TIMELOCK,
-            bitcoin_punish_timelock: testnet::BITCOIN_PUNISH_TIMELOCK,
-        }
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Bitcoin {
+    pub bitcoind_url: Url,
+    pub wallet_name: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Monero {
+    pub wallet_rpc_url: Url,
+}
+
+#[derive(thiserror::Error, Debug, Clone, Copy)]
+#[error("config not initialized")]
+pub struct ConfigNotInitialized {}
+
+pub fn read_config(config_path: PathBuf) -> Result<Result<File, ConfigNotInitialized>> {
+    if config_path.exists() {
+        info!(
+            "Using config file at default path: {}",
+            config_path.display()
+        );
+    } else {
+        return Ok(Err(ConfigNotInitialized {}));
     }
+
+    let file = File::read(&config_path)
+        .with_context(|| format!("failed to read config file {}", config_path.display()))?;
+
+    Ok(Ok(file))
 }
 
-impl GetExecutionParams for Regtest {
-    fn get_execution_params() -> ExecutionParams {
-        ExecutionParams {
-            bob_time_to_act: *regtest::BOB_TIME_TO_ACT,
-            bitcoin_finality_confirmations: regtest::BITCOIN_FINALITY_CONFIRMATIONS,
-            bitcoin_avg_block_time: *regtest::BITCOIN_AVG_BLOCK_TIME,
-            monero_finality_confirmations: regtest::MONERO_FINALITY_CONFIRMATIONS,
-            bitcoin_cancel_timelock: regtest::BITCOIN_CANCEL_TIMELOCK,
-            bitcoin_punish_timelock: regtest::BITCOIN_PUNISH_TIMELOCK,
-        }
+pub fn initial_setup<F>(config_path: PathBuf, config_file: F) -> Result<()>
+where
+    F: Fn() -> Result<File>,
+{
+    info!("Config file not found, running initial setup...");
+    ensure_directory_exists(config_path.as_path())?;
+    let initial_config = config_file()?;
+
+    let toml = toml::to_string(&initial_config)?;
+    fs::write(&config_path, toml)?;
+
+    info!(
+        "Initial setup complete, config file created at {} ",
+        config_path.as_path().display()
+    );
+    Ok(())
+}
+
+pub fn query_user_for_initial_testnet_config() -> Result<File> {
+    println!();
+    let bitcoind_url: String = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter Bitcoind URL (including username and password if applicable) or hit return to use default")
+        .default(DEFAULT_BITCOIND_TESTNET_URL.to_owned())
+        .interact_text()?;
+    let bitcoind_url = Url::parse(bitcoind_url.as_str())?;
+
+    let bitcoin_wallet_name: String = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter Bitcoind wallet name")
+        .interact_text()?;
+
+    let monero_wallet_rpc_url: String = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter Monero Wallet RPC URL or hit enter to use default")
+        .default(DEFAULT_MONERO_WALLET_RPC_TESTNET_URL.to_owned())
+        .interact_text()?;
+    let monero_wallet_rpc_url = Url::parse(monero_wallet_rpc_url.as_str())?;
+    println!();
+
+    Ok(File {
+        bitcoin: Bitcoin {
+            bitcoind_url,
+            wallet_name: bitcoin_wallet_name,
+        },
+        monero: Monero {
+            wallet_rpc_url: monero_wallet_rpc_url,
+        },
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+    use tempfile::tempdir;
+
+    #[test]
+    fn config_roundtrip() {
+        let temp_dir = tempdir().unwrap().path().to_path_buf();
+        let config_path = Path::join(&temp_dir, "config.toml");
+
+        let expected = File {
+            bitcoin: Bitcoin {
+                bitcoind_url: Url::from_str("http://127.0.0.1:18332").unwrap(),
+                wallet_name: "alice".to_string(),
+            },
+            monero: Monero {
+                wallet_rpc_url: Url::from_str("http://127.0.0.1:38083/json_rpc").unwrap(),
+            },
+        };
+
+        initial_setup(config_path.clone(), || Ok(expected.clone())).unwrap();
+        let actual = read_config(config_path).unwrap().unwrap();
+
+        assert_eq!(expected, actual);
     }
-}
-
-mod mainnet {
-    use crate::config::*;
-
-    // For each step, we are giving Bob 10 minutes to act.
-    pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(10 * 60));
-
-    pub static BITCOIN_FINALITY_CONFIRMATIONS: u32 = 3;
-
-    pub static BITCOIN_AVG_BLOCK_TIME: Lazy<Duration> = Lazy::new(|| Duration::from_secs(10 * 60));
-
-    pub static MONERO_FINALITY_CONFIRMATIONS: u32 = 15;
-
-    // Set to 12 hours, arbitrary value to be reviewed properly
-    pub static BITCOIN_CANCEL_TIMELOCK: Timelock = Timelock::new(72);
-    pub static BITCOIN_PUNISH_TIMELOCK: Timelock = Timelock::new(72);
-}
-
-mod testnet {
-    use crate::config::*;
-
-    pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(60 * 60));
-
-    // This does not reflect recommended values for mainnet!
-    pub static BITCOIN_FINALITY_CONFIRMATIONS: u32 = 1;
-
-    pub static BITCOIN_AVG_BLOCK_TIME: Lazy<Duration> = Lazy::new(|| Duration::from_secs(5 * 60));
-
-    // This does not reflect recommended values for mainnet!
-    pub static MONERO_FINALITY_CONFIRMATIONS: u32 = 5;
-
-    // This does not reflect recommended values for mainnet!
-    pub static BITCOIN_CANCEL_TIMELOCK: Timelock = Timelock::new(12);
-    pub static BITCOIN_PUNISH_TIMELOCK: Timelock = Timelock::new(6);
-}
-
-mod regtest {
-    use crate::config::*;
-
-    // In test, we set a shorter time to fail fast
-    pub static BOB_TIME_TO_ACT: Lazy<Duration> = Lazy::new(|| Duration::from_secs(30));
-
-    pub static BITCOIN_FINALITY_CONFIRMATIONS: u32 = 1;
-
-    pub static BITCOIN_AVG_BLOCK_TIME: Lazy<Duration> = Lazy::new(|| Duration::from_secs(5));
-
-    pub static MONERO_FINALITY_CONFIRMATIONS: u32 = 1;
-
-    pub static BITCOIN_CANCEL_TIMELOCK: Timelock = Timelock::new(100);
-
-    pub static BITCOIN_PUNISH_TIMELOCK: Timelock = Timelock::new(50);
 }

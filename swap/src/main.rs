@@ -14,10 +14,10 @@
 
 use crate::{
     cli::{Command, Options, Resume},
-    config::GetExecutionParams,
-    configuration::{
+    config::{
         initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
     },
+    execution_params::GetExecutionParams,
 };
 use anyhow::{Context, Result};
 use database::Database;
@@ -33,8 +33,8 @@ use uuid::Uuid;
 
 pub mod bitcoin;
 pub mod config;
-pub mod configuration;
 pub mod database;
+pub mod execution_params;
 pub mod monero;
 pub mod network;
 pub mod protocol;
@@ -66,14 +66,14 @@ async fn main() -> Result<()> {
     );
 
     let db_path = data_dir.join("database");
-    let seed = configuration::seed::Seed::from_file_or_generate(&data_dir)
+    let seed = config::seed::Seed::from_file_or_generate(&data_dir)
         .expect("Could not retrieve/initialize seed")
         .into();
 
     // hardcode to testnet/stagenet
     let bitcoin_network = bitcoin::Network::Testnet;
     let monero_network = monero::Network::Stagenet;
-    let execution_params = config::Testnet::get_execution_params();
+    let execution_params = execution_params::Testnet::get_execution_params();
 
     match opt.cmd {
         Command::SellXmr {
