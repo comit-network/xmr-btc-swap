@@ -1,13 +1,16 @@
 use crate::{bitcoin, monero};
 use libp2p::{core::Multiaddr, PeerId};
-use url::Url;
+use std::path::PathBuf;
 use uuid::Uuid;
 
 #[derive(structopt::StructOpt, Debug)]
 pub struct Options {
-    // TODO: Default value should points to proper configuration folder in home folder
-    #[structopt(long = "data-dir", default_value = "./.swap-data/")]
-    pub data_dir: String,
+    #[structopt(
+        long = "data-dir",
+        help = "Provide a custom path to the data directory.",
+        parse(from_os_str)
+    )]
+    pub data_dir: Option<PathBuf>,
 
     #[structopt(subcommand)]
     pub cmd: Command,
@@ -17,18 +20,6 @@ pub struct Options {
 #[structopt(name = "xmr_btc-swap", about = "XMR BTC atomic swap")]
 pub enum Command {
     SellXmr {
-        #[structopt(long = "bitcoind-rpc", default_value = "http://127.0.0.1:8332")]
-        bitcoind_url: Url,
-
-        #[structopt(long = "bitcoin-wallet-name")]
-        bitcoin_wallet_name: String,
-
-        #[structopt(
-            long = "monero-wallet-rpc",
-            default_value = "http://127.0.0.1:18083/json_rpc"
-        )]
-        monero_wallet_rpc_url: Url,
-
         #[structopt(long = "p2p-address", default_value = "/ip4/0.0.0.0/tcp/9876")]
         listen_addr: Multiaddr,
 
@@ -37,6 +28,9 @@ pub enum Command {
 
         #[structopt(long = "receive-btc", help = "Bitcoin amount as floating point nr without denomination (e.g. 1.25)", parse(try_from_str = parse_btc))]
         receive_bitcoin: bitcoin::Amount,
+
+        #[structopt(flatten)]
+        config: Config,
     },
     BuyXmr {
         #[structopt(long = "connect-peer-id")]
@@ -45,23 +39,14 @@ pub enum Command {
         #[structopt(long = "connect-addr")]
         alice_addr: Multiaddr,
 
-        #[structopt(long = "bitcoind-rpc", default_value = "http://127.0.0.1:8332")]
-        bitcoind_url: Url,
-
-        #[structopt(long = "bitcoin-wallet-name")]
-        bitcoin_wallet_name: String,
-
-        #[structopt(
-            long = "monero-wallet-rpc",
-            default_value = "http://127.0.0.1:18083/json_rpc"
-        )]
-        monero_wallet_rpc_url: Url,
-
         #[structopt(long = "send-btc", help = "Bitcoin amount as floating point nr without denomination (e.g. 1.25)", parse(try_from_str = parse_btc))]
         send_bitcoin: bitcoin::Amount,
 
         #[structopt(long = "receive-xmr", help = "Monero amount as floating point nr without denomination (e.g. 125.1)", parse(try_from_str = parse_xmr))]
         receive_monero: monero::Amount,
+
+        #[structopt(flatten)]
+        config: Config,
     },
     History,
     Resume(Resume),
@@ -73,20 +58,11 @@ pub enum Resume {
         #[structopt(long = "swap-id")]
         swap_id: Uuid,
 
-        #[structopt(long = "bitcoind-rpc", default_value = "http://127.0.0.1:8332")]
-        bitcoind_url: Url,
-
-        #[structopt(long = "bitcoin-wallet-name")]
-        bitcoin_wallet_name: String,
-
-        #[structopt(
-            long = "monero-wallet-rpc",
-            default_value = "http://127.0.0.1:18083/json_rpc"
-        )]
-        monero_wallet_rpc_url: Url,
-
         #[structopt(long = "listen-address", default_value = "/ip4/127.0.0.1/tcp/9876")]
         listen_addr: Multiaddr,
+
+        #[structopt(flatten)]
+        config: Config,
     },
     BuyXmr {
         #[structopt(long = "swap-id")]
@@ -98,18 +74,19 @@ pub enum Resume {
         #[structopt(long = "counterpart-addr")]
         alice_addr: Multiaddr,
 
-        #[structopt(long = "bitcoind-rpc", default_value = "http://127.0.0.1:8332")]
-        bitcoind_url: Url,
-
-        #[structopt(long = "bitcoin-wallet-name")]
-        bitcoin_wallet_name: String,
-
-        #[structopt(
-            long = "monero-wallet-rpc",
-            default_value = "http://127.0.0.1:18083/json_rpc"
-        )]
-        monero_wallet_rpc_url: Url,
+        #[structopt(flatten)]
+        config: Config,
     },
+}
+
+#[derive(structopt::StructOpt, Debug)]
+pub struct Config {
+    #[structopt(
+        long = "config",
+        help = "Provide a custom path to the configuration file. The configuration file must be a toml file.",
+        parse(from_os_str)
+    )]
+    pub path: Option<PathBuf>,
 }
 
 fn parse_btc(str: &str) -> anyhow::Result<bitcoin::Amount> {

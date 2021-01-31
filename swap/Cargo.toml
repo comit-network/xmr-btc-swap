@@ -14,10 +14,13 @@ backoff = { git = "https://github.com/ihrwein/backoff", rev = "9d03992a83dfdc596
 base64 = "0.12"
 bitcoin = { version = "0.25", features = ["rand", "use-serde"] }
 bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "ae2f6cd547496e680941c0910018bbe884128799" }
+config = { version = "0.10", default-features = false, features = ["toml"] }
 conquer-once = "0.3"
 cross-curve-dleq = { git = "https://github.com/comit-network/cross-curve-dleq", rev = "eddcdea1d1f16fa33ef581d1744014ece535c920", features = ["serde"] }
 curve25519-dalek = "2"
 derivative = "2"
+dialoguer = "0.7"
+directories-next = "2"
 ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", rev = "cdfbc766045ea678a41780919d6228dd5acee3be", features = ["libsecp_compat", "serde"] }
 ed25519-dalek = { version = "1.0.0-pre.4", features = ["serde"] }# Cannot be 1 because they depend on curve25519-dalek version 3
 futures = { version = "0.3", default-features = false }
@@ -43,12 +46,13 @@ tempfile = "3"
 thiserror = "1"
 time = "0.2"
 tokio = { version = "1.0", features = ["rt-multi-thread", "time", "macros", "sync"] }
+toml = "0.5"
 tracing = { version = "0.1", features = ["attributes"] }
 tracing-core = "0.1"
 tracing-futures = { version = "0.2", features = ["std-future", "futures-03"] }
 tracing-log = "0.1"
 tracing-subscriber = { version = "0.2", default-features = false, features = ["fmt", "ansi", "env-filter"] }
-url = "2.1"
+url = { version = "2.1", features = ["serde"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
 void = "1"
 

@@ -17,13 +17,12 @@
 )]
 
 pub mod bitcoin;
-pub mod config;
 pub mod database;
+pub mod execution_params;
 pub mod monero;
 pub mod network;
 pub mod protocol;
 pub mod seed;
 pub mod trace;
 
-mod fs;
 mod serde_peer_id;

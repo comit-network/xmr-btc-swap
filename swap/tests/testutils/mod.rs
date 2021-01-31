@@ -8,8 +8,8 @@ use std::{path::PathBuf, sync::Arc};
 use swap::{
     bitcoin,
     bitcoin::Timelock,
-    config,
-    config::{Config, GetConfig},
+    execution_params,
+    execution_params::{ExecutionParams, GetExecutionParams},
     monero,
     protocol::{alice, alice::AliceState, bob, bob::BobState, SwapAmounts},
     seed::Seed,
@@ -29,7 +29,7 @@ pub struct StartingBalances {
 
 struct AliceParams {
     seed: Seed,
-    config: Config,
+    execution_params: ExecutionParams,
     swap_id: Uuid,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
@@ -41,7 +41,7 @@ impl AliceParams {
     pub fn builder(&self) -> alice::Builder {
         alice::Builder::new(
             self.seed,
-            self.config,
+            self.execution_params,
             self.swap_id,
             self.bitcoin_wallet.clone(),
             self.monero_wallet.clone(),
@@ -64,7 +64,7 @@ struct BobParams {
     monero_wallet: Arc<monero::Wallet>,
     alice_address: Multiaddr,
     alice_peer_id: PeerId,
-    config: Config,
+    execution_params: ExecutionParams,
 }
 
 impl BobParams {
@@ -77,7 +77,7 @@ impl BobParams {
             self.monero_wallet.clone(),
             self.alice_address.clone(),
             self.alice_peer_id,
-            self.config,
+            self.execution_params,
         )
     }
 }
@@ -308,13 +308,13 @@ pub async fn setup_test<T, F, C>(_config: C, testfn: T)
 where
     T: Fn(TestContext) -> F,
     F: Future<Output = ()>,
-    C: GetConfig,
+    C: GetExecutionParams,
 {
     let cli = Cli::default();
 
     let _guard = init_tracing();
 
-    let config = C::get_config();
+    let execution_params = C::get_execution_params();
 
     let (monero, containers) = testutils::init_containers(&cli).await;
 
@@ -334,18 +334,17 @@ where
         .parse()
         .expect("failed to parse Alice's address");
 
-    let (alice_bitcoin_wallet, alice_monero_wallet) = init_wallets(
+    let (alice_bitcoin_wallet, alice_monero_wallet) = init_test_wallets(
         "alice",
         &containers.bitcoind,
         &monero,
         alice_starting_balances.clone(),
-        config,
     )
     .await;
 
     let alice_params = AliceParams {
         seed: Seed::random().unwrap(),
-        config,
+        execution_params,
         swap_id: Uuid::new_v4(),
         bitcoin_wallet: alice_bitcoin_wallet.clone(),
         monero_wallet: alice_monero_wallet.clone(),
@@ -358,12 +357,11 @@ where
         btc: swap_amounts.btc * 10,
     };
 
-    let (bob_bitcoin_wallet, bob_monero_wallet) = init_wallets(
+    let (bob_bitcoin_wallet, bob_monero_wallet) = init_test_wallets(
         "bob",
         &containers.bitcoind,
         &monero,
         bob_starting_balances.clone(),
-        config,
     )
     .await;
 
@@ -375,7 +373,7 @@ where
         monero_wallet: bob_monero_wallet.clone(),
         alice_address: alice_params.listen_address.clone(),
         alice_peer_id: alice_params.peer_id(),
-        config,
+        execution_params,
     };
 
     let test = TestContext {
@@ -403,12 +401,11 @@ async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
     (monero, Containers { bitcoind, monerods })
 }
 
-async fn init_wallets(
+async fn init_test_wallets(
     name: &str,
     bitcoind: &Bitcoind<'_>,
     monero: &Monero,
     starting_balances: StartingBalances,
-    config: Config,
 ) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {
     monero
         .init(vec![(name, starting_balances.xmr.as_piconero())])
@@ -417,11 +414,11 @@ async fn init_wallets(
 
     let xmr_wallet = Arc::new(swap::monero::Wallet {
         inner: monero.wallet(name).unwrap().client(),
-        network: config.monero_network,
+        network: monero::Network::default(),
     });
 
     let btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new(name, bitcoind.node_url.clone(), config.bitcoin_network)
+        swap::bitcoin::Wallet::new(name, bitcoind.node_url.clone(), bitcoin::Network::Regtest)
             .await
             .unwrap(),
     );
@@ -517,34 +514,34 @@ pub mod bob_run_until {
 
 pub struct SlowCancelConfig;
 
-impl GetConfig for SlowCancelConfig {
-    fn get_config() -> Config {
-        Config {
+impl GetExecutionParams for SlowCancelConfig {
+    fn get_execution_params() -> ExecutionParams {
+        ExecutionParams {
             bitcoin_cancel_timelock: Timelock::new(180),
-            ..config::Regtest::get_config()
+            ..execution_params::Regtest::get_execution_params()
         }
     }
 }
 
 pub struct FastCancelConfig;
 
-impl GetConfig for FastCancelConfig {
-    fn get_config() -> Config {
-        Config {
+impl GetExecutionParams for FastCancelConfig {
+    fn get_execution_params() -> ExecutionParams {
+        ExecutionParams {
             bitcoin_cancel_timelock: Timelock::new(1),
-            ..config::Regtest::get_config()
+            ..execution_params::Regtest::get_execution_params()
         }
     }
 }
 
 pub struct FastPunishConfig;
 
-impl GetConfig for FastPunishConfig {
-    fn get_config() -> Config {
-        Config {
+impl GetExecutionParams for FastPunishConfig {
+    fn get_execution_params() -> ExecutionParams {
+        ExecutionParams {
             bitcoin_cancel_timelock: Timelock::new(1),
             bitcoin_punish_timelock: Timelock::new(1),
-            ..config::Regtest::get_config()
+            ..execution_params::Regtest::get_execution_params()
         }
     }
 }

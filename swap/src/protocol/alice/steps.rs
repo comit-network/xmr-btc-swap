@@ -7,7 +7,7 @@ use crate::{
         TransactionBlockHeight, TxCancel, TxLock, TxRefund, WaitForTransactionFinality,
         WatchForRawTransaction,
     },
-    config::Config,
+    execution_params::ExecutionParams,
     monero,
     monero::Transfer,
     protocol::{
@@ -33,28 +33,34 @@ pub async fn negotiate(
     state0: alice::State0,
     xmr_amount: monero::Amount,
     event_loop_handle: &mut EventLoopHandle,
-    config: Config,
+    execution_params: ExecutionParams,
 ) -> Result<(PeerId, alice::State3)> {
     trace!("Starting negotiate");
 
     // todo: we can move this out, we dont need to timeout here
     let bob_peer_id = timeout(
-        config.bob_time_to_act,
+        execution_params.bob_time_to_act,
         event_loop_handle.recv_conn_established(),
     )
     .await
     .context("Failed to receive dial connection from Bob")??;
 
-    let event = timeout(config.bob_time_to_act, event_loop_handle.recv_request())
-        .await
-        .context("Failed to receive swap request from Bob")??;
+    let event = timeout(
+        execution_params.bob_time_to_act,
+        event_loop_handle.recv_request(),
+    )
+    .await
+    .context("Failed to receive swap request from Bob")??;
 
     event_loop_handle
         .send_swap_response(event.channel, SwapResponse { xmr_amount })
         .await?;
 
-    let (bob_message0, channel) =
-        timeout(config.bob_time_to_act, event_loop_handle.recv_message0()).await??;
+    let (bob_message0, channel) = timeout(
+        execution_params.bob_time_to_act,
+        event_loop_handle.recv_message0(),
+    )
+    .await??;
 
     let alice_message0 = state0.next_message(&mut OsRng);
     event_loop_handle
@@ -63,8 +69,11 @@ pub async fn negotiate(
 
     let state1 = state0.receive(bob_message0)?;
 
-    let (bob_message1, channel) =
-        timeout(config.bob_time_to_act, event_loop_handle.recv_message1()).await??;
+    let (bob_message1, channel) = timeout(
+        execution_params.bob_time_to_act,
+        event_loop_handle.recv_message1(),
+    )
+    .await??;
 
     let state2 = state1.receive(bob_message1);
 
@@ -72,7 +81,11 @@ pub async fn negotiate(
         .send_message1(channel, state2.next_message())
         .await?;
 
-    let bob_message2 = timeout(config.bob_time_to_act, event_loop_handle.recv_message2()).await??;
+    let bob_message2 = timeout(
+        execution_params.bob_time_to_act,
+        event_loop_handle.recv_message2(),
+    )
+    .await??;
 
     let state3 = state2.receive(bob_message2)?;
 
@@ -84,14 +97,14 @@ pub async fn negotiate(
 pub async fn wait_for_locked_bitcoin<W>(
     lock_bitcoin_txid: bitcoin::Txid,
     bitcoin_wallet: Arc<W>,
-    config: Config,
+    execution_params: ExecutionParams,
 ) -> Result<()>
 where
     W: WatchForRawTransaction + WaitForTransactionFinality,
 {
     // We assume we will see Bob's transaction in the mempool first.
     timeout(
-        config.bob_time_to_act,
+        execution_params.bob_time_to_act,
         bitcoin_wallet.watch_for_raw_transaction(lock_bitcoin_txid),
     )
     .await
@@ -99,7 +112,7 @@ where
 
     // // We saw the transaction in the mempool, waiting for it to be confirmed.
     bitcoin_wallet
-        .wait_for_transaction_finality(lock_bitcoin_txid, config)
+        .wait_for_transaction_finality(lock_bitcoin_txid, execution_params)
         .await?;
 
     Ok(())
@@ -324,7 +337,7 @@ pub fn build_bitcoin_punish_transaction(
 pub async fn publish_bitcoin_punish_transaction<W>(
     punish_tx: bitcoin::Transaction,
     bitcoin_wallet: Arc<W>,
-    config: Config,
+    execution_params: ExecutionParams,
 ) -> Result<bitcoin::Txid>
 where
     W: BroadcastSignedTransaction + WaitForTransactionFinality,
@@ -334,7 +347,7 @@ where
         .await?;
 
     bitcoin_wallet
-        .wait_for_transaction_finality(txid, config)
+        .wait_for_transaction_finality(txid, execution_params)
         .await?;
 
     Ok(txid)

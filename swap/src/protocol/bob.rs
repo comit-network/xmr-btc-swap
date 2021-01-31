@@ -1,9 +1,7 @@
 //! Run an XMR/BTC swap in the role of Bob.
 //! Bob holds BTC and wishes receive XMR.
 use crate::{
-    bitcoin,
-    config::Config,
-    database,
+    bitcoin, database,
     database::Database,
     monero, network,
     network::{
@@ -30,7 +28,7 @@ pub use self::{
     swap::{run, run_until},
     swap_request::*,
 };
-use crate::protocol::alice::TransferProof;
+use crate::{execution_params::ExecutionParams, protocol::alice::TransferProof};
 
 mod encrypted_signature;
 pub mod event_loop;
@@ -48,7 +46,7 @@ pub struct Swap {
     pub db: Database,
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
-    pub config: Config,
+    pub execution_params: ExecutionParams,
     pub swap_id: Uuid,
 }
 
@@ -65,7 +63,7 @@ pub struct Builder {
     monero_wallet: Arc<monero::Wallet>,
 
     init_params: InitParams,
-    config: Config,
+    execution_params: ExecutionParams,
 }
 
 enum InitParams {
@@ -83,7 +81,7 @@ impl Builder {
         monero_wallet: Arc<monero::Wallet>,
         alice_address: Multiaddr,
         alice_peer_id: PeerId,
-        config: Config,
+        execution_params: ExecutionParams,
     ) -> Self {
         let identity = network::Seed::new(seed).derive_libp2p_identity();
         let peer_id = identity.public().into_peer_id();
@@ -98,7 +96,7 @@ impl Builder {
             bitcoin_wallet,
             monero_wallet,
             init_params: InitParams::None,
-            config,
+            execution_params,
         }
     }
 
@@ -113,7 +111,7 @@ impl Builder {
         match self.init_params {
             InitParams::New { swap_amounts } => {
                 let initial_state = self
-                    .make_initial_state(swap_amounts.btc, swap_amounts.xmr, self.config)
+                    .make_initial_state(swap_amounts.btc, swap_amounts.xmr, self.execution_params)
                     .await?;
 
                 let (event_loop, event_loop_handle) = self.init_event_loop()?;
@@ -128,7 +126,7 @@ impl Builder {
                         bitcoin_wallet: self.bitcoin_wallet.clone(),
                         monero_wallet: self.monero_wallet.clone(),
                         swap_id: self.swap_id,
-                        config: self.config,
+                        execution_params: self.execution_params,
                     },
                     event_loop,
                 ))
@@ -157,7 +155,7 @@ impl Builder {
                         bitcoin_wallet: self.bitcoin_wallet.clone(),
                         monero_wallet: self.monero_wallet.clone(),
                         swap_id: self.swap_id,
-                        config: self.config,
+                        execution_params: self.execution_params,
                     },
                     event_loop,
                 ))
@@ -183,7 +181,7 @@ impl Builder {
         &self,
         btc_to_swap: bitcoin::Amount,
         xmr_to_swap: monero::Amount,
-        config: Config,
+        execution_params: ExecutionParams,
     ) -> Result<BobState> {
         let amounts = SwapAmounts {
             btc: btc_to_swap,
@@ -195,10 +193,10 @@ impl Builder {
             &mut OsRng,
             btc_to_swap,
             xmr_to_swap,
-            config.bitcoin_cancel_timelock,
-            config.bitcoin_punish_timelock,
+            execution_params.bitcoin_cancel_timelock,
+            execution_params.bitcoin_punish_timelock,
             refund_address,
-            config.monero_finality_confirmations,
+            execution_params.monero_finality_confirmations,
         );
 
         Ok(BobState::Started { state0, amounts })
