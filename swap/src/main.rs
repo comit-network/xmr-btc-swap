@@ -215,6 +215,7 @@ async fn main() -> Result<()> {
             alice_peer_id,
             alice_addr,
             config,
+            force,
         }) => {
             // TODO: Optimization: Only init the Bitcoin wallet, Monero wallet unnecessary
             let (bitcoin_wallet, monero_wallet) =
@@ -234,7 +235,15 @@ async fn main() -> Result<()> {
 
             tokio::spawn(async move { event_loop.run().await });
 
-            match bob::cancel(swap.swap_id, swap.state, swap.bitcoin_wallet, swap.db).await? {
+            match bob::cancel(
+                swap.swap_id,
+                swap.state,
+                swap.bitcoin_wallet,
+                swap.db,
+                force,
+            )
+            .await?
+            {
                 Ok((txid, _)) => {
                     info!("Cancel transaction successfully published with id {}", txid)
                 }
@@ -251,6 +260,7 @@ async fn main() -> Result<()> {
             alice_peer_id,
             alice_addr,
             config,
+            force,
         }) => {
             let (bitcoin_wallet, monero_wallet) =
                 init_wallets(config.path, bitcoin_network, monero_network).await?;
@@ -275,6 +285,7 @@ async fn main() -> Result<()> {
                 swap.execution_params,
                 swap.bitcoin_wallet,
                 swap.db,
+                force,
             )
             .await??;
         }

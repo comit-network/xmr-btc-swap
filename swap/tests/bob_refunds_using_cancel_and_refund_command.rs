@@ -34,6 +34,7 @@ async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
             bob_swap.state,
             bob_swap.bitcoin_wallet,
             bob_swap.db,
+            false,
         )
         .await
         .unwrap()
@@ -50,6 +51,7 @@ async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
             bob_swap.execution_params,
             bob_swap.bitcoin_wallet,
             bob_swap.db,
+            false,
         )
         .await
         .unwrap()

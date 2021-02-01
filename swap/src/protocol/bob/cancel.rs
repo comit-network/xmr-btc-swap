@@ -20,6 +20,7 @@ pub async fn cancel(
     state: BobState,
     bitcoin_wallet: Arc<Wallet>,
     db: Database,
+    force: bool,
 ) -> Result<Result<(Txid, BobState), CancelError>> {
     let state4 = match state {
         BobState::BtcLocked(state3) => state3.state4(),
@@ -34,20 +35,22 @@ pub async fn cancel(
         ),
     };
 
-    if let ExpiredTimelocks::None = state4.expired_timelock(bitcoin_wallet.as_ref()).await? {
-        return Ok(Err(CancelError::CancelTimelockNotExpiredYet));
-    }
+    if !force {
+        if let ExpiredTimelocks::None = state4.expired_timelock(bitcoin_wallet.as_ref()).await? {
+            return Ok(Err(CancelError::CancelTimelockNotExpiredYet));
+        }
 
-    if state4
-        .check_for_tx_cancel(bitcoin_wallet.as_ref())
-        .await
-        .is_ok()
-    {
-        let state = BobState::BtcCancelled(state4);
-        let db_state = state.into();
-        db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
+        if state4
+            .check_for_tx_cancel(bitcoin_wallet.as_ref())
+            .await
+            .is_ok()
+        {
+            let state = BobState::BtcCancelled(state4);
+            let db_state = state.into();
+            db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
 
-        return Ok(Err(CancelError::CancelTxAlreadyPublished));
+            return Ok(Err(CancelError::CancelTxAlreadyPublished));
+        }
     }
 
     let txid = state4.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;

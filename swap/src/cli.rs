@@ -96,6 +96,9 @@ pub enum Cancel {
 
         #[structopt(flatten)]
         config: Config,
+
+        #[structopt(short, long)]
+        force: bool,
     },
 }
 
@@ -114,6 +117,9 @@ pub enum Refund {
 
         #[structopt(flatten)]
         config: Config,
+
+        #[structopt(short, long)]
+        force: bool,
     },
 }
 

@@ -4,7 +4,7 @@ use crate::{
     execution_params::ExecutionParams,
     protocol::bob::BobState,
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -18,11 +18,28 @@ pub async fn refund(
     execution_params: ExecutionParams,
     bitcoin_wallet: Arc<Wallet>,
     db: Database,
+    force: bool,
 ) -> Result<Result<BobState, SwapNotCancelledYet>> {
-    let state4 = match state {
-        BobState::BtcCancelled(state4) => state4,
-        _ => {
-            return Ok(Err(SwapNotCancelledYet(swap_id)));
+    let state4 = if force {
+        match state {
+            BobState::BtcLocked(state3) => state3.state4(),
+            BobState::XmrLockProofReceived { state, .. } => state.state4(),
+            BobState::XmrLocked(state4) => state4,
+            BobState::EncSigSent(state4) => state4,
+            BobState::CancelTimelockExpired(state4) => state4,
+            BobState::BtcCancelled(state4) => state4,
+            _ => bail!(
+                "Cannot refund swap {} because it is in state {} which is not refundable.",
+                swap_id,
+                state
+            ),
+        }
+    } else {
+        match state {
+            BobState::BtcCancelled(state4) => state4,
+            _ => {
+                return Ok(Err(SwapNotCancelledYet(swap_id)));
+            }
         }
     };
 
