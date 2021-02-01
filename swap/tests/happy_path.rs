@@ -1,6 +1,7 @@
 pub mod testutils;
 
 use swap::protocol::{alice, bob};
+
 use testutils::SlowCancelConfig;
 use tokio::join;
 

@@ -26,7 +26,10 @@ use fs::{default_config_path, default_data_dir};
 use log::LevelFilter;
 use prettytable::{row, Table};
 use protocol::{alice, bob, bob::Builder, SwapAmounts};
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use structopt::StructOpt;
 use trace::init_tracing;
 use tracing::{error, info, warn};
@@ -67,6 +70,7 @@ async fn main() -> Result<()> {
     );
 
     let db_path = data_dir.join("database");
+    let wallet_data_dir = data_dir.join("wallet");
     let seed = config::seed::Seed::from_file_or_generate(&data_dir)
         .expect("Could not retrieve/initialize seed")
         .into();
@@ -88,8 +92,13 @@ async fn main() -> Result<()> {
                 btc: receive_bitcoin,
             };
 
-            let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config.path, bitcoin_network, monero_network).await?;
+            let (bitcoin_wallet, monero_wallet) = init_wallets(
+                config.path,
+                bitcoin_network,
+                &wallet_data_dir,
+                monero_network,
+            )
+            .await?;
 
             let swap_id = Uuid::new_v4();
 
@@ -125,8 +134,13 @@ async fn main() -> Result<()> {
                 xmr: receive_monero,
             };
 
-            let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config.path, bitcoin_network, monero_network).await?;
+            let (bitcoin_wallet, monero_wallet) = init_wallets(
+                config.path,
+                bitcoin_network,
+                &wallet_data_dir,
+                monero_network,
+            )
+            .await?;
 
             let swap_id = Uuid::new_v4();
 
@@ -169,8 +183,13 @@ async fn main() -> Result<()> {
             listen_addr,
             config,
         }) => {
-            let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config.path, bitcoin_network, monero_network).await?;
+            let (bitcoin_wallet, monero_wallet) = init_wallets(
+                config.path,
+                bitcoin_network,
+                &wallet_data_dir,
+                monero_network,
+            )
+            .await?;
 
             let alice_factory = alice::Builder::new(
                 seed,
@@ -192,8 +211,13 @@ async fn main() -> Result<()> {
             alice_addr,
             config,
         }) => {
-            let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config.path, bitcoin_network, monero_network).await?;
+            let (bitcoin_wallet, monero_wallet) = init_wallets(
+                config.path,
+                bitcoin_network,
+                &wallet_data_dir,
+                monero_network,
+            )
+            .await?;
 
             let bob_factory = Builder::new(
                 seed,
@@ -218,8 +242,13 @@ async fn main() -> Result<()> {
             force,
         }) => {
             // TODO: Optimization: Only init the Bitcoin wallet, Monero wallet unnecessary
-            let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config.path, bitcoin_network, monero_network).await?;
+            let (bitcoin_wallet, monero_wallet) = init_wallets(
+                config.path,
+                bitcoin_network,
+                &wallet_data_dir,
+                monero_network,
+            )
+            .await?;
 
             let bob_factory = Builder::new(
                 seed,
@@ -263,8 +292,13 @@ async fn main() -> Result<()> {
             config,
             force,
         }) => {
-            let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config.path, bitcoin_network, monero_network).await?;
+            let (bitcoin_wallet, monero_wallet) = init_wallets(
+                config.path,
+                bitcoin_network,
+                &wallet_data_dir,
+                monero_network,
+            )
+            .await?;
 
             // TODO: Optimize to only use the Bitcoin wallet, Monero wallet is unnecessary
             let bob_factory = Builder::new(
@@ -298,6 +332,7 @@ async fn main() -> Result<()> {
 async fn init_wallets(
     config_path: Option<PathBuf>,
     bitcoin_network: bitcoin::Network,
+    bitcoin_wallet_data_dir: &Path,
     monero_network: monero::Network,
 ) -> Result<(bitcoin::Wallet, monero::Wallet)> {
     let config_path = if let Some(config_path) = config_path {
@@ -315,9 +350,10 @@ async fn init_wallets(
     };
 
     let bitcoin_wallet = bitcoin::Wallet::new(
-        config.bitcoin.wallet_name.as_str(),
-        config.bitcoin.bitcoind_url,
+        config.bitcoin.electrum_rpc_url,
+        config.bitcoin.electrum_http_url,
         bitcoin_network,
+        bitcoin_wallet_data_dir,
     )
     .await?;
     let bitcoin_balance = bitcoin_wallet.balance().await?;

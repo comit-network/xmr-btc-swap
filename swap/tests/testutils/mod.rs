@@ -1,10 +1,18 @@
+mod bitcoind;
+mod electrs;
+
 use crate::testutils;
-use bitcoin_harness::Bitcoind;
+use anyhow::{Context, Result};
+use bitcoin_harness::{BitcoindRpcApi, Client};
 use futures::Future;
 use get_port::get_port;
 use libp2p::{core::Multiaddr, PeerId};
 use monero_harness::{image, Monero};
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 use swap::{
     bitcoin,
     bitcoin::Timelock,
@@ -15,11 +23,14 @@ use swap::{
     seed::Seed,
 };
 use tempfile::tempdir;
-use testcontainers::{clients::Cli, Container};
+use testcontainers::{clients::Cli, Container, Docker, RunArgs};
 use tokio::task::JoinHandle;
 use tracing_core::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
+use url::Url;
 use uuid::Uuid;
+
+const TEST_WALLET_NAME: &str = "testwallet";
 
 #[derive(Debug, Clone)]
 pub struct StartingBalances {
@@ -55,7 +66,7 @@ impl AliceParams {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct BobParams {
     seed: Seed,
     db_path: PathBuf,
@@ -334,11 +345,23 @@ where
         .parse()
         .expect("failed to parse Alice's address");
 
+    let electrs_rpc_port = containers
+        .electrs
+        .get_host_port(testutils::electrs::RPC_PORT)
+        .expect("Could not map electrs rpc port");
+    let electrs_http_port = containers
+        .electrs
+        .get_host_port(testutils::electrs::HTTP_PORT)
+        .expect("Could not map electrs http port");
+
     let (alice_bitcoin_wallet, alice_monero_wallet) = init_test_wallets(
         "alice",
-        &containers.bitcoind,
+        containers.bitcoind_url.clone(),
         &monero,
         alice_starting_balances.clone(),
+        tempdir().unwrap().path(),
+        electrs_rpc_port,
+        electrs_http_port,
     )
     .await;
 
@@ -359,9 +382,12 @@ where
 
     let (bob_bitcoin_wallet, bob_monero_wallet) = init_test_wallets(
         "bob",
-        &containers.bitcoind,
+        containers.bitcoind_url,
         &monero,
         bob_starting_balances.clone(),
+        tempdir().unwrap().path(),
+        electrs_rpc_port,
+        electrs_http_port,
     )
     .await;
 
@@ -391,21 +417,163 @@ where
     testfn(test).await
 }
 
+fn random_prefix() -> String {
+    use rand::{distributions::Alphanumeric, thread_rng, Rng};
+    use std::iter;
+    const LEN: usize = 8;
+    let mut rng = thread_rng();
+    let chars: String = iter::repeat(())
+        .map(|()| rng.sample(Alphanumeric))
+        .map(char::from)
+        .take(LEN)
+        .collect();
+    chars
+}
+
 async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
-    let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
-    let _ = bitcoind.init(5).await;
+    let prefix = random_prefix();
+    let bitcoind_name = format!("{}_{}", prefix, "bitcoind");
+    let (bitcoind, bitcoind_url) =
+        init_bitcoind_container(&cli, prefix.clone(), bitcoind_name.clone(), prefix.clone())
+            .await
+            .expect("could not init bitcoind");
+    let electrs = init_electrs_container(&cli, prefix.clone(), bitcoind_name, prefix)
+        .await
+        .expect("could not init electrs");
+    let (monero, monerods) = init_monero_container(&cli).await;
+    (monero, Containers {
+        bitcoind_url,
+        bitcoind,
+        monerods,
+        electrs,
+    })
+}
+
+async fn init_bitcoind_container(
+    cli: &Cli,
+    volume: String,
+    name: String,
+    network: String,
+) -> Result<(Container<'_, Cli, bitcoind::Bitcoind>, Url)> {
+    let image = bitcoind::Bitcoind::default()
+        .with_volume(volume)
+        .with_tag("0.19.1");
+
+    let run_args = RunArgs::default().with_name(name).with_network(network);
+
+    let docker = cli.run_with_args(image, run_args);
+    let a = docker
+        .get_host_port(testutils::bitcoind::RPC_PORT)
+        .context("Could not map bitcoind rpc port")?;
+
+    let bitcoind_url = {
+        let input = format!(
+            "http://{}:{}@localhost:{}",
+            bitcoind::RPC_USER,
+            bitcoind::RPC_PASSWORD,
+            a
+        );
+        Url::parse(&input).unwrap()
+    };
+
+    init_bitcoind(bitcoind_url.clone(), 5).await?;
+
+    Ok((docker, bitcoind_url.clone()))
+}
+
+pub async fn init_electrs_container(
+    cli: &Cli,
+    volume: String,
+    bitcoind_container_name: String,
+    network: String,
+) -> Result<Container<'_, Cli, electrs::Electrs>> {
+    let bitcoind_rpc_addr = format!(
+        "{}:{}",
+        bitcoind_container_name,
+        testutils::bitcoind::RPC_PORT
+    );
+    let image = electrs::Electrs::default()
+        .with_volume(volume)
+        .with_daemon_rpc_addr(bitcoind_rpc_addr)
+        .with_tag("latest");
+
+    let run_args = RunArgs::default().with_network(network);
+
+    let docker = cli.run_with_args(image, run_args);
+
+    Ok(docker)
+}
+
+async fn mine(bitcoind_client: Client, reward_address: bitcoin::Address) -> Result<()> {
+    loop {
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        bitcoind_client
+            .generatetoaddress(1, reward_address.clone(), None)
+            .await?;
+    }
+}
+
+async fn init_bitcoind(node_url: Url, spendable_quantity: u32) -> Result<Client> {
+    let bitcoind_client = Client::new(node_url.clone());
+
+    bitcoind_client
+        .createwallet(TEST_WALLET_NAME, None, None, None, None)
+        .await?;
+
+    let reward_address = bitcoind_client
+        .with_wallet(TEST_WALLET_NAME)?
+        .getnewaddress(None, None)
+        .await?;
+
+    bitcoind_client
+        .generatetoaddress(101 + spendable_quantity, reward_address.clone(), None)
+        .await?;
+    let _ = tokio::spawn(mine(bitcoind_client.clone(), reward_address));
+    Ok(bitcoind_client)
+}
+
+/// Send Bitcoin to the specified address, limited to the spendable bitcoin
+/// quantity.
+pub async fn mint(node_url: Url, address: bitcoin::Address, amount: bitcoin::Amount) -> Result<()> {
+    let bitcoind_client = Client::new(node_url.clone());
+
+    bitcoind_client
+        .send_to_address(TEST_WALLET_NAME, address.clone(), amount)
+        .await?;
+
+    // Confirm the transaction
+    let reward_address = bitcoind_client
+        .with_wallet(TEST_WALLET_NAME)?
+        .getnewaddress(None, None)
+        .await?;
+    bitcoind_client
+        .generatetoaddress(1, reward_address, None)
+        .await?;
+
+    Ok(())
+}
+
+async fn init_monero_container(
+    cli: &Cli,
+) -> (
+    Monero,
+    Vec<Container<'_, Cli, monero_harness::image::Monero>>,
+) {
     let (monero, monerods) = Monero::new(&cli, None, vec!["alice".to_string(), "bob".to_string()])
         .await
         .unwrap();
 
-    (monero, Containers { bitcoind, monerods })
+    (monero, monerods)
 }
 
 async fn init_test_wallets(
     name: &str,
-    bitcoind: &Bitcoind<'_>,
+    bitcoind_url: Url,
     monero: &Monero,
     starting_balances: StartingBalances,
+    datadir: &Path,
+    electrum_rpc_port: u16,
+    electrum_http_port: u16,
 ) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {
     monero
         .init(vec![(name, starting_balances.xmr.as_piconero())])
@@ -417,20 +585,34 @@ async fn init_test_wallets(
         network: monero::Network::default(),
     });
 
+    let electrum_rpc_url = {
+        let input = format!("tcp://@localhost:{}", electrum_rpc_port);
+        Url::parse(&input).unwrap()
+    };
+    let electrum_http_url = {
+        let input = format!("http://@localhost:{}", electrum_http_port);
+        Url::parse(&input).unwrap()
+    };
+
     let btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new(name, bitcoind.node_url.clone(), bitcoin::Network::Regtest)
-            .await
-            .unwrap(),
+        swap::bitcoin::Wallet::new(
+            electrum_rpc_url,
+            electrum_http_url,
+            bitcoin::Network::Regtest,
+            datadir,
+        )
+        .await
+        .expect("could not init btc wallet"),
     );
 
     if starting_balances.btc != bitcoin::Amount::ZERO {
-        bitcoind
-            .mint(
-                btc_wallet.inner.new_address().await.unwrap(),
-                starting_balances.btc,
-            )
-            .await
-            .unwrap();
+        mint(
+            bitcoind_url,
+            btc_wallet.new_address().await.unwrap(),
+            starting_balances.btc,
+        )
+        .await
+        .expect("could not mint btc starting balance");
     }
 
     (btc_wallet, xmr_wallet)
@@ -439,8 +621,10 @@ async fn init_test_wallets(
 // This is just to keep the containers alive
 #[allow(dead_code)]
 struct Containers<'a> {
-    bitcoind: Bitcoind<'a>,
+    bitcoind_url: Url,
+    bitcoind: Container<'a, Cli, bitcoind::Bitcoind>,
     monerods: Vec<Container<'a, Cli, image::Monero>>,
+    electrs: Container<'a, Cli, electrs::Electrs>,
 }
 
 /// Utility function to initialize logging in the test environment.
@@ -449,7 +633,7 @@ struct Containers<'a> {
 /// ```rust
 /// let _guard = init_tracing();
 /// ```
-fn init_tracing() -> DefaultGuard {
+pub fn init_tracing() -> DefaultGuard {
     // converts all log records into tracing events
     // Note: Make sure to initialize without unwrapping, otherwise this causes
     // trouble when running multiple tests.
@@ -460,16 +644,18 @@ fn init_tracing() -> DefaultGuard {
     let xmr_btc_filter = tracing::Level::DEBUG;
     let monero_harness_filter = tracing::Level::INFO;
     let bitcoin_harness_filter = tracing::Level::INFO;
+    let testcontainers_filter = tracing::Level::DEBUG;
 
     use tracing_subscriber::util::SubscriberInitExt as _;
     tracing_subscriber::fmt()
         .with_env_filter(format!(
-            "{},swap={},xmr_btc={},monero_harness={},bitcoin_harness={}",
+            "{},swap={},xmr_btc={},monero_harness={},bitcoin_harness={},testcontainers={}",
             global_filter,
             swap_filter,
             xmr_btc_filter,
             monero_harness_filter,
             bitcoin_harness_filter,
+            testcontainers_filter
         ))
         .set_default()
 }

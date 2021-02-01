@@ -1,4 +1,4 @@
-use std::ops::Add;
+use std::ops::{Add, Sub};
 
 use serde::{Deserialize, Serialize};
 
@@ -46,6 +46,14 @@ impl Add<Timelock> for BlockHeight {
 
     fn add(self, rhs: Timelock) -> Self::Output {
         BlockHeight(self.0 + rhs.0)
+    }
+}
+
+impl Sub<BlockHeight> for BlockHeight {
+    type Output = BlockHeight;
+
+    fn sub(self, rhs: BlockHeight) -> Self::Output {
+        BlockHeight(self.0 - rhs.0)
     }
 }
 
