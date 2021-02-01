@@ -135,6 +135,7 @@ jobs:
             refund_restart_alice_cancelled,
             refund_restart_alice,
             bob_refunds_using_cancel_and_refund_command,
+            bob_refunds_using_cancel_and_refund_command_timelock_not_exired,
         ]
     runs-on: ubuntu-latest
     steps:
