@@ -1,10 +1,11 @@
 use crate::testutils;
-use bitcoin_harness::Bitcoind;
+use anyhow::Result;
+use bitcoin_harness::{BitcoindRpcApi, Client};
 use futures::Future;
 use get_port::get_port;
 use libp2p::{core::Multiaddr, PeerId};
 use monero_harness::{image, Monero};
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 use swap::{
     bitcoin,
     bitcoin::Timelock,
@@ -19,7 +20,10 @@ use testcontainers::{clients::Cli, Container};
 use tokio::task::JoinHandle;
 use tracing_core::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
+use url::Url;
 use uuid::Uuid;
+
+const TEST_WALLET_NAME: &str = "testwallet";
 
 #[derive(Debug, Clone)]
 pub struct StartingBalances {
@@ -336,7 +340,7 @@ where
 
     let (alice_bitcoin_wallet, alice_monero_wallet) = init_wallets(
         "alice",
-        &containers.bitcoind,
+        containers.bitcoind_url.clone(),
         &monero,
         alice_starting_balances.clone(),
         config,
@@ -360,7 +364,7 @@ where
 
     let (bob_bitcoin_wallet, bob_monero_wallet) = init_wallets(
         "bob",
-        &containers.bitcoind,
+        containers.bitcoind_url,
         &monero,
         bob_starting_balances.clone(),
         config,
@@ -394,18 +398,86 @@ where
 }
 
 async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
-    let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
-    let _ = bitcoind.init(5).await;
+    let bitcoind_url = init_bitcoind_container().await.unwrap();
+    let (monero, monerods) = init_monero_container(&cli).await;
+    (monero, Containers {
+        bitcoind_url,
+        monerods,
+    })
+}
+
+async fn init_bitcoind_container() -> Result<Url> {
+    // let bitcoind = Bitcoind::new(&cli, "0.19.1").unwrap();
+    let node_url: Url = "".parse()?;
+    init_bitcoind(node_url.clone(), 5).await?;
+    Ok(node_url)
+}
+
+async fn mine(bitcoind_client: Client, reward_address: bitcoin::Address) -> Result<()> {
+    loop {
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        bitcoind_client
+            .generatetoaddress(1, reward_address.clone(), None)
+            .await?;
+    }
+}
+
+pub async fn init_bitcoind(node_url: Url, spendable_quantity: u32) -> Result<Client> {
+    let bitcoind_client = Client::new(node_url.clone());
+
+    bitcoind_client
+        .createwallet(TEST_WALLET_NAME, None, None, None, None)
+        .await?;
+
+    let reward_address = bitcoind_client
+        .with_wallet(TEST_WALLET_NAME)?
+        .getnewaddress(None, None)
+        .await?;
+
+    bitcoind_client
+        .generatetoaddress(101 + spendable_quantity, reward_address.clone(), None)
+        .await?;
+    let _ = tokio::spawn(mine(bitcoind_client.clone(), reward_address));
+    Ok(bitcoind_client)
+}
+
+/// Send Bitcoin to the specified address, limited to the spendable bitcoin
+/// quantity.
+pub async fn mint(node_url: Url, address: bitcoin::Address, amount: bitcoin::Amount) -> Result<()> {
+    let bitcoind_client = Client::new(node_url.clone());
+
+    bitcoind_client
+        .send_to_address(TEST_WALLET_NAME, address.clone(), amount)
+        .await?;
+
+    // Confirm the transaction
+    let reward_address = bitcoind_client
+        .with_wallet(TEST_WALLET_NAME)?
+        .getnewaddress(None, None)
+        .await?;
+    bitcoind_client
+        .generatetoaddress(1, reward_address, None)
+        .await?;
+
+    Ok(())
+}
+
+async fn init_monero_container(
+    cli: &Cli,
+) -> (
+    Monero,
+    Vec<Container<'_, Cli, monero_harness::image::Monero>>,
+) {
     let (monero, monerods) = Monero::new(&cli, None, vec!["alice".to_string(), "bob".to_string()])
         .await
         .unwrap();
 
-    (monero, Containers { bitcoind, monerods })
+    (monero, monerods)
 }
 
 async fn init_wallets(
     name: &str,
-    bitcoind: &Bitcoind<'_>,
+    bitcoind_url: Url,
     monero: &Monero,
     starting_balances: StartingBalances,
     config: Config,
@@ -421,19 +493,19 @@ async fn init_wallets(
     });
 
     let btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new(name, bitcoind.node_url.clone(), config.bitcoin_network)
+        swap::bitcoin::Wallet::new(name, bitcoind_url.clone(), config.bitcoin_network)
             .await
             .unwrap(),
     );
 
     if starting_balances.btc != bitcoin::Amount::ZERO {
-        bitcoind
-            .mint(
-                btc_wallet.inner.new_address().await.unwrap(),
-                starting_balances.btc,
-            )
-            .await
-            .unwrap();
+        mint(
+            bitcoind_url,
+            btc_wallet.inner.new_address().await.unwrap(),
+            starting_balances.btc,
+        )
+        .await
+        .unwrap();
     }
 
     (btc_wallet, xmr_wallet)
@@ -442,7 +514,7 @@ async fn init_wallets(
 // This is just to keep the containers alive
 #[allow(dead_code)]
 struct Containers<'a> {
-    bitcoind: Bitcoind<'a>,
+    bitcoind_url: Url,
     monerods: Vec<Container<'a, Cli, image::Monero>>,
 }
 
