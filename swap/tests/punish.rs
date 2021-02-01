@@ -23,7 +23,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
 
         // Restart Bob after Alice punished to ensure Bob transitions to
         // punished and does not run indefinitely
-        let bob_swap = ctx.stop_and_resume_bob_from_db(bob_join_handle).await;
+        let (bob_swap, _) = ctx.stop_and_resume_bob_from_db(bob_join_handle).await;
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));
 
         let bob_state = bob::run(bob_swap).await.unwrap();

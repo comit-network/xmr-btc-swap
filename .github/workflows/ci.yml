@@ -134,6 +134,7 @@ jobs:
             punish,
             refund_restart_alice_cancelled,
             refund_restart_alice,
+            bob_refunds_using_cancel_and_refund_command,
         ]
     runs-on: ubuntu-latest
     steps:
