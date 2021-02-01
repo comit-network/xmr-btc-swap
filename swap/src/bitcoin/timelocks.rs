@@ -18,11 +18,16 @@ impl BlockHeight {
     pub const fn new(block_height: u32) -> Self {
         Self(block_height)
     }
+    pub const fn checked_sub(self, rhs: Self) -> Option<Self> {
+        match self.0.checked_sub(rhs.0) {
+            Some(result) => Some(BlockHeight(result)),
+            None => None,
+        }
+    }
 }
 
 impl Add<u32> for BlockHeight {
     type Output = BlockHeight;
-
     fn add(self, rhs: u32) -> Self::Output {
         BlockHeight(self.0 + rhs)
     }

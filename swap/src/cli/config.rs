@@ -11,7 +11,8 @@ use std::{
 use tracing::info;
 use url::Url;
 
-const DEFAULT_BITCOIND_TESTNET_URL: &str = "http://127.0.0.1:18332";
+const DEFAULT_ELECTRUM_HTTP_URL: &str = "https://blockstream.info/testnet/api/";
+const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://electrum.blockstream.info:60002";
 const DEFAULT_MONERO_WALLET_RPC_TESTNET_URL: &str = "http://127.0.0.1:38083/json_rpc";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
@@ -43,8 +44,8 @@ pub struct Data {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Bitcoin {
-    pub bitcoind_url: Url,
-    pub wallet_name: String,
+    pub electrum_http_url: Url,
+    pub electrum_rpc_url: Url,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -105,15 +106,17 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
         .interact_text()?;
     let data_dir = data_dir.as_str().parse()?;
 
-    let bitcoind_url = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Enter Bitcoind URL (including username and password if applicable) or hit return to use default")
-        .default(DEFAULT_BITCOIND_TESTNET_URL.to_owned())
+    let electrum_http_url: String = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter Electrum HTTP URL or hit return to use default")
+        .default(DEFAULT_ELECTRUM_HTTP_URL.to_owned())
         .interact_text()?;
-    let bitcoind_url = bitcoind_url.as_str().parse()?;
+    let electrum_http_url = Url::parse(electrum_http_url.as_str())?;
 
-    let bitcoin_wallet_name = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Enter Bitcoind wallet name")
+    let electrum_rpc_url: String = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter Electrum RPC URL or hit return to use default")
+        .default(DEFAULT_ELECTRUM_RPC_URL.to_owned())
         .interact_text()?;
+    let electrum_rpc_url = Url::parse(electrum_rpc_url.as_str())?;
 
     let monero_wallet_rpc_url = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter Monero Wallet RPC URL or hit enter to use default")
@@ -125,8 +128,8 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
     Ok(Config {
         data: Data { dir: data_dir },
         bitcoin: Bitcoin {
-            bitcoind_url,
-            wallet_name: bitcoin_wallet_name,
+            electrum_http_url,
+            electrum_rpc_url,
         },
         monero: Monero {
             wallet_rpc_url: monero_wallet_rpc_url,
@@ -150,8 +153,8 @@ mod tests {
                 dir: Default::default(),
             },
             bitcoin: Bitcoin {
-                bitcoind_url: Url::from_str("http://127.0.0.1:18332").unwrap(),
-                wallet_name: "alice".to_string(),
+                electrum_http_url: Url::from_str(DEFAULT_ELECTRUM_HTTP_URL).unwrap(),
+                electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
             },
             monero: Monero {
                 wallet_rpc_url: Url::from_str("http://127.0.0.1:38083/json_rpc").unwrap(),

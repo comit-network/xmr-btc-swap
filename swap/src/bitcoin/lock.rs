@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TxLock {
-    inner: Transaction,
+    inner: PartiallySignedTransaction,
     pub(in crate::bitcoin) output_descriptor: Descriptor<::bitcoin::PublicKey>,
 }
 
@@ -20,41 +20,38 @@ impl TxLock {
     {
         let lock_output_descriptor = build_shared_output_descriptor(A.0, B.0);
         let address = lock_output_descriptor
-            .address(wallet.get_network(), NullCtx)
+            .address(wallet.get_network().await, NullCtx)
             .expect("can derive address from descriptor");
 
-        // We construct a psbt for convenience
         let psbt = wallet.build_tx_lock_psbt(address, amount).await?;
 
-        // We don't take advantage of psbt functionality yet, instead we convert to a
-        // raw transaction
-        let inner = psbt.extract_tx();
-
         Ok(Self {
-            inner,
+            inner: psbt,
             output_descriptor: lock_output_descriptor,
         })
     }
 
     pub fn lock_amount(&self) -> Amount {
-        Amount::from_sat(self.inner.output[self.lock_output_vout()].value)
+        Amount::from_sat(self.inner.clone().extract_tx().output[self.lock_output_vout()].value)
     }
 
     pub fn txid(&self) -> Txid {
-        self.inner.txid()
+        self.inner.clone().extract_tx().txid()
     }
 
     pub fn as_outpoint(&self) -> OutPoint {
         // This is fine because a transaction that has that many outputs is not
         // realistic
         #[allow(clippy::cast_possible_truncation)]
-        OutPoint::new(self.inner.txid(), self.lock_output_vout() as u32)
+        OutPoint::new(self.txid(), self.lock_output_vout() as u32)
     }
 
     /// Retreive the index of the locked output in the transaction outputs
     /// vector
     fn lock_output_vout(&self) -> usize {
         self.inner
+            .clone()
+            .extract_tx()
             .output
             .iter()
             .position(|output| {
@@ -78,7 +75,7 @@ impl TxLock {
         };
 
         let tx_out = TxOut {
-            value: self.inner.output[self.lock_output_vout()].value - TX_FEE,
+            value: self.inner.clone().extract_tx().output[self.lock_output_vout()].value - TX_FEE,
             script_pubkey: spend_address.script_pubkey(),
         };
 
@@ -93,6 +90,6 @@ impl TxLock {
 
 impl From<TxLock> for PartiallySignedTransaction {
     fn from(from: TxLock) -> Self {
-        PartiallySignedTransaction::from_unsigned_tx(from.inner).expect("to be unsigned")
+        from.inner
     }
 }

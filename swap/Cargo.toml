@@ -18,6 +18,7 @@ async-trait = "0.1"
 atty = "0.2"
 backoff = { git = "https://github.com/ihrwein/backoff", rev = "9d03992a83dfdc596be26276d4e5c5254a4b11a2", features = ["tokio"] }
 base64 = "0.12"
+bdk = { version = "0.3" }
 bitcoin = { version = "0.25", features = ["rand", "use-serde"] }
 bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "ae2f6cd547496e680941c0910018bbe884128799" }
 config = { version = "0.10", default-features = false, features = ["toml"] }

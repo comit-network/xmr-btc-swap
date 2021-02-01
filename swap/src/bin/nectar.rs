@@ -15,7 +15,7 @@
 use anyhow::{Context, Result};
 use log::LevelFilter;
 use prettytable::{row, Table};
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 use structopt::StructOpt;
 use swap::{
     bitcoin,
@@ -70,8 +70,12 @@ async fn main() -> Result<()> {
         config.data.dir.display()
     );
 
-    let db = Database::open(config.data.dir.join("database").as_path())
+    let db_path = config.data.dir.join("database");
+
+    let db = Database::open(config.data.dir.join(db_path).as_path())
         .context("Could not open database")?;
+
+    let wallet_data_dir = config.data.dir.join("wallet");
 
     match opt.cmd {
         Command::Start => {
@@ -80,7 +84,8 @@ async fn main() -> Result<()> {
 
             let execution_params = execution_params::Testnet::get_execution_params();
 
-            let (bitcoin_wallet, monero_wallet) = init_wallets(config.clone()).await?;
+            let (bitcoin_wallet, monero_wallet) =
+                init_wallets(config.clone(), &wallet_data_dir).await?;
 
             let (mut event_loop, _) = EventLoop::new(
                 config.network.listen,
@@ -113,11 +118,15 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn init_wallets(config: Config) -> Result<(bitcoin::Wallet, monero::Wallet)> {
+async fn init_wallets(
+    config: Config,
+    bitcoin_wallet_data_dir: &Path,
+) -> Result<(bitcoin::Wallet, monero::Wallet)> {
     let bitcoin_wallet = bitcoin::Wallet::new(
-        config.bitcoin.wallet_name.as_str(),
-        config.bitcoin.bitcoind_url,
+        config.bitcoin.electrum_rpc_url,
+        config.bitcoin.electrum_http_url,
         BITCOIN_NETWORK,
+        bitcoin_wallet_data_dir,
     )
     .await?;
     let bitcoin_balance = bitcoin_wallet.balance().await?;

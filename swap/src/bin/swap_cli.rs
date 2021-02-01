@@ -15,7 +15,7 @@
 use anyhow::{Context, Result};
 use log::LevelFilter;
 use prettytable::{row, Table};
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 use structopt::StructOpt;
 use swap::{
     bitcoin,
@@ -75,6 +75,7 @@ async fn main() -> Result<()> {
     let db = Database::open(config.data.dir.join("database").as_path())
         .context("Could not open database")?;
 
+    let wallet_data_dir = config.data.dir.join("wallet");
     let seed =
         Seed::from_file_or_generate(&config.data.dir).expect("Could not retrieve/initialize seed");
 
@@ -90,7 +91,7 @@ async fn main() -> Result<()> {
             send_bitcoin,
         } => {
             let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config, bitcoin_network, monero_network).await?;
+                init_wallets(config, bitcoin_network, &wallet_data_dir, monero_network).await?;
 
             let swap_id = Uuid::new_v4();
 
@@ -132,7 +133,7 @@ async fn main() -> Result<()> {
             alice_addr,
         }) => {
             let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config, bitcoin_network, monero_network).await?;
+                init_wallets(config, bitcoin_network, &wallet_data_dir, monero_network).await?;
 
             let bob_factory = Builder::new(
                 seed,
@@ -157,7 +158,7 @@ async fn main() -> Result<()> {
         }) => {
             // TODO: Optimization: Only init the Bitcoin wallet, Monero wallet unnecessary
             let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config, bitcoin_network, monero_network).await?;
+                init_wallets(config, bitcoin_network, &wallet_data_dir, monero_network).await?;
 
             let bob_factory = Builder::new(
                 seed,
@@ -201,7 +202,7 @@ async fn main() -> Result<()> {
             force,
         }) => {
             let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config, bitcoin_network, monero_network).await?;
+                init_wallets(config, bitcoin_network, &wallet_data_dir, monero_network).await?;
 
             // TODO: Optimize to only use the Bitcoin wallet, Monero wallet is unnecessary
             let bob_factory = Builder::new(
@@ -235,14 +236,22 @@ async fn main() -> Result<()> {
 async fn init_wallets(
     config: Config,
     bitcoin_network: bitcoin::Network,
+    bitcoin_wallet_data_dir: &Path,
     monero_network: monero::Network,
 ) -> Result<(bitcoin::Wallet, monero::Wallet)> {
     let bitcoin_wallet = bitcoin::Wallet::new(
-        config.bitcoin.wallet_name.as_str(),
-        config.bitcoin.bitcoind_url,
+        config.bitcoin.electrum_rpc_url,
+        config.bitcoin.electrum_http_url,
         bitcoin_network,
+        bitcoin_wallet_data_dir,
     )
     .await?;
+
+    bitcoin_wallet
+        .sync_wallet()
+        .await
+        .expect("Could not sync btc wallet");
+
     let bitcoin_balance = bitcoin_wallet.balance().await?;
     info!(
         "Connection to Bitcoin wallet succeeded, balance: {}",

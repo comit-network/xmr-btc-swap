@@ -245,7 +245,7 @@ pub trait GetRawTransaction {
 
 #[async_trait]
 pub trait GetNetwork {
-    fn get_network(&self) -> Network;
+    async fn get_network(&self) -> Network;
 }
 
 pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Result<SecretKey> {
