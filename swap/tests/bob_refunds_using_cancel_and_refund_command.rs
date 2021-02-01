@@ -10,7 +10,7 @@ async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
         let (bob_swap, bob_join_handle) = ctx.new_swap_as_bob().await;
 
         let alice_handle = alice::run(alice_swap);
-        tokio::spawn(alice_handle);
+        let alice_swap_handle = tokio::spawn(alice_handle);
 
         let bob_state = bob::run_until(bob_swap, is_btc_locked).await.unwrap();
 
@@ -57,10 +57,8 @@ async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
 
         ctx.assert_bob_refunded(bob_state).await;
 
-        // TODO: Alice hangs indefinitely waiting for Blob's acknowledge on
-        //  sending the transfer proof
-        // let alice_state = alice_swap_handle.await.unwrap().unwrap();
-        // ctx.assert_alice_refunded(alice_state).await;
+        let alice_state = alice_swap_handle.await.unwrap().unwrap();
+        ctx.assert_alice_refunded(alice_state).await;
     })
     .await;
 }

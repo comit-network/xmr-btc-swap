@@ -1,4 +1,5 @@
 use crate::{
+    execution_params::ExecutionParams,
     network::{transport::SwapTransport, TokioExecutor},
     protocol::{
         alice::{Behaviour, OutEvent, State0, State3, SwapResponse, TransferProof},
@@ -9,7 +10,10 @@ use anyhow::{anyhow, Context, Result};
 use libp2p::{
     core::Multiaddr, futures::FutureExt, request_response::ResponseChannel, PeerId, Swarm,
 };
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::{
+    sync::mpsc::{Receiver, Sender},
+    time::timeout,
+};
 use tracing::{error, trace};
 
 #[allow(missing_debug_implementations)]
@@ -91,13 +95,27 @@ impl EventLoopHandle {
         Ok(())
     }
 
-    pub async fn send_transfer_proof(&mut self, bob: PeerId, msg: TransferProof) -> Result<()> {
+    pub async fn send_transfer_proof(
+        &mut self,
+        bob: PeerId,
+        msg: TransferProof,
+        execution_params: ExecutionParams,
+    ) -> Result<()> {
         let _ = self.send_transfer_proof.send((bob, msg)).await?;
 
-        self.recv_transfer_proof_ack
-            .recv()
-            .await
-            .ok_or_else(|| anyhow!("Failed to receive transfer proof ack from Bob"))?;
+        // TODO: Re-evaluate if these acknowledges are necessary at all.
+        // If we don't use a timeout here and Alice fails to dial Bob she will wait
+        // indefinitely for this acknowledge.
+        if timeout(
+            execution_params.bob_time_to_act,
+            self.recv_transfer_proof_ack.recv(),
+        )
+        .await
+        .is_err()
+        {
+            error!("Failed to receive transfer proof ack from Bob")
+        }
+
         Ok(())
     }
 }
