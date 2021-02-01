@@ -13,11 +13,12 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    cli::{Command, Options, Resume},
+    cli::{Cancel, Command, Options, Resume},
     config::{
         initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
     },
     execution_params::GetExecutionParams,
+    protocol::bob::cancel::CancelError,
 };
 use anyhow::{Context, Result};
 use database::Database;
@@ -208,6 +209,36 @@ async fn main() -> Result<()> {
 
             tokio::spawn(async move { event_loop.run().await });
             bob::run(swap).await?;
+        }
+        Command::Cancel(Cancel::BuyXmr {
+            swap_id,
+            alice_peer_id,
+            alice_addr,
+            config,
+        }) => {
+            // TODO: Optimization: Only init the Bitcoin wallet, Monero wallet unnecessary
+            let (bitcoin_wallet, monero_wallet) =
+                init_wallets(config.path, bitcoin_network, monero_network).await?;
+
+            let bob_factory = Builder::new(
+                seed,
+                db_path,
+                swap_id,
+                Arc::new(bitcoin_wallet),
+                Arc::new(monero_wallet),
+                alice_addr,
+                alice_peer_id,
+                execution_params,
+            );
+            let (swap, event_loop) = bob_factory.build().await?;
+
+            tokio::spawn(async move { event_loop.run().await });
+
+            match bob::cancel(swap.swap_id, swap.state, swap.bitcoin_wallet, swap.db).await? {
+                Ok((txid, _)) => { info!("Cancel transaction successfully published with id {}", txid)},
+                Err(CancelError::CancelTimelockNotExpiredYet) => {info!("The Cancel Transaction cannot be published yet, because the timelock has not expired. Please try again later.")},
+                Err(CancelError::CancelTxAlreadyPublished) => {info!("The Cancel Transaction has already been published.")}
+            }
         }
     };
 

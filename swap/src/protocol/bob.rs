@@ -20,6 +20,7 @@ use tracing::{debug, info};
 use uuid::Uuid;
 
 pub use self::{
+    cancel::cancel,
     encrypted_signature::EncryptedSignature,
     event_loop::{EventLoop, EventLoopHandle},
     state::*,
@@ -29,6 +30,7 @@ pub use self::{
 pub use execution_setup::{Message0, Message2, Message4};
 use libp2p::request_response::ResponseChannel;
 
+pub mod cancel;
 mod encrypted_signature;
 pub mod event_loop;
 mod execution_setup;
