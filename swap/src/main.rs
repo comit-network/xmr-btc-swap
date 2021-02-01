@@ -13,7 +13,7 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    cli::{Cancel, Command, Options, Resume},
+    cli::{Cancel, Command, Options, Refund, Resume},
     config::{
         initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
     },
@@ -235,10 +235,48 @@ async fn main() -> Result<()> {
             tokio::spawn(async move { event_loop.run().await });
 
             match bob::cancel(swap.swap_id, swap.state, swap.bitcoin_wallet, swap.db).await? {
-                Ok((txid, _)) => { info!("Cancel transaction successfully published with id {}", txid)},
-                Err(CancelError::CancelTimelockNotExpiredYet) => {info!("The Cancel Transaction cannot be published yet, because the timelock has not expired. Please try again later.")},
-                Err(CancelError::CancelTxAlreadyPublished) => {info!("The Cancel Transaction has already been published.")}
+                Ok((txid, _)) => {
+                    info!("Cancel transaction successfully published with id {}", txid)
+                }
+                Err(CancelError::CancelTimelockNotExpiredYet) => {
+                    info!("The Cancel Transaction cannot be published yet, because the timelock has not expired. Please try again later.")
+                }
+                Err(CancelError::CancelTxAlreadyPublished) => {
+                    info!("The Cancel Transaction has already been published.")
+                }
             }
+        }
+        Command::Refund(Refund::BuyXmr {
+            swap_id,
+            alice_peer_id,
+            alice_addr,
+            config,
+        }) => {
+            let (bitcoin_wallet, monero_wallet) =
+                init_wallets(config.path, bitcoin_network, monero_network).await?;
+
+            // TODO: Optimize to only use the Bitcoin wallet, Monero wallet is unnecessary
+            let bob_factory = Builder::new(
+                seed,
+                db_path,
+                swap_id,
+                Arc::new(bitcoin_wallet),
+                Arc::new(monero_wallet),
+                alice_addr,
+                alice_peer_id,
+                execution_params,
+            );
+            let (swap, event_loop) = bob_factory.build().await?;
+
+            tokio::spawn(async move { event_loop.run().await });
+            bob::refund(
+                swap.swap_id,
+                swap.state,
+                swap.execution_params,
+                swap.bitcoin_wallet,
+                swap.db,
+            )
+            .await??;
         }
     };
 

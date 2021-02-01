@@ -23,6 +23,7 @@ pub use self::{
     cancel::cancel,
     encrypted_signature::EncryptedSignature,
     event_loop::{EventLoop, EventLoopHandle},
+    refund::refund,
     state::*,
     swap::{run, run_until},
     swap_request::*,
@@ -34,6 +35,7 @@ pub mod cancel;
 mod encrypted_signature;
 pub mod event_loop;
 mod execution_setup;
+pub mod refund;
 pub mod state;
 pub mod swap;
 mod swap_request;
