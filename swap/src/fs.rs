@@ -16,10 +16,10 @@ pub fn default_config_path() -> anyhow::Result<PathBuf> {
 }
 
 /// This is to store the DB
-// Linux: /home/<user>/.local/share/nectar/
-// OSX: /Users/<user>/Library/Application Support/nectar/
+// Linux: /home/<user>/.local/share/xmr-btc-swap/
+// OSX: /Users/<user>/Library/Application Support/xmr-btc-swap/
 pub fn default_data_dir() -> Option<std::path::PathBuf> {
-    ProjectDirs::from("", "", "nectar").map(|proj_dirs| proj_dirs.data_dir().to_path_buf())
+    ProjectDirs::from("", "", "xmr-btc-swap").map(|proj_dirs| proj_dirs.data_dir().to_path_buf())
 }
 
 pub fn ensure_directory_exists(file: &Path) -> Result<(), std::io::Error> {
