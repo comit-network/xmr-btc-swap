@@ -22,7 +22,7 @@ async fn given_alice_restarts_after_enc_sig_learned_and_bob_already_cancelled_re
             .await
             .unwrap();
         assert!(
-            matches!(alice_state, AliceState::EncSigLearned {..}),
+            matches!(alice_state, AliceState::EncSigLearned { .. }),
             "Alice state is not EncSigLearned: {:?}",
             alice_state
         );
@@ -34,8 +34,7 @@ async fn given_alice_restarts_after_enc_sig_learned_and_bob_already_cancelled_re
         // Once bob has finished Alice is restarted and refunds as well
         let alice_swap = ctx.stop_and_resume_alice_from_db(alice_join_handle).await;
         assert!(
-            matches!(alice_swap.state, AliceState::EncSigLearned
-        {..}),
+            matches!(alice_swap.state, AliceState::EncSigLearned { .. }),
             "Alice state is not EncSigLearned: {:?}",
             alice_state
         );

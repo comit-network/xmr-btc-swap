@@ -16,7 +16,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
 
         let bob_state = bob::run_until(bob_swap, is_btc_locked).await.unwrap();
 
-        assert!(matches!(bob_state, BobState::BtcLocked {..}));
+        assert!(matches!(bob_state, BobState::BtcLocked { .. }));
 
         let alice_state = alice_handle.await.unwrap();
         ctx.assert_alice_punished(alice_state.unwrap()).await;
@@ -24,7 +24,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         // Restart Bob after Alice punished to ensure Bob transitions to
         // punished and does not run indefinitely
         let bob_swap = ctx.stop_and_resume_bob_from_db(bob_join_handle).await;
-        assert!(matches!(bob_swap.state, BobState::BtcLocked {..}));
+        assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));
 
         let bob_state = bob::run(bob_swap).await.unwrap();
 

@@ -157,8 +157,7 @@ impl TransactionBlockHeight for Wallet {
                 .await
                 .map_err(|_| backoff::Error::Transient(Error::Io))?;
 
-            let block_height =
-                block_height.ok_or_else(|| backoff::Error::Transient(Error::NotYetMined))?;
+            let block_height = block_height.ok_or(backoff::Error::Transient(Error::NotYetMined))?;
 
             Result::<_, backoff::Error<Error>>::Ok(block_height)
         })

@@ -15,10 +15,10 @@ async fn given_alice_restarts_after_encsig_is_learned_resume_swap() {
         let alice_state = alice::run_until(alice_swap, is_encsig_learned)
             .await
             .unwrap();
-        assert!(matches!(alice_state, AliceState::EncSigLearned {..}));
+        assert!(matches!(alice_state, AliceState::EncSigLearned { .. }));
 
         let alice_swap = ctx.stop_and_resume_alice_from_db(alice_join_handle).await;
-        assert!(matches!(alice_swap.state, AliceState::EncSigLearned {..}));
+        assert!(matches!(alice_swap.state, AliceState::EncSigLearned { .. }));
 
         let alice_state = alice::run(alice_swap).await.unwrap();
 

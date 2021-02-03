@@ -14,10 +14,10 @@ async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {
 
         let bob_state = bob::run_until(bob_swap, is_xmr_locked).await.unwrap();
 
-        assert!(matches!(bob_state, BobState::XmrLocked {..}));
+        assert!(matches!(bob_state, BobState::XmrLocked { .. }));
 
         let bob_swap = ctx.stop_and_resume_bob_from_db(bob_join_handle).await;
-        assert!(matches!(bob_swap.state, BobState::XmrLocked {..}));
+        assert!(matches!(bob_swap.state, BobState::XmrLocked { .. }));
 
         let bob_state = bob::run(bob_swap).await.unwrap();
 
