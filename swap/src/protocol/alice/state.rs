@@ -16,7 +16,6 @@ use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::fmt;
-use tracing::info;
 
 #[derive(Debug)]
 pub enum AliceState {
@@ -87,6 +86,7 @@ pub struct State0 {
     pub a: bitcoin::SecretKey,
     pub s_a: cross_curve_dleq::Scalar,
     pub v_a: monero::PrivateViewKey,
+    pub dleq_proof_s_a: cross_curve_dleq::Proof,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub btc: bitcoin::Amount,
     pub xmr: monero::Amount,
@@ -98,7 +98,7 @@ pub struct State0 {
 
 impl State0 {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub fn new<R>(
         a: bitcoin::SecretKey,
         s_a: cross_curve_dleq::Scalar,
         v_a: monero::PrivateViewKey,
@@ -108,11 +108,18 @@ impl State0 {
         punish_timelock: Timelock,
         redeem_address: bitcoin::Address,
         punish_address: bitcoin::Address,
-    ) -> Self {
+        rng: &mut R,
+    ) -> Self
+    where
+        R: RngCore + CryptoRng,
+    {
+        let dleq_proof_s_a = cross_curve_dleq::Proof::new(rng, &s_a);
+
         Self {
             a,
             s_a,
             v_a,
+            dleq_proof_s_a,
             redeem_address,
             punish_address,
             btc,
@@ -122,17 +129,14 @@ impl State0 {
         }
     }
 
-    pub fn next_message<R: RngCore + CryptoRng>(&self, rng: &mut R) -> alice::Message0 {
-        info!("Producing first message");
-        let dleq_proof_s_a = cross_curve_dleq::Proof::new(rng, &self.s_a);
-
+    pub fn next_message(&self) -> alice::Message0 {
         alice::Message0 {
             A: self.a.public(),
             S_a_monero: monero::PublicKey::from_private_key(&monero::PrivateKey {
                 scalar: self.s_a.into_ed25519(),
             }),
             S_a_bitcoin: self.s_a.into_secp256k1().into(),
-            dleq_proof_s_a,
+            dleq_proof_s_a: self.dleq_proof_s_a.clone(),
             v_a: self.v_a,
             redeem_address: self.redeem_address.clone(),
             punish_address: self.punish_address.clone(),

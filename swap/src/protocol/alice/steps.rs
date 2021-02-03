@@ -23,7 +23,6 @@ use futures::{
     pin_mut,
 };
 use libp2p::PeerId;
-use rand::rngs::OsRng;
 use sha2::Sha256;
 use std::sync::Arc;
 use tokio::time::timeout;
@@ -62,7 +61,7 @@ pub async fn negotiate(
     )
     .await??;
 
-    let alice_message0 = state0.next_message(&mut OsRng);
+    let alice_message0 = state0.next_message();
     event_loop_handle
         .send_message0(channel, alice_message0)
         .await?;

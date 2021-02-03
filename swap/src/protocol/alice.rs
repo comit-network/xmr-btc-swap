@@ -198,6 +198,7 @@ impl Builder {
             self.execution_params.bitcoin_punish_timelock,
             redeem_address,
             punish_address,
+            rng,
         );
 
         Ok(AliceState::Started { amounts, state0 })

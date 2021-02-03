@@ -11,7 +11,6 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
-use rand::{rngs::OsRng, CryptoRng, RngCore};
 use std::sync::Arc;
 use tokio::select;
 use tracing::info;
@@ -44,7 +43,6 @@ pub async fn run_until(
         swap.db,
         swap.bitcoin_wallet,
         swap.monero_wallet,
-        OsRng,
         swap.swap_id,
         swap.execution_params,
     )
@@ -54,20 +52,16 @@ pub async fn run_until(
 // State machine driver for swap execution
 #[allow(clippy::too_many_arguments)]
 #[async_recursion]
-async fn run_until_internal<R>(
+async fn run_until_internal(
     state: BobState,
     is_target_state: fn(&BobState) -> bool,
     mut event_loop_handle: EventLoopHandle,
     db: Database,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
-    mut rng: R,
     swap_id: Uuid,
     execution_params: ExecutionParams,
-) -> Result<BobState>
-where
-    R: RngCore + CryptoRng + Send,
-{
+) -> Result<BobState> {
     info!("Current state: {}", state);
     if is_target_state(&state) {
         Ok(state)
@@ -80,7 +74,6 @@ where
                     state0,
                     amounts,
                     &mut event_loop_handle,
-                    &mut rng,
                     bitcoin_wallet.clone(),
                 )
                 .await?;
@@ -95,7 +88,6 @@ where
                     db,
                     bitcoin_wallet,
                     monero_wallet,
-                    rng,
                     swap_id,
                     execution_params,
                 )
@@ -117,7 +109,6 @@ where
                     db,
                     bitcoin_wallet,
                     monero_wallet,
-                    rng,
                     swap_id,
                     execution_params,
                 )
@@ -170,7 +161,6 @@ where
                     db,
                     bitcoin_wallet,
                     monero_wallet,
-                    rng,
                     swap_id,
                     execution_params,
                 )
@@ -217,7 +207,6 @@ where
                     db,
                     bitcoin_wallet,
                     monero_wallet,
-                    rng,
                     swap_id,
                     execution_params,
                 )
@@ -260,7 +249,6 @@ where
                     db,
                     bitcoin_wallet,
                     monero_wallet,
-                    rng,
                     swap_id,
                     execution_params,
                 )
@@ -296,7 +284,6 @@ where
                     db,
                     bitcoin_wallet.clone(),
                     monero_wallet,
-                    rng,
                     swap_id,
                     execution_params,
                 )
@@ -318,7 +305,6 @@ where
                     db,
                     bitcoin_wallet,
                     monero_wallet,
-                    rng,
                     swap_id,
                     execution_params,
                 )
@@ -344,7 +330,6 @@ where
                     db,
                     bitcoin_wallet,
                     monero_wallet,
-                    rng,
                     swap_id,
                     execution_params,
                 )
@@ -376,7 +361,6 @@ where
                     db,
                     bitcoin_wallet,
                     monero_wallet,
-                    rng,
                     swap_id,
                     execution_params,
                 )
@@ -390,16 +374,12 @@ where
     }
 }
 
-pub async fn negotiate<R>(
+pub async fn negotiate(
     state0: crate::protocol::bob::state::State0,
     amounts: SwapAmounts,
     swarm: &mut EventLoopHandle,
-    mut rng: R,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
-) -> Result<bob::state::State2>
-where
-    R: RngCore + CryptoRng + Send,
-{
+) -> Result<bob::state::State2> {
     tracing::trace!("Starting negotiate");
     swarm
         .send_swap_request(SwapRequest {
@@ -411,7 +391,7 @@ where
     // argument.
     let _swap_response = swarm.recv_swap_response().await?;
 
-    swarm.send_message0(state0.next_message(&mut rng)).await?;
+    swarm.send_message0(state0.next_message()).await?;
     let msg0 = swarm.recv_message0().await?;
     let state1 = state0.receive(bitcoin_wallet.as_ref(), msg0).await?;
 
