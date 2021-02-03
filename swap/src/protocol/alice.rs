@@ -34,6 +34,7 @@ use uuid::Uuid;
 
 mod encrypted_signature;
 pub mod event_loop;
+mod execution_setup;
 mod message0;
 mod message1;
 mod message2;
@@ -236,6 +237,7 @@ pub enum OutEvent {
         msg: Box<bob::Message2>,
         bob_peer_id: PeerId,
     },
+    ExecutionSetupDone(Result<Box<State3>>),
     TransferProofAcknowledged,
     EncryptedSignature(EncryptedSignature),
 }
@@ -286,6 +288,14 @@ impl From<message2::OutEvent> for OutEvent {
     }
 }
 
+impl From<execution_setup::OutEvent> for OutEvent {
+    fn from(event: execution_setup::OutEvent) -> Self {
+        match event {
+            execution_setup::OutEvent::Done(res) => OutEvent::ExecutionSetupDone(res.map(Box::new)),
+        }
+    }
+}
+
 impl From<transfer_proof::OutEvent> for OutEvent {
     fn from(event: transfer_proof::OutEvent) -> Self {
         match event {
@@ -312,6 +322,7 @@ pub struct Behaviour {
     message0: message0::Behaviour,
     message1: message1::Behaviour,
     message2: message2::Behaviour,
+    execution_setup: execution_setup::Behaviour,
     transfer_proof: transfer_proof::Behaviour,
     encrypted_signature: encrypted_signature::Behaviour,
 }
@@ -326,6 +337,11 @@ impl Behaviour {
         self.amounts.send(channel, swap_response)?;
         info!("Sent swap response");
         Ok(())
+    }
+
+    pub fn start_execution_setup(&mut self, bob_peer_id: PeerId, state0: State0) {
+        self.execution_setup.run(bob_peer_id, state0);
+        info!("Start execution setup with {}", bob_peer_id);
     }
 
     /// Send Message0 to Bob in response to receiving his Message0.

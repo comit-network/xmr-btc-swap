@@ -70,13 +70,7 @@ async fn run_until_internal(
             BobState::Started { state0, amounts } => {
                 event_loop_handle.dial().await?;
 
-                let state2 = negotiate(
-                    state0,
-                    amounts,
-                    &mut event_loop_handle,
-                    bitcoin_wallet.clone(),
-                )
-                .await?;
+                let state2 = negotiate(state0, amounts, &mut event_loop_handle).await?;
 
                 let state = BobState::Negotiated(state2);
                 let db_state = state.clone().into();
@@ -378,7 +372,6 @@ pub async fn negotiate(
     state0: crate::protocol::bob::state::State0,
     amounts: SwapAmounts,
     event_loop_handle: &mut EventLoopHandle,
-    bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
 ) -> Result<bob::state::State2> {
     tracing::trace!("Starting negotiate");
     event_loop_handle
@@ -391,21 +384,7 @@ pub async fn negotiate(
     // argument.
     let _swap_response = event_loop_handle.recv_swap_response().await?;
 
-    event_loop_handle
-        .send_message0(state0.next_message())
-        .await?;
-    let msg0 = event_loop_handle.recv_message0().await?;
-    let state1 = state0.receive(bitcoin_wallet.as_ref(), msg0).await?;
-
-    event_loop_handle
-        .send_message1(state1.next_message())
-        .await?;
-    let msg1 = event_loop_handle.recv_message1().await?;
-    let state2 = state1.receive(msg1)?;
-
-    event_loop_handle
-        .send_message2(state2.next_message())
-        .await?;
+    let state2 = event_loop_handle.execution_setup(state0).await?;
 
     Ok(state2)
 }

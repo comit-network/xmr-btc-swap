@@ -32,6 +32,7 @@ use crate::{execution_params::ExecutionParams, protocol::alice::TransferProof};
 
 mod encrypted_signature;
 pub mod event_loop;
+mod execution_setup;
 mod message0;
 mod message1;
 mod message2;
@@ -162,6 +163,7 @@ impl Builder {
             }
         }
     }
+
     fn init_event_loop(
         &self,
     ) -> Result<(bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle)> {
@@ -174,6 +176,7 @@ impl Builder {
             self.peer_id,
             self.alice_peer_id,
             self.alice_address.clone(),
+            self.bitcoin_wallet.clone(),
         )
     }
 
@@ -203,13 +206,14 @@ impl Builder {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
     SwapResponse(alice::SwapResponse),
     Message0(Box<alice::Message0>),
     Message1(Box<alice::Message1>),
     Message2,
+    ExecutionSetupDone(Result<Box<State2>>),
     TransferProof(Box<TransferProof>),
     EncryptedSignatureAcknowledged,
 }
@@ -254,6 +258,14 @@ impl From<message2::OutEvent> for OutEvent {
     }
 }
 
+impl From<execution_setup::OutEvent> for OutEvent {
+    fn from(event: execution_setup::OutEvent) -> Self {
+        match event {
+            execution_setup::OutEvent::Done(res) => OutEvent::ExecutionSetupDone(res.map(Box::new)),
+        }
+    }
+}
+
 impl From<transfer_proof::OutEvent> for OutEvent {
     fn from(event: transfer_proof::OutEvent) -> Self {
         match event {
@@ -280,6 +292,7 @@ pub struct Behaviour {
     message0: message0::Behaviour,
     message1: message1::Behaviour,
     message2: message2::Behaviour,
+    execution_setup: execution_setup::Behaviour,
     transfer_proof: transfer_proof::Behaviour,
     encrypted_signature: encrypted_signature::Behaviour,
 }
@@ -289,6 +302,17 @@ impl Behaviour {
     pub fn send_swap_request(&mut self, alice: PeerId, swap_request: SwapRequest) {
         let _id = self.swap_request.send(alice, swap_request);
         info!("Requesting swap from: {}", alice);
+    }
+
+    pub fn start_execution_setup(
+        &mut self,
+        alice_peer_id: PeerId,
+        state0: State0,
+        bitcoin_wallet: Arc<bitcoin::Wallet>,
+    ) {
+        self.execution_setup
+            .run(alice_peer_id, state0, bitcoin_wallet);
+        info!("Start execution setup with {}", alice_peer_id);
     }
 
     /// Sends Bob's first message to Alice.

@@ -55,38 +55,11 @@ pub async fn negotiate(
         .send_swap_response(event.channel, SwapResponse { xmr_amount })
         .await?;
 
-    let (bob_message0, channel) = timeout(
+    let state3 = timeout(
         execution_params.bob_time_to_act,
-        event_loop_handle.recv_message0(),
+        event_loop_handle.execution_setup(bob_peer_id, state0),
     )
     .await??;
-
-    let alice_message0 = state0.next_message();
-    event_loop_handle
-        .send_message0(channel, alice_message0)
-        .await?;
-
-    let state1 = state0.receive(bob_message0)?;
-
-    let (bob_message1, channel) = timeout(
-        execution_params.bob_time_to_act,
-        event_loop_handle.recv_message1(),
-    )
-    .await??;
-
-    let state2 = state1.receive(bob_message1);
-
-    event_loop_handle
-        .send_message1(channel, state2.next_message())
-        .await?;
-
-    let bob_message2 = timeout(
-        execution_params.bob_time_to_act,
-        event_loop_handle.recv_message2(),
-    )
-    .await??;
-
-    let state3 = state2.receive(bob_message2)?;
 
     Ok((bob_peer_id, state3))
 }

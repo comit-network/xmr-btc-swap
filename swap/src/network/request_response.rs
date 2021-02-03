@@ -12,7 +12,7 @@ use std::{fmt::Debug, io, marker::PhantomData};
 pub const TIMEOUT: u64 = 3600; // One hour.
 
 /// Message receive buffer.
-const BUF_SIZE: usize = 1024 * 1024;
+pub const BUF_SIZE: usize = 1024 * 1024;
 
 // TODO: Think about whether there is a better way to do this, e.g., separate
 // Codec for each Message and a macro that implements them.
