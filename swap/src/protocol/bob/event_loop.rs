@@ -225,6 +225,9 @@ impl EventLoop {
                             let _ = self.recv_message1.send(*msg).await;
                         }
                         OutEvent::Message2 => info!("Alice acknowledged message 2 received"),
+                        OutEvent::ExecutionSetupDone(_res) => {
+                            todo!()
+                        }
                         OutEvent::TransferProof(msg) => {
                             let _ = self.recv_transfer_proof.send(*msg).await;
                         }

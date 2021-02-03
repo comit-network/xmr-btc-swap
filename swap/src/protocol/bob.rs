@@ -32,6 +32,7 @@ use crate::{execution_params::ExecutionParams, protocol::alice::TransferProof};
 
 mod encrypted_signature;
 pub mod event_loop;
+mod execution_setup;
 mod message0;
 mod message1;
 mod message2;
@@ -203,13 +204,14 @@ impl Builder {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
     SwapResponse(alice::SwapResponse),
     Message0(Box<alice::Message0>),
     Message1(Box<alice::Message1>),
     Message2,
+    ExecutionSetupDone(Result<Box<State2>>),
     TransferProof(Box<TransferProof>),
     EncryptedSignatureAcknowledged,
 }
@@ -254,6 +256,14 @@ impl From<message2::OutEvent> for OutEvent {
     }
 }
 
+impl From<execution_setup::OutEvent> for OutEvent {
+    fn from(event: execution_setup::OutEvent) -> Self {
+        match event {
+            execution_setup::OutEvent::Done(res) => OutEvent::ExecutionSetupDone(res.map(Box::new)),
+        }
+    }
+}
+
 impl From<transfer_proof::OutEvent> for OutEvent {
     fn from(event: transfer_proof::OutEvent) -> Self {
         match event {
@@ -280,6 +290,7 @@ pub struct Behaviour {
     message0: message0::Behaviour,
     message1: message1::Behaviour,
     message2: message2::Behaviour,
+    execution_setup: execution_setup::Behaviour,
     transfer_proof: transfer_proof::Behaviour,
     encrypted_signature: encrypted_signature::Behaviour,
 }

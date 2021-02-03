@@ -1638,6 +1638,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "libp2p-async-await"
+version = "0.1.0"
+source = "git+https://github.com/comit-network/rust-libp2p-async-await?rev=1429cd780204624b4d244e7d8179fe6ff77988c3#1429cd780204624b4d244e7d8179fe6ff77988c3"
+dependencies = [
+ "libp2p",
+ "log",
+]
+
+[[package]]
 name = "libp2p-core"
 version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3415,6 +3424,7 @@ dependencies = [
  "get-port",
  "hyper",
  "libp2p",
+ "libp2p-async-await",
  "log",
  "miniscript",
  "monero",

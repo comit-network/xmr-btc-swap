@@ -227,6 +227,9 @@ impl EventLoop {
                         OutEvent::Message2 { msg, bob_peer_id : _} => {
                             let _ = self.recv_message2.send(*msg).await;
                         }
+                        OutEvent::ExecutionSetupDone(_res) => {
+                            todo!()
+                        }
                         OutEvent::TransferProofAcknowledged => {
                             trace!("Bob acknowledged transfer proof");
                             let _ = self.recv_transfer_proof_ack.send(()).await;
