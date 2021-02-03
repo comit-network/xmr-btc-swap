@@ -19,7 +19,7 @@ async fn given_bob_manually_cancels_when_timelock_not_expired_errors() {
         let (bob_swap, bob_join_handle) = ctx.stop_and_resume_bob_from_db(bob_join_handle).await;
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));
 
-        // Bob manually cancels
+        // Bob tries but fails to manually cancel
         let result = bob::cancel(
             bob_swap.swap_id,
             bob_swap.state,
@@ -37,7 +37,7 @@ async fn given_bob_manually_cancels_when_timelock_not_expired_errors() {
         let (bob_swap, bob_join_handle) = ctx.stop_and_resume_bob_from_db(bob_join_handle).await;
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));
 
-        // Bob manually refunds
+        // Bob tries but fails to manually refund
         bob::refund(
             bob_swap.swap_id,
             bob_swap.state,

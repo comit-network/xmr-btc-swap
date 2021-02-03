@@ -29,7 +29,7 @@ use protocol::{alice, bob, bob::Builder, SwapAmounts};
 use std::{path::PathBuf, sync::Arc};
 use structopt::StructOpt;
 use trace::init_tracing;
-use tracing::info;
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 pub mod bitcoin;
@@ -247,11 +247,12 @@ async fn main() -> Result<()> {
                 Ok((txid, _)) => {
                     info!("Cancel transaction successfully published with id {}", txid)
                 }
-                Err(CancelError::CancelTimelockNotExpiredYet) => {
-                    info!("The Cancel Transaction cannot be published yet, because the timelock has not expired. Please try again later.")
-                }
+                Err(CancelError::CancelTimelockNotExpiredYet) => error!(
+                    "The Cancel Transaction cannot be published yet, \
+                    because the timelock has not expired. Please try again later."
+                ),
                 Err(CancelError::CancelTxAlreadyPublished) => {
-                    info!("The Cancel Transaction has already been published.")
+                    warn!("The Cancel Transaction has already been published.")
                 }
             }
         }
