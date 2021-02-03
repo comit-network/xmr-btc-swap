@@ -7,7 +7,6 @@ use crate::{
         TxRefund, WatchForRawTransaction,
     },
     monero,
-    monero::CreateWalletForOutput,
     protocol::{alice, alice::TransferProof, bob, bob::EncryptedSignature, SwapAmounts},
 };
 use anyhow::{anyhow, Context, Result};
@@ -300,36 +299,6 @@ pub struct State3 {
 }
 
 impl State3 {
-    pub async fn watch_for_lock_btc<W>(self, bitcoin_wallet: &W) -> Result<State4>
-    where
-        W: bitcoin::WatchForRawTransaction,
-    {
-        tracing::info!("watching for lock btc with txid: {}", self.tx_lock.txid());
-        let tx = bitcoin_wallet
-            .watch_for_raw_transaction(self.tx_lock.txid())
-            .await;
-
-        tracing::info!("tx lock seen with txid: {}", tx.txid());
-
-        Ok(State4 {
-            a: self.a,
-            B: self.B,
-            s_a: self.s_a,
-            S_b_monero: self.S_b_monero,
-            S_b_bitcoin: self.S_b_bitcoin,
-            v: self.v,
-            xmr: self.xmr,
-            cancel_timelock: self.cancel_timelock,
-            punish_timelock: self.punish_timelock,
-            refund_address: self.refund_address,
-            redeem_address: self.redeem_address,
-            punish_address: self.punish_address,
-            tx_lock: self.tx_lock,
-            tx_punish_sig_bob: self.tx_punish_sig_bob,
-            tx_cancel_sig_bob: self.tx_cancel_sig_bob,
-        })
-    }
-
     pub async fn wait_for_cancel_timelock_to_expire<W>(&self, bitcoin_wallet: &W) -> Result<()>
     where
         W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
@@ -496,41 +465,6 @@ impl State5 {
             tx_redeem_encsig: msg.tx_redeem_encsig,
             lock_xmr_fee: self.lock_xmr_fee,
         }
-    }
-
-    // watch for refund on btc, recover s_b and refund xmr
-    pub async fn refund_xmr<B, M>(self, bitcoin_wallet: &B, monero_wallet: &M) -> Result<()>
-    where
-        B: WatchForRawTransaction,
-        M: CreateWalletForOutput,
-    {
-        let tx_cancel =
-            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
-
-        let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &self.refund_address);
-
-        let tx_refund_encsig = self.a.encsign(self.S_b_bitcoin, tx_refund.digest());
-
-        let tx_refund_candidate = bitcoin_wallet
-            .watch_for_raw_transaction(tx_refund.txid())
-            .await;
-
-        let tx_refund_sig =
-            tx_refund.extract_signature_by_key(tx_refund_candidate, self.a.public())?;
-
-        let s_b = bitcoin::recover(self.S_b_bitcoin, tx_refund_sig, tx_refund_encsig)?;
-        let s_b = monero::private_key_from_secp256k1_scalar(s_b.into());
-
-        let s = s_b.scalar + self.s_a.into_ed25519();
-
-        // TODO: Optimized rescan height should be passed for refund as well.
-        // NOTE: This actually generates and opens a new wallet, closing the currently
-        // open one.
-        monero_wallet
-            .create_and_load_wallet_for_output(monero::PrivateKey::from_scalar(s), self.v, None)
-            .await?;
-
-        Ok(())
     }
 }
 
