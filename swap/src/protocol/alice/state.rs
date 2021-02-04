@@ -11,7 +11,7 @@ use crate::{
         alice,
         alice::{Message3, TransferProof},
         bob,
-        bob::{EncryptedSignature, Message4},
+        bob::{EncryptedSignature, Message2, Message4},
         SwapAmounts,
     },
 };
@@ -197,7 +197,7 @@ pub struct State1 {
 }
 
 impl State1 {
-    pub fn receive(self, msg: bob::Message1) -> State2 {
+    pub fn receive(self, msg: Message2) -> State2 {
         State2 {
             a: self.a,
             B: self.B,

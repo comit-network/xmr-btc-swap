@@ -24,7 +24,7 @@ pub struct Message0 {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Message1 {
+pub struct Message2 {
     pub(crate) tx_lock: crate::bitcoin::TxLock,
 }
 
@@ -90,11 +90,11 @@ impl Behaviour {
                     .receive(bitcoin_wallet.as_ref(), alice_message0)
                     .await?;
                 {
-                    let bob_message1 = state1.next_message();
+                    let message2 = state1.next_message();
                     substream
                         .write_message(
-                            &serde_cbor::to_vec(&bob_message1)
-                                .context("failed to serialize Message1")?,
+                            &serde_cbor::to_vec(&message2)
+                                .context("failed to serialize message2")?,
                         )
                         .await?;
                 }
