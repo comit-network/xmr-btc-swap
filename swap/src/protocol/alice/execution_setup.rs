@@ -5,8 +5,7 @@ use crate::{
     network::request_response::BUF_SIZE,
     protocol::{
         alice::{State0, State3},
-        bob,
-        bob::{Message2, Message4},
+        bob::{Message0, Message2, Message4},
     },
 };
 use anyhow::{Context, Error, Result};
@@ -67,11 +66,11 @@ impl Behaviour {
                 let message1 = state0.next_message();
 
                 let state1 = {
-                    let bob_message0 = serde_cbor::from_slice::<bob::Message0>(
+                    let message0 = serde_cbor::from_slice::<Message0>(
                         &substream.read_message(BUF_SIZE).await?,
                     )
                     .context("failed to deserialize message0")?;
-                    state0.receive(bob_message0)?
+                    state0.receive(message0)?
                 };
 
                 substream
