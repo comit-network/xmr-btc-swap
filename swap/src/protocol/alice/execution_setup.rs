@@ -15,7 +15,7 @@ use libp2p_async_await::BehaviourOutEvent;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Message0 {
+pub struct Message1 {
     pub(crate) A: bitcoin::PublicKey,
     pub(crate) S_a_monero: monero::PublicKey,
     pub(crate) S_a_bitcoin: bitcoin::PublicKey,
@@ -64,7 +64,7 @@ impl Behaviour {
     pub fn run(&mut self, bob: PeerId, state0: State0) {
         self.inner
             .do_protocol_listener(bob, move |mut substream| async move {
-                let alice_message0 = state0.next_message();
+                let message1 = state0.next_message();
 
                 let state1 = {
                     let bob_message0 = serde_cbor::from_slice::<bob::Message0>(
@@ -76,8 +76,7 @@ impl Behaviour {
 
                 substream
                     .write_message(
-                        &serde_cbor::to_vec(&alice_message0)
-                            .context("failed to serialize Message0")?,
+                        &serde_cbor::to_vec(&message1).context("failed to serialize message1")?,
                     )
                     .await?;
 

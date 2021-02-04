@@ -2,8 +2,7 @@ use crate::{
     bitcoin::Signature,
     network::request_response::BUF_SIZE,
     protocol::{
-        alice,
-        alice::Message3,
+        alice::{Message1, Message3},
         bob::{State0, State2},
     },
 };
@@ -81,14 +80,11 @@ impl Behaviour {
                     )
                     .await?;
 
-                let alice_message0 = serde_cbor::from_slice::<alice::Message0>(
-                    &substream.read_message(BUF_SIZE).await?,
-                )
-                .context("failed to deserialize message0")?;
+                let message1 =
+                    serde_cbor::from_slice::<Message1>(&substream.read_message(BUF_SIZE).await?)
+                        .context("failed to deserialize message1")?;
 
-                let state1 = state0
-                    .receive(bitcoin_wallet.as_ref(), alice_message0)
-                    .await?;
+                let state1 = state0.receive(bitcoin_wallet.as_ref(), message1).await?;
                 {
                     let message2 = state1.next_message();
                     substream
