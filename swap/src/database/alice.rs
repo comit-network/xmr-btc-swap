@@ -14,10 +14,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Alice {
     Started {
-        amounts: SwapAmounts,
-        state0: alice::State0,
-    },
-    Negotiated {
         state3: alice::State3,
         #[serde(with = "crate::serde_peer_id")]
         bob_peer_id: PeerId,
@@ -54,11 +50,11 @@ pub enum AliceEndState {
 impl From<&AliceState> for Alice {
     fn from(alice_state: &AliceState) -> Self {
         match alice_state {
-            AliceState::Negotiated {
+            AliceState::Started {
                 state3,
                 bob_peer_id,
                 ..
-            } => Alice::Negotiated {
+            } => Alice::Started {
                 state3: state3.as_ref().clone(),
                 bob_peer_id: *bob_peer_id,
             },
@@ -93,10 +89,6 @@ impl From<&AliceState> for Alice {
             }
             AliceState::BtcPunished => Alice::Done(AliceEndState::BtcPunished),
             AliceState::SafelyAborted => Alice::Done(AliceEndState::SafelyAborted),
-            AliceState::Started { amounts, state0 } => Alice::Started {
-                amounts: *amounts,
-                state0: state0.clone(),
-            },
         }
     }
 }
@@ -104,11 +96,10 @@ impl From<&AliceState> for Alice {
 impl From<Alice> for AliceState {
     fn from(db_state: Alice) -> Self {
         match db_state {
-            Alice::Started { amounts, state0 } => AliceState::Started { amounts, state0 },
-            Alice::Negotiated {
+            Alice::Started {
                 state3,
                 bob_peer_id,
-            } => AliceState::Negotiated {
+            } => AliceState::Started {
                 bob_peer_id,
                 amounts: SwapAmounts {
                     btc: state3.btc,
@@ -186,7 +177,6 @@ impl Display for Alice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Alice::Started { .. } => write!(f, "Started"),
-            Alice::Negotiated { .. } => f.write_str("Negotiated"),
             Alice::BtcLocked { .. } => f.write_str("Bitcoin locked"),
             Alice::XmrLocked(_) => f.write_str("Monero locked"),
             Alice::CancelTimelockExpired(_) => f.write_str("Cancel timelock is expired"),

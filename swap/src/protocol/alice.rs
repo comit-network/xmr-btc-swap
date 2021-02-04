@@ -17,7 +17,6 @@ use anyhow::{bail, Result};
 use libp2p::{
     core::Multiaddr, identity::Keypair, request_response::ResponseChannel, NetworkBehaviour, PeerId,
 };
-use rand::rngs::OsRng;
 use std::{path::PathBuf, sync::Arc};
 use tracing::{debug, info};
 use uuid::Uuid;
@@ -69,7 +68,11 @@ pub struct Builder {
 
 enum InitParams {
     None,
-    New { swap_amounts: SwapAmounts },
+    New {
+        swap_amounts: SwapAmounts,
+        bob_peer_id: PeerId,
+        state3: Box<State3>,
+    },
 }
 
 impl Builder {
@@ -99,19 +102,34 @@ impl Builder {
         }
     }
 
-    pub fn with_init_params(self, swap_amounts: SwapAmounts) -> Self {
+    pub fn with_init_params(
+        self,
+        swap_amounts: SwapAmounts,
+        bob_peer_id: PeerId,
+        state3: State3,
+    ) -> Self {
         Self {
-            init_params: InitParams::New { swap_amounts },
+            init_params: InitParams::New {
+                swap_amounts,
+                bob_peer_id,
+                state3: Box::new(state3),
+            },
             ..self
         }
     }
 
     pub async fn build(self) -> Result<(Swap, EventLoop)> {
         match self.init_params {
-            InitParams::New { swap_amounts } => {
-                let initial_state = self
-                    .make_initial_state(swap_amounts.btc, swap_amounts.xmr)
-                    .await?;
+            InitParams::New {
+                swap_amounts,
+                bob_peer_id,
+                ref state3,
+            } => {
+                let initial_state = AliceState::Started {
+                    bob_peer_id,
+                    amounts: swap_amounts,
+                    state3: state3.clone(),
+                };
 
                 let (event_loop, event_loop_handle) = self.init_event_loop()?;
 
@@ -168,31 +186,6 @@ impl Builder {
 
     pub fn listen_address(&self) -> Multiaddr {
         self.listen_address.clone()
-    }
-
-    async fn make_initial_state(
-        &self,
-        btc_to_swap: bitcoin::Amount,
-        xmr_to_swap: monero::Amount,
-    ) -> Result<AliceState> {
-        let rng = &mut OsRng;
-
-        let amounts = SwapAmounts {
-            btc: btc_to_swap,
-            xmr: xmr_to_swap,
-        };
-
-        let state0 = State0::new(
-            amounts.btc,
-            amounts.xmr,
-            self.execution_params.bitcoin_cancel_timelock,
-            self.execution_params.bitcoin_punish_timelock,
-            self.bitcoin_wallet.as_ref(),
-            rng,
-        )
-        .await?;
-
-        Ok(AliceState::Started { amounts, state0 })
     }
 
     fn init_event_loop(&self) -> Result<(EventLoop, EventLoopHandle)> {

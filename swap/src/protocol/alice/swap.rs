@@ -17,10 +17,10 @@ use crate::{
             event_loop::EventLoopHandle,
             steps::{
                 build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
-                extract_monero_private_key, lock_xmr, negotiate,
-                publish_bitcoin_punish_transaction, publish_bitcoin_redeem_transaction,
-                publish_cancel_transaction, wait_for_bitcoin_encrypted_signature,
-                wait_for_bitcoin_refund, wait_for_locked_bitcoin,
+                extract_monero_private_key, lock_xmr, publish_bitcoin_punish_transaction,
+                publish_bitcoin_redeem_transaction, publish_cancel_transaction,
+                wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund,
+                wait_for_locked_bitcoin,
             },
             AliceState,
         },
@@ -91,37 +91,7 @@ async fn run_until_internal(
         Ok(state)
     } else {
         match state {
-            AliceState::Started { amounts, state0 } => {
-                let (bob_peer_id, state3) = negotiate(
-                    state0,
-                    amounts.xmr,
-                    &mut event_loop_handle,
-                    execution_params,
-                )
-                .await?;
-
-                let state = AliceState::Negotiated {
-                    bob_peer_id,
-                    amounts,
-                    state3: Box::new(state3),
-                };
-
-                let db_state = (&state).into();
-                db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
-                    .await?;
-                run_until_internal(
-                    state,
-                    is_target_state,
-                    event_loop_handle,
-                    bitcoin_wallet,
-                    monero_wallet,
-                    execution_params,
-                    swap_id,
-                    db,
-                )
-                .await
-            }
-            AliceState::Negotiated {
+            AliceState::Started {
                 state3,
                 bob_peer_id,
                 amounts,

@@ -10,7 +10,7 @@ use libp2p::{
     core::Multiaddr, futures::FutureExt, request_response::ResponseChannel, PeerId, Swarm,
 };
 use tokio::sync::mpsc::{Receiver, Sender};
-use tracing::{error, trace};
+use tracing::{debug, error, trace};
 
 #[allow(missing_debug_implementations)]
 pub struct Channels<T> {
@@ -36,7 +36,6 @@ pub struct EventLoopHandle {
     done_execution_setup: Receiver<Result<State3>>,
     recv_encrypted_signature: Receiver<EncryptedSignature>,
     request: Receiver<crate::protocol::alice::swap_response::OutEvent>,
-    conn_established: Receiver<PeerId>,
     send_swap_response: Sender<(ResponseChannel<Response>, SwapResponse)>,
     start_execution_setup: Sender<(PeerId, State0)>,
     send_transfer_proof: Sender<(PeerId, TransferProof)>,
@@ -44,13 +43,6 @@ pub struct EventLoopHandle {
 }
 
 impl EventLoopHandle {
-    pub async fn recv_conn_established(&mut self) -> Result<PeerId> {
-        self.conn_established
-            .recv()
-            .await
-            .ok_or_else(|| anyhow!("Failed to receive connection established from Bob"))
-    }
-
     pub async fn execution_setup(&mut self, bob_peer_id: PeerId, state0: State0) -> Result<State3> {
         let _ = self
             .start_execution_setup
@@ -109,7 +101,6 @@ pub struct EventLoop {
     done_execution_setup: Sender<Result<State3>>,
     recv_encrypted_signature: Sender<EncryptedSignature>,
     request: Sender<crate::protocol::alice::swap_response::OutEvent>,
-    conn_established: Sender<PeerId>,
     send_swap_response: Receiver<(ResponseChannel<Response>, SwapResponse)>,
     send_transfer_proof: Receiver<(PeerId, TransferProof)>,
     recv_transfer_proof_ack: Sender<()>,
@@ -135,7 +126,6 @@ impl EventLoop {
         let done_execution_setup = Channels::new();
         let recv_encrypted_signature = Channels::new();
         let request = Channels::new();
-        let conn_established = Channels::new();
         let send_swap_response = Channels::new();
         let send_transfer_proof = Channels::new();
         let recv_transfer_proof_ack = Channels::new();
@@ -146,7 +136,6 @@ impl EventLoop {
             done_execution_setup: done_execution_setup.sender,
             recv_encrypted_signature: recv_encrypted_signature.sender,
             request: request.sender,
-            conn_established: conn_established.sender,
             send_swap_response: send_swap_response.receiver,
             send_transfer_proof: send_transfer_proof.receiver,
             recv_transfer_proof_ack: recv_transfer_proof_ack.sender,
@@ -157,7 +146,6 @@ impl EventLoop {
             done_execution_setup: done_execution_setup.receiver,
             recv_encrypted_signature: recv_encrypted_signature.receiver,
             request: request.receiver,
-            conn_established: conn_established.receiver,
             send_swap_response: send_swap_response.sender,
             send_transfer_proof: send_transfer_proof.sender,
             recv_transfer_proof_ack: recv_transfer_proof_ack.receiver,
@@ -171,8 +159,8 @@ impl EventLoop {
             tokio::select! {
                 swarm_event = self.swarm.next().fuse() => {
                     match swarm_event {
-                        OutEvent::ConnectionEstablished(alice) => {
-                            let _ = self.conn_established.send(alice).await;
+                        OutEvent::ConnectionEstablished(bob_peer_id) => {
+                            debug!("Connection established with {}", bob_peer_id)
                         }
                         OutEvent::ExecutionSetupDone(res) => {
                             let _ = self.done_execution_setup.send(res.map(|state|*state)).await;
