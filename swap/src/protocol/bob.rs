@@ -26,7 +26,7 @@ pub use self::{
     swap::{run, run_until},
     swap_request::*,
 };
-pub use execution_setup::{Message0, Message1, Message2};
+pub use execution_setup::{Message0, Message1, Message4};
 
 mod encrypted_signature;
 pub mod event_loop;

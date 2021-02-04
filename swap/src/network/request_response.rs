@@ -1,4 +1,9 @@
-use crate::protocol::{alice, alice::TransferProof, bob, bob::EncryptedSignature};
+use crate::protocol::{
+    alice,
+    alice::TransferProof,
+    bob,
+    bob::{EncryptedSignature, Message4},
+};
 use async_trait::async_trait;
 use futures::prelude::*;
 use libp2p::{
@@ -23,7 +28,7 @@ pub enum BobToAlice {
     SwapRequest(Box<bob::SwapRequest>),
     Message0(Box<bob::Message0>),
     Message1(Box<bob::Message1>),
-    Message2(Box<bob::Message2>),
+    Message4(Box<Message4>),
 }
 
 /// Messages Alice sends to Bob.

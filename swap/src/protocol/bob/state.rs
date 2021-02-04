@@ -9,7 +9,11 @@ use crate::{
     execution_params::ExecutionParams,
     monero,
     monero::{monero_private_key, TransferProof},
-    protocol::{alice, bob, bob::EncryptedSignature, SwapAmounts},
+    protocol::{
+        alice, bob,
+        bob::{EncryptedSignature, Message4},
+        SwapAmounts,
+    },
 };
 use anyhow::{anyhow, Result};
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic, Signature};
@@ -246,14 +250,14 @@ pub struct State2 {
 }
 
 impl State2 {
-    pub fn next_message(&self) -> bob::Message2 {
+    pub fn next_message(&self) -> Message4 {
         let tx_cancel = TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
         let tx_cancel_sig = self.b.sign(tx_cancel.digest());
         let tx_punish =
             bitcoin::TxPunish::new(&tx_cancel, &self.punish_address, self.punish_timelock);
         let tx_punish_sig = self.b.sign(tx_punish.digest());
 
-        bob::Message2 {
+        Message4 {
             tx_punish_sig,
             tx_cancel_sig,
         }

@@ -7,7 +7,13 @@ use crate::{
         TxRefund, WatchForRawTransaction,
     },
     monero,
-    protocol::{alice, alice::TransferProof, bob, bob::EncryptedSignature, SwapAmounts},
+    protocol::{
+        alice,
+        alice::TransferProof,
+        bob,
+        bob::{EncryptedSignature, Message4},
+        SwapAmounts,
+    },
 };
 use anyhow::{anyhow, Context, Result};
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
@@ -250,7 +256,7 @@ impl State2 {
         }
     }
 
-    pub fn receive(self, msg: bob::Message2) -> Result<State3> {
+    pub fn receive(self, msg: Message4) -> Result<State3> {
         let tx_cancel =
             bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
         bitcoin::verify_sig(&self.B, &tx_cancel.digest(), &msg.tx_cancel_sig)
