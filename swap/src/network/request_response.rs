@@ -42,19 +42,19 @@ pub struct EncryptedSignatureProtocol;
 
 impl ProtocolName for Swap {
     fn protocol_name(&self) -> &[u8] {
-        b"/xmr/btc/swap/1.0.0"
+        b"/comit/xmr/btc/swap/1.0.0"
     }
 }
 
 impl ProtocolName for TransferProofProtocol {
     fn protocol_name(&self) -> &[u8] {
-        b"/xmr/btc/transfer_proof/1.0.0"
+        b"/comit/xmr/btc/transfer_proof/1.0.0"
     }
 }
 
 impl ProtocolName for EncryptedSignatureProtocol {
     fn protocol_name(&self) -> &[u8] {
-        b"/xmr/btc/encrypted_signature/1.0.0"
+        b"/comit/xmr/btc/encrypted_signature/1.0.0"
     }
 }
 
