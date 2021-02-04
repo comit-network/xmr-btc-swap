@@ -54,7 +54,7 @@ pub struct Behaviour {
 impl Default for Behaviour {
     fn default() -> Self {
         Self {
-            inner: libp2p_async_await::Behaviour::new(b"/execution_setup/1.0.0"),
+            inner: libp2p_async_await::Behaviour::new(b"/comit/xmr/btc/execution_setup/1.0.0"),
         }
     }
 }
