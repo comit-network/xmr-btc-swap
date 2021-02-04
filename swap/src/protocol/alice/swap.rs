@@ -202,7 +202,7 @@ async fn run_until_internal(
                             Either::Left(_) => AliceState::CancelTimelockExpired { state3 },
                             Either::Right((enc_sig, _)) => AliceState::EncSigLearned {
                                 state3,
-                                encrypted_signature: enc_sig?,
+                                encrypted_signature: Box::new(enc_sig?),
                             },
                         }
                     }
@@ -231,7 +231,7 @@ async fn run_until_internal(
                 let state = match state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {
                     ExpiredTimelocks::None => {
                         match build_bitcoin_redeem_transaction(
-                            encrypted_signature,
+                            *encrypted_signature,
                             &state3.tx_lock,
                             state3.a.clone(),
                             state3.s_a,

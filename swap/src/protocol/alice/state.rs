@@ -41,7 +41,7 @@ pub enum AliceState {
         state3: Box<State3>,
     },
     EncSigLearned {
-        encrypted_signature: bitcoin::EncryptedSignature,
+        encrypted_signature: Box<bitcoin::EncryptedSignature>,
         state3: Box<State3>,
     },
     BtcRedeemed,
