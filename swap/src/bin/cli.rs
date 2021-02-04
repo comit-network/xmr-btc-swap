@@ -12,40 +12,33 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
-use crate::{
+use anyhow::{Context, Result};
+use log::LevelFilter;
+use prettytable::{row, Table};
+use std::{path::PathBuf, sync::Arc};
+use structopt::StructOpt;
+use swap::{
+    bitcoin,
     cli::{Cancel, Command, Options, Refund, Resume},
+    config,
     config::{
         initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
     },
+    database::Database,
+    execution_params,
     execution_params::GetExecutionParams,
+    fs::{default_config_path, default_data_dir},
+    monero,
     monero::{CreateWallet, OpenWallet},
-    protocol::bob::cancel::CancelError,
+    protocol::{
+        bob,
+        bob::{cancel::CancelError, Builder},
+        SwapAmounts,
+    },
+    trace::init_tracing,
 };
-use anyhow::{Context, Result};
-use database::Database;
-use fs::{default_config_path, default_data_dir};
-use log::LevelFilter;
-use prettytable::{row, Table};
-use protocol::{bob, bob::Builder, SwapAmounts};
-use std::{path::PathBuf, sync::Arc};
-use structopt::StructOpt;
-use trace::init_tracing;
 use tracing::{error, info, warn};
 use uuid::Uuid;
-
-pub mod bitcoin;
-pub mod config;
-pub mod database;
-pub mod execution_params;
-pub mod monero;
-pub mod network;
-pub mod protocol;
-pub mod seed;
-pub mod trace;
-
-mod cli;
-mod fs;
-mod serde_peer_id;
 
 #[macro_use]
 extern crate prettytable;
@@ -70,7 +63,7 @@ async fn main() -> Result<()> {
     );
 
     let db_path = data_dir.join("database");
-    let seed = config::seed::Seed::from_file_or_generate(&data_dir)
+    let seed = config::Seed::from_file_or_generate(&data_dir)
         .expect("Could not retrieve/initialize seed")
         .into();
 
