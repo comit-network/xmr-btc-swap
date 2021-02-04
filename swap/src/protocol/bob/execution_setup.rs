@@ -40,7 +40,12 @@ impl Default for Behaviour {
 }
 
 impl Behaviour {
-    fn run(&mut self, alice: PeerId, state0: State0, bitcoin_wallet: Arc<crate::bitcoin::Wallet>) {
+    pub fn run(
+        &mut self,
+        alice: PeerId,
+        state0: State0,
+        bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
+    ) {
         self.inner
             .do_protocol_dialer(alice, move |mut substream| async move {
                 let bob_message0 = state0.next_message();

@@ -39,7 +39,7 @@ impl Default for Behaviour {
 }
 
 impl Behaviour {
-    fn run(&mut self, bob: PeerId, state0: State0) {
+    pub fn run(&mut self, bob: PeerId, state0: State0) {
         self.inner
             .do_protocol_listener(bob, move |mut substream| async move {
                 let alice_message0 = state0.next_message();

@@ -163,6 +163,7 @@ impl Builder {
             }
         }
     }
+
     fn init_event_loop(
         &self,
     ) -> Result<(bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle)> {
@@ -175,6 +176,7 @@ impl Builder {
             self.peer_id,
             self.alice_peer_id,
             self.alice_address.clone(),
+            self.bitcoin_wallet.clone(),
         )
     }
 
@@ -300,6 +302,17 @@ impl Behaviour {
     pub fn send_swap_request(&mut self, alice: PeerId, swap_request: SwapRequest) {
         let _id = self.swap_request.send(alice, swap_request);
         info!("Requesting swap from: {}", alice);
+    }
+
+    pub fn start_execution_setup(
+        &mut self,
+        alice_peer_id: PeerId,
+        state0: State0,
+        bitcoin_wallet: Arc<bitcoin::Wallet>,
+    ) {
+        self.execution_setup
+            .run(alice_peer_id, state0, bitcoin_wallet);
+        info!("Start execution setup with {}", alice_peer_id);
     }
 
     /// Sends Bob's first message to Alice.
