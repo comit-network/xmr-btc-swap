@@ -76,7 +76,7 @@ impl From<&AliceState> for Alice {
                 encrypted_signature,
             } => Alice::EncSigLearned {
                 state3: state3.as_ref().clone(),
-                encrypted_signature: encrypted_signature.clone(),
+                encrypted_signature: *encrypted_signature.clone(),
             },
             AliceState::BtcRedeemed => Alice::Done(AliceEndState::BtcRedeemed),
             AliceState::BtcCancelled { state3, .. } => Alice::BtcCancelled(state3.as_ref().clone()),
@@ -135,7 +135,7 @@ impl From<Alice> for AliceState {
                 encrypted_signature,
             } => AliceState::EncSigLearned {
                 state3: Box::new(state),
-                encrypted_signature,
+                encrypted_signature: Box::new(encrypted_signature),
             },
             Alice::CancelTimelockExpired(state3) => AliceState::CancelTimelockExpired {
                 state3: Box::new(state3),
