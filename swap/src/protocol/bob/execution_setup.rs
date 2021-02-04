@@ -28,7 +28,7 @@ pub struct Message1 {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Message2 {
+pub struct Message4 {
     pub(crate) tx_punish_sig: Signature,
     pub(crate) tx_cancel_sig: Signature,
 }
@@ -105,11 +105,11 @@ impl Behaviour {
                 let state2 = state1.receive(alice_message1)?;
 
                 {
-                    let bob_message2 = state2.next_message();
+                    let message4 = state2.next_message();
                     substream
                         .write_message(
-                            &serde_cbor::to_vec(&bob_message2)
-                                .context("failed to serialize Message2")?,
+                            &serde_cbor::to_vec(&message4)
+                                .context("failed to serialize message4")?,
                         )
                         .await?;
                 }
