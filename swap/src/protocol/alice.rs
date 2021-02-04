@@ -196,6 +196,9 @@ impl Builder {
             alice_behaviour,
             self.listen_address(),
             self.peer_id,
+            self.execution_params.bitcoin_cancel_timelock,
+            self.execution_params.bitcoin_punish_timelock,
+            self.bitcoin_wallet.clone(),
         )
     }
 }

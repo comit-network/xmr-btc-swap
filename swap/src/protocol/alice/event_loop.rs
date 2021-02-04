@@ -1,7 +1,10 @@
 use crate::{
+    bitcoin,
+    bitcoin::Timelock,
+    monero,
     network::{request_response::Response, transport::SwapTransport, TokioExecutor},
     protocol::{
-        alice::{Behaviour, OutEvent, State0, State3, SwapResponse, TransferProof},
+        alice::{swap_response, Behaviour, OutEvent, State0, State3, SwapResponse, TransferProof},
         bob::EncryptedSignature,
     },
 };
@@ -9,8 +12,13 @@ use anyhow::{anyhow, Context, Result};
 use libp2p::{
     core::Multiaddr, futures::FutureExt, request_response::ResponseChannel, PeerId, Swarm,
 };
+use rand::rngs::OsRng;
+use std::sync::Arc;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{debug, error, trace};
+
+// TODO: Use dynamic
+const RATE: u32 = 100;
 
 #[allow(missing_debug_implementations)]
 pub struct Channels<T> {
@@ -35,7 +43,6 @@ impl<T> Default for Channels<T> {
 pub struct EventLoopHandle {
     done_execution_setup: Receiver<Result<State3>>,
     recv_encrypted_signature: Receiver<EncryptedSignature>,
-    request: Receiver<crate::protocol::alice::swap_response::OutEvent>,
     send_swap_response: Sender<(ResponseChannel<Response>, SwapResponse)>,
     start_execution_setup: Sender<(PeerId, State0)>,
     send_transfer_proof: Sender<(PeerId, TransferProof)>,
@@ -60,15 +67,6 @@ impl EventLoopHandle {
             .recv()
             .await
             .ok_or_else(|| anyhow!("Failed to receive Bitcoin encrypted signature from Bob"))
-    }
-
-    pub async fn recv_request(
-        &mut self,
-    ) -> Result<crate::protocol::alice::swap_response::OutEvent> {
-        self.request
-            .recv()
-            .await
-            .ok_or_else(|| anyhow!("Failed to receive amounts request from Bob"))
     }
 
     pub async fn send_swap_response(
@@ -100,10 +98,12 @@ pub struct EventLoop {
     start_execution_setup: Receiver<(PeerId, State0)>,
     done_execution_setup: Sender<Result<State3>>,
     recv_encrypted_signature: Sender<EncryptedSignature>,
-    request: Sender<crate::protocol::alice::swap_response::OutEvent>,
     send_swap_response: Receiver<(ResponseChannel<Response>, SwapResponse)>,
     send_transfer_proof: Receiver<(PeerId, TransferProof)>,
     recv_transfer_proof_ack: Sender<()>,
+    cancel_timelock: Timelock,
+    punish_timelock: Timelock,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
 }
 
 impl EventLoop {
@@ -112,6 +112,10 @@ impl EventLoop {
         behaviour: Behaviour,
         listen: Multiaddr,
         peer_id: PeerId,
+        // TODO(Franck): Have the timelocks in a struct so they don't get swap by mistake
+        cancel_timelock: Timelock,
+        punish_timelock: Timelock,
+        bitcoin_wallet: Arc<bitcoin::Wallet>,
     ) -> Result<(Self, EventLoopHandle)> {
         let mut swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, peer_id)
             .executor(Box::new(TokioExecutor {
@@ -125,7 +129,6 @@ impl EventLoop {
         let start_execution_setup = Channels::new();
         let done_execution_setup = Channels::new();
         let recv_encrypted_signature = Channels::new();
-        let request = Channels::new();
         let send_swap_response = Channels::new();
         let send_transfer_proof = Channels::new();
         let recv_transfer_proof_ack = Channels::new();
@@ -135,17 +138,18 @@ impl EventLoop {
             start_execution_setup: start_execution_setup.receiver,
             done_execution_setup: done_execution_setup.sender,
             recv_encrypted_signature: recv_encrypted_signature.sender,
-            request: request.sender,
             send_swap_response: send_swap_response.receiver,
             send_transfer_proof: send_transfer_proof.receiver,
             recv_transfer_proof_ack: recv_transfer_proof_ack.sender,
+            cancel_timelock,
+            punish_timelock,
+            bitcoin_wallet,
         };
 
         let handle = EventLoopHandle {
             start_execution_setup: start_execution_setup.sender,
             done_execution_setup: done_execution_setup.receiver,
             recv_encrypted_signature: recv_encrypted_signature.receiver,
-            request: request.receiver,
             send_swap_response: send_swap_response.sender,
             send_transfer_proof: send_transfer_proof.sender,
             recv_transfer_proof_ack: recv_transfer_proof_ack.receiver,
@@ -173,7 +177,7 @@ impl EventLoop {
                             let _ = self.recv_encrypted_signature.send(*msg).await;
                         }
                         OutEvent::Request(event) => {
-                            let _ = self.request.send(*event).await;
+                           let _ = self.handle_swap_request(*event).await;
                         }
                     }
                 },
@@ -199,5 +203,44 @@ impl EventLoop {
                 },
             }
         }
+    }
+
+    async fn handle_swap_request(&mut self, event: swap_response::OutEvent) -> Result<()> {
+        let swap_response::OutEvent {
+            msg,
+            bob_peer_id,
+            channel,
+        } = event;
+        // 1. Check if acceptable request
+        // 2. Send response
+
+        let btc_amount = msg.btc_amount;
+        let xmr_amount = btc_amount.as_btc() * RATE as f64;
+        let xmr_amount = monero::Amount::from_monero(xmr_amount)?;
+        let swap_response = SwapResponse { xmr_amount };
+
+        self.swarm
+            .send_swap_response(channel, swap_response)
+            .context("Failed to send swap response")?;
+
+        // 3. Start setup execution
+
+        let state0 = State0::new(
+            btc_amount,
+            xmr_amount,
+            self.cancel_timelock,
+            self.punish_timelock,
+            self.bitcoin_wallet.as_ref(),
+            &mut OsRng,
+        )
+        .await?;
+
+        self.swarm.execution_setup.run(bob_peer_id, state0);
+
+        // 4. Trigger swap
+
+        todo!();
+
+        Ok(())
     }
 }

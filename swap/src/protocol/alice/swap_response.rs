@@ -10,7 +10,7 @@ use libp2p::{
         RequestResponseEvent, RequestResponseMessage, ResponseChannel,
     },
     swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
-    NetworkBehaviour,
+    NetworkBehaviour, PeerId,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -23,6 +23,7 @@ use tracing::{debug, error};
 #[derive(Debug)]
 pub struct OutEvent {
     pub msg: bob::SwapRequest,
+    pub bob_peer_id: PeerId,
     pub channel: ResponseChannel<Response>,
 }
 
@@ -86,6 +87,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for B
     fn inject_event(&mut self, event: RequestResponseEvent<Request, Response>) {
         match event {
             RequestResponseEvent::Message {
+                peer,
                 message:
                     RequestResponseMessage::Request {
                         request, channel, ..
@@ -94,7 +96,11 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for B
             } => {
                 if let Request::SwapRequest(msg) = request {
                     debug!("Received swap request");
-                    self.events.push_back(OutEvent { msg: *msg, channel })
+                    self.events.push_back(OutEvent {
+                        bob_peer_id: peer,
+                        msg: *msg,
+                        channel,
+                    })
                 }
             }
             RequestResponseEvent::Message {
