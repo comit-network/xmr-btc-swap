@@ -182,23 +182,15 @@ impl Builder {
             xmr: xmr_to_swap,
         };
 
-        let a = bitcoin::SecretKey::new_random(rng);
-        let s_a = cross_curve_dleq::Scalar::random(rng);
-        let v_a = monero::PrivateViewKey::new_random(rng);
-        let redeem_address = self.bitcoin_wallet.new_address().await?;
-        let punish_address = redeem_address.clone();
         let state0 = State0::new(
-            a,
-            s_a,
-            v_a,
             amounts.btc,
             amounts.xmr,
             self.execution_params.bitcoin_cancel_timelock,
             self.execution_params.bitcoin_punish_timelock,
-            redeem_address,
-            punish_address,
+            self.bitcoin_wallet.as_ref(),
             rng,
-        );
+        )
+        .await?;
 
         Ok(AliceState::Started { amounts, state0 })
     }
