@@ -1,6 +1,6 @@
 use crate::{
     monero,
-    network::request_response::{AliceToBob, BobToAlice, Codec, Swap, TIMEOUT},
+    network::request_response::{OneShotCodec, Request, Response, Swap, TIMEOUT},
     protocol::bob,
 };
 use anyhow::{anyhow, Result};
@@ -23,7 +23,7 @@ use tracing::{debug, error};
 #[derive(Debug)]
 pub struct OutEvent {
     pub msg: bob::SwapRequest,
-    pub channel: ResponseChannel<AliceToBob>,
+    pub channel: ResponseChannel<Response>,
 }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -37,15 +37,15 @@ pub struct SwapResponse {
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<Codec<Swap>>,
+    rr: RequestResponse<OneShotCodec<Swap>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
 impl Behaviour {
     /// Alice always sends her messages as a response to a request from Bob.
-    pub fn send(&mut self, channel: ResponseChannel<AliceToBob>, msg: SwapResponse) -> Result<()> {
-        let msg = AliceToBob::SwapResponse(Box::new(msg));
+    pub fn send(&mut self, channel: ResponseChannel<Response>, msg: SwapResponse) -> Result<()> {
+        let msg = Response::SwapResponse(Box::new(msg));
         self.rr
             .send_response(channel, msg)
             .map_err(|_| anyhow!("Sending swap response failed"))
@@ -55,7 +55,7 @@ impl Behaviour {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Swap>>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<OneShotCodec<Swap>>, OutEvent>> {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -73,8 +73,8 @@ impl Default for Behaviour {
 
         Self {
             rr: RequestResponse::new(
-                Codec::default(),
-                vec![(Swap, ProtocolSupport::Full)],
+                OneShotCodec::default(),
+                vec![(Swap, ProtocolSupport::Inbound)],
                 config,
             ),
             events: Default::default(),
@@ -82,8 +82,8 @@ impl Default for Behaviour {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for Behaviour {
+    fn inject_event(&mut self, event: RequestResponseEvent<Request, Response>) {
         match event {
             RequestResponseEvent::Message {
                 message:
@@ -92,7 +92,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                     },
                 ..
             } => {
-                if let BobToAlice::SwapRequest(msg) = request {
+                if let Request::SwapRequest(msg) = request {
                     debug!("Received swap request");
                     self.events.push_back(OutEvent { msg: *msg, channel })
                 }
