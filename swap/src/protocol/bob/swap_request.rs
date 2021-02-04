@@ -1,5 +1,5 @@
 use crate::{
-    network::request_response::{AliceToBob, BobToAlice, Codec, Swap, TIMEOUT},
+    network::request_response::{OneShotCodec, Request, Response, Swap, TIMEOUT},
     protocol::alice::SwapResponse,
 };
 use anyhow::Result;
@@ -35,14 +35,14 @@ pub struct OutEvent {
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<Codec<Swap>>,
+    rr: RequestResponse<OneShotCodec<Swap>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
 impl Behaviour {
     pub fn send(&mut self, alice: PeerId, swap_request: SwapRequest) -> Result<RequestId> {
-        let msg = BobToAlice::SwapRequest(Box::new(swap_request));
+        let msg = Request::SwapRequest(Box::new(swap_request));
         let id = self.rr.send_request(&alice, msg);
 
         Ok(id)
@@ -52,7 +52,7 @@ impl Behaviour {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<Codec<Swap>>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<OneShotCodec<Swap>>, OutEvent>> {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -70,7 +70,7 @@ impl Default for Behaviour {
 
         Self {
             rr: RequestResponse::new(
-                Codec::default(),
+                OneShotCodec::default(),
                 vec![(Swap, ProtocolSupport::Outbound)],
                 config,
             ),
@@ -79,8 +79,8 @@ impl Default for Behaviour {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<BobToAlice, AliceToBob>) {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for Behaviour {
+    fn inject_event(&mut self, event: RequestResponseEvent<Request, Response>) {
         match event {
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Request { .. },
@@ -90,7 +90,7 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<BobToAlice, AliceToBob>> 
                 message: RequestResponseMessage::Response { response, .. },
                 ..
             } => {
-                if let AliceToBob::SwapResponse(swap_response) = response {
+                if let Response::SwapResponse(swap_response) = response {
                     debug!("Received swap response");
                     self.events.push_back(OutEvent {
                         swap_response: *swap_response,
