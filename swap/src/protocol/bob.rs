@@ -3,12 +3,13 @@
 use crate::{
     bitcoin, database,
     database::Database,
+    execution_params::ExecutionParams,
     monero, network,
     network::{
         peer_tracker::{self, PeerTracker},
         transport::build,
     },
-    protocol::{alice, bob, SwapAmounts},
+    protocol::{alice, alice::TransferProof, bob, SwapAmounts},
     seed::Seed,
 };
 use anyhow::{bail, Result};
@@ -21,21 +22,15 @@ use uuid::Uuid;
 pub use self::{
     encrypted_signature::EncryptedSignature,
     event_loop::{EventLoop, EventLoopHandle},
-    message0::Message0,
-    message1::Message1,
-    message2::Message2,
     state::*,
     swap::{run, run_until},
     swap_request::*,
 };
-use crate::{execution_params::ExecutionParams, protocol::alice::TransferProof};
+pub use execution_setup::{Message0, Message1, Message2};
 
 mod encrypted_signature;
 pub mod event_loop;
 mod execution_setup;
-mod message0;
-mod message1;
-mod message2;
 pub mod state;
 pub mod swap;
 mod swap_request;
@@ -210,9 +205,6 @@ impl Builder {
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
     SwapResponse(alice::SwapResponse),
-    Message0(Box<alice::Message0>),
-    Message1(Box<alice::Message1>),
-    Message2,
     ExecutionSetupDone(Result<Box<State2>>),
     TransferProof(Box<TransferProof>),
     EncryptedSignatureAcknowledged,
@@ -231,30 +223,6 @@ impl From<peer_tracker::OutEvent> for OutEvent {
 impl From<swap_request::OutEvent> for OutEvent {
     fn from(event: swap_request::OutEvent) -> Self {
         OutEvent::SwapResponse(event.swap_response)
-    }
-}
-
-impl From<message0::OutEvent> for OutEvent {
-    fn from(event: message0::OutEvent) -> Self {
-        match event {
-            message0::OutEvent::Msg(msg) => OutEvent::Message0(Box::new(msg)),
-        }
-    }
-}
-
-impl From<message1::OutEvent> for OutEvent {
-    fn from(event: message1::OutEvent) -> Self {
-        match event {
-            message1::OutEvent::Msg(msg) => OutEvent::Message1(Box::new(msg)),
-        }
-    }
-}
-
-impl From<message2::OutEvent> for OutEvent {
-    fn from(event: message2::OutEvent) -> Self {
-        match event {
-            message2::OutEvent::Msg => OutEvent::Message2,
-        }
     }
 }
 
@@ -289,9 +257,6 @@ impl From<encrypted_signature::OutEvent> for OutEvent {
 pub struct Behaviour {
     pt: PeerTracker,
     swap_request: swap_request::Behaviour,
-    message0: message0::Behaviour,
-    message1: message1::Behaviour,
-    message2: message2::Behaviour,
     execution_setup: execution_setup::Behaviour,
     transfer_proof: transfer_proof::Behaviour,
     encrypted_signature: encrypted_signature::Behaviour,
@@ -313,24 +278,6 @@ impl Behaviour {
         self.execution_setup
             .run(alice_peer_id, state0, bitcoin_wallet);
         info!("Start execution setup with {}", alice_peer_id);
-    }
-
-    /// Sends Bob's first message to Alice.
-    pub fn send_message0(&mut self, alice: PeerId, msg: bob::Message0) {
-        self.message0.send(alice, msg);
-        debug!("Message0 sent");
-    }
-
-    /// Sends Bob's second message to Alice.
-    pub fn send_message1(&mut self, alice: PeerId, msg: bob::Message1) {
-        self.message1.send(alice, msg);
-        debug!("Message1 sent");
-    }
-
-    /// Sends Bob's third message to Alice.
-    pub fn send_message2(&mut self, alice: PeerId, msg: bob::Message2) {
-        self.message2.send(alice, msg);
-        debug!("Message2 sent");
     }
 
     /// Sends Bob's fourth message to Alice.
