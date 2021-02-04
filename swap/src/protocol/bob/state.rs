@@ -10,8 +10,7 @@ use crate::{
     monero,
     monero::{monero_private_key, TransferProof},
     protocol::{
-        alice,
-        alice::Message3,
+        alice::{Message1, Message3},
         bob,
         bob::{EncryptedSignature, Message2, Message4},
         SwapAmounts,
@@ -133,7 +132,7 @@ impl State0 {
         }
     }
 
-    pub async fn receive<W>(self, wallet: &W, msg: alice::Message0) -> anyhow::Result<State1>
+    pub async fn receive<W>(self, wallet: &W, msg: Message1) -> anyhow::Result<State1>
     where
         W: BuildTxLockPsbt + GetNetwork,
     {

@@ -8,8 +8,7 @@ use crate::{
     },
     monero,
     protocol::{
-        alice,
-        alice::{Message3, TransferProof},
+        alice::{Message1, Message3, TransferProof},
         bob,
         bob::{EncryptedSignature, Message2, Message4},
         SwapAmounts,
@@ -135,8 +134,8 @@ impl State0 {
         }
     }
 
-    pub fn next_message(&self) -> alice::Message0 {
-        alice::Message0 {
+    pub fn next_message(&self) -> Message1 {
+        Message1 {
             A: self.a.public(),
             S_a_monero: monero::PublicKey::from_private_key(&monero::PrivateKey {
                 scalar: self.s_a.into_ed25519(),
