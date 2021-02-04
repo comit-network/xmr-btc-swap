@@ -1,6 +1,6 @@
 use crate::protocol::{
     alice,
-    alice::TransferProof,
+    alice::{Message3, TransferProof},
     bob,
     bob::{EncryptedSignature, Message4},
 };
@@ -36,7 +36,7 @@ pub enum BobToAlice {
 pub enum AliceToBob {
     SwapResponse(Box<alice::SwapResponse>),
     Message0(Box<alice::Message0>),
-    Message1(Box<alice::Message1>),
+    Message3(Box<Message3>),
     Message2,
 }
 
