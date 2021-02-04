@@ -1,14 +1,5 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-pub use self::{
-    event_loop::{EventLoop, EventLoopHandle},
-    message0::Message0,
-    message1::Message1,
-    state::*,
-    swap::{run, run_until},
-    swap_response::*,
-    transfer_proof::TransferProof,
-};
 use crate::{
     bitcoin, database,
     database::Database,
@@ -20,7 +11,7 @@ use crate::{
         transport::build,
         Seed as NetworkSeed,
     },
-    protocol::{bob, bob::EncryptedSignature, SwapAmounts},
+    protocol::{bob::EncryptedSignature, SwapAmounts},
     seed::Seed,
 };
 use anyhow::{bail, Result};
@@ -32,12 +23,19 @@ use std::{path::PathBuf, sync::Arc};
 use tracing::{debug, info};
 use uuid::Uuid;
 
+pub use self::{
+    event_loop::{EventLoop, EventLoopHandle},
+    execution_setup::Message0,
+    state::*,
+    swap::{run, run_until},
+    swap_response::*,
+    transfer_proof::TransferProof,
+};
+pub use execution_setup::Message1;
+
 mod encrypted_signature;
 pub mod event_loop;
 mod execution_setup;
-mod message0;
-mod message1;
-mod message2;
 pub mod state;
 mod steps;
 pub mod swap;
@@ -220,23 +218,7 @@ impl Builder {
 #[derive(Debug)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
-    // TODO (Franck): Change this to get both amounts so parties can verify the amounts are
-    // expected early on.
-    Request(Box<swap_response::OutEvent>), /* Not-uniform with Bob on purpose, ready for adding
-                                            * Xmr
-                                            * event. */
-    Message0 {
-        msg: Box<bob::Message0>,
-        channel: ResponseChannel<AliceToBob>,
-    },
-    Message1 {
-        msg: Box<bob::Message1>,
-        channel: ResponseChannel<AliceToBob>,
-    },
-    Message2 {
-        msg: Box<bob::Message2>,
-        bob_peer_id: PeerId,
-    },
+    Request(Box<swap_response::OutEvent>),
     ExecutionSetupDone(Result<Box<State3>>),
     TransferProofAcknowledged,
     EncryptedSignature(Box<EncryptedSignature>),
@@ -255,39 +237,6 @@ impl From<peer_tracker::OutEvent> for OutEvent {
 impl From<swap_response::OutEvent> for OutEvent {
     fn from(event: swap_response::OutEvent) -> Self {
         OutEvent::Request(Box::new(event))
-    }
-}
-
-impl From<message0::OutEvent> for OutEvent {
-    fn from(event: message0::OutEvent) -> Self {
-        match event {
-            message0::OutEvent::Msg { channel, msg } => OutEvent::Message0 {
-                msg: Box::new(msg),
-                channel,
-            },
-        }
-    }
-}
-
-impl From<message1::OutEvent> for OutEvent {
-    fn from(event: message1::OutEvent) -> Self {
-        match event {
-            message1::OutEvent::Msg { msg, channel } => OutEvent::Message1 {
-                msg: Box::new(msg),
-                channel,
-            },
-        }
-    }
-}
-
-impl From<message2::OutEvent> for OutEvent {
-    fn from(event: message2::OutEvent) -> Self {
-        match event {
-            message2::OutEvent::Msg { msg, bob_peer_id } => OutEvent::Message2 {
-                msg: Box::new(msg),
-                bob_peer_id,
-            },
-        }
     }
 }
 
@@ -322,9 +271,6 @@ impl From<encrypted_signature::OutEvent> for OutEvent {
 pub struct Behaviour {
     pt: PeerTracker,
     amounts: swap_response::Behaviour,
-    message0: message0::Behaviour,
-    message1: message1::Behaviour,
-    message2: message2::Behaviour,
     execution_setup: execution_setup::Behaviour,
     transfer_proof: transfer_proof::Behaviour,
     encrypted_signature: encrypted_signature::Behaviour,
@@ -345,28 +291,6 @@ impl Behaviour {
     pub fn start_execution_setup(&mut self, bob_peer_id: PeerId, state0: State0) {
         self.execution_setup.run(bob_peer_id, state0);
         info!("Start execution setup with {}", bob_peer_id);
-    }
-
-    /// Send Message0 to Bob in response to receiving his Message0.
-    pub fn send_message0(
-        &mut self,
-        channel: ResponseChannel<AliceToBob>,
-        msg: Message0,
-    ) -> Result<()> {
-        self.message0.send(channel, msg)?;
-        debug!("Sent Message0");
-        Ok(())
-    }
-
-    /// Send Message1 to Bob in response to receiving his Message1.
-    pub fn send_message1(
-        &mut self,
-        channel: ResponseChannel<AliceToBob>,
-        msg: Message1,
-    ) -> Result<()> {
-        self.message1.send(channel, msg)?;
-        debug!("Sent Message1");
-        Ok(())
     }
 
     /// Send Transfer Proof to Bob.

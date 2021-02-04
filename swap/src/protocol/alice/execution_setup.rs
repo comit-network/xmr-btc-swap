@@ -1,4 +1,7 @@
 use crate::{
+    bitcoin,
+    bitcoin::{EncryptedSignature, Signature},
+    monero,
     network::request_response::BUF_SIZE,
     protocol::{
         alice::{State0, State3},
@@ -8,6 +11,24 @@ use crate::{
 use anyhow::{Context, Error, Result};
 use libp2p::PeerId;
 use libp2p_async_await::BehaviourOutEvent;
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message0 {
+    pub(crate) A: bitcoin::PublicKey,
+    pub(crate) S_a_monero: monero::PublicKey,
+    pub(crate) S_a_bitcoin: bitcoin::PublicKey,
+    pub(crate) dleq_proof_s_a: cross_curve_dleq::Proof,
+    pub(crate) v_a: monero::PrivateViewKey,
+    pub(crate) redeem_address: bitcoin::Address,
+    pub(crate) punish_address: bitcoin::Address,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message1 {
+    pub(crate) tx_cancel_sig: Signature,
+    pub(crate) tx_refund_encsig: EncryptedSignature,
+}
 
 #[derive(Debug)]
 pub enum OutEvent {
