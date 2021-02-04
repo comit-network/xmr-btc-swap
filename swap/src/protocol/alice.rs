@@ -230,7 +230,7 @@ pub enum OutEvent {
         channel: ResponseChannel<AliceToBob>,
     },
     Message1 {
-        msg: bob::Message1,
+        msg: Box<bob::Message1>,
         channel: ResponseChannel<AliceToBob>,
     },
     Message2 {
@@ -239,7 +239,7 @@ pub enum OutEvent {
     },
     ExecutionSetupDone(Result<Box<State3>>),
     TransferProofAcknowledged,
-    EncryptedSignature(EncryptedSignature),
+    EncryptedSignature(Box<EncryptedSignature>),
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -272,7 +272,10 @@ impl From<message0::OutEvent> for OutEvent {
 impl From<message1::OutEvent> for OutEvent {
     fn from(event: message1::OutEvent) -> Self {
         match event {
-            message1::OutEvent::Msg { msg, channel } => OutEvent::Message1 { msg, channel },
+            message1::OutEvent::Msg { msg, channel } => OutEvent::Message1 {
+                msg: Box::new(msg),
+                channel,
+            },
         }
     }
 }
@@ -307,7 +310,7 @@ impl From<transfer_proof::OutEvent> for OutEvent {
 impl From<encrypted_signature::OutEvent> for OutEvent {
     fn from(event: encrypted_signature::OutEvent) -> Self {
         match event {
-            encrypted_signature::OutEvent::Msg(msg) => OutEvent::EncryptedSignature(msg),
+            encrypted_signature::OutEvent::Msg(msg) => OutEvent::EncryptedSignature(Box::new(msg)),
         }
     }
 }

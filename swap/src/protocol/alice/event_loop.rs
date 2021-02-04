@@ -244,7 +244,7 @@ impl EventLoop {
                             let _ = self.recv_message0.send((*msg, channel)).await;
                         }
                         OutEvent::Message1 { msg, channel } => {
-                            let _ = self.recv_message1.send((msg, channel)).await;
+                            let _ = self.recv_message1.send((*msg, channel)).await;
                         }
                         OutEvent::Message2 { msg, bob_peer_id : _} => {
                             let _ = self.recv_message2.send(*msg).await;
@@ -257,7 +257,7 @@ impl EventLoop {
                             let _ = self.recv_transfer_proof_ack.send(()).await;
                         }
                         OutEvent::EncryptedSignature(msg) => {
-                            let _ = self.recv_encrypted_signature.send(msg).await;
+                            let _ = self.recv_encrypted_signature.send(*msg).await;
                         }
                         OutEvent::Request(event) => {
                             let _ = self.request.send(*event).await;
