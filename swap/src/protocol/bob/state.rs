@@ -11,8 +11,7 @@ use crate::{
     monero::{monero_private_key, TransferProof},
     protocol::{
         alice::{Message1, Message3},
-        bob,
-        bob::{EncryptedSignature, Message2, Message4},
+        bob::{EncryptedSignature, Message0, Message2, Message4},
         SwapAmounts,
     },
 };
@@ -119,8 +118,8 @@ impl State0 {
         }
     }
 
-    pub fn next_message(&self) -> bob::Message0 {
-        bob::Message0 {
+    pub fn next_message(&self) -> Message0 {
+        Message0 {
             B: self.b.public(),
             S_b_monero: monero::PublicKey::from_private_key(&monero::PrivateKey {
                 scalar: self.s_b.into_ed25519(),

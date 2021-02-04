@@ -9,8 +9,7 @@ use crate::{
     monero,
     protocol::{
         alice::{Message1, Message3, TransferProof},
-        bob,
-        bob::{EncryptedSignature, Message2, Message4},
+        bob::{EncryptedSignature, Message0, Message2, Message4},
         SwapAmounts,
     },
 };
@@ -148,7 +147,7 @@ impl State0 {
         }
     }
 
-    pub fn receive(self, msg: bob::Message0) -> Result<State1> {
+    pub fn receive(self, msg: Message0) -> Result<State1> {
         msg.dleq_proof_s_b.verify(
             msg.S_b_bitcoin.clone().into(),
             msg.S_b_monero
