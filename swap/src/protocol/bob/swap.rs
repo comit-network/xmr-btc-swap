@@ -377,11 +377,11 @@ async fn run_until_internal(
 pub async fn negotiate(
     state0: crate::protocol::bob::state::State0,
     amounts: SwapAmounts,
-    swarm: &mut EventLoopHandle,
+    event_loop_handle: &mut EventLoopHandle,
     bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
 ) -> Result<bob::state::State2> {
     tracing::trace!("Starting negotiate");
-    swarm
+    event_loop_handle
         .send_swap_request(SwapRequest {
             btc_amount: amounts.btc,
         })
@@ -389,17 +389,23 @@ pub async fn negotiate(
 
     // TODO: Use this once Bob's CLI is modified to only pass xmr amount in
     // argument.
-    let _swap_response = swarm.recv_swap_response().await?;
+    let _swap_response = event_loop_handle.recv_swap_response().await?;
 
-    swarm.send_message0(state0.next_message()).await?;
-    let msg0 = swarm.recv_message0().await?;
+    event_loop_handle
+        .send_message0(state0.next_message())
+        .await?;
+    let msg0 = event_loop_handle.recv_message0().await?;
     let state1 = state0.receive(bitcoin_wallet.as_ref(), msg0).await?;
 
-    swarm.send_message1(state1.next_message()).await?;
-    let msg1 = swarm.recv_message1().await?;
+    event_loop_handle
+        .send_message1(state1.next_message())
+        .await?;
+    let msg1 = event_loop_handle.recv_message1().await?;
     let state2 = state1.receive(msg1)?;
 
-    swarm.send_message2(state2.next_message()).await?;
+    event_loop_handle
+        .send_message2(state2.next_message())
+        .await?;
 
     Ok(state2)
 }
