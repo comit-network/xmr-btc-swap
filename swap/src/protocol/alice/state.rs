@@ -9,7 +9,7 @@ use crate::{
     monero,
     protocol::{
         alice,
-        alice::TransferProof,
+        alice::{Message3, TransferProof},
         bob,
         bob::{EncryptedSignature, Message4},
         SwapAmounts,
@@ -237,7 +237,7 @@ pub struct State2 {
 }
 
 impl State2 {
-    pub fn next_message(&self) -> alice::Message1 {
+    pub fn next_message(&self) -> Message3 {
         let tx_cancel =
             bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
 
@@ -250,7 +250,7 @@ impl State2 {
         let tx_refund_encsig = self.a.encsign(self.S_b_bitcoin, tx_refund.digest());
 
         let tx_cancel_sig = self.a.sign(tx_cancel.digest());
-        alice::Message1 {
+        Message3 {
             tx_refund_encsig,
             tx_cancel_sig,
         }

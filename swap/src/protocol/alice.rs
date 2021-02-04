@@ -31,7 +31,7 @@ pub use self::{
     swap_response::*,
     transfer_proof::TransferProof,
 };
-pub use execution_setup::Message1;
+pub use execution_setup::Message3;
 
 mod encrypted_signature;
 pub mod event_loop;

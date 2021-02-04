@@ -10,7 +10,9 @@ use crate::{
     monero,
     monero::{monero_private_key, TransferProof},
     protocol::{
-        alice, bob,
+        alice,
+        alice::Message3,
+        bob,
         bob::{EncryptedSignature, Message4},
         SwapAmounts,
     },
@@ -193,7 +195,7 @@ impl State1 {
         }
     }
 
-    pub fn receive(self, msg: alice::Message1) -> Result<State2> {
+    pub fn receive(self, msg: Message3) -> Result<State2> {
         let tx_cancel = TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
         let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &self.refund_address);
 

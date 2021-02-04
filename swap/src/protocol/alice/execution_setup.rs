@@ -26,7 +26,7 @@ pub struct Message0 {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Message1 {
+pub struct Message3 {
     pub(crate) tx_cancel_sig: Signature,
     pub(crate) tx_refund_encsig: EncryptedSignature,
 }
@@ -90,11 +90,11 @@ impl Behaviour {
                 };
 
                 {
-                    let alice_message2 = state2.next_message();
+                    let message3 = state2.next_message();
                     substream
                         .write_message(
-                            &serde_cbor::to_vec(&alice_message2)
-                                .context("failed to serialize Message2")?,
+                            &serde_cbor::to_vec(&message3)
+                                .context("failed to serialize message3")?,
                         )
                         .await?;
                 }
