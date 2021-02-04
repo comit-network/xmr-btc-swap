@@ -19,19 +19,6 @@ pub struct Options {
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(name = "xmr_btc-swap", about = "XMR BTC atomic swap")]
 pub enum Command {
-    SellXmr {
-        #[structopt(long = "p2p-address", default_value = "/ip4/0.0.0.0/tcp/9876")]
-        listen_addr: Multiaddr,
-
-        #[structopt(long = "send-xmr",  help = "Monero amount as floating point nr without denomination (e.g. 125.1)", parse(try_from_str = parse_xmr))]
-        send_monero: monero::Amount,
-
-        #[structopt(long = "receive-btc", help = "Bitcoin amount as floating point nr without denomination (e.g. 1.25)", parse(try_from_str = parse_btc))]
-        receive_bitcoin: bitcoin::Amount,
-
-        #[structopt(flatten)]
-        config: Config,
-    },
     BuyXmr {
         #[structopt(long = "connect-peer-id")]
         alice_peer_id: PeerId,
@@ -56,16 +43,6 @@ pub enum Command {
 
 #[derive(structopt::StructOpt, Debug)]
 pub enum Resume {
-    SellXmr {
-        #[structopt(long = "swap-id")]
-        swap_id: Uuid,
-
-        #[structopt(long = "listen-address", default_value = "/ip4/127.0.0.1/tcp/9876")]
-        listen_addr: Multiaddr,
-
-        #[structopt(flatten)]
-        config: Config,
-    },
     BuyXmr {
         #[structopt(long = "swap-id")]
         swap_id: Uuid,

@@ -26,7 +26,7 @@ use database::Database;
 use fs::{default_config_path, default_data_dir};
 use log::LevelFilter;
 use prettytable::{row, Table};
-use protocol::{alice, bob, bob::Builder, SwapAmounts};
+use protocol::{bob, bob::Builder, SwapAmounts};
 use std::{path::PathBuf, sync::Arc};
 use structopt::StructOpt;
 use trace::init_tracing;
@@ -80,42 +80,6 @@ async fn main() -> Result<()> {
     let execution_params = execution_params::Testnet::get_execution_params();
 
     match opt.cmd {
-        Command::SellXmr {
-            listen_addr,
-            send_monero,
-            receive_bitcoin,
-            config,
-        } => {
-            let swap_amounts = SwapAmounts {
-                xmr: send_monero,
-                btc: receive_bitcoin,
-            };
-
-            let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config.path, bitcoin_network, monero_network).await?;
-
-            let swap_id = Uuid::new_v4();
-
-            info!(
-                "Swap sending {} and receiving {} started with ID {}",
-                send_monero, receive_bitcoin, swap_id
-            );
-
-            let alice_factory = alice::Builder::new(
-                seed,
-                execution_params,
-                swap_id,
-                Arc::new(bitcoin_wallet),
-                Arc::new(monero_wallet),
-                db_path,
-                listen_addr,
-            );
-            let (swap, mut event_loop) =
-                alice_factory.with_init_params(swap_amounts).build().await?;
-
-            tokio::spawn(async move { event_loop.run().await });
-            alice::run(swap).await?;
-        }
         Command::BuyXmr {
             alice_peer_id,
             alice_addr,
@@ -166,28 +130,6 @@ async fn main() -> Result<()> {
 
             // Print the table to stdout
             table.printstd();
-        }
-        Command::Resume(Resume::SellXmr {
-            swap_id,
-            listen_addr,
-            config,
-        }) => {
-            let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config.path, bitcoin_network, monero_network).await?;
-
-            let alice_factory = alice::Builder::new(
-                seed,
-                execution_params,
-                swap_id,
-                Arc::new(bitcoin_wallet),
-                Arc::new(monero_wallet),
-                db_path,
-                listen_addr,
-            );
-            let (swap, mut event_loop) = alice_factory.build().await?;
-
-            tokio::spawn(async move { event_loop.run().await });
-            alice::run(swap).await?;
         }
         Command::Resume(Resume::BuyXmr {
             swap_id,
