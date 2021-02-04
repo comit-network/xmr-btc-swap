@@ -13,7 +13,7 @@ use crate::{
         alice,
         alice::Message3,
         bob,
-        bob::{EncryptedSignature, Message4},
+        bob::{EncryptedSignature, Message2, Message4},
         SwapAmounts,
     },
 };
@@ -189,8 +189,8 @@ pub struct State1 {
 }
 
 impl State1 {
-    pub fn next_message(&self) -> bob::Message1 {
-        bob::Message1 {
+    pub fn next_message(&self) -> Message2 {
+        Message2 {
             tx_lock: self.tx_lock.clone(),
         }
     }

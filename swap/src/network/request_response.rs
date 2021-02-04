@@ -2,7 +2,7 @@ use crate::protocol::{
     alice,
     alice::{Message3, TransferProof},
     bob,
-    bob::{EncryptedSignature, Message4},
+    bob::{EncryptedSignature, Message2, Message4},
 };
 use async_trait::async_trait;
 use futures::prelude::*;
@@ -27,7 +27,7 @@ pub const BUF_SIZE: usize = 1024 * 1024;
 pub enum BobToAlice {
     SwapRequest(Box<bob::SwapRequest>),
     Message0(Box<bob::Message0>),
-    Message1(Box<bob::Message1>),
+    Message2(Box<Message2>),
     Message4(Box<Message4>),
 }
 
