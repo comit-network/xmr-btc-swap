@@ -1,5 +1,5 @@
 use crate::{
-    network::request_response::{CborCodec, Request, Response, TransferProofProtocol, TIMEOUT},
+    network::request_response::{CborCodec, TransferProofProtocol, TIMEOUT},
     protocol::alice::TransferProof,
 };
 use libp2p::{
@@ -28,7 +28,7 @@ pub enum OutEvent {
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<CborCodec<TransferProofProtocol>>,
+    rr: RequestResponse<CborCodec<TransferProofProtocol, TransferProof, ()>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
@@ -38,8 +38,12 @@ impl Behaviour {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<CborCodec<TransferProofProtocol>>, OutEvent>>
-    {
+    ) -> Poll<
+        NetworkBehaviourAction<
+            RequestProtocol<CborCodec<TransferProofProtocol, TransferProof, ()>>,
+            OutEvent,
+        >,
+    > {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -65,8 +69,8 @@ impl Default for Behaviour {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<Request, Response>) {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<TransferProof, ()>> for Behaviour {
+    fn inject_event(&mut self, event: RequestResponseEvent<TransferProof, ()>) {
         match event {
             RequestResponseEvent::Message {
                 message:
@@ -75,15 +79,13 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for B
                     },
                 ..
             } => {
-                if let Request::TransferProof(msg) = request {
-                    debug!("Received Transfer Proof");
-                    self.events.push_back(OutEvent::Msg(*msg));
-                    // Send back empty response so that the request/response protocol completes.
-                    let _ = self
-                        .rr
-                        .send_response(channel, Response::TransferProof)
-                        .map_err(|err| error!("Failed to send message 3: {:?}", err));
-                }
+                debug!("Received Transfer Proof");
+                self.events.push_back(OutEvent::Msg(request));
+                // Send back empty response so that the request/response protocol completes.
+                let _ = self
+                    .rr
+                    .send_response(channel, ())
+                    .map_err(|err| error!("Failed to send message 3: {:?}", err));
             }
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { .. },

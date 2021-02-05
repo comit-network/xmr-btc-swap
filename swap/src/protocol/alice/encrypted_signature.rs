@@ -1,7 +1,5 @@
 use crate::{
-    network::request_response::{
-        CborCodec, EncryptedSignatureProtocol, Request, Response, TIMEOUT,
-    },
+    network::request_response::{CborCodec, EncryptedSignatureProtocol, TIMEOUT},
     protocol::bob::EncryptedSignature,
 };
 use libp2p::{
@@ -30,7 +28,7 @@ pub enum OutEvent {
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<CborCodec<EncryptedSignatureProtocol>>,
+    rr: RequestResponse<CborCodec<EncryptedSignatureProtocol, EncryptedSignature, ()>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
@@ -41,7 +39,10 @@ impl Behaviour {
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
     ) -> Poll<
-        NetworkBehaviourAction<RequestProtocol<CborCodec<EncryptedSignatureProtocol>>, OutEvent>,
+        NetworkBehaviourAction<
+            RequestProtocol<CborCodec<EncryptedSignatureProtocol, EncryptedSignature, ()>>,
+            OutEvent,
+        >,
     > {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
@@ -68,8 +69,8 @@ impl Default for Behaviour {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<Request, Response>) {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<EncryptedSignature, ()>> for Behaviour {
+    fn inject_event(&mut self, event: RequestResponseEvent<EncryptedSignature, ()>) {
         match event {
             RequestResponseEvent::Message {
                 message:
@@ -78,14 +79,11 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for B
                     },
                 ..
             } => {
-                if let Request::EncryptedSignature(msg) = request {
-                    debug!("Received encrypted signature");
-                    self.events.push_back(OutEvent::Msg(*msg));
-                    // Send back empty response so that the request/response protocol completes.
-                    if let Err(error) = self.rr.send_response(channel, Response::EncryptedSignature)
-                    {
-                        error!("Failed to send Encrypted Signature ack: {:?}", error);
-                    }
+                debug!("Received encrypted signature");
+                self.events.push_back(OutEvent::Msg(request));
+                // Send back empty response so that the request/response protocol completes.
+                if let Err(error) = self.rr.send_response(channel, ()) {
+                    error!("Failed to send Encrypted Signature ack: {:?}", error);
                 }
             }
             RequestResponseEvent::Message {

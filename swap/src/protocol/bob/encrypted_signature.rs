@@ -1,6 +1,4 @@
-use crate::network::request_response::{
-    CborCodec, EncryptedSignatureProtocol, Request, Response, TIMEOUT,
-};
+use crate::network::request_response::{CborCodec, EncryptedSignatureProtocol, TIMEOUT};
 use libp2p::{
     request_response::{
         handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
@@ -32,14 +30,13 @@ pub enum OutEvent {
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<CborCodec<EncryptedSignatureProtocol>>,
+    rr: RequestResponse<CborCodec<EncryptedSignatureProtocol, EncryptedSignature, ()>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
 impl Behaviour {
     pub fn send(&mut self, alice: PeerId, msg: EncryptedSignature) {
-        let msg = Request::EncryptedSignature(Box::new(msg));
         let _id = self.rr.send_request(&alice, msg);
     }
 
@@ -48,7 +45,10 @@ impl Behaviour {
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
     ) -> Poll<
-        NetworkBehaviourAction<RequestProtocol<CborCodec<EncryptedSignatureProtocol>>, OutEvent>,
+        NetworkBehaviourAction<
+            RequestProtocol<CborCodec<EncryptedSignatureProtocol, EncryptedSignature, ()>>,
+            OutEvent,
+        >,
     > {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
@@ -75,20 +75,18 @@ impl Default for Behaviour {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<Request, Response>) {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<EncryptedSignature, ()>> for Behaviour {
+    fn inject_event(&mut self, event: RequestResponseEvent<EncryptedSignature, ()>) {
         match event {
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Request { .. },
                 ..
             } => panic!("Bob should never get a request from Alice"),
             RequestResponseEvent::Message {
-                message: RequestResponseMessage::Response { response, .. },
+                message: RequestResponseMessage::Response { .. },
                 ..
             } => {
-                if let Response::EncryptedSignature = response {
-                    self.events.push_back(OutEvent::Acknowledged);
-                }
+                self.events.push_back(OutEvent::Acknowledged);
             }
             RequestResponseEvent::InboundFailure { error, .. } => {
                 error!("Inbound failure: {:?}", error);

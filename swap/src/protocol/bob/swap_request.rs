@@ -1,5 +1,5 @@
 use crate::{
-    network::request_response::{CborCodec, Request, Response, Swap, TIMEOUT},
+    network::request_response::{CborCodec, Swap, TIMEOUT},
     protocol::alice::SwapResponse,
 };
 use anyhow::Result;
@@ -35,15 +35,14 @@ pub struct OutEvent {
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<CborCodec<Swap>>,
+    rr: RequestResponse<CborCodec<Swap, SwapRequest, SwapResponse>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
 impl Behaviour {
     pub fn send(&mut self, alice: PeerId, swap_request: SwapRequest) -> Result<RequestId> {
-        let msg = Request::SwapRequest(Box::new(swap_request));
-        let id = self.rr.send_request(&alice, msg);
+        let id = self.rr.send_request(&alice, swap_request);
 
         Ok(id)
     }
@@ -52,7 +51,12 @@ impl Behaviour {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<CborCodec<Swap>>, OutEvent>> {
+    ) -> Poll<
+        NetworkBehaviourAction<
+            RequestProtocol<CborCodec<Swap, SwapRequest, SwapResponse>>,
+            OutEvent,
+        >,
+    > {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -79,8 +83,8 @@ impl Default for Behaviour {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<Request, Response>) {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<SwapRequest, SwapResponse>> for Behaviour {
+    fn inject_event(&mut self, event: RequestResponseEvent<SwapRequest, SwapResponse>) {
         match event {
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Request { .. },
@@ -90,12 +94,10 @@ impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for B
                 message: RequestResponseMessage::Response { response, .. },
                 ..
             } => {
-                if let Response::SwapResponse(swap_response) = response {
-                    debug!("Received swap response");
-                    self.events.push_back(OutEvent {
-                        swap_response: *swap_response,
-                    });
-                }
+                debug!("Received swap response");
+                self.events.push_back(OutEvent {
+                    swap_response: response,
+                });
             }
             RequestResponseEvent::InboundFailure { error, .. } => {
                 error!("Inbound failure: {:?}", error);

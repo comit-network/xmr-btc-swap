@@ -1,5 +1,5 @@
 use crate::{
-    network::{request_response::Response, transport::SwapTransport, TokioExecutor},
+    network::{transport::SwapTransport, TokioExecutor},
     protocol::{
         alice::{Behaviour, OutEvent, State0, State3, SwapResponse, TransferProof},
         bob::EncryptedSignature,
@@ -37,7 +37,7 @@ pub struct EventLoopHandle {
     recv_encrypted_signature: Receiver<EncryptedSignature>,
     request: Receiver<crate::protocol::alice::swap_response::OutEvent>,
     conn_established: Receiver<PeerId>,
-    send_swap_response: Sender<(ResponseChannel<Response>, SwapResponse)>,
+    send_swap_response: Sender<(ResponseChannel<SwapResponse>, SwapResponse)>,
     start_execution_setup: Sender<(PeerId, State0)>,
     send_transfer_proof: Sender<(PeerId, TransferProof)>,
     recv_transfer_proof_ack: Receiver<()>,
@@ -81,7 +81,7 @@ impl EventLoopHandle {
 
     pub async fn send_swap_response(
         &mut self,
-        channel: ResponseChannel<Response>,
+        channel: ResponseChannel<SwapResponse>,
         swap_response: SwapResponse,
     ) -> Result<()> {
         let _ = self
@@ -110,7 +110,7 @@ pub struct EventLoop {
     recv_encrypted_signature: Sender<EncryptedSignature>,
     request: Sender<crate::protocol::alice::swap_response::OutEvent>,
     conn_established: Sender<PeerId>,
-    send_swap_response: Receiver<(ResponseChannel<Response>, SwapResponse)>,
+    send_swap_response: Receiver<(ResponseChannel<SwapResponse>, SwapResponse)>,
     send_transfer_proof: Receiver<(PeerId, TransferProof)>,
     recv_transfer_proof_ack: Sender<()>,
 }

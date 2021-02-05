@@ -30,7 +30,6 @@ pub use self::{
     swap_response::*,
     transfer_proof::TransferProof,
 };
-use crate::network::request_response::Response;
 pub use execution_setup::Message3;
 
 mod encrypted_signature;
@@ -280,7 +279,7 @@ impl Behaviour {
     /// Alice always sends her messages as a response to a request from Bob.
     pub fn send_swap_response(
         &mut self,
-        channel: ResponseChannel<Response>,
+        channel: ResponseChannel<SwapResponse>,
         swap_response: SwapResponse,
     ) -> Result<()> {
         self.amounts.send(channel, swap_response)?;

@@ -1,7 +1,7 @@
 use crate::{
     monero,
-    network::request_response::{CborCodec, Request, Response, Swap, TIMEOUT},
-    protocol::bob,
+    network::request_response::{CborCodec, Swap, TIMEOUT},
+    protocol::bob::SwapRequest,
 };
 use anyhow::{anyhow, Result};
 use libp2p::{
@@ -22,8 +22,8 @@ use tracing::{debug, error};
 
 #[derive(Debug)]
 pub struct OutEvent {
-    pub msg: bob::SwapRequest,
-    pub channel: ResponseChannel<Response>,
+    pub msg: SwapRequest,
+    pub channel: ResponseChannel<SwapResponse>,
 }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -37,15 +37,18 @@ pub struct SwapResponse {
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<CborCodec<Swap>>,
+    rr: RequestResponse<CborCodec<Swap, SwapRequest, SwapResponse>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
 
 impl Behaviour {
     /// Alice always sends her messages as a response to a request from Bob.
-    pub fn send(&mut self, channel: ResponseChannel<Response>, msg: SwapResponse) -> Result<()> {
-        let msg = Response::SwapResponse(Box::new(msg));
+    pub fn send(
+        &mut self,
+        channel: ResponseChannel<SwapResponse>,
+        msg: SwapResponse,
+    ) -> Result<()> {
         self.rr
             .send_response(channel, msg)
             .map_err(|_| anyhow!("Sending swap response failed"))
@@ -55,7 +58,12 @@ impl Behaviour {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<CborCodec<Swap>>, OutEvent>> {
+    ) -> Poll<
+        NetworkBehaviourAction<
+            RequestProtocol<CborCodec<Swap, SwapRequest, SwapResponse>>,
+            OutEvent,
+        >,
+    > {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -82,20 +90,22 @@ impl Default for Behaviour {
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<Request, Response>) {
+impl NetworkBehaviourEventProcess<RequestResponseEvent<SwapRequest, SwapResponse>> for Behaviour {
+    fn inject_event(&mut self, event: RequestResponseEvent<SwapRequest, SwapResponse>) {
         match event {
             RequestResponseEvent::Message {
+                peer,
                 message:
                     RequestResponseMessage::Request {
                         request, channel, ..
                     },
                 ..
             } => {
-                if let Request::SwapRequest(msg) = request {
-                    debug!("Received swap request");
-                    self.events.push_back(OutEvent { msg: *msg, channel })
-                }
+                debug!("Received swap request from {}", peer);
+                self.events.push_back(OutEvent {
+                    msg: request,
+                    channel,
+                })
             }
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { .. },

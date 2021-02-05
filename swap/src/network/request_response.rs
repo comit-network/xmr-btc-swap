@@ -1,14 +1,10 @@
-use crate::protocol::{
-    alice::{SwapResponse, TransferProof},
-    bob::{EncryptedSignature, SwapRequest},
-};
 use async_trait::async_trait;
 use futures::prelude::*;
 use libp2p::{
     core::{upgrade, upgrade::ReadOneError},
     request_response::{ProtocolName, RequestResponseCodec},
 };
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, io, marker::PhantomData};
 
 /// Time to wait for a response back once we send a request.
@@ -16,20 +12,6 @@ pub const TIMEOUT: u64 = 3600; // One hour.
 
 /// Message receive buffer.
 pub const BUF_SIZE: usize = 1024 * 1024;
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Request {
-    SwapRequest(Box<SwapRequest>),
-    TransferProof(Box<TransferProof>),
-    EncryptedSignature(Box<EncryptedSignature>),
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Response {
-    SwapResponse(Box<SwapResponse>),
-    TransferProof,
-    EncryptedSignature,
-}
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Swap;
@@ -58,19 +40,29 @@ impl ProtocolName for EncryptedSignatureProtocol {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct CborCodec<P> {
-    phantom: PhantomData<P>,
+#[derive(Clone, Copy, Debug)]
+pub struct CborCodec<P, Req, Res> {
+    phantom: PhantomData<(P, Req, Res)>,
+}
+
+impl<P, Req, Res> Default for CborCodec<P, Req, Res> {
+    fn default() -> Self {
+        Self {
+            phantom: PhantomData::default(),
+        }
+    }
 }
 
 #[async_trait]
-impl<P> RequestResponseCodec for CborCodec<P>
+impl<P, Req, Res> RequestResponseCodec for CborCodec<P, Req, Res>
 where
-    P: Send + Sync + Clone + ProtocolName,
+    P: ProtocolName + Send + Sync + Clone,
+    Req: DeserializeOwned + Serialize + Send,
+    Res: DeserializeOwned + Serialize + Send,
 {
     type Protocol = P;
-    type Request = Request;
-    type Response = Response;
+    type Request = Req;
+    type Response = Res;
 
     async fn read_request<T>(&mut self, _: &Self::Protocol, io: &mut T) -> io::Result<Self::Request>
     where
@@ -81,7 +73,7 @@ where
             e => io::Error::new(io::ErrorKind::Other, e),
         })?;
         let mut de = serde_cbor::Deserializer::from_slice(&message);
-        let msg = Request::deserialize(&mut de).map_err(|e| {
+        let msg = Req::deserialize(&mut de).map_err(|e| {
             tracing::debug!("serde read_request error: {:?}", e);
             io::Error::new(io::ErrorKind::Other, e)
         })?;
@@ -101,7 +93,7 @@ where
             .await
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         let mut de = serde_cbor::Deserializer::from_slice(&message);
-        let msg = Response::deserialize(&mut de).map_err(|e| {
+        let msg = Res::deserialize(&mut de).map_err(|e| {
             tracing::debug!("serde read_response error: {:?}", e);
             io::Error::new(io::ErrorKind::InvalidData, e)
         })?;
