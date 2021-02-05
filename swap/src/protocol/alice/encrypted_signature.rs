@@ -2,53 +2,41 @@ use crate::{
     network::request_response::{CborCodec, EncryptedSignatureProtocol, TIMEOUT},
     protocol::bob::EncryptedSignature,
 };
+use anyhow::{anyhow, Error, Result};
 use libp2p::{
     request_response::{
-        handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
-        RequestResponseEvent, RequestResponseMessage,
+        ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
+        RequestResponseMessage, ResponseChannel,
     },
-    swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
     NetworkBehaviour,
 };
-use std::{
-    collections::VecDeque,
-    task::{Context, Poll},
-    time::Duration,
-};
-use tracing::{debug, error};
+use std::time::Duration;
+use tracing::debug;
 
 #[derive(Debug)]
 pub enum OutEvent {
-    Msg(EncryptedSignature),
+    MsgReceived {
+        msg: EncryptedSignature,
+        channel: ResponseChannel<()>,
+    },
+    AckSent,
+    Failure(Error),
 }
 
 /// A `NetworkBehaviour` that represents receiving the Bitcoin encrypted
 /// signature from Bob.
 #[derive(NetworkBehaviour)]
-#[behaviour(out_event = "OutEvent", poll_method = "poll")]
+#[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
     rr: RequestResponse<CborCodec<EncryptedSignatureProtocol, EncryptedSignature, ()>>,
-    #[behaviour(ignore)]
-    events: VecDeque<OutEvent>,
 }
 
 impl Behaviour {
-    fn poll(
-        &mut self,
-        _: &mut Context<'_>,
-        _: &mut impl PollParameters,
-    ) -> Poll<
-        NetworkBehaviourAction<
-            RequestProtocol<CborCodec<EncryptedSignatureProtocol, EncryptedSignature, ()>>,
-            OutEvent,
-        >,
-    > {
-        if let Some(event) = self.events.pop_front() {
-            return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
-        }
-
-        Poll::Pending
+    pub fn send_ack(&mut self, channel: ResponseChannel<()>) -> Result<()> {
+        self.rr
+            .send_response(channel, ())
+            .map_err(|err| anyhow!("Failed to ack encrypted signature: {:?}", err))
     }
 }
 
@@ -64,41 +52,38 @@ impl Default for Behaviour {
                 vec![(EncryptedSignatureProtocol, ProtocolSupport::Inbound)],
                 config,
             ),
-            events: Default::default(),
         }
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<EncryptedSignature, ()>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<EncryptedSignature, ()>) {
+impl From<RequestResponseEvent<EncryptedSignature, ()>> for OutEvent {
+    fn from(event: RequestResponseEvent<EncryptedSignature, ()>) -> Self {
         match event {
             RequestResponseEvent::Message {
+                peer,
                 message:
                     RequestResponseMessage::Request {
                         request, channel, ..
                     },
                 ..
             } => {
-                debug!("Received encrypted signature");
-                self.events.push_back(OutEvent::Msg(request));
-                // Send back empty response so that the request/response protocol completes.
-                if let Err(error) = self.rr.send_response(channel, ()) {
-                    error!("Failed to send Encrypted Signature ack: {:?}", error);
+                debug!("Received encrypted signature from {}", peer);
+                OutEvent::MsgReceived {
+                    msg: request,
+                    channel,
                 }
             }
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { .. },
                 ..
-            } => panic!("Alice should not get a Response"),
+            } => OutEvent::Failure(anyhow!("Alice should not get a Response")),
             RequestResponseEvent::InboundFailure { error, .. } => {
-                error!("Inbound failure: {:?}", error);
+                OutEvent::Failure(anyhow!("Inbound failure: {:?}", error))
             }
             RequestResponseEvent::OutboundFailure { error, .. } => {
-                error!("Outbound failure: {:?}", error);
+                OutEvent::Failure(anyhow!("Outbound failure: {:?}", error))
             }
-            RequestResponseEvent::ResponseSent { .. } => {
-                debug!("Alice has sent an Message3 response to Bob");
-            }
+            RequestResponseEvent::ResponseSent { .. } => OutEvent::AckSent,
         }
     }
 }

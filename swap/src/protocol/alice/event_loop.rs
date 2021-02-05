@@ -2,7 +2,7 @@ use crate::{
     network::{transport::SwapTransport, TokioExecutor},
     protocol::{
         alice::{Behaviour, OutEvent, State0, State3, SwapResponse, TransferProof},
-        bob::EncryptedSignature,
+        bob::{EncryptedSignature, SwapRequest},
     },
 };
 use anyhow::{anyhow, Context, Result};
@@ -35,7 +35,7 @@ impl<T> Default for Channels<T> {
 pub struct EventLoopHandle {
     done_execution_setup: Receiver<Result<State3>>,
     recv_encrypted_signature: Receiver<EncryptedSignature>,
-    request: Receiver<crate::protocol::alice::swap_response::OutEvent>,
+    recv_swap_request: Receiver<(SwapRequest, ResponseChannel<SwapResponse>)>,
     conn_established: Receiver<PeerId>,
     send_swap_response: Sender<(ResponseChannel<SwapResponse>, SwapResponse)>,
     start_execution_setup: Sender<(PeerId, State0)>,
@@ -70,10 +70,10 @@ impl EventLoopHandle {
             .ok_or_else(|| anyhow!("Failed to receive Bitcoin encrypted signature from Bob"))
     }
 
-    pub async fn recv_request(
+    pub async fn recv_swap_request(
         &mut self,
-    ) -> Result<crate::protocol::alice::swap_response::OutEvent> {
-        self.request
+    ) -> Result<(SwapRequest, ResponseChannel<SwapResponse>)> {
+        self.recv_swap_request
             .recv()
             .await
             .ok_or_else(|| anyhow!("Failed to receive amounts request from Bob"))
@@ -108,7 +108,7 @@ pub struct EventLoop {
     start_execution_setup: Receiver<(PeerId, State0)>,
     done_execution_setup: Sender<Result<State3>>,
     recv_encrypted_signature: Sender<EncryptedSignature>,
-    request: Sender<crate::protocol::alice::swap_response::OutEvent>,
+    recv_swap_request: Sender<(SwapRequest, ResponseChannel<SwapResponse>)>,
     conn_established: Sender<PeerId>,
     send_swap_response: Receiver<(ResponseChannel<SwapResponse>, SwapResponse)>,
     send_transfer_proof: Receiver<(PeerId, TransferProof)>,
@@ -145,7 +145,7 @@ impl EventLoop {
             start_execution_setup: start_execution_setup.receiver,
             done_execution_setup: done_execution_setup.sender,
             recv_encrypted_signature: recv_encrypted_signature.sender,
-            request: request.sender,
+            recv_swap_request: request.sender,
             conn_established: conn_established.sender,
             send_swap_response: send_swap_response.receiver,
             send_transfer_proof: send_transfer_proof.receiver,
@@ -156,7 +156,7 @@ impl EventLoop {
             start_execution_setup: start_execution_setup.sender,
             done_execution_setup: done_execution_setup.receiver,
             recv_encrypted_signature: recv_encrypted_signature.receiver,
-            request: request.receiver,
+            recv_swap_request: request.receiver,
             conn_established: conn_established.receiver,
             send_swap_response: send_swap_response.sender,
             send_transfer_proof: send_transfer_proof.sender,
@@ -174,6 +174,9 @@ impl EventLoop {
                         OutEvent::ConnectionEstablished(alice) => {
                             let _ = self.conn_established.send(alice).await;
                         }
+                        OutEvent::SwapRequest { msg, channel } => {
+                            let _ = self.recv_swap_request.send((msg, channel)).await;
+                        }
                         OutEvent::ExecutionSetupDone(res) => {
                             let _ = self.done_execution_setup.send(res.map(|state|*state)).await;
                         }
@@ -181,11 +184,16 @@ impl EventLoop {
                             trace!("Bob acknowledged transfer proof");
                             let _ = self.recv_transfer_proof_ack.send(()).await;
                         }
-                        OutEvent::EncryptedSignature(msg) => {
+                        OutEvent::EncryptedSignature{ msg, channel } => {
                             let _ = self.recv_encrypted_signature.send(*msg).await;
+                            // Send back empty response so that the request/response protocol completes.
+                            if let Err(error) = self.swarm.encrypted_signature.send_ack(channel) {
+                                error!("Failed to send Encrypted Signature ack: {:?}", error);
+                            }
                         }
-                        OutEvent::Request(event) => {
-                            let _ = self.request.send(*event).await;
+                        OutEvent::ResponseSent => {}
+                        OutEvent::Failure(err) => {
+                            error!("Communication error: {:#}", err);
                         }
                     }
                 },

@@ -3,27 +3,26 @@ use crate::{
     network::request_response::{CborCodec, Swap, TIMEOUT},
     protocol::bob::SwapRequest,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Error, Result};
 use libp2p::{
     request_response::{
-        handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
-        RequestResponseEvent, RequestResponseMessage, ResponseChannel,
+        ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
+        RequestResponseMessage, ResponseChannel,
     },
-    swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
     NetworkBehaviour,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::VecDeque,
-    task::{Context, Poll},
-    time::Duration,
-};
-use tracing::{debug, error};
+use std::time::Duration;
+use tracing::debug;
 
 #[derive(Debug)]
-pub struct OutEvent {
-    pub msg: SwapRequest,
-    pub channel: ResponseChannel<SwapResponse>,
+pub enum OutEvent {
+    MsgReceived {
+        msg: SwapRequest,
+        channel: ResponseChannel<SwapResponse>,
+    },
+    ResponseSent,
+    Failure(Error),
 }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -31,15 +30,45 @@ pub struct SwapResponse {
     pub xmr_amount: monero::Amount,
 }
 
+impl From<RequestResponseEvent<SwapRequest, SwapResponse>> for OutEvent {
+    fn from(event: RequestResponseEvent<SwapRequest, SwapResponse>) -> Self {
+        match event {
+            RequestResponseEvent::Message {
+                peer,
+                message:
+                    RequestResponseMessage::Request {
+                        request, channel, ..
+                    },
+                ..
+            } => {
+                debug!("Received swap request from {}", peer);
+                OutEvent::MsgReceived {
+                    msg: request,
+                    channel,
+                }
+            }
+            RequestResponseEvent::Message {
+                message: RequestResponseMessage::Response { .. },
+                ..
+            } => OutEvent::Failure(anyhow!("Alice should not get a Response")),
+            RequestResponseEvent::InboundFailure { error, .. } => {
+                OutEvent::Failure(anyhow!("Inbound failure: {:?}", error))
+            }
+            RequestResponseEvent::OutboundFailure { error, .. } => {
+                OutEvent::Failure(anyhow!("Outbound failure: {:?}", error))
+            }
+            RequestResponseEvent::ResponseSent { .. } => OutEvent::ResponseSent,
+        }
+    }
+}
+
 /// A `NetworkBehaviour` that represents negotiate a swap using Swap
 /// request/response.
 #[derive(NetworkBehaviour)]
-#[behaviour(out_event = "OutEvent", poll_method = "poll")]
+#[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
     rr: RequestResponse<CborCodec<Swap, SwapRequest, SwapResponse>>,
-    #[behaviour(ignore)]
-    events: VecDeque<OutEvent>,
 }
 
 impl Behaviour {
@@ -52,23 +81,6 @@ impl Behaviour {
         self.rr
             .send_response(channel, msg)
             .map_err(|_| anyhow!("Sending swap response failed"))
-    }
-
-    fn poll(
-        &mut self,
-        _: &mut Context<'_>,
-        _: &mut impl PollParameters,
-    ) -> Poll<
-        NetworkBehaviourAction<
-            RequestProtocol<CborCodec<Swap, SwapRequest, SwapResponse>>,
-            OutEvent,
-        >,
-    > {
-        if let Some(event) = self.events.pop_front() {
-            return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
-        }
-
-        Poll::Pending
     }
 }
 
@@ -85,41 +97,6 @@ impl Default for Behaviour {
                 vec![(Swap, ProtocolSupport::Inbound)],
                 config,
             ),
-            events: Default::default(),
-        }
-    }
-}
-
-impl NetworkBehaviourEventProcess<RequestResponseEvent<SwapRequest, SwapResponse>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<SwapRequest, SwapResponse>) {
-        match event {
-            RequestResponseEvent::Message {
-                peer,
-                message:
-                    RequestResponseMessage::Request {
-                        request, channel, ..
-                    },
-                ..
-            } => {
-                debug!("Received swap request from {}", peer);
-                self.events.push_back(OutEvent {
-                    msg: request,
-                    channel,
-                })
-            }
-            RequestResponseEvent::Message {
-                message: RequestResponseMessage::Response { .. },
-                ..
-            } => panic!("Alice should not get a Response"),
-            RequestResponseEvent::InboundFailure { error, .. } => {
-                error!("Inbound failure: {:?}", error);
-            }
-            RequestResponseEvent::OutboundFailure { error, .. } => {
-                error!("Outbound failure: {:?}", error);
-            }
-            RequestResponseEvent::ResponseSent { .. } => {
-                debug!("Alice has sent a swap response to Bob");
-            }
         }
     }
 }

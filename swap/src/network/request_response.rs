@@ -128,7 +128,7 @@ where
         T: AsyncWrite + Unpin + Send,
     {
         let bytes = serde_cbor::to_vec(&res).map_err(|e| {
-            tracing::debug!("serde write_reponse error: {:?}", e);
+            tracing::debug!("serde write_response error: {:?}", e);
             io::Error::new(io::ErrorKind::InvalidData, e)
         })?;
         upgrade::write_one(io, &bytes).await?;

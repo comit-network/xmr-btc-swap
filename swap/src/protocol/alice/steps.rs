@@ -46,13 +46,13 @@ pub async fn negotiate(
 
     let event = timeout(
         execution_params.bob_time_to_act,
-        event_loop_handle.recv_request(),
+        event_loop_handle.recv_swap_request(),
     )
     .await
     .context("Failed to receive swap request from Bob")??;
 
     event_loop_handle
-        .send_swap_response(event.channel, SwapResponse { xmr_amount })
+        .send_swap_response(event.1, SwapResponse { xmr_amount })
         .await?;
 
     let state3 = timeout(
