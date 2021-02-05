@@ -1,6 +1,6 @@
 use crate::{
     monero,
-    network::request_response::{OneShotCodec, Request, Response, Swap, TIMEOUT},
+    network::request_response::{CborCodec, Request, Response, Swap, TIMEOUT},
     protocol::bob,
 };
 use anyhow::{anyhow, Result};
@@ -37,7 +37,7 @@ pub struct SwapResponse {
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<OneShotCodec<Swap>>,
+    rr: RequestResponse<CborCodec<Swap>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
@@ -55,7 +55,7 @@ impl Behaviour {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<OneShotCodec<Swap>>, OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<CborCodec<Swap>>, OutEvent>> {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -73,7 +73,7 @@ impl Default for Behaviour {
 
         Self {
             rr: RequestResponse::new(
-                OneShotCodec::default(),
+                CborCodec::default(),
                 vec![(Swap, ProtocolSupport::Inbound)],
                 config,
             ),

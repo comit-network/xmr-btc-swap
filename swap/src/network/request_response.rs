@@ -59,12 +59,12 @@ impl ProtocolName for EncryptedSignatureProtocol {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct OneShotCodec<P> {
+pub struct CborCodec<P> {
     phantom: PhantomData<P>,
 }
 
 #[async_trait]
-impl<P> RequestResponseCodec for OneShotCodec<P>
+impl<P> RequestResponseCodec for CborCodec<P>
 where
     P: Send + Sync + Clone + ProtocolName,
 {

@@ -1,6 +1,6 @@
 use crate::{
     network::request_response::{
-        EncryptedSignatureProtocol, OneShotCodec, Request, Response, TIMEOUT,
+        CborCodec, EncryptedSignatureProtocol, Request, Response, TIMEOUT,
     },
     protocol::bob::EncryptedSignature,
 };
@@ -30,7 +30,7 @@ pub enum OutEvent {
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<OneShotCodec<EncryptedSignatureProtocol>>,
+    rr: RequestResponse<CborCodec<EncryptedSignatureProtocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
@@ -41,7 +41,7 @@ impl Behaviour {
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
     ) -> Poll<
-        NetworkBehaviourAction<RequestProtocol<OneShotCodec<EncryptedSignatureProtocol>>, OutEvent>,
+        NetworkBehaviourAction<RequestProtocol<CborCodec<EncryptedSignatureProtocol>>, OutEvent>,
     > {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
@@ -59,7 +59,7 @@ impl Default for Behaviour {
 
         Self {
             rr: RequestResponse::new(
-                OneShotCodec::default(),
+                CborCodec::default(),
                 vec![(EncryptedSignatureProtocol, ProtocolSupport::Inbound)],
                 config,
             ),

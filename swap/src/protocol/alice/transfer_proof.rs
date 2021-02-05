@@ -1,6 +1,6 @@
 use crate::{
     monero,
-    network::request_response::{OneShotCodec, Request, Response, TransferProofProtocol, TIMEOUT},
+    network::request_response::{CborCodec, Request, Response, TransferProofProtocol, TIMEOUT},
 };
 use libp2p::{
     request_response::{
@@ -34,7 +34,7 @@ pub enum OutEvent {
 #[behaviour(out_event = "OutEvent", poll_method = "poll")]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<OneShotCodec<TransferProofProtocol>>,
+    rr: RequestResponse<CborCodec<TransferProofProtocol>>,
     #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 }
@@ -49,7 +49,7 @@ impl Behaviour {
         &mut self,
         _: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<OneShotCodec<TransferProofProtocol>>, OutEvent>>
+    ) -> Poll<NetworkBehaviourAction<RequestProtocol<CborCodec<TransferProofProtocol>>, OutEvent>>
     {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
@@ -67,7 +67,7 @@ impl Default for Behaviour {
 
         Self {
             rr: RequestResponse::new(
-                OneShotCodec::default(),
+                CborCodec::default(),
                 vec![(TransferProofProtocol, ProtocolSupport::Outbound)],
                 config,
             ),
