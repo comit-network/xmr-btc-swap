@@ -63,47 +63,34 @@ impl Behaviour {
     pub fn run(&mut self, bob: PeerId, state0: State0) {
         self.inner
             .do_protocol_listener(bob, move |mut substream| async move {
-                let message1 = state0.next_message();
-
-                let state1 = {
-                    let message0 = serde_cbor::from_slice::<Message0>(
-                        &substream.read_message(BUF_SIZE).await?,
-                    )
-                    .context("failed to deserialize message0")?;
-                    state0.receive(message0)?
-                };
+                let message0 =
+                    serde_cbor::from_slice::<Message0>(&substream.read_message(BUF_SIZE).await?)
+                        .context("failed to deserialize message0")?;
+                let state1 = state0.receive(message0)?;
 
                 substream
                     .write_message(
-                        &serde_cbor::to_vec(&message1).context("failed to serialize message1")?,
+                        &serde_cbor::to_vec(&state1.next_message())
+                            .context("failed to serialize message1")?,
                     )
                     .await?;
 
-                let state2 = {
-                    let message2 = serde_cbor::from_slice::<Message2>(
-                        &substream.read_message(BUF_SIZE).await?,
-                    )
-                    .context("failed to deserialize message2")?;
-                    state1.receive(message2)
-                };
+                let message2 =
+                    serde_cbor::from_slice::<Message2>(&substream.read_message(BUF_SIZE).await?)
+                        .context("failed to deserialize message2")?;
+                let state2 = state1.receive(message2);
 
-                {
-                    let message3 = state2.next_message();
-                    substream
-                        .write_message(
-                            &serde_cbor::to_vec(&message3)
-                                .context("failed to serialize message3")?,
-                        )
-                        .await?;
-                }
-
-                let state3 = {
-                    let message4 = serde_cbor::from_slice::<Message4>(
-                        &substream.read_message(BUF_SIZE).await?,
+                substream
+                    .write_message(
+                        &serde_cbor::to_vec(&state2.next_message())
+                            .context("failed to serialize message3")?,
                     )
-                    .context("failed to deserialize message4")?;
-                    state2.receive(message4)?
-                };
+                    .await?;
+
+                let message4 =
+                    serde_cbor::from_slice::<Message4>(&substream.read_message(BUF_SIZE).await?)
+                        .context("failed to deserialize message4")?;
+                let state3 = state2.receive(message4)?;
 
                 Ok(state3)
             })

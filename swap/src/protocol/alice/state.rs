@@ -133,20 +133,6 @@ impl State0 {
         }
     }
 
-    pub fn next_message(&self) -> Message1 {
-        Message1 {
-            A: self.a.public(),
-            S_a_monero: monero::PublicKey::from_private_key(&monero::PrivateKey {
-                scalar: self.s_a.into_ed25519(),
-            }),
-            S_a_bitcoin: self.s_a.into_secp256k1().into(),
-            dleq_proof_s_a: self.dleq_proof_s_a.clone(),
-            v_a: self.v_a,
-            redeem_address: self.redeem_address.clone(),
-            punish_address: self.punish_address.clone(),
-        }
-    }
-
     pub fn receive(self, msg: Message0) -> Result<State1> {
         msg.dleq_proof_s_b.verify(
             msg.S_b_bitcoin.clone().into(),
@@ -165,6 +151,8 @@ impl State0 {
             S_b_monero: msg.S_b_monero,
             S_b_bitcoin: msg.S_b_bitcoin,
             v,
+            v_a: self.v_a,
+            dleq_proof_s_a: self.dleq_proof_s_a,
             btc: self.btc,
             xmr: self.xmr,
             cancel_timelock: self.cancel_timelock,
@@ -184,6 +172,8 @@ pub struct State1 {
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
+    v_a: monero::PrivateViewKey,
+    dleq_proof_s_a: cross_curve_dleq::Proof,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
@@ -195,6 +185,20 @@ pub struct State1 {
 }
 
 impl State1 {
+    pub fn next_message(&self) -> Message1 {
+        Message1 {
+            A: self.a.public(),
+            S_a_monero: monero::PublicKey::from_private_key(&monero::PrivateKey {
+                scalar: self.s_a.into_ed25519(),
+            }),
+            S_a_bitcoin: self.s_a.into_secp256k1().into(),
+            dleq_proof_s_a: self.dleq_proof_s_a.clone(),
+            v_a: self.v_a,
+            redeem_address: self.redeem_address.clone(),
+            punish_address: self.punish_address.clone(),
+        }
+    }
+
     pub fn receive(self, msg: Message2) -> State2 {
         State2 {
             a: self.a,
