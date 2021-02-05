@@ -71,11 +71,9 @@ impl Behaviour {
     ) {
         self.inner
             .do_protocol_dialer(alice, move |mut substream| async move {
-                let bob_message0 = state0.next_message();
-
                 substream
                     .write_message(
-                        &serde_cbor::to_vec(&bob_message0)
+                        &serde_cbor::to_vec(&state0.next_message())
                             .context("failed to serialize message0")?,
                     )
                     .await?;
@@ -83,32 +81,26 @@ impl Behaviour {
                 let message1 =
                     serde_cbor::from_slice::<Message1>(&substream.read_message(BUF_SIZE).await?)
                         .context("failed to deserialize message1")?;
-
                 let state1 = state0.receive(bitcoin_wallet.as_ref(), message1).await?;
-                {
-                    let message2 = state1.next_message();
-                    substream
-                        .write_message(
-                            &serde_cbor::to_vec(&message2)
-                                .context("failed to serialize message2")?,
-                        )
-                        .await?;
-                }
+
+                substream
+                    .write_message(
+                        &serde_cbor::to_vec(&state1.next_message())
+                            .context("failed to serialize message2")?,
+                    )
+                    .await?;
 
                 let message3 =
                     serde_cbor::from_slice::<Message3>(&substream.read_message(BUF_SIZE).await?)
                         .context("failed to deserialize message3")?;
                 let state2 = state1.receive(message3)?;
 
-                {
-                    let message4 = state2.next_message();
-                    substream
-                        .write_message(
-                            &serde_cbor::to_vec(&message4)
-                                .context("failed to serialize message4")?,
-                        )
-                        .await?;
-                }
+                substream
+                    .write_message(
+                        &serde_cbor::to_vec(&state2.next_message())
+                            .context("failed to serialize message4")?,
+                    )
+                    .await?;
 
                 Ok(state2)
             })
