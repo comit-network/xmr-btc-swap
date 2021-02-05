@@ -12,7 +12,7 @@ use crate::{
     protocol::{alice, alice::TransferProof, bob, SwapAmounts},
     seed::Seed,
 };
-use anyhow::{bail, Result};
+use anyhow::{bail, Error, Result};
 use libp2p::{core::Multiaddr, identity::Keypair, NetworkBehaviour, PeerId};
 use rand::rngs::OsRng;
 use std::{path::PathBuf, sync::Arc};
@@ -27,6 +27,7 @@ pub use self::{
     swap_request::*,
 };
 pub use execution_setup::{Message0, Message2, Message4};
+use libp2p::request_response::ResponseChannel;
 
 mod encrypted_signature;
 pub mod event_loop;
@@ -206,8 +207,13 @@ pub enum OutEvent {
     ConnectionEstablished(PeerId),
     SwapResponse(alice::SwapResponse),
     ExecutionSetupDone(Result<Box<State2>>),
-    TransferProof(Box<TransferProof>),
+    TransferProof {
+        msg: Box<TransferProof>,
+        channel: ResponseChannel<()>,
+    },
     EncryptedSignatureAcknowledged,
+    ResponseSent, // Same variant is used for all messages as no processing is done
+    Failure(Error),
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -222,7 +228,11 @@ impl From<peer_tracker::OutEvent> for OutEvent {
 
 impl From<swap_request::OutEvent> for OutEvent {
     fn from(event: swap_request::OutEvent) -> Self {
-        OutEvent::SwapResponse(event.swap_response)
+        use swap_request::OutEvent::*;
+        match event {
+            MsgReceived(swap_response) => OutEvent::SwapResponse(swap_response),
+            Failure(err) => OutEvent::Failure(err.context("Failre with Swap Request")),
+        }
     }
 }
 
@@ -236,16 +246,24 @@ impl From<execution_setup::OutEvent> for OutEvent {
 
 impl From<transfer_proof::OutEvent> for OutEvent {
     fn from(event: transfer_proof::OutEvent) -> Self {
+        use transfer_proof::OutEvent::*;
         match event {
-            transfer_proof::OutEvent::Msg(msg) => OutEvent::TransferProof(Box::new(msg)),
+            MsgReceived { msg, channel } => OutEvent::TransferProof {
+                msg: Box::new(msg),
+                channel,
+            },
+            AckSent => OutEvent::ResponseSent,
+            Failure(err) => OutEvent::Failure(err.context("Failure with Transfer Proof")),
         }
     }
 }
 
 impl From<encrypted_signature::OutEvent> for OutEvent {
     fn from(event: encrypted_signature::OutEvent) -> Self {
+        use encrypted_signature::OutEvent::*;
         match event {
-            encrypted_signature::OutEvent::Acknowledged => OutEvent::EncryptedSignatureAcknowledged,
+            Acknowledged => OutEvent::EncryptedSignatureAcknowledged,
+            Failure(err) => OutEvent::Failure(err.context("Failure with Encrypted Signature")),
         }
     }
 }

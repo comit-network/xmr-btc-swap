@@ -2,53 +2,41 @@ use crate::{
     network::request_response::{CborCodec, TransferProofProtocol, TIMEOUT},
     protocol::alice::TransferProof,
 };
+use anyhow::{anyhow, Error, Result};
 use libp2p::{
     request_response::{
-        handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
-        RequestResponseEvent, RequestResponseMessage,
+        ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
+        RequestResponseMessage, ResponseChannel,
     },
-    swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
     NetworkBehaviour,
 };
-use std::{
-    collections::VecDeque,
-    task::{Context, Poll},
-    time::Duration,
-};
-use tracing::{debug, error};
+use std::time::Duration;
+use tracing::debug;
 
 #[derive(Debug)]
 pub enum OutEvent {
-    Msg(TransferProof),
+    MsgReceived {
+        msg: TransferProof,
+        channel: ResponseChannel<()>,
+    },
+    AckSent,
+    Failure(Error),
 }
 
 /// A `NetworkBehaviour` that represents receiving the transfer proof from
 /// Alice.
 #[derive(NetworkBehaviour)]
-#[behaviour(out_event = "OutEvent", poll_method = "poll")]
+#[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
     rr: RequestResponse<CborCodec<TransferProofProtocol, TransferProof, ()>>,
-    #[behaviour(ignore)]
-    events: VecDeque<OutEvent>,
 }
 
 impl Behaviour {
-    fn poll(
-        &mut self,
-        _: &mut Context<'_>,
-        _: &mut impl PollParameters,
-    ) -> Poll<
-        NetworkBehaviourAction<
-            RequestProtocol<CborCodec<TransferProofProtocol, TransferProof, ()>>,
-            OutEvent,
-        >,
-    > {
-        if let Some(event) = self.events.pop_front() {
-            return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
-        }
-
-        Poll::Pending
+    pub fn send_ack(&mut self, channel: ResponseChannel<()>) -> Result<()> {
+        self.rr
+            .send_response(channel, ())
+            .map_err(|err| anyhow!("Failed to ack transfer proof: {:?}", err))
     }
 }
 
@@ -64,40 +52,38 @@ impl Default for Behaviour {
                 vec![(TransferProofProtocol, ProtocolSupport::Inbound)],
                 config,
             ),
-            events: Default::default(),
         }
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<TransferProof, ()>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<TransferProof, ()>) {
+impl From<RequestResponseEvent<TransferProof, ()>> for OutEvent {
+    fn from(event: RequestResponseEvent<TransferProof, ()>) -> Self {
         match event {
             RequestResponseEvent::Message {
+                peer,
                 message:
                     RequestResponseMessage::Request {
                         request, channel, ..
                     },
                 ..
             } => {
-                debug!("Received Transfer Proof");
-                self.events.push_back(OutEvent::Msg(request));
-                // Send back empty response so that the request/response protocol completes.
-                let _ = self
-                    .rr
-                    .send_response(channel, ())
-                    .map_err(|err| error!("Failed to send message 3: {:?}", err));
+                debug!("Received Transfer Proof from {}", peer);
+                OutEvent::MsgReceived {
+                    msg: request,
+                    channel,
+                }
             }
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { .. },
                 ..
-            } => panic!("Bob should not get a Response"),
+            } => OutEvent::Failure(anyhow!("Bob should not get a Response")),
             RequestResponseEvent::InboundFailure { error, .. } => {
-                error!("Inbound failure: {:?}", error);
+                OutEvent::Failure(anyhow!("Inbound failure: {:?}", error))
             }
             RequestResponseEvent::OutboundFailure { error, .. } => {
-                error!("Outbound failure: {:?}", error);
+                OutEvent::Failure(anyhow!("Outbound failure: {:?}", error))
             }
-            RequestResponseEvent::ResponseSent { .. } => debug!("Bob ack'd transfer proof message"),
+            RequestResponseEvent::ResponseSent { .. } => OutEvent::AckSent,
         }
     }
 }

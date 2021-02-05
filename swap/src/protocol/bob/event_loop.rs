@@ -190,12 +190,20 @@ impl EventLoop {
                         OutEvent::ExecutionSetupDone(res) => {
                             let _ = self.done_execution_setup.send(res.map(|state|*state)).await;
                         }
-                        OutEvent::TransferProof(msg) => {
+                        OutEvent::TransferProof{ msg, channel }=> {
                             let _ = self.recv_transfer_proof.send(*msg).await;
+                            // Send back empty response so that the request/response protocol completes.
+                            if let Err(error) = self.swarm.transfer_proof.send_ack(channel) {
+                                error!("Failed to send Transfer Proof ack: {:?}", error);
+                            }
                         }
                         OutEvent::EncryptedSignatureAcknowledged => {
                             debug!("Alice acknowledged encrypted signature");
                             let _ = self.recv_encrypted_signature_ack.send(()).await;
+                        }
+                        OutEvent::ResponseSent => {}
+                        OutEvent::Failure(err) => {
+                            error!("Communication error: {:#}", err)
                         }
                     }
                 },

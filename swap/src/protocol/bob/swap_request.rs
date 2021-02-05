@@ -2,22 +2,17 @@ use crate::{
     network::request_response::{CborCodec, Swap, TIMEOUT},
     protocol::alice::SwapResponse,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Error, Result};
 use libp2p::{
     request_response::{
-        handler::RequestProtocol, ProtocolSupport, RequestId, RequestResponse,
-        RequestResponseConfig, RequestResponseEvent, RequestResponseMessage,
+        ProtocolSupport, RequestId, RequestResponse, RequestResponseConfig, RequestResponseEvent,
+        RequestResponseMessage,
     },
-    swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
     NetworkBehaviour, PeerId,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::VecDeque,
-    task::{Context, Poll},
-    time::Duration,
-};
-use tracing::{debug, error};
+use std::time::Duration;
+use tracing::debug;
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct SwapRequest {
@@ -25,19 +20,18 @@ pub struct SwapRequest {
     pub btc_amount: bitcoin::Amount,
 }
 
-#[derive(Copy, Clone, Debug)]
-pub struct OutEvent {
-    pub swap_response: SwapResponse,
+#[derive(Debug)]
+pub enum OutEvent {
+    MsgReceived(SwapResponse),
+    Failure(Error),
 }
 
 /// A `NetworkBehaviour` that represents doing the negotiation of a swap.
 #[derive(NetworkBehaviour)]
-#[behaviour(out_event = "OutEvent", poll_method = "poll")]
+#[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
     rr: RequestResponse<CborCodec<Swap, SwapRequest, SwapResponse>>,
-    #[behaviour(ignore)]
-    events: VecDeque<OutEvent>,
 }
 
 impl Behaviour {
@@ -45,23 +39,6 @@ impl Behaviour {
         let id = self.rr.send_request(&alice, swap_request);
 
         Ok(id)
-    }
-
-    fn poll(
-        &mut self,
-        _: &mut Context<'_>,
-        _: &mut impl PollParameters,
-    ) -> Poll<
-        NetworkBehaviourAction<
-            RequestProtocol<CborCodec<Swap, SwapRequest, SwapResponse>>,
-            OutEvent,
-        >,
-    > {
-        if let Some(event) = self.events.pop_front() {
-            return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
-        }
-
-        Poll::Pending
     }
 }
 
@@ -78,35 +55,33 @@ impl Default for Behaviour {
                 vec![(Swap, ProtocolSupport::Outbound)],
                 config,
             ),
-            events: Default::default(),
         }
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<SwapRequest, SwapResponse>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<SwapRequest, SwapResponse>) {
+impl From<RequestResponseEvent<SwapRequest, SwapResponse>> for OutEvent {
+    fn from(event: RequestResponseEvent<SwapRequest, SwapResponse>) -> Self {
         match event {
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Request { .. },
                 ..
-            } => panic!("Bob should never get a request from Alice"),
+            } => OutEvent::Failure(anyhow!("Bob should never get a request from Alice")),
             RequestResponseEvent::Message {
+                peer,
                 message: RequestResponseMessage::Response { response, .. },
                 ..
             } => {
-                debug!("Received swap response");
-                self.events.push_back(OutEvent {
-                    swap_response: response,
-                });
+                debug!("Received swap response from {}", peer);
+                OutEvent::MsgReceived(response)
             }
             RequestResponseEvent::InboundFailure { error, .. } => {
-                error!("Inbound failure: {:?}", error);
+                OutEvent::Failure(anyhow!("Inbound failure: {:?}", error))
             }
             RequestResponseEvent::OutboundFailure { error, .. } => {
-                error!("Outbound failure: {:?}", error);
+                OutEvent::Failure(anyhow!("Outbound failure: {:?}", error))
             }
             RequestResponseEvent::ResponseSent { .. } => {
-                error!("Bob does not send a swap response to Alice");
+                OutEvent::Failure(anyhow!("Bob does not send a swap response to Alice"))
             }
         }
     }
