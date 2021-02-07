@@ -1,10 +1,8 @@
 use crate::{
-    network::{request_response::AliceToBob, transport::SwapTransport, TokioExecutor},
+    network::{transport::SwapTransport, TokioExecutor},
     protocol::{
-        alice,
-        alice::{Behaviour, OutEvent, SwapResponse, TransferProof},
-        bob,
-        bob::EncryptedSignature,
+        alice::{Behaviour, OutEvent, State0, State3, SwapResponse, TransferProof},
+        bob::{EncryptedSignature, SwapRequest},
     },
 };
 use anyhow::{anyhow, Context, Result};
@@ -35,15 +33,12 @@ impl<T> Default for Channels<T> {
 
 #[derive(Debug)]
 pub struct EventLoopHandle {
-    recv_message0: Receiver<(bob::Message0, ResponseChannel<AliceToBob>)>,
-    recv_message1: Receiver<(bob::Message1, ResponseChannel<AliceToBob>)>,
-    recv_message2: Receiver<bob::Message2>,
+    done_execution_setup: Receiver<Result<State3>>,
     recv_encrypted_signature: Receiver<EncryptedSignature>,
-    request: Receiver<crate::protocol::alice::swap_response::OutEvent>,
+    recv_swap_request: Receiver<(SwapRequest, ResponseChannel<SwapResponse>)>,
     conn_established: Receiver<PeerId>,
-    send_swap_response: Sender<(ResponseChannel<AliceToBob>, SwapResponse)>,
-    send_message0: Sender<(ResponseChannel<AliceToBob>, alice::Message0)>,
-    send_message1: Sender<(ResponseChannel<AliceToBob>, alice::Message1)>,
+    send_swap_response: Sender<(ResponseChannel<SwapResponse>, SwapResponse)>,
+    start_execution_setup: Sender<(PeerId, State0)>,
     send_transfer_proof: Sender<(PeerId, TransferProof)>,
     recv_transfer_proof_ack: Receiver<()>,
 }
@@ -56,25 +51,16 @@ impl EventLoopHandle {
             .ok_or_else(|| anyhow!("Failed to receive connection established from Bob"))
     }
 
-    pub async fn recv_message0(&mut self) -> Result<(bob::Message0, ResponseChannel<AliceToBob>)> {
-        self.recv_message0
-            .recv()
-            .await
-            .ok_or_else(|| anyhow!("Failed to receive message 0 from Bob"))
-    }
+    pub async fn execution_setup(&mut self, bob_peer_id: PeerId, state0: State0) -> Result<State3> {
+        let _ = self
+            .start_execution_setup
+            .send((bob_peer_id, state0))
+            .await?;
 
-    pub async fn recv_message1(&mut self) -> Result<(bob::Message1, ResponseChannel<AliceToBob>)> {
-        self.recv_message1
+        self.done_execution_setup
             .recv()
             .await
-            .ok_or_else(|| anyhow!("Failed to receive message 1 from Bob"))
-    }
-
-    pub async fn recv_message2(&mut self) -> Result<bob::Message2> {
-        self.recv_message2
-            .recv()
-            .await
-            .ok_or_else(|| anyhow!("Failed to receive message 2 from Bob"))
+            .ok_or_else(|| anyhow!("Failed to setup execution with Bob"))?
     }
 
     pub async fn recv_encrypted_signature(&mut self) -> Result<EncryptedSignature> {
@@ -84,10 +70,10 @@ impl EventLoopHandle {
             .ok_or_else(|| anyhow!("Failed to receive Bitcoin encrypted signature from Bob"))
     }
 
-    pub async fn recv_request(
+    pub async fn recv_swap_request(
         &mut self,
-    ) -> Result<crate::protocol::alice::swap_response::OutEvent> {
-        self.request
+    ) -> Result<(SwapRequest, ResponseChannel<SwapResponse>)> {
+        self.recv_swap_request
             .recv()
             .await
             .ok_or_else(|| anyhow!("Failed to receive amounts request from Bob"))
@@ -95,31 +81,13 @@ impl EventLoopHandle {
 
     pub async fn send_swap_response(
         &mut self,
-        channel: ResponseChannel<AliceToBob>,
+        channel: ResponseChannel<SwapResponse>,
         swap_response: SwapResponse,
     ) -> Result<()> {
         let _ = self
             .send_swap_response
             .send((channel, swap_response))
             .await?;
-        Ok(())
-    }
-
-    pub async fn send_message0(
-        &mut self,
-        channel: ResponseChannel<AliceToBob>,
-        msg: alice::Message0,
-    ) -> Result<()> {
-        let _ = self.send_message0.send((channel, msg)).await?;
-        Ok(())
-    }
-
-    pub async fn send_message1(
-        &mut self,
-        channel: ResponseChannel<AliceToBob>,
-        msg: alice::Message1,
-    ) -> Result<()> {
-        let _ = self.send_message1.send((channel, msg)).await?;
         Ok(())
     }
 
@@ -137,15 +105,12 @@ impl EventLoopHandle {
 #[allow(missing_debug_implementations)]
 pub struct EventLoop {
     swarm: libp2p::Swarm<Behaviour>,
-    recv_message0: Sender<(bob::Message0, ResponseChannel<AliceToBob>)>,
-    recv_message1: Sender<(bob::Message1, ResponseChannel<AliceToBob>)>,
-    recv_message2: Sender<bob::Message2>,
+    start_execution_setup: Receiver<(PeerId, State0)>,
+    done_execution_setup: Sender<Result<State3>>,
     recv_encrypted_signature: Sender<EncryptedSignature>,
-    request: Sender<crate::protocol::alice::swap_response::OutEvent>,
+    recv_swap_request: Sender<(SwapRequest, ResponseChannel<SwapResponse>)>,
     conn_established: Sender<PeerId>,
-    send_swap_response: Receiver<(ResponseChannel<AliceToBob>, SwapResponse)>,
-    send_message0: Receiver<(ResponseChannel<AliceToBob>, alice::Message0)>,
-    send_message1: Receiver<(ResponseChannel<AliceToBob>, alice::Message1)>,
+    send_swap_response: Receiver<(ResponseChannel<SwapResponse>, SwapResponse)>,
     send_transfer_proof: Receiver<(PeerId, TransferProof)>,
     recv_transfer_proof_ack: Sender<()>,
 }
@@ -166,43 +131,34 @@ impl EventLoop {
         Swarm::listen_on(&mut swarm, listen.clone())
             .with_context(|| format!("Address is not supported: {:#}", listen))?;
 
-        let recv_message0 = Channels::new();
-        let recv_message1 = Channels::new();
-        let recv_message2 = Channels::new();
+        let start_execution_setup = Channels::new();
+        let done_execution_setup = Channels::new();
         let recv_encrypted_signature = Channels::new();
         let request = Channels::new();
         let conn_established = Channels::new();
         let send_swap_response = Channels::new();
-        let send_message0 = Channels::new();
-        let send_message1 = Channels::new();
         let send_transfer_proof = Channels::new();
         let recv_transfer_proof_ack = Channels::new();
 
         let driver = EventLoop {
             swarm,
-            recv_message0: recv_message0.sender,
-            recv_message1: recv_message1.sender,
-            recv_message2: recv_message2.sender,
+            start_execution_setup: start_execution_setup.receiver,
+            done_execution_setup: done_execution_setup.sender,
             recv_encrypted_signature: recv_encrypted_signature.sender,
-            request: request.sender,
+            recv_swap_request: request.sender,
             conn_established: conn_established.sender,
             send_swap_response: send_swap_response.receiver,
-            send_message0: send_message0.receiver,
-            send_message1: send_message1.receiver,
             send_transfer_proof: send_transfer_proof.receiver,
             recv_transfer_proof_ack: recv_transfer_proof_ack.sender,
         };
 
         let handle = EventLoopHandle {
-            recv_message0: recv_message0.receiver,
-            recv_message1: recv_message1.receiver,
-            recv_message2: recv_message2.receiver,
+            start_execution_setup: start_execution_setup.sender,
+            done_execution_setup: done_execution_setup.receiver,
             recv_encrypted_signature: recv_encrypted_signature.receiver,
-            request: request.receiver,
+            recv_swap_request: request.receiver,
             conn_established: conn_established.receiver,
             send_swap_response: send_swap_response.sender,
-            send_message0: send_message0.sender,
-            send_message1: send_message1.sender,
             send_transfer_proof: send_transfer_proof.sender,
             recv_transfer_proof_ack: recv_transfer_proof_ack.receiver,
         };
@@ -218,24 +174,26 @@ impl EventLoop {
                         OutEvent::ConnectionEstablished(alice) => {
                             let _ = self.conn_established.send(alice).await;
                         }
-                        OutEvent::Message0 { msg, channel } => {
-                            let _ = self.recv_message0.send((*msg, channel)).await;
+                        OutEvent::SwapRequest { msg, channel } => {
+                            let _ = self.recv_swap_request.send((msg, channel)).await;
                         }
-                        OutEvent::Message1 { msg, channel } => {
-                            let _ = self.recv_message1.send((msg, channel)).await;
-                        }
-                        OutEvent::Message2 { msg, bob_peer_id : _} => {
-                            let _ = self.recv_message2.send(*msg).await;
+                        OutEvent::ExecutionSetupDone(res) => {
+                            let _ = self.done_execution_setup.send(res.map(|state|*state)).await;
                         }
                         OutEvent::TransferProofAcknowledged => {
                             trace!("Bob acknowledged transfer proof");
                             let _ = self.recv_transfer_proof_ack.send(()).await;
                         }
-                        OutEvent::EncryptedSignature(msg) => {
-                            let _ = self.recv_encrypted_signature.send(msg).await;
+                        OutEvent::EncryptedSignature{ msg, channel } => {
+                            let _ = self.recv_encrypted_signature.send(*msg).await;
+                            // Send back empty response so that the request/response protocol completes.
+                            if let Err(error) = self.swarm.encrypted_signature.send_ack(channel) {
+                                error!("Failed to send Encrypted Signature ack: {:?}", error);
+                            }
                         }
-                        OutEvent::Request(event) => {
-                            let _ = self.request.send(*event).await;
+                        OutEvent::ResponseSent => {}
+                        OutEvent::Failure(err) => {
+                            error!("Communication error: {:#}", err);
                         }
                     }
                 },
@@ -247,20 +205,11 @@ impl EventLoop {
                             .map_err(|err|error!("Failed to send swap response: {:#}", err));
                     }
                 },
-                msg0 = self.send_message0.recv().fuse() => {
-                    if let Some((channel, msg)) = msg0  {
+                option = self.start_execution_setup.recv().fuse() => {
+                    if let Some((bob_peer_id, state0)) = option {
                         let _ = self
                             .swarm
-                            .send_message0(channel, msg)
-                            .map_err(|err|error!("Failed to send message0: {:#}", err));
-                    }
-                },
-                msg1 = self.send_message1.recv().fuse() => {
-                    if let Some((channel, msg)) = msg1  {
-                        let _ = self
-                            .swarm
-                            .send_message1(channel, msg)
-                            .map_err(|err|error!("Failed to send message1: {:#}", err));
+                            .start_execution_setup(bob_peer_id, state0);
                     }
                 },
                 transfer_proof = self.send_transfer_proof.recv().fuse() => {

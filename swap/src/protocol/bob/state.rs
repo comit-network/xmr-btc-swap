@@ -9,7 +9,11 @@ use crate::{
     execution_params::ExecutionParams,
     monero,
     monero::{monero_private_key, TransferProof},
-    protocol::{alice, bob, bob::EncryptedSignature, SwapAmounts},
+    protocol::{
+        alice::{Message1, Message3},
+        bob::{EncryptedSignature, Message0, Message2, Message4},
+        SwapAmounts,
+    },
 };
 use anyhow::{anyhow, Result};
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic, Signature};
@@ -74,6 +78,7 @@ pub struct State0 {
     b: bitcoin::SecretKey,
     s_b: cross_curve_dleq::Scalar,
     v_b: monero::PrivateViewKey,
+    dleq_proof_s_b: cross_curve_dleq::Proof,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
@@ -97,6 +102,7 @@ impl State0 {
 
         let s_b = cross_curve_dleq::Scalar::random(rng);
         let v_b = monero::PrivateViewKey::new_random(rng);
+        let dleq_proof_s_b = cross_curve_dleq::Proof::new(rng, &s_b);
 
         Self {
             b,
@@ -104,6 +110,7 @@ impl State0 {
             v_b,
             btc,
             xmr,
+            dleq_proof_s_b,
             cancel_timelock,
             punish_timelock,
             refund_address,
@@ -111,22 +118,20 @@ impl State0 {
         }
     }
 
-    pub fn next_message<R: RngCore + CryptoRng>(&self, rng: &mut R) -> bob::Message0 {
-        let dleq_proof_s_b = cross_curve_dleq::Proof::new(rng, &self.s_b);
-
-        bob::Message0 {
+    pub fn next_message(&self) -> Message0 {
+        Message0 {
             B: self.b.public(),
             S_b_monero: monero::PublicKey::from_private_key(&monero::PrivateKey {
                 scalar: self.s_b.into_ed25519(),
             }),
             S_b_bitcoin: self.s_b.into_secp256k1().into(),
-            dleq_proof_s_b,
+            dleq_proof_s_b: self.dleq_proof_s_b.clone(),
             v_b: self.v_b,
             refund_address: self.refund_address.clone(),
         }
     }
 
-    pub async fn receive<W>(self, wallet: &W, msg: alice::Message0) -> anyhow::Result<State1>
+    pub async fn receive<W>(self, wallet: &W, msg: Message1) -> anyhow::Result<State1>
     where
         W: BuildTxLockPsbt + GetNetwork,
     {
@@ -182,13 +187,13 @@ pub struct State1 {
 }
 
 impl State1 {
-    pub fn next_message(&self) -> bob::Message1 {
-        bob::Message1 {
+    pub fn next_message(&self) -> Message2 {
+        Message2 {
             tx_lock: self.tx_lock.clone(),
         }
     }
 
-    pub fn receive(self, msg: alice::Message1) -> Result<State2> {
+    pub fn receive(self, msg: Message3) -> Result<State2> {
         let tx_cancel = TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
         let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &self.refund_address);
 
@@ -245,14 +250,14 @@ pub struct State2 {
 }
 
 impl State2 {
-    pub fn next_message(&self) -> bob::Message2 {
+    pub fn next_message(&self) -> Message4 {
         let tx_cancel = TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
         let tx_cancel_sig = self.b.sign(tx_cancel.digest());
         let tx_punish =
             bitcoin::TxPunish::new(&tx_cancel, &self.punish_address, self.punish_timelock);
         let tx_punish_sig = self.b.sign(tx_punish.digest());
 
-        bob::Message2 {
+        Message4 {
             tx_punish_sig,
             tx_cancel_sig,
         }

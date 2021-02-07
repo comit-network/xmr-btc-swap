@@ -1,60 +1,37 @@
-use crate::network::request_response::{
-    EncryptedSignatureProtocol, OneShotCodec, Request, Response, TIMEOUT,
-};
+use crate::network::request_response::{CborCodec, EncryptedSignatureProtocol, TIMEOUT};
+use anyhow::{anyhow, Error};
 use libp2p::{
     request_response::{
-        handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
-        RequestResponseEvent, RequestResponseMessage,
+        ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
+        RequestResponseMessage,
     },
-    swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
     NetworkBehaviour, PeerId,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::VecDeque,
-    task::{Context, Poll},
-    time::Duration,
-};
-use tracing::error;
+use std::time::Duration;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EncryptedSignature {
     pub tx_redeem_encsig: crate::bitcoin::EncryptedSignature,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
 pub enum OutEvent {
     Acknowledged,
+    Failure(Error),
 }
 
 /// A `NetworkBehaviour` that represents sending encrypted signature to Alice.
 #[derive(NetworkBehaviour)]
-#[behaviour(out_event = "OutEvent", poll_method = "poll")]
+#[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<OneShotCodec<EncryptedSignatureProtocol>>,
-    #[behaviour(ignore)]
-    events: VecDeque<OutEvent>,
+    rr: RequestResponse<CborCodec<EncryptedSignatureProtocol, EncryptedSignature, ()>>,
 }
 
 impl Behaviour {
     pub fn send(&mut self, alice: PeerId, msg: EncryptedSignature) {
-        let msg = Request::EncryptedSignature(Box::new(msg));
         let _id = self.rr.send_request(&alice, msg);
-    }
-
-    fn poll(
-        &mut self,
-        _: &mut Context<'_>,
-        _: &mut impl PollParameters,
-    ) -> Poll<
-        NetworkBehaviourAction<RequestProtocol<OneShotCodec<EncryptedSignatureProtocol>>, OutEvent>,
-    > {
-        if let Some(event) = self.events.pop_front() {
-            return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
-        }
-
-        Poll::Pending
     }
 }
 
@@ -66,39 +43,34 @@ impl Default for Behaviour {
 
         Self {
             rr: RequestResponse::new(
-                OneShotCodec::default(),
+                CborCodec::default(),
                 vec![(EncryptedSignatureProtocol, ProtocolSupport::Outbound)],
                 config,
             ),
-            events: Default::default(),
         }
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<Request, Response>) {
+impl From<RequestResponseEvent<EncryptedSignature, ()>> for OutEvent {
+    fn from(event: RequestResponseEvent<EncryptedSignature, ()>) -> Self {
         match event {
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Request { .. },
                 ..
-            } => panic!("Bob should never get a request from Alice"),
+            } => OutEvent::Failure(anyhow!("Bob should never get a request from Alice")),
             RequestResponseEvent::Message {
-                message: RequestResponseMessage::Response { response, .. },
+                message: RequestResponseMessage::Response { .. },
                 ..
-            } => {
-                if let Response::EncryptedSignature = response {
-                    self.events.push_back(OutEvent::Acknowledged);
-                }
-            }
+            } => OutEvent::Acknowledged,
             RequestResponseEvent::InboundFailure { error, .. } => {
-                error!("Inbound failure: {:?}", error);
+                OutEvent::Failure(anyhow!("Inbound failure: {:?}", error))
             }
             RequestResponseEvent::OutboundFailure { error, .. } => {
-                error!("Outbound failure: {:?}", error);
+                OutEvent::Failure(anyhow!("Outbound failure: {:?}", error))
             }
-            RequestResponseEvent::ResponseSent { .. } => {
-                unreachable!("Bob does not send the encrypted signature response to Alice");
-            }
+            RequestResponseEvent::ResponseSent { .. } => OutEvent::Failure(anyhow!(
+                "Bob does not send the encrypted signature response to Alice"
+            )),
         }
     }
 }

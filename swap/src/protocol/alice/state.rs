@@ -7,7 +7,11 @@ use crate::{
         TxRefund, WatchForRawTransaction,
     },
     monero,
-    protocol::{alice, alice::TransferProof, bob, bob::EncryptedSignature, SwapAmounts},
+    protocol::{
+        alice::{Message1, Message3, TransferProof},
+        bob::{EncryptedSignature, Message0, Message2, Message4},
+        SwapAmounts,
+    },
 };
 use anyhow::{anyhow, Context, Result};
 use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
@@ -16,7 +20,6 @@ use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::fmt;
-use tracing::info;
 
 #[derive(Debug)]
 pub enum AliceState {
@@ -87,6 +90,7 @@ pub struct State0 {
     pub a: bitcoin::SecretKey,
     pub s_a: cross_curve_dleq::Scalar,
     pub v_a: monero::PrivateViewKey,
+    pub dleq_proof_s_a: cross_curve_dleq::Proof,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub btc: bitcoin::Amount,
     pub xmr: monero::Amount,
@@ -98,7 +102,7 @@ pub struct State0 {
 
 impl State0 {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub fn new<R>(
         a: bitcoin::SecretKey,
         s_a: cross_curve_dleq::Scalar,
         v_a: monero::PrivateViewKey,
@@ -108,11 +112,18 @@ impl State0 {
         punish_timelock: Timelock,
         redeem_address: bitcoin::Address,
         punish_address: bitcoin::Address,
-    ) -> Self {
+        rng: &mut R,
+    ) -> Self
+    where
+        R: RngCore + CryptoRng,
+    {
+        let dleq_proof_s_a = cross_curve_dleq::Proof::new(rng, &s_a);
+
         Self {
             a,
             s_a,
             v_a,
+            dleq_proof_s_a,
             redeem_address,
             punish_address,
             btc,
@@ -122,24 +133,7 @@ impl State0 {
         }
     }
 
-    pub fn next_message<R: RngCore + CryptoRng>(&self, rng: &mut R) -> alice::Message0 {
-        info!("Producing first message");
-        let dleq_proof_s_a = cross_curve_dleq::Proof::new(rng, &self.s_a);
-
-        alice::Message0 {
-            A: self.a.public(),
-            S_a_monero: monero::PublicKey::from_private_key(&monero::PrivateKey {
-                scalar: self.s_a.into_ed25519(),
-            }),
-            S_a_bitcoin: self.s_a.into_secp256k1().into(),
-            dleq_proof_s_a,
-            v_a: self.v_a,
-            redeem_address: self.redeem_address.clone(),
-            punish_address: self.punish_address.clone(),
-        }
-    }
-
-    pub fn receive(self, msg: bob::Message0) -> Result<State1> {
+    pub fn receive(self, msg: Message0) -> Result<State1> {
         msg.dleq_proof_s_b.verify(
             msg.S_b_bitcoin.clone().into(),
             msg.S_b_monero
@@ -157,6 +151,8 @@ impl State0 {
             S_b_monero: msg.S_b_monero,
             S_b_bitcoin: msg.S_b_bitcoin,
             v,
+            v_a: self.v_a,
+            dleq_proof_s_a: self.dleq_proof_s_a,
             btc: self.btc,
             xmr: self.xmr,
             cancel_timelock: self.cancel_timelock,
@@ -176,6 +172,8 @@ pub struct State1 {
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
+    v_a: monero::PrivateViewKey,
+    dleq_proof_s_a: cross_curve_dleq::Proof,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
@@ -187,7 +185,21 @@ pub struct State1 {
 }
 
 impl State1 {
-    pub fn receive(self, msg: bob::Message1) -> State2 {
+    pub fn next_message(&self) -> Message1 {
+        Message1 {
+            A: self.a.public(),
+            S_a_monero: monero::PublicKey::from_private_key(&monero::PrivateKey {
+                scalar: self.s_a.into_ed25519(),
+            }),
+            S_a_bitcoin: self.s_a.into_secp256k1().into(),
+            dleq_proof_s_a: self.dleq_proof_s_a.clone(),
+            v_a: self.v_a,
+            redeem_address: self.redeem_address.clone(),
+            punish_address: self.punish_address.clone(),
+        }
+    }
+
+    pub fn receive(self, msg: Message2) -> State2 {
         State2 {
             a: self.a,
             B: self.B,
@@ -227,7 +239,7 @@ pub struct State2 {
 }
 
 impl State2 {
-    pub fn next_message(&self) -> alice::Message1 {
+    pub fn next_message(&self) -> Message3 {
         let tx_cancel =
             bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
 
@@ -240,13 +252,13 @@ impl State2 {
         let tx_refund_encsig = self.a.encsign(self.S_b_bitcoin, tx_refund.digest());
 
         let tx_cancel_sig = self.a.sign(tx_cancel.digest());
-        alice::Message1 {
+        Message3 {
             tx_refund_encsig,
             tx_cancel_sig,
         }
     }
 
-    pub fn receive(self, msg: bob::Message2) -> Result<State3> {
+    pub fn receive(self, msg: Message4) -> Result<State3> {
         let tx_cancel =
             bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
         bitcoin::verify_sig(&self.B, &tx_cancel.digest(), &msg.tx_cancel_sig)

@@ -16,11 +16,13 @@ async fn given_bob_restarts_after_lock_proof_received_resume_swap() {
             .await
             .unwrap();
 
-        assert!(matches!(bob_state, BobState::XmrLockProofReceived {..}));
+        assert!(matches!(bob_state, BobState::XmrLockProofReceived { .. }));
 
         let bob_swap = ctx.stop_and_resume_bob_from_db(bob_join_handle).await;
-        assert!(matches!(bob_swap.state, BobState::XmrLockProofReceived
-        {..}));
+        assert!(matches!(
+            bob_swap.state,
+            BobState::XmrLockProofReceived { .. }
+        ));
 
         let bob_state = bob::run(bob_swap).await.unwrap();
 

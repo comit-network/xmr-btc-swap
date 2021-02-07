@@ -247,9 +247,7 @@ async fn run_until_internal(
                                             .await;
 
                                         match publishded_redeem_tx {
-                                            Ok(_) => {
-                                                AliceState::BtcRedeemed
-                                            }
+                                            Ok(_) => AliceState::BtcRedeemed,
                                             Err(e) => {
                                                 bail!("Waiting for Bitcoin transaction finality failed with {}! The redeem transaction was published, but it is not ensured that the transaction was included! You're screwed.", e)
                                             }

@@ -3,15 +3,16 @@
 use crate::{
     bitcoin, database,
     database::Database,
+    execution_params::ExecutionParams,
     monero, network,
     network::{
         peer_tracker::{self, PeerTracker},
         transport::build,
     },
-    protocol::{alice, bob, SwapAmounts},
+    protocol::{alice, alice::TransferProof, bob, SwapAmounts},
     seed::Seed,
 };
-use anyhow::{bail, Result};
+use anyhow::{bail, Error, Result};
 use libp2p::{core::Multiaddr, identity::Keypair, NetworkBehaviour, PeerId};
 use rand::rngs::OsRng;
 use std::{path::PathBuf, sync::Arc};
@@ -21,20 +22,16 @@ use uuid::Uuid;
 pub use self::{
     encrypted_signature::EncryptedSignature,
     event_loop::{EventLoop, EventLoopHandle},
-    message0::Message0,
-    message1::Message1,
-    message2::Message2,
     state::*,
     swap::{run, run_until},
     swap_request::*,
 };
-use crate::{execution_params::ExecutionParams, protocol::alice::TransferProof};
+pub use execution_setup::{Message0, Message2, Message4};
+use libp2p::request_response::ResponseChannel;
 
 mod encrypted_signature;
 pub mod event_loop;
-mod message0;
-mod message1;
-mod message2;
+mod execution_setup;
 pub mod state;
 pub mod swap;
 mod swap_request;
@@ -162,6 +159,7 @@ impl Builder {
             }
         }
     }
+
     fn init_event_loop(
         &self,
     ) -> Result<(bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle)> {
@@ -174,6 +172,7 @@ impl Builder {
             self.peer_id,
             self.alice_peer_id,
             self.alice_address.clone(),
+            self.bitcoin_wallet.clone(),
         )
     }
 
@@ -203,15 +202,18 @@ impl Builder {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
     SwapResponse(alice::SwapResponse),
-    Message0(Box<alice::Message0>),
-    Message1(Box<alice::Message1>),
-    Message2,
-    TransferProof(Box<TransferProof>),
+    ExecutionSetupDone(Result<Box<State2>>),
+    TransferProof {
+        msg: Box<TransferProof>,
+        channel: ResponseChannel<()>,
+    },
     EncryptedSignatureAcknowledged,
+    ResponseSent, // Same variant is used for all messages as no processing is done
+    Failure(Error),
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -226,46 +228,42 @@ impl From<peer_tracker::OutEvent> for OutEvent {
 
 impl From<swap_request::OutEvent> for OutEvent {
     fn from(event: swap_request::OutEvent) -> Self {
-        OutEvent::SwapResponse(event.swap_response)
-    }
-}
-
-impl From<message0::OutEvent> for OutEvent {
-    fn from(event: message0::OutEvent) -> Self {
+        use swap_request::OutEvent::*;
         match event {
-            message0::OutEvent::Msg(msg) => OutEvent::Message0(Box::new(msg)),
+            MsgReceived(swap_response) => OutEvent::SwapResponse(swap_response),
+            Failure(err) => OutEvent::Failure(err.context("Failre with Swap Request")),
         }
     }
 }
 
-impl From<message1::OutEvent> for OutEvent {
-    fn from(event: message1::OutEvent) -> Self {
+impl From<execution_setup::OutEvent> for OutEvent {
+    fn from(event: execution_setup::OutEvent) -> Self {
         match event {
-            message1::OutEvent::Msg(msg) => OutEvent::Message1(Box::new(msg)),
-        }
-    }
-}
-
-impl From<message2::OutEvent> for OutEvent {
-    fn from(event: message2::OutEvent) -> Self {
-        match event {
-            message2::OutEvent::Msg => OutEvent::Message2,
+            execution_setup::OutEvent::Done(res) => OutEvent::ExecutionSetupDone(res.map(Box::new)),
         }
     }
 }
 
 impl From<transfer_proof::OutEvent> for OutEvent {
     fn from(event: transfer_proof::OutEvent) -> Self {
+        use transfer_proof::OutEvent::*;
         match event {
-            transfer_proof::OutEvent::Msg(msg) => OutEvent::TransferProof(Box::new(msg)),
+            MsgReceived { msg, channel } => OutEvent::TransferProof {
+                msg: Box::new(msg),
+                channel,
+            },
+            AckSent => OutEvent::ResponseSent,
+            Failure(err) => OutEvent::Failure(err.context("Failure with Transfer Proof")),
         }
     }
 }
 
 impl From<encrypted_signature::OutEvent> for OutEvent {
     fn from(event: encrypted_signature::OutEvent) -> Self {
+        use encrypted_signature::OutEvent::*;
         match event {
-            encrypted_signature::OutEvent::Acknowledged => OutEvent::EncryptedSignatureAcknowledged,
+            Acknowledged => OutEvent::EncryptedSignatureAcknowledged,
+            Failure(err) => OutEvent::Failure(err.context("Failure with Encrypted Signature")),
         }
     }
 }
@@ -277,9 +275,7 @@ impl From<encrypted_signature::OutEvent> for OutEvent {
 pub struct Behaviour {
     pt: PeerTracker,
     swap_request: swap_request::Behaviour,
-    message0: message0::Behaviour,
-    message1: message1::Behaviour,
-    message2: message2::Behaviour,
+    execution_setup: execution_setup::Behaviour,
     transfer_proof: transfer_proof::Behaviour,
     encrypted_signature: encrypted_signature::Behaviour,
 }
@@ -291,22 +287,15 @@ impl Behaviour {
         info!("Requesting swap from: {}", alice);
     }
 
-    /// Sends Bob's first message to Alice.
-    pub fn send_message0(&mut self, alice: PeerId, msg: bob::Message0) {
-        self.message0.send(alice, msg);
-        debug!("Message0 sent");
-    }
-
-    /// Sends Bob's second message to Alice.
-    pub fn send_message1(&mut self, alice: PeerId, msg: bob::Message1) {
-        self.message1.send(alice, msg);
-        debug!("Message1 sent");
-    }
-
-    /// Sends Bob's third message to Alice.
-    pub fn send_message2(&mut self, alice: PeerId, msg: bob::Message2) {
-        self.message2.send(alice, msg);
-        debug!("Message2 sent");
+    pub fn start_execution_setup(
+        &mut self,
+        alice_peer_id: PeerId,
+        state0: State0,
+        bitcoin_wallet: Arc<bitcoin::Wallet>,
+    ) {
+        self.execution_setup
+            .run(alice_peer_id, state0, bitcoin_wallet);
+        info!("Start execution setup with {}", alice_peer_id);
     }
 
     /// Sends Bob's fourth message to Alice.

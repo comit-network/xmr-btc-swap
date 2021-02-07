@@ -303,14 +303,11 @@ impl IntoIterator for Args {
     type IntoIter = ::std::vec::IntoIter<String>;
 
     fn into_iter(self) -> <Self as IntoIterator>::IntoIter {
-        let mut args = Vec::new();
-
-        args.push("/bin/bash".into());
-        args.push("-c".into());
-
-        let cmd = format!("{} ", self.image_args.args());
-        args.push(cmd);
-
-        args.into_iter()
+        vec![
+            "/bin/bash".to_string(),
+            "-c".to_string(),
+            format!("{} ", self.image_args.args()),
+        ]
+        .into_iter()
     }
 }

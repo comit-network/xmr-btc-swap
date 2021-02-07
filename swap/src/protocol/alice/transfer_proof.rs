@@ -1,61 +1,41 @@
 use crate::{
     monero,
-    network::request_response::{OneShotCodec, Request, Response, TransferProofProtocol, TIMEOUT},
+    network::request_response::{CborCodec, TransferProofProtocol, TIMEOUT},
 };
+use anyhow::{anyhow, Error};
 use libp2p::{
     request_response::{
-        handler::RequestProtocol, ProtocolSupport, RequestResponse, RequestResponseConfig,
-        RequestResponseEvent, RequestResponseMessage,
+        ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
+        RequestResponseMessage,
     },
-    swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters},
     NetworkBehaviour, PeerId,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::VecDeque,
-    task::{Context, Poll},
-    time::Duration,
-};
-use tracing::error;
+use std::time::Duration;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TransferProof {
     pub tx_lock_proof: monero::TransferProof,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
 pub enum OutEvent {
     Acknowledged,
+    Failure(Error),
 }
 
 /// A `NetworkBehaviour` that represents sending the Monero transfer proof to
 /// Bob.
 #[derive(NetworkBehaviour)]
-#[behaviour(out_event = "OutEvent", poll_method = "poll")]
+#[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<OneShotCodec<TransferProofProtocol>>,
-    #[behaviour(ignore)]
-    events: VecDeque<OutEvent>,
+    rr: RequestResponse<CborCodec<TransferProofProtocol, TransferProof, ()>>,
 }
 
 impl Behaviour {
     pub fn send(&mut self, bob: PeerId, msg: TransferProof) {
-        let msg = Request::TransferProof(Box::new(msg));
         let _id = self.rr.send_request(&bob, msg);
-    }
-
-    fn poll(
-        &mut self,
-        _: &mut Context<'_>,
-        _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<RequestProtocol<OneShotCodec<TransferProofProtocol>>, OutEvent>>
-    {
-        if let Some(event) = self.events.pop_front() {
-            return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
-        }
-
-        Poll::Pending
     }
 }
 
@@ -67,37 +47,36 @@ impl Default for Behaviour {
 
         Self {
             rr: RequestResponse::new(
-                OneShotCodec::default(),
+                CborCodec::default(),
                 vec![(TransferProofProtocol, ProtocolSupport::Outbound)],
                 config,
             ),
-            events: Default::default(),
         }
     }
 }
 
-impl NetworkBehaviourEventProcess<RequestResponseEvent<Request, Response>> for Behaviour {
-    fn inject_event(&mut self, event: RequestResponseEvent<Request, Response>) {
+impl From<RequestResponseEvent<TransferProof, ()>> for OutEvent {
+    fn from(event: RequestResponseEvent<TransferProof, ()>) -> Self {
         match event {
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Request { .. },
                 ..
-            } => panic!("Alice should never get a transfer proof request from Bob"),
+            } => OutEvent::Failure(anyhow!(
+                "Alice should never get a transfer proof request from Bob"
+            )),
             RequestResponseEvent::Message {
-                message: RequestResponseMessage::Response { response, .. },
+                message: RequestResponseMessage::Response { .. },
                 ..
-            } => {
-                if let Response::TransferProof = response {
-                    self.events.push_back(OutEvent::Acknowledged);
-                }
-            }
+            } => OutEvent::Acknowledged,
             RequestResponseEvent::InboundFailure { error, .. } => {
-                error!("Inbound failure: {:?}", error);
+                OutEvent::Failure(anyhow!("Inbound failure: {:?}", error))
             }
             RequestResponseEvent::OutboundFailure { error, .. } => {
-                error!("Outbound failure: {:?}", error);
+                OutEvent::Failure(anyhow!("Outbound failure: {:?}", error))
             }
-            RequestResponseEvent::ResponseSent { .. } => {}
+            RequestResponseEvent::ResponseSent { .. } => {
+                OutEvent::Failure(anyhow!("Alice should not send a response"))
+            }
         }
     }
 }
