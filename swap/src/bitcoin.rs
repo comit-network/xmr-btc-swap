@@ -231,7 +231,6 @@ pub trait GetRawTransaction {
     async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction>;
 }
 
-#[async_trait]
 pub trait GetNetwork {
     fn get_network(&self) -> Network;
 }

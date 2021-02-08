@@ -232,8 +232,16 @@ async fn setup_wallets(
     monero_wallet_rpc_url: url::Url,
     config: Config,
 ) -> Result<(bitcoin::Wallet, monero::Wallet)> {
-    let bitcoin_wallet =
-        bitcoin::Wallet::new(bitcoin_wallet_name, bitcoind_url, config.bitcoin_network).await?;
+    // todo: use electrum rpc url for the rpc url
+    // todo: pass datadir path as arg
+    let bitcoin_wallet = bitcoin::Wallet::new(
+        bitcoin_wallet_name,
+        bitcoind_url.clone(),
+        bitcoind_url,
+        config.bitcoin_network,
+        unimplemented!(),
+    )
+    .await?;
     let bitcoin_balance = bitcoin_wallet.balance().await?;
     info!(
         "Connection to Bitcoin wallet succeeded, balance: {}",
