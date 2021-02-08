@@ -34,7 +34,7 @@ impl<T> Default for Channels<T> {
 
 #[derive(Debug)]
 pub struct EventLoopHandle {
-    done_execution_setup: Receiver<Result<State3>>,
+    done_execution_setup: Receiver<State3>,
     recv_encrypted_signature: Receiver<EncryptedSignature>,
     recv_swap_request: Receiver<(SwapRequest, ResponseChannel<SwapResponse>)>,
     conn_established: Receiver<PeerId>,
@@ -61,7 +61,7 @@ impl EventLoopHandle {
         self.done_execution_setup
             .recv()
             .await
-            .ok_or_else(|| anyhow!("Failed to setup execution with Bob"))?
+            .ok_or_else(|| anyhow!("Failed to setup execution with Bob"))
     }
 
     pub async fn recv_encrypted_signature(&mut self) -> Result<EncryptedSignature> {
@@ -121,7 +121,7 @@ impl EventLoopHandle {
 pub struct EventLoop {
     swarm: libp2p::Swarm<Behaviour>,
     start_execution_setup: Receiver<(PeerId, State0)>,
-    done_execution_setup: Sender<Result<State3>>,
+    done_execution_setup: Sender<State3>,
     recv_encrypted_signature: Sender<EncryptedSignature>,
     recv_swap_request: Sender<(SwapRequest, ResponseChannel<SwapResponse>)>,
     conn_established: Sender<PeerId>,
@@ -194,8 +194,8 @@ impl EventLoop {
                         OutEvent::SwapRequest { msg, channel } => {
                             let _ = self.recv_swap_request.send((msg, channel)).await;
                         }
-                        OutEvent::ExecutionSetupDone(res) => {
-                            let _ = self.done_execution_setup.send(res.map(|state|*state)).await;
+                        OutEvent::ExecutionSetupDone(state3) => {
+                            let _ = self.done_execution_setup.send(*state3).await;
                         }
                         OutEvent::TransferProofAcknowledged => {
                             trace!("Bob acknowledged transfer proof");

@@ -20,7 +20,7 @@ pub enum OutEvent {
         msg: SwapRequest,
         channel: ResponseChannel<SwapResponse>,
     },
-    ExecutionSetupDone(anyhow::Result<Box<State3>>),
+    ExecutionSetupDone(Box<State3>),
     TransferProofAcknowledged,
     EncryptedSignature {
         msg: Box<EncryptedSignature>,
@@ -53,8 +53,10 @@ impl From<alice::OutEvent> for OutEvent {
 
 impl From<execution_setup::OutEvent> for OutEvent {
     fn from(event: execution_setup::OutEvent) -> Self {
+        use crate::protocol::alice::execution_setup::OutEvent::*;
         match event {
-            execution_setup::OutEvent::Done(res) => OutEvent::ExecutionSetupDone(res.map(Box::new)),
+            Done(state3) => OutEvent::ExecutionSetupDone(Box::new(state3)),
+            Failure(err) => OutEvent::Failure(err),
         }
     }
 }

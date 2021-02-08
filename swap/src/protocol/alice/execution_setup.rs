@@ -8,7 +8,7 @@ use crate::{
         bob::{Message0, Message2, Message4},
     },
 };
-use anyhow::{Context, Error, Result};
+use anyhow::{Context, Error};
 use libp2p::PeerId;
 use libp2p_async_await::BehaviourOutEvent;
 use serde::{Deserialize, Serialize};
@@ -32,14 +32,15 @@ pub struct Message3 {
 
 #[derive(Debug)]
 pub enum OutEvent {
-    Done(Result<State3>),
+    Done(State3),
+    Failure(Error),
 }
 
-impl From<BehaviourOutEvent<State3, (), anyhow::Error>> for OutEvent {
+impl From<BehaviourOutEvent<State3, (), Error>> for OutEvent {
     fn from(event: BehaviourOutEvent<State3, (), Error>) -> Self {
         match event {
-            BehaviourOutEvent::Inbound(_, Ok(State3)) => OutEvent::Done(Ok(State3)),
-            BehaviourOutEvent::Inbound(_, Err(e)) => OutEvent::Done(Err(e)),
+            BehaviourOutEvent::Inbound(_, Ok(State3)) => OutEvent::Done(State3),
+            BehaviourOutEvent::Inbound(_, Err(e)) => OutEvent::Failure(e),
             BehaviourOutEvent::Outbound(..) => unreachable!("Alice only supports inbound"),
         }
     }
