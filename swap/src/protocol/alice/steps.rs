@@ -12,7 +12,7 @@ use crate::{
     monero::Transfer,
     protocol::{
         alice,
-        alice::{event_loop::EventLoopHandle, SwapResponse, TransferProof},
+        alice::{event_loop::EventLoopHandle, TransferProof},
         SwapAmounts,
     },
 };
@@ -26,43 +26,7 @@ use libp2p::PeerId;
 use sha2::Sha256;
 use std::sync::Arc;
 use tokio::time::timeout;
-use tracing::{info, trace};
-
-pub async fn negotiate(
-    state0: alice::State0,
-    xmr_amount: monero::Amount,
-    event_loop_handle: &mut EventLoopHandle,
-    execution_params: ExecutionParams,
-) -> Result<(PeerId, alice::State3)> {
-    trace!("Starting negotiate");
-
-    // todo: we can move this out, we dont need to timeout here
-    let bob_peer_id = timeout(
-        execution_params.bob_time_to_act,
-        event_loop_handle.recv_conn_established(),
-    )
-    .await
-    .context("Failed to receive dial connection from Bob")??;
-
-    let event = timeout(
-        execution_params.bob_time_to_act,
-        event_loop_handle.recv_swap_request(),
-    )
-    .await
-    .context("Failed to receive swap request from Bob")??;
-
-    event_loop_handle
-        .send_swap_response(event.1, SwapResponse { xmr_amount })
-        .await?;
-
-    let state3 = timeout(
-        execution_params.bob_time_to_act,
-        event_loop_handle.execution_setup(bob_peer_id, state0),
-    )
-    .await??;
-
-    Ok((bob_peer_id, state3))
-}
+use tracing::info;
 
 // TODO(Franck): Use helper functions from xmr-btc instead of re-writing them
 // here
