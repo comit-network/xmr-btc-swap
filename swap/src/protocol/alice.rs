@@ -18,7 +18,7 @@ use libp2p::{
     core::Multiaddr, identity::Keypair, request_response::ResponseChannel, NetworkBehaviour, PeerId,
 };
 use rand::rngs::OsRng;
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 use tracing::{debug, info};
 use uuid::Uuid;
 
@@ -56,7 +56,7 @@ pub struct Builder {
     swap_id: Uuid,
     identity: Keypair,
     peer_id: PeerId,
-    db_path: PathBuf,
+    db: Database,
     execution_params: ExecutionParams,
 
     listen_address: Multiaddr,
@@ -79,7 +79,7 @@ impl Builder {
         swap_id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
-        db_path: PathBuf,
+        db: Database,
         listen_address: Multiaddr,
     ) -> Self {
         let network_seed = NetworkSeed::new(seed);
@@ -90,7 +90,7 @@ impl Builder {
             swap_id,
             identity,
             peer_id,
-            db_path,
+            db,
             execution_params,
             listen_address,
             bitcoin_wallet,
@@ -115,15 +115,13 @@ impl Builder {
 
                 let (event_loop, event_loop_handle) = self.init_event_loop()?;
 
-                let db = Database::open(self.db_path.as_path())?;
-
                 Ok((
                     Swap {
                         event_loop_handle,
                         bitcoin_wallet: self.bitcoin_wallet,
                         monero_wallet: self.monero_wallet,
                         execution_params: self.execution_params,
-                        db,
+                        db: self.db,
                         state: initial_state,
                         swap_id: self.swap_id,
                     },
@@ -131,11 +129,8 @@ impl Builder {
                 ))
             }
             InitParams::None => {
-                // reopen the existing database
-                let db = Database::open(self.db_path.as_path())?;
-
                 let resume_state =
-                    if let database::Swap::Alice(state) = db.get_state(self.swap_id)? {
+                    if let database::Swap::Alice(state) = self.db.get_state(self.swap_id)? {
                         state.into()
                     } else {
                         bail!(
@@ -154,7 +149,7 @@ impl Builder {
                         monero_wallet: self.monero_wallet,
                         execution_params: self.execution_params,
                         swap_id: self.swap_id,
-                        db,
+                        db: self.db,
                     },
                     event_loop,
                 ))
