@@ -1,24 +1,13 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
 use crate::{
-    bitcoin, database,
-    database::Database,
-    execution_params::ExecutionParams,
-    monero,
-    network::{
-        peer_tracker::{self, PeerTracker},
-        Seed as NetworkSeed,
-    },
-    protocol::{bob::EncryptedSignature, SwapAmounts},
-    seed::Seed,
+    bitcoin, database, database::Database, execution_params::ExecutionParams, monero,
+    network::Seed as NetworkSeed, protocol::SwapAmounts, seed::Seed,
 };
-use anyhow::{bail, Error, Result};
-use libp2p::{
-    core::Multiaddr, identity::Keypair, request_response::ResponseChannel, NetworkBehaviour, PeerId,
-};
+use anyhow::{bail, Result};
+use libp2p::{core::Multiaddr, identity::Keypair, PeerId};
 use rand::rngs::OsRng;
 use std::sync::Arc;
-use tracing::{debug, info};
 use uuid::Uuid;
 
 pub use self::{
@@ -29,9 +18,9 @@ pub use self::{
     swap_response::*,
     transfer_proof::TransferProof,
 };
-use crate::protocol::bob::SwapRequest;
 pub use execution_setup::Message3;
 
+mod behaviour;
 mod encrypted_signature;
 pub mod event_loop;
 mod execution_setup;
@@ -186,111 +175,5 @@ impl Builder {
         .await?;
 
         Ok(AliceState::Started { amounts, state0 })
-    }
-}
-
-#[derive(Debug)]
-pub enum OutEvent {
-    ConnectionEstablished(PeerId),
-    SwapRequest {
-        msg: SwapRequest,
-        channel: ResponseChannel<SwapResponse>,
-    },
-    ExecutionSetupDone(Result<Box<State3>>),
-    TransferProofAcknowledged,
-    EncryptedSignature {
-        msg: Box<EncryptedSignature>,
-        channel: ResponseChannel<()>,
-    },
-    ResponseSent, // Same variant is used for all messages as no processing is done
-    Failure(Error),
-}
-
-impl From<peer_tracker::OutEvent> for OutEvent {
-    fn from(event: peer_tracker::OutEvent) -> Self {
-        match event {
-            peer_tracker::OutEvent::ConnectionEstablished(id) => {
-                OutEvent::ConnectionEstablished(id)
-            }
-        }
-    }
-}
-
-impl From<swap_response::OutEvent> for OutEvent {
-    fn from(event: swap_response::OutEvent) -> Self {
-        use swap_response::OutEvent::*;
-        match event {
-            MsgReceived { msg, channel } => OutEvent::SwapRequest { msg, channel },
-            ResponseSent => OutEvent::ResponseSent,
-            Failure(err) => OutEvent::Failure(err.context("Swap Request/Response failure")),
-        }
-    }
-}
-
-impl From<execution_setup::OutEvent> for OutEvent {
-    fn from(event: execution_setup::OutEvent) -> Self {
-        match event {
-            execution_setup::OutEvent::Done(res) => OutEvent::ExecutionSetupDone(res.map(Box::new)),
-        }
-    }
-}
-
-impl From<transfer_proof::OutEvent> for OutEvent {
-    fn from(event: transfer_proof::OutEvent) -> Self {
-        use transfer_proof::OutEvent::*;
-        match event {
-            Acknowledged => OutEvent::TransferProofAcknowledged,
-            Failure(err) => OutEvent::Failure(err.context("Failure with Transfer Proof")),
-        }
-    }
-}
-
-impl From<encrypted_signature::OutEvent> for OutEvent {
-    fn from(event: encrypted_signature::OutEvent) -> Self {
-        use encrypted_signature::OutEvent::*;
-        match event {
-            MsgReceived { msg, channel } => OutEvent::EncryptedSignature {
-                msg: Box::new(msg),
-                channel,
-            },
-            AckSent => OutEvent::ResponseSent,
-            Failure(err) => OutEvent::Failure(err.context("Failure with Encrypted Signature")),
-        }
-    }
-}
-
-/// A `NetworkBehaviour` that represents an XMR/BTC swap node as Alice.
-#[derive(NetworkBehaviour, Default)]
-#[behaviour(out_event = "OutEvent", event_process = false)]
-#[allow(missing_debug_implementations)]
-pub struct Behaviour {
-    pt: PeerTracker,
-    amounts: swap_response::Behaviour,
-    execution_setup: execution_setup::Behaviour,
-    transfer_proof: transfer_proof::Behaviour,
-    encrypted_signature: encrypted_signature::Behaviour,
-}
-
-impl Behaviour {
-    /// Alice always sends her messages as a response to a request from Bob.
-    pub fn send_swap_response(
-        &mut self,
-        channel: ResponseChannel<SwapResponse>,
-        swap_response: SwapResponse,
-    ) -> Result<()> {
-        self.amounts.send(channel, swap_response)?;
-        info!("Sent swap response");
-        Ok(())
-    }
-
-    pub fn start_execution_setup(&mut self, bob_peer_id: PeerId, state0: State0) {
-        self.execution_setup.run(bob_peer_id, state0);
-        info!("Start execution setup with {}", bob_peer_id);
-    }
-
-    /// Send Transfer Proof to Bob.
-    pub fn send_transfer_proof(&mut self, bob: PeerId, msg: TransferProof) {
-        self.transfer_proof.send(bob, msg);
-        debug!("Sent Transfer Proof");
     }
 }

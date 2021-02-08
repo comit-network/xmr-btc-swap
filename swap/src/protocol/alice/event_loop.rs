@@ -2,7 +2,10 @@ use crate::{
     execution_params::ExecutionParams,
     network::{transport, TokioExecutor},
     protocol::{
-        alice::{Behaviour, OutEvent, State0, State3, SwapResponse, TransferProof},
+        alice::{
+            behaviour::{Behaviour, OutEvent},
+            State0, State3, SwapResponse, TransferProof,
+        },
         bob::{EncryptedSignature, SwapRequest},
     },
 };
@@ -207,7 +210,7 @@ impl EventLoop {
                         OutEvent::EncryptedSignature{ msg, channel } => {
                             let _ = self.recv_encrypted_signature.send(*msg).await;
                             // Send back empty response so that the request/response protocol completes.
-                            if let Err(error) = self.swarm.encrypted_signature.send_ack(channel) {
+                            if let Err(error) = self.swarm.send_encrypted_signature_ack(channel) {
                                 error!("Failed to send Encrypted Signature ack: {:?}", error);
                             }
                         }
