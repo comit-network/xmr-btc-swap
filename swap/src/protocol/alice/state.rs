@@ -46,7 +46,7 @@ pub enum AliceState {
     },
     BtcRedeemed,
     BtcCancelled {
-        tx_cancel: TxCancel,
+        tx_cancel: Box<TxCancel>,
         state3: Box<State3>,
     },
     BtcRefunded {

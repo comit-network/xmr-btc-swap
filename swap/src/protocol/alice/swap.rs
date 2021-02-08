@@ -305,7 +305,10 @@ async fn run_until_internal(
                 )
                 .await?;
 
-                let state = AliceState::BtcCancelled { state3, tx_cancel };
+                let state = AliceState::BtcCancelled {
+                    state3,
+                    tx_cancel: Box::new(tx_cancel),
+                };
                 let db_state = (&state).into();
                 db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                     .await?;

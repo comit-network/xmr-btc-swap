@@ -150,7 +150,7 @@ impl From<Alice> for AliceState {
 
                 AliceState::BtcCancelled {
                     state3: Box::new(state),
-                    tx_cancel,
+                    tx_cancel: Box::new(tx_cancel),
                 }
             }
             Alice::BtcPunishable(state3) => {
