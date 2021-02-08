@@ -1,6 +1,6 @@
 use crate::{
     execution_params::ExecutionParams,
-    network::{transport::SwapTransport, TokioExecutor},
+    network::{transport, TokioExecutor},
     protocol::{
         alice::{Behaviour, OutEvent, State0, State3, SwapResponse, TransferProof},
         bob::{EncryptedSignature, SwapRequest},
@@ -135,11 +135,13 @@ pub struct EventLoop {
 
 impl EventLoop {
     pub fn new(
-        transport: SwapTransport,
-        behaviour: Behaviour,
+        identity: libp2p::identity::Keypair,
         listen: Multiaddr,
         peer_id: PeerId,
     ) -> Result<(Self, EventLoopHandle)> {
+        let behaviour = Behaviour::default();
+        let transport = transport::build(identity)?;
+
         let mut swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, peer_id)
             .executor(Box::new(TokioExecutor {
                 handle: tokio::runtime::Handle::current(),

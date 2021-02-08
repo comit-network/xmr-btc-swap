@@ -7,7 +7,6 @@ use crate::{
     monero,
     network::{
         peer_tracker::{self, PeerTracker},
-        transport::build,
         Seed as NetworkSeed,
     },
     protocol::{bob::EncryptedSignature, SwapAmounts},
@@ -113,7 +112,8 @@ impl Builder {
                     .make_initial_state(swap_amounts.btc, swap_amounts.xmr)
                     .await?;
 
-                let (event_loop, event_loop_handle) = self.init_event_loop()?;
+                let (event_loop, event_loop_handle) =
+                    EventLoop::new(self.identity.clone(), self.listen_address(), self.peer_id)?;
 
                 Ok((
                     Swap {
@@ -139,7 +139,8 @@ impl Builder {
                         )
                     };
 
-                let (event_loop, event_loop_handle) = self.init_event_loop()?;
+                let (event_loop, event_loop_handle) =
+                    EventLoop::new(self.identity.clone(), self.listen_address(), self.peer_id)?;
 
                 Ok((
                     Swap {
@@ -185,17 +186,6 @@ impl Builder {
         .await?;
 
         Ok(AliceState::Started { amounts, state0 })
-    }
-
-    fn init_event_loop(&self) -> Result<(EventLoop, EventLoopHandle)> {
-        let alice_behaviour = Behaviour::default();
-        let alice_transport = build(self.identity.clone())?;
-        EventLoop::new(
-            alice_transport,
-            alice_behaviour,
-            self.listen_address(),
-            self.peer_id,
-        )
     }
 }
 
