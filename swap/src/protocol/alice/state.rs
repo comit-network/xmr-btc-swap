@@ -6,6 +6,7 @@ use crate::{
         wait_for_cancel_timelock_to_expire, GetBlockHeight, TransactionBlockHeight, TxCancel,
         TxRefund, WatchForRawTransaction,
     },
+    execution_params::ExecutionParams,
     monero,
     protocol::{
         alice::{Message1, Message3, TransferProof},
@@ -104,8 +105,7 @@ impl State0 {
     pub async fn new<R>(
         btc: bitcoin::Amount,
         xmr: monero::Amount,
-        cancel_timelock: Timelock,
-        punish_timelock: Timelock,
+        execution_params: ExecutionParams,
         bitcoin_wallet: &bitcoin::Wallet,
         rng: &mut R,
     ) -> Result<Self>
@@ -128,8 +128,8 @@ impl State0 {
             punish_address,
             btc,
             xmr,
-            cancel_timelock,
-            punish_timelock,
+            cancel_timelock: execution_params.bitcoin_cancel_timelock,
+            punish_timelock: execution_params.bitcoin_punish_timelock,
         })
     }
 

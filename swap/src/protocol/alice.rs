@@ -178,8 +178,7 @@ impl Builder {
         let state0 = State0::new(
             amounts.btc,
             amounts.xmr,
-            self.execution_params.bitcoin_cancel_timelock,
-            self.execution_params.bitcoin_punish_timelock,
+            self.execution_params,
             self.bitcoin_wallet.as_ref(),
             &mut OsRng,
         )
