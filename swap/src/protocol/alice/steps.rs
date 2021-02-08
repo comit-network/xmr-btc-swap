@@ -60,7 +60,6 @@ pub async fn lock_xmr<W>(
     state3: alice::State3,
     event_loop_handle: &mut EventLoopHandle,
     monero_wallet: Arc<W>,
-    execution_params: ExecutionParams,
 ) -> Result<()>
 where
     W: Transfer,
@@ -82,13 +81,9 @@ where
     //  Otherwise Alice might publish the lock tx twice!
 
     event_loop_handle
-        .send_transfer_proof(
-            bob_peer_id,
-            TransferProof {
-                tx_lock_proof: transfer_proof,
-            },
-            execution_params,
-        )
+        .send_transfer_proof(bob_peer_id, TransferProof {
+            tx_lock_proof: transfer_proof,
+        })
         .await?;
 
     Ok(())

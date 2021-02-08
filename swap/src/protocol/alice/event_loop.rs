@@ -1,5 +1,4 @@
 use crate::{
-    execution_params::ExecutionParams,
     network::{transport, TokioExecutor},
     protocol::{
         alice::{
@@ -13,10 +12,7 @@ use anyhow::{Context, Result};
 use libp2p::{
     core::Multiaddr, futures::FutureExt, request_response::ResponseChannel, PeerId, Swarm,
 };
-use tokio::{
-    sync::{broadcast, mpsc},
-    time::timeout,
-};
+use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, error, trace};
 
 #[allow(missing_debug_implementations)]
@@ -55,7 +51,6 @@ where
 pub struct EventLoopHandle {
     recv_encrypted_signature: broadcast::Receiver<EncryptedSignature>,
     send_transfer_proof: mpsc::Sender<(PeerId, TransferProof)>,
-    recv_transfer_proof_ack: broadcast::Receiver<()>,
 }
 
 impl EventLoopHandle {
@@ -65,26 +60,8 @@ impl EventLoopHandle {
             .await
             .context("Failed to receive Bitcoin encrypted signature from Bob")
     }
-    pub async fn send_transfer_proof(
-        &mut self,
-        bob: PeerId,
-        msg: TransferProof,
-        execution_params: ExecutionParams,
-    ) -> Result<()> {
+    pub async fn send_transfer_proof(&mut self, bob: PeerId, msg: TransferProof) -> Result<()> {
         let _ = self.send_transfer_proof.send((bob, msg)).await?;
-
-        // TODO: Re-evaluate if these acknowledges are necessary at all.
-        // If we don't use a timeout here and Alice fails to dial Bob she will wait
-        // indefinitely for this acknowledge.
-        if timeout(
-            execution_params.bob_time_to_act,
-            self.recv_transfer_proof_ack.recv(),
-        )
-        .await
-        .is_err()
-        {
-            error!("Failed to receive transfer proof ack from Bob")
-        }
 
         Ok(())
     }
@@ -95,7 +72,6 @@ pub struct EventLoop {
     swarm: libp2p::Swarm<Behaviour>,
     recv_encrypted_signature: broadcast::Sender<EncryptedSignature>,
     send_transfer_proof: mpsc::Receiver<(PeerId, TransferProof)>,
-    recv_transfer_proof_ack: broadcast::Sender<()>,
 
     // Only used to clone further handles
     handle: EventLoopHandle,
@@ -121,26 +97,22 @@ impl EventLoop {
 
         let recv_encrypted_signature = BroadcastChannels::default();
         let send_transfer_proof = MpscChannels::default();
-        let recv_transfer_proof_ack = BroadcastChannels::default();
 
         let handle_clone = EventLoopHandle {
             recv_encrypted_signature: recv_encrypted_signature.sender.subscribe(),
             send_transfer_proof: send_transfer_proof.sender.clone(),
-            recv_transfer_proof_ack: recv_transfer_proof_ack.sender.subscribe(),
         };
 
         let driver = EventLoop {
             swarm,
             recv_encrypted_signature: recv_encrypted_signature.sender,
             send_transfer_proof: send_transfer_proof.receiver,
-            recv_transfer_proof_ack: recv_transfer_proof_ack.sender,
             handle: handle_clone,
         };
 
         let handle = EventLoopHandle {
             recv_encrypted_signature: recv_encrypted_signature.receiver,
             send_transfer_proof: send_transfer_proof.sender,
-            recv_transfer_proof_ack: recv_transfer_proof_ack.receiver,
         };
 
         Ok((driver, handle))
@@ -150,7 +122,6 @@ impl EventLoop {
         EventLoopHandle {
             recv_encrypted_signature: self.recv_encrypted_signature.subscribe(),
             send_transfer_proof: self.handle.send_transfer_proof.clone(),
-            recv_transfer_proof_ack: self.recv_transfer_proof_ack.subscribe(),
         }
     }
 
@@ -170,7 +141,6 @@ impl EventLoop {
                         }
                         OutEvent::TransferProofAcknowledged => {
                             trace!("Bob acknowledged transfer proof");
-                            let _ = self.recv_transfer_proof_ack.send(());
                         }
                         OutEvent::EncryptedSignature{ msg, channel } => {
                             let _ = self.recv_encrypted_signature.send(*msg);

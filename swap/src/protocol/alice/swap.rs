@@ -157,7 +157,6 @@ async fn run_until_internal(
                     *state3.clone(),
                     &mut event_loop_handle,
                     monero_wallet.clone(),
-                    execution_params,
                 )
                 .await?;
 
