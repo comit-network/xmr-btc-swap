@@ -25,16 +25,10 @@ pub struct Channels<T> {
     receiver: Receiver<T>,
 }
 
-impl<T> Channels<T> {
-    pub fn new() -> Channels<T> {
-        let (sender, receiver) = tokio::sync::mpsc::channel(100);
-        Channels { sender, receiver }
-    }
-}
-
 impl<T> Default for Channels<T> {
     fn default() -> Self {
-        Self::new()
+        let (sender, receiver) = tokio::sync::mpsc::channel(100);
+        Channels { sender, receiver }
     }
 }
 
@@ -154,14 +148,14 @@ impl EventLoop {
         Swarm::listen_on(&mut swarm, listen.clone())
             .with_context(|| format!("Address is not supported: {:#}", listen))?;
 
-        let start_execution_setup = Channels::new();
-        let done_execution_setup = Channels::new();
-        let recv_encrypted_signature = Channels::new();
-        let request = Channels::new();
-        let conn_established = Channels::new();
-        let send_swap_response = Channels::new();
-        let send_transfer_proof = Channels::new();
-        let recv_transfer_proof_ack = Channels::new();
+        let start_execution_setup = Channels::default();
+        let done_execution_setup = Channels::default();
+        let recv_encrypted_signature = Channels::default();
+        let request = Channels::default();
+        let conn_established = Channels::default();
+        let send_swap_response = Channels::default();
+        let send_transfer_proof = Channels::default();
+        let recv_transfer_proof_ack = Channels::default();
 
         let driver = EventLoop {
             swarm,
