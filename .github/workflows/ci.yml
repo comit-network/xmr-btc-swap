@@ -127,13 +127,10 @@ jobs:
       matrix:
         test_name: [
             happy_path,
-            happy_path_restart_alice,
             happy_path_restart_bob_after_comm,
             happy_path_restart_bob_after_lock_proof_received,
             happy_path_restart_bob_before_comm,
             punish,
-            refund_restart_alice_cancelled,
-            refund_restart_alice,
             bob_refunds_using_cancel_and_refund_command,
             bob_refunds_using_cancel_and_refund_command_timelock_not_exired,
             bob_refunds_using_cancel_and_refund_command_timelock_not_exired_force,
