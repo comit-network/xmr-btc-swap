@@ -20,7 +20,6 @@ use reqwest::{Method, Url};
 use serde::{Deserialize, Serialize};
 use std::{path::Path, sync::Arc, time::Duration};
 use tokio::{sync::Mutex, time::interval};
-use url::ParseError;
 
 const SLED_TREE_NAME: &str = "default_tree";
 
@@ -180,8 +179,27 @@ impl GetRawTransaction for Wallet {
 #[async_trait]
 impl GetBlockHeight for Wallet {
     async fn get_block_height(&self) -> BlockHeight {
+        // todo: create this url using the join() api in the Url type
+        let url = format!("{}{}", self.http_url.as_str(), "blocks/tip/height");
+        #[derive(Debug)]
+        enum Error {
+            Io(reqwest::Error),
+            Parse(std::num::ParseIntError),
+        }
         let height = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
-            Ok(self.inner.lock().await.client().get_height()?)
+            // todo: We may want to return early if we cannot connect to the electrum node
+            // rather than retrying
+            let height = reqwest::Client::new()
+                .request(Method::GET, &url)
+                .send()
+                .await
+                .map_err(Error::Io)?
+                .text()
+                .await
+                .map_err(Error::Io)?
+                .parse::<u32>()
+                .map_err(Error::Parse)?;
+            Result::<_, backoff::Error<Error>>::Ok(height)
         })
         .await
         .expect("transient errors to be retried");
@@ -193,36 +211,27 @@ impl GetBlockHeight for Wallet {
 #[async_trait]
 impl TransactionBlockHeight for Wallet {
     async fn transaction_block_height(&self, txid: Txid) -> BlockHeight {
-        #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+        // todo: create this url using the join() api in the Url type
+        let url = format!("{}tx/{}/status", self.http_url, txid);
+        #[derive(Serialize, Deserialize, Debug, Clone)]
         struct TransactionStatus {
             block_height: Option<u32>,
             confirmed: bool,
         }
-        // todo: Implement conversion to anyhow::error so we can dont have to wrap these
+        // todo: See if we can make this error handling more elegant
         // errors
         #[derive(Debug)]
         enum Error {
-            Io,
+            Io(reqwest::Error),
             NotYetMined,
             JsonDeserialisation(reqwest::Error),
-            UrlDeserialisation(ParseError),
         }
         let height = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
-            let path = &format!("/tx/{}/status", txid);
-            let url = self
-                .http_url
-                .clone()
-                .join(path)
-                .map_err(|err| backoff::Error::Permanent(Error::UrlDeserialisation(err)))?;
-
             let resp = reqwest::Client::new()
-                .request(Method::GET, url)
+                .request(Method::GET, &url)
                 .send()
                 .await
-                .map_err(|err| {
-                    tracing::error!("Fetching TxStatus failed: {}", err);
-                    backoff::Error::Transient(Error::Io)
-                })?;
+                .map_err(|err| backoff::Error::Transient(Error::Io(err)))?;
 
             let tx_status: TransactionStatus = resp
                 .json()
@@ -256,7 +265,6 @@ impl WaitForTransactionFinality for Wallet {
 
         loop {
             tracing::debug!("syncing wallet");
-            self.inner.lock().await.sync(noop_progress(), None)?;
             let tx_block_height = self.transaction_block_height(txid).await;
             let block_height = self.get_block_height().await;
             let confirmations = block_height - tx_block_height;
