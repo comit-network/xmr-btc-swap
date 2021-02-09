@@ -1,4 +1,8 @@
 use ::bitcoin::secp256k1::{self, constants::SECRET_KEY_SIZE, SecretKey};
+use bitcoin::{
+    hashes::{sha512, Hash, HashEngine, Hmac, HmacEngine},
+    PrivateKey,
+};
 use rand::prelude::*;
 use std::fmt;
 
@@ -16,6 +20,29 @@ impl Seed {
         let _ = SecretKey::from_slice(&bytes)?;
 
         Ok(Seed(bytes))
+    }
+
+    /// Return the private key and chain code to be used as root extended
+    /// private key for a BIP32 wallet.
+    pub fn root_private_key(&self, network: bitcoin::Network) -> PrivateKey {
+        let bytes = self.bytes();
+
+        // Yes, this is as per BIP32 and used in both Bitcoin and Ethereum ecosystems
+        let hash_key = b"Bitcoin seed";
+
+        let mut engine = HmacEngine::<sha512::Hash>::new(hash_key);
+        engine.input(&bytes);
+        let hash = Hmac::<sha512::Hash>::from_engine(engine);
+        let output = &hash.into_inner()[..];
+        let key = &output[..32];
+
+        let secret_key = SecretKey::from_slice(key).expect("32 bytes array should be fine");
+
+        PrivateKey {
+            compressed: true,
+            network,
+            key: secret_key,
+        }
     }
 
     pub fn bytes(&self) -> [u8; SEED_LENGTH] {

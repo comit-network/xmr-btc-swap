@@ -13,7 +13,6 @@ use backoff::{backoff::Constant as ConstantBackoff, tokio::retry};
 use bdk::{
     blockchain::{noop_progress, Blockchain, ElectrumBlockchain},
     electrum_client::{Client, ElectrumApi},
-    keys::GeneratableDefaultOptions,
     FeeRate,
 };
 use reqwest::{Method, Url};
@@ -36,6 +35,7 @@ impl Wallet {
         electrum_http_url: Url,
         network: bitcoin::Network,
         datadir: &Path,
+        p_key: bitcoin::PrivateKey,
     ) -> Result<Self> {
         // todo: Implement conversion to anyhow::error so we can use ?
         let client =
@@ -43,8 +43,6 @@ impl Wallet {
 
         let db = bdk::sled::open(datadir)?.open_tree(SLED_TREE_NAME)?;
 
-        // todo: make key generation configurable using a descriptor
-        let p_key = ::bitcoin::PrivateKey::generate_default()?;
         let bdk_wallet = bdk::Wallet::new(
             bdk::template::P2WPKH(p_key),
             None,

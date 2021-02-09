@@ -19,6 +19,7 @@ use crate::{
     },
     execution_params::GetExecutionParams,
     protocol::bob::cancel::CancelError,
+    seed::Seed,
 };
 use anyhow::{Context, Result};
 use database::Database;
@@ -97,6 +98,7 @@ async fn main() -> Result<()> {
                 bitcoin_network,
                 &wallet_data_dir,
                 monero_network,
+                seed,
             )
             .await?;
 
@@ -139,6 +141,7 @@ async fn main() -> Result<()> {
                 bitcoin_network,
                 &wallet_data_dir,
                 monero_network,
+                seed,
             )
             .await?;
 
@@ -188,6 +191,7 @@ async fn main() -> Result<()> {
                 bitcoin_network,
                 &wallet_data_dir,
                 monero_network,
+                seed,
             )
             .await?;
 
@@ -216,6 +220,7 @@ async fn main() -> Result<()> {
                 bitcoin_network,
                 &wallet_data_dir,
                 monero_network,
+                seed,
             )
             .await?;
 
@@ -247,6 +252,7 @@ async fn main() -> Result<()> {
                 bitcoin_network,
                 &wallet_data_dir,
                 monero_network,
+                seed,
             )
             .await?;
 
@@ -297,6 +303,7 @@ async fn main() -> Result<()> {
                 bitcoin_network,
                 &wallet_data_dir,
                 monero_network,
+                seed,
             )
             .await?;
 
@@ -334,6 +341,7 @@ async fn init_wallets(
     bitcoin_network: bitcoin::Network,
     bitcoin_wallet_data_dir: &Path,
     monero_network: monero::Network,
+    seed: Seed,
 ) -> Result<(bitcoin::Wallet, monero::Wallet)> {
     let config_path = if let Some(config_path) = config_path {
         config_path
@@ -354,6 +362,7 @@ async fn init_wallets(
         config.bitcoin.electrum_http_url,
         bitcoin_network,
         bitcoin_wallet_data_dir,
+        seed.root_private_key(bitcoin_network),
     )
     .await?;
     let bitcoin_balance = bitcoin_wallet.balance().await?;
