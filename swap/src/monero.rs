@@ -208,6 +208,11 @@ pub trait CreateWalletForOutput {
 }
 
 #[async_trait]
+pub trait OpenWallet {
+    async fn open_wallet(&self, file_name: &str) -> anyhow::Result<()>;
+}
+
+#[async_trait]
 pub trait CreateWallet {
     async fn create_wallet(&self, file_name: &str) -> anyhow::Result<()>;
 }

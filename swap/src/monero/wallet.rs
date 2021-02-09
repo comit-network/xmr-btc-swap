@@ -1,6 +1,6 @@
 use crate::monero::{
-    Amount, CreateWallet, CreateWalletForOutput, InsufficientFunds, PrivateViewKey, PublicViewKey,
-    Transfer, TransferProof, TxHash, WatchForTransfer,
+    Amount, CreateWallet, CreateWalletForOutput, InsufficientFunds, OpenWallet, PrivateViewKey,
+    PublicViewKey, Transfer, TransferProof, TxHash, WatchForTransfer,
 };
 use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::Result;
@@ -90,6 +90,14 @@ impl CreateWalletForOutput for Wallet {
             )
             .await?;
 
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl OpenWallet for Wallet {
+    async fn open_wallet(&self, file_name: &str) -> Result<()> {
+        self.inner.open_wallet(file_name).await?;
         Ok(())
     }
 }

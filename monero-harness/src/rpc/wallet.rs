@@ -121,6 +121,33 @@ impl Client {
         Ok(r.result)
     }
 
+    /// Opens a wallet using `filename`.
+    pub async fn open_wallet(&self, filename: &str) -> Result<()> {
+        let params = OpenWalletParams {
+            filename: filename.to_owned(),
+        };
+        let request = Request::new("open_wallet", params);
+
+        let response = self
+            .inner
+            .post(self.url.clone())
+            .json(&request)
+            .send()
+            .await?
+            .text()
+            .await?;
+
+        debug!("open wallet RPC response: {}", response);
+
+        // TODO: Proper error handling once switching to https://github.com/thomaseizinger/rust-jsonrpc-client/
+        //  Currently blocked by https://github.com/thomaseizinger/rust-jsonrpc-client/issues/20
+        if response.contains("error") {
+            bail!("Failed to open wallet")
+        }
+
+        Ok(())
+    }
+
     /// Creates a wallet using `filename`.
     pub async fn create_wallet(&self, filename: &str) -> Result<()> {
         let params = CreateWalletParams {
@@ -350,6 +377,11 @@ pub struct SubAddressAccount {
     pub label: String,
     pub tag: String,
     pub unlocked_balance: u64,
+}
+
+#[derive(Serialize, Debug, Clone)]
+struct OpenWalletParams {
+    filename: String,
 }
 
 #[derive(Serialize, Debug, Clone)]
