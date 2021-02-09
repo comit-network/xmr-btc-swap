@@ -417,9 +417,16 @@ async fn run_until_internal(
                 pin_mut!(punish_tx_finalised);
                 pin_mut!(refund_tx_seen);
 
-                match select(punish_tx_finalised, refund_tx_seen).await {
-                    Either::Left(_) => {
-                        let state = AliceState::BtcPunished;
+                match select(refund_tx_seen, punish_tx_finalised).await {
+                    Either::Left((published_refund_tx, _)) => {
+                        let spend_key = extract_monero_private_key(
+                            published_refund_tx,
+                            tx_refund,
+                            state3.s_a,
+                            state3.a.clone(),
+                            state3.S_b_bitcoin,
+                        )?;
+                        let state = AliceState::BtcRefunded { spend_key, state3 };
                         let db_state = (&state).into();
                         db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                             .await?;
@@ -435,15 +442,8 @@ async fn run_until_internal(
                         )
                         .await
                     }
-                    Either::Right((published_refund_tx, _)) => {
-                        let spend_key = extract_monero_private_key(
-                            published_refund_tx,
-                            tx_refund,
-                            state3.s_a,
-                            state3.a.clone(),
-                            state3.S_b_bitcoin,
-                        )?;
-                        let state = AliceState::BtcRefunded { spend_key, state3 };
+                    Either::Right(_) => {
+                        let state = AliceState::BtcPunished;
                         let db_state = (&state).into();
                         db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                             .await?;
