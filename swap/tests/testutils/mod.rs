@@ -346,6 +346,9 @@ where
         .get_host_port(testutils::electrs::HTTP_PORT)
         .expect("Could not map electrs http port");
 
+    let alice_seed = Seed::random().unwrap();
+    let bob_seed = Seed::random().unwrap();
+
     let (alice_bitcoin_wallet, alice_monero_wallet) = init_test_wallets(
         "alice",
         containers.bitcoind_url.clone(),
@@ -354,6 +357,7 @@ where
         tempdir().unwrap().path(),
         electrs_rpc_port,
         electrs_http_port,
+        alice_seed,
     )
     .await;
 
@@ -375,6 +379,7 @@ where
         tempdir().unwrap().path(),
         electrs_rpc_port,
         electrs_http_port,
+        bob_seed,
     )
     .await;
 
@@ -570,6 +575,7 @@ async fn init_monero_container(
     (monero, monerods)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn init_test_wallets(
     name: &str,
     bitcoind_url: Url,
@@ -578,6 +584,7 @@ async fn init_test_wallets(
     datadir: &Path,
     electrum_rpc_port: u16,
     electrum_http_port: u16,
+    seed: Seed,
 ) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {
     monero
         .init(vec![(name, starting_balances.xmr.as_piconero())])
@@ -603,6 +610,9 @@ async fn init_test_wallets(
         electrum_http_url,
         bitcoin::Network::Regtest,
         datadir,
+        seed.extended_private_key(bitcoin::Network::Regtest)
+            .expect("Could not create extended private key from seed")
+            .private_key,
     )
     .await
     .expect("could not init btc wallet");

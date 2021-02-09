@@ -90,8 +90,14 @@ async fn main() -> Result<()> {
             alice_addr,
             send_bitcoin,
         } => {
-            let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config, bitcoin_network, &wallet_data_dir, monero_network).await?;
+            let (bitcoin_wallet, monero_wallet) = init_wallets(
+                config,
+                bitcoin_network,
+                &wallet_data_dir,
+                monero_network,
+                seed,
+            )
+            .await?;
 
             let swap_id = Uuid::new_v4();
 
@@ -132,8 +138,14 @@ async fn main() -> Result<()> {
             alice_peer_id,
             alice_addr,
         }) => {
-            let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config, bitcoin_network, &wallet_data_dir, monero_network).await?;
+            let (bitcoin_wallet, monero_wallet) = init_wallets(
+                config,
+                bitcoin_network,
+                &wallet_data_dir,
+                monero_network,
+                seed,
+            )
+            .await?;
 
             let bob_factory = Builder::new(
                 seed,
@@ -157,8 +169,14 @@ async fn main() -> Result<()> {
             force,
         }) => {
             // TODO: Optimization: Only init the Bitcoin wallet, Monero wallet unnecessary
-            let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config, bitcoin_network, &wallet_data_dir, monero_network).await?;
+            let (bitcoin_wallet, monero_wallet) = init_wallets(
+                config,
+                bitcoin_network,
+                &wallet_data_dir,
+                monero_network,
+                seed,
+            )
+            .await?;
 
             let bob_factory = Builder::new(
                 seed,
@@ -201,8 +219,14 @@ async fn main() -> Result<()> {
             alice_addr,
             force,
         }) => {
-            let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config, bitcoin_network, &wallet_data_dir, monero_network).await?;
+            let (bitcoin_wallet, monero_wallet) = init_wallets(
+                config,
+                bitcoin_network,
+                &wallet_data_dir,
+                monero_network,
+                seed,
+            )
+            .await?;
 
             // TODO: Optimize to only use the Bitcoin wallet, Monero wallet is unnecessary
             let bob_factory = Builder::new(
@@ -238,12 +262,14 @@ async fn init_wallets(
     bitcoin_network: bitcoin::Network,
     bitcoin_wallet_data_dir: &Path,
     monero_network: monero::Network,
+    seed: Seed,
 ) -> Result<(bitcoin::Wallet, monero::Wallet)> {
     let bitcoin_wallet = bitcoin::Wallet::new(
         config.bitcoin.electrum_rpc_url,
         config.bitcoin.electrum_http_url,
         bitcoin_network,
         bitcoin_wallet_data_dir,
+        seed.extended_private_key(bitcoin_network)?.private_key,
     )
     .await?;
 

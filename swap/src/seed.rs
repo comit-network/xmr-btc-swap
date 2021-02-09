@@ -1,5 +1,7 @@
 use crate::fs::ensure_directory_exists;
 use ::bitcoin::secp256k1::{self, constants::SECRET_KEY_SIZE, SecretKey};
+use anyhow::Result;
+use bdk::bitcoin::util::bip32::ExtendedPrivKey;
 use pem::{encode, Pem};
 use rand::prelude::*;
 use std::{
@@ -24,6 +26,11 @@ impl Seed {
         let _ = SecretKey::from_slice(&bytes)?;
 
         Ok(Seed(bytes))
+    }
+
+    pub fn extended_private_key(&self, network: bitcoin::Network) -> Result<ExtendedPrivKey> {
+        let private_key = ExtendedPrivKey::new_master(network, &self.bytes())?;
+        Ok(private_key)
     }
 
     pub fn bytes(&self) -> [u8; SEED_LENGTH] {

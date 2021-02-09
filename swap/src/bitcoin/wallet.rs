@@ -13,7 +13,7 @@ use backoff::{backoff::Constant as ConstantBackoff, tokio::retry};
 use bdk::{
     blockchain::{noop_progress, Blockchain, ElectrumBlockchain},
     electrum_client::{self, Client, ElectrumApi},
-    keys::GeneratableDefaultOptions,
+    miniscript::bitcoin::PrivateKey,
     FeeRate,
 };
 use reqwest::{Method, Url};
@@ -43,7 +43,8 @@ impl Wallet {
         electrum_rpc_url: Url,
         electrum_http_url: Url,
         network: bitcoin::Network,
-        waller_dir: &Path,
+        wallet_dir: &Path,
+        private_key: PrivateKey,
     ) -> Result<Self> {
         // Workaround for https://github.com/bitcoindevkit/rust-electrum-client/issues/47.
         let config = electrum_client::ConfigBuilder::default().retry(2).build();
@@ -51,11 +52,10 @@ impl Wallet {
         let client = Client::from_config(electrum_rpc_url.as_str(), config)
             .map_err(|e| anyhow!("Failed to init electrum rpc client: {:?}", e))?;
 
-        let db = bdk::sled::open(waller_dir)?.open_tree(SLED_TREE_NAME)?;
+        let db = bdk::sled::open(wallet_dir)?.open_tree(SLED_TREE_NAME)?;
 
-        let p_key = ::bitcoin::PrivateKey::generate_default()?;
         let bdk_wallet = bdk::Wallet::new(
-            bdk::template::P2WPKH(p_key),
+            bdk::template::P2WPKH(private_key),
             None,
             network,
             db,

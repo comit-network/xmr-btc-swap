@@ -84,8 +84,12 @@ async fn main() -> Result<()> {
 
             let execution_params = execution_params::Testnet::get_execution_params();
 
-            let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config.clone(), &wallet_data_dir).await?;
+            let (bitcoin_wallet, monero_wallet) = init_wallets(
+                config.clone(),
+                &wallet_data_dir,
+                seed.extended_private_key(BITCOIN_NETWORK)?.private_key,
+            )
+            .await?;
 
             let (mut event_loop, _) = EventLoop::new(
                 config.network.listen,
@@ -121,12 +125,14 @@ async fn main() -> Result<()> {
 async fn init_wallets(
     config: Config,
     bitcoin_wallet_data_dir: &Path,
+    private_key: ::bitcoin::PrivateKey,
 ) -> Result<(bitcoin::Wallet, monero::Wallet)> {
     let bitcoin_wallet = bitcoin::Wallet::new(
         config.bitcoin.electrum_rpc_url,
         config.bitcoin.electrum_http_url,
         BITCOIN_NETWORK,
         bitcoin_wallet_data_dir,
+        private_key,
     )
     .await?;
     let bitcoin_balance = bitcoin_wallet.balance().await?;
