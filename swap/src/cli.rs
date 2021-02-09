@@ -56,6 +56,10 @@ pub enum Command {
         #[structopt(flatten)]
         config: Config,
     },
+    Balance {
+        #[structopt(flatten)]
+        config: Config,
+    },
 }
 
 #[derive(structopt::StructOpt, Debug)]

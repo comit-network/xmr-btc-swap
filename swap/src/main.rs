@@ -343,6 +343,18 @@ async fn main() -> Result<()> {
             let address = bitcoin_wallet.new_address().await?;
             info!("Deposit bitcoin here: {}", address);
         }
+        Command::Balance { config } => {
+            let (bitcoin_wallet, _) = init_wallets(
+                config.path,
+                bitcoin_network,
+                &wallet_data_dir,
+                monero_network,
+                seed,
+            )
+            .await?;
+            let balance = bitcoin_wallet.balance().await?;
+            info!("Bitcoin wallet balance: {}", balance.as_btc());
+        }
     };
 
     Ok(())
