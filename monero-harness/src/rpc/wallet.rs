@@ -1,6 +1,6 @@
 use crate::rpc::{Request, Response};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
@@ -139,6 +139,10 @@ impl Client {
             .await?;
 
         debug!("create wallet RPC response: {}", response);
+
+        if response.contains("error") {
+            bail!("Failed to create wallet")
+        }
 
         Ok(())
     }
