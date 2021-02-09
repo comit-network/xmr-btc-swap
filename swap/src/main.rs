@@ -18,6 +18,7 @@ use crate::{
         initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
     },
     execution_params::GetExecutionParams,
+    monero::{CreateWallet, OpenWallet},
     protocol::bob::cancel::CancelError,
 };
 use anyhow::{Context, Result};
@@ -49,9 +50,11 @@ mod serde_peer_id;
 #[macro_use]
 extern crate prettytable;
 
+const MONERO_WATCH_ONLY_TEMP_WALLET_NAME: &str = "swap-tool-watch-only-tmp-wallet";
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    init_tracing(LevelFilter::Info).expect("initialize tracing");
+    init_tracing(LevelFilter::Debug).expect("initialize tracing");
 
     let opt = Options::from_args();
 
@@ -326,12 +329,35 @@ async fn init_wallets(
         bitcoin_balance
     );
 
-    let monero_wallet = monero::Wallet::new(config.monero.wallet_rpc_url, monero_network);
-    let monero_balance = monero_wallet.get_balance().await?;
-    info!(
-        "Connection to Monero wallet succeeded, balance: {}",
-        monero_balance
-    );
+    let monero_wallet = monero::Wallet::new(config.monero.wallet_rpc_url.clone(), monero_network);
+
+    // Setup the temporary Monero wallet necessary for monitoring the blockchain
+    let open_tmp_wallet_response = monero_wallet
+        .open_wallet(MONERO_WATCH_ONLY_TEMP_WALLET_NAME)
+        .await;
+    if open_tmp_wallet_response.is_err() {
+        monero_wallet
+            .create_wallet(MONERO_WATCH_ONLY_TEMP_WALLET_NAME)
+            .await
+            .context(format!(
+                "Unable to create temporary Monero wallet.\
+             Please ensure that the monero-wallet-rpc is available at {}",
+                config.monero.wallet_rpc_url
+            ))?;
+
+        info!(
+            "Created temporary Monero wallet {}",
+            MONERO_WATCH_ONLY_TEMP_WALLET_NAME
+        );
+    } else {
+        info!(
+            "Opened temporary Monero wallet {}",
+            MONERO_WATCH_ONLY_TEMP_WALLET_NAME
+        );
+    }
+
+    let _test_wallet_connection = monero_wallet.inner.block_height().await?;
+    info!("The Monero wallet RPC is set up correctly!");
 
     Ok((bitcoin_wallet, monero_wallet))
 }
