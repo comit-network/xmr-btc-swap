@@ -52,6 +52,10 @@ pub enum Command {
     Resume(Resume),
     Cancel(Cancel),
     Refund(Refund),
+    Deposit {
+        #[structopt(flatten)]
+        config: Config,
+    },
 }
 
 #[derive(structopt::StructOpt, Debug)]

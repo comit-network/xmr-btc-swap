@@ -331,6 +331,18 @@ async fn main() -> Result<()> {
             )
             .await??;
         }
+        Command::Deposit { config } => {
+            let (bitcoin_wallet, _) = init_wallets(
+                config.path,
+                bitcoin_network,
+                &wallet_data_dir,
+                monero_network,
+                seed,
+            )
+            .await?;
+            let address = bitcoin_wallet.new_address().await?;
+            info!("Deposit bitcoin here: {}", address);
+        }
     };
 
     Ok(())
