@@ -25,10 +25,6 @@ use std::fmt;
 #[derive(Debug)]
 pub enum AliceState {
     Started {
-        amounts: SwapAmounts,
-        state0: State0,
-    },
-    Negotiated {
         bob_peer_id: PeerId,
         amounts: SwapAmounts,
         state3: Box<State3>,
@@ -70,7 +66,6 @@ impl fmt::Display for AliceState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AliceState::Started { .. } => write!(f, "started"),
-            AliceState::Negotiated { .. } => write!(f, "negotiated"),
             AliceState::BtcLocked { .. } => write!(f, "btc is locked"),
             AliceState::XmrLocked { .. } => write!(f, "xmr is locked"),
             AliceState::EncSigLearned { .. } => write!(f, "encrypted signature is learned"),

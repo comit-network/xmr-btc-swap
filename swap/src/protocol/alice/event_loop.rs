@@ -1,19 +1,29 @@
 use crate::{
+    bitcoin,
+    database::Database,
+    execution_params::ExecutionParams,
+    monero, network,
     network::{transport, TokioExecutor},
     protocol::{
-        alice::{
-            behaviour::{Behaviour, OutEvent},
-            State3, SwapResponse, TransferProof,
-        },
+        alice,
+        alice::{Behaviour, Builder, OutEvent, State0, State3, SwapResponse, TransferProof},
         bob::{EncryptedSignature, SwapRequest},
+        SwapAmounts,
     },
+    seed::Seed,
 };
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use libp2p::{
     core::Multiaddr, futures::FutureExt, request_response::ResponseChannel, PeerId, Swarm,
 };
+use rand::rngs::OsRng;
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, error, trace};
+use uuid::Uuid;
+
+// TODO: Use dynamic
+const RATE: u32 = 100;
 
 #[allow(missing_debug_implementations)]
 pub struct MpscChannels<T> {
@@ -34,7 +44,6 @@ where
     T: Clone,
 {
     sender: broadcast::Sender<T>,
-    receiver: broadcast::Receiver<T>,
 }
 
 impl<T> Default for BroadcastChannels<T>
@@ -42,8 +51,8 @@ where
     T: Clone,
 {
     fn default() -> Self {
-        let (sender, receiver) = broadcast::channel(100);
-        BroadcastChannels { sender, receiver }
+        let (sender, _receiver) = broadcast::channel(100);
+        BroadcastChannels { sender }
     }
 }
 
@@ -70,21 +79,37 @@ impl EventLoopHandle {
 #[allow(missing_debug_implementations)]
 pub struct EventLoop {
     swarm: libp2p::Swarm<Behaviour>,
+    peer_id: PeerId,
+    execution_params: ExecutionParams,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
+    db: Arc<Database>,
+    listen_address: Multiaddr,
+
+    // Amounts agreed upon for swaps currently in the execution setup phase
+    // Note: We can do one execution setup per peer at a given time.
+    swap_amounts: HashMap<PeerId, SwapAmounts>,
+
     recv_encrypted_signature: broadcast::Sender<EncryptedSignature>,
     send_transfer_proof: mpsc::Receiver<(PeerId, TransferProof)>,
 
-    // Only used to clone further handles
-    handle: EventLoopHandle,
+    // Only used to produce new handles
+    send_transfer_proof_sender: mpsc::Sender<(PeerId, TransferProof)>,
 }
 
 impl EventLoop {
     pub fn new(
-        identity: libp2p::identity::Keypair,
-        listen: Multiaddr,
-        peer_id: PeerId,
-    ) -> Result<(Self, EventLoopHandle)> {
+        listen_address: Multiaddr,
+        seed: Seed,
+        execution_params: ExecutionParams,
+        bitcoin_wallet: Arc<bitcoin::Wallet>,
+        monero_wallet: Arc<monero::Wallet>,
+        db: Arc<Database>,
+    ) -> Result<Self> {
+        let identity = network::Seed::new(seed).derive_libp2p_identity();
         let behaviour = Behaviour::default();
-        let transport = transport::build(identity)?;
+        let transport = transport::build(&identity)?;
+        let peer_id = PeerId::from(identity.public());
 
         let mut swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, peer_id)
             .executor(Box::new(TokioExecutor {
@@ -92,37 +117,36 @@ impl EventLoop {
             }))
             .build();
 
-        Swarm::listen_on(&mut swarm, listen.clone())
-            .with_context(|| format!("Address is not supported: {:#}", listen))?;
+        Swarm::listen_on(&mut swarm, listen_address.clone())
+            .with_context(|| format!("Address is not supported: {:#}", listen_address))?;
 
         let recv_encrypted_signature = BroadcastChannels::default();
         let send_transfer_proof = MpscChannels::default();
 
-        let handle_clone = EventLoopHandle {
-            recv_encrypted_signature: recv_encrypted_signature.sender.subscribe(),
-            send_transfer_proof: send_transfer_proof.sender.clone(),
-        };
-
-        let driver = EventLoop {
+        Ok(EventLoop {
             swarm,
+            peer_id,
+            execution_params,
+            bitcoin_wallet,
+            monero_wallet,
+            db,
+            listen_address,
+            swap_amounts: Default::default(),
             recv_encrypted_signature: recv_encrypted_signature.sender,
             send_transfer_proof: send_transfer_proof.receiver,
-            handle: handle_clone,
-        };
-
-        let handle = EventLoopHandle {
-            recv_encrypted_signature: recv_encrypted_signature.receiver,
-            send_transfer_proof: send_transfer_proof.sender,
-        };
-
-        Ok((driver, handle))
+            send_transfer_proof_sender: send_transfer_proof.sender,
+        })
     }
 
-    pub fn clone_handle(&self) -> EventLoopHandle {
+    pub fn new_handle(&self) -> EventLoopHandle {
         EventLoopHandle {
             recv_encrypted_signature: self.recv_encrypted_signature.subscribe(),
-            send_transfer_proof: self.handle.send_transfer_proof.clone(),
+            send_transfer_proof: self.send_transfer_proof_sender.clone(),
         }
+    }
+
+    pub fn peer_id(&self) -> PeerId {
+        self.peer_id
     }
 
     pub async fn run(&mut self) {
@@ -133,11 +157,11 @@ impl EventLoop {
                         OutEvent::ConnectionEstablished(alice) => {
                             debug!("Connection Established with {}", alice);
                         }
-                        OutEvent::SwapRequest { msg, channel } => {
-                            let _ = self.handle_swap_request(msg, channel).await;
+                        OutEvent::SwapRequest { msg, channel, bob_peer_id } => {
+                            let _ = self.handle_swap_request(msg, channel, bob_peer_id).await;
                         }
-                        OutEvent::ExecutionSetupDone(state3) => {
-                            let _ = self.handle_execution_setup_done(*state3).await;
+                        OutEvent::ExecutionSetupDone{bob_peer_id, state3} => {
+                            let _ = self.handle_execution_setup_done(bob_peer_id, *state3).await;
                         }
                         OutEvent::TransferProofAcknowledged => {
                             trace!("Bob acknowledged transfer proof");
@@ -165,11 +189,76 @@ impl EventLoop {
     }
 
     async fn handle_swap_request(
-        &self,
-        _msg: SwapRequest,
-        _channel: ResponseChannel<SwapResponse>,
-    ) {
+        &mut self,
+        swap_request: SwapRequest,
+        channel: ResponseChannel<SwapResponse>,
+        bob_peer_id: PeerId,
+    ) -> Result<()> {
+        // 1. Check if acceptable request
+        // 2. Send response
+
+        let btc_amount = swap_request.btc_amount;
+        let xmr_amount = btc_amount.as_btc() * RATE as f64;
+        let xmr_amount = monero::Amount::from_monero(xmr_amount)?;
+        let swap_response = SwapResponse { xmr_amount };
+
+        self.swarm
+            .send_swap_response(channel, swap_response)
+            .context("Failed to send swap response")?;
+
+        // 3. Start setup execution
+
+        let state0 = State0::new(
+            btc_amount,
+            xmr_amount,
+            self.execution_params,
+            self.bitcoin_wallet.as_ref(),
+            &mut OsRng,
+        )
+        .await?;
+
+        // if a node restart during execution setup, the swap is aborted (safely).
+        self.swap_amounts.insert(bob_peer_id, SwapAmounts {
+            btc: btc_amount,
+            xmr: xmr_amount,
+        });
+
+        self.swarm.start_execution_setup(bob_peer_id, state0);
+        // Continues once the execution setup protocol is done
+        Ok(())
     }
 
-    async fn handle_execution_setup_done(&self, _state3: State3) {}
+    async fn handle_execution_setup_done(
+        &mut self,
+        bob_peer_id: PeerId,
+        state3: State3,
+    ) -> Result<()> {
+        let swap_id = Uuid::new_v4();
+        let handle = self.new_handle();
+
+        let swap_amounts = self.swap_amounts.remove(&bob_peer_id).ok_or_else(|| {
+            anyhow!(
+                "execution setup done for an unknown peer id: {}, node restarted in between?",
+                bob_peer_id
+            )
+        })?;
+
+        let swap = Builder::new(
+            self.peer_id,
+            self.execution_params,
+            swap_id,
+            self.bitcoin_wallet.clone(),
+            self.monero_wallet.clone(),
+            self.db.clone(),
+            self.listen_address.clone(),
+            handle,
+        )
+        .with_init_params(swap_amounts, bob_peer_id, state3)
+        .build()
+        .await?;
+
+        tokio::spawn(async move { alice::run(swap).await });
+
+        Ok(())
+    }
 }

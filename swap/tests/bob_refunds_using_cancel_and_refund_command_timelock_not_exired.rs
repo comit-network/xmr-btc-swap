@@ -1,17 +1,13 @@
 pub mod testutils;
 
 use bob::cancel::CancelError;
-use swap::protocol::{alice, bob, bob::BobState};
+use swap::protocol::{bob, bob::BobState};
 use testutils::{bob_run_until::is_btc_locked, SlowCancelConfig};
 
 #[tokio::test]
 async fn given_bob_manually_cancels_when_timelock_not_expired_errors() {
     testutils::setup_test(SlowCancelConfig, |mut ctx| async move {
-        let (alice_swap, _) = ctx.new_swap_as_alice().await;
         let (bob_swap, bob_join_handle) = ctx.new_swap_as_bob().await;
-
-        let alice_handle = alice::run(alice_swap);
-        tokio::spawn(alice_handle);
 
         let bob_state = bob::run_until(bob_swap, is_btc_locked).await.unwrap();
         assert!(matches!(bob_state, BobState::BtcLocked { .. }));

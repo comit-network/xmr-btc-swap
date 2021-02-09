@@ -1,7 +1,6 @@
 use crate::{
     network::{peer_tracker, peer_tracker::PeerTracker},
     protocol::{
-        alice,
         alice::{
             encrypted_signature, execution_setup, swap_response, transfer_proof, State0, State3,
             SwapResponse, TransferProof,
@@ -19,8 +18,12 @@ pub enum OutEvent {
     SwapRequest {
         msg: SwapRequest,
         channel: ResponseChannel<SwapResponse>,
+        bob_peer_id: PeerId,
     },
-    ExecutionSetupDone(Box<State3>),
+    ExecutionSetupDone {
+        bob_peer_id: PeerId,
+        state3: Box<State3>,
+    },
     TransferProofAcknowledged,
     EncryptedSignature {
         msg: Box<EncryptedSignature>,
@@ -40,11 +43,19 @@ impl From<peer_tracker::OutEvent> for OutEvent {
     }
 }
 
-impl From<alice::OutEvent> for OutEvent {
-    fn from(event: alice::OutEvent) -> Self {
-        use crate::protocol::alice::OutEvent::*;
+impl From<swap_response::OutEvent> for OutEvent {
+    fn from(event: swap_response::OutEvent) -> Self {
+        use crate::protocol::alice::swap_response::OutEvent::*;
         match event {
-            MsgReceived { msg, channel } => OutEvent::SwapRequest { msg, channel },
+            MsgReceived {
+                msg,
+                channel,
+                bob_peer_id,
+            } => OutEvent::SwapRequest {
+                msg,
+                channel,
+                bob_peer_id,
+            },
             ResponseSent => OutEvent::ResponseSent,
             Failure(err) => OutEvent::Failure(err.context("Swap Request/Response failure")),
         }
@@ -55,7 +66,13 @@ impl From<execution_setup::OutEvent> for OutEvent {
     fn from(event: execution_setup::OutEvent) -> Self {
         use crate::protocol::alice::execution_setup::OutEvent::*;
         match event {
-            Done(state3) => OutEvent::ExecutionSetupDone(Box::new(state3)),
+            Done {
+                bob_peer_id,
+                state3,
+            } => OutEvent::ExecutionSetupDone {
+                bob_peer_id,
+                state3: Box::new(state3),
+            },
             Failure(err) => OutEvent::Failure(err),
         }
     }

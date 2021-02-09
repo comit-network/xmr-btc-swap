@@ -8,6 +8,7 @@ use std::{path::PathBuf, sync::Arc};
 use swap::{
     bitcoin,
     bitcoin::Timelock,
+    database::{Database, Swap},
     execution_params,
     execution_params::{ExecutionParams, GetExecutionParams},
     monero,
@@ -30,29 +31,8 @@ pub struct StartingBalances {
 struct AliceParams {
     seed: Seed,
     execution_params: ExecutionParams,
-    swap_id: Uuid,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Wallet>,
-    db_path: PathBuf,
+    db: Arc<Database>,
     listen_address: Multiaddr,
-}
-
-impl AliceParams {
-    pub fn builder(&self) -> alice::Builder {
-        alice::Builder::new(
-            self.seed,
-            self.execution_params,
-            self.swap_id,
-            self.bitcoin_wallet.clone(),
-            self.monero_wallet.clone(),
-            self.db_path.clone(),
-            self.listen_address.clone(),
-        )
-    }
-
-    fn peer_id(&self) -> PeerId {
-        self.builder().peer_id()
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -84,6 +64,12 @@ impl BobParams {
 
 pub struct BobEventLoopJoinHandle(JoinHandle<()>);
 
+impl BobEventLoopJoinHandle {
+    pub fn abort(&self) {
+        self.0.abort()
+    }
+}
+
 pub struct AliceEventLoopJoinHandle(JoinHandle<()>);
 
 pub struct TestContext {
@@ -101,20 +87,6 @@ pub struct TestContext {
 }
 
 impl TestContext {
-    pub async fn new_swap_as_alice(&mut self) -> (alice::Swap, AliceEventLoopJoinHandle) {
-        let (swap, mut event_loop) = self
-            .alice_params
-            .builder()
-            .with_init_params(self.swap_amounts)
-            .build()
-            .await
-            .unwrap();
-
-        let join_handle = tokio::spawn(async move { event_loop.run().await });
-
-        (swap, AliceEventLoopJoinHandle(join_handle))
-    }
-
     pub async fn new_swap_as_bob(&mut self) -> (bob::Swap, BobEventLoopJoinHandle) {
         let (swap, event_loop) = self
             .bob_params
@@ -129,24 +101,11 @@ impl TestContext {
         (swap, BobEventLoopJoinHandle(join_handle))
     }
 
-    pub async fn stop_and_resume_alice_from_db(
-        &mut self,
-        join_handle: AliceEventLoopJoinHandle,
-    ) -> alice::Swap {
-        join_handle.0.abort();
-
-        let (swap, mut event_loop) = self.alice_params.builder().build().await.unwrap();
-
-        tokio::spawn(async move { event_loop.run().await });
-
-        swap
-    }
-
     pub async fn stop_and_resume_bob_from_db(
         &mut self,
         join_handle: BobEventLoopJoinHandle,
     ) -> (bob::Swap, BobEventLoopJoinHandle) {
-        join_handle.0.abort();
+        join_handle.abort();
 
         let (swap, event_loop) = self.bob_params.builder().build().await.unwrap();
 
@@ -155,7 +114,17 @@ impl TestContext {
         (swap, BobEventLoopJoinHandle(join_handle))
     }
 
-    pub async fn assert_alice_redeemed(&self, state: AliceState) {
+    pub async fn assert_alice_redeemed(&self) {
+        let mut states = self.alice_params.db.all().unwrap();
+
+        assert_eq!(states.len(), 1, "Expected only one swap in Alice's db");
+
+        let (_swap_id, state) = states.pop().unwrap();
+        let state = match state {
+            Swap::Alice(state) => state.into(),
+            Swap::Bob(_) => panic!("Bob state in Alice db is unexpected"),
+        };
+
         assert!(matches!(state, AliceState::BtcRedeemed));
 
         let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
@@ -174,8 +143,22 @@ impl TestContext {
         assert!(xmr_balance_after_swap <= self.alice_starting_balances.xmr - self.swap_amounts.xmr);
     }
 
-    pub async fn assert_alice_refunded(&self, state: AliceState) {
-        assert!(matches!(state, AliceState::XmrRefunded));
+    pub async fn assert_alice_refunded(&self) {
+        let mut states = self.alice_params.db.all().unwrap();
+
+        assert_eq!(states.len(), 1, "Expected only one swap in Alice's db");
+
+        let (_swap_id, state) = states.pop().unwrap();
+        let state = match state {
+            Swap::Alice(state) => state.into(),
+            Swap::Bob(_) => panic!("Bob state in Alice db is unexpected"),
+        };
+
+        assert!(
+            matches!(state, AliceState::XmrRefunded),
+            "Alice state is not XmrRefunded: {}",
+            state
+        );
 
         let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
         assert_eq!(btc_balance_after_swap, self.alice_starting_balances.btc);
@@ -342,13 +325,13 @@ where
     )
     .await;
 
+    let db_path = tempdir().unwrap();
+    let alice_db = Arc::new(Database::open(db_path.path()).unwrap());
+
     let alice_params = AliceParams {
         seed: Seed::random().unwrap(),
         execution_params,
-        swap_id: Uuid::new_v4(),
-        bitcoin_wallet: alice_bitcoin_wallet.clone(),
-        monero_wallet: alice_monero_wallet.clone(),
-        db_path: tempdir().unwrap().path().to_path_buf(),
+        db: alice_db.clone(),
         listen_address,
     };
 
@@ -365,6 +348,22 @@ where
     )
     .await;
 
+    let mut alice_event_loop = alice::EventLoop::new(
+        alice_params.listen_address.clone(),
+        alice_params.seed,
+        alice_params.execution_params,
+        alice_bitcoin_wallet.clone(),
+        alice_monero_wallet.clone(),
+        alice_db,
+    )
+    .unwrap();
+
+    let alice_peer_id = alice_event_loop.peer_id();
+
+    tokio::spawn(async move {
+        alice_event_loop.run().await;
+    });
+
     let bob_params = BobParams {
         seed: Seed::random().unwrap(),
         db_path: tempdir().unwrap().path().to_path_buf(),
@@ -372,7 +371,7 @@ where
         bitcoin_wallet: bob_bitcoin_wallet.clone(),
         monero_wallet: bob_monero_wallet.clone(),
         alice_address: alice_params.listen_address.clone(),
-        alice_peer_id: alice_params.peer_id(),
+        alice_peer_id,
         execution_params,
     };
 
@@ -388,7 +387,7 @@ where
         bob_monero_wallet,
     };
 
-    testfn(test).await
+    testfn(test).await;
 }
 
 async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {

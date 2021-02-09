@@ -84,36 +84,14 @@ async fn run_until_internal(
     monero_wallet: Arc<monero::Wallet>,
     execution_params: ExecutionParams,
     swap_id: Uuid,
-    db: Database,
+    db: Arc<Database>,
 ) -> Result<AliceState> {
     info!("Current state:{}", state);
     if is_target_state(&state) {
         Ok(state)
     } else {
         match state {
-            AliceState::Started { amounts, state0 } => {
-                let state = AliceState::Negotiated {
-                    bob_peer_id: todo!(),
-                    amounts,
-                    state3: todo!(),
-                };
-
-                let db_state = (&state).into();
-                db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
-                    .await?;
-                run_until_internal(
-                    state,
-                    is_target_state,
-                    event_loop_handle,
-                    bitcoin_wallet,
-                    monero_wallet,
-                    execution_params,
-                    swap_id,
-                    db,
-                )
-                .await
-            }
-            AliceState::Negotiated {
+            AliceState::Started {
                 state3,
                 bob_peer_id,
                 amounts,

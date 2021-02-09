@@ -18,10 +18,10 @@ use libp2p::{
 /// - DNS name resolution
 /// - authentication via noise
 /// - multiplexing via yamux or mplex
-pub fn build(id_keys: identity::Keypair) -> Result<SwapTransport> {
+pub fn build(id_keys: &identity::Keypair) -> Result<SwapTransport> {
     use libp2p::tcp::TokioTcpConfig;
 
-    let dh_keys = noise::Keypair::<X25519Spec>::new().into_authentic(&id_keys)?;
+    let dh_keys = noise::Keypair::<X25519Spec>::new().into_authentic(id_keys)?;
     let noise = NoiseConfig::xx(dh_keys).into_authenticated();
 
     let tcp = TokioTcpConfig::new().nodelay(true);

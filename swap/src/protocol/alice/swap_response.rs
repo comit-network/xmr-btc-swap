@@ -9,7 +9,7 @@ use libp2p::{
         ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
         RequestResponseMessage, ResponseChannel,
     },
-    NetworkBehaviour,
+    NetworkBehaviour, PeerId,
 };
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -20,6 +20,7 @@ pub enum OutEvent {
     MsgReceived {
         msg: SwapRequest,
         channel: ResponseChannel<SwapResponse>,
+        bob_peer_id: PeerId,
     },
     ResponseSent,
     Failure(Error),
@@ -45,6 +46,7 @@ impl From<RequestResponseEvent<SwapRequest, SwapResponse>> for OutEvent {
                 OutEvent::MsgReceived {
                     msg: request,
                     channel,
+                    bob_peer_id: peer,
                 }
             }
             RequestResponseEvent::Message {

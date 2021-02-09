@@ -168,7 +168,7 @@ impl Builder {
         &self,
     ) -> Result<(bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle)> {
         let bob_behaviour = bob::Behaviour::default();
-        let bob_transport = build(self.identity.clone())?;
+        let bob_transport = build(&self.identity)?;
 
         bob::event_loop::EventLoop::new(
             bob_transport,

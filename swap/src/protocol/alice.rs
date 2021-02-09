@@ -2,15 +2,15 @@
 //! Alice holds XMR and wishes receive BTC.
 use crate::{
     bitcoin, database, database::Database, execution_params::ExecutionParams, monero,
-    network::Seed as NetworkSeed, protocol::SwapAmounts, seed::Seed,
+    protocol::SwapAmounts,
 };
 use anyhow::{bail, Result};
-use libp2p::{core::Multiaddr, identity::Keypair, PeerId};
-use rand::rngs::OsRng;
+use libp2p::{core::Multiaddr, PeerId};
 use std::sync::Arc;
 use uuid::Uuid;
 
 pub use self::{
+    behaviour::{Behaviour, OutEvent},
     event_loop::{EventLoop, EventLoopHandle},
     execution_setup::Message1,
     state::*,
@@ -37,16 +37,15 @@ pub struct Swap {
     pub monero_wallet: Arc<monero::Wallet>,
     pub execution_params: ExecutionParams,
     pub swap_id: Uuid,
-    pub db: Database,
+    pub db: Arc<Database>,
 }
 
 pub struct Builder {
     swap_id: Uuid,
-    identity: Keypair,
     peer_id: PeerId,
-    db: Database,
+    db: Arc<Database>,
     execution_params: ExecutionParams,
-
+    event_loop_handle: EventLoopHandle,
     listen_address: Multiaddr,
 
     bitcoin_wallet: Arc<bitcoin::Wallet>,
@@ -57,29 +56,31 @@ pub struct Builder {
 
 enum InitParams {
     None,
-    New { swap_amounts: SwapAmounts },
+    New {
+        swap_amounts: SwapAmounts,
+        bob_peer_id: PeerId,
+        state3: Box<State3>,
+    },
 }
 
 impl Builder {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        seed: Seed,
+        self_peer_id: PeerId,
         execution_params: ExecutionParams,
         swap_id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
-        db: Database,
+        db: Arc<Database>,
         listen_address: Multiaddr,
+        event_loop_handle: EventLoopHandle,
     ) -> Self {
-        let network_seed = NetworkSeed::new(seed);
-        let identity = network_seed.derive_libp2p_identity();
-        let peer_id = PeerId::from(identity.public());
-
         Self {
             swap_id,
-            identity,
-            peer_id,
+            peer_id: self_peer_id,
             db,
             execution_params,
+            event_loop_handle,
             listen_address,
             bitcoin_wallet,
             monero_wallet,
@@ -87,35 +88,44 @@ impl Builder {
         }
     }
 
-    pub fn with_init_params(self, swap_amounts: SwapAmounts) -> Self {
+    pub fn with_init_params(
+        self,
+        swap_amounts: SwapAmounts,
+        bob_peer_id: PeerId,
+        state3: State3,
+    ) -> Self {
         Self {
-            init_params: InitParams::New { swap_amounts },
+            init_params: InitParams::New {
+                swap_amounts,
+                bob_peer_id,
+                state3: Box::new(state3),
+            },
             ..self
         }
     }
 
-    pub async fn build(self) -> Result<(Swap, EventLoop)> {
+    pub async fn build(self) -> Result<Swap> {
         match self.init_params {
-            InitParams::New { swap_amounts } => {
-                let initial_state = self
-                    .make_initial_state(swap_amounts.btc, swap_amounts.xmr)
-                    .await?;
+            InitParams::New {
+                swap_amounts,
+                bob_peer_id,
+                ref state3,
+            } => {
+                let initial_state = AliceState::Started {
+                    amounts: swap_amounts,
+                    state3: state3.clone(),
+                    bob_peer_id,
+                };
 
-                let (event_loop, event_loop_handle) =
-                    EventLoop::new(self.identity.clone(), self.listen_address(), self.peer_id)?;
-
-                Ok((
-                    Swap {
-                        event_loop_handle,
-                        bitcoin_wallet: self.bitcoin_wallet,
-                        monero_wallet: self.monero_wallet,
-                        execution_params: self.execution_params,
-                        db: self.db,
-                        state: initial_state,
-                        swap_id: self.swap_id,
-                    },
-                    event_loop,
-                ))
+                Ok(Swap {
+                    event_loop_handle: self.event_loop_handle,
+                    bitcoin_wallet: self.bitcoin_wallet,
+                    monero_wallet: self.monero_wallet,
+                    execution_params: self.execution_params,
+                    db: self.db,
+                    state: initial_state,
+                    swap_id: self.swap_id,
+                })
             }
             InitParams::None => {
                 let resume_state =
@@ -128,21 +138,15 @@ impl Builder {
                         )
                     };
 
-                let (event_loop, event_loop_handle) =
-                    EventLoop::new(self.identity.clone(), self.listen_address(), self.peer_id)?;
-
-                Ok((
-                    Swap {
-                        state: resume_state,
-                        event_loop_handle,
-                        bitcoin_wallet: self.bitcoin_wallet,
-                        monero_wallet: self.monero_wallet,
-                        execution_params: self.execution_params,
-                        swap_id: self.swap_id,
-                        db: self.db,
-                    },
-                    event_loop,
-                ))
+                Ok(Swap {
+                    state: resume_state,
+                    event_loop_handle: self.event_loop_handle,
+                    bitcoin_wallet: self.bitcoin_wallet,
+                    monero_wallet: self.monero_wallet,
+                    execution_params: self.execution_params,
+                    swap_id: self.swap_id,
+                    db: self.db,
+                })
             }
         }
     }
@@ -153,27 +157,5 @@ impl Builder {
 
     pub fn listen_address(&self) -> Multiaddr {
         self.listen_address.clone()
-    }
-
-    async fn make_initial_state(
-        &self,
-        btc_to_swap: bitcoin::Amount,
-        xmr_to_swap: monero::Amount,
-    ) -> Result<AliceState> {
-        let amounts = SwapAmounts {
-            btc: btc_to_swap,
-            xmr: xmr_to_swap,
-        };
-
-        let state0 = State0::new(
-            amounts.btc,
-            amounts.xmr,
-            self.execution_params,
-            self.bitcoin_wallet.as_ref(),
-            &mut OsRng,
-        )
-        .await?;
-
-        Ok(AliceState::Started { amounts, state0 })
     }
 }
