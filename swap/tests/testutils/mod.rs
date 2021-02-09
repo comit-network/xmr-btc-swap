@@ -339,6 +339,9 @@ where
         btc: bitcoin::Amount::ZERO,
     };
 
+    let alice_seed = Seed::random().unwrap();
+    let bob_seed = Seed::random().unwrap();
+
     let port = get_port().expect("Failed to find a free port");
 
     let listen_address: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", port)
@@ -362,11 +365,12 @@ where
         tempdir().unwrap().path(),
         electrs_rpc_port,
         electrs_http_port,
+        alice_seed,
     )
     .await;
 
     let alice_params = AliceParams {
-        seed: Seed::random().unwrap(),
+        seed: alice_seed,
         execution_params,
         swap_id: Uuid::new_v4(),
         bitcoin_wallet: alice_bitcoin_wallet.clone(),
@@ -388,11 +392,12 @@ where
         tempdir().unwrap().path(),
         electrs_rpc_port,
         electrs_http_port,
+        bob_seed,
     )
     .await;
 
     let bob_params = BobParams {
-        seed: Seed::random().unwrap(),
+        seed: bob_seed,
         db_path: tempdir().unwrap().path().to_path_buf(),
         swap_id: Uuid::new_v4(),
         bitcoin_wallet: bob_bitcoin_wallet.clone(),
@@ -566,6 +571,7 @@ async fn init_monero_container(
     (monero, monerods)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn init_test_wallets(
     name: &str,
     bitcoind_url: Url,
@@ -574,6 +580,7 @@ async fn init_test_wallets(
     datadir: &Path,
     electrum_rpc_port: u16,
     electrum_http_port: u16,
+    seed: Seed,
 ) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {
     monero
         .init(vec![(name, starting_balances.xmr.as_piconero())])
@@ -594,12 +601,15 @@ async fn init_test_wallets(
         Url::parse(&input).unwrap()
     };
 
+    let priv_key = seed.root_private_key(bitcoin::Network::Regtest);
+
     let btc_wallet = Arc::new(
         swap::bitcoin::Wallet::new(
             electrum_rpc_url,
             electrum_http_url,
             bitcoin::Network::Regtest,
             datadir,
+            priv_key,
         )
         .await
         .expect("could not init btc wallet"),
