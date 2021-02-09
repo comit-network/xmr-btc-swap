@@ -20,8 +20,10 @@ use tracing::{debug, info};
 use uuid::Uuid;
 
 pub use self::{
+    cancel::cancel,
     encrypted_signature::EncryptedSignature,
     event_loop::{EventLoop, EventLoopHandle},
+    refund::refund,
     state::*,
     swap::{run, run_until},
     swap_request::*,
@@ -29,9 +31,11 @@ pub use self::{
 pub use execution_setup::{Message0, Message2, Message4};
 use libp2p::request_response::ResponseChannel;
 
+pub mod cancel;
 mod encrypted_signature;
 pub mod event_loop;
 mod execution_setup;
+pub mod refund;
 pub mod state;
 pub mod swap;
 mod swap_request;

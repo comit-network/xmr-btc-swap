@@ -13,11 +13,12 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    cli::{Command, Options, Resume},
+    cli::{Cancel, Command, Options, Refund, Resume},
     config::{
         initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
     },
     execution_params::GetExecutionParams,
+    protocol::bob::cancel::CancelError,
 };
 use anyhow::{Context, Result};
 use database::Database;
@@ -28,7 +29,7 @@ use protocol::{alice, bob, bob::Builder, SwapAmounts};
 use std::{path::PathBuf, sync::Arc};
 use structopt::StructOpt;
 use trace::init_tracing;
-use tracing::info;
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 pub mod bitcoin;
@@ -208,6 +209,86 @@ async fn main() -> Result<()> {
 
             tokio::spawn(async move { event_loop.run().await });
             bob::run(swap).await?;
+        }
+        Command::Cancel(Cancel::BuyXmr {
+            swap_id,
+            alice_peer_id,
+            alice_addr,
+            config,
+            force,
+        }) => {
+            // TODO: Optimization: Only init the Bitcoin wallet, Monero wallet unnecessary
+            let (bitcoin_wallet, monero_wallet) =
+                init_wallets(config.path, bitcoin_network, monero_network).await?;
+
+            let bob_factory = Builder::new(
+                seed,
+                db_path,
+                swap_id,
+                Arc::new(bitcoin_wallet),
+                Arc::new(monero_wallet),
+                alice_addr,
+                alice_peer_id,
+                execution_params,
+            );
+            let (swap, event_loop) = bob_factory.build().await?;
+
+            tokio::spawn(async move { event_loop.run().await });
+
+            match bob::cancel(
+                swap.swap_id,
+                swap.state,
+                swap.bitcoin_wallet,
+                swap.db,
+                force,
+            )
+            .await?
+            {
+                Ok((txid, _)) => {
+                    info!("Cancel transaction successfully published with id {}", txid)
+                }
+                Err(CancelError::CancelTimelockNotExpiredYet) => error!(
+                    "The Cancel Transaction cannot be published yet, \
+                    because the timelock has not expired. Please try again later."
+                ),
+                Err(CancelError::CancelTxAlreadyPublished) => {
+                    warn!("The Cancel Transaction has already been published.")
+                }
+            }
+        }
+        Command::Refund(Refund::BuyXmr {
+            swap_id,
+            alice_peer_id,
+            alice_addr,
+            config,
+            force,
+        }) => {
+            let (bitcoin_wallet, monero_wallet) =
+                init_wallets(config.path, bitcoin_network, monero_network).await?;
+
+            // TODO: Optimize to only use the Bitcoin wallet, Monero wallet is unnecessary
+            let bob_factory = Builder::new(
+                seed,
+                db_path,
+                swap_id,
+                Arc::new(bitcoin_wallet),
+                Arc::new(monero_wallet),
+                alice_addr,
+                alice_peer_id,
+                execution_params,
+            );
+            let (swap, event_loop) = bob_factory.build().await?;
+
+            tokio::spawn(async move { event_loop.run().await });
+            bob::refund(
+                swap.swap_id,
+                swap.state,
+                swap.execution_params,
+                swap.bitcoin_wallet,
+                swap.db,
+                force,
+            )
+            .await??;
         }
     };
 

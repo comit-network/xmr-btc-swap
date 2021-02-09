@@ -50,6 +50,8 @@ pub enum Command {
     },
     History,
     Resume(Resume),
+    Cancel(Cancel),
+    Refund(Refund),
 }
 
 #[derive(structopt::StructOpt, Debug)]
@@ -76,6 +78,48 @@ pub enum Resume {
 
         #[structopt(flatten)]
         config: Config,
+    },
+}
+
+#[derive(structopt::StructOpt, Debug)]
+pub enum Cancel {
+    BuyXmr {
+        #[structopt(long = "swap-id")]
+        swap_id: Uuid,
+
+        // TODO: Remove Alice peer-id/address, it should be saved in the database when running swap
+        // and loaded from the database when running resume/cancel/refund
+        #[structopt(long = "counterpart-peer-id")]
+        alice_peer_id: PeerId,
+        #[structopt(long = "counterpart-addr")]
+        alice_addr: Multiaddr,
+
+        #[structopt(flatten)]
+        config: Config,
+
+        #[structopt(short, long)]
+        force: bool,
+    },
+}
+
+#[derive(structopt::StructOpt, Debug)]
+pub enum Refund {
+    BuyXmr {
+        #[structopt(long = "swap-id")]
+        swap_id: Uuid,
+
+        // TODO: Remove Alice peer-id/address, it should be saved in the database when running swap
+        // and loaded from the database when running resume/cancel/refund
+        #[structopt(long = "counterpart-peer-id")]
+        alice_peer_id: PeerId,
+        #[structopt(long = "counterpart-addr")]
+        alice_addr: Multiaddr,
+
+        #[structopt(flatten)]
+        config: Config,
+
+        #[structopt(short, long)]
+        force: bool,
     },
 }
 

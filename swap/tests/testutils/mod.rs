@@ -145,14 +145,14 @@ impl TestContext {
     pub async fn stop_and_resume_bob_from_db(
         &mut self,
         join_handle: BobEventLoopJoinHandle,
-    ) -> bob::Swap {
+    ) -> (bob::Swap, BobEventLoopJoinHandle) {
         join_handle.0.abort();
 
         let (swap, event_loop) = self.bob_params.builder().build().await.unwrap();
 
-        tokio::spawn(async move { event_loop.run().await });
+        let join_handle = tokio::spawn(async move { event_loop.run().await });
 
-        swap
+        (swap, BobEventLoopJoinHandle(join_handle))
     }
 
     pub async fn assert_alice_redeemed(&self, state: AliceState) {
