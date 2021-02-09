@@ -4,5 +4,4 @@ status = [
     "build_test (x86_64-apple-darwin)",
     "docker_tests (happy_path)",
     "docker_tests (happy_path_restart_bob_before_comm)",
-    "docker_tests (punish)",
 ]
