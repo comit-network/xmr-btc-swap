@@ -196,6 +196,7 @@ impl TransactionBlockHeight for Wallet {
         #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
         struct TransactionStatus {
             block_height: Option<u32>,
+            confirmed: bool,
         }
         // todo: Implement conversion to anyhow::error so we can dont have to wrap these
         // errors
