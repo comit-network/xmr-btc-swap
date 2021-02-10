@@ -15,6 +15,7 @@ use rust_decimal::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    convert::TryFrom,
     fmt::Display,
     ops::{Add, Mul, Sub},
     str::FromStr,
@@ -88,13 +89,22 @@ impl Amount {
         self.0
     }
 
+    pub fn from_monero(amount: f64) -> Result<Self> {
+        let decimal = Decimal::try_from(amount)?;
+        Self::from_decimal(decimal)
+    }
+
     pub fn parse_monero(amount: &str) -> Result<Self> {
         let decimal = Decimal::from_str(amount)?;
+        Self::from_decimal(decimal)
+    }
+
+    fn from_decimal(amount: Decimal) -> Result<Self> {
         let piconeros_dec =
-            decimal.mul(Decimal::from_u64(PICONERO_OFFSET).expect("constant to fit into u64"));
+            amount.mul(Decimal::from_u64(PICONERO_OFFSET).expect("constant to fit into u64"));
         let piconeros = piconeros_dec
             .to_u64()
-            .ok_or_else(|| OverflowError(amount.to_owned()))?;
+            .ok_or_else(|| OverflowError(amount.to_string()))?;
         Ok(Amount(piconeros))
     }
 }

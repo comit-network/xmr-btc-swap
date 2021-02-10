@@ -43,7 +43,6 @@ pub struct EventLoopHandle {
     dial_alice: Sender<()>,
     send_swap_request: Sender<SwapRequest>,
     send_encrypted_signature: Sender<EncryptedSignature>,
-    recv_encrypted_signature_ack: Receiver<()>,
 }
 
 impl EventLoopHandle {
@@ -95,10 +94,6 @@ impl EventLoopHandle {
     ) -> Result<()> {
         self.send_encrypted_signature.send(tx_redeem_encsig).await?;
 
-        self.recv_encrypted_signature_ack
-            .recv()
-            .await
-            .ok_or_else(|| anyhow!("Failed to receive encrypted signature ack from Alice"))?;
         Ok(())
     }
 }
@@ -116,7 +111,6 @@ pub struct EventLoop {
     conn_established: Sender<PeerId>,
     send_swap_request: Receiver<SwapRequest>,
     send_encrypted_signature: Receiver<EncryptedSignature>,
-    recv_encrypted_signature_ack: Sender<()>,
 }
 
 impl EventLoop {
@@ -144,7 +138,6 @@ impl EventLoop {
         let conn_established = Channels::new();
         let send_swap_request = Channels::new();
         let send_encrypted_signature = Channels::new();
-        let recv_encrypted_signature_ack = Channels::new();
 
         let event_loop = EventLoop {
             swarm,
@@ -158,7 +151,6 @@ impl EventLoop {
             dial_alice: dial_alice.receiver,
             send_swap_request: send_swap_request.receiver,
             send_encrypted_signature: send_encrypted_signature.receiver,
-            recv_encrypted_signature_ack: recv_encrypted_signature_ack.sender,
         };
 
         let handle = EventLoopHandle {
@@ -170,7 +162,6 @@ impl EventLoop {
             dial_alice: dial_alice.sender,
             send_swap_request: send_swap_request.sender,
             send_encrypted_signature: send_encrypted_signature.sender,
-            recv_encrypted_signature_ack: recv_encrypted_signature_ack.receiver,
         };
 
         Ok((event_loop, handle))
@@ -199,7 +190,6 @@ impl EventLoop {
                         }
                         OutEvent::EncryptedSignatureAcknowledged => {
                             debug!("Alice acknowledged encrypted signature");
-                            let _ = self.recv_encrypted_signature_ack.send(()).await;
                         }
                         OutEvent::ResponseSent => {}
                         OutEvent::Failure(err) => {

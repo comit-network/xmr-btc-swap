@@ -17,10 +17,10 @@ use crate::{
             event_loop::EventLoopHandle,
             steps::{
                 build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
-                extract_monero_private_key, lock_xmr, negotiate,
-                publish_bitcoin_punish_transaction, publish_bitcoin_redeem_transaction,
-                publish_cancel_transaction, wait_for_bitcoin_encrypted_signature,
-                wait_for_bitcoin_refund, wait_for_locked_bitcoin,
+                extract_monero_private_key, lock_xmr, publish_bitcoin_punish_transaction,
+                publish_bitcoin_redeem_transaction, publish_cancel_transaction,
+                wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund,
+                wait_for_locked_bitcoin,
             },
             AliceState,
         },
@@ -84,44 +84,14 @@ async fn run_until_internal(
     monero_wallet: Arc<monero::Wallet>,
     execution_params: ExecutionParams,
     swap_id: Uuid,
-    db: Database,
+    db: Arc<Database>,
 ) -> Result<AliceState> {
     info!("Current state:{}", state);
     if is_target_state(&state) {
         Ok(state)
     } else {
         match state {
-            AliceState::Started { amounts, state0 } => {
-                let (bob_peer_id, state3) = negotiate(
-                    state0,
-                    amounts.xmr,
-                    &mut event_loop_handle,
-                    execution_params,
-                )
-                .await?;
-
-                let state = AliceState::Negotiated {
-                    bob_peer_id,
-                    amounts,
-                    state3: Box::new(state3),
-                };
-
-                let db_state = (&state).into();
-                db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
-                    .await?;
-                run_until_internal(
-                    state,
-                    is_target_state,
-                    event_loop_handle,
-                    bitcoin_wallet,
-                    monero_wallet,
-                    execution_params,
-                    swap_id,
-                    db,
-                )
-                .await
-            }
-            AliceState::Negotiated {
+            AliceState::Started {
                 state3,
                 bob_peer_id,
                 amounts,
@@ -165,7 +135,6 @@ async fn run_until_internal(
                     *state3.clone(),
                     &mut event_loop_handle,
                     monero_wallet.clone(),
-                    execution_params,
                 )
                 .await?;
 
@@ -202,7 +171,7 @@ async fn run_until_internal(
                             Either::Left(_) => AliceState::CancelTimelockExpired { state3 },
                             Either::Right((enc_sig, _)) => AliceState::EncSigLearned {
                                 state3,
-                                encrypted_signature: enc_sig?,
+                                encrypted_signature: Box::new(enc_sig?),
                             },
                         }
                     }
@@ -231,7 +200,7 @@ async fn run_until_internal(
                 let state = match state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {
                     ExpiredTimelocks::None => {
                         match build_bitcoin_redeem_transaction(
-                            encrypted_signature,
+                            *encrypted_signature,
                             &state3.tx_lock,
                             state3.a.clone(),
                             state3.s_a,
@@ -305,7 +274,10 @@ async fn run_until_internal(
                 )
                 .await?;
 
-                let state = AliceState::BtcCancelled { state3, tx_cancel };
+                let state = AliceState::BtcCancelled {
+                    state3,
+                    tx_cancel: Box::new(tx_cancel),
+                };
                 let db_state = (&state).into();
                 db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
                     .await?;

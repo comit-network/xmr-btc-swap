@@ -3,11 +3,8 @@ status = [
     "build_test (x86_64-unknown-linux-gnu)",
     "build_test (x86_64-apple-darwin)",
     "docker_tests (happy_path)",
-    "docker_tests (happy_path_restart_alice)",
-    "docker_tests (happy_path_restart_bob_after_comm)",
-    "docker_tests (happy_path_restart_bob_after_lock_proof_received)",
     "docker_tests (happy_path_restart_bob_before_comm)",
-    "docker_tests (punish)",
-    "docker_tests (refund_restart_alice_cancelled)",
-    "docker_tests (refund_restart_alice)",
+    "docker_tests (bob_refunds_using_cancel_and_refund_command)",
+    "docker_tests (bob_refunds_using_cancel_and_refund_command_timelock_not_expired_force)",
+    "docker_tests (bob_refunds_using_cancel_and_refund_command_timelock_not_expired)"
 ]

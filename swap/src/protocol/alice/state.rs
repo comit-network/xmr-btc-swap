@@ -6,6 +6,7 @@ use crate::{
         wait_for_cancel_timelock_to_expire, GetBlockHeight, TransactionBlockHeight, TxCancel,
         TxRefund, WatchForRawTransaction,
     },
+    execution_params::ExecutionParams,
     monero,
     protocol::{
         alice::{Message1, Message3, TransferProof},
@@ -24,10 +25,6 @@ use std::fmt;
 #[derive(Debug)]
 pub enum AliceState {
     Started {
-        amounts: SwapAmounts,
-        state0: State0,
-    },
-    Negotiated {
         bob_peer_id: PeerId,
         amounts: SwapAmounts,
         state3: Box<State3>,
@@ -41,12 +38,12 @@ pub enum AliceState {
         state3: Box<State3>,
     },
     EncSigLearned {
-        encrypted_signature: bitcoin::EncryptedSignature,
+        encrypted_signature: Box<bitcoin::EncryptedSignature>,
         state3: Box<State3>,
     },
     BtcRedeemed,
     BtcCancelled {
-        tx_cancel: TxCancel,
+        tx_cancel: Box<TxCancel>,
         state3: Box<State3>,
     },
     BtcRefunded {
@@ -69,7 +66,6 @@ impl fmt::Display for AliceState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AliceState::Started { .. } => write!(f, "started"),
-            AliceState::Negotiated { .. } => write!(f, "negotiated"),
             AliceState::BtcLocked { .. } => write!(f, "btc is locked"),
             AliceState::XmrLocked { .. } => write!(f, "xmr is locked"),
             AliceState::EncSigLearned { .. } => write!(f, "encrypted signature is learned"),
@@ -101,25 +97,24 @@ pub struct State0 {
 }
 
 impl State0 {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new<R>(
-        a: bitcoin::SecretKey,
-        s_a: cross_curve_dleq::Scalar,
-        v_a: monero::PrivateViewKey,
+    pub async fn new<R>(
         btc: bitcoin::Amount,
         xmr: monero::Amount,
-        cancel_timelock: Timelock,
-        punish_timelock: Timelock,
-        redeem_address: bitcoin::Address,
-        punish_address: bitcoin::Address,
+        execution_params: ExecutionParams,
+        bitcoin_wallet: &bitcoin::Wallet,
         rng: &mut R,
-    ) -> Self
+    ) -> Result<Self>
     where
         R: RngCore + CryptoRng,
     {
+        let a = bitcoin::SecretKey::new_random(rng);
+        let s_a = cross_curve_dleq::Scalar::random(rng);
+        let v_a = monero::PrivateViewKey::new_random(rng);
+        let redeem_address = bitcoin_wallet.new_address().await?;
+        let punish_address = redeem_address.clone();
         let dleq_proof_s_a = cross_curve_dleq::Proof::new(rng, &s_a);
 
-        Self {
+        Ok(Self {
             a,
             s_a,
             v_a,
@@ -128,9 +123,9 @@ impl State0 {
             punish_address,
             btc,
             xmr,
-            cancel_timelock,
-            punish_timelock,
-        }
+            cancel_timelock: execution_params.bitcoin_cancel_timelock,
+            punish_timelock: execution_params.bitcoin_punish_timelock,
+        })
     }
 
     pub fn receive(self, msg: Message0) -> Result<State1> {

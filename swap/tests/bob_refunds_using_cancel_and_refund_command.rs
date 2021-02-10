@@ -1,16 +1,12 @@
 pub mod testutils;
 
-use swap::protocol::{alice, bob, bob::BobState};
+use swap::protocol::{bob, bob::BobState};
 use testutils::{bob_run_until::is_btc_locked, FastCancelConfig};
 
 #[tokio::test]
 async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
     testutils::setup_test(FastCancelConfig, |mut ctx| async move {
-        let (alice_swap, _) = ctx.new_swap_as_alice().await;
         let (bob_swap, bob_join_handle) = ctx.new_swap_as_bob().await;
-
-        let alice_handle = alice::run(alice_swap);
-        let alice_swap_handle = tokio::spawn(alice_handle);
 
         let bob_state = bob::run_until(bob_swap, is_btc_locked).await.unwrap();
 
@@ -29,6 +25,7 @@ async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
         }
 
         // Bob manually cancels
+        bob_join_handle.abort();
         let (_, state) = bob::cancel(
             bob_swap.swap_id,
             bob_swap.state,
@@ -41,10 +38,11 @@ async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
         .unwrap();
         assert!(matches!(state, BobState::BtcCancelled { .. }));
 
-        let (bob_swap, _) = ctx.stop_and_resume_bob_from_db(bob_join_handle).await;
+        let (bob_swap, bob_join_handle) = ctx.stop_and_resume_bob_from_db(bob_join_handle).await;
         assert!(matches!(bob_swap.state, BobState::BtcCancelled { .. }));
 
         // Bob manually refunds
+        bob_join_handle.abort();
         let bob_state = bob::refund(
             bob_swap.swap_id,
             bob_swap.state,
@@ -58,9 +56,6 @@ async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
         .unwrap();
 
         ctx.assert_bob_refunded(bob_state).await;
-
-        let alice_state = alice_swap_handle.await.unwrap().unwrap();
-        ctx.assert_alice_refunded(alice_state).await;
     })
     .await;
 }

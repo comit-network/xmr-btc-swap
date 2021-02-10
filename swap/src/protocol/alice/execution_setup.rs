@@ -8,7 +8,7 @@ use crate::{
         bob::{Message0, Message2, Message4},
     },
 };
-use anyhow::{Context, Error, Result};
+use anyhow::{Context, Error};
 use libp2p::PeerId;
 use libp2p_async_await::BehaviourOutEvent;
 use serde::{Deserialize, Serialize};
@@ -32,14 +32,18 @@ pub struct Message3 {
 
 #[derive(Debug)]
 pub enum OutEvent {
-    Done(Result<State3>),
+    Done { bob_peer_id: PeerId, state3: State3 },
+    Failure(Error),
 }
 
-impl From<BehaviourOutEvent<State3, (), anyhow::Error>> for OutEvent {
-    fn from(event: BehaviourOutEvent<State3, (), Error>) -> Self {
+impl From<BehaviourOutEvent<(PeerId, State3), (), Error>> for OutEvent {
+    fn from(event: BehaviourOutEvent<(PeerId, State3), (), Error>) -> Self {
         match event {
-            BehaviourOutEvent::Inbound(_, Ok(State3)) => OutEvent::Done(Ok(State3)),
-            BehaviourOutEvent::Inbound(_, Err(e)) => OutEvent::Done(Err(e)),
+            BehaviourOutEvent::Inbound(_, Ok((bob_peer_id, state3))) => OutEvent::Done {
+                bob_peer_id,
+                state3,
+            },
+            BehaviourOutEvent::Inbound(_, Err(e)) => OutEvent::Failure(e),
             BehaviourOutEvent::Outbound(..) => unreachable!("Alice only supports inbound"),
         }
     }
@@ -48,7 +52,7 @@ impl From<BehaviourOutEvent<State3, (), anyhow::Error>> for OutEvent {
 #[derive(libp2p::NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
 pub struct Behaviour {
-    inner: libp2p_async_await::Behaviour<State3, (), anyhow::Error>,
+    inner: libp2p_async_await::Behaviour<(PeerId, State3), (), anyhow::Error>,
 }
 
 impl Default for Behaviour {
@@ -92,7 +96,7 @@ impl Behaviour {
                         .context("failed to deserialize message4")?;
                 let state3 = state2.receive(message4)?;
 
-                Ok(state3)
+                Ok((bob, state3))
             })
     }
 }
