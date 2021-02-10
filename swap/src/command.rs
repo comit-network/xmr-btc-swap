@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct Options {
+pub struct Arguments {
     #[structopt(
         long = "data-dir",
         help = "Provide a custom path to the data directory.",

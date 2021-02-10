@@ -19,7 +19,7 @@ use std::{path::PathBuf, sync::Arc};
 use structopt::StructOpt;
 use swap::{
     bitcoin,
-    cli::{Cancel, Command, Options, Refund, Resume},
+    command::{Arguments, Cancel, Command, Refund, Resume},
     config,
     config::{
         initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
@@ -49,7 +49,7 @@ const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-mon
 async fn main() -> Result<()> {
     init_tracing(LevelFilter::Debug).expect("initialize tracing");
 
-    let opt = Options::from_args();
+    let opt = Arguments::from_args();
 
     let data_dir = if let Some(data_dir) = opt.data_dir {
         data_dir
