@@ -24,7 +24,7 @@ use swap::{
 };
 use tempfile::tempdir;
 use testcontainers::{clients::Cli, Container, Docker, RunArgs};
-use tokio::task::JoinHandle;
+use tokio::{task::JoinHandle, time::sleep};
 use tracing_core::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
 use url::Url;
@@ -169,6 +169,11 @@ impl TestContext {
     pub async fn assert_alice_redeemed(&self, state: AliceState) {
         assert!(matches!(state, AliceState::BtcRedeemed));
 
+        self.alice_bitcoin_wallet
+            .sync_wallet()
+            .await
+            .expect("Could not sync wallet");
+
         let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
         assert_eq!(
             btc_balance_after_swap,
@@ -187,6 +192,11 @@ impl TestContext {
 
     pub async fn assert_alice_refunded(&self, state: AliceState) {
         assert!(matches!(state, AliceState::XmrRefunded));
+
+        self.alice_bitcoin_wallet
+            .sync_wallet()
+            .await
+            .expect("Could not sync wallet");
 
         let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
         assert_eq!(btc_balance_after_swap, self.alice_starting_balances.btc);
@@ -210,6 +220,11 @@ impl TestContext {
     pub async fn assert_alice_punished(&self, state: AliceState) {
         assert!(matches!(state, AliceState::BtcPunished));
 
+        self.alice_bitcoin_wallet
+            .sync_wallet()
+            .await
+            .expect("Could not sync wallet");
+
         let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
         assert_eq!(
             btc_balance_after_swap,
@@ -227,6 +242,11 @@ impl TestContext {
     }
 
     pub async fn assert_bob_redeemed(&self, state: BobState) {
+        self.bob_bitcoin_wallet
+            .sync_wallet()
+            .await
+            .expect("Could not sync wallet");
+
         let lock_tx_id = if let BobState::XmrRedeemed { tx_lock_id } = state {
             tx_lock_id
         } else {
@@ -260,6 +280,11 @@ impl TestContext {
     }
 
     pub async fn assert_bob_refunded(&self, state: BobState) {
+        self.bob_bitcoin_wallet
+            .sync_wallet()
+            .await
+            .expect("Could not sync wallet");
+
         let lock_tx_id = if let BobState::BtcRefunded(state4) = state {
             state4.tx_lock_id()
         } else {
@@ -292,6 +317,11 @@ impl TestContext {
     }
 
     pub async fn assert_bob_punished(&self, state: BobState) {
+        self.bob_bitcoin_wallet
+            .sync_wallet()
+            .await
+            .expect("Could not sync wallet");
+
         let lock_tx_id = if let BobState::BtcPunished { tx_lock_id } = state {
             tx_lock_id
         } else {
@@ -580,10 +610,10 @@ async fn init_test_wallets(
         .await
         .unwrap();
 
-    let xmr_wallet = Arc::new(swap::monero::Wallet {
+    let xmr_wallet = swap::monero::Wallet {
         inner: monero.wallet(name).unwrap().client(),
         network: monero::Network::default(),
-    });
+    };
 
     let electrum_rpc_url = {
         let input = format!("tcp://@localhost:{}", electrum_rpc_port);
@@ -594,16 +624,14 @@ async fn init_test_wallets(
         Url::parse(&input).unwrap()
     };
 
-    let btc_wallet = Arc::new(
-        swap::bitcoin::Wallet::new(
-            electrum_rpc_url,
-            electrum_http_url,
-            bitcoin::Network::Regtest,
-            datadir,
-        )
-        .await
-        .expect("could not init btc wallet"),
-    );
+    let btc_wallet = swap::bitcoin::Wallet::new(
+        electrum_rpc_url,
+        electrum_http_url,
+        bitcoin::Network::Regtest,
+        datadir,
+    )
+    .await
+    .expect("could not init btc wallet");
 
     if starting_balances.btc != bitcoin::Amount::ZERO {
         mint(
@@ -615,7 +643,14 @@ async fn init_test_wallets(
         .expect("could not mint btc starting balance");
     }
 
-    (btc_wallet, xmr_wallet)
+    sleep(Duration::from_secs(5)).await;
+
+    btc_wallet
+        .sync_wallet()
+        .await
+        .expect("Could not sync btc wallet");
+
+    (Arc::new(btc_wallet), Arc::new(xmr_wallet))
 }
 
 // This is just to keep the containers alive

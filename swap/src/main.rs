@@ -356,6 +356,12 @@ async fn init_wallets(
         bitcoin_wallet_data_dir,
     )
     .await?;
+
+    bitcoin_wallet
+        .sync_wallet()
+        .await
+        .expect("Could not sync btc wallet");
+
     let bitcoin_balance = bitcoin_wallet.balance().await?;
     info!(
         "Connection to Bitcoin wallet succeeded, balance: {}",

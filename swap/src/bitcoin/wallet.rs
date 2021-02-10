@@ -62,7 +62,6 @@ impl Wallet {
     }
 
     pub async fn balance(&self) -> Result<Amount> {
-        self.sync_wallet().await?;
         let balance = self.inner.lock().await.get_balance()?;
         Ok(Amount::from_sat(balance))
     }
@@ -81,7 +80,6 @@ impl Wallet {
     }
 
     pub async fn transaction_fee(&self, txid: Txid) -> Result<Amount> {
-        self.sync_wallet().await?;
         let fees = self
             .inner
             .lock()
@@ -111,8 +109,8 @@ impl BuildTxLockPsbt for Wallet {
         output_address: Address,
         output_amount: Amount,
     ) -> Result<PartiallySignedTransaction> {
-        self.sync_wallet().await?;
         tracing::debug!("building tx lock");
+        self.sync_wallet().await?;
         let (psbt, _details) = self.inner.lock().await.create_tx(
             bdk::TxBuilder::with_recipients(vec![(
                 output_address.script_pubkey(),
@@ -129,7 +127,6 @@ impl BuildTxLockPsbt for Wallet {
 #[async_trait]
 impl SignTxLock for Wallet {
     async fn sign_tx_lock(&self, tx_lock: TxLock) -> Result<Transaction> {
-        self.sync_wallet().await?;
         tracing::debug!("signing tx lock");
         let psbt = PartiallySignedTransaction::from(tx_lock);
         let (signed_psbt, finalized) = self.inner.lock().await.sign(psbt, None)?;
@@ -264,7 +261,6 @@ impl WaitForTransactionFinality for Wallet {
         let mut interval = interval(execution_params.bitcoin_avg_block_time / 4);
 
         loop {
-            tracing::debug!("syncing wallet");
             let tx_block_height = self.transaction_block_height(txid).await;
             let block_height = self.get_block_height().await;
             let confirmations = block_height - tx_block_height;
