@@ -50,7 +50,7 @@ mod serde_peer_id;
 #[macro_use]
 extern crate prettytable;
 
-const MONERO_WATCH_ONLY_TEMP_WALLET_NAME: &str = "swap-tool-watch-only-tmp-wallet";
+const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-monitoring-wallet";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -332,27 +332,27 @@ async fn init_wallets(
     let monero_wallet = monero::Wallet::new(config.monero.wallet_rpc_url.clone(), monero_network);
 
     // Setup the temporary Monero wallet necessary for monitoring the blockchain
-    let open_tmp_wallet_response = monero_wallet
-        .open_wallet(MONERO_WATCH_ONLY_TEMP_WALLET_NAME)
+    let open_monitoring_wallet_response = monero_wallet
+        .open_wallet(MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME)
         .await;
-    if open_tmp_wallet_response.is_err() {
+    if open_monitoring_wallet_response.is_err() {
         monero_wallet
-            .create_wallet(MONERO_WATCH_ONLY_TEMP_WALLET_NAME)
+            .create_wallet(MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME)
             .await
             .context(format!(
-                "Unable to create temporary Monero wallet.\
+                "Unable to create Monero wallet for blockchain monitoring.\
              Please ensure that the monero-wallet-rpc is available at {}",
                 config.monero.wallet_rpc_url
             ))?;
 
         info!(
-            "Created temporary Monero wallet {}",
-            MONERO_WATCH_ONLY_TEMP_WALLET_NAME
+            "Created Monero wallet for blockchain monitoring with name {}",
+            MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME
         );
     } else {
         info!(
-            "Opened temporary Monero wallet {}",
-            MONERO_WATCH_ONLY_TEMP_WALLET_NAME
+            "Opened Monero wallet for blockchain monitoring with name {}",
+            MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME
         );
     }
 
