@@ -264,13 +264,15 @@ impl WaitForTransactionFinality for Wallet {
         let mut interval = interval(execution_params.bitcoin_avg_block_time / 4);
 
         loop {
-            tracing::debug!("syncing wallet");
             let tx_block_height = self.transaction_block_height(txid).await;
+            tracing::debug!("tx_block_height: {}", tx_block_height.0);
             let block_height = self.get_block_height().await;
-            let confirmations = block_height - tx_block_height;
-            tracing::debug!("confirmations: {:?}", confirmations);
-            if confirmations >= BlockHeight::new(execution_params.bitcoin_finality_confirmations) {
-                break;
+            tracing::debug!("block_height: {}", block_height.0);
+            if let Some(confirmations) = block_height.0.checked_sub(tx_block_height.0) {
+                tracing::debug!("confirmations: {:?}", confirmations);
+                if confirmations >= execution_params.bitcoin_finality_confirmations {
+                    break;
+                }
             }
             interval.tick().await;
         }

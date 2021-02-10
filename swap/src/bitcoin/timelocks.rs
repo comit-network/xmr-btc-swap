@@ -1,6 +1,5 @@
-use std::ops::{Add, Sub};
-
 use serde::{Deserialize, Serialize};
+use std::ops::Add;
 
 /// Represent a timelock, expressed in relative block height as defined in
 /// [BIP68](https://github.com/bitcoin/bips/blob/master/bip-0068.mediawiki).
@@ -27,7 +26,7 @@ impl From<Timelock> for u32 {
 /// after the genesis block.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct BlockHeight(u32);
+pub struct BlockHeight(pub u32);
 
 impl From<BlockHeight> for u32 {
     fn from(height: BlockHeight) -> Self {
@@ -46,14 +45,6 @@ impl Add<Timelock> for BlockHeight {
 
     fn add(self, rhs: Timelock) -> Self::Output {
         BlockHeight(self.0 + rhs.0)
-    }
-}
-
-impl Sub<BlockHeight> for BlockHeight {
-    type Output = BlockHeight;
-
-    fn sub(self, rhs: BlockHeight) -> Self::Output {
-        BlockHeight(self.0 - rhs.0)
     }
 }
 
