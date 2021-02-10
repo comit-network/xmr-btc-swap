@@ -20,7 +20,6 @@ use structopt::StructOpt;
 use swap::{
     bitcoin,
     command::{Arguments, Cancel, Command, Refund, Resume},
-    config,
     config::{
         initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
     },
@@ -35,6 +34,7 @@ use swap::{
         bob::{cancel::CancelError, Builder},
         SwapAmounts,
     },
+    seed::Seed,
     trace::init_tracing,
 };
 use tracing::{error, info, warn};
@@ -63,9 +63,7 @@ async fn main() -> Result<()> {
     );
 
     let db_path = data_dir.join("database");
-    let seed = config::Seed::from_file_or_generate(&data_dir)
-        .expect("Could not retrieve/initialize seed")
-        .into();
+    let seed = Seed::from_file_or_generate(&data_dir).expect("Could not retrieve/initialize seed");
 
     // hardcode to testnet/stagenet
     let bitcoin_network = bitcoin::Network::Testnet;

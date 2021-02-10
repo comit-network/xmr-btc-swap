@@ -11,10 +11,6 @@ use std::{
 use tracing::info;
 use url::Url;
 
-pub mod seed;
-
-pub use seed::Seed;
-
 const DEFAULT_BITCOIND_TESTNET_URL: &str = "http://127.0.0.1:18332";
 const DEFAULT_MONERO_WALLET_RPC_TESTNET_URL: &str = "http://127.0.0.1:38083/json_rpc";
 
