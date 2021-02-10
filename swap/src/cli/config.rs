@@ -86,21 +86,21 @@ where
 
 pub fn query_user_for_initial_testnet_config() -> Result<Config> {
     println!();
-    let bitcoind_url: String = Input::with_theme(&ColorfulTheme::default())
+    let bitcoind_url = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter Bitcoind URL (including username and password if applicable) or hit return to use default")
         .default(DEFAULT_BITCOIND_TESTNET_URL.to_owned())
         .interact_text()?;
-    let bitcoind_url = Url::parse(bitcoind_url.as_str())?;
+    let bitcoind_url = bitcoind_url.as_str().parse()?;
 
-    let bitcoin_wallet_name: String = Input::with_theme(&ColorfulTheme::default())
+    let bitcoin_wallet_name = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter Bitcoind wallet name")
         .interact_text()?;
 
-    let monero_wallet_rpc_url: String = Input::with_theme(&ColorfulTheme::default())
+    let monero_wallet_rpc_url = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter Monero Wallet RPC URL or hit enter to use default")
         .default(DEFAULT_MONERO_WALLET_RPC_TESTNET_URL.to_owned())
         .interact_text()?;
-    let monero_wallet_rpc_url = Url::parse(monero_wallet_rpc_url.as_str())?;
+    let monero_wallet_rpc_url = monero_wallet_rpc_url.as_str().parse()?;
     println!();
 
     Ok(Config {
