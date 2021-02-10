@@ -19,9 +19,11 @@ use std::{path::PathBuf, sync::Arc};
 use structopt::StructOpt;
 use swap::{
     bitcoin,
-    command::{Arguments, Cancel, Command, Refund, Resume},
-    config::{
-        initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
+    cli::{
+        command::{Arguments, Cancel, Command, Refund, Resume},
+        config::{
+            initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
+        },
     },
     database::Database,
     execution_params,

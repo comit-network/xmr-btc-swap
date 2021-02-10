@@ -17,8 +17,7 @@
 )]
 
 pub mod bitcoin;
-pub mod command;
-pub mod config;
+pub mod cli;
 pub mod database;
 pub mod execution_params;
 pub mod fs;
