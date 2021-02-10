@@ -207,6 +207,16 @@ pub trait CreateWalletForOutput {
     ) -> anyhow::Result<()>;
 }
 
+#[async_trait]
+pub trait OpenWallet {
+    async fn open_wallet(&self, file_name: &str) -> anyhow::Result<()>;
+}
+
+#[async_trait]
+pub trait CreateWallet {
+    async fn create_wallet(&self, file_name: &str) -> anyhow::Result<()>;
+}
+
 #[derive(thiserror::Error, Debug, Clone, PartialEq)]
 #[error("Overflow, cannot convert {0} to u64")]
 pub struct OverflowError(pub String);
