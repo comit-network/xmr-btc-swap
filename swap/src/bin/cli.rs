@@ -19,10 +19,11 @@ use std::{path::PathBuf, sync::Arc};
 use structopt::StructOpt;
 use swap::{
     bitcoin,
-    cli::{Cancel, Command, Options, Refund, Resume},
-    config,
-    config::{
-        initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
+    cli::{
+        command::{Arguments, Cancel, Command, Refund, Resume},
+        config::{
+            initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
+        },
     },
     database::Database,
     execution_params,
@@ -35,6 +36,7 @@ use swap::{
         bob::{cancel::CancelError, Builder},
         SwapAmounts,
     },
+    seed::Seed,
     trace::init_tracing,
 };
 use tracing::{error, info, warn};
@@ -49,7 +51,7 @@ const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-mon
 async fn main() -> Result<()> {
     init_tracing(LevelFilter::Debug).expect("initialize tracing");
 
-    let opt = Options::from_args();
+    let opt = Arguments::from_args();
 
     let data_dir = if let Some(data_dir) = opt.data_dir {
         data_dir
@@ -63,9 +65,7 @@ async fn main() -> Result<()> {
     );
 
     let db_path = data_dir.join("database");
-    let seed = config::Seed::from_file_or_generate(&data_dir)
-        .expect("Could not retrieve/initialize seed")
-        .into();
+    let seed = Seed::from_file_or_generate(&data_dir).expect("Could not retrieve/initialize seed");
 
     // hardcode to testnet/stagenet
     let bitcoin_network = bitcoin::Network::Testnet;

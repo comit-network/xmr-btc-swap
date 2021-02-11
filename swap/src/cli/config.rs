@@ -1,6 +1,6 @@
 use crate::fs::ensure_directory_exists;
 use anyhow::{Context, Result};
-use config::{Config, ConfigError};
+use config::ConfigError;
 use dialoguer::{theme::ColorfulTheme, Input};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -11,27 +11,23 @@ use std::{
 use tracing::info;
 use url::Url;
 
-pub mod seed;
-
-pub use seed::Seed;
-
 const DEFAULT_BITCOIND_TESTNET_URL: &str = "http://127.0.0.1:18332";
 const DEFAULT_MONERO_WALLET_RPC_TESTNET_URL: &str = "http://127.0.0.1:38083/json_rpc";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct File {
+pub struct Config {
     pub bitcoin: Bitcoin,
     pub monero: Monero,
 }
 
-impl File {
+impl Config {
     pub fn read<D>(config_file: D) -> Result<Self, ConfigError>
     where
         D: AsRef<OsStr>,
     {
         let config_file = Path::new(&config_file);
 
-        let mut config = Config::new();
+        let mut config = config::Config::new();
         config.merge(config::File::from(config_file))?;
         config.try_into()
     }
@@ -54,7 +50,7 @@ pub struct Monero {
 #[error("config not initialized")]
 pub struct ConfigNotInitialized {}
 
-pub fn read_config(config_path: PathBuf) -> Result<Result<File, ConfigNotInitialized>> {
+pub fn read_config(config_path: PathBuf) -> Result<Result<Config, ConfigNotInitialized>> {
     if config_path.exists() {
         info!(
             "Using config file at default path: {}",
@@ -64,7 +60,7 @@ pub fn read_config(config_path: PathBuf) -> Result<Result<File, ConfigNotInitial
         return Ok(Err(ConfigNotInitialized {}));
     }
 
-    let file = File::read(&config_path)
+    let file = Config::read(&config_path)
         .with_context(|| format!("failed to read config file {}", config_path.display()))?;
 
     Ok(Ok(file))
@@ -72,7 +68,7 @@ pub fn read_config(config_path: PathBuf) -> Result<Result<File, ConfigNotInitial
 
 pub fn initial_setup<F>(config_path: PathBuf, config_file: F) -> Result<()>
 where
-    F: Fn() -> Result<File>,
+    F: Fn() -> Result<Config>,
 {
     info!("Config file not found, running initial setup...");
     ensure_directory_exists(config_path.as_path())?;
@@ -88,26 +84,26 @@ where
     Ok(())
 }
 
-pub fn query_user_for_initial_testnet_config() -> Result<File> {
+pub fn query_user_for_initial_testnet_config() -> Result<Config> {
     println!();
-    let bitcoind_url: String = Input::with_theme(&ColorfulTheme::default())
+    let bitcoind_url = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter Bitcoind URL (including username and password if applicable) or hit return to use default")
         .default(DEFAULT_BITCOIND_TESTNET_URL.to_owned())
         .interact_text()?;
-    let bitcoind_url = Url::parse(bitcoind_url.as_str())?;
+    let bitcoind_url = bitcoind_url.as_str().parse()?;
 
-    let bitcoin_wallet_name: String = Input::with_theme(&ColorfulTheme::default())
+    let bitcoin_wallet_name = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter Bitcoind wallet name")
         .interact_text()?;
 
-    let monero_wallet_rpc_url: String = Input::with_theme(&ColorfulTheme::default())
+    let monero_wallet_rpc_url = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter Monero Wallet RPC URL or hit enter to use default")
         .default(DEFAULT_MONERO_WALLET_RPC_TESTNET_URL.to_owned())
         .interact_text()?;
-    let monero_wallet_rpc_url = Url::parse(monero_wallet_rpc_url.as_str())?;
+    let monero_wallet_rpc_url = monero_wallet_rpc_url.as_str().parse()?;
     println!();
 
-    Ok(File {
+    Ok(Config {
         bitcoin: Bitcoin {
             bitcoind_url,
             wallet_name: bitcoin_wallet_name,
@@ -129,7 +125,7 @@ mod tests {
         let temp_dir = tempdir().unwrap().path().to_path_buf();
         let config_path = Path::join(&temp_dir, "config.toml");
 
-        let expected = File {
+        let expected = Config {
             bitcoin: Bitcoin {
                 bitcoind_url: Url::from_str("http://127.0.0.1:18332").unwrap(),
                 wallet_name: "alice".to_string(),

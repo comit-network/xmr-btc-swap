@@ -18,7 +18,6 @@
 
 pub mod bitcoin;
 pub mod cli;
-pub mod config;
 pub mod database;
 pub mod execution_params;
 pub mod fs;
