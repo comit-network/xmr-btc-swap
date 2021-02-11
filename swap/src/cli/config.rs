@@ -1,4 +1,4 @@
-use crate::fs::ensure_directory_exists;
+use crate::fs::{default_data_dir, ensure_directory_exists};
 use anyhow::{Context, Result};
 use config::ConfigError;
 use dialoguer::{theme::ColorfulTheme, Input};
@@ -16,6 +16,7 @@ const DEFAULT_MONERO_WALLET_RPC_TESTNET_URL: &str = "http://127.0.0.1:38083/json
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct Config {
+    pub data: Data,
     pub bitcoin: Bitcoin,
     pub monero: Monero,
 }
@@ -31,6 +32,12 @@ impl Config {
         config.merge(config::File::from(config_file))?;
         config.try_into()
     }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Data {
+    pub dir: PathBuf,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -86,6 +93,18 @@ where
 
 pub fn query_user_for_initial_testnet_config() -> Result<Config> {
     println!();
+    let data_dir = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter data directory for the swap CLI or hit return to use default")
+        .default(
+            default_data_dir()
+                .context("No default data dir value for this system")?
+                .to_str()
+                .context("Unsupported characters in default path")?
+                .to_string(),
+        )
+        .interact_text()?;
+    let data_dir = data_dir.as_str().parse()?;
+
     let bitcoind_url = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter Bitcoind URL (including username and password if applicable) or hit return to use default")
         .default(DEFAULT_BITCOIND_TESTNET_URL.to_owned())
@@ -104,6 +123,7 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
     println!();
 
     Ok(Config {
+        data: Data { dir: data_dir },
         bitcoin: Bitcoin {
             bitcoind_url,
             wallet_name: bitcoin_wallet_name,
@@ -126,6 +146,9 @@ mod tests {
         let config_path = Path::join(&temp_dir, "config.toml");
 
         let expected = Config {
+            data: Data {
+                dir: Default::default(),
+            },
             bitcoin: Bitcoin {
                 bitcoind_url: Url::from_str("http://127.0.0.1:18332").unwrap(),
                 wallet_name: "alice".to_string(),
