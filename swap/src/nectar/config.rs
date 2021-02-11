@@ -106,7 +106,7 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
         .with_prompt("Enter data directory for nectar or hit return to use default")
         .default(
             default_data_dir()
-                .context("Not default data dir value for this system")?
+                .context("No default data dir value for this system")?
                 .to_str()
                 .context("Unsupported characters in default path")?
                 .to_string(),
