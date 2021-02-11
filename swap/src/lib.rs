@@ -22,6 +22,7 @@ pub mod database;
 pub mod execution_params;
 pub mod fs;
 pub mod monero;
+pub mod nectar;
 pub mod network;
 pub mod protocol;
 pub mod seed;
