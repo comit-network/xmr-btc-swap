@@ -6,8 +6,8 @@ use crate::{
     network::{transport, TokioExecutor},
     protocol::{
         alice,
-        alice::{Behaviour, Builder, OutEvent, State0, State3, SwapResponse, TransferProof},
-        bob::{EncryptedSignature, SwapRequest},
+        alice::{Behaviour, Builder, OutEvent, QuoteResponse, State0, State3, TransferProof},
+        bob::{EncryptedSignature, QuoteRequest},
         SwapAmounts,
     },
     seed::Seed,
@@ -157,8 +157,8 @@ impl EventLoop {
                         OutEvent::ConnectionEstablished(alice) => {
                             debug!("Connection Established with {}", alice);
                         }
-                        OutEvent::SwapRequest { msg, channel, bob_peer_id } => {
-                            let _ = self.handle_swap_request(msg, channel, bob_peer_id).await;
+                        OutEvent::QuoteRequest { msg, channel, bob_peer_id } => {
+                            let _ = self.handle_quote_request(msg, channel, bob_peer_id).await;
                         }
                         OutEvent::ExecutionSetupDone{bob_peer_id, state3} => {
                             let _ = self.handle_execution_setup_done(bob_peer_id, *state3).await;
@@ -188,23 +188,23 @@ impl EventLoop {
         }
     }
 
-    async fn handle_swap_request(
+    async fn handle_quote_request(
         &mut self,
-        swap_request: SwapRequest,
-        channel: ResponseChannel<SwapResponse>,
+        quote_request: QuoteRequest,
+        channel: ResponseChannel<QuoteResponse>,
         bob_peer_id: PeerId,
     ) -> Result<()> {
         // 1. Check if acceptable request
         // 2. Send response
 
-        let btc_amount = swap_request.btc_amount;
+        let btc_amount = quote_request.btc_amount;
         let xmr_amount = btc_amount.as_btc() * RATE as f64;
         let xmr_amount = monero::Amount::from_monero(xmr_amount)?;
-        let swap_response = SwapResponse { xmr_amount };
+        let quote_response = QuoteResponse { xmr_amount };
 
         self.swarm
-            .send_swap_response(channel, swap_response)
-            .context("Failed to send swap response")?;
+            .send_quote_response(channel, quote_response)
+            .context("Failed to send quote response")?;
 
         // 3. Start setup execution
 

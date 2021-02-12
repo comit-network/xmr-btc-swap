@@ -9,11 +9,11 @@ group Negotiation
     Bob --> Alice: Establish connection
 
     group Request Response Channel
-        Bob -> Alice: Swap request
+        Bob -> Alice: Quote request
         note left: Btc Amount\naddress hints
         note right: Alice stores peer id & address hints\nto contact Bob
 
-        Alice --> Bob: Swap response
+        Alice --> Bob: Quote response
         note right: Exact XMR amount
     end
 end

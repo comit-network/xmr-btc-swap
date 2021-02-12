@@ -2,10 +2,10 @@ use crate::{
     network::{peer_tracker, peer_tracker::PeerTracker},
     protocol::{
         alice::{
-            encrypted_signature, execution_setup, swap_response, transfer_proof, State0, State3,
-            SwapResponse, TransferProof,
+            encrypted_signature, execution_setup, quote_response, transfer_proof, QuoteResponse,
+            State0, State3, TransferProof,
         },
-        bob::{EncryptedSignature, SwapRequest},
+        bob::{EncryptedSignature, QuoteRequest},
     },
 };
 use anyhow::{Error, Result};
@@ -15,9 +15,9 @@ use tracing::{debug, info};
 #[derive(Debug)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
-    SwapRequest {
-        msg: SwapRequest,
-        channel: ResponseChannel<SwapResponse>,
+    QuoteRequest {
+        msg: QuoteRequest,
+        channel: ResponseChannel<QuoteResponse>,
         bob_peer_id: PeerId,
     },
     ExecutionSetupDone {
@@ -43,21 +43,21 @@ impl From<peer_tracker::OutEvent> for OutEvent {
     }
 }
 
-impl From<swap_response::OutEvent> for OutEvent {
-    fn from(event: swap_response::OutEvent) -> Self {
-        use crate::protocol::alice::swap_response::OutEvent::*;
+impl From<quote_response::OutEvent> for OutEvent {
+    fn from(event: quote_response::OutEvent) -> Self {
+        use crate::protocol::alice::quote_response::OutEvent::*;
         match event {
             MsgReceived {
                 msg,
                 channel,
                 bob_peer_id,
-            } => OutEvent::SwapRequest {
+            } => OutEvent::QuoteRequest {
                 msg,
                 channel,
                 bob_peer_id,
             },
             ResponseSent => OutEvent::ResponseSent,
-            Failure(err) => OutEvent::Failure(err.context("Swap Request/Response failure")),
+            Failure(err) => OutEvent::Failure(err.context("Quote Request/Response failure")),
         }
     }
 }
@@ -108,21 +108,20 @@ impl From<encrypted_signature::OutEvent> for OutEvent {
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
     pt: PeerTracker,
-    swap_response: swap_response::Behaviour,
+    quote_response: quote_response::Behaviour,
     execution_setup: execution_setup::Behaviour,
     transfer_proof: transfer_proof::Behaviour,
     encrypted_signature: encrypted_signature::Behaviour,
 }
 
 impl Behaviour {
-    /// Alice always sends her messages as a response to a request from Bob.
-    pub fn send_swap_response(
+    pub fn send_quote_response(
         &mut self,
-        channel: ResponseChannel<SwapResponse>,
-        swap_response: SwapResponse,
+        channel: ResponseChannel<QuoteResponse>,
+        quote_response: QuoteResponse,
     ) -> anyhow::Result<()> {
-        self.swap_response.send(channel, swap_response)?;
-        info!("Sent swap response");
+        self.quote_response.send(channel, quote_response)?;
+        info!("Sent quote response");
         Ok(())
     }
 

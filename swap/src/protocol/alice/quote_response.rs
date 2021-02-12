@@ -1,7 +1,7 @@
 use crate::{
     monero,
     network::request_response::{CborCodec, Swap, TIMEOUT},
-    protocol::bob::SwapRequest,
+    protocol::bob::QuoteRequest,
 };
 use anyhow::{anyhow, Error, Result};
 use libp2p::{
@@ -18,8 +18,8 @@ use tracing::debug;
 #[derive(Debug)]
 pub enum OutEvent {
     MsgReceived {
-        msg: SwapRequest,
-        channel: ResponseChannel<SwapResponse>,
+        msg: QuoteRequest,
+        channel: ResponseChannel<QuoteResponse>,
         bob_peer_id: PeerId,
     },
     ResponseSent,
@@ -27,12 +27,12 @@ pub enum OutEvent {
 }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub struct SwapResponse {
+pub struct QuoteResponse {
     pub xmr_amount: monero::Amount,
 }
 
-impl From<RequestResponseEvent<SwapRequest, SwapResponse>> for OutEvent {
-    fn from(event: RequestResponseEvent<SwapRequest, SwapResponse>) -> Self {
+impl From<RequestResponseEvent<QuoteRequest, QuoteResponse>> for OutEvent {
+    fn from(event: RequestResponseEvent<QuoteRequest, QuoteResponse>) -> Self {
         match event {
             RequestResponseEvent::Message {
                 peer,
@@ -42,7 +42,7 @@ impl From<RequestResponseEvent<SwapRequest, SwapResponse>> for OutEvent {
                     },
                 ..
             } => {
-                debug!("Received swap request from {}", peer);
+                debug!("Received quote request from {}", peer);
                 OutEvent::MsgReceived {
                     msg: request,
                     channel,
@@ -70,19 +70,19 @@ impl From<RequestResponseEvent<SwapRequest, SwapResponse>> for OutEvent {
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<CborCodec<Swap, SwapRequest, SwapResponse>>,
+    rr: RequestResponse<CborCodec<Swap, QuoteRequest, QuoteResponse>>,
 }
 
 impl Behaviour {
     /// Alice always sends her messages as a response to a request from Bob.
     pub fn send(
         &mut self,
-        channel: ResponseChannel<SwapResponse>,
-        msg: SwapResponse,
+        channel: ResponseChannel<QuoteResponse>,
+        msg: QuoteResponse,
     ) -> Result<()> {
         self.rr
             .send_response(channel, msg)
-            .map_err(|_| anyhow!("Sending swap response failed"))
+            .map_err(|_| anyhow!("Sending quote response failed"))
     }
 }
 

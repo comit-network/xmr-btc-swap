@@ -5,7 +5,7 @@ use crate::{
     execution_params::ExecutionParams,
     monero,
     protocol::{
-        bob::{self, event_loop::EventLoopHandle, state::*, SwapRequest},
+        bob::{self, event_loop::EventLoopHandle, state::*, QuoteRequest},
         SwapAmounts,
     },
 };
@@ -375,14 +375,14 @@ pub async fn negotiate(
 ) -> Result<bob::state::State2> {
     tracing::trace!("Starting negotiate");
     event_loop_handle
-        .send_swap_request(SwapRequest {
+        .send_quote_request(QuoteRequest {
             btc_amount: amounts.btc,
         })
         .await?;
 
     // TODO: Use this once Bob's CLI is modified to only pass xmr amount in
     // argument.
-    let _swap_response = event_loop_handle.recv_swap_response().await?;
+    let _quote_response = event_loop_handle.recv_quote_response().await?;
 
     let state2 = event_loop_handle.execution_setup(state0).await?;
 
