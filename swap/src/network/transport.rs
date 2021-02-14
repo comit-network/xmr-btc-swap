@@ -13,7 +13,7 @@ use libp2p::{
     yamux, PeerId,
 };
 
-/// Builds a libp2p transport without Tor with the following features:
+/// Builds a libp2p transport with the following features:
 /// - TcpConnection
 /// - DNS name resolution
 /// - authentication via noise
