@@ -1,6 +1,6 @@
 use crate::testutils;
 use bitcoin_harness::Bitcoind;
-use futures::Future;
+use futures::{future::RemoteHandle, Future};
 use get_port::get_port;
 use libp2p::{core::Multiaddr, PeerId};
 use monero_harness::{image, Monero};
@@ -8,7 +8,7 @@ use std::{path::PathBuf, sync::Arc};
 use swap::{
     bitcoin,
     bitcoin::Timelock,
-    database::{Database, Swap},
+    database::Database,
     execution_params,
     execution_params::{ExecutionParams, GetExecutionParams},
     monero,
@@ -17,7 +17,7 @@ use swap::{
 };
 use tempfile::tempdir;
 use testcontainers::{clients::Cli, Container};
-use tokio::task::JoinHandle;
+use tokio::{sync::mpsc, task::JoinHandle};
 use tracing_core::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
 use uuid::Uuid;
@@ -26,13 +26,6 @@ use uuid::Uuid;
 pub struct StartingBalances {
     pub xmr: monero::Amount,
     pub btc: bitcoin::Amount,
-}
-
-struct AliceParams {
-    seed: Seed,
-    execution_params: ExecutionParams,
-    db: Arc<Database>,
-    listen_address: Multiaddr,
 }
 
 #[derive(Debug, Clone)]
@@ -75,10 +68,10 @@ pub struct AliceEventLoopJoinHandle(JoinHandle<()>);
 pub struct TestContext {
     swap_amounts: SwapAmounts,
 
-    alice_params: AliceParams,
     alice_starting_balances: StartingBalances,
     alice_bitcoin_wallet: Arc<bitcoin::Wallet>,
     alice_monero_wallet: Arc<monero::Wallet>,
+    alice_swap_handle: mpsc::Receiver<RemoteHandle<anyhow::Result<AliceState>>>,
 
     bob_params: BobParams,
     bob_starting_balances: StartingBalances,
@@ -114,16 +107,9 @@ impl TestContext {
         (swap, BobEventLoopJoinHandle(join_handle))
     }
 
-    pub async fn assert_alice_redeemed(&self) {
-        let mut states = self.alice_params.db.all().unwrap();
-
-        assert_eq!(states.len(), 1, "Expected only one swap in Alice's db");
-
-        let (_swap_id, state) = states.pop().unwrap();
-        let state = match state {
-            Swap::Alice(state) => state.into(),
-            Swap::Bob(_) => panic!("Bob state in Alice db is unexpected"),
-        };
+    pub async fn assert_alice_redeemed(&mut self) {
+        let swap_handle = self.alice_swap_handle.recv().await.unwrap();
+        let state = swap_handle.await.unwrap();
 
         assert!(matches!(state, AliceState::BtcRedeemed));
 
@@ -143,16 +129,9 @@ impl TestContext {
         assert!(xmr_balance_after_swap <= self.alice_starting_balances.xmr - self.swap_amounts.xmr);
     }
 
-    pub async fn assert_alice_refunded(&self) {
-        let mut states = self.alice_params.db.all().unwrap();
-
-        assert_eq!(states.len(), 1, "Expected only one swap in Alice's db");
-
-        let (_swap_id, state) = states.pop().unwrap();
-        let state = match state {
-            Swap::Alice(state) => state.into(),
-            Swap::Bob(_) => panic!("Bob state in Alice db is unexpected"),
-        };
+    pub async fn assert_alice_refunded(&mut self) {
+        let swap_handle = self.alice_swap_handle.recv().await.unwrap();
+        let state = swap_handle.await.unwrap();
 
         assert!(
             matches!(state, AliceState::XmrRefunded),
@@ -313,7 +292,7 @@ where
 
     let port = get_port().expect("Failed to find a free port");
 
-    let listen_address: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", port)
+    let alice_listen_address: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", port)
         .parse()
         .expect("failed to parse Alice's address");
 
@@ -328,12 +307,7 @@ where
     let db_path = tempdir().unwrap();
     let alice_db = Arc::new(Database::open(db_path.path()).unwrap());
 
-    let alice_params = AliceParams {
-        seed: Seed::random().unwrap(),
-        execution_params,
-        db: alice_db.clone(),
-        listen_address,
-    };
+    let alice_seed = Seed::random().unwrap();
 
     let bob_starting_balances = StartingBalances {
         xmr: monero::Amount::ZERO,
@@ -348,10 +322,10 @@ where
     )
     .await;
 
-    let mut alice_event_loop = alice::EventLoop::new(
-        alice_params.listen_address.clone(),
-        alice_params.seed,
-        alice_params.execution_params,
+    let (mut alice_event_loop, alice_swap_handle) = alice::EventLoop::new(
+        alice_listen_address.clone(),
+        alice_seed,
+        execution_params,
         alice_bitcoin_wallet.clone(),
         alice_monero_wallet.clone(),
         alice_db,
@@ -370,17 +344,17 @@ where
         swap_id: Uuid::new_v4(),
         bitcoin_wallet: bob_bitcoin_wallet.clone(),
         monero_wallet: bob_monero_wallet.clone(),
-        alice_address: alice_params.listen_address.clone(),
+        alice_address: alice_listen_address,
         alice_peer_id,
         execution_params,
     };
 
     let test = TestContext {
         swap_amounts,
-        alice_params,
         alice_starting_balances,
         alice_bitcoin_wallet,
         alice_monero_wallet,
+        alice_swap_handle,
         bob_params,
         bob_starting_balances,
         bob_bitcoin_wallet,
