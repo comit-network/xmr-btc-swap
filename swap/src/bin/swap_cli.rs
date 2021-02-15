@@ -35,7 +35,6 @@ use swap::{
     protocol::{
         bob,
         bob::{cancel::CancelError, Builder},
-        SwapAmounts,
     },
     seed::Seed,
     trace::init_tracing,
@@ -89,21 +88,15 @@ async fn main() -> Result<()> {
             alice_peer_id,
             alice_addr,
             send_bitcoin,
-            receive_monero,
         } => {
-            let swap_amounts = SwapAmounts {
-                btc: send_bitcoin,
-                xmr: receive_monero,
-            };
-
             let (bitcoin_wallet, monero_wallet) =
                 init_wallets(config, bitcoin_network, monero_network).await?;
 
             let swap_id = Uuid::new_v4();
 
             info!(
-                "Swap sending {} and receiving {} started with ID {}",
-                send_bitcoin, receive_monero, swap_id
+                "Swap buy XMR with {} started with ID {}",
+                send_bitcoin, swap_id
             );
 
             let bob_factory = Builder::new(
@@ -116,7 +109,7 @@ async fn main() -> Result<()> {
                 alice_peer_id,
                 execution_params,
             );
-            let (swap, event_loop) = bob_factory.with_init_params(swap_amounts).build().await?;
+            let (swap, event_loop) = bob_factory.with_init_params(send_bitcoin).build().await?;
 
             tokio::spawn(async move { event_loop.run().await });
             bob::run(swap).await?;

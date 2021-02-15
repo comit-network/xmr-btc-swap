@@ -1,4 +1,4 @@
-use crate::{bitcoin, monero};
+use crate::bitcoin;
 use libp2p::{core::Multiaddr, PeerId};
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -28,9 +28,6 @@ pub enum Command {
 
         #[structopt(long = "send-btc", help = "Bitcoin amount as floating point nr without denomination (e.g. 1.25)", parse(try_from_str = parse_btc))]
         send_bitcoin: bitcoin::Amount,
-
-        #[structopt(long = "receive-xmr", help = "Monero amount as floating point nr without denomination (e.g. 125.1)", parse(try_from_str = parse_xmr))]
-        receive_monero: monero::Amount,
     },
     History,
     Resume(Resume),
@@ -90,10 +87,5 @@ pub enum Refund {
 
 fn parse_btc(str: &str) -> anyhow::Result<bitcoin::Amount> {
     let amount = bitcoin::Amount::from_str_in(str, ::bitcoin::Denomination::Bitcoin)?;
-    Ok(amount)
-}
-
-fn parse_xmr(str: &str) -> anyhow::Result<monero::Amount> {
-    let amount = monero::Amount::parse_monero(str)?;
     Ok(amount)
 }

@@ -25,7 +25,7 @@ use tracing::{debug, error, trace, warn};
 use uuid::Uuid;
 
 // TODO: Use dynamic
-const RATE: u32 = 100;
+pub const RATE: u32 = 100;
 
 #[allow(missing_debug_implementations)]
 pub struct MpscChannels<T> {

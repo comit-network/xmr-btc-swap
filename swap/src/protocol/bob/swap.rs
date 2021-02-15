@@ -4,13 +4,11 @@ use crate::{
     database::{Database, Swap},
     execution_params::ExecutionParams,
     monero,
-    protocol::{
-        bob::{self, event_loop::EventLoopHandle, state::*, QuoteRequest},
-        SwapAmounts,
-    },
+    protocol::bob::{self, event_loop::EventLoopHandle, state::*, QuoteRequest},
 };
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
+use rand::rngs::OsRng;
 use std::sync::Arc;
 use tokio::select;
 use tracing::info;
@@ -67,12 +65,20 @@ async fn run_until_internal(
         Ok(state)
     } else {
         match state {
-            BobState::Started { state0, amounts } => {
+            BobState::Started { btc_amount } => {
+                let bitcoin_refund_address = bitcoin_wallet.new_address().await?;
+
                 event_loop_handle.dial().await?;
 
-                let state2 = negotiate(state0, amounts, &mut event_loop_handle).await?;
+                let state2 = request_quote_and_setup(
+                    btc_amount,
+                    &mut event_loop_handle,
+                    execution_params,
+                    bitcoin_refund_address,
+                )
+                .await?;
 
-                let state = BobState::Negotiated(state2);
+                let state = BobState::ExecutionSetupDone(state2);
                 let db_state = state.clone().into();
                 db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
                 run_until_internal(
@@ -87,7 +93,7 @@ async fn run_until_internal(
                 )
                 .await
             }
-            BobState::Negotiated(state2) => {
+            BobState::ExecutionSetupDone(state2) => {
                 // Do not lock Bitcoin if not connected to Alice.
                 event_loop_handle.dial().await?;
                 // Alice and Bob have exchanged info
@@ -368,21 +374,27 @@ async fn run_until_internal(
     }
 }
 
-pub async fn negotiate(
-    state0: crate::protocol::bob::state::State0,
-    amounts: SwapAmounts,
+pub async fn request_quote_and_setup(
+    btc_amount: bitcoin::Amount,
     event_loop_handle: &mut EventLoopHandle,
+    execution_params: ExecutionParams,
+    bitcoin_refund_address: bitcoin::Address,
 ) -> Result<bob::state::State2> {
-    tracing::trace!("Starting negotiate");
     event_loop_handle
-        .send_quote_request(QuoteRequest {
-            btc_amount: amounts.btc,
-        })
+        .send_quote_request(QuoteRequest { btc_amount })
         .await?;
 
-    // TODO: Use this once Bob's CLI is modified to only pass xmr amount in
-    // argument.
-    let _quote_response = event_loop_handle.recv_quote_response().await?;
+    let quote_response = event_loop_handle.recv_quote_response().await?;
+
+    let state0 = State0::new(
+        &mut OsRng,
+        btc_amount,
+        quote_response.xmr_amount,
+        execution_params.bitcoin_cancel_timelock,
+        execution_params.bitcoin_punish_timelock,
+        bitcoin_refund_address,
+        execution_params.monero_finality_confirmations,
+    );
 
     let state2 = event_loop_handle.execution_setup(state0).await?;
 

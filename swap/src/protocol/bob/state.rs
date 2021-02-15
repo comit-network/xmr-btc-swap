@@ -11,7 +11,6 @@ use crate::{
     protocol::{
         alice::{Message1, Message3},
         bob::{EncryptedSignature, Message0, Message2, Message4},
-        SwapAmounts,
     },
 };
 use anyhow::{anyhow, Result};
@@ -25,10 +24,9 @@ use std::fmt;
 #[derive(Debug, Clone)]
 pub enum BobState {
     Started {
-        state0: State0,
-        amounts: SwapAmounts,
+        btc_amount: bitcoin::Amount,
     },
-    Negotiated(State2),
+    ExecutionSetupDone(State2),
     BtcLocked(State3),
     XmrLockProofReceived {
         state: State3,
@@ -53,8 +51,8 @@ pub enum BobState {
 impl fmt::Display for BobState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BobState::Started { .. } => write!(f, "started"),
-            BobState::Negotiated(..) => write!(f, "negotiated"),
+            BobState::Started { .. } => write!(f, "quote has been requested"),
+            BobState::ExecutionSetupDone(..) => write!(f, "execution setup done"),
             BobState::BtcLocked(..) => write!(f, "btc is locked"),
             BobState::XmrLockProofReceived { .. } => {
                 write!(f, "XMR lock transaction transfer proof received")
