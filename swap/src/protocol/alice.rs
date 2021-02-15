@@ -1,9 +1,6 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use crate::{
-    bitcoin, database, database::Database, execution_params::ExecutionParams, monero,
-    protocol::SwapAmounts,
-};
+use crate::{bitcoin, database, database::Database, execution_params::ExecutionParams, monero};
 use anyhow::{bail, Result};
 use libp2p::{core::Multiaddr, PeerId};
 use std::sync::Arc;
@@ -57,7 +54,6 @@ pub struct Builder {
 enum InitParams {
     None,
     New {
-        swap_amounts: SwapAmounts,
         bob_peer_id: PeerId,
         state3: Box<State3>,
     },
@@ -88,15 +84,9 @@ impl Builder {
         }
     }
 
-    pub fn with_init_params(
-        self,
-        swap_amounts: SwapAmounts,
-        bob_peer_id: PeerId,
-        state3: State3,
-    ) -> Self {
+    pub fn with_init_params(self, bob_peer_id: PeerId, state3: State3) -> Self {
         Self {
             init_params: InitParams::New {
-                swap_amounts,
                 bob_peer_id,
                 state3: Box::new(state3),
             },
@@ -107,12 +97,10 @@ impl Builder {
     pub async fn build(self) -> Result<Swap> {
         match self.init_params {
             InitParams::New {
-                swap_amounts,
                 bob_peer_id,
                 ref state3,
             } => {
                 let initial_state = AliceState::Started {
-                    amounts: swap_amounts,
                     state3: state3.clone(),
                     bob_peer_id,
                 };

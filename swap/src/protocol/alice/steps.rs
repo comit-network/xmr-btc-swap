@@ -12,7 +12,6 @@ use crate::{
     protocol::{
         alice,
         alice::{event_loop::EventLoopHandle, TransferProof},
-        SwapAmounts,
     },
 };
 use anyhow::{Context, Result};
@@ -55,7 +54,6 @@ where
 
 pub async fn lock_xmr<W>(
     bob_peer_id: PeerId,
-    amounts: SwapAmounts,
     state3: alice::State3,
     event_loop_handle: &mut EventLoopHandle,
     monero_wallet: Arc<W>,
@@ -71,7 +69,7 @@ where
     let public_view_key = state3.v.public();
 
     let (transfer_proof, _) = monero_wallet
-        .transfer(public_spend_key, public_view_key, amounts.xmr)
+        .transfer(public_spend_key, public_view_key, state3.xmr)
         .await?;
 
     // TODO(Franck): Wait for Monero to be confirmed once

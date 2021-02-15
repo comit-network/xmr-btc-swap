@@ -10,17 +10,16 @@ use crate::{
             AliceState, Behaviour, Builder, OutEvent, QuoteResponse, State0, State3, TransferProof,
         },
         bob::{EncryptedSignature, QuoteRequest},
-        SwapAmounts,
     },
     seed::Seed,
 };
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use futures::future::RemoteHandle;
 use libp2p::{
     core::Multiaddr, futures::FutureExt, request_response::ResponseChannel, PeerId, Swarm,
 };
 use rand::rngs::OsRng;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, error, trace, warn};
 use uuid::Uuid;
@@ -89,10 +88,6 @@ pub struct EventLoop {
     db: Arc<Database>,
     listen_address: Multiaddr,
 
-    // Amounts agreed upon for swaps currently in the execution setup phase
-    // Note: We can do one execution setup per peer at a given time.
-    swap_amounts: HashMap<PeerId, SwapAmounts>,
-
     recv_encrypted_signature: broadcast::Sender<EncryptedSignature>,
     send_transfer_proof: mpsc::Receiver<(PeerId, TransferProof)>,
 
@@ -137,7 +132,6 @@ impl EventLoop {
             monero_wallet,
             db,
             listen_address,
-            swap_amounts: Default::default(),
             recv_encrypted_signature: recv_encrypted_signature.sender,
             send_transfer_proof: send_transfer_proof.receiver,
             send_transfer_proof_sender: send_transfer_proof.sender,
@@ -225,12 +219,6 @@ impl EventLoop {
         )
         .await?;
 
-        // if a node restart during execution setup, the swap is aborted (safely).
-        self.swap_amounts.insert(bob_peer_id, SwapAmounts {
-            btc: btc_amount,
-            xmr: xmr_amount,
-        });
-
         self.swarm.start_execution_setup(bob_peer_id, state0);
         // Continues once the execution setup protocol is done
         Ok(())
@@ -244,13 +232,6 @@ impl EventLoop {
         let swap_id = Uuid::new_v4();
         let handle = self.new_handle();
 
-        let swap_amounts = self.swap_amounts.remove(&bob_peer_id).ok_or_else(|| {
-            anyhow!(
-                "execution setup done for an unknown peer id: {}, node restarted in between?",
-                bob_peer_id
-            )
-        })?;
-
         let swap = Builder::new(
             self.peer_id,
             self.execution_params,
@@ -261,7 +242,7 @@ impl EventLoop {
             self.listen_address.clone(),
             handle,
         )
-        .with_init_params(swap_amounts, bob_peer_id, state3)
+        .with_init_params(bob_peer_id, state3)
         .build()
         .await?;
 

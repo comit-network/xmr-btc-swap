@@ -10,7 +10,6 @@ use crate::{
     protocol::{
         alice::{Message1, Message3, TransferProof},
         bob::{EncryptedSignature, Message0, Message2, Message4},
-        SwapAmounts,
     },
 };
 use anyhow::{anyhow, Context, Result};
@@ -25,12 +24,10 @@ use std::fmt;
 pub enum AliceState {
     Started {
         bob_peer_id: PeerId,
-        amounts: SwapAmounts,
         state3: Box<State3>,
     },
     BtcLocked {
         bob_peer_id: PeerId,
-        amounts: SwapAmounts,
         state3: Box<State3>,
     },
     XmrLocked {
