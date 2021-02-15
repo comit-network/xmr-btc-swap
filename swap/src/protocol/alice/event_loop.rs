@@ -266,7 +266,7 @@ impl EventLoop {
         .await?;
 
         let (remote, remote_handle) = alice::run(swap).remote_handle();
-        tokio::spawn(async move { remote.await });
+        tokio::spawn(remote);
 
         let _ = self
             .swap_handle_sender
