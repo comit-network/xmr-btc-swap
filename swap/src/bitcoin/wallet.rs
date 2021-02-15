@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, tokio::retry};
 use bdk::{
     blockchain::{noop_progress, Blockchain, ElectrumBlockchain},
-    electrum_client::{Client, ElectrumApi},
+    electrum_client::{self, Client, ElectrumApi},
     keys::GeneratableDefaultOptions,
     FeeRate,
 };
@@ -45,7 +45,10 @@ impl Wallet {
         network: bitcoin::Network,
         waller_dir: &Path,
     ) -> Result<Self> {
-        let client = Client::new(electrum_rpc_url.as_str())
+        // Workaround for https://github.com/bitcoindevkit/rust-electrum-client/issues/47.
+        let config = electrum_client::ConfigBuilder::default().retry(2).build();
+
+        let client = Client::from_config(electrum_rpc_url.as_str(), config)
             .map_err(|e| anyhow!("Failed to init electrum rpc client: {:?}", e))?;
 
         let db = bdk::sled::open(waller_dir)?.open_tree(SLED_TREE_NAME)?;
