@@ -480,7 +480,7 @@ impl State4 {
 
         let tx_redeem_candidate = bitcoin_wallet
             .watch_for_raw_transaction(tx_redeem.txid())
-            .await;
+            .await?;
 
         let tx_redeem_sig =
             tx_redeem.extract_signature_by_key(tx_redeem_candidate, self.b.public())?;

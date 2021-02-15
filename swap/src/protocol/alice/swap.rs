@@ -292,7 +292,7 @@ async fn run_until_internal(
             AliceState::BtcCancelled { state3, tx_cancel } => {
                 let tx_cancel_height = bitcoin_wallet
                     .transaction_block_height(tx_cancel.txid())
-                    .await;
+                    .await?;
 
                 let (tx_refund, published_refund_tx) = wait_for_bitcoin_refund(
                     &tx_cancel,
@@ -388,7 +388,7 @@ async fn run_until_internal(
                 match select(refund_tx_seen, punish_tx_finalised).await {
                     Either::Left((published_refund_tx, _)) => {
                         let spend_key = extract_monero_private_key(
-                            published_refund_tx,
+                            published_refund_tx?,
                             tx_refund,
                             state3.s_a,
                             state3.a.clone(),

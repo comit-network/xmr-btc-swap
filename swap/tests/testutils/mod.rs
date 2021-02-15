@@ -155,11 +155,7 @@ impl TestContext {
         let swap_handle = self.alice_swap_handle.recv().await.unwrap();
         let state = swap_handle.await.unwrap();
 
-        assert!(
-            matches!(state, AliceState::XmrRefunded),
-            "Alice state is not XmrRefunded: {}",
-            state
-        );
+        assert!(matches!(state, AliceState::XmrRefunded));
 
         self.alice_bitcoin_wallet
             .sync_wallet()

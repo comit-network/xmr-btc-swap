@@ -23,6 +23,14 @@ use tokio::{sync::Mutex, time::interval};
 
 const SLED_TREE_NAME: &str = "default_tree";
 
+#[derive(Debug)]
+enum Error {
+    Io(reqwest::Error),
+    Parse(std::num::ParseIntError),
+    NotYetMined,
+    JsonDeserialisation(reqwest::Error),
+}
+
 pub struct Wallet {
     pub inner: Arc<Mutex<bdk::Wallet<ElectrumBlockchain, bdk::sled::Tree>>>,
     pub network: bitcoin::Network,
@@ -150,7 +158,7 @@ impl BroadcastSignedTransaction for Wallet {
 
 #[async_trait]
 impl WatchForRawTransaction for Wallet {
-    async fn watch_for_raw_transaction(&self, txid: Txid) -> Transaction {
+    async fn watch_for_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
         tracing::debug!("watching for tx: {}", txid);
         retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
             let client = Client::new(self.rpc_url.as_ref())?;
@@ -159,7 +167,7 @@ impl WatchForRawTransaction for Wallet {
             Ok(tx)
         })
         .await
-        .expect("transient errors to be retried")
+        .map_err(|err| anyhow!("transient errors to be retried: {:?}", err))
     }
 }
 
@@ -174,19 +182,11 @@ impl GetRawTransaction for Wallet {
 
 #[async_trait]
 impl GetBlockHeight for Wallet {
-    async fn get_block_height(&self) -> BlockHeight {
-        // todo: create this url using the join() api in the Url type
-        let url = format!("{}{}", self.http_url.as_str(), "blocks/tip/height");
-        #[derive(Debug)]
-        enum Error {
-            Io(reqwest::Error),
-            Parse(std::num::ParseIntError),
-        }
+    async fn get_block_height(&self) -> Result<BlockHeight> {
+        let url = self.http_url.join("blocks/tip/height")?;
         let height = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
-            // todo: We may want to return early if we cannot connect to the electrum node
-            // rather than retrying
             let height = reqwest::Client::new()
-                .request(Method::GET, &url)
+                .request(Method::GET, url.clone())
                 .send()
                 .await
                 .map_err(Error::Io)?
@@ -194,37 +194,29 @@ impl GetBlockHeight for Wallet {
                 .await
                 .map_err(Error::Io)?
                 .parse::<u32>()
-                .map_err(Error::Parse)?;
+                .map_err(|err| backoff::Error::Permanent(Error::Parse(err)))?;
             Result::<_, backoff::Error<Error>>::Ok(height)
         })
         .await
-        .expect("transient errors to be retried");
+        .map_err(|err| anyhow!("transient errors to be retried: {:?}", err))?;
 
-        BlockHeight::new(height)
+        Ok(BlockHeight::new(height))
     }
 }
 
 #[async_trait]
 impl TransactionBlockHeight for Wallet {
-    async fn transaction_block_height(&self, txid: Txid) -> BlockHeight {
-        // todo: create this url using the join() api in the Url type
-        let url = format!("{}tx/{}/status", self.http_url, txid);
+    async fn transaction_block_height(&self, txid: Txid) -> Result<BlockHeight> {
+        let url = self.http_url.join(&format!("tx/{}/status", txid))?;
+
         #[derive(Serialize, Deserialize, Debug, Clone)]
         struct TransactionStatus {
             block_height: Option<u32>,
             confirmed: bool,
         }
-        // todo: See if we can make this error handling more elegant
-        // errors
-        #[derive(Debug)]
-        enum Error {
-            Io(reqwest::Error),
-            NotYetMined,
-            JsonDeserialisation(reqwest::Error),
-        }
         let height = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
             let resp = reqwest::Client::new()
-                .request(Method::GET, &url)
+                .request(Method::GET, url.clone())
                 .send()
                 .await
                 .map_err(|err| backoff::Error::Transient(Error::Io(err)))?;
@@ -241,9 +233,9 @@ impl TransactionBlockHeight for Wallet {
             Result::<_, backoff::Error<Error>>::Ok(block_height)
         })
         .await
-        .expect("transient errors to be retried");
+        .map_err(|err| anyhow!("transient errors to be retried: {:?}", err))?;
 
-        BlockHeight::new(height)
+        Ok(BlockHeight::new(height))
     }
 }
 
@@ -260,9 +252,9 @@ impl WaitForTransactionFinality for Wallet {
         let mut interval = interval(execution_params.bitcoin_avg_block_time / 4);
 
         loop {
-            let tx_block_height = self.transaction_block_height(txid).await;
+            let tx_block_height = self.transaction_block_height(txid).await?;
             tracing::debug!("tx_block_height: {:?}", tx_block_height);
-            let block_height = self.get_block_height().await;
+            let block_height = self.get_block_height().await?;
             tracing::debug!("latest_block_height: {:?}", block_height);
             if let Some(confirmations) = block_height.checked_sub(tx_block_height) {
                 tracing::debug!("confirmations: {:?}", confirmations);
