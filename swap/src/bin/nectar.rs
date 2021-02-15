@@ -91,6 +91,11 @@ async fn main() -> Result<()> {
             )
             .await?;
 
+            info!(
+                "BTC deposit address: {}",
+                bitcoin_wallet.new_address().await?
+            );
+
             let (mut event_loop, _) = EventLoop::new(
                 config.network.listen,
                 seed,

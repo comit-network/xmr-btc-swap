@@ -106,6 +106,11 @@ async fn main() -> Result<()> {
                 send_bitcoin, swap_id
             );
 
+            info!(
+                "BTC deposit address: {}",
+                bitcoin_wallet.new_address().await?
+            );
+
             let bob_factory = Builder::new(
                 seed,
                 db,
