@@ -23,10 +23,10 @@ pub use self::{
     cancel::cancel,
     encrypted_signature::EncryptedSignature,
     event_loop::{EventLoop, EventLoopHandle},
+    quote_request::*,
     refund::refund,
     state::*,
     swap::{run, run_until},
-    swap_request::*,
 };
 pub use execution_setup::{Message0, Message2, Message4};
 use libp2p::request_response::ResponseChannel;
@@ -35,10 +35,10 @@ pub mod cancel;
 mod encrypted_signature;
 pub mod event_loop;
 mod execution_setup;
+mod quote_request;
 pub mod refund;
 pub mod state;
 pub mod swap;
-mod swap_request;
 mod transfer_proof;
 
 pub struct Swap {
@@ -205,7 +205,7 @@ impl Builder {
 #[derive(Debug)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
-    SwapResponse(alice::SwapResponse),
+    QuoteResponse(alice::QuoteResponse),
     ExecutionSetupDone(Result<Box<State2>>),
     TransferProof {
         msg: Box<TransferProof>,
@@ -226,12 +226,12 @@ impl From<peer_tracker::OutEvent> for OutEvent {
     }
 }
 
-impl From<swap_request::OutEvent> for OutEvent {
-    fn from(event: swap_request::OutEvent) -> Self {
-        use swap_request::OutEvent::*;
+impl From<quote_request::OutEvent> for OutEvent {
+    fn from(event: quote_request::OutEvent) -> Self {
+        use quote_request::OutEvent::*;
         match event {
-            MsgReceived(swap_response) => OutEvent::SwapResponse(swap_response),
-            Failure(err) => OutEvent::Failure(err.context("Failre with Swap Request")),
+            MsgReceived(quote_response) => OutEvent::QuoteResponse(quote_response),
+            Failure(err) => OutEvent::Failure(err.context("Failure with Quote Request")),
         }
     }
 }
@@ -274,17 +274,17 @@ impl From<encrypted_signature::OutEvent> for OutEvent {
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
     pt: PeerTracker,
-    swap_request: swap_request::Behaviour,
+    quote_request: quote_request::Behaviour,
     execution_setup: execution_setup::Behaviour,
     transfer_proof: transfer_proof::Behaviour,
     encrypted_signature: encrypted_signature::Behaviour,
 }
 
 impl Behaviour {
-    /// Sends a swap request to Alice to negotiate the swap.
-    pub fn send_swap_request(&mut self, alice: PeerId, swap_request: SwapRequest) {
-        let _id = self.swap_request.send(alice, swap_request);
-        info!("Requesting swap from: {}", alice);
+    /// Sends a quote request to Alice to retrieve the rate.
+    pub fn send_quote_request(&mut self, alice: PeerId, quote_request: QuoteRequest) {
+        let _id = self.quote_request.send(alice, quote_request);
+        info!("Requesting quote from: {}", alice);
     }
 
     pub fn start_execution_setup(

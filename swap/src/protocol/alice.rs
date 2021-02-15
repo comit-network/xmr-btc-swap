@@ -13,9 +13,9 @@ pub use self::{
     behaviour::{Behaviour, OutEvent},
     event_loop::{EventLoop, EventLoopHandle},
     execution_setup::Message1,
+    quote_response::*,
     state::*,
     swap::{run, run_until},
-    swap_response::*,
     transfer_proof::TransferProof,
 };
 pub use execution_setup::Message3;
@@ -24,10 +24,10 @@ mod behaviour;
 mod encrypted_signature;
 pub mod event_loop;
 mod execution_setup;
+mod quote_response;
 pub mod state;
 mod steps;
 pub mod swap;
-mod swap_response;
 mod transfer_proof;
 
 pub struct Swap {

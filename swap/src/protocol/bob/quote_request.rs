@@ -1,6 +1,6 @@
 use crate::{
     network::request_response::{CborCodec, Swap, TIMEOUT},
-    protocol::alice::SwapResponse,
+    protocol::alice::QuoteResponse,
 };
 use anyhow::{anyhow, Error, Result};
 use libp2p::{
@@ -15,14 +15,14 @@ use std::time::Duration;
 use tracing::debug;
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-pub struct SwapRequest {
+pub struct QuoteRequest {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub btc_amount: bitcoin::Amount,
 }
 
 #[derive(Debug)]
 pub enum OutEvent {
-    MsgReceived(SwapResponse),
+    MsgReceived(QuoteResponse),
     Failure(Error),
 }
 
@@ -31,12 +31,12 @@ pub enum OutEvent {
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    rr: RequestResponse<CborCodec<Swap, SwapRequest, SwapResponse>>,
+    rr: RequestResponse<CborCodec<Swap, QuoteRequest, QuoteResponse>>,
 }
 
 impl Behaviour {
-    pub fn send(&mut self, alice: PeerId, swap_request: SwapRequest) -> Result<RequestId> {
-        let id = self.rr.send_request(&alice, swap_request);
+    pub fn send(&mut self, alice: PeerId, quote_request: QuoteRequest) -> Result<RequestId> {
+        let id = self.rr.send_request(&alice, quote_request);
 
         Ok(id)
     }
@@ -59,8 +59,8 @@ impl Default for Behaviour {
     }
 }
 
-impl From<RequestResponseEvent<SwapRequest, SwapResponse>> for OutEvent {
-    fn from(event: RequestResponseEvent<SwapRequest, SwapResponse>) -> Self {
+impl From<RequestResponseEvent<QuoteRequest, QuoteResponse>> for OutEvent {
+    fn from(event: RequestResponseEvent<QuoteRequest, QuoteResponse>) -> Self {
         match event {
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Request { .. },
@@ -71,7 +71,7 @@ impl From<RequestResponseEvent<SwapRequest, SwapResponse>> for OutEvent {
                 message: RequestResponseMessage::Response { response, .. },
                 ..
             } => {
-                debug!("Received swap response from {}", peer);
+                debug!("Received quote response from {}", peer);
                 OutEvent::MsgReceived(response)
             }
             RequestResponseEvent::InboundFailure { error, .. } => {
@@ -81,7 +81,7 @@ impl From<RequestResponseEvent<SwapRequest, SwapResponse>> for OutEvent {
                 OutEvent::Failure(anyhow!("Outbound failure: {:?}", error))
             }
             RequestResponseEvent::ResponseSent { .. } => {
-                OutEvent::Failure(anyhow!("Bob does not send a swap response to Alice"))
+                OutEvent::Failure(anyhow!("Bob does not send a quote response to Alice"))
             }
         }
     }
