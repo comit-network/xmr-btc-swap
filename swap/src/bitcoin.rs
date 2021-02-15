@@ -1,10 +1,20 @@
-pub mod timelocks;
-pub mod transactions;
 pub mod wallet;
 
+mod timelocks;
+mod cancel;
+mod lock;
+mod punish;
+mod redeem;
+mod refund;
+mod timelocks;
+
 pub use crate::bitcoin::{
+    cancel::TxCancel,
+    lock::TxLock,
+    punish::TxPunish,
+    redeem::TxRedeem,
+    refund::TxRefund,
     timelocks::Timelock,
-    transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund},
 };
 pub use ::bitcoin::{util::amount::Amount, Address, Network, Transaction, Txid};
 pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
@@ -297,3 +307,19 @@ where
     poll_until_block_height_is_gte(bitcoin_wallet, tx_lock_height + cancel_timelock).await;
     Ok(())
 }
+
+#[derive(Clone, Copy, thiserror::Error, Debug)]
+#[error("transaction does not spend anything")]
+pub struct NoInputs;
+
+#[derive(Clone, Copy, thiserror::Error, Debug)]
+#[error("transaction has {0} inputs, expected 1")]
+pub struct TooManyInputs(usize);
+
+#[derive(Clone, Copy, thiserror::Error, Debug)]
+#[error("empty witness stack")]
+pub struct EmptyWitnessStack;
+
+#[derive(Clone, Copy, thiserror::Error, Debug)]
+#[error("input has {0} witnesses, expected 3")]
+pub struct NotThreeWitnesses(usize);
