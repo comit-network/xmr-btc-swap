@@ -82,7 +82,7 @@ async fn main() -> Result<()> {
 
             let (bitcoin_wallet, monero_wallet) = init_wallets(config.clone()).await?;
 
-            let mut event_loop = EventLoop::new(
+            let (mut event_loop, _) = EventLoop::new(
                 config.network.listen,
                 seed,
                 execution_params,

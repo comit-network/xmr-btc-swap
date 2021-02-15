@@ -6,20 +6,23 @@ use crate::{
     network::{transport, TokioExecutor},
     protocol::{
         alice,
-        alice::{Behaviour, Builder, OutEvent, QuoteResponse, State0, State3, TransferProof},
+        alice::{
+            AliceState, Behaviour, Builder, OutEvent, QuoteResponse, State0, State3, TransferProof,
+        },
         bob::{EncryptedSignature, QuoteRequest},
         SwapAmounts,
     },
     seed::Seed,
 };
 use anyhow::{anyhow, Context, Result};
+use futures::future::RemoteHandle;
 use libp2p::{
     core::Multiaddr, futures::FutureExt, request_response::ResponseChannel, PeerId, Swarm,
 };
 use rand::rngs::OsRng;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{broadcast, mpsc};
-use tracing::{debug, error, trace};
+use tracing::{debug, error, trace, warn};
 use uuid::Uuid;
 
 // TODO: Use dynamic
@@ -95,6 +98,8 @@ pub struct EventLoop {
 
     // Only used to produce new handles
     send_transfer_proof_sender: mpsc::Sender<(PeerId, TransferProof)>,
+
+    swap_handle_sender: mpsc::Sender<RemoteHandle<Result<AliceState>>>,
 }
 
 impl EventLoop {
@@ -105,7 +110,7 @@ impl EventLoop {
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
         db: Arc<Database>,
-    ) -> Result<Self> {
+    ) -> Result<(Self, mpsc::Receiver<RemoteHandle<Result<AliceState>>>)> {
         let identity = network::Seed::new(seed).derive_libp2p_identity();
         let behaviour = Behaviour::default();
         let transport = transport::build(&identity)?;
@@ -122,8 +127,9 @@ impl EventLoop {
 
         let recv_encrypted_signature = BroadcastChannels::default();
         let send_transfer_proof = MpscChannels::default();
+        let swap_handle = MpscChannels::default();
 
-        Ok(EventLoop {
+        let event_loop = EventLoop {
             swarm,
             peer_id,
             execution_params,
@@ -135,7 +141,9 @@ impl EventLoop {
             recv_encrypted_signature: recv_encrypted_signature.sender,
             send_transfer_proof: send_transfer_proof.receiver,
             send_transfer_proof_sender: send_transfer_proof.sender,
-        })
+            swap_handle_sender: swap_handle.sender,
+        };
+        Ok((event_loop, swap_handle.receiver))
     }
 
     pub fn new_handle(&self) -> EventLoopHandle {
@@ -257,7 +265,14 @@ impl EventLoop {
         .build()
         .await?;
 
-        tokio::spawn(async move { alice::run(swap).await });
+        let (remote, remote_handle) = alice::run(swap).remote_handle();
+        tokio::spawn(async move { remote.await });
+
+        let _ = self
+            .swap_handle_sender
+            .send(remote_handle)
+            .await
+            .map_err(|err| warn!("Could not send swap handle over channel: {:?}", err));
 
         Ok(())
     }
