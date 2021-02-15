@@ -3,7 +3,7 @@
 use crate::{
     bitcoin,
     bitcoin::{
-        timelocks::ExpiredTimelocks, TransactionBlockHeight, WaitForTransactionFinality,
+        ExpiredTimelocks, TransactionBlockHeight, WaitForTransactionFinality,
         WatchForRawTransaction,
     },
     database,

@@ -1,6 +1,5 @@
 pub mod wallet;
 
-mod timelocks;
 mod cancel;
 mod lock;
 mod punish;
@@ -9,18 +8,18 @@ mod refund;
 mod timelocks;
 
 pub use crate::bitcoin::{
-    cancel::TxCancel,
+    cancel::{CancelTimelock, PunishTimelock, TxCancel},
     lock::TxLock,
     punish::TxPunish,
     redeem::TxRedeem,
     refund::TxRefund,
-    timelocks::Timelock,
+    timelocks::{BlockHeight, ExpiredTimelocks},
 };
 pub use ::bitcoin::{util::amount::Amount, Address, Network, Transaction, Txid};
 pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
 pub use wallet::Wallet;
 
-use crate::{bitcoin::timelocks::BlockHeight, execution_params::ExecutionParams};
+use crate::execution_params::ExecutionParams;
 use ::bitcoin::{
     hashes::{hex::ToHex, Hash},
     secp256k1,
@@ -35,7 +34,6 @@ use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
-use timelocks::ExpiredTimelocks;
 
 // TODO: Configurable tx-fee (note: parties have to agree prior to swapping)
 // Current reasoning:
@@ -272,8 +270,8 @@ where
 
 pub async fn current_epoch<W>(
     bitcoin_wallet: &W,
-    cancel_timelock: Timelock,
-    punish_timelock: Timelock,
+    cancel_timelock: CancelTimelock,
+    punish_timelock: PunishTimelock,
     lock_tx_id: ::bitcoin::Txid,
 ) -> anyhow::Result<ExpiredTimelocks>
 where
@@ -296,7 +294,7 @@ where
 
 pub async fn wait_for_cancel_timelock_to_expire<W>(
     bitcoin_wallet: &W,
-    cancel_timelock: Timelock,
+    cancel_timelock: CancelTimelock,
     lock_tx_id: ::bitcoin::Txid,
 ) -> Result<()>
 where

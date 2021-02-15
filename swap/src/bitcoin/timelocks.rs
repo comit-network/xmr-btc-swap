@@ -1,26 +1,5 @@
-use std::ops::Add;
-
 use serde::{Deserialize, Serialize};
-
-/// Represent a timelock, expressed in relative block height as defined in
-/// [BIP68](https://github.com/bitcoin/bips/blob/master/bip-0068.mediawiki).
-/// E.g. The timelock expires 10 blocks after the reference transaction is
-/// mined.
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
-#[serde(transparent)]
-pub struct Timelock(u32);
-
-impl Timelock {
-    pub const fn new(number_of_blocks: u32) -> Self {
-        Self(number_of_blocks)
-    }
-}
-
-impl From<Timelock> for u32 {
-    fn from(timelock: Timelock) -> Self {
-        timelock.0
-    }
-}
+use std::ops::Add;
 
 /// Represent a block height, or block number, expressed in absolute block
 /// count. E.g. The transaction was included in block #655123, 655123 block
@@ -41,11 +20,11 @@ impl BlockHeight {
     }
 }
 
-impl Add<Timelock> for BlockHeight {
+impl Add<u32> for BlockHeight {
     type Output = BlockHeight;
 
-    fn add(self, rhs: Timelock) -> Self::Output {
-        BlockHeight(self.0 + rhs.0)
+    fn add(self, rhs: u32) -> Self::Output {
+        BlockHeight(self.0 + rhs)
     }
 }
 

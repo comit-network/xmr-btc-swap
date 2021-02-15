@@ -1,6 +1,6 @@
 use crate::{
     bitcoin,
-    bitcoin::timelocks::ExpiredTimelocks,
+    bitcoin::ExpiredTimelocks,
     database::{Database, Swap},
     execution_params::ExecutionParams,
     monero,

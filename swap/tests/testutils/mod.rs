@@ -7,7 +7,7 @@ use monero_harness::{image, Monero};
 use std::{path::PathBuf, sync::Arc};
 use swap::{
     bitcoin,
-    bitcoin::Timelock,
+    bitcoin::{CancelTimelock, PunishTimelock},
     database::Database,
     execution_params,
     execution_params::{ExecutionParams, GetExecutionParams},
@@ -484,7 +484,7 @@ pub struct SlowCancelConfig;
 impl GetExecutionParams for SlowCancelConfig {
     fn get_execution_params() -> ExecutionParams {
         ExecutionParams {
-            bitcoin_cancel_timelock: Timelock::new(180),
+            bitcoin_cancel_timelock: CancelTimelock::new(180),
             ..execution_params::Regtest::get_execution_params()
         }
     }
@@ -495,7 +495,7 @@ pub struct FastCancelConfig;
 impl GetExecutionParams for FastCancelConfig {
     fn get_execution_params() -> ExecutionParams {
         ExecutionParams {
-            bitcoin_cancel_timelock: Timelock::new(1),
+            bitcoin_cancel_timelock: CancelTimelock::new(1),
             ..execution_params::Regtest::get_execution_params()
         }
     }
@@ -506,8 +506,8 @@ pub struct FastPunishConfig;
 impl GetExecutionParams for FastPunishConfig {
     fn get_execution_params() -> ExecutionParams {
         ExecutionParams {
-            bitcoin_cancel_timelock: Timelock::new(1),
-            bitcoin_punish_timelock: Timelock::new(1),
+            bitcoin_cancel_timelock: CancelTimelock::new(1),
+            bitcoin_punish_timelock: PunishTimelock::new(1),
             ..execution_params::Regtest::get_execution_params()
         }
     }

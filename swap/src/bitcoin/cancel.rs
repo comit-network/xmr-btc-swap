@@ -1,13 +1,57 @@
 use crate::bitcoin::{
-    build_shared_output_descriptor,
-    timelocks::{CancelTimelock, Timelock},
-    Address, Amount, PublicKey, Transaction, TxLock, TX_FEE,
+    build_shared_output_descriptor, Address, Amount, BlockHeight, PublicKey, Transaction, TxLock,
+    TX_FEE,
 };
 use ::bitcoin::{util::bip143::SigHashCache, OutPoint, SigHash, SigHashType, TxIn, TxOut, Txid};
 use anyhow::Result;
 use ecdsa_fun::Signature;
 use miniscript::{Descriptor, NullCtx};
-use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, ops::Add};
+
+/// Represent a timelock, expressed in relative block height as defined in
+/// [BIP68](https://github.com/bitcoin/bips/blob/master/bip-0068.mediawiki).
+/// E.g. The timelock expires 10 blocks after the reference transaction is
+/// mined.
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[serde(transparent)]
+pub struct CancelTimelock(u32);
+
+impl CancelTimelock {
+    pub const fn new(number_of_blocks: u32) -> Self {
+        Self(number_of_blocks)
+    }
+}
+
+impl Add<CancelTimelock> for BlockHeight {
+    type Output = BlockHeight;
+
+    fn add(self, rhs: CancelTimelock) -> Self::Output {
+        self + rhs.0
+    }
+}
+
+/// Represent a timelock, expressed in relative block height as defined in
+/// [BIP68](https://github.com/bitcoin/bips/blob/master/bip-0068.mediawiki).
+/// E.g. The timelock expires 10 blocks after the reference transaction is
+/// mined.
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[serde(transparent)]
+pub struct PunishTimelock(u32);
+
+impl PunishTimelock {
+    pub const fn new(number_of_blocks: u32) -> Self {
+        Self(number_of_blocks)
+    }
+}
+
+impl Add<PunishTimelock> for BlockHeight {
+    type Output = BlockHeight;
+
+    fn add(self, rhs: PunishTimelock) -> Self::Output {
+        self + rhs.0
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct TxCancel {
@@ -28,7 +72,7 @@ impl TxCancel {
         let tx_in = TxIn {
             previous_output: tx_lock.as_outpoint(),
             script_sig: Default::default(),
-            sequence: cancel_timelock.into(),
+            sequence: cancel_timelock.0,
             witness: Vec::new(),
         };
 
@@ -110,14 +154,14 @@ impl TxCancel {
     pub fn build_spend_transaction(
         &self,
         spend_address: &Address,
-        sequence: Option<Timelock>,
+        sequence: Option<PunishTimelock>,
     ) -> Transaction {
         let previous_output = self.as_outpoint();
 
         let tx_in = TxIn {
             previous_output,
             script_sig: Default::default(),
-            sequence: sequence.map(Into::into).unwrap_or(0xFFFF_FFFF),
+            sequence: sequence.map(|seq| seq.0).unwrap_or(0xFFFF_FFFF),
             witness: Vec::new(),
         };
 

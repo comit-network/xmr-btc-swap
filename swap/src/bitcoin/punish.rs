@@ -1,4 +1,4 @@
-use crate::bitcoin::{timelocks::PunishTimelock, Address, PublicKey, Transaction, TxCancel};
+use crate::bitcoin::{Address, PublicKey, PunishTimelock, Transaction, TxCancel};
 use ::bitcoin::{util::bip143::SigHashCache, SigHash, SigHashType};
 use anyhow::Result;
 use ecdsa_fun::Signature;
@@ -17,8 +17,7 @@ impl TxPunish {
         punish_address: &Address,
         punish_timelock: PunishTimelock,
     ) -> Self {
-        let tx_punish =
-            tx_cancel.build_spend_transaction(punish_address, Some(punish_timelock.into()));
+        let tx_punish = tx_cancel.build_spend_transaction(punish_address, Some(punish_timelock));
 
         let digest = SigHashCache::new(&tx_punish).signature_hash(
             0, // Only one input: cancel transaction
