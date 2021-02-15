@@ -1,6 +1,6 @@
 use crate::{
     monero::TransferProof,
-    protocol::{bob, bob::BobState, SwapAmounts},
+    protocol::{bob, bob::BobState},
 };
 use ::bitcoin::hashes::core::fmt::Display;
 use monero_harness::rpc::wallet::BlockHeight;
@@ -9,10 +9,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Bob {
     Started {
-        state0: bob::State0,
-        amounts: SwapAmounts,
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        btc_amount: bitcoin::Amount,
     },
-    Negotiated {
+    ExecutionSetupDone {
         state2: bob::State2,
     },
     BtcLocked {
@@ -46,8 +46,8 @@ pub enum BobEndState {
 impl From<BobState> for Bob {
     fn from(bob_state: BobState) -> Self {
         match bob_state {
-            BobState::Started { state0, amounts } => Bob::Started { state0, amounts },
-            BobState::Negotiated(state2) => Bob::Negotiated { state2 },
+            BobState::Started { btc_amount } => Bob::Started { btc_amount },
+            BobState::ExecutionSetupDone(state2) => Bob::ExecutionSetupDone { state2 },
             BobState::BtcLocked(state3) => Bob::BtcLocked { state3 },
             BobState::XmrLockProofReceived {
                 state,
@@ -78,8 +78,8 @@ impl From<BobState> for Bob {
 impl From<Bob> for BobState {
     fn from(db_state: Bob) -> Self {
         match db_state {
-            Bob::Started { state0, amounts } => BobState::Started { state0, amounts },
-            Bob::Negotiated { state2 } => BobState::Negotiated(state2),
+            Bob::Started { btc_amount } => BobState::Started { btc_amount },
+            Bob::ExecutionSetupDone { state2 } => BobState::ExecutionSetupDone(state2),
             Bob::BtcLocked { state3 } => BobState::BtcLocked(state3),
             Bob::XmrLockProofReceived {
                 state,
@@ -109,7 +109,7 @@ impl Display for Bob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Bob::Started { .. } => write!(f, "Started"),
-            Bob::Negotiated { .. } => f.write_str("Negotiated"),
+            Bob::ExecutionSetupDone { .. } => f.write_str("Execution setup done"),
             Bob::BtcLocked { .. } => f.write_str("Bitcoin locked"),
             Bob::XmrLockProofReceived { .. } => {
                 f.write_str("XMR lock transaction transfer proof received")

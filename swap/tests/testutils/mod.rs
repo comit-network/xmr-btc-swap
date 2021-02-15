@@ -7,12 +7,17 @@ use monero_harness::{image, Monero};
 use std::{path::PathBuf, sync::Arc};
 use swap::{
     bitcoin,
-    bitcoin::Timelock,
+    bitcoin::{CancelTimelock, PunishTimelock},
     database::Database,
     execution_params,
     execution_params::{ExecutionParams, GetExecutionParams},
     monero,
-    protocol::{alice, alice::AliceState, bob, bob::BobState, SwapAmounts},
+    protocol::{
+        alice,
+        alice::{event_loop::RATE, AliceState},
+        bob,
+        bob::BobState,
+    },
     seed::Seed,
 };
 use tempfile::tempdir;
@@ -66,7 +71,8 @@ impl BobEventLoopJoinHandle {
 pub struct AliceEventLoopJoinHandle(JoinHandle<()>);
 
 pub struct TestContext {
-    swap_amounts: SwapAmounts,
+    btc_amount: bitcoin::Amount,
+    xmr_amount: monero::Amount,
 
     alice_starting_balances: StartingBalances,
     alice_bitcoin_wallet: Arc<bitcoin::Wallet>,
@@ -84,7 +90,7 @@ impl TestContext {
         let (swap, event_loop) = self
             .bob_params
             .builder()
-            .with_init_params(self.swap_amounts)
+            .with_init_params(self.btc_amount)
             .build()
             .await
             .unwrap();
@@ -116,7 +122,7 @@ impl TestContext {
         let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
         assert_eq!(
             btc_balance_after_swap,
-            self.alice_starting_balances.btc + self.swap_amounts.btc
+            self.alice_starting_balances.btc + self.btc_amount
                 - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
         );
 
@@ -126,7 +132,7 @@ impl TestContext {
             .get_balance()
             .await
             .unwrap();
-        assert!(xmr_balance_after_swap <= self.alice_starting_balances.xmr - self.swap_amounts.xmr);
+        assert!(xmr_balance_after_swap <= self.alice_starting_balances.xmr - self.xmr_amount);
     }
 
     pub async fn assert_alice_refunded(&mut self) {
@@ -155,7 +161,7 @@ impl TestContext {
             .get_balance()
             .await
             .unwrap();
-        assert_eq!(xmr_balance_after_swap, self.swap_amounts.xmr);
+        assert_eq!(xmr_balance_after_swap, self.xmr_amount);
     }
 
     pub async fn assert_alice_punished(&self, state: AliceState) {
@@ -164,7 +170,7 @@ impl TestContext {
         let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
         assert_eq!(
             btc_balance_after_swap,
-            self.alice_starting_balances.btc + self.swap_amounts.btc
+            self.alice_starting_balances.btc + self.btc_amount
                 - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE)
         );
 
@@ -174,7 +180,7 @@ impl TestContext {
             .get_balance()
             .await
             .unwrap();
-        assert!(xmr_balance_after_swap <= self.alice_starting_balances.xmr - self.swap_amounts.xmr);
+        assert!(xmr_balance_after_swap <= self.alice_starting_balances.xmr - self.xmr_amount);
     }
 
     pub async fn assert_bob_redeemed(&self, state: BobState) {
@@ -193,7 +199,7 @@ impl TestContext {
         let btc_balance_after_swap = self.bob_bitcoin_wallet.as_ref().balance().await.unwrap();
         assert_eq!(
             btc_balance_after_swap,
-            self.bob_starting_balances.btc - self.swap_amounts.btc - lock_tx_bitcoin_fee
+            self.bob_starting_balances.btc - self.btc_amount - lock_tx_bitcoin_fee
         );
 
         // Ensure that Bob's balance is refreshed as we use a newly created wallet
@@ -206,7 +212,7 @@ impl TestContext {
         let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().get_balance().await.unwrap();
         assert_eq!(
             xmr_balance_after_swap,
-            self.bob_starting_balances.xmr + self.swap_amounts.xmr
+            self.bob_starting_balances.xmr + self.xmr_amount
         );
     }
 
@@ -258,7 +264,7 @@ impl TestContext {
         let btc_balance_after_swap = self.bob_bitcoin_wallet.as_ref().balance().await.unwrap();
         assert_eq!(
             btc_balance_after_swap,
-            self.bob_starting_balances.btc - self.swap_amounts.btc - lock_tx_bitcoin_fee
+            self.bob_starting_balances.btc - self.btc_amount - lock_tx_bitcoin_fee
         );
 
         let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().get_balance().await.unwrap();
@@ -280,13 +286,11 @@ where
 
     let (monero, containers) = testutils::init_containers(&cli).await;
 
-    let swap_amounts = SwapAmounts {
-        btc: bitcoin::Amount::from_sat(1_000_000),
-        xmr: monero::Amount::from_piconero(1_000_000_000_000),
-    };
+    let btc_amount = bitcoin::Amount::from_sat(1_000_000);
+    let xmr_amount = monero::Amount::from_monero(btc_amount.as_btc() * RATE as f64).unwrap();
 
     let alice_starting_balances = StartingBalances {
-        xmr: swap_amounts.xmr * 10,
+        xmr: xmr_amount * 10,
         btc: bitcoin::Amount::ZERO,
     };
 
@@ -311,7 +315,7 @@ where
 
     let bob_starting_balances = StartingBalances {
         xmr: monero::Amount::ZERO,
-        btc: swap_amounts.btc * 10,
+        btc: btc_amount * 10,
     };
 
     let (bob_bitcoin_wallet, bob_monero_wallet) = init_test_wallets(
@@ -350,7 +354,8 @@ where
     };
 
     let test = TestContext {
-        swap_amounts,
+        btc_amount,
+        xmr_amount,
         alice_starting_balances,
         alice_bitcoin_wallet,
         alice_monero_wallet,
@@ -484,7 +489,7 @@ pub struct SlowCancelConfig;
 impl GetExecutionParams for SlowCancelConfig {
     fn get_execution_params() -> ExecutionParams {
         ExecutionParams {
-            bitcoin_cancel_timelock: Timelock::new(180),
+            bitcoin_cancel_timelock: CancelTimelock::new(180),
             ..execution_params::Regtest::get_execution_params()
         }
     }
@@ -495,7 +500,7 @@ pub struct FastCancelConfig;
 impl GetExecutionParams for FastCancelConfig {
     fn get_execution_params() -> ExecutionParams {
         ExecutionParams {
-            bitcoin_cancel_timelock: Timelock::new(1),
+            bitcoin_cancel_timelock: CancelTimelock::new(1),
             ..execution_params::Regtest::get_execution_params()
         }
     }
@@ -506,8 +511,8 @@ pub struct FastPunishConfig;
 impl GetExecutionParams for FastPunishConfig {
     fn get_execution_params() -> ExecutionParams {
         ExecutionParams {
-            bitcoin_cancel_timelock: Timelock::new(1),
-            bitcoin_punish_timelock: Timelock::new(1),
+            bitcoin_cancel_timelock: CancelTimelock::new(1),
+            bitcoin_punish_timelock: PunishTimelock::new(1),
             ..execution_params::Regtest::get_execution_params()
         }
     }

@@ -1,5 +1,5 @@
 use crate::{
-    bitcoin::{timelocks::ExpiredTimelocks, Txid, Wallet},
+    bitcoin::{ExpiredTimelocks, Txid, Wallet},
     database::{Database, Swap},
     protocol::bob::BobState,
 };

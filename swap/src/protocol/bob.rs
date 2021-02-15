@@ -9,12 +9,11 @@ use crate::{
         peer_tracker::{self, PeerTracker},
         transport::build,
     },
-    protocol::{alice, alice::TransferProof, bob, SwapAmounts},
+    protocol::{alice, alice::TransferProof, bob},
     seed::Seed,
 };
 use anyhow::{bail, Error, Result};
 use libp2p::{core::Multiaddr, identity::Keypair, NetworkBehaviour, PeerId};
-use rand::rngs::OsRng;
 use std::sync::Arc;
 use tracing::{debug, info};
 use uuid::Uuid;
@@ -69,7 +68,7 @@ pub struct Builder {
 
 enum InitParams {
     None,
-    New { swap_amounts: SwapAmounts },
+    New { btc_amount: bitcoin::Amount },
 }
 
 impl Builder {
@@ -101,19 +100,17 @@ impl Builder {
         }
     }
 
-    pub fn with_init_params(self, swap_amounts: SwapAmounts) -> Self {
+    pub fn with_init_params(self, btc_amount: bitcoin::Amount) -> Self {
         Self {
-            init_params: InitParams::New { swap_amounts },
+            init_params: InitParams::New { btc_amount },
             ..self
         }
     }
 
     pub async fn build(self) -> Result<(bob::Swap, bob::EventLoop)> {
         match self.init_params {
-            InitParams::New { swap_amounts } => {
-                let initial_state = self
-                    .make_initial_state(swap_amounts.btc, swap_amounts.xmr, self.execution_params)
-                    .await?;
+            InitParams::New { btc_amount } => {
+                let initial_state = BobState::Started { btc_amount };
 
                 let (event_loop, event_loop_handle) = self.init_event_loop()?;
 
@@ -174,31 +171,6 @@ impl Builder {
             self.alice_address.clone(),
             self.bitcoin_wallet.clone(),
         )
-    }
-
-    async fn make_initial_state(
-        &self,
-        btc_to_swap: bitcoin::Amount,
-        xmr_to_swap: monero::Amount,
-        execution_params: ExecutionParams,
-    ) -> Result<BobState> {
-        let amounts = SwapAmounts {
-            btc: btc_to_swap,
-            xmr: xmr_to_swap,
-        };
-
-        let refund_address = self.bitcoin_wallet.new_address().await?;
-        let state0 = bob::State0::new(
-            &mut OsRng,
-            btc_to_swap,
-            xmr_to_swap,
-            execution_params.bitcoin_cancel_timelock,
-            execution_params.bitcoin_punish_timelock,
-            refund_address,
-            execution_params.monero_finality_confirmations,
-        );
-
-        Ok(BobState::Started { state0, amounts })
     }
 }
 

@@ -2,7 +2,7 @@ use crate::{
     bitcoin::{EncryptedSignature, TxCancel, TxRefund},
     monero,
     monero::monero_private_key,
-    protocol::{alice, alice::AliceState, SwapAmounts},
+    protocol::{alice, alice::AliceState},
 };
 use ::bitcoin::hashes::core::fmt::Display;
 use libp2p::PeerId;
@@ -101,10 +101,6 @@ impl From<Alice> for AliceState {
                 bob_peer_id,
             } => AliceState::Started {
                 bob_peer_id,
-                amounts: SwapAmounts {
-                    btc: state3.btc,
-                    xmr: state3.xmr,
-                },
                 state3: Box::new(state3),
             },
             Alice::BtcLocked {
@@ -112,10 +108,6 @@ impl From<Alice> for AliceState {
                 bob_peer_id,
             } => AliceState::BtcLocked {
                 bob_peer_id,
-                amounts: SwapAmounts {
-                    btc: state3.btc,
-                    xmr: state3.xmr,
-                },
                 state3: Box::new(state3),
             },
             Alice::XmrLocked(state3) => AliceState::XmrLocked {

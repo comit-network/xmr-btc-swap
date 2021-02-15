@@ -3,7 +3,7 @@
 use crate::{
     bitcoin,
     bitcoin::{
-        timelocks::ExpiredTimelocks, TransactionBlockHeight, WaitForTransactionFinality,
+        ExpiredTimelocks, TransactionBlockHeight, WaitForTransactionFinality,
         WatchForRawTransaction,
     },
     database,
@@ -94,7 +94,6 @@ async fn run_until_internal(
             AliceState::Started {
                 state3,
                 bob_peer_id,
-                amounts,
             } => {
                 let _ = wait_for_locked_bitcoin(
                     state3.tx_lock.txid(),
@@ -105,7 +104,6 @@ async fn run_until_internal(
 
                 let state = AliceState::BtcLocked {
                     bob_peer_id,
-                    amounts,
                     state3,
                 };
 
@@ -126,12 +124,10 @@ async fn run_until_internal(
             }
             AliceState::BtcLocked {
                 bob_peer_id,
-                amounts,
                 state3,
             } => {
                 lock_xmr(
                     bob_peer_id,
-                    amounts,
                     *state3.clone(),
                     &mut event_loop_handle,
                     monero_wallet.clone(),

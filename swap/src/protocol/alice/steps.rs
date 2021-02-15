@@ -1,9 +1,8 @@
 use crate::{
     bitcoin,
     bitcoin::{
-        poll_until_block_height_is_gte,
-        timelocks::{BlockHeight, Timelock},
-        BroadcastSignedTransaction, EncryptedSignature, GetBlockHeight, GetRawTransaction,
+        poll_until_block_height_is_gte, BlockHeight, BroadcastSignedTransaction, CancelTimelock,
+        EncryptedSignature, GetBlockHeight, GetRawTransaction, PunishTimelock,
         TransactionBlockHeight, TxCancel, TxLock, TxRefund, WaitForTransactionFinality,
         WatchForRawTransaction,
     },
@@ -13,7 +12,6 @@ use crate::{
     protocol::{
         alice,
         alice::{event_loop::EventLoopHandle, TransferProof},
-        SwapAmounts,
     },
 };
 use anyhow::{Context, Result};
@@ -56,7 +54,6 @@ where
 
 pub async fn lock_xmr<W>(
     bob_peer_id: PeerId,
-    amounts: SwapAmounts,
     state3: alice::State3,
     event_loop_handle: &mut EventLoopHandle,
     monero_wallet: Arc<W>,
@@ -72,7 +69,7 @@ where
     let public_view_key = state3.v.public();
 
     let (transfer_proof, _) = monero_wallet
-        .transfer(public_spend_key, public_view_key, amounts.xmr)
+        .transfer(public_spend_key, public_view_key, state3.xmr)
         .await?;
 
     // TODO(Franck): Wait for Monero to be confirmed once
@@ -151,7 +148,7 @@ pub async fn publish_cancel_transaction<W>(
     tx_lock: TxLock,
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
-    cancel_timelock: Timelock,
+    cancel_timelock: CancelTimelock,
     tx_cancel_sig_bob: bitcoin::Signature,
     bitcoin_wallet: Arc<W>,
 ) -> Result<bitcoin::TxCancel>
@@ -198,7 +195,7 @@ where
 pub async fn wait_for_bitcoin_refund<W>(
     tx_cancel: &TxCancel,
     cancel_tx_height: BlockHeight,
-    punish_timelock: Timelock,
+    punish_timelock: PunishTimelock,
     refund_address: &bitcoin::Address,
     bitcoin_wallet: Arc<W>,
 ) -> Result<(bitcoin::TxRefund, Option<bitcoin::Transaction>)>
@@ -250,9 +247,9 @@ pub fn extract_monero_private_key(
 
 pub fn build_bitcoin_punish_transaction(
     tx_lock: &TxLock,
-    cancel_timelock: Timelock,
+    cancel_timelock: CancelTimelock,
     punish_address: &bitcoin::Address,
-    punish_timelock: Timelock,
+    punish_timelock: PunishTimelock,
     tx_punish_sig_bob: bitcoin::Signature,
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,

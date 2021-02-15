@@ -1,16 +1,25 @@
-pub mod timelocks;
-pub mod transactions;
 pub mod wallet;
 
+mod cancel;
+mod lock;
+mod punish;
+mod redeem;
+mod refund;
+mod timelocks;
+
 pub use crate::bitcoin::{
-    timelocks::Timelock,
-    transactions::{TxCancel, TxLock, TxPunish, TxRedeem, TxRefund},
+    cancel::{CancelTimelock, PunishTimelock, TxCancel},
+    lock::TxLock,
+    punish::TxPunish,
+    redeem::TxRedeem,
+    refund::TxRefund,
+    timelocks::{BlockHeight, ExpiredTimelocks},
 };
 pub use ::bitcoin::{util::amount::Amount, Address, Network, Transaction, Txid};
 pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
 pub use wallet::Wallet;
 
-use crate::{bitcoin::timelocks::BlockHeight, execution_params::ExecutionParams};
+use crate::execution_params::ExecutionParams;
 use ::bitcoin::{
     hashes::{hex::ToHex, Hash},
     secp256k1,
@@ -25,7 +34,6 @@ use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
-use timelocks::ExpiredTimelocks;
 
 // TODO: Configurable tx-fee (note: parties have to agree prior to swapping)
 // Current reasoning:
@@ -262,8 +270,8 @@ where
 
 pub async fn current_epoch<W>(
     bitcoin_wallet: &W,
-    cancel_timelock: Timelock,
-    punish_timelock: Timelock,
+    cancel_timelock: CancelTimelock,
+    punish_timelock: PunishTimelock,
     lock_tx_id: ::bitcoin::Txid,
 ) -> anyhow::Result<ExpiredTimelocks>
 where
@@ -286,7 +294,7 @@ where
 
 pub async fn wait_for_cancel_timelock_to_expire<W>(
     bitcoin_wallet: &W,
-    cancel_timelock: Timelock,
+    cancel_timelock: CancelTimelock,
     lock_tx_id: ::bitcoin::Txid,
 ) -> Result<()>
 where
@@ -297,3 +305,19 @@ where
     poll_until_block_height_is_gte(bitcoin_wallet, tx_lock_height + cancel_timelock).await;
     Ok(())
 }
+
+#[derive(Clone, Copy, thiserror::Error, Debug)]
+#[error("transaction does not spend anything")]
+pub struct NoInputs;
+
+#[derive(Clone, Copy, thiserror::Error, Debug)]
+#[error("transaction has {0} inputs, expected 1")]
+pub struct TooManyInputs(usize);
+
+#[derive(Clone, Copy, thiserror::Error, Debug)]
+#[error("empty witness stack")]
+pub struct EmptyWitnessStack;
+
+#[derive(Clone, Copy, thiserror::Error, Debug)]
+#[error("input has {0} witnesses, expected 3")]
+pub struct NotThreeWitnesses(usize);

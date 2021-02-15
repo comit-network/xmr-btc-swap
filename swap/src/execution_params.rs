@@ -1,4 +1,4 @@
-use crate::bitcoin::Timelock;
+use crate::bitcoin::{CancelTimelock, PunishTimelock};
 use conquer_once::Lazy;
 use std::time::Duration;
 
@@ -8,8 +8,8 @@ pub struct ExecutionParams {
     pub bitcoin_finality_confirmations: u32,
     pub bitcoin_avg_block_time: Duration,
     pub monero_finality_confirmations: u32,
-    pub bitcoin_cancel_timelock: Timelock,
-    pub bitcoin_punish_timelock: Timelock,
+    pub bitcoin_cancel_timelock: CancelTimelock,
+    pub bitcoin_punish_timelock: PunishTimelock,
 }
 
 pub trait GetExecutionParams {
@@ -77,8 +77,8 @@ mod mainnet {
     pub static MONERO_FINALITY_CONFIRMATIONS: u32 = 15;
 
     // Set to 12 hours, arbitrary value to be reviewed properly
-    pub static BITCOIN_CANCEL_TIMELOCK: Timelock = Timelock::new(72);
-    pub static BITCOIN_PUNISH_TIMELOCK: Timelock = Timelock::new(72);
+    pub static BITCOIN_CANCEL_TIMELOCK: CancelTimelock = CancelTimelock::new(72);
+    pub static BITCOIN_PUNISH_TIMELOCK: PunishTimelock = PunishTimelock::new(72);
 }
 
 mod testnet {
@@ -95,8 +95,8 @@ mod testnet {
     pub static MONERO_FINALITY_CONFIRMATIONS: u32 = 5;
 
     // This does not reflect recommended values for mainnet!
-    pub static BITCOIN_CANCEL_TIMELOCK: Timelock = Timelock::new(12);
-    pub static BITCOIN_PUNISH_TIMELOCK: Timelock = Timelock::new(6);
+    pub static BITCOIN_CANCEL_TIMELOCK: CancelTimelock = CancelTimelock::new(12);
+    pub static BITCOIN_PUNISH_TIMELOCK: PunishTimelock = PunishTimelock::new(6);
 }
 
 mod regtest {
@@ -111,7 +111,7 @@ mod regtest {
 
     pub static MONERO_FINALITY_CONFIRMATIONS: u32 = 1;
 
-    pub static BITCOIN_CANCEL_TIMELOCK: Timelock = Timelock::new(100);
+    pub static BITCOIN_CANCEL_TIMELOCK: CancelTimelock = CancelTimelock::new(100);
 
-    pub static BITCOIN_PUNISH_TIMELOCK: Timelock = Timelock::new(50);
+    pub static BITCOIN_PUNISH_TIMELOCK: PunishTimelock = PunishTimelock::new(50);
 }
