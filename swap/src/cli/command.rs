@@ -6,11 +6,11 @@ use uuid::Uuid;
 #[derive(structopt::StructOpt, Debug)]
 pub struct Arguments {
     #[structopt(
-        long = "data-dir",
-        help = "Provide a custom path to the data directory.",
+        long = "config",
+        help = "Provide a custom path to the configuration file. The configuration file must be a toml file.",
         parse(from_os_str)
     )]
-    pub data_dir: Option<PathBuf>,
+    pub config: Option<PathBuf>,
 
     #[structopt(subcommand)]
     pub cmd: Command,
@@ -31,9 +31,6 @@ pub enum Command {
 
         #[structopt(long = "receive-xmr", help = "Monero amount as floating point nr without denomination (e.g. 125.1)", parse(try_from_str = parse_xmr))]
         receive_monero: monero::Amount,
-
-        #[structopt(flatten)]
-        config: Config,
     },
     History,
     Resume(Resume),
@@ -52,9 +49,6 @@ pub enum Resume {
 
         #[structopt(long = "counterpart-addr")]
         alice_addr: Multiaddr,
-
-        #[structopt(flatten)]
-        config: Config,
     },
 }
 
@@ -70,9 +64,6 @@ pub enum Cancel {
         alice_peer_id: PeerId,
         #[structopt(long = "counterpart-addr")]
         alice_addr: Multiaddr,
-
-        #[structopt(flatten)]
-        config: Config,
 
         #[structopt(short, long)]
         force: bool,
@@ -92,22 +83,9 @@ pub enum Refund {
         #[structopt(long = "counterpart-addr")]
         alice_addr: Multiaddr,
 
-        #[structopt(flatten)]
-        config: Config,
-
         #[structopt(short, long)]
         force: bool,
     },
-}
-
-#[derive(structopt::StructOpt, Debug)]
-pub struct Config {
-    #[structopt(
-        long = "config",
-        help = "Provide a custom path to the configuration file. The configuration file must be a toml file.",
-        parse(from_os_str)
-    )]
-    pub path: Option<PathBuf>,
 }
 
 fn parse_btc(str: &str) -> anyhow::Result<bitcoin::Amount> {

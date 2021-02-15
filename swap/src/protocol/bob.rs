@@ -15,7 +15,7 @@ use crate::{
 use anyhow::{bail, Error, Result};
 use libp2p::{core::Multiaddr, identity::Keypair, NetworkBehaviour, PeerId};
 use rand::rngs::OsRng;
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 use tracing::{debug, info};
 use uuid::Uuid;
 
@@ -55,7 +55,7 @@ pub struct Builder {
     swap_id: Uuid,
     identity: Keypair,
     peer_id: PeerId,
-    db_path: PathBuf,
+    db: Database,
 
     alice_address: Multiaddr,
     alice_peer_id: PeerId,
@@ -76,7 +76,7 @@ impl Builder {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         seed: Seed,
-        db_path: PathBuf,
+        db: Database,
         swap_id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
@@ -91,7 +91,7 @@ impl Builder {
             swap_id,
             identity,
             peer_id,
-            db_path,
+            db,
             alice_address,
             alice_peer_id,
             bitcoin_wallet,
@@ -117,13 +117,11 @@ impl Builder {
 
                 let (event_loop, event_loop_handle) = self.init_event_loop()?;
 
-                let db = Database::open(self.db_path.as_path())?;
-
                 Ok((
                     Swap {
                         state: initial_state,
                         event_loop_handle,
-                        db,
+                        db: self.db,
                         bitcoin_wallet: self.bitcoin_wallet.clone(),
                         monero_wallet: self.monero_wallet.clone(),
                         swap_id: self.swap_id,
@@ -134,17 +132,15 @@ impl Builder {
             }
 
             InitParams::None => {
-                // reopen the existing database
-                let db = Database::open(self.db_path.as_path())?;
-
-                let resume_state = if let database::Swap::Bob(state) = db.get_state(self.swap_id)? {
-                    state.into()
-                } else {
-                    bail!(
-                        "Trying to load swap with id {} for the wrong direction.",
-                        self.swap_id
-                    )
-                };
+                let resume_state =
+                    if let database::Swap::Bob(state) = self.db.get_state(self.swap_id)? {
+                        state.into()
+                    } else {
+                        bail!(
+                            "Trying to load swap with id {} for the wrong direction.",
+                            self.swap_id
+                        )
+                    };
 
                 let (event_loop, event_loop_handle) = self.init_event_loop()?;
 
@@ -152,7 +148,7 @@ impl Builder {
                     Swap {
                         state: resume_state,
                         event_loop_handle,
-                        db,
+                        db: self.db,
                         bitcoin_wallet: self.bitcoin_wallet.clone(),
                         monero_wallet: self.monero_wallet.clone(),
                         swap_id: self.swap_id,

@@ -15,20 +15,21 @@
 use anyhow::{Context, Result};
 use log::LevelFilter;
 use prettytable::{row, Table};
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 use structopt::StructOpt;
 use swap::{
     bitcoin,
     cli::{
         command::{Arguments, Cancel, Command, Refund, Resume},
         config::{
-            initial_setup, query_user_for_initial_testnet_config, read_config, ConfigNotInitialized,
+            initial_setup, query_user_for_initial_testnet_config, read_config, Config,
+            ConfigNotInitialized,
         },
     },
     database::Database,
     execution_params,
     execution_params::GetExecutionParams,
-    fs::{default_config_path, default_data_dir},
+    fs::default_config_path,
     monero,
     monero::{CreateWallet, OpenWallet},
     protocol::{
@@ -53,19 +54,30 @@ async fn main() -> Result<()> {
 
     let opt = Arguments::from_args();
 
-    let data_dir = if let Some(data_dir) = opt.data_dir {
-        data_dir
+    let config_path = if let Some(config_path) = opt.config {
+        config_path
     } else {
-        default_data_dir().context("unable to determine default data path")?
+        default_config_path()?
+    };
+
+    let config = match read_config(config_path.clone())? {
+        Ok(config) => config,
+        Err(ConfigNotInitialized {}) => {
+            initial_setup(config_path.clone(), query_user_for_initial_testnet_config)?;
+            read_config(config_path)?.expect("after initial setup config can be read")
+        }
     };
 
     info!(
         "Database and Seed will be stored in directory: {}",
-        data_dir.display()
+        config.data.dir.display()
     );
 
-    let db_path = data_dir.join("database");
-    let seed = Seed::from_file_or_generate(&data_dir).expect("Could not retrieve/initialize seed");
+    let db = Database::open(config.data.dir.join("database").as_path())
+        .context("Could not open database")?;
+
+    let seed =
+        Seed::from_file_or_generate(&config.data.dir).expect("Could not retrieve/initialize seed");
 
     // hardcode to testnet/stagenet
     let bitcoin_network = bitcoin::Network::Testnet;
@@ -78,7 +90,6 @@ async fn main() -> Result<()> {
             alice_addr,
             send_bitcoin,
             receive_monero,
-            config,
         } => {
             let swap_amounts = SwapAmounts {
                 btc: send_bitcoin,
@@ -86,7 +97,7 @@ async fn main() -> Result<()> {
             };
 
             let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config.path, bitcoin_network, monero_network).await?;
+                init_wallets(config, bitcoin_network, monero_network).await?;
 
             let swap_id = Uuid::new_v4();
 
@@ -97,7 +108,7 @@ async fn main() -> Result<()> {
 
             let bob_factory = Builder::new(
                 seed,
-                db_path,
+                db,
                 swap_id,
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
@@ -115,8 +126,6 @@ async fn main() -> Result<()> {
 
             table.add_row(row!["SWAP ID", "STATE"]);
 
-            let db = Database::open(db_path.as_path()).context("Could not open database")?;
-
             for (swap_id, state) in db.all()? {
                 table.add_row(row![swap_id, state]);
             }
@@ -128,14 +137,13 @@ async fn main() -> Result<()> {
             swap_id,
             alice_peer_id,
             alice_addr,
-            config,
         }) => {
             let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config.path, bitcoin_network, monero_network).await?;
+                init_wallets(config, bitcoin_network, monero_network).await?;
 
             let bob_factory = Builder::new(
                 seed,
-                db_path,
+                db,
                 swap_id,
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
@@ -152,16 +160,15 @@ async fn main() -> Result<()> {
             swap_id,
             alice_peer_id,
             alice_addr,
-            config,
             force,
         }) => {
             // TODO: Optimization: Only init the Bitcoin wallet, Monero wallet unnecessary
             let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config.path, bitcoin_network, monero_network).await?;
+                init_wallets(config, bitcoin_network, monero_network).await?;
 
             let bob_factory = Builder::new(
                 seed,
-                db_path,
+                db,
                 swap_id,
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
@@ -198,16 +205,15 @@ async fn main() -> Result<()> {
             swap_id,
             alice_peer_id,
             alice_addr,
-            config,
             force,
         }) => {
             let (bitcoin_wallet, monero_wallet) =
-                init_wallets(config.path, bitcoin_network, monero_network).await?;
+                init_wallets(config, bitcoin_network, monero_network).await?;
 
             // TODO: Optimize to only use the Bitcoin wallet, Monero wallet is unnecessary
             let bob_factory = Builder::new(
                 seed,
-                db_path,
+                db,
                 swap_id,
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
@@ -234,24 +240,10 @@ async fn main() -> Result<()> {
 }
 
 async fn init_wallets(
-    config_path: Option<PathBuf>,
+    config: Config,
     bitcoin_network: bitcoin::Network,
     monero_network: monero::Network,
 ) -> Result<(bitcoin::Wallet, monero::Wallet)> {
-    let config_path = if let Some(config_path) = config_path {
-        config_path
-    } else {
-        default_config_path()?
-    };
-
-    let config = match read_config(config_path.clone())? {
-        Ok(config) => config,
-        Err(ConfigNotInitialized {}) => {
-            initial_setup(config_path.clone(), query_user_for_initial_testnet_config)?;
-            read_config(config_path)?.expect("after initial setup config can be read")
-        }
-    };
-
     let bitcoin_wallet = bitcoin::Wallet::new(
         config.bitcoin.wallet_name.as_str(),
         config.bitcoin.bitcoind_url,

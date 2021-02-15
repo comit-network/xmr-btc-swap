@@ -51,7 +51,7 @@ impl BobParams {
     pub fn builder(&self) -> bob::Builder {
         bob::Builder::new(
             self.seed,
-            self.db_path.clone(),
+            Database::open(&self.db_path.clone().as_path()).unwrap(),
             self.swap_id,
             self.bitcoin_wallet.clone(),
             self.monero_wallet.clone(),

@@ -6,7 +6,7 @@ edition = "2018"
 description = "XMR/BTC trustless atomic swaps."
 
 [[bin]]
-name = "cli"
+name = "swap_cli"
 
 [lib]
 name = "swap"
