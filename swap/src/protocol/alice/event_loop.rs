@@ -1,5 +1,6 @@
 use crate::{
     bitcoin,
+    bitcoin::FEE_RATE,
     database::Database,
     execution_params::ExecutionParams,
     monero, network,
@@ -202,7 +203,10 @@ impl EventLoop {
         let btc_amount = quote_request.btc_amount;
         let xmr_amount = btc_amount.as_btc() * RATE as f64;
         let xmr_amount = monero::Amount::from_monero(xmr_amount)?;
-        let quote_response = QuoteResponse { xmr_amount };
+        let quote_response = QuoteResponse {
+            xmr_amount,
+            tx_fee_rate: FEE_RATE,
+        };
 
         self.swarm
             .send_quote_response(channel, quote_response)

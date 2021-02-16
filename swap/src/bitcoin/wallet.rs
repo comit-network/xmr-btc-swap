@@ -14,7 +14,6 @@ use bdk::{
     blockchain::{noop_progress, Blockchain, ElectrumBlockchain},
     electrum_client::{self, Client, ElectrumApi},
     miniscript::bitcoin::PrivateKey,
-    FeeRate,
 };
 use reqwest::{Method, Url};
 use serde::{Deserialize, Serialize};
@@ -120,14 +119,14 @@ impl BuildTxLockPsbt for Wallet {
     ) -> Result<PartiallySignedTransaction> {
         tracing::debug!("building tx lock");
         self.sync_wallet().await?;
-        let (psbt, _details) = self.inner.lock().await.create_tx(
-            bdk::TxBuilder::with_recipients(vec![(
-                output_address.script_pubkey(),
-                output_amount.as_sat(),
-            )])
-            // todo: get actual fee
-            .fee_rate(FeeRate::from_sat_per_vb(5.0)),
-        )?;
+        let (psbt, _details) =
+            self.inner
+                .lock()
+                .await
+                .create_tx(bdk::TxBuilder::with_recipients(vec![(
+                    output_address.script_pubkey(),
+                    output_amount.as_sat(),
+                )]))?;
         tracing::debug!("tx lock built");
         Ok(psbt)
     }

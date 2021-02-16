@@ -35,14 +35,7 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
 
-// TODO: Configurable tx-fee (note: parties have to agree prior to swapping)
-// Current reasoning:
-// tx with largest weight (as determined by get_weight() upon broadcast in e2e
-// test) = 609 assuming segwit and 60 sat/vB:
-// (609 / 4) * 60 (sat/vB) = 9135 sats
-// Recommended: Overpay a bit to ensure we don't have to wait too long for test
-// runs.
-pub const TX_FEE: u64 = 15_000;
+pub const FEE_RATE: u64 = 80;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct SecretKey {
@@ -317,3 +310,41 @@ pub struct EmptyWitnessStack;
 #[derive(Clone, Copy, thiserror::Error, Debug)]
 #[error("input has {0} witnesses, expected 3")]
 pub struct NotThreeWitnesses(usize);
+
+pub mod bitcoin_amount {
+    use crate::bitcoin::Amount;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(x: &Amount, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        s.serialize_u64(x.as_sat())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Amount, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let sats = u64::deserialize(deserializer)?;
+        let amount = Amount::from_sat(sats);
+
+        Ok(amount)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    pub struct BitcoinAmount(#[serde(with = "bitcoin_amount")] crate::bitcoin::Amount);
+
+    #[test]
+    fn serde_bitcoin_amount() {
+        let amount = BitcoinAmount(crate::bitcoin::Amount::from_sat(1000));
+        let encoded = serde_cbor::to_vec(&amount).unwrap();
+        let decoded: BitcoinAmount = serde_cbor::from_slice(&encoded).unwrap();
+        assert_eq!(amount, decoded);
+    }
+}

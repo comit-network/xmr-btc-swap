@@ -79,6 +79,7 @@ pub struct State0 {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
+    btc_fee_rate: u64,
     cancel_timelock: CancelTimelock,
     punish_timelock: PunishTimelock,
     refund_address: bitcoin::Address,
@@ -86,10 +87,12 @@ pub struct State0 {
 }
 
 impl State0 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new<R: RngCore + CryptoRng>(
         rng: &mut R,
         btc: bitcoin::Amount,
         xmr: monero::Amount,
+        btc_fee_rate: u64,
         cancel_timelock: CancelTimelock,
         punish_timelock: PunishTimelock,
         refund_address: bitcoin::Address,
@@ -107,6 +110,7 @@ impl State0 {
             v_b,
             btc,
             xmr,
+            btc_fee_rate,
             dleq_proof_s_b,
             cancel_timelock,
             punish_timelock,
@@ -558,6 +562,12 @@ impl State4 {
 
     pub fn tx_lock_id(&self) -> bitcoin::Txid {
         self.tx_lock.txid()
+    }
+
+    pub fn tx_cancel_id(&self) -> bitcoin::Txid {
+        let tx_cancel =
+            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
+        tx_cancel.txid()
     }
 }
 

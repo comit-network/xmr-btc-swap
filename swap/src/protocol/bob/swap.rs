@@ -390,6 +390,7 @@ pub async fn request_quote_and_setup(
         &mut OsRng,
         btc_amount,
         quote_response.xmr_amount,
+        quote_response.tx_fee_rate,
         execution_params.bitcoin_cancel_timelock,
         execution_params.bitcoin_punish_timelock,
         bitcoin_refund_address,

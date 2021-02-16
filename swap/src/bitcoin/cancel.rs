@@ -1,6 +1,6 @@
 use crate::bitcoin::{
     build_shared_output_descriptor, Address, Amount, BlockHeight, PublicKey, Transaction, TxLock,
-    TX_FEE,
+    FEE_RATE,
 };
 use ::bitcoin::{util::bip143::SigHashCache, OutPoint, SigHash, SigHashType, TxIn, TxOut, Txid};
 use anyhow::Result;
@@ -77,7 +77,7 @@ impl TxCancel {
         };
 
         let tx_out = TxOut {
-            value: tx_lock.lock_amount().as_sat() - TX_FEE,
+            value: tx_lock.lock_amount().as_sat(),
             script_pubkey: cancel_output_descriptor.script_pubkey(NullCtx),
         };
 
@@ -165,8 +165,11 @@ impl TxCancel {
             witness: Vec::new(),
         };
 
+        let vbytes = self.inner.get_weight() / 4;
+        let tx_fee = vbytes as u64 * FEE_RATE;
+
         let tx_out = TxOut {
-            value: self.amount().as_sat() - TX_FEE,
+            value: self.amount().as_sat() - tx_fee,
             script_pubkey: spend_address.script_pubkey(),
         };
 

@@ -29,6 +29,7 @@ pub enum OutEvent {
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct QuoteResponse {
     pub xmr_amount: monero::Amount,
+    pub tx_fee_rate: u64,
 }
 
 impl From<RequestResponseEvent<QuoteRequest, QuoteResponse>> for OutEvent {

@@ -139,7 +139,7 @@ impl TestContext {
         assert_eq!(
             btc_balance_after_swap,
             self.alice_starting_balances.btc + self.btc_amount
-                - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
+                - bitcoin::Amount::from_sat(bitcoin::FEE_RATE)
         );
 
         let xmr_balance_after_swap = self
@@ -193,7 +193,7 @@ impl TestContext {
         assert_eq!(
             btc_balance_after_swap,
             self.alice_starting_balances.btc + self.btc_amount
-                - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE)
+                - bitcoin::Amount::from_sat(2 * bitcoin::FEE_RATE)
         );
 
         let xmr_balance_after_swap = self
@@ -265,12 +265,12 @@ impl TestContext {
         let alice_submitted_cancel = btc_balance_after_swap
             == self.bob_starting_balances.btc
                 - lock_tx_bitcoin_fee
-                - bitcoin::Amount::from_sat(bitcoin::TX_FEE);
+                - bitcoin::Amount::from_sat(bitcoin::FEE_RATE);
 
         let bob_submitted_cancel = btc_balance_after_swap
             == self.bob_starting_balances.btc
                 - lock_tx_bitcoin_fee
-                - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE);
+                - bitcoin::Amount::from_sat(2 * bitcoin::FEE_RATE);
 
         // The cancel tx can be submitted by both Alice and Bob.
         // Since we cannot be sure who submitted it we have to assert accordingly

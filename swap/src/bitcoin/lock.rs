@@ -1,6 +1,6 @@
 use crate::bitcoin::{
     build_shared_output_descriptor, Address, Amount, BuildTxLockPsbt, GetNetwork, PublicKey,
-    Transaction, TX_FEE,
+    Transaction, FEE_RATE,
 };
 use ::bitcoin::{util::psbt::PartiallySignedTransaction, OutPoint, TxIn, TxOut, Txid};
 use anyhow::Result;
@@ -74,8 +74,11 @@ impl TxLock {
             witness: Vec::new(),
         };
 
+        let vbytes = self.inner.clone().extract_tx().get_weight() / 4;
+        let tx_fee = vbytes as u64 * FEE_RATE;
+
         let tx_out = TxOut {
-            value: self.inner.clone().extract_tx().output[self.lock_output_vout()].value - TX_FEE,
+            value: self.inner.clone().extract_tx().output[self.lock_output_vout()].value - tx_fee,
             script_pubkey: spend_address.script_pubkey(),
         };
 
