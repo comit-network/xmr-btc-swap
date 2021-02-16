@@ -234,11 +234,6 @@ pub trait TransactionBlockHeight {
 }
 
 #[async_trait]
-pub trait WaitForBlockHeight {
-    async fn wait_for_block_height(&self, height: BlockHeight);
-}
-
-#[async_trait]
 pub trait GetRawTransaction {
     async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction>;
 }
