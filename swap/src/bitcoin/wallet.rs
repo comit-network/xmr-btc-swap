@@ -186,7 +186,7 @@ impl GetRawTransaction for Wallet {
 #[async_trait]
 impl GetBlockHeight for Wallet {
     async fn get_block_height(&self) -> Result<BlockHeight> {
-        let url = self.http_url.join("blocks/tip/height")?;
+        let url = blocks_tip_height_url(&self.http_url)?;
         let height = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
             let height = reqwest::Client::new()
                 .request(Method::GET, url.clone())
@@ -210,8 +210,7 @@ impl GetBlockHeight for Wallet {
 #[async_trait]
 impl TransactionBlockHeight for Wallet {
     async fn transaction_block_height(&self, txid: Txid) -> Result<BlockHeight> {
-        let url = self.http_url.join(&format!("tx/{}/status", txid))?;
-
+        let url = tx_status_url(txid, &self.http_url)?;
         #[derive(Serialize, Deserialize, Debug, Clone)]
         struct TransactionStatus {
             block_height: Option<u32>,
@@ -276,5 +275,44 @@ impl WaitForTransactionFinality for Wallet {
 impl GetNetwork for Wallet {
     async fn get_network(&self) -> bitcoin::Network {
         self.inner.lock().await.network()
+    }
+}
+
+fn tx_status_url(txid: Txid, base_url: &Url) -> Result<Url> {
+    let url = base_url.join(&format!("tx/{}/status", txid))?;
+    Ok(url)
+}
+
+fn blocks_tip_height_url(base_url: &Url) -> Result<Url> {
+    let url = base_url.join("blocks/tip/height")?;
+    Ok(url)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        bitcoin::{
+            wallet::{blocks_tip_height_url, tx_status_url},
+            Txid,
+        },
+        cli::config::DEFAULT_ELECTRUM_HTTP_URL,
+    };
+    use reqwest::Url;
+
+    #[test]
+    fn create_tx_status_url_from_default_base_url_success() {
+        let txid: Txid = Txid::default();
+        let base_url = Url::parse(DEFAULT_ELECTRUM_HTTP_URL).expect("Could not parse url");
+        let url = tx_status_url(txid, &base_url).expect("Could not create url");
+        let expected = format!("https://blockstream.info/testnet/api/tx/{}/status", txid);
+        assert_eq!(url.as_str(), expected);
+    }
+
+    #[test]
+    fn create_block_tip_height_url_from_default_base_url_success() {
+        let base_url = Url::parse(DEFAULT_ELECTRUM_HTTP_URL).expect("Could not parse url");
+        let url = blocks_tip_height_url(&base_url).expect("Could not create url");
+        let expected = "https://blockstream.info/testnet/api/blocks/tip/height";
+        assert_eq!(url.as_str(), expected);
     }
 }
