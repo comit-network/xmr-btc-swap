@@ -1,4 +1,5 @@
 use crate::{
+    asb::LatestRate,
     bitcoin,
     database::Database,
     execution_params::ExecutionParams,
@@ -23,9 +24,6 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, mpsc::error::SendError};
 use tracing::{debug, error, trace};
 use uuid::Uuid;
-
-// TODO: Use dynamic
-pub const RATE: u32 = 100;
 
 #[allow(missing_debug_implementations)]
 pub struct MpscChannels<T> {
@@ -79,7 +77,7 @@ impl EventLoopHandle {
 }
 
 #[allow(missing_debug_implementations)]
-pub struct EventLoop {
+pub struct EventLoop<RS> {
     swarm: libp2p::Swarm<Behaviour>,
     peer_id: PeerId,
     execution_params: ExecutionParams,
@@ -87,6 +85,7 @@ pub struct EventLoop {
     monero_wallet: Arc<monero::Wallet>,
     db: Arc<Database>,
     listen_address: Multiaddr,
+    rate_service: RS,
 
     recv_encrypted_signature: broadcast::Sender<EncryptedSignature>,
     send_transfer_proof: mpsc::Receiver<(PeerId, TransferProof)>,
@@ -97,7 +96,10 @@ pub struct EventLoop {
     swap_handle_sender: mpsc::Sender<RemoteHandle<Result<AliceState>>>,
 }
 
-impl EventLoop {
+impl<RS> EventLoop<RS>
+where
+    RS: LatestRate,
+{
     pub fn new(
         listen_address: Multiaddr,
         seed: Seed,
@@ -105,6 +107,7 @@ impl EventLoop {
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
         db: Arc<Database>,
+        rate_service: RS,
     ) -> Result<(Self, mpsc::Receiver<RemoteHandle<Result<AliceState>>>)> {
         let identity = network::Seed::new(seed).derive_libp2p_identity();
         let behaviour = Behaviour::default();
@@ -132,6 +135,7 @@ impl EventLoop {
             monero_wallet,
             db,
             listen_address,
+            rate_service,
             recv_encrypted_signature: recv_encrypted_signature.sender,
             send_transfer_proof: send_transfer_proof.receiver,
             send_transfer_proof_sender: send_transfer_proof.sender,
@@ -199,9 +203,10 @@ impl EventLoop {
         // 1. Check if acceptable request
         // 2. Send response
 
+        let rate = self.rate_service.latest_rate();
+
         let btc_amount = quote_request.btc_amount;
-        let xmr_amount = btc_amount.as_btc() * RATE as f64;
-        let xmr_amount = monero::Amount::from_monero(xmr_amount)?;
+        let xmr_amount = rate.sell_quote(btc_amount)?;
         let quote_response = QuoteResponse { xmr_amount };
 
         self.swarm

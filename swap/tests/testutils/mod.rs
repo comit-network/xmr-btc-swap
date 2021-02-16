@@ -14,18 +14,14 @@ use std::{
     time::Duration,
 };
 use swap::{
+    asb::{fixed_rate, fixed_rate::RATE},
     bitcoin,
     bitcoin::{CancelTimelock, PunishTimelock},
     database::Database,
     execution_params,
     execution_params::{ExecutionParams, GetExecutionParams},
     monero,
-    protocol::{
-        alice,
-        alice::{event_loop::RATE, AliceState},
-        bob,
-        bob::BobState,
-    },
+    protocol::{alice, alice::AliceState, bob, bob::BobState},
     seed::Seed,
 };
 use tempfile::tempdir;
@@ -324,7 +320,7 @@ where
     let (monero, containers) = testutils::init_containers(&cli).await;
 
     let btc_amount = bitcoin::Amount::from_sat(1_000_000);
-    let xmr_amount = monero::Amount::from_monero(btc_amount.as_btc() * RATE as f64).unwrap();
+    let xmr_amount = monero::Amount::from_monero(btc_amount.as_btc() / RATE).unwrap();
 
     let alice_starting_balances = StartingBalances {
         xmr: xmr_amount * 10,
@@ -390,6 +386,7 @@ where
         alice_bitcoin_wallet.clone(),
         alice_monero_wallet.clone(),
         alice_db,
+        fixed_rate::RateService::default(),
     )
     .unwrap();
 

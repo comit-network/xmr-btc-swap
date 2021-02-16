@@ -24,6 +24,7 @@ use swap::{
             initial_setup, query_user_for_initial_testnet_config, read_config, Config,
             ConfigNotInitialized,
         },
+        kraken,
     },
     bitcoin,
     database::Database,
@@ -96,6 +97,8 @@ async fn main() -> Result<()> {
                 bitcoin_wallet.new_address().await?
             );
 
+            let rate_service = kraken::RateService::new().await?;
+
             let (mut event_loop, _) = EventLoop::new(
                 config.network.listen,
                 seed,
@@ -103,6 +106,7 @@ async fn main() -> Result<()> {
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
                 Arc::new(db),
+                rate_service,
             )
             .unwrap();
 

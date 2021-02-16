@@ -77,6 +77,7 @@ pub struct Amount(u64);
 
 impl Amount {
     pub const ZERO: Self = Self(0);
+    pub const ONE_XMR: Self = Self(PICONERO_OFFSET);
     /// Create an [Amount] with piconero precision and the given number of
     /// piconeros.
     ///
