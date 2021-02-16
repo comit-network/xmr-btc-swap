@@ -211,7 +211,7 @@ pub trait BroadcastSignedTransaction {
 
 #[async_trait]
 pub trait WatchForRawTransaction {
-    async fn watch_for_raw_transaction(&self, txid: Txid) -> Transaction;
+    async fn watch_for_raw_transaction(&self, txid: Txid) -> Result<Transaction>;
 }
 
 #[async_trait]
@@ -225,17 +225,12 @@ pub trait WaitForTransactionFinality {
 
 #[async_trait]
 pub trait GetBlockHeight {
-    async fn get_block_height(&self) -> BlockHeight;
+    async fn get_block_height(&self) -> Result<BlockHeight>;
 }
 
 #[async_trait]
 pub trait TransactionBlockHeight {
-    async fn transaction_block_height(&self, txid: Txid) -> BlockHeight;
-}
-
-#[async_trait]
-pub trait WaitForBlockHeight {
-    async fn wait_for_block_height(&self, height: BlockHeight);
+    async fn transaction_block_height(&self, txid: Txid) -> Result<BlockHeight>;
 }
 
 #[async_trait]
@@ -245,7 +240,7 @@ pub trait GetRawTransaction {
 
 #[async_trait]
 pub trait GetNetwork {
-    fn get_network(&self) -> Network;
+    async fn get_network(&self) -> Network;
 }
 
 pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Result<SecretKey> {
@@ -259,13 +254,14 @@ pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Resu
     Ok(s)
 }
 
-pub async fn poll_until_block_height_is_gte<B>(client: &B, target: BlockHeight)
+pub async fn poll_until_block_height_is_gte<B>(client: &B, target: BlockHeight) -> Result<()>
 where
     B: GetBlockHeight,
 {
-    while client.get_block_height().await < target {
+    while client.get_block_height().await? < target {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
+    Ok(())
 }
 
 pub async fn current_epoch<W>(
@@ -277,8 +273,8 @@ pub async fn current_epoch<W>(
 where
     W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
 {
-    let current_block_height = bitcoin_wallet.get_block_height().await;
-    let lock_tx_height = bitcoin_wallet.transaction_block_height(lock_tx_id).await;
+    let current_block_height = bitcoin_wallet.get_block_height().await?;
+    let lock_tx_height = bitcoin_wallet.transaction_block_height(lock_tx_id).await?;
     let cancel_timelock_height = lock_tx_height + cancel_timelock;
     let punish_timelock_height = cancel_timelock_height + punish_timelock;
 
@@ -300,9 +296,9 @@ pub async fn wait_for_cancel_timelock_to_expire<W>(
 where
     W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
 {
-    let tx_lock_height = bitcoin_wallet.transaction_block_height(lock_tx_id).await;
+    let tx_lock_height = bitcoin_wallet.transaction_block_height(lock_tx_id).await?;
 
-    poll_until_block_height_is_gte(bitcoin_wallet, tx_lock_height + cancel_timelock).await;
+    poll_until_block_height_is_gte(bitcoin_wallet, tx_lock_height + cancel_timelock).await?;
     Ok(())
 }
 

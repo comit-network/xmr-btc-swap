@@ -7,55 +7,107 @@ use crate::{
     execution_params::ExecutionParams,
 };
 use ::bitcoin::{util::psbt::PartiallySignedTransaction, Txid};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, tokio::retry};
-use bitcoin_harness::{bitcoind_rpc::PsbtBase64, BitcoindRpcApi};
-use reqwest::Url;
-use std::time::Duration;
-use tokio::time::interval;
+use bdk::{
+    blockchain::{noop_progress, Blockchain, ElectrumBlockchain},
+    electrum_client::{self, Client, ElectrumApi},
+    miniscript::bitcoin::PrivateKey,
+    FeeRate,
+};
+use reqwest::{Method, Url};
+use serde::{Deserialize, Serialize};
+use std::{path::Path, sync::Arc, time::Duration};
+use tokio::{sync::Mutex, time::interval};
+
+const SLED_TREE_NAME: &str = "default_tree";
 
 #[derive(Debug)]
+enum Error {
+    Io(reqwest::Error),
+    Parse(std::num::ParseIntError),
+    NotYetMined,
+    JsonDeserialisation(reqwest::Error),
+}
+
 pub struct Wallet {
-    pub inner: bitcoin_harness::Wallet,
+    pub inner: Arc<Mutex<bdk::Wallet<ElectrumBlockchain, bdk::sled::Tree>>>,
     pub network: bitcoin::Network,
+    pub http_url: Url,
+    pub rpc_url: Url,
 }
 
 impl Wallet {
-    pub async fn new(name: &str, url: Url, network: bitcoin::Network) -> Result<Self> {
-        let wallet = bitcoin_harness::Wallet::new(name, url).await?;
+    pub async fn new(
+        electrum_rpc_url: Url,
+        electrum_http_url: Url,
+        network: bitcoin::Network,
+        wallet_dir: &Path,
+        private_key: PrivateKey,
+    ) -> Result<Self> {
+        // Workaround for https://github.com/bitcoindevkit/rust-electrum-client/issues/47.
+        let config = electrum_client::ConfigBuilder::default().retry(2).build();
+
+        let client = Client::from_config(electrum_rpc_url.as_str(), config)
+            .map_err(|e| anyhow!("Failed to init electrum rpc client: {:?}", e))?;
+
+        let db = bdk::sled::open(wallet_dir)?.open_tree(SLED_TREE_NAME)?;
+
+        let bdk_wallet = bdk::Wallet::new(
+            bdk::template::P2WPKH(private_key),
+            None,
+            network,
+            db,
+            ElectrumBlockchain::from(client),
+        )?;
 
         Ok(Self {
-            inner: wallet,
+            inner: Arc::new(Mutex::new(bdk_wallet)),
             network,
+            http_url: electrum_http_url,
+            rpc_url: electrum_rpc_url,
         })
     }
 
     pub async fn balance(&self) -> Result<Amount> {
-        let balance = self.inner.balance().await?;
-        Ok(balance)
+        let balance = self.inner.lock().await.get_balance()?;
+        Ok(Amount::from_sat(balance))
     }
 
     pub async fn new_address(&self) -> Result<Address> {
-        self.inner.new_address().await.map_err(Into::into)
+        self.inner
+            .lock()
+            .await
+            .get_new_address()
+            .map_err(Into::into)
+    }
+
+    pub async fn get_tx(&self, txid: Txid) -> Result<Option<Transaction>> {
+        let tx = self.inner.lock().await.client().get_tx(&txid)?;
+        Ok(tx)
     }
 
     pub async fn transaction_fee(&self, txid: Txid) -> Result<Amount> {
-        let fee = self
+        let fees = self
             .inner
-            .get_wallet_transaction(txid)
+            .lock()
             .await
-            .map(|res| {
-                res.fee.map(|signed_amount| {
-                    signed_amount
-                        .abs()
-                        .to_unsigned()
-                        .expect("Absolute value is always positive")
-                })
+            .list_transactions(true)?
+            .iter()
+            .find(|tx| tx.txid == txid)
+            .ok_or_else(|| {
+                anyhow!("Could not find tx in bdk wallet when trying to determine fees")
             })?
-            .context("Rpc response did not contain a fee")?;
+            .fees;
 
-        Ok(fee)
+        Ok(Amount::from_sat(fees))
+    }
+
+    pub async fn sync_wallet(&self) -> Result<()> {
+        tracing::debug!("syncing wallet");
+        self.inner.lock().await.sync(noop_progress(), None)?;
+        Ok(())
     }
 }
 
@@ -66,11 +118,17 @@ impl BuildTxLockPsbt for Wallet {
         output_address: Address,
         output_amount: Amount,
     ) -> Result<PartiallySignedTransaction> {
-        let psbt = self.inner.fund_psbt(output_address, output_amount).await?;
-        let as_hex = base64::decode(psbt)?;
-
-        let psbt = bitcoin::consensus::deserialize(&as_hex)?;
-
+        tracing::debug!("building tx lock");
+        self.sync_wallet().await?;
+        let (psbt, _details) = self.inner.lock().await.create_tx(
+            bdk::TxBuilder::with_recipients(vec![(
+                output_address.script_pubkey(),
+                output_amount.as_sat(),
+            )])
+            // todo: get actual fee
+            .fee_rate(FeeRate::from_sat_per_vb(5.0)),
+        )?;
+        tracing::debug!("tx lock built");
         Ok(psbt)
     }
 }
@@ -78,22 +136,15 @@ impl BuildTxLockPsbt for Wallet {
 #[async_trait]
 impl SignTxLock for Wallet {
     async fn sign_tx_lock(&self, tx_lock: TxLock) -> Result<Transaction> {
+        let txid = tx_lock.txid();
+        tracing::debug!("signing tx lock: {}", txid);
         let psbt = PartiallySignedTransaction::from(tx_lock);
-
-        let psbt = bitcoin::consensus::serialize(&psbt);
-        let as_base64 = base64::encode(psbt);
-
-        let psbt = self
-            .inner
-            .wallet_process_psbt(PsbtBase64(as_base64))
-            .await?;
-        let PsbtBase64(signed_psbt) = PsbtBase64::from(psbt);
-
-        let as_hex = base64::decode(signed_psbt)?;
-        let psbt: PartiallySignedTransaction = bitcoin::consensus::deserialize(&as_hex)?;
-
-        let tx = psbt.extract_tx();
-
+        let (signed_psbt, finalized) = self.inner.lock().await.sign(psbt, None)?;
+        if !finalized {
+            bail!("Could not finalize TxLock psbt")
+        }
+        let tx = signed_psbt.extract_tx();
+        tracing::debug!("signed tx lock: {}", txid);
         Ok(tx)
     }
 }
@@ -101,70 +152,92 @@ impl SignTxLock for Wallet {
 #[async_trait]
 impl BroadcastSignedTransaction for Wallet {
     async fn broadcast_signed_transaction(&self, transaction: Transaction) -> Result<Txid> {
-        let txid = self.inner.send_raw_transaction(transaction).await?;
-        tracing::info!("Bitcoin tx broadcasted! TXID = {}", txid);
-        Ok(txid)
+        tracing::debug!("attempting to broadcast tx: {}", transaction.txid());
+        self.inner.lock().await.broadcast(transaction.clone())?;
+        tracing::info!("Bitcoin tx broadcasted! TXID = {}", transaction.txid());
+        Ok(transaction.txid())
     }
 }
 
-// TODO: For retry, use `backoff::ExponentialBackoff` in production as opposed
-// to `ConstantBackoff`.
 #[async_trait]
 impl WatchForRawTransaction for Wallet {
-    async fn watch_for_raw_transaction(&self, txid: Txid) -> Transaction {
+    async fn watch_for_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
+        tracing::debug!("watching for tx: {}", txid);
         retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
-            Ok(self.inner.get_raw_transaction(txid).await?)
+            let client = Client::new(self.rpc_url.as_ref())?;
+            let tx = client.transaction_get(&txid)?;
+            tracing::debug!("found tx: {}", txid);
+            Ok(tx)
         })
         .await
-        .expect("transient errors to be retried")
+        .map_err(|err| anyhow!("transient errors to be retried: {:?}", err))
     }
 }
 
 #[async_trait]
 impl GetRawTransaction for Wallet {
-    // todo: potentially replace with option
     async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
-        Ok(self.inner.get_raw_transaction(txid).await?)
+        self.get_tx(txid)
+            .await?
+            .ok_or_else(|| anyhow!("Could not get raw tx with id: {}", txid))
     }
 }
 
 #[async_trait]
 impl GetBlockHeight for Wallet {
-    async fn get_block_height(&self) -> BlockHeight {
+    async fn get_block_height(&self) -> Result<BlockHeight> {
+        let url = blocks_tip_height_url(&self.http_url)?;
         let height = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
-            Ok(self.inner.client.getblockcount().await?)
+            let height = reqwest::Client::new()
+                .request(Method::GET, url.clone())
+                .send()
+                .await
+                .map_err(Error::Io)?
+                .text()
+                .await
+                .map_err(Error::Io)?
+                .parse::<u32>()
+                .map_err(|err| backoff::Error::Permanent(Error::Parse(err)))?;
+            Result::<_, backoff::Error<Error>>::Ok(height)
         })
         .await
-        .expect("transient errors to be retried");
+        .map_err(|err| anyhow!("transient errors to be retried: {:?}", err))?;
 
-        BlockHeight::new(height)
+        Ok(BlockHeight::new(height))
     }
 }
 
 #[async_trait]
 impl TransactionBlockHeight for Wallet {
-    async fn transaction_block_height(&self, txid: Txid) -> BlockHeight {
-        #[derive(Debug)]
-        enum Error {
-            Io,
-            NotYetMined,
+    async fn transaction_block_height(&self, txid: Txid) -> Result<BlockHeight> {
+        let url = tx_status_url(txid, &self.http_url)?;
+        #[derive(Serialize, Deserialize, Debug, Clone)]
+        struct TransactionStatus {
+            block_height: Option<u32>,
+            confirmed: bool,
         }
-
         let height = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
-            let block_height = self
-                .inner
-                .transaction_block_height(txid)
+            let resp = reqwest::Client::new()
+                .request(Method::GET, url.clone())
+                .send()
                 .await
-                .map_err(|_| backoff::Error::Transient(Error::Io))?;
+                .map_err(|err| backoff::Error::Transient(Error::Io(err)))?;
 
-            let block_height = block_height.ok_or(backoff::Error::Transient(Error::NotYetMined))?;
+            let tx_status: TransactionStatus = resp
+                .json()
+                .await
+                .map_err(|err| backoff::Error::Permanent(Error::JsonDeserialisation(err)))?;
+
+            let block_height = tx_status
+                .block_height
+                .ok_or(backoff::Error::Transient(Error::NotYetMined))?;
 
             Result::<_, backoff::Error<Error>>::Ok(block_height)
         })
         .await
-        .expect("transient errors to be retried");
+        .map_err(|err| anyhow!("transient errors to be retried: {:?}", err))?;
 
-        BlockHeight::new(height)
+        Ok(BlockHeight::new(height))
     }
 }
 
@@ -175,16 +248,19 @@ impl WaitForTransactionFinality for Wallet {
         txid: Txid,
         execution_params: ExecutionParams,
     ) -> Result<()> {
-        // TODO(Franck): This assumes that bitcoind runs with txindex=1
-
+        tracing::debug!("waiting for tx finality: {}", txid);
         // Divide by 4 to not check too often yet still be aware of the new block early
         // on.
         let mut interval = interval(execution_params.bitcoin_avg_block_time / 4);
 
         loop {
-            let tx = self.inner.client.get_raw_transaction_verbose(txid).await?;
-            if let Some(confirmations) = tx.confirmations {
-                if confirmations >= execution_params.bitcoin_finality_confirmations {
+            let tx_block_height = self.transaction_block_height(txid).await?;
+            tracing::debug!("tx_block_height: {:?}", tx_block_height);
+            let block_height = self.get_block_height().await?;
+            tracing::debug!("latest_block_height: {:?}", block_height);
+            if let Some(confirmations) = block_height.checked_sub(tx_block_height) {
+                tracing::debug!("confirmations: {:?}", confirmations);
+                if u32::from(confirmations) >= execution_params.bitcoin_finality_confirmations {
                     break;
                 }
             }
@@ -195,8 +271,48 @@ impl WaitForTransactionFinality for Wallet {
     }
 }
 
+#[async_trait]
 impl GetNetwork for Wallet {
-    fn get_network(&self) -> bitcoin::Network {
-        self.network
+    async fn get_network(&self) -> bitcoin::Network {
+        self.inner.lock().await.network()
+    }
+}
+
+fn tx_status_url(txid: Txid, base_url: &Url) -> Result<Url> {
+    let url = base_url.join(&format!("tx/{}/status", txid))?;
+    Ok(url)
+}
+
+fn blocks_tip_height_url(base_url: &Url) -> Result<Url> {
+    let url = base_url.join("blocks/tip/height")?;
+    Ok(url)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        bitcoin::{
+            wallet::{blocks_tip_height_url, tx_status_url},
+            Txid,
+        },
+        cli::config::DEFAULT_ELECTRUM_HTTP_URL,
+    };
+    use reqwest::Url;
+
+    #[test]
+    fn create_tx_status_url_from_default_base_url_success() {
+        let txid: Txid = Txid::default();
+        let base_url = Url::parse(DEFAULT_ELECTRUM_HTTP_URL).expect("Could not parse url");
+        let url = tx_status_url(txid, &base_url).expect("Could not create url");
+        let expected = format!("https://blockstream.info/testnet/api/tx/{}/status", txid);
+        assert_eq!(url.as_str(), expected);
+    }
+
+    #[test]
+    fn create_block_tip_height_url_from_default_base_url_success() {
+        let base_url = Url::parse(DEFAULT_ELECTRUM_HTTP_URL).expect("Could not parse url");
+        let url = blocks_tip_height_url(&base_url).expect("Could not create url");
+        let expected = "https://blockstream.info/testnet/api/blocks/tip/height";
+        assert_eq!(url.as_str(), expected);
     }
 }

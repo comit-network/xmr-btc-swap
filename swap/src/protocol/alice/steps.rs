@@ -42,7 +42,7 @@ where
         bitcoin_wallet.watch_for_raw_transaction(lock_bitcoin_txid),
     )
     .await
-    .context("Failed to find lock Bitcoin tx")?;
+    .context("Failed to find lock Bitcoin tx")??;
 
     // // We saw the transaction in the mempool, waiting for it to be confirmed.
     bitcoin_wallet
@@ -158,8 +158,9 @@ where
     // First wait for cancel timelock to expire
     let tx_lock_height = bitcoin_wallet
         .transaction_block_height(tx_lock.txid())
-        .await;
-    poll_until_block_height_is_gte(bitcoin_wallet.as_ref(), tx_lock_height + cancel_timelock).await;
+        .await?;
+    poll_until_block_height_is_gte(bitcoin_wallet.as_ref(), tx_lock_height + cancel_timelock)
+        .await?;
 
     let tx_cancel = bitcoin::TxCancel::new(&tx_lock, cancel_timelock, a.public(), B);
 
@@ -216,7 +217,7 @@ where
 
     match select(punish_timelock_expired, seen_refund_tx).await {
         Either::Left(_) => Ok((tx_refund, None)),
-        Either::Right((published_refund_tx, _)) => Ok((tx_refund, Some(published_refund_tx))),
+        Either::Right((published_refund_tx, _)) => Ok((tx_refund, Some(published_refund_tx?))),
     }
 }
 
