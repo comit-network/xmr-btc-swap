@@ -2,7 +2,7 @@ use crate::testutils::bitcoind;
 use bitcoin::Network;
 use std::collections::HashMap;
 use testcontainers::{
-    core::{Container, Docker, Port, WaitForMessage},
+    core::{Container, Docker, WaitForMessage},
     Image,
 };
 
@@ -49,10 +49,6 @@ impl Image for Electrs {
 
     fn env_vars(&self) -> Self::EnvVars {
         HashMap::new()
-    }
-
-    fn ports(&self) -> Option<Vec<Port>> {
-        None
     }
 
     fn with_args(self, args: <Self as Image>::Args) -> Self {

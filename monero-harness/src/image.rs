@@ -1,6 +1,6 @@
 use std::{collections::HashMap, env::var, thread::sleep, time::Duration};
 use testcontainers::{
-    core::{Container, Docker, Port, WaitForMessage},
+    core::{Container, Docker, WaitForMessage},
     Image,
 };
 
@@ -13,7 +13,6 @@ pub const WALLET_RPC_PORT: u16 = 48083;
 pub struct Monero {
     tag: String,
     args: Args,
-    ports: Option<Vec<Port>>,
     entrypoint: Option<String>,
     wait_for_message: String,
 }
@@ -57,10 +56,6 @@ impl Image for Monero {
         HashMap::new()
     }
 
-    fn ports(&self) -> Option<Vec<Port>> {
-        self.ports.clone()
-    }
-
     fn with_args(self, args: <Self as Image>::Args) -> Self {
         Monero { args, ..self }
     }
@@ -82,7 +77,6 @@ impl Default for Monero {
         Monero {
             tag: "v0.16.0.3".into(),
             args: Args::default(),
-            ports: None,
             entrypoint: Some("".into()),
             wait_for_message: "core RPC server started ok".to_string(),
         }
@@ -95,13 +89,6 @@ impl Monero {
             tag: tag_str.to_string(),
             ..self
         }
-    }
-
-    pub fn with_mapped_port<P: Into<Port>>(mut self, port: P) -> Self {
-        let mut ports = self.ports.unwrap_or_default();
-        ports.push(port.into());
-        self.ports = Some(ports);
-        self
     }
 
     pub fn wallet(name: &str, daemon_address: String) -> Self {
