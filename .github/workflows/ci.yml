@@ -17,7 +17,7 @@ jobs:
 
       - name: Cache ~/.cargo/bin directory
         id: cache-cargo-bin
-        uses: actions/cache@v2
+        uses: actions/cache@v2.1.4
         with:
           path: ~/.cargo/bin
           key: ubuntu-rust-${{ hashFiles('rust-toolchain') }}-cargo-bin-directory-v1
@@ -60,7 +60,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Cache target directory and cargo registry
-        uses: actions/cache@v2
+        uses: actions/cache@v2.1.4
         with:
           path: |
             target
@@ -112,7 +112,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Cache target directory and cargo registry
-        uses: actions/cache@v2
+        uses: actions/cache@v2.1.4
         with:
           path: |
             target
