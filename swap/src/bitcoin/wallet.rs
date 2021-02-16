@@ -29,6 +29,7 @@ enum Error {
     Parse(std::num::ParseIntError),
     NotYetMined,
     JsonDeserialisation(reqwest::Error),
+    ElectrumConnection(electrum_client::Error),
 }
 
 pub struct Wallet {
@@ -163,14 +164,20 @@ impl BroadcastSignedTransaction for Wallet {
 impl WatchForRawTransaction for Wallet {
     async fn watch_for_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
         tracing::debug!("watching for tx: {}", txid);
-        retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
-            let client = Client::new(self.rpc_url.as_ref())?;
-            let tx = client.transaction_get(&txid)?;
+        let tx = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
+            let client = Client::new(self.rpc_url.as_ref())
+                .map_err(|err| backoff::Error::Permanent(Error::ElectrumConnection(err)))?;
+            let tx = client
+                .transaction_get(&txid)
+                .map_err(|_| backoff::Error::Transient(Error::NotYetMined))?;
             tracing::debug!("found tx: {}", txid);
-            Ok(tx)
+
+            Result::<_, backoff::Error<Error>>::Ok(tx)
         })
         .await
-        .map_err(|err| anyhow!("transient errors to be retried: {:?}", err))
+        .map_err(|err| anyhow!("transient errors to be retried: {:?}", err))?;
+
+        Ok(tx)
     }
 }
 
