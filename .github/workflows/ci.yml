@@ -15,21 +15,16 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v2
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          override: true
-          components: rustfmt, clippy
-
       - name: Cache ~/.cargo/bin directory
-        uses: actions/cache@v1
+        id: cache-cargo-bin
+        uses: actions/cache@v2
         with:
           path: ~/.cargo/bin
-          key: ubuntu-rust-${{ env.RUST_TOOLCHAIN }}-cargo-bin-directory-v1
+          key: ubuntu-rust-${{ hashFiles('rust-toolchain') }}-cargo-bin-directory-v1
 
       - name: Install tomlfmt
-        run: which cargo-tomlfmt || cargo install cargo-tomlfmt
+        if: steps.cache-cargo-bin.outputs.cache-hit != 'true'
+        run: cargo install cargo-tomlfmt
 
       - name: Check Cargo.toml formatting
         run: |
@@ -64,24 +59,13 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v2
 
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Cache target directory and cargo registry
+        uses: actions/cache@v2
         with:
-          profile: minimal
-          override: true
-
-      - name: Cache target directory
-        uses: actions/cache@v1
-        if: matrix.os == 'ubuntu-latest'
-        with:
-          path: target
-          key: rust-${{ matrix.target }}-target-directory-${{ hashFiles('Cargo.lock') }}-v1
-
-      - name: Cache ~/.cargo/registry directory
-        uses: actions/cache@v1
-        with:
-          path: ~/.cargo/registry
-          key: rust-${{ matrix.target }}-cargo-registry-directory-${{ hashFiles('Cargo.lock') }}-v1
+          path: |
+            target
+            ~/.cargo/registry
+          key: rust-${{ matrix.target }}-target-directory-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('rust-toolchain') }}-v1
 
       - name: Cargo check release code with default features
         run: cargo check --workspace
@@ -127,23 +111,13 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v2
 
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Cache target directory and cargo registry
+        uses: actions/cache@v2
         with:
-          profile: minimal
-          override: true
-
-      - name: Cache target directory
-        uses: actions/cache@v1
-        with:
-          path: target
-          key: rust-${{ env.TARGET }}-target-directory-${{ hashFiles('Cargo.lock') }}-v1
-
-      - name: Cache ~/.cargo/registry directory
-        uses: actions/cache@v1
-        with:
-          path: ~/.cargo/registry
-          key: rust-${{ env.TARGET }}-cargo-registry-directory-${{ hashFiles('Cargo.lock') }}-v1
+          path: |
+            target
+            ~/.cargo/registry
+          key: rust-${{ matrix.target }}-target-directory-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('rust-toolchain') }}-v1
 
       - name: Run test ${{ matrix.test_name }}
         run: cargo test --package swap --all-features --test ${{ matrix.test_name }} ""
