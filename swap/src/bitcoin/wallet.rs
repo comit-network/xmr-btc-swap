@@ -33,8 +33,8 @@ enum Error {
     NotYetMined,
     #[error("Deserialization failed")]
     JsonDeserialization(reqwest::Error),
-    #[error("Connecting to Electrum failed")]
-    ElectrumConnection(electrum_client::Error),
+    #[error("Electrum client error")]
+    ElectrumClient(electrum_client::Error),
 }
 
 pub struct Wallet {
@@ -171,11 +171,15 @@ impl WatchForRawTransaction for Wallet {
         tracing::debug!("watching for tx: {}", txid);
         let tx = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
             let client = Client::new(self.rpc_url.as_ref())
-                .map_err(|err| backoff::Error::Permanent(Error::ElectrumConnection(err)))?;
-            let tx = client
-                .transaction_get(&txid)
-                .map_err(|_| backoff::Error::Transient(Error::NotYetMined))?;
-            tracing::debug!("found tx: {}", txid);
+                .map_err(|err| backoff::Error::Permanent(Error::ElectrumClient(err)))?;
+
+            let tx = client.transaction_get(&txid).map_err(|err| match err {
+                electrum_client::Error::Protocol(err) => {
+                    tracing::debug!("Received protocol error {} from Electrum, retrying...", err);
+                    backoff::Error::Transient(Error::NotYetMined)
+                }
+                err => backoff::Error::Permanent(Error::ElectrumClient(err)),
+            })?;
 
             Result::<_, backoff::Error<Error>>::Ok(tx)
         })
