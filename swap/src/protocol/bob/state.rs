@@ -7,7 +7,7 @@ use crate::{
     },
     execution_params::ExecutionParams,
     monero,
-    monero::{monero_private_key, TransferProof},
+    monero::{monero_private_key, InsufficientFunds, TransferProof},
     protocol::{
         alice::{Message1, Message3},
         bob::{EncryptedSignature, Message0, Message2, Message4},
@@ -310,7 +310,7 @@ impl State3 {
         xmr_wallet: &W,
         transfer_proof: TransferProof,
         monero_wallet_restore_blockheight: u32,
-    ) -> Result<State4>
+    ) -> Result<Result<State4, InsufficientFunds>>
     where
         W: monero::WatchForTransfer,
     {
@@ -319,7 +319,7 @@ impl State3 {
         ));
         let S = self.S_a_monero + S_b_monero;
 
-        xmr_wallet
+        if let Err(e) = xmr_wallet
             .watch_for_transfer(
                 S,
                 self.v.public(),
@@ -327,9 +327,12 @@ impl State3 {
                 self.xmr,
                 self.min_monero_confirmations,
             )
-            .await?;
+            .await
+        {
+            return Ok(Err(e));
+        }
 
-        Ok(State4 {
+        Ok(Ok(State4 {
             A: self.A,
             b: self.b,
             s_b: self.s_b,
@@ -343,7 +346,7 @@ impl State3 {
             tx_cancel_sig_a: self.tx_cancel_sig_a,
             tx_refund_encsig: self.tx_refund_encsig,
             monero_wallet_restore_blockheight,
-        })
+        }))
     }
 
     pub async fn wait_for_cancel_timelock_to_expire<W>(&self, bitcoin_wallet: &W) -> Result<()>

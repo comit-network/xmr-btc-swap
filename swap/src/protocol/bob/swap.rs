@@ -4,6 +4,7 @@ use crate::{
     database::{Database, Swap},
     execution_params::ExecutionParams,
     monero,
+    monero::InsufficientFunds,
     protocol::bob::{self, event_loop::EventLoopHandle, state::*, QuoteRequest},
 };
 use anyhow::{bail, Result};
@@ -186,7 +187,15 @@ async fn run_until_internal(
 
                     select! {
                         state4 = xmr_lock_watcher => {
-                            BobState::XmrLocked(state4?)
+                            match state4? {
+                                Ok(state4) => BobState::XmrLocked(state4),
+                                Err(InsufficientFunds {..}) => {
+                                     info!("The other party has locked insufficient Monero funds! Waiting for refund...");
+                                     state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()).await?;
+                                     let state4 = state.state4();
+                                     BobState::CancelTimelockExpired(state4)
+                                },
+                            }
                         },
                         _ = cancel_timelock_expires => {
                             let state4 = state.state4();
