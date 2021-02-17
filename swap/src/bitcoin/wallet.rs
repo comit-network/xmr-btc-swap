@@ -119,7 +119,6 @@ impl BuildTxLockPsbt for Wallet {
         output_amount: Amount,
     ) -> Result<PartiallySignedTransaction> {
         tracing::debug!("building tx lock");
-        self.sync_wallet().await?;
         let (psbt, _details) = self.inner.lock().await.create_tx(
             bdk::TxBuilder::with_recipients(vec![(
                 output_address.script_pubkey(),
