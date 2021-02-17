@@ -7,7 +7,7 @@ use crate::{
     execution_params::ExecutionParams,
 };
 use ::bitcoin::{util::psbt::PartiallySignedTransaction, Txid};
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, tokio::retry};
 use bdk::{
@@ -23,12 +23,17 @@ use tokio::{sync::Mutex, time::interval};
 
 const SLED_TREE_NAME: &str = "default_tree";
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 enum Error {
+    #[error("Sending the request failed")]
     Io(reqwest::Error),
+    #[error("Conversion to Integer failed")]
     Parse(std::num::ParseIntError),
+    #[error("The transaction is not minded yet")]
     NotYetMined,
-    JsonDeserialisation(reqwest::Error),
+    #[error("Deserialization failed")]
+    JsonDeserialization(reqwest::Error),
+    #[error("Connecting to Electrum failed")]
     ElectrumConnection(electrum_client::Error),
 }
 
@@ -175,7 +180,7 @@ impl WatchForRawTransaction for Wallet {
             Result::<_, backoff::Error<Error>>::Ok(tx)
         })
         .await
-        .map_err(|err| anyhow!("transient errors to be retried: {:?}", err))?;
+        .context("transient errors to be retried")?;
 
         Ok(tx)
     }
@@ -208,7 +213,7 @@ impl GetBlockHeight for Wallet {
             Result::<_, backoff::Error<Error>>::Ok(height)
         })
         .await
-        .map_err(|err| anyhow!("transient errors to be retried: {:?}", err))?;
+        .context("transient errors to be retried")?;
 
         Ok(BlockHeight::new(height))
     }
@@ -233,7 +238,7 @@ impl TransactionBlockHeight for Wallet {
             let tx_status: TransactionStatus = resp
                 .json()
                 .await
-                .map_err(|err| backoff::Error::Permanent(Error::JsonDeserialisation(err)))?;
+                .map_err(|err| backoff::Error::Permanent(Error::JsonDeserialization(err)))?;
 
             let block_height = tx_status
                 .block_height
@@ -242,7 +247,7 @@ impl TransactionBlockHeight for Wallet {
             Result::<_, backoff::Error<Error>>::Ok(block_height)
         })
         .await
-        .map_err(|err| anyhow!("transient errors to be retried: {:?}", err))?;
+        .context("transient errors to be retried")?;
 
         Ok(BlockHeight::new(height))
     }
