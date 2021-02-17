@@ -46,7 +46,57 @@ jobs:
       - name: Run clippy with all features enabled
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-  build_test:
+  build:
+    strategy:
+      matrix:
+        target: [ x86_64-unknown-linux-gnu, x86_64-apple-darwin ]
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          override: true
+
+      - name: Cache target directory
+        uses: actions/cache@v1
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          path: target
+          key: rust-${{ matrix.target }}-target-directory-build-${{ hashFiles('Cargo.lock') }}-v1
+
+      - name: Cache ~/.cargo/registry directory
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: rust-${{ matrix.target }}-cargo-registry-directory-${{ hashFiles('Cargo.lock') }}-v1
+
+      - name: Build binary
+        run: |
+          cargo build -p swap --target ${{ matrix.target }}
+
+      - name: Upload swap_cli binary
+        uses: actions/upload-artifact@v2-preview
+        with:
+          name: swap-${{ matrix.target }}
+          path: target/${{ matrix.target }}/debug/swap_cli
+
+      - name: Upload nectar binary
+        uses: actions/upload-artifact@v2-preview
+        with:
+          name: nectar-${{ matrix.target }}
+          path: target/${{ matrix.target }}/debug/nectar
+
+  test:
     env:
       RUST_TEST_TASKS: 2
     strategy:
@@ -74,19 +124,13 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         with:
           path: target
-          key: rust-${{ matrix.target }}-target-directory-${{ hashFiles('Cargo.lock') }}-v1
+          key: rust-${{ matrix.target }}-target-directory-test-${{ hashFiles('Cargo.lock') }}-v1
 
       - name: Cache ~/.cargo/registry directory
         uses: actions/cache@v1
         with:
           path: ~/.cargo/registry
           key: rust-${{ matrix.target }}-cargo-registry-directory-${{ hashFiles('Cargo.lock') }}-v1
-
-      - name: Cargo check release code with default features
-        run: cargo check --workspace
-
-      - name: Cargo check all features
-        run: cargo check --workspace --all-targets --all-features
 
       - name: Build tests
         run: cargo build --tests --workspace --all-features
@@ -97,22 +141,6 @@ jobs:
 
       - name: Run library tests for swap
         run: cargo test --package swap --lib --all-features
-
-      - name: Build binary
-        run: |
-          cargo build -p swap --target ${{ matrix.target }}
-
-      - name: Upload swap_cli binary
-        uses: actions/upload-artifact@v2-preview
-        with:
-          name: swap-${{ matrix.target }}
-          path: target/${{ matrix.target }}/debug/swap_cli
-
-      - name: Upload nectar binary
-        uses: actions/upload-artifact@v2-preview
-        with:
-          name: nectar-${{ matrix.target }}
-          path: target/${{ matrix.target }}/debug/nectar
 
   docker_tests:
     env:
@@ -142,7 +170,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: target
-          key: rust-${{ env.TARGET }}-target-directory-${{ hashFiles('Cargo.lock') }}-v1
+          key: rust-${{ matrix.target }}-target-directory-test-${{ hashFiles('Cargo.lock') }}-v1
 
       - name: Cache ~/.cargo/registry directory
         uses: actions/cache@v1
