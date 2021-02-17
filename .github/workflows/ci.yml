@@ -107,7 +107,7 @@ jobs:
         uses: actions/upload-artifact@v2-preview
         with:
           name: swap-${{ matrix.target }}
-          path: target/${{ matrix.target }}/debug/swap
+          path: target/${{ matrix.target }}/debug/swap_cli
 
   docker_tests:
     env:
