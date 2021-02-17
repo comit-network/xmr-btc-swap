@@ -23,7 +23,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Cache ~/.cargo/bin directory
-        uses: actions/cache@v1
+        uses: actions/cache@v2.1.4
         with:
           path: ~/.cargo/bin
           key: ubuntu-rust-${{ env.RUST_TOOLCHAIN }}-cargo-bin-directory-v1
@@ -67,18 +67,13 @@ jobs:
           profile: minimal
           override: true
 
-      - name: Cache target directory
-        uses: actions/cache@v1
-        if: matrix.os == 'ubuntu-latest'
+      - name: Cache target and registry directory
+        uses: actions/cache@v2.1.4
         with:
-          path: target
-          key: rust-${{ matrix.target }}-target-directory-build-${{ hashFiles('Cargo.lock') }}-v1
-
-      - name: Cache ~/.cargo/registry directory
-        uses: actions/cache@v1
-        with:
-          path: ~/.cargo/registry
-          key: rust-${{ matrix.target }}-cargo-registry-directory-${{ hashFiles('Cargo.lock') }}-v1
+          path: |
+            target
+            ~/.cargo/registry
+          key: rust-${{ matrix.target }}-build-${{ hashFiles('Cargo.lock') }}-v1
 
       - name: Build binary
         run: |
@@ -119,18 +114,13 @@ jobs:
           profile: minimal
           override: true
 
-      - name: Cache target directory
-        uses: actions/cache@v1
-        if: matrix.os == 'ubuntu-latest'
+      - name: Cache target and registry directory
+        uses: actions/cache@v2.1.4
         with:
-          path: target
-          key: rust-${{ matrix.target }}-target-directory-test-${{ hashFiles('Cargo.lock') }}-v1
-
-      - name: Cache ~/.cargo/registry directory
-        uses: actions/cache@v1
-        with:
-          path: ~/.cargo/registry
-          key: rust-${{ matrix.target }}-cargo-registry-directory-${{ hashFiles('Cargo.lock') }}-v1
+          path: |
+            target
+            ~/.cargo/registry
+          key: rust-${{ matrix.target }}-test-${{ hashFiles('Cargo.lock') }}-v1
 
       - name: Build tests
         run: cargo build --tests --workspace --all-features
@@ -166,17 +156,13 @@ jobs:
           profile: minimal
           override: true
 
-      - name: Cache target directory
-        uses: actions/cache@v1
+      - name: Cache target and registry directory
+        uses: actions/cache@v2.1.4
         with:
-          path: target
-          key: rust-${{ matrix.target }}-target-directory-test-${{ hashFiles('Cargo.lock') }}-v1
-
-      - name: Cache ~/.cargo/registry directory
-        uses: actions/cache@v1
-        with:
-          path: ~/.cargo/registry
-          key: rust-${{ env.TARGET }}-cargo-registry-directory-${{ hashFiles('Cargo.lock') }}-v1
+          path: |
+            target
+            ~/.cargo/registry
+          key: rust-${{ matrix.target }}-test-${{ hashFiles('Cargo.lock') }}-v1
 
       - name: Run test ${{ matrix.test_name }}
         run: cargo test --package swap --all-features --test ${{ matrix.test_name }} ""
