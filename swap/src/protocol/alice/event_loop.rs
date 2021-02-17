@@ -20,8 +20,8 @@ use libp2p::{
 };
 use rand::rngs::OsRng;
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc};
-use tracing::{debug, error, trace, warn};
+use tokio::sync::{broadcast, mpsc, mpsc::error::SendError};
+use tracing::{debug, error, trace};
 use uuid::Uuid;
 
 // TODO: Use dynamic
@@ -246,14 +246,16 @@ impl EventLoop {
         .build()
         .await?;
 
-        let (remote, remote_handle) = alice::run(swap).remote_handle();
-        tokio::spawn(remote);
+        let (swap, swap_handle) = alice::run(swap).remote_handle();
+        tokio::spawn(swap);
 
-        let _ = self
-            .swap_handle_sender
-            .send(remote_handle)
-            .await
-            .map_err(|err| warn!("Could not send swap handle over channel: {:?}", err));
+        // For testing purposes the handle is currently sent via a channel so we can
+        // await it. If a remote handle is dropped, the future of the swap is
+        // also stopped. If we error upon sending the handle through the channel
+        // we have to call forget to detach the handle from the swap future.
+        if let Err(SendError(handle)) = self.swap_handle_sender.send(swap_handle).await {
+            handle.forget();
+        }
 
         Ok(())
     }

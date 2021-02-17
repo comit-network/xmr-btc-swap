@@ -86,7 +86,7 @@ async fn run_until_internal(
     swap_id: Uuid,
     db: Arc<Database>,
 ) -> Result<AliceState> {
-    info!("Current state:{}", state);
+    info!("Current state: {}", state);
     if is_target_state(&state) {
         Ok(state)
     } else {
