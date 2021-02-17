@@ -183,13 +183,14 @@ impl<'c> Monerod {
         let monerod_rpc_port: u16 =
             port_check::free_local_port().ok_or_else(|| anyhow!("Could not retrieve free port"))?;
 
-        let image = image::Monero::default().with_mapped_port(Port {
-            local: monerod_rpc_port,
-            internal: MONEROD_RPC_PORT,
-        });
+        let image = image::Monero::default();
         let run_args = RunArgs::default()
             .with_name(name.clone())
-            .with_network(network.clone());
+            .with_network(network.clone())
+            .with_mapped_port(Port {
+                local: monerod_rpc_port,
+                internal: MONEROD_RPC_PORT,
+            });
         let docker = cli.run_with_args(image, run_args);
 
         Ok((
@@ -227,15 +228,16 @@ impl<'c> MoneroWalletRpc {
             port_check::free_local_port().ok_or_else(|| anyhow!("Could not retrieve free port"))?;
 
         let daemon_address = format!("{}:{}", monerod.name, MONEROD_RPC_PORT);
-        let image = image::Monero::wallet(&name, daemon_address).with_mapped_port(Port {
-            local: wallet_rpc_port,
-            internal: WALLET_RPC_PORT,
-        });
+        let image = image::Monero::wallet(&name, daemon_address);
 
         let network = monerod.network.clone();
         let run_args = RunArgs::default()
             .with_name(name)
-            .with_network(network.clone());
+            .with_network(network.clone())
+            .with_mapped_port(Port {
+                local: wallet_rpc_port,
+                internal: WALLET_RPC_PORT,
+            });
         let docker = cli.run_with_args(image, run_args);
 
         // create new wallet
