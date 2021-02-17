@@ -23,13 +23,15 @@ jobs:
           components: rustfmt, clippy
 
       - name: Cache ~/.cargo/bin directory
+        id: cargo-bin-cache
         uses: actions/cache@v2.1.4
         with:
           path: ~/.cargo/bin
           key: ubuntu-rust-${{ env.RUST_TOOLCHAIN }}-cargo-bin-directory-v1
 
       - name: Install tomlfmt
-        run: which cargo-tomlfmt || cargo install cargo-tomlfmt
+        if: steps.cargo-bin-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-tomlfmt
 
       - name: Check Cargo.toml formatting
         run: |
