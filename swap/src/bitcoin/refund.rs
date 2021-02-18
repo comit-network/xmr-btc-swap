@@ -5,7 +5,7 @@ use crate::bitcoin::{
 use ::bitcoin::{util::bip143::SigHashCache, SigHash, SigHashType, Txid};
 use anyhow::{bail, Context, Result};
 use ecdsa_fun::Signature;
-use miniscript::NullCtx;
+use miniscript::DescriptorTrait;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -20,7 +20,7 @@ impl TxRefund {
 
         let digest = SigHashCache::new(&tx_punish).signature_hash(
             0, // Only one input: cancel transaction
-            &tx_cancel.output_descriptor.witness_script(NullCtx),
+            &tx_cancel.output_descriptor.script_code(),
             tx_cancel.amount().as_sat(),
             SigHashType::All,
         );
@@ -67,7 +67,7 @@ impl TxRefund {
         let mut tx_refund = self.inner;
         tx_cancel
             .output_descriptor
-            .satisfy(&mut tx_refund.input[0], satisfier, NullCtx)?;
+            .satisfy(&mut tx_refund.input[0], satisfier)?;
 
         Ok(tx_refund)
     }

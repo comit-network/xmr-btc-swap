@@ -15,7 +15,10 @@ use crate::{
     },
 };
 use anyhow::{Context, Result};
-use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic};
+use ecdsa_fun::{
+    adaptor::{Adaptor, HashTranscript},
+    nonce::Deterministic,
+};
 use futures::{
     future::{select, Either},
     pin_mut,
@@ -61,9 +64,7 @@ pub async fn lock_xmr<W>(
 where
     W: Transfer,
 {
-    let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey {
-        scalar: state3.s_a.into_ed25519(),
-    });
+    let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey { scalar: state3.s_a });
 
     let public_spend_key = S_a + state3.S_b_monero;
     let public_view_key = state3.v.public();
@@ -103,24 +104,24 @@ pub fn build_bitcoin_redeem_transaction(
     encrypted_signature: EncryptedSignature,
     tx_lock: &TxLock,
     a: bitcoin::SecretKey,
-    s_a: cross_curve_dleq::Scalar,
+    s_a: ecdsa_fun::fun::Scalar,
     B: bitcoin::PublicKey,
     redeem_address: &bitcoin::Address,
 ) -> Result<bitcoin::Transaction> {
-    let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
+    let adaptor = Adaptor::<HashTranscript<Sha256>, Deterministic<Sha256>>::default();
 
     let tx_redeem = bitcoin::TxRedeem::new(tx_lock, redeem_address);
 
     bitcoin::verify_encsig(
         B,
-        s_a.into_secp256k1().into(),
+        bitcoin::PublicKey::from(s_a.clone()),
         &tx_redeem.digest(),
         &encrypted_signature,
     )
     .context("Invalid encrypted signature received")?;
 
     let sig_a = a.sign(tx_redeem.digest());
-    let sig_b = adaptor.decrypt_signature(&s_a.into_secp256k1(), encrypted_signature);
+    let sig_b = adaptor.decrypt_signature(&s_a, encrypted_signature);
 
     let tx = tx_redeem
         .add_signatures(&tx_lock, (a.public(), sig_a), (B, sig_b))
@@ -224,13 +225,11 @@ where
 pub fn extract_monero_private_key(
     published_refund_tx: bitcoin::Transaction,
     tx_refund: TxRefund,
-    s_a: cross_curve_dleq::Scalar,
+    s_a: monero::Scalar,
     a: bitcoin::SecretKey,
     S_b_bitcoin: bitcoin::PublicKey,
 ) -> Result<monero::PrivateKey> {
-    let s_a = monero::PrivateKey {
-        scalar: s_a.into_ed25519(),
-    };
+    let s_a = monero::PrivateKey { scalar: s_a };
 
     let tx_refund_sig = tx_refund
         .extract_signature_by_key(published_refund_tx, a.public())

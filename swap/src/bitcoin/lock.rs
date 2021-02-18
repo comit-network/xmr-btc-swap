@@ -4,7 +4,7 @@ use crate::bitcoin::{
 };
 use ::bitcoin::{util::psbt::PartiallySignedTransaction, OutPoint, TxIn, TxOut, Txid};
 use anyhow::Result;
-use miniscript::{Descriptor, NullCtx};
+use miniscript::{Descriptor, DescriptorTrait};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -20,7 +20,7 @@ impl TxLock {
     {
         let lock_output_descriptor = build_shared_output_descriptor(A.0, B.0);
         let address = lock_output_descriptor
-            .address(wallet.get_network().await, NullCtx)
+            .address(wallet.get_network().await)
             .expect("can derive address from descriptor");
 
         let psbt = wallet.build_tx_lock_psbt(address, amount).await?;
@@ -54,9 +54,7 @@ impl TxLock {
             .extract_tx()
             .output
             .iter()
-            .position(|output| {
-                output.script_pubkey == self.output_descriptor.script_pubkey(NullCtx)
-            })
+            .position(|output| output.script_pubkey == self.output_descriptor.script_pubkey())
             .expect("transaction contains lock output")
     }
 
