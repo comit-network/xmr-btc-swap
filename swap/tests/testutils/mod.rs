@@ -144,7 +144,13 @@ impl TestContext {
             .get_balance()
             .await
             .unwrap();
-        assert!(xmr_balance_after_swap <= self.alice_starting_balances.xmr - self.xmr_amount);
+        assert!(
+            xmr_balance_after_swap <= self.alice_starting_balances.xmr - self.xmr_amount,
+            "{} !< {} - {}",
+            xmr_balance_after_swap,
+            self.alice_starting_balances.xmr,
+            self.xmr_amount
+        );
     }
 
     pub async fn assert_alice_refunded(&mut self) {
