@@ -14,7 +14,7 @@ use crate::{
     },
     seed::Seed,
 };
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use futures::future::RemoteHandle;
 use libp2p::{
     core::Multiaddr, futures::FutureExt, request_response::ResponseChannel, PeerId, Swarm,
@@ -164,7 +164,9 @@ where
                             debug!("Connection Established with {}", alice);
                         }
                         OutEvent::QuoteRequest { msg, channel, bob_peer_id } => {
-                            let _ = self.handle_quote_request(msg, channel, bob_peer_id).await;
+                            if let Err(error) = self.handle_quote_request(msg, channel, bob_peer_id).await {
+                                error!("Failed to handle quote request: {:#}", error);
+                            }
                         }
                         OutEvent::ExecutionSetupDone{bob_peer_id, state3} => {
                             let _ = self.handle_execution_setup_done(bob_peer_id, *state3).await;
@@ -203,7 +205,10 @@ where
         // 1. Check if acceptable request
         // 2. Send response
 
-        let rate = self.rate_service.latest_rate();
+        let rate = self
+            .rate_service
+            .latest_rate()
+            .map_err(|e| anyhow!("Failed to get latest rate: {:?}", e))?;
 
         let btc_amount = quote_request.btc_amount;
         let xmr_amount = rate.sell_quote(btc_amount)?;

@@ -6,8 +6,10 @@ pub const RATE: f64 = 0.01;
 pub struct RateService(Rate);
 
 impl LatestRate for RateService {
-    fn latest_rate(&mut self) -> Rate {
-        self.0
+    type Error = anyhow::Error;
+
+    fn latest_rate(&mut self) -> anyhow::Result<Rate> {
+        Ok(self.0)
     }
 }
 
