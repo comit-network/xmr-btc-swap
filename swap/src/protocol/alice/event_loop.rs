@@ -22,7 +22,7 @@ use libp2p::{
 use rand::rngs::OsRng;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, mpsc::error::SendError};
-use tracing::{debug, error, trace};
+use tracing::{debug, error, info, trace};
 use uuid::Uuid;
 
 #[allow(missing_debug_implementations)]
@@ -228,6 +228,11 @@ where
             &mut OsRng,
         )
         .await?;
+
+        info!(
+            "Starting execution setup to sell {} for {} (rate of {}) with {}",
+            xmr_amount, btc_amount, rate, bob_peer_id
+        );
 
         self.swarm.start_execution_setup(bob_peer_id, state0);
         // Continues once the execution setup protocol is done
