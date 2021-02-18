@@ -1,7 +1,7 @@
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, Result};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter};
 
 /// Prices at which 1 XMR will be traded, in BTC (XMR/BTC pair)
 /// The `ask` represents the minimum price in BTC for which we are willing to
@@ -45,6 +45,12 @@ impl Rate {
             .ok_or_else(|| anyhow!("decimal cannot be represented as u64"))?;
 
         Ok(monero::Amount::from_piconero(base_in_piconero))
+    }
+}
+
+impl Display for Rate {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.ask)
     }
 }
 
