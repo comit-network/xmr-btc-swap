@@ -15,21 +15,16 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v2
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          override: true
-          components: rustfmt, clippy
-
       - name: Cache ~/.cargo/bin directory
-        uses: actions/cache@v1
+        id: cargo-bin-cache
+        uses: actions/cache@v2.1.4
         with:
           path: ~/.cargo/bin
-          key: ubuntu-rust-${{ env.RUST_TOOLCHAIN }}-cargo-bin-directory-v1
+          key: ubuntu-rust-${{ hashFiles('rust-toolchain') }}-cargo-bin-directory-v1
 
       - name: Install tomlfmt
-        run: which cargo-tomlfmt || cargo install cargo-tomlfmt
+        if: steps.cargo-bin-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-tomlfmt
 
       - name: Check Cargo.toml formatting
         run: |
@@ -46,7 +41,46 @@ jobs:
       - name: Run clippy with all features enabled
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-  build_test:
+  build:
+    strategy:
+      matrix:
+        target: [ x86_64-unknown-linux-gnu, x86_64-apple-darwin ]
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Cache target and registry directory
+        uses: actions/cache@v2.1.4
+        with:
+          path: |
+            target
+            ~/.cargo/registry
+          key: rust-${{ matrix.target }}-build-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('rust-toolchain') }}-v1
+
+      - name: Build binary
+        run: |
+          cargo build -p swap --target ${{ matrix.target }}
+
+      - name: Upload swap_cli binary
+        uses: actions/upload-artifact@v2-preview
+        with:
+          name: swap-${{ matrix.target }}
+          path: target/${{ matrix.target }}/debug/swap_cli
+
+      - name: Upload nectar binary
+        uses: actions/upload-artifact@v2-preview
+        with:
+          name: nectar-${{ matrix.target }}
+          path: target/${{ matrix.target }}/debug/nectar
+
+  test:
     env:
       RUST_TEST_TASKS: 2
     strategy:
@@ -57,37 +91,19 @@ jobs:
             os: ubuntu-latest
           - target: x86_64-apple-darwin
             os: macos-latest
-            skip_tests: true # Most likely do not work due to docker usage, TODO: add feature flag to allow unit tests
     runs-on: ${{ matrix.os }}
     steps:
 
       - name: Checkout sources
         uses: actions/checkout@v2
 
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Cache target and registry directory
+        uses: actions/cache@v2.1.4
         with:
-          profile: minimal
-          override: true
-
-      - name: Cache target directory
-        uses: actions/cache@v1
-        if: matrix.os == 'ubuntu-latest'
-        with:
-          path: target
-          key: rust-${{ matrix.target }}-target-directory-${{ hashFiles('Cargo.lock') }}-v1
-
-      - name: Cache ~/.cargo/registry directory
-        uses: actions/cache@v1
-        with:
-          path: ~/.cargo/registry
-          key: rust-${{ matrix.target }}-cargo-registry-directory-${{ hashFiles('Cargo.lock') }}-v1
-
-      - name: Cargo check release code with default features
-        run: cargo check --workspace
-
-      - name: Cargo check all features
-        run: cargo check --workspace --all-targets --all-features
+          path: |
+            target
+            ~/.cargo/registry
+          key: rust-${{ matrix.target }}-test-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('rust-toolchain') }}-v1
 
       - name: Build tests
         run: cargo build --tests --workspace --all-features
@@ -98,16 +114,6 @@ jobs:
 
       - name: Run library tests for swap
         run: cargo test --package swap --lib --all-features
-
-      - name: Build binary
-        run: |
-          cargo build -p swap --target ${{ matrix.target }}
-
-      - name: Upload binary
-        uses: actions/upload-artifact@v2-preview
-        with:
-          name: swap-${{ matrix.target }}
-          path: target/${{ matrix.target }}/debug/swap
 
   docker_tests:
     env:
@@ -127,23 +133,13 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v2
 
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Cache target and registry directory
+        uses: actions/cache@v2.1.4
         with:
-          profile: minimal
-          override: true
-
-      - name: Cache target directory
-        uses: actions/cache@v1
-        with:
-          path: target
-          key: rust-${{ env.TARGET }}-target-directory-${{ hashFiles('Cargo.lock') }}-v1
-
-      - name: Cache ~/.cargo/registry directory
-        uses: actions/cache@v1
-        with:
-          path: ~/.cargo/registry
-          key: rust-${{ env.TARGET }}-cargo-registry-directory-${{ hashFiles('Cargo.lock') }}-v1
+          path: |
+            target
+            ~/.cargo/registry
+          key: rust-${{ matrix.target }}-test-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('rust-toolchain') }}-v1
 
       - name: Run test ${{ matrix.test_name }}
         run: cargo test --package swap --all-features --test ${{ matrix.test_name }} ""

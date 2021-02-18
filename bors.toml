@@ -1,7 +1,9 @@
 status = [
     "static_analysis",
-    "build_test (x86_64-unknown-linux-gnu)",
-    "build_test (x86_64-apple-darwin)",
+    "build (x86_64-unknown-linux-gnu)",
+    "build (x86_64-apple-darwin)",
+    "test (x86_64-unknown-linux-gnu)",
+    "test (x86_64-apple-darwin)",
     "docker_tests (happy_path)",
     "docker_tests (happy_path_restart_bob_before_comm)",
     "docker_tests (bob_refunds_using_cancel_and_refund_command)",
