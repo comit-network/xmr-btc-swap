@@ -119,7 +119,7 @@ impl Behaviour {
         &mut self,
         channel: ResponseChannel<QuoteResponse>,
         quote_response: QuoteResponse,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         self.quote_response.send(channel, quote_response)?;
         info!("Sent quote response");
         Ok(())

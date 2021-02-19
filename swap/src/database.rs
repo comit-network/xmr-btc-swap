@@ -65,7 +65,7 @@ impl Database {
             .context("Could not flush db")
     }
 
-    pub fn get_state(&self, swap_id: Uuid) -> anyhow::Result<Swap> {
+    pub fn get_state(&self, swap_id: Uuid) -> Result<Swap> {
         let key = serialize(&swap_id)?;
 
         let encoded = self
@@ -97,14 +97,14 @@ impl Database {
     }
 }
 
-pub fn serialize<T>(t: &T) -> anyhow::Result<Vec<u8>>
+pub fn serialize<T>(t: &T) -> Result<Vec<u8>>
 where
     T: Serialize,
 {
     Ok(serde_cbor::to_vec(t)?)
 }
 
-pub fn deserialize<T>(v: &[u8]) -> anyhow::Result<T>
+pub fn deserialize<T>(v: &[u8]) -> Result<T>
 where
     T: DeserializeOwned,
 {

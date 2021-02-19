@@ -269,7 +269,7 @@ pub async fn current_epoch<W>(
     cancel_timelock: CancelTimelock,
     punish_timelock: PunishTimelock,
     lock_tx_id: ::bitcoin::Txid,
-) -> anyhow::Result<ExpiredTimelocks>
+) -> Result<ExpiredTimelocks>
 where
     W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
 {
