@@ -9,7 +9,7 @@ use crate::{
 use ::bitcoin::{util::psbt::PartiallySignedTransaction, Txid};
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
-use backoff::{backoff::Constant as ConstantBackoff, tokio::retry};
+use backoff::{backoff::Constant as ConstantBackoff, future::retry};
 use bdk::{
     blockchain::{noop_progress, Blockchain, ElectrumBlockchain},
     electrum_client::{self, Client, ElectrumApi},

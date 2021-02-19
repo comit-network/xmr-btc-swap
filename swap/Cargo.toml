@@ -16,7 +16,7 @@ anyhow = "1"
 async-recursion = "0.3.1"
 async-trait = "0.1"
 atty = "0.2"
-backoff = { git = "https://github.com/ihrwein/backoff", rev = "9d03992a83dfdc596be26276d4e5c5254a4b11a2", features = ["tokio"] }
+backoff = { version = "0.3", features = ["tokio"] }
 base64 = "0.12"
 bdk = { version = "0.4" }
 bitcoin = { version = "0.26", features = ["rand", "use-serde"] }
