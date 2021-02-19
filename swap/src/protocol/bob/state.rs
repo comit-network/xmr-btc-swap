@@ -12,12 +12,12 @@ use crate::{
     protocol::{
         alice::{Message1, Message3},
         bob::{EncryptedSignature, Message0, Message2, Message4},
+        CROSS_CURVE_PROOF_SYSTEM,
     },
 };
 use anyhow::{anyhow, bail, Result};
 use ecdsa_fun::{
     adaptor::{Adaptor, HashTranscript},
-    fun::marker::Mark,
     nonce::Deterministic,
     Signature,
 };
@@ -25,7 +25,7 @@ use monero_harness::rpc::wallet::BlockHeight;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-use sigma_fun::ext::dl_secp256k1_ed25519_eq::{CrossCurveDLEQ, CrossCurveDLEQProof};
+use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQProof;
 use std::fmt;
 
 #[derive(Debug, Clone)]
@@ -109,13 +109,7 @@ impl State0 {
         let s_b = monero::Scalar::random(rng);
         let v_b = monero::PrivateViewKey::new_random(rng);
 
-        let dleq_proof_system =
-            CrossCurveDLEQ::<HashTranscript<Sha256, rand_chacha::ChaCha20Rng>>::new(
-                (*ecdsa_fun::fun::G).mark::<ecdsa_fun::fun::marker::Normal>(),
-                curve25519_dalek::constants::ED25519_BASEPOINT_POINT,
-            );
-
-        let (dleq_proof_s_b, (S_b_bitcoin, S_b_monero)) = dleq_proof_system.prove(&s_b, rng);
+        let (dleq_proof_s_b, (S_b_bitcoin, S_b_monero)) = CROSS_CURVE_PROOF_SYSTEM.prove(&s_b, rng);
 
         Self {
             b,
@@ -150,13 +144,7 @@ impl State0 {
     where
         W: BuildTxLockPsbt + GetNetwork,
     {
-        let dleq_proof_system =
-            CrossCurveDLEQ::<HashTranscript<Sha256, rand_chacha::ChaCha20Rng>>::new(
-                (*ecdsa_fun::fun::G).mark::<ecdsa_fun::fun::marker::Normal>(),
-                curve25519_dalek::constants::ED25519_BASEPOINT_POINT,
-            );
-
-        let valid = dleq_proof_system.verify(
+        let valid = CROSS_CURVE_PROOF_SYSTEM.verify(
             &msg.dleq_proof_s_a,
             (
                 msg.S_a_bitcoin.clone().into(),

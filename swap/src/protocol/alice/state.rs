@@ -11,19 +11,19 @@ use crate::{
     protocol::{
         alice::{Message1, Message3, TransferProof},
         bob::{EncryptedSignature, Message0, Message2, Message4},
+        CROSS_CURVE_PROOF_SYSTEM,
     },
 };
 use anyhow::{anyhow, bail, Context, Result};
 use ecdsa_fun::{
     adaptor::{Adaptor, HashTranscript},
-    fun::marker::Mark,
     nonce::Deterministic,
 };
 use libp2p::PeerId;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-use sigma_fun::ext::dl_secp256k1_ed25519_eq::{CrossCurveDLEQ, CrossCurveDLEQProof};
+use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQProof;
 use std::fmt;
 
 #[derive(Debug)]
@@ -116,14 +116,8 @@ impl State0 {
         let redeem_address = bitcoin_wallet.new_address().await?;
         let punish_address = redeem_address.clone();
 
-        let dleq_proof_system =
-            CrossCurveDLEQ::<HashTranscript<Sha256, rand_chacha::ChaCha20Rng>>::new(
-                (*ecdsa_fun::fun::G).mark::<ecdsa_fun::fun::marker::Normal>(),
-                curve25519_dalek::constants::ED25519_BASEPOINT_POINT,
-            );
-
         let s_a = monero::Scalar::random(rng);
-        let (dleq_proof_s_a, (S_a_bitcoin, S_a_monero)) = dleq_proof_system.prove(&s_a, rng);
+        let (dleq_proof_s_a, (S_a_bitcoin, S_a_monero)) = CROSS_CURVE_PROOF_SYSTEM.prove(&s_a, rng);
 
         Ok(Self {
             a,
@@ -144,13 +138,7 @@ impl State0 {
     }
 
     pub fn receive(self, msg: Message0) -> Result<State1> {
-        let dleq_proof_system =
-            CrossCurveDLEQ::<HashTranscript<Sha256, rand_chacha::ChaCha20Rng>>::new(
-                (*ecdsa_fun::fun::G).mark::<ecdsa_fun::fun::marker::Normal>(),
-                curve25519_dalek::constants::ED25519_BASEPOINT_POINT,
-            );
-
-        let valid = dleq_proof_system.verify(
+        let valid = CROSS_CURVE_PROOF_SYSTEM.verify(
             &msg.dleq_proof_s_b,
             (
                 msg.S_b_bitcoin.into(),
