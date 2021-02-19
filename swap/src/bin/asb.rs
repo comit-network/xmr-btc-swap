@@ -31,7 +31,7 @@ use swap::{
     execution_params::GetExecutionParams,
     fs::default_config_path,
     monero,
-    monero::{CreateWallet, OpenWallet},
+    monero::{Amount, CreateWallet, OpenWallet},
     protocol::alice::EventLoop,
     seed::Seed,
     trace::init_tracing,
@@ -41,7 +41,7 @@ use tracing::{info, warn};
 #[macro_use]
 extern crate prettytable;
 
-const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-monitoring-wallet";
+const DEFAULT_WALLET_NAME: &str = "asb-wallet";
 const BITCOIN_NETWORK: bitcoin::Network = bitcoin::Network::Testnet;
 const MONERO_NETWORK: monero::Network = monero::Network::Stagenet;
 
@@ -154,33 +154,33 @@ async fn init_wallets(
 
     let monero_wallet = monero::Wallet::new(config.monero.wallet_rpc_url.clone(), MONERO_NETWORK);
 
-    // Setup the temporary Monero wallet necessary for monitoring the blockchain
-    let open_monitoring_wallet_response = monero_wallet
-        .open_wallet(MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME)
-        .await;
-    if open_monitoring_wallet_response.is_err() {
+    // Setup the Monero wallet
+    let open_wallet_response = monero_wallet.open_wallet(DEFAULT_WALLET_NAME).await;
+    if open_wallet_response.is_err() {
         monero_wallet
-            .create_wallet(MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME)
+            .create_wallet(DEFAULT_WALLET_NAME)
             .await
             .context(format!(
-                "Unable to create Monero wallet for blockchain monitoring.\
+                "Unable to create Monero wallet.\
              Please ensure that the monero-wallet-rpc is available at {}",
                 config.monero.wallet_rpc_url
             ))?;
 
-        info!(
-            "Created Monero wallet for blockchain monitoring with name {}",
-            MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME
-        );
+        info!("Created Monero wallet {}", DEFAULT_WALLET_NAME);
     } else {
-        info!(
-            "Opened Monero wallet for blockchain monitoring with name {}",
-            MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME
-        );
+        info!("Opened Monero wallet {}", DEFAULT_WALLET_NAME);
     }
 
-    let _test_wallet_connection = monero_wallet.inner.block_height().await?;
-    info!("The Monero wallet RPC is set up correctly!");
+    let balance = monero_wallet.get_balance().await?;
+    if balance == Amount::ZERO {
+        let deposit_address = monero_wallet.inner.get_address(0).await?.address;
+        warn!(
+            "The Monero balance is 0, make sure to deposit funds at: {}",
+            deposit_address
+        )
+    } else {
+        info!("Monero balance: {}", balance);
+    }
 
     Ok((bitcoin_wallet, monero_wallet))
 }
