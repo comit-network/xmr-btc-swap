@@ -8,7 +8,7 @@ mod amounts;
 pub use amounts::Rate;
 
 pub trait LatestRate {
-    type Error: std::fmt::Debug;
+    type Error: std::error::Error + Send + Sync + 'static;
 
     fn latest_rate(&mut self) -> Result<Rate, Self::Error>;
 }
