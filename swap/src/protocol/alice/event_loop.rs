@@ -14,7 +14,7 @@ use crate::{
     },
     seed::Seed,
 };
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use futures::future::RemoteHandle;
 use libp2p::{
     core::Multiaddr, futures::FutureExt, request_response::ResponseChannel, PeerId, Swarm,
@@ -208,7 +208,7 @@ where
         let rate = self
             .rate_service
             .latest_rate()
-            .map_err(|e| anyhow!("Failed to get latest rate: {:?}", e))?;
+            .context("Failed to get latest rate")?;
 
         let btc_amount = quote_request.btc_amount;
         let xmr_amount = rate.sell_quote(btc_amount)?;

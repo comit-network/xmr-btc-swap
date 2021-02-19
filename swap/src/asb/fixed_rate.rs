@@ -1,5 +1,5 @@
 use crate::asb::{LatestRate, Rate};
-use anyhow::Result;
+use std::convert::Infallible;
 
 pub const RATE: f64 = 0.01;
 
@@ -7,9 +7,9 @@ pub const RATE: f64 = 0.01;
 pub struct RateService(Rate);
 
 impl LatestRate for RateService {
-    type Error = anyhow::Error;
+    type Error = Infallible;
 
-    fn latest_rate(&mut self) -> Result<Rate> {
+    fn latest_rate(&mut self) -> Result<Rate, Infallible> {
         Ok(self.0)
     }
 }
