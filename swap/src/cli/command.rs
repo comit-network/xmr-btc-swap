@@ -1,4 +1,5 @@
 use crate::bitcoin;
+use anyhow::Result;
 use libp2p::{core::Multiaddr, PeerId};
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -85,7 +86,7 @@ pub enum Refund {
     },
 }
 
-fn parse_btc(str: &str) -> anyhow::Result<bitcoin::Amount> {
+fn parse_btc(str: &str) -> Result<bitcoin::Amount> {
     let amount = bitcoin::Amount::from_str_in(str, ::bitcoin::Denomination::Bitcoin)?;
     Ok(amount)
 }

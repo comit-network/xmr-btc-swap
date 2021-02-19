@@ -1,4 +1,5 @@
 use crate::asb::{LatestRate, Rate};
+use anyhow::Result;
 
 pub const RATE: f64 = 0.01;
 
@@ -8,7 +9,7 @@ pub struct RateService(Rate);
 impl LatestRate for RateService {
     type Error = anyhow::Error;
 
-    fn latest_rate(&mut self) -> anyhow::Result<Rate> {
+    fn latest_rate(&mut self) -> Result<Rate> {
         Ok(self.0)
     }
 }

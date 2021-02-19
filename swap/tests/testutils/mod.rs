@@ -84,7 +84,7 @@ pub struct TestContext {
     alice_starting_balances: StartingBalances,
     alice_bitcoin_wallet: Arc<bitcoin::Wallet>,
     alice_monero_wallet: Arc<monero::Wallet>,
-    alice_swap_handle: mpsc::Receiver<RemoteHandle<anyhow::Result<AliceState>>>,
+    alice_swap_handle: mpsc::Receiver<RemoteHandle<Result<AliceState>>>,
 
     bob_params: BobParams,
     bob_starting_balances: StartingBalances,

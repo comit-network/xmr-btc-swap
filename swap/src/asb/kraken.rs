@@ -1,4 +1,5 @@
 use crate::asb::{LatestRate, Rate};
+use anyhow::Result;
 use bitcoin::util::amount::ParseAmountError;
 use futures::{SinkExt, StreamExt};
 use reqwest::Url;
@@ -64,7 +65,7 @@ impl From<serde_json::Error> for Error {
 }
 
 impl RateService {
-    pub async fn new() -> anyhow::Result<Self> {
+    pub async fn new() -> Result<Self> {
         let (tx, rx) = watch::channel(Err(Error::NotYetRetrieved));
 
         let (ws, _response) =

@@ -140,7 +140,7 @@ impl State0 {
         }
     }
 
-    pub async fn receive<W>(self, wallet: &W, msg: Message1) -> anyhow::Result<State1>
+    pub async fn receive<W>(self, wallet: &W, msg: Message1) -> Result<State1>
     where
         W: BuildTxLockPsbt + GetNetwork,
     {
