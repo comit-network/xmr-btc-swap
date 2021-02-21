@@ -18,6 +18,13 @@ use prettytable::{row, Table};
 use std::{path::Path, sync::Arc};
 use structopt::StructOpt;
 use swap::{
+    asb::{
+        command::{Arguments, Command},
+        config::{
+            initial_setup, query_user_for_initial_testnet_config, read_config, Config,
+            ConfigNotInitialized,
+        },
+    },
     bitcoin,
     database::Database,
     execution_params,
@@ -25,13 +32,6 @@ use swap::{
     fs::default_config_path,
     monero,
     monero::{CreateWallet, OpenWallet},
-    nectar::{
-        command::{Arguments, Command},
-        config::{
-            initial_setup, query_user_for_initial_testnet_config, read_config, Config,
-            ConfigNotInitialized,
-        },
-    },
     protocol::alice::EventLoop,
     seed::Seed,
     trace::init_tracing,

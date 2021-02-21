@@ -16,13 +16,13 @@
     missing_copy_implementations
 )]
 
+pub mod asb;
 pub mod bitcoin;
 pub mod cli;
 pub mod database;
 pub mod execution_params;
 pub mod fs;
 pub mod monero;
-pub mod nectar;
 pub mod protocol;
 pub mod seed;
 pub mod trace;

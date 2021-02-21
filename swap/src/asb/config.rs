@@ -104,7 +104,7 @@ where
 pub fn query_user_for_initial_testnet_config() -> Result<Config> {
     println!();
     let data_dir = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Enter data directory for nectar or hit return to use default")
+        .with_prompt("Enter data directory for asb or hit return to use default")
         .default(
             default_data_dir()
                 .context("No default data dir value for this system")?
@@ -116,7 +116,7 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
     let data_dir = data_dir.as_str().parse()?;
 
     let listen_address = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Enter multiaddress on which nectar should list for peer-to-peer communications or hit return to use default")
+        .with_prompt("Enter multiaddress on which asb should list for peer-to-peer communications or hit return to use default")
         .default(DEFAULT_LISTEN_ADDRESS.to_owned())
         .interact_text()?;
     let listen_address = listen_address.as_str().parse()?;
