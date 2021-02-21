@@ -273,7 +273,11 @@ impl WaitForTransactionFinality for Wallet {
             tracing::debug!("tx_block_height: {:?}", tx_block_height);
             let block_height = self.get_block_height().await?;
             tracing::debug!("latest_block_height: {:?}", block_height);
-            if let Some(confirmations) = block_height.checked_sub(tx_block_height) {
+            if let Some(confirmations) = block_height.checked_sub(
+                tx_block_height
+                    .checked_sub(BlockHeight::new(1))
+                    .expect("transaction must be included in block with height >= 1"),
+            ) {
                 tracing::debug!("confirmations: {:?}", confirmations);
                 if u32::from(confirmations) >= execution_params.bitcoin_finality_confirmations {
                     break;
