@@ -13,7 +13,6 @@
 #![allow(non_snake_case)]
 
 use anyhow::{Context, Result};
-use log::LevelFilter;
 use prettytable::{row, Table};
 use std::{path::Path, sync::Arc};
 use structopt::StructOpt;
@@ -40,6 +39,7 @@ use swap::{
     trace::init_tracing,
 };
 use tracing::{error, info, warn};
+use tracing_subscriber::filter::LevelFilter;
 use uuid::Uuid;
 
 #[macro_use]
@@ -49,7 +49,7 @@ const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-mon
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    init_tracing(LevelFilter::Debug).expect("initialize tracing");
+    init_tracing(LevelFilter::DEBUG).expect("initialize tracing");
 
     let opt = Arguments::from_args();
 

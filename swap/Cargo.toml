@@ -29,7 +29,6 @@ ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", features = ["libse
 futures = { version = "0.3", default-features = false }
 libp2p = { version = "0.34", default-features = false, features = ["tcp-tokio", "yamux", "mplex", "dns", "noise", "request-response"] }
 libp2p-async-await = { git = "https://github.com/comit-network/rust-libp2p-async-await", rev = "1429cd780204624b4d244e7d8179fe6ff77988c3" }
-log = { version = "0.4", features = ["serde"] }
 miniscript = { version = "5", features = ["serde"] }
 monero = { version = "0.10", features = ["serde_support"] }
 monero-rpc = { path = "../monero-rpc" }

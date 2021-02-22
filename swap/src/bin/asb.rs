@@ -13,7 +13,6 @@
 #![allow(non_snake_case)]
 
 use anyhow::{Context, Result};
-use log::LevelFilter;
 use prettytable::{row, Table};
 use std::{path::Path, sync::Arc};
 use structopt::StructOpt;
@@ -38,6 +37,7 @@ use swap::{
     trace::init_tracing,
 };
 use tracing::{info, warn};
+use tracing_subscriber::filter::LevelFilter;
 
 #[macro_use]
 extern crate prettytable;
@@ -48,7 +48,7 @@ const MONERO_NETWORK: monero::Network = monero::Network::Stagenet;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    init_tracing(LevelFilter::Debug).expect("initialize tracing");
+    init_tracing(LevelFilter::DEBUG).expect("initialize tracing");
 
     let opt = Arguments::from_args();
 

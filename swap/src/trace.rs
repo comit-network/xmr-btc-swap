@@ -1,17 +1,16 @@
 use anyhow::Result;
 use atty::{self};
-use log::LevelFilter;
 use tracing::{info, subscriber};
 use tracing_log::LogTracer;
-use tracing_subscriber::FmtSubscriber;
+use tracing_subscriber::{filter::LevelFilter, FmtSubscriber};
 
 pub fn init_tracing(level: LevelFilter) -> Result<()> {
-    if level == LevelFilter::Off {
+    if level == LevelFilter::OFF {
         return Ok(());
     }
 
     // We want upstream library log messages, just only at Info level.
-    LogTracer::init_with_filter(LevelFilter::Info)?;
+    LogTracer::init_with_filter(tracing_log::log::LevelFilter::Info)?;
 
     let is_terminal = atty::is(atty::Stream::Stderr);
     let subscriber = FmtSubscriber::builder()
