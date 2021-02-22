@@ -119,7 +119,7 @@ impl Behaviour {
         &mut self,
         channel: ResponseChannel<QuoteResponse>,
         quote_response: QuoteResponse,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         self.quote_response.send(channel, quote_response)?;
         info!("Sent quote response");
         Ok(())
@@ -127,7 +127,6 @@ impl Behaviour {
 
     pub fn start_execution_setup(&mut self, bob_peer_id: PeerId, state0: State0) {
         self.execution_setup.run(bob_peer_id, state0);
-        info!("Start execution setup with {}", bob_peer_id);
     }
 
     /// Send Transfer Proof to Bob.

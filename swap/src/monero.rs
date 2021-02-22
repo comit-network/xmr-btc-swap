@@ -77,6 +77,7 @@ pub struct Amount(u64);
 
 impl Amount {
     pub const ZERO: Self = Self(0);
+    pub const ONE_XMR: Self = Self(PICONERO_OFFSET);
     /// Create an [Amount] with piconero precision and the given number of
     /// piconeros.
     ///
@@ -185,7 +186,7 @@ pub trait Transfer {
         public_spend_key: PublicKey,
         public_view_key: PublicViewKey,
         amount: Amount,
-    ) -> anyhow::Result<(TransferProof, Amount)>;
+    ) -> Result<(TransferProof, Amount)>;
 }
 
 #[async_trait]
@@ -214,17 +215,17 @@ pub trait CreateWalletForOutput {
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
         restore_height: Option<u32>,
-    ) -> anyhow::Result<()>;
+    ) -> Result<()>;
 }
 
 #[async_trait]
 pub trait OpenWallet {
-    async fn open_wallet(&self, file_name: &str) -> anyhow::Result<()>;
+    async fn open_wallet(&self, file_name: &str) -> Result<()>;
 }
 
 #[async_trait]
 pub trait CreateWallet {
-    async fn create_wallet(&self, file_name: &str) -> anyhow::Result<()>;
+    async fn create_wallet(&self, file_name: &str) -> Result<()>;
 }
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq)]

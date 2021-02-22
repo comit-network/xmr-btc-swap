@@ -1,10 +1,11 @@
+use anyhow::Result;
 use atty::{self};
 use log::LevelFilter;
 use tracing::{info, subscriber};
 use tracing_log::LogTracer;
 use tracing_subscriber::FmtSubscriber;
 
-pub fn init_tracing(level: LevelFilter) -> anyhow::Result<()> {
+pub fn init_tracing(level: LevelFilter) -> Result<()> {
     if level == LevelFilter::Off {
         return Ok(());
     }
