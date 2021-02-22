@@ -87,6 +87,11 @@ impl RateService {
                     }
                 };
 
+                // If we encounter a heartbeat we skip it and iterate again
+                if msg.eq(r#"{"event":"heartbeat"}"#) {
+                    continue;
+                }
+
                 let ticker = match serde_json::from_str::<TickerUpdate>(&msg) {
                     Ok(ticker) => ticker,
                     Err(e) => {
@@ -151,7 +156,6 @@ impl TryFrom<TickerUpdate> for Rate {
                 TickerField::Metadata(_) => None,
             })
             .ok_or(Error::DataFieldMissing)?;
-        // TODO: Ensure whether heartbeats returned by the api are being filtered.
         let ask = data.ask.first().ok_or(Error::MissingAskRateElementType)?;
         let ask = match ask {
             RateElement::Text(ask) => {
