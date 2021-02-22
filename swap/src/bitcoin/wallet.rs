@@ -9,7 +9,7 @@ use crate::{
 use ::bitcoin::{util::psbt::PartiallySignedTransaction, Txid};
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
-use backoff::{backoff::Constant as ConstantBackoff, tokio::retry};
+use backoff::{backoff::Constant as ConstantBackoff, future::retry};
 use bdk::{
     blockchain::{noop_progress, Blockchain, ElectrumBlockchain},
     electrum_client::{self, Client, ElectrumApi},
@@ -125,14 +125,12 @@ impl BuildTxLockPsbt for Wallet {
         output_amount: Amount,
     ) -> Result<PartiallySignedTransaction> {
         tracing::debug!("building tx lock");
-        let (psbt, _details) = self.inner.lock().await.create_tx(
-            bdk::TxBuilder::with_recipients(vec![(
-                output_address.script_pubkey(),
-                output_amount.as_sat(),
-            )])
-            // todo: get actual fee
-            .fee_rate(FeeRate::from_sat_per_vb(5.0)),
-        )?;
+        let wallet = self.inner.lock().await;
+
+        let mut tx_builder = wallet.build_tx();
+        tx_builder.add_recipient(output_address.script_pubkey(), output_amount.as_sat());
+        tx_builder.fee_rate(FeeRate::from_sat_per_vb(5.0)); // todo: get actual fee
+        let (psbt, _details) = tx_builder.finish()?;
         tracing::debug!("tx lock built");
         Ok(psbt)
     }

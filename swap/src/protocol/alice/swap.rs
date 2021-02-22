@@ -11,6 +11,7 @@ use crate::{
     execution_params::ExecutionParams,
     monero,
     monero::CreateWalletForOutput,
+    monero_ext::ScalarExt,
     protocol::{
         alice,
         alice::{
@@ -199,7 +200,7 @@ async fn run_until_internal(
                             *encrypted_signature,
                             &state3.tx_lock,
                             state3.a.clone(),
-                            state3.s_a,
+                            state3.s_a.to_secpfun_scalar(),
                             state3.B,
                             &state3.redeem_address,
                         ) {

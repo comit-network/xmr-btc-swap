@@ -5,7 +5,7 @@ use crate::bitcoin::{
 use ::bitcoin::{util::bip143::SigHashCache, SigHash, SigHashType, Txid};
 use anyhow::{bail, Context, Result};
 use ecdsa_fun::Signature;
-use miniscript::NullCtx;
+use miniscript::DescriptorTrait;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -22,7 +22,7 @@ impl TxRedeem {
 
         let digest = SigHashCache::new(&tx_redeem).signature_hash(
             0, // Only one input: lock_input (lock transaction)
-            &tx_lock.output_descriptor.witness_script(NullCtx),
+            &tx_lock.output_descriptor.script_code(),
             tx_lock.lock_amount().as_sat(),
             SigHashType::All,
         );
@@ -69,7 +69,7 @@ impl TxRedeem {
         let mut tx_redeem = self.inner;
         tx_lock
             .output_descriptor
-            .satisfy(&mut tx_redeem.input[0], satisfier, NullCtx)?;
+            .satisfy(&mut tx_redeem.input[0], satisfier)?;
 
         Ok(tx_redeem)
     }

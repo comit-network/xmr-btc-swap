@@ -12,13 +12,14 @@ use anyhow::{Context, Error};
 use libp2p::PeerId;
 use libp2p_async_await::BehaviourOutEvent;
 use serde::{Deserialize, Serialize};
+use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQProof;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message1 {
     pub(crate) A: bitcoin::PublicKey,
     pub(crate) S_a_monero: monero::PublicKey,
     pub(crate) S_a_bitcoin: bitcoin::PublicKey,
-    pub(crate) dleq_proof_s_a: cross_curve_dleq::Proof,
+    pub(crate) dleq_proof_s_a: CrossCurveDLEQProof,
     pub(crate) v_a: monero::PrivateViewKey,
     pub(crate) redeem_address: bitcoin::Address,
     pub(crate) punish_address: bitcoin::Address,

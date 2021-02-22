@@ -28,8 +28,13 @@ use ::bitcoin::{
 };
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
-use ecdsa_fun::{adaptor::Adaptor, fun::Point, nonce::Deterministic, ECDSA};
-use miniscript::{Descriptor, Segwitv0};
+use ecdsa_fun::{
+    adaptor::{Adaptor, HashTranscript},
+    fun::Point,
+    nonce::Deterministic,
+    ECDSA,
+};
+use miniscript::{descriptor::Wsh, Descriptor, Segwitv0};
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
@@ -93,7 +98,10 @@ impl SecretKey {
 
     // self = a, Y = S_b, digest = tx_refund
     pub fn encsign(&self, Y: PublicKey, digest: SigHash) -> EncryptedSignature {
-        let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
+        let adaptor = Adaptor::<
+            HashTranscript<Sha256, rand_chacha::ChaCha20Rng>,
+            Deterministic<Sha256>,
+        >::default();
 
         adaptor.encrypted_sign(&self.inner, &Y.0, &digest.into_inner())
     }
@@ -105,6 +113,12 @@ pub struct PublicKey(Point);
 impl From<PublicKey> for Point {
     fn from(from: PublicKey) -> Self {
         from.0
+    }
+}
+
+impl From<Point> for PublicKey {
+    fn from(p: Point) -> Self {
+        Self(p)
     }
 }
 
@@ -157,7 +171,7 @@ pub fn verify_encsig(
     digest: &SigHash,
     encsig: &EncryptedSignature,
 ) -> Result<()> {
-    let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
+    let adaptor = Adaptor::<HashTranscript<Sha256>, Deterministic<Sha256>>::default();
 
     if adaptor.verify_encrypted_signature(
         &verification_key.0,
@@ -187,7 +201,7 @@ pub fn build_shared_output_descriptor(A: Point, B: Point) -> Descriptor<bitcoin:
     let miniscript = miniscript::Miniscript::<bitcoin::PublicKey, Segwitv0>::from_str(&miniscript)
         .expect("a valid miniscript");
 
-    Descriptor::Wsh(miniscript)
+    Descriptor::Wsh(Wsh::new(miniscript).expect("a valid descriptor"))
 }
 
 #[async_trait]
@@ -244,7 +258,7 @@ pub trait GetNetwork {
 }
 
 pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Result<SecretKey> {
-    let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
+    let adaptor = Adaptor::<HashTranscript<Sha256>, Deterministic<Sha256>>::default();
 
     let s = adaptor
         .recover_decryption_key(&S.0, &sig, &encsig)

@@ -16,30 +16,30 @@ anyhow = "1"
 async-recursion = "0.3.1"
 async-trait = "0.1"
 atty = "0.2"
-backoff = { git = "https://github.com/ihrwein/backoff", rev = "9d03992a83dfdc596be26276d4e5c5254a4b11a2", features = ["tokio"] }
+backoff = { version = "0.3", features = ["tokio"] }
 base64 = "0.12"
-bdk = { version = "0.3" }
-bitcoin = { version = "0.25", features = ["rand", "use-serde"] }
-bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "ae2f6cd547496e680941c0910018bbe884128799" }
+bdk = { version = "0.4" }
+bitcoin = { version = "0.26", features = ["rand", "use-serde"] }
+bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs" }
 config = { version = "0.10", default-features = false, features = ["toml"] }
 conquer-once = "0.3"
-cross-curve-dleq = { git = "https://github.com/comit-network/cross-curve-dleq", rev = "eddcdea1d1f16fa33ef581d1744014ece535c920", features = ["serde"] }
-curve25519-dalek = "2"
+curve25519-dalek = "3"
 derivative = "2"
 dialoguer = "0.7"
 directories-next = "2"
-ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", rev = "cdfbc766045ea678a41780919d6228dd5acee3be", features = ["libsecp_compat", "serde"] }
+ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", features = ["libsecp_compat", "serde"] }
 ed25519-dalek = { version = "1.0.0-pre.4", features = ["serde"] }# Cannot be 1 because they depend on curve25519-dalek version 3
 futures = { version = "0.3", default-features = false }
 libp2p = { version = "0.34", default-features = false, features = ["tcp-tokio", "yamux", "mplex", "dns", "noise", "request-response"] }
 libp2p-async-await = { git = "https://github.com/comit-network/rust-libp2p-async-await", rev = "1429cd780204624b4d244e7d8179fe6ff77988c3" }
 log = { version = "0.4", features = ["serde"] }
-miniscript = { version = "4", features = ["serde"] }
-monero = { version = "0.9", features = ["serde_support"] }
+miniscript = { version = "5", features = ["serde"] }
+monero = { version = "0.10", features = ["serde_support"] }
 monero-harness = { path = "../monero-harness" }
 pem = "0.8"
 prettytable-rs = "0.8"
 rand = "0.7"
+rand_chacha = "0.2.0"
 reqwest = { version = "0.11", default-features = false }
 rust_decimal = "1.10"
 serde = { version = "1", features = ["derive"] }
@@ -47,6 +47,7 @@ serde_cbor = "0.11"
 serde_derive = "1.0"
 serde_json = "1"
 sha2 = "0.9"
+sigma_fun = { git = "https://github.com/LLFourn/secp256kfun", features = ["ed25519", "serde"] }
 sled = "0.34"
 structopt = "0.3"
 strum = { version = "0.20", features = ["derive"] }

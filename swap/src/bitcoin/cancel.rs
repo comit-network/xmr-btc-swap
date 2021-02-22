@@ -5,7 +5,7 @@ use crate::bitcoin::{
 use ::bitcoin::{util::bip143::SigHashCache, OutPoint, SigHash, SigHashType, TxIn, TxOut, Txid};
 use anyhow::Result;
 use ecdsa_fun::Signature;
-use miniscript::{Descriptor, NullCtx};
+use miniscript::{Descriptor, DescriptorTrait};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::Add};
 
@@ -78,7 +78,7 @@ impl TxCancel {
 
         let tx_out = TxOut {
             value: tx_lock.lock_amount().as_sat() - TX_FEE,
-            script_pubkey: cancel_output_descriptor.script_pubkey(NullCtx),
+            script_pubkey: cancel_output_descriptor.script_pubkey(),
         };
 
         let transaction = Transaction {
@@ -90,7 +90,7 @@ impl TxCancel {
 
         let digest = SigHashCache::new(&transaction).signature_hash(
             0, // Only one input: lock_input (lock transaction)
-            &tx_lock.output_descriptor.witness_script(NullCtx),
+            &tx_lock.output_descriptor.script_code(),
             tx_lock.lock_amount().as_sat(),
             SigHashType::All,
         );
@@ -146,7 +146,7 @@ impl TxCancel {
         let mut tx_cancel = self.inner;
         tx_lock
             .output_descriptor
-            .satisfy(&mut tx_cancel.input[0], satisfier, NullCtx)?;
+            .satisfy(&mut tx_cancel.input[0], satisfier)?;
 
         Ok(tx_cancel)
     }

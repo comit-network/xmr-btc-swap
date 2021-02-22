@@ -8,17 +8,24 @@ use crate::{
     execution_params::ExecutionParams,
     monero,
     monero::{monero_private_key, InsufficientFunds, TransferProof},
+    monero_ext::ScalarExt,
     protocol::{
         alice::{Message1, Message3},
         bob::{EncryptedSignature, Message0, Message2, Message4},
+        CROSS_CURVE_PROOF_SYSTEM,
     },
 };
-use anyhow::{anyhow, Result};
-use ecdsa_fun::{adaptor::Adaptor, nonce::Deterministic, Signature};
+use anyhow::{anyhow, bail, Result};
+use ecdsa_fun::{
+    adaptor::{Adaptor, HashTranscript},
+    nonce::Deterministic,
+    Signature,
+};
 use monero_harness::rpc::wallet::BlockHeight;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
+use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQProof;
 use std::fmt;
 
 #[derive(Debug, Clone)]
@@ -73,9 +80,11 @@ impl fmt::Display for BobState {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct State0 {
     b: bitcoin::SecretKey,
-    s_b: cross_curve_dleq::Scalar,
+    s_b: monero::Scalar,
+    S_b_monero: monero::PublicKey,
+    S_b_bitcoin: bitcoin::PublicKey,
     v_b: monero::PrivateViewKey,
-    dleq_proof_s_b: cross_curve_dleq::Proof,
+    dleq_proof_s_b: CrossCurveDLEQProof,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
@@ -97,14 +106,19 @@ impl State0 {
     ) -> Self {
         let b = bitcoin::SecretKey::new_random(rng);
 
-        let s_b = cross_curve_dleq::Scalar::random(rng);
+        let s_b = monero::Scalar::random(rng);
         let v_b = monero::PrivateViewKey::new_random(rng);
-        let dleq_proof_s_b = cross_curve_dleq::Proof::new(rng, &s_b);
+
+        let (dleq_proof_s_b, (S_b_bitcoin, S_b_monero)) = CROSS_CURVE_PROOF_SYSTEM.prove(&s_b, rng);
 
         Self {
             b,
             s_b,
             v_b,
+            S_b_bitcoin: bitcoin::PublicKey::from(S_b_bitcoin),
+            S_b_monero: monero::PublicKey {
+                point: S_b_monero.compress(),
+            },
             btc,
             xmr,
             dleq_proof_s_b,
@@ -118,10 +132,8 @@ impl State0 {
     pub fn next_message(&self) -> Message0 {
         Message0 {
             B: self.b.public(),
-            S_b_monero: monero::PublicKey::from_private_key(&monero::PrivateKey {
-                scalar: self.s_b.into_ed25519(),
-            }),
-            S_b_bitcoin: self.s_b.into_secp256k1().into(),
+            S_b_monero: self.S_b_monero,
+            S_b_bitcoin: self.S_b_bitcoin,
             dleq_proof_s_b: self.dleq_proof_s_b.clone(),
             v_b: self.v_b,
             refund_address: self.refund_address.clone(),
@@ -132,13 +144,20 @@ impl State0 {
     where
         W: BuildTxLockPsbt + GetNetwork,
     {
-        msg.dleq_proof_s_a.verify(
-            msg.S_a_bitcoin.clone().into(),
-            msg.S_a_monero
-                .point
-                .decompress()
-                .ok_or_else(|| anyhow!("S_a is not a monero curve point"))?,
-        )?;
+        let valid = CROSS_CURVE_PROOF_SYSTEM.verify(
+            &msg.dleq_proof_s_a,
+            (
+                msg.S_a_bitcoin.clone().into(),
+                msg.S_a_monero
+                    .point
+                    .decompress()
+                    .ok_or_else(|| anyhow!("S_a is not a monero curve point"))?,
+            ),
+        );
+
+        if !valid {
+            bail!("Alice's dleq proof doesn't verify")
+        }
 
         let tx_lock = bitcoin::TxLock::new(wallet, self.btc, msg.A, self.b.public()).await?;
         let v = msg.v_a + self.v_b;
@@ -166,7 +185,7 @@ impl State0 {
 pub struct State1 {
     A: bitcoin::PublicKey,
     b: bitcoin::SecretKey,
-    s_b: cross_curve_dleq::Scalar,
+    s_b: monero::Scalar,
     S_a_monero: monero::PublicKey,
     S_a_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
@@ -194,7 +213,7 @@ impl State1 {
         bitcoin::verify_sig(&self.A, &tx_cancel.digest(), &msg.tx_cancel_sig)?;
         bitcoin::verify_encsig(
             self.A,
-            self.s_b.into_secp256k1().into(),
+            bitcoin::PublicKey::from(self.s_b.to_secpfun_scalar()),
             &tx_refund.digest(),
             &msg.tx_refund_encsig,
         )?;
@@ -224,7 +243,7 @@ impl State1 {
 pub struct State2 {
     A: bitcoin::PublicKey,
     b: bitcoin::SecretKey,
-    s_b: cross_curve_dleq::Scalar,
+    s_b: monero::Scalar,
     S_a_monero: monero::PublicKey,
     S_a_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
@@ -289,7 +308,7 @@ impl State2 {
 pub struct State3 {
     A: bitcoin::PublicKey,
     b: bitcoin::SecretKey,
-    s_b: cross_curve_dleq::Scalar,
+    s_b: monero::Scalar,
     S_a_monero: monero::PublicKey,
     S_a_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
@@ -314,9 +333,8 @@ impl State3 {
     where
         W: monero::WatchForTransfer,
     {
-        let S_b_monero = monero::PublicKey::from_private_key(&monero::PrivateKey::from_scalar(
-            self.s_b.into_ed25519(),
-        ));
+        let S_b_monero =
+            monero::PublicKey::from_private_key(&monero::PrivateKey::from_scalar(self.s_b));
         let S = self.S_a_monero + S_b_monero;
 
         if let Err(e) = xmr_wallet
@@ -401,7 +419,7 @@ impl State3 {
 pub struct State4 {
     A: bitcoin::PublicKey,
     b: bitcoin::SecretKey,
-    s_b: cross_curve_dleq::Scalar,
+    s_b: monero::Scalar,
     S_a_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
     cancel_timelock: CancelTimelock,
@@ -536,11 +554,11 @@ impl State4 {
             bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
         let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &self.refund_address);
 
-        let adaptor = Adaptor::<Sha256, Deterministic<Sha256>>::default();
+        let adaptor = Adaptor::<HashTranscript<Sha256>, Deterministic<Sha256>>::default();
 
         let sig_b = self.b.sign(tx_refund.digest());
         let sig_a =
-            adaptor.decrypt_signature(&self.s_b.into_secp256k1(), self.tx_refund_encsig.clone());
+            adaptor.decrypt_signature(&self.s_b.to_secpfun_scalar(), self.tx_refund_encsig.clone());
 
         let signed_tx_refund = tx_refund.add_signatures(
             &tx_cancel.clone(),
@@ -568,7 +586,7 @@ impl State4 {
 pub struct State5 {
     #[serde(with = "monero_private_key")]
     s_a: monero::PrivateKey,
-    s_b: cross_curve_dleq::Scalar,
+    s_b: monero::Scalar,
     v: monero::PrivateViewKey,
     tx_lock: bitcoin::TxLock,
     monero_wallet_restore_blockheight: u32,
@@ -579,9 +597,7 @@ impl State5 {
     where
         W: monero::CreateWalletForOutput,
     {
-        let s_b = monero::PrivateKey {
-            scalar: self.s_b.into_ed25519(),
-        };
+        let s_b = monero::PrivateKey { scalar: self.s_b };
 
         let s = self.s_a + s_b;
 
