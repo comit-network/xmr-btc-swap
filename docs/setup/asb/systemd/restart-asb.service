@@ -1,0 +1,11 @@
+[Unit]
+Description=Restart ASB service
+After=watch-asb-binary-change.path
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl restart start-asb.service
+ExecStopPost=/bin/sh -c 'if [ "$$EXIT_STATUS" -ne 0 ]; then /usr/local/bin/systemd-email.sh daniel@coblox.tech %n; fi'
+
+[Install]
+WantedBy=multi-user.target
