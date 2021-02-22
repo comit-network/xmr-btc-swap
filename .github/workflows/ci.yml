@@ -74,11 +74,11 @@ jobs:
           name: swap-${{ matrix.target }}
           path: target/${{ matrix.target }}/debug/swap_cli
 
-      - name: Upload nectar binary
+      - name: Upload asb binary
         uses: actions/upload-artifact@v2-preview
         with:
-          name: nectar-${{ matrix.target }}
-          path: target/${{ matrix.target }}/debug/nectar
+          name: asb-${{ matrix.target }}
+          path: target/${{ matrix.target }}/debug/asb
 
   test:
     env:
