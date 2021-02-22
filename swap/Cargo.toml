@@ -50,7 +50,6 @@ sigma_fun = { git = "https://github.com/LLFourn/secp256kfun", features = ["ed255
 sled = "0.34"
 structopt = "0.3"
 strum = { version = "0.20", features = ["derive"] }
-tempfile = "3"
 thiserror = "1"
 time = "0.2"
 tokio = { version = "1.0", features = ["rt-multi-thread", "time", "macros", "sync"] }
