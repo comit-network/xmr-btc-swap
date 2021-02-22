@@ -3514,7 +3514,6 @@ dependencies = [
  "tokio-tungstenite",
  "toml",
  "tracing",
- "tracing-core",
  "tracing-futures",
  "tracing-log",
  "tracing-subscriber",

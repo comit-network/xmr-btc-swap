@@ -57,7 +57,6 @@ tokio = { version = "1.0", features = ["rt-multi-thread", "time", "macros", "syn
 tokio-tungstenite = { version = "0.13", features = [ "tls" ] }
 toml = "0.5"
 tracing = { version = "0.1", features = ["attributes"] }
-tracing-core = "0.1"
 tracing-futures = { version = "0.2", features = ["std-future", "futures-03"] }
 tracing-log = "0.1"
 tracing-subscriber = { version = "0.2", default-features = false, features = ["fmt", "ansi", "env-filter"] }
