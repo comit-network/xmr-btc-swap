@@ -3498,7 +3498,6 @@ dependencies = [
  "rust_decimal",
  "serde",
  "serde_cbor",
- "serde_derive",
  "serde_json",
  "sha2 0.9.2",
  "sigma_fun",
