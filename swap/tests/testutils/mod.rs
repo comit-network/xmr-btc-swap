@@ -30,7 +30,7 @@ use swap::{
 };
 use tempfile::tempdir;
 use testcontainers::{clients::Cli, Container, Docker, RunArgs};
-use tokio::{sync::mpsc, task::JoinHandle, time::sleep};
+use tokio::{sync::mpsc, task::JoinHandle, time::interval};
 use tracing_core::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
 use url::Url;
@@ -625,14 +625,30 @@ async fn init_test_wallets(
         )
         .await
         .expect("could not mint btc starting balance");
+
+        let mut interval = interval(Duration::from_secs(1u64));
+        let mut retries = 0u8;
+        let max_retries = 30u8;
+        loop {
+            retries += 1;
+            btc_wallet
+                .sync_wallet()
+                .await
+                .expect("Could not sync btc wallet");
+
+            let btc_balance = btc_wallet.balance().await.unwrap();
+
+            if btc_balance == starting_balances.btc {
+                break;
+            } else if retries == max_retries {
+                panic!(
+                    "Bitcoin wallet initialization failed, reached max retries upon balance sync"
+                )
+            }
+
+            interval.tick().await;
+        }
     }
-
-    sleep(Duration::from_secs(5)).await;
-
-    btc_wallet
-        .sync_wallet()
-        .await
-        .expect("Could not sync btc wallet");
 
     (Arc::new(btc_wallet), Arc::new(xmr_wallet))
 }
