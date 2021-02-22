@@ -1,0 +1,16 @@
+[Unit]
+Description=Run the automated swap backend
+After=start-monero-wallet-rpc.service
+
+[Service]
+WorkingDirectory=/var/external/asb/xmr-btc-swap
+ExecStart=/home/asb/.cargo/bin/cargo run --release --bin asb -- --config /var/external/asb/run/asb-config/config.toml start
+ExecStopPost=/bin/sh -c 'if [ "$$EXIT_STATUS" -ne 0 ]; then /usr/local/bin/systemd-email.sh daniel@coblox.tech %n; fi'
+StandardOutput=append:/var/external/asb/run/logs/log_stdout.log
+StandardError=append:/var/external/asb/run/logs/log_stderr.log
+Restart=on-failure
+User=asb
+Group=asb
+
+[Install]
+WantedBy=multi-user.target
