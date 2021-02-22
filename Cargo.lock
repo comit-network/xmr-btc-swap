@@ -870,7 +870,6 @@ version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37c66a534cbb46ab4ea03477eae19d5c22c01da8258030280b7bd9d8433fb6ef"
 dependencies = [
- "serde",
  "signature",
 ]
 
@@ -884,7 +883,6 @@ dependencies = [
  "ed25519",
  "rand 0.7.3",
  "serde",
- "serde_bytes",
  "sha2 0.9.2",
  "zeroize 1.2.0",
 ]
@@ -3120,15 +3118,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_bytes"
-version = "0.11.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16ae07dd2f88a366f15bd0632ba725227018c69a1c8550a927324f8eb8368bb9"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "serde_cbor"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3491,7 +3480,6 @@ dependencies = [
  "dialoguer",
  "directories-next",
  "ecdsa_fun",
- "ed25519-dalek",
  "futures",
  "get-port",
  "hyper",
