@@ -24,7 +24,6 @@ bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs" }
 config = { version = "0.10", default-features = false, features = ["toml"] }
 conquer-once = "0.3"
 curve25519-dalek = "3"
-derivative = "2"
 dialoguer = "0.7"
 directories-next = "2"
 ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", features = ["libsecp_compat", "serde"] }

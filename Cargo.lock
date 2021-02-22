@@ -3476,7 +3476,6 @@ dependencies = [
  "config",
  "conquer-once",
  "curve25519-dalek",
- "derivative",
  "dialoguer",
  "directories-next",
  "ecdsa_fun",
