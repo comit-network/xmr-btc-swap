@@ -15,7 +15,7 @@ pub fn init_tracing() -> DefaultGuard {
 
     let global_filter = tracing::Level::WARN;
     let test_filter = tracing::Level::DEBUG;
-    let monero_harness_filter = tracing::Level::INFO;
+    let monero_harness_filter = tracing::Level::DEBUG;
 
     use tracing_subscriber::util::SubscriberInitExt as _;
     tracing_subscriber::fmt()
