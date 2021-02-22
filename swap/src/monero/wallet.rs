@@ -7,7 +7,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::retry};
 use bitcoin::hashes::core::sync::atomic::AtomicU32;
-use monero_harness::rpc::wallet;
+use monero_rpc::wallet;
 use std::{
     str::FromStr,
     sync::{atomic::Ordering, Arc},

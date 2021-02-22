@@ -39,7 +39,6 @@ struct Response<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use spectral::prelude::*;
 
     #[derive(Serialize, Debug, Clone)]
     struct Params {
@@ -58,6 +57,7 @@ mod tests {
         let want =
             "{\"jsonrpc\":\"2.0\",\"id\":\"1\",\"method\":\"get_block\",\"params\":{\"val\":0}}"
                 .to_string();
-        assert_that!(got).is_equal_to(want);
+
+        assert_eq!(got, want);
     }
 }

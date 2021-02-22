@@ -439,9 +439,9 @@ checksum = "771fe0050b883fcc3ea2359b1a96bcfbc090b7116eae7c3c512c7a083fdf23d3"
 
 [[package]]
 name = "bstr"
-version = "0.2.14"
+version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "473fc6b38233f9af7baa94fb5852dca389e3d95b8e21c8e3719301462c5d9faf"
+checksum = "a40b47ad93e1a5404e6c18dec46b628214fee441c70f4ab5d6942142cc268a3d"
 dependencies = [
  "lazy_static",
  "memchr",
@@ -799,19 +799,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066"
 dependencies = [
  "generic-array 0.14.4",
-]
-
-[[package]]
-name = "digest_auth"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4bce617b8491dd210e3fcbc939e2c5bbeb27355f8adf7da335b87d6cc8d5482"
-dependencies = [
- "digest 0.8.1",
- "hex 0.4.2",
- "md-5",
- "rand 0.7.3",
- "sha2 0.8.2",
 ]
 
 [[package]]
@@ -1877,17 +1864,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 
 [[package]]
-name = "md-5"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a18af3dcaf2b0219366cdb4e2af65a6101457b415c3d1a5c71dd9c2b7c77b9c8"
-dependencies = [
- "block-buffer 0.7.3",
- "digest 0.8.1",
- "opaque-debug 0.2.3",
-]
-
-[[package]]
 name = "memchr"
 version = "2.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1983,20 +1959,27 @@ name = "monero-harness"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "digest_auth",
  "futures",
+ "monero-rpc",
  "port_check",
  "rand 0.7.3",
- "reqwest",
- "serde",
- "serde_json",
  "spectral",
  "testcontainers 0.12.0",
  "tokio",
  "tracing",
  "tracing-log",
  "tracing-subscriber",
- "url",
+]
+
+[[package]]
+name = "monero-rpc"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tracing",
 ]
 
 [[package]]
@@ -3488,6 +3471,7 @@ dependencies = [
  "miniscript",
  "monero",
  "monero-harness",
+ "monero-rpc",
  "pem",
  "port_check",
  "prettytable-rs",

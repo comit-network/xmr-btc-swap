@@ -21,7 +21,7 @@ use ecdsa_fun::{
     nonce::Deterministic,
     Signature,
 };
-use monero_harness::rpc::wallet::BlockHeight;
+use monero_rpc::wallet::BlockHeight;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
