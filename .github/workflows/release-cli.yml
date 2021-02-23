@@ -1,0 +1,51 @@
+name: "Release swap_cli"
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  release:
+    name: Release swap_cli
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout tagged commit
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.release.target_commitish }}
+          token: ${{ secrets.BOTTY_GITHUB_TOKEN }}
+
+      - name: Build ${{ matrix.target }} release binary
+        run: cargo build --target=${{ matrix.target }} --release --package swap --bin swap_cli
+
+      # Remove once python 3 is the default
+      - uses: actions/setup-python@v1
+        with:
+          python-version: '3.x'
+
+      - name: Create release archive
+        id: create-archive
+        uses: ./.github/actions/create-release-archive
+        with:
+          binary: swap_cli
+          version: ${{ github.event.release.tag_name }}
+          target: ${{ matrix.target }}
+
+      - name: Upload ${{ matrix.os }} release binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOTTY_GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./${{ steps.create-archive.outputs.archive }}
+          asset_name: ${{ steps.create-archive.outputs.archive }}
+          asset_content_type: application/gzip
