@@ -89,12 +89,11 @@ impl SecretKey {
     // joint output for TxLock_Monero
 
     // tx_refund: multisig(A, B), published by bob
-    // bob can produce sig on B for tx_refund using b
-    // alice sends over an encrypted signature on A for tx_refund using a encrypted
-    // with S_b we want to leak s_b
-
-    // produced (by Alice) encsig - published (by Bob) sig = s_b (it's not really
-    // subtraction, it's recover)
+    // bob can produce sig on B using b
+    // alice sends over an encrypted signature on A encrypted with S_b
+    // s_b is leaked to alice when bob publishes signed tx_refund allowing her to
+    // recover s_b: recover(encsig, S_b, sig_tx_refund) = s_b
+    // alice now has s_a and s_b and can refund monero
 
     // self = a, Y = S_b, digest = tx_refund
     pub fn encsign(&self, Y: PublicKey, digest: SigHash) -> EncryptedSignature {
