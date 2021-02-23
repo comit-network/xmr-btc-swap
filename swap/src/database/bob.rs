@@ -3,7 +3,7 @@ use crate::{
     protocol::{bob, bob::BobState},
 };
 use ::bitcoin::hashes::core::fmt::Display;
-use monero_harness::rpc::wallet::BlockHeight;
+use monero_rpc::wallet::BlockHeight;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]

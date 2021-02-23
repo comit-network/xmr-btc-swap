@@ -1,5 +1,4 @@
 use crate::rpc::{Request, Response};
-
 use anyhow::Result;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};

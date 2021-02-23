@@ -27,7 +27,7 @@ use swap::{
 use tempfile::tempdir;
 use testcontainers::{clients::Cli, Container, Docker, RunArgs};
 use tokio::{sync::mpsc, task::JoinHandle, time::interval};
-use tracing_core::dispatcher::DefaultGuard;
+use tracing::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
 use url::Url;
 use uuid::Uuid;

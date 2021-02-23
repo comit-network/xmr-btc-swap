@@ -21,18 +21,15 @@
 //!
 //! Also provides standalone JSON RPC clients for monerod and monero-wallet-rpc.
 pub mod image;
-pub mod rpc;
 
-use crate::{
-    image::{
-        MONEROD_DAEMON_CONTAINER_NAME, MONEROD_DEFAULT_NETWORK, MONEROD_RPC_PORT, WALLET_RPC_PORT,
-    },
-    rpc::{
-        monerod,
-        wallet::{self, GetAddress, Refreshed, Transfer},
-    },
+use crate::image::{
+    MONEROD_DAEMON_CONTAINER_NAME, MONEROD_DEFAULT_NETWORK, MONEROD_RPC_PORT, WALLET_RPC_PORT,
 };
 use anyhow::{anyhow, bail, Result};
+use monero_rpc::{
+    monerod,
+    wallet::{self, GetAddress, Refreshed, Transfer},
+};
 use std::time::Duration;
 use testcontainers::{clients::Cli, core::Port, Container, Docker, RunArgs};
 use tokio::time;
