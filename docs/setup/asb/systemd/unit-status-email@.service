@@ -1,0 +1,6 @@
+[Unit]
+Description=%i email notification
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash -c '/usr/local/bin/systemd-email.sh daniel@coblox.tech %i'

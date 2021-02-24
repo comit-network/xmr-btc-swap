@@ -1,13 +1,13 @@
 [Unit]
 Description=Pull and build ASB from source
 Wants=pull-and-build-asb.timer
+OnFailure=unit-status-email@%n.service
 
 [Service]
 Type=oneshot
 WorkingDirectory=/var/external/asb/xmr-btc-swap
 ExecStartPre=git pull
 ExecStart=/home/asb/.cargo/bin/cargo build --release --bin asb
-ExecStopPost=/bin/sh -c 'if [ "$$EXIT_STATUS" -ne 0 ]; then /usr/local/bin/systemd-email.sh daniel@coblox.tech %n; fi'
 StandardOutput=append:/var/external/asb/run/logs/pull-and-build.log
 StandardError=append:/var/external/asb/run/logs/pull-and-build.log
 User=asb

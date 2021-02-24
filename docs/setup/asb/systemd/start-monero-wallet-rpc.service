@@ -1,11 +1,11 @@
 [Unit]
 Description=monero-wallet-rpc for the automated swap backend (asb)
 After=network.target
+OnFailure=unit-status-email@%n.service
 
 [Service]
 ExecStart=/var/external/asb/monero/bin/monero-wallet-rpc --stagenet --daemon-host stagenet.community.xmr.to --rpc-bind-port 38083 --disable-rpc-login --wallet-dir /var/external/asb/monero/data/stagenet/asb-wallets
-ExecStartPost=/bin/bash -c "i=1; while [ $i -ne 0 ]; do tail -n1 /var/external/asb/monero/bin/monero-wallet-rpc.log | grep 'Starting wallet RPC server'; i=$?; sleep 5; done"
-ExecStopPost=/bin/sh -c 'if [ "$$EXIT_STATUS" -ne 0 ]; then /usr/local/bin/systemd-email.sh daniel@coblox.tech %n; fi'
+ExecStartPost=/usr/bin/bash -c "i=1; while [ $i -ne 0 ]; do tail -n1 /var/external/asb/monero/bin/monero-wallet-rpc.log | grep 'Starting wallet RPC server'; i=$?; sleep 5; done"
 Restart=always
 User=asb
 Group=asb
