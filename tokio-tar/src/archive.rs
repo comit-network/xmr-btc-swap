@@ -98,10 +98,11 @@ impl<R: Read + Unpin> ArchiveBuilder<R> {
         self
     }
 
-    /// Ignore zeroed headers, which would otherwise indicate to the archive that it has no more
-    /// entries.
+    /// Ignore zeroed headers, which would otherwise indicate to the archive
+    /// that it has no more entries.
     ///
-    /// This can be used in case multiple tar archives have been concatenated together.
+    /// This can be used in case multiple tar archives have been concatenated
+    /// together.
     pub fn set_ignore_zeros(mut self, ignore_zeros: bool) -> Self {
         self.ignore_zeros = ignore_zeros;
         self
@@ -365,8 +366,8 @@ fn poll_next_raw<R: Read + Unpin>(
         }
 
         // If a header is not all zeros, we have another valid header.
-        // Otherwise, check if we are ignoring zeros and continue, or break as if this is the
-        // end of the archive.
+        // Otherwise, check if we are ignoring zeros and continue, or break as if this
+        // is the end of the archive.
         if !header.as_bytes().iter().all(|i| *i == 0) {
             *next += 512;
             break;
@@ -559,8 +560,8 @@ impl<R: Read + Unpin> Read for Archive<R> {
 
 /// Try to fill the buffer from the reader.
 ///
-/// If the reader reaches its end before filling the buffer at all, returns `false`.
-/// Otherwise returns `true`.
+/// If the reader reaches its end before filling the buffer at all, returns
+/// `false`. Otherwise returns `true`.
 fn poll_try_read_all<R: Read + Unpin>(
     mut source: R,
     cx: &mut Context<'_>,

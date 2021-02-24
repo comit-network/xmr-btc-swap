@@ -777,7 +777,8 @@ impl Header {
 
     #[cfg(windows)]
     fn fill_platform_from(&mut self, meta: &Metadata, mode: HeaderMode) {
-        // There's no concept of a file mode on Windows, so do a best approximation here.
+        // There's no concept of a file mode on Windows, so do a best approximation
+        // here.
         match mode {
             HeaderMode::Complete => {
                 self.set_uid(0);
@@ -1100,7 +1101,8 @@ impl GnuHeader {
         truncate(&self.uname)
     }
 
-    /// Gets the fullname (group:user) in a "lossy" way, used for error reporting ONLY.
+    /// Gets the fullname (group:user) in a "lossy" way, used for error
+    /// reporting ONLY.
     fn fullname_lossy(&self) -> String {
         format!(
             "{}:{}",

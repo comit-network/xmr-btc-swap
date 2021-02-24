@@ -13,13 +13,11 @@ use url::Url;
 
 pub const DEFAULT_ELECTRUM_HTTP_URL: &str = "https://blockstream.info/testnet/api/";
 const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://electrum.blockstream.info:60002";
-const DEFAULT_MONERO_WALLET_RPC_TESTNET_URL: &str = "http://127.0.0.1:38083/json_rpc";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct Config {
     pub data: Data,
     pub bitcoin: Bitcoin,
-    pub monero: Monero,
 }
 
 impl Config {
@@ -46,12 +44,6 @@ pub struct Data {
 pub struct Bitcoin {
     pub electrum_http_url: Url,
     pub electrum_rpc_url: Url,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct Monero {
-    pub wallet_rpc_url: Url,
 }
 
 #[derive(thiserror::Error, Debug, Clone, Copy)]
@@ -118,11 +110,6 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
         .interact_text()?;
     let electrum_rpc_url = Url::parse(electrum_rpc_url.as_str())?;
 
-    let monero_wallet_rpc_url = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Enter Monero Wallet RPC URL or hit enter to use default")
-        .default(DEFAULT_MONERO_WALLET_RPC_TESTNET_URL.to_owned())
-        .interact_text()?;
-    let monero_wallet_rpc_url = monero_wallet_rpc_url.as_str().parse()?;
     println!();
 
     Ok(Config {
@@ -130,9 +117,6 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
         bitcoin: Bitcoin {
             electrum_http_url,
             electrum_rpc_url,
-        },
-        monero: Monero {
-            wallet_rpc_url: monero_wallet_rpc_url,
         },
     })
 }
@@ -155,9 +139,6 @@ mod tests {
             bitcoin: Bitcoin {
                 electrum_http_url: Url::from_str(DEFAULT_ELECTRUM_HTTP_URL).unwrap(),
                 electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
-            },
-            monero: Monero {
-                wallet_rpc_url: Url::from_str("http://127.0.0.1:38083/json_rpc").unwrap(),
             },
         };
 

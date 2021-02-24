@@ -144,8 +144,8 @@ impl<R: Read + Unpin> Entry<R> {
     /// Returns the link name for this entry, in bytes, if listed.
     ///
     /// Note that this will not always return the same value as
-    /// `self.header().link_name_bytes()` as some archive formats have support for
-    /// longer path names described in separate entries.
+    /// `self.header().link_name_bytes()` as some archive formats have support
+    /// for longer path names described in separate entries.
     pub fn link_name_bytes(&self) -> Option<Cow<[u8]>> {
         self.fields.link_name_bytes()
     }
@@ -414,14 +414,12 @@ impl<R: Read + Unpin> EntryFields<R> {
 
     async fn unpack_in(&mut self, dst: &Path) -> io::Result<bool> {
         // Notes regarding bsdtar 2.8.3 / libarchive 2.8.3:
-        // * Leading '/'s are trimmed. For example, `///test` is treated as
-        //   `test`.
-        // * If the filename contains '..', then the file is skipped when
-        //   extracting the tarball.
-        // * '//' within a filename is effectively skipped. An error is
-        //   logged, but otherwise the effect is as if any two or more
-        //   adjacent '/'s within the filename were consolidated into one
-        //   '/'.
+        // * Leading '/'s are trimmed. For example, `///test` is treated as `test`.
+        // * If the filename contains '..', then the file is skipped when extracting the
+        //   tarball.
+        // * '//' within a filename is effectively skipped. An error is logged, but
+        //   otherwise the effect is as if any two or more adjacent '/'s within the
+        //   filename were consolidated into one '/'.
         //
         // Most of this is handled by the `path` module of the standard
         // library, but we specially handle a few cases here as well.

@@ -37,8 +37,8 @@ macro_rules! tar {
 
 mod header;
 
-/// test that we can concatenate the simple.tar archive and extract the same entries twice when we
-/// use the ignore_zeros option.
+/// test that we can concatenate the simple.tar archive and extract the same
+/// entries twice when we use the ignore_zeros option.
 #[tokio::test]
 async fn simple_concat() {
     let bytes = tar!("simple.tar");
@@ -52,7 +52,8 @@ async fn simple_concat() {
     // concat two archives (with null in-between);
     archive_bytes.extend(bytes);
 
-    // test now that when we read the archive, it stops processing at the first zero header.
+    // test now that when we read the archive, it stops processing at the first zero
+    // header.
     let actual = decode_names(&mut Archive::new(Cursor::new(&archive_bytes))).await;
     assert_eq!(expected, actual);
 

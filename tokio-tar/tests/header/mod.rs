@@ -189,7 +189,8 @@ fn set_metadata_deterministic() {
         h
     }
 
-    // Create "the same" File twice in a row, one second apart, with differing readonly values.
+    // Create "the same" File twice in a row, one second apart, with differing
+    // readonly values.
     let one = mk_header(tmppath.as_path(), false);
     thread::sleep(time::Duration::from_millis(1050));
     let two = mk_header(tmppath.as_path(), true);

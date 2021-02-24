@@ -597,7 +597,8 @@ async fn append_dir_all<Dst: Write + Unpin + ?Sized>(
     while let Some((src, is_dir, is_symlink)) = stack.pop() {
         let dest = path.join(src.strip_prefix(&src_path).unwrap());
 
-        // In case of a symlink pointing to a directory, is_dir is false, but src.is_dir() will return true
+        // In case of a symlink pointing to a directory, is_dir is false, but
+        // src.is_dir() will return true
         if is_dir || (is_symlink && follow && src.is_dir()) {
             let mut entries = fs::read_dir(&src).await?;
             while let Some(entry) = entries.next_entry().await.transpose() {
