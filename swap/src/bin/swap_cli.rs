@@ -30,7 +30,7 @@ use swap::{
     execution_params::GetExecutionParams,
     fs::default_config_path,
     monero,
-    monero::{CreateWallet, OpenWallet, WalletBlockHeight},
+    monero::{CreateWallet, OpenWallet},
     protocol::{
         bob,
         bob::{cancel::CancelError, Builder},

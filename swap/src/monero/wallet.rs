@@ -1,7 +1,7 @@
 use crate::monero::{
     Amount, CreateWallet, CreateWalletForOutput, CreateWalletForOutputThenLoadDefaultWallet,
-    GetAddress, InsufficientFunds, OpenWallet, PrivateViewKey, PublicViewKey, Refresh, Transfer,
-    TransferProof, TxHash, WalletBlockHeight, WatchForTransfer,
+    InsufficientFunds, OpenWallet, PrivateViewKey, PublicViewKey, Transfer, TransferProof, TxHash,
+    WatchForTransfer,
 };
 use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::Result;
@@ -54,6 +54,19 @@ impl Wallet {
         let amount = self.inner.lock().await.get_balance(0).await?;
 
         Ok(Amount::from_piconero(amount))
+    }
+
+    pub async fn block_height(&self) -> Result<BlockHeight> {
+        self.inner.lock().await.block_height().await
+    }
+
+    pub async fn get_main_address(&self) -> Result<Address> {
+        let address = self.inner.lock().await.get_address(0).await?;
+        Ok(Address::from_str(address.address.as_str())?)
+    }
+
+    pub async fn refresh(&self) -> Result<Refreshed> {
+        self.inner.lock().await.refresh().await
     }
 }
 
@@ -231,27 +244,5 @@ impl WatchForTransfer for Wallet {
         };
 
         Ok(())
-    }
-}
-
-#[async_trait]
-impl WalletBlockHeight for Wallet {
-    async fn block_height(&self) -> Result<BlockHeight> {
-        self.inner.lock().await.block_height().await
-    }
-}
-
-#[async_trait]
-impl GetAddress for Wallet {
-    async fn get_main_address(&self) -> Result<Address> {
-        let address = self.inner.lock().await.get_address(0).await?;
-        Ok(Address::from_str(address.address.as_str())?)
-    }
-}
-
-#[async_trait]
-impl Refresh for Wallet {
-    async fn refresh(&self) -> Result<Refreshed> {
-        self.inner.lock().await.refresh().await
     }
 }

@@ -31,7 +31,7 @@ use swap::{
     execution_params::GetExecutionParams,
     fs::default_config_path,
     monero,
-    monero::{Amount, CreateWallet, GetAddress, OpenWallet},
+    monero::{Amount, CreateWallet, OpenWallet},
     protocol::alice::EventLoop,
     seed::Seed,
     trace::init_tracing,

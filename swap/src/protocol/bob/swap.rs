@@ -4,7 +4,7 @@ use crate::{
     database::{Database, Swap},
     execution_params::ExecutionParams,
     monero,
-    monero::{InsufficientFunds, WalletBlockHeight},
+    monero::InsufficientFunds,
     protocol::bob::{self, event_loop::EventLoopHandle, state::*, QuoteRequest},
 };
 use anyhow::{bail, Result};

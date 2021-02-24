@@ -21,7 +21,6 @@ use swap::{
     execution_params,
     execution_params::{ExecutionParams, GetExecutionParams},
     monero,
-    monero::Refresh,
     protocol::{alice, alice::AliceState, bob, bob::BobState},
     seed::Seed,
 };

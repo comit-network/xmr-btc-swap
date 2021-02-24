@@ -10,7 +10,7 @@ use crate::{
     database::Database,
     execution_params::ExecutionParams,
     monero,
-    monero::{CreateWalletForOutputThenLoadDefaultWallet, WalletBlockHeight},
+    monero::CreateWalletForOutputThenLoadDefaultWallet,
     monero_ext::ScalarExt,
     protocol::{
         alice,
