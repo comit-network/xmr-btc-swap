@@ -7,22 +7,16 @@ use crate::{
     },
     execution_params::ExecutionParams,
     monero,
-    monero_ext::ScalarExt,
     protocol::{
-        alice::{Message1, Message3, TransferProof},
-        bob::{EncryptedSignature, Message0, Message2, Message4},
+        alice::{Message1, Message3},
+        bob::{Message0, Message2, Message4},
         CROSS_CURVE_PROOF_SYSTEM,
     },
 };
 use anyhow::{anyhow, bail, Context, Result};
-use ecdsa_fun::{
-    adaptor::{Adaptor, HashTranscript},
-    nonce::Deterministic,
-};
 use libp2p::PeerId;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
-use sha2::Sha256;
 use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQProof;
 use std::fmt;
 
@@ -347,193 +341,5 @@ impl State3 {
             self.tx_lock.txid(),
         )
         .await
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct State4 {
-    a: bitcoin::SecretKey,
-    B: bitcoin::PublicKey,
-    s_a: monero::Scalar,
-    S_b_monero: monero::PublicKey,
-    S_b_bitcoin: bitcoin::PublicKey,
-    v: monero::PrivateViewKey,
-    xmr: monero::Amount,
-    cancel_timelock: CancelTimelock,
-    punish_timelock: PunishTimelock,
-    refund_address: bitcoin::Address,
-    redeem_address: bitcoin::Address,
-    punish_address: bitcoin::Address,
-    tx_lock: bitcoin::TxLock,
-    tx_punish_sig_bob: bitcoin::Signature,
-    tx_cancel_sig_bob: bitcoin::Signature,
-}
-
-impl State4 {
-    pub async fn lock_xmr<W>(self, monero_wallet: &W) -> Result<State5>
-    where
-        W: monero::Transfer,
-    {
-        let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey { scalar: self.s_a });
-        let S_b = self.S_b_monero;
-
-        let (tx_lock_proof, fee) = monero_wallet
-            .transfer(S_a + S_b, self.v.public(), self.xmr)
-            .await?;
-
-        Ok(State5 {
-            a: self.a,
-            B: self.B,
-            s_a: self.s_a,
-            S_b_monero: self.S_b_monero,
-            S_b_bitcoin: self.S_b_bitcoin,
-            v: self.v,
-            cancel_timelock: self.cancel_timelock,
-            punish_timelock: self.punish_timelock,
-            refund_address: self.refund_address,
-            redeem_address: self.redeem_address,
-            punish_address: self.punish_address,
-            tx_lock: self.tx_lock,
-            tx_lock_proof,
-            tx_punish_sig_bob: self.tx_punish_sig_bob,
-            tx_cancel_sig_bob: self.tx_cancel_sig_bob,
-            lock_xmr_fee: fee,
-        })
-    }
-
-    pub async fn punish<W: bitcoin::BroadcastSignedTransaction>(
-        &self,
-        bitcoin_wallet: &W,
-    ) -> Result<()> {
-        let tx_cancel =
-            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
-        let tx_punish =
-            bitcoin::TxPunish::new(&tx_cancel, &self.punish_address, self.punish_timelock);
-
-        {
-            let sig_a = self.a.sign(tx_cancel.digest());
-            let sig_b = self.tx_cancel_sig_bob.clone();
-
-            let signed_tx_cancel = tx_cancel.clone().add_signatures(
-                &self.tx_lock,
-                (self.a.public(), sig_a),
-                (self.B, sig_b),
-            )?;
-
-            let _ = bitcoin_wallet
-                .broadcast_signed_transaction(signed_tx_cancel)
-                .await?;
-        }
-
-        {
-            let sig_a = self.a.sign(tx_punish.digest());
-            let sig_b = self.tx_punish_sig_bob.clone();
-
-            let signed_tx_punish =
-                tx_punish.add_signatures(&tx_cancel, (self.a.public(), sig_a), (self.B, sig_b))?;
-
-            let _ = bitcoin_wallet
-                .broadcast_signed_transaction(signed_tx_punish)
-                .await?;
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct State5 {
-    a: bitcoin::SecretKey,
-    B: bitcoin::PublicKey,
-    s_a: monero::Scalar,
-    S_b_monero: monero::PublicKey,
-    S_b_bitcoin: bitcoin::PublicKey,
-    v: monero::PrivateViewKey,
-    cancel_timelock: CancelTimelock,
-    punish_timelock: PunishTimelock,
-    refund_address: bitcoin::Address,
-    redeem_address: bitcoin::Address,
-    punish_address: bitcoin::Address,
-    tx_lock: bitcoin::TxLock,
-    tx_lock_proof: monero::TransferProof,
-
-    tx_punish_sig_bob: bitcoin::Signature,
-
-    tx_cancel_sig_bob: bitcoin::Signature,
-    lock_xmr_fee: monero::Amount,
-}
-
-impl State5 {
-    pub fn next_message(&self) -> TransferProof {
-        TransferProof {
-            tx_lock_proof: self.tx_lock_proof.clone(),
-        }
-    }
-
-    pub fn receive(self, msg: EncryptedSignature) -> State6 {
-        State6 {
-            a: self.a,
-            B: self.B,
-            s_a: self.s_a,
-            S_b_monero: self.S_b_monero,
-            S_b_bitcoin: self.S_b_bitcoin,
-            v: self.v,
-            cancel_timelock: self.cancel_timelock,
-            punish_timelock: self.punish_timelock,
-            refund_address: self.refund_address,
-            redeem_address: self.redeem_address,
-            punish_address: self.punish_address,
-            tx_lock: self.tx_lock,
-            tx_punish_sig_bob: self.tx_punish_sig_bob,
-            tx_redeem_encsig: msg.tx_redeem_encsig,
-            lock_xmr_fee: self.lock_xmr_fee,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct State6 {
-    a: bitcoin::SecretKey,
-    B: bitcoin::PublicKey,
-    s_a: monero::Scalar,
-    S_b_monero: monero::PublicKey,
-    S_b_bitcoin: bitcoin::PublicKey,
-    v: monero::PrivateViewKey,
-    cancel_timelock: CancelTimelock,
-    punish_timelock: PunishTimelock,
-    refund_address: bitcoin::Address,
-    redeem_address: bitcoin::Address,
-    punish_address: bitcoin::Address,
-    tx_lock: bitcoin::TxLock,
-
-    tx_punish_sig_bob: bitcoin::Signature,
-    tx_redeem_encsig: bitcoin::EncryptedSignature,
-    lock_xmr_fee: monero::Amount,
-}
-
-impl State6 {
-    pub async fn redeem_btc<W: bitcoin::BroadcastSignedTransaction>(
-        &self,
-        bitcoin_wallet: &W,
-    ) -> Result<()> {
-        let adaptor = Adaptor::<HashTranscript<Sha256>, Deterministic<Sha256>>::default();
-
-        let tx_redeem = bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address);
-
-        let sig_a = self.a.sign(tx_redeem.digest());
-        let sig_b =
-            adaptor.decrypt_signature(&self.s_a.to_secpfun_scalar(), self.tx_redeem_encsig.clone());
-
-        let sig_tx_redeem =
-            tx_redeem.add_signatures(&self.tx_lock, (self.a.public(), sig_a), (self.B, sig_b))?;
-        bitcoin_wallet
-            .broadcast_signed_transaction(sig_tx_redeem)
-            .await?;
-
-        Ok(())
-    }
-
-    pub fn lock_xmr_fee(&self) -> monero::Amount {
-        self.lock_xmr_fee
     }
 }
