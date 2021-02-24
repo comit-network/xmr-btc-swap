@@ -23,15 +23,27 @@ use url::Url;
 
 #[derive(Debug)]
 pub struct Wallet {
-    pub inner: Mutex<wallet::Client>,
-    pub network: Network,
-    pub default_wallet_name: String,
+    inner: Mutex<wallet::Client>,
+    network: Network,
+    default_wallet_name: String,
 }
 
 impl Wallet {
     pub fn new(url: Url, network: Network, default_wallet_name: String) -> Self {
         Self {
             inner: Mutex::new(wallet::Client::new(url)),
+            network,
+            default_wallet_name,
+        }
+    }
+
+    pub fn new_with_client(
+        client: wallet::Client,
+        network: Network,
+        default_wallet_name: String,
+    ) -> Self {
+        Self {
+            inner: Mutex::new(client),
             network,
             default_wallet_name,
         }

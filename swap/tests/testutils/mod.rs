@@ -27,11 +27,7 @@ use swap::{
 };
 use tempfile::tempdir;
 use testcontainers::{clients::Cli, Container, Docker, RunArgs};
-use tokio::{
-    sync::{mpsc, Mutex},
-    task::JoinHandle,
-    time::interval,
-};
+use tokio::{sync::mpsc, task::JoinHandle, time::interval};
 use tracing::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
 use url::Url;
@@ -589,11 +585,11 @@ async fn init_test_wallets(
         .await
         .unwrap();
 
-    let xmr_wallet = swap::monero::Wallet {
-        inner: Mutex::new(monero.wallet(name).unwrap().client()),
-        network: monero::Network::default(),
-        default_wallet_name: "irrelevant_for_tests".to_string(),
-    };
+    let xmr_wallet = swap::monero::Wallet::new_with_client(
+        monero.wallet(name).unwrap().client(),
+        monero::Network::default(),
+        "irrelevant_for_tests".to_string(),
+    );
 
     let electrum_rpc_url = {
         let input = format!("tcp://@localhost:{}", electrum_rpc_port);
