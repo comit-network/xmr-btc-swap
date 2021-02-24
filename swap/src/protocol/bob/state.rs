@@ -379,7 +379,7 @@ impl State3 {
         .await
     }
 
-    pub fn state4(&self) -> State4 {
+    pub fn cancel(&self) -> State4 {
         State4 {
             A: self.A,
             b: self.b.clone(),

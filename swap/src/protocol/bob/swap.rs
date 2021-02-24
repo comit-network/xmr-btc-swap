@@ -141,12 +141,12 @@ async fn run_until_internal(
                             }
                         },
                         _ = cancel_timelock_expires => {
-                            let state4 = state3.state4();
+                            let state4 = state3.cancel();
                             BobState::CancelTimelockExpired(state4)
                         }
                     }
                 } else {
-                    let state4 = state3.state4();
+                    let state4 = state3.cancel();
                     BobState::CancelTimelockExpired(state4)
                 };
                 let db_state = state.clone().into();
@@ -188,18 +188,18 @@ async fn run_until_internal(
                                 Err(InsufficientFunds {..}) => {
                                      info!("The other party has locked insufficient Monero funds! Waiting for refund...");
                                      state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()).await?;
-                                     let state4 = state.state4();
+                                     let state4 = state.cancel();
                                      BobState::CancelTimelockExpired(state4)
                                 },
                             }
                         },
                         _ = cancel_timelock_expires => {
-                            let state4 = state.state4();
+                            let state4 = state.cancel();
                             BobState::CancelTimelockExpired(state4)
                         }
                     }
                 } else {
-                    let state4 = state.state4();
+                    let state4 = state.cancel();
                     BobState::CancelTimelockExpired(state4)
                 };
 

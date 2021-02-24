@@ -23,8 +23,8 @@ pub async fn cancel(
     force: bool,
 ) -> Result<Result<(Txid, BobState), CancelError>> {
     let state4 = match state {
-        BobState::BtcLocked(state3) => state3.state4(),
-        BobState::XmrLockProofReceived { state, .. } => state.state4(),
+        BobState::BtcLocked(state3) => state3.cancel(),
+        BobState::XmrLockProofReceived { state, .. } => state.cancel(),
         BobState::XmrLocked(state4) => state4,
         BobState::EncSigSent(state4) => state4,
         BobState::CancelTimelockExpired(state4) => state4,
