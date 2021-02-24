@@ -176,7 +176,7 @@ async fn run_until_internal(
                     let xmr_lock_watcher = state.clone().watch_for_lock_xmr(
                         monero_wallet.as_ref(),
                         lock_transfer_proof,
-                        monero_wallet_restore_blockheight.height,
+                        monero_wallet_restore_blockheight,
                     );
                     let cancel_timelock_expires =
                         state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());

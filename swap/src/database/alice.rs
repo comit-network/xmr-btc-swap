@@ -6,6 +6,7 @@ use crate::{
 };
 use ::bitcoin::hashes::core::fmt::Display;
 use libp2p::PeerId;
+use monero_rpc::wallet::BlockHeight;
 use serde::{Deserialize, Serialize};
 
 // Large enum variant is fine because this is only used for database
@@ -23,15 +24,29 @@ pub enum Alice {
         #[serde(with = "crate::serde_peer_id")]
         bob_peer_id: PeerId,
     },
-    XmrLocked(alice::State3),
+    XmrLocked {
+        monero_wallet_restore_blockheight: BlockHeight,
+        state3: alice::State3,
+    },
     EncSigLearned {
+        monero_wallet_restore_blockheight: BlockHeight,
         encrypted_signature: EncryptedSignature,
         state3: alice::State3,
     },
-    CancelTimelockExpired(alice::State3),
-    BtcCancelled(alice::State3),
-    BtcPunishable(alice::State3),
+    CancelTimelockExpired {
+        monero_wallet_restore_blockheight: BlockHeight,
+        state3: alice::State3,
+    },
+    BtcCancelled {
+        monero_wallet_restore_blockheight: BlockHeight,
+        state3: alice::State3,
+    },
+    BtcPunishable {
+        monero_wallet_restore_blockheight: BlockHeight,
+        state3: alice::State3,
+    },
     BtcRefunded {
+        monero_wallet_restore_blockheight: BlockHeight,
         state3: alice::State3,
         #[serde(with = "monero_private_key")]
         spend_key: monero::PrivateKey,
@@ -53,7 +68,6 @@ impl From<&AliceState> for Alice {
             AliceState::Started {
                 state3,
                 bob_peer_id,
-                ..
             } => Alice::Started {
                 state3: state3.as_ref().clone(),
                 bob_peer_id: *bob_peer_id,
@@ -61,32 +75,60 @@ impl From<&AliceState> for Alice {
             AliceState::BtcLocked {
                 state3,
                 bob_peer_id,
-                ..
             } => Alice::BtcLocked {
                 state3: state3.as_ref().clone(),
                 bob_peer_id: *bob_peer_id,
             },
-            AliceState::XmrLocked { state3 } => Alice::XmrLocked(state3.as_ref().clone()),
+            AliceState::XmrLocked {
+                monero_wallet_restore_blockheight,
+                state3,
+            } => Alice::XmrLocked {
+                monero_wallet_restore_blockheight: *monero_wallet_restore_blockheight,
+                state3: state3.as_ref().clone(),
+            },
             AliceState::EncSigLearned {
+                monero_wallet_restore_blockheight,
                 state3,
                 encrypted_signature,
             } => Alice::EncSigLearned {
+                monero_wallet_restore_blockheight: *monero_wallet_restore_blockheight,
                 state3: state3.as_ref().clone(),
                 encrypted_signature: *encrypted_signature.clone(),
             },
             AliceState::BtcRedeemed => Alice::Done(AliceEndState::BtcRedeemed),
-            AliceState::BtcCancelled { state3, .. } => Alice::BtcCancelled(state3.as_ref().clone()),
-            AliceState::BtcRefunded { spend_key, state3 } => Alice::BtcRefunded {
+            AliceState::BtcCancelled {
+                monero_wallet_restore_blockheight,
+                state3,
+                ..
+            } => Alice::BtcCancelled {
+                monero_wallet_restore_blockheight: *monero_wallet_restore_blockheight,
+                state3: state3.as_ref().clone(),
+            },
+            AliceState::BtcRefunded {
+                monero_wallet_restore_blockheight,
+                spend_key,
+                state3,
+            } => Alice::BtcRefunded {
+                monero_wallet_restore_blockheight: *monero_wallet_restore_blockheight,
                 spend_key: *spend_key,
                 state3: state3.as_ref().clone(),
             },
-            AliceState::BtcPunishable { state3, .. } => {
-                Alice::BtcPunishable(state3.as_ref().clone())
-            }
+            AliceState::BtcPunishable {
+                monero_wallet_restore_blockheight,
+                state3,
+                ..
+            } => Alice::BtcPunishable {
+                monero_wallet_restore_blockheight: *monero_wallet_restore_blockheight,
+                state3: state3.as_ref().clone(),
+            },
             AliceState::XmrRefunded => Alice::Done(AliceEndState::XmrRefunded),
-            AliceState::CancelTimelockExpired { state3 } => {
-                Alice::CancelTimelockExpired(state3.as_ref().clone())
-            }
+            AliceState::CancelTimelockExpired {
+                monero_wallet_restore_blockheight,
+                state3,
+            } => Alice::CancelTimelockExpired {
+                monero_wallet_restore_blockheight: *monero_wallet_restore_blockheight,
+                state3: state3.as_ref().clone(),
+            },
             AliceState::BtcPunished => Alice::Done(AliceEndState::BtcPunished),
             AliceState::SafelyAborted => Alice::Done(AliceEndState::SafelyAborted),
         }
@@ -110,33 +152,50 @@ impl From<Alice> for AliceState {
                 bob_peer_id,
                 state3: Box::new(state3),
             },
-            Alice::XmrLocked(state3) => AliceState::XmrLocked {
+            Alice::XmrLocked {
+                monero_wallet_restore_blockheight,
+                state3,
+            } => AliceState::XmrLocked {
+                monero_wallet_restore_blockheight,
                 state3: Box::new(state3),
             },
             Alice::EncSigLearned {
+                monero_wallet_restore_blockheight,
                 state3: state,
                 encrypted_signature,
             } => AliceState::EncSigLearned {
+                monero_wallet_restore_blockheight,
                 state3: Box::new(state),
                 encrypted_signature: Box::new(encrypted_signature),
             },
-            Alice::CancelTimelockExpired(state3) => AliceState::CancelTimelockExpired {
+            Alice::CancelTimelockExpired {
+                monero_wallet_restore_blockheight,
+                state3,
+            } => AliceState::CancelTimelockExpired {
+                monero_wallet_restore_blockheight,
                 state3: Box::new(state3),
             },
-            Alice::BtcCancelled(state) => {
+            Alice::BtcCancelled {
+                monero_wallet_restore_blockheight,
+                state3,
+            } => {
                 let tx_cancel = TxCancel::new(
-                    &state.tx_lock,
-                    state.cancel_timelock,
-                    state.a.public(),
-                    state.B,
+                    &state3.tx_lock,
+                    state3.cancel_timelock,
+                    state3.a.public(),
+                    state3.B,
                 );
 
                 AliceState::BtcCancelled {
-                    state3: Box::new(state),
+                    monero_wallet_restore_blockheight,
+                    state3: Box::new(state3),
                     tx_cancel: Box::new(tx_cancel),
                 }
             }
-            Alice::BtcPunishable(state3) => {
+            Alice::BtcPunishable {
+                monero_wallet_restore_blockheight,
+                state3,
+            } => {
                 let tx_cancel = TxCancel::new(
                     &state3.tx_lock,
                     state3.cancel_timelock,
@@ -145,13 +204,17 @@ impl From<Alice> for AliceState {
                 );
                 let tx_refund = TxRefund::new(&tx_cancel, &state3.refund_address);
                 AliceState::BtcPunishable {
+                    monero_wallet_restore_blockheight,
                     tx_refund,
                     state3: Box::new(state3),
                 }
             }
             Alice::BtcRefunded {
-                state3, spend_key, ..
+                monero_wallet_restore_blockheight,
+                state3,
+                spend_key,
             } => AliceState::BtcRefunded {
+                monero_wallet_restore_blockheight,
                 spend_key,
                 state3: Box::new(state3),
             },
@@ -170,10 +233,10 @@ impl Display for Alice {
         match self {
             Alice::Started { .. } => write!(f, "Started"),
             Alice::BtcLocked { .. } => f.write_str("Bitcoin locked"),
-            Alice::XmrLocked(_) => f.write_str("Monero locked"),
-            Alice::CancelTimelockExpired(_) => f.write_str("Cancel timelock is expired"),
-            Alice::BtcCancelled(_) => f.write_str("Bitcoin cancel transaction published"),
-            Alice::BtcPunishable(_) => f.write_str("Bitcoin punishable"),
+            Alice::XmrLocked { .. } => f.write_str("Monero locked"),
+            Alice::CancelTimelockExpired { .. } => f.write_str("Cancel timelock is expired"),
+            Alice::BtcCancelled { .. } => f.write_str("Bitcoin cancel transaction published"),
+            Alice::BtcPunishable { .. } => f.write_str("Bitcoin punishable"),
             Alice::BtcRefunded { .. } => f.write_str("Monero refundable"),
             Alice::Done(end_state) => write!(f, "Done: {}", end_state),
             Alice::EncSigLearned { .. } => f.write_str("Encrypted signature learned"),

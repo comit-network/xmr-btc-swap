@@ -15,6 +15,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Context, Result};
 use libp2p::PeerId;
+use monero_rpc::wallet::BlockHeight;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQProof;
@@ -31,27 +32,33 @@ pub enum AliceState {
         state3: Box<State3>,
     },
     XmrLocked {
+        monero_wallet_restore_blockheight: BlockHeight,
         state3: Box<State3>,
     },
     EncSigLearned {
+        monero_wallet_restore_blockheight: BlockHeight,
         encrypted_signature: Box<bitcoin::EncryptedSignature>,
         state3: Box<State3>,
     },
     BtcRedeemed,
     BtcCancelled {
+        monero_wallet_restore_blockheight: BlockHeight,
         tx_cancel: Box<TxCancel>,
         state3: Box<State3>,
     },
     BtcRefunded {
+        monero_wallet_restore_blockheight: BlockHeight,
         spend_key: monero::PrivateKey,
         state3: Box<State3>,
     },
     BtcPunishable {
+        monero_wallet_restore_blockheight: BlockHeight,
         tx_refund: TxRefund,
         state3: Box<State3>,
     },
     XmrRefunded,
     CancelTimelockExpired {
+        monero_wallet_restore_blockheight: BlockHeight,
         state3: Box<State3>,
     },
     BtcPunished,
