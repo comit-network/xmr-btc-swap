@@ -328,7 +328,7 @@ impl State3 {
         self,
         xmr_wallet: &W,
         transfer_proof: TransferProof,
-        monero_wallet_restore_blockheight: u32,
+        monero_wallet_restore_blockheight: BlockHeight,
     ) -> Result<Result<State4, InsufficientFunds>>
     where
         W: monero::WatchForTransfer,
@@ -379,7 +379,7 @@ impl State3 {
         .await
     }
 
-    pub fn state4(&self) -> State4 {
+    pub fn cancel(&self) -> State4 {
         State4 {
             A: self.A,
             b: self.b.clone(),
@@ -393,7 +393,9 @@ impl State3 {
             tx_lock: self.tx_lock.clone(),
             tx_cancel_sig_a: self.tx_cancel_sig_a.clone(),
             tx_refund_encsig: self.tx_refund_encsig.clone(),
-            monero_wallet_restore_blockheight: 0u32,
+            // For cancel scenarios the monero wallet rescan blockchain height is irrelevant for
+            // Bob, because Bob's cancel can only lead to refunding on Bitcoin
+            monero_wallet_restore_blockheight: BlockHeight { height: 0 },
         }
     }
 
@@ -429,7 +431,7 @@ pub struct State4 {
     tx_lock: bitcoin::TxLock,
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: bitcoin::EncryptedSignature,
-    monero_wallet_restore_blockheight: u32,
+    monero_wallet_restore_blockheight: BlockHeight,
 }
 
 impl State4 {
@@ -589,7 +591,7 @@ pub struct State5 {
     s_b: monero::Scalar,
     v: monero::PrivateViewKey,
     tx_lock: bitcoin::TxLock,
-    monero_wallet_restore_blockheight: u32,
+    monero_wallet_restore_blockheight: BlockHeight,
 }
 
 impl State5 {
@@ -604,11 +606,7 @@ impl State5 {
         // NOTE: This actually generates and opens a new wallet, closing the currently
         // open one.
         monero_wallet
-            .create_and_load_wallet_for_output(
-                s,
-                self.v,
-                Some(self.monero_wallet_restore_blockheight),
-            )
+            .create_and_load_wallet_for_output(s, self.v, self.monero_wallet_restore_blockheight)
             .await?;
 
         Ok(())

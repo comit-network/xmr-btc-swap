@@ -1,40 +1,72 @@
 use crate::monero::{
-    Amount, CreateWallet, CreateWalletForOutput, InsufficientFunds, OpenWallet, PrivateViewKey,
-    PublicViewKey, Transfer, TransferProof, TxHash, WatchForTransfer,
+    Amount, CreateWallet, CreateWalletForOutput, CreateWalletForOutputThenLoadDefaultWallet,
+    InsufficientFunds, OpenWallet, PrivateViewKey, PublicViewKey, Transfer, TransferProof, TxHash,
+    WatchForTransfer,
 };
 use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::Result;
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::retry};
 use bitcoin::hashes::core::sync::atomic::AtomicU32;
-use monero_rpc::wallet;
+use monero_rpc::{
+    wallet,
+    wallet::{BlockHeight, Refreshed},
+};
 use std::{
     str::FromStr,
     sync::{atomic::Ordering, Arc},
     time::Duration,
 };
+use tokio::sync::Mutex;
 use tracing::info;
 use url::Url;
 
 #[derive(Debug)]
 pub struct Wallet {
-    pub inner: wallet::Client,
-    pub network: Network,
+    inner: Mutex<wallet::Client>,
+    network: Network,
+    default_wallet_name: String,
 }
 
 impl Wallet {
-    pub fn new(url: Url, network: Network) -> Self {
+    pub fn new(url: Url, network: Network, default_wallet_name: String) -> Self {
         Self {
-            inner: wallet::Client::new(url),
+            inner: Mutex::new(wallet::Client::new(url)),
             network,
+            default_wallet_name,
+        }
+    }
+
+    pub fn new_with_client(
+        client: wallet::Client,
+        network: Network,
+        default_wallet_name: String,
+    ) -> Self {
+        Self {
+            inner: Mutex::new(client),
+            network,
+            default_wallet_name,
         }
     }
 
     /// Get the balance of the primary account.
     pub async fn get_balance(&self) -> Result<Amount> {
-        let amount = self.inner.get_balance(0).await?;
+        let amount = self.inner.lock().await.get_balance(0).await?;
 
         Ok(Amount::from_piconero(amount))
+    }
+
+    pub async fn block_height(&self) -> Result<BlockHeight> {
+        self.inner.lock().await.block_height().await
+    }
+
+    pub async fn get_main_address(&self) -> Result<Address> {
+        let address = self.inner.lock().await.get_address(0).await?;
+        Ok(Address::from_str(address.address.as_str())?)
+    }
+
+    pub async fn refresh(&self) -> Result<Refreshed> {
+        self.inner.lock().await.refresh().await
     }
 }
 
@@ -51,6 +83,8 @@ impl Transfer for Wallet {
 
         let res = self
             .inner
+            .lock()
+            .await
             .transfer(0, amount.as_piconero(), &destination_address.to_string())
             .await?;
 
@@ -73,7 +107,7 @@ impl CreateWalletForOutput for Wallet {
         &self,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
-        restore_height: Option<u32>,
+        restore_height: BlockHeight,
     ) -> Result<()> {
         let public_spend_key = PublicKey::from_private_key(&private_spend_key);
         let public_view_key = PublicKey::from_private_key(&private_view_key.into());
@@ -82,12 +116,46 @@ impl CreateWalletForOutput for Wallet {
 
         let _ = self
             .inner
+            .lock()
+            .await
             .generate_from_keys(
                 &address.to_string(),
                 &private_spend_key.to_string(),
                 &PrivateKey::from(private_view_key).to_string(),
-                restore_height,
+                restore_height.height,
             )
+            .await?;
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl CreateWalletForOutputThenLoadDefaultWallet for Wallet {
+    async fn create_and_load_wallet_for_output_then_load_default_wallet(
+        &self,
+        private_spend_key: PrivateKey,
+        private_view_key: PrivateViewKey,
+        restore_height: BlockHeight,
+    ) -> Result<()> {
+        let public_spend_key = PublicKey::from_private_key(&private_spend_key);
+        let public_view_key = PublicKey::from_private_key(&private_view_key.into());
+
+        let address = Address::standard(self.network, public_spend_key, public_view_key);
+
+        let wallet = self.inner.lock().await;
+
+        let _ = wallet
+            .generate_from_keys(
+                &address.to_string(),
+                &private_spend_key.to_string(),
+                &PrivateKey::from(private_view_key).to_string(),
+                restore_height.height,
+            )
+            .await?;
+
+        let _ = wallet
+            .open_wallet(self.default_wallet_name.as_str())
             .await?;
 
         Ok(())
@@ -97,7 +165,7 @@ impl CreateWalletForOutput for Wallet {
 #[async_trait]
 impl OpenWallet for Wallet {
     async fn open_wallet(&self, file_name: &str) -> Result<()> {
-        self.inner.open_wallet(file_name).await?;
+        self.inner.lock().await.open_wallet(file_name).await?;
         Ok(())
     }
 }
@@ -105,7 +173,7 @@ impl OpenWallet for Wallet {
 #[async_trait]
 impl CreateWallet for Wallet {
     async fn create_wallet(&self, file_name: &str) -> Result<()> {
-        self.inner.create_wallet(file_name).await?;
+        self.inner.lock().await.create_wallet(file_name).await?;
         Ok(())
     }
 }
@@ -129,7 +197,6 @@ impl WatchForTransfer for Wallet {
         }
 
         let address = Address::standard(self.network, public_spend_key, public_view_key.into());
-        let wallet = self.inner.clone();
 
         let confirmations = Arc::new(AtomicU32::new(0u32));
 
@@ -137,7 +204,10 @@ impl WatchForTransfer for Wallet {
             // NOTE: Currently, this is conflicting IO errors with the transaction not being
             // in the blockchain yet, or not having enough confirmations on it. All these
             // errors warrant a retry, but the strategy should probably differ per case
-            let proof = wallet
+            let proof = self
+                .inner
+                .lock()
+                .await
                 .check_tx_key(
                     &String::from(transfer_proof.tx_hash()),
                     &transfer_proof.tx_key().to_string(),

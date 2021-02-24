@@ -268,14 +268,8 @@ impl Client {
         address: &str,
         spend_key: &str,
         view_key: &str,
-        restore_height: Option<u32>,
+        restore_height: u32,
     ) -> Result<GenerateFromKeys> {
-        let restore_height = if let Some(restore_height) = restore_height {
-            restore_height
-        } else {
-            0
-        };
-
         let params = GenerateFromKeysParams {
             restore_height,
             filename: view_key.into(),

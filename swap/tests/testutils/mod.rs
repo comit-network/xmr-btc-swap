@@ -168,12 +168,7 @@ impl TestContext {
         assert_eq!(btc_balance_after_swap, self.alice_starting_balances.btc);
 
         // Ensure that Alice's balance is refreshed as we use a newly created wallet
-        self.alice_monero_wallet
-            .as_ref()
-            .inner
-            .refresh()
-            .await
-            .unwrap();
+        self.alice_monero_wallet.as_ref().refresh().await.unwrap();
         let xmr_balance_after_swap = self
             .alice_monero_wallet
             .as_ref()
@@ -232,12 +227,7 @@ impl TestContext {
         );
 
         // Ensure that Bob's balance is refreshed as we use a newly created wallet
-        self.bob_monero_wallet
-            .as_ref()
-            .inner
-            .refresh()
-            .await
-            .unwrap();
+        self.bob_monero_wallet.as_ref().refresh().await.unwrap();
         let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().get_balance().await.unwrap();
         assert_eq!(
             xmr_balance_after_swap,
@@ -594,10 +584,11 @@ async fn init_test_wallets(
         .await
         .unwrap();
 
-    let xmr_wallet = swap::monero::Wallet {
-        inner: monero.wallet(name).unwrap().client(),
-        network: monero::Network::default(),
-    };
+    let xmr_wallet = swap::monero::Wallet::new_with_client(
+        monero.wallet(name).unwrap().client(),
+        monero::Network::default(),
+        "irrelevant_for_tests".to_string(),
+    );
 
     let electrum_rpc_url = {
         let input = format!("tcp://@localhost:{}", electrum_rpc_port);

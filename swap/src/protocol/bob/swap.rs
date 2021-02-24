@@ -129,11 +129,7 @@ async fn run_until_internal(
 
                     // Record the current monero wallet block height so we don't have to scan from
                     // block 0 once we create the redeem wallet.
-                    // TODO: This can be optimized further by extracting the block height when
-                    //  tx-lock was included. However, scanning a few more blocks won't do any harm
-                    //  and is simpler.
-                    let monero_wallet_restore_blockheight =
-                        monero_wallet.inner.block_height().await?;
+                    let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
 
                     select! {
                         transfer_proof = transfer_proof_watcher => {
@@ -145,12 +141,12 @@ async fn run_until_internal(
                             }
                         },
                         _ = cancel_timelock_expires => {
-                            let state4 = state3.state4();
+                            let state4 = state3.cancel();
                             BobState::CancelTimelockExpired(state4)
                         }
                     }
                 } else {
-                    let state4 = state3.state4();
+                    let state4 = state3.cancel();
                     BobState::CancelTimelockExpired(state4)
                 };
                 let db_state = state.clone().into();
@@ -180,7 +176,7 @@ async fn run_until_internal(
                     let xmr_lock_watcher = state.clone().watch_for_lock_xmr(
                         monero_wallet.as_ref(),
                         lock_transfer_proof,
-                        monero_wallet_restore_blockheight.height,
+                        monero_wallet_restore_blockheight,
                     );
                     let cancel_timelock_expires =
                         state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
@@ -192,18 +188,18 @@ async fn run_until_internal(
                                 Err(InsufficientFunds {..}) => {
                                      info!("The other party has locked insufficient Monero funds! Waiting for refund...");
                                      state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()).await?;
-                                     let state4 = state.state4();
+                                     let state4 = state.cancel();
                                      BobState::CancelTimelockExpired(state4)
                                 },
                             }
                         },
                         _ = cancel_timelock_expires => {
-                            let state4 = state.state4();
+                            let state4 = state.cancel();
                             BobState::CancelTimelockExpired(state4)
                         }
                     }
                 } else {
-                    let state4 = state.state4();
+                    let state4 = state.cancel();
                     BobState::CancelTimelockExpired(state4)
                 };
 
