@@ -156,7 +156,11 @@ async fn init_wallets(
         bitcoin_balance
     );
 
-    let monero_wallet = monero::Wallet::new(config.monero.wallet_rpc_url.clone(), MONERO_NETWORK);
+    let monero_wallet = monero::Wallet::new(
+        config.monero.wallet_rpc_url.clone(),
+        MONERO_NETWORK,
+        DEFAULT_WALLET_NAME.to_string(),
+    );
 
     // Setup the Monero wallet
     let open_wallet_response = monero_wallet.open_wallet(DEFAULT_WALLET_NAME).await;

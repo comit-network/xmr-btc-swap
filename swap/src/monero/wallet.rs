@@ -1,7 +1,7 @@
 use crate::monero::{
-    Amount, CreateWallet, CreateWalletForOutput, GetAddress, InsufficientFunds, OpenWallet,
-    PrivateViewKey, PublicViewKey, Refresh, Transfer, TransferProof, TxHash, WalletBlockHeight,
-    WatchForTransfer,
+    Amount, CreateWallet, CreateWalletForOutput, CreateWalletForOutputThenLoadDefaultWallet,
+    GetAddress, InsufficientFunds, OpenWallet, PrivateViewKey, PublicViewKey, Refresh, Transfer,
+    TransferProof, TxHash, WalletBlockHeight, WatchForTransfer,
 };
 use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::Result;
@@ -25,13 +25,15 @@ use url::Url;
 pub struct Wallet {
     pub inner: Mutex<wallet::Client>,
     pub network: Network,
+    pub default_wallet_name: String,
 }
 
 impl Wallet {
-    pub fn new(url: Url, network: Network) -> Self {
+    pub fn new(url: Url, network: Network, default_wallet_name: String) -> Self {
         Self {
             inner: Mutex::new(wallet::Client::new(url)),
             network,
+            default_wallet_name,
         }
     }
 
@@ -97,6 +99,38 @@ impl CreateWalletForOutput for Wallet {
                 &PrivateKey::from(private_view_key).to_string(),
                 restore_height.height,
             )
+            .await?;
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl CreateWalletForOutputThenLoadDefaultWallet for Wallet {
+    async fn create_and_load_wallet_for_output_then_load_default_wallet(
+        &self,
+        private_spend_key: PrivateKey,
+        private_view_key: PrivateViewKey,
+        restore_height: BlockHeight,
+    ) -> Result<()> {
+        let public_spend_key = PublicKey::from_private_key(&private_spend_key);
+        let public_view_key = PublicKey::from_private_key(&private_view_key.into());
+
+        let address = Address::standard(self.network, public_spend_key, public_view_key);
+
+        let wallet = self.inner.lock().await;
+
+        let _ = wallet
+            .generate_from_keys(
+                &address.to_string(),
+                &private_spend_key.to_string(),
+                &PrivateKey::from(private_view_key).to_string(),
+                restore_height.height,
+            )
+            .await?;
+
+        let _ = wallet
+            .open_wallet(self.default_wallet_name.as_str())
             .await?;
 
         Ok(())

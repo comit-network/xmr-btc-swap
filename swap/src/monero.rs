@@ -221,6 +221,16 @@ pub trait CreateWalletForOutput {
 }
 
 #[async_trait]
+pub trait CreateWalletForOutputThenLoadDefaultWallet {
+    async fn create_and_load_wallet_for_output_then_load_default_wallet(
+        &self,
+        private_spend_key: PrivateKey,
+        private_view_key: PrivateViewKey,
+        restore_height: BlockHeight,
+    ) -> Result<()>;
+}
+
+#[async_trait]
 pub trait OpenWallet {
     async fn open_wallet(&self, file_name: &str) -> Result<()>;
 }

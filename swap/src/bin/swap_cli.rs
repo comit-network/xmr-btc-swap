@@ -289,7 +289,11 @@ async fn init_wallets(
         bitcoin_balance
     );
 
-    let monero_wallet = monero::Wallet::new(config.monero.wallet_rpc_url.clone(), monero_network);
+    let monero_wallet = monero::Wallet::new(
+        config.monero.wallet_rpc_url.clone(),
+        monero_network,
+        MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME.to_string(),
+    );
 
     // Setup the temporary Monero wallet necessary for monitoring the blockchain
     let open_monitoring_wallet_response = monero_wallet
