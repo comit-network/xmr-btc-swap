@@ -21,12 +21,17 @@ use swap::{
     execution_params,
     execution_params::{ExecutionParams, GetExecutionParams},
     monero,
+    monero::Refresh,
     protocol::{alice, alice::AliceState, bob, bob::BobState},
     seed::Seed,
 };
 use tempfile::tempdir;
 use testcontainers::{clients::Cli, Container, Docker, RunArgs};
-use tokio::{sync::mpsc, task::JoinHandle, time::interval};
+use tokio::{
+    sync::{mpsc, Mutex},
+    task::JoinHandle,
+    time::interval,
+};
 use tracing::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
 use url::Url;
@@ -168,12 +173,7 @@ impl TestContext {
         assert_eq!(btc_balance_after_swap, self.alice_starting_balances.btc);
 
         // Ensure that Alice's balance is refreshed as we use a newly created wallet
-        self.alice_monero_wallet
-            .as_ref()
-            .inner
-            .refresh()
-            .await
-            .unwrap();
+        self.alice_monero_wallet.as_ref().refresh().await.unwrap();
         let xmr_balance_after_swap = self
             .alice_monero_wallet
             .as_ref()
@@ -232,12 +232,7 @@ impl TestContext {
         );
 
         // Ensure that Bob's balance is refreshed as we use a newly created wallet
-        self.bob_monero_wallet
-            .as_ref()
-            .inner
-            .refresh()
-            .await
-            .unwrap();
+        self.bob_monero_wallet.as_ref().refresh().await.unwrap();
         let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().get_balance().await.unwrap();
         assert_eq!(
             xmr_balance_after_swap,
@@ -595,7 +590,7 @@ async fn init_test_wallets(
         .unwrap();
 
     let xmr_wallet = swap::monero::Wallet {
-        inner: monero.wallet(name).unwrap().client(),
+        inner: Mutex::new(monero.wallet(name).unwrap().client()),
         network: monero::Network::default(),
     };
 

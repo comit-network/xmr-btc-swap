@@ -31,7 +31,7 @@ use swap::{
     execution_params::GetExecutionParams,
     fs::default_config_path,
     monero,
-    monero::{Amount, CreateWallet, OpenWallet},
+    monero::{Amount, CreateWallet, GetAddress, OpenWallet},
     protocol::alice::EventLoop,
     seed::Seed,
     trace::init_tracing,
@@ -177,7 +177,7 @@ async fn init_wallets(
 
     let balance = monero_wallet.get_balance().await?;
     if balance == Amount::ZERO {
-        let deposit_address = monero_wallet.inner.get_address(0).await?.address;
+        let deposit_address = monero_wallet.get_main_address().await?;
         warn!(
             "The Monero balance is 0, make sure to deposit funds at: {}",
             deposit_address

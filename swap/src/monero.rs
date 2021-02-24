@@ -8,6 +8,8 @@ use crate::bitcoin;
 use ::bitcoin::hashes::core::fmt::Formatter;
 use anyhow::Result;
 use async_trait::async_trait;
+use monero::Address;
+use monero_rpc::wallet::{BlockHeight, Refreshed};
 use rand::{CryptoRng, RngCore};
 use rust_decimal::{
     prelude::{FromPrimitive, ToPrimitive},
@@ -226,6 +228,21 @@ pub trait OpenWallet {
 #[async_trait]
 pub trait CreateWallet {
     async fn create_wallet(&self, file_name: &str) -> Result<()>;
+}
+
+#[async_trait]
+pub trait WalletBlockHeight {
+    async fn block_height(&self) -> Result<BlockHeight>;
+}
+
+#[async_trait]
+pub trait GetAddress {
+    async fn get_main_address(&self) -> Result<Address>;
+}
+
+#[async_trait]
+pub trait Refresh {
+    async fn refresh(&self) -> Result<Refreshed>;
 }
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq)]

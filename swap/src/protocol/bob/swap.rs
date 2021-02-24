@@ -4,7 +4,7 @@ use crate::{
     database::{Database, Swap},
     execution_params::ExecutionParams,
     monero,
-    monero::InsufficientFunds,
+    monero::{InsufficientFunds, WalletBlockHeight},
     protocol::bob::{self, event_loop::EventLoopHandle, state::*, QuoteRequest},
 };
 use anyhow::{bail, Result};
@@ -132,8 +132,7 @@ async fn run_until_internal(
                     // TODO: This can be optimized further by extracting the block height when
                     //  tx-lock was included. However, scanning a few more blocks won't do any harm
                     //  and is simpler.
-                    let monero_wallet_restore_blockheight =
-                        monero_wallet.inner.block_height().await?;
+                    let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
 
                     select! {
                         transfer_proof = transfer_proof_watcher => {

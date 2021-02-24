@@ -30,7 +30,7 @@ use swap::{
     execution_params::GetExecutionParams,
     fs::default_config_path,
     monero,
-    monero::{CreateWallet, OpenWallet},
+    monero::{CreateWallet, OpenWallet, WalletBlockHeight},
     protocol::{
         bob,
         bob::{cancel::CancelError, Builder},
@@ -316,7 +316,7 @@ async fn init_wallets(
         );
     }
 
-    let _test_wallet_connection = monero_wallet.inner.block_height().await?;
+    let _test_wallet_connection = monero_wallet.block_height().await?;
     info!("The Monero wallet RPC is set up correctly!");
 
     Ok((bitcoin_wallet, monero_wallet))
