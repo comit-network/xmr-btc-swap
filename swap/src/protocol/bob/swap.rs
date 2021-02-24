@@ -129,9 +129,6 @@ async fn run_until_internal(
 
                     // Record the current monero wallet block height so we don't have to scan from
                     // block 0 once we create the redeem wallet.
-                    // TODO: This can be optimized further by extracting the block height when
-                    //  tx-lock was included. However, scanning a few more blocks won't do any harm
-                    //  and is simpler.
                     let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
 
                     select! {
