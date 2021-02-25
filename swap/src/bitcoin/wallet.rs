@@ -82,11 +82,9 @@ impl Wallet {
     }
 
     pub async fn new_address(&self) -> Result<Address> {
-        self.inner
-            .lock()
-            .await
-            .get_new_address()
-            .map_err(Into::into)
+        let address = self.inner.lock().await.get_new_address()?;
+
+        Ok(address)
     }
 
     pub async fn get_tx(&self, txid: Txid) -> Result<Option<Transaction>> {
