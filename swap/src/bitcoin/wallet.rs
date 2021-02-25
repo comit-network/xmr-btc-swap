@@ -38,10 +38,9 @@ enum Error {
 }
 
 pub struct Wallet {
-    pub inner: Arc<Mutex<bdk::Wallet<ElectrumBlockchain, bdk::sled::Tree>>>,
-    pub network: bitcoin::Network,
-    pub http_url: Url,
-    pub rpc_url: Url,
+    inner: Arc<Mutex<bdk::Wallet<ElectrumBlockchain, bdk::sled::Tree>>>,
+    http_url: Url,
+    rpc_url: Url,
 }
 
 impl Wallet {
@@ -70,7 +69,6 @@ impl Wallet {
 
         Ok(Self {
             inner: Arc::new(Mutex::new(bdk_wallet)),
-            network,
             http_url: electrum_http_url,
             rpc_url: electrum_rpc_url,
         })
