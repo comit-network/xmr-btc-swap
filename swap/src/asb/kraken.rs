@@ -36,8 +36,8 @@ impl LatestRate for RateService {
 pub enum Error {
     #[error("Rate has not yet been retrieved from Kraken websocket API")]
     NotYetRetrieved,
-    #[error("Message is not text")]
-    NonTextMessage,
+    #[error("Received close message from Kraken")]
+    CloseMessage,
     #[error("Websocket: ")]
     WebSocket(String),
     #[error("Serde: ")]
@@ -77,8 +77,11 @@ impl RateService {
             while let Some(msg) = rate_stream.next().await {
                 let msg = match msg {
                     Ok(Message::Text(msg)) => msg,
+                    Ok(Message::Close(..)) => {
+                        let _ = rate_update.send(Err(Error::CloseMessage));
+                        continue;
+                    }
                     Ok(_) => {
-                        let _ = rate_update.send(Err(Error::NonTextMessage));
                         continue;
                     }
                     Err(e) => {
