@@ -1,8 +1,8 @@
 use crate::{
     bitcoin::{
-        timelocks::BlockHeight, Address, Amount, BroadcastSignedTransaction, BuildTxLockPsbt,
-        GetBlockHeight, GetNetwork, GetRawTransaction, SignTxLock, Transaction,
-        TransactionBlockHeight, TxLock, WaitForTransactionFinality, WatchForRawTransaction,
+        timelocks::BlockHeight, Address, Amount, BroadcastSignedTransaction, GetBlockHeight,
+        GetRawTransaction, SignTxLock, Transaction, TransactionBlockHeight, TxLock,
+        WaitForTransactionFinality, WatchForRawTransaction,
     },
     execution_params::ExecutionParams,
 };
@@ -110,11 +110,8 @@ impl Wallet {
         self.inner.lock().await.sync(noop_progress(), None)?;
         Ok(())
     }
-}
 
-#[async_trait]
-impl BuildTxLockPsbt for Wallet {
-    async fn build_tx_lock_psbt(
+    pub async fn build_tx_lock_psbt(
         &self,
         output_address: Address,
         output_amount: Amount,
@@ -128,6 +125,10 @@ impl BuildTxLockPsbt for Wallet {
         let (psbt, _details) = tx_builder.finish()?;
         tracing::debug!("tx lock built");
         Ok(psbt)
+    }
+
+    pub async fn get_network(&self) -> bitcoin::Network {
+        self.inner.lock().await.network()
     }
 }
 
@@ -280,13 +281,6 @@ impl WaitForTransactionFinality for Wallet {
         }
 
         Ok(())
-    }
-}
-
-#[async_trait]
-impl GetNetwork for Wallet {
-    async fn get_network(&self) -> bitcoin::Network {
-        self.inner.lock().await.network()
     }
 }
 

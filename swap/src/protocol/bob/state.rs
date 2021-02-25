@@ -1,9 +1,8 @@
 use crate::{
     bitcoin::{
         self, current_epoch, wait_for_cancel_timelock_to_expire, BroadcastSignedTransaction,
-        BuildTxLockPsbt, CancelTimelock, ExpiredTimelocks, GetBlockHeight, GetNetwork,
-        GetRawTransaction, PunishTimelock, Transaction, TransactionBlockHeight, TxCancel, Txid,
-        WatchForRawTransaction,
+        CancelTimelock, ExpiredTimelocks, GetBlockHeight, GetRawTransaction, PunishTimelock,
+        Transaction, TransactionBlockHeight, TxCancel, Txid, WatchForRawTransaction,
     },
     execution_params::ExecutionParams,
     monero,
@@ -140,10 +139,7 @@ impl State0 {
         }
     }
 
-    pub async fn receive<W>(self, wallet: &W, msg: Message1) -> Result<State1>
-    where
-        W: BuildTxLockPsbt + GetNetwork,
-    {
+    pub async fn receive(self, wallet: &bitcoin::Wallet, msg: Message1) -> Result<State1> {
         let valid = CROSS_CURVE_PROOF_SYSTEM.verify(
             &msg.dleq_proof_s_a,
             (

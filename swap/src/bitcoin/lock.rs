@@ -1,6 +1,5 @@
 use crate::bitcoin::{
-    build_shared_output_descriptor, Address, Amount, BuildTxLockPsbt, GetNetwork, PublicKey,
-    Transaction, TX_FEE,
+    build_shared_output_descriptor, Address, Amount, PublicKey, Transaction, Wallet, TX_FEE,
 };
 use ::bitcoin::{util::psbt::PartiallySignedTransaction, OutPoint, TxIn, TxOut, Txid};
 use anyhow::Result;
@@ -14,10 +13,7 @@ pub struct TxLock {
 }
 
 impl TxLock {
-    pub async fn new<W>(wallet: &W, amount: Amount, A: PublicKey, B: PublicKey) -> Result<Self>
-    where
-        W: BuildTxLockPsbt + GetNetwork,
-    {
+    pub async fn new(wallet: &Wallet, amount: Amount, A: PublicKey, B: PublicKey) -> Result<Self> {
         let lock_output_descriptor = build_shared_output_descriptor(A.0, B.0);
         let address = lock_output_descriptor
             .address(wallet.get_network().await)

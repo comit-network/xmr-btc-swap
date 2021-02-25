@@ -22,9 +22,7 @@ pub use wallet::Wallet;
 use crate::execution_params::ExecutionParams;
 use ::bitcoin::{
     hashes::{hex::ToHex, Hash},
-    secp256k1,
-    util::psbt::PartiallySignedTransaction,
-    SigHash,
+    secp256k1, SigHash,
 };
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
@@ -204,15 +202,6 @@ pub fn build_shared_output_descriptor(A: Point, B: Point) -> Descriptor<bitcoin:
 }
 
 #[async_trait]
-pub trait BuildTxLockPsbt {
-    async fn build_tx_lock_psbt(
-        &self,
-        output_address: Address,
-        output_amount: Amount,
-    ) -> Result<PartiallySignedTransaction>;
-}
-
-#[async_trait]
 pub trait SignTxLock {
     async fn sign_tx_lock(&self, tx_lock: TxLock) -> Result<Transaction>;
 }
@@ -249,11 +238,6 @@ pub trait TransactionBlockHeight {
 #[async_trait]
 pub trait GetRawTransaction {
     async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction>;
-}
-
-#[async_trait]
-pub trait GetNetwork {
-    async fn get_network(&self) -> Network;
 }
 
 pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Result<SecretKey> {
