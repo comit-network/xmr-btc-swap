@@ -79,7 +79,7 @@ async fn main() -> Result<()> {
     let wallet_data_dir = config.data.dir.join("wallet");
 
     match opt.cmd {
-        Command::Start => {
+        Command::Start { max_sell } => {
             let seed = Seed::from_file_or_generate(&config.data.dir)
                 .expect("Could not retrieve/initialize seed");
 
@@ -107,6 +107,7 @@ async fn main() -> Result<()> {
                 Arc::new(monero_wallet),
                 Arc::new(db),
                 rate_service,
+                max_sell,
             )
             .unwrap();
 
