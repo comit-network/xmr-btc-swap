@@ -58,6 +58,7 @@ pub struct TxCancel {
     inner: Transaction,
     digest: SigHash,
     pub(in crate::bitcoin) output_descriptor: Descriptor<::bitcoin::PublicKey>,
+    lock_output_descriptor: Descriptor<::bitcoin::PublicKey>,
 }
 
 impl TxCancel {
@@ -99,6 +100,7 @@ impl TxCancel {
             inner: transaction,
             digest,
             output_descriptor: cancel_output_descriptor,
+            lock_output_descriptor: tx_lock.output_descriptor.clone(),
         }
     }
 
@@ -120,7 +122,6 @@ impl TxCancel {
 
     pub fn add_signatures(
         self,
-        tx_lock: &TxLock,
         (A, sig_a): (PublicKey, Signature),
         (B, sig_b): (PublicKey, Signature),
     ) -> Result<Transaction> {
@@ -144,8 +145,7 @@ impl TxCancel {
         };
 
         let mut tx_cancel = self.inner;
-        tx_lock
-            .output_descriptor
+        self.lock_output_descriptor
             .satisfy(&mut tx_cancel.input[0], satisfier)?;
 
         Ok(tx_cancel)

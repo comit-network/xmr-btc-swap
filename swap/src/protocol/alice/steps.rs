@@ -124,7 +124,7 @@ pub fn build_bitcoin_redeem_transaction(
     let sig_b = adaptor.decrypt_signature(&s_a, encrypted_signature);
 
     let tx = tx_redeem
-        .add_signatures(&tx_lock, (a.public(), sig_a), (B, sig_b))
+        .add_signatures((a.public(), sig_a), (B, sig_b))
         .context("sig_{a,b} are invalid for tx_redeem")?;
 
     Ok(tx)
@@ -179,7 +179,7 @@ where
 
         let tx_cancel = tx_cancel
             .clone()
-            .add_signatures(&tx_lock, (a.public(), sig_a), (B, sig_b))
+            .add_signatures((a.public(), sig_a), (B, sig_b))
             .expect("sig_{a,b} to be valid signatures for tx_cancel");
 
         // TODO(Franck): Error handling is delicate, why can't we broadcast?
@@ -224,7 +224,7 @@ where
 
 pub fn extract_monero_private_key(
     published_refund_tx: bitcoin::Transaction,
-    tx_refund: TxRefund,
+    tx_refund: &TxRefund,
     s_a: monero::Scalar,
     a: bitcoin::SecretKey,
     S_b_bitcoin: bitcoin::PublicKey,
@@ -261,7 +261,7 @@ pub fn build_bitcoin_punish_transaction(
     let sig_b = tx_punish_sig_bob;
 
     let signed_tx_punish = tx_punish
-        .add_signatures(&tx_cancel, (a.public(), sig_a), (B, sig_b))
+        .add_signatures((a.public(), sig_a), (B, sig_b))
         .expect("sig_{a,b} to be valid signatures for tx_cancel");
 
     Ok(signed_tx_punish)

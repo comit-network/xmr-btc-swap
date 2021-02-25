@@ -2,13 +2,14 @@ use crate::bitcoin::{Address, PublicKey, PunishTimelock, Transaction, TxCancel};
 use ::bitcoin::{util::bip143::SigHashCache, SigHash, SigHashType};
 use anyhow::Result;
 use ecdsa_fun::Signature;
-use miniscript::DescriptorTrait;
+use miniscript::{Descriptor, DescriptorTrait};
 use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct TxPunish {
     inner: Transaction,
     digest: SigHash,
+    cancel_output_descriptor: Descriptor<::bitcoin::PublicKey>,
 }
 
 impl TxPunish {
@@ -29,6 +30,7 @@ impl TxPunish {
         Self {
             inner: tx_punish,
             digest,
+            cancel_output_descriptor: tx_cancel.output_descriptor.clone(),
         }
     }
 
@@ -38,7 +40,6 @@ impl TxPunish {
 
     pub fn add_signatures(
         self,
-        tx_cancel: &TxCancel,
         (A, sig_a): (PublicKey, Signature),
         (B, sig_b): (PublicKey, Signature),
     ) -> Result<Transaction> {
@@ -62,8 +63,7 @@ impl TxPunish {
         };
 
         let mut tx_punish = self.inner;
-        tx_cancel
-            .output_descriptor
+        self.cancel_output_descriptor
             .satisfy(&mut tx_punish.input[0], satisfier)?;
 
         Ok(tx_punish)

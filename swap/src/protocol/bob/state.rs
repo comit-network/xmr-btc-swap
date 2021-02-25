@@ -459,7 +459,7 @@ impl State4 {
 
         let tx_cancel = tx_cancel
             .clone()
-            .add_signatures(&self.tx_lock, (self.A, sig_a), (self.b.public(), sig_b))
+            .add_signatures((self.A, sig_a), (self.b.public(), sig_b))
             .expect(
                 "sig_{a,b} to be valid signatures for
                 tx_cancel",
@@ -482,7 +482,7 @@ impl State4 {
 
         let tx_cancel = tx_cancel
             .clone()
-            .add_signatures(&self.tx_lock, (self.A, sig_a), (self.b.public(), sig_b))
+            .add_signatures((self.A, sig_a), (self.b.public(), sig_b))
             .expect(
                 "sig_{a,b} to be valid signatures for
                 tx_cancel",
@@ -562,11 +562,8 @@ impl State4 {
         let sig_a =
             adaptor.decrypt_signature(&self.s_b.to_secpfun_scalar(), self.tx_refund_encsig.clone());
 
-        let signed_tx_refund = tx_refund.add_signatures(
-            &tx_cancel.clone(),
-            (self.A, sig_a),
-            (self.b.public(), sig_b),
-        )?;
+        let signed_tx_refund =
+            tx_refund.add_signatures((self.A, sig_a), (self.b.public(), sig_b))?;
 
         let txid = bitcoin_wallet
             .broadcast_signed_transaction(signed_tx_refund)
