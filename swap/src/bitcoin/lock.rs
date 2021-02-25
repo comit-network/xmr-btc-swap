@@ -19,7 +19,7 @@ impl TxLock {
             .address(wallet.get_network().await)
             .expect("can derive address from descriptor");
 
-        let psbt = wallet.build_tx_lock_psbt(address, amount).await?;
+        let psbt = wallet.send_to_address(address, amount).await?;
 
         Ok(Self {
             inner: psbt,

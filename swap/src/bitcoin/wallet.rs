@@ -111,19 +111,18 @@ impl Wallet {
         Ok(())
     }
 
-    pub async fn build_tx_lock_psbt(
+    pub async fn send_to_address(
         &self,
-        output_address: Address,
-        output_amount: Amount,
+        address: Address,
+        amount: Amount,
     ) -> Result<PartiallySignedTransaction> {
-        tracing::debug!("building tx lock");
         let wallet = self.inner.lock().await;
 
         let mut tx_builder = wallet.build_tx();
-        tx_builder.add_recipient(output_address.script_pubkey(), output_amount.as_sat());
-        tx_builder.fee_rate(FeeRate::from_sat_per_vb(5.0)); // todo: get actual fee
+        tx_builder.add_recipient(address.script_pubkey(), amount.as_sat());
+        tx_builder.fee_rate(FeeRate::from_sat_per_vb(5.0)); // todo: make dynamic
         let (psbt, _details) = tx_builder.finish()?;
-        tracing::debug!("tx lock built");
+
         Ok(psbt)
     }
 
