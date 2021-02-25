@@ -14,6 +14,7 @@
 
 use anyhow::{Context, Result};
 use prettytable::{row, Table};
+use reqwest::Url;
 use std::{path::Path, sync::Arc};
 use structopt::StructOpt;
 use swap::{
@@ -84,6 +85,12 @@ async fn main() -> Result<()> {
     let monero_network = monero::Network::Stagenet;
     let execution_params = execution_params::Testnet::get_execution_params();
 
+    let monero_wallet_rpc = monero::WalletRpc::new(config.data.dir.join("monero")).await?;
+
+    let monero_wallet_rpc_process = monero_wallet_rpc
+        .run(monero_network, "stagenet.community.xmr.to")
+        .await?;
+
     match opt.cmd {
         Command::BuyXmr {
             alice_peer_id,
@@ -96,6 +103,7 @@ async fn main() -> Result<()> {
                 &wallet_data_dir,
                 monero_network,
                 seed,
+                monero_wallet_rpc_process.endpoint(),
             )
             .await?;
 
@@ -149,6 +157,7 @@ async fn main() -> Result<()> {
                 &wallet_data_dir,
                 monero_network,
                 seed,
+                monero_wallet_rpc_process.endpoint(),
             )
             .await?;
 
@@ -180,6 +189,7 @@ async fn main() -> Result<()> {
                 &wallet_data_dir,
                 monero_network,
                 seed,
+                monero_wallet_rpc_process.endpoint(),
             )
             .await?;
 
@@ -230,6 +240,7 @@ async fn main() -> Result<()> {
                 &wallet_data_dir,
                 monero_network,
                 seed,
+                monero_wallet_rpc_process.endpoint(),
             )
             .await?;
 
@@ -268,6 +279,7 @@ async fn init_wallets(
     bitcoin_wallet_data_dir: &Path,
     monero_network: monero::Network,
     seed: Seed,
+    monero_wallet_rpc_url: Url,
 ) -> Result<(bitcoin::Wallet, monero::Wallet)> {
     let bitcoin_wallet = bitcoin::Wallet::new(
         config.bitcoin.electrum_rpc_url,
@@ -290,7 +302,7 @@ async fn init_wallets(
     );
 
     let monero_wallet = monero::Wallet::new(
-        config.monero.wallet_rpc_url.clone(),
+        monero_wallet_rpc_url.clone(),
         monero_network,
         MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME.to_string(),
     );
@@ -306,7 +318,7 @@ async fn init_wallets(
             .context(format!(
                 "Unable to create Monero wallet for blockchain monitoring.\
              Please ensure that the monero-wallet-rpc is available at {}",
-                config.monero.wallet_rpc_url
+                monero_wallet_rpc_url
             ))?;
 
         info!(

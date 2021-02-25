@@ -1,8 +1,10 @@
 pub mod wallet;
+mod wallet_rpc;
 
 pub use ::monero::{Network, PrivateKey, PublicKey};
 pub use curve25519_dalek::scalar::Scalar;
 pub use wallet::Wallet;
+pub use wallet_rpc::{WalletRpc, WalletRpcProcess};
 
 use crate::bitcoin;
 use ::bitcoin::hashes::core::fmt::Formatter;

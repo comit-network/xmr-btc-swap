@@ -13,6 +13,7 @@ name = "swap"
 
 [dependencies]
 anyhow = "1"
+async-compression = { version = "0.3", features = ["bzip2", "tokio"] }
 async-recursion = "0.3.1"
 async-trait = "0.1"
 atty = "0.2"
@@ -36,7 +37,7 @@ pem = "0.8"
 prettytable-rs = "0.8"
 rand = "0.7"
 rand_chacha = "0.2.0"
-reqwest = { version = "0.11", default-features = false }
+reqwest = { version = "0.11", features = ["rustls-tls", "stream"], default-features = false }
 rust_decimal = "1.10"
 serde = { version = "1", features = ["derive"] }
 serde_cbor = "0.11"
@@ -48,8 +49,10 @@ structopt = "0.3"
 strum = { version = "0.20", features = ["derive"] }
 thiserror = "1"
 time = "0.2"
-tokio = { version = "1.0", features = ["rt-multi-thread", "time", "macros", "sync"] }
+tokio = { version = "1.0", features = ["rt-multi-thread", "time", "macros", "sync", "process", "fs"] }
+tokio-tar = { path = "../tokio-tar" }
 tokio-tungstenite = { version = "0.13", features = [ "tls" ] }
+tokio-util = { version = "0.6.3", features = ["io"] }
 toml = "0.5"
 tracing = { version = "0.1", features = ["attributes"] }
 tracing-futures = { version = "0.2", features = ["std-future", "futures-03"] }
