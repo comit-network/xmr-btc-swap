@@ -1,9 +1,8 @@
 [Unit]
 Description=triggers the service that pulls and builds asb
-Requires=pull-and-build-asb.service
 
 [Timer]
-OnCalendar=*-*-* 16:00:00
+OnCalendar=16:00
 Persistent=true
 
 [Install]
