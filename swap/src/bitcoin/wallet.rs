@@ -111,7 +111,6 @@ impl Wallet {
     }
 
     pub async fn sync_wallet(&self) -> Result<()> {
-        tracing::debug!("syncing wallet");
         self.inner.lock().await.sync(noop_progress(), None)?;
         Ok(())
     }
