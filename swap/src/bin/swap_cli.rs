@@ -21,15 +21,11 @@ use swap::{
     bitcoin,
     cli::{
         command::{Arguments, Cancel, Command, Refund, Resume},
-        config::{
-            initial_setup, query_user_for_initial_testnet_config, read_config, Config,
-            ConfigNotInitialized,
-        },
+        config::{read_config, Config},
     },
     database::Database,
     execution_params,
     execution_params::GetExecutionParams,
-    fs::default_config_path,
     monero,
     monero::{CreateWallet, OpenWallet},
     protocol::{
@@ -54,18 +50,9 @@ async fn main() -> Result<()> {
 
     let opt = Arguments::from_args();
 
-    let config_path = if let Some(config_path) = opt.config {
-        config_path
-    } else {
-        default_config_path()?
-    };
-
-    let config = match read_config(config_path.clone())? {
-        Ok(config) => config,
-        Err(ConfigNotInitialized {}) => {
-            initial_setup(config_path.clone(), query_user_for_initial_testnet_config)?;
-            read_config(config_path)?.expect("after initial setup config can be read")
-        }
+    let config = match opt.config {
+        Some(config_path) => read_config(config_path)??,
+        None => Config::testnet(),
     };
 
     info!(

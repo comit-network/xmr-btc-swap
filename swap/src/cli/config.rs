@@ -1,11 +1,9 @@
-use crate::fs::{default_data_dir, ensure_directory_exists};
+use crate::fs::default_data_dir;
 use anyhow::{Context, Result};
 use config::ConfigError;
-use dialoguer::{theme::ColorfulTheme, Input};
 use serde::{Deserialize, Serialize};
 use std::{
     ffi::OsStr,
-    fs,
     path::{Path, PathBuf},
 };
 use tracing::info;
@@ -30,6 +28,22 @@ impl Config {
         let mut config = config::Config::new();
         config.merge(config::File::from(config_file))?;
         config.try_into()
+    }
+
+    pub fn testnet() -> Self {
+        Self {
+            data: Data {
+                dir: default_data_dir().expect("computed valid path for data dir"),
+            },
+            bitcoin: Bitcoin {
+                electrum_http_url: DEFAULT_ELECTRUM_HTTP_URL
+                    .parse()
+                    .expect("default electrum http str is a valid url"),
+                electrum_rpc_url: DEFAULT_ELECTRUM_RPC_URL
+                    .parse()
+                    .expect("default electrum rpc str is a valid url"),
+            },
+        }
     }
 }
 
@@ -66,66 +80,21 @@ pub fn read_config(config_path: PathBuf) -> Result<Result<Config, ConfigNotIniti
     Ok(Ok(file))
 }
 
-pub fn initial_setup<F>(config_path: PathBuf, config_file: F) -> Result<()>
-where
-    F: Fn() -> Result<Config>,
-{
-    info!("Config file not found, running initial setup...");
-    ensure_directory_exists(config_path.as_path())?;
-    let initial_config = config_file()?;
-
-    let toml = toml::to_string(&initial_config)?;
-    fs::write(&config_path, toml)?;
-
-    info!(
-        "Initial setup complete, config file created at {} ",
-        config_path.as_path().display()
-    );
-    Ok(())
-}
-
-pub fn query_user_for_initial_testnet_config() -> Result<Config> {
-    println!();
-    let data_dir = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Enter data directory for the swap CLI or hit return to use default")
-        .default(
-            default_data_dir()
-                .context("No default data dir value for this system")?
-                .to_str()
-                .context("Unsupported characters in default path")?
-                .to_string(),
-        )
-        .interact_text()?;
-    let data_dir = data_dir.as_str().parse()?;
-
-    let electrum_http_url: String = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Enter Electrum HTTP URL or hit return to use default")
-        .default(DEFAULT_ELECTRUM_HTTP_URL.to_owned())
-        .interact_text()?;
-    let electrum_http_url = Url::parse(electrum_http_url.as_str())?;
-
-    let electrum_rpc_url: String = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Enter Electrum RPC URL or hit return to use default")
-        .default(DEFAULT_ELECTRUM_RPC_URL.to_owned())
-        .interact_text()?;
-    let electrum_rpc_url = Url::parse(electrum_rpc_url.as_str())?;
-
-    println!();
-
-    Ok(Config {
-        data: Data { dir: data_dir },
-        bitcoin: Bitcoin {
-            electrum_http_url,
-            electrum_rpc_url,
-        },
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
+    use crate::fs::ensure_directory_exists;
+    use std::{fs, str::FromStr};
     use tempfile::tempdir;
+
+    pub fn initial_setup(config_path: PathBuf, config: Config) -> Result<()> {
+        ensure_directory_exists(config_path.as_path())?;
+
+        let toml = toml::to_string(&config)?;
+        fs::write(&config_path, toml)?;
+
+        Ok(())
+    }
 
     #[test]
     fn config_roundtrip() {
@@ -142,7 +111,7 @@ mod tests {
             },
         };
 
-        initial_setup(config_path.clone(), || Ok(expected.clone())).unwrap();
+        initial_setup(config_path.clone(), expected.clone()).unwrap();
         let actual = read_config(config_path).unwrap().unwrap();
 
         assert_eq!(expected, actual);
