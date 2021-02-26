@@ -325,13 +325,7 @@ async fn init_wallets(
     bitcoin_wallet
         .sync_wallet()
         .await
-        .expect("Could not sync btc wallet");
-
-    let bitcoin_balance = bitcoin_wallet.balance().await?;
-    info!(
-        "Connection to Bitcoin wallet succeeded, balance: {}",
-        bitcoin_balance
-    );
+        .context("failed to sync balance of bitcoin wallet")?;
 
     let monero_wallet = monero::Wallet::new(
         monero_wallet_rpc_url.clone(),
@@ -357,15 +351,12 @@ async fn init_wallets(
             "Created Monero wallet for blockchain monitoring with name {}",
             MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME
         );
-    } else {
-        info!(
-            "Opened Monero wallet for blockchain monitoring with name {}",
-            MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME
-        );
     }
 
-    let _test_wallet_connection = monero_wallet.block_height().await?;
-    info!("The Monero wallet RPC is set up correctly!");
+    let _test_wallet_connection = monero_wallet
+        .block_height()
+        .await
+        .context("failed to validate connection to monero-wallet-rpc")?;
 
     Ok((bitcoin_wallet, monero_wallet))
 }
