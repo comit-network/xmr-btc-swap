@@ -12,11 +12,7 @@ use monero_rpc::{
     wallet,
     wallet::{BlockHeight, Refreshed},
 };
-use std::{
-    str::FromStr,
-    sync::{atomic::Ordering, Arc},
-    time::Duration,
-};
+use std::{str::FromStr, sync::atomic::Ordering, time::Duration};
 use tokio::sync::Mutex;
 use tracing::info;
 use url::Url;
@@ -201,7 +197,7 @@ impl WatchForTransfer for Wallet {
 
         let address = Address::standard(self.network, public_spend_key, public_view_key.into());
 
-        let confirmations = Arc::new(AtomicU32::new(0u32));
+        let confirmations = AtomicU32::new(0u32);
 
         let res = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
             // NOTE: Currently, this is conflicting IO errors with the transaction not being
