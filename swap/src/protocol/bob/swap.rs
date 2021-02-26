@@ -30,7 +30,6 @@ pub async fn run(swap: bob::Swap) -> Result<BobState> {
     run_until(swap, is_complete).await
 }
 
-#[tracing::instrument(name = "swap", skip(swap,is_target_state), fields(id = %swap.swap_id))]
 pub async fn run_until(
     swap: bob::Swap,
     is_target_state: fn(&BobState) -> bool,
