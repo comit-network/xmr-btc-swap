@@ -21,7 +21,7 @@ use swap::{
     bitcoin,
     bitcoin::Amount,
     cli::{
-        command::{Arguments, Cancel, Command, Refund, Resume},
+        command::{Arguments, Command},
         config::{read_config, Config},
     },
     database::Database,
@@ -141,11 +141,11 @@ async fn main() -> Result<()> {
             // Print the table to stdout
             table.printstd();
         }
-        Command::Resume(Resume::BuyXmr {
+        Command::Resume {
             swap_id,
             alice_peer_id,
             alice_addr,
-        }) => {
+        } => {
             let (bitcoin_wallet, monero_wallet) = init_wallets(
                 config,
                 bitcoin_network,
@@ -171,12 +171,12 @@ async fn main() -> Result<()> {
             tokio::spawn(async move { event_loop.run().await });
             bob::run(swap).await?;
         }
-        Command::Cancel(Cancel::BuyXmr {
+        Command::Cancel {
             swap_id,
             alice_peer_id,
             alice_addr,
             force,
-        }) => {
+        } => {
             // TODO: Optimization: Only init the Bitcoin wallet, Monero wallet unnecessary
             let (bitcoin_wallet, monero_wallet) = init_wallets(
                 config,
@@ -223,12 +223,12 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        Command::Refund(Refund::BuyXmr {
+        Command::Refund {
             swap_id,
             alice_peer_id,
             alice_addr,
             force,
-        }) => {
+        } => {
             let (bitcoin_wallet, monero_wallet) = init_wallets(
                 config,
                 bitcoin_network,
