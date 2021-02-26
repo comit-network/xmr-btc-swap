@@ -34,10 +34,9 @@ use swap::{
         bob::{cancel::CancelError, Builder},
     },
     seed::Seed,
-    trace::init_tracing,
 };
-use tracing::{debug, error, info, warn};
-use tracing_subscriber::filter::LevelFilter;
+use tracing::{debug, error, info, warn, Level};
+use tracing_subscriber::FmtSubscriber;
 use uuid::Uuid;
 
 #[macro_use]
@@ -47,7 +46,15 @@ const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-mon
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    init_tracing(LevelFilter::DEBUG).expect("initialize tracing");
+    let is_terminal = atty::is(atty::Stream::Stderr);
+    let subscriber = FmtSubscriber::builder()
+        .with_env_filter(format!("swap={}", Level::DEBUG))
+        .with_writer(std::io::stderr)
+        .with_ansi(is_terminal)
+        .with_target(false)
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber)?;
 
     let opt = Arguments::from_args();
 
