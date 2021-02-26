@@ -85,7 +85,9 @@ impl Behaviour {
     ) -> Result<()> {
         self.rr
             .send_response(channel, msg)
-            .map_err(|_| anyhow!("Sending quote response failed"))
+            .map_err(|_| anyhow!("failed to send quote response"))?;
+
+        Ok(())
     }
 }
 
