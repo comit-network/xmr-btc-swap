@@ -3,7 +3,9 @@ use crate::{
     bitcoin,
     database::Database,
     execution_params::ExecutionParams,
-    monero, network,
+    monero,
+    monero::BalanceTooLow,
+    network,
     network::{transport, TokioExecutor},
     protocol::{
         alice,
@@ -14,7 +16,7 @@ use crate::{
     },
     seed::Seed,
 };
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use futures::future::RemoteHandle;
 use libp2p::{
     core::Multiaddr, futures::FutureExt, request_response::ResponseChannel, PeerId, Swarm,
@@ -164,7 +166,7 @@ where
                             debug!("Connection Established with {}", alice);
                         }
                         OutEvent::QuoteRequest { msg, channel, bob_peer_id } => {
-                            if let Err(error) = self.handle_quote_request(msg, channel, bob_peer_id).await {
+                            if let Err(error) = self.handle_quote_request(msg, channel, bob_peer_id, self.monero_wallet.clone()).await {
                                 error!("Failed to handle quote request: {:#}", error);
                             }
                         }
@@ -201,6 +203,7 @@ where
         quote_request: QuoteRequest,
         channel: ResponseChannel<QuoteResponse>,
         bob_peer_id: PeerId,
+        monero_wallet: Arc<monero::Wallet>,
     ) -> Result<()> {
         // 1. Check if acceptable request
         // 2. Send response
@@ -212,6 +215,16 @@ where
 
         let btc_amount = quote_request.btc_amount;
         let xmr_amount = rate.sell_quote(btc_amount)?;
+
+        let xmr_balance = monero_wallet.get_balance().await?;
+        let xmr_lock_fees = monero_wallet.static_tx_fee_estimate();
+
+        if xmr_balance < xmr_amount + xmr_lock_fees {
+            anyhow!(BalanceTooLow {
+                balance: xmr_balance
+            });
+        }
+
         let quote_response = QuoteResponse { xmr_amount };
 
         self.swarm

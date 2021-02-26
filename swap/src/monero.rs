@@ -206,10 +206,16 @@ pub trait WatchForTransfer {
 }
 
 #[derive(Debug, Clone, Copy, thiserror::Error)]
-#[error("transaction does not pay enough: expected {expected:?}, got {actual:?}")]
+#[error("transaction does not pay enough: expected {expected}, got {actual}")]
 pub struct InsufficientFunds {
     pub expected: Amount,
     pub actual: Amount,
+}
+
+#[derive(Debug, Clone, Copy, thiserror::Error)]
+#[error("The balance is too low, current balance: {balance}")]
+pub struct BalanceTooLow {
+    pub balance: Amount,
 }
 
 #[async_trait]

@@ -68,6 +68,11 @@ impl Wallet {
     pub async fn refresh(&self) -> Result<Refreshed> {
         self.inner.lock().await.refresh().await
     }
+
+    pub fn static_tx_fee_estimate(&self) -> Amount {
+        // Median tx fees on Monero as found here: https://www.monero.how/monero-transaction-fees, 0.000_015 * 2 (to be on the safe side)
+        Amount::from_monero(0.000_03f64).expect("static fee to be convertible without problems")
+    }
 }
 
 #[async_trait]
