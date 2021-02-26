@@ -69,7 +69,7 @@ where
     let public_spend_key = S_a + state3.S_b_monero;
     let public_view_key = state3.v.public();
 
-    let (transfer_proof, _) = monero_wallet
+    let transfer_proof = monero_wallet
         .transfer(public_spend_key, public_view_key, state3.xmr)
         .await?;
 
