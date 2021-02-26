@@ -13,6 +13,7 @@
 #![allow(non_snake_case)]
 
 use anyhow::{Context, Result};
+use libp2p::{core::Multiaddr, PeerId};
 use prettytable::{row, Table};
 use reqwest::Url;
 use std::{path::Path, sync::Arc, time::Duration};
@@ -21,12 +22,12 @@ use swap::{
     bitcoin,
     bitcoin::Amount,
     cli::{
-        command::{Arguments, Command},
+        command::{Arguments, Command, DEFAULT_ALICE_MULTIADDR, DEFAULT_ALICE_PEER_ID},
         config::{read_config, Config},
     },
     database::Database,
     execution_params,
-    execution_params::GetExecutionParams,
+    execution_params::{ExecutionParams, GetExecutionParams},
     monero,
     monero::{CreateWallet, OpenWallet},
     protocol::{
@@ -80,56 +81,44 @@ async fn main() -> Result<()> {
         .await?;
 
     match opt.cmd {
-        Command::BuyXmr {
+        Some(Command::BuyXmr {
             alice_peer_id,
             alice_addr,
-        } => {
-            let (bitcoin_wallet, monero_wallet) = init_wallets(
-                config,
-                bitcoin_network,
-                &wallet_data_dir,
-                monero_network,
-                seed,
-                monero_wallet_rpc_process.endpoint(),
-            )
-            .await?;
-
-            // TODO: Also wait for more funds if balance < dust
-            if bitcoin_wallet.balance().await? == Amount::ZERO {
-                debug!(
-                    "Waiting for BTC at address {}",
-                    bitcoin_wallet.new_address().await?
-                );
-
-                while bitcoin_wallet.balance().await? == Amount::ZERO {
-                    bitcoin_wallet.sync_wallet().await?;
-
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-                }
-
-                debug!("Received {}", bitcoin_wallet.balance().await?);
-            }
-
-            let send_bitcoin = bitcoin_wallet.max_giveable().await?;
-
-            info!("Swapping {} ...", send_bitcoin);
-
-            let bob_factory = Builder::new(
-                seed,
-                db,
-                Uuid::new_v4(),
-                Arc::new(bitcoin_wallet),
-                Arc::new(monero_wallet),
+        }) => {
+            buy_xmr(
                 alice_addr,
                 alice_peer_id,
+                config,
+                bitcoin_network,
+                monero_network,
+                &wallet_data_dir,
+                seed,
+                monero_wallet_rpc_process.endpoint(),
+                db,
                 execution_params,
-            );
-            let (swap, event_loop) = bob_factory.with_init_params(send_bitcoin).build().await?;
-
-            tokio::spawn(async move { event_loop.run().await });
-            bob::run(swap).await?;
+            )
+            .await?;
         }
-        Command::History => {
+        None => {
+            buy_xmr(
+                DEFAULT_ALICE_MULTIADDR
+                    .parse()
+                    .expect("default alice multiaddr str is a valid Multiaddr>"),
+                DEFAULT_ALICE_PEER_ID
+                    .parse()
+                    .expect("default alice peer id str is a valid PeerId"),
+                config,
+                bitcoin_network,
+                monero_network,
+                &wallet_data_dir,
+                seed,
+                monero_wallet_rpc_process.endpoint(),
+                db,
+                execution_params,
+            )
+            .await?;
+        }
+        Some(Command::History) => {
             let mut table = Table::new();
 
             table.add_row(row!["SWAP ID", "STATE"]);
@@ -141,11 +130,11 @@ async fn main() -> Result<()> {
             // Print the table to stdout
             table.printstd();
         }
-        Command::Resume {
+        Some(Command::Resume {
             swap_id,
             alice_peer_id,
             alice_addr,
-        } => {
+        }) => {
             let (bitcoin_wallet, monero_wallet) = init_wallets(
                 config,
                 bitcoin_network,
@@ -171,12 +160,12 @@ async fn main() -> Result<()> {
             tokio::spawn(async move { event_loop.run().await });
             bob::run(swap).await?;
         }
-        Command::Cancel {
+        Some(Command::Cancel {
             swap_id,
             alice_peer_id,
             alice_addr,
             force,
-        } => {
+        }) => {
             // TODO: Optimization: Only init the Bitcoin wallet, Monero wallet unnecessary
             let (bitcoin_wallet, monero_wallet) = init_wallets(
                 config,
@@ -223,12 +212,12 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        Command::Refund {
+        Some(Command::Refund {
             swap_id,
             alice_peer_id,
             alice_addr,
             force,
-        } => {
+        }) => {
             let (bitcoin_wallet, monero_wallet) = init_wallets(
                 config,
                 bitcoin_network,
@@ -331,4 +320,66 @@ async fn init_wallets(
     info!("The Monero wallet RPC is set up correctly!");
 
     Ok((bitcoin_wallet, monero_wallet))
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn buy_xmr(
+    alice_addr: Multiaddr,
+    alice_peer_id: PeerId,
+    config: Config,
+    bitcoin_network: bitcoin::Network,
+    monero_network: monero::Network,
+    wallet_data_dir: &Path,
+    seed: Seed,
+    monero_wallet_rpc_url: Url,
+    db: Database,
+    execution_params: ExecutionParams,
+) -> Result<()> {
+    let (bitcoin_wallet, monero_wallet) = init_wallets(
+        config,
+        bitcoin_network,
+        wallet_data_dir,
+        monero_network,
+        seed,
+        monero_wallet_rpc_url,
+    )
+    .await?;
+
+    let swap_id = Uuid::new_v4();
+
+    // TODO: Also wait for more funds if balance < dust
+    if bitcoin_wallet.balance().await? == Amount::ZERO {
+        debug!(
+            "Waiting for BTC at address {}",
+            bitcoin_wallet.new_address().await?
+        );
+
+        while bitcoin_wallet.balance().await? == Amount::ZERO {
+            bitcoin_wallet.sync_wallet().await?;
+
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+
+        debug!("Received {}", bitcoin_wallet.balance().await?);
+    }
+
+    let send_bitcoin = bitcoin_wallet.max_giveable().await?;
+
+    info!("Swapping {} ...", send_bitcoin);
+
+    let bob_factory = Builder::new(
+        seed,
+        db,
+        swap_id,
+        Arc::new(bitcoin_wallet),
+        Arc::new(monero_wallet),
+        alice_addr,
+        alice_peer_id,
+        execution_params,
+    );
+    let (swap, event_loop) = bob_factory.with_init_params(send_bitcoin).build().await?;
+
+    tokio::spawn(async move { event_loop.run().await });
+    bob::run(swap).await?;
+    Ok(())
 }

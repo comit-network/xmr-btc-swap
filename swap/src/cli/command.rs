@@ -2,8 +2,8 @@ use libp2p::{core::Multiaddr, PeerId};
 use std::path::PathBuf;
 use uuid::Uuid;
 
-const DEFAULT_ALICE_MULTIADDR: &str = "/dns4/xmr-btc-asb.coblox.tech/tcp/9876";
-const DEFAULT_ALICE_PEER_ID: &str = "12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
+pub const DEFAULT_ALICE_MULTIADDR: &str = "/dns4/xmr-btc-asb.coblox.tech/tcp/9876";
+pub const DEFAULT_ALICE_PEER_ID: &str = "12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
 
 #[derive(structopt::StructOpt, Debug)]
 pub struct Arguments {
@@ -15,7 +15,7 @@ pub struct Arguments {
     pub config: Option<PathBuf>,
 
     #[structopt(subcommand)]
-    pub cmd: Command,
+    pub cmd: Option<Command>,
 }
 
 #[derive(structopt::StructOpt, Debug)]
