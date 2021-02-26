@@ -185,7 +185,7 @@ pub enum OutEvent {
     },
     EncryptedSignatureAcknowledged,
     ResponseSent, // Same variant is used for all messages as no processing is done
-    Failure(Error),
+    CommunicationError(Error),
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -203,7 +203,7 @@ impl From<quote_request::OutEvent> for OutEvent {
         use quote_request::OutEvent::*;
         match event {
             MsgReceived(quote_response) => OutEvent::QuoteResponse(quote_response),
-            Failure(err) => OutEvent::Failure(err.context("Failure with Quote Request")),
+            Failure(err) => OutEvent::CommunicationError(err.context("Failure with Quote Request")),
         }
     }
 }
@@ -225,7 +225,7 @@ impl From<transfer_proof::OutEvent> for OutEvent {
                 channel,
             },
             AckSent => OutEvent::ResponseSent,
-            Failure(err) => OutEvent::Failure(err.context("Failure with Transfer Proof")),
+            Failure(err) => OutEvent::CommunicationError(err.context("Failure with Transfer Proof")),
         }
     }
 }
@@ -235,7 +235,7 @@ impl From<encrypted_signature::OutEvent> for OutEvent {
         use encrypted_signature::OutEvent::*;
         match event {
             Acknowledged => OutEvent::EncryptedSignatureAcknowledged,
-            Failure(err) => OutEvent::Failure(err.context("Failure with Encrypted Signature")),
+            Failure(err) => OutEvent::CommunicationError(err.context("Failure with Encrypted Signature")),
         }
     }
 }

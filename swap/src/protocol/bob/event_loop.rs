@@ -192,7 +192,7 @@ impl EventLoop {
                             debug!("Alice acknowledged encrypted signature");
                         }
                         OutEvent::ResponseSent => {}
-                        OutEvent::Failure(err) => {
+                        OutEvent::CommunicationError(err) => {
                             error!("Communication error: {:#}", err)
                         }
                     }
