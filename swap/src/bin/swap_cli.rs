@@ -35,7 +35,7 @@ use swap::{
     },
     seed::Seed,
 };
-use tracing::{debug, error, info, warn, Level};
+use tracing::{debug, error, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 use uuid::Uuid;
 
@@ -63,8 +63,8 @@ async fn main() -> Result<()> {
         None => Config::testnet(),
     };
 
-    info!(
-        "Database and Seed will be stored in directory: {}",
+    debug!(
+        "Database and seed will be stored in {}",
         config.data.dir.display()
     );
 
@@ -240,7 +240,7 @@ async fn main() -> Result<()> {
                 cancel_result = cancel => {
                     match cancel_result? {
                         Ok((txid, _)) => {
-                            info!("Cancel transaction successfully published with id {}", txid)
+                            debug!("Cancel transaction successfully published with id {}", txid)
                         }
                         Err(CancelError::CancelTimelockNotExpiredYet) => error!(
                             "The Cancel Transaction cannot be published yet, \
@@ -353,7 +353,7 @@ async fn init_wallets(
                 monero_wallet_rpc_url
             ))?;
 
-        info!(
+        debug!(
             "Created Monero wallet for blockchain monitoring with name {}",
             MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME
         );

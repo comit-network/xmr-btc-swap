@@ -12,7 +12,7 @@ use futures::FutureExt;
 use libp2p::{core::Multiaddr, PeerId};
 use std::{convert::Infallible, sync::Arc};
 use tokio::sync::mpsc::{Receiver, Sender};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, trace};
 
 #[derive(Debug)]
 pub struct Channels<T> {
@@ -200,7 +200,7 @@ impl EventLoop {
                     if option.is_some() {
                            let peer_id = self.alice_peer_id;
                         if self.swarm.pt.is_connected(&peer_id) {
-                            debug!("Already connected to Alice: {}", peer_id);
+                            trace!("Already connected to Alice at {}", peer_id);
                             let _ = self.conn_established.send(peer_id).await;
                         } else {
                             info!("dialing alice: {}", peer_id);

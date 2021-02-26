@@ -89,14 +89,17 @@ impl Transfer for Wallet {
             .transfer(0, amount.as_piconero(), &destination_address.to_string())
             .await?;
 
-        let tx_hash = TxHash(res.tx_hash);
-        tracing::info!("Monero tx broadcasted!, tx hash: {:?}", tx_hash);
-        let tx_key = PrivateKey::from_str(&res.tx_key)?;
+        tracing::debug!(
+            "sent transfer of {} to {} in {}",
+            amount,
+            public_spend_key,
+            res.tx_hash
+        );
 
-        let transfer_proof = TransferProof::new(tx_hash, tx_key);
-        tracing::debug!("  Transfer proof: {:?}", transfer_proof);
-
-        Ok(transfer_proof)
+        Ok(TransferProof::new(
+            TxHash(res.tx_hash),
+            PrivateKey::from_str(&res.tx_key)?,
+        ))
     }
 }
 

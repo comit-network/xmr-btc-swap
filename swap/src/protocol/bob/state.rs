@@ -275,7 +275,7 @@ impl State2 {
     {
         let signed_tx_lock = bitcoin_wallet.sign_tx_lock(self.tx_lock.clone()).await?;
 
-        tracing::info!("{}", self.tx_lock.txid());
+        tracing::debug!("locking BTC in transaction {}", self.tx_lock.txid());
         let _ = bitcoin_wallet
             .broadcast_signed_transaction(signed_tx_lock)
             .await?;

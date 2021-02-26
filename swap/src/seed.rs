@@ -45,7 +45,7 @@ impl Seed {
             return Self::from_file(&file_path);
         }
 
-        tracing::info!("No seed file found, creating at: {}", file_path.display());
+        tracing::debug!("No seed file found, creating at: {}", file_path.display());
 
         let random_seed = Seed::random()?;
         random_seed.write_to(file_path.to_path_buf())?;
@@ -61,7 +61,7 @@ impl Seed {
         let contents = fs::read_to_string(file)?;
         let pem = pem::parse(contents)?;
 
-        tracing::info!("Read in seed from file: {}", file.display());
+        tracing::trace!("Read in seed from {}", file.display());
 
         Self::from_pem(pem)
     }

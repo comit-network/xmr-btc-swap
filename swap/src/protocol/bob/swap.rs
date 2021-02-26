@@ -12,7 +12,7 @@ use async_recursion::async_recursion;
 use rand::rngs::OsRng;
 use std::sync::Arc;
 use tokio::select;
-use tracing::info;
+use tracing::{trace, warn};
 use uuid::Uuid;
 
 pub fn is_complete(state: &BobState) -> bool {
@@ -61,7 +61,7 @@ async fn run_until_internal(
     swap_id: Uuid,
     execution_params: ExecutionParams,
 ) -> Result<BobState> {
-    info!("Current state: {}", state);
+    trace!("Current state: {}", state);
     if is_target_state(&state) {
         Ok(state)
     } else {
@@ -186,7 +186,7 @@ async fn run_until_internal(
                             match state4? {
                                 Ok(state4) => BobState::XmrLocked(state4),
                                 Err(InsufficientFunds {..}) => {
-                                     info!("The other party has locked insufficient Monero funds! Waiting for refund...");
+                                     warn!("The other party has locked insufficient Monero funds! Waiting for refund...");
                                      state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()).await?;
                                      let state4 = state.cancel();
                                      BobState::CancelTimelockExpired(state4)
