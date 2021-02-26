@@ -389,12 +389,14 @@ pub async fn request_quote_and_setup(
         .send_quote_request(QuoteRequest { btc_amount })
         .await?;
 
-    let quote_response = event_loop_handle.recv_quote_response().await?;
+    let xmr_amount = event_loop_handle.recv_quote_response().await?.xmr_amount;
+
+    tracing::info!("Quote for {} is {}", btc_amount, xmr_amount);
 
     let state0 = State0::new(
         &mut OsRng,
         btc_amount,
-        quote_response.xmr_amount,
+        xmr_amount,
         execution_params.bitcoin_cancel_timelock,
         execution_params.bitcoin_punish_timelock,
         bitcoin_refund_address,

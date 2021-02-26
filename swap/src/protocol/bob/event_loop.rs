@@ -72,7 +72,6 @@ impl EventLoopHandle {
     /// Dials other party and wait for the connection to be established.
     /// Do nothing if we are already connected
     pub async fn dial(&mut self) -> Result<()> {
-        debug!("Attempt to dial Alice");
         let _ = self.dial_alice.send(()).await?;
 
         self.conn_established

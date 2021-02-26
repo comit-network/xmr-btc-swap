@@ -59,7 +59,10 @@ impl From<RequestResponseEvent<QuoteRequest, QuoteResponse>> for OutEvent {
             RequestResponseEvent::OutboundFailure { error, .. } => {
                 OutEvent::Failure(anyhow!("Outbound failure: {:?}", error))
             }
-            RequestResponseEvent::ResponseSent { .. } => OutEvent::ResponseSent,
+            RequestResponseEvent::ResponseSent { peer, .. } => {
+                tracing::debug!("successfully sent quote response to {}", peer);
+                OutEvent::ResponseSent
+            }
         }
     }
 }
