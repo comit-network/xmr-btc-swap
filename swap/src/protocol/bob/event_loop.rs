@@ -7,12 +7,12 @@ use crate::{
         bob::{Behaviour, OutEvent, QuoteRequest, State0, State2},
     },
 };
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use futures::FutureExt;
 use libp2p::{core::Multiaddr, PeerId};
 use std::{convert::Infallible, sync::Arc};
 use tokio::sync::mpsc::{Receiver, Sender};
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, trace};
 
 #[derive(Debug)]
 pub struct Channels<T> {
@@ -203,12 +203,8 @@ impl EventLoop {
                             trace!("Already connected to Alice at {}", peer_id);
                             let _ = self.conn_established.send(peer_id).await;
                         } else {
-                            info!("dialing alice: {}", peer_id);
-                            if let Err(err) = libp2p::Swarm::dial(&mut self.swarm, &peer_id) {
-                                error!("Could not dial alice: {}", err);
-                                // TODO(Franck): If Dial fails then we should report it.
-                            }
-
+                            debug!("Dialing alice at {}", peer_id);
+                            libp2p::Swarm::dial(&mut self.swarm, &peer_id).context("failed to dial alice")?;
                         }
                     }
                 },
