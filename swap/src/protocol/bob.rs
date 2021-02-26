@@ -225,7 +225,9 @@ impl From<transfer_proof::OutEvent> for OutEvent {
                 channel,
             },
             AckSent => OutEvent::ResponseSent,
-            Failure(err) => OutEvent::CommunicationError(err.context("Failure with Transfer Proof")),
+            Failure(err) => {
+                OutEvent::CommunicationError(err.context("Failure with Transfer Proof"))
+            }
         }
     }
 }
@@ -235,7 +237,9 @@ impl From<encrypted_signature::OutEvent> for OutEvent {
         use encrypted_signature::OutEvent::*;
         match event {
             Acknowledged => OutEvent::EncryptedSignatureAcknowledged,
-            Failure(err) => OutEvent::CommunicationError(err.context("Failure with Encrypted Signature")),
+            Failure(err) => {
+                OutEvent::CommunicationError(err.context("Failure with Encrypted Signature"))
+            }
         }
     }
 }
