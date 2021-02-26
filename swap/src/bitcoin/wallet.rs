@@ -16,6 +16,7 @@ use bdk::{
     miniscript::bitcoin::PrivateKey,
     FeeRate,
 };
+use bitcoin::Script;
 use reqwest::{Method, Url};
 use serde::{Deserialize, Serialize};
 use std::{path::Path, sync::Arc, time::Duration};
@@ -120,14 +121,46 @@ impl Wallet {
 
         let mut tx_builder = wallet.build_tx();
         tx_builder.add_recipient(address.script_pubkey(), amount.as_sat());
-        tx_builder.fee_rate(FeeRate::from_sat_per_vb(5.0)); // todo: make dynamic
+        tx_builder.fee_rate(self.select_feerate());
         let (psbt, _details) = tx_builder.finish()?;
 
         Ok(psbt)
     }
 
+    /// Calculates the maximum "giveable" amount of this wallet.
+    ///
+    /// We define this as the maximum amount we can pay to a single output,
+    /// already accounting for the fees we need to spend to get the
+    /// transaction confirmed.
+    pub async fn max_giveable(&self) -> Result<Amount> {
+        let wallet = self.inner.lock().await;
+
+        let mut tx_builder = wallet.build_tx();
+
+        // create a dummy script to make the txbuilder pass
+        // we don't intend to send this transaction, we just want to know the max amount
+        // we can spend
+        let dummy_script = Script::default();
+        tx_builder.set_single_recipient(dummy_script);
+
+        tx_builder.drain_wallet();
+        tx_builder.fee_rate(self.select_feerate());
+        let (_, details) = tx_builder.finish()?;
+
+        let max_giveable = details.sent - details.fees;
+
+        Ok(Amount::from_sat(max_giveable))
+    }
+
     pub async fn get_network(&self) -> bitcoin::Network {
         self.inner.lock().await.network()
+    }
+
+    /// Selects an appropriate [`FeeRate`] to be used for getting transactions
+    /// confirmed within a reasonable amount of time.
+    fn select_feerate(&self) -> FeeRate {
+        // TODO: This should obviously not be a const :)
+        FeeRate::from_sat_per_vb(5.0)
     }
 }
 
