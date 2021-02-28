@@ -16,7 +16,7 @@ pub fn init_tracing(level: LevelFilter) -> Result<()> {
     let subscriber = FmtSubscriber::builder()
         .with_env_filter(format!(
             "swap={},monero_harness={},bitcoin_harness={},http=warn,warp=warn",
-            level, level, level,
+            level, level, level
         ))
         .with_writer(std::io::stderr)
         .with_ansi(is_terminal)

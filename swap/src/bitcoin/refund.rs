@@ -5,13 +5,14 @@ use crate::bitcoin::{
 use ::bitcoin::{util::bip143::SigHashCache, SigHash, SigHashType, Txid};
 use anyhow::{bail, Context, Result};
 use ecdsa_fun::Signature;
-use miniscript::DescriptorTrait;
+use miniscript::{Descriptor, DescriptorTrait};
 use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct TxRefund {
     inner: Transaction,
     digest: SigHash,
+    cancel_output_descriptor: Descriptor<::bitcoin::PublicKey>,
 }
 
 impl TxRefund {
@@ -28,6 +29,7 @@ impl TxRefund {
         Self {
             inner: tx_punish,
             digest,
+            cancel_output_descriptor: tx_cancel.output_descriptor.clone(),
         }
     }
 
@@ -41,7 +43,6 @@ impl TxRefund {
 
     pub fn add_signatures(
         self,
-        tx_cancel: &TxCancel,
         (A, sig_a): (PublicKey, Signature),
         (B, sig_b): (PublicKey, Signature),
     ) -> Result<Transaction> {
@@ -65,8 +66,7 @@ impl TxRefund {
         };
 
         let mut tx_refund = self.inner;
-        tx_cancel
-            .output_descriptor
+        self.cancel_output_descriptor
             .satisfy(&mut tx_refund.input[0], satisfier)?;
 
         Ok(tx_refund)

@@ -1,8 +1,8 @@
 use crate::{
     bitcoin::{
-        timelocks::BlockHeight, Address, Amount, BroadcastSignedTransaction, BuildTxLockPsbt,
-        GetBlockHeight, GetNetwork, GetRawTransaction, SignTxLock, Transaction,
-        TransactionBlockHeight, TxLock, WaitForTransactionFinality, WatchForRawTransaction,
+        timelocks::BlockHeight, Address, Amount, BroadcastSignedTransaction, GetBlockHeight,
+        GetRawTransaction, SignTxLock, Transaction, TransactionBlockHeight, TxLock,
+        WaitForTransactionFinality, WatchForRawTransaction,
     },
     execution_params::ExecutionParams,
 };
@@ -16,6 +16,7 @@ use bdk::{
     miniscript::bitcoin::PrivateKey,
     FeeRate,
 };
+use bitcoin::Script;
 use reqwest::{Method, Url};
 use serde::{Deserialize, Serialize};
 use std::{path::Path, sync::Arc, time::Duration};
@@ -38,10 +39,9 @@ enum Error {
 }
 
 pub struct Wallet {
-    pub inner: Arc<Mutex<bdk::Wallet<ElectrumBlockchain, bdk::sled::Tree>>>,
-    pub network: bitcoin::Network,
-    pub http_url: Url,
-    pub rpc_url: Url,
+    inner: Arc<Mutex<bdk::Wallet<ElectrumBlockchain, bdk::sled::Tree>>>,
+    http_url: Url,
+    rpc_url: Url,
 }
 
 impl Wallet {
@@ -70,7 +70,6 @@ impl Wallet {
 
         Ok(Self {
             inner: Arc::new(Mutex::new(bdk_wallet)),
-            network,
             http_url: electrum_http_url,
             rpc_url: electrum_rpc_url,
         })
@@ -82,11 +81,9 @@ impl Wallet {
     }
 
     pub async fn new_address(&self) -> Result<Address> {
-        self.inner
-            .lock()
-            .await
-            .get_new_address()
-            .map_err(Into::into)
+        let address = self.inner.lock().await.get_new_address()?;
+
+        Ok(address)
     }
 
     pub async fn get_tx(&self, txid: Txid) -> Result<Option<Transaction>> {
@@ -111,28 +108,59 @@ impl Wallet {
     }
 
     pub async fn sync_wallet(&self) -> Result<()> {
-        tracing::debug!("syncing wallet");
         self.inner.lock().await.sync(noop_progress(), None)?;
         Ok(())
     }
-}
 
-#[async_trait]
-impl BuildTxLockPsbt for Wallet {
-    async fn build_tx_lock_psbt(
+    pub async fn send_to_address(
         &self,
-        output_address: Address,
-        output_amount: Amount,
+        address: Address,
+        amount: Amount,
     ) -> Result<PartiallySignedTransaction> {
-        tracing::debug!("building tx lock");
         let wallet = self.inner.lock().await;
 
         let mut tx_builder = wallet.build_tx();
-        tx_builder.add_recipient(output_address.script_pubkey(), output_amount.as_sat());
-        tx_builder.fee_rate(FeeRate::from_sat_per_vb(5.0)); // todo: get actual fee
+        tx_builder.add_recipient(address.script_pubkey(), amount.as_sat());
+        tx_builder.fee_rate(self.select_feerate());
         let (psbt, _details) = tx_builder.finish()?;
-        tracing::debug!("tx lock built");
+
         Ok(psbt)
+    }
+
+    /// Calculates the maximum "giveable" amount of this wallet.
+    ///
+    /// We define this as the maximum amount we can pay to a single output,
+    /// already accounting for the fees we need to spend to get the
+    /// transaction confirmed.
+    pub async fn max_giveable(&self) -> Result<Amount> {
+        let wallet = self.inner.lock().await;
+
+        let mut tx_builder = wallet.build_tx();
+
+        // create a dummy script to make the txbuilder pass
+        // we don't intend to send this transaction, we just want to know the max amount
+        // we can spend
+        let dummy_script = Script::default();
+        tx_builder.set_single_recipient(dummy_script);
+
+        tx_builder.drain_wallet();
+        tx_builder.fee_rate(self.select_feerate());
+        let (_, details) = tx_builder.finish()?;
+
+        let max_giveable = details.sent - details.fees;
+
+        Ok(Amount::from_sat(max_giveable))
+    }
+
+    pub async fn get_network(&self) -> bitcoin::Network {
+        self.inner.lock().await.network()
+    }
+
+    /// Selects an appropriate [`FeeRate`] to be used for getting transactions
+    /// confirmed within a reasonable amount of time.
+    fn select_feerate(&self) -> FeeRate {
+        // TODO: This should obviously not be a const :)
+        FeeRate::from_sat_per_vb(5.0)
     }
 }
 
@@ -285,13 +313,6 @@ impl WaitForTransactionFinality for Wallet {
         }
 
         Ok(())
-    }
-}
-
-#[async_trait]
-impl GetNetwork for Wallet {
-    async fn get_network(&self) -> bitcoin::Network {
-        self.inner.lock().await.network()
     }
 }
 

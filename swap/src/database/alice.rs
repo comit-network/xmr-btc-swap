@@ -205,7 +205,7 @@ impl From<Alice> for AliceState {
                 let tx_refund = TxRefund::new(&tx_cancel, &state3.refund_address);
                 AliceState::BtcPunishable {
                     monero_wallet_restore_blockheight,
-                    tx_refund,
+                    tx_refund: Box::new(tx_refund),
                     state3: Box::new(state3),
                 }
             }

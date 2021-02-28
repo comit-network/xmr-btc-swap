@@ -343,7 +343,7 @@ async fn run_until_internal(
                 match published_refund_tx {
                     None => {
                         let state = AliceState::BtcPunishable {
-                            tx_refund,
+                            tx_refund: Box::new(tx_refund),
                             state3,
                             monero_wallet_restore_blockheight,
                         };
@@ -366,7 +366,7 @@ async fn run_until_internal(
                     Some(published_refund_tx) => {
                         let spend_key = extract_monero_private_key(
                             published_refund_tx,
-                            tx_refund,
+                            &tx_refund,
                             state3.s_a,
                             state3.a.clone(),
                             state3.S_b_bitcoin,
@@ -445,7 +445,7 @@ async fn run_until_internal(
                     Either::Left((published_refund_tx, _)) => {
                         let spend_key = extract_monero_private_key(
                             published_refund_tx?,
-                            tx_refund,
+                            &tx_refund,
                             state3.s_a,
                             state3.a.clone(),
                             state3.S_b_bitcoin,

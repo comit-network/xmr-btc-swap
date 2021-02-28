@@ -1,9 +1,8 @@
 use crate::{
     bitcoin::{
         self, current_epoch, wait_for_cancel_timelock_to_expire, BroadcastSignedTransaction,
-        BuildTxLockPsbt, CancelTimelock, ExpiredTimelocks, GetBlockHeight, GetNetwork,
-        GetRawTransaction, PunishTimelock, Transaction, TransactionBlockHeight, TxCancel, Txid,
-        WatchForRawTransaction,
+        CancelTimelock, ExpiredTimelocks, GetBlockHeight, GetRawTransaction, PunishTimelock,
+        Transaction, TransactionBlockHeight, TxCancel, Txid, WatchForRawTransaction,
     },
     execution_params::ExecutionParams,
     monero,
@@ -140,10 +139,7 @@ impl State0 {
         }
     }
 
-    pub async fn receive<W>(self, wallet: &W, msg: Message1) -> Result<State1>
-    where
-        W: BuildTxLockPsbt + GetNetwork,
-    {
+    pub async fn receive(self, wallet: &bitcoin::Wallet, msg: Message1) -> Result<State1> {
         let valid = CROSS_CURVE_PROOF_SYSTEM.verify(
             &msg.dleq_proof_s_a,
             (
@@ -459,7 +455,7 @@ impl State4 {
 
         let tx_cancel = tx_cancel
             .clone()
-            .add_signatures(&self.tx_lock, (self.A, sig_a), (self.b.public(), sig_b))
+            .add_signatures((self.A, sig_a), (self.b.public(), sig_b))
             .expect(
                 "sig_{a,b} to be valid signatures for
                 tx_cancel",
@@ -482,7 +478,7 @@ impl State4 {
 
         let tx_cancel = tx_cancel
             .clone()
-            .add_signatures(&self.tx_lock, (self.A, sig_a), (self.b.public(), sig_b))
+            .add_signatures((self.A, sig_a), (self.b.public(), sig_b))
             .expect(
                 "sig_{a,b} to be valid signatures for
                 tx_cancel",
@@ -562,11 +558,8 @@ impl State4 {
         let sig_a =
             adaptor.decrypt_signature(&self.s_b.to_secpfun_scalar(), self.tx_refund_encsig.clone());
 
-        let signed_tx_refund = tx_refund.add_signatures(
-            &tx_cancel.clone(),
-            (self.A, sig_a),
-            (self.b.public(), sig_b),
-        )?;
+        let signed_tx_refund =
+            tx_refund.add_signatures((self.A, sig_a), (self.b.public(), sig_b))?;
 
         let txid = bitcoin_wallet
             .broadcast_signed_transaction(signed_tx_refund)

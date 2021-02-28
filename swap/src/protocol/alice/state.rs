@@ -53,7 +53,7 @@ pub enum AliceState {
     },
     BtcPunishable {
         monero_wallet_restore_blockheight: BlockHeight,
-        tx_refund: TxRefund,
+        tx_refund: Box<TxRefund>,
         state3: Box<State3>,
     },
     XmrRefunded,

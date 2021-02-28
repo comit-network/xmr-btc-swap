@@ -5,13 +5,14 @@ use crate::bitcoin::{
 use ::bitcoin::{util::bip143::SigHashCache, SigHash, SigHashType, Txid};
 use anyhow::{bail, Context, Result};
 use ecdsa_fun::Signature;
-use miniscript::DescriptorTrait;
+use miniscript::{Descriptor, DescriptorTrait};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct TxRedeem {
     inner: Transaction,
     digest: SigHash,
+    lock_output_descriptor: Descriptor<::bitcoin::PublicKey>,
 }
 
 impl TxRedeem {
@@ -30,6 +31,7 @@ impl TxRedeem {
         Self {
             inner: tx_redeem,
             digest,
+            lock_output_descriptor: tx_lock.output_descriptor.clone(),
         }
     }
 
@@ -43,7 +45,6 @@ impl TxRedeem {
 
     pub fn add_signatures(
         self,
-        tx_lock: &TxLock,
         (A, sig_a): (PublicKey, Signature),
         (B, sig_b): (PublicKey, Signature),
     ) -> Result<Transaction> {
@@ -67,8 +68,7 @@ impl TxRedeem {
         };
 
         let mut tx_redeem = self.inner;
-        tx_lock
-            .output_descriptor
+        self.lock_output_descriptor
             .satisfy(&mut tx_redeem.input[0], satisfier)?;
 
         Ok(tx_redeem)

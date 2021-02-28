@@ -15,10 +15,11 @@
 use anyhow::{Context, Result};
 use prettytable::{row, Table};
 use reqwest::Url;
-use std::{path::Path, sync::Arc};
+use std::{path::Path, sync::Arc, time::Duration};
 use structopt::StructOpt;
 use swap::{
     bitcoin,
+    bitcoin::Amount,
     cli::{
         command::{Arguments, Cancel, Command, Refund, Resume},
         config::{read_config, Config},
@@ -35,7 +36,7 @@ use swap::{
     seed::Seed,
     trace::init_tracing,
 };
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use tracing_subscriber::filter::LevelFilter;
 use uuid::Uuid;
 
@@ -82,7 +83,6 @@ async fn main() -> Result<()> {
         Command::BuyXmr {
             alice_peer_id,
             alice_addr,
-            send_bitcoin,
         } => {
             let (bitcoin_wallet, monero_wallet) = init_wallets(
                 config,
@@ -94,22 +94,30 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            let swap_id = Uuid::new_v4();
+            // TODO: Also wait for more funds if balance < dust
+            if bitcoin_wallet.balance().await? == Amount::ZERO {
+                debug!(
+                    "Waiting for BTC at address {}",
+                    bitcoin_wallet.new_address().await?
+                );
 
-            info!(
-                "Swap buy XMR with {} started with ID {}",
-                send_bitcoin, swap_id
-            );
+                while bitcoin_wallet.balance().await? == Amount::ZERO {
+                    bitcoin_wallet.sync_wallet().await?;
 
-            info!(
-                "BTC deposit address: {}",
-                bitcoin_wallet.new_address().await?
-            );
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                }
+
+                debug!("Received {}", bitcoin_wallet.balance().await?);
+            }
+
+            let send_bitcoin = bitcoin_wallet.max_giveable().await?;
+
+            info!("Swapping {} ...", send_bitcoin);
 
             let bob_factory = Builder::new(
                 seed,
                 db,
-                swap_id,
+                Uuid::new_v4(),
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
                 alice_addr,

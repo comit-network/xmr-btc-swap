@@ -1,5 +1,3 @@
-use crate::bitcoin;
-use anyhow::Result;
 use libp2p::{core::Multiaddr, PeerId};
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -32,9 +30,6 @@ pub enum Command {
             default_value = DEFAULT_ALICE_MULTIADDR
         )]
         alice_addr: Multiaddr,
-
-        #[structopt(long = "send-btc", help = "Bitcoin amount as floating point nr without denomination (e.g. 1.25)", parse(try_from_str = parse_btc))]
-        send_bitcoin: bitcoin::Amount,
     },
     History,
     Resume(Resume),
@@ -101,9 +96,4 @@ pub enum Refund {
         #[structopt(short, long)]
         force: bool,
     },
-}
-
-fn parse_btc(str: &str) -> Result<bitcoin::Amount> {
-    let amount = bitcoin::Amount::from_str_in(str, ::bitcoin::Denomination::Bitcoin)?;
-    Ok(amount)
 }
