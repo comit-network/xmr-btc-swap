@@ -84,3 +84,16 @@ pub enum Command {
         force: bool,
     },
 }
+
+impl Default for Command {
+    fn default() -> Self {
+        Self::BuyXmr {
+            alice_peer_id: DEFAULT_ALICE_PEER_ID
+                .parse()
+                .expect("default alice peer id  str is a valid Multiaddr>"),
+            alice_addr: DEFAULT_ALICE_MULTIADDR
+                .parse()
+                .expect("default alice multiaddr str is a valid PeerId"),
+        }
+    }
+}
