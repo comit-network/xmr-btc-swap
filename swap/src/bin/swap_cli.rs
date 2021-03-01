@@ -52,6 +52,9 @@ async fn main() -> Result<()> {
         .with_writer(std::io::stderr)
         .with_ansi(is_terminal)
         .with_target(false)
+        .with_timer(tracing_subscriber::fmt::time::ChronoLocal::with_format(
+            "%F %T".to_owned(),
+        ))
         .finish();
 
     tracing::subscriber::set_global_default(subscriber)?;
