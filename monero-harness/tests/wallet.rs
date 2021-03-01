@@ -1,6 +1,7 @@
 use crate::testutils::init_tracing;
-use monero_harness::Monero;
+use monero_harness::{Monero, MoneroWalletRpc};
 use spectral::prelude::*;
+use std::{thread::sleep, time::Duration};
 use testcontainers::clients::Cli;
 
 mod testutils;
@@ -22,9 +23,6 @@ async fn fund_transfer_and_check_tx_key() {
     .unwrap();
     let alice_wallet = monero.wallet("alice").unwrap();
     let bob_wallet = monero.wallet("bob").unwrap();
-    let miner_wallet = monero.wallet("miner").unwrap();
-
-    let miner_address = miner_wallet.address().await.unwrap().address;
 
     // fund alice
     monero
@@ -33,7 +31,6 @@ async fn fund_transfer_and_check_tx_key() {
         .unwrap();
 
     // check alice balance
-    alice_wallet.refresh().await.unwrap();
     let got_alice_balance = alice_wallet.balance().await.unwrap();
     assert_that(&got_alice_balance).is_equal_to(fund_alice);
 
@@ -44,14 +41,8 @@ async fn fund_transfer_and_check_tx_key() {
         .await
         .unwrap();
 
-    monero
-        .monerod()
-        .client()
-        .generate_blocks(10, &miner_address)
-        .await
-        .unwrap();
+    wait_for_wallet_to_catch_up(bob_wallet, send_to_bob).await;
 
-    bob_wallet.refresh().await.unwrap();
     let got_bob_balance = bob_wallet.balance().await.unwrap();
     assert_that(&got_bob_balance).is_equal_to(send_to_bob);
 
@@ -65,4 +56,17 @@ async fn fund_transfer_and_check_tx_key() {
         .expect("failed to check tx by key");
 
     assert_that!(res.received).is_equal_to(send_to_bob);
+}
+
+async fn wait_for_wallet_to_catch_up(wallet: &MoneroWalletRpc, expected_balance: u64) {
+    let max_retry = 15;
+    let mut retry = 0;
+    loop {
+        retry += 1;
+        let balance = wallet.balance().await.unwrap();
+        if balance == expected_balance || max_retry == retry {
+            break;
+        }
+        sleep(Duration::from_secs(1));
+    }
 }
