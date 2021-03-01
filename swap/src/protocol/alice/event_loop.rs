@@ -16,7 +16,7 @@ use crate::{
     },
     seed::Seed,
 };
-use anyhow::{anyhow, Context, Result};
+use anyhow::{bail, Context, Result};
 use futures::future::RemoteHandle;
 use libp2p::{
     core::Multiaddr, futures::FutureExt, request_response::ResponseChannel, PeerId, Swarm,
@@ -221,19 +221,19 @@ where
         let xmr_amount = rate.sell_quote(btc_amount)?;
 
         if xmr_amount > self.max_sell {
-            anyhow!(MaximumSellAmountExceeded {
+            bail!(MaximumSellAmountExceeded {
                 actual: xmr_amount,
                 max_sell: self.max_sell
-            });
+            })
         }
 
         let xmr_balance = monero_wallet.get_balance().await?;
         let xmr_lock_fees = monero_wallet.static_tx_fee_estimate();
 
         if xmr_balance < xmr_amount + xmr_lock_fees {
-            anyhow!(BalanceTooLow {
+            bail!(BalanceTooLow {
                 balance: xmr_balance
-            });
+            })
         }
 
         let quote_response = QuoteResponse { xmr_amount };
