@@ -19,7 +19,7 @@ use std::{path::Path, sync::Arc, time::Duration};
 use structopt::StructOpt;
 use swap::{
     bitcoin,
-    bitcoin::Amount,
+    bitcoin::{Amount, TxLock},
     cli::{
         command::{Arguments, Command},
         config::{read_config, Config},
@@ -112,7 +112,7 @@ async fn main() -> Result<()> {
                 debug!("Received {}", bitcoin_wallet.balance().await?);
             }
 
-            let send_bitcoin = bitcoin_wallet.max_giveable().await?;
+            let send_bitcoin = bitcoin_wallet.max_giveable(TxLock::script_size()).await?;
 
             info!("Swapping {} ...", send_bitcoin);
 

@@ -132,17 +132,13 @@ impl Wallet {
     /// We define this as the maximum amount we can pay to a single output,
     /// already accounting for the fees we need to spend to get the
     /// transaction confirmed.
-    pub async fn max_giveable(&self) -> Result<Amount> {
+    pub async fn max_giveable(&self, locking_script_size: usize) -> Result<Amount> {
         let wallet = self.inner.lock().await;
 
         let mut tx_builder = wallet.build_tx();
 
-        // create a dummy script to make the txbuilder pass
-        // we don't intend to send this transaction, we just want to know the max amount
-        // we can spend
-        let dummy_script = Script::default();
+        let dummy_script = Script::from(vec![0u8; locking_script_size]);
         tx_builder.set_single_recipient(dummy_script);
-
         tx_builder.drain_wallet();
         tx_builder.fee_rate(self.select_feerate());
         let (_, details) = tx_builder.finish()?;
