@@ -128,8 +128,16 @@ async fn main() -> Result<()> {
             );
             let (swap, event_loop) = bob_factory.with_init_params(send_bitcoin).build().await?;
 
-            tokio::spawn(async move { event_loop.run().await });
-            bob::run(swap).await?;
+            let handle = tokio::spawn(async move { event_loop.run().await });
+            let swap = bob::run(swap);
+            tokio::select! {
+                event_loop_result = handle => {
+                    event_loop_result??;
+                },
+                swap_result = swap => {
+                    swap_result?;
+                }
+            }
         }
         Command::History => {
             let mut table = Table::new();
@@ -169,9 +177,16 @@ async fn main() -> Result<()> {
                 execution_params,
             );
             let (swap, event_loop) = bob_factory.build().await?;
-
-            tokio::spawn(async move { event_loop.run().await });
-            bob::run(swap).await?;
+            let handle = tokio::spawn(async move { event_loop.run().await });
+            let swap = bob::run(swap);
+            tokio::select! {
+                event_loop_result = handle => {
+                    event_loop_result??;
+                },
+                swap_result = swap => {
+                    swap_result?;
+                }
+            }
         }
         Command::Cancel {
             swap_id,
@@ -201,27 +216,33 @@ async fn main() -> Result<()> {
                 execution_params,
             );
             let (swap, event_loop) = bob_factory.build().await?;
+            let handle = tokio::spawn(async move { event_loop.run().await });
 
-            tokio::spawn(async move { event_loop.run().await });
-
-            match bob::cancel(
+            let cancel = bob::cancel(
                 swap.swap_id,
                 swap.state,
                 swap.bitcoin_wallet,
                 swap.db,
                 force,
-            )
-            .await?
-            {
-                Ok((txid, _)) => {
-                    info!("Cancel transaction successfully published with id {}", txid)
-                }
-                Err(CancelError::CancelTimelockNotExpiredYet) => error!(
-                    "The Cancel Transaction cannot be published yet, \
-                    because the timelock has not expired. Please try again later."
-                ),
-                Err(CancelError::CancelTxAlreadyPublished) => {
-                    warn!("The Cancel Transaction has already been published.")
+            );
+
+            tokio::select! {
+                event_loop_result = handle => {
+                    event_loop_result??;
+                },
+                cancel_result = cancel => {
+                    match cancel_result? {
+                        Ok((txid, _)) => {
+                            info!("Cancel transaction successfully published with id {}", txid)
+                        }
+                        Err(CancelError::CancelTimelockNotExpiredYet) => error!(
+                            "The Cancel Transaction cannot be published yet, \
+                            because the timelock has not expired. Please try again later."
+                        ),
+                        Err(CancelError::CancelTxAlreadyPublished) => {
+                            warn!("The Cancel Transaction has already been published.")
+                        }
+                    }
                 }
             }
         }
@@ -254,19 +275,26 @@ async fn main() -> Result<()> {
             );
             let (swap, event_loop) = bob_factory.build().await?;
 
-            tokio::spawn(async move { event_loop.run().await });
-            bob::refund(
+            let handle = tokio::spawn(async move { event_loop.run().await });
+            let refund = bob::refund(
                 swap.swap_id,
                 swap.state,
                 swap.execution_params,
                 swap.bitcoin_wallet,
                 swap.db,
                 force,
-            )
-            .await??;
+            );
+
+            tokio::select! {
+                event_loop_result = handle => {
+                    event_loop_result??;
+                },
+                refund_result = refund => {
+                    refund_result??;
+                }
+            }
         }
     };
-
     Ok(())
 }
 

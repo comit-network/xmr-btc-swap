@@ -7,10 +7,10 @@ use crate::{
         bob::{Behaviour, OutEvent, QuoteRequest, State0, State2},
     },
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use futures::FutureExt;
 use libp2p::{core::Multiaddr, PeerId};
-use std::sync::Arc;
+use std::{convert::Infallible, sync::Arc};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{debug, error, info};
 
@@ -167,7 +167,7 @@ impl EventLoop {
         Ok((event_loop, handle))
     }
 
-    pub async fn run(mut self) {
+    pub async fn run(mut self) -> Result<Infallible> {
         loop {
             tokio::select! {
                 swarm_event = self.swarm.next().fuse() => {
@@ -192,8 +192,8 @@ impl EventLoop {
                             debug!("Alice acknowledged encrypted signature");
                         }
                         OutEvent::ResponseSent => {}
-                        OutEvent::Failure(err) => {
-                            error!("Communication error: {:#}", err)
+                        OutEvent::CommunicationError(err) => {
+                            bail!("Communication error: {:#}", err)
                         }
                     }
                 },
