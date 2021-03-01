@@ -3,7 +3,9 @@ use crate::bitcoin::{
 };
 use ::bitcoin::{util::psbt::PartiallySignedTransaction, OutPoint, TxIn, TxOut, Txid};
 use anyhow::Result;
+use ecdsa_fun::fun::Point;
 use miniscript::{Descriptor, DescriptorTrait};
+use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -40,6 +42,16 @@ impl TxLock {
         // realistic
         #[allow(clippy::cast_possible_truncation)]
         OutPoint::new(self.txid(), self.lock_output_vout() as u32)
+    }
+
+    /// Calculate the size of the script used by this transaction.
+    pub fn script_size() -> usize {
+        build_shared_output_descriptor(
+            Point::random(&mut thread_rng()),
+            Point::random(&mut thread_rng()),
+        )
+        .script_pubkey()
+        .len()
     }
 
     /// Retreive the index of the locked output in the transaction outputs
