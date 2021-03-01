@@ -1,5 +1,5 @@
 use ::monero::Network;
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use async_compression::tokio::bufread::BzDecoder;
 use big_bytes::BigByte;
 use futures::{StreamExt, TryStreamExt};
@@ -30,6 +30,10 @@ const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-linux-x64
 compile_error!("unsupported operating system");
 
 const PACKED_FILE: &str = "monero-wallet-rpc";
+
+#[derive(Debug, Clone, Copy, thiserror::Error)]
+#[error("monero wallet rpc executable not found in downloaded archive")]
+pub struct ExecutableNotFoundInArchive;
 
 pub struct WalletRpcProcess {
     _child: Child,
@@ -109,17 +113,22 @@ impl WalletRpc {
             let mut ar = Archive::new(file);
             let mut entries = ar.entries()?;
 
-            while let Some(file) = entries.next().await {
-                let mut f = file?;
-                if f.path()?
-                    .to_str()
-                    .context("Could not find convert path to str in tar ball")?
-                    .contains(PACKED_FILE)
-                {
-                    f.unpack(monero_wallet_rpc.exec_path()).await?;
+            loop {
+                match entries.next().await {
+                    Some(file) => {
+                        let mut f = file?;
+                        if f.path()?
+                            .to_str()
+                            .context("Could not find convert path to str in tar ball")?
+                            .contains(PACKED_FILE)
+                        {
+                            f.unpack(monero_wallet_rpc.exec_path()).await?;
+                            break;
+                        }
+                    }
+                    None => bail!(ExecutableNotFoundInArchive),
                 }
             }
-
             remove_file(monero_wallet_rpc.tar_path()).await?;
         }
 
