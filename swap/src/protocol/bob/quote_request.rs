@@ -36,10 +36,7 @@ pub struct Behaviour {
 
 impl Behaviour {
     pub fn send(&mut self, alice: PeerId, quote_request: QuoteRequest) -> Result<RequestId> {
-        debug!(
-            "Requesting quote for {} from {}",
-            quote_request.btc_amount, alice
-        );
+        debug!("Requesting quote for {}", quote_request.btc_amount);
 
         let id = self.rr.send_request(&alice, quote_request);
 
