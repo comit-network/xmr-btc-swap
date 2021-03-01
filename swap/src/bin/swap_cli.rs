@@ -21,7 +21,7 @@ use swap::{
     bitcoin,
     bitcoin::Amount,
     cli::{
-        command::{Arguments, Cancel, Command, Refund, Resume},
+        command::{Arguments, Command},
         config::{read_config, Config},
     },
     database::Database,
@@ -79,7 +79,7 @@ async fn main() -> Result<()> {
         .run(monero_network, "stagenet.community.xmr.to")
         .await?;
 
-    match opt.cmd {
+    match opt.cmd.unwrap_or_default() {
         Command::BuyXmr {
             alice_peer_id,
             alice_addr,
@@ -93,6 +93,8 @@ async fn main() -> Result<()> {
                 monero_wallet_rpc_process.endpoint(),
             )
             .await?;
+
+            let swap_id = Uuid::new_v4();
 
             // TODO: Also wait for more funds if balance < dust
             if bitcoin_wallet.balance().await? == Amount::ZERO {
@@ -117,7 +119,7 @@ async fn main() -> Result<()> {
             let bob_factory = Builder::new(
                 seed,
                 db,
-                Uuid::new_v4(),
+                swap_id,
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
                 alice_addr,
@@ -141,11 +143,11 @@ async fn main() -> Result<()> {
             // Print the table to stdout
             table.printstd();
         }
-        Command::Resume(Resume::BuyXmr {
+        Command::Resume {
             swap_id,
             alice_peer_id,
             alice_addr,
-        }) => {
+        } => {
             let (bitcoin_wallet, monero_wallet) = init_wallets(
                 config,
                 bitcoin_network,
@@ -171,12 +173,12 @@ async fn main() -> Result<()> {
             tokio::spawn(async move { event_loop.run().await });
             bob::run(swap).await?;
         }
-        Command::Cancel(Cancel::BuyXmr {
+        Command::Cancel {
             swap_id,
             alice_peer_id,
             alice_addr,
             force,
-        }) => {
+        } => {
             // TODO: Optimization: Only init the Bitcoin wallet, Monero wallet unnecessary
             let (bitcoin_wallet, monero_wallet) = init_wallets(
                 config,
@@ -223,12 +225,12 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        Command::Refund(Refund::BuyXmr {
+        Command::Refund {
             swap_id,
             alice_peer_id,
             alice_addr,
             force,
-        }) => {
+        } => {
             let (bitcoin_wallet, monero_wallet) = init_wallets(
                 config,
                 bitcoin_network,
