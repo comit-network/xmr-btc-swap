@@ -59,9 +59,9 @@ async fn main() -> Result<()> {
 
     tracing::subscriber::set_global_default(subscriber)?;
 
-    let opt = Arguments::from_args();
+    let args = Arguments::from_args();
 
-    let config = match opt.config {
+    let config = match args.config {
         Some(config_path) => read_config(config_path)??,
         None => Config::testnet(),
     };
@@ -89,7 +89,7 @@ async fn main() -> Result<()> {
         .run(monero_network, "stagenet.community.xmr.to")
         .await?;
 
-    match opt.cmd.unwrap_or_default() {
+    match args.cmd.unwrap_or_default() {
         Command::BuyXmr {
             alice_peer_id,
             alice_addr,
