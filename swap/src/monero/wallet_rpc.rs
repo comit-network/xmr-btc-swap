@@ -1,8 +1,9 @@
 use ::monero::Network;
 use anyhow::{Context, Result};
 use async_compression::tokio::bufread::BzDecoder;
+use big_bytes::BigByte;
 use futures::{StreamExt, TryStreamExt};
-use reqwest::Url;
+use reqwest::{header::CONTENT_LENGTH, Url};
 use std::{
     io::ErrorKind,
     path::{Path, PathBuf},
@@ -71,8 +72,19 @@ impl WalletRpc {
                 .open(monero_wallet_rpc.tar_path())
                 .await?;
 
-            let byte_stream = reqwest::get(DOWNLOAD_URL)
-                .await?
+            let response = reqwest::get(DOWNLOAD_URL).await?;
+
+            let content_length = response.headers()[CONTENT_LENGTH]
+                .to_str()
+                .context("failed to convert content-length to string")?
+                .parse::<u64>()?;
+
+            tracing::info!(
+                "Downloading monero-wallet-rpc ({})",
+                content_length.big_byte(2)
+            );
+
+            let byte_stream = response
                 .bytes_stream()
                 .map_err(|err| std::io::Error::new(ErrorKind::Other, err));
 
@@ -119,6 +131,8 @@ impl WalletRpc {
             .local_addr()?
             .port();
 
+        tracing::debug!("Starting monero-wallet-rpc on port {}", port);
+
         let mut child = Command::new(self.exec_path())
             .stdout(Stdio::piped())
             .kill_on_drop(true)
@@ -148,6 +162,7 @@ impl WalletRpc {
                 break;
             }
         }
+
         Ok(WalletRpcProcess {
             _child: child,
             port,

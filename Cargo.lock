@@ -303,6 +303,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdcf67bb7ba7797a081cd19009948ab533af7c355d5caf1d08c777582d351e9c"
 
 [[package]]
+name = "big-bytes"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4d73a8ae8ce52d09395e4cafc83b5b81c3deb70a97740e907669c8683c4dd50a"
+
+[[package]]
 name = "bincode"
 version = "1.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3525,6 +3531,7 @@ dependencies = [
  "backoff",
  "base64 0.12.3",
  "bdk",
+ "big-bytes",
  "bitcoin",
  "bitcoin-harness",
  "config",
