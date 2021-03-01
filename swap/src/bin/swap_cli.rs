@@ -35,7 +35,7 @@ use swap::{
     },
     seed::Seed,
 };
-use tracing::{debug, error, warn, Level};
+use tracing::{debug, error, info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 use uuid::Uuid;
 
@@ -46,20 +46,33 @@ const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-mon
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let is_terminal = atty::is(atty::Stream::Stderr);
-    let subscriber = FmtSubscriber::builder()
-        .with_env_filter(format!("swap={}", Level::DEBUG))
-        .with_writer(std::io::stderr)
-        .with_ansi(is_terminal)
-        .with_target(false)
-        .with_timer(tracing_subscriber::fmt::time::ChronoLocal::with_format(
-            "%F %T".to_owned(),
-        ))
-        .finish();
-
-    tracing::subscriber::set_global_default(subscriber)?;
-
     let args = Arguments::from_args();
+
+    let is_terminal = atty::is(atty::Stream::Stderr);
+    let base_subscriber = |level| {
+        FmtSubscriber::builder()
+            .with_writer(std::io::stderr)
+            .with_ansi(is_terminal)
+            .with_target(false)
+            .with_env_filter(format!("swap={}", level))
+    };
+
+    if args.debug {
+        let subscriber = base_subscriber(Level::DEBUG)
+            .with_timer(tracing_subscriber::fmt::time::ChronoLocal::with_format(
+                "%F %T".to_owned(),
+            ))
+            .finish();
+
+        tracing::subscriber::set_global_default(subscriber)?;
+    } else {
+        let subscriber = base_subscriber(Level::INFO)
+            .without_time()
+            .with_level(false)
+            .finish();
+
+        tracing::subscriber::set_global_default(subscriber)?;
+    }
 
     let config = match args.config {
         Some(config_path) => read_config(config_path)??,
@@ -108,8 +121,8 @@ async fn main() -> Result<()> {
 
             // TODO: Also wait for more funds if balance < dust
             if bitcoin_wallet.balance().await? == Amount::ZERO {
-                debug!(
-                    "Waiting for BTC at address {}",
+                info!(
+                    "Please deposit BTC to {}",
                     bitcoin_wallet.new_address().await?
                 );
 
@@ -121,7 +134,7 @@ async fn main() -> Result<()> {
 
                 debug!("Received {}", bitcoin_wallet.balance().await?);
             } else {
-                debug!(
+                info!(
                     "Still got {} left in wallet, swapping ...",
                     bitcoin_wallet.balance().await?
                 );

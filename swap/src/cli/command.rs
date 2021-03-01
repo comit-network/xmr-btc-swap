@@ -14,6 +14,9 @@ pub struct Arguments {
     )]
     pub config: Option<PathBuf>,
 
+    #[structopt(long, help = "Activate debug logging.")]
+    pub debug: bool,
+
     #[structopt(subcommand)]
     pub cmd: Option<Command>,
 }
