@@ -97,3 +97,28 @@ impl Default for Command {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::cli::command::{Command, DEFAULT_ALICE_MULTIADDR, DEFAULT_ALICE_PEER_ID};
+    use libp2p::{core::Multiaddr, PeerId};
+
+    #[test]
+    fn parse_default_alice_peer_id_success() {
+        DEFAULT_ALICE_PEER_ID
+            .parse::<PeerId>()
+            .expect("default alice peer id str is a valid PeerId");
+    }
+
+    #[test]
+    fn parse_default_alice_multiaddr_success() {
+        DEFAULT_ALICE_MULTIADDR
+            .parse::<Multiaddr>()
+            .expect("default alice multiaddr str is a valid Multiaddr>");
+    }
+
+    #[test]
+    fn default_command_success() {
+        Command::default();
+    }
+}
