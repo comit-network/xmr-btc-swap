@@ -117,11 +117,14 @@ async fn main() -> Result<()> {
                 }
 
                 debug!("Received {}", bitcoin_wallet.balance().await?);
+            } else {
+                debug!(
+                    "Still got {} left in wallet, swapping ...",
+                    bitcoin_wallet.balance().await?
+                );
             }
 
             let send_bitcoin = bitcoin_wallet.max_giveable(TxLock::script_size()).await?;
-
-            info!("Swapping {} ...", send_bitcoin);
 
             let bob_factory = Builder::new(
                 seed,
