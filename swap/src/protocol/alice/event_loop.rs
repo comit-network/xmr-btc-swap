@@ -4,7 +4,7 @@ use crate::{
     database::Database,
     execution_params::ExecutionParams,
     monero,
-    monero::BalanceTooLow,
+    monero::{Amount, BalanceTooLow},
     network,
     network::{transport, TokioExecutor},
     protocol::{
@@ -88,6 +88,7 @@ pub struct EventLoop<RS> {
     db: Arc<Database>,
     listen_address: Multiaddr,
     rate_service: RS,
+    max_sell: Amount,
 
     recv_encrypted_signature: broadcast::Sender<EncryptedSignature>,
     send_transfer_proof: mpsc::Receiver<(PeerId, TransferProof)>,
@@ -102,6 +103,7 @@ impl<RS> EventLoop<RS>
 where
     RS: LatestRate,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         listen_address: Multiaddr,
         seed: Seed,
@@ -110,6 +112,7 @@ where
         monero_wallet: Arc<monero::Wallet>,
         db: Arc<Database>,
         rate_service: RS,
+        max_sell: Amount,
     ) -> Result<(Self, mpsc::Receiver<RemoteHandle<Result<AliceState>>>)> {
         let identity = network::Seed::new(seed).derive_libp2p_identity();
         let behaviour = Behaviour::default();
@@ -142,6 +145,7 @@ where
             send_transfer_proof: send_transfer_proof.receiver,
             send_transfer_proof_sender: send_transfer_proof.sender,
             swap_handle_sender: swap_handle.sender,
+            max_sell,
         };
         Ok((event_loop, swap_handle.receiver))
     }
@@ -216,6 +220,13 @@ where
         let btc_amount = quote_request.btc_amount;
         let xmr_amount = rate.sell_quote(btc_amount)?;
 
+        if xmr_amount > self.max_sell {
+            anyhow!(MaximumSellAmountExceeded {
+                actual: xmr_amount,
+                max_sell: self.max_sell
+            });
+        }
+
         let xmr_balance = monero_wallet.get_balance().await?;
         let xmr_lock_fees = monero_wallet.static_tx_fee_estimate();
 
@@ -287,4 +298,11 @@ where
 
         Ok(())
     }
+}
+
+#[derive(Debug, Clone, Copy, thiserror::Error)]
+#[error("The amount {actual} exceeds the configured maximum sell amount of {max_sell} XMR")]
+pub struct MaximumSellAmountExceeded {
+    pub max_sell: Amount,
+    pub actual: Amount,
 }
