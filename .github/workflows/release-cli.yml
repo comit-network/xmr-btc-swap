@@ -25,6 +25,9 @@ jobs:
       - name: Build ${{ matrix.target }} release binary
         run: cargo build --target=${{ matrix.target }} --release --package swap --bin swap_cli
 
+      - name: Smoke test the binary
+        run: target/${{ matrix.target }}/release/swap_cli --help
+
       # Remove once python 3 is the default
       - uses: actions/setup-python@v1
         with:

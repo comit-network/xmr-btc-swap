@@ -1,0 +1,29 @@
+name: "Create 'latest' release"
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  create_release:
+    name: Create latest release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Delete 'latest' release
+        uses: larryjoelane/delete-release-action@v1.0.24
+        with:
+          release-name: latest
+          token: ${{ secrets.BOTTY_GITHUB_TOKEN }}
+
+      - name: Create 'latest' release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOTTY_GITHUB_TOKEN }}
+        with:
+          tag_name: latest
+          release_name: latest
+          draft: false
+          prerelease: true
