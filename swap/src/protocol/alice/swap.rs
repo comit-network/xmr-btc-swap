@@ -7,7 +7,7 @@ use crate::{
     database::Database,
     execution_params::ExecutionParams,
     monero,
-    monero::CreateWalletForOutputThenLoadDefaultWallet,
+    monero::CreateWalletForOutputThenReloadWallet,
     monero_ext::ScalarExt,
     protocol::{
         alice,
@@ -392,7 +392,7 @@ async fn run_until_internal(
                 let view_key = state3.v;
 
                 monero_wallet
-                    .create_and_load_wallet_for_output_then_load_default_wallet(
+                    .create_and_load_wallet_for_output_then_reload_wallet(
                         spend_key,
                         view_key,
                         monero_wallet_restore_blockheight,
