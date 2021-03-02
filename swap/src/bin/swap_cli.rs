@@ -337,7 +337,7 @@ async fn init_wallets(
         config.bitcoin.electrum_http_url,
         bitcoin_network,
         bitcoin_wallet_data_dir,
-        seed.extended_private_key(bitcoin_network)?.private_key,
+        seed.extended_private_key(bitcoin_network)?,
     )
     .await?;
 

@@ -7,9 +7,10 @@ use anyhow::{anyhow, bail, Context, Result};
 use backoff::{backoff::Constant as ConstantBackoff, future::retry};
 use bdk::{
     blockchain::{noop_progress, Blockchain, ElectrumBlockchain},
+    descriptor::Segwitv0,
     electrum_client::{self, Client, ElectrumApi},
-    miniscript::bitcoin::PrivateKey,
-    FeeRate,
+    keys::DerivableKey,
+    FeeRate, KeychainKind,
 };
 use bitcoin::Script;
 use reqwest::{Method, Url};
@@ -45,7 +46,7 @@ impl Wallet {
         electrum_http_url: Url,
         network: bitcoin::Network,
         wallet_dir: &Path,
-        private_key: PrivateKey,
+        key: impl DerivableKey<Segwitv0> + Clone,
     ) -> Result<Self> {
         // Workaround for https://github.com/bitcoindevkit/rust-electrum-client/issues/47.
         let config = electrum_client::ConfigBuilder::default().retry(2).build();
@@ -56,8 +57,8 @@ impl Wallet {
         let db = bdk::sled::open(wallet_dir)?.open_tree(SLED_TREE_NAME)?;
 
         let bdk_wallet = bdk::Wallet::new(
-            bdk::template::P2WPKH(private_key),
-            None,
+            bdk::template::BIP84(key.clone(), KeychainKind::External),
+            Some(bdk::template::BIP84(key, KeychainKind::Internal)),
             network,
             db,
             ElectrumBlockchain::from(client),

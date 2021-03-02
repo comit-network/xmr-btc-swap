@@ -13,6 +13,7 @@
 #![allow(non_snake_case)]
 
 use anyhow::{Context, Result};
+use bdk::{descriptor::Segwitv0, keys::DerivableKey};
 use prettytable::{row, Table};
 use std::{path::Path, sync::Arc};
 use structopt::StructOpt;
@@ -88,7 +89,7 @@ async fn main() -> Result<()> {
             let (bitcoin_wallet, monero_wallet) = init_wallets(
                 config.clone(),
                 &wallet_data_dir,
-                seed.extended_private_key(BITCOIN_NETWORK)?.private_key,
+                seed.extended_private_key(BITCOIN_NETWORK)?,
             )
             .await?;
 
@@ -135,14 +136,14 @@ async fn main() -> Result<()> {
 async fn init_wallets(
     config: Config,
     bitcoin_wallet_data_dir: &Path,
-    private_key: ::bitcoin::PrivateKey,
+    key: impl DerivableKey<Segwitv0> + Clone,
 ) -> Result<(bitcoin::Wallet, monero::Wallet)> {
     let bitcoin_wallet = bitcoin::Wallet::new(
         config.bitcoin.electrum_rpc_url,
         config.bitcoin.electrum_http_url,
         BITCOIN_NETWORK,
         bitcoin_wallet_data_dir,
-        private_key,
+        key,
     )
     .await?;
 
