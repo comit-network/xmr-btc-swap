@@ -2,6 +2,7 @@ status = [
     "static_analysis",
     "build (x86_64-unknown-linux-gnu)",
     "build (x86_64-apple-darwin)",
+    "build (x86_64-pc-windows-msvc)",
     "test (x86_64-unknown-linux-gnu)",
     "test (x86_64-apple-darwin)",
     "docker_tests (happy_path)",

@@ -51,7 +51,6 @@ strum = { version = "0.20", features = ["derive"] }
 thiserror = "1"
 time = "0.2"
 tokio = { version = "1.0", features = ["rt-multi-thread", "time", "macros", "sync", "process", "fs"] }
-tokio-tar = { path = "../tokio-tar" }
 tokio-tungstenite = { version = "0.13", features = [ "tls" ] }
 tokio-util = { version = "0.6.3", features = ["io"] }
 toml = "0.5"
@@ -62,6 +61,12 @@ tracing-subscriber = { version = "0.2", default-features = false, features = ["f
 url = { version = "2.1", features = ["serde"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
 void = "1"
+
+[target.'cfg(not(windows))'.dependencies]
+tokio-tar = { path = "../tokio-tar" }
+
+[target.'cfg(windows)'.dependencies]
+zip = "0.5"
 
 [dev-dependencies]
 bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs" }
