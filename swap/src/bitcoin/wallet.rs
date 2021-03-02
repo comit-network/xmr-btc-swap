@@ -1,5 +1,5 @@
 use crate::{
-    bitcoin::{timelocks::BlockHeight, Address, Amount, Transaction, TxLock},
+    bitcoin::{timelocks::BlockHeight, Address, Amount, Transaction},
     execution_params::ExecutionParams,
 };
 use ::bitcoin::{util::psbt::PartiallySignedTransaction, Txid};
@@ -165,16 +165,15 @@ impl Wallet {
         Ok(txid)
     }
 
-    pub async fn sign_tx_lock(&self, tx_lock: TxLock) -> Result<Transaction> {
-        let txid = tx_lock.txid();
-        tracing::debug!("signing tx lock: {}", txid);
-        let psbt = PartiallySignedTransaction::from(tx_lock);
+    pub async fn sign_and_finalize(&self, psbt: PartiallySignedTransaction) -> Result<Transaction> {
         let (signed_psbt, finalized) = self.inner.lock().await.sign(psbt, None)?;
+
         if !finalized {
-            bail!("Could not finalize TxLock psbt")
+            bail!("PSBT is not finalized")
         }
+
         let tx = signed_psbt.extract_tx();
-        tracing::debug!("signed tx lock: {}", txid);
+
         Ok(tx)
     }
 

@@ -13,7 +13,7 @@ use crate::{
         CROSS_CURVE_PROOF_SYSTEM,
     },
 };
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use ecdsa_fun::{
     adaptor::{Adaptor, HashTranscript},
     nonce::Deterministic,
@@ -269,9 +269,12 @@ impl State2 {
     }
 
     pub async fn lock_btc(self, bitcoin_wallet: &bitcoin::Wallet) -> Result<State3> {
-        let signed_tx_lock = bitcoin_wallet.sign_tx_lock(self.tx_lock.clone()).await?;
+        let signed_tx = bitcoin_wallet
+            .sign_and_finalize(self.tx_lock.clone().into())
+            .await
+            .context("failed to sign Bitcoin lock transaction")?;
 
-        let _ = bitcoin_wallet.broadcast(signed_tx_lock, "lock").await?;
+        let _ = bitcoin_wallet.broadcast(signed_tx, "lock").await?;
 
         Ok(State3 {
             A: self.A,
