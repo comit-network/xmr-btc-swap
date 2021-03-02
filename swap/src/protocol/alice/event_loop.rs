@@ -4,7 +4,7 @@ use crate::{
     database::Database,
     execution_params::ExecutionParams,
     monero,
-    monero::{Amount, BalanceTooLow},
+    monero::BalanceTooLow,
     network::{transport, TokioExecutor},
     protocol::{
         alice,
@@ -86,7 +86,7 @@ pub struct EventLoop<RS> {
     monero_wallet: Arc<monero::Wallet>,
     db: Arc<Database>,
     rate_service: RS,
-    max_sell: Amount,
+    max_buy: bitcoin::Amount,
 
     recv_encrypted_signature: broadcast::Sender<EncryptedSignature>,
     send_transfer_proof: mpsc::Receiver<(PeerId, TransferProof)>,
@@ -110,7 +110,7 @@ where
         monero_wallet: Arc<monero::Wallet>,
         db: Arc<Database>,
         rate_service: RS,
-        max_sell: Amount,
+        max_buy: bitcoin::Amount,
     ) -> Result<(Self, mpsc::Receiver<RemoteHandle<Result<AliceState>>>)> {
         let identity = seed.derive_libp2p_identity();
         let behaviour = Behaviour::default();
@@ -142,7 +142,7 @@ where
             send_transfer_proof: send_transfer_proof.receiver,
             send_transfer_proof_sender: send_transfer_proof.sender,
             swap_handle_sender: swap_handle.sender,
-            max_sell,
+            max_buy,
         };
         Ok((event_loop, swap_handle.receiver))
     }
@@ -215,17 +215,17 @@ where
             .context("Failed to get latest rate")?;
 
         let btc_amount = quote_request.btc_amount;
-        let xmr_amount = rate.sell_quote(btc_amount)?;
 
-        if xmr_amount > self.max_sell {
-            bail!(MaximumSellAmountExceeded {
-                actual: xmr_amount,
-                max_sell: self.max_sell
+        if btc_amount > self.max_buy {
+            bail!(MaximumBuyAmountExceeded {
+                actual: btc_amount,
+                max: self.max_buy
             })
         }
 
         let xmr_balance = monero_wallet.get_balance().await?;
         let xmr_lock_fees = monero_wallet.static_tx_fee_estimate();
+        let xmr_amount = rate.sell_quote(btc_amount)?;
 
         if xmr_balance < xmr_amount + xmr_lock_fees {
             bail!(BalanceTooLow {
@@ -299,8 +299,8 @@ where
 }
 
 #[derive(Debug, Clone, Copy, thiserror::Error)]
-#[error("The amount {actual} exceeds the configured maximum sell amount of {max_sell} XMR")]
-pub struct MaximumSellAmountExceeded {
-    pub max_sell: Amount,
-    pub actual: Amount,
+#[error("Refusing to buy {actual} because the maximum configured limit is {max}")]
+pub struct MaximumBuyAmountExceeded {
+    pub max: bitcoin::Amount,
+    pub actual: bitcoin::Amount,
 }

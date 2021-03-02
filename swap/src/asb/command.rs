@@ -1,5 +1,5 @@
-use crate::monero::Amount;
-use anyhow::Result;
+use crate::bitcoin::Amount;
+use bitcoin::{util::amount::ParseAmountError, Denomination};
 use std::path::PathBuf;
 
 #[derive(structopt::StructOpt, Debug)]
@@ -19,13 +19,12 @@ pub struct Arguments {
 #[structopt(name = "xmr_btc-swap", about = "XMR BTC atomic swap")]
 pub enum Command {
     Start {
-        #[structopt(long = "max-sell-xmr", help = "The maximum amount of XMR the ASB is willing to sell.", default_value="0.5", parse(try_from_str = parse_xmr))]
-        max_sell: Amount,
+        #[structopt(long = "max-buy-btc", help = "The maximum amount of BTC the ASB is willing to buy.", default_value="0.005", parse(try_from_str = parse_btc))]
+        max_buy: Amount,
     },
     History,
 }
 
-fn parse_xmr(str: &str) -> Result<Amount> {
-    let amount = Amount::parse_monero(str)?;
-    Ok(amount)
+fn parse_btc(s: &str) -> Result<Amount, ParseAmountError> {
+    Amount::from_str_in(s, Denomination::Bitcoin)
 }
