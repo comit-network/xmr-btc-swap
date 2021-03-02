@@ -147,14 +147,20 @@ impl Wallet {
         self.inner.lock().await.network()
     }
 
-    pub async fn broadcast(&self, transaction: Transaction) -> Result<Txid> {
+    /// Broadcast the given transaction to the network and emit a log statement
+    /// if done so successfully.
+    pub async fn broadcast(&self, transaction: Transaction, kind: &str) -> Result<Txid> {
         let txid = transaction.txid();
 
         self.inner
             .lock()
             .await
             .broadcast(transaction)
-            .with_context(|| format!("failed to broadcast transaction {}", txid))?;
+            .with_context(|| {
+                format!("failed to broadcast Bitcoin {} transaction {}", kind, txid)
+            })?;
+
+        tracing::info!("Published Bitcoin {} transaction as {}", txid, kind);
 
         Ok(txid)
     }

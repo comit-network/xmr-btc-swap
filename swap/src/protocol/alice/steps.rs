@@ -25,7 +25,6 @@ use libp2p::PeerId;
 use sha2::Sha256;
 use std::sync::Arc;
 use tokio::time::timeout;
-use tracing::info;
 
 // TODO(Franck): Use helper functions from xmr-btc instead of re-writing them
 // here
@@ -125,16 +124,6 @@ pub fn build_bitcoin_redeem_transaction(
     Ok(tx)
 }
 
-pub async fn publish_bitcoin_redeem_transaction(
-    redeem_tx: bitcoin::Transaction,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
-) -> Result<::bitcoin::Txid> {
-    info!("Attempting to publish bitcoin redeem txn");
-    let txid = bitcoin_wallet.broadcast(redeem_tx).await?;
-
-    Ok(txid)
-}
-
 pub async fn publish_cancel_transaction(
     tx_lock: TxLock,
     a: bitcoin::SecretKey,
@@ -170,7 +159,7 @@ pub async fn publish_cancel_transaction(
             .expect("sig_{a,b} to be valid signatures for tx_cancel");
 
         // TODO(Franck): Error handling is delicate, why can't we broadcast?
-        bitcoin_wallet.broadcast(tx_cancel).await?;
+        bitcoin_wallet.broadcast(tx_cancel, "cancel").await?;
 
         // TODO(Franck): Wait until transaction is mined and returned mined
         // block height
@@ -247,18 +236,4 @@ pub fn build_bitcoin_punish_transaction(
         .expect("sig_{a,b} to be valid signatures for tx_cancel");
 
     Ok(signed_tx_punish)
-}
-
-pub async fn publish_bitcoin_punish_transaction(
-    punish_tx: bitcoin::Transaction,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
-    execution_params: ExecutionParams,
-) -> Result<bitcoin::Txid> {
-    let txid = bitcoin_wallet.broadcast(punish_tx).await?;
-
-    bitcoin_wallet
-        .wait_for_transaction_finality(txid, execution_params)
-        .await?;
-
-    Ok(txid)
 }

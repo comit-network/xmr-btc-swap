@@ -271,8 +271,7 @@ impl State2 {
     pub async fn lock_btc(self, bitcoin_wallet: &bitcoin::Wallet) -> Result<State3> {
         let signed_tx_lock = bitcoin_wallet.sign_tx_lock(self.tx_lock.clone()).await?;
 
-        tracing::debug!("locking BTC in transaction {}", self.tx_lock.txid());
-        let _ = bitcoin_wallet.broadcast(signed_tx_lock).await?;
+        let _ = bitcoin_wallet.broadcast(signed_tx_lock, "lock").await?;
 
         Ok(State3 {
             A: self.A,
@@ -475,7 +474,8 @@ impl State4 {
                 tx_cancel",
             );
 
-        let tx_id = bitcoin_wallet.broadcast(tx_cancel).await?;
+        let tx_id = bitcoin_wallet.broadcast(tx_cancel, "cancel").await?;
+
         Ok(tx_id)
     }
 
@@ -544,7 +544,7 @@ impl State4 {
         let signed_tx_refund =
             tx_refund.add_signatures((self.A, sig_a), (self.b.public(), sig_b))?;
 
-        let txid = bitcoin_wallet.broadcast(signed_tx_refund).await?;
+        let txid = bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
 
         bitcoin_wallet
             .wait_for_transaction_finality(txid, execution_params)
