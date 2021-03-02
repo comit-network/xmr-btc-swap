@@ -18,13 +18,16 @@ pub struct Arguments {
     pub debug: bool,
 
     #[structopt(subcommand)]
-    pub cmd: Option<Command>,
+    pub cmd: Command,
 }
 
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(name = "xmr_btc-swap", about = "XMR BTC atomic swap")]
 pub enum Command {
     BuyXmr {
+        #[structopt(long = "receive-address")]
+        receive_monero_address: monero::Address,
+
         #[structopt(long = "connect-peer-id", default_value = DEFAULT_ALICE_PEER_ID)]
         alice_peer_id: PeerId,
 
@@ -36,6 +39,9 @@ pub enum Command {
     },
     History,
     Resume {
+        #[structopt(long = "receive-address")]
+        receive_monero_address: monero::Address,
+
         #[structopt(long = "swap-id")]
         swap_id: Uuid,
 
@@ -66,22 +72,9 @@ pub enum Command {
     },
 }
 
-impl Default for Command {
-    fn default() -> Self {
-        Self::BuyXmr {
-            alice_peer_id: DEFAULT_ALICE_PEER_ID
-                .parse()
-                .expect("default alice peer id  str is a valid Multiaddr>"),
-            alice_addr: DEFAULT_ALICE_MULTIADDR
-                .parse()
-                .expect("default alice multiaddr str is a valid PeerId"),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::cli::command::{Command, DEFAULT_ALICE_MULTIADDR, DEFAULT_ALICE_PEER_ID};
+    use crate::cli::command::{DEFAULT_ALICE_MULTIADDR, DEFAULT_ALICE_PEER_ID};
     use libp2p::{core::Multiaddr, PeerId};
 
     #[test]
@@ -96,10 +89,5 @@ mod tests {
         DEFAULT_ALICE_MULTIADDR
             .parse::<Multiaddr>()
             .expect("default alice multiaddr str is a valid Multiaddr>");
-    }
-
-    #[test]
-    fn default_command_success() {
-        Command::default();
     }
 }

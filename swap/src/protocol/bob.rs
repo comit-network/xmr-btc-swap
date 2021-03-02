@@ -48,6 +48,7 @@ pub struct Swap {
     pub monero_wallet: Arc<monero::Wallet>,
     pub execution_params: ExecutionParams,
     pub swap_id: Uuid,
+    pub receive_monero_address: ::monero::Address,
 }
 
 pub struct Builder {
@@ -64,6 +65,8 @@ pub struct Builder {
 
     init_params: InitParams,
     execution_params: ExecutionParams,
+
+    receive_monero_address: ::monero::Address,
 }
 
 enum InitParams {
@@ -82,6 +85,7 @@ impl Builder {
         alice_address: Multiaddr,
         alice_peer_id: PeerId,
         execution_params: ExecutionParams,
+        receive_monero_address: ::monero::Address,
     ) -> Self {
         let identity = network::Seed::new(seed).derive_libp2p_identity();
         let peer_id = identity.public().into_peer_id();
@@ -97,6 +101,7 @@ impl Builder {
             monero_wallet,
             init_params: InitParams::None,
             execution_params,
+            receive_monero_address,
         }
     }
 
@@ -123,6 +128,7 @@ impl Builder {
                         monero_wallet: self.monero_wallet.clone(),
                         swap_id: self.swap_id,
                         execution_params: self.execution_params,
+                        receive_monero_address: self.receive_monero_address,
                     },
                     event_loop,
                 ))
@@ -142,6 +148,7 @@ impl Builder {
                         monero_wallet: self.monero_wallet.clone(),
                         swap_id: self.swap_id,
                         execution_params: self.execution_params,
+                        receive_monero_address: self.receive_monero_address,
                     },
                     event_loop,
                 ))

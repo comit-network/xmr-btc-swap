@@ -102,8 +102,9 @@ async fn main() -> Result<()> {
         .run(monero_network, "stagenet.community.xmr.to")
         .await?;
 
-    match args.cmd.unwrap_or_default() {
+    match args.cmd {
         Command::BuyXmr {
+            receive_monero_address,
             alice_peer_id,
             alice_addr,
         } => {
@@ -146,6 +147,7 @@ async fn main() -> Result<()> {
                 alice_addr,
                 alice_peer_id,
                 execution_params,
+                receive_monero_address,
             );
             let (swap, event_loop) = bob_factory.with_init_params(send_bitcoin).build().await?;
 
@@ -173,6 +175,7 @@ async fn main() -> Result<()> {
             table.printstd();
         }
         Command::Resume {
+            receive_monero_address,
             swap_id,
             alice_peer_id,
             alice_addr,
@@ -191,6 +194,7 @@ async fn main() -> Result<()> {
                 alice_addr,
                 alice_peer_id,
                 execution_params,
+                receive_monero_address,
             );
             let (swap, event_loop) = bob_factory.build().await?;
             let handle = tokio::spawn(async move { event_loop.run().await });

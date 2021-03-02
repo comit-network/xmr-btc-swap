@@ -1,7 +1,7 @@
 pub mod wallet;
 mod wallet_rpc;
 
-pub use ::monero::{Network, PrivateKey, PublicKey};
+pub use ::monero::{Address, Network, PrivateKey, PublicKey};
 pub use curve25519_dalek::scalar::Scalar;
 pub use wallet::Wallet;
 pub use wallet_rpc::{WalletRpc, WalletRpcProcess};
@@ -10,7 +10,6 @@ use crate::bitcoin;
 use ::bitcoin::hashes::core::fmt::Formatter;
 use anyhow::Result;
 use async_trait::async_trait;
-use monero::Address;
 use monero_rpc::wallet::{BlockHeight, Refreshed};
 use rand::{CryptoRng, RngCore};
 use rust_decimal::{
