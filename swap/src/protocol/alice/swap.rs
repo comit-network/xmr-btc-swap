@@ -2,10 +2,7 @@
 //! Alice holds XMR and wishes receive BTC.
 use crate::{
     bitcoin,
-    bitcoin::{
-        ExpiredTimelocks, TransactionBlockHeight, WaitForTransactionFinality,
-        WatchForRawTransaction,
-    },
+    bitcoin::ExpiredTimelocks,
     database,
     database::Database,
     execution_params::ExecutionParams,
@@ -98,7 +95,7 @@ async fn run_until_internal(
             } => {
                 let _ = wait_for_locked_bitcoin(
                     state3.tx_lock.txid(),
-                    bitcoin_wallet.clone(),
+                    &bitcoin_wallet,
                     execution_params,
                 )
                 .await?;
@@ -335,7 +332,7 @@ async fn run_until_internal(
                     tx_cancel_height,
                     state3.punish_timelock,
                     &state3.refund_address,
-                    bitcoin_wallet.clone(),
+                    &bitcoin_wallet,
                 )
                 .await?;
 
