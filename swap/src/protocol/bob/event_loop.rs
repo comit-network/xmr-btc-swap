@@ -1,6 +1,5 @@
 use crate::bitcoin::EncryptedSignature;
-use crate::network::spot_price::{Request, Response};
-use crate::network::{transport, TokioExecutor};
+use crate::network::{spot_price, transport, TokioExecutor};
 use crate::protocol::alice::TransferProof;
 use crate::protocol::bob::{Behaviour, OutEvent, State0, State2};
 use crate::{bitcoin, monero};
@@ -34,14 +33,14 @@ impl<T> Default for Channels<T> {
 
 #[derive(Debug)]
 pub struct EventLoopHandle {
-    recv_spot_price: Receiver<Response>,
     start_execution_setup: Sender<State0>,
     done_execution_setup: Receiver<Result<State2>>,
     recv_transfer_proof: Receiver<TransferProof>,
     conn_established: Receiver<PeerId>,
     dial_alice: Sender<()>,
-    request_spot_price: Sender<Request>,
     send_encrypted_signature: Sender<EncryptedSignature>,
+    request_spot_price: Sender<spot_price::Request>,
+    recv_spot_price: Receiver<spot_price::Response>,
 }
 
 impl EventLoopHandle {
@@ -133,38 +132,38 @@ impl EventLoop {
 
         swarm.add_address(alice_peer_id, alice_addr);
 
-        let quote_response = Channels::new();
         let start_execution_setup = Channels::new();
         let done_execution_setup = Channels::new();
         let recv_transfer_proof = Channels::new();
         let dial_alice = Channels::new();
         let conn_established = Channels::new();
-        let send_quote_request = Channels::new();
         let send_encrypted_signature = Channels::new();
+        let send_quote_request = Channels::new();
+        let quote_response = Channels::new();
 
         let event_loop = EventLoop {
             swarm,
             alice_peer_id,
             bitcoin_wallet,
-            recv_spot_price: quote_response.sender,
             start_execution_setup: start_execution_setup.receiver,
             done_execution_setup: done_execution_setup.sender,
             recv_transfer_proof: recv_transfer_proof.sender,
             conn_established: conn_established.sender,
             dial_alice: dial_alice.receiver,
-            request_spot_price: send_quote_request.receiver,
             send_encrypted_signature: send_encrypted_signature.receiver,
+            request_spot_price: send_quote_request.receiver,
+            recv_spot_price: quote_response.sender,
         };
 
         let handle = EventLoopHandle {
-            recv_spot_price: quote_response.receiver,
             start_execution_setup: start_execution_setup.sender,
             done_execution_setup: done_execution_setup.receiver,
             recv_transfer_proof: recv_transfer_proof.receiver,
             conn_established: conn_established.receiver,
             dial_alice: dial_alice.sender,
-            request_spot_price: send_quote_request.sender,
             send_encrypted_signature: send_encrypted_signature.sender,
+            request_spot_price: send_quote_request.sender,
+            recv_spot_price: quote_response.receiver,
         };
 
         Ok((event_loop, handle))
