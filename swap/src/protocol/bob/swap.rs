@@ -12,7 +12,7 @@ use async_recursion::async_recursion;
 use rand::rngs::OsRng;
 use std::sync::Arc;
 use tokio::select;
-use tracing::info;
+use tracing::{trace, warn};
 use uuid::Uuid;
 
 pub fn is_complete(state: &BobState) -> bool {
@@ -30,7 +30,6 @@ pub async fn run(swap: bob::Swap) -> Result<BobState> {
     run_until(swap, is_complete).await
 }
 
-#[tracing::instrument(name = "swap", skip(swap,is_target_state), fields(id = %swap.swap_id))]
 pub async fn run_until(
     swap: bob::Swap,
     is_target_state: fn(&BobState) -> bool,
@@ -61,7 +60,7 @@ async fn run_until_internal(
     swap_id: Uuid,
     execution_params: ExecutionParams,
 ) -> Result<BobState> {
-    info!("Current state: {}", state);
+    trace!("Current state: {}", state);
     if is_target_state(&state) {
         Ok(state)
     } else {
@@ -186,7 +185,7 @@ async fn run_until_internal(
                             match state4? {
                                 Ok(state4) => BobState::XmrLocked(state4),
                                 Err(InsufficientFunds {..}) => {
-                                     info!("The other party has locked insufficient Monero funds! Waiting for refund...");
+                                     warn!("The other party has locked insufficient Monero funds! Waiting for refund...");
                                      state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()).await?;
                                      let state4 = state.cancel();
                                      BobState::CancelTimelockExpired(state4)
@@ -389,12 +388,14 @@ pub async fn request_quote_and_setup(
         .send_quote_request(QuoteRequest { btc_amount })
         .await?;
 
-    let quote_response = event_loop_handle.recv_quote_response().await?;
+    let xmr_amount = event_loop_handle.recv_quote_response().await?.xmr_amount;
+
+    tracing::info!("Quote for {} is {}", btc_amount, xmr_amount);
 
     let state0 = State0::new(
         &mut OsRng,
         btc_amount,
-        quote_response.xmr_amount,
+        xmr_amount,
         execution_params.bitcoin_cancel_timelock,
         execution_params.bitcoin_punish_timelock,
         bitcoin_refund_address,

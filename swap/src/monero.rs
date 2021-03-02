@@ -190,7 +190,7 @@ pub trait Transfer {
         public_spend_key: PublicKey,
         public_view_key: PublicViewKey,
         amount: Amount,
-    ) -> Result<(TransferProof, Amount)>;
+    ) -> Result<TransferProof>;
 }
 
 #[async_trait]

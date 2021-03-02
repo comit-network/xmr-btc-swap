@@ -2,8 +2,7 @@ use crate::{
     bitcoin,
     bitcoin::{
         current_epoch, wait_for_cancel_timelock_to_expire, CancelTimelock, ExpiredTimelocks,
-        GetBlockHeight, PunishTimelock, TransactionBlockHeight, TxCancel, TxRefund,
-        WatchForRawTransaction,
+        PunishTimelock, TxCancel, TxRefund,
     },
     execution_params::ExecutionParams,
     monero,
@@ -325,10 +324,10 @@ pub struct State3 {
 }
 
 impl State3 {
-    pub async fn wait_for_cancel_timelock_to_expire<W>(&self, bitcoin_wallet: &W) -> Result<()>
-    where
-        W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
-    {
+    pub async fn wait_for_cancel_timelock_to_expire(
+        &self,
+        bitcoin_wallet: &bitcoin::Wallet,
+    ) -> Result<()> {
         wait_for_cancel_timelock_to_expire(
             bitcoin_wallet,
             self.cancel_timelock,
@@ -337,10 +336,10 @@ impl State3 {
         .await
     }
 
-    pub async fn expired_timelocks<W>(&self, bitcoin_wallet: &W) -> Result<ExpiredTimelocks>
-    where
-        W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
-    {
+    pub async fn expired_timelocks(
+        &self,
+        bitcoin_wallet: &bitcoin::Wallet,
+    ) -> Result<ExpiredTimelocks> {
         current_epoch(
             bitcoin_wallet,
             self.cancel_timelock,

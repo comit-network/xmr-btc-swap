@@ -7,12 +7,12 @@ use crate::{
         bob::{Behaviour, OutEvent, QuoteRequest, State0, State2},
     },
 };
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use futures::FutureExt;
 use libp2p::{core::Multiaddr, PeerId};
 use std::{convert::Infallible, sync::Arc};
 use tokio::sync::mpsc::{Receiver, Sender};
-use tracing::{debug, error, info};
+use tracing::{debug, error, trace};
 
 #[derive(Debug)]
 pub struct Channels<T> {
@@ -72,7 +72,6 @@ impl EventLoopHandle {
     /// Dials other party and wait for the connection to be established.
     /// Do nothing if we are already connected
     pub async fn dial(&mut self) -> Result<()> {
-        debug!("Attempt to dial Alice");
         let _ = self.dial_alice.send(()).await?;
 
         self.conn_established
@@ -201,15 +200,11 @@ impl EventLoop {
                     if option.is_some() {
                            let peer_id = self.alice_peer_id;
                         if self.swarm.pt.is_connected(&peer_id) {
-                            debug!("Already connected to Alice: {}", peer_id);
+                            trace!("Already connected to Alice at {}", peer_id);
                             let _ = self.conn_established.send(peer_id).await;
                         } else {
-                            info!("dialing alice: {}", peer_id);
-                            if let Err(err) = libp2p::Swarm::dial(&mut self.swarm, &peer_id) {
-                                error!("Could not dial alice: {}", err);
-                                // TODO(Franck): If Dial fails then we should report it.
-                            }
-
+                            debug!("Dialing alice at {}", peer_id);
+                            libp2p::Swarm::dial(&mut self.swarm, &peer_id).context("failed to dial alice")?;
                         }
                     }
                 },

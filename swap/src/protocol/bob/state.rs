@@ -1,8 +1,7 @@
 use crate::{
     bitcoin::{
-        self, current_epoch, wait_for_cancel_timelock_to_expire, BroadcastSignedTransaction,
-        CancelTimelock, ExpiredTimelocks, GetBlockHeight, GetRawTransaction, PunishTimelock,
-        Transaction, TransactionBlockHeight, TxCancel, Txid, WatchForRawTransaction,
+        self, current_epoch, wait_for_cancel_timelock_to_expire, CancelTimelock, ExpiredTimelocks,
+        PunishTimelock, Transaction, TxCancel, Txid,
     },
     execution_params::ExecutionParams,
     monero,
@@ -14,7 +13,7 @@ use crate::{
         CROSS_CURVE_PROOF_SYSTEM,
     },
 };
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use ecdsa_fun::{
     adaptor::{Adaptor, HashTranscript},
     nonce::Deterministic,
@@ -269,16 +268,13 @@ impl State2 {
         }
     }
 
-    pub async fn lock_btc<W>(self, bitcoin_wallet: &W) -> Result<State3>
-    where
-        W: bitcoin::SignTxLock + bitcoin::BroadcastSignedTransaction,
-    {
-        let signed_tx_lock = bitcoin_wallet.sign_tx_lock(self.tx_lock.clone()).await?;
+    pub async fn lock_btc(self, bitcoin_wallet: &bitcoin::Wallet) -> Result<State3> {
+        let signed_tx = bitcoin_wallet
+            .sign_and_finalize(self.tx_lock.clone().into())
+            .await
+            .context("failed to sign Bitcoin lock transaction")?;
 
-        tracing::info!("{}", self.tx_lock.txid());
-        let _ = bitcoin_wallet
-            .broadcast_signed_transaction(signed_tx_lock)
-            .await?;
+        let _ = bitcoin_wallet.broadcast(signed_tx, "lock").await?;
 
         Ok(State3 {
             A: self.A,
@@ -363,10 +359,10 @@ impl State3 {
         }))
     }
 
-    pub async fn wait_for_cancel_timelock_to_expire<W>(&self, bitcoin_wallet: &W) -> Result<()>
-    where
-        W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
-    {
+    pub async fn wait_for_cancel_timelock_to_expire(
+        &self,
+        bitcoin_wallet: &bitcoin::Wallet,
+    ) -> Result<()> {
         wait_for_cancel_timelock_to_expire(
             bitcoin_wallet,
             self.cancel_timelock,
@@ -399,10 +395,10 @@ impl State3 {
         self.tx_lock.txid()
     }
 
-    pub async fn current_epoch<W>(&self, bitcoin_wallet: &W) -> Result<ExpiredTimelocks>
-    where
-        W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
-    {
+    pub async fn current_epoch(
+        &self,
+        bitcoin_wallet: &bitcoin::Wallet,
+    ) -> Result<ExpiredTimelocks> {
         current_epoch(
             bitcoin_wallet,
             self.cancel_timelock,
@@ -443,10 +439,10 @@ impl State4 {
         self.b.encsign(self.S_a_bitcoin, tx_redeem.digest())
     }
 
-    pub async fn check_for_tx_cancel<W>(&self, bitcoin_wallet: &W) -> Result<Transaction>
-    where
-        W: GetRawTransaction,
-    {
+    pub async fn check_for_tx_cancel(
+        &self,
+        bitcoin_wallet: &bitcoin::Wallet,
+    ) -> Result<Transaction> {
         let tx_cancel =
             bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
 
@@ -466,10 +462,7 @@ impl State4 {
         Ok(tx)
     }
 
-    pub async fn submit_tx_cancel<W>(&self, bitcoin_wallet: &W) -> Result<Txid>
-    where
-        W: BroadcastSignedTransaction,
-    {
+    pub async fn submit_tx_cancel(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<Txid> {
         let tx_cancel =
             bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
 
@@ -484,16 +477,12 @@ impl State4 {
                 tx_cancel",
             );
 
-        let tx_id = bitcoin_wallet
-            .broadcast_signed_transaction(tx_cancel)
-            .await?;
+        let tx_id = bitcoin_wallet.broadcast(tx_cancel, "cancel").await?;
+
         Ok(tx_id)
     }
 
-    pub async fn watch_for_redeem_btc<W>(&self, bitcoin_wallet: &W) -> Result<State5>
-    where
-        W: WatchForRawTransaction,
-    {
+    pub async fn watch_for_redeem_btc(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<State5> {
         let tx_redeem = bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address);
         let tx_redeem_encsig = self.b.encsign(self.S_a_bitcoin, tx_redeem.digest());
 
@@ -515,10 +504,10 @@ impl State4 {
         })
     }
 
-    pub async fn wait_for_cancel_timelock_to_expire<W>(&self, bitcoin_wallet: &W) -> Result<()>
-    where
-        W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
-    {
+    pub async fn wait_for_cancel_timelock_to_expire(
+        &self,
+        bitcoin_wallet: &bitcoin::Wallet,
+    ) -> Result<()> {
         wait_for_cancel_timelock_to_expire(
             bitcoin_wallet,
             self.cancel_timelock,
@@ -527,10 +516,10 @@ impl State4 {
         .await
     }
 
-    pub async fn expired_timelock<W>(&self, bitcoin_wallet: &W) -> Result<ExpiredTimelocks>
-    where
-        W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
-    {
+    pub async fn expired_timelock(
+        &self,
+        bitcoin_wallet: &bitcoin::Wallet,
+    ) -> Result<ExpiredTimelocks> {
         current_epoch(
             bitcoin_wallet,
             self.cancel_timelock,
@@ -540,14 +529,11 @@ impl State4 {
         .await
     }
 
-    pub async fn refund_btc<W>(
+    pub async fn refund_btc(
         &self,
-        bitcoin_wallet: &W,
+        bitcoin_wallet: &bitcoin::Wallet,
         execution_params: ExecutionParams,
-    ) -> Result<()>
-    where
-        W: bitcoin::BroadcastSignedTransaction + bitcoin::WaitForTransactionFinality,
-    {
+    ) -> Result<()> {
         let tx_cancel =
             bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
         let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &self.refund_address);
@@ -561,9 +547,7 @@ impl State4 {
         let signed_tx_refund =
             tx_refund.add_signatures((self.A, sig_a), (self.b.public(), sig_b))?;
 
-        let txid = bitcoin_wallet
-            .broadcast_signed_transaction(signed_tx_refund)
-            .await?;
+        let txid = bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
 
         bitcoin_wallet
             .wait_for_transaction_finality(txid, execution_params)

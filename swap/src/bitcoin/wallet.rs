@@ -1,14 +1,9 @@
 use crate::{
-    bitcoin::{
-        timelocks::BlockHeight, Address, Amount, BroadcastSignedTransaction, GetBlockHeight,
-        GetRawTransaction, SignTxLock, Transaction, TransactionBlockHeight, TxLock,
-        WaitForTransactionFinality, WatchForRawTransaction,
-    },
+    bitcoin::{timelocks::BlockHeight, Address, Amount, Transaction},
     execution_params::ExecutionParams,
 };
 use ::bitcoin::{util::psbt::PartiallySignedTransaction, Txid};
 use anyhow::{anyhow, bail, Context, Result};
-use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::retry};
 use bdk::{
     blockchain::{noop_progress, Blockchain, ElectrumBlockchain},
@@ -152,43 +147,43 @@ impl Wallet {
         self.inner.lock().await.network()
     }
 
-    /// Selects an appropriate [`FeeRate`] to be used for getting transactions
-    /// confirmed within a reasonable amount of time.
-    fn select_feerate(&self) -> FeeRate {
-        // TODO: This should obviously not be a const :)
-        FeeRate::from_sat_per_vb(5.0)
-    }
-}
+    /// Broadcast the given transaction to the network and emit a log statement
+    /// if done so successfully.
+    pub async fn broadcast(&self, transaction: Transaction, kind: &str) -> Result<Txid> {
+        let txid = transaction.txid();
 
-#[async_trait]
-impl SignTxLock for Wallet {
-    async fn sign_tx_lock(&self, tx_lock: TxLock) -> Result<Transaction> {
-        let txid = tx_lock.txid();
-        tracing::debug!("signing tx lock: {}", txid);
-        let psbt = PartiallySignedTransaction::from(tx_lock);
+        self.inner
+            .lock()
+            .await
+            .broadcast(transaction)
+            .with_context(|| {
+                format!("failed to broadcast Bitcoin {} transaction {}", kind, txid)
+            })?;
+
+        tracing::info!("Published Bitcoin {} transaction as {}", txid, kind);
+
+        Ok(txid)
+    }
+
+    pub async fn sign_and_finalize(&self, psbt: PartiallySignedTransaction) -> Result<Transaction> {
         let (signed_psbt, finalized) = self.inner.lock().await.sign(psbt, None)?;
+
         if !finalized {
-            bail!("Could not finalize TxLock psbt")
+            bail!("PSBT is not finalized")
         }
+
         let tx = signed_psbt.extract_tx();
-        tracing::debug!("signed tx lock: {}", txid);
+
         Ok(tx)
     }
-}
 
-#[async_trait]
-impl BroadcastSignedTransaction for Wallet {
-    async fn broadcast_signed_transaction(&self, transaction: Transaction) -> Result<Txid> {
-        tracing::debug!("attempting to broadcast tx: {}", transaction.txid());
-        self.inner.lock().await.broadcast(transaction.clone())?;
-        tracing::info!("Bitcoin tx broadcasted! TXID = {}", transaction.txid());
-        Ok(transaction.txid())
+    pub async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
+        self.get_tx(txid)
+            .await?
+            .ok_or_else(|| anyhow!("Could not get raw tx with id: {}", txid))
     }
-}
 
-#[async_trait]
-impl WatchForRawTransaction for Wallet {
-    async fn watch_for_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
+    pub async fn watch_for_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
         tracing::debug!("watching for tx: {}", txid);
         let tx = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
             let client = Client::new(self.rpc_url.as_ref())
@@ -209,20 +204,8 @@ impl WatchForRawTransaction for Wallet {
 
         Ok(tx)
     }
-}
 
-#[async_trait]
-impl GetRawTransaction for Wallet {
-    async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
-        self.get_tx(txid)
-            .await?
-            .ok_or_else(|| anyhow!("Could not get raw tx with id: {}", txid))
-    }
-}
-
-#[async_trait]
-impl GetBlockHeight for Wallet {
-    async fn get_block_height(&self) -> Result<BlockHeight> {
+    pub async fn get_block_height(&self) -> Result<BlockHeight> {
         let url = blocks_tip_height_url(&self.http_url)?;
         let height = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
             let height = reqwest::Client::new()
@@ -242,11 +225,8 @@ impl GetBlockHeight for Wallet {
 
         Ok(BlockHeight::new(height))
     }
-}
 
-#[async_trait]
-impl TransactionBlockHeight for Wallet {
-    async fn transaction_block_height(&self, txid: Txid) -> Result<BlockHeight> {
+    pub async fn transaction_block_height(&self, txid: Txid) -> Result<BlockHeight> {
         let url = tx_status_url(txid, &self.http_url)?;
         #[derive(Serialize, Deserialize, Debug, Clone)]
         struct TransactionStatus {
@@ -276,11 +256,8 @@ impl TransactionBlockHeight for Wallet {
 
         Ok(BlockHeight::new(height))
     }
-}
 
-#[async_trait]
-impl WaitForTransactionFinality for Wallet {
-    async fn wait_for_transaction_finality(
+    pub async fn wait_for_transaction_finality(
         &self,
         txid: Txid,
         execution_params: ExecutionParams,
@@ -309,6 +286,13 @@ impl WaitForTransactionFinality for Wallet {
         }
 
         Ok(())
+    }
+
+    /// Selects an appropriate [`FeeRate`] to be used for getting transactions
+    /// confirmed within a reasonable amount of time.
+    fn select_feerate(&self) -> FeeRate {
+        // TODO: This should obviously not be a const :)
+        FeeRate::from_sat_per_vb(5.0)
     }
 }
 

@@ -1,10 +1,8 @@
 use crate::{
     bitcoin,
     bitcoin::{
-        poll_until_block_height_is_gte, BlockHeight, BroadcastSignedTransaction, CancelTimelock,
-        EncryptedSignature, GetBlockHeight, GetRawTransaction, PunishTimelock,
-        TransactionBlockHeight, TxCancel, TxLock, TxRefund, WaitForTransactionFinality,
-        WatchForRawTransaction,
+        poll_until_block_height_is_gte, BlockHeight, CancelTimelock, EncryptedSignature,
+        PunishTimelock, TxCancel, TxLock, TxRefund,
     },
     execution_params::ExecutionParams,
     monero,
@@ -27,18 +25,14 @@ use libp2p::PeerId;
 use sha2::Sha256;
 use std::sync::Arc;
 use tokio::time::timeout;
-use tracing::info;
 
 // TODO(Franck): Use helper functions from xmr-btc instead of re-writing them
 // here
-pub async fn wait_for_locked_bitcoin<W>(
+pub async fn wait_for_locked_bitcoin(
     lock_bitcoin_txid: bitcoin::Txid,
-    bitcoin_wallet: Arc<W>,
+    bitcoin_wallet: &bitcoin::Wallet,
     execution_params: ExecutionParams,
-) -> Result<()>
-where
-    W: WatchForRawTransaction + WaitForTransactionFinality,
-{
+) -> Result<()> {
     // We assume we will see Bob's transaction in the mempool first.
     timeout(
         execution_params.bob_time_to_act,
@@ -69,7 +63,7 @@ where
     let public_spend_key = S_a + state3.S_b_monero;
     let public_view_key = state3.v.public();
 
-    let (transfer_proof, _) = monero_wallet
+    let transfer_proof = monero_wallet
         .transfer(public_spend_key, public_view_key, state3.xmr)
         .await?;
 
@@ -130,32 +124,14 @@ pub fn build_bitcoin_redeem_transaction(
     Ok(tx)
 }
 
-pub async fn publish_bitcoin_redeem_transaction<W>(
-    redeem_tx: bitcoin::Transaction,
-    bitcoin_wallet: Arc<W>,
-) -> Result<::bitcoin::Txid>
-where
-    W: BroadcastSignedTransaction + WaitForTransactionFinality,
-{
-    info!("Attempting to publish bitcoin redeem txn");
-    let txid = bitcoin_wallet
-        .broadcast_signed_transaction(redeem_tx)
-        .await?;
-
-    Ok(txid)
-}
-
-pub async fn publish_cancel_transaction<W>(
+pub async fn publish_cancel_transaction(
     tx_lock: TxLock,
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
     cancel_timelock: CancelTimelock,
     tx_cancel_sig_bob: bitcoin::Signature,
-    bitcoin_wallet: Arc<W>,
-) -> Result<bitcoin::TxCancel>
-where
-    W: GetRawTransaction + TransactionBlockHeight + GetBlockHeight + BroadcastSignedTransaction,
-{
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+) -> Result<bitcoin::TxCancel> {
     // First wait for cancel timelock to expire
     let tx_lock_height = bitcoin_wallet
         .transaction_block_height(tx_lock.txid())
@@ -183,9 +159,7 @@ where
             .expect("sig_{a,b} to be valid signatures for tx_cancel");
 
         // TODO(Franck): Error handling is delicate, why can't we broadcast?
-        bitcoin_wallet
-            .broadcast_signed_transaction(tx_cancel)
-            .await?;
+        bitcoin_wallet.broadcast(tx_cancel, "cancel").await?;
 
         // TODO(Franck): Wait until transaction is mined and returned mined
         // block height
@@ -194,18 +168,15 @@ where
     Ok(tx_cancel)
 }
 
-pub async fn wait_for_bitcoin_refund<W>(
+pub async fn wait_for_bitcoin_refund(
     tx_cancel: &TxCancel,
     cancel_tx_height: BlockHeight,
     punish_timelock: PunishTimelock,
     refund_address: &bitcoin::Address,
-    bitcoin_wallet: Arc<W>,
-) -> Result<(bitcoin::TxRefund, Option<bitcoin::Transaction>)>
-where
-    W: GetBlockHeight + WatchForRawTransaction,
-{
+    bitcoin_wallet: &bitcoin::Wallet,
+) -> Result<(bitcoin::TxRefund, Option<bitcoin::Transaction>)> {
     let punish_timelock_expired =
-        poll_until_block_height_is_gte(bitcoin_wallet.as_ref(), cancel_tx_height + punish_timelock);
+        poll_until_block_height_is_gte(bitcoin_wallet, cancel_tx_height + punish_timelock);
 
     let tx_refund = bitcoin::TxRefund::new(tx_cancel, refund_address);
 
@@ -265,23 +236,4 @@ pub fn build_bitcoin_punish_transaction(
         .expect("sig_{a,b} to be valid signatures for tx_cancel");
 
     Ok(signed_tx_punish)
-}
-
-pub async fn publish_bitcoin_punish_transaction<W>(
-    punish_tx: bitcoin::Transaction,
-    bitcoin_wallet: Arc<W>,
-    execution_params: ExecutionParams,
-) -> Result<bitcoin::Txid>
-where
-    W: BroadcastSignedTransaction + WaitForTransactionFinality,
-{
-    let txid = bitcoin_wallet
-        .broadcast_signed_transaction(punish_tx)
-        .await?;
-
-    bitcoin_wallet
-        .wait_for_transaction_finality(txid, execution_params)
-        .await?;
-
-    Ok(txid)
 }

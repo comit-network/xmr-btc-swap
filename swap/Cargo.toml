@@ -20,6 +20,7 @@ atty = "0.2"
 backoff = { version = "0.3", features = ["tokio"] }
 base64 = "0.12"
 bdk = { version = "0.4" }
+big-bytes = "1"
 bitcoin = { version = "0.26", features = ["rand", "use-serde"] }
 config = { version = "0.10", default-features = false, features = ["toml"] }
 conquer-once = "0.3"
@@ -57,7 +58,7 @@ toml = "0.5"
 tracing = { version = "0.1", features = ["attributes"] }
 tracing-futures = { version = "0.2", features = ["std-future", "futures-03"] }
 tracing-log = "0.1"
-tracing-subscriber = { version = "0.2", default-features = false, features = ["fmt", "ansi", "env-filter"] }
+tracing-subscriber = { version = "0.2", default-features = false, features = ["fmt", "ansi", "env-filter", "chrono"] }
 url = { version = "2.1", features = ["serde"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
 void = "1"

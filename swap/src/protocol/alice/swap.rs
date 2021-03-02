@@ -2,10 +2,7 @@
 //! Alice holds XMR and wishes receive BTC.
 use crate::{
     bitcoin,
-    bitcoin::{
-        ExpiredTimelocks, TransactionBlockHeight, WaitForTransactionFinality,
-        WatchForRawTransaction,
-    },
+    bitcoin::ExpiredTimelocks,
     database,
     database::Database,
     execution_params::ExecutionParams,
@@ -18,8 +15,7 @@ use crate::{
             event_loop::EventLoopHandle,
             steps::{
                 build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
-                extract_monero_private_key, lock_xmr, publish_bitcoin_punish_transaction,
-                publish_bitcoin_redeem_transaction, publish_cancel_transaction,
+                extract_monero_private_key, lock_xmr, publish_cancel_transaction,
                 wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund,
                 wait_for_locked_bitcoin,
             },
@@ -98,7 +94,7 @@ async fn run_until_internal(
             } => {
                 let _ = wait_for_locked_bitcoin(
                     state3.tx_lock.txid(),
-                    bitcoin_wallet.clone(),
+                    &bitcoin_wallet,
                     execution_params,
                 )
                 .await?;
@@ -222,37 +218,31 @@ async fn run_until_internal(
                             state3.B,
                             &state3.redeem_address,
                         ) {
-                            Ok(tx) => {
-                                match publish_bitcoin_redeem_transaction(tx, bitcoin_wallet.clone())
-                                    .await
-                                {
-                                    Ok(txid) => {
-                                        let publishded_redeem_tx = bitcoin_wallet
-                                            .wait_for_transaction_finality(txid, execution_params)
-                                            .await;
+                            Ok(tx) => match bitcoin_wallet.broadcast(tx, "redeem").await {
+                                Ok(txid) => {
+                                    let publishded_redeem_tx = bitcoin_wallet
+                                        .wait_for_transaction_finality(txid, execution_params)
+                                        .await;
 
-                                        match publishded_redeem_tx {
-                                            Ok(_) => AliceState::BtcRedeemed,
-                                            Err(e) => {
-                                                bail!("Waiting for Bitcoin transaction finality failed with {}! The redeem transaction was published, but it is not ensured that the transaction was included! You're screwed.", e)
-                                            }
-                                        }
-                                    }
-                                    Err(e) => {
-                                        error!("Publishing the redeem transaction failed with {}, attempting to wait for cancellation now. If you restart the application before the timelock is expired publishing the redeem transaction will be retried.", e);
-                                        state3
-                                            .wait_for_cancel_timelock_to_expire(
-                                                bitcoin_wallet.as_ref(),
-                                            )
-                                            .await?;
-
-                                        AliceState::CancelTimelockExpired {
-                                            state3,
-                                            monero_wallet_restore_blockheight,
+                                    match publishded_redeem_tx {
+                                        Ok(_) => AliceState::BtcRedeemed,
+                                        Err(e) => {
+                                            bail!("Waiting for Bitcoin transaction finality failed with {}! The redeem transaction was published, but it is not ensured that the transaction was included! You're screwed.", e)
                                         }
                                     }
                                 }
-                            }
+                                Err(e) => {
+                                    error!("Publishing the redeem transaction failed with {}, attempting to wait for cancellation now. If you restart the application before the timelock is expired publishing the redeem transaction will be retried.", e);
+                                    state3
+                                        .wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref())
+                                        .await?;
+
+                                    AliceState::CancelTimelockExpired {
+                                        state3,
+                                        monero_wallet_restore_blockheight,
+                                    }
+                                }
+                            },
                             Err(e) => {
                                 error!("Constructing the redeem transaction failed with {}, attempting to wait for cancellation now.", e);
                                 state3
@@ -335,7 +325,7 @@ async fn run_until_internal(
                     tx_cancel_height,
                     state3.punish_timelock,
                     &state3.refund_address,
-                    bitcoin_wallet.clone(),
+                    &bitcoin_wallet,
                 )
                 .await?;
 
@@ -430,11 +420,15 @@ async fn run_until_internal(
                     state3.B,
                 )?;
 
-                let punish_tx_finalised = publish_bitcoin_punish_transaction(
-                    signed_tx_punish,
-                    bitcoin_wallet.clone(),
-                    execution_params,
-                );
+                let punish_tx_finalised = async {
+                    let txid = bitcoin_wallet.broadcast(signed_tx_punish, "punish").await?;
+
+                    bitcoin_wallet
+                        .wait_for_transaction_finality(txid, execution_params)
+                        .await?;
+
+                    Result::<_, anyhow::Error>::Ok(txid)
+                };
 
                 let refund_tx_seen = bitcoin_wallet.watch_for_raw_transaction(tx_refund.txid());
 

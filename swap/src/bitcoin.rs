@@ -19,13 +19,11 @@ pub use ::bitcoin::{util::amount::Amount, Address, Network, Transaction, Txid};
 pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
 pub use wallet::Wallet;
 
-use crate::execution_params::ExecutionParams;
 use ::bitcoin::{
     hashes::{hex::ToHex, Hash},
     secp256k1, SigHash,
 };
 use anyhow::{anyhow, bail, Result};
-use async_trait::async_trait;
 use ecdsa_fun::{
     adaptor::{Adaptor, HashTranscript},
     fun::Point,
@@ -201,45 +199,6 @@ pub fn build_shared_output_descriptor(A: Point, B: Point) -> Descriptor<bitcoin:
     Descriptor::Wsh(Wsh::new(miniscript).expect("a valid descriptor"))
 }
 
-#[async_trait]
-pub trait SignTxLock {
-    async fn sign_tx_lock(&self, tx_lock: TxLock) -> Result<Transaction>;
-}
-
-#[async_trait]
-pub trait BroadcastSignedTransaction {
-    async fn broadcast_signed_transaction(&self, transaction: Transaction) -> Result<Txid>;
-}
-
-#[async_trait]
-pub trait WatchForRawTransaction {
-    async fn watch_for_raw_transaction(&self, txid: Txid) -> Result<Transaction>;
-}
-
-#[async_trait]
-pub trait WaitForTransactionFinality {
-    async fn wait_for_transaction_finality(
-        &self,
-        txid: Txid,
-        execution_params: ExecutionParams,
-    ) -> Result<()>;
-}
-
-#[async_trait]
-pub trait GetBlockHeight {
-    async fn get_block_height(&self) -> Result<BlockHeight>;
-}
-
-#[async_trait]
-pub trait TransactionBlockHeight {
-    async fn transaction_block_height(&self, txid: Txid) -> Result<BlockHeight>;
-}
-
-#[async_trait]
-pub trait GetRawTransaction {
-    async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction>;
-}
-
 pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Result<SecretKey> {
     let adaptor = Adaptor::<HashTranscript<Sha256>, Deterministic<Sha256>>::default();
 
@@ -251,25 +210,22 @@ pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Resu
     Ok(s)
 }
 
-pub async fn poll_until_block_height_is_gte<B>(client: &B, target: BlockHeight) -> Result<()>
-where
-    B: GetBlockHeight,
-{
+pub async fn poll_until_block_height_is_gte(
+    client: &crate::bitcoin::Wallet,
+    target: BlockHeight,
+) -> Result<()> {
     while client.get_block_height().await? < target {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
     Ok(())
 }
 
-pub async fn current_epoch<W>(
-    bitcoin_wallet: &W,
+pub async fn current_epoch(
+    bitcoin_wallet: &crate::bitcoin::Wallet,
     cancel_timelock: CancelTimelock,
     punish_timelock: PunishTimelock,
     lock_tx_id: ::bitcoin::Txid,
-) -> Result<ExpiredTimelocks>
-where
-    W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
-{
+) -> Result<ExpiredTimelocks> {
     let current_block_height = bitcoin_wallet.get_block_height().await?;
     let lock_tx_height = bitcoin_wallet.transaction_block_height(lock_tx_id).await?;
     let cancel_timelock_height = lock_tx_height + cancel_timelock;
@@ -285,14 +241,11 @@ where
     }
 }
 
-pub async fn wait_for_cancel_timelock_to_expire<W>(
-    bitcoin_wallet: &W,
+pub async fn wait_for_cancel_timelock_to_expire(
+    bitcoin_wallet: &crate::bitcoin::Wallet,
     cancel_timelock: CancelTimelock,
     lock_tx_id: ::bitcoin::Txid,
-) -> Result<()>
-where
-    W: WatchForRawTransaction + TransactionBlockHeight + GetBlockHeight,
-{
+) -> Result<()> {
     let tx_lock_height = bitcoin_wallet.transaction_block_height(lock_tx_id).await?;
 
     poll_until_block_height_is_gte(bitcoin_wallet, tx_lock_height + cancel_timelock).await?;

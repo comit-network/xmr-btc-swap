@@ -12,11 +12,7 @@ use monero_rpc::{
     wallet,
     wallet::{BlockHeight, Refreshed},
 };
-use std::{
-    str::FromStr,
-    sync::{atomic::Ordering, Arc},
-    time::Duration,
-};
+use std::{str::FromStr, sync::atomic::Ordering, time::Duration};
 use tokio::sync::Mutex;
 use tracing::info;
 use url::Url;
@@ -82,7 +78,7 @@ impl Transfer for Wallet {
         public_spend_key: PublicKey,
         public_view_key: PublicViewKey,
         amount: Amount,
-    ) -> Result<(TransferProof, Amount)> {
+    ) -> Result<TransferProof> {
         let destination_address =
             Address::standard(self.network, public_spend_key, public_view_key.into());
 
@@ -93,16 +89,17 @@ impl Transfer for Wallet {
             .transfer(0, amount.as_piconero(), &destination_address.to_string())
             .await?;
 
-        let tx_hash = TxHash(res.tx_hash);
-        tracing::info!("Monero tx broadcasted!, tx hash: {:?}", tx_hash);
-        let tx_key = PrivateKey::from_str(&res.tx_key)?;
+        tracing::debug!(
+            "sent transfer of {} to {} in {}",
+            amount,
+            public_spend_key,
+            res.tx_hash
+        );
 
-        let fee = Amount::from_piconero(res.fee);
-
-        let transfer_proof = TransferProof::new(tx_hash, tx_key);
-        tracing::debug!("  Transfer proof: {:?}", transfer_proof);
-
-        Ok((transfer_proof, fee))
+        Ok(TransferProof::new(
+            TxHash(res.tx_hash),
+            PrivateKey::from_str(&res.tx_key)?,
+        ))
     }
 }
 
@@ -203,7 +200,7 @@ impl WatchForTransfer for Wallet {
 
         let address = Address::standard(self.network, public_spend_key, public_view_key.into());
 
-        let confirmations = Arc::new(AtomicU32::new(0u32));
+        let confirmations = AtomicU32::new(0u32);
 
         let res = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
             // NOTE: Currently, this is conflicting IO errors with the transaction not being

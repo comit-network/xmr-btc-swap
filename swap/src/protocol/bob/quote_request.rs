@@ -36,6 +36,8 @@ pub struct Behaviour {
 
 impl Behaviour {
     pub fn send(&mut self, alice: PeerId, quote_request: QuoteRequest) -> Result<RequestId> {
+        debug!("Requesting quote for {}", quote_request.btc_amount);
+
         let id = self.rr.send_request(&alice, quote_request);
 
         Ok(id)
@@ -67,13 +69,9 @@ impl From<RequestResponseEvent<QuoteRequest, QuoteResponse>> for OutEvent {
                 ..
             } => OutEvent::Failure(anyhow!("Bob should never get a request from Alice")),
             RequestResponseEvent::Message {
-                peer,
                 message: RequestResponseMessage::Response { response, .. },
                 ..
-            } => {
-                debug!("Received quote response from {}", peer);
-                OutEvent::MsgReceived(response)
-            }
+            } => OutEvent::MsgReceived(response),
             RequestResponseEvent::InboundFailure { error, .. } => {
                 OutEvent::Failure(anyhow!("Inbound failure: {:?}", error))
             }

@@ -34,10 +34,9 @@ use swap::{
         bob::{cancel::CancelError, Builder},
     },
     seed::Seed,
-    trace::init_tracing,
 };
-use tracing::{debug, error, info, warn};
-use tracing_subscriber::filter::LevelFilter;
+use tracing::{debug, error, info, warn, Level};
+use tracing_subscriber::FmtSubscriber;
 use uuid::Uuid;
 
 #[macro_use]
@@ -47,17 +46,41 @@ const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-mon
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    init_tracing(LevelFilter::DEBUG).expect("initialize tracing");
+    let args = Arguments::from_args();
 
-    let opt = Arguments::from_args();
+    let is_terminal = atty::is(atty::Stream::Stderr);
+    let base_subscriber = |level| {
+        FmtSubscriber::builder()
+            .with_writer(std::io::stderr)
+            .with_ansi(is_terminal)
+            .with_target(false)
+            .with_env_filter(format!("swap={}", level))
+    };
 
-    let config = match opt.config {
+    if args.debug {
+        let subscriber = base_subscriber(Level::DEBUG)
+            .with_timer(tracing_subscriber::fmt::time::ChronoLocal::with_format(
+                "%F %T".to_owned(),
+            ))
+            .finish();
+
+        tracing::subscriber::set_global_default(subscriber)?;
+    } else {
+        let subscriber = base_subscriber(Level::INFO)
+            .without_time()
+            .with_level(false)
+            .finish();
+
+        tracing::subscriber::set_global_default(subscriber)?;
+    }
+
+    let config = match args.config {
         Some(config_path) => read_config(config_path)??,
         None => Config::testnet(),
     };
 
-    info!(
-        "Database and Seed will be stored in directory: {}",
+    debug!(
+        "Database and seed will be stored in {}",
         config.data.dir.display()
     );
 
@@ -79,7 +102,7 @@ async fn main() -> Result<()> {
         .run(monero_network, "stagenet.community.xmr.to")
         .await?;
 
-    match opt.cmd.unwrap_or_default() {
+    match args.cmd.unwrap_or_default() {
         Command::BuyXmr {
             alice_peer_id,
             alice_addr,
@@ -98,8 +121,8 @@ async fn main() -> Result<()> {
 
             // TODO: Also wait for more funds if balance < dust
             if bitcoin_wallet.balance().await? == Amount::ZERO {
-                debug!(
-                    "Waiting for BTC at address {}",
+                info!(
+                    "Please deposit BTC to {}",
                     bitcoin_wallet.new_address().await?
                 );
 
@@ -110,11 +133,14 @@ async fn main() -> Result<()> {
                 }
 
                 debug!("Received {}", bitcoin_wallet.balance().await?);
+            } else {
+                info!(
+                    "Still got {} left in wallet, swapping ...",
+                    bitcoin_wallet.balance().await?
+                );
             }
 
             let send_bitcoin = bitcoin_wallet.max_giveable(TxLock::script_size()).await?;
-
-            info!("Swapping {} ...", send_bitcoin);
 
             let bob_factory = Builder::new(
                 seed,
@@ -233,7 +259,7 @@ async fn main() -> Result<()> {
                 cancel_result = cancel => {
                     match cancel_result? {
                         Ok((txid, _)) => {
-                            info!("Cancel transaction successfully published with id {}", txid)
+                            debug!("Cancel transaction successfully published with id {}", txid)
                         }
                         Err(CancelError::CancelTimelockNotExpiredYet) => error!(
                             "The Cancel Transaction cannot be published yet, \
@@ -318,13 +344,7 @@ async fn init_wallets(
     bitcoin_wallet
         .sync_wallet()
         .await
-        .expect("Could not sync btc wallet");
-
-    let bitcoin_balance = bitcoin_wallet.balance().await?;
-    info!(
-        "Connection to Bitcoin wallet succeeded, balance: {}",
-        bitcoin_balance
-    );
+        .context("failed to sync balance of bitcoin wallet")?;
 
     let monero_wallet = monero::Wallet::new(
         monero_wallet_rpc_url.clone(),
@@ -346,19 +366,16 @@ async fn init_wallets(
                 monero_wallet_rpc_url
             ))?;
 
-        info!(
+        debug!(
             "Created Monero wallet for blockchain monitoring with name {}",
-            MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME
-        );
-    } else {
-        info!(
-            "Opened Monero wallet for blockchain monitoring with name {}",
             MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME
         );
     }
 
-    let _test_wallet_connection = monero_wallet.block_height().await?;
-    info!("The Monero wallet RPC is set up correctly!");
+    let _test_wallet_connection = monero_wallet
+        .block_height()
+        .await
+        .context("failed to validate connection to monero-wallet-rpc")?;
 
     Ok((bitcoin_wallet, monero_wallet))
 }
