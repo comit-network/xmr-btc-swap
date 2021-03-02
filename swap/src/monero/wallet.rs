@@ -61,6 +61,15 @@ impl Wallet {
         self.inner.lock().await.refresh().await
     }
 
+    pub async fn sweep_all(&self, address: Address) -> Result<Vec<TxHash>> {
+        self.inner
+            .lock()
+            .await
+            .sweep_all(address.to_string().as_str())
+            .await
+            .map(|sweep_all| sweep_all.tx_hash_list.into_iter().map(TxHash).collect())
+    }
+
     pub fn static_tx_fee_estimate(&self) -> Amount {
         // Median tx fees on Monero as found here: https://www.monero.how/monero-transaction-fees, 0.000_015 * 2 (to be on the safe side)
         Amount::from_monero(0.000_03f64).expect("static fee to be convertible without problems")
@@ -112,10 +121,13 @@ impl CreateWalletForOutput for Wallet {
 
         let address = Address::standard(self.network, public_spend_key, public_view_key);
 
-        let _ = self
-            .inner
-            .lock()
-            .await
+        let wallet = self.inner.lock().await;
+
+        // Properly close the wallet before generating the other wallet to ensure that
+        // it saves its state correctly
+        let _ = wallet.close_wallet().await?;
+
+        let _ = wallet
             .generate_from_keys(
                 &address.to_string(),
                 &private_spend_key.to_string(),
@@ -142,6 +154,10 @@ impl CreateWalletForOutputThenReloadWallet for Wallet {
         let address = Address::standard(self.network, public_spend_key, public_view_key);
 
         let wallet = self.inner.lock().await;
+
+        // Properly close the wallet before generating the other wallet to ensure that
+        // it saves its state correctly
+        let _ = wallet.close_wallet().await?;
 
         let _ = wallet
             .generate_from_keys(

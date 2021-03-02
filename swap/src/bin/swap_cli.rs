@@ -102,8 +102,9 @@ async fn main() -> Result<()> {
         .run(monero_network, "stagenet.community.xmr.to")
         .await?;
 
-    match args.cmd.unwrap_or_default() {
+    match args.cmd {
         Command::BuyXmr {
+            receive_monero_address,
             alice_peer_id,
             alice_addr,
         } => {
@@ -153,6 +154,7 @@ async fn main() -> Result<()> {
                 Arc::new(monero_wallet),
                 execution_params,
                 event_loop_handle,
+                receive_monero_address,
             )
             .with_init_params(send_bitcoin)
             .build()?;
@@ -180,6 +182,7 @@ async fn main() -> Result<()> {
             table.printstd();
         }
         Command::Resume {
+            receive_monero_address,
             swap_id,
             alice_peer_id,
             alice_addr,
@@ -205,6 +208,7 @@ async fn main() -> Result<()> {
                 Arc::new(monero_wallet),
                 execution_params,
                 event_loop_handle,
+                receive_monero_address,
             )
             .build()?;
 

@@ -43,6 +43,7 @@ pub async fn run_until(
         swap.monero_wallet,
         swap.swap_id,
         swap.execution_params,
+        swap.receive_monero_address,
     )
     .await
 }
@@ -59,6 +60,7 @@ async fn run_until_internal(
     monero_wallet: Arc<monero::Wallet>,
     swap_id: Uuid,
     execution_params: ExecutionParams,
+    receive_monero_address: monero::Address,
 ) -> Result<BobState> {
     trace!("Current state: {}", state);
     if is_target_state(&state) {
@@ -90,6 +92,7 @@ async fn run_until_internal(
                     monero_wallet,
                     swap_id,
                     execution_params,
+                    receive_monero_address,
                 )
                 .await
             }
@@ -111,6 +114,7 @@ async fn run_until_internal(
                     monero_wallet,
                     swap_id,
                     execution_params,
+                    receive_monero_address,
                 )
                 .await
             }
@@ -159,6 +163,7 @@ async fn run_until_internal(
                     monero_wallet,
                     swap_id,
                     execution_params,
+                    receive_monero_address,
                 )
                 .await
             }
@@ -213,6 +218,7 @@ async fn run_until_internal(
                     monero_wallet,
                     swap_id,
                     execution_params,
+                    receive_monero_address,
                 )
                 .await
             }
@@ -255,6 +261,7 @@ async fn run_until_internal(
                     monero_wallet,
                     swap_id,
                     execution_params,
+                    receive_monero_address,
                 )
                 .await
             }
@@ -290,12 +297,18 @@ async fn run_until_internal(
                     monero_wallet,
                     swap_id,
                     execution_params,
+                    receive_monero_address,
                 )
                 .await
             }
             BobState::BtcRedeemed(state) => {
                 // Bob redeems XMR using revealed s_a
                 state.claim_xmr(monero_wallet.as_ref()).await?;
+
+                // Ensure that the generated wallet is synced so we have a proper balance
+                monero_wallet.refresh().await?;
+                // Sweep (transfer all funds) to the given address
+                monero_wallet.sweep_all(receive_monero_address).await?;
 
                 let state = BobState::XmrRedeemed {
                     tx_lock_id: state.tx_lock_id(),
@@ -311,6 +324,7 @@ async fn run_until_internal(
                     monero_wallet,
                     swap_id,
                     execution_params,
+                    receive_monero_address,
                 )
                 .await
             }
@@ -336,6 +350,7 @@ async fn run_until_internal(
                     monero_wallet,
                     swap_id,
                     execution_params,
+                    receive_monero_address,
                 )
                 .await
             }
@@ -367,6 +382,7 @@ async fn run_until_internal(
                     monero_wallet,
                     swap_id,
                     execution_params,
+                    receive_monero_address,
                 )
                 .await
             }

@@ -44,6 +44,7 @@ pub struct Swap {
     pub monero_wallet: Arc<monero::Wallet>,
     pub execution_params: ExecutionParams,
     pub swap_id: Uuid,
+    pub receive_monero_address: ::monero::Address,
 }
 
 pub struct Builder {
@@ -57,6 +58,8 @@ pub struct Builder {
     execution_params: ExecutionParams,
 
     event_loop_handle: bob::EventLoopHandle,
+
+    receive_monero_address: ::monero::Address,
 }
 
 enum InitParams {
@@ -73,6 +76,7 @@ impl Builder {
         monero_wallet: Arc<monero::Wallet>,
         execution_params: ExecutionParams,
         event_loop_handle: bob::EventLoopHandle,
+        receive_monero_address: ::monero::Address,
     ) -> Self {
         Self {
             swap_id,
@@ -82,6 +86,7 @@ impl Builder {
             init_params: InitParams::None,
             execution_params,
             event_loop_handle,
+            receive_monero_address,
         }
     }
 
@@ -106,6 +111,7 @@ impl Builder {
             monero_wallet: self.monero_wallet.clone(),
             swap_id: self.swap_id,
             execution_params: self.execution_params,
+            receive_monero_address: self.receive_monero_address,
         })
     }
 }

@@ -22,6 +22,7 @@ use swap::{
     execution_params,
     execution_params::{ExecutionParams, GetExecutionParams},
     monero,
+    monero::OpenWallet,
     protocol::{alice, alice::AliceState, bob, bob::BobState},
     seed::Seed,
 };
@@ -56,15 +57,18 @@ struct BobParams {
 }
 
 impl BobParams {
-    pub fn builder(&self, event_loop_handle: bob::EventLoopHandle) -> bob::Builder {
-        bob::Builder::new(
+    pub async fn builder(&self, event_loop_handle: bob::EventLoopHandle) -> Result<bob::Builder> {
+        let receive_address = self.monero_wallet.get_main_address().await?;
+
+        Ok(bob::Builder::new(
             Database::open(&self.db_path.clone().as_path()).unwrap(),
             self.swap_id,
             self.bitcoin_wallet.clone(),
             self.monero_wallet.clone(),
             self.execution_params,
             event_loop_handle,
-        )
+            receive_address,
+        ))
     }
 
     pub fn new_eventloop(&self) -> Result<(bob::EventLoop, bob::EventLoopHandle)> {
@@ -109,6 +113,8 @@ impl TestContext {
         let swap = self
             .bob_params
             .builder(event_loop_handle)
+            .await
+            .unwrap()
             .with_init_params(self.btc_amount)
             .build()
             .unwrap();
@@ -126,7 +132,13 @@ impl TestContext {
 
         let (event_loop, event_loop_handle) = self.bob_params.new_eventloop().unwrap();
 
-        let swap = self.bob_params.builder(event_loop_handle).build().unwrap();
+        let swap = self
+            .bob_params
+            .builder(event_loop_handle)
+            .await
+            .unwrap()
+            .build()
+            .unwrap();
 
         let join_handle = tokio::spawn(event_loop.run());
 
@@ -239,13 +251,15 @@ impl TestContext {
             self.bob_starting_balances.btc - self.btc_amount - lock_tx_bitcoin_fee
         );
 
+        // unload the generated wallet by opening the original wallet
+        self.bob_monero_wallet.open().await.unwrap();
+        // refresh the original wallet to make sure the balance is caught up
+        self.bob_monero_wallet.refresh().await.unwrap();
+
         // Ensure that Bob's balance is refreshed as we use a newly created wallet
         self.bob_monero_wallet.as_ref().refresh().await.unwrap();
         let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().get_balance().await.unwrap();
-        assert_eq!(
-            xmr_balance_after_swap,
-            self.bob_starting_balances.xmr + self.xmr_amount
-        );
+        assert!(xmr_balance_after_swap > self.bob_starting_balances.xmr);
     }
 
     pub async fn assert_bob_refunded(&self, state: BobState) {
@@ -685,18 +699,20 @@ pub fn init_tracing() -> DefaultGuard {
     let global_filter = tracing::Level::WARN;
     let swap_filter = tracing::Level::DEBUG;
     let xmr_btc_filter = tracing::Level::DEBUG;
-    let monero_harness_filter = tracing::Level::INFO;
+    let monero_rpc_filter = tracing::Level::DEBUG;
+    let monero_harness_filter = tracing::Level::DEBUG;
     let bitcoin_harness_filter = tracing::Level::INFO;
     let testcontainers_filter = tracing::Level::DEBUG;
 
     use tracing_subscriber::util::SubscriberInitExt as _;
     tracing_subscriber::fmt()
         .with_env_filter(format!(
-            "{},swap={},xmr_btc={},monero_harness={},bitcoin_harness={},testcontainers={}",
+            "{},swap={},xmr_btc={},monero_harness={},monero_rpc={},bitcoin_harness={},testcontainers={}",
             global_filter,
             swap_filter,
             xmr_btc_filter,
             monero_harness_filter,
+            monero_rpc_filter,
             bitcoin_harness_filter,
             testcontainers_filter
         ))
