@@ -18,6 +18,9 @@ jobs:
           release-name: latest
           token: ${{ secrets.BOTTY_GITHUB_TOKEN }}
 
+      - name: Give GitHub some time to process the deletion, otherwise our release shows up as draft. Sigh.
+        run: sleep 10
+
       - name: Create 'latest' release
         uses: actions/create-release@v1
         env:
