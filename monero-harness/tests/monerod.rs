@@ -12,7 +12,7 @@ async fn init_miner_and_mine_to_miner_address() {
     let _guard = init_tracing();
 
     let tc = Cli::default();
-    let (monero, _monerod_container) = Monero::new(&tc, None, vec![]).await.unwrap();
+    let (monero, _monerod_container) = Monero::new(&tc, vec![]).await.unwrap();
 
     monero.init(vec![]).await.unwrap();
 
