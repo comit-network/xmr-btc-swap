@@ -1,8 +1,9 @@
 use crate::testutils::init_tracing;
 use monero_harness::{Monero, MoneroWalletRpc};
 use spectral::prelude::*;
-use std::{thread::sleep, time::Duration};
+use std::time::Duration;
 use testcontainers::clients::Cli;
+use tokio::time::sleep;
 
 mod testutils;
 
@@ -67,6 +68,6 @@ async fn wait_for_wallet_to_catch_up(wallet: &MoneroWalletRpc, expected_balance:
         if balance == expected_balance || max_retry == retry {
             break;
         }
-        sleep(Duration::from_secs(1));
+        sleep(Duration::from_secs(1)).await;
     }
 }
