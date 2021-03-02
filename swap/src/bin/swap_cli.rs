@@ -293,9 +293,7 @@ async fn init_monero_wallet(
     );
 
     // Setup the temporary Monero wallet necessary for monitoring the blockchain
-    let open_monitoring_wallet_response = monero_wallet
-        .open_wallet(MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME)
-        .await;
+    let open_monitoring_wallet_response = monero_wallet.open().await;
     if open_monitoring_wallet_response.is_err() {
         monero_wallet
             .create_wallet(MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME)

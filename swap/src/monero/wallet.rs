@@ -166,8 +166,12 @@ impl CreateWalletForOutputThenLoadDefaultWallet for Wallet {
 
 #[async_trait]
 impl OpenWallet for Wallet {
-    async fn open_wallet(&self, file_name: &str) -> Result<()> {
-        self.inner.lock().await.open_wallet(file_name).await?;
+    async fn open(&self) -> Result<()> {
+        self.inner
+            .lock()
+            .await
+            .open_wallet(self.default_wallet_name.as_str())
+            .await?;
         Ok(())
     }
 }

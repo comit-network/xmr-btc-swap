@@ -240,7 +240,7 @@ pub trait CreateWalletForOutputThenLoadDefaultWallet {
 
 #[async_trait]
 pub trait OpenWallet {
-    async fn open_wallet(&self, file_name: &str) -> Result<()>;
+    async fn open(&self) -> Result<()>;
 }
 
 #[async_trait]

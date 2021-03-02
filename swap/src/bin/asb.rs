@@ -165,7 +165,7 @@ async fn init_wallets(
     );
 
     // Setup the Monero wallet
-    let open_wallet_response = monero_wallet.open_wallet(DEFAULT_WALLET_NAME).await;
+    let open_wallet_response = monero_wallet.open().await;
     if open_wallet_response.is_err() {
         monero_wallet
             .create_wallet(DEFAULT_WALLET_NAME)
