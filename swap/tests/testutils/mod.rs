@@ -33,7 +33,9 @@ use tracing_log::LogTracer;
 use url::Url;
 use uuid::Uuid;
 
-const TEST_WALLET_NAME: &str = "testwallet";
+const MONERO_WALLET_NAME_BOB: &str = "bob";
+const MONERO_WALLET_NAME_ALICE: &str = "alice";
+const BITCOIN_TEST_WALLET_NAME: &str = "testwallet";
 
 #[derive(Debug, Clone)]
 pub struct StartingBalances {
@@ -353,7 +355,7 @@ where
     let bob_seed = Seed::random().unwrap();
 
     let (alice_bitcoin_wallet, alice_monero_wallet) = init_test_wallets(
-        "alice",
+        MONERO_WALLET_NAME_ALICE,
         containers.bitcoind_url.clone(),
         &monero,
         alice_starting_balances.clone(),
@@ -375,7 +377,7 @@ where
     };
 
     let (bob_bitcoin_wallet, bob_monero_wallet) = init_test_wallets(
-        "bob",
+        MONERO_WALLET_NAME_BOB,
         containers.bitcoind_url,
         &monero,
         bob_starting_balances.clone(),
@@ -529,11 +531,11 @@ async fn init_bitcoind(node_url: Url, spendable_quantity: u32) -> Result<Client>
     let bitcoind_client = Client::new(node_url.clone());
 
     bitcoind_client
-        .createwallet(TEST_WALLET_NAME, None, None, None, None)
+        .createwallet(BITCOIN_TEST_WALLET_NAME, None, None, None, None)
         .await?;
 
     let reward_address = bitcoind_client
-        .with_wallet(TEST_WALLET_NAME)?
+        .with_wallet(BITCOIN_TEST_WALLET_NAME)?
         .getnewaddress(None, None)
         .await?;
 
@@ -550,12 +552,12 @@ pub async fn mint(node_url: Url, address: bitcoin::Address, amount: bitcoin::Amo
     let bitcoind_client = Client::new(node_url.clone());
 
     bitcoind_client
-        .send_to_address(TEST_WALLET_NAME, address.clone(), amount)
+        .send_to_address(BITCOIN_TEST_WALLET_NAME, address.clone(), amount)
         .await?;
 
     // Confirm the transaction
     let reward_address = bitcoind_client
-        .with_wallet(TEST_WALLET_NAME)?
+        .with_wallet(BITCOIN_TEST_WALLET_NAME)?
         .getnewaddress(None, None)
         .await?;
     bitcoind_client
@@ -571,9 +573,12 @@ async fn init_monero_container(
     Monero,
     Vec<Container<'_, Cli, monero_harness::image::Monero>>,
 ) {
-    let (monero, monerods) = Monero::new(&cli, None, vec!["alice".to_string(), "bob".to_string()])
-        .await
-        .unwrap();
+    let (monero, monerods) = Monero::new(&cli, vec![
+        MONERO_WALLET_NAME_ALICE.to_string(),
+        MONERO_WALLET_NAME_BOB.to_string(),
+    ])
+    .await
+    .unwrap();
 
     (monero, monerods)
 }
