@@ -130,9 +130,7 @@ pub async fn publish_bitcoin_redeem_transaction(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
 ) -> Result<::bitcoin::Txid> {
     info!("Attempting to publish bitcoin redeem txn");
-    let txid = bitcoin_wallet
-        .broadcast_signed_transaction(redeem_tx)
-        .await?;
+    let txid = bitcoin_wallet.broadcast(redeem_tx).await?;
 
     Ok(txid)
 }
@@ -172,9 +170,7 @@ pub async fn publish_cancel_transaction(
             .expect("sig_{a,b} to be valid signatures for tx_cancel");
 
         // TODO(Franck): Error handling is delicate, why can't we broadcast?
-        bitcoin_wallet
-            .broadcast_signed_transaction(tx_cancel)
-            .await?;
+        bitcoin_wallet.broadcast(tx_cancel).await?;
 
         // TODO(Franck): Wait until transaction is mined and returned mined
         // block height
@@ -258,9 +254,7 @@ pub async fn publish_bitcoin_punish_transaction(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     execution_params: ExecutionParams,
 ) -> Result<bitcoin::Txid> {
-    let txid = bitcoin_wallet
-        .broadcast_signed_transaction(punish_tx)
-        .await?;
+    let txid = bitcoin_wallet.broadcast(punish_tx).await?;
 
     bitcoin_wallet
         .wait_for_transaction_finality(txid, execution_params)

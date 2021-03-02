@@ -147,7 +147,7 @@ impl Wallet {
         self.inner.lock().await.network()
     }
 
-    pub async fn broadcast_signed_transaction(&self, transaction: Transaction) -> Result<Txid> {
+    pub async fn broadcast(&self, transaction: Transaction) -> Result<Txid> {
         let txid = transaction.txid();
 
         self.inner
