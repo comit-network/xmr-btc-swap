@@ -178,8 +178,12 @@ impl OpenWallet for Wallet {
 
 #[async_trait]
 impl CreateWallet for Wallet {
-    async fn create_wallet(&self, file_name: &str) -> Result<()> {
-        self.inner.lock().await.create_wallet(file_name).await?;
+    async fn create(&self) -> Result<()> {
+        self.inner
+            .lock()
+            .await
+            .create_wallet(self.default_wallet_name.as_str())
+            .await?;
         Ok(())
     }
 }
