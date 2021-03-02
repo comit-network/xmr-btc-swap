@@ -597,7 +597,7 @@ async fn init_test_wallets(
     let xmr_wallet = swap::monero::Wallet::new_with_client(
         monero.wallet(name).unwrap().client(),
         monero::Network::default(),
-        "irrelevant_for_tests".to_string(),
+        name.to_string(),
     );
 
     let electrum_rpc_url = {
