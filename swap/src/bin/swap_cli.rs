@@ -295,14 +295,11 @@ async fn init_monero_wallet(
     // Setup the temporary Monero wallet necessary for monitoring the blockchain
     let open_monitoring_wallet_response = monero_wallet.open().await;
     if open_monitoring_wallet_response.is_err() {
-        monero_wallet
-            .create_wallet(MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME)
-            .await
-            .context(format!(
-                "Unable to create Monero wallet for blockchain monitoring.\
+        monero_wallet.create().await.context(format!(
+            "Unable to create Monero wallet for blockchain monitoring.\
              Please ensure that the monero-wallet-rpc is available at {}",
-                monero_wallet_rpc_url
-            ))?;
+            monero_wallet_rpc_url
+        ))?;
 
         debug!(
             "Created Monero wallet for blockchain monitoring with name {}",

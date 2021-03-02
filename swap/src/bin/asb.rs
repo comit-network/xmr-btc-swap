@@ -167,14 +167,11 @@ async fn init_wallets(
     // Setup the Monero wallet
     let open_wallet_response = monero_wallet.open().await;
     if open_wallet_response.is_err() {
-        monero_wallet
-            .create_wallet(DEFAULT_WALLET_NAME)
-            .await
-            .context(format!(
-                "Unable to create Monero wallet.\
+        monero_wallet.create().await.context(format!(
+            "Unable to create Monero wallet.\
              Please ensure that the monero-wallet-rpc is available at {}",
-                config.monero.wallet_rpc_url
-            ))?;
+            config.monero.wallet_rpc_url
+        ))?;
 
         info!("Created Monero wallet {}", DEFAULT_WALLET_NAME);
     } else {
