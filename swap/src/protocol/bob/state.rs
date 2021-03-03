@@ -574,7 +574,7 @@ pub struct State5 {
 impl State5 {
     pub async fn claim_xmr<W>(&self, monero_wallet: &W) -> Result<()>
     where
-        W: monero::CreateWalletForOutput,
+        W: monero::CreateFromAndLoad,
     {
         let s_b = monero::PrivateKey { scalar: self.s_b };
 
@@ -583,7 +583,7 @@ impl State5 {
         // NOTE: This actually generates and opens a new wallet, closing the currently
         // open one.
         monero_wallet
-            .create_and_load_wallet_for_output(s, self.v, self.monero_wallet_restore_blockheight)
+            .create_from_and_load(s, self.v, self.monero_wallet_restore_blockheight)
             .await?;
 
         Ok(())

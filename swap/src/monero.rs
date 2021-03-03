@@ -218,8 +218,8 @@ pub struct BalanceTooLow {
 }
 
 #[async_trait]
-pub trait CreateWalletForOutput {
-    async fn create_and_load_wallet_for_output(
+pub trait CreateFromAndLoad {
+    async fn create_from_and_load(
         &self,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
@@ -228,8 +228,8 @@ pub trait CreateWalletForOutput {
 }
 
 #[async_trait]
-pub trait CreateWalletForOutputThenReloadWallet {
-    async fn create_and_load_wallet_for_output_then_reload_wallet(
+pub trait CreateFrom {
+    async fn create_from(
         &self,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
@@ -243,8 +243,8 @@ pub trait OpenWallet {
 }
 
 #[async_trait]
-pub trait CreateWallet {
-    async fn create(&self) -> Result<()>;
+pub trait OpenOrCreate {
+    async fn open_or_create(&self) -> Result<()>;
 }
 
 #[async_trait]

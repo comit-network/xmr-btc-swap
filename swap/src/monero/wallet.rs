@@ -1,10 +1,9 @@
 use crate::monero::{
-    Amount, CreateWallet, CreateWalletForOutput, CreateWalletForOutputThenReloadWallet,
-    InsufficientFunds, OpenWallet, PrivateViewKey, PublicViewKey, Transfer, TransferProof, TxHash,
-    WatchForTransfer,
+    Amount, CreateFrom, CreateFromAndLoad, InsufficientFunds, OpenOrCreate, OpenWallet,
+    PrivateViewKey, PublicViewKey, Transfer, TransferProof, TxHash, WatchForTransfer,
 };
 use ::monero::{Address, Network, PrivateKey, PublicKey};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::retry};
 use bitcoin::hashes::core::sync::atomic::AtomicU32;
@@ -14,7 +13,7 @@ use monero_rpc::{
 };
 use std::{str::FromStr, sync::atomic::Ordering, time::Duration};
 use tokio::sync::Mutex;
-use tracing::info;
+use tracing::{debug, info};
 use url::Url;
 
 #[derive(Debug)]
@@ -62,12 +61,15 @@ impl Wallet {
     }
 
     pub async fn sweep_all(&self, address: Address) -> Result<Vec<TxHash>> {
-        self.inner
+        let sweep_all = self
+            .inner
             .lock()
             .await
             .sweep_all(address.to_string().as_str())
-            .await
-            .map(|sweep_all| sweep_all.tx_hash_list.into_iter().map(TxHash).collect())
+            .await?;
+
+        let tx_hashes = sweep_all.tx_hash_list.into_iter().map(TxHash).collect();
+        Ok(tx_hashes)
     }
 
     pub fn static_tx_fee_estimate(&self) -> Amount {
@@ -109,8 +111,8 @@ impl Transfer for Wallet {
 }
 
 #[async_trait]
-impl CreateWalletForOutput for Wallet {
-    async fn create_and_load_wallet_for_output(
+impl CreateFromAndLoad for Wallet {
+    async fn create_from_and_load(
         &self,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
@@ -141,8 +143,8 @@ impl CreateWalletForOutput for Wallet {
 }
 
 #[async_trait]
-impl CreateWalletForOutputThenReloadWallet for Wallet {
-    async fn create_and_load_wallet_for_output_then_reload_wallet(
+impl CreateFrom for Wallet {
+    async fn create_from(
         &self,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
@@ -187,13 +189,19 @@ impl OpenWallet for Wallet {
 }
 
 #[async_trait]
-impl CreateWallet for Wallet {
-    async fn create(&self) -> Result<()> {
-        self.inner
-            .lock()
-            .await
-            .create_wallet(self.name.as_str())
-            .await?;
+impl OpenOrCreate for Wallet {
+    async fn open_or_create(&self) -> Result<()> {
+        let open_wallet_response = self.open().await;
+        if open_wallet_response.is_err() {
+            self.inner.lock().await.create_wallet(self.name.as_str()).await.context(
+                "Unable to create Monero wallet, please ensure that the monero-wallet-rpc is available",
+            )?;
+
+            debug!("Created Monero wallet {}", self.name);
+        } else {
+            debug!("Opened Monero wallet {}", self.name);
+        }
+
         Ok(())
     }
 }
