@@ -38,6 +38,30 @@ impl Wallet {
         }
     }
 
+    pub async fn open(&self) -> Result<()> {
+        self.inner
+            .lock()
+            .await
+            .open_wallet(self.name.as_str())
+            .await?;
+        Ok(())
+    }
+
+    pub async fn open_or_create(&self) -> Result<()> {
+        let open_wallet_response = self.open().await;
+        if open_wallet_response.is_err() {
+            self.inner.lock().await.create_wallet(self.name.as_str()).await.context(
+                "Unable to create Monero wallet, please ensure that the monero-wallet-rpc is available",
+            )?;
+
+            debug!("Created Monero wallet {}", self.name);
+        } else {
+            debug!("Opened Monero wallet {}", self.name);
+        }
+
+        Ok(())
+    }
+
     /// Get the balance of the primary account.
     pub async fn get_balance(&self) -> Result<Amount> {
         let amount = self.inner.lock().await.get_balance(0).await?;
@@ -160,30 +184,6 @@ impl Wallet {
             .await?;
 
         let _ = wallet.open_wallet(self.name.as_str()).await?;
-
-        Ok(())
-    }
-
-    pub async fn open(&self) -> Result<()> {
-        self.inner
-            .lock()
-            .await
-            .open_wallet(self.name.as_str())
-            .await?;
-        Ok(())
-    }
-
-    pub async fn open_or_create(&self) -> Result<()> {
-        let open_wallet_response = self.open().await;
-        if open_wallet_response.is_err() {
-            self.inner.lock().await.create_wallet(self.name.as_str()).await.context(
-                "Unable to create Monero wallet, please ensure that the monero-wallet-rpc is available",
-            )?;
-
-            debug!("Created Monero wallet {}", self.name);
-        } else {
-            debug!("Opened Monero wallet {}", self.name);
-        }
 
         Ok(())
     }
