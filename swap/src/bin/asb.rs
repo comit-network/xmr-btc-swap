@@ -32,7 +32,7 @@ use swap::{
     execution_params::GetExecutionParams,
     fs::default_config_path,
     monero,
-    monero::{Amount, CreateWallet, OpenWallet},
+    monero::{Amount, OpenOrCreate},
     protocol::alice::EventLoop,
     seed::Seed,
     trace::init_tracing,
@@ -165,18 +165,7 @@ async fn init_wallets(
     );
 
     // Setup the Monero wallet
-    let open_wallet_response = monero_wallet.open().await;
-    if open_wallet_response.is_err() {
-        monero_wallet.create().await.context(format!(
-            "Unable to create Monero wallet.\
-             Please ensure that the monero-wallet-rpc is available at {}",
-            config.monero.wallet_rpc_url
-        ))?;
-
-        info!("Created Monero wallet {}", DEFAULT_WALLET_NAME);
-    } else {
-        info!("Opened Monero wallet {}", DEFAULT_WALLET_NAME);
-    }
+    monero_wallet.open_or_create().await?;
 
     let balance = monero_wallet.get_balance().await?;
     if balance == Amount::ZERO {

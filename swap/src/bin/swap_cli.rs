@@ -28,7 +28,7 @@ use swap::{
     execution_params,
     execution_params::GetExecutionParams,
     monero,
-    monero::{CreateWallet, OpenWallet},
+    monero::OpenOrCreate,
     protocol::{
         bob,
         bob::{cancel::CancelError, Builder, EventLoop},
@@ -296,20 +296,7 @@ async fn init_monero_wallet(
         MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME.to_string(),
     );
 
-    // Setup the temporary Monero wallet necessary for monitoring the blockchain
-    let open_monitoring_wallet_response = monero_wallet.open().await;
-    if open_monitoring_wallet_response.is_err() {
-        monero_wallet.create().await.context(format!(
-            "Unable to create Monero wallet for blockchain monitoring.\
-             Please ensure that the monero-wallet-rpc is available at {}",
-            monero_wallet_rpc_url
-        ))?;
-
-        debug!(
-            "Created Monero wallet for blockchain monitoring with name {}",
-            MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME
-        );
-    }
+    monero_wallet.open_or_create().await?;
 
     let _test_wallet_connection = monero_wallet
         .block_height()
