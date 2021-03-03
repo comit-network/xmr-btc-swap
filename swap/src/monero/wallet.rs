@@ -142,18 +142,6 @@ impl Wallet {
         self.inner.lock().await.refresh().await
     }
 
-    pub async fn sweep_all(&self, address: Address) -> Result<Vec<TxHash>> {
-        let sweep_all = self
-            .inner
-            .lock()
-            .await
-            .sweep_all(address.to_string().as_str())
-            .await?;
-
-        let tx_hashes = sweep_all.tx_hash_list.into_iter().map(TxHash).collect();
-        Ok(tx_hashes)
-    }
-
     pub fn static_tx_fee_estimate(&self) -> Amount {
         // Median tx fees on Monero as found here: https://www.monero.how/monero-transaction-fees, 0.000_015 * 2 (to be on the safe side)
         Amount::from_monero(0.000_03f64).expect("static fee to be convertible without problems")
@@ -250,5 +238,17 @@ impl Wallet {
         };
 
         Ok(())
+    }
+
+    pub async fn sweep_all(&self, address: Address) -> Result<Vec<TxHash>> {
+        let sweep_all = self
+            .inner
+            .lock()
+            .await
+            .sweep_all(address.to_string().as_str())
+            .await?;
+
+        let tx_hashes = sweep_all.tx_hash_list.into_iter().map(TxHash).collect();
+        Ok(tx_hashes)
     }
 }
