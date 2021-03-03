@@ -394,7 +394,7 @@ where
         alice_monero_wallet.clone(),
         alice_db,
         fixed_rate::RateService::default(),
-        alice_starting_balances.xmr,
+        bitcoin::Amount::ONE_BTC,
     )
     .unwrap();
 
