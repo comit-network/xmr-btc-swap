@@ -1,7 +1,7 @@
 use crate::{
     bitcoin,
     bitcoin::EncryptedSignature,
-    network::{transport::SwapTransport, TokioExecutor},
+    network::{transport, TokioExecutor},
     protocol::{
         alice::{QuoteResponse, TransferProof},
         bob::{Behaviour, OutEvent, QuoteRequest, State0, State2},
@@ -114,18 +114,23 @@ pub struct EventLoop {
 
 impl EventLoop {
     pub fn new(
-        transport: SwapTransport,
-        behaviour: Behaviour,
-        peer_id: PeerId,
+        identity: &libp2p::core::identity::Keypair,
         alice_peer_id: PeerId,
         alice_addr: Multiaddr,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
     ) -> Result<(Self, EventLoopHandle)> {
-        let mut swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, peer_id)
-            .executor(Box::new(TokioExecutor {
-                handle: tokio::runtime::Handle::current(),
-            }))
-            .build();
+        let behaviour = Behaviour::default();
+        let transport = transport::build(identity)?;
+
+        let mut swarm = libp2p::swarm::SwarmBuilder::new(
+            transport,
+            behaviour,
+            identity.public().into_peer_id(),
+        )
+        .executor(Box::new(TokioExecutor {
+            handle: tokio::runtime::Handle::current(),
+        }))
+        .build();
 
         swarm.add_address(alice_peer_id, alice_addr);
 
