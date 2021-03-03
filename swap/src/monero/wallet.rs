@@ -1,10 +1,8 @@
 use crate::monero::{
-    Amount, CreateFrom, CreateFromAndLoad, InsufficientFunds, OpenOrCreate, OpenWallet,
-    PrivateViewKey, PublicViewKey, Transfer, TransferProof, TxHash, WatchForTransfer,
+    Amount, InsufficientFunds, PrivateViewKey, PublicViewKey, TransferProof, TxHash,
 };
 use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::{Context, Result};
-use async_trait::async_trait;
 use backoff::{backoff::Constant as ConstantBackoff, future::retry};
 use bitcoin::hashes::core::sync::atomic::AtomicU32;
 use monero_rpc::{
@@ -76,11 +74,8 @@ impl Wallet {
         // Median tx fees on Monero as found here: https://www.monero.how/monero-transaction-fees, 0.000_015 * 2 (to be on the safe side)
         Amount::from_monero(0.000_03f64).expect("static fee to be convertible without problems")
     }
-}
 
-#[async_trait]
-impl Transfer for Wallet {
-    async fn transfer(
+    pub async fn transfer(
         &self,
         public_spend_key: PublicKey,
         public_view_key: PublicViewKey,
@@ -108,11 +103,8 @@ impl Transfer for Wallet {
             PrivateKey::from_str(&res.tx_key)?,
         ))
     }
-}
 
-#[async_trait]
-impl CreateFromAndLoad for Wallet {
-    async fn create_from_and_load(
+    pub async fn create_from_and_load(
         &self,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
@@ -140,11 +132,8 @@ impl CreateFromAndLoad for Wallet {
 
         Ok(())
     }
-}
 
-#[async_trait]
-impl CreateFrom for Wallet {
-    async fn create_from(
+    pub async fn create_from(
         &self,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
@@ -174,11 +163,8 @@ impl CreateFrom for Wallet {
 
         Ok(())
     }
-}
 
-#[async_trait]
-impl OpenWallet for Wallet {
-    async fn open(&self) -> Result<()> {
+    pub async fn open(&self) -> Result<()> {
         self.inner
             .lock()
             .await
@@ -186,11 +172,8 @@ impl OpenWallet for Wallet {
             .await?;
         Ok(())
     }
-}
 
-#[async_trait]
-impl OpenOrCreate for Wallet {
-    async fn open_or_create(&self) -> Result<()> {
+    pub async fn open_or_create(&self) -> Result<()> {
         let open_wallet_response = self.open().await;
         if open_wallet_response.is_err() {
             self.inner.lock().await.create_wallet(self.name.as_str()).await.context(
@@ -204,13 +187,8 @@ impl OpenOrCreate for Wallet {
 
         Ok(())
     }
-}
 
-// TODO: For retry, use `backoff::ExponentialBackoff` in production as opposed
-// to `ConstantBackoff`.
-#[async_trait]
-impl WatchForTransfer for Wallet {
-    async fn watch_for_transfer(
+    pub async fn watch_for_transfer(
         &self,
         public_spend_key: PublicKey,
         public_view_key: PublicViewKey,

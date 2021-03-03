@@ -28,7 +28,6 @@ use swap::{
     execution_params,
     execution_params::GetExecutionParams,
     monero,
-    monero::OpenOrCreate,
     protocol::{
         bob,
         bob::{cancel::CancelError, Builder, EventLoop},

@@ -316,15 +316,12 @@ pub struct State3 {
 }
 
 impl State3 {
-    pub async fn watch_for_lock_xmr<W>(
+    pub async fn watch_for_lock_xmr(
         self,
-        xmr_wallet: &W,
+        xmr_wallet: &monero::Wallet,
         transfer_proof: TransferProof,
         monero_wallet_restore_blockheight: BlockHeight,
-    ) -> Result<Result<State4, InsufficientFunds>>
-    where
-        W: monero::WatchForTransfer,
-    {
+    ) -> Result<Result<State4, InsufficientFunds>> {
         let S_b_monero =
             monero::PublicKey::from_private_key(&monero::PrivateKey::from_scalar(self.s_b));
         let S = self.S_a_monero + S_b_monero;
@@ -572,10 +569,7 @@ pub struct State5 {
 }
 
 impl State5 {
-    pub async fn claim_xmr<W>(&self, monero_wallet: &W) -> Result<()>
-    where
-        W: monero::CreateFromAndLoad,
-    {
+    pub async fn claim_xmr(&self, monero_wallet: &monero::Wallet) -> Result<()> {
         let s_b = monero::PrivateKey { scalar: self.s_b };
 
         let s = self.s_a + s_b;

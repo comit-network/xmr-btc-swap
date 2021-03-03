@@ -22,7 +22,6 @@ use swap::{
     execution_params,
     execution_params::{ExecutionParams, GetExecutionParams},
     monero,
-    monero::OpenWallet,
     protocol::{alice, alice::AliceState, bob, bob::BobState},
     seed::Seed,
 };
