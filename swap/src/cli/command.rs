@@ -1,5 +1,6 @@
+use anyhow::{Context, Result};
 use libp2p::{core::Multiaddr, PeerId};
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 use uuid::Uuid;
 
 pub const DEFAULT_ALICE_MULTIADDR: &str = "/dns4/xmr-btc-asb.coblox.tech/tcp/9876";
@@ -25,7 +26,7 @@ pub struct Arguments {
 #[structopt(name = "xmr_btc-swap", about = "XMR BTC atomic swap")]
 pub enum Command {
     BuyXmr {
-        #[structopt(long = "receive-address")]
+        #[structopt(long = "receive-address", parse(try_from_str = parse_monero_address))]
         receive_monero_address: monero::Address,
 
         #[structopt(long = "connect-peer-id", default_value = DEFAULT_ALICE_PEER_ID)]
@@ -39,7 +40,7 @@ pub enum Command {
     },
     History,
     Resume {
-        #[structopt(long = "receive-address")]
+        #[structopt(long = "receive-address", parse(try_from_str = parse_monero_address))]
         receive_monero_address: monero::Address,
 
         #[structopt(long = "swap-id")]
@@ -70,6 +71,15 @@ pub enum Command {
         #[structopt(short, long)]
         force: bool,
     },
+}
+
+fn parse_monero_address(s: &str) -> Result<monero::Address> {
+    monero::Address::from_str(s).with_context(|| {
+        format!(
+            "Failed to parse {} as a monero address, please make sure it is a valid address",
+            s
+        )
+    })
 }
 
 #[cfg(test)]
