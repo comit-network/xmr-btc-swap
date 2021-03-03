@@ -10,7 +10,7 @@ use crate::{
     protocol::{
         alice,
         alice::{
-            AliceState, Behaviour, Builder, OutEvent, QuoteResponse, State0, State3, TransferProof,
+            AliceState, Behaviour, OutEvent, QuoteResponse, State0, State3, Swap, TransferProof,
         },
         bob::{EncryptedSignature, QuoteRequest},
     },
@@ -86,7 +86,6 @@ pub struct EventLoop<RS> {
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
     db: Arc<Database>,
-    listen_address: Multiaddr,
     rate_service: RS,
     max_sell: Amount,
 
@@ -139,7 +138,6 @@ where
             bitcoin_wallet,
             monero_wallet,
             db,
-            listen_address,
             rate_service,
             recv_encrypted_signature: recv_encrypted_signature.sender,
             send_transfer_proof: send_transfer_proof.receiver,
@@ -271,19 +269,20 @@ where
         let swap_id = Uuid::new_v4();
         let handle = self.new_handle();
 
-        let swap = Builder::new(
-            self.peer_id,
-            self.execution_params,
+        let initial_state = AliceState::Started {
+            state3: Box::new(state3),
+            bob_peer_id,
+        };
+
+        let swap = Swap {
+            event_loop_handle: handle,
+            bitcoin_wallet: self.bitcoin_wallet.clone(),
+            monero_wallet: self.monero_wallet.clone(),
+            execution_params: self.execution_params,
+            db: self.db.clone(),
+            state: initial_state,
             swap_id,
-            self.bitcoin_wallet.clone(),
-            self.monero_wallet.clone(),
-            self.db.clone(),
-            self.listen_address.clone(),
-            handle,
-        )
-        .with_init_params(bob_peer_id, state3)
-        .build()
-        .await?;
+        };
 
         let (swap, swap_handle) = alice::run(swap).remote_handle();
         tokio::spawn(swap);

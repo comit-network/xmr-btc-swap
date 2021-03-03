@@ -1,7 +1,7 @@
 //! Run an XMR/BTC swap in the role of Bob.
 //! Bob holds BTC and wishes receive XMR.
 use crate::{
-    bitcoin, database,
+    bitcoin,
     database::Database,
     execution_params::ExecutionParams,
     monero, network,
@@ -12,7 +12,7 @@ use crate::{
     protocol::{alice, alice::TransferProof, bob},
     seed::Seed,
 };
-use anyhow::{bail, Error, Result};
+use anyhow::{Error, Result};
 use libp2p::{core::Multiaddr, identity::Keypair, NetworkBehaviour, PeerId};
 use std::sync::Arc;
 use tracing::debug;
@@ -129,15 +129,7 @@ impl Builder {
             }
 
             InitParams::None => {
-                let resume_state =
-                    if let database::Swap::Bob(state) = self.db.get_state(self.swap_id)? {
-                        state.into()
-                    } else {
-                        bail!(
-                            "Trying to load swap with id {} for the wrong direction.",
-                            self.swap_id
-                        )
-                    };
+                let resume_state = self.db.get_state(self.swap_id)?.try_into_bob()?.into();
 
                 let (event_loop, event_loop_handle) = self.init_event_loop()?;
 
