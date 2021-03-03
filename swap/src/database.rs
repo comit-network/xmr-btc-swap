@@ -36,6 +36,15 @@ impl Display for Swap {
     }
 }
 
+impl Swap {
+    pub fn try_into_bob(self) -> Result<Bob> {
+        match self {
+            Swap::Bob(bob) => Ok(bob),
+            Swap::Alice(_) => bail!("Swap instance is not Bob"),
+        }
+    }
+}
+
 pub struct Database(sled::Db);
 
 impl Database {

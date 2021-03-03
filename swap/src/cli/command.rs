@@ -54,34 +54,12 @@ pub enum Command {
         #[structopt(long = "swap-id")]
         swap_id: Uuid,
 
-        // TODO: Remove Alice peer-id/address, it should be saved in the database when running swap
-        // and loaded from the database when running resume/cancel/refund
-        #[structopt(long = "counterpart-peer-id", default_value = DEFAULT_ALICE_PEER_ID)]
-        alice_peer_id: PeerId,
-
-        #[structopt(
-             long = "counterpart-addr",
-             default_value = DEFAULT_ALICE_MULTIADDR
-             )]
-        alice_addr: Multiaddr,
-
         #[structopt(short, long)]
         force: bool,
     },
     Refund {
         #[structopt(long = "swap-id")]
         swap_id: Uuid,
-
-        // TODO: Remove Alice peer-id/address, it should be saved in the database when running swap
-        // and loaded from the database when running resume/cancel/refund
-        #[structopt(long = "counterpart-peer-id", default_value = DEFAULT_ALICE_PEER_ID)]
-        alice_peer_id: PeerId,
-
-        #[structopt(
-        long = "counterpart-addr",
-        default_value = DEFAULT_ALICE_MULTIADDR
-        )]
-        alice_addr: Multiaddr,
 
         #[structopt(short, long)]
         force: bool,
