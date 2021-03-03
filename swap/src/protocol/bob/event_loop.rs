@@ -138,8 +138,8 @@ impl EventLoop {
         let dial_alice = Channels::new();
         let conn_established = Channels::new();
         let send_encrypted_signature = Channels::new();
-        let send_quote_request = Channels::new();
-        let quote_response = Channels::new();
+        let request_spot_price = Channels::new();
+        let recv_spot_price = Channels::new();
 
         let event_loop = EventLoop {
             swarm,
@@ -151,8 +151,8 @@ impl EventLoop {
             conn_established: conn_established.sender,
             dial_alice: dial_alice.receiver,
             send_encrypted_signature: send_encrypted_signature.receiver,
-            request_spot_price: send_quote_request.receiver,
-            recv_spot_price: quote_response.sender,
+            request_spot_price: request_spot_price.receiver,
+            recv_spot_price: recv_spot_price.sender,
         };
 
         let handle = EventLoopHandle {
@@ -162,8 +162,8 @@ impl EventLoop {
             conn_established: conn_established.receiver,
             dial_alice: dial_alice.sender,
             send_encrypted_signature: send_encrypted_signature.sender,
-            request_spot_price: send_quote_request.sender,
-            recv_spot_price: quote_response.receiver,
+            request_spot_price: request_spot_price.sender,
+            recv_spot_price: recv_spot_price.receiver,
         };
 
         Ok((event_loop, handle))
@@ -211,9 +211,9 @@ impl EventLoop {
                         }
                     }
                 },
-                quote_request = self.request_spot_price.recv().fuse() =>  {
-                    if let Some(quote_request) = quote_request {
-                        self.swarm.request_spot_price(self.alice_peer_id, quote_request);
+                spot_price_request = self.request_spot_price.recv().fuse() =>  {
+                    if let Some(request) = spot_price_request {
+                        self.swarm.request_spot_price(self.alice_peer_id, request);
                     }
                 },
                 option = self.start_execution_setup.recv().fuse() => {
