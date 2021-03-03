@@ -147,7 +147,7 @@ impl Client {
         Ok(())
     }
 
-    /// Opens a wallet using `filename`.
+    /// Close the currently opened wallet, after trying to save it.
     pub async fn close_wallet(&self) -> Result<()> {
         let request = Request::new("close_wallet", "");
 
