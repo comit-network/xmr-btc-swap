@@ -15,6 +15,7 @@
 use anyhow::{bail, Context, Result};
 use prettytable::{row, Table};
 use reqwest::Url;
+use std::cmp::min;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -115,14 +116,27 @@ async fn main() -> Result<()> {
             let monero_wallet =
                 init_monero_wallet(monero_network, monero_wallet_rpc_process.endpoint()).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
+            let (event_loop, mut event_loop_handle) = EventLoop::new(
+                &seed.derive_libp2p_identity(),
+                alice_peer_id,
+                alice_addr,
+                bitcoin_wallet.clone(),
+            )?;
+            let handle = tokio::spawn(event_loop.run());
 
-            let swap_id = Uuid::new_v4();
+            let bid_quote = event_loop_handle
+                .request_quote()
+                .await
+                .context("failed to request quote")?;
+
+            info!("Received quote: 1 XMR ~ {}", bid_quote.price);
 
             // TODO: Also wait for more funds if balance < dust
             if bitcoin_wallet.balance().await? == Amount::ZERO {
                 info!(
-                    "Please deposit BTC to {}",
-                    bitcoin_wallet.new_address().await?
+                    "Please deposit the BTC you want to swap to {} (max {})",
+                    bitcoin_wallet.new_address().await?,
+                    bid_quote.max_quantity
                 );
 
                 while bitcoin_wallet.balance().await? == Amount::ZERO {
@@ -139,19 +153,14 @@ async fn main() -> Result<()> {
                 );
             }
 
-            let send_bitcoin = bitcoin_wallet.max_giveable(TxLock::script_size()).await?;
+            let max_giveable = bitcoin_wallet.max_giveable(TxLock::script_size()).await?;
+            let max_accepted = bid_quote.max_quantity;
 
-            let (event_loop, event_loop_handle) = EventLoop::new(
-                &seed.derive_libp2p_identity(),
-                alice_peer_id,
-                alice_addr,
-                bitcoin_wallet.clone(),
-            )?;
-            let handle = tokio::spawn(event_loop.run());
+            let send_bitcoin = min(max_giveable, max_accepted);
 
             let swap = Builder::new(
                 db,
-                swap_id,
+                Uuid::new_v4(),
                 bitcoin_wallet.clone(),
                 Arc::new(monero_wallet),
                 execution_params,

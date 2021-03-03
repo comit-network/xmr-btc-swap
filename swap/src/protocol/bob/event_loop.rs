@@ -1,4 +1,5 @@
 use crate::bitcoin::EncryptedSignature;
+use crate::network::quote::BidQuote;
 use crate::network::{spot_price, transport, TokioExecutor};
 use crate::protocol::alice::TransferProof;
 use crate::protocol::bob::{Behaviour, OutEvent, State0, State2};
@@ -41,6 +42,8 @@ pub struct EventLoopHandle {
     send_encrypted_signature: Sender<EncryptedSignature>,
     request_spot_price: Sender<spot_price::Request>,
     recv_spot_price: Receiver<spot_price::Response>,
+    request_quote: Sender<()>,
+    recv_quote: Receiver<BidQuote>,
 }
 
 impl EventLoopHandle {
@@ -74,7 +77,10 @@ impl EventLoopHandle {
     }
 
     pub async fn request_spot_price(&mut self, btc: bitcoin::Amount) -> Result<monero::Amount> {
-        let _ = self.request_spot_price.send(Request { btc }).await?;
+        let _ = self
+            .request_spot_price
+            .send(spot_price::Request { btc })
+            .await?;
 
         let response = self
             .recv_spot_price
@@ -83,6 +89,18 @@ impl EventLoopHandle {
             .ok_or_else(|| anyhow!("Failed to receive spot price from Alice"))?;
 
         Ok(response.xmr)
+    }
+
+    pub async fn request_quote(&mut self) -> Result<BidQuote> {
+        let _ = self.request_quote.send(()).await?;
+
+        let quote = self
+            .recv_quote
+            .recv()
+            .await
+            .ok_or_else(|| anyhow!("Failed to receive quote from Alice"))?;
+
+        Ok(quote)
     }
 
     pub async fn send_encrypted_signature(
@@ -100,14 +118,16 @@ pub struct EventLoop {
     swarm: libp2p::Swarm<Behaviour>,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     alice_peer_id: PeerId,
-    request_spot_price: Receiver<Request>,
-    recv_spot_price: Sender<Response>,
+    request_spot_price: Receiver<spot_price::Request>,
+    recv_spot_price: Sender<spot_price::Response>,
     start_execution_setup: Receiver<State0>,
     done_execution_setup: Sender<Result<State2>>,
     recv_transfer_proof: Sender<TransferProof>,
     dial_alice: Receiver<()>,
     conn_established: Sender<PeerId>,
     send_encrypted_signature: Receiver<EncryptedSignature>,
+    request_quote: Receiver<()>,
+    recv_quote: Sender<BidQuote>,
 }
 
 impl EventLoop {
@@ -140,6 +160,8 @@ impl EventLoop {
         let send_encrypted_signature = Channels::new();
         let request_spot_price = Channels::new();
         let recv_spot_price = Channels::new();
+        let request_quote = Channels::new();
+        let recv_quote = Channels::new();
 
         let event_loop = EventLoop {
             swarm,
@@ -153,6 +175,8 @@ impl EventLoop {
             send_encrypted_signature: send_encrypted_signature.receiver,
             request_spot_price: request_spot_price.receiver,
             recv_spot_price: recv_spot_price.sender,
+            request_quote: request_quote.receiver,
+            recv_quote: recv_quote.sender,
         };
 
         let handle = EventLoopHandle {
@@ -164,6 +188,8 @@ impl EventLoop {
             send_encrypted_signature: send_encrypted_signature.sender,
             request_spot_price: request_spot_price.sender,
             recv_spot_price: recv_spot_price.receiver,
+            request_quote: request_quote.sender,
+            recv_quote: recv_quote.receiver,
         };
 
         Ok((event_loop, handle))
@@ -179,6 +205,9 @@ impl EventLoop {
                         }
                         OutEvent::SpotPriceReceived(msg) => {
                             let _ = self.recv_spot_price.send(msg).await;
+                        },
+                        OutEvent::QuoteReceived(msg) => {
+                            let _ = self.recv_quote.send(msg).await;
                         },
                         OutEvent::ExecutionSetupDone(res) => {
                             let _ = self.done_execution_setup.send(res.map(|state|*state)).await;
@@ -214,6 +243,11 @@ impl EventLoop {
                 spot_price_request = self.request_spot_price.recv().fuse() =>  {
                     if let Some(request) = spot_price_request {
                         self.swarm.request_spot_price(self.alice_peer_id, request);
+                    }
+                },
+                quote_request = self.request_quote.recv().fuse() =>  {
+                    if quote_request.is_some() {
+                        self.swarm.request_quote(self.alice_peer_id);
                     }
                 },
                 option = self.start_execution_setup.recv().fuse() => {
