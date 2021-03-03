@@ -130,7 +130,7 @@ async fn run_until_internal(
                     bob_peer_id,
                     *state3.clone(),
                     &mut event_loop_handle,
-                    monero_wallet.clone(),
+                    &monero_wallet,
                 )
                 .await?;
 
@@ -286,7 +286,7 @@ async fn run_until_internal(
                     state3.B,
                     state3.cancel_timelock,
                     state3.tx_cancel_sig_bob.clone(),
-                    bitcoin_wallet.clone(),
+                    &bitcoin_wallet,
                 )
                 .await?;
 
