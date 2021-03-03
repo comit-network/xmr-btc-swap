@@ -5,7 +5,6 @@ use crate::{
     execution_params::ExecutionParams,
     monero,
     monero::{Amount, BalanceTooLow},
-    network,
     network::{transport, TokioExecutor},
     protocol::{
         alice,
@@ -113,7 +112,7 @@ where
         rate_service: RS,
         max_sell: Amount,
     ) -> Result<(Self, mpsc::Receiver<RemoteHandle<Result<AliceState>>>)> {
-        let identity = network::Seed::new(seed).derive_libp2p_identity();
+        let identity = seed.derive_libp2p_identity();
         let behaviour = Behaviour::default();
         let transport = transport::build(&identity)?;
         let peer_id = PeerId::from(identity.public());

@@ -2,6 +2,8 @@ use crate::fs::ensure_directory_exists;
 use ::bitcoin::secp256k1::{self, constants::SECRET_KEY_SIZE, SecretKey};
 use anyhow::Result;
 use bdk::bitcoin::util::bip32::ExtendedPrivKey;
+use bitcoin::hashes::{sha256, Hash, HashEngine};
+use libp2p::identity;
 use pem::{encode, Pem};
 use rand::prelude::*;
 use std::{
@@ -28,13 +30,21 @@ impl Seed {
         Ok(Seed(bytes))
     }
 
-    pub fn extended_private_key(&self, network: bitcoin::Network) -> Result<ExtendedPrivKey> {
-        let private_key = ExtendedPrivKey::new_master(network, &self.bytes())?;
+    pub fn derive_extended_private_key(
+        &self,
+        network: bitcoin::Network,
+    ) -> Result<ExtendedPrivKey> {
+        let seed = self.derive(b"BITCOIN_EXTENDED_PRIVATE_KEY").bytes();
+        let private_key = ExtendedPrivKey::new_master(network, &seed)?;
+
         Ok(private_key)
     }
 
-    pub fn bytes(&self) -> [u8; SEED_LENGTH] {
-        self.0
+    pub fn derive_libp2p_identity(&self) -> identity::Keypair {
+        let bytes = self.derive(b"NETWORK").derive(b"LIBP2P_IDENTITY").bytes();
+        let key = identity::ed25519::SecretKey::from_bytes(bytes).expect("we always pass 32 bytes");
+
+        identity::Keypair::Ed25519(key.into())
     }
 
     pub fn from_file_or_generate(data_dir: &Path) -> Result<Self, Error> {
@@ -51,6 +61,26 @@ impl Seed {
         random_seed.write_to(file_path.to_path_buf())?;
 
         Ok(random_seed)
+    }
+
+    /// Derive a new seed using the given scope.
+    ///
+    /// This function is purposely kept private because it is only a helper
+    /// function for deriving specific secret material from the root seed
+    /// like the libp2p identity or the seed for the Bitcoin wallet.
+    fn derive(&self, scope: &[u8]) -> Self {
+        let mut engine = sha256::HashEngine::default();
+
+        engine.input(&self.bytes());
+        engine.input(scope);
+
+        let hash = sha256::Hash::from_engine(engine);
+
+        Self(hash.into_inner())
+    }
+
+    fn bytes(&self) -> [u8; SEED_LENGTH] {
+        self.0
     }
 
     fn from_file<D>(seed_file: D) -> Result<Self, Error>

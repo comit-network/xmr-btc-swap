@@ -89,7 +89,7 @@ async fn main() -> Result<()> {
             let (bitcoin_wallet, monero_wallet) = init_wallets(
                 config.clone(),
                 &wallet_data_dir,
-                seed.extended_private_key(BITCOIN_NETWORK)?,
+                seed.derive_extended_private_key(BITCOIN_NETWORK)?,
             )
             .await?;
 

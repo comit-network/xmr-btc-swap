@@ -606,7 +606,7 @@ async fn init_test_wallets(
         electrum_http_url,
         bitcoin::Network::Regtest,
         datadir,
-        seed.extended_private_key(bitcoin::Network::Regtest)
+        seed.derive_extended_private_key(bitcoin::Network::Regtest)
             .expect("Could not create extended private key from seed"),
     )
     .await
