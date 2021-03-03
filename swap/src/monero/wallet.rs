@@ -62,6 +62,66 @@ impl Wallet {
         Ok(())
     }
 
+    pub async fn create_from_and_load(
+        &self,
+        private_spend_key: PrivateKey,
+        private_view_key: PrivateViewKey,
+        restore_height: BlockHeight,
+    ) -> Result<()> {
+        let public_spend_key = PublicKey::from_private_key(&private_spend_key);
+        let public_view_key = PublicKey::from_private_key(&private_view_key.into());
+
+        let address = Address::standard(self.network, public_spend_key, public_view_key);
+
+        let wallet = self.inner.lock().await;
+
+        // Properly close the wallet before generating the other wallet to ensure that
+        // it saves its state correctly
+        let _ = wallet.close_wallet().await?;
+
+        let _ = wallet
+            .generate_from_keys(
+                &address.to_string(),
+                &private_spend_key.to_string(),
+                &PrivateKey::from(private_view_key).to_string(),
+                restore_height.height,
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn create_from(
+        &self,
+        private_spend_key: PrivateKey,
+        private_view_key: PrivateViewKey,
+        restore_height: BlockHeight,
+    ) -> Result<()> {
+        let public_spend_key = PublicKey::from_private_key(&private_spend_key);
+        let public_view_key = PublicKey::from_private_key(&private_view_key.into());
+
+        let address = Address::standard(self.network, public_spend_key, public_view_key);
+
+        let wallet = self.inner.lock().await;
+
+        // Properly close the wallet before generating the other wallet to ensure that
+        // it saves its state correctly
+        let _ = wallet.close_wallet().await?;
+
+        let _ = wallet
+            .generate_from_keys(
+                &address.to_string(),
+                &private_spend_key.to_string(),
+                &PrivateKey::from(private_view_key).to_string(),
+                restore_height.height,
+            )
+            .await?;
+
+        let _ = wallet.open_wallet(self.name.as_str()).await?;
+
+        Ok(())
+    }
+
     /// Get the balance of the primary account.
     pub async fn get_balance(&self) -> Result<Amount> {
         let amount = self.inner.lock().await.get_balance(0).await?;
@@ -126,66 +186,6 @@ impl Wallet {
             TxHash(res.tx_hash),
             PrivateKey::from_str(&res.tx_key)?,
         ))
-    }
-
-    pub async fn create_from_and_load(
-        &self,
-        private_spend_key: PrivateKey,
-        private_view_key: PrivateViewKey,
-        restore_height: BlockHeight,
-    ) -> Result<()> {
-        let public_spend_key = PublicKey::from_private_key(&private_spend_key);
-        let public_view_key = PublicKey::from_private_key(&private_view_key.into());
-
-        let address = Address::standard(self.network, public_spend_key, public_view_key);
-
-        let wallet = self.inner.lock().await;
-
-        // Properly close the wallet before generating the other wallet to ensure that
-        // it saves its state correctly
-        let _ = wallet.close_wallet().await?;
-
-        let _ = wallet
-            .generate_from_keys(
-                &address.to_string(),
-                &private_spend_key.to_string(),
-                &PrivateKey::from(private_view_key).to_string(),
-                restore_height.height,
-            )
-            .await?;
-
-        Ok(())
-    }
-
-    pub async fn create_from(
-        &self,
-        private_spend_key: PrivateKey,
-        private_view_key: PrivateViewKey,
-        restore_height: BlockHeight,
-    ) -> Result<()> {
-        let public_spend_key = PublicKey::from_private_key(&private_spend_key);
-        let public_view_key = PublicKey::from_private_key(&private_view_key.into());
-
-        let address = Address::standard(self.network, public_spend_key, public_view_key);
-
-        let wallet = self.inner.lock().await;
-
-        // Properly close the wallet before generating the other wallet to ensure that
-        // it saves its state correctly
-        let _ = wallet.close_wallet().await?;
-
-        let _ = wallet
-            .generate_from_keys(
-                &address.to_string(),
-                &private_spend_key.to_string(),
-                &PrivateKey::from(private_view_key).to_string(),
-                restore_height.height,
-            )
-            .await?;
-
-        let _ = wallet.open_wallet(self.name.as_str()).await?;
-
-        Ok(())
     }
 
     pub async fn watch_for_transfer(
