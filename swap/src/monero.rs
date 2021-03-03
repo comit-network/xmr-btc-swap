@@ -9,8 +9,6 @@ pub use wallet_rpc::{WalletRpc, WalletRpcProcess};
 use crate::bitcoin;
 use ::bitcoin::hashes::core::fmt::Formatter;
 use anyhow::Result;
-use async_trait::async_trait;
-use monero_rpc::wallet::{BlockHeight, Refreshed};
 use rand::{CryptoRng, RngCore};
 use rust_decimal::{
     prelude::{FromPrimitive, ToPrimitive},
@@ -182,28 +180,6 @@ impl From<TxHash> for String {
     }
 }
 
-#[async_trait]
-pub trait Transfer {
-    async fn transfer(
-        &self,
-        public_spend_key: PublicKey,
-        public_view_key: PublicViewKey,
-        amount: Amount,
-    ) -> Result<TransferProof>;
-}
-
-#[async_trait]
-pub trait WatchForTransfer {
-    async fn watch_for_transfer(
-        &self,
-        public_spend_key: PublicKey,
-        public_view_key: PublicViewKey,
-        transfer_proof: TransferProof,
-        amount: Amount,
-        expected_confirmations: u32,
-    ) -> Result<(), InsufficientFunds>;
-}
-
 #[derive(Debug, Clone, Copy, thiserror::Error)]
 #[error("transaction does not pay enough: expected {expected}, got {actual}")]
 pub struct InsufficientFunds {
@@ -215,51 +191,6 @@ pub struct InsufficientFunds {
 #[error("The balance is too low, current balance: {balance}")]
 pub struct BalanceTooLow {
     pub balance: Amount,
-}
-
-#[async_trait]
-pub trait CreateFromAndLoad {
-    async fn create_from_and_load(
-        &self,
-        private_spend_key: PrivateKey,
-        private_view_key: PrivateViewKey,
-        restore_height: BlockHeight,
-    ) -> Result<()>;
-}
-
-#[async_trait]
-pub trait CreateFrom {
-    async fn create_from(
-        &self,
-        private_spend_key: PrivateKey,
-        private_view_key: PrivateViewKey,
-        restore_height: BlockHeight,
-    ) -> Result<()>;
-}
-
-#[async_trait]
-pub trait OpenWallet {
-    async fn open(&self) -> Result<()>;
-}
-
-#[async_trait]
-pub trait OpenOrCreate {
-    async fn open_or_create(&self) -> Result<()>;
-}
-
-#[async_trait]
-pub trait WalletBlockHeight {
-    async fn block_height(&self) -> Result<BlockHeight>;
-}
-
-#[async_trait]
-pub trait GetAddress {
-    async fn get_main_address(&self) -> Result<Address>;
-}
-
-#[async_trait]
-pub trait Refresh {
-    async fn refresh(&self) -> Result<Refreshed>;
 }
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq)]

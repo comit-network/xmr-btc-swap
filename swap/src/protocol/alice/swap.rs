@@ -7,7 +7,6 @@ use crate::{
     database::Database,
     execution_params::ExecutionParams,
     monero,
-    monero::CreateFrom,
     monero_ext::ScalarExt,
     protocol::{
         alice,

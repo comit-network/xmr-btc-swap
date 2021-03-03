@@ -32,7 +32,7 @@ use swap::{
     execution_params::GetExecutionParams,
     fs::default_config_path,
     monero,
-    monero::{Amount, OpenOrCreate},
+    monero::Amount,
     protocol::alice::EventLoop,
     seed::Seed,
     trace::init_tracing,

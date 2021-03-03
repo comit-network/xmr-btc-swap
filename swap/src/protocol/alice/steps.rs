@@ -6,7 +6,6 @@ use crate::{
     },
     execution_params::ExecutionParams,
     monero,
-    monero::Transfer,
     protocol::{
         alice,
         alice::{event_loop::EventLoopHandle, TransferProof},
@@ -49,15 +48,12 @@ pub async fn wait_for_locked_bitcoin(
     Ok(())
 }
 
-pub async fn lock_xmr<W>(
+pub async fn lock_xmr(
     bob_peer_id: PeerId,
     state3: alice::State3,
     event_loop_handle: &mut EventLoopHandle,
-    monero_wallet: Arc<W>,
-) -> Result<()>
-where
-    W: Transfer,
-{
+    monero_wallet: Arc<monero::Wallet>,
+) -> Result<()> {
     let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey { scalar: state3.s_a });
 
     let public_spend_key = S_a + state3.S_b_monero;
