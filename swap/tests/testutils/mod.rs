@@ -607,8 +607,7 @@ async fn init_test_wallets(
         bitcoin::Network::Regtest,
         datadir,
         seed.extended_private_key(bitcoin::Network::Regtest)
-            .expect("Could not create extended private key from seed")
-            .private_key,
+            .expect("Could not create extended private key from seed"),
     )
     .await
     .expect("could not init btc wallet");
