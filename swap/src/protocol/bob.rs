@@ -5,10 +5,7 @@ use crate::{
     database::Database,
     execution_params::ExecutionParams,
     monero, network,
-    network::{
-        peer_tracker::{self, PeerTracker},
-        transport::build,
-    },
+    network::peer_tracker::{self, PeerTracker},
     protocol::{alice, alice::TransferProof, bob},
     seed::Seed,
 };
@@ -53,7 +50,6 @@ pub struct Swap {
 pub struct Builder {
     swap_id: Uuid,
     identity: Keypair,
-    peer_id: PeerId,
     db: Database,
 
     alice_address: Multiaddr,
@@ -84,12 +80,10 @@ impl Builder {
         execution_params: ExecutionParams,
     ) -> Self {
         let identity = network::Seed::new(seed).derive_libp2p_identity();
-        let peer_id = identity.public().into_peer_id();
 
         Self {
             swap_id,
             identity,
-            peer_id,
             db,
             alice_address,
             alice_peer_id,
@@ -152,13 +146,8 @@ impl Builder {
     fn init_event_loop(
         &self,
     ) -> Result<(bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle)> {
-        let bob_behaviour = bob::Behaviour::default();
-        let bob_transport = build(&self.identity)?;
-
         bob::event_loop::EventLoop::new(
-            bob_transport,
-            bob_behaviour,
-            self.peer_id,
+            &self.identity,
             self.alice_peer_id,
             self.alice_address.clone(),
             self.bitcoin_wallet.clone(),
