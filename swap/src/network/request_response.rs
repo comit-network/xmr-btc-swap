@@ -14,19 +14,10 @@ pub const TIMEOUT: u64 = 3600; // One hour.
 pub const BUF_SIZE: usize = 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, Default)]
-pub struct Swap;
-
-#[derive(Debug, Clone, Copy, Default)]
 pub struct TransferProofProtocol;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct EncryptedSignatureProtocol;
-
-impl ProtocolName for Swap {
-    fn protocol_name(&self) -> &[u8] {
-        b"/comit/xmr/btc/swap/1.0.0"
-    }
-}
 
 impl ProtocolName for TransferProofProtocol {
     fn protocol_name(&self) -> &[u8] {

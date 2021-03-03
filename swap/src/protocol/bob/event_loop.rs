@@ -1,10 +1,14 @@
 use crate::{
     bitcoin,
     bitcoin::EncryptedSignature,
-    network::{transport, TokioExecutor},
+    monero,
+    network::{
+        spot_price::{SpotPriceRequest, SpotPriceResponse},
+        transport, TokioExecutor,
+    },
     protocol::{
-        alice::{QuoteResponse, TransferProof},
-        bob::{Behaviour, OutEvent, QuoteRequest, State0, State2},
+        alice::TransferProof,
+        bob::{Behaviour, OutEvent, State0, State2},
     },
 };
 use anyhow::{anyhow, bail, Context, Result};
@@ -35,24 +39,17 @@ impl<T> Default for Channels<T> {
 
 #[derive(Debug)]
 pub struct EventLoopHandle {
-    recv_quote_response: Receiver<QuoteResponse>,
+    recv_spot_price: Receiver<SpotPriceResponse>,
     start_execution_setup: Sender<State0>,
     done_execution_setup: Receiver<Result<State2>>,
     recv_transfer_proof: Receiver<TransferProof>,
     conn_established: Receiver<PeerId>,
     dial_alice: Sender<()>,
-    send_quote_request: Sender<QuoteRequest>,
+    request_spot_price: Sender<SpotPriceRequest>,
     send_encrypted_signature: Sender<EncryptedSignature>,
 }
 
 impl EventLoopHandle {
-    pub async fn recv_quote_response(&mut self) -> Result<QuoteResponse> {
-        self.recv_quote_response
-            .recv()
-            .await
-            .ok_or_else(|| anyhow!("Failed to receive quote response from Alice"))
-    }
-
     pub async fn execution_setup(&mut self, state0: State0) -> Result<State2> {
         let _ = self.start_execution_setup.send(state0).await?;
 
@@ -82,9 +79,19 @@ impl EventLoopHandle {
         Ok(())
     }
 
-    pub async fn send_quote_request(&mut self, quote_request: QuoteRequest) -> Result<()> {
-        let _ = self.send_quote_request.send(quote_request).await?;
-        Ok(())
+    pub async fn request_spot_price(&mut self, btc: bitcoin::Amount) -> Result<monero::Amount> {
+        let _ = self
+            .request_spot_price
+            .send(SpotPriceRequest { btc })
+            .await?;
+
+        let response = self
+            .recv_spot_price
+            .recv()
+            .await
+            .ok_or_else(|| anyhow!("Failed to receive spot price from Alice"))?;
+
+        Ok(response.xmr)
     }
 
     pub async fn send_encrypted_signature(
@@ -102,13 +109,13 @@ pub struct EventLoop {
     swarm: libp2p::Swarm<Behaviour>,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     alice_peer_id: PeerId,
-    recv_quote_response: Sender<QuoteResponse>,
+    request_spot_price: Receiver<SpotPriceRequest>,
+    recv_spot_price: Sender<SpotPriceResponse>,
     start_execution_setup: Receiver<State0>,
     done_execution_setup: Sender<Result<State2>>,
     recv_transfer_proof: Sender<TransferProof>,
     dial_alice: Receiver<()>,
     conn_established: Sender<PeerId>,
-    send_quote_request: Receiver<QuoteRequest>,
     send_encrypted_signature: Receiver<EncryptedSignature>,
 }
 
@@ -147,24 +154,24 @@ impl EventLoop {
             swarm,
             alice_peer_id,
             bitcoin_wallet,
-            recv_quote_response: quote_response.sender,
+            recv_spot_price: quote_response.sender,
             start_execution_setup: start_execution_setup.receiver,
             done_execution_setup: done_execution_setup.sender,
             recv_transfer_proof: recv_transfer_proof.sender,
             conn_established: conn_established.sender,
             dial_alice: dial_alice.receiver,
-            send_quote_request: send_quote_request.receiver,
+            request_spot_price: send_quote_request.receiver,
             send_encrypted_signature: send_encrypted_signature.receiver,
         };
 
         let handle = EventLoopHandle {
-            recv_quote_response: quote_response.receiver,
+            recv_spot_price: quote_response.receiver,
             start_execution_setup: start_execution_setup.sender,
             done_execution_setup: done_execution_setup.receiver,
             recv_transfer_proof: recv_transfer_proof.receiver,
             conn_established: conn_established.receiver,
             dial_alice: dial_alice.sender,
-            send_quote_request: send_quote_request.sender,
+            request_spot_price: send_quote_request.sender,
             send_encrypted_signature: send_encrypted_signature.sender,
         };
 
@@ -179,8 +186,8 @@ impl EventLoop {
                         OutEvent::ConnectionEstablished(peer_id) => {
                             let _ = self.conn_established.send(peer_id).await;
                         }
-                        OutEvent::QuoteResponse(msg) => {
-                            let _ = self.recv_quote_response.send(msg).await;
+                        OutEvent::SpotPriceReceived(msg) => {
+                            let _ = self.recv_spot_price.send(msg).await;
                         },
                         OutEvent::ExecutionSetupDone(res) => {
                             let _ = self.done_execution_setup.send(res.map(|state|*state)).await;
@@ -213,9 +220,9 @@ impl EventLoop {
                         }
                     }
                 },
-                quote_request = self.send_quote_request.recv().fuse() =>  {
+                quote_request = self.request_spot_price.recv().fuse() =>  {
                     if let Some(quote_request) = quote_request {
-                        self.swarm.send_quote_request(self.alice_peer_id, quote_request);
+                        self.swarm.request_spot_price(self.alice_peer_id, quote_request);
                     }
                 },
                 option = self.start_execution_setup.recv().fuse() => {
