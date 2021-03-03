@@ -122,31 +122,6 @@ impl Wallet {
         Ok(())
     }
 
-    /// Get the balance of the primary account.
-    pub async fn get_balance(&self) -> Result<Amount> {
-        let amount = self.inner.lock().await.get_balance(0).await?;
-
-        Ok(Amount::from_piconero(amount))
-    }
-
-    pub async fn block_height(&self) -> Result<BlockHeight> {
-        self.inner.lock().await.block_height().await
-    }
-
-    pub async fn get_main_address(&self) -> Result<Address> {
-        let address = self.inner.lock().await.get_address(0).await?;
-        Ok(Address::from_str(address.address.as_str())?)
-    }
-
-    pub async fn refresh(&self) -> Result<Refreshed> {
-        self.inner.lock().await.refresh().await
-    }
-
-    pub fn static_tx_fee_estimate(&self) -> Amount {
-        // Median tx fees on Monero as found here: https://www.monero.how/monero-transaction-fees, 0.000_015 * 2 (to be on the safe side)
-        Amount::from_monero(0.000_03f64).expect("static fee to be convertible without problems")
-    }
-
     pub async fn transfer(
         &self,
         public_spend_key: PublicKey,
@@ -250,5 +225,30 @@ impl Wallet {
 
         let tx_hashes = sweep_all.tx_hash_list.into_iter().map(TxHash).collect();
         Ok(tx_hashes)
+    }
+
+    /// Get the balance of the primary account.
+    pub async fn get_balance(&self) -> Result<Amount> {
+        let amount = self.inner.lock().await.get_balance(0).await?;
+
+        Ok(Amount::from_piconero(amount))
+    }
+
+    pub async fn block_height(&self) -> Result<BlockHeight> {
+        self.inner.lock().await.block_height().await
+    }
+
+    pub async fn get_main_address(&self) -> Result<Address> {
+        let address = self.inner.lock().await.get_address(0).await?;
+        Ok(Address::from_str(address.address.as_str())?)
+    }
+
+    pub async fn refresh(&self) -> Result<Refreshed> {
+        self.inner.lock().await.refresh().await
+    }
+
+    pub fn static_tx_fee_estimate(&self) -> Amount {
+        // Median tx fees on Monero as found here: https://www.monero.how/monero-transaction-fees, 0.000_015 * 2 (to be on the safe side)
+        Amount::from_monero(0.000_03f64).expect("static fee to be convertible without problems")
     }
 }
