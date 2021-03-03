@@ -35,4 +35,4 @@ runs:
 
     - name: Make archive
       shell: bash
-      run: tar -C ./target/${{ inputs.target }}/release --create --file=${{ steps.create-archive-name.outputs.archive }} ${{ inputs.binary }}
+      run: gtar -C ./target/${{ inputs.target }}/release --create --file=${{ steps.create-archive-name.outputs.archive }} ${{ inputs.binary }}
