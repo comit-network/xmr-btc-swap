@@ -7,10 +7,9 @@ use crate::{
     monero,
     network::peer_tracker::{self, PeerTracker},
     protocol::{alice, alice::TransferProof, bob},
-    seed::Seed,
 };
 use anyhow::{Error, Result};
-use libp2p::{core::Multiaddr, identity::Keypair, NetworkBehaviour, PeerId};
+use libp2p::{core::Multiaddr, NetworkBehaviour, PeerId};
 use std::sync::Arc;
 use tracing::debug;
 use uuid::Uuid;
@@ -49,17 +48,15 @@ pub struct Swap {
 
 pub struct Builder {
     swap_id: Uuid,
-    identity: Keypair,
     db: Database,
-
-    alice_address: Multiaddr,
-    alice_peer_id: PeerId,
 
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
 
     init_params: InitParams,
     execution_params: ExecutionParams,
+
+    event_loop_handle: bob::EventLoopHandle,
 }
 
 enum InitParams {
@@ -70,27 +67,21 @@ enum InitParams {
 impl Builder {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        seed: Seed,
         db: Database,
         swap_id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
-        alice_address: Multiaddr,
-        alice_peer_id: PeerId,
         execution_params: ExecutionParams,
+        event_loop_handle: bob::EventLoopHandle,
     ) -> Self {
-        let identity = seed.derive_libp2p_identity();
-
         Self {
             swap_id,
-            identity,
             db,
-            alice_address,
-            alice_peer_id,
             bitcoin_wallet,
             monero_wallet,
             init_params: InitParams::None,
             execution_params,
+            event_loop_handle,
         }
     }
 
@@ -101,57 +92,21 @@ impl Builder {
         }
     }
 
-    pub async fn build(self) -> Result<(bob::Swap, bob::EventLoop)> {
-        match self.init_params {
-            InitParams::New { btc_amount } => {
-                let initial_state = BobState::Started { btc_amount };
+    pub fn build(self) -> Result<bob::Swap> {
+        let state = match self.init_params {
+            InitParams::New { btc_amount } => BobState::Started { btc_amount },
+            InitParams::None => self.db.get_state(self.swap_id)?.try_into_bob()?.into(),
+        };
 
-                let (event_loop, event_loop_handle) = self.init_event_loop()?;
-
-                Ok((
-                    Swap {
-                        state: initial_state,
-                        event_loop_handle,
-                        db: self.db,
-                        bitcoin_wallet: self.bitcoin_wallet.clone(),
-                        monero_wallet: self.monero_wallet.clone(),
-                        swap_id: self.swap_id,
-                        execution_params: self.execution_params,
-                    },
-                    event_loop,
-                ))
-            }
-
-            InitParams::None => {
-                let resume_state = self.db.get_state(self.swap_id)?.try_into_bob()?.into();
-
-                let (event_loop, event_loop_handle) = self.init_event_loop()?;
-
-                Ok((
-                    Swap {
-                        state: resume_state,
-                        event_loop_handle,
-                        db: self.db,
-                        bitcoin_wallet: self.bitcoin_wallet.clone(),
-                        monero_wallet: self.monero_wallet.clone(),
-                        swap_id: self.swap_id,
-                        execution_params: self.execution_params,
-                    },
-                    event_loop,
-                ))
-            }
-        }
-    }
-
-    fn init_event_loop(
-        &self,
-    ) -> Result<(bob::event_loop::EventLoop, bob::event_loop::EventLoopHandle)> {
-        bob::event_loop::EventLoop::new(
-            &self.identity,
-            self.alice_peer_id,
-            self.alice_address.clone(),
-            self.bitcoin_wallet.clone(),
-        )
+        Ok(Swap {
+            state,
+            event_loop_handle: self.event_loop_handle,
+            db: self.db,
+            bitcoin_wallet: self.bitcoin_wallet.clone(),
+            monero_wallet: self.monero_wallet.clone(),
+            swap_id: self.swap_id,
+            execution_params: self.execution_params,
+        })
     }
 }
 

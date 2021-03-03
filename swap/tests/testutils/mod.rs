@@ -54,16 +54,23 @@ struct BobParams {
 }
 
 impl BobParams {
-    pub fn builder(&self) -> bob::Builder {
+    pub fn builder(&self, event_loop_handle: bob::EventLoopHandle) -> bob::Builder {
         bob::Builder::new(
-            self.seed,
             Database::open(&self.db_path.clone().as_path()).unwrap(),
             self.swap_id,
             self.bitcoin_wallet.clone(),
             self.monero_wallet.clone(),
-            self.alice_address.clone(),
-            self.alice_peer_id,
             self.execution_params,
+            event_loop_handle,
+        )
+    }
+
+    pub fn new_eventloop(&self) -> Result<(bob::EventLoop, bob::EventLoopHandle)> {
+        bob::EventLoop::new(
+            &self.seed.derive_libp2p_identity(),
+            self.alice_peer_id,
+            self.alice_address.clone(),
+            self.bitcoin_wallet.clone(),
         )
     }
 }
@@ -95,12 +102,13 @@ pub struct TestContext {
 
 impl TestContext {
     pub async fn new_swap_as_bob(&mut self) -> (bob::Swap, BobEventLoopJoinHandle) {
-        let (swap, event_loop) = self
+        let (event_loop, event_loop_handle) = self.bob_params.new_eventloop().unwrap();
+
+        let swap = self
             .bob_params
-            .builder()
+            .builder(event_loop_handle)
             .with_init_params(self.btc_amount)
             .build()
-            .await
             .unwrap();
 
         let join_handle = tokio::spawn(event_loop.run());
@@ -114,7 +122,9 @@ impl TestContext {
     ) -> (bob::Swap, BobEventLoopJoinHandle) {
         join_handle.abort();
 
-        let (swap, event_loop) = self.bob_params.builder().build().await.unwrap();
+        let (event_loop, event_loop_handle) = self.bob_params.new_eventloop().unwrap();
+
+        let swap = self.bob_params.builder(event_loop_handle).build().unwrap();
 
         let join_handle = tokio::spawn(event_loop.run());
 
