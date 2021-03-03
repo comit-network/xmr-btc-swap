@@ -44,7 +44,7 @@ impl Client {
 
         debug!("get address RPC response: {}", response);
 
-        let r: Response<GetAddress> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<GetAddress>>(&response)?;
         Ok(r.result)
     }
 
@@ -69,9 +69,9 @@ impl Client {
             index, response
         );
 
-        let res: Response<GetBalance> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<GetBalance>>(&response)?;
 
-        let balance = res.result.balance;
+        let balance = r.result.balance;
 
         Ok(balance)
     }
@@ -93,7 +93,7 @@ impl Client {
 
         debug!("create account RPC response: {}", response);
 
-        let r: Response<CreateAccount> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<CreateAccount>>(&response)?;
         Ok(r.result)
     }
 
@@ -115,7 +115,7 @@ impl Client {
 
         debug!("get accounts RPC response: {}", response);
 
-        let r: Response<GetAccounts> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<GetAccounts>>(&response)?;
 
         Ok(r.result)
     }
@@ -233,7 +233,7 @@ impl Client {
 
         debug!("transfer RPC response: {}", response);
 
-        let r: Response<Transfer> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<Transfer>>(&response)?;
         Ok(r.result)
     }
 
@@ -252,7 +252,7 @@ impl Client {
 
         debug!("wallet height RPC response: {}", response);
 
-        let r: Response<BlockHeight> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<BlockHeight>>(&response)?;
         Ok(r.result)
     }
 
@@ -281,7 +281,7 @@ impl Client {
 
         debug!("transfer RPC response: {}", response);
 
-        let r: Response<CheckTxKey> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<CheckTxKey>>(&response)?;
         Ok(r.result)
     }
 
@@ -314,7 +314,7 @@ impl Client {
 
         debug!("generate_from_keys RPC response: {}", response);
 
-        let r: Response<GenerateFromKeys> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<GenerateFromKeys>>(&response)?;
         Ok(r.result)
     }
 
@@ -332,7 +332,7 @@ impl Client {
 
         debug!("refresh RPC response: {}", response);
 
-        let r: Response<Refreshed> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<Refreshed>>(&response)?;
         Ok(r.result)
     }
 
@@ -354,7 +354,7 @@ impl Client {
 
         debug!("sweep_all RPC response: {}", response);
 
-        let r: Response<SweepAll> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<SweepAll>>(&response)?;
         Ok(r.result)
     }
 }
