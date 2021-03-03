@@ -158,7 +158,7 @@ where
         self.peer_id
     }
 
-    pub async fn run(&mut self) {
+    pub async fn run(mut self) {
         loop {
             tokio::select! {
                 swarm_event = self.swarm.next().fuse() => {

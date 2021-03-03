@@ -103,7 +103,7 @@ impl TestContext {
             .await
             .unwrap();
 
-        let join_handle = tokio::spawn(async move { event_loop.run().await });
+        let join_handle = tokio::spawn(event_loop.run());
 
         (swap, BobEventLoopJoinHandle(join_handle))
     }
@@ -116,7 +116,7 @@ impl TestContext {
 
         let (swap, event_loop) = self.bob_params.builder().build().await.unwrap();
 
-        let join_handle = tokio::spawn(async move { event_loop.run().await });
+        let join_handle = tokio::spawn(event_loop.run());
 
         (swap, BobEventLoopJoinHandle(join_handle))
     }
@@ -376,7 +376,7 @@ where
     )
     .await;
 
-    let (mut alice_event_loop, alice_swap_handle) = alice::EventLoop::new(
+    let (alice_event_loop, alice_swap_handle) = alice::EventLoop::new(
         alice_listen_address.clone(),
         alice_seed,
         execution_params,
@@ -390,9 +390,7 @@ where
 
     let alice_peer_id = alice_event_loop.peer_id();
 
-    tokio::spawn(async move {
-        alice_event_loop.run().await;
-    });
+    tokio::spawn(alice_event_loop.run());
 
     let bob_params = BobParams {
         seed: Seed::random().unwrap(),

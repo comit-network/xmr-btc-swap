@@ -149,7 +149,7 @@ async fn main() -> Result<()> {
             );
             let (swap, event_loop) = bob_factory.with_init_params(send_bitcoin).build().await?;
 
-            let handle = tokio::spawn(async move { event_loop.run().await });
+            let handle = tokio::spawn(event_loop.run());
             let swap = bob::run(swap);
             tokio::select! {
                 event_loop_result = handle => {
@@ -193,7 +193,7 @@ async fn main() -> Result<()> {
                 execution_params,
             );
             let (swap, event_loop) = bob_factory.build().await?;
-            let handle = tokio::spawn(async move { event_loop.run().await });
+            let handle = tokio::spawn(event_loop.run());
             let swap = bob::run(swap);
             tokio::select! {
                 event_loop_result = handle => {

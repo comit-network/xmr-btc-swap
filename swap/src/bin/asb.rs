@@ -100,7 +100,7 @@ async fn main() -> Result<()> {
 
             let rate_service = kraken::RateService::new().await?;
 
-            let (mut event_loop, _) = EventLoop::new(
+            let (event_loop, _) = EventLoop::new(
                 config.network.listen,
                 seed,
                 execution_params,
