@@ -91,8 +91,7 @@ mod testnet {
 
     pub static BITCOIN_AVG_BLOCK_TIME: Lazy<Duration> = Lazy::new(|| Duration::from_secs(5 * 60));
 
-    // This does not reflect recommended values for mainnet!
-    pub static MONERO_FINALITY_CONFIRMATIONS: u32 = 5;
+    pub static MONERO_FINALITY_CONFIRMATIONS: u32 = 10;
 
     // This does not reflect recommended values for mainnet!
     pub static BITCOIN_CANCEL_TIMELOCK: CancelTimelock = CancelTimelock::new(12);
@@ -109,7 +108,7 @@ mod regtest {
 
     pub static BITCOIN_AVG_BLOCK_TIME: Lazy<Duration> = Lazy::new(|| Duration::from_secs(5));
 
-    pub static MONERO_FINALITY_CONFIRMATIONS: u32 = 1;
+    pub static MONERO_FINALITY_CONFIRMATIONS: u32 = 10;
 
     pub static BITCOIN_CANCEL_TIMELOCK: CancelTimelock = CancelTimelock::new(100);
 

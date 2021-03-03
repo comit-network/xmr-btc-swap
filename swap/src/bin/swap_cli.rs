@@ -28,7 +28,6 @@ use swap::{
     execution_params,
     execution_params::GetExecutionParams,
     monero,
-    monero::{CreateWallet, OpenWallet},
     protocol::{
         bob,
         bob::{cancel::CancelError, Builder, EventLoop},
@@ -102,8 +101,9 @@ async fn main() -> Result<()> {
         .run(monero_network, "stagenet.community.xmr.to")
         .await?;
 
-    match args.cmd.unwrap_or_default() {
+    match args.cmd {
         Command::BuyXmr {
+            receive_monero_address,
             alice_peer_id,
             alice_addr,
         } => {
@@ -153,6 +153,7 @@ async fn main() -> Result<()> {
                 Arc::new(monero_wallet),
                 execution_params,
                 event_loop_handle,
+                receive_monero_address,
             )
             .with_init_params(send_bitcoin)
             .build()?;
@@ -180,6 +181,7 @@ async fn main() -> Result<()> {
             table.printstd();
         }
         Command::Resume {
+            receive_monero_address,
             swap_id,
             alice_peer_id,
             alice_addr,
@@ -205,6 +207,7 @@ async fn main() -> Result<()> {
                 Arc::new(monero_wallet),
                 execution_params,
                 event_loop_handle,
+                receive_monero_address,
             )
             .build()?;
 
@@ -292,25 +295,7 @@ async fn init_monero_wallet(
         MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME.to_string(),
     );
 
-    // Setup the temporary Monero wallet necessary for monitoring the blockchain
-    let open_monitoring_wallet_response = monero_wallet
-        .open_wallet(MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME)
-        .await;
-    if open_monitoring_wallet_response.is_err() {
-        monero_wallet
-            .create_wallet(MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME)
-            .await
-            .context(format!(
-                "Unable to create Monero wallet for blockchain monitoring.\
-             Please ensure that the monero-wallet-rpc is available at {}",
-                monero_wallet_rpc_url
-            ))?;
-
-        debug!(
-            "Created Monero wallet for blockchain monitoring with name {}",
-            MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME
-        );
-    }
+    monero_wallet.open_or_create().await?;
 
     let _test_wallet_connection = monero_wallet
         .block_height()

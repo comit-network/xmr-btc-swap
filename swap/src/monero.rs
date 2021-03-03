@@ -1,7 +1,7 @@
 pub mod wallet;
 mod wallet_rpc;
 
-pub use ::monero::{Network, PrivateKey, PublicKey};
+pub use ::monero::{Address, Network, PrivateKey, PublicKey};
 pub use curve25519_dalek::scalar::Scalar;
 pub use wallet::Wallet;
 pub use wallet_rpc::{WalletRpc, WalletRpcProcess};
@@ -9,9 +9,6 @@ pub use wallet_rpc::{WalletRpc, WalletRpcProcess};
 use crate::bitcoin;
 use ::bitcoin::hashes::core::fmt::Formatter;
 use anyhow::Result;
-use async_trait::async_trait;
-use monero::Address;
-use monero_rpc::wallet::{BlockHeight, Refreshed};
 use rand::{CryptoRng, RngCore};
 use rust_decimal::{
     prelude::{FromPrimitive, ToPrimitive},
@@ -183,28 +180,6 @@ impl From<TxHash> for String {
     }
 }
 
-#[async_trait]
-pub trait Transfer {
-    async fn transfer(
-        &self,
-        public_spend_key: PublicKey,
-        public_view_key: PublicViewKey,
-        amount: Amount,
-    ) -> Result<TransferProof>;
-}
-
-#[async_trait]
-pub trait WatchForTransfer {
-    async fn watch_for_transfer(
-        &self,
-        public_spend_key: PublicKey,
-        public_view_key: PublicViewKey,
-        transfer_proof: TransferProof,
-        amount: Amount,
-        expected_confirmations: u32,
-    ) -> Result<(), InsufficientFunds>;
-}
-
 #[derive(Debug, Clone, Copy, thiserror::Error)]
 #[error("transaction does not pay enough: expected {expected}, got {actual}")]
 pub struct InsufficientFunds {
@@ -216,51 +191,6 @@ pub struct InsufficientFunds {
 #[error("The balance is too low, current balance: {balance}")]
 pub struct BalanceTooLow {
     pub balance: Amount,
-}
-
-#[async_trait]
-pub trait CreateWalletForOutput {
-    async fn create_and_load_wallet_for_output(
-        &self,
-        private_spend_key: PrivateKey,
-        private_view_key: PrivateViewKey,
-        restore_height: BlockHeight,
-    ) -> Result<()>;
-}
-
-#[async_trait]
-pub trait CreateWalletForOutputThenLoadDefaultWallet {
-    async fn create_and_load_wallet_for_output_then_load_default_wallet(
-        &self,
-        private_spend_key: PrivateKey,
-        private_view_key: PrivateViewKey,
-        restore_height: BlockHeight,
-    ) -> Result<()>;
-}
-
-#[async_trait]
-pub trait OpenWallet {
-    async fn open_wallet(&self, file_name: &str) -> Result<()>;
-}
-
-#[async_trait]
-pub trait CreateWallet {
-    async fn create_wallet(&self, file_name: &str) -> Result<()>;
-}
-
-#[async_trait]
-pub trait WalletBlockHeight {
-    async fn block_height(&self) -> Result<BlockHeight>;
-}
-
-#[async_trait]
-pub trait GetAddress {
-    async fn get_main_address(&self) -> Result<Address>;
-}
-
-#[async_trait]
-pub trait Refresh {
-    async fn refresh(&self) -> Result<Refreshed>;
 }
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq)]

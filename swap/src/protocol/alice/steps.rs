@@ -6,7 +6,6 @@ use crate::{
     },
     execution_params::ExecutionParams,
     monero,
-    monero::Transfer,
     protocol::{
         alice,
         alice::{event_loop::EventLoopHandle, TransferProof},
@@ -23,7 +22,6 @@ use futures::{
 };
 use libp2p::PeerId;
 use sha2::Sha256;
-use std::sync::Arc;
 use tokio::time::timeout;
 
 // TODO(Franck): Use helper functions from xmr-btc instead of re-writing them
@@ -49,15 +47,12 @@ pub async fn wait_for_locked_bitcoin(
     Ok(())
 }
 
-pub async fn lock_xmr<W>(
+pub async fn lock_xmr(
     bob_peer_id: PeerId,
     state3: alice::State3,
     event_loop_handle: &mut EventLoopHandle,
-    monero_wallet: Arc<W>,
-) -> Result<()>
-where
-    W: Transfer,
-{
+    monero_wallet: &monero::Wallet,
+) -> Result<()> {
     let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey { scalar: state3.s_a });
 
     let public_spend_key = S_a + state3.S_b_monero;
@@ -130,14 +125,13 @@ pub async fn publish_cancel_transaction(
     B: bitcoin::PublicKey,
     cancel_timelock: CancelTimelock,
     tx_cancel_sig_bob: bitcoin::Signature,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    bitcoin_wallet: &bitcoin::Wallet,
 ) -> Result<bitcoin::TxCancel> {
     // First wait for cancel timelock to expire
     let tx_lock_height = bitcoin_wallet
         .transaction_block_height(tx_lock.txid())
         .await?;
-    poll_until_block_height_is_gte(bitcoin_wallet.as_ref(), tx_lock_height + cancel_timelock)
-        .await?;
+    poll_until_block_height_is_gte(&bitcoin_wallet, tx_lock_height + cancel_timelock).await?;
 
     let tx_cancel = bitcoin::TxCancel::new(&tx_lock, cancel_timelock, a.public(), B);
 

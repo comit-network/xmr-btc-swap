@@ -44,7 +44,7 @@ impl Client {
 
         debug!("get address RPC response: {}", response);
 
-        let r: Response<GetAddress> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<GetAddress>>(&response)?;
         Ok(r.result)
     }
 
@@ -69,9 +69,9 @@ impl Client {
             index, response
         );
 
-        let res: Response<GetBalance> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<GetBalance>>(&response)?;
 
-        let balance = res.result.balance;
+        let balance = r.result.balance;
 
         Ok(balance)
     }
@@ -93,7 +93,7 @@ impl Client {
 
         debug!("create account RPC response: {}", response);
 
-        let r: Response<CreateAccount> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<CreateAccount>>(&response)?;
         Ok(r.result)
     }
 
@@ -115,7 +115,7 @@ impl Client {
 
         debug!("get accounts RPC response: {}", response);
 
-        let r: Response<GetAccounts> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<GetAccounts>>(&response)?;
 
         Ok(r.result)
     }
@@ -142,6 +142,28 @@ impl Client {
         //  Currently blocked by https://github.com/thomaseizinger/rust-jsonrpc-client/issues/20
         if response.contains("error") {
             bail!("Failed to open wallet")
+        }
+
+        Ok(())
+    }
+
+    /// Close the currently opened wallet, after trying to save it.
+    pub async fn close_wallet(&self) -> Result<()> {
+        let request = Request::new("close_wallet", "");
+
+        let response = self
+            .inner
+            .post(self.url.clone())
+            .json(&request)
+            .send()
+            .await?
+            .text()
+            .await?;
+
+        debug!("close wallet RPC response: {}", response);
+
+        if response.contains("error") {
+            bail!("Failed to close wallet")
         }
 
         Ok(())
@@ -211,7 +233,7 @@ impl Client {
 
         debug!("transfer RPC response: {}", response);
 
-        let r: Response<Transfer> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<Transfer>>(&response)?;
         Ok(r.result)
     }
 
@@ -230,7 +252,7 @@ impl Client {
 
         debug!("wallet height RPC response: {}", response);
 
-        let r: Response<BlockHeight> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<BlockHeight>>(&response)?;
         Ok(r.result)
     }
 
@@ -259,7 +281,7 @@ impl Client {
 
         debug!("transfer RPC response: {}", response);
 
-        let r: Response<CheckTxKey> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<CheckTxKey>>(&response)?;
         Ok(r.result)
     }
 
@@ -292,7 +314,7 @@ impl Client {
 
         debug!("generate_from_keys RPC response: {}", response);
 
-        let r: Response<GenerateFromKeys> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<GenerateFromKeys>>(&response)?;
         Ok(r.result)
     }
 
@@ -310,7 +332,29 @@ impl Client {
 
         debug!("refresh RPC response: {}", response);
 
-        let r: Response<Refreshed> = serde_json::from_str(&response)?;
+        let r = serde_json::from_str::<Response<Refreshed>>(&response)?;
+        Ok(r.result)
+    }
+
+    /// Transfers the complete balance of the account to `address`.
+    pub async fn sweep_all(&self, address: &str) -> Result<SweepAll> {
+        let params = SweepAllParams {
+            address: address.into(),
+        };
+        let request = Request::new("sweep_all", params);
+
+        let response = self
+            .inner
+            .post(self.url.clone())
+            .json(&request)
+            .send()
+            .await?
+            .text()
+            .await?;
+
+        debug!("sweep_all RPC response: {}", response);
+
+        let r = serde_json::from_str::<Response<SweepAll>>(&response)?;
         Ok(r.result)
     }
 }
@@ -452,4 +496,42 @@ pub struct GenerateFromKeys {
 pub struct Refreshed {
     pub blocks_fetched: u32,
     pub received_money: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SweepAllParams {
+    pub address: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SweepAll {
+    amount_list: Vec<u64>,
+    fee_list: Vec<u64>,
+    multisig_txset: String,
+    pub tx_hash_list: Vec<String>,
+    unsigned_txset: String,
+    weight_list: Vec<u32>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn can_deserialize_sweep_all_response() {
+        let response = r#"{
+          "id": "0",
+          "jsonrpc": "2.0",
+          "result": {
+            "amount_list": [29921410000],
+            "fee_list": [78590000],
+            "multisig_txset": "",
+            "tx_hash_list": ["c1d8cfa87d445c1915a59d67be3e93ba8a29018640cf69b465f07b1840a8f8c8"],
+            "unsigned_txset": "",
+            "weight_list": [1448]
+          }
+        }"#;
+
+        let _: Response<SweepAll> = serde_json::from_str(&response).unwrap();
+    }
 }
