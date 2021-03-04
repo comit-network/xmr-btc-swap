@@ -26,7 +26,6 @@ use swap::database::Database;
 use swap::execution_params::GetExecutionParams;
 use swap::network::quote::BidQuote;
 use swap::protocol::bob;
-use swap::protocol::bob::cancel::CancelError;
 use swap::protocol::bob::{Builder, EventLoop};
 use swap::seed::Seed;
 use swap::{bitcoin, execution_params, monero};
@@ -213,11 +212,11 @@ async fn main() -> Result<()> {
                 Ok((txid, _)) => {
                     debug!("Cancel transaction successfully published with id {}", txid)
                 }
-                Err(CancelError::CancelTimelockNotExpiredYet) => error!(
+                Err(bob::cancel::Error::CancelTimelockNotExpiredYet) => error!(
                     "The Cancel Transaction cannot be published yet, \
                         because the timelock has not expired. Please try again later."
                 ),
-                Err(CancelError::CancelTxAlreadyPublished) => {
+                Err(bob::cancel::Error::CancelTxAlreadyPublished) => {
                     warn!("The Cancel Transaction has already been published.")
                 }
             }

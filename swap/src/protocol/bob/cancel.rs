@@ -6,7 +6,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Debug, thiserror::Error, Clone, Copy)]
-pub enum CancelError {
+pub enum Error {
     #[error("The cancel timelock has not expired yet.")]
     CancelTimelockNotExpiredYet,
     #[error("The cancel transaction has already been published.")]
@@ -19,7 +19,7 @@ pub async fn cancel(
     bitcoin_wallet: Arc<Wallet>,
     db: Database,
     force: bool,
-) -> Result<Result<(Txid, BobState), CancelError>> {
+) -> Result<Result<(Txid, BobState), Error>> {
     let state4 = match state {
         BobState::BtcLocked(state3) => state3.cancel(),
         BobState::XmrLockProofReceived { state, .. } => state.cancel(),
@@ -35,7 +35,7 @@ pub async fn cancel(
 
     if !force {
         if let ExpiredTimelocks::None = state4.expired_timelock(bitcoin_wallet.as_ref()).await? {
-            return Ok(Err(CancelError::CancelTimelockNotExpiredYet));
+            return Ok(Err(Error::CancelTimelockNotExpiredYet));
         }
 
         if state4
@@ -47,7 +47,7 @@ pub async fn cancel(
             let db_state = state.into();
             db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
 
-            return Ok(Err(CancelError::CancelTxAlreadyPublished));
+            return Ok(Err(Error::CancelTxAlreadyPublished));
         }
     }
 
