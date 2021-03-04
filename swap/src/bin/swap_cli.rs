@@ -16,6 +16,7 @@ use anyhow::{bail, Context, Result};
 use prettytable::{row, Table};
 use reqwest::Url;
 use std::cmp::min;
+use std::future::Future;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -25,6 +26,7 @@ use swap::cli::command::{Arguments, Command};
 use swap::cli::config::{read_config, Config};
 use swap::database::Database;
 use swap::execution_params::GetExecutionParams;
+use swap::network::quote::BidQuote;
 use swap::protocol::bob;
 use swap::protocol::bob::cancel::CancelError;
 use swap::protocol::bob::{Builder, EventLoop};
@@ -124,39 +126,22 @@ async fn main() -> Result<()> {
             )?;
             let handle = tokio::spawn(event_loop.run());
 
-            let bid_quote = event_loop_handle
-                .request_quote()
-                .await
-                .context("failed to request quote")?;
+            let send_bitcoin = determine_btc_to_swap(
+                event_loop_handle.request_quote(),
+                bitcoin_wallet.balance(),
+                bitcoin_wallet.new_address(),
+                async {
+                    while bitcoin_wallet.balance().await? == Amount::ZERO {
+                        bitcoin_wallet.sync_wallet().await?;
 
-            info!("Received quote: 1 XMR ~ {}", bid_quote.price);
+                        tokio::time::sleep(Duration::from_secs(1)).await;
+                    }
 
-            // TODO: Also wait for more funds if balance < dust
-            if bitcoin_wallet.balance().await? == Amount::ZERO {
-                info!(
-                    "Please deposit the BTC you want to swap to {} (max {})",
-                    bitcoin_wallet.new_address().await?,
-                    bid_quote.max_quantity
-                );
-
-                while bitcoin_wallet.balance().await? == Amount::ZERO {
-                    bitcoin_wallet.sync_wallet().await?;
-
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-                }
-
-                debug!("Received {}", bitcoin_wallet.balance().await?);
-            } else {
-                info!(
-                    "Still got {} left in wallet, swapping ...",
-                    bitcoin_wallet.balance().await?
-                );
-            }
-
-            let max_giveable = bitcoin_wallet.max_giveable(TxLock::script_size()).await?;
-            let max_accepted = bid_quote.max_quantity;
-
-            let send_bitcoin = min(max_giveable, max_accepted);
+                    bitcoin_wallet.balance().await
+                },
+                bitcoin_wallet.max_giveable(TxLock::script_size()),
+            )
+            .await?;
 
             let swap = Builder::new(
                 db,
@@ -319,4 +304,134 @@ async fn init_monero_wallet(
         .context("failed to validate connection to monero-wallet-rpc")?;
 
     Ok(monero_wallet)
+}
+
+async fn determine_btc_to_swap(
+    request_quote: impl Future<Output = Result<BidQuote>>,
+    initial_balance: impl Future<Output = Result<bitcoin::Amount>>,
+    get_new_address: impl Future<Output = Result<bitcoin::Address>>,
+    wait_for_deposit: impl Future<Output = Result<bitcoin::Amount>>,
+    max_giveable: impl Future<Output = Result<bitcoin::Amount>>,
+) -> Result<bitcoin::Amount> {
+    debug!("Requesting quote");
+
+    let bid_quote = request_quote.await.context("failed to request quote")?;
+
+    info!("Received quote: 1 XMR ~ {}", bid_quote.price);
+
+    // TODO: Also wait for more funds if balance < dust
+    let initial_balance = initial_balance.await?;
+
+    if initial_balance == Amount::ZERO {
+        info!(
+            "Please deposit the BTC you want to swap to {} (max {})",
+            get_new_address.await?,
+            bid_quote.max_quantity
+        );
+
+        let new_balance = wait_for_deposit.await?;
+
+        info!("Received {}", new_balance);
+    } else {
+        info!("Found {} in wallet", initial_balance);
+    }
+
+    let max_giveable = max_giveable.await?;
+    let max_accepted = bid_quote.max_quantity;
+
+    if max_giveable > max_accepted {
+        info!(
+            "Max giveable amount {} exceeds max accepted amount {}!",
+            max_giveable, max_accepted
+        );
+    }
+
+    Ok(min(max_giveable, max_accepted))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::determine_btc_to_swap;
+    use ::bitcoin::Amount;
+    use tracing::subscriber;
+
+    #[tokio::test]
+    async fn given_no_balance_and_transfers_less_than_max_swaps_max_giveable() {
+        let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+
+        let amount = determine_btc_to_swap(
+            async { Ok(quote_with_max(0.01)) },
+            async { Ok(Amount::ZERO) },
+            get_dummy_address(),
+            async { Ok(Amount::from_btc(0.0001)?) },
+            async { Ok(Amount::from_btc(0.00009)?) },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(amount, Amount::from_btc(0.00009).unwrap())
+    }
+
+    #[tokio::test]
+    async fn given_no_balance_and_transfers_more_then_swaps_max_quantity_from_quote() {
+        let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+
+        let amount = determine_btc_to_swap(
+            async { Ok(quote_with_max(0.01)) },
+            async { Ok(Amount::ZERO) },
+            get_dummy_address(),
+            async { Ok(Amount::from_btc(0.1)?) },
+            async { Ok(Amount::from_btc(0.09)?) },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(amount, Amount::from_btc(0.01).unwrap())
+    }
+
+    #[tokio::test]
+    async fn given_initial_balance_below_max_quantity_swaps_max_givable() {
+        let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+
+        let amount = determine_btc_to_swap(
+            async { Ok(quote_with_max(0.01)) },
+            async { Ok(Amount::from_btc(0.005)?) },
+            async { panic!("should not request new address when initial balance is > 0") },
+            async { panic!("should not wait for deposit when initial balance > 0") },
+            async { Ok(Amount::from_btc(0.0049)?) },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(amount, Amount::from_btc(0.0049).unwrap())
+    }
+
+    #[tokio::test]
+    async fn given_initial_balance_above_max_quantity_swaps_max_quantity() {
+        let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+
+        let amount = determine_btc_to_swap(
+            async { Ok(quote_with_max(0.01)) },
+            async { Ok(Amount::from_btc(0.1)?) },
+            async { panic!("should not request new address when initial balance is > 0") },
+            async { panic!("should not wait for deposit when initial balance > 0") },
+            async { Ok(Amount::from_btc(0.09)?) },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(amount, Amount::from_btc(0.01).unwrap())
+    }
+
+    fn quote_with_max(btc: f64) -> BidQuote {
+        BidQuote {
+            price: Amount::from_btc(0.001).unwrap(),
+            max_quantity: Amount::from_btc(btc).unwrap(),
+        }
+    }
+
+    async fn get_dummy_address() -> Result<bitcoin::Address> {
+        Ok("1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6".parse()?)
+    }
 }
