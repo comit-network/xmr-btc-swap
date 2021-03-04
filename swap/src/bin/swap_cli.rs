@@ -12,7 +12,7 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use prettytable::{row, Table};
 use reqwest::Url;
 use std::{path::Path, sync::Arc, time::Duration};
@@ -107,6 +107,14 @@ async fn main() -> Result<()> {
             alice_peer_id,
             alice_addr,
         } => {
+            if receive_monero_address.network != monero_network {
+                bail!(
+                    "Given monero address is on network {:?}, expected address on network {:?}",
+                    receive_monero_address.network,
+                    monero_network
+                )
+            }
+
             let bitcoin_wallet =
                 init_bitcoin_wallet(config, bitcoin_network, &wallet_data_dir, seed).await?;
             let monero_wallet =
@@ -186,6 +194,10 @@ async fn main() -> Result<()> {
             alice_peer_id,
             alice_addr,
         } => {
+            if receive_monero_address.network != monero_network {
+                bail!("The given monero address is on network {:?}, expected address of network {:?}.", receive_monero_address.network, monero_network)
+            }
+
             let bitcoin_wallet =
                 init_bitcoin_wallet(config, bitcoin_network, &wallet_data_dir, seed).await?;
             let monero_wallet =
