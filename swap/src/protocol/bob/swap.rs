@@ -308,7 +308,11 @@ async fn run_until_internal(
                 // Ensure that the generated wallet is synced so we have a proper balance
                 monero_wallet.refresh().await?;
                 // Sweep (transfer all funds) to the given address
-                monero_wallet.sweep_all(receive_monero_address).await?;
+                let tx_hashes = monero_wallet.sweep_all(receive_monero_address).await?;
+
+                for tx_hash in tx_hashes {
+                    tracing::info!("Sent XMR to {} in tx {}", receive_monero_address, tx_hash.0);
+                }
 
                 let state = BobState::XmrRedeemed {
                     tx_lock_id: state.tx_lock_id(),
