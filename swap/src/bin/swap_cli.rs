@@ -256,10 +256,7 @@ async fn init_bitcoin_wallet(
     )
     .await?;
 
-    wallet
-        .sync_wallet()
-        .await
-        .context("failed to sync balance of bitcoin wallet")?;
+    wallet.sync_wallet().await?;
 
     Ok(wallet)
 }

@@ -106,7 +106,12 @@ impl Wallet {
     }
 
     pub async fn sync_wallet(&self) -> Result<()> {
-        self.inner.lock().await.sync(noop_progress(), None)?;
+        self.inner
+            .lock()
+            .await
+            .sync(noop_progress(), None)
+            .context("failed to sync balance of Bitcoin wallet")?;
+
         Ok(())
     }
 
