@@ -76,11 +76,6 @@ async fn main() -> Result<()> {
         None => Config::testnet(),
     };
 
-    debug!(
-        "Database and seed will be stored in {}",
-        config.data.dir.display()
-    );
-
     let db = Database::open(config.data.dir.join("database").as_path())
         .context("Could not open database")?;
 

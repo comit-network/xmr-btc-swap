@@ -51,6 +51,8 @@ pub struct Database(sled::Db);
 
 impl Database {
     pub fn open(path: &Path) -> Result<Self> {
+        tracing::debug!("Opening database at {}", path.display());
+
         let db =
             sled::open(path).with_context(|| format!("Could not open the DB at {:?}", path))?;
 
