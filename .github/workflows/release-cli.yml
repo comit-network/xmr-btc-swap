@@ -27,6 +27,8 @@ jobs:
           ref: ${{ github.event.release.target_commitish }}
           token: ${{ secrets.BOTTY_GITHUB_TOKEN }}
 
+      - uses: Swatinem/rust-cache@v1.2.0
+
       - name: Build ${{ matrix.target }} release binary
         run: cargo build --target=${{ matrix.target }} --release --package swap --bin swap_cli
 
