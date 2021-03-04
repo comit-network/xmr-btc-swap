@@ -12,10 +12,13 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
+            archive_ext: tar
           - target: x86_64-apple-darwin
             os: macos-latest
+            archive_ext: tar
           - target: x86_64-pc-windows-msvc
             os: windows-latest
+            archive_ext: zip
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout tagged commit
@@ -35,62 +38,44 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Create windows release archive
-        id: create-archive-windows
-        if: contains(matrix.os, 'windows')
-        uses: ./.github/actions/create-release-archive/windows
-        with:
-          binary: swap_cli
-          version: ${{ github.event.release.tag_name }}
-          target: ${{ matrix.target }}
+      - id: create-archive-name
+        shell: python # Use python to have a prettier name for the archive on Windows.
+        run: |
+          import platform
+          os_info = platform.uname()
 
-      - name: Create macos release archive
-        id: create-archive-macos
-        if: contains(matrix.os, 'macos')
-        uses: ./.github/actions/create-release-archive/macos
-        with:
-          binary: swap_cli
-          version: ${{ github.event.release.tag_name }}
-          target: ${{ matrix.target }}
+          arch = os_info.machine
 
-      - name: Create ubuntu release archive
-        id: create-archive-ubuntu
-        if: contains(matrix.os, 'ubuntu')
-        uses: ./.github/actions/create-release-archive/ubuntu
-        with:
-          binary: swap_cli
-          version: ${{ github.event.release.tag_name }}
-          target: ${{ matrix.target }}
+          triple = "${{ matrix.target }}".split("-")
+          arch = triple[0]
 
-      - name: Upload windows release binary
-        if: contains(matrix.os, 'windows')
+          archive_name=f'swap_cli_${{ github.event.release.tag_name }}_{os_info.system}_{arch}.${{ matrix.archive_ext }}'
+
+          print(f'::set-output name=archive::{archive_name}')
+
+      - name: Pack macos archive
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: gtar -C ./target/${{ matrix.target }}/release --create --file=${{ steps.create-archive-name.outputs.archive }} swap_cli
+
+      - name: Pack linux archive
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: tar -C ./target/${{ matrix.target }}/release --create --file=${{ steps.create-archive-name.outputs.archive }} swap_cli
+
+      - name: Pack windows archive
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          cp target/${{ matrix.target }}/release/swap_cli.exe ./swap_cli.exe
+          7z a -tzip ${{ steps.create-archive-name.outputs.archive }} ./swap_cli.exe
+
+      - name: Upload archive
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.BOTTY_GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./${{ steps.create-archive-windows.outputs.archive }}
-          asset_name: ${{ steps.create-archive-windows.outputs.archive }}
-          asset_content_type: application/gzip
-
-      - name: Upload macos release binary
-        if: contains(matrix.os, 'macos')
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.BOTTY_GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./${{ steps.create-archive-macos.outputs.archive }}
-          asset_name: ${{ steps.create-archive-macos.outputs.archive }}
-          asset_content_type: application/gzip
-
-      - name: Upload ubuntu release binary
-        if: contains(matrix.os, 'ubuntu')
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.BOTTY_GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./${{ steps.create-archive-ubuntu.outputs.archive }}
-          asset_name: ${{ steps.create-archive-ubuntu.outputs.archive }}
+          asset_path: ./${{ steps.create-archive-name.outputs.archive }}
+          asset_name: ${{ steps.create-archive-name.outputs.archive }}
           asset_content_type: application/gzip
