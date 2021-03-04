@@ -313,14 +313,18 @@ async fn determine_btc_to_swap(
             bid_quote.max_quantity
         );
 
-        let new_balance = wait_for_deposit.await?;
+        let new_balance = wait_for_deposit
+            .await
+            .context("Failed to wait for Bitcoin deposit")?;
 
         info!("Received {}", new_balance);
     } else {
         info!("Found {} in wallet", initial_balance);
     }
 
-    let max_giveable = max_giveable.await?;
+    let max_giveable = max_giveable
+        .await
+        .context("Failed to compute max 'giveable' Bitcoin amount")?;
     let max_accepted = bid_quote.max_quantity;
 
     if max_giveable > max_accepted {

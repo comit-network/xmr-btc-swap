@@ -155,7 +155,7 @@ impl Wallet {
         tx_builder.set_single_recipient(dummy_script);
         tx_builder.drain_wallet();
         tx_builder.fee_rate(self.select_feerate());
-        let (_, details) = tx_builder.finish()?;
+        let (_, details) = tx_builder.finish().context("Failed to build transaction")?;
 
         let max_giveable = details.sent - details.fees;
 
