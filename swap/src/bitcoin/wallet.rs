@@ -74,12 +74,13 @@ impl Wallet {
     }
 
     pub async fn balance(&self) -> Result<Amount> {
-        let balance = self.inner.lock().await.get_balance()?;
+        let balance = self.inner.lock().await.get_balance().context("Failed to calculate Bitcoin balance")?;
+
         Ok(Amount::from_sat(balance))
     }
 
     pub async fn new_address(&self) -> Result<Address> {
-        let address = self.inner.lock().await.get_new_address()?;
+        let address = self.inner.lock().await.get_new_address().context("Failed to get new Bitcoin address")?;
 
         Ok(address)
     }
