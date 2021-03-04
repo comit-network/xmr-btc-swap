@@ -35,20 +35,62 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Create release archive
-        id: create-archive
-        uses: ./.github/actions/create-release-archive
+      - name: Create windows release archive
+        id: create-archive-windows
+        if: contains(matrix.os, 'windows')
+        uses: ./.github/actions/create-release-archive/windows
         with:
           binary: swap_cli
           version: ${{ github.event.release.tag_name }}
           target: ${{ matrix.target }}
 
-      - name: Upload ${{ matrix.os }} release binary
+      - name: Create macos release archive
+        id: create-archive-macos
+        if: contains(matrix.os, 'macos')
+        uses: ./.github/actions/create-release-archive/macos
+        with:
+          binary: swap_cli
+          version: ${{ github.event.release.tag_name }}
+          target: ${{ matrix.target }}
+
+      - name: Create ubuntu release archive
+        id: create-archive-ubuntu
+        if: contains(matrix.os, 'ubuntu')
+        uses: ./.github/actions/create-release-archive/ubuntu
+        with:
+          binary: swap_cli
+          version: ${{ github.event.release.tag_name }}
+          target: ${{ matrix.target }}
+
+      - name: Upload windows release binary
+        if: contains(matrix.os, 'windows')
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.BOTTY_GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./${{ steps.create-archive.outputs.archive }}
-          asset_name: ${{ steps.create-archive.outputs.archive }}
+          asset_path: ./${{ steps.create-archive-windows.outputs.archive }}
+          asset_name: ${{ steps.create-archive-windows.outputs.archive }}
+          asset_content_type: application/gzip
+
+      - name: Upload macos release binary
+        if: contains(matrix.os, 'macos')
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOTTY_GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./${{ steps.create-archive-macos.outputs.archive }}
+          asset_name: ${{ steps.create-archive-macos.outputs.archive }}
+          asset_content_type: application/gzip
+
+      - name: Upload ubuntu release binary
+        if: contains(matrix.os, 'ubuntu')
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOTTY_GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./${{ steps.create-archive-ubuntu.outputs.archive }}
+          asset_name: ${{ steps.create-archive-ubuntu.outputs.archive }}
           asset_content_type: application/gzip
