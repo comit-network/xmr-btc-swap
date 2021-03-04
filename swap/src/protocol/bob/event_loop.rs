@@ -1,20 +1,15 @@
-use crate::{
-    bitcoin,
-    bitcoin::EncryptedSignature,
-    monero,
-    network::{
-        spot_price::{SpotPriceRequest, SpotPriceResponse},
-        transport, TokioExecutor,
-    },
-    protocol::{
-        alice::TransferProof,
-        bob::{Behaviour, OutEvent, State0, State2},
-    },
-};
+use crate::bitcoin::EncryptedSignature;
+use crate::network::spot_price::{SpotPriceRequest, SpotPriceResponse};
+use crate::network::{transport, TokioExecutor};
+use crate::protocol::alice::TransferProof;
+use crate::protocol::bob::{Behaviour, OutEvent, State0, State2};
+use crate::{bitcoin, monero};
 use anyhow::{anyhow, bail, Context, Result};
 use futures::FutureExt;
-use libp2p::{core::Multiaddr, PeerId};
-use std::{convert::Infallible, sync::Arc};
+use libp2p::core::Multiaddr;
+use libp2p::PeerId;
+use std::convert::Infallible;
+use std::sync::Arc;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{debug, error, trace};
 

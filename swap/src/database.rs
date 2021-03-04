@@ -2,8 +2,10 @@ pub use alice::Alice;
 pub use bob::Bob;
 
 use anyhow::{anyhow, bail, Context, Result};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{fmt::Display, path::Path};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use std::fmt::Display;
+use std::path::Path;
 use uuid::Uuid;
 
 mod alice;
@@ -123,10 +125,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::database::{
-        alice::{Alice, AliceEndState},
-        bob::{Bob, BobEndState},
-    };
+    use crate::database::alice::{Alice, AliceEndState};
+    use crate::database::bob::{Bob, BobEndState};
 
     #[tokio::test]
     async fn can_write_and_read_to_multiple_keys() {

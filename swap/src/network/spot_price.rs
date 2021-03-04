@@ -1,9 +1,8 @@
-use crate::{bitcoin, monero, network::request_response::CborCodec};
-use libp2p::{
-    core::ProtocolName,
-    request_response::{
-        ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
-    },
+use crate::network::request_response::CborCodec;
+use crate::{bitcoin, monero};
+use libp2p::core::ProtocolName;
+use libp2p::request_response::{
+    ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
 };
 use serde::{Deserialize, Serialize};
 

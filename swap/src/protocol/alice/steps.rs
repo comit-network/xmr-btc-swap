@@ -1,25 +1,17 @@
-use crate::{
-    bitcoin,
-    bitcoin::{
-        poll_until_block_height_is_gte, BlockHeight, CancelTimelock, EncryptedSignature,
-        PunishTimelock, TxCancel, TxLock, TxRefund,
-    },
-    execution_params::ExecutionParams,
-    monero,
-    protocol::{
-        alice,
-        alice::{event_loop::EventLoopHandle, TransferProof},
-    },
+use crate::bitcoin::{
+    poll_until_block_height_is_gte, BlockHeight, CancelTimelock, EncryptedSignature,
+    PunishTimelock, TxCancel, TxLock, TxRefund,
 };
+use crate::execution_params::ExecutionParams;
+use crate::protocol::alice;
+use crate::protocol::alice::event_loop::EventLoopHandle;
+use crate::protocol::alice::TransferProof;
+use crate::{bitcoin, monero};
 use anyhow::{Context, Result};
-use ecdsa_fun::{
-    adaptor::{Adaptor, HashTranscript},
-    nonce::Deterministic,
-};
-use futures::{
-    future::{select, Either},
-    pin_mut,
-};
+use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
+use ecdsa_fun::nonce::Deterministic;
+use futures::future::{select, Either};
+use futures::pin_mut;
 use libp2p::PeerId;
 use sha2::Sha256;
 use tokio::time::timeout;

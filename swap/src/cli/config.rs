@@ -2,10 +2,8 @@ use crate::fs::default_data_dir;
 use anyhow::{Context, Result};
 use config::ConfigError;
 use serde::{Deserialize, Serialize};
-use std::{
-    ffi::OsStr,
-    path::{Path, PathBuf},
-};
+use std::ffi::OsStr;
+use std::path::{Path, PathBuf};
 use tracing::debug;
 use url::Url;
 
@@ -84,7 +82,8 @@ pub fn read_config(config_path: PathBuf) -> Result<Result<Config, ConfigNotIniti
 mod tests {
     use super::*;
     use crate::fs::ensure_directory_exists;
-    use std::{fs, str::FromStr};
+    use std::fs;
+    use std::str::FromStr;
     use tempfile::tempdir;
 
     pub fn initial_setup(config_path: PathBuf, config: Config) -> Result<()> {

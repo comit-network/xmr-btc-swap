@@ -1,6 +1,8 @@
 use anyhow::{Context, Result};
-use libp2p::{core::Multiaddr, PeerId};
-use std::{path::PathBuf, str::FromStr};
+use libp2p::core::Multiaddr;
+use libp2p::PeerId;
+use std::path::PathBuf;
+use std::str::FromStr;
 use uuid::Uuid;
 
 pub const DEFAULT_ALICE_MULTIADDR: &str = "/dns4/xmr-btc-asb.coblox.tech/tcp/9876";
@@ -85,7 +87,8 @@ fn parse_monero_address(s: &str) -> Result<monero::Address> {
 #[cfg(test)]
 mod tests {
     use crate::cli::command::{DEFAULT_ALICE_MULTIADDR, DEFAULT_ALICE_PEER_ID};
-    use libp2p::{core::Multiaddr, PeerId};
+    use libp2p::core::Multiaddr;
+    use libp2p::PeerId;
 
     #[test]
     fn parse_default_alice_peer_id_success() {

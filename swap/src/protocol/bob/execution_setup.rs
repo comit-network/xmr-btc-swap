@@ -1,11 +1,7 @@
-use crate::{
-    bitcoin::Signature,
-    network::request_response::BUF_SIZE,
-    protocol::{
-        alice::{Message1, Message3},
-        bob::{State0, State2},
-    },
-};
+use crate::bitcoin::Signature;
+use crate::network::request_response::BUF_SIZE;
+use crate::protocol::alice::{Message1, Message3};
+use crate::protocol::bob::{State0, State2};
 use anyhow::{Context, Error, Result};
 use libp2p::PeerId;
 use libp2p_async_await::BehaviourOutEvent;

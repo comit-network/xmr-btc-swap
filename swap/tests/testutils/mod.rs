@@ -4,30 +4,32 @@ mod electrs;
 use crate::testutils;
 use anyhow::{Context, Result};
 use bitcoin_harness::{BitcoindRpcApi, Client};
-use futures::{future::RemoteHandle, Future};
+use futures::future::RemoteHandle;
+use futures::Future;
 use get_port::get_port;
-use libp2p::{core::Multiaddr, PeerId};
+use libp2p::core::Multiaddr;
+use libp2p::PeerId;
 use monero_harness::{image, Monero};
-use std::{
-    convert::Infallible,
-    path::{Path, PathBuf},
-    sync::Arc,
-    time::Duration,
-};
-use swap::{
-    asb::{fixed_rate, fixed_rate::RATE},
-    bitcoin,
-    bitcoin::{CancelTimelock, PunishTimelock},
-    database::Database,
-    execution_params,
-    execution_params::{ExecutionParams, GetExecutionParams},
-    monero,
-    protocol::{alice, alice::AliceState, bob, bob::BobState},
-    seed::Seed,
-};
+use std::convert::Infallible;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::Duration;
+use swap::asb::fixed_rate;
+use swap::asb::fixed_rate::RATE;
+use swap::bitcoin::{CancelTimelock, PunishTimelock};
+use swap::database::Database;
+use swap::execution_params::{ExecutionParams, GetExecutionParams};
+use swap::protocol::alice::AliceState;
+use swap::protocol::bob::BobState;
+use swap::protocol::{alice, bob};
+use swap::seed::Seed;
+use swap::{bitcoin, execution_params, monero};
 use tempfile::tempdir;
-use testcontainers::{clients::Cli, Container, Docker, RunArgs};
-use tokio::{sync::mpsc, task::JoinHandle, time::interval};
+use testcontainers::clients::Cli;
+use testcontainers::{Container, Docker, RunArgs};
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
+use tokio::time::interval;
 use tracing::dispatcher::DefaultGuard;
 use tracing_log::LogTracer;
 use url::Url;
@@ -445,7 +447,8 @@ where
 }
 
 fn random_prefix() -> String {
-    use rand::{distributions::Alphanumeric, thread_rng, Rng};
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
     use std::iter;
     const LEN: usize = 8;
     let mut rng = thread_rng();

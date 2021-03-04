@@ -1,24 +1,23 @@
-use crate::{
-    asb::LatestRate,
-    bitcoin,
-    database::Database,
-    execution_params::ExecutionParams,
-    monero,
-    monero::BalanceTooLow,
-    network::{spot_price::SpotPriceResponse, transport, TokioExecutor},
-    protocol::{
-        alice,
-        alice::{AliceState, Behaviour, OutEvent, State3, Swap, TransferProof},
-        bob::EncryptedSignature,
-    },
-    seed::Seed,
-};
+use crate::asb::LatestRate;
+use crate::database::Database;
+use crate::execution_params::ExecutionParams;
+use crate::monero::BalanceTooLow;
+use crate::network::spot_price::SpotPriceResponse;
+use crate::network::{transport, TokioExecutor};
+use crate::protocol::alice;
+use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State3, Swap, TransferProof};
+use crate::protocol::bob::EncryptedSignature;
+use crate::seed::Seed;
+use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
 use futures::future::RemoteHandle;
-use libp2p::{core::Multiaddr, futures::FutureExt, PeerId, Swarm};
+use libp2p::core::Multiaddr;
+use libp2p::futures::FutureExt;
+use libp2p::{PeerId, Swarm};
 use rand::rngs::OsRng;
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc, mpsc::error::SendError};
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, error, trace};
 use uuid::Uuid;
 

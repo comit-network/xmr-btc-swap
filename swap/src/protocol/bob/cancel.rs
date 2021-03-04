@@ -1,8 +1,6 @@
-use crate::{
-    bitcoin::{ExpiredTimelocks, Txid, Wallet},
-    database::{Database, Swap},
-    protocol::bob::BobState,
-};
+use crate::bitcoin::{ExpiredTimelocks, Txid, Wallet};
+use crate::database::{Database, Swap};
+use crate::protocol::bob::BobState;
 use anyhow::{bail, Result};
 use std::sync::Arc;
 use uuid::Uuid;

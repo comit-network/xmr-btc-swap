@@ -10,17 +10,13 @@ use crate::bitcoin;
 use ::bitcoin::hashes::core::fmt::Formatter;
 use anyhow::Result;
 use rand::{CryptoRng, RngCore};
-use rust_decimal::{
-    prelude::{FromPrimitive, ToPrimitive},
-    Decimal,
-};
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use std::{
-    convert::TryFrom,
-    fmt::Display,
-    ops::{Add, Mul, Sub},
-    str::FromStr,
-};
+use std::convert::TryFrom;
+use std::fmt::Display;
+use std::ops::{Add, Mul, Sub};
+use std::str::FromStr;
 
 pub const PICONERO_OFFSET: u64 = 1_000_000_000_000;
 
@@ -198,12 +194,13 @@ pub struct BalanceTooLow {
 pub struct OverflowError(pub String);
 
 pub mod monero_private_key {
-    use monero::{
-        consensus::{Decodable, Encodable},
-        PrivateKey,
-    };
-    use serde::{de, de::Visitor, ser::Error, Deserializer, Serializer};
-    use std::{fmt, io::Cursor};
+    use monero::consensus::{Decodable, Encodable};
+    use monero::PrivateKey;
+    use serde::de::Visitor;
+    use serde::ser::Error;
+    use serde::{de, Deserializer, Serializer};
+    use std::fmt;
+    use std::io::Cursor;
 
     struct BytesVisitor;
 

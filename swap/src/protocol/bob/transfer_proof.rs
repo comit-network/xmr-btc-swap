@@ -1,15 +1,11 @@
-use crate::{
-    network::request_response::{CborCodec, TransferProofProtocol, TIMEOUT},
-    protocol::alice::TransferProof,
-};
+use crate::network::request_response::{CborCodec, TransferProofProtocol, TIMEOUT};
+use crate::protocol::alice::TransferProof;
 use anyhow::{anyhow, Error, Result};
-use libp2p::{
-    request_response::{
-        ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
-        RequestResponseMessage, ResponseChannel,
-    },
-    NetworkBehaviour,
+use libp2p::request_response::{
+    ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
+    RequestResponseMessage, ResponseChannel,
 };
+use libp2p::NetworkBehaviour;
 use std::time::Duration;
 use tracing::debug;
 

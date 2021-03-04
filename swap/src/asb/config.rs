@@ -1,14 +1,13 @@
 use crate::fs::{default_data_dir, ensure_directory_exists};
 use anyhow::{Context, Result};
 use config::ConfigError;
-use dialoguer::{theme::ColorfulTheme, Input};
+use dialoguer::theme::ColorfulTheme;
+use dialoguer::Input;
 use libp2p::core::Multiaddr;
 use serde::{Deserialize, Serialize};
-use std::{
-    ffi::OsStr,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::ffi::OsStr;
+use std::fs;
+use std::path::{Path, PathBuf};
 use tracing::info;
 use url::Url;
 

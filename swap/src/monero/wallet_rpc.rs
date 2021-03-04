@@ -2,21 +2,16 @@ use ::monero::Network;
 use anyhow::{Context, Result};
 use big_bytes::BigByte;
 use futures::{StreamExt, TryStreamExt};
-use reqwest::{header::CONTENT_LENGTH, Url};
-use std::{
-    io::ErrorKind,
-    path::{Path, PathBuf},
-    process::Stdio,
-};
-use tokio::{
-    fs::{remove_file, OpenOptions},
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-    process::{Child, Command},
-};
-use tokio_util::{
-    codec::{BytesCodec, FramedRead},
-    io::StreamReader,
-};
+use reqwest::header::CONTENT_LENGTH;
+use reqwest::Url;
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
+use std::process::Stdio;
+use tokio::fs::{remove_file, OpenOptions};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::process::{Child, Command};
+use tokio_util::codec::{BytesCodec, FramedRead};
+use tokio_util::io::StreamReader;
 
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
 compile_error!("unsupported operating system");

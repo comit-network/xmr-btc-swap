@@ -1,25 +1,15 @@
-use crate::{
-    bitcoin,
-    execution_params::ExecutionParams,
-    monero,
-    network::{
-        peer_tracker,
-        peer_tracker::PeerTracker,
-        spot_price,
-        spot_price::{SpotPriceRequest, SpotPriceResponse},
-    },
-    protocol::{
-        alice::{
-            encrypted_signature, execution_setup, transfer_proof, State0, State3, TransferProof,
-        },
-        bob::EncryptedSignature,
-    },
+use crate::execution_params::ExecutionParams;
+use crate::network::peer_tracker::PeerTracker;
+use crate::network::spot_price::{SpotPriceRequest, SpotPriceResponse};
+use crate::network::{peer_tracker, spot_price};
+use crate::protocol::alice::{
+    encrypted_signature, execution_setup, transfer_proof, State0, State3, TransferProof,
 };
+use crate::protocol::bob::EncryptedSignature;
+use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
-use libp2p::{
-    request_response::{RequestResponseMessage, ResponseChannel},
-    NetworkBehaviour, PeerId,
-};
+use libp2p::request_response::{RequestResponseMessage, ResponseChannel};
+use libp2p::{NetworkBehaviour, PeerId};
 use rand::{CryptoRng, RngCore};
 use tracing::debug;
 

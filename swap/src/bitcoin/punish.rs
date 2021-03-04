@@ -1,5 +1,6 @@
 use crate::bitcoin::{Address, PublicKey, PunishTimelock, Transaction, TxCancel};
-use ::bitcoin::{util::bip143::SigHashCache, SigHash, SigHashType};
+use ::bitcoin::util::bip143::SigHashCache;
+use ::bitcoin::{SigHash, SigHashType};
 use anyhow::Result;
 use ecdsa_fun::Signature;
 use miniscript::{Descriptor, DescriptorTrait};

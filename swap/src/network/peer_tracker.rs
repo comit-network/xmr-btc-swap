@@ -1,16 +1,11 @@
 use futures::task::Context;
-use libp2p::{
-    core::{connection::ConnectionId, ConnectedPoint},
-    swarm::{
-        protocols_handler::DummyProtocolsHandler, NetworkBehaviour, NetworkBehaviourAction,
-        PollParameters,
-    },
-    Multiaddr, PeerId,
-};
-use std::{
-    collections::{HashMap, VecDeque},
-    task::Poll,
-};
+use libp2p::core::connection::ConnectionId;
+use libp2p::core::ConnectedPoint;
+use libp2p::swarm::protocols_handler::DummyProtocolsHandler;
+use libp2p::swarm::{NetworkBehaviour, NetworkBehaviourAction, PollParameters};
+use libp2p::{Multiaddr, PeerId};
+use std::collections::{HashMap, VecDeque};
+use std::task::Poll;
 
 #[derive(Debug, Copy, Clone)]
 pub enum OutEvent {

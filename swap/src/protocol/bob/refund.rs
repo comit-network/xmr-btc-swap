@@ -1,9 +1,7 @@
-use crate::{
-    bitcoin::Wallet,
-    database::{Database, Swap},
-    execution_params::ExecutionParams,
-    protocol::bob::BobState,
-};
+use crate::bitcoin::Wallet;
+use crate::database::{Database, Swap};
+use crate::execution_params::ExecutionParams;
+use crate::protocol::bob::BobState;
 use anyhow::{bail, Result};
 use std::sync::Arc;
 use uuid::Uuid;

@@ -1,7 +1,9 @@
 pub mod testutils;
 
-use swap::protocol::{bob, bob::BobState};
-use testutils::{bob_run_until::is_xmr_locked, SlowCancelConfig};
+use swap::protocol::bob;
+use swap::protocol::bob::BobState;
+use testutils::bob_run_until::is_xmr_locked;
+use testutils::SlowCancelConfig;
 
 #[tokio::test]
 async fn given_bob_restarts_after_xmr_is_locked_resume_swap() {

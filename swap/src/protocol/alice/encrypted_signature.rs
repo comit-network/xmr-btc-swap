@@ -1,15 +1,11 @@
-use crate::{
-    network::request_response::{CborCodec, EncryptedSignatureProtocol, TIMEOUT},
-    protocol::bob::EncryptedSignature,
-};
+use crate::network::request_response::{CborCodec, EncryptedSignatureProtocol, TIMEOUT};
+use crate::protocol::bob::EncryptedSignature;
 use anyhow::{anyhow, Error, Result};
-use libp2p::{
-    request_response::{
-        ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
-        RequestResponseMessage, ResponseChannel,
-    },
-    NetworkBehaviour,
+use libp2p::request_response::{
+    ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
+    RequestResponseMessage, ResponseChannel,
 };
+use libp2p::NetworkBehaviour;
 use std::time::Duration;
 use tracing::debug;
 

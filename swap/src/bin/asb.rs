@@ -13,30 +13,25 @@
 #![allow(non_snake_case)]
 
 use anyhow::{Context, Result};
-use bdk::{descriptor::Segwitv0, keys::DerivableKey};
+use bdk::descriptor::Segwitv0;
+use bdk::keys::DerivableKey;
 use prettytable::{row, Table};
-use std::{path::Path, sync::Arc};
+use std::path::Path;
+use std::sync::Arc;
 use structopt::StructOpt;
-use swap::{
-    asb::{
-        command::{Arguments, Command},
-        config::{
-            initial_setup, query_user_for_initial_testnet_config, read_config, Config,
-            ConfigNotInitialized,
-        },
-        kraken,
-    },
-    bitcoin,
-    database::Database,
-    execution_params,
-    execution_params::GetExecutionParams,
-    fs::default_config_path,
-    monero,
-    monero::Amount,
-    protocol::alice::EventLoop,
-    seed::Seed,
-    trace::init_tracing,
+use swap::asb::command::{Arguments, Command};
+use swap::asb::config::{
+    initial_setup, query_user_for_initial_testnet_config, read_config, Config, ConfigNotInitialized,
 };
+use swap::asb::kraken;
+use swap::database::Database;
+use swap::execution_params::GetExecutionParams;
+use swap::fs::default_config_path;
+use swap::monero::Amount;
+use swap::protocol::alice::EventLoop;
+use swap::seed::Seed;
+use swap::trace::init_tracing;
+use swap::{bitcoin, execution_params, monero};
 use tracing::{info, warn};
 use tracing_subscriber::filter::LevelFilter;
 

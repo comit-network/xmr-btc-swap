@@ -1,7 +1,9 @@
 pub mod testutils;
 
-use swap::protocol::{bob, bob::BobState};
-use testutils::{bob_run_until::is_btc_locked, FastCancelConfig};
+use swap::protocol::bob;
+use swap::protocol::bob::BobState;
+use testutils::bob_run_until::is_btc_locked;
+use testutils::FastCancelConfig;
 
 #[tokio::test]
 async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {

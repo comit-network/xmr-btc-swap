@@ -1,8 +1,6 @@
 use std::collections::HashMap;
-use testcontainers::{
-    core::{Container, Docker, WaitForMessage},
-    Image,
-};
+use testcontainers::core::{Container, Docker, WaitForMessage};
+use testcontainers::Image;
 
 pub const RPC_USER: &str = "admin";
 pub const RPC_PASSWORD: &str = "123";

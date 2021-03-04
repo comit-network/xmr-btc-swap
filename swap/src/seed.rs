@@ -1,18 +1,17 @@
 use crate::fs::ensure_directory_exists;
-use ::bitcoin::secp256k1::{self, constants::SECRET_KEY_SIZE, SecretKey};
+use ::bitcoin::secp256k1::constants::SECRET_KEY_SIZE;
+use ::bitcoin::secp256k1::{self, SecretKey};
 use anyhow::Result;
 use bdk::bitcoin::util::bip32::ExtendedPrivKey;
 use bitcoin::hashes::{sha256, Hash, HashEngine};
 use libp2p::identity;
 use pem::{encode, Pem};
 use rand::prelude::*;
-use std::{
-    ffi::OsStr,
-    fmt,
-    fs::{self, File},
-    io::{self, Write},
-    path::{Path, PathBuf},
-};
+use std::ffi::OsStr;
+use std::fmt;
+use std::fs::{self, File};
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
 
 pub const SEED_LENGTH: usize = 32;
 

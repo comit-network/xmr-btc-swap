@@ -2,7 +2,8 @@
 //! HTTP-API.
 
 use libp2p::PeerId;
-use serde::{de::Error, Deserialize, Deserializer, Serializer};
+use serde::de::Error;
+use serde::{Deserialize, Deserializer, Serializer};
 
 pub fn serialize<S>(peer_id: &PeerId, serializer: S) -> Result<S::Ok, S::Error>
 where

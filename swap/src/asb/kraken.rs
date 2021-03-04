@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::convert::TryFrom;
 use tokio::sync::watch;
-use tokio_tungstenite::tungstenite::{protocol::CloseFrame, Message};
+use tokio_tungstenite::tungstenite::protocol::CloseFrame;
+use tokio_tungstenite::tungstenite::Message;
 use tracing::{error, trace};
 use watch::Receiver;
 

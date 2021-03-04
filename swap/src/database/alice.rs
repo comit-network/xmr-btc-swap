@@ -1,9 +1,8 @@
-use crate::{
-    bitcoin::{EncryptedSignature, TxCancel, TxRefund},
-    monero,
-    monero::monero_private_key,
-    protocol::{alice, alice::AliceState},
-};
+use crate::bitcoin::{EncryptedSignature, TxCancel, TxRefund};
+use crate::monero;
+use crate::monero::monero_private_key;
+use crate::protocol::alice;
+use crate::protocol::alice::AliceState;
 use ::bitcoin::hashes::core::fmt::Display;
 use libp2p::PeerId;
 use monero_rpc::wallet::BlockHeight;

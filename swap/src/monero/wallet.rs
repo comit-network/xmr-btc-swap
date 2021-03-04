@@ -3,13 +3,14 @@ use crate::monero::{
 };
 use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::{Context, Result};
-use backoff::{backoff::Constant as ConstantBackoff, future::retry};
+use backoff::backoff::Constant as ConstantBackoff;
+use backoff::future::retry;
 use bitcoin::hashes::core::sync::atomic::AtomicU32;
-use monero_rpc::{
-    wallet,
-    wallet::{BlockHeight, Refreshed},
-};
-use std::{str::FromStr, sync::atomic::Ordering, time::Duration};
+use monero_rpc::wallet;
+use monero_rpc::wallet::{BlockHeight, Refreshed};
+use std::str::FromStr;
+use std::sync::atomic::Ordering;
+use std::time::Duration;
 use tokio::sync::Mutex;
 use tracing::{debug, info};
 use url::Url;

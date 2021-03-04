@@ -1,34 +1,26 @@
-use crate::{
-    bitcoin,
-    database::Database,
-    execution_params::ExecutionParams,
-    monero,
-    network::{
-        peer_tracker::{self, PeerTracker},
-        spot_price,
-        spot_price::{SpotPriceRequest, SpotPriceResponse},
-    },
-    protocol::{alice::TransferProof, bob},
-};
+use crate::database::Database;
+use crate::execution_params::ExecutionParams;
+use crate::network::peer_tracker::{self, PeerTracker};
+use crate::network::spot_price;
+use crate::network::spot_price::{SpotPriceRequest, SpotPriceResponse};
+use crate::protocol::alice::TransferProof;
+use crate::protocol::bob;
+use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
-use libp2p::{
-    core::Multiaddr,
-    request_response::{RequestResponseMessage, ResponseChannel},
-    NetworkBehaviour, PeerId,
-};
+use libp2p::core::Multiaddr;
+use libp2p::request_response::{RequestResponseMessage, ResponseChannel};
+use libp2p::{NetworkBehaviour, PeerId};
 use std::sync::Arc;
 use tracing::debug;
 use uuid::Uuid;
 
-pub use self::{
-    cancel::cancel,
-    encrypted_signature::EncryptedSignature,
-    event_loop::{EventLoop, EventLoopHandle},
-    execution_setup::{Message0, Message2, Message4},
-    refund::refund,
-    state::*,
-    swap::{run, run_until},
-};
+pub use self::cancel::cancel;
+pub use self::encrypted_signature::EncryptedSignature;
+pub use self::event_loop::{EventLoop, EventLoopHandle};
+pub use self::execution_setup::{Message0, Message2, Message4};
+pub use self::refund::refund;
+pub use self::state::*;
+pub use self::swap::{run, run_until};
 
 pub mod cancel;
 mod encrypted_signature;

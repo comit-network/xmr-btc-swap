@@ -2,7 +2,8 @@ use crate::bitcoin::{
     verify_sig, Address, EmptyWitnessStack, NoInputs, NotThreeWitnesses, PublicKey, TooManyInputs,
     Transaction, TxLock,
 };
-use ::bitcoin::{util::bip143::SigHashCache, SigHash, SigHashType, Txid};
+use ::bitcoin::util::bip143::SigHashCache;
+use ::bitcoin::{SigHash, SigHashType, Txid};
 use anyhow::{bail, Context, Result};
 use ecdsa_fun::Signature;
 use miniscript::{Descriptor, DescriptorTrait};

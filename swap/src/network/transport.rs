@@ -1,17 +1,12 @@
 use anyhow::Result;
-use libp2p::{
-    core::{
-        identity,
-        muxing::StreamMuxerBox,
-        transport::Boxed,
-        upgrade::{SelectUpgrade, Version},
-        Transport,
-    },
-    dns::DnsConfig,
-    mplex::MplexConfig,
-    noise::{self, NoiseConfig, X25519Spec},
-    yamux, PeerId,
-};
+use libp2p::core::muxing::StreamMuxerBox;
+use libp2p::core::transport::Boxed;
+use libp2p::core::upgrade::{SelectUpgrade, Version};
+use libp2p::core::{identity, Transport};
+use libp2p::dns::DnsConfig;
+use libp2p::mplex::MplexConfig;
+use libp2p::noise::{self, NoiseConfig, X25519Spec};
+use libp2p::{yamux, PeerId};
 
 /// Builds a libp2p transport with the following features:
 /// - TcpConnection
