@@ -11,7 +11,6 @@ use crate::{
     protocol::{alice::TransferProof, bob},
 };
 use anyhow::{anyhow, Error, Result};
-pub use execution_setup::{Message0, Message2, Message4};
 use libp2p::{
     core::Multiaddr,
     request_response::{RequestResponseMessage, ResponseChannel},
@@ -25,6 +24,7 @@ pub use self::{
     cancel::cancel,
     encrypted_signature::EncryptedSignature,
     event_loop::{EventLoop, EventLoopHandle},
+    execution_setup::{Message0, Message2, Message4},
     refund::refund,
     state::*,
     swap::{run, run_until},
