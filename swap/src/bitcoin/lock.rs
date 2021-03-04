@@ -1,7 +1,8 @@
 use crate::bitcoin::{
     build_shared_output_descriptor, Address, Amount, PublicKey, Transaction, Wallet, TX_FEE,
 };
-use ::bitcoin::{util::psbt::PartiallySignedTransaction, OutPoint, TxIn, TxOut, Txid};
+use ::bitcoin::util::psbt::PartiallySignedTransaction;
+use ::bitcoin::{OutPoint, TxIn, TxOut, Txid};
 use anyhow::Result;
 use ecdsa_fun::fun::Point;
 use miniscript::{Descriptor, DescriptorTrait};

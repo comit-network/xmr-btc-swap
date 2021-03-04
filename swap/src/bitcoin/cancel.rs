@@ -2,12 +2,14 @@ use crate::bitcoin::{
     build_shared_output_descriptor, Address, Amount, BlockHeight, PublicKey, Transaction, TxLock,
     TX_FEE,
 };
-use ::bitcoin::{util::bip143::SigHashCache, OutPoint, SigHash, SigHashType, TxIn, TxOut, Txid};
+use ::bitcoin::util::bip143::SigHashCache;
+use ::bitcoin::{OutPoint, SigHash, SigHashType, TxIn, TxOut, Txid};
 use anyhow::Result;
 use ecdsa_fun::Signature;
 use miniscript::{Descriptor, DescriptorTrait};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, ops::Add};
+use std::collections::HashMap;
+use std::ops::Add;
 
 /// Represent a timelock, expressed in relative block height as defined in
 /// [BIP68](https://github.com/bitcoin/bips/blob/master/bip-0068.mediawiki).

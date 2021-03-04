@@ -1,11 +1,13 @@
 use async_trait::async_trait;
 use futures::prelude::*;
-use libp2p::{
-    core::{upgrade, upgrade::ReadOneError},
-    request_response::{ProtocolName, RequestResponseCodec},
-};
-use serde::{de::DeserializeOwned, Serialize};
-use std::{fmt::Debug, io, marker::PhantomData};
+use libp2p::core::upgrade;
+use libp2p::core::upgrade::ReadOneError;
+use libp2p::request_response::{ProtocolName, RequestResponseCodec};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+use std::fmt::Debug;
+use std::io;
+use std::marker::PhantomData;
 
 /// Time to wait for a response back once we send a request.
 pub const TIMEOUT: u64 = 3600; // One hour.

@@ -1,17 +1,12 @@
-use crate::{
-    bitcoin,
-    bitcoin::{
-        current_epoch, wait_for_cancel_timelock_to_expire, CancelTimelock, ExpiredTimelocks,
-        PunishTimelock, TxCancel, TxRefund,
-    },
-    execution_params::ExecutionParams,
-    monero,
-    protocol::{
-        alice::{Message1, Message3},
-        bob::{Message0, Message2, Message4},
-        CROSS_CURVE_PROOF_SYSTEM,
-    },
+use crate::bitcoin::{
+    current_epoch, wait_for_cancel_timelock_to_expire, CancelTimelock, ExpiredTimelocks,
+    PunishTimelock, TxCancel, TxRefund,
 };
+use crate::execution_params::ExecutionParams;
+use crate::protocol::alice::{Message1, Message3};
+use crate::protocol::bob::{Message0, Message2, Message4};
+use crate::protocol::CROSS_CURVE_PROOF_SYSTEM;
+use crate::{bitcoin, monero};
 use anyhow::{anyhow, bail, Context, Result};
 use libp2p::PeerId;
 use monero_rpc::wallet::BlockHeight;

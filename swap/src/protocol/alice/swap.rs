@@ -1,33 +1,22 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use crate::{
-    bitcoin,
-    bitcoin::ExpiredTimelocks,
-    database,
-    database::Database,
-    execution_params::ExecutionParams,
-    monero,
-    monero_ext::ScalarExt,
-    protocol::{
-        alice,
-        alice::{
-            event_loop::EventLoopHandle,
-            steps::{
-                build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction,
-                extract_monero_private_key, lock_xmr, publish_cancel_transaction,
-                wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund,
-                wait_for_locked_bitcoin,
-            },
-            AliceState,
-        },
-    },
+use crate::bitcoin::ExpiredTimelocks;
+use crate::database::Database;
+use crate::execution_params::ExecutionParams;
+use crate::monero_ext::ScalarExt;
+use crate::protocol::alice;
+use crate::protocol::alice::event_loop::EventLoopHandle;
+use crate::protocol::alice::steps::{
+    build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction, extract_monero_private_key,
+    lock_xmr, publish_cancel_transaction, wait_for_bitcoin_encrypted_signature,
+    wait_for_bitcoin_refund, wait_for_locked_bitcoin,
 };
+use crate::protocol::alice::AliceState;
+use crate::{bitcoin, database, monero};
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
-use futures::{
-    future::{select, Either},
-    pin_mut,
-};
+use futures::future::{select, Either};
+use futures::pin_mut;
 use rand::{CryptoRng, RngCore};
 use std::sync::Arc;
 use tracing::{error, info};

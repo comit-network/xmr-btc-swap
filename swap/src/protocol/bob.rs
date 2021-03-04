@@ -1,34 +1,23 @@
-use crate::{
-    bitcoin,
-    database::Database,
-    execution_params::ExecutionParams,
-    monero,
-    network::{
-        peer_tracker::{self, PeerTracker},
-        spot_price,
-        spot_price::{SpotPriceRequest, SpotPriceResponse},
-    },
-    protocol::{alice::TransferProof, bob},
-};
+use crate::database::Database;
+use crate::execution_params::ExecutionParams;
+use crate::network::{peer_tracker, spot_price};
+use crate::protocol::alice::TransferProof;
+use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
-pub use execution_setup::{Message0, Message2, Message4};
-use libp2p::{
-    core::Multiaddr,
-    request_response::{RequestResponseMessage, ResponseChannel},
-    NetworkBehaviour, PeerId,
-};
+use libp2p::core::Multiaddr;
+use libp2p::request_response::{RequestResponseMessage, ResponseChannel};
+use libp2p::{NetworkBehaviour, PeerId};
 use std::sync::Arc;
 use tracing::debug;
 use uuid::Uuid;
 
-pub use self::{
-    cancel::cancel,
-    encrypted_signature::EncryptedSignature,
-    event_loop::{EventLoop, EventLoopHandle},
-    refund::refund,
-    state::*,
-    swap::{run, run_until},
-};
+pub use self::cancel::cancel;
+pub use self::encrypted_signature::EncryptedSignature;
+pub use self::event_loop::{EventLoop, EventLoopHandle};
+pub use self::execution_setup::{Message0, Message2, Message4};
+pub use self::refund::refund;
+pub use self::state::*;
+pub use self::swap::{run, run_until};
 
 pub mod cancel;
 mod encrypted_signature;
@@ -41,7 +30,7 @@ mod transfer_proof;
 
 pub struct Swap {
     pub state: BobState,
-    pub event_loop_handle: bob::EventLoopHandle,
+    pub event_loop_handle: EventLoopHandle,
     pub db: Database,
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
@@ -60,7 +49,7 @@ pub struct Builder {
     init_params: InitParams,
     execution_params: ExecutionParams,
 
-    event_loop_handle: bob::EventLoopHandle,
+    event_loop_handle: EventLoopHandle,
 
     receive_monero_address: ::monero::Address,
 }
@@ -78,7 +67,7 @@ impl Builder {
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
         execution_params: ExecutionParams,
-        event_loop_handle: bob::EventLoopHandle,
+        event_loop_handle: EventLoopHandle,
         receive_monero_address: ::monero::Address,
     ) -> Self {
         Self {
@@ -100,7 +89,7 @@ impl Builder {
         }
     }
 
-    pub fn build(self) -> Result<bob::Swap> {
+    pub fn build(self) -> Result<Swap> {
         let state = match self.init_params {
             InitParams::New { btc_amount } => BobState::Started { btc_amount },
             InitParams::None => self.db.get_state(self.swap_id)?.try_into_bob()?.into(),
@@ -122,7 +111,7 @@ impl Builder {
 #[derive(Debug)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
-    SpotPriceReceived(SpotPriceResponse),
+    SpotPriceReceived(spot_price::Response),
     ExecutionSetupDone(Result<Box<State2>>),
     TransferProof {
         msg: Box<TransferProof>,
@@ -216,7 +205,7 @@ impl From<encrypted_signature::OutEvent> for OutEvent {
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    pt: PeerTracker,
+    pt: peer_tracker::Behaviour,
     spot_price: spot_price::Behaviour,
     execution_setup: execution_setup::Behaviour,
     transfer_proof: transfer_proof::Behaviour,
@@ -236,7 +225,7 @@ impl Default for Behaviour {
 }
 
 impl Behaviour {
-    pub fn request_spot_price(&mut self, alice: PeerId, request: SpotPriceRequest) {
+    pub fn request_spot_price(&mut self, alice: PeerId, request: spot_price::Request) {
         let _ = self.spot_price.send_request(&alice, request);
     }
 

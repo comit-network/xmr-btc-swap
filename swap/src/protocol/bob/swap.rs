@@ -1,12 +1,11 @@
-use crate::{
-    bitcoin,
-    bitcoin::ExpiredTimelocks,
-    database::{Database, Swap},
-    execution_params::ExecutionParams,
-    monero,
-    monero::InsufficientFunds,
-    protocol::bob::{self, event_loop::EventLoopHandle, state::*},
-};
+use crate::bitcoin::ExpiredTimelocks;
+use crate::database::{Database, Swap};
+use crate::execution_params::ExecutionParams;
+use crate::monero::InsufficientFunds;
+use crate::protocol::bob;
+use crate::protocol::bob::event_loop::EventLoopHandle;
+use crate::protocol::bob::state::*;
+use crate::{bitcoin, monero};
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
 use rand::rngs::OsRng;

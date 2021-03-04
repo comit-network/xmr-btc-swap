@@ -7,30 +7,29 @@ mod redeem;
 mod refund;
 mod timelocks;
 
-pub use crate::bitcoin::{
-    cancel::{CancelTimelock, PunishTimelock, TxCancel},
-    lock::TxLock,
-    punish::TxPunish,
-    redeem::TxRedeem,
-    refund::TxRefund,
-    timelocks::{BlockHeight, ExpiredTimelocks},
-};
-pub use ::bitcoin::{util::amount::Amount, Address, Network, Transaction, Txid};
-pub use ecdsa_fun::{adaptor::EncryptedSignature, fun::Scalar, Signature};
+pub use crate::bitcoin::cancel::{CancelTimelock, PunishTimelock, TxCancel};
+pub use crate::bitcoin::lock::TxLock;
+pub use crate::bitcoin::punish::TxPunish;
+pub use crate::bitcoin::redeem::TxRedeem;
+pub use crate::bitcoin::refund::TxRefund;
+pub use crate::bitcoin::timelocks::{BlockHeight, ExpiredTimelocks};
+pub use ::bitcoin::util::amount::Amount;
+pub use ::bitcoin::{Address, Network, Transaction, Txid};
+pub use ecdsa_fun::adaptor::EncryptedSignature;
+pub use ecdsa_fun::fun::Scalar;
+pub use ecdsa_fun::Signature;
 pub use wallet::Wallet;
 
-use ::bitcoin::{
-    hashes::{hex::ToHex, Hash},
-    secp256k1, SigHash,
-};
+use ::bitcoin::hashes::hex::ToHex;
+use ::bitcoin::hashes::Hash;
+use ::bitcoin::{secp256k1, SigHash};
 use anyhow::{anyhow, bail, Result};
-use ecdsa_fun::{
-    adaptor::{Adaptor, HashTranscript},
-    fun::Point,
-    nonce::Deterministic,
-    ECDSA,
-};
-use miniscript::{descriptor::Wsh, Descriptor, Segwitv0};
+use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
+use ecdsa_fun::fun::Point;
+use ecdsa_fun::nonce::Deterministic;
+use ecdsa_fun::ECDSA;
+use miniscript::descriptor::Wsh;
+use miniscript::{Descriptor, Segwitv0};
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;

@@ -1,6 +1,7 @@
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, Result};
-use rust_decimal::{prelude::ToPrimitive, Decimal};
+use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::Decimal;
 use std::fmt::{Debug, Display, Formatter};
 
 /// Prices at which 1 XMR will be traded, in BTC (XMR/BTC pair)

@@ -1,5 +1,6 @@
 use crate::bitcoin::Amount;
-use bitcoin::{util::amount::ParseAmountError, Denomination};
+use bitcoin::util::amount::ParseAmountError;
+use bitcoin::Denomination;
 use std::path::PathBuf;
 
 #[derive(structopt::StructOpt, Debug)]

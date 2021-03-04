@@ -1,10 +1,8 @@
 use crate::testutils::bitcoind;
 use bitcoin::Network;
 use std::collections::HashMap;
-use testcontainers::{
-    core::{Container, Docker, WaitForMessage},
-    Image,
-};
+use testcontainers::core::{Container, Docker, WaitForMessage};
+use testcontainers::Image;
 
 pub const HTTP_PORT: u16 = 60401;
 pub const RPC_PORT: u16 = 3002;

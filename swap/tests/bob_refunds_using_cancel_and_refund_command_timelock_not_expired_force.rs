@@ -1,7 +1,9 @@
 pub mod testutils;
 
-use swap::protocol::{bob, bob::BobState};
-use testutils::{bob_run_until::is_btc_locked, SlowCancelConfig};
+use swap::protocol::bob;
+use swap::protocol::bob::BobState;
+use testutils::bob_run_until::is_btc_locked;
+use testutils::SlowCancelConfig;
 
 #[tokio::test]
 async fn given_bob_manually_forces_cancel_when_timelock_not_expired_errors() {

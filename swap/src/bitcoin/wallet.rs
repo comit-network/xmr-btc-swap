@@ -1,22 +1,24 @@
-use crate::{
-    bitcoin::{timelocks::BlockHeight, Address, Amount, Transaction},
-    execution_params::ExecutionParams,
-};
-use ::bitcoin::{util::psbt::PartiallySignedTransaction, Txid};
+use crate::bitcoin::timelocks::BlockHeight;
+use crate::bitcoin::{Address, Amount, Transaction};
+use crate::execution_params::ExecutionParams;
+use ::bitcoin::util::psbt::PartiallySignedTransaction;
+use ::bitcoin::Txid;
 use anyhow::{anyhow, bail, Context, Result};
-use backoff::{backoff::Constant as ConstantBackoff, future::retry};
-use bdk::{
-    blockchain::{noop_progress, Blockchain, ElectrumBlockchain},
-    descriptor::Segwitv0,
-    electrum_client::{self, Client, ElectrumApi},
-    keys::DerivableKey,
-    FeeRate, KeychainKind,
-};
+use backoff::backoff::Constant as ConstantBackoff;
+use backoff::future::retry;
+use bdk::blockchain::{noop_progress, Blockchain, ElectrumBlockchain};
+use bdk::descriptor::Segwitv0;
+use bdk::electrum_client::{self, Client, ElectrumApi};
+use bdk::keys::DerivableKey;
+use bdk::{FeeRate, KeychainKind};
 use bitcoin::Script;
 use reqwest::{Method, Url};
 use serde::{Deserialize, Serialize};
-use std::{path::Path, sync::Arc, time::Duration};
-use tokio::{sync::Mutex, time::interval};
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::Mutex;
+use tokio::time::interval;
 
 const SLED_TREE_NAME: &str = "default_tree";
 
@@ -309,13 +311,9 @@ fn blocks_tip_height_url(base_url: &Url) -> Result<Url> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        bitcoin::{
-            wallet::{blocks_tip_height_url, tx_status_url},
-            Txid,
-        },
-        cli::config::DEFAULT_ELECTRUM_HTTP_URL,
-    };
+    use crate::bitcoin::wallet::{blocks_tip_height_url, tx_status_url};
+    use crate::bitcoin::Txid;
+    use crate::cli::config::DEFAULT_ELECTRUM_HTTP_URL;
     use reqwest::Url;
 
     #[test]

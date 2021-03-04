@@ -1,8 +1,8 @@
 use anyhow::Result;
-use atty::{self};
 use tracing::{info, subscriber};
 use tracing_log::LogTracer;
-use tracing_subscriber::{filter::LevelFilter, FmtSubscriber};
+use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::FmtSubscriber;
 
 pub fn init_tracing(level: LevelFilter) -> Result<()> {
     if level == LevelFilter::OFF {

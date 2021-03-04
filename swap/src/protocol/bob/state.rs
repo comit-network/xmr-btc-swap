@@ -1,24 +1,18 @@
-use crate::{
-    bitcoin::{
-        self, current_epoch, wait_for_cancel_timelock_to_expire, CancelTimelock, ExpiredTimelocks,
-        PunishTimelock, Transaction, TxCancel, Txid,
-    },
-    execution_params::ExecutionParams,
-    monero,
-    monero::{monero_private_key, InsufficientFunds, TransferProof},
-    monero_ext::ScalarExt,
-    protocol::{
-        alice::{Message1, Message3},
-        bob::{EncryptedSignature, Message0, Message2, Message4},
-        CROSS_CURVE_PROOF_SYSTEM,
-    },
+use crate::bitcoin::{
+    self, current_epoch, wait_for_cancel_timelock_to_expire, CancelTimelock, ExpiredTimelocks,
+    PunishTimelock, Transaction, TxCancel, Txid,
 };
+use crate::execution_params::ExecutionParams;
+use crate::monero;
+use crate::monero::{monero_private_key, InsufficientFunds, TransferProof};
+use crate::monero_ext::ScalarExt;
+use crate::protocol::alice::{Message1, Message3};
+use crate::protocol::bob::{EncryptedSignature, Message0, Message2, Message4};
+use crate::protocol::CROSS_CURVE_PROOF_SYSTEM;
 use anyhow::{anyhow, bail, Context, Result};
-use ecdsa_fun::{
-    adaptor::{Adaptor, HashTranscript},
-    nonce::Deterministic,
-    Signature,
-};
+use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
+use ecdsa_fun::nonce::Deterministic;
+use ecdsa_fun::Signature;
 use monero_rpc::wallet::BlockHeight;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};

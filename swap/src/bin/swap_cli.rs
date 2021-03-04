@@ -15,25 +15,20 @@
 use anyhow::{bail, Context, Result};
 use prettytable::{row, Table};
 use reqwest::Url;
-use std::{path::Path, sync::Arc, time::Duration};
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
 use structopt::StructOpt;
-use swap::{
-    bitcoin,
-    bitcoin::{Amount, TxLock},
-    cli::{
-        command::{Arguments, Command},
-        config::{read_config, Config},
-    },
-    database::Database,
-    execution_params,
-    execution_params::GetExecutionParams,
-    monero,
-    protocol::{
-        bob,
-        bob::{cancel::CancelError, Builder, EventLoop},
-    },
-    seed::Seed,
-};
+use swap::bitcoin::{Amount, TxLock};
+use swap::cli::command::{Arguments, Command};
+use swap::cli::config::{read_config, Config};
+use swap::database::Database;
+use swap::execution_params::GetExecutionParams;
+use swap::protocol::bob;
+use swap::protocol::bob::cancel::CancelError;
+use swap::protocol::bob::{Builder, EventLoop};
+use swap::seed::Seed;
+use swap::{bitcoin, execution_params, monero};
 use tracing::{debug, error, info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 use uuid::Uuid;

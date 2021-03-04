@@ -1,12 +1,10 @@
 use crate::network::request_response::{CborCodec, EncryptedSignatureProtocol, TIMEOUT};
 use anyhow::{anyhow, Error};
-use libp2p::{
-    request_response::{
-        ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
-        RequestResponseMessage,
-    },
-    NetworkBehaviour, PeerId,
+use libp2p::request_response::{
+    ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
+    RequestResponseMessage,
 };
+use libp2p::{NetworkBehaviour, PeerId};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 

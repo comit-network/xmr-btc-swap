@@ -1,17 +1,17 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use crate::{bitcoin, database::Database, execution_params::ExecutionParams, monero};
+use crate::database::Database;
+use crate::execution_params::ExecutionParams;
+use crate::{bitcoin, monero};
 use std::sync::Arc;
 use uuid::Uuid;
 
-pub use self::{
-    behaviour::{Behaviour, OutEvent},
-    event_loop::{EventLoop, EventLoopHandle},
-    execution_setup::Message1,
-    state::*,
-    swap::{run, run_until},
-    transfer_proof::TransferProof,
-};
+pub use self::behaviour::{Behaviour, OutEvent};
+pub use self::event_loop::{EventLoop, EventLoopHandle};
+pub use self::execution_setup::Message1;
+pub use self::state::*;
+pub use self::swap::{run, run_until};
+pub use self::transfer_proof::TransferProof;
 pub use execution_setup::Message3;
 
 mod behaviour;

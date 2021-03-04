@@ -1,7 +1,8 @@
 use conquer_once::Lazy;
 use ecdsa_fun::fun::marker::Mark;
 use sha2::Sha256;
-use sigma_fun::{ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQ, HashTranscript};
+use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQ;
+use sigma_fun::HashTranscript;
 
 pub mod alice;
 pub mod bob;

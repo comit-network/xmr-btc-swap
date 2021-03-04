@@ -1,13 +1,12 @@
-use crate::{bitcoin, monero, network::request_response::CborCodec};
-use libp2p::{
-    core::ProtocolName,
-    request_response::{
-        ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
-    },
+use crate::network::request_response::CborCodec;
+use crate::{bitcoin, monero};
+use libp2p::core::ProtocolName;
+use libp2p::request_response::{
+    ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
 };
 use serde::{Deserialize, Serialize};
 
-pub type OutEvent = RequestResponseEvent<SpotPriceRequest, SpotPriceResponse>;
+pub type OutEvent = RequestResponseEvent<Request, Response>;
 
 /// The spot price protocol allows parties to **initiate** a trade by requesting
 /// a spot price.
@@ -28,18 +27,17 @@ impl ProtocolName for SpotPriceProtocol {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SpotPriceRequest {
+pub struct Request {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub btc: bitcoin::Amount,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SpotPriceResponse {
+pub struct Response {
     pub xmr: monero::Amount,
 }
 
-pub type Behaviour =
-    RequestResponse<CborCodec<SpotPriceProtocol, SpotPriceRequest, SpotPriceResponse>>;
+pub type Behaviour = RequestResponse<CborCodec<SpotPriceProtocol, Request, Response>>;
 
 /// Constructs a new instance of the `spot-price` behaviour to be used by Alice.
 ///
