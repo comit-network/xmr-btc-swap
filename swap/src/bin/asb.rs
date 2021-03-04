@@ -141,7 +141,7 @@ async fn init_wallets(
     )
     .await?;
 
-    bitcoin_wallet.sync_wallet().await?;
+    bitcoin_wallet.sync().await?;
 
     let bitcoin_balance = bitcoin_wallet.balance().await?;
     info!(

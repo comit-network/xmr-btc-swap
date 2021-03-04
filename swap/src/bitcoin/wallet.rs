@@ -105,7 +105,7 @@ impl Wallet {
         Ok(Amount::from_sat(fees))
     }
 
-    pub async fn sync_wallet(&self) -> Result<()> {
+    pub async fn sync(&self) -> Result<()> {
         self.inner
             .lock()
             .await

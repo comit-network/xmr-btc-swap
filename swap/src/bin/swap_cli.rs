@@ -113,7 +113,7 @@ async fn main() -> Result<()> {
                 bitcoin_wallet.new_address(),
                 async {
                     while bitcoin_wallet.balance().await? == Amount::ZERO {
-                        bitcoin_wallet.sync_wallet().await?;
+                        bitcoin_wallet.sync().await?;
 
                         tokio::time::sleep(Duration::from_secs(1)).await;
                     }
@@ -256,7 +256,7 @@ async fn init_bitcoin_wallet(
     )
     .await?;
 
-    wallet.sync_wallet().await?;
+    wallet.sync().await?;
 
     Ok(wallet)
 }
