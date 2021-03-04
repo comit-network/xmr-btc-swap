@@ -14,10 +14,8 @@
 
 use anyhow::{bail, Context, Result};
 use prettytable::{row, Table};
-use reqwest::Url;
 use std::cmp::min;
 use std::future::Future;
-use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use structopt::StructOpt;
@@ -79,7 +77,6 @@ async fn main() -> Result<()> {
     let db = Database::open(config.data.dir.join("database").as_path())
         .context("Could not open database")?;
 
-    let wallet_data_dir = config.data.dir.join("wallet");
     let seed =
         Seed::from_file_or_generate(&config.data.dir).expect("Could not retrieve/initialize seed");
 
@@ -87,12 +84,6 @@ async fn main() -> Result<()> {
     let bitcoin_network = bitcoin::Network::Testnet;
     let monero_network = monero::Network::Stagenet;
     let execution_params = execution_params::Testnet::get_execution_params();
-
-    let monero_wallet_rpc = monero::WalletRpc::new(config.data.dir.join("monero")).await?;
-
-    let monero_wallet_rpc_process = monero_wallet_rpc
-        .run(monero_network, "monero-stagenet.exan.tech")
-        .await?;
 
     match args.cmd {
         Command::BuyXmr {
@@ -108,10 +99,8 @@ async fn main() -> Result<()> {
                 )
             }
 
-            let bitcoin_wallet =
-                init_bitcoin_wallet(config, bitcoin_network, &wallet_data_dir, seed).await?;
-            let monero_wallet =
-                init_monero_wallet(monero_network, monero_wallet_rpc_process.endpoint()).await?;
+            let bitcoin_wallet = init_bitcoin_wallet(bitcoin_network, &config, seed).await?;
+            let (monero_wallet, _process) = init_monero_wallet(monero_network, &config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
             let (event_loop, mut event_loop_handle) = EventLoop::new(
                 &seed.derive_libp2p_identity(),
@@ -182,10 +171,8 @@ async fn main() -> Result<()> {
                 bail!("The given monero address is on network {:?}, expected address of network {:?}.", receive_monero_address.network, monero_network)
             }
 
-            let bitcoin_wallet =
-                init_bitcoin_wallet(config, bitcoin_network, &wallet_data_dir, seed).await?;
-            let monero_wallet =
-                init_monero_wallet(monero_network, monero_wallet_rpc_process.endpoint()).await?;
+            let bitcoin_wallet = init_bitcoin_wallet(bitcoin_network, &config, seed).await?;
+            let (monero_wallet, _process) = init_monero_wallet(monero_network, &config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
             let (event_loop, event_loop_handle) = EventLoop::new(
@@ -218,8 +205,7 @@ async fn main() -> Result<()> {
             }
         }
         Command::Cancel { swap_id, force } => {
-            let bitcoin_wallet =
-                init_bitcoin_wallet(config, bitcoin_network, &wallet_data_dir, seed).await?;
+            let bitcoin_wallet = init_bitcoin_wallet(bitcoin_network, &config, seed).await?;
 
             let resume_state = db.get_state(swap_id)?.try_into_bob()?.into();
             let cancel =
@@ -239,8 +225,7 @@ async fn main() -> Result<()> {
             }
         }
         Command::Refund { swap_id, force } => {
-            let bitcoin_wallet =
-                init_bitcoin_wallet(config, bitcoin_network, &wallet_data_dir, seed).await?;
+            let bitcoin_wallet = init_bitcoin_wallet(bitcoin_network, &config, seed).await?;
 
             let resume_state = db.get_state(swap_id)?.try_into_bob()?.into();
 
@@ -259,34 +244,41 @@ async fn main() -> Result<()> {
 }
 
 async fn init_bitcoin_wallet(
-    config: Config,
-    bitcoin_network: bitcoin::Network,
-    bitcoin_wallet_data_dir: &Path,
+    network: bitcoin::Network,
+    config: &Config,
     seed: Seed,
 ) -> Result<bitcoin::Wallet> {
-    let bitcoin_wallet = bitcoin::Wallet::new(
-        config.bitcoin.electrum_rpc_url,
-        config.bitcoin.electrum_http_url,
-        bitcoin_network,
-        bitcoin_wallet_data_dir,
-        seed.derive_extended_private_key(bitcoin_network)?,
+    let wallet_dir = config.data.dir.join("wallet");
+
+    let wallet = bitcoin::Wallet::new(
+        config.bitcoin.electrum_rpc_url.clone(),
+        config.bitcoin.electrum_http_url.clone(),
+        network,
+        &wallet_dir,
+        seed.derive_extended_private_key(network)?,
     )
     .await?;
 
-    bitcoin_wallet
+    wallet
         .sync_wallet()
         .await
         .context("failed to sync balance of bitcoin wallet")?;
 
-    Ok(bitcoin_wallet)
+    Ok(wallet)
 }
 
 async fn init_monero_wallet(
     monero_network: monero::Network,
-    monero_wallet_rpc_url: Url,
-) -> Result<monero::Wallet> {
+    config: &Config,
+) -> Result<(monero::Wallet, monero::WalletRpcProcess)> {
+    let monero_wallet_rpc = monero::WalletRpc::new(config.data.dir.join("monero")).await?;
+
+    let monero_wallet_rpc_process = monero_wallet_rpc
+        .run(monero_network, "monero-stagenet.exan.tech")
+        .await?;
+
     let monero_wallet = monero::Wallet::new(
-        monero_wallet_rpc_url.clone(),
+        monero_wallet_rpc_process.endpoint(),
         monero_network,
         MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME.to_string(),
     );
@@ -298,7 +290,7 @@ async fn init_monero_wallet(
         .await
         .context("failed to validate connection to monero-wallet-rpc")?;
 
-    Ok(monero_wallet)
+    Ok((monero_wallet, monero_wallet_rpc_process))
 }
 
 async fn determine_btc_to_swap(
