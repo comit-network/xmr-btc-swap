@@ -1,5 +1,4 @@
 use anyhow::Result;
-use atty::{self};
 use tracing::{info, subscriber};
 use tracing_log::LogTracer;
 use tracing_subscriber::filter::LevelFilter;

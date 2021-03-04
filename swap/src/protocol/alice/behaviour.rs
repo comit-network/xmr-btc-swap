@@ -1,6 +1,5 @@
 use crate::execution_params::ExecutionParams;
-use crate::network::peer_tracker::PeerTracker;
-use crate::network::spot_price::{SpotPriceRequest, SpotPriceResponse};
+use crate::network::spot_price::{Request, Response};
 use crate::network::{peer_tracker, spot_price};
 use crate::protocol::alice::{
     encrypted_signature, execution_setup, transfer_proof, State0, State3, TransferProof,
@@ -17,8 +16,8 @@ use tracing::debug;
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
     SpotPriceRequested {
-        msg: SpotPriceRequest,
-        channel: ResponseChannel<SpotPriceResponse>,
+        msg: Request,
+        channel: ResponseChannel<Response>,
         peer: PeerId,
     },
     ExecutionSetupDone {
@@ -124,7 +123,7 @@ impl From<encrypted_signature::OutEvent> for OutEvent {
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    pt: PeerTracker,
+    pt: peer_tracker::Behaviour,
     spot_price: spot_price::Behaviour,
     execution_setup: execution_setup::Behaviour,
     transfer_proof: transfer_proof::Behaviour,
@@ -146,8 +145,8 @@ impl Default for Behaviour {
 impl Behaviour {
     pub fn send_spot_price(
         &mut self,
-        channel: ResponseChannel<SpotPriceResponse>,
-        response: SpotPriceResponse,
+        channel: ResponseChannel<Response>,
+        response: Response,
     ) -> Result<()> {
         self.spot_price
             .send_response(channel, response)

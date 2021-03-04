@@ -3,8 +3,8 @@ pub mod request_response;
 pub mod spot_price;
 pub mod transport;
 
-use futures::prelude::*;
 use libp2p::core::Executor;
+use std::future::Future;
 use std::pin::Pin;
 use tokio::runtime::Handle;
 

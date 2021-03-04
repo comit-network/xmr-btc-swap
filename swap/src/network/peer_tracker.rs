@@ -17,13 +17,13 @@ pub enum OutEvent {
 /// peers we only ever connect to a single counterparty. Peer Tracker tracks
 /// that connection.
 #[derive(Default, Debug)]
-pub struct PeerTracker {
+pub struct Behaviour {
     connected: Option<(PeerId, Multiaddr)>,
     address_of_peer: HashMap<PeerId, Multiaddr>,
     events: VecDeque<OutEvent>,
 }
 
-impl PeerTracker {
+impl Behaviour {
     /// Return whether we are connected to the given peer.
     pub fn is_connected(&self, peer_id: &PeerId) -> bool {
         if let Some((connected_peer_id, _)) = &self.connected {
@@ -56,7 +56,7 @@ impl PeerTracker {
     }
 }
 
-impl NetworkBehaviour for PeerTracker {
+impl NetworkBehaviour for Behaviour {
     type ProtocolsHandler = DummyProtocolsHandler;
     type OutEvent = OutEvent;
 

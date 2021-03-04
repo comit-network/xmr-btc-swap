@@ -7,14 +7,13 @@ pub use wallet::Wallet;
 pub use wallet_rpc::{WalletRpc, WalletRpcProcess};
 
 use crate::bitcoin;
-use ::bitcoin::hashes::core::fmt::Formatter;
 use anyhow::Result;
 use rand::{CryptoRng, RngCore};
-use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
+use rust_decimal::prelude::*;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
-use std::fmt::Display;
+use std::fmt;
 use std::ops::{Add, Mul, Sub};
 use std::str::FromStr;
 
@@ -137,8 +136,8 @@ impl From<Amount> for u64 {
     }
 }
 
-impl Display for Amount {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Amount {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut decimal = Decimal::from(self.0);
         decimal
             .set_scale(12)

@@ -2,7 +2,7 @@ use crate::asb::LatestRate;
 use crate::database::Database;
 use crate::execution_params::ExecutionParams;
 use crate::monero::BalanceTooLow;
-use crate::network::spot_price::SpotPriceResponse;
+use crate::network::spot_price::Response;
 use crate::network::{transport, TokioExecutor};
 use crate::protocol::alice;
 use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State3, Swap, TransferProof};
@@ -171,7 +171,7 @@ where
                                 }
                             };
 
-                            match self.swarm.send_spot_price(channel, SpotPriceResponse { xmr }) {
+                            match self.swarm.send_spot_price(channel, Response { xmr }) {
                                 Ok(_) => {},
                                 Err(e) => {
                                     // if we can't respond, the peer probably just disconnected so it is not a huge deal, only log this on debug

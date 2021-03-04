@@ -1,5 +1,5 @@
 use crate::bitcoin::EncryptedSignature;
-use crate::network::spot_price::{SpotPriceRequest, SpotPriceResponse};
+use crate::network::spot_price::{Request, Response};
 use crate::network::{transport, TokioExecutor};
 use crate::protocol::alice::TransferProof;
 use crate::protocol::bob::{Behaviour, OutEvent, State0, State2};
@@ -34,13 +34,13 @@ impl<T> Default for Channels<T> {
 
 #[derive(Debug)]
 pub struct EventLoopHandle {
-    recv_spot_price: Receiver<SpotPriceResponse>,
+    recv_spot_price: Receiver<Response>,
     start_execution_setup: Sender<State0>,
     done_execution_setup: Receiver<Result<State2>>,
     recv_transfer_proof: Receiver<TransferProof>,
     conn_established: Receiver<PeerId>,
     dial_alice: Sender<()>,
-    request_spot_price: Sender<SpotPriceRequest>,
+    request_spot_price: Sender<Request>,
     send_encrypted_signature: Sender<EncryptedSignature>,
 }
 
@@ -75,10 +75,7 @@ impl EventLoopHandle {
     }
 
     pub async fn request_spot_price(&mut self, btc: bitcoin::Amount) -> Result<monero::Amount> {
-        let _ = self
-            .request_spot_price
-            .send(SpotPriceRequest { btc })
-            .await?;
+        let _ = self.request_spot_price.send(Request { btc }).await?;
 
         let response = self
             .recv_spot_price
@@ -104,8 +101,8 @@ pub struct EventLoop {
     swarm: libp2p::Swarm<Behaviour>,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     alice_peer_id: PeerId,
-    request_spot_price: Receiver<SpotPriceRequest>,
-    recv_spot_price: Sender<SpotPriceResponse>,
+    request_spot_price: Receiver<Request>,
+    recv_spot_price: Sender<Response>,
     start_execution_setup: Receiver<State0>,
     done_execution_setup: Sender<Result<State2>>,
     recv_transfer_proof: Sender<TransferProof>,
