@@ -195,10 +195,9 @@ impl Wallet {
 
             if proof.confirmations > confirmations.load(Ordering::SeqCst) {
                 confirmations.store(proof.confirmations, Ordering::SeqCst);
-                info!(
-                    "Monero lock tx received {} out of {} confirmations",
-                    proof.confirmations, expected_confirmations
-                );
+
+                let txid = &transfer_proof.tx_hash.0;
+                info!(%txid, "Monero lock tx has {} out of {} confirmations", proof.confirmations, expected_confirmations);
             }
 
             if proof.confirmations < expected_confirmations {
