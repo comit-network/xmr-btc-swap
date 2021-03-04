@@ -1,7 +1,7 @@
 use crate::fs::ensure_directory_exists;
 use ::bitcoin::secp256k1::constants::SECRET_KEY_SIZE;
 use ::bitcoin::secp256k1::{self, SecretKey};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use bdk::bitcoin::util::bip32::ExtendedPrivKey;
 use bitcoin::hashes::{sha256, Hash, HashEngine};
 use libp2p::identity;
@@ -34,7 +34,8 @@ impl Seed {
         network: bitcoin::Network,
     ) -> Result<ExtendedPrivKey> {
         let seed = self.derive(b"BITCOIN_EXTENDED_PRIVATE_KEY").bytes();
-        let private_key = ExtendedPrivKey::new_master(network, &seed)?;
+        let private_key = ExtendedPrivKey::new_master(network, &seed)
+            .context("Failed to create new master extended private key")?;
 
         Ok(private_key)
     }
