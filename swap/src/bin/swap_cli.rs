@@ -37,8 +37,6 @@ use uuid::Uuid;
 #[macro_use]
 extern crate prettytable;
 
-const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-monitoring-wallet";
-
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Arguments::from_args();
@@ -271,6 +269,8 @@ async fn init_monero_wallet(
     monero_network: monero::Network,
     config: &Config,
 ) -> Result<(monero::Wallet, monero::WalletRpcProcess)> {
+    const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-monitoring-wallet";
+
     let monero_wallet_rpc = monero::WalletRpc::new(config.data.dir.join("monero")).await?;
 
     let monero_wallet_rpc_process = monero_wallet_rpc
