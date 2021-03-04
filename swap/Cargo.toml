@@ -5,9 +5,6 @@ authors = ["CoBloX developers <team@coblox.tech>"]
 edition = "2018"
 description = "XMR/BTC trustless atomic swaps."
 
-[[bin]]
-name = "swap_cli"
-
 [lib]
 name = "swap"
 
