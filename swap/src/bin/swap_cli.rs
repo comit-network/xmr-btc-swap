@@ -285,7 +285,7 @@ async fn init_monero_wallet(
     let _test_wallet_connection = monero_wallet
         .block_height()
         .await
-        .context("failed to validate connection to monero-wallet-rpc")?;
+        .context("Failed to validate connection to monero-wallet-rpc")?;
 
     Ok((monero_wallet, monero_wallet_rpc_process))
 }
@@ -299,7 +299,7 @@ async fn determine_btc_to_swap(
 ) -> Result<bitcoin::Amount> {
     debug!("Requesting quote");
 
-    let bid_quote = request_quote.await.context("failed to request quote")?;
+    let bid_quote = request_quote.await.context("Failed to request quote")?;
 
     info!("Received quote: 1 XMR ~ {}", bid_quote.price);
 

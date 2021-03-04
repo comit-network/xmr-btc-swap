@@ -266,7 +266,7 @@ impl State2 {
         let signed_tx = bitcoin_wallet
             .sign_and_finalize(self.tx_lock.clone().into())
             .await
-            .context("failed to sign Bitcoin lock transaction")?;
+            .context("Failed to sign Bitcoin lock transaction")?;
 
         let _ = bitcoin_wallet.broadcast(signed_tx, "lock").await?;
 

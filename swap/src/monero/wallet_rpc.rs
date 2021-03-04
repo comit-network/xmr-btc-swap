@@ -80,7 +80,7 @@ impl WalletRpc {
 
             let content_length = response.headers()[CONTENT_LENGTH]
                 .to_str()
-                .context("failed to convert content-length to string")?
+                .context("Failed to convert content-length to string")?
                 .parse::<u64>()?;
 
             tracing::info!(

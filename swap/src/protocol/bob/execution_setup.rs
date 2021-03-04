@@ -73,31 +73,31 @@ impl Behaviour {
                 substream
                     .write_message(
                         &serde_cbor::to_vec(&state0.next_message())
-                            .context("failed to serialize message0")?,
+                            .context("Failed to serialize message0")?,
                     )
                     .await?;
 
                 let message1 =
                     serde_cbor::from_slice::<Message1>(&substream.read_message(BUF_SIZE).await?)
-                        .context("failed to deserialize message1")?;
+                        .context("Failed to deserialize message1")?;
                 let state1 = state0.receive(bitcoin_wallet.as_ref(), message1).await?;
 
                 substream
                     .write_message(
                         &serde_cbor::to_vec(&state1.next_message())
-                            .context("failed to serialize message2")?,
+                            .context("Failed to serialize message2")?,
                     )
                     .await?;
 
                 let message3 =
                     serde_cbor::from_slice::<Message3>(&substream.read_message(BUF_SIZE).await?)
-                        .context("failed to deserialize message3")?;
+                        .context("Failed to deserialize message3")?;
                 let state2 = state1.receive(message3)?;
 
                 substream
                     .write_message(
                         &serde_cbor::to_vec(&state2.next_message())
-                            .context("failed to serialize message4")?,
+                            .context("Failed to serialize message4")?,
                     )
                     .await?;
 

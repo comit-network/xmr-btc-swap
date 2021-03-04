@@ -1,5 +1,5 @@
 use crate::{bitcoin, monero};
-use anyhow::{anyhow, Result};
+use anyhow::{Context, Result};
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use std::fmt::{Debug, Display, Formatter};
@@ -30,20 +30,20 @@ impl Rate {
         let quote_in_sats = quote.as_sat();
         let quote_in_btc = Decimal::from(quote_in_sats)
             .checked_div(Decimal::from(bitcoin::Amount::ONE_BTC.as_sat()))
-            .ok_or_else(|| anyhow!("division overflow"))?;
+            .context("Division overflow")?;
 
         let rate_in_btc = Decimal::from(rate.as_sat())
             .checked_div(Decimal::from(bitcoin::Amount::ONE_BTC.as_sat()))
-            .ok_or_else(|| anyhow!("division overflow"))?;
+            .context("Division overflow")?;
 
         let base_in_xmr = quote_in_btc
             .checked_div(rate_in_btc)
-            .ok_or_else(|| anyhow!("division overflow"))?;
+            .context("Division overflow")?;
         let base_in_piconero = base_in_xmr * Decimal::from(monero::Amount::ONE_XMR.as_piconero());
 
         let base_in_piconero = base_in_piconero
             .to_u64()
-            .ok_or_else(|| anyhow!("decimal cannot be represented as u64"))?;
+            .context("Failed to fit piconero amount into a u64")?;
 
         Ok(monero::Amount::from_piconero(base_in_piconero))
     }

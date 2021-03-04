@@ -74,13 +74,23 @@ impl Wallet {
     }
 
     pub async fn balance(&self) -> Result<Amount> {
-        let balance = self.inner.lock().await.get_balance().context("Failed to calculate Bitcoin balance")?;
+        let balance = self
+            .inner
+            .lock()
+            .await
+            .get_balance()
+            .context("Failed to calculate Bitcoin balance")?;
 
         Ok(Amount::from_sat(balance))
     }
 
     pub async fn new_address(&self) -> Result<Address> {
-        let address = self.inner.lock().await.get_new_address().context("Failed to get new Bitcoin address")?;
+        let address = self
+            .inner
+            .lock()
+            .await
+            .get_new_address()
+            .context("Failed to get new Bitcoin address")?;
 
         Ok(address)
     }
@@ -111,7 +121,7 @@ impl Wallet {
             .lock()
             .await
             .sync(noop_progress(), None)
-            .context("failed to sync balance of Bitcoin wallet")?;
+            .context("Failed to sync balance of Bitcoin wallet")?;
 
         Ok(())
     }
@@ -166,7 +176,7 @@ impl Wallet {
             .await
             .broadcast(transaction)
             .with_context(|| {
-                format!("failed to broadcast Bitcoin {} transaction {}", kind, txid)
+                format!("Failed to broadcast Bitcoin {} transaction {}", kind, txid)
             })?;
 
         tracing::info!("Published Bitcoin {} transaction as {}", txid, kind);
@@ -209,7 +219,7 @@ impl Wallet {
             Result::<_, backoff::Error<Error>>::Ok(tx)
         })
         .await
-        .context("transient errors to be retried")?;
+        .context("Transient errors should be retried")?;
 
         Ok(tx)
     }
@@ -230,7 +240,7 @@ impl Wallet {
             Result::<_, backoff::Error<Error>>::Ok(height)
         })
         .await
-        .context("transient errors to be retried")?;
+        .context("Transient errors should be retried")?;
 
         Ok(BlockHeight::new(height))
     }
@@ -261,7 +271,7 @@ impl Wallet {
             Result::<_, backoff::Error<Error>>::Ok(block_height)
         })
         .await
-        .context("transient errors to be retried")?;
+        .context("Transient errors should be retried")?;
 
         Ok(BlockHeight::new(height))
     }

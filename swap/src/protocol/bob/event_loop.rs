@@ -236,7 +236,7 @@ impl EventLoop {
                             let _ = self.conn_established.send(peer_id).await;
                         } else {
                             debug!("Dialing alice at {}", peer_id);
-                            libp2p::Swarm::dial(&mut self.swarm, &peer_id).context("failed to dial alice")?;
+                            libp2p::Swarm::dial(&mut self.swarm, &peer_id).context("Failed to dial alice")?;
                         }
                     }
                 },
