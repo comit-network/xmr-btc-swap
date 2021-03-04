@@ -5,7 +5,7 @@ use crate::{
     execution_params::ExecutionParams,
     monero,
     monero::InsufficientFunds,
-    protocol::bob::{self, event_loop::EventLoopHandle, state::*, QuoteRequest},
+    protocol::bob::{self, event_loop::EventLoopHandle, state::*},
 };
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
@@ -72,7 +72,7 @@ async fn run_until_internal(
 
                 event_loop_handle.dial().await?;
 
-                let state2 = request_quote_and_setup(
+                let state2 = request_price_and_setup(
                     btc_amount,
                     &mut event_loop_handle,
                     execution_params,
@@ -394,24 +394,20 @@ async fn run_until_internal(
     }
 }
 
-pub async fn request_quote_and_setup(
-    btc_amount: bitcoin::Amount,
+pub async fn request_price_and_setup(
+    btc: bitcoin::Amount,
     event_loop_handle: &mut EventLoopHandle,
     execution_params: ExecutionParams,
     bitcoin_refund_address: bitcoin::Address,
 ) -> Result<bob::state::State2> {
-    event_loop_handle
-        .send_quote_request(QuoteRequest { btc_amount })
-        .await?;
+    let xmr = event_loop_handle.request_spot_price(btc).await?;
 
-    let xmr_amount = event_loop_handle.recv_quote_response().await?.xmr_amount;
-
-    tracing::info!("Quote for {} is {}", btc_amount, xmr_amount);
+    tracing::info!("Spot price for {} is {}", btc, xmr);
 
     let state0 = State0::new(
         &mut OsRng,
-        btc_amount,
-        xmr_amount,
+        btc,
+        xmr,
         execution_params.bitcoin_cancel_timelock,
         execution_params.bitcoin_punish_timelock,
         bitcoin_refund_address,

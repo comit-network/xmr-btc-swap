@@ -1,5 +1,6 @@
 pub mod peer_tracker;
 pub mod request_response;
+pub mod spot_price;
 pub mod transport;
 
 use futures::prelude::*;

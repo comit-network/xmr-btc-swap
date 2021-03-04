@@ -5,25 +5,21 @@ use crate::{
     execution_params::ExecutionParams,
     monero,
     monero::BalanceTooLow,
-    network::{transport, TokioExecutor},
+    network::{spot_price::SpotPriceResponse, transport, TokioExecutor},
     protocol::{
         alice,
-        alice::{
-            AliceState, Behaviour, OutEvent, QuoteResponse, State0, State3, Swap, TransferProof,
-        },
-        bob::{EncryptedSignature, QuoteRequest},
+        alice::{AliceState, Behaviour, OutEvent, State3, Swap, TransferProof},
+        bob::EncryptedSignature,
     },
     seed::Seed,
 };
 use anyhow::{bail, Context, Result};
 use futures::future::RemoteHandle;
-use libp2p::{
-    core::Multiaddr, futures::FutureExt, request_response::ResponseChannel, PeerId, Swarm,
-};
+use libp2p::{core::Multiaddr, futures::FutureExt, PeerId, Swarm};
 use rand::rngs::OsRng;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, mpsc::error::SendError};
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, trace};
 use uuid::Uuid;
 
 #[allow(missing_debug_implementations)]
@@ -166,9 +162,30 @@ where
                         OutEvent::ConnectionEstablished(alice) => {
                             debug!("Connection Established with {}", alice);
                         }
-                        OutEvent::QuoteRequest { msg, channel, bob_peer_id } => {
-                            if let Err(error) = self.handle_quote_request(msg, channel, bob_peer_id, self.monero_wallet.clone()).await {
-                                error!("Failed to handle quote request: {:#}", error);
+                        OutEvent::SpotPriceRequested { msg, channel, peer } => {
+                            let btc = msg.btc;
+                            let xmr = match self.handle_spot_price_request(btc, self.monero_wallet.clone()).await {
+                                Ok(xmr) => xmr,
+                                Err(e) => {
+                                    tracing::warn!(%peer, "failed to produce spot price for {}: {:#}", btc, e);
+                                    continue;
+                                }
+                            };
+
+                            match self.swarm.send_spot_price(channel, SpotPriceResponse { xmr }) {
+                                Ok(_) => {},
+                                Err(e) => {
+                                    // if we can't respond, the peer probably just disconnected so it is not a huge deal, only log this on debug
+                                    debug!(%peer, "failed to respond with spot price: {:#}", e);
+                                    continue;
+                                }
+                            }
+
+                            match self.swarm.start_execution_setup(peer, btc, xmr, self.execution_params, self.bitcoin_wallet.as_ref(), &mut OsRng).await {
+                                Ok(_) => {},
+                                Err(e) => {
+                                    tracing::warn!(%peer, "failed to start execution setup: {:#}", e);
+                                }
                             }
                         }
                         OutEvent::ExecutionSetupDone{bob_peer_id, state3} => {
@@ -199,65 +216,34 @@ where
         }
     }
 
-    async fn handle_quote_request(
+    async fn handle_spot_price_request(
         &mut self,
-        quote_request: QuoteRequest,
-        channel: ResponseChannel<QuoteResponse>,
-        bob_peer_id: PeerId,
+        btc: bitcoin::Amount,
         monero_wallet: Arc<monero::Wallet>,
-    ) -> Result<()> {
-        // 1. Check if acceptable request
-        // 2. Send response
-
+    ) -> Result<monero::Amount> {
         let rate = self
             .rate_service
             .latest_rate()
             .context("Failed to get latest rate")?;
 
-        let btc_amount = quote_request.btc_amount;
-
-        if btc_amount > self.max_buy {
+        if btc > self.max_buy {
             bail!(MaximumBuyAmountExceeded {
-                actual: btc_amount,
+                actual: btc,
                 max: self.max_buy
             })
         }
 
         let xmr_balance = monero_wallet.get_balance().await?;
         let xmr_lock_fees = monero_wallet.static_tx_fee_estimate();
-        let xmr_amount = rate.sell_quote(btc_amount)?;
+        let xmr = rate.sell_quote(btc)?;
 
-        if xmr_balance < xmr_amount + xmr_lock_fees {
+        if xmr_balance < xmr + xmr_lock_fees {
             bail!(BalanceTooLow {
                 balance: xmr_balance
             })
         }
 
-        let quote_response = QuoteResponse { xmr_amount };
-
-        self.swarm
-            .send_quote_response(channel, quote_response)
-            .context("Failed to send quote response")?;
-
-        // 3. Start setup execution
-
-        let state0 = State0::new(
-            btc_amount,
-            xmr_amount,
-            self.execution_params,
-            self.bitcoin_wallet.as_ref(),
-            &mut OsRng,
-        )
-        .await?;
-
-        info!(
-            "Starting execution setup to sell {} for {} (rate of {}) with {}",
-            xmr_amount, btc_amount, rate, bob_peer_id
-        );
-
-        self.swarm.start_execution_setup(bob_peer_id, state0);
-        // Continues once the execution setup protocol is done
-        Ok(())
+        Ok(xmr)
     }
 
     async fn handle_execution_setup_done(

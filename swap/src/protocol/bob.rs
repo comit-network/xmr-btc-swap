@@ -1,15 +1,22 @@
-//! Run an XMR/BTC swap in the role of Bob.
-//! Bob holds BTC and wishes receive XMR.
 use crate::{
     bitcoin,
     database::Database,
     execution_params::ExecutionParams,
     monero,
-    network::peer_tracker::{self, PeerTracker},
-    protocol::{alice, alice::TransferProof, bob},
+    network::{
+        peer_tracker::{self, PeerTracker},
+        spot_price,
+        spot_price::{SpotPriceRequest, SpotPriceResponse},
+    },
+    protocol::{alice::TransferProof, bob},
 };
-use anyhow::{Error, Result};
-use libp2p::{core::Multiaddr, NetworkBehaviour, PeerId};
+use anyhow::{anyhow, Error, Result};
+pub use execution_setup::{Message0, Message2, Message4};
+use libp2p::{
+    core::Multiaddr,
+    request_response::{RequestResponseMessage, ResponseChannel},
+    NetworkBehaviour, PeerId,
+};
 use std::sync::Arc;
 use tracing::debug;
 use uuid::Uuid;
@@ -18,19 +25,15 @@ pub use self::{
     cancel::cancel,
     encrypted_signature::EncryptedSignature,
     event_loop::{EventLoop, EventLoopHandle},
-    quote_request::*,
     refund::refund,
     state::*,
     swap::{run, run_until},
 };
-pub use execution_setup::{Message0, Message2, Message4};
-use libp2p::request_response::ResponseChannel;
 
 pub mod cancel;
 mod encrypted_signature;
 pub mod event_loop;
 mod execution_setup;
-mod quote_request;
 pub mod refund;
 pub mod state;
 pub mod swap;
@@ -119,7 +122,7 @@ impl Builder {
 #[derive(Debug)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
-    QuoteResponse(alice::QuoteResponse),
+    SpotPriceReceived(SpotPriceResponse),
     ExecutionSetupDone(Result<Box<State2>>),
     TransferProof {
         msg: Box<TransferProof>,
@@ -140,12 +143,34 @@ impl From<peer_tracker::OutEvent> for OutEvent {
     }
 }
 
-impl From<quote_request::OutEvent> for OutEvent {
-    fn from(event: quote_request::OutEvent) -> Self {
-        use quote_request::OutEvent::*;
+impl From<spot_price::OutEvent> for OutEvent {
+    fn from(event: spot_price::OutEvent) -> Self {
         match event {
-            MsgReceived(quote_response) => OutEvent::QuoteResponse(quote_response),
-            Failure(err) => OutEvent::CommunicationError(err.context("Failure with Quote Request")),
+            spot_price::OutEvent::Message {
+                message: RequestResponseMessage::Response { response, .. },
+                ..
+            } => OutEvent::SpotPriceReceived(response),
+            spot_price::OutEvent::Message {
+                message: RequestResponseMessage::Request { .. },
+                ..
+            } => OutEvent::CommunicationError(anyhow!(
+                "Bob is only meant to receive spot prices, not hand them out"
+            )),
+            spot_price::OutEvent::ResponseSent { .. } => OutEvent::ResponseSent,
+            spot_price::OutEvent::InboundFailure { peer, error, .. } => {
+                OutEvent::CommunicationError(anyhow!(
+                    "spot_price protocol with peer {} failed due to {:?}",
+                    peer,
+                    error
+                ))
+            }
+            spot_price::OutEvent::OutboundFailure { peer, error, .. } => {
+                OutEvent::CommunicationError(anyhow!(
+                    "spot_price protocol with peer {} failed due to {:?}",
+                    peer,
+                    error
+                ))
+            }
         }
     }
 }
@@ -187,21 +212,32 @@ impl From<encrypted_signature::OutEvent> for OutEvent {
 }
 
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Bob.
-#[derive(NetworkBehaviour, Default)]
+#[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
     pt: PeerTracker,
-    quote_request: quote_request::Behaviour,
+    spot_price: spot_price::Behaviour,
     execution_setup: execution_setup::Behaviour,
     transfer_proof: transfer_proof::Behaviour,
     encrypted_signature: encrypted_signature::Behaviour,
 }
 
+impl Default for Behaviour {
+    fn default() -> Self {
+        Self {
+            pt: Default::default(),
+            spot_price: spot_price::bob(),
+            execution_setup: Default::default(),
+            transfer_proof: Default::default(),
+            encrypted_signature: Default::default(),
+        }
+    }
+}
+
 impl Behaviour {
-    /// Sends a quote request to Alice to retrieve the rate.
-    pub fn send_quote_request(&mut self, alice: PeerId, quote_request: QuoteRequest) {
-        let _ = self.quote_request.send(alice, quote_request);
+    pub fn request_spot_price(&mut self, alice: PeerId, request: SpotPriceRequest) {
+        let _ = self.spot_price.send_request(&alice, request);
     }
 
     pub fn start_execution_setup(

@@ -1,24 +1,35 @@
 use crate::{
-    network::{peer_tracker, peer_tracker::PeerTracker},
+    bitcoin,
+    execution_params::ExecutionParams,
+    monero,
+    network::{
+        peer_tracker,
+        peer_tracker::PeerTracker,
+        spot_price,
+        spot_price::{SpotPriceRequest, SpotPriceResponse},
+    },
     protocol::{
         alice::{
-            encrypted_signature, execution_setup, quote_response, transfer_proof, QuoteResponse,
-            State0, State3, TransferProof,
+            encrypted_signature, execution_setup, transfer_proof, State0, State3, TransferProof,
         },
-        bob::{EncryptedSignature, QuoteRequest},
+        bob::EncryptedSignature,
     },
 };
-use anyhow::{Error, Result};
-use libp2p::{request_response::ResponseChannel, NetworkBehaviour, PeerId};
+use anyhow::{anyhow, Error, Result};
+use libp2p::{
+    request_response::{RequestResponseMessage, ResponseChannel},
+    NetworkBehaviour, PeerId,
+};
+use rand::{CryptoRng, RngCore};
 use tracing::debug;
 
 #[derive(Debug)]
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
-    QuoteRequest {
-        msg: QuoteRequest,
-        channel: ResponseChannel<QuoteResponse>,
-        bob_peer_id: PeerId,
+    SpotPriceRequested {
+        msg: SpotPriceRequest,
+        channel: ResponseChannel<SpotPriceResponse>,
+        peer: PeerId,
     },
     ExecutionSetupDone {
         bob_peer_id: PeerId,
@@ -43,21 +54,37 @@ impl From<peer_tracker::OutEvent> for OutEvent {
     }
 }
 
-impl From<quote_response::OutEvent> for OutEvent {
-    fn from(event: quote_response::OutEvent) -> Self {
-        use crate::protocol::alice::quote_response::OutEvent::*;
+impl From<spot_price::OutEvent> for OutEvent {
+    fn from(event: spot_price::OutEvent) -> Self {
         match event {
-            MsgReceived {
-                msg,
-                channel,
-                bob_peer_id,
-            } => OutEvent::QuoteRequest {
-                msg,
-                channel,
-                bob_peer_id,
-            },
-            ResponseSent => OutEvent::ResponseSent,
-            Failure(err) => OutEvent::Failure(err.context("Quote Request/Response failure")),
+            spot_price::OutEvent::Message {
+                peer,
+                message:
+                    RequestResponseMessage::Request {
+                        channel,
+                        request: msg,
+                        ..
+                    },
+            } => OutEvent::SpotPriceRequested { msg, channel, peer },
+            spot_price::OutEvent::Message {
+                message: RequestResponseMessage::Response { .. },
+                ..
+            } => OutEvent::Failure(anyhow!(
+                "Alice is only meant to hand out spot prices, not receive them"
+            )),
+            spot_price::OutEvent::ResponseSent { .. } => OutEvent::ResponseSent,
+            spot_price::OutEvent::InboundFailure { peer, error, .. } => OutEvent::Failure(anyhow!(
+                "spot_price protocol with peer {} failed due to {:?}",
+                peer,
+                error
+            )),
+            spot_price::OutEvent::OutboundFailure { peer, error, .. } => {
+                OutEvent::Failure(anyhow!(
+                    "spot_price protocol with peer {} failed due to {:?}",
+                    peer,
+                    error
+                ))
+            }
         }
     }
 }
@@ -103,29 +130,62 @@ impl From<encrypted_signature::OutEvent> for OutEvent {
 }
 
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Alice.
-#[derive(NetworkBehaviour, Default)]
+#[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
     pt: PeerTracker,
-    quote_response: quote_response::Behaviour,
+    spot_price: spot_price::Behaviour,
     execution_setup: execution_setup::Behaviour,
     transfer_proof: transfer_proof::Behaviour,
     encrypted_signature: encrypted_signature::Behaviour,
 }
 
+impl Default for Behaviour {
+    fn default() -> Self {
+        Self {
+            pt: Default::default(),
+            spot_price: spot_price::alice(),
+            execution_setup: Default::default(),
+            transfer_proof: Default::default(),
+            encrypted_signature: Default::default(),
+        }
+    }
+}
+
 impl Behaviour {
-    pub fn send_quote_response(
+    pub fn send_spot_price(
         &mut self,
-        channel: ResponseChannel<QuoteResponse>,
-        quote_response: QuoteResponse,
+        channel: ResponseChannel<SpotPriceResponse>,
+        response: SpotPriceResponse,
     ) -> Result<()> {
-        self.quote_response.send(channel, quote_response)?;
+        self.spot_price
+            .send_response(channel, response)
+            .map_err(|_| anyhow!("failed to respond with spot price"))?;
+
         Ok(())
     }
 
-    pub fn start_execution_setup(&mut self, bob_peer_id: PeerId, state0: State0) {
-        self.execution_setup.run(bob_peer_id, state0);
+    pub async fn start_execution_setup(
+        &mut self,
+        peer: PeerId,
+        btc: bitcoin::Amount,
+        xmr: monero::Amount,
+        execution_params: ExecutionParams,
+        bitcoin_wallet: &bitcoin::Wallet,
+        rng: &mut (impl RngCore + CryptoRng),
+    ) -> Result<()> {
+        let state0 = State0::new(btc, xmr, execution_params, bitcoin_wallet, rng).await?;
+
+        tracing::info!(
+            %peer,
+            "Starting execution setup to sell {} for {}",
+            xmr, btc,
+        );
+
+        self.execution_setup.run(peer, state0);
+
+        Ok(())
     }
 
     /// Send Transfer Proof to Bob.

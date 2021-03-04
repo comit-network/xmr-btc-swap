@@ -8,7 +8,6 @@ pub use self::{
     behaviour::{Behaviour, OutEvent},
     event_loop::{EventLoop, EventLoopHandle},
     execution_setup::Message1,
-    quote_response::*,
     state::*,
     swap::{run, run_until},
     transfer_proof::TransferProof,
@@ -19,7 +18,6 @@ mod behaviour;
 mod encrypted_signature;
 pub mod event_loop;
 mod execution_setup;
-mod quote_response;
 pub mod state;
 mod steps;
 pub mod swap;
