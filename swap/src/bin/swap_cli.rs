@@ -72,10 +72,10 @@ async fn main() -> Result<()> {
     };
 
     let db = Database::open(config.data.dir.join("database").as_path())
-        .context("Could not open database")?;
+        .context("Failed to open database")?;
 
     let seed =
-        Seed::from_file_or_generate(&config.data.dir).expect("Could not retrieve/initialize seed");
+        Seed::from_file_or_generate(&config.data.dir).context("Failed to read in seed file")?;
 
     // hardcode to testnet/stagenet
     let bitcoin_network = bitcoin::Network::Testnet;
@@ -254,7 +254,8 @@ async fn init_bitcoin_wallet(
         &wallet_dir,
         seed.derive_extended_private_key(network)?,
     )
-    .await?;
+    .await
+    .context("Failed to initialize Bitcoin wallet")?;
 
     wallet.sync().await?;
 
