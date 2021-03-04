@@ -2,8 +2,8 @@ use crate::asb::LatestRate;
 use crate::database::Database;
 use crate::execution_params::ExecutionParams;
 use crate::monero::BalanceTooLow;
-use crate::network::spot_price::Response;
-use crate::network::{transport, TokioExecutor};
+use crate::network::quote::BidQuote;
+use crate::network::{spot_price, transport, TokioExecutor};
 use crate::protocol::alice;
 use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State3, Swap, TransferProof};
 use crate::protocol::bob::EncryptedSignature;
@@ -171,7 +171,7 @@ where
                                 }
                             };
 
-                            match self.swarm.send_spot_price(channel, Response { xmr }) {
+                            match self.swarm.send_spot_price(channel, spot_price::Response { xmr }) {
                                 Ok(_) => {},
                                 Err(e) => {
                                     // if we can't respond, the peer probably just disconnected so it is not a huge deal, only log this on debug
@@ -184,6 +184,24 @@ where
                                 Ok(_) => {},
                                 Err(e) => {
                                     tracing::warn!(%peer, "failed to start execution setup: {:#}", e);
+                                }
+                            }
+                        }
+                        OutEvent::QuoteRequested { channel, peer } => {
+                            let quote = match self.make_quote(self.max_buy).await {
+                                Ok(quote) => quote,
+                                Err(e) => {
+                                    tracing::warn!(%peer, "failed to make quote: {:#}", e);
+                                    continue;
+                                }
+                            };
+
+                            match self.swarm.send_quote(channel, quote) {
+                                Ok(_) => {},
+                                Err(e) => {
+                                    // if we can't respond, the peer probably just disconnected so it is not a huge deal, only log this on debug
+                                    debug!(%peer, "failed to respond with quote: {:#}", e);
+                                    continue;
                                 }
                             }
                         }
@@ -243,6 +261,18 @@ where
         }
 
         Ok(xmr)
+    }
+
+    async fn make_quote(&mut self, max_buy: bitcoin::Amount) -> Result<BidQuote> {
+        let rate = self
+            .rate_service
+            .latest_rate()
+            .context("Failed to get latest rate")?;
+
+        Ok(BidQuote {
+            price: rate.ask,
+            max_quantity: max_buy,
+        })
     }
 
     async fn handle_execution_setup_done(

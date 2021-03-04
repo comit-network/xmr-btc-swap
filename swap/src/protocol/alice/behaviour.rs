@@ -1,6 +1,6 @@
 use crate::execution_params::ExecutionParams;
-use crate::network::spot_price::{Request, Response};
-use crate::network::{peer_tracker, spot_price};
+use crate::network::quote::BidQuote;
+use crate::network::{peer_tracker, quote, spot_price};
 use crate::protocol::alice::{
     encrypted_signature, execution_setup, transfer_proof, State0, State3, TransferProof,
 };
@@ -16,8 +16,12 @@ use tracing::debug;
 pub enum OutEvent {
     ConnectionEstablished(PeerId),
     SpotPriceRequested {
-        msg: Request,
-        channel: ResponseChannel<Response>,
+        msg: spot_price::Request,
+        channel: ResponseChannel<spot_price::Response>,
+        peer: PeerId,
+    },
+    QuoteRequested {
+        channel: ResponseChannel<BidQuote>,
         peer: PeerId,
     },
     ExecutionSetupDone {
@@ -78,6 +82,34 @@ impl From<spot_price::OutEvent> for OutEvent {
     }
 }
 
+impl From<quote::OutEvent> for OutEvent {
+    fn from(event: quote::OutEvent) -> Self {
+        match event {
+            quote::OutEvent::Message {
+                peer,
+                message: RequestResponseMessage::Request { channel, .. },
+            } => OutEvent::QuoteRequested { channel, peer },
+            quote::OutEvent::Message {
+                message: RequestResponseMessage::Response { .. },
+                ..
+            } => OutEvent::Failure(anyhow!(
+                "Alice is only meant to hand out quotes, not receive them"
+            )),
+            quote::OutEvent::ResponseSent { .. } => OutEvent::ResponseSent,
+            quote::OutEvent::InboundFailure { peer, error, .. } => OutEvent::Failure(anyhow!(
+                "quote protocol with peer {} failed due to {:?}",
+                peer,
+                error
+            )),
+            quote::OutEvent::OutboundFailure { peer, error, .. } => OutEvent::Failure(anyhow!(
+                "quote protocol with peer {} failed due to {:?}",
+                peer,
+                error
+            )),
+        }
+    }
+}
+
 impl From<execution_setup::OutEvent> for OutEvent {
     fn from(event: execution_setup::OutEvent) -> Self {
         use crate::protocol::alice::execution_setup::OutEvent::*;
@@ -124,6 +156,7 @@ impl From<encrypted_signature::OutEvent> for OutEvent {
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
     pt: peer_tracker::Behaviour,
+    quote: quote::Behaviour,
     spot_price: spot_price::Behaviour,
     execution_setup: execution_setup::Behaviour,
     transfer_proof: transfer_proof::Behaviour,
@@ -134,6 +167,7 @@ impl Default for Behaviour {
     fn default() -> Self {
         Self {
             pt: Default::default(),
+            quote: quote::alice(),
             spot_price: spot_price::alice(),
             execution_setup: Default::default(),
             transfer_proof: Default::default(),
@@ -143,10 +177,22 @@ impl Default for Behaviour {
 }
 
 impl Behaviour {
+    pub fn send_quote(
+        &mut self,
+        channel: ResponseChannel<BidQuote>,
+        response: BidQuote,
+    ) -> Result<()> {
+        self.quote
+            .send_response(channel, response)
+            .map_err(|_| anyhow!("failed to respond with quote"))?;
+
+        Ok(())
+    }
+
     pub fn send_spot_price(
         &mut self,
-        channel: ResponseChannel<Response>,
-        response: Response,
+        channel: ResponseChannel<spot_price::Response>,
+        response: spot_price::Response,
     ) -> Result<()> {
         self.spot_price
             .send_response(channel, response)
