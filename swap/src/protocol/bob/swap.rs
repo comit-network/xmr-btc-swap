@@ -133,16 +133,23 @@ async fn run_until_internal(
                     // block 0 once we create the redeem wallet.
                     let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
 
+                    tracing::info!("Waiting for Alice to lock Monero");
+
                     select! {
                         transfer_proof = transfer_proof_watcher => {
-                            let transfer_proof = transfer_proof?;
+                            let transfer_proof = transfer_proof?.tx_lock_proof;
+
+                            tracing::info!(txid = %transfer_proof.tx_hash(), "Alice locked Monero");
+
                             BobState::XmrLockProofReceived {
                                 state: state3,
-                                lock_transfer_proof: transfer_proof.tx_lock_proof,
+                                lock_transfer_proof: transfer_proof,
                                 monero_wallet_restore_blockheight
                             }
                         },
                         _ = cancel_timelock_expires => {
+                            tracing::info!("Alice took too long to lock Monero, cancelling the swap");
+
                             let state4 = state3.cancel();
                             BobState::CancelTimelockExpired(state4)
                         }

@@ -175,6 +175,12 @@ impl From<TxHash> for String {
     }
 }
 
+impl fmt::Display for TxHash {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Debug, Clone, Copy, thiserror::Error)]
 #[error("transaction does not pay enough: expected {expected}, got {actual}")]
 pub struct InsufficientFunds {

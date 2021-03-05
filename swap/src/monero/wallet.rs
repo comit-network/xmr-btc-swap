@@ -160,7 +160,7 @@ impl Wallet {
         expected_amount: Amount,
         conf_target: u32,
     ) -> Result<(), InsufficientFunds> {
-        let txid = &transfer_proof.tx_hash.0;
+        let txid = &transfer_proof.tx_hash();
 
         tracing::info!(%txid, "Waiting for {} confirmation{} of Monero transaction", conf_target, if conf_target > 1 { "s" } else { "" });
 
