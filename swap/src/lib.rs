@@ -22,6 +22,7 @@ pub mod cli;
 pub mod database;
 pub mod execution_params;
 pub mod fs;
+pub mod kraken;
 pub mod monero;
 pub mod network;
 pub mod protocol;
