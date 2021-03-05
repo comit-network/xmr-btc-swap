@@ -193,7 +193,7 @@ impl Wallet {
                 }));
             }
 
-            if proof.confirmations > confirmations.load(Ordering::SeqCst) {
+            if proof.confirmations >= confirmations.load(Ordering::SeqCst) {
                 confirmations.store(proof.confirmations, Ordering::SeqCst);
 
                 let txid = &transfer_proof.tx_hash.0;
