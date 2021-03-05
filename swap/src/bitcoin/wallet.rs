@@ -246,25 +246,20 @@ impl Wallet {
     }
 
     pub async fn transaction_block_height(&self, txid: Txid) -> Result<BlockHeight> {
-        let url = make_tx_status_url(&self.http_url, txid)?;
+        let status_url = make_tx_status_url(&self.http_url, txid)?;
+
         #[derive(Serialize, Deserialize, Debug, Clone)]
         struct TransactionStatus {
             block_height: Option<u32>,
             confirmed: bool,
         }
         let height = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
-            let resp = reqwest::Client::new()
-                .request(Method::GET, url.clone())
-                .send()
+            let block_height = reqwest::get(status_url.clone())
                 .await
-                .map_err(|err| backoff::Error::Transient(Error::Io(err)))?;
-
-            let tx_status: TransactionStatus = resp
-                .json()
+                .map_err(|err| backoff::Error::Transient(Error::Io(err)))?
+                .json::<TransactionStatus>()
                 .await
-                .map_err(|err| backoff::Error::Permanent(Error::JsonDeserialization(err)))?;
-
-            let block_height = tx_status
+                .map_err(|err| backoff::Error::Permanent(Error::JsonDeserialization(err)))?
                 .block_height
                 .ok_or(backoff::Error::Transient(Error::NotYetMined))?;
 
