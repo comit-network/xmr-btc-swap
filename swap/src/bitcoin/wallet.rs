@@ -12,7 +12,7 @@ use bdk::electrum_client::{self, Client, ElectrumApi};
 use bdk::keys::DerivableKey;
 use bdk::{FeeRate, KeychainKind};
 use bitcoin::Script;
-use reqwest::{Method, Url};
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::Arc;
@@ -226,10 +226,9 @@ impl Wallet {
 
     pub async fn get_block_height(&self) -> Result<BlockHeight> {
         let url = make_blocks_tip_height_url(&self.http_url)?;
+
         let height = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
-            let height = reqwest::Client::new()
-                .request(Method::GET, url.clone())
-                .send()
+            let height = reqwest::get(url.clone())
                 .await
                 .map_err(Error::Io)?
                 .text()
