@@ -16,6 +16,7 @@ use anyhow::{bail, Context, Result};
 use prettytable::{row, Table};
 use reqwest::Url;
 use std::cmp::min;
+use std::env;
 use std::future::Future;
 use std::path::Path;
 use std::sync::Arc;
@@ -42,7 +43,7 @@ const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-mon
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args = parse_args();
+    let args = parse_args(env::args_os())?;
 
     let is_terminal = atty::is(atty::Stream::Stderr);
     let base_subscriber = |level| {

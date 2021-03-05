@@ -1,18 +1,24 @@
 use anyhow::{Context, Result};
 use libp2p::core::Multiaddr;
 use libp2p::PeerId;
+use std::ffi::OsString;
 use std::path::PathBuf;
 use std::str::FromStr;
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
 use uuid::Uuid;
 
-pub fn parse_args() -> Arguments {
+pub fn parse_args<I, T>(raw_args: I) -> Result<Arguments>
+where
+    I: IntoIterator<Item = T>,
+    T: Into<OsString> + Clone,
+{
     let matches = RawArguments::clap()
         .setting(AppSettings::SubcommandsNegateReqs)
         .setting(AppSettings::ArgsNegateSubcommands)
-        .get_matches();
-    if matches.subcommand_name().is_none() {
+        .get_matches_from_safe(raw_args)?;
+
+    Ok(if matches.subcommand_name().is_none() {
         let args = RawArguments::from_clap(&matches);
         Arguments {
             config: args.standard_opts.config,
@@ -69,9 +75,10 @@ pub fn parse_args() -> Arguments {
                 },
             },
         }
-    }
+    })
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Arguments {
     pub config: Option<PathBuf>,
     pub debug: bool,
@@ -79,6 +86,7 @@ pub struct Arguments {
 }
 
 #[allow(clippy::large_enum_variant)]
+#[derive(Debug, PartialEq)]
 pub enum Command {
     BuyXmr {
         receive_monero_address: monero::Address,
@@ -175,17 +183,20 @@ struct StandardOpts {
     debug: bool,
 }
 
+const DEFAULT_ALICE_PEER_ID: &str = "12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
+const DEFAULT_ALICE_MULTIADDR: &str = "/dns4/xmr-btc-asb.coblox.tech/tcp/9876";
+
 #[derive(structopt::StructOpt, Debug)]
 struct AliceConnection {
     #[structopt(
         long = "connect-peer-id",
-        default_value = "12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi"
+        default_value = DEFAULT_ALICE_PEER_ID,
     )]
     alice_peer_id: PeerId,
 
     #[structopt(
         long = "connect-addr",
-        default_value = "/dns4/xmr-btc-asb.coblox.tech/tcp/9876"
+        default_value = DEFAULT_ALICE_MULTIADDR
     )]
     alice_addr: Multiaddr,
 }
@@ -210,5 +221,49 @@ mod tests {
         let result = AliceConnection::from_iter_safe(no_args);
 
         assert!(result.is_ok())
+    }
+
+    const BINARY_NAME: &str = "buy_xmr";
+
+    #[test]
+    fn given_no_subcommand_then_defaults_to_buy_xmr() {
+        let args = vec![BINARY_NAME, "--receive-address", "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a"];
+
+        let parsed_args = parse_args(args).unwrap();
+
+        assert_eq!(parsed_args, Arguments {
+            config: None,
+            debug: false,
+            command: Command::BuyXmr {
+                receive_monero_address: "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a".parse().unwrap(),
+                alice_peer_id: DEFAULT_ALICE_PEER_ID.parse().unwrap(),
+                alice_addr: DEFAULT_ALICE_MULTIADDR.parse().unwrap()
+            }
+        })
+    }
+
+    #[test]
+    fn given_resume_subcommand_then_resumes() {
+        let args = vec![
+            BINARY_NAME,
+            "resume",
+            "--swap-id",
+            "6cc8881d-9def-409b-93fc-6c3796f5a777",
+            "--receive-address",
+            "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a",
+        ];
+
+        let parsed_args = parse_args(args).unwrap();
+
+        assert_eq!(parsed_args, Arguments {
+            config: None,
+            debug: false,
+            command: Command::Resume {
+                receive_monero_address: "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a".parse().unwrap(),
+                swap_id: "6cc8881d-9def-409b-93fc-6c3796f5a777".parse().unwrap(),
+                alice_peer_id: DEFAULT_ALICE_PEER_ID.parse().unwrap(),
+                alice_addr: DEFAULT_ALICE_MULTIADDR.parse().unwrap()
+            }
+        })
     }
 }
