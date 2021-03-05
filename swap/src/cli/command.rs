@@ -8,6 +8,9 @@ use uuid::Uuid;
 pub const DEFAULT_ALICE_MULTIADDR: &str = "/dns4/xmr-btc-asb.coblox.tech/tcp/9876";
 pub const DEFAULT_ALICE_PEER_ID: &str = "12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
 
+// Port is assumed to be stagenet standard port 38081
+pub const DEFAULT_STAGENET_MONERO_DAEMON_HOST: &str = "monero-stagenet.exan.tech";
+
 #[derive(structopt::StructOpt, Debug)]
 pub struct Arguments {
     #[structopt(
@@ -77,6 +80,12 @@ pub struct ConnectParams {
 pub struct MoneroParams {
     #[structopt(long = "receive-address", parse(try_from_str = parse_monero_address))]
     pub receive_monero_address: monero::Address,
+
+    #[structopt(
+    long = "monero-daemon-host",
+    default_value = DEFAULT_STAGENET_MONERO_DAEMON_HOST
+    )]
+    pub monero_daemon_host: String,
 }
 
 fn parse_monero_address(s: &str) -> Result<monero::Address> {
