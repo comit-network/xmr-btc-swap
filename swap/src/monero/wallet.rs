@@ -158,8 +158,12 @@ impl Wallet {
         public_view_key: PublicViewKey,
         transfer_proof: TransferProof,
         expected_amount: Amount,
-        expected_confirmations: u32,
+        conf_target: u32,
     ) -> Result<(), InsufficientFunds> {
+        let txid = &transfer_proof.tx_hash.0;
+
+        tracing::info!(%txid, "Waiting for {} confirmation{} of Monero transaction", conf_target, if conf_target > 1 { "s" } else { "" });
+
         enum Error {
             TxNotFound,
             InsufficientConfirmations,
@@ -196,11 +200,10 @@ impl Wallet {
             if proof.confirmations >= confirmations.load(Ordering::SeqCst) {
                 confirmations.store(proof.confirmations, Ordering::SeqCst);
 
-                let txid = &transfer_proof.tx_hash.0;
-                info!(%txid, "Monero lock tx has {} out of {} confirmations", proof.confirmations, expected_confirmations);
+                info!(%txid, "Monero lock tx has {} out of {} confirmations", proof.confirmations, conf_target);
             }
 
-            if proof.confirmations < expected_confirmations {
+            if proof.confirmations < conf_target {
                 return Err(backoff::Error::Transient(Error::InsufficientConfirmations));
             }
 
