@@ -1,4 +1,4 @@
-use crate::asb::LatestRate;
+use crate::asb::{FixedRate, Rate};
 use crate::database::Database;
 use crate::execution_params::ExecutionParams;
 use crate::monero::BalanceTooLow;
@@ -8,13 +8,14 @@ use crate::protocol::alice;
 use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State3, Swap, TransferProof};
 use crate::protocol::bob::EncryptedSignature;
 use crate::seed::Seed;
-use crate::{bitcoin, monero};
+use crate::{bitcoin, kraken, monero};
 use anyhow::{bail, Context, Result};
 use futures::future::RemoteHandle;
 use libp2p::core::Multiaddr;
 use libp2p::futures::FutureExt;
 use libp2p::{PeerId, Swarm};
 use rand::rngs::OsRng;
+use std::convert::Infallible;
 use std::sync::Arc;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{broadcast, mpsc};
@@ -80,7 +81,7 @@ pub struct EventLoop<RS> {
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
     db: Arc<Database>,
-    rate_service: RS,
+    latest_rate: RS,
     max_buy: bitcoin::Amount,
 
     recv_encrypted_signature: broadcast::Sender<EncryptedSignature>,
@@ -92,9 +93,31 @@ pub struct EventLoop<RS> {
     swap_handle_sender: mpsc::Sender<RemoteHandle<Result<AliceState>>>,
 }
 
-impl<RS> EventLoop<RS>
+pub trait LatestRate {
+    type Error: std::error::Error + Send + Sync + 'static;
+
+    fn latest_rate(&mut self) -> Result<Rate, Self::Error>;
+}
+
+impl LatestRate for FixedRate {
+    type Error = Infallible;
+
+    fn latest_rate(&mut self) -> Result<Rate, Self::Error> {
+        Ok(self.value())
+    }
+}
+
+impl LatestRate for kraken::RateUpdateStream {
+    type Error = kraken::Error;
+
+    fn latest_rate(&mut self) -> Result<Rate, Self::Error> {
+        self.latest_update()
+    }
+}
+
+impl<LR> EventLoop<LR>
 where
-    RS: LatestRate,
+    LR: LatestRate,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -104,7 +127,7 @@ where
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
         db: Arc<Database>,
-        rate_service: RS,
+        latest_rate: LR,
         max_buy: bitcoin::Amount,
     ) -> Result<(Self, mpsc::Receiver<RemoteHandle<Result<AliceState>>>)> {
         let identity = seed.derive_libp2p_identity();
@@ -132,7 +155,7 @@ where
             bitcoin_wallet,
             monero_wallet,
             db,
-            rate_service,
+            latest_rate,
             recv_encrypted_signature: recv_encrypted_signature.sender,
             send_transfer_proof: send_transfer_proof.receiver,
             send_transfer_proof_sender: send_transfer_proof.sender,
@@ -239,7 +262,7 @@ where
         monero_wallet: Arc<monero::Wallet>,
     ) -> Result<monero::Amount> {
         let rate = self
-            .rate_service
+            .latest_rate
             .latest_rate()
             .context("Failed to get latest rate")?;
 
@@ -265,7 +288,7 @@ where
 
     async fn make_quote(&mut self, max_buy: bitcoin::Amount) -> Result<BidQuote> {
         let rate = self
-            .rate_service
+            .latest_rate
             .latest_rate()
             .context("Failed to get latest rate")?;
 

@@ -10,7 +10,7 @@ use tokio::sync::watch;
 use tokio_tungstenite::tungstenite;
 use tracing::{error, trace};
 
-pub async fn connect() -> Result<watch::Receiver<Result<Rate, Error>>> {
+pub async fn connect() -> Result<RateUpdateStream> {
     let (rate_update, rate_update_receiver) = watch::channel(Err(Error::NotYetRetrieved));
 
     let (rate_stream, _response) =
@@ -88,7 +88,26 @@ pub async fn connect() -> Result<watch::Receiver<Result<Rate, Error>>> {
         .send(SUBSCRIBE_XMR_BTC_TICKER_PAYLOAD.into())
         .await?;
 
-    Ok(rate_update_receiver)
+    Ok(RateUpdateStream {
+        inner: rate_update_receiver,
+    })
+}
+
+#[derive(Clone, Debug)]
+pub struct RateUpdateStream {
+    inner: watch::Receiver<Result<Rate, Error>>,
+}
+
+impl RateUpdateStream {
+    pub async fn wait_for_update(&mut self) -> Result<Result<Rate, Error>> {
+        self.inner.changed().await?;
+
+        Ok(self.inner.borrow().clone())
+    }
+
+    pub fn latest_update(&mut self) -> Result<Rate, Error> {
+        self.inner.borrow().clone()
+    }
 }
 
 const KRAKEN_WS_URL: &str = "wss://ws.kraken.com";

@@ -11,9 +11,7 @@ async fn main() -> Result<()> {
         .context("Failed to connect to kraken")?;
 
     loop {
-        ticker.changed().await?;
-
-        match &*ticker.borrow() {
+        match ticker.wait_for_update().await? {
             Ok(rate) => println!("Rate update: {}", rate),
             Err(e) => println!("Error: {:#}", e),
         }
