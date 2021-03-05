@@ -23,57 +23,6 @@ use tracing::{debug, error, trace};
 use uuid::Uuid;
 
 #[allow(missing_debug_implementations)]
-pub struct MpscChannels<T> {
-    sender: mpsc::Sender<T>,
-    receiver: mpsc::Receiver<T>,
-}
-
-impl<T> Default for MpscChannels<T> {
-    fn default() -> Self {
-        let (sender, receiver) = mpsc::channel(100);
-        MpscChannels { sender, receiver }
-    }
-}
-
-#[allow(missing_debug_implementations)]
-pub struct BroadcastChannels<T>
-where
-    T: Clone,
-{
-    sender: broadcast::Sender<T>,
-}
-
-impl<T> Default for BroadcastChannels<T>
-where
-    T: Clone,
-{
-    fn default() -> Self {
-        let (sender, _receiver) = broadcast::channel(100);
-        BroadcastChannels { sender }
-    }
-}
-
-#[derive(Debug)]
-pub struct EventLoopHandle {
-    recv_encrypted_signature: broadcast::Receiver<EncryptedSignature>,
-    send_transfer_proof: mpsc::Sender<(PeerId, TransferProof)>,
-}
-
-impl EventLoopHandle {
-    pub async fn recv_encrypted_signature(&mut self) -> Result<EncryptedSignature> {
-        self.recv_encrypted_signature
-            .recv()
-            .await
-            .context("Failed to receive Bitcoin encrypted signature from Bob")
-    }
-    pub async fn send_transfer_proof(&mut self, bob: PeerId, msg: TransferProof) -> Result<()> {
-        let _ = self.send_transfer_proof.send((bob, msg)).await?;
-
-        Ok(())
-    }
-}
-
-#[allow(missing_debug_implementations)]
 pub struct EventLoop<RS> {
     swarm: libp2p::Swarm<Behaviour>,
     peer_id: PeerId,
@@ -93,26 +42,10 @@ pub struct EventLoop<RS> {
     swap_handle_sender: mpsc::Sender<RemoteHandle<Result<AliceState>>>,
 }
 
-pub trait LatestRate {
-    type Error: std::error::Error + Send + Sync + 'static;
-
-    fn latest_rate(&mut self) -> Result<Rate, Self::Error>;
-}
-
-impl LatestRate for FixedRate {
-    type Error = Infallible;
-
-    fn latest_rate(&mut self) -> Result<Rate, Self::Error> {
-        Ok(self.value())
-    }
-}
-
-impl LatestRate for kraken::RateUpdateStream {
-    type Error = kraken::Error;
-
-    fn latest_rate(&mut self) -> Result<Rate, Self::Error> {
-        self.latest_update()
-    }
+#[derive(Debug)]
+pub struct EventLoopHandle {
+    recv_encrypted_signature: broadcast::Receiver<EncryptedSignature>,
+    send_transfer_proof: mpsc::Sender<(PeerId, TransferProof)>,
 }
 
 impl<LR> EventLoop<LR>
@@ -336,9 +269,76 @@ where
     }
 }
 
+pub trait LatestRate {
+    type Error: std::error::Error + Send + Sync + 'static;
+
+    fn latest_rate(&mut self) -> Result<Rate, Self::Error>;
+}
+
+impl LatestRate for FixedRate {
+    type Error = Infallible;
+
+    fn latest_rate(&mut self) -> Result<Rate, Self::Error> {
+        Ok(self.value())
+    }
+}
+
+impl LatestRate for kraken::RateUpdateStream {
+    type Error = kraken::Error;
+
+    fn latest_rate(&mut self) -> Result<Rate, Self::Error> {
+        self.latest_update()
+    }
+}
+
+impl EventLoopHandle {
+    pub async fn recv_encrypted_signature(&mut self) -> Result<EncryptedSignature> {
+        self.recv_encrypted_signature
+            .recv()
+            .await
+            .context("Failed to receive Bitcoin encrypted signature from Bob")
+    }
+    pub async fn send_transfer_proof(&mut self, bob: PeerId, msg: TransferProof) -> Result<()> {
+        let _ = self.send_transfer_proof.send((bob, msg)).await?;
+
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Copy, thiserror::Error)]
 #[error("Refusing to buy {actual} because the maximum configured limit is {max}")]
 pub struct MaximumBuyAmountExceeded {
     pub max: bitcoin::Amount,
     pub actual: bitcoin::Amount,
+}
+
+#[allow(missing_debug_implementations)]
+struct MpscChannels<T> {
+    sender: mpsc::Sender<T>,
+    receiver: mpsc::Receiver<T>,
+}
+
+impl<T> Default for MpscChannels<T> {
+    fn default() -> Self {
+        let (sender, receiver) = mpsc::channel(100);
+        MpscChannels { sender, receiver }
+    }
+}
+
+#[allow(missing_debug_implementations)]
+struct BroadcastChannels<T>
+where
+    T: Clone,
+{
+    sender: broadcast::Sender<T>,
+}
+
+impl<T> Default for BroadcastChannels<T>
+where
+    T: Clone,
+{
+    fn default() -> Self {
+        let (sender, _receiver) = broadcast::channel(100);
+        BroadcastChannels { sender }
+    }
 }
