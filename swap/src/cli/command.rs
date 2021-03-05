@@ -8,6 +8,9 @@ use uuid::Uuid;
 pub const DEFAULT_ALICE_MULTIADDR: &str = "/dns4/xmr-btc-asb.coblox.tech/tcp/9876";
 pub const DEFAULT_ALICE_PEER_ID: &str = "12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
 
+// Port is assumed to be stagenet standard port 38081
+pub const DEFAULT_STAGENET_MONERO_DAEMON_HOST: &str = "monero-stagenet.exan.tech";
+
 #[derive(structopt::StructOpt, Debug)]
 pub struct Arguments {
     #[structopt(
@@ -28,36 +31,22 @@ pub struct Arguments {
 #[structopt(name = "xmr_btc-swap", about = "XMR BTC atomic swap")]
 pub enum Command {
     BuyXmr {
-        #[structopt(long = "receive-address", parse(try_from_str = parse_monero_address))]
-        receive_monero_address: monero::Address,
+        #[structopt(flatten)]
+        connect_params: ConnectParams,
 
-        #[structopt(long = "connect-peer-id", default_value = DEFAULT_ALICE_PEER_ID)]
-        alice_peer_id: PeerId,
-
-        #[structopt(
-        long = "connect-addr",
-        default_value = DEFAULT_ALICE_MULTIADDR
-        )]
-        alice_addr: Multiaddr,
+        #[structopt(flatten)]
+        monero_params: MoneroParams,
     },
     History,
     Resume {
-        #[structopt(long = "receive-address", parse(try_from_str = parse_monero_address))]
-        receive_monero_address: monero::Address,
-
         #[structopt(long = "swap-id")]
         swap_id: Uuid,
 
-        // TODO: Remove Alice peer-id/address, it should be saved in the database when running swap
-        // and loaded from the database when running resume/cancel/refund
-        #[structopt(long = "counterpart-peer-id", default_value = DEFAULT_ALICE_PEER_ID)]
-        alice_peer_id: PeerId,
+        #[structopt(flatten)]
+        connect_params: ConnectParams,
 
-        #[structopt(
-        long = "counterpart-addr",
-        default_value = DEFAULT_ALICE_MULTIADDR
-        )]
-        alice_addr: Multiaddr,
+        #[structopt(flatten)]
+        monero_params: MoneroParams,
     },
     Cancel {
         #[structopt(long = "swap-id")]
@@ -73,6 +62,30 @@ pub enum Command {
         #[structopt(short, long)]
         force: bool,
     },
+}
+
+#[derive(structopt::StructOpt, Debug)]
+pub struct ConnectParams {
+    #[structopt(long = "connect-peer-id", default_value = DEFAULT_ALICE_PEER_ID)]
+    pub alice_peer_id: PeerId,
+
+    #[structopt(
+    long = "connect-addr",
+    default_value = DEFAULT_ALICE_MULTIADDR
+    )]
+    pub alice_addr: Multiaddr,
+}
+
+#[derive(structopt::StructOpt, Debug)]
+pub struct MoneroParams {
+    #[structopt(long = "receive-address", parse(try_from_str = parse_monero_address))]
+    pub receive_monero_address: monero::Address,
+
+    #[structopt(
+    long = "monero-daemon-host",
+    default_value = DEFAULT_STAGENET_MONERO_DAEMON_HOST
+    )]
+    pub monero_daemon_host: String,
 }
 
 fn parse_monero_address(s: &str) -> Result<monero::Address> {

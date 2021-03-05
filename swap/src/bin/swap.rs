@@ -20,7 +20,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use structopt::StructOpt;
 use swap::bitcoin::{Amount, TxLock};
-use swap::cli::command::{Arguments, Command};
+use swap::cli::command::{Arguments, Command, ConnectParams, MoneroParams};
 use swap::cli::config::{read_config, Config};
 use swap::database::Database;
 use swap::execution_params::GetExecutionParams;
@@ -84,9 +84,16 @@ async fn main() -> Result<()> {
 
     match args.cmd {
         Command::BuyXmr {
-            receive_monero_address,
-            alice_peer_id,
-            alice_addr,
+            connect_params:
+                ConnectParams {
+                    alice_peer_id,
+                    alice_addr,
+                },
+            monero_params:
+                MoneroParams {
+                    receive_monero_address,
+                    monero_daemon_host,
+                },
         } => {
             if receive_monero_address.network != monero_network {
                 bail!(
@@ -97,7 +104,8 @@ async fn main() -> Result<()> {
             }
 
             let bitcoin_wallet = init_bitcoin_wallet(bitcoin_network, &config, seed).await?;
-            let (monero_wallet, _process) = init_monero_wallet(monero_network, &config).await?;
+            let (monero_wallet, _process) =
+                init_monero_wallet(monero_network, &config, monero_daemon_host).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
             let (event_loop, mut event_loop_handle) = EventLoop::new(
                 &seed.derive_libp2p_identity(),
@@ -159,17 +167,25 @@ async fn main() -> Result<()> {
             table.printstd();
         }
         Command::Resume {
-            receive_monero_address,
             swap_id,
-            alice_peer_id,
-            alice_addr,
+            connect_params:
+                ConnectParams {
+                    alice_peer_id,
+                    alice_addr,
+                },
+            monero_params:
+                MoneroParams {
+                    receive_monero_address,
+                    monero_daemon_host,
+                },
         } => {
             if receive_monero_address.network != monero_network {
                 bail!("The given monero address is on network {:?}, expected address of network {:?}.", receive_monero_address.network, monero_network)
             }
 
             let bitcoin_wallet = init_bitcoin_wallet(bitcoin_network, &config, seed).await?;
-            let (monero_wallet, _process) = init_monero_wallet(monero_network, &config).await?;
+            let (monero_wallet, _process) =
+                init_monero_wallet(monero_network, &config, monero_daemon_host).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
             let (event_loop, event_loop_handle) = EventLoop::new(
@@ -265,13 +281,14 @@ async fn init_bitcoin_wallet(
 async fn init_monero_wallet(
     monero_network: monero::Network,
     config: &Config,
+    monero_daemon_host: String,
 ) -> Result<(monero::Wallet, monero::WalletRpcProcess)> {
     const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-monitoring-wallet";
 
     let monero_wallet_rpc = monero::WalletRpc::new(config.data.dir.join("monero")).await?;
 
     let monero_wallet_rpc_process = monero_wallet_rpc
-        .run(monero_network, "monero-stagenet.exan.tech")
+        .run(monero_network, monero_daemon_host.as_str())
         .await?;
 
     let monero_wallet = monero::Wallet::new(

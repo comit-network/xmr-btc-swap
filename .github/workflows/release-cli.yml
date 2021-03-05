@@ -1,4 +1,4 @@
-name: "Release swap_cli"
+name: "Release swap"
 
 on:
   release:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   release:
-    name: Release swap_cli
+    name: Release swap
     strategy:
       matrix:
         include:
@@ -30,10 +30,10 @@ jobs:
       - uses: Swatinem/rust-cache@v1.2.0
 
       - name: Build ${{ matrix.target }} release binary
-        run: cargo build --target=${{ matrix.target }} --release --package swap --bin swap_cli
+        run: cargo build --target=${{ matrix.target }} --release --package swap --bin swap
 
       - name: Smoke test the binary
-        run: target/${{ matrix.target }}/release/swap_cli --help
+        run: target/${{ matrix.target }}/release/swap --help
 
       # Remove once python 3 is the default
       - uses: actions/setup-python@v1
@@ -51,26 +51,26 @@ jobs:
           triple = "${{ matrix.target }}".split("-")
           arch = triple[0]
 
-          archive_name=f'swap_cli_${{ github.event.release.tag_name }}_{os_info.system}_{arch}.${{ matrix.archive_ext }}'
+          archive_name=f'swap_${{ github.event.release.tag_name }}_{os_info.system}_{arch}.${{ matrix.archive_ext }}'
 
           print(f'::set-output name=archive::{archive_name}')
 
       - name: Pack macos archive
         if: matrix.os == 'macos-latest'
         shell: bash
-        run: gtar -C ./target/${{ matrix.target }}/release --create --file=${{ steps.create-archive-name.outputs.archive }} swap_cli
+        run: gtar -C ./target/${{ matrix.target }}/release --create --file=${{ steps.create-archive-name.outputs.archive }} swap
 
       - name: Pack linux archive
         if: matrix.os == 'ubuntu-latest'
         shell: bash
-        run: tar -C ./target/${{ matrix.target }}/release --create --file=${{ steps.create-archive-name.outputs.archive }} swap_cli
+        run: tar -C ./target/${{ matrix.target }}/release --create --file=${{ steps.create-archive-name.outputs.archive }} swap
 
       - name: Pack windows archive
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
-          cp target/${{ matrix.target }}/release/swap_cli.exe ./swap_cli.exe
-          7z a -tzip ${{ steps.create-archive-name.outputs.archive }} ./swap_cli.exe
+          cp target/${{ matrix.target }}/release/swap.exe ./swap.exe
+          7z a -tzip ${{ steps.create-archive-name.outputs.archive }} ./swap.exe
 
       - name: Upload archive
         uses: actions/upload-release-asset@v1
