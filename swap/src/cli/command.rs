@@ -7,80 +7,75 @@ use structopt::clap::AppSettings;
 use structopt::StructOpt;
 use uuid::Uuid;
 
-pub const DEFAULT_ALICE_MULTIADDR: &str = "/dns4/xmr-btc-asb.coblox.tech/tcp/9876";
-pub const DEFAULT_ALICE_PEER_ID: &str = "12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
-
-pub struct CliExecutionParams {
-    pub config: Option<PathBuf>,
-    pub debug: bool,
-    pub command: Command,
-}
-
-impl CliExecutionParams {
-    pub fn from_args() -> Self {
-        let matches = Arguments::clap()
-            .setting(AppSettings::SubcommandsNegateReqs)
-            .setting(AppSettings::ArgsNegateSubcommands)
-            .get_matches();
-        if matches.subcommand_name().is_none() {
-            let args = Arguments::from_clap(&matches);
-            Self {
-                config: args.standard_opts.config,
-                debug: args.standard_opts.debug,
-                command: Command::BuyXmr {
-                    receive_monero_address: args.receive_monero_address,
-                    alice_peer_id: args.alice_connection.alice_peer_id,
-                    alice_addr: args.alice_connection.alice_addr,
-                },
-            }
-        } else {
-            let sub_command: SubCommand = SubCommand::from_clap(&matches);
-            match sub_command {
-                SubCommand::History { debug } => CliExecutionParams {
-                    config: None,
-                    debug,
-                    command: Command::History,
-                },
-                SubCommand::Cancel {
-                    swap_id,
-                    force,
-                    standard_opts: StandardOpts { config, debug },
-                } => CliExecutionParams {
-                    config,
-                    debug,
-                    command: Command::Cancel { swap_id, force },
-                },
-                SubCommand::Refund {
-                    swap_id,
-                    force,
-                    standard_opts: StandardOpts { config, debug },
-                } => CliExecutionParams {
-                    config,
-                    debug,
-                    command: Command::Refund { swap_id, force },
-                },
-                SubCommand::Resume {
-                    receive_monero_address,
-                    swap_id,
-                    alice_connection:
-                        AliceConnection {
-                            alice_peer_id,
-                            alice_addr,
-                        },
-                    standard_opts: StandardOpts { config, debug },
-                } => CliExecutionParams {
-                    config,
-                    debug,
-                    command: Command::Resume {
-                        receive_monero_address,
-                        swap_id,
+pub fn parse_args() -> Arguments {
+    let matches = RawArguments::clap()
+        .setting(AppSettings::SubcommandsNegateReqs)
+        .setting(AppSettings::ArgsNegateSubcommands)
+        .get_matches();
+    if matches.subcommand_name().is_none() {
+        let args = RawArguments::from_clap(&matches);
+        Arguments {
+            config: args.standard_opts.config,
+            debug: args.standard_opts.debug,
+            command: Command::BuyXmr {
+                receive_monero_address: args.receive_monero_address,
+                alice_peer_id: args.alice_connection.alice_peer_id,
+                alice_addr: args.alice_connection.alice_addr,
+            },
+        }
+    } else {
+        let sub_command: SubCommand = SubCommand::from_clap(&matches);
+        match sub_command {
+            SubCommand::History { debug } => Arguments {
+                config: None,
+                debug,
+                command: Command::History,
+            },
+            SubCommand::Cancel {
+                swap_id,
+                force,
+                standard_opts: StandardOpts { config, debug },
+            } => Arguments {
+                config,
+                debug,
+                command: Command::Cancel { swap_id, force },
+            },
+            SubCommand::Refund {
+                swap_id,
+                force,
+                standard_opts: StandardOpts { config, debug },
+            } => Arguments {
+                config,
+                debug,
+                command: Command::Refund { swap_id, force },
+            },
+            SubCommand::Resume {
+                receive_monero_address,
+                swap_id,
+                alice_connection:
+                    AliceConnection {
                         alice_peer_id,
                         alice_addr,
                     },
+                standard_opts: StandardOpts { config, debug },
+            } => Arguments {
+                config,
+                debug,
+                command: Command::Resume {
+                    receive_monero_address,
+                    swap_id,
+                    alice_peer_id,
+                    alice_addr,
                 },
-            }
+            },
         }
     }
+}
+
+pub struct Arguments {
+    pub config: Option<PathBuf>,
+    pub debug: bool,
+    pub command: Command,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -108,7 +103,7 @@ pub enum Command {
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct Arguments {
+struct RawArguments {
     #[structopt(long = "receive-address")]
     receive_monero_address: monero::Address,
 
@@ -119,13 +114,13 @@ pub struct Arguments {
     alice_connection: AliceConnection,
 
     #[structopt(subcommand)]
-    pub sub_command: Option<SubCommand>,
+    sub_command: Option<SubCommand>,
 }
 
 #[allow(clippy::large_enum_variant)]
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(name = "xmr_btc-swap", about = "XMR BTC atomic swap")]
-pub enum SubCommand {
+enum SubCommand {
     History {
         #[structopt(long, help = "Activate debug logging.")]
         debug: bool,
@@ -168,7 +163,7 @@ pub enum SubCommand {
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct StandardOpts {
+struct StandardOpts {
     #[structopt(
         long = "config",
         help = "Provide a custom path to the configuration file. The configuration file must be a toml file.",
@@ -181,11 +176,17 @@ pub struct StandardOpts {
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct AliceConnection {
-    #[structopt(long = "connect-peer-id", default_value = DEFAULT_ALICE_PEER_ID)]
+struct AliceConnection {
+    #[structopt(
+        long = "connect-peer-id",
+        default_value = "12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi"
+    )]
     alice_peer_id: PeerId,
 
-    #[structopt(long = "connect-addr", default_value = DEFAULT_ALICE_MULTIADDR)]
+    #[structopt(
+        long = "connect-addr",
+        default_value = "/dns4/xmr-btc-asb.coblox.tech/tcp/9876"
+    )]
     alice_addr: Multiaddr,
 }
 
@@ -200,21 +201,14 @@ fn parse_monero_address(s: &str) -> Result<monero::Address> {
 
 #[cfg(test)]
 mod tests {
-    use crate::cli::command::{DEFAULT_ALICE_MULTIADDR, DEFAULT_ALICE_PEER_ID};
-    use libp2p::core::Multiaddr;
-    use libp2p::PeerId;
+    use super::*;
 
     #[test]
-    fn parse_default_alice_peer_id_success() {
-        DEFAULT_ALICE_PEER_ID
-            .parse::<PeerId>()
-            .expect("default alice peer id str is a valid PeerId");
-    }
+    fn parse_default_alice_connection_success() {
+        let no_args = Vec::<&str>::new();
 
-    #[test]
-    fn parse_default_alice_multiaddr_success() {
-        DEFAULT_ALICE_MULTIADDR
-            .parse::<Multiaddr>()
-            .expect("default alice multiaddr str is a valid Multiaddr>");
+        let result = AliceConnection::from_iter_safe(no_args);
+
+        assert!(result.is_ok())
     }
 }

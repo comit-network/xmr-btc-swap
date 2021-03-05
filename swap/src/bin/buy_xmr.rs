@@ -21,7 +21,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use swap::bitcoin::{Amount, TxLock};
-use swap::cli::command::{CliExecutionParams, Command};
+use swap::cli::command::{parse_args, Command};
 use swap::cli::config::{read_config, Config};
 use swap::database::Database;
 use swap::execution_params::GetExecutionParams;
@@ -42,7 +42,7 @@ const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-mon
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let cli_execution_params = CliExecutionParams::from_args();
+    let args = parse_args();
 
     let is_terminal = atty::is(atty::Stream::Stderr);
     let base_subscriber = |level| {
@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
             .with_env_filter(format!("swap={}", level))
     };
 
-    if cli_execution_params.debug {
+    if args.debug {
         let subscriber = base_subscriber(Level::DEBUG)
             .with_timer(tracing_subscriber::fmt::time::ChronoLocal::with_format(
                 "%F %T".to_owned(),
@@ -70,7 +70,7 @@ async fn main() -> Result<()> {
         tracing::subscriber::set_global_default(subscriber)?;
     }
 
-    let config = match cli_execution_params.config {
+    let config = match args.config {
         Some(config_path) => read_config(config_path)??,
         None => Config::testnet(),
     };
@@ -98,7 +98,7 @@ async fn main() -> Result<()> {
         .run(monero_network, "stagenet.community.xmr.to")
         .await?;
 
-    match cli_execution_params.command {
+    match args.command {
         Command::BuyXmr {
             receive_monero_address,
             alice_peer_id,
