@@ -96,7 +96,7 @@ async fn main() -> Result<()> {
     let monero_wallet_rpc = monero::WalletRpc::new(config.data.dir.join("monero")).await?;
 
     let monero_wallet_rpc_process = monero_wallet_rpc
-        .run(monero_network, "stagenet.community.xmr.to")
+        .run(monero_network, "monero-stagenet.exan.tech")
         .await?;
 
     match args.cmd {
