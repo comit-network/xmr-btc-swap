@@ -23,7 +23,6 @@ use swap::asb::command::{Arguments, Command};
 use swap::asb::config::{
     initial_setup, query_user_for_initial_testnet_config, read_config, Config, ConfigNotInitialized,
 };
-use swap::asb::kraken;
 use swap::database::Database;
 use swap::execution_params::GetExecutionParams;
 use swap::fs::default_config_path;
@@ -31,7 +30,7 @@ use swap::monero::Amount;
 use swap::protocol::alice::EventLoop;
 use swap::seed::Seed;
 use swap::trace::init_tracing;
-use swap::{bitcoin, execution_params, monero};
+use swap::{bitcoin, execution_params, kraken, monero};
 use tracing::{info, warn};
 use tracing_subscriber::filter::LevelFilter;
 
@@ -93,7 +92,7 @@ async fn main() -> Result<()> {
                 bitcoin_wallet.new_address().await?
             );
 
-            let rate_service = kraken::RateService::new().await?;
+            let kraken_rate_updates = kraken::connect().await?;
 
             let (event_loop, _) = EventLoop::new(
                 config.network.listen,
@@ -102,7 +101,7 @@ async fn main() -> Result<()> {
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
                 Arc::new(db),
-                rate_service,
+                kraken_rate_updates,
                 max_buy,
             )
             .unwrap();

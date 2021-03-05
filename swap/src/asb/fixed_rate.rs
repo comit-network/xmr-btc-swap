@@ -1,23 +1,20 @@
-use crate::asb::{LatestRate, Rate};
-use std::convert::Infallible;
+use crate::asb::Rate;
 
-pub const RATE: f64 = 0.01;
+#[derive(Clone, Debug)]
+pub struct FixedRate(Rate);
 
-#[derive(Clone)]
-pub struct RateService(Rate);
+impl FixedRate {
+    pub const RATE: f64 = 0.01;
 
-impl LatestRate for RateService {
-    type Error = Infallible;
-
-    fn latest_rate(&mut self) -> Result<Rate, Infallible> {
-        Ok(self.0)
+    pub fn value(&self) -> Rate {
+        self.0
     }
 }
 
-impl Default for RateService {
+impl Default for FixedRate {
     fn default() -> Self {
         Self(Rate {
-            ask: bitcoin::Amount::from_btc(RATE).expect("Static value should never fail"),
+            ask: bitcoin::Amount::from_btc(Self::RATE).expect("Static value should never fail"),
         })
     }
 }

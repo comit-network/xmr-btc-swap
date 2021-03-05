@@ -14,8 +14,7 @@ use std::convert::Infallible;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use swap::asb::fixed_rate;
-use swap::asb::fixed_rate::RATE;
+use swap::asb::FixedRate;
 use swap::bitcoin::{CancelTimelock, PunishTimelock};
 use swap::database::Database;
 use swap::execution_params::{ExecutionParams, GetExecutionParams};
@@ -344,7 +343,7 @@ where
     let (monero, containers) = testutils::init_containers(&cli).await;
 
     let btc_amount = bitcoin::Amount::from_sat(1_000_000);
-    let xmr_amount = monero::Amount::from_monero(btc_amount.as_btc() / RATE).unwrap();
+    let xmr_amount = monero::Amount::from_monero(btc_amount.as_btc() / FixedRate::RATE).unwrap();
 
     let alice_starting_balances = StartingBalances {
         xmr: xmr_amount * 10,
@@ -410,7 +409,7 @@ where
         alice_bitcoin_wallet.clone(),
         alice_monero_wallet.clone(),
         alice_db,
-        fixed_rate::RateService::default(),
+        FixedRate::default(),
         bitcoin::Amount::ONE_BTC,
     )
     .unwrap();
