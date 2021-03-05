@@ -1,4 +1,4 @@
-name: "Create 'latest' release"
+name: "Create 'preview' release"
 
 on:
   push:
@@ -7,26 +7,26 @@ on:
 
 jobs:
   create_release:
-    name: Create latest release
+    name: Create preview release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
 
-      - name: Delete 'latest' release
+      - name: Delete 'preview' release
         uses: larryjoelane/delete-release-action@v1.0.24
         with:
-          release-name: latest
+          release-name: preview
           token: ${{ secrets.BOTTY_GITHUB_TOKEN }}
 
       - name: Give GitHub some time to process the deletion, otherwise our release shows up as draft. Sigh.
         run: sleep 10
 
-      - name: Create 'latest' release
+      - name: Create 'preview' release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.BOTTY_GITHUB_TOKEN }}
         with:
-          tag_name: latest
-          release_name: latest
+          tag_name: preview
+          release_name: preview
           draft: false
           prerelease: true
