@@ -179,7 +179,7 @@ impl Wallet {
                 format!("Failed to broadcast Bitcoin {} transaction {}", kind, txid)
             })?;
 
-        tracing::info!("Published Bitcoin {} transaction as {}", txid, kind);
+        tracing::info!(%txid, "Published Bitcoin {} transaction", kind);
 
         Ok(txid)
     }
@@ -281,7 +281,10 @@ impl Wallet {
         txid: Txid,
         execution_params: ExecutionParams,
     ) -> Result<()> {
-        tracing::debug!("waiting for tx finality: {}", txid);
+        let conf_target = execution_params.bitcoin_finality_confirmations;
+
+        tracing::info!(%txid, "Waiting for {} confirmation{} of Bitcoin transaction", conf_target, if conf_target > 1 { "s" } else { "" });
+
         // Divide by 4 to not check too often yet still be aware of the new block early
         // on.
         let mut interval = interval(execution_params.bitcoin_avg_block_time / 4);
@@ -289,15 +292,17 @@ impl Wallet {
         loop {
             let tx_block_height = self.transaction_block_height(txid).await?;
             tracing::debug!("tx_block_height: {:?}", tx_block_height);
+
             let block_height = self.get_block_height().await?;
             tracing::debug!("latest_block_height: {:?}", block_height);
+
             if let Some(confirmations) = block_height.checked_sub(
                 tx_block_height
                     .checked_sub(BlockHeight::new(1))
                     .expect("transaction must be included in block with height >= 1"),
             ) {
-                tracing::debug!("confirmations: {:?}", confirmations);
-                if u32::from(confirmations) >= execution_params.bitcoin_finality_confirmations {
+                tracing::debug!(%txid, "confirmations: {:?}", confirmations);
+                if u32::from(confirmations) >= conf_target {
                     break;
                 }
             }
