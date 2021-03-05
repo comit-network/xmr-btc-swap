@@ -20,7 +20,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use structopt::StructOpt;
 use swap::bitcoin::{Amount, TxLock};
-use swap::cli::command::{Arguments, Command};
+use swap::cli::command::{Arguments, Command, ConnectParams, MoneroParams};
 use swap::cli::config::{read_config, Config};
 use swap::database::Database;
 use swap::execution_params::GetExecutionParams;
@@ -84,9 +84,14 @@ async fn main() -> Result<()> {
 
     match args.cmd {
         Command::BuyXmr {
-            receive_monero_address,
-            alice_peer_id,
-            alice_addr,
+            connect_params:
+                ConnectParams {
+                    alice_peer_id,
+                    alice_addr,
+                },
+            monero_params: MoneroParams {
+                receive_monero_address,
+            },
         } => {
             if receive_monero_address.network != monero_network {
                 bail!(
@@ -159,10 +164,15 @@ async fn main() -> Result<()> {
             table.printstd();
         }
         Command::Resume {
-            receive_monero_address,
             swap_id,
-            alice_peer_id,
-            alice_addr,
+            connect_params:
+                ConnectParams {
+                    alice_peer_id,
+                    alice_addr,
+                },
+            monero_params: MoneroParams {
+                receive_monero_address,
+            },
         } => {
             if receive_monero_address.network != monero_network {
                 bail!("The given monero address is on network {:?}, expected address of network {:?}.", receive_monero_address.network, monero_network)
