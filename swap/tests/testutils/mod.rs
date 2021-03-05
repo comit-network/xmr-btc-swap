@@ -151,10 +151,7 @@ impl TestContext {
 
         assert!(matches!(state, AliceState::BtcRedeemed));
 
-        self.alice_bitcoin_wallet
-            .sync_wallet()
-            .await
-            .expect("Could not sync wallet");
+        self.alice_bitcoin_wallet.sync().await.unwrap();
 
         let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
         assert_eq!(
@@ -184,10 +181,7 @@ impl TestContext {
 
         assert!(matches!(state, AliceState::XmrRefunded));
 
-        self.alice_bitcoin_wallet
-            .sync_wallet()
-            .await
-            .expect("Could not sync wallet");
+        self.alice_bitcoin_wallet.sync().await.unwrap();
 
         let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
         assert_eq!(btc_balance_after_swap, self.alice_starting_balances.btc);
@@ -206,10 +200,7 @@ impl TestContext {
     pub async fn assert_alice_punished(&self, state: AliceState) {
         assert!(matches!(state, AliceState::BtcPunished));
 
-        self.alice_bitcoin_wallet
-            .sync_wallet()
-            .await
-            .expect("Could not sync wallet");
+        self.alice_bitcoin_wallet.sync().await.unwrap();
 
         let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
         assert_eq!(
@@ -228,10 +219,7 @@ impl TestContext {
     }
 
     pub async fn assert_bob_redeemed(&self, state: BobState) {
-        self.bob_bitcoin_wallet
-            .sync_wallet()
-            .await
-            .expect("Could not sync wallet");
+        self.bob_bitcoin_wallet.sync().await.unwrap();
 
         let lock_tx_id = if let BobState::XmrRedeemed { tx_lock_id } = state {
             tx_lock_id
@@ -263,10 +251,7 @@ impl TestContext {
     }
 
     pub async fn assert_bob_refunded(&self, state: BobState) {
-        self.bob_bitcoin_wallet
-            .sync_wallet()
-            .await
-            .expect("Could not sync wallet");
+        self.bob_bitcoin_wallet.sync().await.unwrap();
 
         let lock_tx_id = if let BobState::BtcRefunded(state4) = state {
             state4.tx_lock_id()
@@ -300,10 +285,7 @@ impl TestContext {
     }
 
     pub async fn assert_bob_punished(&self, state: BobState) {
-        self.bob_bitcoin_wallet
-            .sync_wallet()
-            .await
-            .expect("Could not sync wallet");
+        self.bob_bitcoin_wallet.sync().await.unwrap();
 
         let lock_tx_id = if let BobState::BtcPunished { tx_lock_id } = state {
             tx_lock_id
@@ -654,10 +636,7 @@ async fn init_test_wallets(
         let max_retries = 30u8;
         loop {
             retries += 1;
-            btc_wallet
-                .sync_wallet()
-                .await
-                .expect("Could not sync btc wallet");
+            btc_wallet.sync().await.unwrap();
 
             let btc_balance = btc_wallet.balance().await.unwrap();
 

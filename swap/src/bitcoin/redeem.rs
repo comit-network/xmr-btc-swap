@@ -107,7 +107,7 @@ impl TxRedeem {
         let sig = sigs
             .into_iter()
             .find(|sig| verify_sig(&B, &self.digest(), &sig).is_ok())
-            .context("neither signature on witness stack verifies against B")?;
+            .context("Neither signature on witness stack verifies against B")?;
 
         Ok(sig)
     }

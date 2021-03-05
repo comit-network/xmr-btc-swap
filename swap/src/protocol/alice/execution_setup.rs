@@ -65,31 +65,31 @@ impl Behaviour {
             .do_protocol_listener(bob, move |mut substream| async move {
                 let message0 =
                     serde_cbor::from_slice::<Message0>(&substream.read_message(BUF_SIZE).await?)
-                        .context("failed to deserialize message0")?;
+                        .context("Failed to deserialize message0")?;
                 let state1 = state0.receive(message0)?;
 
                 substream
                     .write_message(
                         &serde_cbor::to_vec(&state1.next_message())
-                            .context("failed to serialize message1")?,
+                            .context("Failed to serialize message1")?,
                     )
                     .await?;
 
                 let message2 =
                     serde_cbor::from_slice::<Message2>(&substream.read_message(BUF_SIZE).await?)
-                        .context("failed to deserialize message2")?;
+                        .context("Failed to deserialize message2")?;
                 let state2 = state1.receive(message2);
 
                 substream
                     .write_message(
                         &serde_cbor::to_vec(&state2.next_message())
-                            .context("failed to serialize message3")?,
+                            .context("Failed to serialize message3")?,
                     )
                     .await?;
 
                 let message4 =
                     serde_cbor::from_slice::<Message4>(&substream.read_message(BUF_SIZE).await?)
-                        .context("failed to deserialize message4")?;
+                        .context("Failed to deserialize message4")?;
                 let state3 = state2.receive(message4)?;
 
                 Ok((bob, state3))

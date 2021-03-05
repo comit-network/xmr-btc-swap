@@ -77,7 +77,7 @@ pub fn read_config(config_path: PathBuf) -> Result<Result<Config, ConfigNotIniti
     }
 
     let file = Config::read(&config_path)
-        .with_context(|| format!("failed to read config file {}", config_path.display()))?;
+        .with_context(|| format!("Failed to read config file at {}", config_path.display()))?;
 
     Ok(Ok(file))
 }

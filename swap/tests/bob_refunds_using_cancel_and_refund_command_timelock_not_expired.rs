@@ -1,6 +1,6 @@
 pub mod testutils;
 
-use bob::cancel::CancelError;
+use bob::cancel::Error;
 use swap::protocol::bob;
 use swap::protocol::bob::BobState;
 use testutils::bob_run_until::is_btc_locked;
@@ -30,7 +30,7 @@ async fn given_bob_manually_cancels_when_timelock_not_expired_errors() {
         .err()
         .unwrap();
 
-        assert!(matches!(result, CancelError::CancelTimelockNotExpiredYet));
+        assert!(matches!(result, Error::CancelTimelockNotExpiredYet));
 
         let (bob_swap, bob_join_handle) = ctx.stop_and_resume_bob_from_db(bob_join_handle).await;
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));

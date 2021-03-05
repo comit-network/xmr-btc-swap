@@ -184,7 +184,7 @@ impl Behaviour {
     ) -> Result<()> {
         self.quote
             .send_response(channel, response)
-            .map_err(|_| anyhow!("failed to respond with quote"))?;
+            .map_err(|_| anyhow!("Failed to respond with quote"))?;
 
         Ok(())
     }
@@ -196,7 +196,7 @@ impl Behaviour {
     ) -> Result<()> {
         self.spot_price
             .send_response(channel, response)
-            .map_err(|_| anyhow!("failed to respond with spot price"))?;
+            .map_err(|_| anyhow!("Failed to respond with spot price"))?;
 
         Ok(())
     }

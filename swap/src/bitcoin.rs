@@ -23,7 +23,7 @@ pub use wallet::Wallet;
 use ::bitcoin::hashes::hex::ToHex;
 use ::bitcoin::hashes::Hash;
 use ::bitcoin::{secp256k1, SigHash};
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Context, Result};
 use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
 use ecdsa_fun::fun::Point;
 use ecdsa_fun::nonce::Deterministic;
@@ -204,7 +204,7 @@ pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Resu
     let s = adaptor
         .recover_decryption_key(&S.0, &sig, &encsig)
         .map(SecretKey::from)
-        .ok_or_else(|| anyhow!("secret recovery failure"))?;
+        .context("Failed to recover secret from adaptor signature")?;
 
     Ok(s)
 }

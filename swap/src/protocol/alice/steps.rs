@@ -106,7 +106,7 @@ pub fn build_bitcoin_redeem_transaction(
 
     let tx = tx_redeem
         .add_signatures((a.public(), sig_a), (B, sig_b))
-        .context("sig_{a,b} are invalid for tx_redeem")?;
+        .context("Failed to sign Bitcoin redeem transaction")?;
 
     Ok(tx)
 }

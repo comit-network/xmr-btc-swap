@@ -51,6 +51,8 @@ pub struct Database(sled::Db);
 
 impl Database {
     pub fn open(path: &Path) -> Result<Self> {
+        tracing::debug!("Opening database at {}", path.display());
+
         let db =
             sled::open(path).with_context(|| format!("Could not open the DB at {:?}", path))?;
 
@@ -94,15 +96,15 @@ impl Database {
             .map(|item| match item {
                 Ok((key, value)) => {
                     let swap_id = deserialize::<Uuid>(&key);
-                    let swap = deserialize::<Swap>(&value).context("failed to deserialize swap");
+                    let swap = deserialize::<Swap>(&value).context("Failed to deserialize swap");
 
                     match (swap_id, swap) {
                         (Ok(swap_id), Ok(swap)) => Ok((swap_id, swap)),
                         (Ok(_), Err(err)) => Err(err),
-                        _ => bail!("failed to deserialize swap"),
+                        _ => bail!("Failed to deserialize swap"),
                     }
                 }
-                Err(err) => Err(err).context("failed to retrieve swap from DB"),
+                Err(err) => Err(err).context("Failed to retrieve swap from DB"),
             })
             .collect()
     }
