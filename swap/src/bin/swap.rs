@@ -20,7 +20,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use structopt::StructOpt;
 use swap::bitcoin::{Amount, TxLock};
-use swap::cli::command::{Arguments, Command, ConnectParams, MoneroParams};
+use swap::cli::command::{AliceConnectParams, Arguments, Command, MoneroParams};
 use swap::cli::config::{read_config, Config};
 use swap::database::Database;
 use swap::execution_params::GetExecutionParams;
@@ -66,7 +66,7 @@ async fn main() -> Result<()> {
         tracing::subscriber::set_global_default(subscriber)?;
     }
 
-    let config = match args.config {
+    let config = match args.file_path {
         Some(config_path) => read_config(config_path)??,
         None => Config::testnet(),
     };
@@ -85,9 +85,9 @@ async fn main() -> Result<()> {
     match args.cmd {
         Command::BuyXmr {
             connect_params:
-                ConnectParams {
-                    alice_peer_id,
-                    alice_addr,
+                AliceConnectParams {
+                    peer_id: alice_peer_id,
+                    multiaddr: alice_addr,
                 },
             monero_params:
                 MoneroParams {
@@ -169,9 +169,9 @@ async fn main() -> Result<()> {
         Command::Resume {
             swap_id,
             connect_params:
-                ConnectParams {
-                    alice_peer_id,
-                    alice_addr,
+                AliceConnectParams {
+                    peer_id: alice_peer_id,
+                    multiaddr: alice_addr,
                 },
             monero_params:
                 MoneroParams {

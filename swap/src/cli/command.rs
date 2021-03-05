@@ -12,13 +12,14 @@ pub const DEFAULT_ALICE_PEER_ID: &str = "12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5s
 pub const DEFAULT_STAGENET_MONERO_DAEMON_HOST: &str = "monero-stagenet.exan.tech";
 
 #[derive(structopt::StructOpt, Debug)]
+#[structopt(name = "xmr-btc-swap", about = "Atomically swap BTC for XMR")]
 pub struct Arguments {
     #[structopt(
         long = "config",
         help = "Provide a custom path to the configuration file. The configuration file must be a toml file.",
         parse(from_os_str)
     )]
-    pub config: Option<PathBuf>,
+    pub file_path: Option<PathBuf>,
 
     #[structopt(long, help = "Activate debug logging.")]
     pub debug: bool,
@@ -28,35 +29,48 @@ pub struct Arguments {
 }
 
 #[derive(structopt::StructOpt, Debug)]
-#[structopt(name = "xmr_btc-swap", about = "XMR BTC atomic swap")]
 pub enum Command {
+    /// Start a XMR for BTC swap
     BuyXmr {
         #[structopt(flatten)]
-        connect_params: ConnectParams,
+        connect_params: AliceConnectParams,
 
         #[structopt(flatten)]
         monero_params: MoneroParams,
     },
+    /// Show a list of past ongoing and completed swaps
     History,
+    /// Resume a swap
     Resume {
-        #[structopt(long = "swap-id")]
+        #[structopt(
+            long = "swap-id",
+            help = "The swap id can be retrieved using the history subcommand"
+        )]
         swap_id: Uuid,
 
         #[structopt(flatten)]
-        connect_params: ConnectParams,
+        connect_params: AliceConnectParams,
 
         #[structopt(flatten)]
         monero_params: MoneroParams,
     },
+    /// Try to cancel an ongoing swap (expert users only)
     Cancel {
-        #[structopt(long = "swap-id")]
+        #[structopt(
+            long = "swap-id",
+            help = "The swap id can be retrieved using the history subcommand"
+        )]
         swap_id: Uuid,
 
         #[structopt(short, long)]
         force: bool,
     },
+    /// Try to cancel a swap and refund my BTC (expert users only)
     Refund {
-        #[structopt(long = "swap-id")]
+        #[structopt(
+            long = "swap-id",
+            help = "The swap id can be retrieved using the history subcommand"
+        )]
         swap_id: Uuid,
 
         #[structopt(short, long)]
@@ -65,25 +79,34 @@ pub enum Command {
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct ConnectParams {
-    #[structopt(long = "connect-peer-id", default_value = DEFAULT_ALICE_PEER_ID)]
-    pub alice_peer_id: PeerId,
+pub struct AliceConnectParams {
+    #[structopt(
+        long = "seller-peer-id",
+        default_value = DEFAULT_ALICE_PEER_ID,
+        help = "The peer id of a specific swap partner can be optionally provided"
+    )]
+    pub peer_id: PeerId,
 
     #[structopt(
-    long = "connect-addr",
-    default_value = DEFAULT_ALICE_MULTIADDR
+        long = "seller-addr",
+        default_value = DEFAULT_ALICE_MULTIADDR,
+        help = "The multiaddr of a specific swap partner can be optionally provided"
     )]
-    pub alice_addr: Multiaddr,
+    pub multiaddr: Multiaddr,
 }
 
 #[derive(structopt::StructOpt, Debug)]
 pub struct MoneroParams {
-    #[structopt(long = "receive-address", parse(try_from_str = parse_monero_address))]
+    #[structopt(long = "receive-address",
+        help = "Provide the monero address where you would like to receive monero",
+        parse(try_from_str = parse_monero_address)
+    )]
     pub receive_monero_address: monero::Address,
 
     #[structopt(
-    long = "monero-daemon-host",
-    default_value = DEFAULT_STAGENET_MONERO_DAEMON_HOST
+        long = "monero-daemon-host",
+        help = "Specify to connect to a monero daemon of your choice",
+        default_value = DEFAULT_STAGENET_MONERO_DAEMON_HOST
     )]
     pub monero_daemon_host: String,
 }
