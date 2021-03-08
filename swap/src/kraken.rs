@@ -8,7 +8,6 @@ use serde_json::Value;
 use std::convert::TryFrom;
 use tokio::sync::watch;
 use tokio_tungstenite::tungstenite;
-use tracing::{error, trace};
 
 pub async fn connect() -> Result<RateUpdateStream> {
     let (rate_update, rate_update_receiver) = watch::channel(Err(Error::NotYetRetrieved));
@@ -24,25 +23,26 @@ pub async fn connect() -> Result<RateUpdateStream> {
                 Ok(tungstenite::Message::Text(msg)) => msg,
                 Ok(tungstenite::Message::Close(close_frame)) => {
                     if let Some(tungstenite::protocol::CloseFrame { code, reason }) = close_frame {
-                        error!(
+                        tracing::error!(
                             "Kraken rate stream was closed with code {} and reason: {}",
-                            code, reason
+                            code,
+                            reason
                         );
                     } else {
-                        error!("Kraken rate stream was closed without code and reason");
+                        tracing::error!("Kraken rate stream was closed without code and reason");
                     }
                     let _ = rate_update.send(Err(Error::ConnectionClosed));
                     continue;
                 }
                 Ok(msg) => {
-                    trace!(
+                    tracing::trace!(
                         "Kraken rate stream returned non text message that will be ignored: {}",
                         msg
                     );
                     continue;
                 }
                 Err(e) => {
-                    error!(%e, "Error when reading from Kraken rate stream");
+                    tracing::error!(%e, "Error when reading from Kraken rate stream");
                     let _ = rate_update.send(Err(e.into()));
                     continue;
                 }
