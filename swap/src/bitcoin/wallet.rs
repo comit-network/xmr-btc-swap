@@ -12,7 +12,7 @@ use bdk::electrum_client::{self, Client, ElectrumApi};
 use bdk::keys::DerivableKey;
 use bdk::{FeeRate, KeychainKind};
 use bitcoin::Script;
-use reqwest::{Method, Url};
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::Arc;
@@ -179,7 +179,7 @@ impl Wallet {
                 format!("Failed to broadcast Bitcoin {} transaction {}", kind, txid)
             })?;
 
-        tracing::info!("Published Bitcoin {} transaction as {}", txid, kind);
+        tracing::info!(%txid, "Published Bitcoin {} transaction", kind);
 
         Ok(txid)
     }
@@ -225,11 +225,10 @@ impl Wallet {
     }
 
     pub async fn get_block_height(&self) -> Result<BlockHeight> {
-        let url = blocks_tip_height_url(&self.http_url)?;
+        let url = make_blocks_tip_height_url(&self.http_url)?;
+
         let height = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
-            let height = reqwest::Client::new()
-                .request(Method::GET, url.clone())
-                .send()
+            let height = reqwest::get(url.clone())
                 .await
                 .map_err(Error::Io)?
                 .text()
@@ -246,25 +245,20 @@ impl Wallet {
     }
 
     pub async fn transaction_block_height(&self, txid: Txid) -> Result<BlockHeight> {
-        let url = tx_status_url(txid, &self.http_url)?;
+        let status_url = make_tx_status_url(&self.http_url, txid)?;
+
         #[derive(Serialize, Deserialize, Debug, Clone)]
         struct TransactionStatus {
             block_height: Option<u32>,
             confirmed: bool,
         }
         let height = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
-            let resp = reqwest::Client::new()
-                .request(Method::GET, url.clone())
-                .send()
+            let block_height = reqwest::get(status_url.clone())
                 .await
-                .map_err(|err| backoff::Error::Transient(Error::Io(err)))?;
-
-            let tx_status: TransactionStatus = resp
-                .json()
+                .map_err(|err| backoff::Error::Transient(Error::Io(err)))?
+                .json::<TransactionStatus>()
                 .await
-                .map_err(|err| backoff::Error::Permanent(Error::JsonDeserialization(err)))?;
-
-            let block_height = tx_status
+                .map_err(|err| backoff::Error::Permanent(Error::JsonDeserialization(err)))?
                 .block_height
                 .ok_or(backoff::Error::Transient(Error::NotYetMined))?;
 
@@ -281,7 +275,10 @@ impl Wallet {
         txid: Txid,
         execution_params: ExecutionParams,
     ) -> Result<()> {
-        tracing::debug!("waiting for tx finality: {}", txid);
+        let conf_target = execution_params.bitcoin_finality_confirmations;
+
+        tracing::info!(%txid, "Waiting for {} confirmation{} of Bitcoin transaction", conf_target, if conf_target > 1 { "s" } else { "" });
+
         // Divide by 4 to not check too often yet still be aware of the new block early
         // on.
         let mut interval = interval(execution_params.bitcoin_avg_block_time / 4);
@@ -289,15 +286,17 @@ impl Wallet {
         loop {
             let tx_block_height = self.transaction_block_height(txid).await?;
             tracing::debug!("tx_block_height: {:?}", tx_block_height);
+
             let block_height = self.get_block_height().await?;
             tracing::debug!("latest_block_height: {:?}", block_height);
+
             if let Some(confirmations) = block_height.checked_sub(
                 tx_block_height
                     .checked_sub(BlockHeight::new(1))
                     .expect("transaction must be included in block with height >= 1"),
             ) {
-                tracing::debug!("confirmations: {:?}", confirmations);
-                if u32::from(confirmations) >= execution_params.bitcoin_finality_confirmations {
+                tracing::debug!(%txid, "confirmations: {:?}", confirmations);
+                if u32::from(confirmations) >= conf_target {
                     break;
                 }
             }
@@ -315,37 +314,42 @@ impl Wallet {
     }
 }
 
-fn tx_status_url(txid: Txid, base_url: &Url) -> Result<Url> {
+fn make_tx_status_url(base_url: &Url, txid: Txid) -> Result<Url> {
     let url = base_url.join(&format!("tx/{}/status", txid))?;
+
     Ok(url)
 }
 
-fn blocks_tip_height_url(base_url: &Url) -> Result<Url> {
+fn make_blocks_tip_height_url(base_url: &Url) -> Result<Url> {
     let url = base_url.join("blocks/tip/height")?;
+
     Ok(url)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::bitcoin::wallet::{blocks_tip_height_url, tx_status_url};
-    use crate::bitcoin::Txid;
+    use super::*;
     use crate::cli::config::DEFAULT_ELECTRUM_HTTP_URL;
-    use reqwest::Url;
 
     #[test]
     fn create_tx_status_url_from_default_base_url_success() {
-        let txid: Txid = Txid::default();
-        let base_url = Url::parse(DEFAULT_ELECTRUM_HTTP_URL).expect("Could not parse url");
-        let url = tx_status_url(txid, &base_url).expect("Could not create url");
-        let expected = format!("https://blockstream.info/testnet/api/tx/{}/status", txid);
-        assert_eq!(url.as_str(), expected);
+        let base_url = DEFAULT_ELECTRUM_HTTP_URL.parse().unwrap();
+        let txid = Txid::default;
+
+        let url = make_tx_status_url(&base_url, txid()).unwrap();
+
+        assert_eq!(url.as_str(), "https://blockstream.info/testnet/api/tx/0000000000000000000000000000000000000000000000000000000000000000/status");
     }
 
     #[test]
     fn create_block_tip_height_url_from_default_base_url_success() {
-        let base_url = Url::parse(DEFAULT_ELECTRUM_HTTP_URL).expect("Could not parse url");
-        let url = blocks_tip_height_url(&base_url).expect("Could not create url");
-        let expected = "https://blockstream.info/testnet/api/blocks/tip/height";
-        assert_eq!(url.as_str(), expected);
+        let base_url = DEFAULT_ELECTRUM_HTTP_URL.parse().unwrap();
+
+        let url = make_blocks_tip_height_url(&base_url).unwrap();
+
+        assert_eq!(
+            url.as_str(),
+            "https://blockstream.info/testnet/api/blocks/tip/height"
+        );
     }
 }
