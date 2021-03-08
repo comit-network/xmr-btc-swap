@@ -1,8 +1,7 @@
 use crate::asb::Rate;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use bitcoin::util::amount::ParseAmountError;
 use futures::{SinkExt, StreamExt};
-use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::convert::TryFrom;
@@ -12,8 +11,9 @@ use tokio_tungstenite::tungstenite;
 pub async fn connect() -> Result<RateUpdateStream> {
     let (rate_update, rate_update_receiver) = watch::channel(Err(Error::NotYetRetrieved));
 
-    let (rate_stream, _response) =
-        tokio_tungstenite::connect_async(Url::parse(KRAKEN_WS_URL).expect("valid url")).await?;
+    let (rate_stream, _) = tokio_tungstenite::connect_async("wss://ws.kraken.com")
+        .await
+        .context("Failed to connect to Kraken websocket API")?;
 
     let (mut rate_stream_sink, mut rate_stream) = rate_stream.split();
 
@@ -110,7 +110,6 @@ impl RateUpdateStream {
     }
 }
 
-const KRAKEN_WS_URL: &str = "wss://ws.kraken.com";
 const SUBSCRIBE_XMR_BTC_TICKER_PAYLOAD: &str = r#"
 { "event": "subscribe",
   "pair": [ "XMR/XBT" ],
