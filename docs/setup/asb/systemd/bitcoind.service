@@ -8,11 +8,7 @@ Wants=network-online.target
 OnFailure=unit-status-email@%n.service
 
 [Service]
-Type=forking
-PIDFile=/var/external/asb/bitcoin/bin/bitcoind.pid
-
-# note that the conf is relative to the datadir
-ExecStart=/var/external/asb/bitcoin/bin/bitcoind -daemon -pid=/var/external/asb/bitcoin/bin/bitcoind.pid -conf=/var/external/asb/bitcoin/conf/bitcoin-testnet-default.conf -datadir=/var/external/asb/bitcoin
+ExecStart=/var/external/asb/bitcoin/bin/bitcoind -conf=/var/external/asb/bitcoin/conf/bitcoin-testnet-default.conf -datadir=/var/external/asb/bitcoin --logtimestamps=0
 
 Restart=on-failure
 TimeoutStopSec=600
