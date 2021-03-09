@@ -7,7 +7,7 @@ OnFailure=unit-status-email@%n.service
 Type=simple
 ExecStart=/var/external/asb/monero/bin/monero-wallet-rpc --stagenet --daemon-address 127.0.0.1:38081 --rpc-bind-port 38083 --disable-rpc-login --wallet-dir /var/external/asb/monero/data/stagenet/asb-wallets
 ExecStartPost=/usr/bin/bash -c "i=1; while [ $i -ne 0 ]; do tail -n1 /var/external/asb/monero/bin/monero-wallet-rpc.log | grep 'Starting wallet RPC server'; i=$?; sleep 5; done"
-Restart=always
+Restart=on-failure
 User=asb
 Group=asb
 

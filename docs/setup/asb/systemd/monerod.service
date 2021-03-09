@@ -1,15 +1,19 @@
 [Unit]
 Description=monerod for the automated swap backend (asb)
-After=network.target
+
+# https://www.freedesktop.org/wiki/Software/systemd/NetworkTarget/
+After=network-online.target
+Wants=network-online.target
+
 OnFailure=unit-status-email@%n.service
 
 [Service]
 Type=simple
+
 ExecStart=/var/external/asb/monero/bin/monerod --stagenet --data-dir /var/external/asb/monero/data/stagenet/monerod --non-interactive
-# ExecStartPost=/usr/bin/bash -c "i=1; while [ $i -ne 0 ]; do cat /var/external/asb/monero/bin/monerod.log | grep 'core RPC server started ok'; i=$?; sleep 1; done"
-# StandardOutput=append:/var/external/asb/monero/bin/monerod.log
-# StandardError=append:/var/external/asb/monero/bin/monerod.log
-Restart=always
+
+Restart=on-failure
+
 User=asb
 Group=asb
 
