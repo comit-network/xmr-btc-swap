@@ -92,7 +92,7 @@ async fn main() -> Result<()> {
                 bitcoin_wallet.new_address().await?
             );
 
-            let kraken_rate_updates = kraken::connect().await?;
+            let kraken_rate_updates = kraken::connect()?;
 
             let (event_loop, _) = EventLoop::new(
                 config.network.listen,
