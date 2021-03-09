@@ -8,6 +8,8 @@ use std::convert::TryFrom;
 use tokio::sync::watch;
 use tokio_tungstenite::tungstenite;
 
+type RateUpdate = Result<Rate, Error>;
+
 pub async fn connect() -> Result<RateUpdateStream> {
     let (rate_update, rate_update_receiver) = watch::channel(Err(Error::NotYetRetrieved));
 
@@ -95,17 +97,17 @@ pub async fn connect() -> Result<RateUpdateStream> {
 
 #[derive(Clone, Debug)]
 pub struct RateUpdateStream {
-    inner: watch::Receiver<Result<Rate, Error>>,
+    inner: watch::Receiver<RateUpdate>,
 }
 
 impl RateUpdateStream {
-    pub async fn wait_for_update(&mut self) -> Result<Result<Rate, Error>> {
+    pub async fn wait_for_update(&mut self) -> Result<RateUpdate> {
         self.inner.changed().await?;
 
         Ok(self.inner.borrow().clone())
     }
 
-    pub fn latest_update(&mut self) -> Result<Rate, Error> {
+    pub fn latest_update(&mut self) -> RateUpdate {
         self.inner.borrow().clone()
     }
 }
