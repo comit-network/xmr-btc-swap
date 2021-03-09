@@ -2,7 +2,8 @@
 Description=triggers the service that pulls and builds asb
 
 [Timer]
-OnCalendar=16:00
+# 6am GMT = 5pm AEDT
+OnCalendar=6:00
 Persistent=true
 
 [Install]

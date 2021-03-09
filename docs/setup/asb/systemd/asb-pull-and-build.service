@@ -8,8 +8,6 @@ Type=oneshot
 WorkingDirectory=/var/external/asb/xmr-btc-swap
 ExecStartPre=git pull
 ExecStart=/home/asb/.cargo/bin/cargo build --release --bin asb
-StandardOutput=append:/var/external/asb/run/logs/pull-and-build.log
-StandardError=append:/var/external/asb/run/logs/pull-and-build.log
 User=asb
 Group=asb
 

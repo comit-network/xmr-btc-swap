@@ -6,8 +6,6 @@ OnFailure=unit-status-email@%n.service
 [Service]
 WorkingDirectory=/var/external/asb/xmr-btc-swap
 ExecStart=/home/asb/.cargo/bin/cargo run --release --bin asb -- --config /var/external/asb/run/asb-config/config.toml start
-StandardOutput=append:/var/external/asb/run/logs/start-asb.log
-StandardError=append:/var/external/asb/run/logs/start-asb.log
 Restart=on-failure
 User=asb
 Group=asb

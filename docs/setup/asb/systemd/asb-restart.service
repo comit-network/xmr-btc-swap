@@ -6,6 +6,8 @@ OnFailure=unit-status-email@%n.service
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/systemctl restart start-asb.service
+# notify upon restart to know that the service was restarted
+ExecStartPost=/usr/bin/bash -c '/usr/local/bin/systemd-email.sh daniel@coblox.tech %n'
 
 [Install]
 WantedBy=multi-user.target
