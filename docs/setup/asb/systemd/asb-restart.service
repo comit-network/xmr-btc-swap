@@ -1,11 +1,11 @@
 [Unit]
 Description=Restart ASB service
-After=watch-asb-binary-change.path
+After=asb-watch-binary-change.path
 OnFailure=unit-status-email@%n.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/systemctl restart start-asb.service
+ExecStart=/usr/bin/systemctl restart asb.service
 # notify upon restart to know that the service was restarted
 ExecStartPost=/usr/bin/bash -c '/usr/local/bin/systemd-email.sh daniel@coblox.tech %n'
 

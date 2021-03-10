@@ -1,6 +1,6 @@
 [Unit]
 Description=Run the automated swap backend
-Requires=start-monero-wallet-rpc.service
+Requires=monero-wallet-rpc.service
 OnFailure=unit-status-email@%n.service
 
 [Service]

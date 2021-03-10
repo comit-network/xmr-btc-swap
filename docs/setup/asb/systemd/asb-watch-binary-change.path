@@ -1,5 +1,5 @@
 [Path]
-Unit=restart-asb.service
+Unit=asb-restart.service
 PathChanged=/var/external/asb/xmr-btc-swap/target/release/asb
 
 [Install]

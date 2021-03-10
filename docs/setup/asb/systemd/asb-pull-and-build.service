@@ -1,6 +1,6 @@
 [Unit]
 Description=Pull and build ASB from source
-Wants=pull-and-build-asb.timer
+Wants=asb-pull-and-build.timer
 OnFailure=unit-status-email@%n.service
 
 [Service]
