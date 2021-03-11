@@ -23,7 +23,7 @@ use swap::bitcoin::{Amount, TxLock};
 use swap::cli::command::{AliceConnectParams, Arguments, Command, MoneroParams};
 use swap::cli::config::{read_config, Config};
 use swap::database::Database;
-use swap::execution_params::GetExecutionParams;
+use swap::execution_params::{ExecutionParams, GetExecutionParams};
 use swap::network::quote::BidQuote;
 use swap::protocol::bob;
 use swap::protocol::bob::{Builder, EventLoop};
@@ -104,8 +104,13 @@ async fn main() -> Result<()> {
             }
 
             let bitcoin_wallet = init_bitcoin_wallet(bitcoin_network, &config, seed).await?;
-            let (monero_wallet, _process) =
-                init_monero_wallet(monero_network, &config, monero_daemon_host).await?;
+            let (monero_wallet, _process) = init_monero_wallet(
+                monero_network,
+                &config,
+                monero_daemon_host,
+                execution_params,
+            )
+            .await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
             let (event_loop, mut event_loop_handle) = EventLoop::new(
                 &seed.derive_libp2p_identity(),
@@ -184,8 +189,13 @@ async fn main() -> Result<()> {
             }
 
             let bitcoin_wallet = init_bitcoin_wallet(bitcoin_network, &config, seed).await?;
-            let (monero_wallet, _process) =
-                init_monero_wallet(monero_network, &config, monero_daemon_host).await?;
+            let (monero_wallet, _process) = init_monero_wallet(
+                monero_network,
+                &config,
+                monero_daemon_host,
+                execution_params,
+            )
+            .await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
             let (event_loop, event_loop_handle) = EventLoop::new(
@@ -282,6 +292,7 @@ async fn init_monero_wallet(
     monero_network: monero::Network,
     config: &Config,
     monero_daemon_host: String,
+    execution_params: ExecutionParams,
 ) -> Result<(monero::Wallet, monero::WalletRpcProcess)> {
     const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-monitoring-wallet";
 
@@ -295,6 +306,7 @@ async fn init_monero_wallet(
         monero_wallet_rpc_process.endpoint(),
         monero_network,
         MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME.to_string(),
+        execution_params,
     );
 
     monero_wallet.open_or_create().await?;

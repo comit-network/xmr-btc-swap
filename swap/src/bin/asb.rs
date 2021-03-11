@@ -24,7 +24,7 @@ use swap::asb::config::{
     initial_setup, query_user_for_initial_testnet_config, read_config, Config, ConfigNotInitialized,
 };
 use swap::database::Database;
-use swap::execution_params::GetExecutionParams;
+use swap::execution_params::{ExecutionParams, GetExecutionParams};
 use swap::fs::default_config_path;
 use swap::monero::Amount;
 use swap::protocol::alice::EventLoop;
@@ -84,6 +84,7 @@ async fn main() -> Result<()> {
                 config.clone(),
                 &wallet_data_dir,
                 seed.derive_extended_private_key(BITCOIN_NETWORK)?,
+                execution_params,
             )
             .await?;
 
@@ -131,6 +132,7 @@ async fn init_wallets(
     config: Config,
     bitcoin_wallet_data_dir: &Path,
     key: impl DerivableKey<Segwitv0> + Clone,
+    execution_params: ExecutionParams,
 ) -> Result<(bitcoin::Wallet, monero::Wallet)> {
     let bitcoin_wallet = bitcoin::Wallet::new(
         config.bitcoin.electrum_rpc_url,
@@ -153,6 +155,7 @@ async fn init_wallets(
         config.monero.wallet_rpc_url.clone(),
         MONERO_NETWORK,
         DEFAULT_WALLET_NAME.to_string(),
+        execution_params,
     );
 
     // Setup the Monero wallet
