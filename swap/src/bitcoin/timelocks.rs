@@ -1,4 +1,7 @@
+use anyhow::Context;
+use bdk::electrum_client::HeaderNotification;
 use serde::{Deserialize, Serialize};
+use std::convert::{TryFrom, TryInto};
 use std::ops::Add;
 
 /// Represent a block height, or block number, expressed in absolute block
@@ -23,6 +26,19 @@ impl BlockHeight {
             Some(result) => Some(BlockHeight(result)),
             None => None,
         }
+    }
+}
+
+impl TryFrom<HeaderNotification> for BlockHeight {
+    type Error = anyhow::Error;
+
+    fn try_from(value: HeaderNotification) -> Result<Self, Self::Error> {
+        Ok(Self(
+            value
+                .height
+                .try_into()
+                .context("Failed to fit usize into u32")?,
+        ))
     }
 }
 

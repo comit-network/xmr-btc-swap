@@ -8,15 +8,16 @@ use backoff::backoff::Constant as ConstantBackoff;
 use backoff::future::retry;
 use bdk::blockchain::{noop_progress, Blockchain, ElectrumBlockchain};
 use bdk::descriptor::Segwitv0;
-use bdk::electrum_client::{self, Client, ElectrumApi};
+use bdk::electrum_client::{self, ElectrumApi};
 use bdk::keys::DerivableKey;
 use bdk::{FeeRate, KeychainKind};
 use bitcoin::Script;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 use tokio::time::interval;
 
@@ -26,8 +27,6 @@ const SLED_TREE_NAME: &str = "default_tree";
 enum Error {
     #[error("Sending the request failed")]
     Io(reqwest::Error),
-    #[error("Conversion to Integer failed")]
-    Parse(std::num::ParseIntError),
     #[error("The transaction is not minded yet")]
     NotYetMined,
     #[error("Deserialization failed")]
@@ -36,8 +35,41 @@ enum Error {
     ElectrumClient(electrum_client::Error),
 }
 
+pub struct Client {
+    electrum: bdk::electrum_client::Client,
+    latest_block: BlockHeight,
+    last_ping: Instant,
+    interval: Duration,
+}
+
+impl Client {
+    fn ping(&mut self) -> Result<()> {
+        if self.last_ping.elapsed() > self.interval {
+            self.electrum
+                .ping()
+                .map_err(|e| anyhow!("Could not refresh subscriptions: {:?}", e))?;
+            self.last_ping = Instant::now();
+        }
+        Ok(())
+    }
+
+    fn drain_blockheight_notifications(&mut self) -> Result<()> {
+        let latest_block = std::iter::from_fn(|| self.electrum.block_headers_pop().transpose())
+            .last()
+            .transpose()
+            .map_err(|e| anyhow!("Failed to pop header notification: {:?}", e))?;
+
+        if let Some(new_block) = latest_block {
+            self.latest_block = BlockHeight::try_from(new_block)?;
+        }
+
+        Ok(())
+    }
+}
+
 pub struct Wallet {
-    inner: Arc<Mutex<bdk::Wallet<ElectrumBlockchain, bdk::sled::Tree>>>,
+    client: Arc<Mutex<Client>>,
+    wallet: Arc<Mutex<bdk::Wallet<ElectrumBlockchain, bdk::sled::Tree>>>,
     http_url: Url,
     rpc_url: Url,
 }
@@ -53,8 +85,9 @@ impl Wallet {
         // Workaround for https://github.com/bitcoindevkit/rust-electrum-client/issues/47.
         let config = electrum_client::ConfigBuilder::default().retry(2).build();
 
-        let client = Client::from_config(electrum_rpc_url.as_str(), config)
-            .map_err(|e| anyhow!("Failed to init electrum rpc client: {:?}", e))?;
+        let client =
+            bdk::electrum_client::Client::from_config(electrum_rpc_url.as_str(), config.clone())
+                .map_err(|e| anyhow!("Failed to init electrum rpc client: {:?}", e))?;
 
         let db = bdk::sled::open(wallet_dir)?.open_tree(SLED_TREE_NAME)?;
 
@@ -66,8 +99,26 @@ impl Wallet {
             ElectrumBlockchain::from(client),
         )?;
 
+        let electrum = bdk::electrum_client::Client::from_config(electrum_rpc_url.as_str(), config)
+            .map_err(|e| anyhow!("Failed to init electrum rpc client {:?}", e))?;
+
+        let latest_block = electrum.block_headers_subscribe().map_err(|e| {
+            anyhow!(
+                "Electrum client failed to subscribe to header notifications: {:?}",
+                e
+            )
+        })?;
+
+        let interval = Duration::from_secs(5);
+
         Ok(Self {
-            inner: Arc::new(Mutex::new(bdk_wallet)),
+            wallet: Arc::new(Mutex::new(bdk_wallet)),
+            client: Arc::new(Mutex::new(Client {
+                electrum,
+                latest_block: BlockHeight::try_from(latest_block)?,
+                last_ping: Instant::now() - interval,
+                interval,
+            })),
             http_url: electrum_http_url,
             rpc_url: electrum_rpc_url,
         })
@@ -75,7 +126,7 @@ impl Wallet {
 
     pub async fn balance(&self) -> Result<Amount> {
         let balance = self
-            .inner
+            .wallet
             .lock()
             .await
             .get_balance()
@@ -86,7 +137,7 @@ impl Wallet {
 
     pub async fn new_address(&self) -> Result<Address> {
         let address = self
-            .inner
+            .wallet
             .lock()
             .await
             .get_new_address()
@@ -96,13 +147,13 @@ impl Wallet {
     }
 
     pub async fn get_tx(&self, txid: Txid) -> Result<Option<Transaction>> {
-        let tx = self.inner.lock().await.client().get_tx(&txid)?;
+        let tx = self.wallet.lock().await.client().get_tx(&txid)?;
         Ok(tx)
     }
 
     pub async fn transaction_fee(&self, txid: Txid) -> Result<Amount> {
         let fees = self
-            .inner
+            .wallet
             .lock()
             .await
             .list_transactions(true)?
@@ -117,7 +168,7 @@ impl Wallet {
     }
 
     pub async fn sync(&self) -> Result<()> {
-        self.inner
+        self.wallet
             .lock()
             .await
             .sync(noop_progress(), None)
@@ -131,7 +182,7 @@ impl Wallet {
         address: Address,
         amount: Amount,
     ) -> Result<PartiallySignedTransaction> {
-        let wallet = self.inner.lock().await;
+        let wallet = self.wallet.lock().await;
 
         let mut tx_builder = wallet.build_tx();
         tx_builder.add_recipient(address.script_pubkey(), amount.as_sat());
@@ -147,7 +198,7 @@ impl Wallet {
     /// already accounting for the fees we need to spend to get the
     /// transaction confirmed.
     pub async fn max_giveable(&self, locking_script_size: usize) -> Result<Amount> {
-        let wallet = self.inner.lock().await;
+        let wallet = self.wallet.lock().await;
 
         let mut tx_builder = wallet.build_tx();
 
@@ -163,7 +214,7 @@ impl Wallet {
     }
 
     pub async fn get_network(&self) -> bitcoin::Network {
-        self.inner.lock().await.network()
+        self.wallet.lock().await.network()
     }
 
     /// Broadcast the given transaction to the network and emit a log statement
@@ -171,7 +222,7 @@ impl Wallet {
     pub async fn broadcast(&self, transaction: Transaction, kind: &str) -> Result<Txid> {
         let txid = transaction.txid();
 
-        self.inner
+        self.wallet
             .lock()
             .await
             .broadcast(transaction)
@@ -185,7 +236,7 @@ impl Wallet {
     }
 
     pub async fn sign_and_finalize(&self, psbt: PartiallySignedTransaction) -> Result<Transaction> {
-        let (signed_psbt, finalized) = self.inner.lock().await.sign(psbt, None)?;
+        let (signed_psbt, finalized) = self.wallet.lock().await.sign(psbt, None)?;
 
         if !finalized {
             bail!("PSBT is not finalized")
@@ -205,7 +256,7 @@ impl Wallet {
     pub async fn watch_for_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
         tracing::debug!("watching for tx: {}", txid);
         let tx = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
-            let client = Client::new(self.rpc_url.as_ref())
+            let client = bdk::electrum_client::Client::new(self.rpc_url.as_ref())
                 .map_err(|err| backoff::Error::Permanent(Error::ElectrumClient(err)))?;
 
             let tx = client.transaction_get(&txid).map_err(|err| match err {
@@ -225,23 +276,12 @@ impl Wallet {
     }
 
     pub async fn get_block_height(&self) -> Result<BlockHeight> {
-        let url = make_blocks_tip_height_url(&self.http_url)?;
+        let mut inner = self.client.lock().await;
 
-        let height = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
-            let height = reqwest::get(url.clone())
-                .await
-                .map_err(Error::Io)?
-                .text()
-                .await
-                .map_err(Error::Io)?
-                .parse::<u32>()
-                .map_err(|err| backoff::Error::Permanent(Error::Parse(err)))?;
-            Result::<_, backoff::Error<Error>>::Ok(height)
-        })
-        .await
-        .context("Transient errors should be retried")?;
+        inner.ping()?;
+        inner.drain_blockheight_notifications()?;
 
-        Ok(BlockHeight::new(height))
+        Ok(inner.latest_block)
     }
 
     pub async fn transaction_block_height(&self, txid: Txid) -> Result<BlockHeight> {
@@ -314,14 +354,15 @@ impl Wallet {
     }
 }
 
-fn make_tx_status_url(base_url: &Url, txid: Txid) -> Result<Url> {
-    let url = base_url.join(&format!("tx/{}/status", txid))?;
-
-    Ok(url)
+#[derive(Debug, Copy, Clone)]
+pub enum ScriptStatus {
+    Unseen,
+    InMempool,
+    Confirmed { depth: u64 },
 }
 
-fn make_blocks_tip_height_url(base_url: &Url) -> Result<Url> {
-    let url = base_url.join("blocks/tip/height")?;
+fn make_tx_status_url(base_url: &Url, txid: Txid) -> Result<Url> {
+    let url = base_url.join(&format!("tx/{}/status", txid))?;
 
     Ok(url)
 }
@@ -339,17 +380,5 @@ mod tests {
         let url = make_tx_status_url(&base_url, txid()).unwrap();
 
         assert_eq!(url.as_str(), "https://blockstream.info/testnet/api/tx/0000000000000000000000000000000000000000000000000000000000000000/status");
-    }
-
-    #[test]
-    fn create_block_tip_height_url_from_default_base_url_success() {
-        let base_url = DEFAULT_ELECTRUM_HTTP_URL.parse().unwrap();
-
-        let url = make_blocks_tip_height_url(&base_url).unwrap();
-
-        assert_eq!(
-            url.as_str(),
-            "https://blockstream.info/testnet/api/blocks/tip/height"
-        );
     }
 }
