@@ -123,7 +123,7 @@ pub async fn publish_cancel_transaction(
     let tx_lock_height = bitcoin_wallet
         .transaction_block_height(tx_lock.txid())
         .await?;
-    poll_until_block_height_is_gte(&bitcoin_wallet, tx_lock_height + cancel_timelock).await?;
+    poll_until_block_height_is_gte(bitcoin_wallet, tx_lock_height + cancel_timelock).await?;
 
     let tx_cancel = bitcoin::TxCancel::new(&tx_lock, cancel_timelock, a.public(), B);
 
