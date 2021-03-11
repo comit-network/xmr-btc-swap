@@ -342,10 +342,6 @@ where
         .electrs
         .get_host_port(testutils::electrs::RPC_PORT)
         .expect("Could not map electrs rpc port");
-    let electrs_http_port = containers
-        .electrs
-        .get_host_port(testutils::electrs::HTTP_PORT)
-        .expect("Could not map electrs http port");
 
     let alice_seed = Seed::random().unwrap();
     let bob_seed = Seed::random().unwrap();
@@ -357,7 +353,6 @@ where
         alice_starting_balances.clone(),
         tempdir().unwrap().path(),
         electrs_rpc_port,
-        electrs_http_port,
         alice_seed,
         execution_params,
     )
@@ -380,7 +375,6 @@ where
         bob_starting_balances.clone(),
         tempdir().unwrap().path(),
         electrs_rpc_port,
-        electrs_http_port,
         bob_seed,
         execution_params,
     )
@@ -588,7 +582,6 @@ async fn init_test_wallets(
     starting_balances: StartingBalances,
     datadir: &Path,
     electrum_rpc_port: u16,
-    electrum_http_port: u16,
     seed: Seed,
     execution_params: ExecutionParams,
 ) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {
@@ -608,14 +601,9 @@ async fn init_test_wallets(
         let input = format!("tcp://@localhost:{}", electrum_rpc_port);
         Url::parse(&input).unwrap()
     };
-    let electrum_http_url = {
-        let input = format!("http://@localhost:{}", electrum_http_port);
-        Url::parse(&input).unwrap()
-    };
 
     let btc_wallet = swap::bitcoin::Wallet::new(
         electrum_rpc_url,
-        electrum_http_url,
         bitcoin::Network::Regtest,
         datadir,
         seed.derive_extended_private_key(bitcoin::Network::Regtest)

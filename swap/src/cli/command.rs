@@ -40,8 +40,11 @@ pub enum Command {
         #[structopt(flatten)]
         connect_params: AliceConnectParams,
 
-        #[structopt(flatten)]
-        bitcoin_params: BitcoinParams,
+        #[structopt(long = "electrum-rpc",
+        help = "Provide the Bitcoin Electrum RPC URL",
+        default_value = DEFAULT_ELECTRUM_RPC_URL
+        )]
+        electrum_rpc_url: Url,
 
         #[structopt(flatten)]
         monero_params: MoneroParams,
@@ -59,8 +62,11 @@ pub enum Command {
         #[structopt(flatten)]
         connect_params: AliceConnectParams,
 
-        #[structopt(flatten)]
-        bitcoin_params: BitcoinParams,
+        #[structopt(long = "electrum-rpc",
+        help = "Provide the Bitcoin Electrum RPC URL",
+        default_value = DEFAULT_ELECTRUM_RPC_URL
+        )]
+        electrum_rpc_url: Url,
 
         #[structopt(flatten)]
         monero_params: MoneroParams,
@@ -76,8 +82,11 @@ pub enum Command {
         #[structopt(short, long)]
         force: bool,
 
-        #[structopt(flatten)]
-        bitcoin_params: BitcoinParams,
+        #[structopt(long = "electrum-rpc",
+        help = "Provide the Bitcoin Electrum RPC URL",
+        default_value = DEFAULT_ELECTRUM_RPC_URL
+        )]
+        electrum_rpc_url: Url,
     },
     /// Try to cancel a swap and refund my BTC (expert users only)
     Refund {
@@ -90,8 +99,11 @@ pub enum Command {
         #[structopt(short, long)]
         force: bool,
 
-        #[structopt(flatten)]
-        bitcoin_params: BitcoinParams,
+        #[structopt(long = "electrum-rpc",
+        help = "Provide the Bitcoin Electrum RPC URL",
+        default_value = DEFAULT_ELECTRUM_RPC_URL
+        )]
+        electrum_rpc_url: Url,
     },
 }
 
@@ -126,21 +138,6 @@ pub struct MoneroParams {
         default_value = DEFAULT_STAGENET_MONERO_DAEMON_HOST
     )]
     pub monero_daemon_host: String,
-}
-
-#[derive(structopt::StructOpt, Debug)]
-pub struct BitcoinParams {
-    #[structopt(long = "electrum-http",
-    help = "Provide the Bitcoin Electrum HTTP URL",
-    default_value = DEFAULT_ELECTRUM_HTTP_URL
-    )]
-    pub electrum_http_url: Url,
-
-    #[structopt(long = "electrum-rpc",
-    help = "Provide the Bitcoin Electrum RPC URL",
-    default_value = DEFAULT_ELECTRUM_RPC_URL
-    )]
-    pub electrum_rpc_url: Url,
 }
 
 #[derive(Clone, Debug)]

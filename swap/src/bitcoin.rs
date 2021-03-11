@@ -20,6 +20,7 @@ pub use ecdsa_fun::fun::Scalar;
 pub use ecdsa_fun::Signature;
 pub use wallet::Wallet;
 
+use crate::bitcoin::wallet::ScriptStatus;
 use ::bitcoin::hashes::hex::ToHex;
 use ::bitcoin::hashes::Hash;
 use ::bitcoin::{secp256k1, SigHash};
@@ -218,46 +219,21 @@ pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Resu
     Ok(s)
 }
 
-pub async fn poll_until_block_height_is_gte(
-    wallet: &crate::bitcoin::Wallet,
-    target: BlockHeight,
-) -> Result<()> {
-    while wallet.get_block_height().await? < target {
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-    }
-    Ok(())
-}
-
-pub async fn current_epoch(
-    bitcoin_wallet: &crate::bitcoin::Wallet,
+pub fn current_epoch(
     cancel_timelock: CancelTimelock,
     punish_timelock: PunishTimelock,
-    lock_tx_id: ::bitcoin::Txid,
-) -> Result<ExpiredTimelocks> {
-    let current_block_height = bitcoin_wallet.get_block_height().await?;
-    let lock_tx_height = bitcoin_wallet.transaction_block_height(lock_tx_id).await?;
-    let cancel_timelock_height = lock_tx_height + cancel_timelock;
-    let punish_timelock_height = cancel_timelock_height + punish_timelock;
-
-    match (
-        current_block_height < cancel_timelock_height,
-        current_block_height < punish_timelock_height,
-    ) {
-        (true, _) => Ok(ExpiredTimelocks::None),
-        (false, true) => Ok(ExpiredTimelocks::Cancel),
-        (false, false) => Ok(ExpiredTimelocks::Punish),
+    tx_lock_status: ScriptStatus,
+    tx_cancel_status: ScriptStatus,
+) -> ExpiredTimelocks {
+    if tx_cancel_status.is_confirmed_with(punish_timelock) {
+        return ExpiredTimelocks::Punish;
     }
-}
 
-pub async fn wait_for_cancel_timelock_to_expire(
-    bitcoin_wallet: &crate::bitcoin::Wallet,
-    cancel_timelock: CancelTimelock,
-    lock_tx_id: ::bitcoin::Txid,
-) -> Result<()> {
-    let tx_lock_height = bitcoin_wallet.transaction_block_height(lock_tx_id).await?;
+    if tx_lock_status.is_confirmed_with(cancel_timelock) {
+        return ExpiredTimelocks::Cancel;
+    }
 
-    poll_until_block_height_is_gte(bitcoin_wallet, tx_lock_height + cancel_timelock).await?;
-    Ok(())
+    ExpiredTimelocks::None
 }
 
 #[derive(Clone, Copy, thiserror::Error, Debug)]
@@ -275,3 +251,53 @@ pub struct EmptyWitnessStack;
 #[derive(Clone, Copy, thiserror::Error, Debug)]
 #[error("input has {0} witnesses, expected 3")]
 pub struct NotThreeWitnesses(usize);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lock_confirmations_le_to_cancel_timelock_no_timelock_expired() {
+        let tx_lock_status = ScriptStatus::from_confirmations(4);
+        let tx_cancel_status = ScriptStatus::Unseen;
+
+        let expired_timelock = current_epoch(
+            CancelTimelock::new(5),
+            PunishTimelock::new(5),
+            tx_lock_status,
+            tx_cancel_status,
+        );
+
+        assert_eq!(expired_timelock, ExpiredTimelocks::None)
+    }
+
+    #[test]
+    fn lock_confirmations_ge_to_cancel_timelock_cancel_timelock_expired() {
+        let tx_lock_status = ScriptStatus::from_confirmations(5);
+        let tx_cancel_status = ScriptStatus::Unseen;
+
+        let expired_timelock = current_epoch(
+            CancelTimelock::new(5),
+            PunishTimelock::new(5),
+            tx_lock_status,
+            tx_cancel_status,
+        );
+
+        assert_eq!(expired_timelock, ExpiredTimelocks::Cancel)
+    }
+
+    #[test]
+    fn cancel_confirmations_ge_to_punish_timelock_punish_timelock_expired() {
+        let tx_lock_status = ScriptStatus::from_confirmations(10);
+        let tx_cancel_status = ScriptStatus::from_confirmations(5);
+
+        let expired_timelock = current_epoch(
+            CancelTimelock::new(5),
+            PunishTimelock::new(5),
+            tx_lock_status,
+            tx_cancel_status,
+        );
+
+        assert_eq!(expired_timelock, ExpiredTimelocks::Punish)
+    }
+}

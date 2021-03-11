@@ -5,9 +5,11 @@ use crate::bitcoin::{
 use ::bitcoin::util::bip143::SigHashCache;
 use ::bitcoin::{OutPoint, SigHash, SigHashType, TxIn, TxOut, Txid};
 use anyhow::Result;
+use bitcoin::Script;
 use ecdsa_fun::Signature;
 use miniscript::{Descriptor, DescriptorTrait};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ops::Add;
 
@@ -33,6 +35,18 @@ impl Add<CancelTimelock> for BlockHeight {
     }
 }
 
+impl PartialOrd<CancelTimelock> for u32 {
+    fn partial_cmp(&self, other: &CancelTimelock) -> Option<Ordering> {
+        self.partial_cmp(&other.0)
+    }
+}
+
+impl PartialEq<CancelTimelock> for u32 {
+    fn eq(&self, other: &CancelTimelock) -> bool {
+        self.eq(&other.0)
+    }
+}
+
 /// Represent a timelock, expressed in relative block height as defined in
 /// [BIP68](https://github.com/bitcoin/bips/blob/master/bip-0068.mediawiki).
 /// E.g. The timelock expires 10 blocks after the reference transaction is
@@ -52,6 +66,18 @@ impl Add<PunishTimelock> for BlockHeight {
 
     fn add(self, rhs: PunishTimelock) -> Self::Output {
         self + rhs.0
+    }
+}
+
+impl PartialOrd<PunishTimelock> for u32 {
+    fn partial_cmp(&self, other: &PunishTimelock) -> Option<Ordering> {
+        self.partial_cmp(&other.0)
+    }
+}
+
+impl PartialEq<PunishTimelock> for u32 {
+    fn eq(&self, other: &PunishTimelock) -> bool {
+        self.eq(&other.0)
     }
 }
 
@@ -120,6 +146,16 @@ impl TxCancel {
 
     pub fn as_outpoint(&self) -> OutPoint {
         OutPoint::new(self.inner.txid(), 0)
+    }
+
+    /// Return the relevant script_pubkey of this transaction.
+    ///
+    /// Even though a transaction can have multiple outputs, the nature of our
+    /// protocol is that there is only one relevant output within this one.
+    /// As such, subscribing or inquiring the status of this script allows us to
+    /// check the status of the whole transaction.
+    pub fn script_pubkey(&self) -> Script {
+        self.output_descriptor.script_pubkey()
     }
 
     pub fn add_signatures(

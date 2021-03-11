@@ -4,6 +4,7 @@ use crate::bitcoin::{
 use ::bitcoin::util::psbt::PartiallySignedTransaction;
 use ::bitcoin::{OutPoint, TxIn, TxOut, Txid};
 use anyhow::Result;
+use bitcoin::Script;
 use ecdsa_fun::fun::Point;
 use miniscript::{Descriptor, DescriptorTrait};
 use rand::thread_rng;
@@ -53,6 +54,10 @@ impl TxLock {
         )
         .script_pubkey()
         .len()
+    }
+
+    pub fn script_pubkey(&self) -> Script {
+        self.output_descriptor.script_pubkey()
     }
 
     /// Retreive the index of the locked output in the transaction outputs

@@ -1,6 +1,5 @@
 use crate::bitcoin::{
-    current_epoch, wait_for_cancel_timelock_to_expire, CancelTimelock, ExpiredTimelocks,
-    PunishTimelock, TxCancel, TxPunish, TxRefund,
+    current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, TxCancel, TxPunish, TxRefund,
 };
 use crate::execution_params::ExecutionParams;
 use crate::protocol::alice::{Message1, Message3};
@@ -323,25 +322,36 @@ impl State3 {
         &self,
         bitcoin_wallet: &bitcoin::Wallet,
     ) -> Result<()> {
-        wait_for_cancel_timelock_to_expire(
-            bitcoin_wallet,
-            self.cancel_timelock,
-            self.tx_lock.txid(),
-        )
-        .await
+        bitcoin_wallet
+            .watch_until_status(
+                self.tx_lock.txid(),
+                self.tx_lock.script_pubkey(),
+                |status| status.is_confirmed_with(self.cancel_timelock),
+            )
+            .await?;
+
+        Ok(())
     }
 
     pub async fn expired_timelocks(
         &self,
         bitcoin_wallet: &bitcoin::Wallet,
     ) -> Result<ExpiredTimelocks> {
-        current_epoch(
-            bitcoin_wallet,
+        let tx_cancel = TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
+
+        let tx_lock_status = bitcoin_wallet
+            .status_of_script(&self.tx_lock.script_pubkey(), &self.tx_lock.txid())
+            .await?;
+        let tx_cancel_status = bitcoin_wallet
+            .status_of_script(&tx_cancel.script_pubkey(), &tx_cancel.txid())
+            .await?;
+
+        Ok(current_epoch(
             self.cancel_timelock,
             self.punish_timelock,
-            self.tx_lock.txid(),
-        )
-        .await
+            tx_lock_status,
+            tx_cancel_status,
+        ))
     }
 
     pub fn tx_punish(&self) -> TxPunish {
