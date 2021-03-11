@@ -9,16 +9,17 @@ use crate::protocol::alice::event_loop::EventLoopHandle;
 use crate::protocol::alice::steps::{
     build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction, extract_monero_private_key,
     lock_xmr, publish_cancel_transaction, wait_for_bitcoin_encrypted_signature,
-    wait_for_bitcoin_refund, wait_for_locked_bitcoin,
+    wait_for_bitcoin_refund,
 };
 use crate::protocol::alice::AliceState;
 use crate::{bitcoin, database, monero};
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use async_recursion::async_recursion;
 use futures::future::{select, Either};
 use futures::pin_mut;
 use rand::{CryptoRng, RngCore};
 use std::sync::Arc;
+use tokio::time::timeout;
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -80,12 +81,16 @@ async fn run_until_internal(
                 state3,
                 bob_peer_id,
             } => {
-                let _ = wait_for_locked_bitcoin(
-                    state3.tx_lock.txid(),
-                    &bitcoin_wallet,
-                    execution_params,
+                timeout(
+                    execution_params.bob_time_to_act,
+                    bitcoin_wallet.watch_for_raw_transaction(state3.tx_lock.txid()),
                 )
-                .await?;
+                .await
+                .context("Failed to find lock Bitcoin tx")??;
+
+                bitcoin_wallet
+                    .wait_for_transaction_finality(state3.tx_lock.txid(), execution_params)
+                    .await?;
 
                 let state = AliceState::BtcLocked {
                     bob_peer_id,
