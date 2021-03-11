@@ -155,7 +155,7 @@ async fn init_wallets(
         config.monero.wallet_rpc_url.clone(),
         MONERO_NETWORK,
         DEFAULT_WALLET_NAME.to_string(),
-        execution_params,
+        execution_params.monero_avg_block_time,
     );
 
     // Setup the Monero wallet

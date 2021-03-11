@@ -603,7 +603,7 @@ async fn init_test_wallets(
         monero.wallet(name).unwrap().client(),
         monero::Network::default(),
         name.to_string(),
-        execution_params,
+        execution_params.monero_avg_block_time,
     );
 
     let electrum_rpc_url = {

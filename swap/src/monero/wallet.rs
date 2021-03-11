@@ -1,4 +1,3 @@
-use crate::execution_params::ExecutionParams;
 use crate::monero::{
     Amount, InsufficientFunds, PrivateViewKey, PublicViewKey, TransferProof, TxHash,
 };
@@ -20,16 +19,16 @@ pub struct Wallet {
     inner: Mutex<wallet::Client>,
     network: Network,
     name: String,
-    exec_params: ExecutionParams,
+    avg_block_time: Duration,
 }
 
 impl Wallet {
-    pub fn new(url: Url, network: Network, name: String, exec_params: ExecutionParams) -> Self {
+    pub fn new(url: Url, network: Network, name: String, avg_block_time: Duration) -> Self {
         Self {
             inner: Mutex::new(wallet::Client::new(url)),
             network,
             name,
-            exec_params,
+            avg_block_time,
         }
     }
 
@@ -37,13 +36,13 @@ impl Wallet {
         client: wallet::Client,
         network: Network,
         name: String,
-        exec_params: ExecutionParams,
+        avg_block_time: Duration,
     ) -> Self {
         Self {
             inner: Mutex::new(client),
             network,
             name,
-            exec_params,
+            avg_block_time,
         }
     }
 
@@ -174,10 +173,8 @@ impl Wallet {
 
         let address = Address::standard(self.network, public_spend_key, public_view_key.into());
 
-        let check_interval = tokio::time::interval(min(
-            self.exec_params.monero_avg_block_time / 10,
-            Duration::from_secs(1),
-        ));
+        let check_interval =
+            tokio::time::interval(min(self.avg_block_time / 10, Duration::from_secs(1)));
         let key = &transfer_proof.tx_key().to_string();
 
         wait_for_confirmations(

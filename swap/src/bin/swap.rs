@@ -306,7 +306,7 @@ async fn init_monero_wallet(
         monero_wallet_rpc_process.endpoint(),
         monero_network,
         MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME.to_string(),
-        execution_params,
+        execution_params.monero_avg_block_time,
     );
 
     monero_wallet.open_or_create().await?;
