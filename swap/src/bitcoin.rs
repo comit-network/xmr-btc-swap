@@ -210,10 +210,10 @@ pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Resu
 }
 
 pub async fn poll_until_block_height_is_gte(
-    client: &crate::bitcoin::Wallet,
+    wallet: &crate::bitcoin::Wallet,
     target: BlockHeight,
 ) -> Result<()> {
-    while client.get_block_height().await? < target {
+    while wallet.get_block_height().await? < target {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
     Ok(())
