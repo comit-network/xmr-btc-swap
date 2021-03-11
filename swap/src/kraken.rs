@@ -15,8 +15,16 @@ pub fn connect() -> Result<RateUpdateStream> {
     let rate_update = Arc::new(rate_update);
 
     tokio::spawn(async move {
+        // The default backoff config is fine for us apart from one thing:
+        // `max_elapsed_time`. If we don't get an error within this timeframe,
+        // backoff won't actually retry the operation.
+        let backoff = backoff::ExponentialBackoff {
+            max_elapsed_time: None,
+            ..backoff::ExponentialBackoff::default()
+        };
+
         let result = backoff::future::retry_notify::<Infallible, _, _, _, _, _>(
-            backoff::ExponentialBackoff::default(),
+            backoff,
             || {
                 let rate_update = rate_update.clone();
                 async move {
