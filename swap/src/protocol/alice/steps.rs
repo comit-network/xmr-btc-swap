@@ -2,7 +2,6 @@ use crate::bitcoin::{
     poll_until_block_height_is_gte, BlockHeight, CancelTimelock, EncryptedSignature,
     PunishTimelock, TxCancel, TxLock, TxRefund,
 };
-use crate::execution_params::ExecutionParams;
 use crate::protocol::alice;
 use crate::protocol::alice::event_loop::EventLoopHandle;
 use crate::protocol::alice::TransferProof;
@@ -14,30 +13,6 @@ use futures::future::{select, Either};
 use futures::pin_mut;
 use libp2p::PeerId;
 use sha2::Sha256;
-use tokio::time::timeout;
-
-// TODO(Franck): Use helper functions from xmr-btc instead of re-writing them
-// here
-pub async fn wait_for_locked_bitcoin(
-    lock_bitcoin_txid: bitcoin::Txid,
-    bitcoin_wallet: &bitcoin::Wallet,
-    execution_params: ExecutionParams,
-) -> Result<()> {
-    // We assume we will see Bob's transaction in the mempool first.
-    timeout(
-        execution_params.bob_time_to_act,
-        bitcoin_wallet.watch_for_raw_transaction(lock_bitcoin_txid),
-    )
-    .await
-    .context("Failed to find lock Bitcoin tx")??;
-
-    // // We saw the transaction in the mempool, waiting for it to be confirmed.
-    bitcoin_wallet
-        .wait_for_transaction_finality(lock_bitcoin_txid, execution_params)
-        .await?;
-
-    Ok(())
-}
 
 pub async fn lock_xmr(
     bob_peer_id: PeerId,
