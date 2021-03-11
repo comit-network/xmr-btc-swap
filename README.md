@@ -12,7 +12,7 @@ It implements the protocol described in [this](https://arxiv.org/abs/2101.12332)
 
 ## Limitations
 
-For now, the MVP is `limited` to testnet3 on Bitcoin and `stagenet` on Monero.
+For now, the MVP is limited to `testnet3` on Bitcoin and `stagenet` on Monero.
 
 ## How it works
 
