@@ -1,3 +1,4 @@
+use crate::bitcoin::wallet::ScriptStatus;
 use crate::bitcoin::ExpiredTimelocks;
 use crate::database::{Database, Swap};
 use crate::execution_params::ExecutionParams;
@@ -6,7 +7,7 @@ use crate::protocol::bob;
 use crate::protocol::bob::event_loop::EventLoopHandle;
 use crate::protocol::bob::state::*;
 use crate::{bitcoin, monero};
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use async_recursion::async_recursion;
 use rand::rngs::OsRng;
 use std::sync::Arc;
@@ -99,7 +100,18 @@ async fn run_until_internal(
                 // Do not lock Bitcoin if not connected to Alice.
                 event_loop_handle.dial().await?;
                 // Alice and Bob have exchanged info
-                let state3 = state2.lock_btc(bitcoin_wallet.as_ref()).await?;
+                let (state3, tx_lock) = state2.lock_btc().await?;
+                let signed_tx = bitcoin_wallet
+                    .sign_and_finalize(tx_lock.clone().into())
+                    .await
+                    .context("Failed to sign Bitcoin lock transaction")?;
+                let tx_lock_id = bitcoin_wallet.broadcast(signed_tx, "lock").await?;
+
+                bitcoin_wallet
+                    .watch_until_status(tx_lock_id, tx_lock.script_pubkey(), |status| {
+                        matches!(status, ScriptStatus::Confirmed { .. })
+                    })
+                    .await?;
 
                 let state = BobState::BtcLocked(state3);
                 let db_state = state.clone().into();

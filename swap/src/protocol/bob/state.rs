@@ -1,6 +1,7 @@
+use crate::bitcoin::wallet::ScriptStatus;
 use crate::bitcoin::{
     self, current_epoch, wait_for_cancel_timelock_to_expire, CancelTimelock, ExpiredTimelocks,
-    PunishTimelock, Transaction, TxCancel, Txid,
+    PunishTimelock, Transaction, TxCancel, TxLock, Txid,
 };
 use crate::execution_params::ExecutionParams;
 use crate::monero;
@@ -9,7 +10,7 @@ use crate::monero_ext::ScalarExt;
 use crate::protocol::alice::{Message1, Message3};
 use crate::protocol::bob::{EncryptedSignature, Message0, Message2, Message4};
 use crate::protocol::CROSS_CURVE_PROOF_SYSTEM;
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Result};
 use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
 use ecdsa_fun::nonce::Deterministic;
 use ecdsa_fun::Signature;
@@ -262,31 +263,27 @@ impl State2 {
         }
     }
 
-    pub async fn lock_btc(self, bitcoin_wallet: &bitcoin::Wallet) -> Result<State3> {
-        let signed_tx = bitcoin_wallet
-            .sign_and_finalize(self.tx_lock.clone().into())
-            .await
-            .context("Failed to sign Bitcoin lock transaction")?;
-
-        let _ = bitcoin_wallet.broadcast(signed_tx, "lock").await?;
-
-        Ok(State3 {
-            A: self.A,
-            b: self.b,
-            s_b: self.s_b,
-            S_a_monero: self.S_a_monero,
-            S_a_bitcoin: self.S_a_bitcoin,
-            v: self.v,
-            xmr: self.xmr,
-            cancel_timelock: self.cancel_timelock,
-            punish_timelock: self.punish_timelock,
-            refund_address: self.refund_address,
-            redeem_address: self.redeem_address,
-            tx_lock: self.tx_lock,
-            tx_cancel_sig_a: self.tx_cancel_sig_a,
-            tx_refund_encsig: self.tx_refund_encsig,
-            min_monero_confirmations: self.min_monero_confirmations,
-        })
+    pub async fn lock_btc(self) -> Result<(State3, TxLock)> {
+        Ok((
+            State3 {
+                A: self.A,
+                b: self.b,
+                s_b: self.s_b,
+                S_a_monero: self.S_a_monero,
+                S_a_bitcoin: self.S_a_bitcoin,
+                v: self.v,
+                xmr: self.xmr,
+                cancel_timelock: self.cancel_timelock,
+                punish_timelock: self.punish_timelock,
+                refund_address: self.refund_address,
+                redeem_address: self.redeem_address,
+                tx_lock: self.tx_lock.clone(),
+                tx_cancel_sig_a: self.tx_cancel_sig_a,
+                tx_refund_encsig: self.tx_refund_encsig,
+                min_monero_confirmations: self.min_monero_confirmations,
+            },
+            self.tx_lock,
+        ))
     }
 }
 
@@ -419,10 +416,9 @@ pub struct State4 {
 
 impl State4 {
     pub fn next_message(&self) -> EncryptedSignature {
-        let tx_redeem = bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address);
-        let tx_redeem_encsig = self.b.encsign(self.S_a_bitcoin, tx_redeem.digest());
-
-        EncryptedSignature { tx_redeem_encsig }
+        EncryptedSignature {
+            tx_redeem_encsig: self.tx_redeem_encsig(),
+        }
     }
 
     pub fn tx_redeem_encsig(&self) -> bitcoin::EncryptedSignature {
@@ -477,9 +473,20 @@ impl State4 {
         let tx_redeem = bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address);
         let tx_redeem_encsig = self.b.encsign(self.S_a_bitcoin, tx_redeem.digest());
 
-        let tx_redeem_candidate = bitcoin_wallet
-            .watch_for_raw_transaction(tx_redeem.txid())
+        bitcoin_wallet
+            .watch_until_status(
+                tx_redeem.txid(),
+                self.redeem_address.script_pubkey(),
+                |status| {
+                    matches!(
+                        status,
+                        ScriptStatus::InMempool | ScriptStatus::Confirmed { .. }
+                    )
+                },
+            )
             .await?;
+
+        let tx_redeem_candidate = bitcoin_wallet.get_raw_transaction(tx_redeem.txid()).await?;
 
         let tx_redeem_sig =
             tx_redeem.extract_signature_by_key(tx_redeem_candidate, self.b.public())?;
@@ -541,7 +548,11 @@ impl State4 {
         let txid = bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
 
         bitcoin_wallet
-            .wait_for_transaction_finality(txid, execution_params)
+            .wait_for_transaction_finality(
+                txid,
+                self.refund_address.script_pubkey(),
+                execution_params,
+            )
             .await?;
 
         Ok(())

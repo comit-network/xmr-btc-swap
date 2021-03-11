@@ -1,3 +1,4 @@
+use crate::bitcoin::wallet::ScriptStatus;
 use crate::bitcoin::{
     poll_until_block_height_is_gte, BlockHeight, CancelTimelock, EncryptedSignature,
     PunishTimelock, TxCancel, TxLock, TxRefund,
@@ -6,7 +7,7 @@ use crate::protocol::alice;
 use crate::protocol::alice::event_loop::EventLoopHandle;
 use crate::protocol::alice::TransferProof;
 use crate::{bitcoin, monero};
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use futures::future::{select, Either};
 use futures::pin_mut;
 use libp2p::PeerId;
@@ -64,7 +65,9 @@ pub async fn publish_cancel_transaction(
     // First wait for cancel timelock to expire
     let tx_lock_height = bitcoin_wallet
         .transaction_block_height(tx_lock.txid())
-        .await?;
+        .await?
+        .context("Lock transaction must already be included")?;
+
     poll_until_block_height_is_gte(bitcoin_wallet, tx_lock_height + cancel_timelock).await?;
 
     let tx_cancel = bitcoin::TxCancel::new(&tx_lock, cancel_timelock, a.public(), B);
@@ -108,16 +111,30 @@ pub async fn wait_for_bitcoin_refund(
 
     let tx_refund = bitcoin::TxRefund::new(tx_cancel, refund_address);
 
-    // TODO(Franck): This only checks the mempool, need to cater for the case where
-    // the transaction goes directly in a block
-    let seen_refund_tx = bitcoin_wallet.watch_for_raw_transaction(tx_refund.txid());
+    let seen_refund_tx = bitcoin_wallet.watch_until_status(
+        tx_refund.txid(),
+        refund_address.script_pubkey(),
+        |status| {
+            matches!(
+                status,
+                ScriptStatus::InMempool | ScriptStatus::Confirmed { .. }
+            )
+        },
+    );
 
     pin_mut!(punish_timelock_expired);
     pin_mut!(seen_refund_tx);
 
     match select(punish_timelock_expired, seen_refund_tx).await {
         Either::Left(_) => Ok((tx_refund, None)),
-        Either::Right((published_refund_tx, _)) => Ok((tx_refund, Some(published_refund_tx?))),
+        Either::Right((Ok(()), _)) => {
+            let published_refund_tx = bitcoin_wallet.get_raw_transaction(tx_refund.txid()).await?;
+
+            Ok((tx_refund, Some(published_refund_tx)))
+        }
+        Either::Right((Err(e), _)) => {
+            bail!(e.context("Failed to monitor refund transaction"))
+        }
     }
 }
 

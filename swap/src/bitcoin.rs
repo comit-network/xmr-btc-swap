@@ -227,6 +227,12 @@ pub async fn current_epoch(
 ) -> Result<ExpiredTimelocks> {
     let current_block_height = bitcoin_wallet.get_block_height().await?;
     let lock_tx_height = bitcoin_wallet.transaction_block_height(lock_tx_id).await?;
+
+    let lock_tx_height = match lock_tx_height {
+        None => return Ok(ExpiredTimelocks::None),
+        Some(lock_tx_height) => lock_tx_height,
+    };
+
     let cancel_timelock_height = lock_tx_height + cancel_timelock;
     let punish_timelock_height = cancel_timelock_height + punish_timelock;
 
@@ -245,9 +251,12 @@ pub async fn wait_for_cancel_timelock_to_expire(
     cancel_timelock: CancelTimelock,
     lock_tx_id: ::bitcoin::Txid,
 ) -> Result<()> {
-    let tx_lock_height = bitcoin_wallet.transaction_block_height(lock_tx_id).await?;
-
+    let tx_lock_height = bitcoin_wallet
+        .transaction_block_height(lock_tx_id)
+        .await?
+        .context("Bitcoin Lock transaction must already be included")?;
     poll_until_block_height_is_gte(bitcoin_wallet, tx_lock_height + cancel_timelock).await?;
+
     Ok(())
 }
 

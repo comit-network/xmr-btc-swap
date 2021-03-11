@@ -4,53 +4,109 @@ use crate::execution_params::ExecutionParams;
 use ::bitcoin::util::psbt::PartiallySignedTransaction;
 use ::bitcoin::Txid;
 use anyhow::{anyhow, bail, Context, Result};
-use backoff::backoff::Constant as ConstantBackoff;
-use backoff::future::retry;
 use bdk::blockchain::{noop_progress, Blockchain, ElectrumBlockchain};
 use bdk::descriptor::Segwitv0;
-use bdk::electrum_client::{self, ElectrumApi};
+use bdk::electrum_client::{self, ElectrumApi, GetHistoryRes};
 use bdk::keys::DerivableKey;
 use bdk::{FeeRate, KeychainKind};
 use bitcoin::Script;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::fmt;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
-use tokio::time::interval;
 
 const SLED_TREE_NAME: &str = "default_tree";
-
-#[derive(Debug, thiserror::Error)]
-enum Error {
-    #[error("Sending the request failed")]
-    Io(reqwest::Error),
-    #[error("The transaction is not minded yet")]
-    NotYetMined,
-    #[error("Deserialization failed")]
-    JsonDeserialization(reqwest::Error),
-    #[error("Electrum client error")]
-    ElectrumClient(electrum_client::Error),
-}
 
 pub struct Client {
     electrum: bdk::electrum_client::Client,
     latest_block: BlockHeight,
     last_ping: Instant,
     interval: Duration,
+    script_history: HashMap<Script, Vec<GetHistoryRes>>,
 }
 
 impl Client {
-    fn ping(&mut self) -> Result<()> {
-        if self.last_ping.elapsed() > self.interval {
-            self.electrum
-                .ping()
-                .map_err(|e| anyhow!("Could not refresh subscriptions: {:?}", e))?;
-            self.last_ping = Instant::now();
+    /// Ping the electrum server unless we already did within the set interval.
+    ///
+    /// Returns a boolean indicating whether we actually pinged the server.
+    fn ping(&mut self) -> bool {
+        if self.last_ping.elapsed() <= self.interval {
+            return false;
         }
+
+        match self.electrum.ping() {
+            Ok(()) => {
+                self.last_ping = Instant::now();
+
+                true
+            }
+            Err(error) => {
+                tracing::debug!(?error, "Failed to ping electrum server");
+
+                false
+            }
+        }
+    }
+
+    fn drain_notifications(&mut self) -> Result<()> {
+        let pinged = self.ping();
+
+        if !pinged {
+            return Ok(());
+        }
+
+        self.drain_blockheight_notifications()?;
+        self.drain_script_notifications()?;
+
         Ok(())
+    }
+
+    fn subscribe_to_script(&mut self, script: Script) -> Result<()> {
+        if self.script_history.contains_key(&script) {
+            return Ok(());
+        }
+
+        let _status = self
+            .electrum
+            .script_subscribe(&script)
+            .map_err(|e| anyhow!("Failed to subscribe to script notifications: {:?}", e))?;
+
+        self.script_history.insert(script, Vec::new());
+
+        Ok(())
+    }
+
+    fn status_of_script(&mut self, script: &Script, txid: &Txid) -> Result<ScriptStatus> {
+        self.drain_notifications()?;
+
+        let history = self.script_history.entry(script.clone()).or_default();
+
+        let history_of_tx = history
+            .iter()
+            .filter(|entry| &entry.tx_hash == txid)
+            .collect::<Vec<_>>();
+
+        match history_of_tx.as_slice() {
+            [] => Ok(ScriptStatus::Unseen),
+            [single, remaining @ ..] => {
+                if !remaining.is_empty() {
+                    tracing::warn!("Found more than a single history entry for script. This is highly unexpected and those history entries will be ignored.")
+                }
+
+                if single.height <= 0 {
+                    Ok(ScriptStatus::InMempool)
+                } else {
+                    Ok(ScriptStatus::Confirmed {
+                        depth: u32::from(self.latest_block) - u32::try_from(single.height)?,
+                    })
+                }
+            }
+        }
     }
 
     fn drain_blockheight_notifications(&mut self) -> Result<()> {
@@ -65,13 +121,34 @@ impl Client {
 
         Ok(())
     }
+
+    fn drain_script_notifications(&mut self) -> Result<()> {
+        let script_history = &mut self.script_history;
+        let electrum = &self.electrum;
+
+        for (script, history) in script_history.iter_mut() {
+            if std::iter::from_fn(|| electrum.script_pop(script).transpose())
+                .last()
+                .transpose()
+                .map_err(|e| anyhow!("Failed to pop script notification: {:?}", e))?
+                .is_some()
+            {
+                let new_history = electrum
+                    .script_get_history(script)
+                    .map_err(|e| anyhow!("Failed to get to script history: {:?}", e))?;
+
+                *history = new_history;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 pub struct Wallet {
     client: Arc<Mutex<Client>>,
     wallet: Arc<Mutex<bdk::Wallet<ElectrumBlockchain, bdk::sled::Tree>>>,
     http_url: Url,
-    rpc_url: Url,
 }
 
 impl Wallet {
@@ -118,9 +195,9 @@ impl Wallet {
                 latest_block: BlockHeight::try_from(latest_block)?,
                 last_ping: Instant::now() - interval,
                 interval,
+                script_history: HashMap::new(),
             })),
             http_url: electrum_http_url,
-            rpc_url: electrum_rpc_url,
         })
     }
 
@@ -253,38 +330,44 @@ impl Wallet {
             .ok_or_else(|| anyhow!("Could not get raw tx with id: {}", txid))
     }
 
-    pub async fn watch_for_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
-        tracing::debug!("watching for tx: {}", txid);
-        let tx = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
-            let client = bdk::electrum_client::Client::new(self.rpc_url.as_ref())
-                .map_err(|err| backoff::Error::Permanent(Error::ElectrumClient(err)))?;
+    pub async fn watch_until_status(
+        &self,
+        txid: Txid,
+        script: Script,
+        status_fn: impl Fn(ScriptStatus) -> bool,
+    ) -> Result<()> {
+        {
+            let mut client = self.client.lock().await;
+            client.subscribe_to_script(script.clone())?;
+        }
 
-            let tx = client.transaction_get(&txid).map_err(|err| match err {
-                electrum_client::Error::Protocol(err) => {
-                    tracing::debug!("Received protocol error {} from Electrum, retrying...", err);
-                    backoff::Error::Transient(Error::NotYetMined)
-                }
-                err => backoff::Error::Permanent(Error::ElectrumClient(err)),
-            })?;
+        loop {
+            let status = self.client.lock().await.status_of_script(&script, &txid)?;
 
-            Result::<_, backoff::Error<Error>>::Ok(tx)
-        })
-        .await
-        .context("Transient errors should be retried")?;
+            tracing::debug!("Transaction {} is {}", txid, status);
 
-        Ok(tx)
+            if status_fn(status) {
+                break;
+            }
+
+            tokio::time::sleep(Duration::from_secs(5)).await;
+        }
+
+        // TODO: Unsubscribe using the client? Or at least clear our local data, we
+        // should never get a notification again.
+
+        Ok(())
     }
 
     pub async fn get_block_height(&self) -> Result<BlockHeight> {
         let mut inner = self.client.lock().await;
 
-        inner.ping()?;
-        inner.drain_blockheight_notifications()?;
+        inner.drain_notifications()?;
 
         Ok(inner.latest_block)
     }
 
-    pub async fn transaction_block_height(&self, txid: Txid) -> Result<BlockHeight> {
+    pub async fn transaction_block_height(&self, txid: Txid) -> Result<Option<BlockHeight>> {
         let status_url = make_tx_status_url(&self.http_url, txid)?;
 
         #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -292,56 +375,34 @@ impl Wallet {
             block_height: Option<u32>,
             confirmed: bool,
         }
-        let height = retry(ConstantBackoff::new(Duration::from_secs(1)), || async {
-            let block_height = reqwest::get(status_url.clone())
-                .await
-                .map_err(|err| backoff::Error::Transient(Error::Io(err)))?
-                .json::<TransactionStatus>()
-                .await
-                .map_err(|err| backoff::Error::Permanent(Error::JsonDeserialization(err)))?
-                .block_height
-                .ok_or(backoff::Error::Transient(Error::NotYetMined))?;
 
-            Result::<_, backoff::Error<Error>>::Ok(block_height)
-        })
-        .await
-        .context("Transient errors should be retried")?;
+        let block_height = reqwest::get(status_url.clone())
+            .await
+            .context("Failed to send request")?
+            .json::<TransactionStatus>()
+            .await
+            .context("Failed to deserialize response as TransactionStatus")?
+            .block_height;
 
-        Ok(BlockHeight::new(height))
+        Ok(block_height.map(BlockHeight::new))
     }
 
     pub async fn wait_for_transaction_finality(
         &self,
         txid: Txid,
+        script_to_watch: Script,
         execution_params: ExecutionParams,
     ) -> Result<()> {
         let conf_target = execution_params.bitcoin_finality_confirmations;
 
         tracing::info!(%txid, "Waiting for {} confirmation{} of Bitcoin transaction", conf_target, if conf_target > 1 { "s" } else { "" });
 
-        // Divide by 4 to not check too often yet still be aware of the new block early
-        // on.
-        let mut interval = interval(execution_params.bitcoin_avg_block_time / 4);
+        self.watch_until_status(txid, script_to_watch, |status| {
+            // TODO: Log the number of confirmations in here to the user.
 
-        loop {
-            let tx_block_height = self.transaction_block_height(txid).await?;
-            tracing::debug!("tx_block_height: {:?}", tx_block_height);
-
-            let block_height = self.get_block_height().await?;
-            tracing::debug!("latest_block_height: {:?}", block_height);
-
-            if let Some(confirmations) = block_height.checked_sub(
-                tx_block_height
-                    .checked_sub(BlockHeight::new(1))
-                    .expect("transaction must be included in block with height >= 1"),
-            ) {
-                tracing::debug!(%txid, "confirmations: {:?}", confirmations);
-                if u32::from(confirmations) >= conf_target {
-                    break;
-                }
-            }
-            interval.tick().await;
-        }
+            matches!(status, ScriptStatus::Confirmed { depth } if depth > conf_target)
+        })
+        .await?;
 
         Ok(())
     }
@@ -358,7 +419,17 @@ impl Wallet {
 pub enum ScriptStatus {
     Unseen,
     InMempool,
-    Confirmed { depth: u64 },
+    Confirmed { depth: u32 },
+}
+
+impl fmt::Display for ScriptStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ScriptStatus::Unseen => write!(f, "unseen"),
+            ScriptStatus::InMempool => write!(f, "in mempool"),
+            ScriptStatus::Confirmed { depth } => write!(f, "confirmed with {} blocks", depth),
+        }
+    }
 }
 
 fn make_tx_status_url(base_url: &Url, txid: Txid) -> Result<Url> {
