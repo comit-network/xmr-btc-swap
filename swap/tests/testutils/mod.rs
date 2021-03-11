@@ -359,6 +359,7 @@ where
         electrs_rpc_port,
         electrs_http_port,
         alice_seed,
+        execution_params,
     )
     .await;
 
@@ -381,6 +382,7 @@ where
         electrs_rpc_port,
         electrs_http_port,
         bob_seed,
+        execution_params,
     )
     .await;
 
@@ -590,6 +592,7 @@ async fn init_test_wallets(
     electrum_rpc_port: u16,
     electrum_http_port: u16,
     seed: Seed,
+    execution_params: ExecutionParams,
 ) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {
     monero
         .init(vec![(name, starting_balances.xmr.as_piconero())])
@@ -600,6 +603,7 @@ async fn init_test_wallets(
         monero.wallet(name).unwrap().client(),
         monero::Network::default(),
         name.to_string(),
+        execution_params.monero_avg_block_time,
     );
 
     let electrum_rpc_url = {
