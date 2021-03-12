@@ -10,7 +10,6 @@ pub const DATADIR: &str = "/home/bdk";
 
 #[derive(Debug)]
 pub struct Bitcoind {
-    tag: String,
     args: BitcoindArgs,
     entrypoint: Option<String>,
     volume: Option<String>,
@@ -23,7 +22,7 @@ impl Image for Bitcoind {
     type EntryPoint = str;
 
     fn descriptor(&self) -> String {
-        format!("coblox/bitcoin-core:{}", self.tag)
+        "coblox/bitcoin-core:0.21.0".to_string()
     }
 
     fn wait_until_ready<D: Docker>(&self, container: &Container<'_, D, Self>) {
@@ -72,7 +71,6 @@ impl Image for Bitcoind {
 impl Default for Bitcoind {
     fn default() -> Self {
         Bitcoind {
-            tag: "0.19.1".into(),
             args: BitcoindArgs::default(),
             entrypoint: Some("/usr/bin/bitcoind".into()),
             volume: None,
@@ -81,13 +79,6 @@ impl Default for Bitcoind {
 }
 
 impl Bitcoind {
-    pub fn with_tag(self, tag_str: &str) -> Self {
-        Bitcoind {
-            tag: tag_str.to_string(),
-            ..self
-        }
-    }
-
     pub fn with_volume(mut self, volume: String) -> Self {
         self.volume = Some(volume);
         self

@@ -468,9 +468,7 @@ async fn init_bitcoind_container(
     name: String,
     network: String,
 ) -> Result<(Container<'_, Cli, bitcoind::Bitcoind>, Url)> {
-    let image = bitcoind::Bitcoind::default()
-        .with_volume(volume)
-        .with_tag("0.19.1");
+    let image = bitcoind::Bitcoind::default().with_volume(volume);
 
     let run_args = RunArgs::default().with_name(name).with_network(network);
 
