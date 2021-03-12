@@ -1,4 +1,4 @@
-name: "Release swap"
+name: "Release swap and asb"
 
 on:
   release:
@@ -10,13 +10,28 @@ jobs:
     strategy:
       matrix:
         include:
-          - target: x86_64-unknown-linux-gnu
+          - bin: swap
+            target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             archive_ext: tar
-          - target: x86_64-apple-darwin
+          - bin: swap
+            target: x86_64-apple-darwin
             os: macos-latest
             archive_ext: tar
-          - target: x86_64-pc-windows-msvc
+          - bin: swap
+            target: x86_64-pc-windows-msvc
+            os: windows-latest
+            archive_ext: zip
+          - bin: asb
+            target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            archive_ext: tar
+          - bin: asb
+            target: x86_64-apple-darwin
+            os: macos-latest
+            archive_ext: tar
+          - bin: asb
+            target: x86_64-pc-windows-msvc
             os: windows-latest
             archive_ext: zip
     runs-on: ${{ matrix.os }}
@@ -29,11 +44,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@v1.2.0
 
-      - name: Build ${{ matrix.target }} release binary
-        run: cargo build --target=${{ matrix.target }} --release --package swap --bin swap
+      - name: Build ${{ matrix.target }} ${{ matrix.bin }} release binary
+        run: cargo build --target=${{ matrix.target }} --release --package swap --bin ${{ matrix.bin }}
 
       - name: Smoke test the binary
-        run: target/${{ matrix.target }}/release/swap --help
+        run: target/${{ matrix.target }}/release/${{ matrix.bin }} --help
 
       # Remove once python 3 is the default
       - uses: actions/setup-python@v1
@@ -51,26 +66,26 @@ jobs:
           triple = "${{ matrix.target }}".split("-")
           arch = triple[0]
 
-          archive_name=f'swap_${{ github.event.release.tag_name }}_{os_info.system}_{arch}.${{ matrix.archive_ext }}'
+          archive_name=f'${{ matrix.bin }}_${{ github.event.release.tag_name }}_{os_info.system}_{arch}.${{ matrix.archive_ext }}'
 
           print(f'::set-output name=archive::{archive_name}')
 
       - name: Pack macos archive
         if: matrix.os == 'macos-latest'
         shell: bash
-        run: gtar -C ./target/${{ matrix.target }}/release --create --file=${{ steps.create-archive-name.outputs.archive }} swap
+        run: gtar -C ./target/${{ matrix.target }}/release --create --file=${{ steps.create-archive-name.outputs.archive }} ${{ matrix.bin }}
 
       - name: Pack linux archive
         if: matrix.os == 'ubuntu-latest'
         shell: bash
-        run: tar -C ./target/${{ matrix.target }}/release --create --file=${{ steps.create-archive-name.outputs.archive }} swap
+        run: tar -C ./target/${{ matrix.target }}/release --create --file=${{ steps.create-archive-name.outputs.archive }} ${{ matrix.bin }}
 
       - name: Pack windows archive
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
-          cp target/${{ matrix.target }}/release/swap.exe ./swap.exe
-          7z a -tzip ${{ steps.create-archive-name.outputs.archive }} ./swap.exe
+          cp target/${{ matrix.target }}/release/${{ matrix.bin }}.exe ./${{ matrix.bin }}.exe
+          7z a -tzip ${{ steps.create-archive-name.outputs.archive }} ./${{ matrix.bin }}.exe
 
       - name: Upload archive
         uses: actions/upload-release-asset@v1
