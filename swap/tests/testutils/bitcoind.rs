@@ -98,8 +98,6 @@ impl IntoIterator for BitcoindArgs {
     type Item = String;
     type IntoIter = ::std::vec::IntoIter<String>;
 
-    // todo: these "defaults" are only suitable for our tests and need to be looked
-    // at
     fn into_iter(self) -> <Self as IntoIterator>::IntoIter {
         let args = vec![
             "-server".to_string(),
