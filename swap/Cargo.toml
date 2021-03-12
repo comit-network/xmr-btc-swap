@@ -26,6 +26,7 @@ dialoguer = "0.7"
 directories-next = "2"
 ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", features = ["libsecp_compat", "serde"] }
 futures = { version = "0.3", default-features = false }
+itertools = "0.9"
 libp2p = { version = "0.34", default-features = false, features = ["tcp-tokio", "yamux", "mplex", "dns", "noise", "request-response"] }
 libp2p-async-await = { git = "https://github.com/comit-network/rust-libp2p-async-await", rev = "1429cd780204624b4d244e7d8179fe6ff77988c3" }
 miniscript = { version = "5", features = ["serde"] }

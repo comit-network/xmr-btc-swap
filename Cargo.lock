@@ -3592,6 +3592,7 @@ dependencies = [
  "futures",
  "get-port",
  "hyper",
+ "itertools",
  "libp2p",
  "libp2p-async-await",
  "miniscript",

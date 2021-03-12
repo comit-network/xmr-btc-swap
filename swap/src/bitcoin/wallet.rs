@@ -10,6 +10,7 @@ use bdk::electrum_client::{self, ElectrumApi, GetHistoryRes};
 use bdk::keys::DerivableKey;
 use bdk::{FeeRate, KeychainKind};
 use bitcoin::Script;
+use itertools::Itertools;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -371,15 +372,12 @@ impl Client {
         let history_of_tx = history
             .iter()
             .filter(|entry| &entry.tx_hash == txid)
+            .sorted_by(|a, b| Ord::cmp(&b.height, &a.height))
             .collect::<Vec<_>>();
 
         match history_of_tx.as_slice() {
             [] => Ok(ScriptStatus::Unseen),
-            [single, remaining @ ..] => {
-                if !remaining.is_empty() {
-                    tracing::warn!("Found more than a single history entry for script. This is highly unexpected and those history entries will be ignored.")
-                }
-
+            [single, ..] => {
                 if single.height <= 0 {
                     Ok(ScriptStatus::InMempool)
                 } else {
