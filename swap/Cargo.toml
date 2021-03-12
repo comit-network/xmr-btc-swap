@@ -24,6 +24,7 @@ conquer-once = "0.3"
 curve25519-dalek = "3"
 dialoguer = "0.7"
 directories-next = "2"
+druid = { version = "0.7", features = ["image", "svg"] }
 ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", features = ["libsecp_compat", "serde"] }
 futures = { version = "0.3", default-features = false }
 libp2p = { version = "0.34", default-features = false, features = ["tcp-tokio", "yamux", "mplex", "dns", "noise", "request-response"] }

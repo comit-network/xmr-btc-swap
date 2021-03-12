@@ -28,6 +28,7 @@ pub mod network;
 pub mod protocol;
 pub mod seed;
 pub mod trace;
+pub mod ui;
 
 mod monero_ext;
 mod serde_peer_id;
