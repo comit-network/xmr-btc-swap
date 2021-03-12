@@ -1,12 +1,16 @@
 use crate::bitcoin::{
-    verify_sig, Address, EmptyWitnessStack, NoInputs, NotThreeWitnesses, PublicKey, TooManyInputs,
-    Transaction, TxLock,
+    verify_encsig, verify_sig, Address, EmptyWitnessStack, EncryptedSignature, NoInputs,
+    NotThreeWitnesses, PublicKey, SecretKey, TooManyInputs, Transaction, TxLock,
 };
 use ::bitcoin::util::bip143::SigHashCache;
 use ::bitcoin::{SigHash, SigHashType, Txid};
 use anyhow::{bail, Context, Result};
+use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
+use ecdsa_fun::fun::Scalar;
+use ecdsa_fun::nonce::Deterministic;
 use ecdsa_fun::Signature;
 use miniscript::{Descriptor, DescriptorTrait};
+use sha2::Sha256;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -44,17 +48,31 @@ impl TxRedeem {
         self.digest
     }
 
-    pub fn add_signatures(
-        self,
-        (A, sig_a): (PublicKey, Signature),
-        (B, sig_b): (PublicKey, Signature),
+    pub fn complete(
+        mut self,
+        encrypted_signature: EncryptedSignature,
+        a: SecretKey,
+        s_a: Scalar,
+        B: PublicKey,
     ) -> Result<Transaction> {
+        verify_encsig(
+            B,
+            PublicKey::from(s_a.clone()),
+            &self.digest(),
+            &encrypted_signature,
+        )
+        .context("Invalid encrypted signature received")?;
+
+        let sig_a = a.sign(self.digest());
+        let adaptor = Adaptor::<HashTranscript<Sha256>, Deterministic<Sha256>>::default();
+        let sig_b = adaptor.decrypt_signature(&s_a, encrypted_signature);
+
         let satisfier = {
             let mut satisfier = HashMap::with_capacity(2);
 
             let A = ::bitcoin::PublicKey {
                 compressed: true,
-                key: A.0.into(),
+                key: a.public.into(),
             };
             let B = ::bitcoin::PublicKey {
                 compressed: true,
@@ -68,11 +86,11 @@ impl TxRedeem {
             satisfier
         };
 
-        let mut tx_redeem = self.inner;
         self.lock_output_descriptor
-            .satisfy(&mut tx_redeem.input[0], satisfier)?;
+            .satisfy(&mut self.inner.input[0], satisfier)
+            .context("Failed to sign Bitcoin redeem transaction")?;
 
-        Ok(tx_redeem)
+        Ok(self.inner)
     }
 
     pub fn extract_signature_by_key(

@@ -7,12 +7,9 @@ use crate::protocol::alice::event_loop::EventLoopHandle;
 use crate::protocol::alice::TransferProof;
 use crate::{bitcoin, monero};
 use anyhow::{Context, Result};
-use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
-use ecdsa_fun::nonce::Deterministic;
 use futures::future::{select, Either};
 use futures::pin_mut;
 use libp2p::PeerId;
-use sha2::Sha256;
 
 pub async fn lock_xmr(
     bob_peer_id: PeerId,
@@ -54,36 +51,6 @@ pub async fn wait_for_bitcoin_encrypted_signature(
     tracing::debug!("Message 3 received, returning it");
 
     Ok(msg3.tx_redeem_encsig)
-}
-
-pub fn build_bitcoin_redeem_transaction(
-    encrypted_signature: EncryptedSignature,
-    tx_lock: &TxLock,
-    a: bitcoin::SecretKey,
-    s_a: ecdsa_fun::fun::Scalar,
-    B: bitcoin::PublicKey,
-    redeem_address: &bitcoin::Address,
-) -> Result<bitcoin::Transaction> {
-    let adaptor = Adaptor::<HashTranscript<Sha256>, Deterministic<Sha256>>::default();
-
-    let tx_redeem = bitcoin::TxRedeem::new(tx_lock, redeem_address);
-
-    bitcoin::verify_encsig(
-        B,
-        bitcoin::PublicKey::from(s_a.clone()),
-        &tx_redeem.digest(),
-        &encrypted_signature,
-    )
-    .context("Invalid encrypted signature received")?;
-
-    let sig_a = a.sign(tx_redeem.digest());
-    let sig_b = adaptor.decrypt_signature(&s_a, encrypted_signature);
-
-    let tx = tx_redeem
-        .add_signatures((a.public(), sig_a), (B, sig_b))
-        .context("Failed to sign Bitcoin redeem transaction")?;
-
-    Ok(tx)
 }
 
 pub async fn publish_cancel_transaction(
