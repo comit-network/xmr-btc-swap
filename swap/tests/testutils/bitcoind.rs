@@ -72,7 +72,7 @@ impl Image for Bitcoind {
 impl Default for Bitcoind {
     fn default() -> Self {
         Bitcoind {
-            tag: "v0.19.1".into(),
+            tag: "0.19.1".into(),
             args: BitcoindArgs::default(),
             entrypoint: Some("/usr/bin/bitcoind".into()),
             volume: None,
