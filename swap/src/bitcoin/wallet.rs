@@ -22,146 +22,6 @@ use tokio::sync::Mutex;
 
 const SLED_TREE_NAME: &str = "default_tree";
 
-pub struct Client {
-    electrum: bdk::electrum_client::Client,
-    latest_block: BlockHeight,
-    last_ping: Instant,
-    interval: Duration,
-    script_history: HashMap<Script, Vec<GetHistoryRes>>,
-}
-
-impl Client {
-    fn new(electrum: bdk::electrum_client::Client, interval: Duration) -> Result<Self> {
-        let latest_block = electrum.block_headers_subscribe().map_err(|e| {
-            anyhow!(
-                "Electrum client failed to subscribe to header notifications: {:?}",
-                e
-            )
-        })?;
-
-        Ok(Self {
-            electrum,
-            latest_block: BlockHeight::try_from(latest_block)?,
-            last_ping: Instant::now(),
-            interval,
-            script_history: HashMap::default(),
-        })
-    }
-
-    /// Ping the electrum server unless we already did within the set interval.
-    ///
-    /// Returns a boolean indicating whether we actually pinged the server.
-    fn ping(&mut self) -> bool {
-        if self.last_ping.elapsed() <= self.interval {
-            return false;
-        }
-
-        match self.electrum.ping() {
-            Ok(()) => {
-                self.last_ping = Instant::now();
-
-                true
-            }
-            Err(error) => {
-                tracing::debug!(?error, "Failed to ping electrum server");
-
-                false
-            }
-        }
-    }
-
-    fn drain_notifications(&mut self) -> Result<()> {
-        let pinged = self.ping();
-
-        if !pinged {
-            return Ok(());
-        }
-
-        self.drain_blockheight_notifications()?;
-        self.drain_script_notifications()?;
-
-        Ok(())
-    }
-
-    fn subscribe_to_script(&mut self, script: Script) -> Result<()> {
-        if self.script_history.contains_key(&script) {
-            return Ok(());
-        }
-
-        let _status = self
-            .electrum
-            .script_subscribe(&script)
-            .map_err(|e| anyhow!("Failed to subscribe to script notifications: {:?}", e))?;
-
-        self.script_history.insert(script, Vec::new());
-
-        Ok(())
-    }
-
-    fn status_of_script(&mut self, script: &Script, txid: &Txid) -> Result<ScriptStatus> {
-        self.drain_notifications()?;
-
-        let history = self.script_history.entry(script.clone()).or_default();
-
-        let history_of_tx = history
-            .iter()
-            .filter(|entry| &entry.tx_hash == txid)
-            .collect::<Vec<_>>();
-
-        match history_of_tx.as_slice() {
-            [] => Ok(ScriptStatus::Unseen),
-            [single, remaining @ ..] => {
-                if !remaining.is_empty() {
-                    tracing::warn!("Found more than a single history entry for script. This is highly unexpected and those history entries will be ignored.")
-                }
-
-                if single.height <= 0 {
-                    Ok(ScriptStatus::InMempool)
-                } else {
-                    Ok(ScriptStatus::Confirmed {
-                        depth: u32::from(self.latest_block) - u32::try_from(single.height)?,
-                    })
-                }
-            }
-        }
-    }
-
-    fn drain_blockheight_notifications(&mut self) -> Result<()> {
-        let latest_block = std::iter::from_fn(|| self.electrum.block_headers_pop().transpose())
-            .last()
-            .transpose()
-            .map_err(|e| anyhow!("Failed to pop header notification: {:?}", e))?;
-
-        if let Some(new_block) = latest_block {
-            self.latest_block = BlockHeight::try_from(new_block)?;
-        }
-
-        Ok(())
-    }
-
-    fn drain_script_notifications(&mut self) -> Result<()> {
-        let script_history = &mut self.script_history;
-        let electrum = &self.electrum;
-
-        for (script, history) in script_history.iter_mut() {
-            if std::iter::from_fn(|| electrum.script_pop(script).transpose())
-                .last()
-                .transpose()
-                .map_err(|e| anyhow!("Failed to pop script notification: {:?}", e))?
-                .is_some()
-            {
-                let new_history = electrum
-                    .script_get_history(script)
-                    .map_err(|e| anyhow!("Failed to get to script history: {:?}", e))?;
-
-                *history = new_history;
-            }
-        }
-
-        Ok(())
-    }
-}
-
 pub struct Wallet {
     client: Arc<Mutex<Client>>,
     wallet: Arc<Mutex<bdk::Wallet<ElectrumBlockchain, bdk::sled::Tree>>>,
@@ -424,6 +284,146 @@ impl Wallet {
     fn select_feerate(&self) -> FeeRate {
         // TODO: This should obviously not be a const :)
         FeeRate::from_sat_per_vb(5.0)
+    }
+}
+
+struct Client {
+    electrum: bdk::electrum_client::Client,
+    latest_block: BlockHeight,
+    last_ping: Instant,
+    interval: Duration,
+    script_history: HashMap<Script, Vec<GetHistoryRes>>,
+}
+
+impl Client {
+    fn new(electrum: bdk::electrum_client::Client, interval: Duration) -> Result<Self> {
+        let latest_block = electrum.block_headers_subscribe().map_err(|e| {
+            anyhow!(
+                "Electrum client failed to subscribe to header notifications: {:?}",
+                e
+            )
+        })?;
+
+        Ok(Self {
+            electrum,
+            latest_block: BlockHeight::try_from(latest_block)?,
+            last_ping: Instant::now(),
+            interval,
+            script_history: HashMap::default(),
+        })
+    }
+
+    /// Ping the electrum server unless we already did within the set interval.
+    ///
+    /// Returns a boolean indicating whether we actually pinged the server.
+    fn ping(&mut self) -> bool {
+        if self.last_ping.elapsed() <= self.interval {
+            return false;
+        }
+
+        match self.electrum.ping() {
+            Ok(()) => {
+                self.last_ping = Instant::now();
+
+                true
+            }
+            Err(error) => {
+                tracing::debug!(?error, "Failed to ping electrum server");
+
+                false
+            }
+        }
+    }
+
+    fn drain_notifications(&mut self) -> Result<()> {
+        let pinged = self.ping();
+
+        if !pinged {
+            return Ok(());
+        }
+
+        self.drain_blockheight_notifications()?;
+        self.drain_script_notifications()?;
+
+        Ok(())
+    }
+
+    fn subscribe_to_script(&mut self, script: Script) -> Result<()> {
+        if self.script_history.contains_key(&script) {
+            return Ok(());
+        }
+
+        let _status = self
+            .electrum
+            .script_subscribe(&script)
+            .map_err(|e| anyhow!("Failed to subscribe to script notifications: {:?}", e))?;
+
+        self.script_history.insert(script, Vec::new());
+
+        Ok(())
+    }
+
+    fn status_of_script(&mut self, script: &Script, txid: &Txid) -> Result<ScriptStatus> {
+        self.drain_notifications()?;
+
+        let history = self.script_history.entry(script.clone()).or_default();
+
+        let history_of_tx = history
+            .iter()
+            .filter(|entry| &entry.tx_hash == txid)
+            .collect::<Vec<_>>();
+
+        match history_of_tx.as_slice() {
+            [] => Ok(ScriptStatus::Unseen),
+            [single, remaining @ ..] => {
+                if !remaining.is_empty() {
+                    tracing::warn!("Found more than a single history entry for script. This is highly unexpected and those history entries will be ignored.")
+                }
+
+                if single.height <= 0 {
+                    Ok(ScriptStatus::InMempool)
+                } else {
+                    Ok(ScriptStatus::Confirmed {
+                        depth: u32::from(self.latest_block) - u32::try_from(single.height)?,
+                    })
+                }
+            }
+        }
+    }
+
+    fn drain_blockheight_notifications(&mut self) -> Result<()> {
+        let latest_block = std::iter::from_fn(|| self.electrum.block_headers_pop().transpose())
+            .last()
+            .transpose()
+            .map_err(|e| anyhow!("Failed to pop header notification: {:?}", e))?;
+
+        if let Some(new_block) = latest_block {
+            self.latest_block = BlockHeight::try_from(new_block)?;
+        }
+
+        Ok(())
+    }
+
+    fn drain_script_notifications(&mut self) -> Result<()> {
+        let script_history = &mut self.script_history;
+        let electrum = &self.electrum;
+
+        for (script, history) in script_history.iter_mut() {
+            if std::iter::from_fn(|| electrum.script_pop(script).transpose())
+                .last()
+                .transpose()
+                .map_err(|e| anyhow!("Failed to pop script notification: {:?}", e))?
+                .is_some()
+            {
+                let new_history = electrum
+                    .script_get_history(script)
+                    .map_err(|e| anyhow!("Failed to get to script history: {:?}", e))?;
+
+                *history = new_history;
+            }
+        }
+
+        Ok(())
     }
 }
 
