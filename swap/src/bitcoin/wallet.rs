@@ -338,7 +338,7 @@ impl Wallet {
         &self,
         txid: Txid,
         script: Script,
-        status_fn: impl Fn(ScriptStatus) -> bool,
+        mut status_fn: impl FnMut(ScriptStatus) -> bool,
     ) -> Result<()> {
         {
             let mut client = self.client.lock().await;
@@ -401,10 +401,18 @@ impl Wallet {
 
         tracing::info!(%txid, "Waiting for {} confirmation{} of Bitcoin transaction", conf_target, if conf_target > 1 { "s" } else { "" });
 
-        self.watch_until_status(txid, script_to_watch, |status| {
-            // TODO: Log the number of confirmations in here to the user.
+        let mut seen_confirmations = 0;
 
-            matches!(status, ScriptStatus::Confirmed { depth } if depth > conf_target)
+        self.watch_until_status(txid, script_to_watch, |status| match status {
+            ScriptStatus::Confirmed { depth } => {
+                if depth > seen_confirmations {
+                    tracing::info!(%txid, "Bitcoin tx has {} out of {} confirmation{}", depth, conf_target, if conf_target > 1 { "s" } else { "" });
+                    seen_confirmations = depth;
+                }
+
+                depth >= conf_target
+            },
+            _ => false
         })
         .await?;
 
