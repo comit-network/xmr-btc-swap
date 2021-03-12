@@ -26,6 +26,7 @@ use swap::database::Database;
 use swap::execution_params::{ExecutionParams, GetExecutionParams};
 use swap::network::quote::BidQuote;
 use swap::protocol::bob;
+use swap::protocol::bob::swap::{SwapEvent, SwapEventDetails};
 use swap::protocol::bob::{Builder, EventLoop};
 use swap::seed::Seed;
 use swap::{bitcoin, execution_params, monero};
@@ -149,7 +150,15 @@ async fn main() -> Result<()> {
             .with_init_params(send_bitcoin)
             .build()?;
 
-            let swap = bob::run(swap);
+            let (swap_event_sender, mut swap_event_receiver) = tokio::sync::mpsc::channel(100);
+            let swap = bob::run(swap, Some(swap_event_sender));
+
+            tokio::spawn(async move {
+                while let Some(swap_event) = swap_event_receiver.recv().await {
+                    handle_swap_event(swap_event);
+                }
+            });
+
             tokio::select! {
                 event_loop_result = handle => {
                     event_loop_result??;
@@ -217,7 +226,15 @@ async fn main() -> Result<()> {
             )
             .build()?;
 
-            let swap = bob::run(swap);
+            let (swap_event_sender, mut swap_event_receiver) = tokio::sync::mpsc::channel(100);
+            let swap = bob::run(swap, Some(swap_event_sender));
+
+            tokio::spawn(async move {
+                while let Some(swap_event) = swap_event_receiver.recv().await {
+                    handle_swap_event(swap_event);
+                }
+            });
+
             tokio::select! {
                 event_loop_result = handle => {
                     event_loop_result??;
@@ -364,6 +381,17 @@ async fn determine_btc_to_swap(
     }
 
     Ok(min(max_giveable, max_accepted))
+}
+
+pub fn handle_swap_event(swap_event: SwapEvent) {
+    match swap_event.details {
+        SwapEventDetails::State { state } => {
+            tracing::trace!(%swap_event.swap_id, "{}", state);
+        }
+        SwapEventDetails::Amounts { bitcoin, monero } => {
+            tracing::trace!(%swap_event.swap_id, "swap amounts: {}, {}", bitcoin, monero);
+        }
+    }
 }
 
 #[cfg(test)]

@@ -11,7 +11,6 @@ use async_recursion::async_recursion;
 use rand::rngs::OsRng;
 use std::sync::Arc;
 use tokio::select;
-use tracing::{trace, warn};
 use uuid::Uuid;
 
 pub fn is_complete(state: &BobState) -> bool {
@@ -24,14 +23,35 @@ pub fn is_complete(state: &BobState) -> bool {
     )
 }
 
+#[derive(Debug)]
+pub enum SwapEventDetails {
+    State {
+        state: BobState,
+    },
+    Amounts {
+        bitcoin: bitcoin::Amount,
+        monero: monero::Amount,
+    },
+}
+
+#[derive(Debug)]
+pub struct SwapEvent {
+    pub swap_id: Uuid,
+    pub details: SwapEventDetails,
+}
+
 #[allow(clippy::too_many_arguments)]
-pub async fn run(swap: bob::Swap) -> Result<BobState> {
-    run_until(swap, is_complete).await
+pub async fn run(
+    swap: bob::Swap,
+    swap_event_channel: Option<tokio::sync::mpsc::Sender<SwapEvent>>,
+) -> Result<BobState> {
+    run_until(swap, is_complete, swap_event_channel).await
 }
 
 pub async fn run_until(
     swap: bob::Swap,
     is_target_state: fn(&BobState) -> bool,
+    swap_event_channel: Option<tokio::sync::mpsc::Sender<SwapEvent>>,
 ) -> Result<BobState> {
     run_until_internal(
         swap.state,
@@ -43,8 +63,19 @@ pub async fn run_until(
         swap.swap_id,
         swap.execution_params,
         swap.receive_monero_address,
+        swap_event_channel,
     )
     .await
+}
+
+async fn emit_swap_event(channel: Option<&tokio::sync::mpsc::Sender<SwapEvent>>, event: SwapEvent) {
+    tracing::debug!("emitting event {:?}", event);
+    if let Some(channel) = channel {
+        match channel.send(event).await {
+            Ok(_) => (),
+            Err(e) => tracing::warn!("Failed to emit swap event because of: {}", e),
+        };
+    }
 }
 
 // State machine driver for swap execution
@@ -60,8 +91,16 @@ async fn run_until_internal(
     swap_id: Uuid,
     execution_params: ExecutionParams,
     receive_monero_address: monero::Address,
+    swap_event_channel: Option<tokio::sync::mpsc::Sender<SwapEvent>>,
 ) -> Result<BobState> {
-    trace!("Current state: {}", state);
+    emit_swap_event(swap_event_channel.as_ref(), SwapEvent {
+        swap_id,
+        details: SwapEventDetails::State {
+            state: state.clone(),
+        },
+    })
+    .await;
+
     if is_target_state(&state) {
         Ok(state)
     } else {
@@ -71,13 +110,25 @@ async fn run_until_internal(
 
                 event_loop_handle.dial().await?;
 
-                let state2 = request_price_and_setup(
+                let xmr_amount = request_price(btc_amount, &mut event_loop_handle).await?;
+
+                let state2 = execution_setup(
                     btc_amount,
+                    xmr_amount,
                     &mut event_loop_handle,
                     execution_params,
                     bitcoin_refund_address,
                 )
                 .await?;
+
+                emit_swap_event(swap_event_channel.as_ref(), SwapEvent {
+                    swap_id,
+                    details: SwapEventDetails::Amounts {
+                        bitcoin: btc_amount,
+                        monero: xmr_amount,
+                    },
+                })
+                .await;
 
                 let state = BobState::ExecutionSetupDone(state2);
                 let db_state = state.clone().into();
@@ -92,6 +143,7 @@ async fn run_until_internal(
                     swap_id,
                     execution_params,
                     receive_monero_address,
+                    swap_event_channel,
                 )
                 .await
             }
@@ -114,6 +166,7 @@ async fn run_until_internal(
                     swap_id,
                     execution_params,
                     receive_monero_address,
+                    swap_event_channel,
                 )
                 .await
             }
@@ -170,6 +223,7 @@ async fn run_until_internal(
                     swap_id,
                     execution_params,
                     receive_monero_address,
+                    swap_event_channel,
                 )
                 .await
             }
@@ -196,7 +250,7 @@ async fn run_until_internal(
                             match state4? {
                                 Ok(state4) => BobState::XmrLocked(state4),
                                 Err(InsufficientFunds {..}) => {
-                                     warn!("The other party has locked insufficient Monero funds! Waiting for refund...");
+                                     tracing::warn!("The other party has locked insufficient Monero funds! Waiting for refund...");
                                      state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()).await?;
                                      let state4 = state.cancel();
                                      BobState::CancelTimelockExpired(state4)
@@ -225,6 +279,7 @@ async fn run_until_internal(
                     swap_id,
                     execution_params,
                     receive_monero_address,
+                    swap_event_channel,
                 )
                 .await
             }
@@ -268,6 +323,7 @@ async fn run_until_internal(
                     swap_id,
                     execution_params,
                     receive_monero_address,
+                    swap_event_channel,
                 )
                 .await
             }
@@ -304,6 +360,7 @@ async fn run_until_internal(
                     swap_id,
                     execution_params,
                     receive_monero_address,
+                    swap_event_channel,
                 )
                 .await
             }
@@ -335,6 +392,7 @@ async fn run_until_internal(
                     swap_id,
                     execution_params,
                     receive_monero_address,
+                    swap_event_channel,
                 )
                 .await
             }
@@ -361,6 +419,7 @@ async fn run_until_internal(
                     swap_id,
                     execution_params,
                     receive_monero_address,
+                    swap_event_channel,
                 )
                 .await
             }
@@ -393,6 +452,7 @@ async fn run_until_internal(
                     swap_id,
                     execution_params,
                     receive_monero_address,
+                    swap_event_channel,
                 )
                 .await
             }
@@ -404,16 +464,24 @@ async fn run_until_internal(
     }
 }
 
-pub async fn request_price_and_setup(
+pub async fn request_price(
     btc: bitcoin::Amount,
     event_loop_handle: &mut EventLoopHandle,
-    execution_params: ExecutionParams,
-    bitcoin_refund_address: bitcoin::Address,
-) -> Result<bob::state::State2> {
+) -> Result<monero::Amount> {
     let xmr = event_loop_handle.request_spot_price(btc).await?;
 
     tracing::info!("Spot price for {} is {}", btc, xmr);
 
+    Ok(xmr)
+}
+
+pub async fn execution_setup(
+    btc: bitcoin::Amount,
+    xmr: monero::Amount,
+    event_loop_handle: &mut EventLoopHandle,
+    execution_params: ExecutionParams,
+    bitcoin_refund_address: bitcoin::Address,
+) -> Result<bob::state::State2> {
     let state0 = State0::new(
         &mut OsRng,
         btc,

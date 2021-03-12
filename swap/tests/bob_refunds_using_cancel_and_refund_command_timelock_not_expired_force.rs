@@ -10,7 +10,7 @@ async fn given_bob_manually_forces_cancel_when_timelock_not_expired_errors() {
     testutils::setup_test(SlowCancelConfig, |mut ctx| async move {
         let (bob_swap, bob_join_handle) = ctx.new_swap_as_bob().await;
 
-        let bob_state = bob::run_until(bob_swap, is_btc_locked).await.unwrap();
+        let bob_state = bob::run_until(bob_swap, is_btc_locked, None).await.unwrap();
         assert!(matches!(bob_state, BobState::BtcLocked { .. }));
 
         let (bob_swap, bob_join_handle) = ctx.stop_and_resume_bob_from_db(bob_join_handle).await;

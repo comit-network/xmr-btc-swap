@@ -10,7 +10,7 @@ async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
     testutils::setup_test(FastCancelConfig, |mut ctx| async move {
         let (bob_swap, bob_join_handle) = ctx.new_swap_as_bob().await;
 
-        let bob_state = bob::run_until(bob_swap, is_btc_locked).await.unwrap();
+        let bob_state = bob::run_until(bob_swap, is_btc_locked, None).await.unwrap();
 
         assert!(matches!(bob_state, BobState::BtcLocked { .. }));
 
