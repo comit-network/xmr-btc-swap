@@ -1,15 +1,14 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use crate::bitcoin::ExpiredTimelocks;
+use crate::bitcoin::{ExpiredTimelocks, TxRedeem};
 use crate::database::Database;
 use crate::execution_params::ExecutionParams;
 use crate::monero_ext::ScalarExt;
 use crate::protocol::alice;
 use crate::protocol::alice::event_loop::EventLoopHandle;
 use crate::protocol::alice::steps::{
-    build_bitcoin_punish_transaction, build_bitcoin_redeem_transaction, extract_monero_private_key,
-    lock_xmr, publish_cancel_transaction, wait_for_bitcoin_encrypted_signature,
-    wait_for_bitcoin_refund,
+    build_bitcoin_punish_transaction, extract_monero_private_key, lock_xmr,
+    publish_cancel_transaction, wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund,
 };
 use crate::protocol::alice::AliceState;
 use crate::{bitcoin, database, monero};
@@ -203,13 +202,13 @@ async fn run_until_internal(
             } => {
                 let state = match state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {
                     ExpiredTimelocks::None => {
-                        match build_bitcoin_redeem_transaction(
+                        let tx_redeem = TxRedeem::new(&state3.tx_lock, &state3.redeem_address);
+
+                        match tx_redeem.complete(
                             *encrypted_signature,
-                            &state3.tx_lock,
                             state3.a.clone(),
                             state3.s_a.to_secpfun_scalar(),
                             state3.B,
-                            &state3.redeem_address,
                         ) {
                             Ok(tx) => match bitcoin_wallet.broadcast(tx, "redeem").await {
                                 Ok(txid) => {
