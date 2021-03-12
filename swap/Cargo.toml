@@ -31,6 +31,7 @@ libp2p-async-await = { git = "https://github.com/comit-network/rust-libp2p-async
 miniscript = { version = "5", features = ["serde"] }
 monero = { version = "0.10", features = ["serde_support"] }
 monero-rpc = { path = "../monero-rpc" }
+openssl = { version = "0.10", features = ["vendored"] }
 pem = "0.8"
 prettytable-rs = "0.8"
 rand = "0.7"
