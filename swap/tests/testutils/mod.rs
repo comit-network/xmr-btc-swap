@@ -678,26 +678,9 @@ pub fn init_tracing() -> DefaultGuard {
     // trouble when running multiple tests.
     let _ = LogTracer::init();
 
-    let global_filter = tracing::Level::WARN;
-    let swap_filter = tracing::Level::DEBUG;
-    let xmr_btc_filter = tracing::Level::DEBUG;
-    let monero_rpc_filter = tracing::Level::DEBUG;
-    let monero_harness_filter = tracing::Level::DEBUG;
-    let bitcoin_harness_filter = tracing::Level::INFO;
-    let testcontainers_filter = tracing::Level::DEBUG;
-
     use tracing_subscriber::util::SubscriberInitExt as _;
     tracing_subscriber::fmt()
-        .with_env_filter(format!(
-            "{},swap={},xmr_btc={},monero_harness={},monero_rpc={},bitcoin_harness={},testcontainers={}",
-            global_filter,
-            swap_filter,
-            xmr_btc_filter,
-            monero_harness_filter,
-            monero_rpc_filter,
-            bitcoin_harness_filter,
-            testcontainers_filter
-        ))
+        .with_env_filter("warn,swap=debug,monero_harness=debug,monero_rpc=info,bitcoin_harness=info,testcontainers=info")
         .set_default()
 }
 
