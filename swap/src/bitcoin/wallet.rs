@@ -31,6 +31,23 @@ pub struct Client {
 }
 
 impl Client {
+    fn new(electrum: bdk::electrum_client::Client, interval: Duration) -> Result<Self> {
+        let latest_block = electrum.block_headers_subscribe().map_err(|e| {
+            anyhow!(
+                "Electrum client failed to subscribe to header notifications: {:?}",
+                e
+            )
+        })?;
+
+        Ok(Self {
+            electrum,
+            latest_block: BlockHeight::try_from(latest_block)?,
+            last_ping: Instant::now(),
+            interval,
+            script_history: HashMap::default(),
+        })
+    }
+
     /// Ping the electrum server unless we already did within the set interval.
     ///
     /// Returns a boolean indicating whether we actually pinged the server.
@@ -179,24 +196,11 @@ impl Wallet {
         let electrum = bdk::electrum_client::Client::from_config(electrum_rpc_url.as_str(), config)
             .map_err(|e| anyhow!("Failed to init electrum rpc client {:?}", e))?;
 
-        let latest_block = electrum.block_headers_subscribe().map_err(|e| {
-            anyhow!(
-                "Electrum client failed to subscribe to header notifications: {:?}",
-                e
-            )
-        })?;
-
         let interval = Duration::from_secs(5);
 
         Ok(Self {
             wallet: Arc::new(Mutex::new(bdk_wallet)),
-            client: Arc::new(Mutex::new(Client {
-                electrum,
-                latest_block: BlockHeight::try_from(latest_block)?,
-                last_ping: Instant::now() - interval,
-                interval,
-                script_history: HashMap::new(),
-            })),
+            client: Arc::new(Mutex::new(Client::new(electrum, interval)?)),
             http_url: electrum_http_url,
         })
     }
