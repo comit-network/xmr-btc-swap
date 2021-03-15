@@ -31,7 +31,6 @@ libp2p-async-await = { git = "https://github.com/comit-network/rust-libp2p-async
 miniscript = { version = "5", features = ["serde"] }
 monero = { version = "0.10", features = ["serde_support"] }
 monero-rpc = { path = "../monero-rpc" }
-openssl = { version = "0.10", features = ["vendored"] }
 pem = "0.8"
 prettytable-rs = "0.8"
 rand = "0.7"
@@ -49,7 +48,7 @@ strum = { version = "0.20", features = ["derive"] }
 thiserror = "1"
 time = "0.2"
 tokio = { version = "1.0", features = ["rt-multi-thread", "time", "macros", "sync", "process", "fs"] }
-tokio-tungstenite = { version = "0.13", features = [ "tls" ] }
+tokio-tungstenite = { version = "0.14", features = [ "rustls-tls" ] }
 tokio-util = { version = "0.6.3", features = ["io"] }
 toml = "0.5"
 tracing = { version = "0.1", features = ["attributes"] }
