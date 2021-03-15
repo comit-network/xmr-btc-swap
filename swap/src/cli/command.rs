@@ -1,8 +1,10 @@
+use crate::fs::default_data_dir;
 use anyhow::{Context, Result};
 use libp2p::core::Multiaddr;
 use libp2p::PeerId;
 use std::path::PathBuf;
 use std::str::FromStr;
+use url::Url;
 use uuid::Uuid;
 
 pub const DEFAULT_ALICE_MULTIADDR: &str = "/dns4/xmr-btc-asb.coblox.tech/tcp/9876";
@@ -11,15 +13,18 @@ pub const DEFAULT_ALICE_PEER_ID: &str = "12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5s
 // Port is assumed to be stagenet standard port 38081
 pub const DEFAULT_STAGENET_MONERO_DAEMON_HOST: &str = "monero-stagenet.exan.tech";
 
+pub const DEFAULT_ELECTRUM_HTTP_URL: &str = "https://blockstream.info/testnet/api/";
+const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://electrum.blockstream.info:60002";
+
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(name = "xmr-btc-swap", about = "Atomically swap BTC for XMR")]
 pub struct Arguments {
     #[structopt(
-        long = "config",
-        help = "Provide a custom path to the configuration file. The configuration file must be a toml file.",
-        parse(from_os_str)
+        long = "--data-dir",
+        help = "Provide the data directory path to be used to store application data",
+        default_value
     )]
-    pub file_path: Option<PathBuf>,
+    pub data: Data,
 
     #[structopt(long, help = "Activate debug logging.")]
     pub debug: bool,
@@ -34,6 +39,9 @@ pub enum Command {
     BuyXmr {
         #[structopt(flatten)]
         connect_params: AliceConnectParams,
+
+        #[structopt(flatten)]
+        bitcoin_params: BitcoinParams,
 
         #[structopt(flatten)]
         monero_params: MoneroParams,
@@ -52,6 +60,9 @@ pub enum Command {
         connect_params: AliceConnectParams,
 
         #[structopt(flatten)]
+        bitcoin_params: BitcoinParams,
+
+        #[structopt(flatten)]
         monero_params: MoneroParams,
     },
     /// Try to cancel an ongoing swap (expert users only)
@@ -64,6 +75,9 @@ pub enum Command {
 
         #[structopt(short, long)]
         force: bool,
+
+        #[structopt(flatten)]
+        bitcoin_params: BitcoinParams,
     },
     /// Try to cancel a swap and refund my BTC (expert users only)
     Refund {
@@ -75,6 +89,9 @@ pub enum Command {
 
         #[structopt(short, long)]
         force: bool,
+
+        #[structopt(flatten)]
+        bitcoin_params: BitcoinParams,
     },
 }
 
@@ -109,6 +126,48 @@ pub struct MoneroParams {
         default_value = DEFAULT_STAGENET_MONERO_DAEMON_HOST
     )]
     pub monero_daemon_host: String,
+}
+
+#[derive(structopt::StructOpt, Debug)]
+pub struct BitcoinParams {
+    #[structopt(long = "electrum-http",
+    help = "Provide the Bitcoin Electrum HTTP URL",
+    default_value = DEFAULT_ELECTRUM_HTTP_URL
+    )]
+    pub electrum_http_url: Url,
+
+    #[structopt(long = "electrum-rpc",
+    help = "Provide the Bitcoin Electrum RPC URL",
+    default_value = DEFAULT_ELECTRUM_RPC_URL
+    )]
+    pub electrum_rpc_url: Url,
+}
+
+#[derive(Clone, Debug)]
+pub struct Data(pub PathBuf);
+
+impl Default for Data {
+    fn default() -> Self {
+        Data(default_data_dir().expect("computed valid path for data dir"))
+    }
+}
+
+impl FromStr for Data {
+    type Err = core::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Data(PathBuf::from_str(s)?))
+    }
+}
+
+impl ToString for Data {
+    fn to_string(&self) -> String {
+        self.0
+            .clone()
+            .into_os_string()
+            .into_string()
+            .expect("default datadir to be convertible to string")
+    }
 }
 
 fn parse_monero_address(s: &str) -> Result<monero::Address> {
