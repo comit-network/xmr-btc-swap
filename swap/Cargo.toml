@@ -48,7 +48,7 @@ strum = { version = "0.20", features = ["derive"] }
 thiserror = "1"
 time = "0.2"
 tokio = { version = "1.0", features = ["rt-multi-thread", "time", "macros", "sync", "process", "fs"] }
-tokio-tungstenite = { version = "0.13", features = [ "tls" ] }
+tokio-tungstenite = { version = "0.14", features = [ "rustls-tls" ] }
 tokio-util = { version = "0.6.3", features = ["io"] }
 toml = "0.5"
 tracing = { version = "0.1", features = ["attributes"] }
