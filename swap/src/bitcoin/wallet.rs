@@ -329,7 +329,7 @@ fn make_blocks_tip_height_url(base_url: &Url) -> Result<Url> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cli::config::DEFAULT_ELECTRUM_HTTP_URL;
+    use crate::cli::command::DEFAULT_ELECTRUM_HTTP_URL;
 
     #[test]
     fn create_tx_status_url_from_default_base_url_success() {
