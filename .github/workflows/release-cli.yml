@@ -55,8 +55,7 @@ jobs:
           sudo apt-get install gcc-arm-linux-gnueabihf
 
       - name: Build ${{ matrix.target }} ${{ matrix.bin }} release binary
-        env:
-          CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
+
         run: cargo build --target=${{ matrix.target }} --release --package swap --bin ${{ matrix.bin }}
 
       - name: Smoke test the binary
