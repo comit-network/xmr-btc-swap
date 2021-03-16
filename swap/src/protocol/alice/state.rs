@@ -1,6 +1,6 @@
 use crate::bitcoin::{
     current_epoch, wait_for_cancel_timelock_to_expire, CancelTimelock, ExpiredTimelocks,
-    PunishTimelock, TxCancel, TxRefund,
+    PunishTimelock, TxCancel, TxPunish, TxRefund,
 };
 use crate::execution_params::ExecutionParams;
 use crate::protocol::alice::{Message1, Message3};
@@ -342,5 +342,12 @@ impl State3 {
             self.tx_lock.txid(),
         )
         .await
+    }
+
+    pub fn tx_punish(&self) -> TxPunish {
+        let tx_cancel =
+            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
+
+        bitcoin::TxPunish::new(&tx_cancel, &self.punish_address, self.punish_timelock)
     }
 }

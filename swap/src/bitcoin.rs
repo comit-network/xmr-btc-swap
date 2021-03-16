@@ -110,6 +110,15 @@ impl From<PublicKey> for Point {
     }
 }
 
+impl From<PublicKey> for ::bitcoin::PublicKey {
+    fn from(from: PublicKey) -> Self {
+        ::bitcoin::PublicKey {
+            compressed: true,
+            key: from.0.into(),
+        }
+    }
+}
+
 impl From<Point> for PublicKey {
     fn from(p: Point) -> Self {
         Self(p)

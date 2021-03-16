@@ -143,25 +143,3 @@ pub fn extract_monero_private_key(
 
     Ok(spend_key)
 }
-
-pub fn build_bitcoin_punish_transaction(
-    tx_lock: &TxLock,
-    cancel_timelock: CancelTimelock,
-    punish_address: &bitcoin::Address,
-    punish_timelock: PunishTimelock,
-    tx_punish_sig_bob: bitcoin::Signature,
-    a: bitcoin::SecretKey,
-    B: bitcoin::PublicKey,
-) -> Result<bitcoin::Transaction> {
-    let tx_cancel = bitcoin::TxCancel::new(&tx_lock, cancel_timelock, a.public(), B);
-    let tx_punish = bitcoin::TxPunish::new(&tx_cancel, &punish_address, punish_timelock);
-
-    let sig_a = a.sign(tx_punish.digest());
-    let sig_b = tx_punish_sig_bob;
-
-    let signed_tx_punish = tx_punish
-        .add_signatures((a.public(), sig_a), (B, sig_b))
-        .expect("sig_{a,b} to be valid signatures for tx_cancel");
-
-    Ok(signed_tx_punish)
-}

@@ -7,8 +7,8 @@ use crate::monero_ext::ScalarExt;
 use crate::protocol::alice;
 use crate::protocol::alice::event_loop::EventLoopHandle;
 use crate::protocol::alice::steps::{
-    build_bitcoin_punish_transaction, extract_monero_private_key, lock_xmr,
-    publish_cancel_transaction, wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund,
+    extract_monero_private_key, lock_xmr, publish_cancel_transaction,
+    wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund,
 };
 use crate::protocol::alice::AliceState;
 use crate::{bitcoin, database, monero};
@@ -398,11 +398,7 @@ async fn run_until_internal(
                 state3,
                 monero_wallet_restore_blockheight,
             } => {
-                let signed_tx_punish = build_bitcoin_punish_transaction(
-                    &state3.tx_lock,
-                    state3.cancel_timelock,
-                    &state3.punish_address,
-                    state3.punish_timelock,
+                let signed_tx_punish = state3.tx_punish().complete(
                     state3.tx_punish_sig_bob.clone(),
                     state3.a.clone(),
                     state3.B,
