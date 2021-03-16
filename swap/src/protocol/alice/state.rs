@@ -36,7 +36,6 @@ pub enum AliceState {
     BtcRedeemed,
     BtcCancelled {
         monero_wallet_restore_blockheight: BlockHeight,
-        tx_cancel: Box<TxCancel>,
         state3: Box<State3>,
     },
     BtcRefunded {
@@ -46,7 +45,6 @@ pub enum AliceState {
     },
     BtcPunishable {
         monero_wallet_restore_blockheight: BlockHeight,
-        tx_refund: Box<TxRefund>,
         state3: Box<State3>,
     },
     XmrRefunded,
@@ -337,7 +335,7 @@ impl State3 {
         &self,
         bitcoin_wallet: &bitcoin::Wallet,
     ) -> Result<ExpiredTimelocks> {
-        let tx_cancel = TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
+        let tx_cancel = self.tx_cancel();
 
         let tx_lock_status = bitcoin_wallet
             .status_of_script(&self.tx_lock.script_pubkey(), &self.tx_lock.txid())
@@ -354,10 +352,19 @@ impl State3 {
         ))
     }
 
-    pub fn tx_punish(&self) -> TxPunish {
-        let tx_cancel =
-            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
+    pub fn tx_cancel(&self) -> TxCancel {
+        TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B)
+    }
 
-        bitcoin::TxPunish::new(&tx_cancel, &self.punish_address, self.punish_timelock)
+    pub fn tx_punish(&self) -> TxPunish {
+        bitcoin::TxPunish::new(
+            &self.tx_cancel(),
+            &self.punish_address,
+            self.punish_timelock,
+        )
+    }
+
+    pub fn tx_refund(&self) -> TxRefund {
+        bitcoin::TxRefund::new(&self.tx_cancel(), &self.refund_address)
     }
 }

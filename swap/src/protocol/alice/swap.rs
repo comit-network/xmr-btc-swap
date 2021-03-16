@@ -285,7 +285,7 @@ async fn run_until_internal(
                 state3,
                 monero_wallet_restore_blockheight,
             } => {
-                let tx_cancel = publish_cancel_transaction(
+                publish_cancel_transaction(
                     state3.tx_lock.clone(),
                     state3.a.clone(),
                     state3.B,
@@ -297,7 +297,6 @@ async fn run_until_internal(
 
                 let state = AliceState::BtcCancelled {
                     state3,
-                    tx_cancel: Box::new(tx_cancel),
                     monero_wallet_restore_blockheight,
                 };
                 let db_state = (&state).into();
@@ -317,11 +316,10 @@ async fn run_until_internal(
             }
             AliceState::BtcCancelled {
                 state3,
-                tx_cancel,
                 monero_wallet_restore_blockheight,
             } => {
                 let (tx_refund, published_refund_tx) = wait_for_bitcoin_refund(
-                    &tx_cancel,
+                    &state3.tx_cancel(),
                     state3.punish_timelock,
                     &state3.refund_address,
                     &bitcoin_wallet,
@@ -332,7 +330,6 @@ async fn run_until_internal(
                 match published_refund_tx {
                     None => {
                         let state = AliceState::BtcPunishable {
-                            tx_refund: Box::new(tx_refund),
                             state3,
                             monero_wallet_restore_blockheight,
                         };
@@ -401,7 +398,6 @@ async fn run_until_internal(
                 Ok(state)
             }
             AliceState::BtcPunishable {
-                tx_refund,
                 state3,
                 monero_wallet_restore_blockheight,
             } => {
@@ -424,7 +420,7 @@ async fn run_until_internal(
                 };
 
                 let refund_tx_seen = bitcoin_wallet.watch_until_status(
-                    tx_refund.txid(),
+                    state3.tx_refund().txid(),
                     state3.refund_address.script_pubkey(),
                     |status| status.has_been_seen(),
                 );
@@ -434,12 +430,13 @@ async fn run_until_internal(
 
                 match select(refund_tx_seen, punish_tx_finalised).await {
                     Either::Left((Ok(()), _)) => {
-                        let published_refund_tx =
-                            bitcoin_wallet.get_raw_transaction(tx_refund.txid()).await?;
+                        let published_refund_tx = bitcoin_wallet
+                            .get_raw_transaction(state3.tx_refund().txid())
+                            .await?;
 
                         let spend_key = extract_monero_private_key(
                             published_refund_tx,
-                            &tx_refund,
+                            &state3.tx_refund(),
                             state3.s_a,
                             state3.a.clone(),
                             state3.S_b_bitcoin,

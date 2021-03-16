@@ -59,7 +59,7 @@ pub async fn publish_cancel_transaction(
     cancel_timelock: CancelTimelock,
     tx_cancel_sig_bob: bitcoin::Signature,
     bitcoin_wallet: &bitcoin::Wallet,
-) -> Result<bitcoin::TxCancel> {
+) -> Result<()> {
     bitcoin_wallet
         .watch_until_status(tx_lock.txid(), tx_lock.script_pubkey(), |status| {
             status.is_confirmed_with(cancel_timelock)
@@ -81,7 +81,6 @@ pub async fn publish_cancel_transaction(
         let sig_b = tx_cancel_sig_bob.clone();
 
         let tx_cancel = tx_cancel
-            .clone()
             .add_signatures((a.public(), sig_a), (B, sig_b))
             .expect("sig_{a,b} to be valid signatures for tx_cancel");
 
@@ -92,7 +91,7 @@ pub async fn publish_cancel_transaction(
         // block height
     }
 
-    Ok(tx_cancel)
+    Ok(())
 }
 
 pub async fn wait_for_bitcoin_refund(

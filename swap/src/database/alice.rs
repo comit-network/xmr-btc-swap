@@ -1,4 +1,4 @@
-use crate::bitcoin::{EncryptedSignature, TxCancel, TxRefund};
+use crate::bitcoin::EncryptedSignature;
 use crate::monero;
 use crate::monero::monero_private_key;
 use crate::protocol::alice;
@@ -177,37 +177,18 @@ impl From<Alice> for AliceState {
             Alice::BtcCancelled {
                 monero_wallet_restore_blockheight,
                 state3,
-            } => {
-                let tx_cancel = TxCancel::new(
-                    &state3.tx_lock,
-                    state3.cancel_timelock,
-                    state3.a.public(),
-                    state3.B,
-                );
+            } => AliceState::BtcCancelled {
+                monero_wallet_restore_blockheight,
+                state3: Box::new(state3),
+            },
 
-                AliceState::BtcCancelled {
-                    monero_wallet_restore_blockheight,
-                    state3: Box::new(state3),
-                    tx_cancel: Box::new(tx_cancel),
-                }
-            }
             Alice::BtcPunishable {
                 monero_wallet_restore_blockheight,
                 state3,
-            } => {
-                let tx_cancel = TxCancel::new(
-                    &state3.tx_lock,
-                    state3.cancel_timelock,
-                    state3.a.public(),
-                    state3.B,
-                );
-                let tx_refund = TxRefund::new(&tx_cancel, &state3.refund_address);
-                AliceState::BtcPunishable {
-                    monero_wallet_restore_blockheight,
-                    tx_refund: Box::new(tx_refund),
-                    state3: Box::new(state3),
-                }
-            }
+            } => AliceState::BtcPunishable {
+                monero_wallet_restore_blockheight,
+                state3: Box::new(state3),
+            },
             Alice::BtcRefunded {
                 monero_wallet_restore_blockheight,
                 state3,
