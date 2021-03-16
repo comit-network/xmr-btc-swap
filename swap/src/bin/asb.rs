@@ -164,18 +164,16 @@ async fn init_wallets(
         bitcoin_balance
     );
 
-    let monero_wallet = monero::Wallet::new(
+    let monero_wallet = monero::Wallet::open_or_create(
         config.monero.wallet_rpc_url.clone(),
         DEFAULT_WALLET_NAME.to_string(),
         env_config,
-    );
-
-    // Setup the Monero wallet
-    monero_wallet.open_or_create().await?;
+    )
+    .await?;
 
     let balance = monero_wallet.get_balance().await?;
     if balance == Amount::ZERO {
-        let deposit_address = monero_wallet.get_main_address().await?;
+        let deposit_address = monero_wallet.get_main_address();
         warn!(
             "The Monero balance is 0, make sure to deposit funds at: {}",
             deposit_address

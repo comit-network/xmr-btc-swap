@@ -57,7 +57,7 @@ struct BobParams {
 
 impl BobParams {
     pub async fn builder(&self, event_loop_handle: bob::EventLoopHandle) -> Result<bob::Builder> {
-        let receive_address = self.monero_wallet.get_main_address().await?;
+        let receive_address = self.monero_wallet.get_main_address();
 
         Ok(bob::Builder::new(
             Database::open(&self.db_path.clone().as_path()).unwrap(),
@@ -191,7 +191,15 @@ impl TestContext {
             .get_balance()
             .await
             .unwrap();
-        assert_eq!(xmr_balance_after_swap, self.xmr_amount);
+
+        // Alice pays fees - comparison does not take exact lock fee into account
+        assert!(
+            xmr_balance_after_swap > self.alice_starting_balances.xmr - self.xmr_amount,
+            "{} > {} - {}",
+            xmr_balance_after_swap,
+            self.alice_starting_balances.xmr,
+            self.xmr_amount
+        );
     }
 
     pub async fn assert_alice_punished(&self, state: AliceState) {
@@ -237,7 +245,7 @@ impl TestContext {
         );
 
         // unload the generated wallet by opening the original wallet
-        self.bob_monero_wallet.open().await.unwrap();
+        self.bob_monero_wallet.re_open().await.unwrap();
         // refresh the original wallet to make sure the balance is caught up
         self.bob_monero_wallet.refresh().await.unwrap();
 
@@ -587,11 +595,13 @@ async fn init_test_wallets(
         .await
         .unwrap();
 
-    let xmr_wallet = swap::monero::Wallet::new_with_client(
+    let xmr_wallet = swap::monero::Wallet::connect(
         monero.wallet(name).unwrap().client(),
         name.to_string(),
         env_config,
-    );
+    )
+    .await
+    .unwrap();
 
     let electrum_rpc_url = {
         let input = format!("tcp://@localhost:{}", electrum_rpc_port);

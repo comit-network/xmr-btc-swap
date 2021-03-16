@@ -12,7 +12,7 @@ async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
         let bob_swap = tokio::spawn(bob::run_until(bob_swap, is_btc_locked));
 
         let alice_swap = ctx.alice_next_swap().await;
-        let _ = tokio::spawn(alice::run(alice_swap));
+        let alice_swap = tokio::spawn(alice::run(alice_swap));
 
         let bob_state = bob_swap.await??;
         assert!(matches!(bob_state, BobState::BtcLocked { .. }));
@@ -55,6 +55,9 @@ async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
         .await??;
 
         ctx.assert_bob_refunded(bob_state).await;
+
+        let alice_state = alice_swap.await??;
+        ctx.assert_alice_refunded(alice_state).await;
 
         Ok(())
     })

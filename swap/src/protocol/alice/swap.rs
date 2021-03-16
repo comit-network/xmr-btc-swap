@@ -97,13 +97,20 @@ async fn run_until_internal(
                 .transfer(state3.lock_xmr_transfer_request())
                 .await?;
 
-            // TODO(Franck): Wait for Monero to be confirmed once
-            //  Waiting for XMR confirmations should not be done in here, but in a separate
+            monero_wallet
+                .watch_for_transfer(state3.lock_xmr_watch_request(transfer_proof.clone(), 1))
+                .await?;
+
+            // TODO: Waiting for XMR confirmations should be done in a separate
             //  state! We have to record that Alice has already sent the transaction.
             //  Otherwise Alice might publish the lock tx twice!
 
             event_loop_handle
-                .send_transfer_proof(transfer_proof)
+                .send_transfer_proof(transfer_proof.clone())
+                .await?;
+
+            monero_wallet
+                .watch_for_transfer(state3.lock_xmr_watch_request(transfer_proof, 10))
                 .await?;
 
             AliceState::XmrLocked {
