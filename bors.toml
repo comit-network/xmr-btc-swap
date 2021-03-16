@@ -10,5 +10,6 @@ status = [
     "docker_tests (happy_path_restart_bob_before_comm)",
     "docker_tests (bob_refunds_using_cancel_and_refund_command)",
     "docker_tests (bob_refunds_using_cancel_and_refund_command_timelock_not_expired_force)",
-    "docker_tests (bob_refunds_using_cancel_and_refund_command_timelock_not_expired)"
+    "docker_tests (bob_refunds_using_cancel_and_refund_command_timelock_not_expired)",
+    "docker_tests (punish)"
 ]
