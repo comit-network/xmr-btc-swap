@@ -4,7 +4,6 @@ mod electrs;
 use crate::testutils;
 use anyhow::{Context, Result};
 use bitcoin_harness::{BitcoindRpcApi, Client};
-use futures::future::RemoteHandle;
 use futures::Future;
 use get_port::get_port;
 use libp2p::core::Multiaddr;
@@ -18,7 +17,7 @@ use swap::asb::FixedRate;
 use swap::bitcoin::{CancelTimelock, PunishTimelock};
 use swap::database::Database;
 use swap::execution_params::{ExecutionParams, GetExecutionParams};
-use swap::protocol::alice::AliceState;
+use swap::protocol::alice::{AliceState, Swap};
 use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
 use swap::seed::Seed;
@@ -98,7 +97,7 @@ pub struct TestContext {
     alice_starting_balances: StartingBalances,
     alice_bitcoin_wallet: Arc<bitcoin::Wallet>,
     alice_monero_wallet: Arc<monero::Wallet>,
-    alice_swap_handle: mpsc::Receiver<RemoteHandle<Result<AliceState>>>,
+    alice_swap_handle: mpsc::Receiver<Swap>,
 
     bob_params: BobParams,
     bob_starting_balances: StartingBalances,
@@ -107,7 +106,11 @@ pub struct TestContext {
 }
 
 impl TestContext {
-    pub async fn new_swap_as_bob(&mut self) -> (bob::Swap, BobEventLoopJoinHandle) {
+    pub async fn alice_next_swap(&mut self) -> alice::Swap {
+        self.alice_swap_handle.recv().await.unwrap()
+    }
+
+    pub async fn bob_swap(&mut self) -> (bob::Swap, BobEventLoopJoinHandle) {
         let (event_loop, event_loop_handle) = self.bob_params.new_eventloop().unwrap();
 
         let swap = self
@@ -145,10 +148,7 @@ impl TestContext {
         (swap, BobEventLoopJoinHandle(join_handle))
     }
 
-    pub async fn assert_alice_redeemed(&mut self) {
-        let swap_handle = self.alice_swap_handle.recv().await.unwrap();
-        let state = swap_handle.await.unwrap();
-
+    pub async fn assert_alice_redeemed(&mut self, state: AliceState) {
         assert!(matches!(state, AliceState::BtcRedeemed));
 
         self.alice_bitcoin_wallet.sync().await.unwrap();
@@ -175,10 +175,7 @@ impl TestContext {
         );
     }
 
-    pub async fn assert_alice_refunded(&mut self) {
-        let swap_handle = self.alice_swap_handle.recv().await.unwrap();
-        let state = swap_handle.await.unwrap();
-
+    pub async fn assert_alice_refunded(&mut self, state: AliceState) {
         assert!(matches!(state, AliceState::XmrRefunded));
 
         self.alice_bitcoin_wallet.sync().await.unwrap();
@@ -313,7 +310,7 @@ impl TestContext {
 pub async fn setup_test<T, F, C>(_config: C, testfn: T)
 where
     T: Fn(TestContext) -> F,
-    F: Future<Output = ()>,
+    F: Future<Output = Result<()>>,
     C: GetExecutionParams,
 {
     let cli = Cli::default();
@@ -426,7 +423,7 @@ where
         bob_monero_wallet,
     };
 
-    testfn(test).await;
+    testfn(test).await.unwrap()
 }
 
 fn random_prefix() -> String {
