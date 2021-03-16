@@ -1,3 +1,4 @@
+use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{
     verify_sig, Address, EmptyWitnessStack, NoInputs, NotThreeWitnesses, PublicKey, TooManyInputs,
     Transaction, TxCancel,
@@ -5,6 +6,7 @@ use crate::bitcoin::{
 use ::bitcoin::util::bip143::SigHashCache;
 use ::bitcoin::{SigHash, SigHashType, Txid};
 use anyhow::{bail, Context, Result};
+use bitcoin::Script;
 use ecdsa_fun::Signature;
 use miniscript::{Descriptor, DescriptorTrait};
 use std::collections::HashMap;
@@ -14,6 +16,7 @@ pub struct TxRefund {
     inner: Transaction,
     digest: SigHash,
     cancel_output_descriptor: Descriptor<::bitcoin::PublicKey>,
+    watch_script: Script,
 }
 
 impl TxRefund {
@@ -31,6 +34,7 @@ impl TxRefund {
             inner: tx_punish,
             digest,
             cancel_output_descriptor: tx_cancel.output_descriptor.clone(),
+            watch_script: refund_address.script_pubkey(),
         }
     }
 
@@ -108,5 +112,15 @@ impl TxRefund {
             .context("Neither signature on witness stack verifies against B")?;
 
         Ok(sig)
+    }
+}
+
+impl Watchable for TxRefund {
+    fn id(&self) -> Txid {
+        self.txid()
+    }
+
+    fn script(&self) -> Script {
+        self.watch_script.clone()
     }
 }

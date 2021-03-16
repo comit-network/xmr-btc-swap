@@ -1,3 +1,4 @@
+use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{
     build_shared_output_descriptor, Address, Amount, PublicKey, Transaction, Wallet, TX_FEE,
 };
@@ -103,5 +104,15 @@ impl TxLock {
 impl From<TxLock> for PartiallySignedTransaction {
     fn from(from: TxLock) -> Self {
         from.inner
+    }
+}
+
+impl Watchable for TxLock {
+    fn id(&self) -> Txid {
+        self.txid()
+    }
+
+    fn script(&self) -> Script {
+        self.output_descriptor.script_pubkey()
     }
 }

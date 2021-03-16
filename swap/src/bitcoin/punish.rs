@@ -1,15 +1,18 @@
-use crate::bitcoin::{self, Address, PunishTimelock, Transaction, TxCancel};
+use crate::bitcoin::wallet::Watchable;
+use crate::bitcoin::{self, Address, PunishTimelock, Transaction, TxCancel, Txid};
 use ::bitcoin::util::bip143::SigHashCache;
 use ::bitcoin::{SigHash, SigHashType};
 use anyhow::{Context, Result};
+use bdk::bitcoin::Script;
 use miniscript::{Descriptor, DescriptorTrait};
 use std::collections::HashMap;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct TxPunish {
     inner: Transaction,
     digest: SigHash,
     cancel_output_descriptor: Descriptor<::bitcoin::PublicKey>,
+    watch_script: Script,
 }
 
 impl TxPunish {
@@ -31,6 +34,7 @@ impl TxPunish {
             inner: tx_punish,
             digest,
             cancel_output_descriptor: tx_cancel.output_descriptor.clone(),
+            watch_script: punish_address.script_pubkey(),
         }
     }
 
@@ -66,5 +70,15 @@ impl TxPunish {
             .context("Failed to satisfy inputs with given signatures")?;
 
         Ok(tx_punish)
+    }
+}
+
+impl Watchable for TxPunish {
+    fn id(&self) -> Txid {
+        self.inner.txid()
+    }
+
+    fn script(&self) -> Script {
+        self.watch_script.clone()
     }
 }

@@ -1,3 +1,4 @@
+use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{
     verify_encsig, verify_sig, Address, EmptyWitnessStack, EncryptedSignature, NoInputs,
     NotThreeWitnesses, PublicKey, SecretKey, TooManyInputs, Transaction, TxLock,
@@ -5,6 +6,7 @@ use crate::bitcoin::{
 use ::bitcoin::util::bip143::SigHashCache;
 use ::bitcoin::{SigHash, SigHashType, Txid};
 use anyhow::{bail, Context, Result};
+use bitcoin::Script;
 use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
 use ecdsa_fun::fun::Scalar;
 use ecdsa_fun::nonce::Deterministic;
@@ -13,11 +15,12 @@ use miniscript::{Descriptor, DescriptorTrait};
 use sha2::Sha256;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TxRedeem {
     inner: Transaction,
     digest: SigHash,
     lock_output_descriptor: Descriptor<::bitcoin::PublicKey>,
+    watch_script: Script,
 }
 
 impl TxRedeem {
@@ -37,6 +40,7 @@ impl TxRedeem {
             inner: tx_redeem,
             digest,
             lock_output_descriptor: tx_lock.output_descriptor.clone(),
+            watch_script: redeem_address.script_pubkey(),
         }
     }
 
@@ -128,5 +132,15 @@ impl TxRedeem {
             .context("Neither signature on witness stack verifies against B")?;
 
         Ok(sig)
+    }
+}
+
+impl Watchable for TxRedeem {
+    fn id(&self) -> Txid {
+        self.txid()
+    }
+
+    fn script(&self) -> Script {
+        self.watch_script.clone()
     }
 }

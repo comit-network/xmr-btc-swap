@@ -104,12 +104,10 @@ async fn run_until_internal(
                     .sign_and_finalize(tx_lock.clone().into())
                     .await
                     .context("Failed to sign Bitcoin lock transaction")?;
-                let tx_lock_id = bitcoin_wallet.broadcast(signed_tx, "lock").await?;
+                let (..) = bitcoin_wallet.broadcast(signed_tx, "lock").await?;
 
                 bitcoin_wallet
-                    .watch_until_status(tx_lock_id, tx_lock.script_pubkey(), |status| {
-                        status.is_confirmed()
-                    })
+                    .watch_until_status(&tx_lock, |status| status.is_confirmed())
                     .await?;
 
                 let state = BobState::BtcLocked(state3);

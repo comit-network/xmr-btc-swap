@@ -82,20 +82,16 @@ async fn run_until_internal(
             } => {
                 timeout(
                     execution_params.bob_time_to_act,
-                    bitcoin_wallet.watch_until_status(
-                        state3.tx_lock.txid(),
-                        state3.tx_lock.script_pubkey(),
-                        |status| status.has_been_seen(),
-                    ),
+                    bitcoin_wallet
+                        .watch_until_status(&state3.tx_lock, |status| status.has_been_seen()),
                 )
                 .await
                 .context("Failed to find lock Bitcoin tx")??;
 
                 bitcoin_wallet
-                    .wait_for_transaction_finality(
-                        state3.tx_lock.txid(),
-                        state3.tx_lock.script_pubkey(),
-                    )
+                    .watch_until_status(&state3.tx_lock, |status| {
+                        status.is_confirmed_with(execution_params.bitcoin_finality_confirmations)
+                    })
                     .await?;
 
                 let state = AliceState::BtcLocked {
@@ -209,30 +205,19 @@ async fn run_until_internal(
             } => {
                 let state = match state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {
                     ExpiredTimelocks::None => {
-                        let tx_redeem = TxRedeem::new(&state3.tx_lock, &state3.redeem_address);
-
-                        match tx_redeem.complete(
+                        match TxRedeem::new(&state3.tx_lock, &state3.redeem_address).complete(
                             *encrypted_signature,
                             state3.a.clone(),
                             state3.s_a.to_secpfun_scalar(),
                             state3.B,
                         ) {
                             Ok(tx) => match bitcoin_wallet.broadcast(tx, "redeem").await {
-                                Ok(txid) => {
-                                    let publishded_redeem_tx = bitcoin_wallet
-                                        .wait_for_transaction_finality(
-                                            txid,
-                                            state3.redeem_address.script_pubkey(),
-                                        )
-                                        .await;
-
-                                    match publishded_redeem_tx {
-                                        Ok(_) => AliceState::BtcRedeemed,
-                                        Err(e) => {
-                                            bail!("Waiting for Bitcoin transaction finality failed with {}! The redeem transaction was published, but it is not ensured that the transaction was included! You're screwed.", e)
-                                        }
+                                Ok((_, finality)) => match finality.await {
+                                    Ok(_) => AliceState::BtcRedeemed,
+                                    Err(e) => {
+                                        bail!("Waiting for Bitcoin transaction finality failed with {}! The redeem transaction was published, but it is not ensured that the transaction was included! You're screwed.", e)
                                     }
-                                }
+                                },
                                 Err(e) => {
                                     error!("Publishing the redeem transaction failed with {}, attempting to wait for cancellation now. If you restart the application before the timelock is expired publishing the redeem transaction will be retried.", e);
                                     state3
@@ -316,10 +301,10 @@ async fn run_until_internal(
                 state3,
                 monero_wallet_restore_blockheight,
             } => {
-                let (tx_refund, published_refund_tx) = wait_for_bitcoin_refund(
+                let published_refund_tx = wait_for_bitcoin_refund(
                     &state3.tx_cancel(),
+                    &state3.tx_refund(),
                     state3.punish_timelock,
-                    &state3.refund_address,
                     &bitcoin_wallet,
                 )
                 .await?;
@@ -350,7 +335,7 @@ async fn run_until_internal(
                     Some(published_refund_tx) => {
                         let spend_key = extract_monero_private_key(
                             published_refund_tx,
-                            &tx_refund,
+                            &state3.tx_refund(),
                             state3.s_a,
                             state3.a.clone(),
                             state3.S_b_bitcoin,
@@ -405,36 +390,30 @@ async fn run_until_internal(
                     state3.B,
                 )?;
 
-                let punish_script_pubkey = state3.punish_address.script_pubkey();
-
                 let punish_tx_finalised = async {
-                    let txid = bitcoin_wallet.broadcast(signed_tx_punish, "punish").await?;
+                    let (txid, finality) =
+                        bitcoin_wallet.broadcast(signed_tx_punish, "punish").await?;
 
-                    bitcoin_wallet
-                        .wait_for_transaction_finality(txid, punish_script_pubkey)
-                        .await?;
+                    finality.await?;
 
                     Result::<_, anyhow::Error>::Ok(txid)
                 };
 
-                let refund_tx_seen = bitcoin_wallet.watch_until_status(
-                    state3.tx_refund().txid(),
-                    state3.refund_address.script_pubkey(),
-                    |status| status.has_been_seen(),
-                );
+                let tx_refund = state3.tx_refund();
+                let refund_tx_seen =
+                    bitcoin_wallet.watch_until_status(&tx_refund, |status| status.has_been_seen());
 
                 pin_mut!(punish_tx_finalised);
                 pin_mut!(refund_tx_seen);
 
                 match select(refund_tx_seen, punish_tx_finalised).await {
                     Either::Left((Ok(()), _)) => {
-                        let published_refund_tx = bitcoin_wallet
-                            .get_raw_transaction(state3.tx_refund().txid())
-                            .await?;
+                        let published_refund_tx =
+                            bitcoin_wallet.get_raw_transaction(tx_refund.txid()).await?;
 
                         let spend_key = extract_monero_private_key(
                             published_refund_tx,
-                            &state3.tx_refund(),
+                            &tx_refund,
                             state3.s_a,
                             state3.a.clone(),
                             state3.S_b_bitcoin,

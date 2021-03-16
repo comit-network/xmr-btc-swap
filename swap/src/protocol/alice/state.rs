@@ -321,11 +321,9 @@ impl State3 {
         bitcoin_wallet: &bitcoin::Wallet,
     ) -> Result<()> {
         bitcoin_wallet
-            .watch_until_status(
-                self.tx_lock.txid(),
-                self.tx_lock.script_pubkey(),
-                |status| status.is_confirmed_with(self.cancel_timelock),
-            )
+            .watch_until_status(&self.tx_lock, |status| {
+                status.is_confirmed_with(self.cancel_timelock)
+            })
             .await?;
 
         Ok(())
@@ -337,12 +335,8 @@ impl State3 {
     ) -> Result<ExpiredTimelocks> {
         let tx_cancel = self.tx_cancel();
 
-        let tx_lock_status = bitcoin_wallet
-            .status_of_script(&self.tx_lock.script_pubkey(), &self.tx_lock.txid())
-            .await?;
-        let tx_cancel_status = bitcoin_wallet
-            .status_of_script(&tx_cancel.script_pubkey(), &tx_cancel.txid())
-            .await?;
+        let tx_lock_status = bitcoin_wallet.status_of_script(&self.tx_lock).await?;
+        let tx_cancel_status = bitcoin_wallet.status_of_script(&tx_cancel).await?;
 
         Ok(current_epoch(
             self.cancel_timelock,

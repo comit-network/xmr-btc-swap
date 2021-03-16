@@ -350,11 +350,9 @@ impl State3 {
         bitcoin_wallet: &bitcoin::Wallet,
     ) -> Result<()> {
         bitcoin_wallet
-            .watch_until_status(
-                self.tx_lock.txid(),
-                self.tx_lock.script_pubkey(),
-                |status| status.is_confirmed_with(self.cancel_timelock),
-            )
+            .watch_until_status(&self.tx_lock, |status| {
+                status.is_confirmed_with(self.cancel_timelock)
+            })
             .await?;
         Ok(())
     }
@@ -389,12 +387,8 @@ impl State3 {
     ) -> Result<ExpiredTimelocks> {
         let tx_cancel = TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
 
-        let tx_lock_status = bitcoin_wallet
-            .status_of_script(&self.tx_lock.script_pubkey(), &self.tx_lock.txid())
-            .await?;
-        let tx_cancel_status = bitcoin_wallet
-            .status_of_script(&tx_cancel.script_pubkey(), &tx_cancel.txid())
-            .await?;
+        let tx_lock_status = bitcoin_wallet.status_of_script(&self.tx_lock).await?;
+        let tx_cancel_status = bitcoin_wallet.status_of_script(&tx_cancel).await?;
 
         Ok(current_epoch(
             self.cancel_timelock,
@@ -454,14 +448,13 @@ impl State4 {
         let sig_b = self.b.sign(tx_cancel.digest());
 
         let tx_cancel = tx_cancel
-            .clone()
             .add_signatures((self.A, sig_a), (self.b.public(), sig_b))
             .expect(
                 "sig_{a,b} to be valid signatures for
                 tx_cancel",
             );
 
-        let tx_id = bitcoin_wallet.broadcast(tx_cancel, "cancel").await?;
+        let (tx_id, _) = bitcoin_wallet.broadcast(tx_cancel, "cancel").await?;
 
         Ok(tx_id)
     }
@@ -471,11 +464,7 @@ impl State4 {
         let tx_redeem_encsig = self.b.encsign(self.S_a_bitcoin, tx_redeem.digest());
 
         bitcoin_wallet
-            .watch_until_status(
-                tx_redeem.txid(),
-                self.redeem_address.script_pubkey(),
-                |status| status.has_been_seen(),
-            )
+            .watch_until_status(&tx_redeem, |status| status.has_been_seen())
             .await?;
 
         let tx_redeem_candidate = bitcoin_wallet.get_raw_transaction(tx_redeem.txid()).await?;
@@ -499,11 +488,9 @@ impl State4 {
         bitcoin_wallet: &bitcoin::Wallet,
     ) -> Result<()> {
         bitcoin_wallet
-            .watch_until_status(
-                self.tx_lock.txid(),
-                self.tx_lock.script_pubkey(),
-                |status| status.is_confirmed_with(self.cancel_timelock),
-            )
+            .watch_until_status(&self.tx_lock, |status| {
+                status.is_confirmed_with(self.cancel_timelock)
+            })
             .await?;
 
         Ok(())
@@ -515,12 +502,8 @@ impl State4 {
     ) -> Result<ExpiredTimelocks> {
         let tx_cancel = TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
 
-        let tx_lock_status = bitcoin_wallet
-            .status_of_script(&self.tx_lock.script_pubkey(), &self.tx_lock.txid())
-            .await?;
-        let tx_cancel_status = bitcoin_wallet
-            .status_of_script(&tx_cancel.script_pubkey(), &tx_cancel.txid())
-            .await?;
+        let tx_lock_status = bitcoin_wallet.status_of_script(&self.tx_lock).await?;
+        let tx_cancel_status = bitcoin_wallet.status_of_script(&tx_cancel).await?;
 
         Ok(current_epoch(
             self.cancel_timelock,
@@ -544,11 +527,9 @@ impl State4 {
         let signed_tx_refund =
             tx_refund.add_signatures((self.A, sig_a), (self.b.public(), sig_b))?;
 
-        let txid = bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
+        let (_, finality) = bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
 
-        bitcoin_wallet
-            .wait_for_transaction_finality(txid, self.refund_address.script_pubkey())
-            .await?;
+        finality.await?;
 
         Ok(())
     }

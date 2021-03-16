@@ -1,3 +1,4 @@
+use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{
     build_shared_output_descriptor, Address, Amount, BlockHeight, PublicKey, Transaction, TxLock,
     TX_FEE,
@@ -81,7 +82,7 @@ impl PartialEq<PunishTimelock> for u32 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TxCancel {
     inner: Transaction,
     digest: SigHash,
@@ -148,16 +149,6 @@ impl TxCancel {
         OutPoint::new(self.inner.txid(), 0)
     }
 
-    /// Return the relevant script_pubkey of this transaction.
-    ///
-    /// Even though a transaction can have multiple outputs, the nature of our
-    /// protocol is that there is only one relevant output within this one.
-    /// As such, subscribing or inquiring the status of this script allows us to
-    /// check the status of the whole transaction.
-    pub fn script_pubkey(&self) -> Script {
-        self.output_descriptor.script_pubkey()
-    }
-
     pub fn add_signatures(
         self,
         (A, sig_a): (PublicKey, Signature),
@@ -214,5 +205,15 @@ impl TxCancel {
             input: vec![tx_in],
             output: vec![tx_out],
         }
+    }
+}
+
+impl Watchable for TxCancel {
+    fn id(&self) -> Txid {
+        self.txid()
+    }
+
+    fn script(&self) -> Script {
+        self.output_descriptor.script_pubkey()
     }
 }

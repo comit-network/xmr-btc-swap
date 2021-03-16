@@ -13,6 +13,7 @@ use reqwest::Url;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
+use std::future::Future;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -159,8 +160,21 @@ impl Wallet {
 
     /// Broadcast the given transaction to the network and emit a log statement
     /// if done so successfully.
-    pub async fn broadcast(&self, transaction: Transaction, kind: &str) -> Result<Txid> {
+    ///
+    /// Returns the transaction ID and a future for when the transaction meets
+    /// the configured finality confirmations.
+    pub async fn broadcast(
+        &self,
+        transaction: Transaction,
+        kind: &str,
+    ) -> Result<(Txid, impl Future<Output = Result<()>> + '_)> {
         let txid = transaction.txid();
+
+        // to watch for confirmations, watching a single output is enough
+        let watcher = self.wait_for_transaction_finality(
+            (txid, transaction.output[0].script_pubkey.clone()),
+            kind.to_owned(),
+        );
 
         self.wallet
             .lock()
@@ -172,7 +186,7 @@ impl Wallet {
 
         tracing::info!(%txid, "Published Bitcoin {} transaction", kind);
 
-        Ok(txid)
+        Ok((txid, watcher))
     }
 
     pub async fn sign_and_finalize(&self, psbt: PartiallySignedTransaction) -> Result<Transaction> {
@@ -193,20 +207,27 @@ impl Wallet {
             .ok_or_else(|| anyhow!("Could not get raw tx with id: {}", txid))
     }
 
-    pub async fn status_of_script(&self, script: &Script, txid: &Txid) -> Result<ScriptStatus> {
-        self.client.lock().await.status_of_script(script, txid)
+    pub async fn status_of_script<T>(&self, tx: &T) -> Result<ScriptStatus>
+    where
+        T: Watchable,
+    {
+        self.client.lock().await.status_of_script(tx)
     }
 
-    pub async fn watch_until_status(
+    pub async fn watch_until_status<T>(
         &self,
-        txid: Txid,
-        script: Script,
+        tx: &T,
         mut status_fn: impl FnMut(ScriptStatus) -> bool,
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        T: Watchable,
+    {
+        let txid = tx.id();
+
         let mut last_status = None;
 
         loop {
-            let new_status = self.client.lock().await.status_of_script(&script, &txid)?;
+            let new_status = self.client.lock().await.status_of_script(tx)?;
 
             if Some(new_status) != last_status {
                 tracing::debug!(%txid, "Transaction is {}", new_status);
@@ -223,23 +244,23 @@ impl Wallet {
         Ok(())
     }
 
-    pub async fn wait_for_transaction_finality(
-        &self,
-        txid: Txid,
-        script_to_watch: Script,
-    ) -> Result<()> {
+    async fn wait_for_transaction_finality<T>(&self, tx: T, kind: String) -> Result<()>
+    where
+        T: Watchable,
+    {
         let conf_target = self.bitcoin_finality_confirmations;
+        let txid = tx.id();
 
-        tracing::info!(%txid, "Waiting for {} confirmation{} of Bitcoin transaction", conf_target, if conf_target > 1 { "s" } else { "" });
+        tracing::info!(%txid, "Waiting for {} confirmation{} of Bitcoin {} transaction", conf_target, if conf_target > 1 { "s" } else { "" }, kind);
 
         let mut seen_confirmations = 0;
 
-        self.watch_until_status(txid, script_to_watch, |status| match status {
+        self.watch_until_status(&tx, |status| match status {
             ScriptStatus::Confirmed(inner) => {
                 let confirmations = inner.confirmations();
 
                 if confirmations > seen_confirmations {
-                    tracing::info!(%txid, "Bitcoin tx has {} out of {} confirmation{}", confirmations, conf_target, if conf_target > 1 { "s" } else { "" });
+                    tracing::info!(%txid, "Bitcoin {} tx has {} out of {} confirmation{}", kind, confirmations, conf_target, if conf_target > 1 { "s" } else { "" });
                     seen_confirmations = confirmations;
                 }
 
@@ -257,6 +278,27 @@ impl Wallet {
     fn select_feerate(&self) -> FeeRate {
         // TODO: This should obviously not be a const :)
         FeeRate::from_sat_per_vb(5.0)
+    }
+}
+
+/// Defines a watchable transaction.
+///
+/// For a transaction to be watchable, we need to know two things: Its
+/// transaction ID and the specific output script that is going to change.
+/// A transaction can obviously have multiple outputs but our protocol purposes,
+/// we are usually interested in a specific one.
+pub trait Watchable {
+    fn id(&self) -> Txid;
+    fn script(&self) -> Script;
+}
+
+impl Watchable for (Txid, Script) {
+    fn id(&self) -> Txid {
+        self.0
+    }
+
+    fn script(&self) -> Script {
+        self.1.clone()
     }
 }
 
@@ -321,18 +363,24 @@ impl Client {
         Ok(())
     }
 
-    fn status_of_script(&mut self, script: &Script, txid: &Txid) -> Result<ScriptStatus> {
-        if !self.script_history.contains_key(script) {
+    fn status_of_script<T>(&mut self, tx: &T) -> Result<ScriptStatus>
+    where
+        T: Watchable,
+    {
+        let txid = tx.id();
+        let script = tx.script();
+
+        if !self.script_history.contains_key(&script) {
             self.script_history.insert(script.clone(), vec![]);
         }
 
         self.drain_notifications()?;
 
-        let history = self.script_history.entry(script.clone()).or_default();
+        let history = self.script_history.entry(script).or_default();
 
         let history_of_tx = history
             .iter()
-            .filter(|entry| &entry.tx_hash == txid)
+            .filter(|entry| entry.tx_hash == txid)
             .collect::<Vec<_>>();
 
         match history_of_tx.as_slice() {

@@ -6,7 +6,6 @@ use crate::protocol::alice::event_loop::EventLoopHandle;
 use crate::protocol::alice::TransferProof;
 use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
-use futures::future::{select, Either};
 use futures::pin_mut;
 use libp2p::PeerId;
 
@@ -61,9 +60,7 @@ pub async fn publish_cancel_transaction(
     bitcoin_wallet: &bitcoin::Wallet,
 ) -> Result<()> {
     bitcoin_wallet
-        .watch_until_status(tx_lock.txid(), tx_lock.script_pubkey(), |status| {
-            status.is_confirmed_with(cancel_timelock)
-        })
+        .watch_until_status(&tx_lock, |status| status.is_confirmed_with(cancel_timelock))
         .await?;
 
     let tx_cancel = bitcoin::TxCancel::new(&tx_lock, cancel_timelock, a.public(), B);
@@ -85,7 +82,7 @@ pub async fn publish_cancel_transaction(
             .expect("sig_{a,b} to be valid signatures for tx_cancel");
 
         // TODO(Franck): Error handling is delicate, why can't we broadcast?
-        bitcoin_wallet.broadcast(tx_cancel, "cancel").await?;
+        let (..) = bitcoin_wallet.broadcast(tx_cancel, "cancel").await?;
 
         // TODO(Franck): Wait until transaction is mined and returned mined
         // block height
@@ -96,35 +93,36 @@ pub async fn publish_cancel_transaction(
 
 pub async fn wait_for_bitcoin_refund(
     tx_cancel: &TxCancel,
+    tx_refund: &TxRefund,
     punish_timelock: PunishTimelock,
-    refund_address: &bitcoin::Address,
     bitcoin_wallet: &bitcoin::Wallet,
-) -> Result<(bitcoin::TxRefund, Option<bitcoin::Transaction>)> {
-    let tx_refund = bitcoin::TxRefund::new(tx_cancel, refund_address);
+) -> Result<Option<bitcoin::Transaction>> {
+    let refund_tx_id = tx_refund.txid();
+    let seen_refund_tx =
+        bitcoin_wallet.watch_until_status(tx_refund, |status| status.has_been_seen());
 
-    let seen_refund_tx = bitcoin_wallet.watch_until_status(
-        tx_refund.txid(),
-        refund_address.script_pubkey(),
-        |status| status.has_been_seen(),
-    );
-
-    let punish_timelock_expired =
-        bitcoin_wallet.watch_until_status(tx_cancel.txid(), tx_cancel.script_pubkey(), |status| {
-            status.is_confirmed_with(punish_timelock)
-        });
+    let punish_timelock_expired = bitcoin_wallet.watch_until_status(tx_cancel, |status| {
+        status.is_confirmed_with(punish_timelock)
+    });
 
     pin_mut!(punish_timelock_expired);
     pin_mut!(seen_refund_tx);
 
-    match select(punish_timelock_expired, seen_refund_tx).await {
-        Either::Left(_) => Ok((tx_refund, None)),
-        Either::Right((Ok(()), _)) => {
-            let published_refund_tx = bitcoin_wallet.get_raw_transaction(tx_refund.txid()).await?;
+    tokio::select! {
+        seen_refund = seen_refund_tx => {
+            match seen_refund {
+                Ok(()) => {
+                    let published_refund_tx = bitcoin_wallet.get_raw_transaction(refund_tx_id).await?;
 
-            Ok((tx_refund, Some(published_refund_tx)))
+                    Ok(Some(published_refund_tx))
+                }
+                Err(e) => {
+                    bail!(e.context("Failed to monitor refund transaction"))
+                }
+            }
         }
-        Either::Right((Err(e), _)) => {
-            bail!(e.context("Failed to monitor refund transaction"))
+        _ = punish_timelock_expired => {
+            Ok(None)
         }
     }
 }
