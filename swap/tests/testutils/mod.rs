@@ -605,6 +605,7 @@ async fn init_test_wallets(
     let btc_wallet = swap::bitcoin::Wallet::new(
         electrum_rpc_url,
         bitcoin::Network::Regtest,
+        execution_params.bitcoin_finality_confirmations,
         datadir,
         seed.derive_extended_private_key(bitcoin::Network::Regtest)
             .expect("Could not create extended private key from seed"),

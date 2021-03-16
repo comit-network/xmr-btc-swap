@@ -2,7 +2,6 @@ use crate::bitcoin::{
     self, current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, Transaction, TxCancel,
     TxLock, Txid,
 };
-use crate::execution_params::ExecutionParams;
 use crate::monero;
 use crate::monero::{monero_private_key, InsufficientFunds, TransferProof};
 use crate::monero_ext::ScalarExt;
@@ -531,11 +530,7 @@ impl State4 {
         ))
     }
 
-    pub async fn refund_btc(
-        &self,
-        bitcoin_wallet: &bitcoin::Wallet,
-        execution_params: ExecutionParams,
-    ) -> Result<()> {
+    pub async fn refund_btc(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<()> {
         let tx_cancel =
             bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
         let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &self.refund_address);
@@ -552,11 +547,7 @@ impl State4 {
         let txid = bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
 
         bitcoin_wallet
-            .wait_for_transaction_finality(
-                txid,
-                self.refund_address.script_pubkey(),
-                execution_params,
-            )
+            .wait_for_transaction_finality(txid, self.refund_address.script_pubkey())
             .await?;
 
         Ok(())

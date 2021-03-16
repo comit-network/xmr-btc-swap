@@ -137,6 +137,7 @@ async fn init_wallets(
     let bitcoin_wallet = bitcoin::Wallet::new(
         config.bitcoin.electrum_rpc_url,
         BITCOIN_NETWORK,
+        execution_params.bitcoin_finality_confirmations,
         bitcoin_wallet_data_dir,
         key,
     )

@@ -1,6 +1,5 @@
 use crate::bitcoin::timelocks::BlockHeight;
 use crate::bitcoin::{Address, Amount, Transaction};
-use crate::execution_params::ExecutionParams;
 use ::bitcoin::util::psbt::PartiallySignedTransaction;
 use ::bitcoin::Txid;
 use anyhow::{anyhow, bail, Context, Result};
@@ -24,12 +23,14 @@ const SLED_TREE_NAME: &str = "default_tree";
 pub struct Wallet {
     client: Arc<Mutex<Client>>,
     wallet: Arc<Mutex<bdk::Wallet<ElectrumBlockchain, bdk::sled::Tree>>>,
+    bitcoin_finality_confirmations: u32,
 }
 
 impl Wallet {
     pub async fn new(
         electrum_rpc_url: Url,
         network: bitcoin::Network,
+        bitcoin_finality_confirmations: u32,
         wallet_dir: &Path,
         key: impl DerivableKey<Segwitv0> + Clone,
     ) -> Result<Self> {
@@ -58,6 +59,7 @@ impl Wallet {
         Ok(Self {
             wallet: Arc::new(Mutex::new(bdk_wallet)),
             client: Arc::new(Mutex::new(Client::new(electrum, interval)?)),
+            bitcoin_finality_confirmations,
         })
     }
 
@@ -225,9 +227,8 @@ impl Wallet {
         &self,
         txid: Txid,
         script_to_watch: Script,
-        execution_params: ExecutionParams,
     ) -> Result<()> {
-        let conf_target = execution_params.bitcoin_finality_confirmations;
+        let conf_target = self.bitcoin_finality_confirmations;
 
         tracing::info!(%txid, "Waiting for {} confirmation{} of Bitcoin transaction", conf_target, if conf_target > 1 { "s" } else { "" });
 

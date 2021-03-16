@@ -95,7 +95,6 @@ async fn run_until_internal(
                     .wait_for_transaction_finality(
                         state3.tx_lock.txid(),
                         state3.tx_lock.script_pubkey(),
-                        execution_params,
                     )
                     .await?;
 
@@ -224,7 +223,6 @@ async fn run_until_internal(
                                         .wait_for_transaction_finality(
                                             txid,
                                             state3.redeem_address.script_pubkey(),
-                                            execution_params,
                                         )
                                         .await;
 
@@ -413,7 +411,7 @@ async fn run_until_internal(
                     let txid = bitcoin_wallet.broadcast(signed_tx_punish, "punish").await?;
 
                     bitcoin_wallet
-                        .wait_for_transaction_finality(txid, punish_script_pubkey, execution_params)
+                        .wait_for_transaction_finality(txid, punish_script_pubkey)
                         .await?;
 
                     Result::<_, anyhow::Error>::Ok(txid)

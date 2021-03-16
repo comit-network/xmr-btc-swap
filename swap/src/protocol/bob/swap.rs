@@ -382,9 +382,7 @@ async fn run_until_internal(
                         bail!("Internal error: canceled state reached before cancel timelock was expired");
                     }
                     ExpiredTimelocks::Cancel => {
-                        state
-                            .refund_btc(bitcoin_wallet.as_ref(), execution_params)
-                            .await?;
+                        state.refund_btc(bitcoin_wallet.as_ref()).await?;
                         BobState::BtcRefunded(state)
                     }
                     ExpiredTimelocks::Punish => BobState::BtcPunished {

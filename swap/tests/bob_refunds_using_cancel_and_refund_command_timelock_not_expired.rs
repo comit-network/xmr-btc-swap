@@ -39,7 +39,6 @@ async fn given_bob_manually_cancels_when_timelock_not_expired_errors() {
         bob::refund(
             bob_swap.swap_id,
             bob_swap.state,
-            bob_swap.execution_params,
             bob_swap.bitcoin_wallet,
             bob_swap.db,
             false,
