@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Delete 'preview' release
-        uses: larryjoelane/delete-release-action@v1.0.24
+        uses: larryjoelane/delete-release-action@v1.4
         with:
           release-name: preview
           token: ${{ secrets.BOTTY_GITHUB_TOKEN }}
