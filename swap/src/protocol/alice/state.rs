@@ -96,7 +96,7 @@ impl State0 {
     pub async fn new<R>(
         btc: bitcoin::Amount,
         xmr: monero::Amount,
-        execution_params: ExecutionParams,
+        exec_params: ExecutionParams,
         bitcoin_wallet: &bitcoin::Wallet,
         rng: &mut R,
     ) -> Result<Self>
@@ -124,8 +124,8 @@ impl State0 {
             punish_address,
             btc,
             xmr,
-            cancel_timelock: execution_params.bitcoin_cancel_timelock,
-            punish_timelock: execution_params.bitcoin_punish_timelock,
+            cancel_timelock: exec_params.bitcoin_cancel_timelock,
+            punish_timelock: exec_params.bitcoin_punish_timelock,
         })
     }
 

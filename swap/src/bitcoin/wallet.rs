@@ -1,5 +1,6 @@
 use crate::bitcoin::timelocks::BlockHeight;
 use crate::bitcoin::{Address, Amount, Transaction};
+use crate::execution_params::ExecutionParams;
 use ::bitcoin::util::psbt::PartiallySignedTransaction;
 use ::bitcoin::Txid;
 use anyhow::{anyhow, bail, Context, Result};
@@ -24,16 +25,15 @@ const SLED_TREE_NAME: &str = "default_tree";
 pub struct Wallet {
     client: Arc<Mutex<Client>>,
     wallet: Arc<Mutex<bdk::Wallet<ElectrumBlockchain, bdk::sled::Tree>>>,
-    bitcoin_finality_confirmations: u32,
+    finality_confirmations: u32,
 }
 
 impl Wallet {
     pub async fn new(
         electrum_rpc_url: Url,
-        network: bitcoin::Network,
-        bitcoin_finality_confirmations: u32,
         wallet_dir: &Path,
         key: impl DerivableKey<Segwitv0> + Clone,
+        exec_params: ExecutionParams,
     ) -> Result<Self> {
         // Workaround for https://github.com/bitcoindevkit/rust-electrum-client/issues/47.
         let config = electrum_client::ConfigBuilder::default().retry(2).build();
@@ -47,7 +47,7 @@ impl Wallet {
         let bdk_wallet = bdk::Wallet::new(
             bdk::template::BIP84(key.clone(), KeychainKind::External),
             Some(bdk::template::BIP84(key, KeychainKind::Internal)),
-            network,
+            exec_params.bitcoin_network,
             db,
             ElectrumBlockchain::from(client),
         )?;
@@ -60,7 +60,7 @@ impl Wallet {
         Ok(Self {
             wallet: Arc::new(Mutex::new(bdk_wallet)),
             client: Arc::new(Mutex::new(Client::new(electrum, interval)?)),
-            bitcoin_finality_confirmations,
+            finality_confirmations: exec_params.bitcoin_finality_confirmations,
         })
     }
 
@@ -248,7 +248,7 @@ impl Wallet {
     where
         T: Watchable,
     {
-        let conf_target = self.bitcoin_finality_confirmations;
+        let conf_target = self.finality_confirmations;
         let txid = tx.id();
 
         tracing::info!(%txid, "Waiting for {} confirmation{} of Bitcoin {} transaction", conf_target, if conf_target > 1 { "s" } else { "" }, kind);

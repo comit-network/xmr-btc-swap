@@ -51,7 +51,7 @@ pub async fn run_until(
         swap.event_loop_handle,
         swap.bitcoin_wallet,
         swap.monero_wallet,
-        swap.execution_params,
+        swap.exec_params,
         swap.swap_id,
         swap.db,
     )
@@ -67,7 +67,7 @@ async fn run_until_internal(
     mut event_loop_handle: EventLoopHandle,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
-    execution_params: ExecutionParams,
+    exec_params: ExecutionParams,
     swap_id: Uuid,
     db: Arc<Database>,
 ) -> Result<AliceState> {
@@ -81,7 +81,7 @@ async fn run_until_internal(
                 bob_peer_id,
             } => {
                 timeout(
-                    execution_params.bob_time_to_act,
+                    exec_params.bob_time_to_act,
                     bitcoin_wallet
                         .watch_until_status(&state3.tx_lock, |status| status.has_been_seen()),
                 )
@@ -90,7 +90,7 @@ async fn run_until_internal(
 
                 bitcoin_wallet
                     .watch_until_status(&state3.tx_lock, |status| {
-                        status.is_confirmed_with(execution_params.bitcoin_finality_confirmations)
+                        status.is_confirmed_with(exec_params.bitcoin_finality_confirmations)
                     })
                     .await?;
 
@@ -108,7 +108,7 @@ async fn run_until_internal(
                     event_loop_handle,
                     bitcoin_wallet,
                     monero_wallet,
-                    execution_params,
+                    exec_params,
                     swap_id,
                     db,
                 )
@@ -144,7 +144,7 @@ async fn run_until_internal(
                     event_loop_handle,
                     bitcoin_wallet,
                     monero_wallet,
-                    execution_params,
+                    exec_params,
                     swap_id,
                     db,
                 )
@@ -192,7 +192,7 @@ async fn run_until_internal(
                     event_loop_handle,
                     bitcoin_wallet.clone(),
                     monero_wallet,
-                    execution_params,
+                    exec_params,
                     swap_id,
                     db,
                 )
@@ -258,7 +258,7 @@ async fn run_until_internal(
                     event_loop_handle,
                     bitcoin_wallet,
                     monero_wallet,
-                    execution_params,
+                    exec_params,
                     swap_id,
                     db,
                 )
@@ -291,7 +291,7 @@ async fn run_until_internal(
                     event_loop_handle,
                     bitcoin_wallet,
                     monero_wallet,
-                    execution_params,
+                    exec_params,
                     swap_id,
                     db,
                 )
@@ -326,7 +326,7 @@ async fn run_until_internal(
                             event_loop_handle,
                             bitcoin_wallet.clone(),
                             monero_wallet,
-                            execution_params,
+                            exec_params,
                             swap_id,
                             db,
                         )
@@ -355,7 +355,7 @@ async fn run_until_internal(
                             event_loop_handle,
                             bitcoin_wallet.clone(),
                             monero_wallet,
-                            execution_params,
+                            exec_params,
                             swap_id,
                             db,
                         )
@@ -432,7 +432,7 @@ async fn run_until_internal(
                             event_loop_handle,
                             bitcoin_wallet.clone(),
                             monero_wallet,
-                            execution_params,
+                            exec_params,
                             swap_id,
                             db,
                         )
@@ -452,7 +452,7 @@ async fn run_until_internal(
                             event_loop_handle,
                             bitcoin_wallet.clone(),
                             monero_wallet,
-                            execution_params,
+                            exec_params,
                             swap_id,
                             db,
                         )

@@ -28,7 +28,7 @@ pub struct Swap {
     pub event_loop_handle: EventLoopHandle,
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
-    pub execution_params: ExecutionParams,
+    pub exec_params: ExecutionParams,
     pub swap_id: Uuid,
     pub db: Arc<Database>,
 }

@@ -1,10 +1,11 @@
+use crate::execution_params::ExecutionParams;
 use crate::monero::{
     Amount, InsufficientFunds, PrivateViewKey, PublicViewKey, TransferProof, TxHash,
 };
 use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::{Context, Result};
 use monero_rpc::wallet;
-use monero_rpc::wallet::{BlockHeight, CheckTxKey, Refreshed};
+use monero_rpc::wallet::{BlockHeight, CheckTxKey, Client, Refreshed};
 use std::cmp::max;
 use std::future::Future;
 use std::str::FromStr;
@@ -23,26 +24,20 @@ pub struct Wallet {
 }
 
 impl Wallet {
-    pub fn new(url: Url, network: Network, name: String, avg_block_time: Duration) -> Self {
-        Self {
-            inner: Mutex::new(wallet::Client::new(url)),
-            network,
-            name,
-            avg_block_time,
-        }
+    pub fn new(url: Url, name: String, exec_params: ExecutionParams) -> Self {
+        Self::new_with_client(Client::new(url), name, exec_params)
     }
 
     pub fn new_with_client(
         client: wallet::Client,
-        network: Network,
         name: String,
-        avg_block_time: Duration,
+        exec_params: ExecutionParams,
     ) -> Self {
         Self {
             inner: Mutex::new(client),
-            network,
+            network: exec_params.monero_network,
             name,
-            avg_block_time,
+            avg_block_time: exec_params.monero_avg_block_time,
         }
     }
 

@@ -52,7 +52,7 @@ struct BobParams {
     monero_wallet: Arc<monero::Wallet>,
     alice_address: Multiaddr,
     alice_peer_id: PeerId,
-    execution_params: ExecutionParams,
+    exec_params: ExecutionParams,
 }
 
 impl BobParams {
@@ -64,7 +64,7 @@ impl BobParams {
             self.swap_id,
             self.bitcoin_wallet.clone(),
             self.monero_wallet.clone(),
-            self.execution_params,
+            self.exec_params,
             event_loop_handle,
             receive_address,
         ))
@@ -317,7 +317,7 @@ where
 
     let _guard = init_tracing();
 
-    let execution_params = C::get_execution_params();
+    let exec_params = C::get_execution_params();
 
     let (monero, containers) = testutils::init_containers(&cli).await;
 
@@ -351,7 +351,7 @@ where
         tempdir().unwrap().path(),
         electrs_rpc_port,
         alice_seed,
-        execution_params,
+        exec_params,
     )
     .await;
 
@@ -373,14 +373,14 @@ where
         tempdir().unwrap().path(),
         electrs_rpc_port,
         bob_seed,
-        execution_params,
+        exec_params,
     )
     .await;
 
     let (alice_event_loop, alice_swap_handle) = alice::EventLoop::new(
         alice_listen_address.clone(),
         alice_seed,
-        execution_params,
+        exec_params,
         alice_bitcoin_wallet.clone(),
         alice_monero_wallet.clone(),
         alice_db,
@@ -401,7 +401,7 @@ where
         monero_wallet: bob_monero_wallet.clone(),
         alice_address: alice_listen_address,
         alice_peer_id,
-        execution_params,
+        exec_params,
     };
 
     let test = TestContext {
@@ -580,7 +580,7 @@ async fn init_test_wallets(
     datadir: &Path,
     electrum_rpc_port: u16,
     seed: Seed,
-    execution_params: ExecutionParams,
+    exec_params: ExecutionParams,
 ) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {
     monero
         .init(vec![(name, starting_balances.xmr.as_piconero())])
@@ -589,9 +589,8 @@ async fn init_test_wallets(
 
     let xmr_wallet = swap::monero::Wallet::new_with_client(
         monero.wallet(name).unwrap().client(),
-        monero::Network::default(),
         name.to_string(),
-        execution_params.monero_avg_block_time,
+        exec_params,
     );
 
     let electrum_rpc_url = {
@@ -601,11 +600,10 @@ async fn init_test_wallets(
 
     let btc_wallet = swap::bitcoin::Wallet::new(
         electrum_rpc_url,
-        bitcoin::Network::Regtest,
-        execution_params.bitcoin_finality_confirmations,
         datadir,
-        seed.derive_extended_private_key(bitcoin::Network::Regtest)
+        seed.derive_extended_private_key(exec_params.bitcoin_network)
             .expect("Could not create extended private key from seed"),
+        exec_params,
     )
     .await
     .expect("could not init btc wallet");

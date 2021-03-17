@@ -38,8 +38,6 @@ use tracing_subscriber::filter::LevelFilter;
 extern crate prettytable;
 
 const DEFAULT_WALLET_NAME: &str = "asb-wallet";
-const BITCOIN_NETWORK: bitcoin::Network = bitcoin::Network::Testnet;
-const MONERO_NETWORK: monero::Network = monero::Network::Stagenet;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -78,13 +76,13 @@ async fn main() -> Result<()> {
             let seed = Seed::from_file_or_generate(&config.data.dir)
                 .expect("Could not retrieve/initialize seed");
 
-            let execution_params = execution_params::Testnet::get_execution_params();
+            let exec_params = execution_params::Testnet::get_execution_params();
 
             let (bitcoin_wallet, monero_wallet) = init_wallets(
                 config.clone(),
                 &wallet_data_dir,
-                seed.derive_extended_private_key(BITCOIN_NETWORK)?,
-                execution_params,
+                seed.derive_extended_private_key(exec_params.bitcoin_network)?,
+                exec_params,
             )
             .await?;
 
@@ -98,7 +96,7 @@ async fn main() -> Result<()> {
             let (event_loop, mut swap_receiver) = EventLoop::new(
                 config.network.listen,
                 seed,
-                execution_params,
+                exec_params,
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
                 Arc::new(db),
@@ -148,14 +146,13 @@ async fn init_wallets(
     config: Config,
     bitcoin_wallet_data_dir: &Path,
     key: impl DerivableKey<Segwitv0> + Clone,
-    execution_params: ExecutionParams,
+    exec_params: ExecutionParams,
 ) -> Result<(bitcoin::Wallet, monero::Wallet)> {
     let bitcoin_wallet = bitcoin::Wallet::new(
         config.bitcoin.electrum_rpc_url,
-        BITCOIN_NETWORK,
-        execution_params.bitcoin_finality_confirmations,
         bitcoin_wallet_data_dir,
         key,
+        exec_params,
     )
     .await?;
 
@@ -169,9 +166,8 @@ async fn init_wallets(
 
     let monero_wallet = monero::Wallet::new(
         config.monero.wallet_rpc_url.clone(),
-        MONERO_NETWORK,
         DEFAULT_WALLET_NAME.to_string(),
-        execution_params.monero_avg_block_time,
+        exec_params,
     );
 
     // Setup the Monero wallet

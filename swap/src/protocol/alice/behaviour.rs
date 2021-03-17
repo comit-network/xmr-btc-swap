@@ -206,11 +206,11 @@ impl Behaviour {
         peer: PeerId,
         btc: bitcoin::Amount,
         xmr: monero::Amount,
-        execution_params: ExecutionParams,
+        exec_params: ExecutionParams,
         bitcoin_wallet: &bitcoin::Wallet,
         rng: &mut (impl RngCore + CryptoRng),
     ) -> Result<()> {
-        let state0 = State0::new(btc, xmr, execution_params, bitcoin_wallet, rng).await?;
+        let state0 = State0::new(btc, xmr, exec_params, bitcoin_wallet, rng).await?;
 
         tracing::info!(
             %peer,
