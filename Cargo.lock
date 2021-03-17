@@ -3463,7 +3463,7 @@ dependencies = [
  "async-trait",
  "atty",
  "backoff",
- "base64 0.12.3",
+ "base64 0.13.0",
  "bdk",
  "big-bytes",
  "bitcoin",

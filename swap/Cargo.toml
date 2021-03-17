@@ -15,7 +15,7 @@ async-recursion = "0.3.1"
 async-trait = "0.1"
 atty = "0.2"
 backoff = { version = "0.3", features = ["tokio"] }
-base64 = "0.12"
+base64 = "0.13"
 bdk = { version = "0.4" }
 big-bytes = "1"
 bitcoin = { version = "0.26", features = ["rand", "use-serde"] }
