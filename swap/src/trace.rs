@@ -1,5 +1,4 @@
 use anyhow::Result;
-use tracing::{info, subscriber};
 use tracing_log::LogTracer;
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::FmtSubscriber;
@@ -13,17 +12,20 @@ pub fn init_tracing(level: LevelFilter) -> Result<()> {
     LogTracer::init_with_filter(tracing_log::log::LevelFilter::Info)?;
 
     let is_terminal = atty::is(atty::Stream::Stderr);
-    let subscriber = FmtSubscriber::builder()
-        .with_env_filter(format!(
-            "swap={},monero_harness={},bitcoin_harness={},http=warn,warp=warn",
-            level, level, level
-        ))
+
+    let builder = FmtSubscriber::builder()
+        .with_env_filter(format!("asb={},swap={}", level, level))
         .with_writer(std::io::stderr)
         .with_ansi(is_terminal)
-        .finish();
+        .with_target(false);
 
-    subscriber::set_global_default(subscriber)?;
-    info!("Initialized tracing with level: {}", level);
+    if !is_terminal {
+        builder.without_time().init();
+    } else {
+        builder.init();
+    }
+
+    tracing::info!("Initialized tracing with level: {}", level);
 
     Ok(())
 }
