@@ -1,6 +1,6 @@
 use crate::bitcoin::ExpiredTimelocks;
 use crate::database::{Database, Swap};
-use crate::execution_params::ExecutionParams;
+use crate::env::Config;
 use crate::monero::InsufficientFunds;
 use crate::protocol::bob;
 use crate::protocol::bob::event_loop::EventLoopHandle;
@@ -41,7 +41,7 @@ pub async fn run_until(
         swap.bitcoin_wallet,
         swap.monero_wallet,
         swap.swap_id,
-        swap.execution_params,
+        swap.env_config,
         swap.receive_monero_address,
     )
     .await
@@ -58,7 +58,7 @@ async fn run_until_internal(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
     swap_id: Uuid,
-    execution_params: ExecutionParams,
+    env_config: Config,
     receive_monero_address: monero::Address,
 ) -> Result<BobState> {
     trace!("Current state: {}", state);
@@ -74,7 +74,7 @@ async fn run_until_internal(
                 let state2 = request_price_and_setup(
                     btc_amount,
                     &mut event_loop_handle,
-                    execution_params,
+                    env_config,
                     bitcoin_refund_address,
                 )
                 .await?;
@@ -90,7 +90,7 @@ async fn run_until_internal(
                     bitcoin_wallet,
                     monero_wallet,
                     swap_id,
-                    execution_params,
+                    env_config,
                     receive_monero_address,
                 )
                 .await
@@ -117,7 +117,7 @@ async fn run_until_internal(
                     bitcoin_wallet,
                     monero_wallet,
                     swap_id,
-                    execution_params,
+                    env_config,
                     receive_monero_address,
                 )
                 .await
@@ -173,7 +173,7 @@ async fn run_until_internal(
                     bitcoin_wallet,
                     monero_wallet,
                     swap_id,
-                    execution_params,
+                    env_config,
                     receive_monero_address,
                 )
                 .await
@@ -228,7 +228,7 @@ async fn run_until_internal(
                     bitcoin_wallet,
                     monero_wallet,
                     swap_id,
-                    execution_params,
+                    env_config,
                     receive_monero_address,
                 )
                 .await
@@ -271,7 +271,7 @@ async fn run_until_internal(
                     bitcoin_wallet,
                     monero_wallet,
                     swap_id,
-                    execution_params,
+                    env_config,
                     receive_monero_address,
                 )
                 .await
@@ -307,7 +307,7 @@ async fn run_until_internal(
                     bitcoin_wallet.clone(),
                     monero_wallet,
                     swap_id,
-                    execution_params,
+                    env_config,
                     receive_monero_address,
                 )
                 .await
@@ -338,7 +338,7 @@ async fn run_until_internal(
                     bitcoin_wallet,
                     monero_wallet,
                     swap_id,
-                    execution_params,
+                    env_config,
                     receive_monero_address,
                 )
                 .await
@@ -364,7 +364,7 @@ async fn run_until_internal(
                     bitcoin_wallet,
                     monero_wallet,
                     swap_id,
-                    execution_params,
+                    env_config,
                     receive_monero_address,
                 )
                 .await
@@ -394,7 +394,7 @@ async fn run_until_internal(
                     bitcoin_wallet,
                     monero_wallet,
                     swap_id,
-                    execution_params,
+                    env_config,
                     receive_monero_address,
                 )
                 .await
@@ -410,7 +410,7 @@ async fn run_until_internal(
 pub async fn request_price_and_setup(
     btc: bitcoin::Amount,
     event_loop_handle: &mut EventLoopHandle,
-    execution_params: ExecutionParams,
+    env_config: Config,
     bitcoin_refund_address: bitcoin::Address,
 ) -> Result<bob::state::State2> {
     let xmr = event_loop_handle.request_spot_price(btc).await?;
@@ -421,10 +421,10 @@ pub async fn request_price_and_setup(
         &mut OsRng,
         btc,
         xmr,
-        execution_params.bitcoin_cancel_timelock,
-        execution_params.bitcoin_punish_timelock,
+        env_config.bitcoin_cancel_timelock,
+        env_config.bitcoin_punish_timelock,
         bitcoin_refund_address,
-        execution_params.monero_finality_confirmations,
+        env_config.monero_finality_confirmations,
     );
 
     let state2 = event_loop_handle.execution_setup(state0).await?;

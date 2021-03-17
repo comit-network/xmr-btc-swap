@@ -1,6 +1,6 @@
 use crate::asb::{FixedRate, Rate};
 use crate::database::Database;
-use crate::execution_params::ExecutionParams;
+use crate::env::Config;
 use crate::monero::BalanceTooLow;
 use crate::network::quote::BidQuote;
 use crate::network::{spot_price, transport, TokioExecutor};
@@ -23,7 +23,7 @@ use uuid::Uuid;
 pub struct EventLoop<RS> {
     swarm: libp2p::Swarm<Behaviour>,
     peer_id: PeerId,
-    execution_params: ExecutionParams,
+    env_config: Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
     db: Arc<Database>,
@@ -53,7 +53,7 @@ where
     pub fn new(
         listen_address: Multiaddr,
         seed: Seed,
-        execution_params: ExecutionParams,
+        env_config: Config,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
         db: Arc<Database>,
@@ -81,7 +81,7 @@ where
         let event_loop = EventLoop {
             swarm,
             peer_id,
-            execution_params,
+            env_config,
             bitcoin_wallet,
             monero_wallet,
             db,
@@ -133,7 +133,7 @@ where
                                 }
                             }
 
-                            match self.swarm.start_execution_setup(peer, btc, xmr, self.execution_params, self.bitcoin_wallet.as_ref(), &mut OsRng).await {
+                            match self.swarm.start_execution_setup(peer, btc, xmr, self.env_config, self.bitcoin_wallet.as_ref(), &mut OsRng).await {
                                 Ok(_) => {},
                                 Err(e) => {
                                     tracing::warn!(%peer, "failed to start execution setup: {:#}", e);
@@ -241,7 +241,7 @@ where
             event_loop_handle: handle,
             bitcoin_wallet: self.bitcoin_wallet.clone(),
             monero_wallet: self.monero_wallet.clone(),
-            execution_params: self.execution_params,
+            env_config: self.env_config,
             db: self.db.clone(),
             state: initial_state,
             swap_id,

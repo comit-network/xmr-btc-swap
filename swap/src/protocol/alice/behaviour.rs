@@ -1,4 +1,4 @@
-use crate::execution_params::ExecutionParams;
+use crate::env::Config;
 use crate::network::quote::BidQuote;
 use crate::network::{peer_tracker, quote, spot_price};
 use crate::protocol::alice::{
@@ -206,11 +206,11 @@ impl Behaviour {
         peer: PeerId,
         btc: bitcoin::Amount,
         xmr: monero::Amount,
-        execution_params: ExecutionParams,
+        env_config: Config,
         bitcoin_wallet: &bitcoin::Wallet,
         rng: &mut (impl RngCore + CryptoRng),
     ) -> Result<()> {
-        let state0 = State0::new(btc, xmr, execution_params, bitcoin_wallet, rng).await?;
+        let state0 = State0::new(btc, xmr, env_config, bitcoin_wallet, rng).await?;
 
         tracing::info!(
             %peer,

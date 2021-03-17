@@ -1,7 +1,7 @@
 use crate::bitcoin::{
     current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, TxCancel, TxPunish, TxRefund,
 };
-use crate::execution_params::ExecutionParams;
+use crate::env::Config;
 use crate::protocol::alice::{Message1, Message3};
 use crate::protocol::bob::{Message0, Message2, Message4};
 use crate::protocol::CROSS_CURVE_PROOF_SYSTEM;
@@ -96,7 +96,7 @@ impl State0 {
     pub async fn new<R>(
         btc: bitcoin::Amount,
         xmr: monero::Amount,
-        execution_params: ExecutionParams,
+        env_config: Config,
         bitcoin_wallet: &bitcoin::Wallet,
         rng: &mut R,
     ) -> Result<Self>
@@ -124,8 +124,8 @@ impl State0 {
             punish_address,
             btc,
             xmr,
-            cancel_timelock: execution_params.bitcoin_cancel_timelock,
-            punish_timelock: execution_params.bitcoin_punish_timelock,
+            cancel_timelock: env_config.bitcoin_cancel_timelock,
+            punish_timelock: env_config.bitcoin_punish_timelock,
         })
     }
 

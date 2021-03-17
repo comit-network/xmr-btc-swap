@@ -24,13 +24,13 @@ use swap::asb::config::{
     initial_setup, query_user_for_initial_testnet_config, read_config, Config, ConfigNotInitialized,
 };
 use swap::database::Database;
-use swap::execution_params::{ExecutionParams, GetExecutionParams};
+use swap::env::GetConfig;
 use swap::fs::default_config_path;
 use swap::monero::Amount;
 use swap::protocol::alice::{run, EventLoop};
 use swap::seed::Seed;
 use swap::trace::init_tracing;
-use swap::{bitcoin, execution_params, kraken, monero};
+use swap::{bitcoin, env, kraken, monero};
 use tracing::{info, warn};
 use tracing_subscriber::filter::LevelFilter;
 
@@ -38,8 +38,6 @@ use tracing_subscriber::filter::LevelFilter;
 extern crate prettytable;
 
 const DEFAULT_WALLET_NAME: &str = "asb-wallet";
-const BITCOIN_NETWORK: bitcoin::Network = bitcoin::Network::Testnet;
-const MONERO_NETWORK: monero::Network = monero::Network::Stagenet;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -78,13 +76,13 @@ async fn main() -> Result<()> {
             let seed = Seed::from_file_or_generate(&config.data.dir)
                 .expect("Could not retrieve/initialize seed");
 
-            let execution_params = execution_params::Testnet::get_execution_params();
+            let env_config = env::Testnet::get_config();
 
             let (bitcoin_wallet, monero_wallet) = init_wallets(
                 config.clone(),
                 &wallet_data_dir,
-                seed.derive_extended_private_key(BITCOIN_NETWORK)?,
-                execution_params,
+                seed.derive_extended_private_key(env_config.bitcoin_network)?,
+                env_config,
             )
             .await?;
 
@@ -98,7 +96,7 @@ async fn main() -> Result<()> {
             let (event_loop, mut swap_receiver) = EventLoop::new(
                 config.network.listen,
                 seed,
-                execution_params,
+                env_config,
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
                 Arc::new(db),
@@ -148,14 +146,13 @@ async fn init_wallets(
     config: Config,
     bitcoin_wallet_data_dir: &Path,
     key: impl DerivableKey<Segwitv0> + Clone,
-    execution_params: ExecutionParams,
+    env_config: env::Config,
 ) -> Result<(bitcoin::Wallet, monero::Wallet)> {
     let bitcoin_wallet = bitcoin::Wallet::new(
         config.bitcoin.electrum_rpc_url,
-        BITCOIN_NETWORK,
-        execution_params.bitcoin_finality_confirmations,
         bitcoin_wallet_data_dir,
         key,
+        env_config,
     )
     .await?;
 
@@ -169,9 +166,8 @@ async fn init_wallets(
 
     let monero_wallet = monero::Wallet::new(
         config.monero.wallet_rpc_url.clone(),
-        MONERO_NETWORK,
         DEFAULT_WALLET_NAME.to_string(),
-        execution_params.monero_avg_block_time,
+        env_config,
     );
 
     // Setup the Monero wallet

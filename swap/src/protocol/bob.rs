@@ -1,5 +1,5 @@
 use crate::database::Database;
-use crate::execution_params::ExecutionParams;
+use crate::env::Config;
 use crate::network::{peer_tracker, spot_price};
 use crate::protocol::alice::TransferProof;
 use crate::protocol::bob;
@@ -37,7 +37,7 @@ pub struct Swap {
     pub db: Database,
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
-    pub execution_params: ExecutionParams,
+    pub env_config: Config,
     pub swap_id: Uuid,
     pub receive_monero_address: ::monero::Address,
 }
@@ -50,7 +50,7 @@ pub struct Builder {
     monero_wallet: Arc<monero::Wallet>,
 
     init_params: InitParams,
-    execution_params: ExecutionParams,
+    env_config: Config,
 
     event_loop_handle: EventLoopHandle,
 
@@ -69,7 +69,7 @@ impl Builder {
         swap_id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
-        execution_params: ExecutionParams,
+        env_config: Config,
         event_loop_handle: EventLoopHandle,
         receive_monero_address: ::monero::Address,
     ) -> Self {
@@ -79,7 +79,7 @@ impl Builder {
             bitcoin_wallet,
             monero_wallet,
             init_params: InitParams::None,
-            execution_params,
+            env_config,
             event_loop_handle,
             receive_monero_address,
         }
@@ -105,7 +105,7 @@ impl Builder {
             bitcoin_wallet: self.bitcoin_wallet.clone(),
             monero_wallet: self.monero_wallet.clone(),
             swap_id: self.swap_id,
-            execution_params: self.execution_params,
+            env_config: self.env_config,
             receive_monero_address: self.receive_monero_address,
         })
     }
