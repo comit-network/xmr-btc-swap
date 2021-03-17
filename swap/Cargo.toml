@@ -22,7 +22,7 @@ bitcoin = { version = "0.26", features = ["rand", "use-serde"] }
 config = { version = "0.10", default-features = false, features = ["toml"] }
 conquer-once = "0.3"
 curve25519-dalek = "3"
-dialoguer = "0.7"
+dialoguer = "0.8"
 directories-next = "2"
 ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", features = ["libsecp_compat", "serde"] }
 futures = { version = "0.3", default-features = false }
