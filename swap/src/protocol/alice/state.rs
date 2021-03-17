@@ -1,6 +1,5 @@
 use crate::bitcoin::{
-    current_epoch, wait_for_cancel_timelock_to_expire, CancelTimelock, ExpiredTimelocks,
-    PunishTimelock, TxCancel, TxRefund,
+    current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, TxCancel, TxPunish, TxRefund,
 };
 use crate::execution_params::ExecutionParams;
 use crate::protocol::alice::{Message1, Message3};
@@ -37,7 +36,6 @@ pub enum AliceState {
     BtcRedeemed,
     BtcCancelled {
         monero_wallet_restore_blockheight: BlockHeight,
-        tx_cancel: Box<TxCancel>,
         state3: Box<State3>,
     },
     BtcRefunded {
@@ -47,7 +45,6 @@ pub enum AliceState {
     },
     BtcPunishable {
         monero_wallet_restore_blockheight: BlockHeight,
-        tx_refund: Box<TxRefund>,
         state3: Box<State3>,
     },
     XmrRefunded,
@@ -323,24 +320,45 @@ impl State3 {
         &self,
         bitcoin_wallet: &bitcoin::Wallet,
     ) -> Result<()> {
-        wait_for_cancel_timelock_to_expire(
-            bitcoin_wallet,
-            self.cancel_timelock,
-            self.tx_lock.txid(),
-        )
-        .await
+        bitcoin_wallet
+            .watch_until_status(&self.tx_lock, |status| {
+                status.is_confirmed_with(self.cancel_timelock)
+            })
+            .await?;
+
+        Ok(())
     }
 
     pub async fn expired_timelocks(
         &self,
         bitcoin_wallet: &bitcoin::Wallet,
     ) -> Result<ExpiredTimelocks> {
-        current_epoch(
-            bitcoin_wallet,
+        let tx_cancel = self.tx_cancel();
+
+        let tx_lock_status = bitcoin_wallet.status_of_script(&self.tx_lock).await?;
+        let tx_cancel_status = bitcoin_wallet.status_of_script(&tx_cancel).await?;
+
+        Ok(current_epoch(
             self.cancel_timelock,
             self.punish_timelock,
-            self.tx_lock.txid(),
+            tx_lock_status,
+            tx_cancel_status,
+        ))
+    }
+
+    pub fn tx_cancel(&self) -> TxCancel {
+        TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B)
+    }
+
+    pub fn tx_punish(&self) -> TxPunish {
+        bitcoin::TxPunish::new(
+            &self.tx_cancel(),
+            &self.punish_address,
+            self.punish_timelock,
         )
-        .await
+    }
+
+    pub fn tx_refund(&self) -> TxRefund {
+        bitcoin::TxRefund::new(&self.tx_cancel(), &self.refund_address)
     }
 }

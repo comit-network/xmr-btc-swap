@@ -152,8 +152,8 @@ async fn init_wallets(
 ) -> Result<(bitcoin::Wallet, monero::Wallet)> {
     let bitcoin_wallet = bitcoin::Wallet::new(
         config.bitcoin.electrum_rpc_url,
-        config.bitcoin.electrum_http_url,
         BITCOIN_NETWORK,
+        execution_params.bitcoin_finality_confirmations,
         bitcoin_wallet_data_dir,
         key,
     )

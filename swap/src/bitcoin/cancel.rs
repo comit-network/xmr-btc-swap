@@ -1,3 +1,4 @@
+use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{
     build_shared_output_descriptor, Address, Amount, BlockHeight, PublicKey, Transaction, TxLock,
     TX_FEE,
@@ -5,9 +6,11 @@ use crate::bitcoin::{
 use ::bitcoin::util::bip143::SigHashCache;
 use ::bitcoin::{OutPoint, SigHash, SigHashType, TxIn, TxOut, Txid};
 use anyhow::Result;
+use bitcoin::Script;
 use ecdsa_fun::Signature;
 use miniscript::{Descriptor, DescriptorTrait};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ops::Add;
 
@@ -33,6 +36,18 @@ impl Add<CancelTimelock> for BlockHeight {
     }
 }
 
+impl PartialOrd<CancelTimelock> for u32 {
+    fn partial_cmp(&self, other: &CancelTimelock) -> Option<Ordering> {
+        self.partial_cmp(&other.0)
+    }
+}
+
+impl PartialEq<CancelTimelock> for u32 {
+    fn eq(&self, other: &CancelTimelock) -> bool {
+        self.eq(&other.0)
+    }
+}
+
 /// Represent a timelock, expressed in relative block height as defined in
 /// [BIP68](https://github.com/bitcoin/bips/blob/master/bip-0068.mediawiki).
 /// E.g. The timelock expires 10 blocks after the reference transaction is
@@ -55,7 +70,19 @@ impl Add<PunishTimelock> for BlockHeight {
     }
 }
 
-#[derive(Debug, Clone)]
+impl PartialOrd<PunishTimelock> for u32 {
+    fn partial_cmp(&self, other: &PunishTimelock) -> Option<Ordering> {
+        self.partial_cmp(&other.0)
+    }
+}
+
+impl PartialEq<PunishTimelock> for u32 {
+    fn eq(&self, other: &PunishTimelock) -> bool {
+        self.eq(&other.0)
+    }
+}
+
+#[derive(Debug)]
 pub struct TxCancel {
     inner: Transaction,
     digest: SigHash,
@@ -178,5 +205,15 @@ impl TxCancel {
             input: vec![tx_in],
             output: vec![tx_out],
         }
+    }
+}
+
+impl Watchable for TxCancel {
+    fn id(&self) -> Txid {
+        self.txid()
+    }
+
+    fn script(&self) -> Script {
+        self.output_descriptor.script_pubkey()
     }
 }

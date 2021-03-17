@@ -48,7 +48,6 @@ async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
         let bob_state = bob::refund(
             bob_swap.swap_id,
             bob_swap.state,
-            bob_swap.execution_params,
             bob_swap.bitcoin_wallet,
             bob_swap.db,
             false,

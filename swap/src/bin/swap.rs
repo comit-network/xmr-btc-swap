@@ -21,9 +21,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use structopt::StructOpt;
 use swap::bitcoin::{Amount, TxLock};
-use swap::cli::command::{
-    AliceConnectParams, Arguments, BitcoinParams, Command, Data, MoneroParams,
-};
+use swap::cli::command::{AliceConnectParams, Arguments, Command, Data, MoneroParams};
 use swap::database::Database;
 use swap::execution_params::{ExecutionParams, GetExecutionParams};
 use swap::network::quote::BidQuote;
@@ -95,11 +93,7 @@ async fn main() -> Result<()> {
                     receive_monero_address,
                     monero_daemon_host,
                 },
-            bitcoin_params:
-                BitcoinParams {
-                    electrum_http_url,
-                    electrum_rpc_url,
-                },
+            electrum_rpc_url,
         } => {
             if receive_monero_address.network != monero_network {
                 bail!(
@@ -112,9 +106,9 @@ async fn main() -> Result<()> {
             let bitcoin_wallet = init_bitcoin_wallet(
                 bitcoin_network,
                 electrum_rpc_url,
-                electrum_http_url,
                 seed,
                 data_dir.clone(),
+                execution_params,
             )
             .await?;
             let (monero_wallet, _process) = init_monero_wallet(
@@ -196,11 +190,7 @@ async fn main() -> Result<()> {
                     receive_monero_address,
                     monero_daemon_host,
                 },
-            bitcoin_params:
-                BitcoinParams {
-                    electrum_http_url,
-                    electrum_rpc_url,
-                },
+            electrum_rpc_url,
         } => {
             if receive_monero_address.network != monero_network {
                 bail!("The given monero address is on network {:?}, expected address of network {:?}.", receive_monero_address.network, monero_network)
@@ -209,9 +199,9 @@ async fn main() -> Result<()> {
             let bitcoin_wallet = init_bitcoin_wallet(
                 bitcoin_network,
                 electrum_rpc_url,
-                electrum_http_url,
                 seed,
                 data_dir.clone(),
+                execution_params,
             )
             .await?;
             let (monero_wallet, _process) = init_monero_wallet(
@@ -255,18 +245,14 @@ async fn main() -> Result<()> {
         Command::Cancel {
             swap_id,
             force,
-            bitcoin_params:
-                BitcoinParams {
-                    electrum_http_url,
-                    electrum_rpc_url,
-                },
+            electrum_rpc_url,
         } => {
             let bitcoin_wallet = init_bitcoin_wallet(
                 bitcoin_network,
                 electrum_rpc_url,
-                electrum_http_url,
                 seed,
                 data_dir,
+                execution_params,
             )
             .await?;
 
@@ -290,32 +276,20 @@ async fn main() -> Result<()> {
         Command::Refund {
             swap_id,
             force,
-            bitcoin_params:
-                BitcoinParams {
-                    electrum_http_url,
-                    electrum_rpc_url,
-                },
+            electrum_rpc_url,
         } => {
             let bitcoin_wallet = init_bitcoin_wallet(
                 bitcoin_network,
                 electrum_rpc_url,
-                electrum_http_url,
                 seed,
                 data_dir,
+                execution_params,
             )
             .await?;
 
             let resume_state = db.get_state(swap_id)?.try_into_bob()?.into();
 
-            bob::refund(
-                swap_id,
-                resume_state,
-                execution_params,
-                Arc::new(bitcoin_wallet),
-                db,
-                force,
-            )
-            .await??;
+            bob::refund(swap_id, resume_state, Arc::new(bitcoin_wallet), db, force).await??;
         }
     };
     Ok(())
@@ -324,16 +298,16 @@ async fn main() -> Result<()> {
 async fn init_bitcoin_wallet(
     network: bitcoin::Network,
     electrum_rpc_url: Url,
-    electrum_http_url: Url,
     seed: Seed,
     data_dir: PathBuf,
+    execution_params: ExecutionParams,
 ) -> Result<bitcoin::Wallet> {
     let wallet_dir = data_dir.join("wallet");
 
     let wallet = bitcoin::Wallet::new(
         electrum_rpc_url.clone(),
-        electrum_http_url.clone(),
         network,
+        execution_params.bitcoin_finality_confirmations,
         &wallet_dir,
         seed.derive_extended_private_key(network)?,
     )

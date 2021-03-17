@@ -1,9 +1,11 @@
+use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{
     build_shared_output_descriptor, Address, Amount, PublicKey, Transaction, Wallet, TX_FEE,
 };
 use ::bitcoin::util::psbt::PartiallySignedTransaction;
 use ::bitcoin::{OutPoint, TxIn, TxOut, Txid};
 use anyhow::Result;
+use bitcoin::Script;
 use ecdsa_fun::fun::Point;
 use miniscript::{Descriptor, DescriptorTrait};
 use rand::thread_rng;
@@ -55,6 +57,10 @@ impl TxLock {
         .len()
     }
 
+    pub fn script_pubkey(&self) -> Script {
+        self.output_descriptor.script_pubkey()
+    }
+
     /// Retreive the index of the locked output in the transaction outputs
     /// vector
     fn lock_output_vout(&self) -> usize {
@@ -98,5 +104,15 @@ impl TxLock {
 impl From<TxLock> for PartiallySignedTransaction {
     fn from(from: TxLock) -> Self {
         from.inner
+    }
+}
+
+impl Watchable for TxLock {
+    fn id(&self) -> Txid {
+        self.txid()
+    }
+
+    fn script(&self) -> Script {
+        self.output_descriptor.script_pubkey()
     }
 }

@@ -1,6 +1,5 @@
 use crate::bitcoin::Wallet;
 use crate::database::{Database, Swap};
-use crate::execution_params::ExecutionParams;
 use crate::protocol::bob::BobState;
 use anyhow::{bail, Result};
 use std::sync::Arc;
@@ -13,7 +12,6 @@ pub struct SwapNotCancelledYet(Uuid);
 pub async fn refund(
     swap_id: Uuid,
     state: BobState,
-    execution_params: ExecutionParams,
     bitcoin_wallet: Arc<Wallet>,
     db: Database,
     force: bool,
@@ -41,9 +39,7 @@ pub async fn refund(
         }
     };
 
-    state4
-        .refund_btc(bitcoin_wallet.as_ref(), execution_params)
-        .await?;
+    state4.refund_btc(bitcoin_wallet.as_ref()).await?;
 
     let state = BobState::BtcRefunded(state4);
     let db_state = state.clone().into();

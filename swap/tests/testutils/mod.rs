@@ -339,10 +339,6 @@ where
         .electrs
         .get_host_port(testutils::electrs::RPC_PORT)
         .expect("Could not map electrs rpc port");
-    let electrs_http_port = containers
-        .electrs
-        .get_host_port(testutils::electrs::HTTP_PORT)
-        .expect("Could not map electrs http port");
 
     let alice_seed = Seed::random().unwrap();
     let bob_seed = Seed::random().unwrap();
@@ -354,7 +350,6 @@ where
         alice_starting_balances.clone(),
         tempdir().unwrap().path(),
         electrs_rpc_port,
-        electrs_http_port,
         alice_seed,
         execution_params,
     )
@@ -377,7 +372,6 @@ where
         bob_starting_balances.clone(),
         tempdir().unwrap().path(),
         electrs_rpc_port,
-        electrs_http_port,
         bob_seed,
         execution_params,
     )
@@ -585,7 +579,6 @@ async fn init_test_wallets(
     starting_balances: StartingBalances,
     datadir: &Path,
     electrum_rpc_port: u16,
-    electrum_http_port: u16,
     seed: Seed,
     execution_params: ExecutionParams,
 ) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {
@@ -605,15 +598,11 @@ async fn init_test_wallets(
         let input = format!("tcp://@localhost:{}", electrum_rpc_port);
         Url::parse(&input).unwrap()
     };
-    let electrum_http_url = {
-        let input = format!("http://@localhost:{}", electrum_http_port);
-        Url::parse(&input).unwrap()
-    };
 
     let btc_wallet = swap::bitcoin::Wallet::new(
         electrum_rpc_url,
-        electrum_http_url,
         bitcoin::Network::Regtest,
+        execution_params.bitcoin_finality_confirmations,
         datadir,
         seed.derive_extended_private_key(bitcoin::Network::Regtest)
             .expect("Could not create extended private key from seed"),
@@ -675,26 +664,9 @@ pub fn init_tracing() -> DefaultGuard {
     // trouble when running multiple tests.
     let _ = LogTracer::init();
 
-    let global_filter = tracing::Level::WARN;
-    let swap_filter = tracing::Level::DEBUG;
-    let xmr_btc_filter = tracing::Level::DEBUG;
-    let monero_rpc_filter = tracing::Level::DEBUG;
-    let monero_harness_filter = tracing::Level::DEBUG;
-    let bitcoin_harness_filter = tracing::Level::INFO;
-    let testcontainers_filter = tracing::Level::DEBUG;
-
     use tracing_subscriber::util::SubscriberInitExt as _;
     tracing_subscriber::fmt()
-        .with_env_filter(format!(
-            "{},swap={},xmr_btc={},monero_harness={},monero_rpc={},bitcoin_harness={},testcontainers={}",
-            global_filter,
-            swap_filter,
-            xmr_btc_filter,
-            monero_harness_filter,
-            monero_rpc_filter,
-            bitcoin_harness_filter,
-            testcontainers_filter
-        ))
+        .with_env_filter("warn,swap=debug,monero_harness=debug,monero_rpc=info,bitcoin_harness=info,testcontainers=info")
         .set_default()
 }
 

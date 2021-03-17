@@ -12,7 +12,6 @@ use tracing::info;
 use url::Url;
 
 const DEFAULT_LISTEN_ADDRESS: &str = "/ip4/0.0.0.0/tcp/9939";
-const DEFAULT_ELECTRUM_HTTP_URL: &str = "https://blockstream.info/testnet/api/";
 const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://electrum.blockstream.info:60002";
 const DEFAULT_MONERO_WALLET_RPC_TESTNET_URL: &str = "http://127.0.0.1:38083/json_rpc";
 
@@ -52,7 +51,6 @@ pub struct Network {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Bitcoin {
-    pub electrum_http_url: Url,
     pub electrum_rpc_url: Url,
 }
 
@@ -120,12 +118,6 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
         .interact_text()?;
     let listen_address = listen_address.as_str().parse()?;
 
-    let electrum_http_url: String = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Enter Electrum HTTP URL or hit return to use default")
-        .default(DEFAULT_ELECTRUM_HTTP_URL.to_owned())
-        .interact_text()?;
-    let electrum_http_url = Url::parse(electrum_http_url.as_str())?;
-
     let electrum_rpc_url: String = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter Electrum RPC URL or hit return to use default")
         .default(DEFAULT_ELECTRUM_RPC_URL.to_owned())
@@ -144,10 +136,7 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
         network: Network {
             listen: listen_address,
         },
-        bitcoin: Bitcoin {
-            electrum_http_url,
-            electrum_rpc_url,
-        },
+        bitcoin: Bitcoin { electrum_rpc_url },
         monero: Monero {
             wallet_rpc_url: monero_wallet_rpc_url,
         },
@@ -170,7 +159,6 @@ mod tests {
                 dir: Default::default(),
             },
             bitcoin: Bitcoin {
-                electrum_http_url: Url::from_str(DEFAULT_ELECTRUM_HTTP_URL).unwrap(),
                 electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
             },
             network: Network {

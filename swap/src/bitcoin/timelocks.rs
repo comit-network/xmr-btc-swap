@@ -1,4 +1,7 @@
+use anyhow::Context;
+use bdk::electrum_client::HeaderNotification;
 use serde::{Deserialize, Serialize};
+use std::convert::{TryFrom, TryInto};
 use std::ops::Add;
 
 /// Represent a block height, or block number, expressed in absolute block
@@ -26,6 +29,19 @@ impl BlockHeight {
     }
 }
 
+impl TryFrom<HeaderNotification> for BlockHeight {
+    type Error = anyhow::Error;
+
+    fn try_from(value: HeaderNotification) -> Result<Self, Self::Error> {
+        Ok(Self(
+            value
+                .height
+                .try_into()
+                .context("Failed to fit usize into u32")?,
+        ))
+    }
+}
+
 impl Add<u32> for BlockHeight {
     type Output = BlockHeight;
     fn add(self, rhs: u32) -> Self::Output {
@@ -33,7 +49,7 @@ impl Add<u32> for BlockHeight {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ExpiredTimelocks {
     None,
     Cancel,
