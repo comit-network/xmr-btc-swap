@@ -2,11 +2,11 @@ XMR to BTC Atomic Swap
 ======================
 
 This repository hosts an MVP for atomically swapping BTC to XMR.
-It implements the protocol described in [this](https://arxiv.org/abs/2101.12332) paper.
+It implements the protocol described in section 3 of [this](https://arxiv.org/abs/2101.12332) paper.
 
 ## Quick start
 
-1. Download the [latest release](https://github.com/comit-network/xmr-btc-swap/releases/latest) for your operation system
+1. Download the [latest release](https://github.com/comit-network/xmr-btc-swap/releases/latest) for your operating system
 2. Run the binary: `./swap buy-xmr --receive-address <YOUR MONERO ADDRESS>`
 3. Follow the instructions printed to the terminal
 
@@ -35,4 +35,4 @@ It provides the CLI with a quote and the liquidity necessary for swapping BTC in
 
 ## Contact
 
-Feel free to reach to out us in the [COMIT-Monero Matrix channel](https://matrix.to/#/#comit-monero:matrix.org). 
+Feel free to reach out to us in the [COMIT-Monero Matrix channel](https://matrix.to/#/#comit-monero:matrix.org).
