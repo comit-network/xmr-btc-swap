@@ -3487,7 +3487,7 @@ dependencies = [
  "port_check",
  "prettytable-rs",
  "rand 0.7.3",
- "rand_chacha 0.2.2",
+ "rand_chacha 0.3.0",
  "reqwest",
  "rust_decimal",
  "serde",
