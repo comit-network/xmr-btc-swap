@@ -1,4 +1,5 @@
 use crate::bitcoin::{CancelTimelock, PunishTimelock};
+use std::cmp::max;
 use std::time::Duration;
 use time::NumericalStdDurationShort;
 
@@ -13,6 +14,16 @@ pub struct Config {
     pub monero_avg_block_time: Duration,
     pub monero_finality_confirmations: u32,
     pub monero_network: monero::Network,
+}
+
+impl Config {
+    pub fn bitcoin_sync_interval(&self) -> Duration {
+        sync_interval(self.bitcoin_avg_block_time)
+    }
+
+    pub fn monero_sync_interval(&self) -> Duration {
+        sync_interval(self.monero_avg_block_time)
+    }
 }
 
 pub trait GetConfig {
@@ -73,5 +84,28 @@ impl GetConfig for Regtest {
             monero_finality_confirmations: 10,
             monero_network: monero::Network::Mainnet, // yes this is strange
         }
+    }
+}
+
+fn sync_interval(avg_block_time: Duration) -> Duration {
+    max(avg_block_time / 10, Duration::from_secs(1))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_interval_is_one_second_if_avg_blocktime_is_one_second() {
+        let interval = sync_interval(Duration::from_secs(1));
+
+        assert_eq!(interval, Duration::from_secs(1))
+    }
+
+    #[test]
+    fn check_interval_is_tenth_of_avg_blocktime() {
+        let interval = sync_interval(Duration::from_secs(100));
+
+        assert_eq!(interval, Duration::from_secs(10))
     }
 }
