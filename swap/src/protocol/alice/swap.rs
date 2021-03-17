@@ -7,8 +7,7 @@ use crate::monero_ext::ScalarExt;
 use crate::protocol::alice;
 use crate::protocol::alice::event_loop::EventLoopHandle;
 use crate::protocol::alice::steps::{
-    extract_monero_private_key, lock_xmr, publish_cancel_transaction,
-    wait_for_bitcoin_encrypted_signature, wait_for_bitcoin_refund,
+    extract_monero_private_key, lock_xmr, publish_cancel_transaction, wait_for_bitcoin_refund,
 };
 use crate::protocol::alice::AliceState;
 use crate::{bitcoin, database, monero};
@@ -18,6 +17,7 @@ use futures::future::{select, Either};
 use futures::pin_mut;
 use rand::{CryptoRng, RngCore};
 use std::sync::Arc;
+use tokio::select;
 use tokio::time::timeout;
 use tracing::{error, info};
 use uuid::Uuid;
@@ -141,25 +141,22 @@ async fn run_until_internal(
             } => {
                 let state = match state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {
                     ExpiredTimelocks::None => {
-                        let wait_for_enc_sig =
-                            wait_for_bitcoin_encrypted_signature(&mut event_loop_handle);
-                        let state3_clone = state3.clone();
-                        let cancel_timelock_expires = state3_clone
-                            .wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
+                        select! {
+                            _ = state3.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()) => {
+                                AliceState::CancelTimelockExpired {
+                                    state3,
+                                    monero_wallet_restore_blockheight,
+                                }
+                            }
+                            enc_sig = event_loop_handle.recv_encrypted_signature() => {
+                                tracing::info!("Received encrypted signature");
 
-                        pin_mut!(wait_for_enc_sig);
-                        pin_mut!(cancel_timelock_expires);
-
-                        match select(cancel_timelock_expires, wait_for_enc_sig).await {
-                            Either::Left(_) => AliceState::CancelTimelockExpired {
-                                state3,
-                                monero_wallet_restore_blockheight,
-                            },
-                            Either::Right((enc_sig, _)) => AliceState::EncSigLearned {
-                                state3,
-                                encrypted_signature: Box::new(enc_sig?),
-                                monero_wallet_restore_blockheight,
-                            },
+                                AliceState::EncSigLearned {
+                                    state3,
+                                    encrypted_signature: Box::new(enc_sig?),
+                                    monero_wallet_restore_blockheight,
+                                }
+                            }
                         }
                     }
                     _ => AliceState::CancelTimelockExpired {

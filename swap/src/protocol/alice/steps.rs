@@ -1,6 +1,4 @@
-use crate::bitcoin::{
-    CancelTimelock, EncryptedSignature, PunishTimelock, TxCancel, TxLock, TxRefund,
-};
+use crate::bitcoin::{CancelTimelock, PunishTimelock, TxCancel, TxLock, TxRefund};
 use crate::protocol::alice;
 use crate::protocol::alice::event_loop::EventLoopHandle;
 use crate::{bitcoin, monero};
@@ -30,19 +28,6 @@ pub async fn lock_xmr(
         .await?;
 
     Ok(())
-}
-
-pub async fn wait_for_bitcoin_encrypted_signature(
-    event_loop_handle: &mut EventLoopHandle,
-) -> Result<EncryptedSignature> {
-    let msg3 = event_loop_handle
-        .recv_encrypted_signature()
-        .await
-        .context("Failed to receive Bitcoin encrypted signature from Bob")?;
-
-    tracing::debug!("Message 3 received, returning it");
-
-    Ok(msg3)
 }
 
 pub async fn publish_cancel_transaction(
