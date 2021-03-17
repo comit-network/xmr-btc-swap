@@ -106,7 +106,7 @@ impl State0 {
         let a = bitcoin::SecretKey::new_random(rng);
         let v_a = monero::PrivateViewKey::new_random(rng);
         let redeem_address = bitcoin_wallet.new_address().await?;
-        let punish_address = redeem_address.clone();
+        let punish_address = bitcoin_wallet.new_address().await?;
 
         let s_a = monero::Scalar::random(rng);
         let (dleq_proof_s_a, (S_a_bitcoin, S_a_monero)) = CROSS_CURVE_PROOF_SYSTEM.prove(&s_a, rng);
