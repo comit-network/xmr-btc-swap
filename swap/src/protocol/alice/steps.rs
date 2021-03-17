@@ -6,7 +6,6 @@ use crate::protocol::alice::event_loop::EventLoopHandle;
 use crate::protocol::alice::TransferProof;
 use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
-use futures::pin_mut;
 
 pub async fn lock_xmr(
     state3: alice::State3,
@@ -102,9 +101,6 @@ pub async fn wait_for_bitcoin_refund(
     let punish_timelock_expired = bitcoin_wallet.watch_until_status(tx_cancel, |status| {
         status.is_confirmed_with(punish_timelock)
     });
-
-    pin_mut!(punish_timelock_expired);
-    pin_mut!(seen_refund_tx);
 
     tokio::select! {
         seen_refund = seen_refund_tx => {
