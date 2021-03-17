@@ -29,7 +29,7 @@ pub struct Message3 {
 #[derive(Debug)]
 pub enum OutEvent {
     Done { bob_peer_id: PeerId, state3: State3 },
-    Failure(Error),
+    Failure { peer: PeerId, error: Error },
 }
 
 impl From<BehaviourOutEvent<(PeerId, State3), (), Error>> for OutEvent {
@@ -39,7 +39,7 @@ impl From<BehaviourOutEvent<(PeerId, State3), (), Error>> for OutEvent {
                 bob_peer_id,
                 state3,
             },
-            BehaviourOutEvent::Inbound(_, Err(e)) => OutEvent::Failure(e),
+            BehaviourOutEvent::Inbound(peer, Err(e)) => OutEvent::Failure { peer, error: e },
             BehaviourOutEvent::Outbound(..) => unreachable!("Alice only supports inbound"),
         }
     }

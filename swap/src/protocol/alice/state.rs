@@ -7,7 +7,6 @@ use crate::protocol::bob::{Message0, Message2, Message4};
 use crate::protocol::CROSS_CURVE_PROOF_SYSTEM;
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, bail, Context, Result};
-use libp2p::PeerId;
 use monero_rpc::wallet::BlockHeight;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -17,11 +16,9 @@ use std::fmt;
 #[derive(Debug)]
 pub enum AliceState {
     Started {
-        bob_peer_id: PeerId,
         state3: Box<State3>,
     },
     BtcLocked {
-        bob_peer_id: PeerId,
         state3: Box<State3>,
     },
     XmrLocked {

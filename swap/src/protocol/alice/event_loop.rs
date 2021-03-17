@@ -9,13 +9,16 @@ use crate::protocol::bob::EncryptedSignature;
 use crate::seed::Seed;
 use crate::{bitcoin, kraken, monero};
 use anyhow::{bail, Context, Result};
+use futures::future;
+use futures::future::{BoxFuture, FutureExt};
+use futures::stream::{FuturesUnordered, StreamExt};
 use libp2p::core::Multiaddr;
-use libp2p::futures::FutureExt;
 use libp2p::{PeerId, Swarm};
 use rand::rngs::OsRng;
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{mpsc, oneshot};
 use tracing::{debug, error, trace};
 use uuid::Uuid;
 
@@ -30,19 +33,19 @@ pub struct EventLoop<RS> {
     latest_rate: RS,
     max_buy: bitcoin::Amount,
 
-    recv_encrypted_signature: broadcast::Sender<EncryptedSignature>,
-    send_transfer_proof: mpsc::Receiver<(PeerId, TransferProof)>,
-
-    // Only used to produce new handles
-    send_transfer_proof_sender: mpsc::Sender<(PeerId, TransferProof)>,
+    /// Stores a sender per peer for incoming [`EncryptedSignature`]s.
+    recv_encrypted_signature: HashMap<PeerId, oneshot::Sender<EncryptedSignature>>,
+    /// Stores a list of futures, waiting for transfer proof which will be sent
+    /// to the given peer.
+    send_transfer_proof: FuturesUnordered<BoxFuture<'static, Result<(PeerId, TransferProof)>>>,
 
     swap_sender: mpsc::Sender<Swap>,
 }
 
 #[derive(Debug)]
 pub struct EventLoopHandle {
-    recv_encrypted_signature: broadcast::Receiver<EncryptedSignature>,
-    send_transfer_proof: mpsc::Sender<(PeerId, TransferProof)>,
+    recv_encrypted_signature: Option<oneshot::Receiver<EncryptedSignature>>,
+    send_transfer_proof: Option<oneshot::Sender<TransferProof>>,
 }
 
 impl<LR> EventLoop<LR>
@@ -74,8 +77,6 @@ where
         Swarm::listen_on(&mut swarm, listen_address.clone())
             .with_context(|| format!("Address is not supported: {:#}", listen_address))?;
 
-        let recv_encrypted_signature = BroadcastChannels::default();
-        let send_transfer_proof = MpscChannels::default();
         let swap_channel = MpscChannels::default();
 
         let event_loop = EventLoop {
@@ -86,20 +87,12 @@ where
             monero_wallet,
             db,
             latest_rate,
-            recv_encrypted_signature: recv_encrypted_signature.sender,
-            send_transfer_proof: send_transfer_proof.receiver,
-            send_transfer_proof_sender: send_transfer_proof.sender,
             swap_sender: swap_channel.sender,
             max_buy,
+            recv_encrypted_signature: Default::default(),
+            send_transfer_proof: Default::default(),
         };
         Ok((event_loop, swap_channel.receiver))
-    }
-
-    pub fn new_handle(&self) -> EventLoopHandle {
-        EventLoopHandle {
-            recv_encrypted_signature: self.recv_encrypted_signature.subscribe(),
-            send_transfer_proof: self.send_transfer_proof_sender.clone(),
-        }
     }
 
     pub fn peer_id(&self) -> PeerId {
@@ -107,9 +100,13 @@ where
     }
 
     pub async fn run(mut self) {
+        // ensure that the send_transfer_proof stream is NEVER empty, otherwise it will
+        // terminate forever.
+        self.send_transfer_proof.push(future::pending().boxed());
+
         loop {
             tokio::select! {
-                swarm_event = self.swarm.next().fuse() => {
+                swarm_event = self.swarm.next() => {
                     match swarm_event {
                         OutEvent::ConnectionEstablished(alice) => {
                             debug!("Connection Established with {}", alice);
@@ -161,27 +158,43 @@ where
                         OutEvent::ExecutionSetupDone{bob_peer_id, state3} => {
                             let _ = self.handle_execution_setup_done(bob_peer_id, *state3).await;
                         }
-                        OutEvent::TransferProofAcknowledged => {
-                            trace!("Bob acknowledged transfer proof");
+                        OutEvent::TransferProofAcknowledged(peer) => {
+                            trace!(%peer, "Bob acknowledged transfer proof");
                         }
-                        OutEvent::EncryptedSignature{ msg, channel } => {
-                            let _ = self.recv_encrypted_signature.send(*msg);
-                            // Send back empty response so that the request/response protocol completes.
+                        OutEvent::EncryptedSignature{ msg, channel, peer } => {
+                            match self.recv_encrypted_signature.remove(&peer) {
+                                Some(sender) => {
+                                    // this failing just means the receiver is no longer interested ...
+                                    let _ = sender.send(*msg);
+                                },
+                                None => {
+                                    tracing::warn!(%peer, "No sender for encrypted signature, maybe already handled?")
+                                }
+                            }
+
                             if let Err(error) = self.swarm.send_encrypted_signature_ack(channel) {
                                 error!("Failed to send Encrypted Signature ack: {:?}", error);
                             }
                         }
                         OutEvent::ResponseSent => {}
-                        OutEvent::Failure(err) => {
-                            error!("Communication error: {:#}", err);
+                        OutEvent::Failure {peer, error} => {
+                            error!(%peer, "Communication error: {:#}", error);
                         }
                     }
                 },
-                transfer_proof = self.send_transfer_proof.recv().fuse() => {
-                    if let Some((bob_peer_id, msg)) = transfer_proof  {
-                      self.swarm.send_transfer_proof(bob_peer_id, msg);
+                next_transfer_proof = self.send_transfer_proof.next() => {
+                    match next_transfer_proof {
+                        Some(Ok((peer, transfer_proof))) => {
+                            self.swarm.send_transfer_proof(peer, transfer_proof);
+                        },
+                        Some(Err(_)) => {
+                            tracing::debug!("A swap stopped without sending a transfer proof");
+                        }
+                        None => {
+                            unreachable!("stream of transfer proof receivers must never terminate")
+                        }
                     }
-                },
+                }
             }
         }
     }
@@ -230,11 +243,10 @@ where
 
     async fn handle_execution_setup_done(&mut self, bob_peer_id: PeerId, state3: State3) {
         let swap_id = Uuid::new_v4();
-        let handle = self.new_handle();
+        let handle = self.new_handle(bob_peer_id);
 
         let initial_state = AliceState::Started {
             state3: Box::new(state3),
-            bob_peer_id,
         };
 
         let swap = Swap {
@@ -249,6 +261,29 @@ where
 
         if let Err(error) = self.swap_sender.send(swap).await {
             tracing::warn!(%swap_id, "Swap cannot be spawned: {}", error);
+        }
+    }
+
+    /// Create a new [`EventLoopHandle`] that is scoped for communication with
+    /// the given peer.
+    fn new_handle(&mut self, peer: PeerId) -> EventLoopHandle {
+        let (send_transfer_proof_sender, send_transfer_proof_receiver) = oneshot::channel();
+        let (recv_enc_sig_sender, recv_enc_sig_receiver) = oneshot::channel();
+
+        self.recv_encrypted_signature
+            .insert(peer, recv_enc_sig_sender);
+        self.send_transfer_proof.push(
+            async move {
+                let transfer_proof = send_transfer_proof_receiver.await?;
+
+                Ok((peer, transfer_proof))
+            }
+            .boxed(),
+        );
+
+        EventLoopHandle {
+            recv_encrypted_signature: Some(recv_enc_sig_receiver),
+            send_transfer_proof: Some(send_transfer_proof_sender),
         }
     }
 }
@@ -277,13 +312,24 @@ impl LatestRate for kraken::RateUpdateStream {
 
 impl EventLoopHandle {
     pub async fn recv_encrypted_signature(&mut self) -> Result<EncryptedSignature> {
-        self.recv_encrypted_signature
-            .recv()
-            .await
-            .context("Failed to receive Bitcoin encrypted signature from Bob")
+        let signature = self
+            .recv_encrypted_signature
+            .take()
+            .context("Encrypted signature was already received")?
+            .await?;
+
+        Ok(signature)
     }
-    pub async fn send_transfer_proof(&mut self, bob: PeerId, msg: TransferProof) -> Result<()> {
-        let _ = self.send_transfer_proof.send((bob, msg)).await?;
+    pub async fn send_transfer_proof(&mut self, msg: TransferProof) -> Result<()> {
+        if self
+            .send_transfer_proof
+            .take()
+            .context("Transfer proof was already sent")?
+            .send(msg)
+            .is_err()
+        {
+            bail!("Failed to send transfer proof, receiver no longer listening?")
+        }
 
         Ok(())
     }
@@ -306,23 +352,5 @@ impl<T> Default for MpscChannels<T> {
     fn default() -> Self {
         let (sender, receiver) = mpsc::channel(100);
         MpscChannels { sender, receiver }
-    }
-}
-
-#[allow(missing_debug_implementations)]
-struct BroadcastChannels<T>
-where
-    T: Clone,
-{
-    sender: broadcast::Sender<T>,
-}
-
-impl<T> Default for BroadcastChannels<T>
-where
-    T: Clone,
-{
-    fn default() -> Self {
-        let (sender, _receiver) = broadcast::channel(100);
-        BroadcastChannels { sender }
     }
 }

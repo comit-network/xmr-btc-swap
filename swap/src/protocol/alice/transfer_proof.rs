@@ -16,8 +16,8 @@ pub struct TransferProof {
 
 #[derive(Debug)]
 pub enum OutEvent {
-    Acknowledged,
-    Failure(Error),
+    Acknowledged(PeerId),
+    Failure { peer: PeerId, error: Error },
 }
 
 /// A `NetworkBehaviour` that represents sending the Monero transfer proof to
@@ -56,23 +56,27 @@ impl From<RequestResponseEvent<TransferProof, ()>> for OutEvent {
         match event {
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Request { .. },
-                ..
-            } => OutEvent::Failure(anyhow!(
-                "Alice should never get a transfer proof request from Bob"
-            )),
+                peer,
+            } => OutEvent::Failure {
+                peer,
+                error: anyhow!("Alice should never get a transfer proof request from Bob"),
+            },
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { .. },
-                ..
-            } => OutEvent::Acknowledged,
-            RequestResponseEvent::InboundFailure { error, .. } => {
-                OutEvent::Failure(anyhow!("Inbound failure: {:?}", error))
-            }
-            RequestResponseEvent::OutboundFailure { error, .. } => {
-                OutEvent::Failure(anyhow!("Outbound failure: {:?}", error))
-            }
-            RequestResponseEvent::ResponseSent { .. } => {
-                OutEvent::Failure(anyhow!("Alice should not send a response"))
-            }
+                peer,
+            } => OutEvent::Acknowledged(peer),
+            RequestResponseEvent::InboundFailure { error, peer, .. } => OutEvent::Failure {
+                peer,
+                error: anyhow!("Inbound failure: {:?}", error),
+            },
+            RequestResponseEvent::OutboundFailure { error, peer, .. } => OutEvent::Failure {
+                peer,
+                error: anyhow!("Outbound failure: {:?}", error),
+            },
+            RequestResponseEvent::ResponseSent { peer, .. } => OutEvent::Failure {
+                peer,
+                error: anyhow!("Alice should not send a response"),
+            },
         }
     }
 }

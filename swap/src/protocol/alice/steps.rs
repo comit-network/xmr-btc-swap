@@ -7,10 +7,8 @@ use crate::protocol::alice::TransferProof;
 use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
 use futures::pin_mut;
-use libp2p::PeerId;
 
 pub async fn lock_xmr(
-    bob_peer_id: PeerId,
     state3: alice::State3,
     event_loop_handle: &mut EventLoopHandle,
     monero_wallet: &monero::Wallet,
@@ -30,7 +28,7 @@ pub async fn lock_xmr(
     //  Otherwise Alice might publish the lock tx twice!
 
     event_loop_handle
-        .send_transfer_proof(bob_peer_id, TransferProof {
+        .send_transfer_proof(TransferProof {
             tx_lock_proof: transfer_proof,
         })
         .await?;
