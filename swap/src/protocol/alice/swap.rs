@@ -7,7 +7,7 @@ use crate::monero_ext::ScalarExt;
 use crate::protocol::alice;
 use crate::protocol::alice::event_loop::EventLoopHandle;
 use crate::protocol::alice::steps::{
-    extract_monero_private_key, lock_xmr, publish_cancel_transaction, wait_for_bitcoin_refund,
+    lock_xmr, publish_cancel_transaction, wait_for_bitcoin_refund,
 };
 use crate::protocol::alice::AliceState;
 use crate::{bitcoin, database, monero};
@@ -315,9 +315,8 @@ async fn run_until_internal(
                         .await
                     }
                     Some(published_refund_tx) => {
-                        let spend_key = extract_monero_private_key(
+                        let spend_key = state3.tx_refund().extract_monero_private_key(
                             published_refund_tx,
-                            &state3.tx_refund(),
                             state3.s_a,
                             state3.a.clone(),
                             state3.S_b_bitcoin,
@@ -393,9 +392,8 @@ async fn run_until_internal(
                         let published_refund_tx =
                             bitcoin_wallet.get_raw_transaction(tx_refund.txid()).await?;
 
-                        let spend_key = extract_monero_private_key(
+                        let spend_key = tx_refund.extract_monero_private_key(
                             published_refund_tx,
-                            &tx_refund,
                             state3.s_a,
                             state3.a.clone(),
                             state3.S_b_bitcoin,

@@ -2,7 +2,7 @@ use crate::bitcoin::{CancelTimelock, PunishTimelock, TxCancel, TxLock, TxRefund}
 use crate::protocol::alice;
 use crate::protocol::alice::event_loop::EventLoopHandle;
 use crate::{bitcoin, monero};
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 
 pub async fn lock_xmr(
     state3: alice::State3,
@@ -101,27 +101,4 @@ pub async fn wait_for_bitcoin_refund(
             Ok(None)
         }
     }
-}
-
-pub fn extract_monero_private_key(
-    published_refund_tx: bitcoin::Transaction,
-    tx_refund: &TxRefund,
-    s_a: monero::Scalar,
-    a: bitcoin::SecretKey,
-    S_b_bitcoin: bitcoin::PublicKey,
-) -> Result<monero::PrivateKey> {
-    let s_a = monero::PrivateKey { scalar: s_a };
-
-    let tx_refund_sig = tx_refund
-        .extract_signature_by_key(published_refund_tx, a.public())
-        .context("Failed to extract signature from Bitcoin refund tx")?;
-    let tx_refund_encsig = a.encsign(S_b_bitcoin, tx_refund.digest());
-
-    let s_b = bitcoin::recover(S_b_bitcoin, tx_refund_sig, tx_refund_encsig)
-        .context("Failed to recover Monero secret key from Bitcoin signature")?;
-    let s_b = monero::private_key_from_secp256k1_scalar(s_b.into());
-
-    let spend_key = s_a + s_b;
-
-    Ok(spend_key)
 }
