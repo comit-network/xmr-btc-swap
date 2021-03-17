@@ -5,7 +5,7 @@ use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::{Context, Result};
 use monero_rpc::wallet;
 use monero_rpc::wallet::{BlockHeight, CheckTxKey, Refreshed};
-use std::cmp::min;
+use std::cmp::max;
 use std::future::Future;
 use std::str::FromStr;
 use std::time::Duration;
@@ -173,8 +173,7 @@ impl Wallet {
 
         let address = Address::standard(self.network, public_spend_key, public_view_key.into());
 
-        let check_interval =
-            tokio::time::interval(min(self.avg_block_time / 10, Duration::from_secs(1)));
+        let check_interval = tokio::time::interval(new_check_interval(self.avg_block_time));
         let key = &transfer_proof.tx_key().to_string();
 
         wait_for_confirmations(
@@ -231,6 +230,10 @@ impl Wallet {
         // Median tx fees on Monero as found here: https://www.monero.how/monero-transaction-fees, 0.000_015 * 2 (to be on the safe side)
         Amount::from_monero(0.000_03f64).expect("static fee to be convertible without problems")
     }
+}
+
+fn new_check_interval(avg_block_time: Duration) -> Duration {
+    max(avg_block_time / 10, Duration::from_secs(1))
 }
 
 async fn wait_for_confirmations<Fut>(
@@ -351,5 +354,19 @@ mod tests {
         .await;
 
         assert!(result.is_ok())
+    }
+
+    #[test]
+    fn check_interval_is_one_second_if_avg_blocktime_is_one_second() {
+        let interval = new_check_interval(Duration::from_secs(1));
+
+        assert_eq!(interval, Duration::from_secs(1))
+    }
+
+    #[test]
+    fn check_interval_is_tenth_of_avg_blocktime() {
+        let interval = new_check_interval(Duration::from_secs(100));
+
+        assert_eq!(interval, Duration::from_secs(10))
     }
 }
