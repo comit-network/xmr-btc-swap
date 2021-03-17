@@ -4,20 +4,17 @@ use crate::execution_params::ExecutionParams;
 use crate::monero::BalanceTooLow;
 use crate::network::quote::BidQuote;
 use crate::network::{spot_price, transport, TokioExecutor};
-use crate::protocol::alice;
 use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State3, Swap, TransferProof};
 use crate::protocol::bob::EncryptedSignature;
 use crate::seed::Seed;
 use crate::{bitcoin, kraken, monero};
 use anyhow::{bail, Context, Result};
-use futures::future::RemoteHandle;
 use libp2p::core::Multiaddr;
 use libp2p::futures::FutureExt;
 use libp2p::{PeerId, Swarm};
 use rand::rngs::OsRng;
 use std::convert::Infallible;
 use std::sync::Arc;
-use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, error, trace};
 use uuid::Uuid;
@@ -39,7 +36,7 @@ pub struct EventLoop<RS> {
     // Only used to produce new handles
     send_transfer_proof_sender: mpsc::Sender<(PeerId, TransferProof)>,
 
-    swap_handle_sender: mpsc::Sender<RemoteHandle<Result<AliceState>>>,
+    swap_sender: mpsc::Sender<Swap>,
 }
 
 #[derive(Debug)]
@@ -62,7 +59,7 @@ where
         db: Arc<Database>,
         latest_rate: LR,
         max_buy: bitcoin::Amount,
-    ) -> Result<(Self, mpsc::Receiver<RemoteHandle<Result<AliceState>>>)> {
+    ) -> Result<(Self, mpsc::Receiver<Swap>)> {
         let identity = seed.derive_libp2p_identity();
         let behaviour = Behaviour::default();
         let transport = transport::build(&identity)?;
@@ -79,7 +76,7 @@ where
 
         let recv_encrypted_signature = BroadcastChannels::default();
         let send_transfer_proof = MpscChannels::default();
-        let swap_handle = MpscChannels::default();
+        let swap_channel = MpscChannels::default();
 
         let event_loop = EventLoop {
             swarm,
@@ -92,10 +89,10 @@ where
             recv_encrypted_signature: recv_encrypted_signature.sender,
             send_transfer_proof: send_transfer_proof.receiver,
             send_transfer_proof_sender: send_transfer_proof.sender,
-            swap_handle_sender: swap_handle.sender,
+            swap_sender: swap_channel.sender,
             max_buy,
         };
-        Ok((event_loop, swap_handle.receiver))
+        Ok((event_loop, swap_channel.receiver))
     }
 
     pub fn new_handle(&self) -> EventLoopHandle {
@@ -231,11 +228,7 @@ where
         })
     }
 
-    async fn handle_execution_setup_done(
-        &mut self,
-        bob_peer_id: PeerId,
-        state3: State3,
-    ) -> Result<()> {
+    async fn handle_execution_setup_done(&mut self, bob_peer_id: PeerId, state3: State3) {
         let swap_id = Uuid::new_v4();
         let handle = self.new_handle();
 
@@ -254,18 +247,9 @@ where
             swap_id,
         };
 
-        let (swap, swap_handle) = alice::run(swap).remote_handle();
-        tokio::spawn(swap);
-
-        // For testing purposes the handle is currently sent via a channel so we can
-        // await it. If a remote handle is dropped, the future of the swap is
-        // also stopped. If we error upon sending the handle through the channel
-        // we have to call forget to detach the handle from the swap future.
-        if let Err(SendError(handle)) = self.swap_handle_sender.send(swap_handle).await {
-            handle.forget();
+        if let Err(error) = self.swap_sender.send(swap).await {
+            tracing::warn!(%swap_id, "Swap cannot be spawned: {}", error);
         }
-
-        Ok(())
     }
 }
 

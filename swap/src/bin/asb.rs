@@ -27,7 +27,7 @@ use swap::database::Database;
 use swap::execution_params::{ExecutionParams, GetExecutionParams};
 use swap::fs::default_config_path;
 use swap::monero::Amount;
-use swap::protocol::alice::EventLoop;
+use swap::protocol::alice::{run, EventLoop};
 use swap::seed::Seed;
 use swap::trace::init_tracing;
 use swap::{bitcoin, execution_params, kraken, monero};
@@ -95,7 +95,7 @@ async fn main() -> Result<()> {
 
             let kraken_rate_updates = kraken::connect()?;
 
-            let (event_loop, _) = EventLoop::new(
+            let (event_loop, mut swap_receiver) = EventLoop::new(
                 config.network.listen,
                 seed,
                 execution_params,
@@ -106,6 +106,22 @@ async fn main() -> Result<()> {
                 max_buy,
             )
             .unwrap();
+
+            tokio::spawn(async move {
+                while let Some(swap) = swap_receiver.recv().await {
+                    tokio::spawn(async move {
+                        let swap_id = swap.swap_id;
+                        match run(swap).await {
+                            Ok(state) => {
+                                tracing::debug!(%swap_id, "Swap finished with state {}", state)
+                            }
+                            Err(e) => {
+                                tracing::error!(%swap_id, "Swap failed with {:#}", e)
+                            }
+                        }
+                    });
+                }
+            });
 
             info!("Our peer id is {}", event_loop.peer_id());
 

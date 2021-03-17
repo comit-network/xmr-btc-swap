@@ -118,6 +118,7 @@ jobs:
             bob_refunds_using_cancel_and_refund_command,
             bob_refunds_using_cancel_and_refund_command_timelock_not_expired,
             bob_refunds_using_cancel_and_refund_command_timelock_not_expired_force,
+            punish
         ]
     runs-on: ubuntu-latest
     steps:
