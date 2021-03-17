@@ -311,21 +311,23 @@ impl LatestRate for kraken::RateUpdateStream {
 }
 
 impl EventLoopHandle {
-    pub async fn recv_encrypted_signature(&mut self) -> Result<EncryptedSignature> {
+    pub async fn recv_encrypted_signature(&mut self) -> Result<bitcoin::EncryptedSignature> {
         let signature = self
             .recv_encrypted_signature
             .take()
             .context("Encrypted signature was already received")?
-            .await?;
+            .await?
+            .tx_redeem_encsig;
 
         Ok(signature)
     }
-    pub async fn send_transfer_proof(&mut self, msg: TransferProof) -> Result<()> {
+
+    pub async fn send_transfer_proof(&mut self, msg: monero::TransferProof) -> Result<()> {
         if self
             .send_transfer_proof
             .take()
             .context("Transfer proof was already sent")?
-            .send(msg)
+            .send(TransferProof { tx_lock_proof: msg })
             .is_err()
         {
             bail!("Failed to send transfer proof, receiver no longer listening?")

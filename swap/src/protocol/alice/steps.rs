@@ -3,7 +3,6 @@ use crate::bitcoin::{
 };
 use crate::protocol::alice;
 use crate::protocol::alice::event_loop::EventLoopHandle;
-use crate::protocol::alice::TransferProof;
 use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
 
@@ -27,9 +26,7 @@ pub async fn lock_xmr(
     //  Otherwise Alice might publish the lock tx twice!
 
     event_loop_handle
-        .send_transfer_proof(TransferProof {
-            tx_lock_proof: transfer_proof,
-        })
+        .send_transfer_proof(transfer_proof)
         .await?;
 
     Ok(())
@@ -45,7 +42,7 @@ pub async fn wait_for_bitcoin_encrypted_signature(
 
     tracing::debug!("Message 3 received, returning it");
 
-    Ok(msg3.tx_redeem_encsig)
+    Ok(msg3)
 }
 
 pub async fn publish_cancel_transaction(
