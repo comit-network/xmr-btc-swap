@@ -20,7 +20,7 @@ pub mod asb;
 pub mod bitcoin;
 pub mod cli;
 pub mod database;
-pub mod execution_params;
+pub mod env;
 pub mod fs;
 pub mod kraken;
 pub mod monero;

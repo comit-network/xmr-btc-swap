@@ -3,7 +3,7 @@ use std::time::Duration;
 use time::NumericalStdDurationShort;
 
 #[derive(Debug, Copy, Clone)]
-pub struct ExecutionParams {
+pub struct Config {
     pub bob_time_to_act: Duration,
     pub bitcoin_finality_confirmations: u32,
     pub bitcoin_avg_block_time: Duration,
@@ -15,8 +15,8 @@ pub struct ExecutionParams {
     pub monero_network: monero::Network,
 }
 
-pub trait GetExecutionParams {
-    fn get_execution_params() -> ExecutionParams;
+pub trait GetConfig {
+    fn get_config() -> Config;
 }
 
 #[derive(Clone, Copy)]
@@ -28,9 +28,9 @@ pub struct Testnet;
 #[derive(Clone, Copy)]
 pub struct Regtest;
 
-impl GetExecutionParams for Mainnet {
-    fn get_execution_params() -> ExecutionParams {
-        ExecutionParams {
+impl GetConfig for Mainnet {
+    fn get_config() -> Config {
+        Config {
             bob_time_to_act: 10.minutes(),
             bitcoin_finality_confirmations: 3,
             bitcoin_avg_block_time: 10.minutes(),
@@ -44,9 +44,9 @@ impl GetExecutionParams for Mainnet {
     }
 }
 
-impl GetExecutionParams for Testnet {
-    fn get_execution_params() -> ExecutionParams {
-        ExecutionParams {
+impl GetConfig for Testnet {
+    fn get_config() -> Config {
+        Config {
             bob_time_to_act: 60.minutes(),
             bitcoin_finality_confirmations: 1,
             bitcoin_avg_block_time: 5.minutes(),
@@ -60,9 +60,9 @@ impl GetExecutionParams for Testnet {
     }
 }
 
-impl GetExecutionParams for Regtest {
-    fn get_execution_params() -> ExecutionParams {
-        ExecutionParams {
+impl GetConfig for Regtest {
+    fn get_config() -> Config {
+        Config {
             bob_time_to_act: 30.seconds(),
             bitcoin_finality_confirmations: 1,
             bitcoin_avg_block_time: 5.seconds(),
@@ -71,7 +71,7 @@ impl GetExecutionParams for Regtest {
             bitcoin_network: bitcoin::Network::Regtest,
             monero_avg_block_time: 1.seconds(),
             monero_finality_confirmations: 10,
-            monero_network: monero::Network::Testnet,
+            monero_network: monero::Network::Mainnet, // yes this is strange
         }
     }
 }

@@ -16,12 +16,12 @@ use std::time::Duration;
 use swap::asb::FixedRate;
 use swap::bitcoin::{CancelTimelock, PunishTimelock};
 use swap::database::Database;
-use swap::execution_params::{ExecutionParams, GetExecutionParams};
+use swap::env::{Config, GetConfig};
 use swap::protocol::alice::{AliceState, Swap};
 use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
 use swap::seed::Seed;
-use swap::{bitcoin, execution_params, monero};
+use swap::{bitcoin, env, monero};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
 use testcontainers::{Container, Docker, RunArgs};
@@ -52,7 +52,7 @@ struct BobParams {
     monero_wallet: Arc<monero::Wallet>,
     alice_address: Multiaddr,
     alice_peer_id: PeerId,
-    exec_params: ExecutionParams,
+    env_config: Config,
 }
 
 impl BobParams {
@@ -64,7 +64,7 @@ impl BobParams {
             self.swap_id,
             self.bitcoin_wallet.clone(),
             self.monero_wallet.clone(),
-            self.exec_params,
+            self.env_config,
             event_loop_handle,
             receive_address,
         ))
@@ -311,13 +311,13 @@ pub async fn setup_test<T, F, C>(_config: C, testfn: T)
 where
     T: Fn(TestContext) -> F,
     F: Future<Output = Result<()>>,
-    C: GetExecutionParams,
+    C: GetConfig,
 {
     let cli = Cli::default();
 
     let _guard = init_tracing();
 
-    let exec_params = C::get_execution_params();
+    let env_config = C::get_config();
 
     let (monero, containers) = testutils::init_containers(&cli).await;
 
@@ -351,7 +351,7 @@ where
         tempdir().unwrap().path(),
         electrs_rpc_port,
         alice_seed,
-        exec_params,
+        env_config,
     )
     .await;
 
@@ -373,14 +373,14 @@ where
         tempdir().unwrap().path(),
         electrs_rpc_port,
         bob_seed,
-        exec_params,
+        env_config,
     )
     .await;
 
     let (alice_event_loop, alice_swap_handle) = alice::EventLoop::new(
         alice_listen_address.clone(),
         alice_seed,
-        exec_params,
+        env_config,
         alice_bitcoin_wallet.clone(),
         alice_monero_wallet.clone(),
         alice_db,
@@ -401,7 +401,7 @@ where
         monero_wallet: bob_monero_wallet.clone(),
         alice_address: alice_listen_address,
         alice_peer_id,
-        exec_params,
+        env_config,
     };
 
     let test = TestContext {
@@ -580,7 +580,7 @@ async fn init_test_wallets(
     datadir: &Path,
     electrum_rpc_port: u16,
     seed: Seed,
-    exec_params: ExecutionParams,
+    env_config: Config,
 ) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {
     monero
         .init(vec![(name, starting_balances.xmr.as_piconero())])
@@ -590,7 +590,7 @@ async fn init_test_wallets(
     let xmr_wallet = swap::monero::Wallet::new_with_client(
         monero.wallet(name).unwrap().client(),
         name.to_string(),
-        exec_params,
+        env_config,
     );
 
     let electrum_rpc_url = {
@@ -601,9 +601,9 @@ async fn init_test_wallets(
     let btc_wallet = swap::bitcoin::Wallet::new(
         electrum_rpc_url,
         datadir,
-        seed.derive_extended_private_key(exec_params.bitcoin_network)
+        seed.derive_extended_private_key(env_config.bitcoin_network)
             .expect("Could not create extended private key from seed"),
-        exec_params,
+        env_config,
     )
     .await
     .expect("could not init btc wallet");
@@ -702,34 +702,34 @@ pub mod bob_run_until {
 
 pub struct SlowCancelConfig;
 
-impl GetExecutionParams for SlowCancelConfig {
-    fn get_execution_params() -> ExecutionParams {
-        ExecutionParams {
+impl GetConfig for SlowCancelConfig {
+    fn get_config() -> Config {
+        Config {
             bitcoin_cancel_timelock: CancelTimelock::new(180),
-            ..execution_params::Regtest::get_execution_params()
+            ..env::Regtest::get_config()
         }
     }
 }
 
 pub struct FastCancelConfig;
 
-impl GetExecutionParams for FastCancelConfig {
-    fn get_execution_params() -> ExecutionParams {
-        ExecutionParams {
+impl GetConfig for FastCancelConfig {
+    fn get_config() -> Config {
+        Config {
             bitcoin_cancel_timelock: CancelTimelock::new(1),
-            ..execution_params::Regtest::get_execution_params()
+            ..env::Regtest::get_config()
         }
     }
 }
 
 pub struct FastPunishConfig;
 
-impl GetExecutionParams for FastPunishConfig {
-    fn get_execution_params() -> ExecutionParams {
-        ExecutionParams {
+impl GetConfig for FastPunishConfig {
+    fn get_config() -> Config {
+        Config {
             bitcoin_cancel_timelock: CancelTimelock::new(1),
             bitcoin_punish_timelock: PunishTimelock::new(1),
-            ..execution_params::Regtest::get_execution_params()
+            ..env::Regtest::get_config()
         }
     }
 }

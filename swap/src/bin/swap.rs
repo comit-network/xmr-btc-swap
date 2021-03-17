@@ -23,12 +23,12 @@ use structopt::StructOpt;
 use swap::bitcoin::{Amount, TxLock};
 use swap::cli::command::{AliceConnectParams, Arguments, Command, Data, MoneroParams};
 use swap::database::Database;
-use swap::execution_params::{ExecutionParams, GetExecutionParams};
+use swap::env::{Config, GetConfig};
 use swap::network::quote::BidQuote;
 use swap::protocol::bob;
 use swap::protocol::bob::{Builder, EventLoop};
 use swap::seed::Seed;
-use swap::{bitcoin, execution_params, monero};
+use swap::{bitcoin, env, monero};
 use tracing::{debug, error, info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 use url::Url;
@@ -76,7 +76,7 @@ async fn main() -> Result<()> {
     let seed =
         Seed::from_file_or_generate(data_dir.as_path()).context("Failed to read in seed file")?;
 
-    let exec_params = execution_params::Testnet::get_execution_params();
+    let env_config = env::Testnet::get_config();
 
     match args.cmd {
         Command::BuyXmr {
@@ -92,18 +92,18 @@ async fn main() -> Result<()> {
                 },
             electrum_rpc_url,
         } => {
-            if receive_monero_address.network != exec_params.monero_network {
+            if receive_monero_address.network != env_config.monero_network {
                 bail!(
                     "Given monero address is on network {:?}, expected address on network {:?}",
                     receive_monero_address.network,
-                    exec_params.monero_network
+                    env_config.monero_network
                 )
             }
 
             let bitcoin_wallet =
-                init_bitcoin_wallet(electrum_rpc_url, seed, data_dir.clone(), exec_params).await?;
+                init_bitcoin_wallet(electrum_rpc_url, seed, data_dir.clone(), env_config).await?;
             let (monero_wallet, _process) =
-                init_monero_wallet(data_dir, monero_daemon_host, exec_params).await?;
+                init_monero_wallet(data_dir, monero_daemon_host, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
             let (event_loop, mut event_loop_handle) = EventLoop::new(
                 &seed.derive_libp2p_identity(),
@@ -135,7 +135,7 @@ async fn main() -> Result<()> {
                 Uuid::new_v4(),
                 bitcoin_wallet.clone(),
                 Arc::new(monero_wallet),
-                exec_params,
+                env_config,
                 event_loop_handle,
                 receive_monero_address,
             )
@@ -178,14 +178,14 @@ async fn main() -> Result<()> {
                 },
             electrum_rpc_url,
         } => {
-            if receive_monero_address.network != exec_params.monero_network {
-                bail!("The given monero address is on network {:?}, expected address of network {:?}.", receive_monero_address.network, exec_params.monero_network)
+            if receive_monero_address.network != env_config.monero_network {
+                bail!("The given monero address is on network {:?}, expected address of network {:?}.", receive_monero_address.network, env_config.monero_network)
             }
 
             let bitcoin_wallet =
-                init_bitcoin_wallet(electrum_rpc_url, seed, data_dir.clone(), exec_params).await?;
+                init_bitcoin_wallet(electrum_rpc_url, seed, data_dir.clone(), env_config).await?;
             let (monero_wallet, _process) =
-                init_monero_wallet(data_dir, monero_daemon_host, exec_params).await?;
+                init_monero_wallet(data_dir, monero_daemon_host, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
             let (event_loop, event_loop_handle) = EventLoop::new(
@@ -201,7 +201,7 @@ async fn main() -> Result<()> {
                 swap_id,
                 bitcoin_wallet.clone(),
                 Arc::new(monero_wallet),
-                exec_params,
+                env_config,
                 event_loop_handle,
                 receive_monero_address,
             )
@@ -223,7 +223,7 @@ async fn main() -> Result<()> {
             electrum_rpc_url,
         } => {
             let bitcoin_wallet =
-                init_bitcoin_wallet(electrum_rpc_url, seed, data_dir, exec_params).await?;
+                init_bitcoin_wallet(electrum_rpc_url, seed, data_dir, env_config).await?;
 
             let resume_state = db.get_state(swap_id)?.try_into_bob()?.into();
             let cancel =
@@ -248,7 +248,7 @@ async fn main() -> Result<()> {
             electrum_rpc_url,
         } => {
             let bitcoin_wallet =
-                init_bitcoin_wallet(electrum_rpc_url, seed, data_dir, exec_params).await?;
+                init_bitcoin_wallet(electrum_rpc_url, seed, data_dir, env_config).await?;
 
             let resume_state = db.get_state(swap_id)?.try_into_bob()?.into();
 
@@ -262,15 +262,15 @@ async fn init_bitcoin_wallet(
     electrum_rpc_url: Url,
     seed: Seed,
     data_dir: PathBuf,
-    exec_params: ExecutionParams,
+    env_config: Config,
 ) -> Result<bitcoin::Wallet> {
     let wallet_dir = data_dir.join("wallet");
 
     let wallet = bitcoin::Wallet::new(
         electrum_rpc_url.clone(),
         &wallet_dir,
-        seed.derive_extended_private_key(exec_params.bitcoin_network)?,
-        exec_params,
+        seed.derive_extended_private_key(env_config.bitcoin_network)?,
+        env_config,
     )
     .await
     .context("Failed to initialize Bitcoin wallet")?;
@@ -283,9 +283,9 @@ async fn init_bitcoin_wallet(
 async fn init_monero_wallet(
     data_dir: PathBuf,
     monero_daemon_host: String,
-    exec_params: ExecutionParams,
+    env_config: Config,
 ) -> Result<(monero::Wallet, monero::WalletRpcProcess)> {
-    let network = exec_params.monero_network;
+    let network = env_config.monero_network;
 
     const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-monitoring-wallet";
 
@@ -298,7 +298,7 @@ async fn init_monero_wallet(
     let monero_wallet = monero::Wallet::new(
         monero_wallet_rpc_process.endpoint(),
         MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME.to_string(),
-        exec_params,
+        env_config,
     );
 
     monero_wallet.open_or_create().await?;

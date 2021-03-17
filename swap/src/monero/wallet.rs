@@ -1,4 +1,4 @@
-use crate::execution_params::ExecutionParams;
+use crate::env::Config;
 use crate::monero::{
     Amount, InsufficientFunds, PrivateViewKey, PublicViewKey, TransferProof, TxHash,
 };
@@ -24,20 +24,16 @@ pub struct Wallet {
 }
 
 impl Wallet {
-    pub fn new(url: Url, name: String, exec_params: ExecutionParams) -> Self {
-        Self::new_with_client(Client::new(url), name, exec_params)
+    pub fn new(url: Url, name: String, env_config: Config) -> Self {
+        Self::new_with_client(Client::new(url), name, env_config)
     }
 
-    pub fn new_with_client(
-        client: wallet::Client,
-        name: String,
-        exec_params: ExecutionParams,
-    ) -> Self {
+    pub fn new_with_client(client: wallet::Client, name: String, env_config: Config) -> Self {
         Self {
             inner: Mutex::new(client),
-            network: exec_params.monero_network,
+            network: env_config.monero_network,
             name,
-            avg_block_time: exec_params.monero_avg_block_time,
+            avg_block_time: env_config.monero_avg_block_time,
         }
     }
 

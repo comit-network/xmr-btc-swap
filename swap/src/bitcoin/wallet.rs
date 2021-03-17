@@ -1,6 +1,6 @@
 use crate::bitcoin::timelocks::BlockHeight;
 use crate::bitcoin::{Address, Amount, Transaction};
-use crate::execution_params::ExecutionParams;
+use crate::env::Config;
 use ::bitcoin::util::psbt::PartiallySignedTransaction;
 use ::bitcoin::Txid;
 use anyhow::{anyhow, bail, Context, Result};
@@ -33,7 +33,7 @@ impl Wallet {
         electrum_rpc_url: Url,
         wallet_dir: &Path,
         key: impl DerivableKey<Segwitv0> + Clone,
-        exec_params: ExecutionParams,
+        env_config: Config,
     ) -> Result<Self> {
         // Workaround for https://github.com/bitcoindevkit/rust-electrum-client/issues/47.
         let config = electrum_client::ConfigBuilder::default().retry(2).build();
@@ -47,7 +47,7 @@ impl Wallet {
         let bdk_wallet = bdk::Wallet::new(
             bdk::template::BIP84(key.clone(), KeychainKind::External),
             Some(bdk::template::BIP84(key, KeychainKind::Internal)),
-            exec_params.bitcoin_network,
+            env_config.bitcoin_network,
             db,
             ElectrumBlockchain::from(client),
         )?;
@@ -60,7 +60,7 @@ impl Wallet {
         Ok(Self {
             wallet: Arc::new(Mutex::new(bdk_wallet)),
             client: Arc::new(Mutex::new(Client::new(electrum, interval)?)),
-            finality_confirmations: exec_params.bitcoin_finality_confirmations,
+            finality_confirmations: env_config.bitcoin_finality_confirmations,
         })
     }
 
