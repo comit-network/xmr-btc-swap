@@ -76,10 +76,7 @@ async fn run_until_internal(
         Ok(state)
     } else {
         match state {
-            AliceState::Started {
-                state3,
-                bob_peer_id,
-            } => {
+            AliceState::Started { state3 } => {
                 timeout(
                     execution_params.bob_time_to_act,
                     bitcoin_wallet
@@ -94,10 +91,7 @@ async fn run_until_internal(
                     })
                     .await?;
 
-                let state = AliceState::BtcLocked {
-                    bob_peer_id,
-                    state3,
-                };
+                let state = AliceState::BtcLocked { state3 };
 
                 let db_state = (&state).into();
                 db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
@@ -114,21 +108,12 @@ async fn run_until_internal(
                 )
                 .await
             }
-            AliceState::BtcLocked {
-                bob_peer_id,
-                state3,
-            } => {
+            AliceState::BtcLocked { state3 } => {
                 // Record the current monero wallet block height so we don't have to scan from
                 // block 0 for scenarios where we create a refund wallet.
                 let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
 
-                lock_xmr(
-                    bob_peer_id,
-                    *state3.clone(),
-                    &mut event_loop_handle,
-                    &monero_wallet,
-                )
-                .await?;
+                lock_xmr(*state3.clone(), &mut event_loop_handle, &monero_wallet).await?;
 
                 let state = AliceState::XmrLocked {
                     state3,

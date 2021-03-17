@@ -5,7 +5,7 @@ use libp2p::request_response::{
     ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
     RequestResponseMessage, ResponseChannel,
 };
-use libp2p::NetworkBehaviour;
+use libp2p::{NetworkBehaviour, PeerId};
 use std::time::Duration;
 use tracing::debug;
 
@@ -14,6 +14,7 @@ pub enum OutEvent {
     MsgReceived {
         msg: EncryptedSignature,
         channel: ResponseChannel<()>,
+        peer: PeerId,
     },
     AckSent,
     Failure(Error),
@@ -67,6 +68,7 @@ impl From<RequestResponseEvent<EncryptedSignature, ()>> for OutEvent {
                 OutEvent::MsgReceived {
                     msg: request,
                     channel,
+                    peer,
                 }
             }
             RequestResponseEvent::Message {

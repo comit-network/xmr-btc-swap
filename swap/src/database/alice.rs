@@ -4,7 +4,6 @@ use crate::monero::monero_private_key;
 use crate::protocol::alice;
 use crate::protocol::alice::AliceState;
 use ::bitcoin::hashes::core::fmt::Display;
-use libp2p::PeerId;
 use monero_rpc::wallet::BlockHeight;
 use serde::{Deserialize, Serialize};
 
@@ -15,13 +14,9 @@ use serde::{Deserialize, Serialize};
 pub enum Alice {
     Started {
         state3: alice::State3,
-        #[serde(with = "crate::serde_peer_id")]
-        bob_peer_id: PeerId,
     },
     BtcLocked {
         state3: alice::State3,
-        #[serde(with = "crate::serde_peer_id")]
-        bob_peer_id: PeerId,
     },
     XmrLocked {
         monero_wallet_restore_blockheight: BlockHeight,
@@ -64,19 +59,11 @@ pub enum AliceEndState {
 impl From<&AliceState> for Alice {
     fn from(alice_state: &AliceState) -> Self {
         match alice_state {
-            AliceState::Started {
-                state3,
-                bob_peer_id,
-            } => Alice::Started {
+            AliceState::Started { state3 } => Alice::Started {
                 state3: state3.as_ref().clone(),
-                bob_peer_id: *bob_peer_id,
             },
-            AliceState::BtcLocked {
-                state3,
-                bob_peer_id,
-            } => Alice::BtcLocked {
+            AliceState::BtcLocked { state3 } => Alice::BtcLocked {
                 state3: state3.as_ref().clone(),
-                bob_peer_id: *bob_peer_id,
             },
             AliceState::XmrLocked {
                 monero_wallet_restore_blockheight,
@@ -137,18 +124,10 @@ impl From<&AliceState> for Alice {
 impl From<Alice> for AliceState {
     fn from(db_state: Alice) -> Self {
         match db_state {
-            Alice::Started {
-                state3,
-                bob_peer_id,
-            } => AliceState::Started {
-                bob_peer_id,
+            Alice::Started { state3 } => AliceState::Started {
                 state3: Box::new(state3),
             },
-            Alice::BtcLocked {
-                state3,
-                bob_peer_id,
-            } => AliceState::BtcLocked {
-                bob_peer_id,
+            Alice::BtcLocked { state3 } => AliceState::BtcLocked {
                 state3: Box::new(state3),
             },
             Alice::XmrLocked {

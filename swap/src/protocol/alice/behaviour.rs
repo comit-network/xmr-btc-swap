@@ -32,6 +32,7 @@ pub enum OutEvent {
     EncryptedSignature {
         msg: Box<EncryptedSignature>,
         channel: ResponseChannel<()>,
+        peer: PeerId,
     },
     ResponseSent, // Same variant is used for all messages as no processing is done
     Failure(Error),
@@ -140,9 +141,10 @@ impl From<encrypted_signature::OutEvent> for OutEvent {
     fn from(event: encrypted_signature::OutEvent) -> Self {
         use crate::protocol::alice::encrypted_signature::OutEvent::*;
         match event {
-            MsgReceived { msg, channel } => OutEvent::EncryptedSignature {
+            MsgReceived { msg, channel, peer } => OutEvent::EncryptedSignature {
                 msg: Box::new(msg),
                 channel,
+                peer,
             },
             AckSent => OutEvent::ResponseSent,
             Failure(err) => OutEvent::Failure(err.context("Failure with Encrypted Signature")),
