@@ -17,7 +17,10 @@ pub enum OutEvent {
         peer: PeerId,
     },
     AckSent,
-    Failure(Error),
+    Failure {
+        peer: PeerId,
+        error: Error,
+    },
 }
 
 /// A `NetworkBehaviour` that represents receiving the Bitcoin encrypted
@@ -73,14 +76,19 @@ impl From<RequestResponseEvent<EncryptedSignature, ()>> for OutEvent {
             }
             RequestResponseEvent::Message {
                 message: RequestResponseMessage::Response { .. },
-                ..
-            } => OutEvent::Failure(anyhow!("Alice should not get a Response")),
-            RequestResponseEvent::InboundFailure { error, .. } => {
-                OutEvent::Failure(anyhow!("Inbound failure: {:?}", error))
-            }
-            RequestResponseEvent::OutboundFailure { error, .. } => {
-                OutEvent::Failure(anyhow!("Outbound failure: {:?}", error))
-            }
+                peer,
+            } => OutEvent::Failure {
+                peer,
+                error: anyhow!("Alice should not get a Response"),
+            },
+            RequestResponseEvent::InboundFailure { error, peer, .. } => OutEvent::Failure {
+                peer,
+                error: anyhow!("Inbound failure: {:?}", error),
+            },
+            RequestResponseEvent::OutboundFailure { error, peer, .. } => OutEvent::Failure {
+                peer,
+                error: anyhow!("Outbound failure: {:?}", error),
+            },
             RequestResponseEvent::ResponseSent { .. } => OutEvent::AckSent,
         }
     }

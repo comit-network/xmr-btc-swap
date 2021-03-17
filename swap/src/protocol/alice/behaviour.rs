@@ -28,14 +28,17 @@ pub enum OutEvent {
         bob_peer_id: PeerId,
         state3: Box<State3>,
     },
-    TransferProofAcknowledged,
+    TransferProofAcknowledged(PeerId),
     EncryptedSignature {
         msg: Box<EncryptedSignature>,
         channel: ResponseChannel<()>,
         peer: PeerId,
     },
     ResponseSent, // Same variant is used for all messages as no processing is done
-    Failure(Error),
+    Failure {
+        peer: PeerId,
+        error: Error,
+    },
 }
 
 impl From<peer_tracker::OutEvent> for OutEvent {
@@ -62,23 +65,20 @@ impl From<spot_price::OutEvent> for OutEvent {
             } => OutEvent::SpotPriceRequested { msg, channel, peer },
             spot_price::OutEvent::Message {
                 message: RequestResponseMessage::Response { .. },
-                ..
-            } => OutEvent::Failure(anyhow!(
-                "Alice is only meant to hand out spot prices, not receive them"
-            )),
-            spot_price::OutEvent::ResponseSent { .. } => OutEvent::ResponseSent,
-            spot_price::OutEvent::InboundFailure { peer, error, .. } => OutEvent::Failure(anyhow!(
-                "spot_price protocol with peer {} failed due to {:?}",
                 peer,
-                error
-            )),
-            spot_price::OutEvent::OutboundFailure { peer, error, .. } => {
-                OutEvent::Failure(anyhow!(
-                    "spot_price protocol with peer {} failed due to {:?}",
-                    peer,
-                    error
-                ))
-            }
+            } => OutEvent::Failure {
+                error: anyhow!("Alice is only meant to hand out spot prices, not receive them"),
+                peer,
+            },
+            spot_price::OutEvent::ResponseSent { .. } => OutEvent::ResponseSent,
+            spot_price::OutEvent::InboundFailure { peer, error, .. } => OutEvent::Failure {
+                error: anyhow!("spot_price protocol failed due to {:?}", error),
+                peer,
+            },
+            spot_price::OutEvent::OutboundFailure { peer, error, .. } => OutEvent::Failure {
+                error: anyhow!("spot_price protocol failed due to {:?}", error),
+                peer,
+            },
         }
     }
 }
@@ -92,21 +92,20 @@ impl From<quote::OutEvent> for OutEvent {
             } => OutEvent::QuoteRequested { channel, peer },
             quote::OutEvent::Message {
                 message: RequestResponseMessage::Response { .. },
-                ..
-            } => OutEvent::Failure(anyhow!(
-                "Alice is only meant to hand out quotes, not receive them"
-            )),
+                peer,
+            } => OutEvent::Failure {
+                error: anyhow!("Alice is only meant to hand out quotes, not receive them"),
+                peer,
+            },
             quote::OutEvent::ResponseSent { .. } => OutEvent::ResponseSent,
-            quote::OutEvent::InboundFailure { peer, error, .. } => OutEvent::Failure(anyhow!(
-                "quote protocol with peer {} failed due to {:?}",
+            quote::OutEvent::InboundFailure { peer, error, .. } => OutEvent::Failure {
+                error: anyhow!("quote protocol failed due to {:?}", error),
                 peer,
-                error
-            )),
-            quote::OutEvent::OutboundFailure { peer, error, .. } => OutEvent::Failure(anyhow!(
-                "quote protocol with peer {} failed due to {:?}",
+            },
+            quote::OutEvent::OutboundFailure { peer, error, .. } => OutEvent::Failure {
+                error: anyhow!("quote protocol failed due to {:?}", error),
                 peer,
-                error
-            )),
+            },
         }
     }
 }
@@ -122,7 +121,7 @@ impl From<execution_setup::OutEvent> for OutEvent {
                 bob_peer_id,
                 state3: Box::new(state3),
             },
-            Failure(err) => OutEvent::Failure(err),
+            Failure { peer, error } => OutEvent::Failure { peer, error },
         }
     }
 }
@@ -131,8 +130,11 @@ impl From<transfer_proof::OutEvent> for OutEvent {
     fn from(event: transfer_proof::OutEvent) -> Self {
         use crate::protocol::alice::transfer_proof::OutEvent::*;
         match event {
-            Acknowledged => OutEvent::TransferProofAcknowledged,
-            Failure(err) => OutEvent::Failure(err.context("Failure with Transfer Proof")),
+            Acknowledged(peer) => OutEvent::TransferProofAcknowledged(peer),
+            Failure { peer, error } => OutEvent::Failure {
+                peer,
+                error: error.context("Failure with Transfer Proof"),
+            },
         }
     }
 }
@@ -147,7 +149,10 @@ impl From<encrypted_signature::OutEvent> for OutEvent {
                 peer,
             },
             AckSent => OutEvent::ResponseSent,
-            Failure(err) => OutEvent::Failure(err.context("Failure with Encrypted Signature")),
+            Failure { peer, error } => OutEvent::Failure {
+                peer,
+                error: error.context("Failure with Encrypted Signature"),
+            },
         }
     }
 }

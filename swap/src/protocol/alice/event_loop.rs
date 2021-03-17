@@ -158,8 +158,8 @@ where
                         OutEvent::ExecutionSetupDone{bob_peer_id, state3} => {
                             let _ = self.handle_execution_setup_done(bob_peer_id, *state3).await;
                         }
-                        OutEvent::TransferProofAcknowledged => {
-                            trace!("Bob acknowledged transfer proof");
+                        OutEvent::TransferProofAcknowledged(peer) => {
+                            trace!(%peer, "Bob acknowledged transfer proof");
                         }
                         OutEvent::EncryptedSignature{ msg, channel, peer } => {
                             match self.recv_encrypted_signature.remove(&peer) {
@@ -177,8 +177,8 @@ where
                             }
                         }
                         OutEvent::ResponseSent => {}
-                        OutEvent::Failure(err) => {
-                            error!("Communication error: {:#}", err);
+                        OutEvent::Failure {peer, error} => {
+                            error!(%peer, "Communication error: {:#}", error);
                         }
                     }
                 },
