@@ -111,7 +111,7 @@ async fn main() -> Result<()> {
                 alice_addr,
                 bitcoin_wallet.clone(),
             )?;
-            let handle = tokio::spawn(event_loop.run());
+            let event_loop = tokio::spawn(event_loop.run());
 
             let send_bitcoin = determine_btc_to_swap(
                 event_loop_handle.request_quote(),
@@ -142,13 +142,14 @@ async fn main() -> Result<()> {
             .with_init_params(send_bitcoin)
             .build()?;
 
-            let swap = bob::run(swap);
             tokio::select! {
-                event_loop_result = handle => {
-                    event_loop_result??;
+                result = event_loop => {
+                    result
+                        .context("EventLoop panicked")?
+                        .context("EventLoop failed")?;
                 },
-                swap_result = swap => {
-                    swap_result?;
+                result = bob::run(swap) => {
+                    result.context("Failed to complete swap")?;
                 }
             }
         }
@@ -207,12 +208,11 @@ async fn main() -> Result<()> {
             )
             .build()?;
 
-            let swap = bob::run(swap);
             tokio::select! {
                 event_loop_result = handle => {
                     event_loop_result??;
                 },
-                swap_result = swap => {
+                swap_result = bob::run(swap) => {
                     swap_result?;
                 }
             }
@@ -314,7 +314,7 @@ async fn determine_btc_to_swap(
 ) -> Result<bitcoin::Amount> {
     debug!("Requesting quote");
 
-    let bid_quote = request_quote.await.context("Failed to request quote")?;
+    let bid_quote = request_quote.await?;
 
     info!("Received quote: 1 XMR ~ {}", bid_quote.price);
 

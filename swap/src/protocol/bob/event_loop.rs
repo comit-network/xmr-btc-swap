@@ -223,7 +223,7 @@ impl EventLoop {
                         }
                         OutEvent::ResponseSent => {}
                         OutEvent::CommunicationError(err) => {
-                            bail!("Communication error: {:#}", err)
+                            bail!(err.context("Communication error"))
                         }
                     }
                 },
