@@ -3,14 +3,13 @@ use crate::network::quote::BidQuote;
 use crate::network::{spot_price, transfer_proof};
 use crate::protocol::bob::{Behaviour, OutEvent, State0, State2};
 use crate::{bitcoin, monero};
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Result};
 use futures::FutureExt;
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
-use std::convert::Infallible;
 use std::sync::Arc;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tracing::{debug, error, trace};
+use tracing::{debug, error};
 
 #[derive(Debug)]
 pub struct Channels<T> {
@@ -36,8 +35,6 @@ pub struct EventLoopHandle {
     start_execution_setup: Sender<State0>,
     done_execution_setup: Receiver<Result<State2>>,
     recv_transfer_proof: Receiver<transfer_proof::Request>,
-    conn_established: Receiver<PeerId>,
-    dial_alice: Sender<()>,
     send_encrypted_signature: Sender<EncryptedSignature>,
     request_spot_price: Sender<spot_price::Request>,
     recv_spot_price: Receiver<spot_price::Response>,
@@ -60,19 +57,6 @@ impl EventLoopHandle {
             .recv()
             .await
             .ok_or_else(|| anyhow!("Failed to receive transfer proof from Alice"))
-    }
-
-    /// Dials other party and wait for the connection to be established.
-    /// Do nothing if we are already connected
-    pub async fn dial(&mut self) -> Result<()> {
-        let _ = self.dial_alice.send(()).await?;
-
-        self.conn_established
-            .recv()
-            .await
-            .ok_or_else(|| anyhow!("Failed to receive connection established from Alice"))?;
-
-        Ok(())
     }
 
     pub async fn request_spot_price(&mut self, btc: bitcoin::Amount) -> Result<monero::Amount> {
@@ -122,7 +106,6 @@ pub struct EventLoop {
     start_execution_setup: Receiver<State0>,
     done_execution_setup: Sender<Result<State2>>,
     recv_transfer_proof: Sender<transfer_proof::Request>,
-    dial_alice: Receiver<()>,
     conn_established: Sender<PeerId>,
     send_encrypted_signature: Receiver<EncryptedSignature>,
     request_quote: Receiver<()>,
@@ -138,7 +121,6 @@ impl EventLoop {
         let start_execution_setup = Channels::new();
         let done_execution_setup = Channels::new();
         let recv_transfer_proof = Channels::new();
-        let dial_alice = Channels::new();
         let conn_established = Channels::new();
         let send_encrypted_signature = Channels::new();
         let request_spot_price = Channels::new();
@@ -154,7 +136,6 @@ impl EventLoop {
             done_execution_setup: done_execution_setup.sender,
             recv_transfer_proof: recv_transfer_proof.sender,
             conn_established: conn_established.sender,
-            dial_alice: dial_alice.receiver,
             send_encrypted_signature: send_encrypted_signature.receiver,
             request_spot_price: request_spot_price.receiver,
             recv_spot_price: recv_spot_price.sender,
@@ -166,8 +147,6 @@ impl EventLoop {
             start_execution_setup: start_execution_setup.sender,
             done_execution_setup: done_execution_setup.receiver,
             recv_transfer_proof: recv_transfer_proof.receiver,
-            conn_established: conn_established.receiver,
-            dial_alice: dial_alice.sender,
             send_encrypted_signature: send_encrypted_signature.sender,
             request_spot_price: request_spot_price.sender,
             recv_spot_price: recv_spot_price.receiver,
@@ -178,7 +157,9 @@ impl EventLoop {
         Ok((event_loop, handle))
     }
 
-    pub async fn run(mut self) -> Result<Infallible> {
+    pub async fn run(mut self) {
+        let _ = Swarm::dial(&mut self.swarm, &self.alice_peer_id);
+
         loop {
             tokio::select! {
                 swarm_event = self.swarm.next_event().fuse() => {
@@ -188,10 +169,10 @@ impl EventLoop {
                         }
                         SwarmEvent::Behaviour(OutEvent::SpotPriceReceived(msg)) => {
                             let _ = self.recv_spot_price.send(msg).await;
-                        },
+                        }
                         SwarmEvent::Behaviour(OutEvent::QuoteReceived(msg)) => {
                             let _ = self.recv_quote.send(msg).await;
-                        },
+                        }
                         SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone(res)) => {
                             let _ = self.done_execution_setup.send(res.map(|state|*state)).await;
                         }
@@ -208,25 +189,42 @@ impl EventLoop {
                         SwarmEvent::Behaviour(OutEvent::ResponseSent) => {
 
                         }
-                        SwarmEvent::Behaviour(OutEvent::CommunicationError(err)) => {
-                            bail!(err.context("Communication error"))
+                        SwarmEvent::Behaviour(OutEvent::CommunicationError(error)) => {
+                            tracing::warn!("Communication error: {:#}", error);
+                            return;
+                        }
+                        SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } if peer_id == self.alice_peer_id => {
+                            tracing::debug!("Connected to Alice at {}", endpoint.get_remote_address());
+                        }
+                        SwarmEvent::Dialing(peer_id) if peer_id == self.alice_peer_id => {
+                            tracing::debug!("Dialling Alice at {}", peer_id);
+                        }
+                        SwarmEvent::ConnectionClosed { peer_id, endpoint, num_established, cause } if peer_id == self.alice_peer_id && num_established == 0 => {
+                            match cause {
+                                Some(error) => {
+                                    tracing::warn!("Lost connection to Alice at {}, cause: {}", endpoint.get_remote_address(), error);
+                                },
+                                None => {
+                                    // no error means the disconnection was requested
+                                    tracing::info!("Successfully closed connection to Alice");
+                                    return;
+                                }
+                            }
+                            match libp2p::Swarm::dial(&mut self.swarm, &self.alice_peer_id) {
+                                Ok(()) => {},
+                                Err(e) => {
+                                    tracing::warn!("Failed to re-dial Alice: {}", e);
+                                    return;
+                                }
+                            }
+                        }
+                        SwarmEvent::UnreachableAddr { peer_id, address, attempts_remaining, error } if peer_id == self.alice_peer_id && attempts_remaining == 0 => {
+                            tracing::warn!("Failed to dial Alice at {}: {}", address, error);
                         }
                         _ => {}
                     }
                 },
-                option = self.dial_alice.recv().fuse() => {
-                    if option.is_some() {
-                           let peer_id = self.alice_peer_id;
-                        if self.swarm.pt.is_connected(&peer_id) {
-                            trace!("Already connected to Alice at {}", peer_id);
-                            let _ = self.conn_established.send(peer_id).await;
-                        } else {
-                            debug!("Dialing alice at {}", peer_id);
-                            libp2p::Swarm::dial(&mut self.swarm, &peer_id).context("Failed to dial alice")?;
-                        }
-                    }
-                },
-                spot_price_request = self.request_spot_price.recv().fuse() =>  {
+                spot_price_request = self.request_spot_price.recv().fuse() => {
                     if let Some(request) = spot_price_request {
                         self.swarm.request_spot_price(self.alice_peer_id, request);
                     }

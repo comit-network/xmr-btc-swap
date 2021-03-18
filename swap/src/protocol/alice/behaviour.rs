@@ -1,6 +1,6 @@
 use crate::env::Config;
 use crate::network::quote::BidQuote;
-use crate::network::{encrypted_signature, peer_tracker, quote, spot_price, transfer_proof};
+use crate::network::{encrypted_signature, quote, spot_price, transfer_proof};
 use crate::protocol::alice::{execution_setup, State0, State3};
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
@@ -11,7 +11,6 @@ use tracing::debug;
 
 #[derive(Debug)]
 pub enum OutEvent {
-    ConnectionEstablished(PeerId),
     SpotPriceRequested {
         request: spot_price::Request,
         channel: ResponseChannel<spot_price::Response>,
@@ -36,16 +35,6 @@ pub enum OutEvent {
         peer: PeerId,
         error: Error,
     },
-}
-
-impl From<peer_tracker::OutEvent> for OutEvent {
-    fn from(event: peer_tracker::OutEvent) -> Self {
-        match event {
-            peer_tracker::OutEvent::ConnectionEstablished(id) => {
-                OutEvent::ConnectionEstablished(id)
-            }
-        }
-    }
 }
 
 impl OutEvent {
@@ -177,7 +166,6 @@ impl From<execution_setup::OutEvent> for OutEvent {
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    pt: peer_tracker::Behaviour,
     quote: quote::Behaviour,
     spot_price: spot_price::Behaviour,
     execution_setup: execution_setup::Behaviour,
@@ -188,7 +176,6 @@ pub struct Behaviour {
 impl Default for Behaviour {
     fn default() -> Self {
         Self {
-            pt: Default::default(),
             quote: quote::alice(),
             spot_price: spot_price::alice(),
             execution_setup: Default::default(),

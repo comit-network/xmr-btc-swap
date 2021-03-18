@@ -1,6 +1,6 @@
 use crate::database::Database;
 use crate::env::Config;
-use crate::network::{encrypted_signature, peer_tracker, spot_price};
+use crate::network::{encrypted_signature, spot_price};
 use crate::protocol::bob;
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
@@ -175,16 +175,6 @@ impl From<encrypted_signature::Message> for OutEvent {
     }
 }
 
-impl From<peer_tracker::OutEvent> for OutEvent {
-    fn from(event: peer_tracker::OutEvent) -> Self {
-        match event {
-            peer_tracker::OutEvent::ConnectionEstablished(id) => {
-                OutEvent::ConnectionEstablished(id)
-            }
-        }
-    }
-}
-
 impl From<spot_price::OutEvent> for OutEvent {
     fn from(event: spot_price::OutEvent) -> Self {
         map_rr_event_to_outevent(event)
@@ -244,7 +234,6 @@ impl From<execution_setup::OutEvent> for OutEvent {
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    pt: peer_tracker::Behaviour,
     quote: quote::Behaviour,
     spot_price: spot_price::Behaviour,
     execution_setup: execution_setup::Behaviour,
@@ -255,7 +244,6 @@ pub struct Behaviour {
 impl Default for Behaviour {
     fn default() -> Self {
         Self {
-            pt: Default::default(),
             quote: quote::bob(),
             spot_price: spot_price::bob(),
             execution_setup: Default::default(),
@@ -296,6 +284,9 @@ impl Behaviour {
 
     /// Add a known address for the given peer
     pub fn add_address(&mut self, peer_id: PeerId, address: Multiaddr) {
-        self.pt.add_address(peer_id, address)
+        self.quote.add_address(&peer_id, address.clone());
+        self.spot_price.add_address(&peer_id, address.clone());
+        self.transfer_proof.add_address(&peer_id, address.clone());
+        self.encrypted_signature.add_address(&peer_id, address);
     }
 }

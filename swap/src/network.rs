@@ -1,6 +1,5 @@
 pub mod cbor_request_response;
 pub mod encrypted_signature;
-pub mod peer_tracker;
 pub mod quote;
 pub mod spot_price;
 pub mod swarm;

@@ -83,9 +83,6 @@ where
             tokio::select! {
                 swarm_event = self.swarm.next_event() => {
                     match swarm_event {
-                        SwarmEvent::Behaviour(OutEvent::ConnectionEstablished(alice)) => {
-                            debug!("Connection Established with {}", alice);
-                        }
                         SwarmEvent::Behaviour(OutEvent::SpotPriceRequested { request, channel, peer }) => {
                             let btc = request.btc;
                             let xmr = match self.handle_spot_price_request(btc, self.monero_wallet.clone()).await {

@@ -146,8 +146,7 @@ async fn main() -> Result<()> {
             tokio::select! {
                 result = event_loop => {
                     result
-                        .context("EventLoop panicked")?
-                        .context("EventLoop failed")?;
+                        .context("EventLoop panicked")?;
                 },
                 result = bob::run(swap) => {
                     result.context("Failed to complete swap")?;
@@ -210,7 +209,7 @@ async fn main() -> Result<()> {
 
             tokio::select! {
                 event_loop_result = handle => {
-                    event_loop_result??;
+                    event_loop_result?;
                 },
                 swap_result = bob::run(swap) => {
                     swap_result?;

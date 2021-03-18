@@ -9,7 +9,6 @@ use get_port::get_port;
 use libp2p::core::Multiaddr;
 use libp2p::{PeerId, Swarm};
 use monero_harness::{image, Monero};
-use std::convert::Infallible;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -78,7 +77,7 @@ impl BobParams {
     }
 }
 
-pub struct BobEventLoopJoinHandle(JoinHandle<Result<Infallible>>);
+pub struct BobEventLoopJoinHandle(JoinHandle<()>);
 
 impl BobEventLoopJoinHandle {
     pub fn abort(&self) {
