@@ -664,7 +664,7 @@ pub fn init_tracing() -> DefaultGuard {
 
     use tracing_subscriber::util::SubscriberInitExt as _;
     tracing_subscriber::fmt()
-        .with_env_filter("warn,swap=debug,monero_harness=debug,monero_rpc=info,bitcoin_harness=info,testcontainers=info")
+        .with_env_filter("warn,swap=debug,monero_harness=debug,monero_rpc=debug,bitcoin_harness=info,testcontainers=info")
         .set_default()
 }
 

@@ -285,6 +285,25 @@ impl Client {
         Ok(r.result)
     }
 
+    /// Returns a list of transfers
+    pub async fn get_transfers(&self, params: GetTransfersParams) -> Result<GetTransfers> {
+        let request = Request::new("get_transfers", params);
+
+        let response = self
+            .inner
+            .post(self.url.clone())
+            .json(&request)
+            .send()
+            .await?
+            .text()
+            .await?;
+
+        debug!("get transfers RPC response: {}", response);
+
+        let r = serde_json::from_str::<Response<GetTransfers>>(&response)?;
+        Ok(r.result)
+    }
+
     pub async fn generate_from_keys(
         &self,
         address: &str,
@@ -438,6 +457,53 @@ struct TransferParams {
 }
 
 #[derive(Serialize, Debug, Clone)]
+pub struct GetTransfersParams {
+    pub r#in: bool,
+    pub out: bool,
+    pub failed: bool,
+    pub pending: bool,
+    pub pool: bool,
+    pub filter_by_height: Option<bool>,
+    pub min_height: Option<u64>,
+    pub max_height: Option<u64>,
+    pub account_index: Option<u64>,
+    pub subaddr_indices: Option<Vec<u64>>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct GetTransfers {
+    pub r#in: Option<Vec<GetTransfer>>,
+    pub out: Option<Vec<GetTransfer>>,
+    pub pending: Option<Vec<GetTransfer>>,
+    pub failed: Option<Vec<GetTransfer>>,
+    pub pool: Option<Vec<GetTransfer>>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct GetTransfer {
+    pub address: String,
+    pub amount: u64,
+    pub confirmations: u64,
+    pub double_spend_seen: bool,
+    pub fee: u64,
+    pub height: u64,
+    pub note: String,
+    pub payment_id: String,
+    pub subaddr_index: SubAddressIndex,
+    pub suggested_confirmations_threshold: u64,
+    pub timestamp: u64,
+    pub txid: String,
+    pub r#type: String,
+    pub unlock_time: u64,
+}
+
+#[derive(Deserialize, Debug, Copy, Clone)]
+pub struct SubAddressIndex {
+    pub major: u64,
+    pub minor: u64,
+}
+
+#[derive(Serialize, Debug, Clone)]
 pub struct Destination {
     amount: u64,
     address: String,
@@ -532,5 +598,36 @@ mod tests {
         }"#;
 
         let _: Response<SweepAll> = serde_json::from_str(&response).unwrap();
+    }
+
+    #[test]
+    fn can_deserialise_get_transfers_response() {
+        let response = r#"{
+          "id": "0",
+          "jsonrpc": "2.0",
+          "result": {
+            "in": [{
+              "address": "77Vx9cs1VPicFndSVgYUvTdLCJEZw9h81hXLMYsjBCXSJfUehLa9TDW3Ffh45SQa7xb6dUs18mpNxfUhQGqfwXPSMrvKhVp",
+              "amount": 200000000000,
+              "confirmations": 1,
+              "double_spend_seen": false,
+              "fee": 21650200000,
+              "height": 153624,
+              "note": "",
+              "payment_id": "0000000000000000",
+              "subaddr_index": {
+                "major": 1,
+                "minor": 0
+              },
+              "suggested_confirmations_threshold": 1,
+              "timestamp": 1535918400,
+              "txid": "c36258a276018c3a4bc1f195a7fb530f50cd63a4fa765fb7c6f7f49fc051762a",
+              "type": "in",
+              "unlock_time": 0
+            }]
+          }
+        }"#;
+
+        let _: Response<GetTransfers> = serde_json::from_str(&response).unwrap();
     }
 }

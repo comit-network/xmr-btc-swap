@@ -5,7 +5,9 @@ use crate::monero::{
 use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::{Context, Result};
 use monero_rpc::wallet;
-use monero_rpc::wallet::{BlockHeight, CheckTxKey, Client, Refreshed};
+use monero_rpc::wallet::{
+    BlockHeight, CheckTxKey, Client, GetTransfer, GetTransfersParams, Refreshed,
+};
 use std::future::Future;
 use std::str::FromStr;
 use std::time::Duration;
@@ -147,6 +149,50 @@ impl Wallet {
             TxHash(res.tx_hash),
             PrivateKey::from_str(&res.tx_key)?,
         ))
+    }
+
+    pub async fn transfer_in_flight_or_confirmed(
+        &self,
+        public_spend_key: PublicKey,
+        public_view_key: PublicViewKey,
+        amount: Amount,
+    ) -> Result<bool> {
+        let destination_address =
+            Address::standard(self.network, public_spend_key, public_view_key.into());
+        let transfers = self
+            .inner
+            .lock()
+            .await
+            .get_transfers(GetTransfersParams {
+                r#in: false,
+                out: true,
+                failed: false,
+                pool: true,
+                pending: true,
+                filter_by_height: None,
+                min_height: None,
+                max_height: None,
+                account_index: None,
+                subaddr_indices: None,
+            })
+            .await?;
+
+        let find_matching_transfer = |transfers: Option<Vec<GetTransfer>>| -> bool {
+            if let Some(inner) = transfers {
+                inner.iter().any(|transfer| {
+                    (transfer.address == destination_address.to_string())
+                        & (transfer.amount == amount.as_piconero())
+                })
+            } else {
+                false
+            }
+        };
+
+        let found_in_pool = find_matching_transfer(transfers.pool);
+        let found_in_out = find_matching_transfer(transfers.out);
+        let found_in_pending = find_matching_transfer(transfers.pending);
+
+        Ok(found_in_out | found_in_pending | found_in_pool)
     }
 
     pub async fn watch_for_transfer(
