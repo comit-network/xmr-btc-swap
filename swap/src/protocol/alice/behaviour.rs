@@ -1,9 +1,7 @@
 use crate::env::Config;
 use crate::network::quote::BidQuote;
-use crate::network::{peer_tracker, quote, spot_price};
-use crate::protocol::alice::{
-    encrypted_signature, execution_setup, transfer_proof, State0, State3, TransferProof,
-};
+use crate::network::{peer_tracker, quote, spot_price, transfer_proof};
+use crate::protocol::alice::{encrypted_signature, execution_setup, State0, State3};
 use crate::protocol::bob::EncryptedSignature;
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
@@ -52,6 +50,13 @@ impl From<peer_tracker::OutEvent> for OutEvent {
 }
 
 impl OutEvent {
+    fn unexpected_request(peer: PeerId) -> OutEvent {
+        OutEvent::Failure {
+            peer,
+            error: anyhow!("Unexpected request received"),
+        }
+    }
+
     fn unexpected_response(peer: PeerId) -> OutEvent {
         OutEvent::Failure {
             peer,
@@ -84,6 +89,15 @@ impl From<(PeerId, spot_price::Message)> for OutEvent {
     }
 }
 
+impl From<(PeerId, transfer_proof::Message)> for OutEvent {
+    fn from((peer, message): (PeerId, transfer_proof::Message)) -> Self {
+        match message {
+            transfer_proof::Message::Request { .. } => OutEvent::unexpected_request(peer),
+            transfer_proof::Message::Response { .. } => OutEvent::TransferProofAcknowledged(peer),
+        }
+    }
+}
+
 impl From<spot_price::OutEvent> for OutEvent {
     fn from(event: spot_price::OutEvent) -> Self {
         map_rr_event_to_outevent(event)
@@ -92,6 +106,12 @@ impl From<spot_price::OutEvent> for OutEvent {
 
 impl From<quote::OutEvent> for OutEvent {
     fn from(event: quote::OutEvent) -> Self {
+        map_rr_event_to_outevent(event)
+    }
+}
+
+impl From<transfer_proof::OutEvent> for OutEvent {
+    fn from(event: transfer_proof::OutEvent) -> Self {
         map_rr_event_to_outevent(event)
     }
 }
@@ -128,19 +148,6 @@ impl From<execution_setup::OutEvent> for OutEvent {
                 state3: Box::new(state3),
             },
             Failure { peer, error } => OutEvent::Failure { peer, error },
-        }
-    }
-}
-
-impl From<transfer_proof::OutEvent> for OutEvent {
-    fn from(event: transfer_proof::OutEvent) -> Self {
-        use crate::protocol::alice::transfer_proof::OutEvent::*;
-        match event {
-            Acknowledged(peer) => OutEvent::TransferProofAcknowledged(peer),
-            Failure { peer, error } => OutEvent::Failure {
-                peer,
-                error: error.context("Failure with Transfer Proof"),
-            },
         }
     }
 }
@@ -183,7 +190,7 @@ impl Default for Behaviour {
             quote: quote::alice(),
             spot_price: spot_price::alice(),
             execution_setup: Default::default(),
-            transfer_proof: Default::default(),
+            transfer_proof: transfer_proof::alice(),
             encrypted_signature: Default::default(),
         }
     }
@@ -237,8 +244,8 @@ impl Behaviour {
     }
 
     /// Send Transfer Proof to Bob.
-    pub fn send_transfer_proof(&mut self, bob: PeerId, msg: TransferProof) {
-        self.transfer_proof.send(bob, msg);
+    pub fn send_transfer_proof(&mut self, bob: PeerId, msg: transfer_proof::Request) {
+        self.transfer_proof.send_request(&bob, msg);
         debug!("Sent Transfer Proof");
     }
 

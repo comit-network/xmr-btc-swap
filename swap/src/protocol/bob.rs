@@ -1,7 +1,6 @@
 use crate::database::Database;
 use crate::env::Config;
 use crate::network::{peer_tracker, spot_price};
-use crate::protocol::alice::TransferProof;
 use crate::protocol::bob;
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
@@ -19,8 +18,8 @@ pub use self::event_loop::{EventLoop, EventLoopHandle};
 pub use self::refund::refund;
 pub use self::state::*;
 pub use self::swap::{run, run_until};
-use crate::network::quote;
 use crate::network::quote::BidQuote;
+use crate::network::{quote, transfer_proof};
 
 pub mod cancel;
 mod encrypted_signature;
@@ -29,7 +28,6 @@ mod execution_setup;
 pub mod refund;
 pub mod state;
 pub mod swap;
-mod transfer_proof;
 
 pub struct Swap {
     pub state: BobState,
@@ -117,8 +115,8 @@ pub enum OutEvent {
     QuoteReceived(BidQuote),
     SpotPriceReceived(spot_price::Response),
     ExecutionSetupDone(Result<Box<State2>>),
-    TransferProof {
-        msg: Box<TransferProof>,
+    TransferProofReceived {
+        msg: Box<transfer_proof::Request>,
         channel: ResponseChannel<()>,
     },
     EncryptedSignatureAcknowledged,
@@ -129,6 +127,10 @@ pub enum OutEvent {
 impl OutEvent {
     fn unexpected_request() -> OutEvent {
         OutEvent::CommunicationError(anyhow!("Unexpected request received"))
+    }
+
+    fn unexpected_response() -> OutEvent {
+        OutEvent::CommunicationError(anyhow!("Unexpected response received"))
     }
 }
 
@@ -146,6 +148,20 @@ impl From<spot_price::Message> for OutEvent {
         match message {
             spot_price::Message::Request { .. } => OutEvent::unexpected_request(),
             spot_price::Message::Response { response, .. } => OutEvent::SpotPriceReceived(response),
+        }
+    }
+}
+
+impl From<transfer_proof::Message> for OutEvent {
+    fn from(message: transfer_proof::Message) -> Self {
+        match message {
+            transfer_proof::Message::Request {
+                request, channel, ..
+            } => OutEvent::TransferProofReceived {
+                msg: Box::new(request),
+                channel,
+            },
+            transfer_proof::Message::Response { .. } => OutEvent::unexpected_response(),
         }
     }
 }
@@ -168,6 +184,12 @@ impl From<spot_price::OutEvent> for OutEvent {
 
 impl From<quote::OutEvent> for OutEvent {
     fn from(event: quote::OutEvent) -> Self {
+        map_rr_event_to_outevent(event)
+    }
+}
+
+impl From<transfer_proof::OutEvent> for OutEvent {
+    fn from(event: transfer_proof::OutEvent) -> Self {
         map_rr_event_to_outevent(event)
     }
 }
@@ -198,22 +220,6 @@ impl From<execution_setup::OutEvent> for OutEvent {
     fn from(event: execution_setup::OutEvent) -> Self {
         match event {
             execution_setup::OutEvent::Done(res) => OutEvent::ExecutionSetupDone(res.map(Box::new)),
-        }
-    }
-}
-
-impl From<transfer_proof::OutEvent> for OutEvent {
-    fn from(event: transfer_proof::OutEvent) -> Self {
-        use transfer_proof::OutEvent::*;
-        match event {
-            MsgReceived { msg, channel } => OutEvent::TransferProof {
-                msg: Box::new(msg),
-                channel,
-            },
-            AckSent => OutEvent::ResponseSent,
-            Failure(err) => {
-                OutEvent::CommunicationError(err.context("Failure with Transfer Proof"))
-            }
         }
     }
 }
@@ -250,7 +256,7 @@ impl Default for Behaviour {
             quote: quote::bob(),
             spot_price: spot_price::bob(),
             execution_setup: Default::default(),
-            transfer_proof: Default::default(),
+            transfer_proof: transfer_proof::bob(),
             encrypted_signature: Default::default(),
         }
     }

@@ -1,7 +1,6 @@
 use crate::bitcoin::EncryptedSignature;
 use crate::network::quote::BidQuote;
-use crate::network::{spot_price, transport, TokioExecutor};
-use crate::protocol::alice::TransferProof;
+use crate::network::{spot_price, transfer_proof, transport, TokioExecutor};
 use crate::protocol::bob::{Behaviour, OutEvent, State0, State2};
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, bail, Context, Result};
@@ -36,7 +35,7 @@ impl<T> Default for Channels<T> {
 pub struct EventLoopHandle {
     start_execution_setup: Sender<State0>,
     done_execution_setup: Receiver<Result<State2>>,
-    recv_transfer_proof: Receiver<TransferProof>,
+    recv_transfer_proof: Receiver<transfer_proof::Request>,
     conn_established: Receiver<PeerId>,
     dial_alice: Sender<()>,
     send_encrypted_signature: Sender<EncryptedSignature>,
@@ -56,7 +55,7 @@ impl EventLoopHandle {
             .ok_or_else(|| anyhow!("Failed to setup execution with Alice"))?
     }
 
-    pub async fn recv_transfer_proof(&mut self) -> Result<TransferProof> {
+    pub async fn recv_transfer_proof(&mut self) -> Result<transfer_proof::Request> {
         self.recv_transfer_proof
             .recv()
             .await
@@ -122,7 +121,7 @@ pub struct EventLoop {
     recv_spot_price: Sender<spot_price::Response>,
     start_execution_setup: Receiver<State0>,
     done_execution_setup: Sender<Result<State2>>,
-    recv_transfer_proof: Sender<TransferProof>,
+    recv_transfer_proof: Sender<transfer_proof::Request>,
     dial_alice: Receiver<()>,
     conn_established: Sender<PeerId>,
     send_encrypted_signature: Receiver<EncryptedSignature>,
@@ -212,10 +211,10 @@ impl EventLoop {
                         OutEvent::ExecutionSetupDone(res) => {
                             let _ = self.done_execution_setup.send(res.map(|state|*state)).await;
                         }
-                        OutEvent::TransferProof{ msg, channel }=> {
+                        OutEvent::TransferProofReceived{ msg, channel }=> {
                             let _ = self.recv_transfer_proof.send(*msg).await;
                             // Send back empty response so that the request/response protocol completes.
-                            if let Err(error) = self.swarm.transfer_proof.send_ack(channel) {
+                            if let Err(error) = self.swarm.transfer_proof.send_response(channel, ()) {
                                 error!("Failed to send Transfer Proof ack: {:?}", error);
                             }
                         }

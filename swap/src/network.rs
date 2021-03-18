@@ -2,6 +2,7 @@ pub mod peer_tracker;
 pub mod quote;
 pub mod request_response;
 pub mod spot_price;
+pub mod transfer_proof;
 pub mod transport;
 
 use libp2p::core::Executor;

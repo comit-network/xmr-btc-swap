@@ -3,8 +3,8 @@ use crate::database::Database;
 use crate::env::Config;
 use crate::monero::BalanceTooLow;
 use crate::network::quote::BidQuote;
-use crate::network::{spot_price, transport, TokioExecutor};
-use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State3, Swap, TransferProof};
+use crate::network::{spot_price, transfer_proof, transport, TokioExecutor};
+use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State3, Swap};
 use crate::protocol::bob::EncryptedSignature;
 use crate::seed::Seed;
 use crate::{bitcoin, kraken, monero};
@@ -37,7 +37,8 @@ pub struct EventLoop<RS> {
     recv_encrypted_signature: HashMap<PeerId, oneshot::Sender<EncryptedSignature>>,
     /// Stores a list of futures, waiting for transfer proof which will be sent
     /// to the given peer.
-    send_transfer_proof: FuturesUnordered<BoxFuture<'static, Result<(PeerId, TransferProof)>>>,
+    send_transfer_proof:
+        FuturesUnordered<BoxFuture<'static, Result<(PeerId, transfer_proof::Request)>>>,
 
     swap_sender: mpsc::Sender<Swap>,
 }
@@ -307,7 +308,7 @@ impl LatestRate for kraken::RateUpdateStream {
 #[derive(Debug)]
 pub struct EventLoopHandle {
     recv_encrypted_signature: Option<oneshot::Receiver<EncryptedSignature>>,
-    send_transfer_proof: Option<oneshot::Sender<TransferProof>>,
+    send_transfer_proof: Option<oneshot::Sender<transfer_proof::Request>>,
 }
 
 impl EventLoopHandle {
@@ -327,7 +328,7 @@ impl EventLoopHandle {
             .send_transfer_proof
             .take()
             .context("Transfer proof was already sent")?
-            .send(TransferProof { tx_lock_proof: msg })
+            .send(transfer_proof::Request { tx_lock_proof: msg })
             .is_err()
         {
             bail!("Failed to send transfer proof, receiver no longer listening?")
