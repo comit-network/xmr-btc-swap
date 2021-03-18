@@ -12,7 +12,10 @@ use serde::{Deserialize, Serialize};
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Alice {
-    Started {
+    WatchingForTxLockInMempool {
+        state3: alice::State3,
+    },
+    WaitingForTxLockConfirmations {
         state3: alice::State3,
     },
     BtcLocked {
@@ -59,9 +62,16 @@ pub enum AliceEndState {
 impl From<&AliceState> for Alice {
     fn from(alice_state: &AliceState) -> Self {
         match alice_state {
-            AliceState::Started { state3 } => Alice::Started {
-                state3: state3.as_ref().clone(),
-            },
+            AliceState::WatchingForTxLockInMempool { state3 } => {
+                Alice::WatchingForTxLockInMempool {
+                    state3: state3.as_ref().clone(),
+                }
+            }
+            AliceState::WaitingForTxLockConfirmations { state3 } => {
+                Alice::WaitingForTxLockConfirmations {
+                    state3: state3.as_ref().clone(),
+                }
+            }
             AliceState::BtcLocked { state3 } => Alice::BtcLocked {
                 state3: state3.as_ref().clone(),
             },
@@ -124,9 +134,16 @@ impl From<&AliceState> for Alice {
 impl From<Alice> for AliceState {
     fn from(db_state: Alice) -> Self {
         match db_state {
-            Alice::Started { state3 } => AliceState::Started {
-                state3: Box::new(state3),
-            },
+            Alice::WatchingForTxLockInMempool { state3 } => {
+                AliceState::WatchingForTxLockInMempool {
+                    state3: Box::new(state3),
+                }
+            }
+            Alice::WaitingForTxLockConfirmations { state3 } => {
+                AliceState::WatchingForTxLockInMempool {
+                    state3: Box::new(state3),
+                }
+            }
             Alice::BtcLocked { state3 } => AliceState::BtcLocked {
                 state3: Box::new(state3),
             },
@@ -190,7 +207,10 @@ impl From<Alice> for AliceState {
 impl Display for Alice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Alice::Started { .. } => write!(f, "Started"),
+            Alice::WatchingForTxLockInMempool { .. } => write!(f, "Watching for TxLock in mempool"),
+            Alice::WaitingForTxLockConfirmations { .. } => {
+                write!(f, "Waiting for TxLock confirmations")
+            }
             Alice::BtcLocked { .. } => f.write_str("Bitcoin locked"),
             Alice::XmrLocked { .. } => f.write_str("Monero locked"),
             Alice::CancelTimelockExpired { .. } => f.write_str("Cancel timelock is expired"),

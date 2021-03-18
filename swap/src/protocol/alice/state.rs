@@ -15,7 +15,10 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum AliceState {
-    Started {
+    WatchingForTxLockInMempool {
+        state3: Box<State3>,
+    },
+    WaitingForTxLockConfirmations {
         state3: Box<State3>,
     },
     BtcLocked {
@@ -56,7 +59,12 @@ pub enum AliceState {
 impl fmt::Display for AliceState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AliceState::Started { .. } => write!(f, "started"),
+            AliceState::WatchingForTxLockInMempool { .. } => {
+                write!(f, "watching for tx lock in mempool")
+            }
+            AliceState::WaitingForTxLockConfirmations { .. } => {
+                write!(f, "waiting for for tx lock confirmations")
+            }
             AliceState::BtcLocked { .. } => write!(f, "btc is locked"),
             AliceState::XmrLocked { .. } => write!(f, "xmr is locked"),
             AliceState::EncSigLearned { .. } => write!(f, "encrypted signature is learned"),

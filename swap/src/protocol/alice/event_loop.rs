@@ -245,7 +245,7 @@ where
         let swap_id = Uuid::new_v4();
         let handle = self.new_handle(bob_peer_id);
 
-        let initial_state = AliceState::Started {
+        let initial_state = AliceState::WatchingForTxLockInMempool {
             state3: Box::new(state3),
         };
 

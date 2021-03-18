@@ -76,7 +76,7 @@ async fn run_until_internal(
         Ok(state)
     } else {
         match state {
-            AliceState::Started { state3 } => {
+            AliceState::WatchingForTxLockInMempool { state3 } => {
                 timeout(
                     env_config.bitcoin_lock_in_mempool_timeout,
                     bitcoin_wallet
@@ -85,6 +85,24 @@ async fn run_until_internal(
                 .await
                 .context("Failed to find lock Bitcoin tx")??;
 
+                let state = AliceState::WaitingForTxLockConfirmations { state3 };
+
+                let db_state = (&state).into();
+                db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
+                    .await?;
+                run_until_internal(
+                    state,
+                    is_target_state,
+                    event_loop_handle,
+                    bitcoin_wallet,
+                    monero_wallet,
+                    env_config,
+                    swap_id,
+                    db,
+                )
+                .await
+            }
+            AliceState::WaitingForTxLockConfirmations { state3 } => {
                 timeout(
                     env_config.bitcoin_lock_confirmed_timeout(),
                     bitcoin_wallet.watch_until_status(&state3.tx_lock, |status| {
@@ -92,7 +110,11 @@ async fn run_until_internal(
                     }),
                 )
                 .await
-                .context("Lock Bitcoin TX failed to confirm in time")??;
+                .context(format!(
+                    "TxLock lock did not get {} confirmations in {} seconds",
+                    env_config.bitcoin_finality_confirmations,
+                    env_config.bitcoin_lock_confirmed_timeout().as_secs()
+                ))??;
 
                 let state = AliceState::BtcLocked { state3 };
 
