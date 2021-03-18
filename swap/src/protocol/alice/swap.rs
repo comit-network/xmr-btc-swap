@@ -10,8 +10,6 @@ use crate::protocol::alice::AliceState;
 use crate::{bitcoin, database, monero};
 use anyhow::{bail, Context, Result};
 use async_recursion::async_recursion;
-use futures::future::{select, Either};
-use futures::pin_mut;
 use rand::{CryptoRng, RngCore};
 use std::sync::Arc;
 use tokio::select;
@@ -297,11 +295,10 @@ async fn run_until_internal(
             let refund_tx_seen =
                 bitcoin_wallet.watch_until_status(&tx_refund, |status| status.has_been_seen());
 
-            pin_mut!(punish_tx_finalised);
-            pin_mut!(refund_tx_seen);
+            select! {
+                result = refund_tx_seen => {
+                    result.context("Failed to monitor refund transaction")?;
 
-            match select(refund_tx_seen, punish_tx_finalised).await {
-                Either::Left((Ok(()), _)) => {
                     let published_refund_tx =
                         bitcoin_wallet.get_raw_transaction(tx_refund.txid()).await?;
 
@@ -317,10 +314,9 @@ async fn run_until_internal(
                         monero_wallet_restore_blockheight,
                     }
                 }
-                Either::Left((Err(e), _)) => {
-                    bail!(e.context("Failed to monitor refund transaction"))
+                _ = punish_tx_finalised => {
+                    AliceState::BtcPunished
                 }
-                Either::Right(_) => AliceState::BtcPunished,
             }
         }
         AliceState::XmrRefunded => AliceState::XmrRefunded,
