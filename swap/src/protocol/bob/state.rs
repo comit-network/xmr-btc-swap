@@ -3,7 +3,8 @@ use crate::bitcoin::{
     TxLock, Txid,
 };
 use crate::monero;
-use crate::monero::{monero_private_key, InsufficientFunds, TransferProof};
+use crate::monero::wallet::WatchRequest;
+use crate::monero::{monero_private_key, TransferProof};
 use crate::monero_ext::ScalarExt;
 use crate::protocol::alice::{Message1, Message3};
 use crate::protocol::bob::{EncryptedSignature, Message0, Message2, Message4};
@@ -305,30 +306,22 @@ pub struct State3 {
 }
 
 impl State3 {
-    pub async fn watch_for_lock_xmr(
-        self,
-        xmr_wallet: &monero::Wallet,
-        transfer_proof: TransferProof,
-        monero_wallet_restore_blockheight: BlockHeight,
-    ) -> Result<Result<State4, InsufficientFunds>> {
+    pub fn lock_xmr_watch_request(&self, transfer_proof: TransferProof) -> WatchRequest {
         let S_b_monero =
             monero::PublicKey::from_private_key(&monero::PrivateKey::from_scalar(self.s_b));
         let S = self.S_a_monero + S_b_monero;
 
-        if let Err(e) = xmr_wallet
-            .watch_for_transfer(
-                S,
-                self.v.public(),
-                transfer_proof,
-                self.xmr,
-                self.min_monero_confirmations,
-            )
-            .await
-        {
-            return Ok(Err(e));
+        WatchRequest {
+            public_spend_key: S,
+            public_view_key: self.v.public(),
+            transfer_proof,
+            conf_target: self.min_monero_confirmations,
+            expected: self.xmr,
         }
+    }
 
-        Ok(Ok(State4 {
+    pub fn xmr_locked(self, monero_wallet_restore_blockheight: BlockHeight) -> State4 {
+        State4 {
             A: self.A,
             b: self.b,
             s_b: self.s_b,
@@ -342,7 +335,7 @@ impl State3 {
             tx_cancel_sig_a: self.tx_cancel_sig_a,
             tx_refund_encsig: self.tx_refund_encsig,
             monero_wallet_restore_blockheight,
-        }))
+        }
     }
 
     pub async fn wait_for_cancel_timelock_to_expire(
@@ -592,6 +585,18 @@ impl State6 {
 
         finality.await?;
 
+        Ok(())
+    }
+
+    pub async fn wait_for_cancel_timelock_to_expire(
+        &self,
+        bitcoin_wallet: &bitcoin::Wallet,
+    ) -> Result<()> {
+        bitcoin_wallet
+            .watch_until_status(&self.tx_lock, |status| {
+                status.is_confirmed_with(self.cancel_timelock)
+            })
+            .await?;
         Ok(())
     }
 

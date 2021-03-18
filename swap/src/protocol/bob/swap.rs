@@ -1,7 +1,6 @@
 use crate::bitcoin::ExpiredTimelocks;
 use crate::database::{Database, Swap};
 use crate::env::Config;
-use crate::monero::InsufficientFunds;
 use crate::protocol::bob;
 use crate::protocol::bob::event_loop::EventLoopHandle;
 use crate::protocol::bob::state::*;
@@ -11,7 +10,7 @@ use async_recursion::async_recursion;
 use rand::rngs::OsRng;
 use std::sync::Arc;
 use tokio::select;
-use tracing::{trace, warn};
+use tracing::trace;
 use uuid::Uuid;
 
 pub fn is_complete(state: &BobState) -> bool {
@@ -143,34 +142,26 @@ async fn run_until_internal(
             if let ExpiredTimelocks::None = state.current_epoch(bitcoin_wallet.as_ref()).await? {
                 event_loop_handle.dial().await?;
 
-                let xmr_lock_watcher = state.clone().watch_for_lock_xmr(
-                    monero_wallet.as_ref(),
-                    lock_transfer_proof,
-                    monero_wallet_restore_blockheight,
-                );
-                let cancel_timelock_expires =
-                    state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
+                let watch_request = state.lock_xmr_watch_request(lock_transfer_proof);
 
                 select! {
-                    state4 = xmr_lock_watcher => {
-                        match state4? {
-                            Ok(state4) => BobState::XmrLocked(state4),
-                            Err(InsufficientFunds {..}) => {
-                                 warn!("The other party has locked insufficient Monero funds! Waiting for refund...");
+                    received_xmr = monero_wallet.watch_for_transfer(watch_request) => {
+                        match received_xmr {
+                            Ok(()) => BobState::XmrLocked(state.xmr_locked(monero_wallet_restore_blockheight)),
+                            Err(e) => {
+                                 tracing::warn!("Waiting for refund because insufficient Monero have been locked! {}", e);
                                  state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()).await?;
-                                 let state4 = state.cancel();
-                                 BobState::CancelTimelockExpired(state4)
+
+                                 BobState::CancelTimelockExpired(state.cancel())
                             },
                         }
-                    },
-                    _ = cancel_timelock_expires => {
-                        let state4 = state.cancel();
-                        BobState::CancelTimelockExpired(state4)
+                    }
+                    _ = state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()) => {
+                        BobState::CancelTimelockExpired(state.cancel())
                     }
                 }
             } else {
-                let state4 = state.cancel();
-                BobState::CancelTimelockExpired(state4)
+                BobState::CancelTimelockExpired(state.cancel())
             }
         }
         BobState::XmrLocked(state) => {

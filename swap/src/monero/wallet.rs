@@ -150,14 +150,15 @@ impl Wallet {
         ))
     }
 
-    pub async fn watch_for_transfer(
-        &self,
-        public_spend_key: PublicKey,
-        public_view_key: PublicViewKey,
-        transfer_proof: TransferProof,
-        expected: Amount,
-        conf_target: u32,
-    ) -> Result<(), InsufficientFunds> {
+    pub async fn watch_for_transfer(&self, request: WatchRequest) -> Result<()> {
+        let WatchRequest {
+            conf_target,
+            public_view_key,
+            public_spend_key,
+            transfer_proof,
+            expected,
+        } = request;
+
         let txid = transfer_proof.tx_hash();
 
         tracing::info!(%txid, "Waiting for {} confirmation{} of Monero transaction", conf_target, if conf_target > 1 { "s" } else { "" });
@@ -228,6 +229,15 @@ pub struct TransferRequest {
     pub public_spend_key: PublicKey,
     pub public_view_key: PublicViewKey,
     pub amount: Amount,
+}
+
+#[derive(Debug)]
+pub struct WatchRequest {
+    pub public_spend_key: PublicKey,
+    pub public_view_key: PublicViewKey,
+    pub transfer_proof: TransferProof,
+    pub conf_target: u32,
+    pub expected: Amount,
 }
 
 async fn wait_for_confirmations<Fut>(
