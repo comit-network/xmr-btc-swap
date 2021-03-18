@@ -34,9 +34,9 @@ pub enum BobState {
     XmrLocked(State4),
     EncSigSent(State4),
     BtcRedeemed(State5),
-    CancelTimelockExpired(State4),
-    BtcCancelled(State4),
-    BtcRefunded(State4),
+    CancelTimelockExpired(State6),
+    BtcCancelled(State6),
+    BtcRefunded(State6),
     XmrRedeemed {
         tx_lock_id: bitcoin::Txid,
     },
@@ -357,23 +357,17 @@ impl State3 {
         Ok(())
     }
 
-    pub fn cancel(&self) -> State4 {
-        State4 {
+    pub fn cancel(&self) -> State6 {
+        State6 {
             A: self.A,
             b: self.b.clone(),
             s_b: self.s_b,
-            S_a_bitcoin: self.S_a_bitcoin,
-            v: self.v,
             cancel_timelock: self.cancel_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: self.refund_address.clone(),
-            redeem_address: self.redeem_address.clone(),
             tx_lock: self.tx_lock.clone(),
             tx_cancel_sig_a: self.tx_cancel_sig_a.clone(),
             tx_refund_encsig: self.tx_refund_encsig.clone(),
-            // For cancel scenarios the monero wallet rescan blockchain height is irrelevant for
-            // Bob, because Bob's cancel can only lead to refunding on Bitcoin
-            monero_wallet_restore_blockheight: BlockHeight { height: 0 },
         }
     }
 
@@ -426,29 +420,6 @@ impl State4 {
     pub fn tx_redeem_encsig(&self) -> bitcoin::EncryptedSignature {
         let tx_redeem = bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address);
         self.b.encsign(self.S_a_bitcoin, tx_redeem.digest())
-    }
-
-    pub async fn check_for_tx_cancel(
-        &self,
-        bitcoin_wallet: &bitcoin::Wallet,
-    ) -> Result<Transaction> {
-        let tx_cancel =
-            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
-
-        let tx = bitcoin_wallet.get_raw_transaction(tx_cancel.txid()).await?;
-
-        Ok(tx)
-    }
-
-    pub async fn submit_tx_cancel(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<Txid> {
-        let transaction =
-            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public())
-                .complete_as_bob(self.A, self.b.clone(), self.tx_cancel_sig_a.clone())
-                .context("Failed to complete Bitcoin cancel transaction")?;
-
-        let (tx_id, _) = bitcoin_wallet.broadcast(transaction, "cancel").await?;
-
-        Ok(tx_id)
     }
 
     pub async fn watch_for_redeem_btc(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<State5> {
@@ -505,29 +476,18 @@ impl State4 {
         ))
     }
 
-    pub async fn refund_btc(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<()> {
-        let tx_cancel =
-            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
-        let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &self.refund_address);
-
-        let adaptor = Adaptor::<HashTranscript<Sha256>, Deterministic<Sha256>>::default();
-
-        let sig_b = self.b.sign(tx_refund.digest());
-        let sig_a =
-            adaptor.decrypt_signature(&self.s_b.to_secpfun_scalar(), self.tx_refund_encsig.clone());
-
-        let signed_tx_refund =
-            tx_refund.add_signatures((self.A, sig_a), (self.b.public(), sig_b))?;
-
-        let (_, finality) = bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
-
-        finality.await?;
-
-        Ok(())
-    }
-
-    pub fn tx_lock_id(&self) -> bitcoin::Txid {
-        self.tx_lock.txid()
+    pub fn cancel(self) -> State6 {
+        State6 {
+            A: self.A,
+            b: self.b,
+            s_b: self.s_b,
+            cancel_timelock: self.cancel_timelock,
+            punish_timelock: self.punish_timelock,
+            refund_address: self.refund_address,
+            tx_lock: self.tx_lock,
+            tx_cancel_sig_a: self.tx_cancel_sig_a,
+            tx_refund_encsig: self.tx_refund_encsig,
+        }
     }
 }
 
@@ -555,6 +515,86 @@ impl State5 {
 
         Ok(())
     }
+    pub fn tx_lock_id(&self) -> bitcoin::Txid {
+        self.tx_lock.txid()
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub struct State6 {
+    A: bitcoin::PublicKey,
+    b: bitcoin::SecretKey,
+    s_b: monero::Scalar,
+    cancel_timelock: CancelTimelock,
+    punish_timelock: PunishTimelock,
+    refund_address: bitcoin::Address,
+    tx_lock: bitcoin::TxLock,
+    tx_cancel_sig_a: Signature,
+    tx_refund_encsig: bitcoin::EncryptedSignature,
+}
+
+impl State6 {
+    pub async fn expired_timelock(
+        &self,
+        bitcoin_wallet: &bitcoin::Wallet,
+    ) -> Result<ExpiredTimelocks> {
+        let tx_cancel = TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
+
+        let tx_lock_status = bitcoin_wallet.status_of_script(&self.tx_lock).await?;
+        let tx_cancel_status = bitcoin_wallet.status_of_script(&tx_cancel).await?;
+
+        Ok(current_epoch(
+            self.cancel_timelock,
+            self.punish_timelock,
+            tx_lock_status,
+            tx_cancel_status,
+        ))
+    }
+
+    pub async fn check_for_tx_cancel(
+        &self,
+        bitcoin_wallet: &bitcoin::Wallet,
+    ) -> Result<Transaction> {
+        let tx_cancel =
+            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
+
+        let tx = bitcoin_wallet.get_raw_transaction(tx_cancel.txid()).await?;
+
+        Ok(tx)
+    }
+
+    pub async fn submit_tx_cancel(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<Txid> {
+        let transaction =
+            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public())
+                .complete_as_bob(self.A, self.b.clone(), self.tx_cancel_sig_a.clone())
+                .context("Failed to complete Bitcoin cancel transaction")?;
+
+        let (tx_id, _) = bitcoin_wallet.broadcast(transaction, "cancel").await?;
+
+        Ok(tx_id)
+    }
+
+    pub async fn refund_btc(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<()> {
+        let tx_cancel =
+            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
+        let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &self.refund_address);
+
+        let adaptor = Adaptor::<HashTranscript<Sha256>, Deterministic<Sha256>>::default();
+
+        let sig_b = self.b.sign(tx_refund.digest());
+        let sig_a =
+            adaptor.decrypt_signature(&self.s_b.to_secpfun_scalar(), self.tx_refund_encsig.clone());
+
+        let signed_tx_refund =
+            tx_refund.add_signatures((self.A, sig_a), (self.b.public(), sig_b))?;
+
+        let (_, finality) = bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
+
+        finality.await?;
+
+        Ok(())
+    }
+
     pub fn tx_lock_id(&self) -> bitcoin::Txid {
         self.tx_lock.txid()
     }

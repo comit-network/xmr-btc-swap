@@ -20,12 +20,12 @@ pub async fn cancel(
     db: Database,
     force: bool,
 ) -> Result<Result<(Txid, BobState), Error>> {
-    let state4 = match state {
+    let state6 = match state {
         BobState::BtcLocked(state3) => state3.cancel(),
         BobState::XmrLockProofReceived { state, .. } => state.cancel(),
-        BobState::XmrLocked(state4) => state4,
-        BobState::EncSigSent(state4) => state4,
-        BobState::CancelTimelockExpired(state4) => state4,
+        BobState::XmrLocked(state4) => state4.cancel(),
+        BobState::EncSigSent(state4) => state4.cancel(),
+        BobState::CancelTimelockExpired(state6) => state6,
         _ => bail!(
             "Cannot cancel swap {} because it is in state {} which is not refundable.",
             swap_id,
@@ -34,16 +34,16 @@ pub async fn cancel(
     };
 
     if !force {
-        if let ExpiredTimelocks::None = state4.expired_timelock(bitcoin_wallet.as_ref()).await? {
+        if let ExpiredTimelocks::None = state6.expired_timelock(bitcoin_wallet.as_ref()).await? {
             return Ok(Err(Error::CancelTimelockNotExpiredYet));
         }
 
-        if state4
+        if state6
             .check_for_tx_cancel(bitcoin_wallet.as_ref())
             .await
             .is_ok()
         {
-            let state = BobState::BtcCancelled(state4);
+            let state = BobState::BtcCancelled(state6);
             let db_state = state.into();
             db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
 
@@ -51,9 +51,9 @@ pub async fn cancel(
         }
     }
 
-    let txid = state4.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
+    let txid = state6.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
 
-    let state = BobState::BtcCancelled(state4);
+    let state = BobState::BtcCancelled(state6);
     let db_state = state.clone().into();
     db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
 

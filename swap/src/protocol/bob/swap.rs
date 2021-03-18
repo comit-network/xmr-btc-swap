@@ -184,11 +184,11 @@ async fn run_until_internal(
                         BobState::EncSigSent(state)
                     },
                     _ = state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()) => {
-                        BobState::CancelTimelockExpired(state)
+                        BobState::CancelTimelockExpired(state.cancel())
                     }
                 }
             } else {
-                BobState::CancelTimelockExpired(state)
+                BobState::CancelTimelockExpired(state.cancel())
             }
         }
         BobState::EncSigSent(state) => {
@@ -198,11 +198,11 @@ async fn run_until_internal(
                         BobState::BtcRedeemed(state5?)
                     },
                     _ = state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()) => {
-                        BobState::CancelTimelockExpired(state)
+                        BobState::CancelTimelockExpired(state.cancel())
                     }
                 }
             } else {
-                BobState::CancelTimelockExpired(state)
+                BobState::CancelTimelockExpired(state.cancel())
             }
         }
         BobState::BtcRedeemed(state) => {
