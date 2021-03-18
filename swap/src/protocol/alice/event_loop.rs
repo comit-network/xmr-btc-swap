@@ -105,8 +105,8 @@ where
                         OutEvent::ConnectionEstablished(alice) => {
                             debug!("Connection Established with {}", alice);
                         }
-                        OutEvent::SpotPriceRequested { msg, channel, peer } => {
-                            let btc = msg.btc;
+                        OutEvent::SpotPriceRequested { request, channel, peer } => {
+                            let btc = request.btc;
                             let xmr = match self.handle_spot_price_request(btc, self.monero_wallet.clone()).await {
                                 Ok(xmr) => xmr,
                                 Err(e) => {

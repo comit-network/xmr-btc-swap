@@ -7,7 +7,7 @@ use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
 pub use execution_setup::{Message0, Message2, Message4};
 use libp2p::core::Multiaddr;
-use libp2p::request_response::{RequestResponseMessage, ResponseChannel};
+use libp2p::request_response::{RequestResponseEvent, RequestResponseMessage, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
 use std::sync::Arc;
 use tracing::debug;
@@ -126,6 +126,30 @@ pub enum OutEvent {
     CommunicationError(Error),
 }
 
+impl OutEvent {
+    fn unexpected_request() -> OutEvent {
+        OutEvent::CommunicationError(anyhow!("Unexpected request received"))
+    }
+}
+
+impl From<quote::Message> for OutEvent {
+    fn from(message: quote::Message) -> Self {
+        match message {
+            quote::Message::Request { .. } => OutEvent::unexpected_request(),
+            quote::Message::Response { response, .. } => OutEvent::QuoteReceived(response),
+        }
+    }
+}
+
+impl From<spot_price::Message> for OutEvent {
+    fn from(message: spot_price::Message) -> Self {
+        match message {
+            spot_price::Message::Request { .. } => OutEvent::unexpected_request(),
+            spot_price::Message::Response { response, .. } => OutEvent::SpotPriceReceived(response),
+        }
+    }
+}
+
 impl From<peer_tracker::OutEvent> for OutEvent {
     fn from(event: peer_tracker::OutEvent) -> Self {
         match event {
@@ -138,65 +162,35 @@ impl From<peer_tracker::OutEvent> for OutEvent {
 
 impl From<spot_price::OutEvent> for OutEvent {
     fn from(event: spot_price::OutEvent) -> Self {
-        match event {
-            spot_price::OutEvent::Message {
-                message: RequestResponseMessage::Response { response, .. },
-                ..
-            } => OutEvent::SpotPriceReceived(response),
-            spot_price::OutEvent::Message {
-                message: RequestResponseMessage::Request { .. },
-                ..
-            } => OutEvent::CommunicationError(anyhow!(
-                "Bob is only meant to receive spot prices, not hand them out"
-            )),
-            spot_price::OutEvent::ResponseSent { .. } => OutEvent::ResponseSent,
-            spot_price::OutEvent::InboundFailure { peer, error, .. } => {
-                OutEvent::CommunicationError(anyhow!(
-                    "spot_price protocol with peer {} failed due to {:?}",
-                    peer,
-                    error
-                ))
-            }
-            spot_price::OutEvent::OutboundFailure { peer, error, .. } => {
-                OutEvent::CommunicationError(anyhow!(
-                    "spot_price protocol with peer {} failed due to {:?}",
-                    peer,
-                    error
-                ))
-            }
-        }
+        map_rr_event_to_outevent(event)
     }
 }
 
 impl From<quote::OutEvent> for OutEvent {
     fn from(event: quote::OutEvent) -> Self {
-        match event {
-            quote::OutEvent::Message {
-                message: RequestResponseMessage::Response { response, .. },
-                ..
-            } => OutEvent::QuoteReceived(response),
-            quote::OutEvent::Message {
-                message: RequestResponseMessage::Request { .. },
-                ..
-            } => OutEvent::CommunicationError(anyhow!(
-                "Bob is only meant to receive quotes, not hand them out"
-            )),
-            quote::OutEvent::ResponseSent { .. } => OutEvent::ResponseSent,
-            quote::OutEvent::InboundFailure { peer, error, .. } => {
-                OutEvent::CommunicationError(anyhow!(
-                    "quote protocol with peer {} failed due to {:?}",
-                    peer,
-                    error
-                ))
-            }
-            quote::OutEvent::OutboundFailure { peer, error, .. } => {
-                OutEvent::CommunicationError(anyhow!(
-                    "quote protocol with peer {} failed due to {:?}",
-                    peer,
-                    error
-                ))
-            }
-        }
+        map_rr_event_to_outevent(event)
+    }
+}
+
+fn map_rr_event_to_outevent<I, O>(event: RequestResponseEvent<I, O>) -> OutEvent
+where
+    OutEvent: From<RequestResponseMessage<I, O>>,
+{
+    use RequestResponseEvent::*;
+
+    match event {
+        Message { message, .. } => OutEvent::from(message),
+        ResponseSent { .. } => OutEvent::ResponseSent,
+        InboundFailure { peer, error, .. } => OutEvent::CommunicationError(anyhow!(
+            "protocol with peer {} failed due to {:?}",
+            peer,
+            error
+        )),
+        OutboundFailure { peer, error, .. } => OutEvent::CommunicationError(anyhow!(
+            "protocol with peer {} failed due to {:?}",
+            peer,
+            error
+        )),
     }
 }
 
