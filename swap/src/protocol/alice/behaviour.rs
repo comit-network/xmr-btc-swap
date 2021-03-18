@@ -1,8 +1,7 @@
 use crate::env::Config;
 use crate::network::quote::BidQuote;
-use crate::network::{peer_tracker, quote, spot_price, transfer_proof};
-use crate::protocol::alice::{encrypted_signature, execution_setup, State0, State3};
-use crate::protocol::bob::EncryptedSignature;
+use crate::network::{encrypted_signature, peer_tracker, quote, spot_price, transfer_proof};
+use crate::protocol::alice::{execution_setup, State0, State3};
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
 use libp2p::request_response::{RequestResponseEvent, RequestResponseMessage, ResponseChannel};
@@ -27,8 +26,8 @@ pub enum OutEvent {
         state3: Box<State3>,
     },
     TransferProofAcknowledged(PeerId),
-    EncryptedSignature {
-        msg: Box<EncryptedSignature>,
+    EncryptedSignatureReceived {
+        msg: Box<encrypted_signature::Request>,
         channel: ResponseChannel<()>,
         peer: PeerId,
     },
@@ -98,6 +97,21 @@ impl From<(PeerId, transfer_proof::Message)> for OutEvent {
     }
 }
 
+impl From<(PeerId, encrypted_signature::Message)> for OutEvent {
+    fn from((peer, message): (PeerId, encrypted_signature::Message)) -> Self {
+        match message {
+            encrypted_signature::Message::Request {
+                request, channel, ..
+            } => OutEvent::EncryptedSignatureReceived {
+                msg: Box::new(request),
+                channel,
+                peer,
+            },
+            encrypted_signature::Message::Response { .. } => OutEvent::unexpected_response(peer),
+        }
+    }
+}
+
 impl From<spot_price::OutEvent> for OutEvent {
     fn from(event: spot_price::OutEvent) -> Self {
         map_rr_event_to_outevent(event)
@@ -112,6 +126,12 @@ impl From<quote::OutEvent> for OutEvent {
 
 impl From<transfer_proof::OutEvent> for OutEvent {
     fn from(event: transfer_proof::OutEvent) -> Self {
+        map_rr_event_to_outevent(event)
+    }
+}
+
+impl From<encrypted_signature::OutEvent> for OutEvent {
+    fn from(event: encrypted_signature::OutEvent) -> Self {
         map_rr_event_to_outevent(event)
     }
 }
@@ -152,24 +172,6 @@ impl From<execution_setup::OutEvent> for OutEvent {
     }
 }
 
-impl From<encrypted_signature::OutEvent> for OutEvent {
-    fn from(event: encrypted_signature::OutEvent) -> Self {
-        use crate::protocol::alice::encrypted_signature::OutEvent::*;
-        match event {
-            MsgReceived { msg, channel, peer } => OutEvent::EncryptedSignature {
-                msg: Box::new(msg),
-                channel,
-                peer,
-            },
-            AckSent => OutEvent::ResponseSent,
-            Failure { peer, error } => OutEvent::Failure {
-                peer,
-                error: error.context("Failure with Encrypted Signature"),
-            },
-        }
-    }
-}
-
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Alice.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
@@ -191,7 +193,7 @@ impl Default for Behaviour {
             spot_price: spot_price::alice(),
             execution_setup: Default::default(),
             transfer_proof: transfer_proof::alice(),
-            encrypted_signature: Default::default(),
+            encrypted_signature: encrypted_signature::alice(),
         }
     }
 }
@@ -249,7 +251,7 @@ impl Behaviour {
         debug!("Sent Transfer Proof");
     }
 
-    pub fn send_encrypted_signature_ack(&mut self, channel: ResponseChannel<()>) -> Result<()> {
-        self.encrypted_signature.send_ack(channel)
+    pub fn send_encrypted_signature_ack(&mut self, channel: ResponseChannel<()>) {
+        let _ = self.encrypted_signature.send_response(channel, ());
     }
 }

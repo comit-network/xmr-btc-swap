@@ -1,3 +1,4 @@
+pub mod encrypted_signature;
 pub mod peer_tracker;
 pub mod quote;
 pub mod request_response;

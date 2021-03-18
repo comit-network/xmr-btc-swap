@@ -7,7 +7,7 @@ use crate::monero::wallet::WatchRequest;
 use crate::monero::{monero_private_key, TransferProof};
 use crate::monero_ext::ScalarExt;
 use crate::protocol::alice::{Message1, Message3};
-use crate::protocol::bob::{EncryptedSignature, Message0, Message2, Message4};
+use crate::protocol::bob::{Message0, Message2, Message4};
 use crate::protocol::CROSS_CURVE_PROOF_SYSTEM;
 use anyhow::{anyhow, bail, Context, Result};
 use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
@@ -404,12 +404,6 @@ pub struct State4 {
 }
 
 impl State4 {
-    pub fn next_message(&self) -> EncryptedSignature {
-        EncryptedSignature {
-            tx_redeem_encsig: self.tx_redeem_encsig(),
-        }
-    }
-
     pub fn tx_redeem_encsig(&self) -> bitcoin::EncryptedSignature {
         let tx_redeem = bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address);
         self.b.encsign(self.S_a_bitcoin, tx_redeem.digest())

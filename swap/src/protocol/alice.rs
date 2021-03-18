@@ -14,7 +14,6 @@ pub use self::swap::{run, run_until};
 pub use execution_setup::Message3;
 
 mod behaviour;
-mod encrypted_signature;
 pub mod event_loop;
 mod execution_setup;
 pub mod state;

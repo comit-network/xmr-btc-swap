@@ -3,9 +3,8 @@ use crate::database::Database;
 use crate::env::Config;
 use crate::monero::BalanceTooLow;
 use crate::network::quote::BidQuote;
-use crate::network::{spot_price, transfer_proof, transport, TokioExecutor};
+use crate::network::{encrypted_signature, spot_price, transfer_proof, transport, TokioExecutor};
 use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State3, Swap};
-use crate::protocol::bob::EncryptedSignature;
 use crate::seed::Seed;
 use crate::{bitcoin, kraken, monero};
 use anyhow::{bail, Context, Result};
@@ -34,7 +33,7 @@ pub struct EventLoop<RS> {
     max_buy: bitcoin::Amount,
 
     /// Stores a sender per peer for incoming [`EncryptedSignature`]s.
-    recv_encrypted_signature: HashMap<PeerId, oneshot::Sender<EncryptedSignature>>,
+    recv_encrypted_signature: HashMap<PeerId, oneshot::Sender<encrypted_signature::Request>>,
     /// Stores a list of futures, waiting for transfer proof which will be sent
     /// to the given peer.
     send_transfer_proof:
@@ -156,7 +155,7 @@ where
                         OutEvent::TransferProofAcknowledged(peer) => {
                             trace!(%peer, "Bob acknowledged transfer proof");
                         }
-                        OutEvent::EncryptedSignature{ msg, channel, peer } => {
+                        OutEvent::EncryptedSignatureReceived{ msg, channel, peer } => {
                             match self.recv_encrypted_signature.remove(&peer) {
                                 Some(sender) => {
                                     // this failing just means the receiver is no longer interested ...
@@ -167,9 +166,7 @@ where
                                 }
                             }
 
-                            if let Err(error) = self.swarm.send_encrypted_signature_ack(channel) {
-                                error!("Failed to send Encrypted Signature ack: {:?}", error);
-                            }
+                            self.swarm.send_encrypted_signature_ack(channel);
                         }
                         OutEvent::ResponseSent => {}
                         OutEvent::Failure {peer, error} => {
@@ -307,7 +304,7 @@ impl LatestRate for kraken::RateUpdateStream {
 
 #[derive(Debug)]
 pub struct EventLoopHandle {
-    recv_encrypted_signature: Option<oneshot::Receiver<EncryptedSignature>>,
+    recv_encrypted_signature: Option<oneshot::Receiver<encrypted_signature::Request>>,
     send_transfer_proof: Option<oneshot::Sender<transfer_proof::Request>>,
 }
 

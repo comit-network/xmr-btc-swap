@@ -1,6 +1,6 @@
 use crate::database::Database;
 use crate::env::Config;
-use crate::network::{peer_tracker, spot_price};
+use crate::network::{encrypted_signature, peer_tracker, spot_price};
 use crate::protocol::bob;
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
@@ -13,7 +13,6 @@ use tracing::debug;
 use uuid::Uuid;
 
 pub use self::cancel::cancel;
-pub use self::encrypted_signature::EncryptedSignature;
 pub use self::event_loop::{EventLoop, EventLoopHandle};
 pub use self::refund::refund;
 pub use self::state::*;
@@ -22,7 +21,6 @@ use crate::network::quote::BidQuote;
 use crate::network::{quote, transfer_proof};
 
 pub mod cancel;
-mod encrypted_signature;
 pub mod event_loop;
 mod execution_setup;
 pub mod refund;
@@ -166,6 +164,17 @@ impl From<transfer_proof::Message> for OutEvent {
     }
 }
 
+impl From<encrypted_signature::Message> for OutEvent {
+    fn from(message: encrypted_signature::Message) -> Self {
+        match message {
+            encrypted_signature::Message::Request { .. } => OutEvent::unexpected_request(),
+            encrypted_signature::Message::Response { .. } => {
+                OutEvent::EncryptedSignatureAcknowledged
+            }
+        }
+    }
+}
+
 impl From<peer_tracker::OutEvent> for OutEvent {
     fn from(event: peer_tracker::OutEvent) -> Self {
         match event {
@@ -190,6 +199,12 @@ impl From<quote::OutEvent> for OutEvent {
 
 impl From<transfer_proof::OutEvent> for OutEvent {
     fn from(event: transfer_proof::OutEvent) -> Self {
+        map_rr_event_to_outevent(event)
+    }
+}
+
+impl From<encrypted_signature::OutEvent> for OutEvent {
+    fn from(event: encrypted_signature::OutEvent) -> Self {
         map_rr_event_to_outevent(event)
     }
 }
@@ -224,18 +239,6 @@ impl From<execution_setup::OutEvent> for OutEvent {
     }
 }
 
-impl From<encrypted_signature::OutEvent> for OutEvent {
-    fn from(event: encrypted_signature::OutEvent) -> Self {
-        use encrypted_signature::OutEvent::*;
-        match event {
-            Acknowledged => OutEvent::EncryptedSignatureAcknowledged,
-            Failure(err) => {
-                OutEvent::CommunicationError(err.context("Failure with Encrypted Signature"))
-            }
-        }
-    }
-}
-
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Bob.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
@@ -257,7 +260,7 @@ impl Default for Behaviour {
             spot_price: spot_price::bob(),
             execution_setup: Default::default(),
             transfer_proof: transfer_proof::bob(),
-            encrypted_signature: Default::default(),
+            encrypted_signature: encrypted_signature::bob(),
         }
     }
 }
@@ -286,8 +289,8 @@ impl Behaviour {
         alice: PeerId,
         tx_redeem_encsig: bitcoin::EncryptedSignature,
     ) {
-        let msg = EncryptedSignature { tx_redeem_encsig };
-        self.encrypted_signature.send(alice, msg);
+        let msg = encrypted_signature::Request { tx_redeem_encsig };
+        self.encrypted_signature.send_request(&alice, msg);
         debug!("Encrypted signature sent");
     }
 

@@ -9,20 +9,8 @@ use std::fmt::Debug;
 use std::io;
 use std::marker::PhantomData;
 
-/// Time to wait for a response back once we send a request.
-pub const TIMEOUT: u64 = 3600; // One hour.
-
 /// Message receive buffer.
 pub const BUF_SIZE: usize = 1024 * 1024;
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct EncryptedSignatureProtocol;
-
-impl ProtocolName for EncryptedSignatureProtocol {
-    fn protocol_name(&self) -> &[u8] {
-        b"/comit/xmr/btc/encrypted_signature/1.0.0"
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 pub struct CborCodec<P, Req, Res> {
