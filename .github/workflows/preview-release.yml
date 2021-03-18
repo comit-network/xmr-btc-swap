@@ -30,3 +30,4 @@ jobs:
           release_name: preview
           draft: false
           prerelease: true
+          body: Preview release of `asb` and `swap`
