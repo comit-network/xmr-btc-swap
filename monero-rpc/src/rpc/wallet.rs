@@ -285,6 +285,25 @@ impl Client {
         Ok(r.result)
     }
 
+    /// Returns a list of transfers
+    pub async fn get_transfers(&self, params: GetTransfersParams) -> Result<GetTransfers> {
+        let request = Request::new("get_transfers", params);
+
+        let response = self
+            .inner
+            .post(self.url.clone())
+            .json(&request)
+            .send()
+            .await?
+            .text()
+            .await?;
+
+        debug!("get transfers RPC response: {}", response);
+
+        let r = serde_json::from_str::<Response<GetTransfers>>(&response)?;
+        Ok(r.result)
+    }
+
     pub async fn generate_from_keys(
         &self,
         address: &str,
@@ -435,6 +454,52 @@ struct TransferParams {
     destinations: Vec<Destination>,
     // Return the transaction key after sending.
     get_tx_key: bool,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct GetTransfersParams {
+    pub r#in: bool,
+    pub out: bool,
+    pub failed: bool,
+    pub pool: bool,
+    pub filter_by_height: Option<bool>,
+    pub min_height: Option<u64>,
+    pub max_height: Option<u64>,
+    pub account_index: Option<u64>,
+    pub subaddr_indices: Option<Vec<u64>>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct GetTransfers {
+    pub r#in: Vec<GetTransfer>,
+    pub out: Vec<GetTransfer>,
+    pub pending: Vec<GetTransfer>,
+    pub failed: Vec<GetTransfer>,
+    pub pool: Vec<GetTransfer>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct GetTransfer {
+    pub address: String,
+    pub amount: u64,
+    pub confirmations: u64,
+    pub double_spend_seen: bool,
+    pub fee: u64,
+    pub height: u64,
+    pub note: String,
+    pub payment_id: String,
+    pub subaddr_index: SubAddressIndex,
+    pub suggested_confirmations_threshold: u64,
+    pub timestamp: u64,
+    pub txid: String,
+    pub r#type: String,
+    pub unlock_time: u64,
+}
+
+#[derive(Deserialize, Debug, Copy, Clone)]
+pub struct SubAddressIndex {
+    pub major: u64,
+    pub minor: u64,
 }
 
 #[derive(Serialize, Debug, Clone)]

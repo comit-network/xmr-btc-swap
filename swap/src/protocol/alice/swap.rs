@@ -116,7 +116,7 @@ async fn run_until_internal(
                     env_config.bitcoin_lock_confirmed_timeout().as_secs()
                 ))??;
 
-                let state = AliceState::BtcLocked { state3 };
+                let state = AliceState::WaitingForEncSig { state3 };
 
                 let db_state = (&state).into();
                 db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
@@ -133,64 +133,36 @@ async fn run_until_internal(
                 )
                 .await
             }
-            AliceState::BtcLocked { state3 } => {
+            AliceState::WaitingForEncSig { state3 } => {
                 // Record the current monero wallet block height so we don't have to scan from
                 // block 0 for scenarios where we create a refund wallet.
                 let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
 
                 lock_xmr(*state3.clone(), &mut event_loop_handle, &monero_wallet).await?;
 
-                let state = AliceState::XmrLocked {
-                    state3,
-                    monero_wallet_restore_blockheight,
-                };
+                let state = {
+                    let wait_for_enc_sig =
+                        wait_for_bitcoin_encrypted_signature(&mut event_loop_handle);
 
-                let db_state = (&state).into();
-                db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
-                    .await?;
-                run_until_internal(
-                    state,
-                    is_target_state,
-                    event_loop_handle,
-                    bitcoin_wallet,
-                    monero_wallet,
-                    env_config,
-                    swap_id,
-                    db,
-                )
-                .await
-            }
-            AliceState::XmrLocked {
-                state3,
-                monero_wallet_restore_blockheight,
-            } => {
-                let state = match state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {
-                    ExpiredTimelocks::None => {
-                        let wait_for_enc_sig =
-                            wait_for_bitcoin_encrypted_signature(&mut event_loop_handle);
-                        let state3_clone = state3.clone();
-                        let cancel_timelock_expires = state3_clone
-                            .wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
+                    let cancel_timelock_expires = bitcoin_wallet
+                        .watch_until_status(&state3.tx_lock, |status| {
+                            status.is_confirmed_with(state3.cancel_timelock)
+                        });
 
-                        pin_mut!(wait_for_enc_sig);
-                        pin_mut!(cancel_timelock_expires);
+                    pin_mut!(wait_for_enc_sig);
+                    pin_mut!(cancel_timelock_expires);
 
-                        match select(cancel_timelock_expires, wait_for_enc_sig).await {
-                            Either::Left(_) => AliceState::CancelTimelockExpired {
-                                state3,
-                                monero_wallet_restore_blockheight,
-                            },
-                            Either::Right((enc_sig, _)) => AliceState::EncSigLearned {
-                                state3,
-                                encrypted_signature: Box::new(enc_sig?),
-                                monero_wallet_restore_blockheight,
-                            },
-                        }
+                    match select(cancel_timelock_expires, wait_for_enc_sig).await {
+                        Either::Left(_) => AliceState::CancelTimelockExpired {
+                            state3: state3.clone(),
+                            monero_wallet_restore_blockheight,
+                        },
+                        Either::Right((enc_sig, _)) => AliceState::EncSigLearned {
+                            state3: state3.clone(),
+                            encrypted_signature: Box::new(enc_sig?),
+                            monero_wallet_restore_blockheight,
+                        },
                     }
-                    _ => AliceState::CancelTimelockExpired {
-                        state3,
-                        monero_wallet_restore_blockheight,
-                    },
                 };
 
                 let db_state = (&state).into();

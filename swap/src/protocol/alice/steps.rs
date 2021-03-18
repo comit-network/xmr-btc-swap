@@ -18,20 +18,25 @@ pub async fn lock_xmr(
     let public_spend_key = S_a + state3.S_b_monero;
     let public_view_key = state3.v.public();
 
-    let transfer_proof = monero_wallet
-        .transfer(public_spend_key, public_view_key, state3.xmr)
-        .await?;
+    if !monero_wallet
+        .is_transfer_in_progress(public_spend_key, public_view_key, state3.xmr)
+        .await?
+    {
+        let transfer_proof = monero_wallet
+            .transfer(public_spend_key, public_view_key, state3.xmr)
+            .await?;
 
-    // TODO(Franck): Wait for Monero to be confirmed once
-    //  Waiting for XMR confirmations should not be done in here, but in a separate
-    //  state! We have to record that Alice has already sent the transaction.
-    //  Otherwise Alice might publish the lock tx twice!
+        // TODO(Franck): Wait for Monero to be confirmed once
+        //  Waiting for XMR confirmations should not be done in here, but in a separate
+        //  state! We have to record that Alice has already sent the transaction.
+        //  Otherwise Alice might publish the lock tx twice!
 
-    event_loop_handle
-        .send_transfer_proof(TransferProof {
-            tx_lock_proof: transfer_proof,
-        })
-        .await?;
+        event_loop_handle
+            .send_transfer_proof(TransferProof {
+                tx_lock_proof: transfer_proof,
+            })
+            .await?;
+    }
 
     Ok(())
 }

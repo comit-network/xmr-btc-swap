@@ -672,7 +672,7 @@ pub mod alice_run_until {
     use swap::protocol::alice::AliceState;
 
     pub fn is_xmr_locked(state: &AliceState) -> bool {
-        matches!(state, AliceState::XmrLocked { .. })
+        matches!(state, AliceState::WaitingForEncSig { .. })
     }
 
     pub fn is_encsig_learned(state: &AliceState) -> bool {

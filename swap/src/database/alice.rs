@@ -18,11 +18,7 @@ pub enum Alice {
     WaitingForTxLockConfirmations {
         state3: alice::State3,
     },
-    BtcLocked {
-        state3: alice::State3,
-    },
-    XmrLocked {
-        monero_wallet_restore_blockheight: BlockHeight,
+    WaitingForEncSig {
         state3: alice::State3,
     },
     EncSigLearned {
@@ -72,14 +68,7 @@ impl From<&AliceState> for Alice {
                     state3: state3.as_ref().clone(),
                 }
             }
-            AliceState::BtcLocked { state3 } => Alice::BtcLocked {
-                state3: state3.as_ref().clone(),
-            },
-            AliceState::XmrLocked {
-                monero_wallet_restore_blockheight,
-                state3,
-            } => Alice::XmrLocked {
-                monero_wallet_restore_blockheight: *monero_wallet_restore_blockheight,
+            AliceState::WaitingForEncSig { state3 } => Alice::WaitingForEncSig {
                 state3: state3.as_ref().clone(),
             },
             AliceState::EncSigLearned {
@@ -144,14 +133,7 @@ impl From<Alice> for AliceState {
                     state3: Box::new(state3),
                 }
             }
-            Alice::BtcLocked { state3 } => AliceState::BtcLocked {
-                state3: Box::new(state3),
-            },
-            Alice::XmrLocked {
-                monero_wallet_restore_blockheight,
-                state3,
-            } => AliceState::XmrLocked {
-                monero_wallet_restore_blockheight,
+            Alice::WaitingForEncSig { state3 } => AliceState::WaitingForEncSig {
                 state3: Box::new(state3),
             },
             Alice::EncSigLearned {
@@ -211,8 +193,7 @@ impl Display for Alice {
             Alice::WaitingForTxLockConfirmations { .. } => {
                 write!(f, "Waiting for TxLock confirmations")
             }
-            Alice::BtcLocked { .. } => f.write_str("Bitcoin locked"),
-            Alice::XmrLocked { .. } => f.write_str("Monero locked"),
+            Alice::WaitingForEncSig { .. } => write!(f, "Waiting Bob to send EncSig"),
             Alice::CancelTimelockExpired { .. } => f.write_str("Cancel timelock is expired"),
             Alice::BtcCancelled { .. } => f.write_str("Bitcoin cancel transaction published"),
             Alice::BtcPunishable { .. } => f.write_str("Bitcoin punishable"),

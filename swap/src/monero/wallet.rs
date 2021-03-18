@@ -5,7 +5,7 @@ use crate::monero::{
 use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::{Context, Result};
 use monero_rpc::wallet;
-use monero_rpc::wallet::{BlockHeight, CheckTxKey, Client, Refreshed};
+use monero_rpc::wallet::{BlockHeight, CheckTxKey, Client, GetTransfersParams, Refreshed};
 use std::future::Future;
 use std::str::FromStr;
 use std::time::Duration;
@@ -147,6 +147,40 @@ impl Wallet {
             TxHash(res.tx_hash),
             PrivateKey::from_str(&res.tx_key)?,
         ))
+    }
+
+    pub async fn is_transfer_in_progress(
+        &self,
+        public_spend_key: PublicKey,
+        public_view_key: PublicViewKey,
+        amount: Amount,
+    ) -> Result<bool> {
+        let destination_address =
+            Address::standard(self.network, public_spend_key, public_view_key.into());
+        let mut transfers = self
+            .inner
+            .lock()
+            .await
+            .get_transfers(GetTransfersParams {
+                r#in: false,
+                out: true,
+                failed: false,
+                pool: true,
+                filter_by_height: None,
+                min_height: None,
+                max_height: None,
+                account_index: None,
+                subaddr_indices: None,
+            })
+            .await?;
+
+        transfers.pool.extend(transfers.pending);
+        transfers.pool.extend(transfers.out);
+
+        Ok(transfers.pool.iter().any(|transfer| {
+            (transfer.address == destination_address.to_string())
+                & (transfer.amount == amount.as_piconero())
+        }))
     }
 
     pub async fn watch_for_transfer(

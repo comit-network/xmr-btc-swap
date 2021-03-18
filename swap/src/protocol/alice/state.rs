@@ -21,11 +21,7 @@ pub enum AliceState {
     WaitingForTxLockConfirmations {
         state3: Box<State3>,
     },
-    BtcLocked {
-        state3: Box<State3>,
-    },
-    XmrLocked {
-        monero_wallet_restore_blockheight: BlockHeight,
+    WaitingForEncSig {
         state3: Box<State3>,
     },
     EncSigLearned {
@@ -65,8 +61,7 @@ impl fmt::Display for AliceState {
             AliceState::WaitingForTxLockConfirmations { .. } => {
                 write!(f, "waiting for for tx lock confirmations")
             }
-            AliceState::BtcLocked { .. } => write!(f, "btc is locked"),
-            AliceState::XmrLocked { .. } => write!(f, "xmr is locked"),
+            AliceState::WaitingForEncSig { .. } => write!(f, "waiting for enc sig"),
             AliceState::EncSigLearned { .. } => write!(f, "encrypted signature is learned"),
             AliceState::BtcRedeemed => write!(f, "btc is redeemed"),
             AliceState::BtcCancelled { .. } => write!(f, "btc is cancelled"),
