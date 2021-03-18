@@ -17,7 +17,7 @@ pub const DEFAULT_ELECTRUM_HTTP_URL: &str = "https://blockstream.info/testnet/ap
 const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://electrum.blockstream.info:60002";
 
 #[derive(structopt::StructOpt, Debug)]
-#[structopt(name = "xmr-btc-swap", about = "Atomically swap BTC for XMR")]
+#[structopt(name = "swap", about = "CLI for swapping BTC for XMR")]
 pub struct Arguments {
     #[structopt(
         long = "--data-dir",
