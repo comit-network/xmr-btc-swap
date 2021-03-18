@@ -78,7 +78,7 @@ async fn run_until_internal(
         match state {
             AliceState::Started { state3 } => {
                 timeout(
-                    env_config.bob_time_to_act,
+                    env_config.bitcoin_lock_in_mempool_timeout,
                     bitcoin_wallet
                         .watch_until_status(&state3.tx_lock, |status| status.has_been_seen()),
                 )
