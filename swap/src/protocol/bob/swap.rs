@@ -66,7 +66,7 @@ async fn run_until_internal(
         return Ok(state);
     }
 
-    match state {
+    let new_state = match state {
         BobState::Started { btc_amount } => {
             let bitcoin_refund_address = bitcoin_wallet.new_address().await?;
 
@@ -80,21 +80,7 @@ async fn run_until_internal(
             )
             .await?;
 
-            let state = BobState::ExecutionSetupDone(state2);
-            let db_state = state.clone().into();
-            db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
-            run_until_internal(
-                state,
-                is_target_state,
-                event_loop_handle,
-                db,
-                bitcoin_wallet,
-                monero_wallet,
-                swap_id,
-                env_config,
-                receive_monero_address,
-            )
-            .await
+            BobState::ExecutionSetupDone(state2)
         }
         BobState::ExecutionSetupDone(state2) => {
             // Do not lock Bitcoin if not connected to Alice.
@@ -107,28 +93,12 @@ async fn run_until_internal(
                 .context("Failed to sign Bitcoin lock transaction")?;
             let (..) = bitcoin_wallet.broadcast(signed_tx, "lock").await?;
 
-            let state = BobState::BtcLocked(state3);
-            let db_state = state.clone().into();
-            db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
-            run_until_internal(
-                state,
-                is_target_state,
-                event_loop_handle,
-                db,
-                bitcoin_wallet,
-                monero_wallet,
-                swap_id,
-                env_config,
-                receive_monero_address,
-            )
-            .await
+            BobState::BtcLocked(state3)
         }
         // Bob has locked Btc
         // Watch for Alice to Lock Xmr or for cancel timelock to elapse
         BobState::BtcLocked(state3) => {
-            let state = if let ExpiredTimelocks::None =
-                state3.current_epoch(bitcoin_wallet.as_ref()).await?
-            {
+            if let ExpiredTimelocks::None = state3.current_epoch(bitcoin_wallet.as_ref()).await? {
                 event_loop_handle.dial().await?;
 
                 let transfer_proof_watcher = event_loop_handle.recv_transfer_proof();
@@ -163,30 +133,14 @@ async fn run_until_internal(
             } else {
                 let state4 = state3.cancel();
                 BobState::CancelTimelockExpired(state4)
-            };
-            let db_state = state.clone().into();
-            db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
-            run_until_internal(
-                state,
-                is_target_state,
-                event_loop_handle,
-                db,
-                bitcoin_wallet,
-                monero_wallet,
-                swap_id,
-                env_config,
-                receive_monero_address,
-            )
-            .await
+            }
         }
         BobState::XmrLockProofReceived {
             state,
             lock_transfer_proof,
             monero_wallet_restore_blockheight,
         } => {
-            let state = if let ExpiredTimelocks::None =
-                state.current_epoch(bitcoin_wallet.as_ref()).await?
-            {
+            if let ExpiredTimelocks::None = state.current_epoch(bitcoin_wallet.as_ref()).await? {
                 event_loop_handle.dial().await?;
 
                 let xmr_lock_watcher = state.clone().watch_for_lock_xmr(
@@ -217,27 +171,10 @@ async fn run_until_internal(
             } else {
                 let state4 = state.cancel();
                 BobState::CancelTimelockExpired(state4)
-            };
-
-            let db_state = state.clone().into();
-            db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
-            run_until_internal(
-                state,
-                is_target_state,
-                event_loop_handle,
-                db,
-                bitcoin_wallet,
-                monero_wallet,
-                swap_id,
-                env_config,
-                receive_monero_address,
-            )
-            .await
+            }
         }
         BobState::XmrLocked(state) => {
-            let state = if let ExpiredTimelocks::None =
-                state.expired_timelock(bitcoin_wallet.as_ref()).await?
-            {
+            if let ExpiredTimelocks::None = state.expired_timelock(bitcoin_wallet.as_ref()).await? {
                 event_loop_handle.dial().await?;
                 // Alice has locked Xmr
                 // Bob sends Alice his key
@@ -261,26 +198,10 @@ async fn run_until_internal(
                 }
             } else {
                 BobState::CancelTimelockExpired(state)
-            };
-            let db_state = state.clone().into();
-            db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
-            run_until_internal(
-                state,
-                is_target_state,
-                event_loop_handle,
-                db,
-                bitcoin_wallet,
-                monero_wallet,
-                swap_id,
-                env_config,
-                receive_monero_address,
-            )
-            .await
+            }
         }
         BobState::EncSigSent(state) => {
-            let state = if let ExpiredTimelocks::None =
-                state.expired_timelock(bitcoin_wallet.as_ref()).await?
-            {
+            if let ExpiredTimelocks::None = state.expired_timelock(bitcoin_wallet.as_ref()).await? {
                 let state_clone = state.clone();
                 let redeem_watcher = state_clone.watch_for_redeem_btc(bitcoin_wallet.as_ref());
                 let cancel_timelock_expires =
@@ -296,22 +217,7 @@ async fn run_until_internal(
                 }
             } else {
                 BobState::CancelTimelockExpired(state)
-            };
-
-            let db_state = state.clone().into();
-            db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
-            run_until_internal(
-                state,
-                is_target_state,
-                event_loop_handle,
-                db,
-                bitcoin_wallet.clone(),
-                monero_wallet,
-                swap_id,
-                env_config,
-                receive_monero_address,
-            )
-            .await
+            }
         }
         BobState::BtcRedeemed(state) => {
             // Bob redeems XMR using revealed s_a
@@ -326,23 +232,9 @@ async fn run_until_internal(
                 tracing::info!("Sent XMR to {} in tx {}", receive_monero_address, tx_hash.0);
             }
 
-            let state = BobState::XmrRedeemed {
+            BobState::XmrRedeemed {
                 tx_lock_id: state.tx_lock_id(),
-            };
-            let db_state = state.clone().into();
-            db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
-            run_until_internal(
-                state,
-                is_target_state,
-                event_loop_handle,
-                db,
-                bitcoin_wallet,
-                monero_wallet,
-                swap_id,
-                env_config,
-                receive_monero_address,
-            )
-            .await
+            }
         }
         BobState::CancelTimelockExpired(state4) => {
             if state4
@@ -353,26 +245,11 @@ async fn run_until_internal(
                 state4.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
             }
 
-            let state = BobState::BtcCancelled(state4);
-            db.insert_latest_state(swap_id, Swap::Bob(state.clone().into()))
-                .await?;
-
-            run_until_internal(
-                state,
-                is_target_state,
-                event_loop_handle,
-                db,
-                bitcoin_wallet,
-                monero_wallet,
-                swap_id,
-                env_config,
-                receive_monero_address,
-            )
-            .await
+            BobState::BtcCancelled(state4)
         }
         BobState::BtcCancelled(state) => {
             // Bob has cancelled the swap
-            let state = match state.expired_timelock(bitcoin_wallet.as_ref()).await? {
+            match state.expired_timelock(bitcoin_wallet.as_ref()).await? {
                 ExpiredTimelocks::None => {
                     bail!(
                         "Internal error: canceled state reached before cancel timelock was expired"
@@ -385,28 +262,28 @@ async fn run_until_internal(
                 ExpiredTimelocks::Punish => BobState::BtcPunished {
                     tx_lock_id: state.tx_lock_id(),
                 },
-            };
-
-            let db_state = state.clone().into();
-            db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
-            run_until_internal(
-                state,
-                is_target_state,
-                event_loop_handle,
-                db,
-                bitcoin_wallet,
-                monero_wallet,
-                swap_id,
-                env_config,
-                receive_monero_address,
-            )
-            .await
+            }
         }
-        BobState::BtcRefunded(state4) => Ok(BobState::BtcRefunded(state4)),
-        BobState::BtcPunished { tx_lock_id } => Ok(BobState::BtcPunished { tx_lock_id }),
-        BobState::SafelyAborted => Ok(BobState::SafelyAborted),
-        BobState::XmrRedeemed { tx_lock_id } => Ok(BobState::XmrRedeemed { tx_lock_id }),
-    }
+        BobState::BtcRefunded(state4) => BobState::BtcRefunded(state4),
+        BobState::BtcPunished { tx_lock_id } => BobState::BtcPunished { tx_lock_id },
+        BobState::SafelyAborted => BobState::SafelyAborted,
+        BobState::XmrRedeemed { tx_lock_id } => BobState::XmrRedeemed { tx_lock_id },
+    };
+
+    let db_state = new_state.clone().into();
+    db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
+    run_until_internal(
+        new_state,
+        is_target_state,
+        event_loop_handle,
+        db,
+        bitcoin_wallet,
+        monero_wallet,
+        swap_id,
+        env_config,
+        receive_monero_address,
+    )
+    .await
 }
 
 pub async fn request_price_and_setup(

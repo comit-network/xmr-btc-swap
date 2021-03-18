@@ -73,7 +73,7 @@ async fn run_until_internal(
         return Ok(state);
     }
 
-    match state {
+    let new_state = match state {
         AliceState::Started { state3 } => {
             timeout(
                 env_config.bob_time_to_act,
@@ -88,22 +88,7 @@ async fn run_until_internal(
                 })
                 .await?;
 
-            let state = AliceState::BtcLocked { state3 };
-
-            let db_state = (&state).into();
-            db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
-                .await?;
-            run_until_internal(
-                state,
-                is_target_state,
-                event_loop_handle,
-                bitcoin_wallet,
-                monero_wallet,
-                env_config,
-                swap_id,
-                db,
-            )
-            .await
+            AliceState::BtcLocked { state3 }
         }
         AliceState::BtcLocked { state3 } => {
             // Record the current monero wallet block height so we don't have to scan from
@@ -123,105 +108,60 @@ async fn run_until_internal(
                 .send_transfer_proof(transfer_proof)
                 .await?;
 
-            let state = AliceState::XmrLocked {
+            AliceState::XmrLocked {
                 state3,
                 monero_wallet_restore_blockheight,
-            };
-
-            let db_state = (&state).into();
-            db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
-                .await?;
-            run_until_internal(
-                state,
-                is_target_state,
-                event_loop_handle,
-                bitcoin_wallet,
-                monero_wallet,
-                env_config,
-                swap_id,
-                db,
-            )
-            .await
+            }
         }
         AliceState::XmrLocked {
             state3,
             monero_wallet_restore_blockheight,
-        } => {
-            let state = match state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {
-                ExpiredTimelocks::None => {
-                    select! {
-                        _ = state3.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()) => {
-                            AliceState::CancelTimelockExpired {
-                                state3,
-                                monero_wallet_restore_blockheight,
-                            }
+        } => match state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {
+            ExpiredTimelocks::None => {
+                select! {
+                    _ = state3.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()) => {
+                        AliceState::CancelTimelockExpired {
+                            state3,
+                            monero_wallet_restore_blockheight,
                         }
-                        enc_sig = event_loop_handle.recv_encrypted_signature() => {
-                            tracing::info!("Received encrypted signature");
+                    }
+                    enc_sig = event_loop_handle.recv_encrypted_signature() => {
+                        tracing::info!("Received encrypted signature");
 
-                            AliceState::EncSigLearned {
-                                state3,
-                                encrypted_signature: Box::new(enc_sig?),
-                                monero_wallet_restore_blockheight,
-                            }
+                        AliceState::EncSigLearned {
+                            state3,
+                            encrypted_signature: Box::new(enc_sig?),
+                            monero_wallet_restore_blockheight,
                         }
                     }
                 }
-                _ => AliceState::CancelTimelockExpired {
-                    state3,
-                    monero_wallet_restore_blockheight,
-                },
-            };
-
-            let db_state = (&state).into();
-            db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
-                .await?;
-            run_until_internal(
-                state,
-                is_target_state,
-                event_loop_handle,
-                bitcoin_wallet.clone(),
-                monero_wallet,
-                env_config,
-                swap_id,
-                db,
-            )
-            .await
-        }
+            }
+            _ => AliceState::CancelTimelockExpired {
+                state3,
+                monero_wallet_restore_blockheight,
+            },
+        },
         AliceState::EncSigLearned {
             state3,
             encrypted_signature,
             monero_wallet_restore_blockheight,
-        } => {
-            let state = match state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {
-                ExpiredTimelocks::None => {
-                    match TxRedeem::new(&state3.tx_lock, &state3.redeem_address).complete(
-                        *encrypted_signature,
-                        state3.a.clone(),
-                        state3.s_a.to_secpfun_scalar(),
-                        state3.B,
-                    ) {
-                        Ok(tx) => match bitcoin_wallet.broadcast(tx, "redeem").await {
-                            Ok((_, finality)) => match finality.await {
-                                Ok(_) => AliceState::BtcRedeemed,
-                                Err(e) => {
-                                    bail!("Waiting for Bitcoin transaction finality failed with {}! The redeem transaction was published, but it is not ensured that the transaction was included! You're screwed.", e)
-                                }
-                            },
+        } => match state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {
+            ExpiredTimelocks::None => {
+                match TxRedeem::new(&state3.tx_lock, &state3.redeem_address).complete(
+                    *encrypted_signature,
+                    state3.a.clone(),
+                    state3.s_a.to_secpfun_scalar(),
+                    state3.B,
+                ) {
+                    Ok(tx) => match bitcoin_wallet.broadcast(tx, "redeem").await {
+                        Ok((_, finality)) => match finality.await {
+                            Ok(_) => AliceState::BtcRedeemed,
                             Err(e) => {
-                                error!("Publishing the redeem transaction failed with {}, attempting to wait for cancellation now. If you restart the application before the timelock is expired publishing the redeem transaction will be retried.", e);
-                                state3
-                                    .wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref())
-                                    .await?;
-
-                                AliceState::CancelTimelockExpired {
-                                    state3,
-                                    monero_wallet_restore_blockheight,
-                                }
+                                bail!("Waiting for Bitcoin transaction finality failed with {}! The redeem transaction was published, but it is not ensured that the transaction was included! You're screwed.", e)
                             }
                         },
                         Err(e) => {
-                            error!("Constructing the redeem transaction failed with {}, attempting to wait for cancellation now.", e);
+                            error!("Publishing the redeem transaction failed with {}, attempting to wait for cancellation now. If you restart the application before the timelock is expired publishing the redeem transaction will be retried.", e);
                             state3
                                 .wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref())
                                 .await?;
@@ -231,29 +171,25 @@ async fn run_until_internal(
                                 monero_wallet_restore_blockheight,
                             }
                         }
+                    },
+                    Err(e) => {
+                        error!("Constructing the redeem transaction failed with {}, attempting to wait for cancellation now.", e);
+                        state3
+                            .wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref())
+                            .await?;
+
+                        AliceState::CancelTimelockExpired {
+                            state3,
+                            monero_wallet_restore_blockheight,
+                        }
                     }
                 }
-                _ => AliceState::CancelTimelockExpired {
-                    state3,
-                    monero_wallet_restore_blockheight,
-                },
-            };
-
-            let db_state = (&state).into();
-            db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
-                .await?;
-            run_until_internal(
-                state,
-                is_target_state,
-                event_loop_handle,
-                bitcoin_wallet,
-                monero_wallet,
-                env_config,
-                swap_id,
-                db,
-            )
-            .await
-        }
+            }
+            _ => AliceState::CancelTimelockExpired {
+                state3,
+                monero_wallet_restore_blockheight,
+            },
+        },
         AliceState::CancelTimelockExpired {
             state3,
             monero_wallet_restore_blockheight,
@@ -281,24 +217,10 @@ async fn run_until_internal(
                 // returned mined block height
             }
 
-            let state = AliceState::BtcCancelled {
+            AliceState::BtcCancelled {
                 state3,
                 monero_wallet_restore_blockheight,
-            };
-            let db_state = (&state).into();
-            db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
-                .await?;
-            run_until_internal(
-                state,
-                is_target_state,
-                event_loop_handle,
-                bitcoin_wallet,
-                monero_wallet,
-                env_config,
-                swap_id,
-                db,
-            )
-            .await
+            }
         }
         AliceState::BtcCancelled {
             state3,
@@ -314,7 +236,7 @@ async fn run_until_internal(
                 status.is_confirmed_with(state3.punish_timelock)
             });
 
-            let state = tokio::select! {
+            select! {
                 seen_refund = seen_refund_tx => {
                     seen_refund.context("Failed to monitor refund transaction")?;
                     let published_refund_tx = bitcoin_wallet.get_raw_transaction(tx_refund.txid()).await?;
@@ -338,23 +260,7 @@ async fn run_until_internal(
                         monero_wallet_restore_blockheight,
                     }
                 }
-            };
-
-            let db_state = (&state).into();
-            db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
-                .await?;
-
-            run_until_internal(
-                state,
-                is_target_state,
-                event_loop_handle,
-                bitcoin_wallet.clone(),
-                monero_wallet,
-                env_config,
-                swap_id,
-                db,
-            )
-            .await
+            }
         }
         AliceState::BtcRefunded {
             spend_key,
@@ -367,11 +273,7 @@ async fn run_until_internal(
                 .create_from(spend_key, view_key, monero_wallet_restore_blockheight)
                 .await?;
 
-            let state = AliceState::XmrRefunded;
-            let db_state = (&state).into();
-            db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
-                .await?;
-            Ok(state)
+            AliceState::XmrRefunded
         }
         AliceState::BtcPunishable {
             state3,
@@ -409,51 +311,36 @@ async fn run_until_internal(
                         state3.a.clone(),
                         state3.S_b_bitcoin,
                     )?;
-                    let state = AliceState::BtcRefunded {
+                    AliceState::BtcRefunded {
                         spend_key,
                         state3,
                         monero_wallet_restore_blockheight,
-                    };
-                    let db_state = (&state).into();
-                    db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
-                        .await?;
-                    run_until_internal(
-                        state,
-                        is_target_state,
-                        event_loop_handle,
-                        bitcoin_wallet.clone(),
-                        monero_wallet,
-                        env_config,
-                        swap_id,
-                        db,
-                    )
-                    .await
+                    }
                 }
                 Either::Left((Err(e), _)) => {
                     bail!(e.context("Failed to monitor refund transaction"))
                 }
-                Either::Right(_) => {
-                    let state = AliceState::BtcPunished;
-                    let db_state = (&state).into();
-                    db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
-                        .await?;
-                    run_until_internal(
-                        state,
-                        is_target_state,
-                        event_loop_handle,
-                        bitcoin_wallet.clone(),
-                        monero_wallet,
-                        env_config,
-                        swap_id,
-                        db,
-                    )
-                    .await
-                }
+                Either::Right(_) => AliceState::BtcPunished,
             }
         }
-        AliceState::XmrRefunded => Ok(AliceState::XmrRefunded),
-        AliceState::BtcRedeemed => Ok(AliceState::BtcRedeemed),
-        AliceState::BtcPunished => Ok(AliceState::BtcPunished),
-        AliceState::SafelyAborted => Ok(AliceState::SafelyAborted),
-    }
+        AliceState::XmrRefunded => AliceState::XmrRefunded,
+        AliceState::BtcRedeemed => AliceState::BtcRedeemed,
+        AliceState::BtcPunished => AliceState::BtcPunished,
+        AliceState::SafelyAborted => AliceState::SafelyAborted,
+    };
+
+    let db_state = (&new_state).into();
+    db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
+        .await?;
+    run_until_internal(
+        new_state,
+        is_target_state,
+        event_loop_handle,
+        bitcoin_wallet,
+        monero_wallet,
+        env_config,
+        swap_id,
+        db,
+    )
+    .await
 }
