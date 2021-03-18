@@ -193,16 +193,11 @@ async fn run_until_internal(
         }
         BobState::EncSigSent(state) => {
             if let ExpiredTimelocks::None = state.expired_timelock(bitcoin_wallet.as_ref()).await? {
-                let state_clone = state.clone();
-                let redeem_watcher = state_clone.watch_for_redeem_btc(bitcoin_wallet.as_ref());
-                let cancel_timelock_expires =
-                    state_clone.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
-
                 select! {
-                    state5 = redeem_watcher => {
+                    state5 = state.watch_for_redeem_btc(bitcoin_wallet.as_ref()) => {
                         BobState::BtcRedeemed(state5?)
                     },
-                    _ = cancel_timelock_expires => {
+                    _ = state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()) => {
                         BobState::CancelTimelockExpired(state)
                     }
                 }
