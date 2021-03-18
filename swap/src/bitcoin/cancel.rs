@@ -1,12 +1,12 @@
+use crate::bitcoin;
 use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{
     build_shared_output_descriptor, Address, Amount, BlockHeight, PublicKey, Transaction, TxLock,
     TX_FEE,
 };
 use ::bitcoin::util::bip143::SigHashCache;
-use ::bitcoin::{OutPoint, SigHash, SigHashType, TxIn, TxOut, Txid};
+use ::bitcoin::{OutPoint, Script, SigHash, SigHashType, TxIn, TxOut, Txid};
 use anyhow::Result;
-use bitcoin::Script;
 use ecdsa_fun::Signature;
 use miniscript::{Descriptor, DescriptorTrait};
 use serde::{Deserialize, Serialize};
@@ -149,7 +149,39 @@ impl TxCancel {
         OutPoint::new(self.inner.txid(), 0)
     }
 
-    pub fn add_signatures(
+    pub fn complete_as_alice(
+        self,
+        a: bitcoin::SecretKey,
+        B: bitcoin::PublicKey,
+        tx_cancel_sig_B: bitcoin::Signature,
+    ) -> Result<Transaction> {
+        let sig_a = a.sign(self.digest());
+        let sig_b = tx_cancel_sig_B;
+
+        let tx_cancel = self
+            .add_signatures((a.public(), sig_a), (B, sig_b))
+            .expect("sig_{a,b} to be valid signatures for tx_cancel");
+
+        Ok(tx_cancel)
+    }
+
+    pub fn complete_as_bob(
+        self,
+        A: bitcoin::PublicKey,
+        b: bitcoin::SecretKey,
+        tx_cancel_sig_A: bitcoin::Signature,
+    ) -> Result<Transaction> {
+        let sig_a = tx_cancel_sig_A;
+        let sig_b = b.sign(self.digest());
+
+        let tx_cancel = self
+            .add_signatures((A, sig_a), (b.public(), sig_b))
+            .expect("sig_{a,b} to be valid signatures for tx_cancel");
+
+        Ok(tx_cancel)
+    }
+
+    fn add_signatures(
         self,
         (A, sig_a): (PublicKey, Signature),
         (B, sig_b): (PublicKey, Signature),

@@ -8,7 +8,7 @@ use crate::monero_ext::ScalarExt;
 use crate::protocol::alice::{Message1, Message3};
 use crate::protocol::bob::{EncryptedSignature, Message0, Message2, Message4};
 use crate::protocol::CROSS_CURVE_PROOF_SYSTEM;
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
 use ecdsa_fun::nonce::Deterministic;
 use ecdsa_fun::Signature;
@@ -441,20 +441,12 @@ impl State4 {
     }
 
     pub async fn submit_tx_cancel(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<Txid> {
-        let tx_cancel =
-            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public());
+        let transaction =
+            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.A, self.b.public())
+                .complete_as_bob(self.A, self.b.clone(), self.tx_cancel_sig_a.clone())
+                .context("Failed to complete Bitcoin cancel transaction")?;
 
-        let sig_a = self.tx_cancel_sig_a.clone();
-        let sig_b = self.b.sign(tx_cancel.digest());
-
-        let tx_cancel = tx_cancel
-            .add_signatures((self.A, sig_a), (self.b.public(), sig_b))
-            .expect(
-                "sig_{a,b} to be valid signatures for
-                tx_cancel",
-            );
-
-        let (tx_id, _) = bitcoin_wallet.broadcast(tx_cancel, "cancel").await?;
+        let (tx_id, _) = bitcoin_wallet.broadcast(transaction, "cancel").await?;
 
         Ok(tx_id)
     }

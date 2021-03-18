@@ -1,6 +1,6 @@
 use crate::bitcoin;
 use crate::bitcoin::{CancelTimelock, PunishTimelock, TxCancel, TxLock, TxRefund};
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 
 pub async fn publish_cancel_transaction(
     tx_lock: TxLock,
@@ -25,15 +25,12 @@ pub async fn publish_cancel_transaction(
         // TODO(Franck): Maybe the cancel transaction is already mined, in this case,
         // the broadcast will error out.
 
-        let sig_a = a.sign(tx_cancel.digest());
-        let sig_b = tx_cancel_sig_bob.clone();
-
-        let tx_cancel = tx_cancel
-            .add_signatures((a.public(), sig_a), (B, sig_b))
-            .expect("sig_{a,b} to be valid signatures for tx_cancel");
+        let transaction = tx_cancel
+            .complete_as_alice(a, B, tx_cancel_sig_bob)
+            .context("Failed to complete Bitcoin cancel transaction")?;
 
         // TODO(Franck): Error handling is delicate, why can't we broadcast?
-        let (..) = bitcoin_wallet.broadcast(tx_cancel, "cancel").await?;
+        let (..) = bitcoin_wallet.broadcast(transaction, "cancel").await?;
 
         // TODO(Franck): Wait until transaction is mined and returned mined
         // block height
