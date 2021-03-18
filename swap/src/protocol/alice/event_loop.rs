@@ -42,12 +42,6 @@ pub struct EventLoop<RS> {
     swap_sender: mpsc::Sender<Swap>,
 }
 
-#[derive(Debug)]
-pub struct EventLoopHandle {
-    recv_encrypted_signature: Option<oneshot::Receiver<EncryptedSignature>>,
-    send_transfer_proof: Option<oneshot::Sender<TransferProof>>,
-}
-
 impl<LR> EventLoop<LR>
 where
     LR: LatestRate,
@@ -308,6 +302,12 @@ impl LatestRate for kraken::RateUpdateStream {
     fn latest_rate(&mut self) -> Result<Rate, Self::Error> {
         self.latest_update()
     }
+}
+
+#[derive(Debug)]
+pub struct EventLoopHandle {
+    recv_encrypted_signature: Option<oneshot::Receiver<EncryptedSignature>>,
+    send_transfer_proof: Option<oneshot::Sender<TransferProof>>,
 }
 
 impl EventLoopHandle {
