@@ -6,7 +6,6 @@ use crate::env::Config;
 use crate::monero_ext::ScalarExt;
 use crate::protocol::alice;
 use crate::protocol::alice::event_loop::EventLoopHandle;
-use crate::protocol::alice::steps::wait_for_bitcoin_refund;
 use crate::protocol::alice::AliceState;
 use crate::{bitcoin, database, monero};
 use anyhow::{bail, Context, Result};
@@ -309,66 +308,58 @@ async fn run_until_internal(
                 state3,
                 monero_wallet_restore_blockheight,
             } => {
-                let published_refund_tx = wait_for_bitcoin_refund(
-                    &state3.tx_cancel(),
-                    &state3.tx_refund(),
-                    state3.punish_timelock,
-                    &bitcoin_wallet,
-                )
-                .await?;
+                let tx_refund = state3.tx_refund();
+                let tx_cancel = state3.tx_cancel();
 
-                // TODO(Franck): Review error handling
-                match published_refund_tx {
-                    None => {
-                        let state = AliceState::BtcPunishable {
-                            state3,
-                            monero_wallet_restore_blockheight,
-                        };
-                        let db_state = (&state).into();
-                        db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
-                            .await?;
+                let seen_refund_tx =
+                    bitcoin_wallet.watch_until_status(&tx_refund, |status| status.has_been_seen());
 
-                        run_until_internal(
-                            state,
-                            is_target_state,
-                            event_loop_handle,
-                            bitcoin_wallet.clone(),
-                            monero_wallet,
-                            env_config,
-                            swap_id,
-                            db,
-                        )
-                        .await
-                    }
-                    Some(published_refund_tx) => {
-                        let spend_key = state3.tx_refund().extract_monero_private_key(
+                let punish_timelock_expired = bitcoin_wallet
+                    .watch_until_status(&tx_cancel, |status| {
+                        status.is_confirmed_with(state3.punish_timelock)
+                    });
+
+                let state = tokio::select! {
+                    seen_refund = seen_refund_tx => {
+                        seen_refund.context("Failed to monitor refund transaction")?;
+                        let published_refund_tx = bitcoin_wallet.get_raw_transaction(tx_refund.txid()).await?;
+
+                        let spend_key = tx_refund.extract_monero_private_key(
                             published_refund_tx,
                             state3.s_a,
                             state3.a.clone(),
                             state3.S_b_bitcoin,
                         )?;
 
-                        let state = AliceState::BtcRefunded {
+                        AliceState::BtcRefunded {
                             spend_key,
                             state3,
                             monero_wallet_restore_blockheight,
-                        };
-                        let db_state = (&state).into();
-                        db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
-                            .await?;
-                        run_until_internal(
-                            state,
-                            is_target_state,
-                            event_loop_handle,
-                            bitcoin_wallet.clone(),
-                            monero_wallet,
-                            env_config,
-                            swap_id,
-                            db,
-                        )
-                        .await
+                        }
                     }
-                }
+                    _ = punish_timelock_expired => {
+                        AliceState::BtcPunishable {
+                            state3,
+                            monero_wallet_restore_blockheight,
+                        }
+                    }
+                };
+
+                let db_state = (&state).into();
+                db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
+                    .await?;
+
+                run_until_internal(
+                    state,
+                    is_target_state,
+                    event_loop_handle,
+                    bitcoin_wallet.clone(),
+                    monero_wallet,
+                    env_config,
+                    swap_id,
+                    db,
+                )
+                .await
             }
             AliceState::BtcRefunded {
                 spend_key,
