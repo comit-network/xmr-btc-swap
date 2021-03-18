@@ -10,10 +10,6 @@ pub async fn publish_cancel_transaction(
     tx_cancel_sig_bob: bitcoin::Signature,
     bitcoin_wallet: &bitcoin::Wallet,
 ) -> Result<()> {
-    bitcoin_wallet
-        .watch_until_status(&tx_lock, |status| status.is_confirmed_with(cancel_timelock))
-        .await?;
-
     let tx_cancel = bitcoin::TxCancel::new(&tx_lock, cancel_timelock, a.public(), B);
 
     // If Bob hasn't yet broadcasted the tx cancel, we do it
