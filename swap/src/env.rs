@@ -58,7 +58,7 @@ impl GetConfig for Mainnet {
 impl GetConfig for Testnet {
     fn get_config() -> Config {
         Config {
-            bitcoin_lock_in_mempool_timeout: 60.minutes(),
+            bitcoin_lock_in_mempool_timeout: 10.minutes(),
             bitcoin_finality_confirmations: 1,
             bitcoin_avg_block_time: 5.minutes(),
             bitcoin_cancel_timelock: CancelTimelock::new(12),
