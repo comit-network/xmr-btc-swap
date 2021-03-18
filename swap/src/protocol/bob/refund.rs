@@ -16,14 +16,14 @@ pub async fn refund(
     db: Database,
     force: bool,
 ) -> Result<Result<BobState, SwapNotCancelledYet>> {
-    let state4 = if force {
+    let state6 = if force {
         match state {
             BobState::BtcLocked(state3) => state3.cancel(),
             BobState::XmrLockProofReceived { state, .. } => state.cancel(),
-            BobState::XmrLocked(state4) => state4,
-            BobState::EncSigSent(state4) => state4,
-            BobState::CancelTimelockExpired(state4) => state4,
-            BobState::BtcCancelled(state4) => state4,
+            BobState::XmrLocked(state4) => state4.cancel(),
+            BobState::EncSigSent(state4) => state4.cancel(),
+            BobState::CancelTimelockExpired(state6) => state6,
+            BobState::BtcCancelled(state6) => state6,
             _ => bail!(
                 "Cannot refund swap {} because it is in state {} which is not refundable.",
                 swap_id,
@@ -32,16 +32,16 @@ pub async fn refund(
         }
     } else {
         match state {
-            BobState::BtcCancelled(state4) => state4,
+            BobState::BtcCancelled(state6) => state6,
             _ => {
                 return Ok(Err(SwapNotCancelledYet(swap_id)));
             }
         }
     };
 
-    state4.refund_btc(bitcoin_wallet.as_ref()).await?;
+    state6.refund_btc(bitcoin_wallet.as_ref()).await?;
 
-    let state = BobState::BtcRefunded(state4);
+    let state = BobState::BtcRefunded(state6);
     let db_state = state.clone().into();
 
     db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;

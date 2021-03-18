@@ -42,12 +42,6 @@ pub struct EventLoop<RS> {
     swap_sender: mpsc::Sender<Swap>,
 }
 
-#[derive(Debug)]
-pub struct EventLoopHandle {
-    recv_encrypted_signature: Option<oneshot::Receiver<EncryptedSignature>>,
-    send_transfer_proof: Option<oneshot::Sender<TransferProof>>,
-}
-
 impl<LR> EventLoop<LR>
 where
     LR: LatestRate,
@@ -310,22 +304,30 @@ impl LatestRate for kraken::RateUpdateStream {
     }
 }
 
+#[derive(Debug)]
+pub struct EventLoopHandle {
+    recv_encrypted_signature: Option<oneshot::Receiver<EncryptedSignature>>,
+    send_transfer_proof: Option<oneshot::Sender<TransferProof>>,
+}
+
 impl EventLoopHandle {
-    pub async fn recv_encrypted_signature(&mut self) -> Result<EncryptedSignature> {
+    pub async fn recv_encrypted_signature(&mut self) -> Result<bitcoin::EncryptedSignature> {
         let signature = self
             .recv_encrypted_signature
             .take()
             .context("Encrypted signature was already received")?
-            .await?;
+            .await?
+            .tx_redeem_encsig;
 
         Ok(signature)
     }
-    pub async fn send_transfer_proof(&mut self, msg: TransferProof) -> Result<()> {
+
+    pub async fn send_transfer_proof(&mut self, msg: monero::TransferProof) -> Result<()> {
         if self
             .send_transfer_proof
             .take()
             .context("Transfer proof was already sent")?
-            .send(msg)
+            .send(TransferProof { tx_lock_proof: msg })
             .is_err()
         {
             bail!("Failed to send transfer proof, receiver no longer listening?")

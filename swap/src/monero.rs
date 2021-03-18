@@ -182,7 +182,7 @@ impl fmt::Display for TxHash {
 }
 
 #[derive(Debug, Clone, Copy, thiserror::Error)]
-#[error("transaction does not pay enough: expected {expected}, got {actual}")]
+#[error("expected {expected}, got {actual}")]
 pub struct InsufficientFunds {
     pub expected: Amount,
     pub actual: Amount,

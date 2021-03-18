@@ -120,12 +120,13 @@ impl Wallet {
         Ok(())
     }
 
-    pub async fn transfer(
-        &self,
-        public_spend_key: PublicKey,
-        public_view_key: PublicViewKey,
-        amount: Amount,
-    ) -> Result<TransferProof> {
+    pub async fn transfer(&self, request: TransferRequest) -> Result<TransferProof> {
+        let TransferRequest {
+            public_spend_key,
+            public_view_key,
+            amount,
+        } = request;
+
         let destination_address =
             Address::standard(self.network, public_spend_key, public_view_key.into());
 
@@ -149,14 +150,15 @@ impl Wallet {
         ))
     }
 
-    pub async fn watch_for_transfer(
-        &self,
-        public_spend_key: PublicKey,
-        public_view_key: PublicViewKey,
-        transfer_proof: TransferProof,
-        expected: Amount,
-        conf_target: u32,
-    ) -> Result<(), InsufficientFunds> {
+    pub async fn watch_for_transfer(&self, request: WatchRequest) -> Result<()> {
+        let WatchRequest {
+            conf_target,
+            public_view_key,
+            public_spend_key,
+            transfer_proof,
+            expected,
+        } = request;
+
         let txid = transfer_proof.tx_hash();
 
         tracing::info!(%txid, "Waiting for {} confirmation{} of Monero transaction", conf_target, if conf_target > 1 { "s" } else { "" });
@@ -220,6 +222,22 @@ impl Wallet {
         // Median tx fees on Monero as found here: https://www.monero.how/monero-transaction-fees, 0.000_015 * 2 (to be on the safe side)
         Amount::from_monero(0.000_03f64).expect("static fee to be convertible without problems")
     }
+}
+
+#[derive(Debug)]
+pub struct TransferRequest {
+    pub public_spend_key: PublicKey,
+    pub public_view_key: PublicViewKey,
+    pub amount: Amount,
+}
+
+#[derive(Debug)]
+pub struct WatchRequest {
+    pub public_spend_key: PublicKey,
+    pub public_view_key: PublicViewKey,
+    pub transfer_proof: TransferProof,
+    pub conf_target: u32,
+    pub expected: Amount,
 }
 
 async fn wait_for_confirmations<Fut>(
