@@ -19,7 +19,7 @@ base64 = "0.13"
 bdk = { version = "0.4" }
 big-bytes = "1"
 bitcoin = { version = "0.26", features = ["rand", "use-serde"] }
-config = { version = "0.10", default-features = false, features = ["toml"] }
+config = { version = "0.11", default-features = false, features = ["toml"] }
 conquer-once = "0.3"
 curve25519-dalek = "3"
 dialoguer = "0.8"
