@@ -24,6 +24,10 @@ impl Config {
     pub fn monero_sync_interval(&self) -> Duration {
         sync_interval(self.monero_avg_block_time)
     }
+
+    pub fn bitcoin_lock_confirmed_timeout(&self) -> Duration {
+        self.bitcoin_avg_block_time * self.bitcoin_finality_confirmations * 4
+    }
 }
 
 pub trait GetConfig {

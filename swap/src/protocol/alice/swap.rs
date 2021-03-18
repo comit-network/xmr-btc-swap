@@ -85,13 +85,24 @@ async fn run_until_internal(
                 .await
                 .context("Failed to find lock Bitcoin tx")??;
 
-                bitcoin_wallet
-                    .watch_until_status(&state3.tx_lock, |status| {
+                let state = match timeout(
+                    env_config.bitcoin_lock_confirmed_timeout(),
+                    bitcoin_wallet.watch_until_status(&state3.tx_lock, |status| {
                         status.is_confirmed_with(env_config.bitcoin_finality_confirmations)
-                    })
-                    .await?;
-
-                let state = AliceState::BtcLocked { state3 };
+                    }),
+                )
+                .await?
+                {
+                    Ok(_) => AliceState::BtcLocked { state3 },
+                    Err(_) => {
+                        tracing::info!(
+                            "TxLock lock did not get {} confirmations in {} seconds",
+                            env_config.bitcoin_finality_confirmations,
+                            env_config.bitcoin_lock_confirmed_timeout().as_secs()
+                        );
+                        AliceState::SafelyAborted
+                    }
+                };
 
                 let db_state = (&state).into();
                 db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
