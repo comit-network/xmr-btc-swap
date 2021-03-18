@@ -6,7 +6,7 @@ use crate::env::Config;
 use crate::monero_ext::ScalarExt;
 use crate::protocol::alice;
 use crate::protocol::alice::event_loop::EventLoopHandle;
-use crate::protocol::alice::steps::{publish_cancel_transaction, wait_for_bitcoin_refund};
+use crate::protocol::alice::steps::wait_for_bitcoin_refund;
 use crate::protocol::alice::AliceState;
 use crate::{bitcoin, database, monero};
 use anyhow::{bail, Context, Result};
@@ -259,15 +259,32 @@ async fn run_until_internal(
                 state3,
                 monero_wallet_restore_blockheight,
             } => {
-                publish_cancel_transaction(
-                    state3.tx_lock.clone(),
-                    state3.a.clone(),
-                    state3.B,
-                    state3.cancel_timelock,
-                    state3.tx_cancel_sig_bob.clone(),
-                    &bitcoin_wallet,
-                )
-                .await?;
+                let tx_cancel = state3.tx_cancel();
+
+                // If Bob hasn't yet broadcasted the tx cancel, we do it
+                if bitcoin_wallet
+                    .get_raw_transaction(tx_cancel.txid())
+                    .await
+                    .is_err()
+                {
+                    let transaction = tx_cancel
+                        .complete_as_alice(
+                            state3.a.clone(),
+                            state3.B,
+                            state3.tx_cancel_sig_bob.clone(),
+                        )
+                        .context("Failed to complete Bitcoin cancel transaction")?;
+
+                    if let Err(e) = bitcoin_wallet.broadcast(transaction, "cancel").await {
+                        tracing::debug!(
+                            "Assuming transaction is already broadcasted because: {:#}",
+                            e
+                        )
+                    }
+
+                    // TODO(Franck): Wait until transaction is mined and
+                    // returned mined block height
+                }
 
                 let state = AliceState::BtcCancelled {
                     state3,
