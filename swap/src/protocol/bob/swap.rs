@@ -178,21 +178,12 @@ async fn run_until_internal(
                 event_loop_handle.dial().await?;
                 // Alice has locked Xmr
                 // Bob sends Alice his key
-                let tx_redeem_encsig = state.tx_redeem_encsig();
-
-                let state4_clone = state.clone();
-
-                let enc_sig_sent_watcher =
-                    event_loop_handle.send_encrypted_signature(tx_redeem_encsig);
-                let bitcoin_wallet = bitcoin_wallet.clone();
-                let cancel_timelock_expires =
-                    state4_clone.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
 
                 select! {
-                    _ = enc_sig_sent_watcher => {
+                    _ = event_loop_handle.send_encrypted_signature(state.tx_redeem_encsig()) => {
                         BobState::EncSigSent(state)
                     },
-                    _ = cancel_timelock_expires => {
+                    _ = state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()) => {
                         BobState::CancelTimelockExpired(state)
                     }
                 }
