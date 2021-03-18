@@ -85,11 +85,14 @@ async fn run_until_internal(
                 .await
                 .context("Failed to find lock Bitcoin tx")??;
 
-                bitcoin_wallet
-                    .watch_until_status(&state3.tx_lock, |status| {
+                timeout(
+                    env_config.bitcoin_lock_confirmed_timeout(),
+                    bitcoin_wallet.watch_until_status(&state3.tx_lock, |status| {
                         status.is_confirmed_with(env_config.bitcoin_finality_confirmations)
-                    })
-                    .await?;
+                    }),
+                )
+                .await
+                .context("Lock Bitcoin TX failed to confirm in time")??;
 
                 let state = AliceState::BtcLocked { state3 };
 
