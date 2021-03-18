@@ -5,6 +5,7 @@ use crate::protocol::bob::{Behaviour, OutEvent, State0, State2};
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, bail, Context, Result};
 use futures::FutureExt;
+use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
 use std::convert::Infallible;
 use std::sync::Arc;
@@ -180,34 +181,37 @@ impl EventLoop {
     pub async fn run(mut self) -> Result<Infallible> {
         loop {
             tokio::select! {
-                swarm_event = self.swarm.next().fuse() => {
+                swarm_event = self.swarm.next_event().fuse() => {
                     match swarm_event {
-                        OutEvent::ConnectionEstablished(peer_id) => {
+                        SwarmEvent::Behaviour(OutEvent::ConnectionEstablished(peer_id)) => {
                             let _ = self.conn_established.send(peer_id).await;
                         }
-                        OutEvent::SpotPriceReceived(msg) => {
+                        SwarmEvent::Behaviour(OutEvent::SpotPriceReceived(msg)) => {
                             let _ = self.recv_spot_price.send(msg).await;
                         },
-                        OutEvent::QuoteReceived(msg) => {
+                        SwarmEvent::Behaviour(OutEvent::QuoteReceived(msg)) => {
                             let _ = self.recv_quote.send(msg).await;
                         },
-                        OutEvent::ExecutionSetupDone(res) => {
+                        SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone(res)) => {
                             let _ = self.done_execution_setup.send(res.map(|state|*state)).await;
                         }
-                        OutEvent::TransferProofReceived{ msg, channel }=> {
+                        SwarmEvent::Behaviour(OutEvent::TransferProofReceived{ msg, channel }) => {
                             let _ = self.recv_transfer_proof.send(*msg).await;
                             // Send back empty response so that the request/response protocol completes.
                             if let Err(error) = self.swarm.transfer_proof.send_response(channel, ()) {
                                 error!("Failed to send Transfer Proof ack: {:?}", error);
                             }
                         }
-                        OutEvent::EncryptedSignatureAcknowledged => {
+                        SwarmEvent::Behaviour(OutEvent::EncryptedSignatureAcknowledged) => {
                             debug!("Alice acknowledged encrypted signature");
                         }
-                        OutEvent::ResponseSent => {}
-                        OutEvent::CommunicationError(err) => {
+                        SwarmEvent::Behaviour(OutEvent::ResponseSent) => {
+
+                        }
+                        SwarmEvent::Behaviour(OutEvent::CommunicationError(err)) => {
                             bail!(err.context("Communication error"))
                         }
+                        _ => {}
                     }
                 },
                 option = self.dial_alice.recv().fuse() => {

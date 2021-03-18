@@ -10,6 +10,7 @@ use anyhow::{bail, Context, Result};
 use futures::future;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::{FuturesUnordered, StreamExt};
+use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
 use rand::rngs::OsRng;
 use std::collections::HashMap;
@@ -80,12 +81,12 @@ where
 
         loop {
             tokio::select! {
-                swarm_event = self.swarm.next() => {
+                swarm_event = self.swarm.next_event() => {
                     match swarm_event {
-                        OutEvent::ConnectionEstablished(alice) => {
+                        SwarmEvent::Behaviour(OutEvent::ConnectionEstablished(alice)) => {
                             debug!("Connection Established with {}", alice);
                         }
-                        OutEvent::SpotPriceRequested { request, channel, peer } => {
+                        SwarmEvent::Behaviour(OutEvent::SpotPriceRequested { request, channel, peer }) => {
                             let btc = request.btc;
                             let xmr = match self.handle_spot_price_request(btc, self.monero_wallet.clone()).await {
                                 Ok(xmr) => xmr,
@@ -111,7 +112,7 @@ where
                                 }
                             }
                         }
-                        OutEvent::QuoteRequested { channel, peer } => {
+                        SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer }) => {
                             let quote = match self.make_quote(self.max_buy).await {
                                 Ok(quote) => quote,
                                 Err(e) => {
@@ -129,13 +130,13 @@ where
                                 }
                             }
                         }
-                        OutEvent::ExecutionSetupDone{bob_peer_id, state3} => {
+                        SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone{bob_peer_id, state3}) => {
                             let _ = self.handle_execution_setup_done(bob_peer_id, *state3).await;
                         }
-                        OutEvent::TransferProofAcknowledged(peer) => {
+                        SwarmEvent::Behaviour(OutEvent::TransferProofAcknowledged(peer)) => {
                             trace!(%peer, "Bob acknowledged transfer proof");
                         }
-                        OutEvent::EncryptedSignatureReceived{ msg, channel, peer } => {
+                        SwarmEvent::Behaviour(OutEvent::EncryptedSignatureReceived{ msg, channel, peer }) => {
                             match self.recv_encrypted_signature.remove(&peer) {
                                 Some(sender) => {
                                     // this failing just means the receiver is no longer interested ...
@@ -148,10 +149,27 @@ where
 
                             self.swarm.send_encrypted_signature_ack(channel);
                         }
-                        OutEvent::ResponseSent => {}
-                        OutEvent::Failure {peer, error} => {
+                        SwarmEvent::Behaviour(OutEvent::ResponseSent) => {}
+                        SwarmEvent::Behaviour(OutEvent::Failure {peer, error}) => {
                             error!(%peer, "Communication error: {:#}", error);
                         }
+                        SwarmEvent::ConnectionEstablished { peer_id: peer, endpoint, .. } => {
+                            tracing::debug!(%peer, address = %endpoint.get_remote_address(), "New connection established");
+                        }
+                        SwarmEvent::IncomingConnectionError { send_back_addr: address, error, .. } => {
+                            tracing::warn!(%address, "Failed to set up connection with peer: {}", error);
+                        }
+                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause } if num_established == 0 => {
+                            match cause {
+                                Some(error) => {
+                                    tracing::warn!(%peer, address = %endpoint.get_remote_address(), "Lost connection: {}", error);
+                                },
+                                None => {
+                                    tracing::info!(%peer, address = %endpoint.get_remote_address(), "Successfully closed connection");
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 },
                 next_transfer_proof = self.send_transfer_proof.next() => {
