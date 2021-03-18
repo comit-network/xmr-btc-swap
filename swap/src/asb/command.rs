@@ -4,6 +4,10 @@ use bitcoin::Denomination;
 use std::path::PathBuf;
 
 #[derive(structopt::StructOpt, Debug)]
+#[structopt(
+    name = "asb",
+    about = "Automated Swap Backend for swapping XMR for BTC"
+)]
 pub struct Arguments {
     #[structopt(
         long = "config",
