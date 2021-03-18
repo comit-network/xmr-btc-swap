@@ -5,7 +5,7 @@ use time::NumericalStdDurationShort;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Config {
-    pub bob_time_to_act: Duration,
+    pub bitcoin_lock_confirmed_timeout: Duration,
     pub bitcoin_finality_confirmations: u32,
     pub bitcoin_avg_block_time: Duration,
     pub bitcoin_cancel_timelock: CancelTimelock,
@@ -42,7 +42,7 @@ pub struct Regtest;
 impl GetConfig for Mainnet {
     fn get_config() -> Config {
         Config {
-            bob_time_to_act: 10.minutes(),
+            bitcoin_lock_confirmed_timeout: 24.hours(),
             bitcoin_finality_confirmations: 3,
             bitcoin_avg_block_time: 10.minutes(),
             bitcoin_cancel_timelock: CancelTimelock::new(72),
@@ -58,7 +58,7 @@ impl GetConfig for Mainnet {
 impl GetConfig for Testnet {
     fn get_config() -> Config {
         Config {
-            bob_time_to_act: 60.minutes(),
+            bitcoin_lock_confirmed_timeout: 12.hours(),
             bitcoin_finality_confirmations: 1,
             bitcoin_avg_block_time: 5.minutes(),
             bitcoin_cancel_timelock: CancelTimelock::new(12),
@@ -74,7 +74,7 @@ impl GetConfig for Testnet {
 impl GetConfig for Regtest {
     fn get_config() -> Config {
         Config {
-            bob_time_to_act: 30.seconds(),
+            bitcoin_lock_confirmed_timeout: 1.minutes(),
             bitcoin_finality_confirmations: 1,
             bitcoin_avg_block_time: 5.seconds(),
             bitcoin_cancel_timelock: CancelTimelock::new(100),
