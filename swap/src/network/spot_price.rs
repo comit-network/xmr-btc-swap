@@ -1,4 +1,4 @@
-use crate::network::request_response::CborCodec;
+use crate::network::cbor_request_response::CborCodec;
 use crate::{bitcoin, monero};
 use libp2p::core::ProtocolName;
 use libp2p::request_response::{

@@ -1,7 +1,7 @@
+pub mod cbor_request_response;
 pub mod encrypted_signature;
 pub mod peer_tracker;
 pub mod quote;
-pub mod request_response;
 pub mod spot_price;
 pub mod transfer_proof;
 pub mod transport;

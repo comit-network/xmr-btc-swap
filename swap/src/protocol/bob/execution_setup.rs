@@ -1,5 +1,5 @@
 use crate::bitcoin::Signature;
-use crate::network::request_response::BUF_SIZE;
+use crate::network::cbor_request_response::BUF_SIZE;
 use crate::protocol::alice::{Message1, Message3};
 use crate::protocol::bob::{State0, State2};
 use anyhow::{Context, Error, Result};
