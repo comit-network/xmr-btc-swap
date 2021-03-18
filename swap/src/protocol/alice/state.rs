@@ -2,6 +2,7 @@ use crate::bitcoin::{
     current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, TxCancel, TxPunish, TxRefund,
 };
 use crate::env::Config;
+use crate::monero::wallet::TransferRequest;
 use crate::protocol::alice::{Message1, Message3};
 use crate::protocol::bob::{Message0, Message2, Message4};
 use crate::protocol::CROSS_CURVE_PROOF_SYSTEM;
@@ -341,6 +342,19 @@ impl State3 {
             tx_lock_status,
             tx_cancel_status,
         ))
+    }
+
+    pub fn lock_xmr_transfer_request(&self) -> TransferRequest {
+        let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey { scalar: self.s_a });
+
+        let public_spend_key = S_a + self.S_b_monero;
+        let public_view_key = self.v.public();
+
+        TransferRequest {
+            public_spend_key,
+            public_view_key,
+            amount: self.xmr,
+        }
     }
 
     pub fn tx_cancel(&self) -> TxCancel {

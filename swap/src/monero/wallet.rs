@@ -120,12 +120,13 @@ impl Wallet {
         Ok(())
     }
 
-    pub async fn transfer(
-        &self,
-        public_spend_key: PublicKey,
-        public_view_key: PublicViewKey,
-        amount: Amount,
-    ) -> Result<TransferProof> {
+    pub async fn transfer(&self, request: TransferRequest) -> Result<TransferProof> {
+        let TransferRequest {
+            public_spend_key,
+            public_view_key,
+            amount,
+        } = request;
+
         let destination_address =
             Address::standard(self.network, public_spend_key, public_view_key.into());
 
@@ -220,6 +221,13 @@ impl Wallet {
         // Median tx fees on Monero as found here: https://www.monero.how/monero-transaction-fees, 0.000_015 * 2 (to be on the safe side)
         Amount::from_monero(0.000_03f64).expect("static fee to be convertible without problems")
     }
+}
+
+#[derive(Debug)]
+pub struct TransferRequest {
+    pub public_spend_key: PublicKey,
+    pub public_view_key: PublicViewKey,
+    pub amount: Amount,
 }
 
 async fn wait_for_confirmations<Fut>(

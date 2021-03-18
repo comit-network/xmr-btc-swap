@@ -6,9 +6,7 @@ use crate::env::Config;
 use crate::monero_ext::ScalarExt;
 use crate::protocol::alice;
 use crate::protocol::alice::event_loop::EventLoopHandle;
-use crate::protocol::alice::steps::{
-    lock_xmr, publish_cancel_transaction, wait_for_bitcoin_refund,
-};
+use crate::protocol::alice::steps::{publish_cancel_transaction, wait_for_bitcoin_refund};
 use crate::protocol::alice::AliceState;
 use crate::{bitcoin, database, monero};
 use anyhow::{bail, Context, Result};
@@ -113,7 +111,18 @@ async fn run_until_internal(
                 // block 0 for scenarios where we create a refund wallet.
                 let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
 
-                lock_xmr(*state3.clone(), &mut event_loop_handle, &monero_wallet).await?;
+                let transfer_proof = monero_wallet
+                    .transfer(state3.lock_xmr_transfer_request())
+                    .await?;
+
+                // TODO(Franck): Wait for Monero to be confirmed once
+                //  Waiting for XMR confirmations should not be done in here, but in a separate
+                //  state! We have to record that Alice has already sent the transaction.
+                //  Otherwise Alice might publish the lock tx twice!
+
+                event_loop_handle
+                    .send_transfer_proof(transfer_proof)
+                    .await?;
 
                 let state = AliceState::XmrLocked {
                     state3,
