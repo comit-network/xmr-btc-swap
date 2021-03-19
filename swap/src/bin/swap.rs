@@ -327,7 +327,7 @@ async fn determine_btc_to_swap(
     // TODO: Also wait for more funds if balance < dust
     let initial_balance = initial_balance.await?;
 
-    if initial_balance == Amount::ZERO {
+    let balance = if initial_balance == Amount::ZERO {
         info!(
             "Please deposit the BTC you want to swap to {} (max {})",
             get_new_address.await?,
@@ -339,23 +339,23 @@ async fn determine_btc_to_swap(
             .context("Failed to wait for Bitcoin deposit")?;
 
         info!("Received {}", new_balance);
+        new_balance
     } else {
         info!("Found {} in wallet", initial_balance);
-    }
+        initial_balance
+    };
 
     let max_giveable = max_giveable
         .await
         .context("Failed to compute max 'giveable' Bitcoin amount")?;
+    let fees = balance - max_giveable;
+
     let max_accepted = bid_quote.max_quantity;
 
-    if max_giveable > max_accepted {
-        info!(
-            "Max giveable amount {} exceeds max accepted amount {}!",
-            max_giveable, max_accepted
-        );
-    }
+    let btc_swap_amount = min(max_giveable, max_accepted);
+    info!("Swapping {} with {} fees", btc_swap_amount, fees);
 
-    Ok(min(max_giveable, max_accepted))
+    Ok(btc_swap_amount)
 }
 
 #[cfg(test)]
