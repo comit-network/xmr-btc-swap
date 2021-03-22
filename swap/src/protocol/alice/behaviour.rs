@@ -233,9 +233,22 @@ impl Behaviour {
     }
 
     /// Send Transfer Proof to Bob.
-    pub fn send_transfer_proof(&mut self, bob: PeerId, msg: transfer_proof::Request) {
+    ///
+    /// Fails and returns the transfer proof if we are currently not connected
+    /// to this peer.
+    pub fn send_transfer_proof(
+        &mut self,
+        bob: PeerId,
+        msg: transfer_proof::Request,
+    ) -> Result<(), transfer_proof::Request> {
+        if !self.transfer_proof.is_connected(&bob) {
+            return Err(msg);
+        }
         self.transfer_proof.send_request(&bob, msg);
-        debug!("Sent Transfer Proof");
+
+        debug!("Sending Transfer Proof");
+
+        Ok(())
     }
 
     pub fn send_encrypted_signature_ack(&mut self, channel: ResponseChannel<()>) {

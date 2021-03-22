@@ -38,6 +38,10 @@ pub struct EventLoop<RS> {
         FuturesUnordered<BoxFuture<'static, Result<(PeerId, transfer_proof::Request)>>>,
 
     swap_sender: mpsc::Sender<Swap>,
+
+    /// Tracks [`transfer_proof::Request`]s which could not yet be sent because
+    /// we are currently disconnected from the peer.
+    buffered_transfer_proofs: HashMap<PeerId, transfer_proof::Request>,
 }
 
 impl<LR> EventLoop<LR>
@@ -66,6 +70,7 @@ where
             max_buy,
             recv_encrypted_signature: Default::default(),
             send_transfer_proof: Default::default(),
+            buffered_transfer_proofs: Default::default(),
         };
         Ok((event_loop, swap_channel.receiver))
     }
@@ -152,6 +157,14 @@ where
                         }
                         SwarmEvent::ConnectionEstablished { peer_id: peer, endpoint, .. } => {
                             tracing::debug!(%peer, address = %endpoint.get_remote_address(), "New connection established");
+
+                            if let Some(transfer_proof) = self.buffered_transfer_proofs.remove(&peer) {
+                                tracing::debug!(%peer, "Found buffered transfer proof for peer");
+
+                                self.swarm
+                                    .send_transfer_proof(peer, transfer_proof)
+                                    .expect("must be able to send transfer proof after connection was established");
+                            }
                         }
                         SwarmEvent::IncomingConnectionError { send_back_addr: address, error, .. } => {
                             tracing::warn!(%address, "Failed to set up connection with peer: {}", error);
@@ -172,7 +185,12 @@ where
                 next_transfer_proof = self.send_transfer_proof.next() => {
                     match next_transfer_proof {
                         Some(Ok((peer, transfer_proof))) => {
-                            self.swarm.send_transfer_proof(peer, transfer_proof);
+                            let result = self.swarm.send_transfer_proof(peer, transfer_proof);
+
+                            if let Err(transfer_proof) = result {
+                                tracing::warn!(%peer, "No active connection to peer, buffering transfer proof");
+                                self.buffered_transfer_proofs.insert(peer, transfer_proof);
+                            }
                         },
                         Some(Err(_)) => {
                             tracing::debug!("A swap stopped without sending a transfer proof");
