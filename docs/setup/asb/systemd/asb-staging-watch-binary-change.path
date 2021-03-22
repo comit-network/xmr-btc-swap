@@ -1,0 +1,6 @@
+[Path]
+Unit=asb-staging-restart.service STAGING
+PathChanged=/var/external/asb/xmr-btc-swap/target/release/asb
+
+[Install]
+WantedBy=multi-user.target

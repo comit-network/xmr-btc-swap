@@ -1,6 +1,6 @@
 [Path]
 Unit=asb-restart.service
-PathChanged=/var/external/asb/xmr-btc-swap/target/release/asb
+PathChanged=/var/external/asb/bin/asb
 
 [Install]
 WantedBy=multi-user.target

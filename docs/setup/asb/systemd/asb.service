@@ -5,7 +5,7 @@ OnFailure=unit-status-email@%n.service
 
 [Service]
 WorkingDirectory=/var/external/asb/xmr-btc-swap
-ExecStart=/home/asb/.cargo/bin/cargo run --release --bin asb -- --config /var/external/asb/run/asb-config/config.toml start
+ExecStart=/var/external/asb/bin/asb --config /var/external/asb/run/asb-config/config.toml start
 Restart=on-failure
 User=asb
 Group=asb

@@ -1,6 +1,6 @@
 [Unit]
 Description=monero-wallet-rpc for the automated swap backend (asb)
-Requires=start-monerod.service
+Requires=monerod.service
 OnFailure=unit-status-email@%n.service
 
 [Service]

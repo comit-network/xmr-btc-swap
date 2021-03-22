@@ -1,0 +1,14 @@
+[Unit]
+Description=Run the automated swap backend STAGING
+Requires=monero-wallet-rpc-staging.service
+OnFailure=unit-status-email@%n.service
+
+[Service]
+WorkingDirectory=/var/external/asb/xmr-btc-swap
+ExecStart=/var/external/asb/xmr-btc-swap/target/release/asb --config /var/external/asb/run/asb-config/config-staging.toml start
+Restart=on-failure
+User=asb
+Group=asb
+
+[Install]
+WantedBy=multi-user.target
