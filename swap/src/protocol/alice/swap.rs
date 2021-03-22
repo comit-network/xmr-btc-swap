@@ -97,13 +97,20 @@ async fn run_until_internal(
                 .transfer(state3.lock_xmr_transfer_request())
                 .await?;
 
-            // TODO(Franck): Wait for Monero to be confirmed once
-            //  Waiting for XMR confirmations should not be done in here, but in a separate
+            monero_wallet
+                .watch_for_transfer(state3.lock_xmr_watch_request(transfer_proof.clone(), 1))
+                .await?;
+
+            // TODO: Waiting for XMR confirmations should be done in a separate
             //  state! We have to record that Alice has already sent the transaction.
             //  Otherwise Alice might publish the lock tx twice!
 
             event_loop_handle
-                .send_transfer_proof(transfer_proof)
+                .send_transfer_proof(transfer_proof.clone())
+                .await?;
+
+            monero_wallet
+                .watch_for_transfer(state3.lock_xmr_watch_request(transfer_proof, 10))
                 .await?;
 
             AliceState::XmrLocked {
@@ -283,22 +290,30 @@ async fn run_until_internal(
                 state3.B,
             )?;
 
-            let punish_tx_finalised = async {
+            let punish = async {
                 let (txid, finality) = bitcoin_wallet.broadcast(signed_tx_punish, "punish").await?;
-
                 finality.await?;
 
                 Result::<_, anyhow::Error>::Ok(txid)
-            };
+            }
+            .await;
 
-            let tx_refund = state3.tx_refund();
-            let refund_tx_seen =
-                bitcoin_wallet.watch_until_status(&tx_refund, |status| status.has_been_seen());
+            match punish {
+                Ok(_) => AliceState::BtcPunished,
+                Err(e) => {
+                    tracing::warn!(
+                        "Falling back to refund because punish transaction failed with {:#}",
+                        e
+                    );
 
-            select! {
-                result = refund_tx_seen => {
-                    result.context("Failed to monitor refund transaction")?;
+                    // Upon punish failure we assume that the refund tx was included but we
+                    // missed seeing it. In case we fail to fetch the refund tx we fail
+                    // with no state update because it is unclear what state we should transition
+                    // to. It does not help to race punish and refund inclusion,
+                    // because a punish tx failure is not recoverable (besides re-trying) if the
+                    // refund tx was not included.
 
+                    let tx_refund = state3.tx_refund();
                     let published_refund_tx =
                         bitcoin_wallet.get_raw_transaction(tx_refund.txid()).await?;
 
@@ -308,14 +323,12 @@ async fn run_until_internal(
                         state3.a.clone(),
                         state3.S_b_bitcoin,
                     )?;
+
                     AliceState::BtcRefunded {
                         spend_key,
                         state3,
                         monero_wallet_restore_blockheight,
                     }
-                }
-                _ = punish_tx_finalised => {
-                    AliceState::BtcPunished
                 }
             }
         }

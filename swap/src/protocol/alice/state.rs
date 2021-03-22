@@ -2,7 +2,8 @@ use crate::bitcoin::{
     current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, TxCancel, TxPunish, TxRefund,
 };
 use crate::env::Config;
-use crate::monero::wallet::TransferRequest;
+use crate::monero::wallet::{TransferRequest, WatchRequest};
+use crate::monero::TransferProof;
 use crate::protocol::alice::{Message1, Message3};
 use crate::protocol::bob::{Message0, Message2, Message4};
 use crate::protocol::CROSS_CURVE_PROOF_SYSTEM;
@@ -354,6 +355,24 @@ impl State3 {
             public_spend_key,
             public_view_key,
             amount: self.xmr,
+        }
+    }
+
+    pub fn lock_xmr_watch_request(
+        &self,
+        transfer_proof: TransferProof,
+        conf_target: u32,
+    ) -> WatchRequest {
+        let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey { scalar: self.s_a });
+
+        let public_spend_key = S_a + self.S_b_monero;
+        let public_view_key = self.v.public();
+        WatchRequest {
+            public_spend_key,
+            public_view_key,
+            transfer_proof,
+            conf_target,
+            expected: self.xmr,
         }
     }
 

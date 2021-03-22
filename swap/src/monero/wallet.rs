@@ -5,7 +5,7 @@ use crate::monero::{
 use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::{Context, Result};
 use monero_rpc::wallet;
-use monero_rpc::wallet::{BlockHeight, CheckTxKey, Client, Refreshed};
+use monero_rpc::wallet::{BlockHeight, CheckTxKey, Refreshed};
 use std::future::Future;
 use std::str::FromStr;
 use std::time::Duration;
@@ -19,24 +19,44 @@ pub struct Wallet {
     inner: Mutex<wallet::Client>,
     network: Network,
     name: String,
+    main_address: monero::Address,
     sync_interval: Duration,
 }
 
 impl Wallet {
-    pub fn new(url: Url, name: String, env_config: Config) -> Self {
-        Self::new_with_client(Client::new(url), name, env_config)
+    /// Connect to a wallet RPC and load the given wallet by name.
+    pub async fn open_or_create(url: Url, name: String, env_config: Config) -> Result<Self> {
+        let client = wallet::Client::new(url);
+
+        let open_wallet_response = client.open_wallet(name.as_str()).await;
+        if open_wallet_response.is_err() {
+            client.create_wallet(name.as_str()).await.context(
+                "Unable to create Monero wallet, please ensure that the monero-wallet-rpc is available",
+            )?;
+
+            debug!("Created Monero wallet {}", name);
+        } else {
+            debug!("Opened Monero wallet {}", name);
+        }
+
+        Self::connect(client, name, env_config).await
     }
 
-    pub fn new_with_client(client: wallet::Client, name: String, env_config: Config) -> Self {
-        Self {
+    /// Connects to a wallet RPC where a wallet is already loaded.
+    pub async fn connect(client: wallet::Client, name: String, env_config: Config) -> Result<Self> {
+        let main_address =
+            monero::Address::from_str(client.get_address(0).await?.address.as_str())?;
+        Ok(Self {
             inner: Mutex::new(client),
             network: env_config.monero_network,
             name,
+            main_address,
             sync_interval: env_config.monero_sync_interval(),
-        }
+        })
     }
 
-    pub async fn open(&self) -> Result<()> {
+    /// Re-open the wallet using the internally stored name.
+    pub async fn re_open(&self) -> Result<()> {
         self.inner
             .lock()
             .await
@@ -45,21 +65,8 @@ impl Wallet {
         Ok(())
     }
 
-    pub async fn open_or_create(&self) -> Result<()> {
-        let open_wallet_response = self.open().await;
-        if open_wallet_response.is_err() {
-            self.inner.lock().await.create_wallet(self.name.as_str()).await.context(
-                "Unable to create Monero wallet, please ensure that the monero-wallet-rpc is available",
-            )?;
-
-            debug!("Created Monero wallet {}", self.name);
-        } else {
-            debug!("Opened Monero wallet {}", self.name);
-        }
-
-        Ok(())
-    }
-
+    /// Close the wallet and open (load) another wallet by generating it from
+    /// keys. The generated wallet will remain loaded.
     pub async fn create_from_and_load(
         &self,
         private_spend_key: PrivateKey,
@@ -89,6 +96,10 @@ impl Wallet {
         Ok(())
     }
 
+    /// Close the wallet and open (load) another wallet by generating it from
+    /// keys. The generated wallet will be opened, all funds sweeped to the
+    /// main_address and then the wallet will be re-loaded using the internally
+    /// stored name.
     pub async fn create_from(
         &self,
         private_spend_key: PrivateKey,
@@ -98,22 +109,47 @@ impl Wallet {
         let public_spend_key = PublicKey::from_private_key(&private_spend_key);
         let public_view_key = PublicKey::from_private_key(&private_view_key.into());
 
-        let address = Address::standard(self.network, public_spend_key, public_view_key);
+        let temp_wallet_address =
+            Address::standard(self.network, public_spend_key, public_view_key);
 
         let wallet = self.inner.lock().await;
 
-        // Properly close the wallet before generating the other wallet to ensure that
+        // Close the default wallet before generating the other wallet to ensure that
         // it saves its state correctly
         let _ = wallet.close_wallet().await?;
 
         let _ = wallet
             .generate_from_keys(
-                &address.to_string(),
+                &temp_wallet_address.to_string(),
                 &private_spend_key.to_string(),
                 &PrivateKey::from(private_view_key).to_string(),
                 restore_height.height,
             )
             .await?;
+
+        // Try to send all the funds from the generated wallet to the default wallet
+        match wallet.refresh().await {
+            Ok(_) => match wallet
+                .sweep_all(self.main_address.to_string().as_str())
+                .await
+            {
+                Ok(sweep_all) => {
+                    for tx in sweep_all.tx_hash_list {
+                        tracing::info!(%tx, "Monero transferred back to default wallet {}", self.main_address);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Transferring Monero back to default wallet {} failed with {:#}",
+                        self.main_address,
+                        e
+                    );
+                }
+            },
+            Err(e) => {
+                tracing::warn!("Refreshing the generated wallet failed with {:#}", e);
+            }
+        }
 
         let _ = wallet.open_wallet(self.name.as_str()).await?;
 
@@ -209,9 +245,8 @@ impl Wallet {
         self.inner.lock().await.block_height().await
     }
 
-    pub async fn get_main_address(&self) -> Result<Address> {
-        let address = self.inner.lock().await.get_address(0).await?;
-        Ok(Address::from_str(address.address.as_str())?)
+    pub fn get_main_address(&self) -> Address {
+        self.main_address
     }
 
     pub async fn refresh(&self) -> Result<Refreshed> {

@@ -295,18 +295,12 @@ async fn init_monero_wallet(
         .run(network, monero_daemon_host.as_str())
         .await?;
 
-    let monero_wallet = monero::Wallet::new(
+    let monero_wallet = monero::Wallet::open_or_create(
         monero_wallet_rpc_process.endpoint(),
         MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME.to_string(),
         env_config,
-    );
-
-    monero_wallet.open_or_create().await?;
-
-    let _test_wallet_connection = monero_wallet
-        .block_height()
-        .await
-        .context("Failed to validate connection to monero-wallet-rpc")?;
+    )
+    .await?;
 
     Ok((monero_wallet, monero_wallet_rpc_process))
 }
