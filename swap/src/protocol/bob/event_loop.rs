@@ -1,12 +1,11 @@
 use crate::bitcoin::EncryptedSignature;
 use crate::network::quote::BidQuote;
-use crate::network::{spot_price, transfer_proof, transport, TokioExecutor};
+use crate::network::{spot_price, transfer_proof};
 use crate::protocol::bob::{Behaviour, OutEvent, State0, State2};
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, bail, Context, Result};
 use futures::FutureExt;
-use libp2p::core::Multiaddr;
-use libp2p::PeerId;
+use libp2p::{PeerId, Swarm};
 use std::convert::Infallible;
 use std::sync::Arc;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -131,26 +130,10 @@ pub struct EventLoop {
 
 impl EventLoop {
     pub fn new(
-        identity: &libp2p::core::identity::Keypair,
+        swarm: Swarm<Behaviour>,
         alice_peer_id: PeerId,
-        alice_addr: Multiaddr,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
     ) -> Result<(Self, EventLoopHandle)> {
-        let behaviour = Behaviour::default();
-        let transport = transport::build(identity)?;
-
-        let mut swarm = libp2p::swarm::SwarmBuilder::new(
-            transport,
-            behaviour,
-            identity.public().into_peer_id(),
-        )
-        .executor(Box::new(TokioExecutor {
-            handle: tokio::runtime::Handle::current(),
-        }))
-        .build();
-
-        swarm.add_address(alice_peer_id, alice_addr);
-
         let start_execution_setup = Channels::new();
         let done_execution_setup = Channels::new();
         let recv_transfer_proof = Channels::new();

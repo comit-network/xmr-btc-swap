@@ -3,15 +3,13 @@ use crate::database::Database;
 use crate::env::Config;
 use crate::monero::BalanceTooLow;
 use crate::network::quote::BidQuote;
-use crate::network::{encrypted_signature, spot_price, transfer_proof, transport, TokioExecutor};
+use crate::network::{encrypted_signature, spot_price, transfer_proof};
 use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State3, Swap};
-use crate::seed::Seed;
 use crate::{bitcoin, kraken, monero};
 use anyhow::{bail, Context, Result};
 use futures::future;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::{FuturesUnordered, StreamExt};
-use libp2p::core::Multiaddr;
 use libp2p::{PeerId, Swarm};
 use rand::rngs::OsRng;
 use std::collections::HashMap;
@@ -24,7 +22,6 @@ use uuid::Uuid;
 #[allow(missing_debug_implementations)]
 pub struct EventLoop<RS> {
     swarm: libp2p::Swarm<Behaviour>,
-    peer_id: PeerId,
     env_config: Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
@@ -46,10 +43,8 @@ impl<LR> EventLoop<LR>
 where
     LR: LatestRate,
 {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        listen_address: Multiaddr,
-        seed: Seed,
+        swarm: Swarm<Behaviour>,
         env_config: Config,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
@@ -57,25 +52,10 @@ where
         latest_rate: LR,
         max_buy: bitcoin::Amount,
     ) -> Result<(Self, mpsc::Receiver<Swap>)> {
-        let identity = seed.derive_libp2p_identity();
-        let behaviour = Behaviour::default();
-        let transport = transport::build(&identity)?;
-        let peer_id = PeerId::from(identity.public());
-
-        let mut swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, peer_id)
-            .executor(Box::new(TokioExecutor {
-                handle: tokio::runtime::Handle::current(),
-            }))
-            .build();
-
-        Swarm::listen_on(&mut swarm, listen_address.clone())
-            .with_context(|| format!("Address is not supported: {:#}", listen_address))?;
-
         let swap_channel = MpscChannels::default();
 
         let event_loop = EventLoop {
             swarm,
-            peer_id,
             env_config,
             bitcoin_wallet,
             monero_wallet,
@@ -90,7 +70,7 @@ where
     }
 
     pub fn peer_id(&self) -> PeerId {
-        self.peer_id
+        *Swarm::local_peer_id(&self.swarm)
     }
 
     pub async fn run(mut self) {
