@@ -101,7 +101,7 @@ async fn main() -> Result<()> {
             }
 
             let bitcoin_wallet =
-                init_bitcoin_wallet(electrum_rpc_url, seed, data_dir.clone(), env_config).await?;
+                init_bitcoin_wallet(electrum_rpc_url, &seed, data_dir.clone(), env_config).await?;
             let (monero_wallet, _process) =
                 init_monero_wallet(data_dir, monero_daemon_host, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
@@ -183,7 +183,7 @@ async fn main() -> Result<()> {
             }
 
             let bitcoin_wallet =
-                init_bitcoin_wallet(electrum_rpc_url, seed, data_dir.clone(), env_config).await?;
+                init_bitcoin_wallet(electrum_rpc_url, &seed, data_dir.clone(), env_config).await?;
             let (monero_wallet, _process) =
                 init_monero_wallet(data_dir, monero_daemon_host, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
@@ -223,7 +223,7 @@ async fn main() -> Result<()> {
             electrum_rpc_url,
         } => {
             let bitcoin_wallet =
-                init_bitcoin_wallet(electrum_rpc_url, seed, data_dir, env_config).await?;
+                init_bitcoin_wallet(electrum_rpc_url, &seed, data_dir, env_config).await?;
 
             let resume_state = db.get_state(swap_id)?.try_into_bob()?.into();
             let cancel =
@@ -248,7 +248,7 @@ async fn main() -> Result<()> {
             electrum_rpc_url,
         } => {
             let bitcoin_wallet =
-                init_bitcoin_wallet(electrum_rpc_url, seed, data_dir, env_config).await?;
+                init_bitcoin_wallet(electrum_rpc_url, &seed, data_dir, env_config).await?;
 
             let resume_state = db.get_state(swap_id)?.try_into_bob()?.into();
 
@@ -260,7 +260,7 @@ async fn main() -> Result<()> {
 
 async fn init_bitcoin_wallet(
     electrum_rpc_url: Url,
-    seed: Seed,
+    seed: &Seed,
     data_dir: PathBuf,
     env_config: Config,
 ) -> Result<bitcoin::Wallet> {

@@ -43,7 +43,6 @@ pub struct StartingBalances {
     pub btc: bitcoin::Amount,
 }
 
-#[derive(Clone)]
 struct BobParams {
     seed: Seed,
     db_path: PathBuf,
