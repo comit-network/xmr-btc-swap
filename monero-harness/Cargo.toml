@@ -9,10 +9,10 @@ anyhow = "1"
 futures = "0.3"
 monero-rpc = { path = "../monero-rpc" }
 port_check = "0.1"
-rand = "0.7"
+rand = "0.8"
 spectral = "0.6"
 testcontainers = "0.12"
-tokio = { version = "1.3", default-features = false, features = ["rt-multi-thread", "time", "macros"] }
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "time", "macros"] }
 tracing = "0.1"
 tracing-log = "0.1"
 tracing-subscriber = { version = "0.2", default-features = false, features = ["fmt", "ansi", "env-filter"] }
