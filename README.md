@@ -1,5 +1,4 @@
-XMR to BTC Atomic Swap
-======================
+# XMR to BTC Atomic Swap
 
 This repository hosts an MVP for atomically swapping BTC to XMR.
 It implements the protocol described in section 3 of [this](https://arxiv.org/abs/2101.12332) paper.
