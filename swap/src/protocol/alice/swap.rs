@@ -68,18 +68,12 @@ async fn next_state(
 
     Ok(match state {
         AliceState::Started { state3 } => {
-            timeout(
-                env_config.bob_time_to_act,
-                bitcoin_wallet.watch_until_status(&state3.tx_lock, |status| status.has_been_seen()),
-            )
-            .await
-            .context("Failed to find lock Bitcoin tx")??;
+            let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
+            timeout(env_config.bob_time_to_act, tx_lock_status.wait_until_seen())
+                .await
+                .context("Failed to find lock Bitcoin tx")??;
 
-            bitcoin_wallet
-                .watch_until_status(&state3.tx_lock, |status| {
-                    status.is_confirmed_with(env_config.bitcoin_finality_confirmations)
-                })
-                .await?;
+            tx_lock_status.wait_until_final().await?;
 
             AliceState::BtcLocked { state3 }
         }
@@ -116,37 +110,42 @@ async fn next_state(
         AliceState::XmrLocked {
             state3,
             monero_wallet_restore_blockheight,
-        } => match state3.expired_timelocks(bitcoin_wallet).await? {
-            ExpiredTimelocks::None => {
-                select! {
-                    _ = state3.wait_for_cancel_timelock_to_expire(bitcoin_wallet) => {
-                        AliceState::CancelTimelockExpired {
-                            state3,
-                            monero_wallet_restore_blockheight,
-                        }
-                    }
-                    enc_sig = event_loop_handle.recv_encrypted_signature() => {
-                        tracing::info!("Received encrypted signature");
+        } => {
+            let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
 
-                        AliceState::EncSigLearned {
-                            state3,
-                            encrypted_signature: Box::new(enc_sig?),
-                            monero_wallet_restore_blockheight,
+            match state3.expired_timelocks(bitcoin_wallet).await? {
+                ExpiredTimelocks::None => {
+                    select! {
+                        _ = tx_lock_status.wait_until_confirmed_with(state3.cancel_timelock) => {
+                            AliceState::CancelTimelockExpired {
+                                state3,
+                                monero_wallet_restore_blockheight,
+                            }
+                        }
+                        enc_sig = event_loop_handle.recv_encrypted_signature() => {
+                            tracing::info!("Received encrypted signature");
+
+                            AliceState::EncSigLearned {
+                                state3,
+                                encrypted_signature: Box::new(enc_sig?),
+                                monero_wallet_restore_blockheight,
+                            }
                         }
                     }
                 }
+                _ => AliceState::CancelTimelockExpired {
+                    state3,
+                    monero_wallet_restore_blockheight,
+                },
             }
-            _ => AliceState::CancelTimelockExpired {
-                state3,
-                monero_wallet_restore_blockheight,
-            },
-        },
+        }
         AliceState::EncSigLearned {
             state3,
             encrypted_signature,
             monero_wallet_restore_blockheight,
         } => match state3.expired_timelocks(bitcoin_wallet).await? {
             ExpiredTimelocks::None => {
+                let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
                 match TxRedeem::new(&state3.tx_lock, &state3.redeem_address).complete(
                     *encrypted_signature,
                     state3.a.clone(),
@@ -154,7 +153,7 @@ async fn next_state(
                     state3.B,
                 ) {
                     Ok(tx) => match bitcoin_wallet.broadcast(tx, "redeem").await {
-                        Ok((_, finality)) => match finality.await {
+                        Ok((_, subscription)) => match subscription.wait_until_final().await {
                             Ok(_) => AliceState::BtcRedeemed,
                             Err(e) => {
                                 bail!("Waiting for Bitcoin transaction finality failed with {}! The redeem transaction was published, but it is not ensured that the transaction was included! You're screwed.", e)
@@ -162,8 +161,8 @@ async fn next_state(
                         },
                         Err(e) => {
                             error!("Publishing the redeem transaction failed with {}, attempting to wait for cancellation now. If you restart the application before the timelock is expired publishing the redeem transaction will be retried.", e);
-                            state3
-                                .wait_for_cancel_timelock_to_expire(bitcoin_wallet)
+                            tx_lock_status
+                                .wait_until_confirmed_with(state3.cancel_timelock)
                                 .await?;
 
                             AliceState::CancelTimelockExpired {
@@ -174,8 +173,8 @@ async fn next_state(
                     },
                     Err(e) => {
                         error!("Constructing the redeem transaction failed with {}, attempting to wait for cancellation now.", e);
-                        state3
-                            .wait_for_cancel_timelock_to_expire(bitcoin_wallet)
+                        tx_lock_status
+                            .wait_until_confirmed_with(state3.cancel_timelock)
                             .await?;
 
                         AliceState::CancelTimelockExpired {
@@ -226,22 +225,15 @@ async fn next_state(
             state3,
             monero_wallet_restore_blockheight,
         } => {
-            let tx_refund = state3.tx_refund();
-            let tx_cancel = state3.tx_cancel();
-
-            let seen_refund_tx =
-                bitcoin_wallet.watch_until_status(&tx_refund, |status| status.has_been_seen());
-
-            let punish_timelock_expired = bitcoin_wallet.watch_until_status(&tx_cancel, |status| {
-                status.is_confirmed_with(state3.punish_timelock)
-            });
+            let tx_refund_status = bitcoin_wallet.subscribe_to(state3.tx_refund()).await;
+            let tx_cancel_status = bitcoin_wallet.subscribe_to(state3.tx_cancel()).await;
 
             select! {
-                seen_refund = seen_refund_tx => {
+                seen_refund = tx_refund_status.wait_until_seen() => {
                     seen_refund.context("Failed to monitor refund transaction")?;
-                    let published_refund_tx = bitcoin_wallet.get_raw_transaction(tx_refund.txid()).await?;
+                    let published_refund_tx = bitcoin_wallet.get_raw_transaction(state3.tx_refund().txid()).await?;
 
-                    let spend_key = tx_refund.extract_monero_private_key(
+                    let spend_key = state3.tx_refund().extract_monero_private_key(
                         published_refund_tx,
                         state3.s_a,
                         state3.a.clone(),
@@ -254,7 +246,7 @@ async fn next_state(
                         monero_wallet_restore_blockheight,
                     }
                 }
-                _ = punish_timelock_expired => {
+                _ = tx_cancel_status.wait_until_confirmed_with(state3.punish_timelock) => {
                     AliceState::BtcPunishable {
                         state3,
                         monero_wallet_restore_blockheight,
@@ -286,8 +278,9 @@ async fn next_state(
             )?;
 
             let punish = async {
-                let (txid, finality) = bitcoin_wallet.broadcast(signed_tx_punish, "punish").await?;
-                finality.await?;
+                let (txid, subscription) =
+                    bitcoin_wallet.broadcast(signed_tx_punish, "punish").await?;
+                subscription.wait_until_final().await?;
 
                 Result::<_, anyhow::Error>::Ok(txid)
             }

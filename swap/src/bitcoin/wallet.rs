@@ -11,14 +11,13 @@ use bdk::keys::DerivableKey;
 use bdk::{FeeRate, KeychainKind};
 use bitcoin::Script;
 use reqwest::Url;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::fmt;
-use std::future::Future;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::sync::Mutex;
+use tokio::sync::{watch, Mutex};
 
 const SLED_TREE_NAME: &str = "default_tree";
 
@@ -162,14 +161,13 @@ impl Wallet {
         &self,
         transaction: Transaction,
         kind: &str,
-    ) -> Result<(Txid, impl Future<Output = Result<()>> + '_)> {
+    ) -> Result<(Txid, Subscription)> {
         let txid = transaction.txid();
 
         // to watch for confirmations, watching a single output is enough
-        let watcher = self.wait_for_transaction_finality(
-            (txid, transaction.output[0].script_pubkey.clone()),
-            kind.to_owned(),
-        );
+        let subscription = self
+            .subscribe_to((txid, transaction.output[0].script_pubkey.clone()))
+            .await;
 
         self.wallet
             .lock()
@@ -181,7 +179,7 @@ impl Wallet {
 
         tracing::info!(%txid, "Published Bitcoin {} transaction", kind);
 
-        Ok((txid, watcher))
+        Ok((txid, subscription))
     }
 
     pub async fn sign_and_finalize(&self, psbt: PartiallySignedTransaction) -> Result<Transaction> {
@@ -209,63 +207,58 @@ impl Wallet {
         self.client.lock().await.status_of_script(tx)
     }
 
-    pub async fn watch_until_status<T>(
-        &self,
-        tx: &T,
-        mut status_fn: impl FnMut(ScriptStatus) -> bool,
-    ) -> Result<()>
-    where
-        T: Watchable,
-    {
+    pub async fn subscribe_to(&self, tx: impl Watchable + Send + 'static) -> Subscription {
         let txid = tx.id();
+        let script = tx.script();
 
-        let mut last_status = None;
+        let sub = self
+            .client
+            .lock()
+            .await
+            .subscriptions
+            .entry((txid, script.clone()))
+            .or_insert_with(|| {
+                let (sender, receiver) = watch::channel(ScriptStatus::Unseen);
+                let client = self.client.clone();
 
-        loop {
-            let new_status = self.client.lock().await.status_of_script(tx)?;
+                tokio::spawn(async move {
+                    let mut last_status = None;
 
-            if Some(new_status) != last_status {
-                tracing::debug!(%txid, "Transaction is {}", new_status);
-            }
-            last_status = Some(new_status);
+                    loop {
+                        tokio::time::sleep(Duration::from_secs(5)).await;
 
-            if status_fn(new_status) {
-                break;
-            }
+                        let new_status = match client.lock().await.status_of_script(&tx) {
+                            Ok(new_status) => new_status,
+                            Err(e) => {
+                                tracing::warn!(%txid, "Failed to get status of script: {:#}", e);
+                                return;
+                            }
+                        };
 
-            tokio::time::sleep(Duration::from_secs(5)).await;
-        }
+                        if Some(new_status) != last_status {
+                            tracing::debug!(%txid, "Transaction is {}", new_status);
+                        }
+                        last_status = Some(new_status);
 
-        Ok(())
-    }
+                        let all_receivers_gone = sender.send(new_status).is_err();
 
-    async fn wait_for_transaction_finality<T>(&self, tx: T, kind: String) -> Result<()>
-    where
-        T: Watchable,
-    {
-        let conf_target = self.finality_confirmations;
-        let txid = tx.id();
+                        if all_receivers_gone {
+                            tracing::debug!(%txid, "All receivers gone, removing subscription");
+                            client.lock().await.subscriptions.remove(&(txid, script));
+                            return;
+                        }
+                    }
+                });
 
-        tracing::info!(%txid, "Waiting for {} confirmation{} of Bitcoin {} transaction", conf_target, if conf_target > 1 { "s" } else { "" }, kind);
-
-        let mut seen_confirmations = 0;
-
-        self.watch_until_status(&tx, |status| match status {
-            ScriptStatus::Confirmed(inner) => {
-                let confirmations = inner.confirmations();
-
-                if confirmations > seen_confirmations {
-                    tracing::info!(%txid, "Bitcoin {} tx has {} out of {} confirmation{}", kind, confirmations, conf_target, if conf_target > 1 { "s" } else { "" });
-                    seen_confirmations = confirmations;
+                Subscription {
+                    receiver,
+                    finality_confirmations: self.finality_confirmations,
+                    txid,
                 }
+            })
+            .clone();
 
-                inner.meets_target(conf_target)
-            },
-            _ => false
-        })
-        .await?;
-
-        Ok(())
+        sub
     }
 
     /// Selects an appropriate [`FeeRate`] to be used for getting transactions
@@ -273,6 +266,66 @@ impl Wallet {
     fn select_feerate(&self) -> FeeRate {
         // TODO: This should obviously not be a const :)
         FeeRate::from_sat_per_vb(5.0)
+    }
+}
+
+/// Represents a subscription to the status of a given transaction.
+#[derive(Debug, Clone)]
+pub struct Subscription {
+    receiver: watch::Receiver<ScriptStatus>,
+    finality_confirmations: u32,
+    txid: Txid,
+}
+
+impl Subscription {
+    pub async fn wait_until_final(&self) -> Result<()> {
+        let conf_target = self.finality_confirmations;
+        let txid = self.txid;
+
+        tracing::info!(%txid, "Waiting for {} confirmation{} of Bitcoin transaction", conf_target, if conf_target > 1 { "s" } else { "" });
+
+        let mut seen_confirmations = 0;
+
+        self.wait_until(|status| match status {
+            ScriptStatus::Confirmed(inner) => {
+                let confirmations = inner.confirmations();
+
+                if confirmations > seen_confirmations {
+                    tracing::info!(%txid, "Bitcoin tx has {} out of {} confirmation{}", confirmations, conf_target, if conf_target > 1 { "s" } else { "" });
+                    seen_confirmations = confirmations;
+                }
+
+                inner.meets_target(conf_target)
+            },
+            _ => false
+        })
+            .await
+    }
+
+    pub async fn wait_until_seen(&self) -> Result<()> {
+        self.wait_until(ScriptStatus::has_been_seen).await
+    }
+
+    pub async fn wait_until_confirmed_with<T>(&self, target: T) -> Result<()>
+    where
+        u32: PartialOrd<T>,
+        T: Copy,
+    {
+        self.wait_until(|status| status.is_confirmed_with(target))
+            .await
+    }
+
+    async fn wait_until(&self, mut predicate: impl FnMut(&ScriptStatus) -> bool) -> Result<()> {
+        let mut receiver = self.receiver.clone();
+
+        while !predicate(&receiver.borrow()) {
+            receiver
+                .changed()
+                .await
+                .context("Failed while waiting for next status update")?;
+        }
+
+        Ok(())
     }
 }
 
@@ -303,6 +356,7 @@ struct Client {
     last_ping: Instant,
     interval: Duration,
     script_history: BTreeMap<Script, Vec<GetHistoryRes>>,
+    subscriptions: HashMap<(Txid, Script), Subscription>,
 }
 
 impl Client {
@@ -317,6 +371,7 @@ impl Client {
             last_ping: Instant::now(),
             interval,
             script_history: Default::default(),
+            subscriptions: Default::default(),
         })
     }
 

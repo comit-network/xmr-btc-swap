@@ -8,7 +8,7 @@ use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
 use rand::rngs::OsRng;
 use tokio::select;
-use tracing::trace;
+use tracing::{info, trace};
 
 pub fn is_complete(state: &BobState) -> bool {
     matches!(
@@ -89,10 +89,12 @@ async fn next_state(
         // Bob has locked Btc
         // Watch for Alice to Lock Xmr or for cancel timelock to elapse
         BobState::BtcLocked(state3) => {
+            let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
+
             if let ExpiredTimelocks::None = state3.current_epoch(bitcoin_wallet).await? {
                 let transfer_proof_watcher = event_loop_handle.recv_transfer_proof();
                 let cancel_timelock_expires =
-                    state3.wait_for_cancel_timelock_to_expire(bitcoin_wallet);
+                    tx_lock_status.wait_until_confirmed_with(state3.cancel_timelock);
 
                 // Record the current monero wallet block height so we don't have to scan from
                 // block 0 once we create the redeem wallet.
@@ -129,6 +131,8 @@ async fn next_state(
             lock_transfer_proof,
             monero_wallet_restore_blockheight,
         } => {
+            let tx_lock_status = bitcoin_wallet.subscribe_to(state.tx_lock.clone()).await;
+
             if let ExpiredTimelocks::None = state.current_epoch(bitcoin_wallet).await? {
                 let watch_request = state.lock_xmr_watch_request(lock_transfer_proof);
 
@@ -138,13 +142,13 @@ async fn next_state(
                             Ok(()) => BobState::XmrLocked(state.xmr_locked(monero_wallet_restore_blockheight)),
                             Err(e) => {
                                  tracing::warn!("Waiting for refund because insufficient Monero have been locked! {}", e);
-                                 state.wait_for_cancel_timelock_to_expire(bitcoin_wallet).await?;
+                                 tx_lock_status.wait_until_confirmed_with(state.cancel_timelock).await?;
 
                                  BobState::CancelTimelockExpired(state.cancel())
                             },
                         }
                     }
-                    _ = state.wait_for_cancel_timelock_to_expire(bitcoin_wallet) => {
+                    _ = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
                         BobState::CancelTimelockExpired(state.cancel())
                     }
                 }
@@ -153,6 +157,10 @@ async fn next_state(
             }
         }
         BobState::XmrLocked(state) => {
+            let tx_lock_status = bitcoin_wallet.subscribe_to(state.tx_lock.clone()).await;
+
+            info!("{:?}", tx_lock_status);
+
             if let ExpiredTimelocks::None = state.expired_timelock(bitcoin_wallet).await? {
                 // Alice has locked Xmr
                 // Bob sends Alice his key
@@ -161,7 +169,7 @@ async fn next_state(
                     _ = event_loop_handle.send_encrypted_signature(state.tx_redeem_encsig()) => {
                         BobState::EncSigSent(state)
                     },
-                    _ = state.wait_for_cancel_timelock_to_expire(bitcoin_wallet) => {
+                    _ = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
                         BobState::CancelTimelockExpired(state.cancel())
                     }
                 }
@@ -170,12 +178,14 @@ async fn next_state(
             }
         }
         BobState::EncSigSent(state) => {
+            let tx_lock_status = bitcoin_wallet.subscribe_to(state.tx_lock.clone()).await;
+
             if let ExpiredTimelocks::None = state.expired_timelock(bitcoin_wallet).await? {
                 select! {
                     state5 = state.watch_for_redeem_btc(bitcoin_wallet) => {
                         BobState::BtcRedeemed(state5?)
                     },
-                    _ = state.wait_for_cancel_timelock_to_expire(bitcoin_wallet) => {
+                    _ = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
                         BobState::CancelTimelockExpired(state.cancel())
                     }
                 }

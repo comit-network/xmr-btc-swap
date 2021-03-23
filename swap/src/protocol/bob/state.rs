@@ -295,11 +295,11 @@ pub struct State3 {
     S_a_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
     xmr: monero::Amount,
-    cancel_timelock: CancelTimelock,
+    pub cancel_timelock: CancelTimelock,
     punish_timelock: PunishTimelock,
     refund_address: bitcoin::Address,
     redeem_address: bitcoin::Address,
-    tx_lock: bitcoin::TxLock,
+    pub tx_lock: bitcoin::TxLock,
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: bitcoin::EncryptedSignature,
     min_monero_confirmations: u64,
@@ -336,18 +336,6 @@ impl State3 {
             tx_refund_encsig: self.tx_refund_encsig,
             monero_wallet_restore_blockheight,
         }
-    }
-
-    pub async fn wait_for_cancel_timelock_to_expire(
-        &self,
-        bitcoin_wallet: &bitcoin::Wallet,
-    ) -> Result<()> {
-        bitcoin_wallet
-            .watch_until_status(&self.tx_lock, |status| {
-                status.is_confirmed_with(self.cancel_timelock)
-            })
-            .await?;
-        Ok(())
     }
 
     pub fn cancel(&self) -> State6 {
@@ -393,11 +381,11 @@ pub struct State4 {
     s_b: monero::Scalar,
     S_a_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
-    cancel_timelock: CancelTimelock,
+    pub cancel_timelock: CancelTimelock,
     punish_timelock: PunishTimelock,
     refund_address: bitcoin::Address,
     redeem_address: bitcoin::Address,
-    tx_lock: bitcoin::TxLock,
+    pub tx_lock: bitcoin::TxLock,
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: bitcoin::EncryptedSignature,
     monero_wallet_restore_blockheight: BlockHeight,
@@ -414,7 +402,9 @@ impl State4 {
         let tx_redeem_encsig = self.b.encsign(self.S_a_bitcoin, tx_redeem.digest());
 
         bitcoin_wallet
-            .watch_until_status(&tx_redeem, |status| status.has_been_seen())
+            .subscribe_to(tx_redeem.clone())
+            .await
+            .wait_until_seen()
             .await?;
 
         let tx_redeem_candidate = bitcoin_wallet.get_raw_transaction(tx_redeem.txid()).await?;
@@ -431,19 +421,6 @@ impl State4 {
             tx_lock: self.tx_lock.clone(),
             monero_wallet_restore_blockheight: self.monero_wallet_restore_blockheight,
         })
-    }
-
-    pub async fn wait_for_cancel_timelock_to_expire(
-        &self,
-        bitcoin_wallet: &bitcoin::Wallet,
-    ) -> Result<()> {
-        bitcoin_wallet
-            .watch_until_status(&self.tx_lock, |status| {
-                status.is_confirmed_with(self.cancel_timelock)
-            })
-            .await?;
-
-        Ok(())
     }
 
     pub async fn expired_timelock(
@@ -569,9 +546,9 @@ impl State6 {
         let signed_tx_refund =
             tx_refund.add_signatures((self.A, sig_a), (self.b.public(), sig_b))?;
 
-        let (_, finality) = bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
+        let (_, subscription) = bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
 
-        finality.await?;
+        subscription.wait_until_final().await?;
 
         Ok(())
     }
