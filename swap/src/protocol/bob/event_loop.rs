@@ -11,91 +11,6 @@ use std::sync::Arc;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{debug, error};
 
-#[derive(Debug)]
-pub struct Channels<T> {
-    sender: Sender<T>,
-    receiver: Receiver<T>,
-}
-
-impl<T> Channels<T> {
-    pub fn new() -> Channels<T> {
-        let (sender, receiver) = tokio::sync::mpsc::channel(100);
-        Channels { sender, receiver }
-    }
-}
-
-impl<T> Default for Channels<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[derive(Debug)]
-pub struct EventLoopHandle {
-    start_execution_setup: Sender<State0>,
-    done_execution_setup: Receiver<Result<State2>>,
-    recv_transfer_proof: Receiver<transfer_proof::Request>,
-    send_encrypted_signature: Sender<EncryptedSignature>,
-    request_spot_price: Sender<spot_price::Request>,
-    recv_spot_price: Receiver<spot_price::Response>,
-    request_quote: Sender<()>,
-    recv_quote: Receiver<BidQuote>,
-}
-
-impl EventLoopHandle {
-    pub async fn execution_setup(&mut self, state0: State0) -> Result<State2> {
-        let _ = self.start_execution_setup.send(state0).await?;
-
-        self.done_execution_setup
-            .recv()
-            .await
-            .ok_or_else(|| anyhow!("Failed to setup execution with Alice"))?
-    }
-
-    pub async fn recv_transfer_proof(&mut self) -> Result<transfer_proof::Request> {
-        self.recv_transfer_proof
-            .recv()
-            .await
-            .ok_or_else(|| anyhow!("Failed to receive transfer proof from Alice"))
-    }
-
-    pub async fn request_spot_price(&mut self, btc: bitcoin::Amount) -> Result<monero::Amount> {
-        let _ = self
-            .request_spot_price
-            .send(spot_price::Request { btc })
-            .await?;
-
-        let response = self
-            .recv_spot_price
-            .recv()
-            .await
-            .ok_or_else(|| anyhow!("Failed to receive spot price from Alice"))?;
-
-        Ok(response.xmr)
-    }
-
-    pub async fn request_quote(&mut self) -> Result<BidQuote> {
-        let _ = self.request_quote.send(()).await?;
-
-        let quote = self
-            .recv_quote
-            .recv()
-            .await
-            .ok_or_else(|| anyhow!("Failed to receive quote from Alice"))?;
-
-        Ok(quote)
-    }
-
-    pub async fn send_encrypted_signature(
-        &mut self,
-        tx_redeem_encsig: EncryptedSignature,
-    ) -> Result<()> {
-        self.send_encrypted_signature.send(tx_redeem_encsig).await?;
-
-        Ok(())
-    }
-}
-
 #[allow(missing_debug_implementations)]
 pub struct EventLoop {
     swarm: libp2p::Swarm<Behaviour>,
@@ -248,5 +163,90 @@ impl EventLoop {
                 }
             }
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct EventLoopHandle {
+    start_execution_setup: Sender<State0>,
+    done_execution_setup: Receiver<Result<State2>>,
+    recv_transfer_proof: Receiver<transfer_proof::Request>,
+    send_encrypted_signature: Sender<EncryptedSignature>,
+    request_spot_price: Sender<spot_price::Request>,
+    recv_spot_price: Receiver<spot_price::Response>,
+    request_quote: Sender<()>,
+    recv_quote: Receiver<BidQuote>,
+}
+
+impl EventLoopHandle {
+    pub async fn execution_setup(&mut self, state0: State0) -> Result<State2> {
+        let _ = self.start_execution_setup.send(state0).await?;
+
+        self.done_execution_setup
+            .recv()
+            .await
+            .ok_or_else(|| anyhow!("Failed to setup execution with Alice"))?
+    }
+
+    pub async fn recv_transfer_proof(&mut self) -> Result<transfer_proof::Request> {
+        self.recv_transfer_proof
+            .recv()
+            .await
+            .ok_or_else(|| anyhow!("Failed to receive transfer proof from Alice"))
+    }
+
+    pub async fn request_spot_price(&mut self, btc: bitcoin::Amount) -> Result<monero::Amount> {
+        let _ = self
+            .request_spot_price
+            .send(spot_price::Request { btc })
+            .await?;
+
+        let response = self
+            .recv_spot_price
+            .recv()
+            .await
+            .ok_or_else(|| anyhow!("Failed to receive spot price from Alice"))?;
+
+        Ok(response.xmr)
+    }
+
+    pub async fn request_quote(&mut self) -> Result<BidQuote> {
+        let _ = self.request_quote.send(()).await?;
+
+        let quote = self
+            .recv_quote
+            .recv()
+            .await
+            .ok_or_else(|| anyhow!("Failed to receive quote from Alice"))?;
+
+        Ok(quote)
+    }
+
+    pub async fn send_encrypted_signature(
+        &mut self,
+        tx_redeem_encsig: EncryptedSignature,
+    ) -> Result<()> {
+        self.send_encrypted_signature.send(tx_redeem_encsig).await?;
+
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct Channels<T> {
+    sender: Sender<T>,
+    receiver: Receiver<T>,
+}
+
+impl<T> Channels<T> {
+    fn new() -> Channels<T> {
+        let (sender, receiver) = tokio::sync::mpsc::channel(100);
+        Channels { sender, receiver }
+    }
+}
+
+impl<T> Default for Channels<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }
