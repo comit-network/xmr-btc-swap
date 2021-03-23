@@ -255,9 +255,9 @@ checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
 name = "bdk"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "daeccaea73c9fc27e218e2a4402070707fb8354afd30fecd4a1c9a0bea8b79c4"
+checksum = "4260e70501c2f9d6fb2915cf2be2f5b8ba57743e527834de5de6e371827f1e19"
 dependencies = [
  "async-trait",
  "bdk-macros",
@@ -275,9 +275,9 @@ dependencies = [
 
 [[package]]
 name = "bdk-macros"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b96757dbe9c7e0a8f0635c5366464d9c713528e111f47490e96385f70d6a67a6"
+checksum = "b45570b78250774145859a8f85bfdb6e310663fc82640d7e159a44b1386074a2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -899,9 +899,9 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 
 [[package]]
 name = "electrum-client"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21453800c95bb1aaa57490458c42d60c6277cb8a3e386030ec2381d5c2d4fa77"
+checksum = "4cab4d90cc575a7daab4cfed9e315912a88071bc47462e6be57516a2f01ccc89"
 dependencies = [
  "bitcoin",
  "log",
