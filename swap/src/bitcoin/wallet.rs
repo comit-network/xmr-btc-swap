@@ -3,10 +3,10 @@ use crate::bitcoin::{Address, Amount, Transaction};
 use crate::env;
 use ::bitcoin::util::psbt::PartiallySignedTransaction;
 use ::bitcoin::Txid;
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use bdk::blockchain::{noop_progress, Blockchain, ElectrumBlockchain};
 use bdk::descriptor::Segwitv0;
-use bdk::electrum_client::{self, ElectrumApi, GetHistoryRes};
+use bdk::electrum_client::{ElectrumApi, GetHistoryRes};
 use bdk::keys::DerivableKey;
 use bdk::{FeeRate, KeychainKind};
 use bitcoin::Script;
@@ -35,12 +35,8 @@ impl Wallet {
         key: impl DerivableKey<Segwitv0> + Clone,
         env_config: env::Config,
     ) -> Result<Self> {
-        // Workaround for https://github.com/bitcoindevkit/rust-electrum-client/issues/47.
-        let config = electrum_client::ConfigBuilder::default().retry(2).build();
-
-        let client =
-            bdk::electrum_client::Client::from_config(electrum_rpc_url.as_str(), config.clone())
-                .map_err(|e| anyhow!("Failed to init electrum rpc client: {:?}", e))?;
+        let client = bdk::electrum_client::Client::new(electrum_rpc_url.as_str())
+            .context("Failed to initialize Electrum RPC client")?;
 
         let db = bdk::sled::open(wallet_dir)?.open_tree(SLED_TREE_NAME)?;
 
@@ -52,8 +48,8 @@ impl Wallet {
             ElectrumBlockchain::from(client),
         )?;
 
-        let electrum = bdk::electrum_client::Client::from_config(electrum_rpc_url.as_str(), config)
-            .map_err(|e| anyhow!("Failed to init electrum rpc client {:?}", e))?;
+        let electrum = bdk::electrum_client::Client::new(electrum_rpc_url.as_str())
+            .context("Failed to initialize Electrum RPC client")?;
 
         Ok(Self {
             wallet: Arc::new(Mutex::new(bdk_wallet)),
@@ -101,9 +97,7 @@ impl Wallet {
             .list_transactions(true)?
             .iter()
             .find(|tx| tx.txid == txid)
-            .ok_or_else(|| {
-                anyhow!("Could not find tx in bdk wallet when trying to determine fees")
-            })?
+            .context("Could not find tx in bdk wallet when trying to determine fees")?
             .fees;
 
         Ok(Amount::from_sat(fees))
@@ -205,7 +199,7 @@ impl Wallet {
     pub async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
         self.get_tx(txid)
             .await?
-            .ok_or_else(|| anyhow!("Could not get raw tx with id: {}", txid))
+            .with_context(|| format!("Could not get raw tx with id: {}", txid))
     }
 
     pub async fn status_of_script<T>(&self, tx: &T) -> Result<ScriptStatus>
@@ -313,12 +307,9 @@ struct Client {
 
 impl Client {
     fn new(electrum: bdk::electrum_client::Client, interval: Duration) -> Result<Self> {
-        let latest_block = electrum.block_headers_subscribe().map_err(|e| {
-            anyhow!(
-                "Electrum client failed to subscribe to header notifications: {:?}",
-                e
-            )
-        })?;
+        let latest_block = electrum
+            .block_headers_subscribe()
+            .context("Failed to subscribe to header notifications")?;
 
         Ok(Self {
             electrum,
@@ -409,7 +400,7 @@ impl Client {
         let latest_block = std::iter::from_fn(|| self.electrum.block_headers_pop().transpose())
             .last()
             .transpose()
-            .map_err(|e| anyhow!("Failed to pop header notification: {:?}", e))?;
+            .context("Failed to pop header notification")?;
 
         if let Some(new_block) = latest_block {
             tracing::debug!(
@@ -426,7 +417,7 @@ impl Client {
         let histories = self
             .electrum
             .batch_script_get_history(self.script_history.keys())
-            .map_err(|e| anyhow!("Failed to get script histories {:?}", e))?;
+            .context("Failed to get script histories")?;
 
         if histories.len() != self.script_history.len() {
             bail!(
