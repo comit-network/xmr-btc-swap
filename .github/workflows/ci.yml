@@ -101,8 +101,6 @@ jobs:
         run: cargo test --package swap --lib --all-features
 
   docker_tests:
-    env:
-      TARGET: x86_64-unknown-linux-gnu
     strategy:
       matrix:
         test_name: [
