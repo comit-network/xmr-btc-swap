@@ -1,7 +1,9 @@
+use crate::{bitcoin, monero};
 use conquer_once::Lazy;
 use ecdsa_fun::fun::marker::Mark;
+use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQ;
+use sigma_fun::ext::dl_secp256k1_ed25519_eq::{CrossCurveDLEQ, CrossCurveDLEQProof};
 use sigma_fun::HashTranscript;
 
 pub mod alice;
@@ -18,6 +20,44 @@ pub static CROSS_CURVE_PROOF_SYSTEM: Lazy<
 
 #[derive(Debug, Copy, Clone)]
 pub struct StartingBalances {
-    pub xmr: crate::monero::Amount,
+    pub xmr: monero::Amount,
     pub btc: bitcoin::Amount,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message0 {
+    B: bitcoin::PublicKey,
+    S_b_monero: monero::PublicKey,
+    S_b_bitcoin: bitcoin::PublicKey,
+    dleq_proof_s_b: CrossCurveDLEQProof,
+    v_b: monero::PrivateViewKey,
+    refund_address: bitcoin::Address,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message1 {
+    A: bitcoin::PublicKey,
+    S_a_monero: monero::PublicKey,
+    S_a_bitcoin: bitcoin::PublicKey,
+    dleq_proof_s_a: CrossCurveDLEQProof,
+    v_a: monero::PrivateViewKey,
+    redeem_address: bitcoin::Address,
+    punish_address: bitcoin::Address,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message2 {
+    tx_lock: bitcoin::TxLock,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message3 {
+    tx_cancel_sig: bitcoin::Signature,
+    tx_refund_encsig: bitcoin::EncryptedSignature,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message4 {
+    tx_punish_sig: bitcoin::Signature,
+    tx_cancel_sig: bitcoin::Signature,
 }

@@ -4,7 +4,6 @@ use crate::network::{encrypted_signature, spot_price};
 use crate::protocol::bob;
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
-pub use execution_setup::{Message0, Message2, Message4};
 use libp2p::core::Multiaddr;
 use libp2p::request_response::{RequestResponseEvent, RequestResponseMessage, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};

@@ -1,34 +1,10 @@
-use crate::bitcoin::Signature;
 use crate::network::cbor_request_response::BUF_SIZE;
-use crate::protocol::alice::{Message1, Message3};
 use crate::protocol::bob::{State0, State2};
+use crate::protocol::{Message1, Message3};
 use anyhow::{Context, Error, Result};
 use libp2p::PeerId;
 use libp2p_async_await::BehaviourOutEvent;
-use serde::{Deserialize, Serialize};
-use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQProof;
 use std::sync::Arc;
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Message0 {
-    pub(crate) B: crate::bitcoin::PublicKey,
-    pub(crate) S_b_monero: monero::PublicKey,
-    pub(crate) S_b_bitcoin: crate::bitcoin::PublicKey,
-    pub(crate) dleq_proof_s_b: CrossCurveDLEQProof,
-    pub(crate) v_b: crate::monero::PrivateViewKey,
-    pub(crate) refund_address: bitcoin::Address,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Message2 {
-    pub(crate) tx_lock: crate::bitcoin::TxLock,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Message4 {
-    pub(crate) tx_punish_sig: Signature,
-    pub(crate) tx_cancel_sig: Signature,
-}
 
 #[derive(Debug)]
 pub enum OutEvent {
