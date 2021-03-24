@@ -1,0 +1,41 @@
+name: "Create release"
+
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  create_release:
+    name: Create from merged release branch
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Extract version from branch name
+        id: extract-version
+        shell: python
+        run: |
+          branch_name = "${{ github.event.pull_request.head.ref }}"
+          version = branch_name.split("/")[1]
+
+          print(f"::set-output name=version::{version}")
+
+      - name: Extract changelog section for release
+        id: changelog
+        uses: coditory/changelog-parser@v1
+        with:
+          version: ${{ steps.extract-version.outputs.version }}
+
+      - name: Create release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOTTY_GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.extract-version.outputs.version }}
+          release_name: ${{ steps.extract-version.outputs.version }}
+          draft: false
+          prerelease: false
+          body: ${{ steps.changelog.outputs.description }}
+          commitish: ${{ github.event.pull_request.merge_commit_sha }}
