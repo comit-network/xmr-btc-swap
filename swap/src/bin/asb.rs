@@ -88,11 +88,6 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            info!(
-                "BTC deposit address: {}",
-                bitcoin_wallet.new_address().await?
-            );
-
             let kraken_rate_updates = kraken::connect()?;
 
             let mut swarm = swarm::new::<Behaviour>(&seed)?;
