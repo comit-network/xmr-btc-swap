@@ -21,7 +21,7 @@ impl TxLock {
     pub async fn new(wallet: &Wallet, amount: Amount, A: PublicKey, B: PublicKey) -> Result<Self> {
         let lock_output_descriptor = build_shared_output_descriptor(A.0, B.0);
         let address = lock_output_descriptor
-            .address(wallet.get_network().await)
+            .address(wallet.get_network())
             .expect("can derive address from descriptor");
 
         let psbt = wallet.send_to_address(address, amount).await?;

@@ -5,11 +5,12 @@ use ::bitcoin::util::psbt::PartiallySignedTransaction;
 use ::bitcoin::Txid;
 use anyhow::{bail, Context, Result};
 use bdk::blockchain::{noop_progress, Blockchain, ElectrumBlockchain};
+use bdk::database::BatchDatabase;
 use bdk::descriptor::Segwitv0;
 use bdk::electrum_client::{ElectrumApi, GetHistoryRes};
 use bdk::keys::DerivableKey;
 use bdk::{FeeRate, KeychainKind};
-use bitcoin::Script;
+use bitcoin::{Network, Script};
 use reqwest::Url;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
@@ -21,10 +22,11 @@ use tokio::sync::{watch, Mutex};
 
 const SLED_TREE_NAME: &str = "default_tree";
 
-pub struct Wallet {
-    client: Arc<Mutex<Client>>,
-    wallet: Arc<Mutex<bdk::Wallet<ElectrumBlockchain, bdk::sled::Tree>>>,
+pub struct Wallet<B = ElectrumBlockchain, D = bdk::sled::Tree, C = Client> {
+    client: Arc<Mutex<C>>,
+    wallet: Arc<Mutex<bdk::Wallet<B, D>>>,
     finality_confirmations: u32,
+    network: Network,
 }
 
 impl Wallet {
@@ -39,7 +41,7 @@ impl Wallet {
 
         let db = bdk::sled::open(wallet_dir)?.open_tree(SLED_TREE_NAME)?;
 
-        let bdk_wallet = bdk::Wallet::new(
+        let wallet = bdk::Wallet::new(
             bdk::template::BIP84(key.clone(), KeychainKind::External),
             Some(bdk::template::BIP84(key, KeychainKind::Internal)),
             env_config.bitcoin_network,
@@ -50,106 +52,17 @@ impl Wallet {
         let electrum = bdk::electrum_client::Client::new(electrum_rpc_url.as_str())
             .context("Failed to initialize Electrum RPC client")?;
 
+        let network = wallet.network();
+
         Ok(Self {
-            wallet: Arc::new(Mutex::new(bdk_wallet)),
             client: Arc::new(Mutex::new(Client::new(
                 electrum,
                 env_config.bitcoin_sync_interval(),
             )?)),
+            wallet: Arc::new(Mutex::new(wallet)),
             finality_confirmations: env_config.bitcoin_finality_confirmations,
+            network,
         })
-    }
-
-    pub async fn balance(&self) -> Result<Amount> {
-        let balance = self
-            .wallet
-            .lock()
-            .await
-            .get_balance()
-            .context("Failed to calculate Bitcoin balance")?;
-
-        Ok(Amount::from_sat(balance))
-    }
-
-    pub async fn new_address(&self) -> Result<Address> {
-        let address = self
-            .wallet
-            .lock()
-            .await
-            .get_new_address()
-            .context("Failed to get new Bitcoin address")?;
-
-        Ok(address)
-    }
-
-    pub async fn get_tx(&self, txid: Txid) -> Result<Option<Transaction>> {
-        let tx = self.wallet.lock().await.client().get_tx(&txid)?;
-
-        Ok(tx)
-    }
-
-    pub async fn transaction_fee(&self, txid: Txid) -> Result<Amount> {
-        let fees = self
-            .wallet
-            .lock()
-            .await
-            .list_transactions(true)?
-            .iter()
-            .find(|tx| tx.txid == txid)
-            .context("Could not find tx in bdk wallet when trying to determine fees")?
-            .fees;
-
-        Ok(Amount::from_sat(fees))
-    }
-
-    pub async fn sync(&self) -> Result<()> {
-        self.wallet
-            .lock()
-            .await
-            .sync(noop_progress(), None)
-            .context("Failed to sync balance of Bitcoin wallet")?;
-
-        Ok(())
-    }
-
-    pub async fn send_to_address(
-        &self,
-        address: Address,
-        amount: Amount,
-    ) -> Result<PartiallySignedTransaction> {
-        let wallet = self.wallet.lock().await;
-
-        let mut tx_builder = wallet.build_tx();
-        tx_builder.add_recipient(address.script_pubkey(), amount.as_sat());
-        tx_builder.fee_rate(self.select_feerate());
-        let (psbt, _details) = tx_builder.finish()?;
-
-        Ok(psbt)
-    }
-
-    /// Calculates the maximum "giveable" amount of this wallet.
-    ///
-    /// We define this as the maximum amount we can pay to a single output,
-    /// already accounting for the fees we need to spend to get the
-    /// transaction confirmed.
-    pub async fn max_giveable(&self, locking_script_size: usize) -> Result<Amount> {
-        let wallet = self.wallet.lock().await;
-
-        let mut tx_builder = wallet.build_tx();
-
-        let dummy_script = Script::from(vec![0u8; locking_script_size]);
-        tx_builder.set_single_recipient(dummy_script);
-        tx_builder.drain_wallet();
-        tx_builder.fee_rate(self.select_feerate());
-        let (_, details) = tx_builder.finish().context("Failed to build transaction")?;
-
-        let max_giveable = details.sent - details.fees;
-
-        Ok(Amount::from_sat(max_giveable))
-    }
-
-    pub async fn get_network(&self) -> bitcoin::Network {
-        self.wallet.lock().await.network()
     }
 
     /// Broadcast the given transaction to the network and emit a log statement
@@ -260,13 +173,6 @@ impl Wallet {
 
         sub
     }
-
-    /// Selects an appropriate [`FeeRate`] to be used for getting transactions
-    /// confirmed within a reasonable amount of time.
-    fn select_feerate(&self) -> FeeRate {
-        // TODO: This should obviously not be a const :)
-        FeeRate::from_sat_per_vb(5.0)
-    }
 }
 
 /// Represents a subscription to the status of a given transaction.
@@ -329,6 +235,119 @@ impl Subscription {
     }
 }
 
+impl<B, D, C> Wallet<B, D, C>
+where
+    D: BatchDatabase,
+{
+    pub async fn balance(&self) -> Result<Amount> {
+        let balance = self
+            .wallet
+            .lock()
+            .await
+            .get_balance()
+            .context("Failed to calculate Bitcoin balance")?;
+
+        Ok(Amount::from_sat(balance))
+    }
+
+    pub async fn new_address(&self) -> Result<Address> {
+        let address = self
+            .wallet
+            .lock()
+            .await
+            .get_new_address()
+            .context("Failed to get new Bitcoin address")?;
+
+        Ok(address)
+    }
+
+    pub async fn transaction_fee(&self, txid: Txid) -> Result<Amount> {
+        let fees = self
+            .wallet
+            .lock()
+            .await
+            .list_transactions(true)?
+            .iter()
+            .find(|tx| tx.txid == txid)
+            .context("Could not find tx in bdk wallet when trying to determine fees")?
+            .fees;
+
+        Ok(Amount::from_sat(fees))
+    }
+
+    pub async fn send_to_address(
+        &self,
+        address: Address,
+        amount: Amount,
+    ) -> Result<PartiallySignedTransaction> {
+        let wallet = self.wallet.lock().await;
+
+        let mut tx_builder = wallet.build_tx();
+        tx_builder.add_recipient(address.script_pubkey(), amount.as_sat());
+        tx_builder.fee_rate(self.select_feerate());
+        let (psbt, _details) = tx_builder.finish()?;
+
+        Ok(psbt)
+    }
+
+    /// Calculates the maximum "giveable" amount of this wallet.
+    ///
+    /// We define this as the maximum amount we can pay to a single output,
+    /// already accounting for the fees we need to spend to get the
+    /// transaction confirmed.
+    pub async fn max_giveable(&self, locking_script_size: usize) -> Result<Amount> {
+        let wallet = self.wallet.lock().await;
+
+        let mut tx_builder = wallet.build_tx();
+
+        let dummy_script = Script::from(vec![0u8; locking_script_size]);
+        tx_builder.set_single_recipient(dummy_script);
+        tx_builder.drain_wallet();
+        tx_builder.fee_rate(self.select_feerate());
+        let (_, details) = tx_builder.finish().context("Failed to build transaction")?;
+
+        let max_giveable = details.sent - details.fees;
+
+        Ok(Amount::from_sat(max_giveable))
+    }
+}
+
+impl<B, D, C> Wallet<B, D, C>
+where
+    B: Blockchain,
+    D: BatchDatabase,
+{
+    pub async fn get_tx(&self, txid: Txid) -> Result<Option<Transaction>> {
+        let tx = self.wallet.lock().await.client().get_tx(&txid)?;
+
+        Ok(tx)
+    }
+
+    pub async fn sync(&self) -> Result<()> {
+        self.wallet
+            .lock()
+            .await
+            .sync(noop_progress(), None)
+            .context("Failed to sync balance of Bitcoin wallet")?;
+
+        Ok(())
+    }
+}
+
+impl<B, D, C> Wallet<B, D, C> {
+    // TODO: Get rid of this by changing bounds on bdk::Wallet
+    pub fn get_network(&self) -> bitcoin::Network {
+        self.network
+    }
+
+    /// Selects an appropriate [`FeeRate`] to be used for getting transactions
+    /// confirmed within a reasonable amount of time.
+    fn select_feerate(&self) -> FeeRate {
+        // TODO: This should obviously not be a const :)
+        FeeRate::from_sat_per_vb(5.0)
+    }
+}
+
 /// Defines a watchable transaction.
 ///
 /// For a transaction to be watchable, we need to know two things: Its
@@ -350,7 +369,7 @@ impl Watchable for (Txid, Script) {
     }
 }
 
-struct Client {
+pub struct Client {
     electrum: bdk::electrum_client::Client,
     latest_block: BlockHeight,
     last_ping: Instant,
