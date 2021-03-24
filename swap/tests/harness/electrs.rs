@@ -1,4 +1,4 @@
-use crate::testutils::bitcoind;
+use crate::harness::bitcoind;
 use bitcoin::Network;
 use std::collections::HashMap;
 use testcontainers::core::{Container, Docker, WaitForMessage};

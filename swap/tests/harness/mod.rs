@@ -1,7 +1,7 @@
 mod bitcoind;
 mod electrs;
 
-use crate::testutils;
+use crate::harness;
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use bitcoin_harness::{BitcoindRpcApi, Client};
@@ -452,7 +452,7 @@ where
 
     let env_config = C::get_config();
 
-    let (monero, containers) = testutils::init_containers(&cli).await;
+    let (monero, containers) = harness::init_containers(&cli).await;
 
     let btc_amount = bitcoin::Amount::from_sat(1_000_000);
     let xmr_amount = monero::Amount::from_monero(btc_amount.as_btc() / FixedRate::RATE).unwrap();
@@ -470,7 +470,7 @@ where
 
     let electrs_rpc_port = containers
         .electrs
-        .get_host_port(testutils::electrs::RPC_PORT)
+        .get_host_port(harness::electrs::RPC_PORT)
         .expect("Could not map electrs rpc port");
 
     let alice_seed = Seed::random().unwrap();
@@ -600,7 +600,7 @@ async fn init_bitcoind_container(
 
     let docker = cli.run_with_args(image, run_args);
     let a = docker
-        .get_host_port(testutils::bitcoind::RPC_PORT)
+        .get_host_port(harness::bitcoind::RPC_PORT)
         .context("Could not map bitcoind rpc port")?;
 
     let bitcoind_url = {
@@ -627,7 +627,7 @@ pub async fn init_electrs_container(
     let bitcoind_rpc_addr = format!(
         "{}:{}",
         bitcoind_container_name,
-        testutils::bitcoind::RPC_PORT
+        harness::bitcoind::RPC_PORT
     );
     let image = electrs::Electrs::default()
         .with_volume(volume)
