@@ -121,9 +121,10 @@ impl Client {
     }
 
     /// Opens a wallet using `filename`.
-    pub async fn open_wallet(&self, filename: &str) -> Result<()> {
+    pub async fn open_wallet(&self, filename: &str, password: &str) -> Result<()> {
         let params = OpenWalletParams {
-            filename: filename.to_owned(),
+            filename: filename.to_string(),
+            password: password.to_string(),
         };
         let request = Request::new("open_wallet", params);
 
@@ -170,10 +171,11 @@ impl Client {
     }
 
     /// Creates a wallet using `filename`.
-    pub async fn create_wallet(&self, filename: &str) -> Result<()> {
+    pub async fn create_wallet(&self, filename: &str, password: &str) -> Result<()> {
         let params = CreateWalletParams {
-            filename: filename.to_owned(),
-            language: "English".to_owned(),
+            filename: filename.to_string(),
+            password: password.to_string(),
+            language: "English".to_string(),
         };
         let request = Request::new("create_wallet", params);
 
@@ -419,11 +421,13 @@ pub struct SubAddressAccount {
 #[derive(Serialize, Debug, Clone)]
 struct OpenWalletParams {
     filename: String,
+    password: String,
 }
 
 #[derive(Serialize, Debug, Clone)]
 struct CreateWalletParams {
     filename: String,
+    password: String,
     language: String,
 }
 

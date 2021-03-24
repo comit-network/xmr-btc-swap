@@ -228,7 +228,7 @@ impl<'c> MoneroWalletRpc {
 
         // create new wallet
         wallet::Client::localhost(wallet_rpc_port)
-            .create_wallet(name)
+            .create_wallet(name, "")
             .await
             .unwrap();
 

@@ -598,6 +598,7 @@ async fn init_test_wallets(
     let xmr_wallet = swap::monero::Wallet::connect(
         monero.wallet(name).unwrap().client(),
         name.to_string(),
+        String::new(),
         env_config,
     )
     .await

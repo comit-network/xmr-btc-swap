@@ -298,6 +298,7 @@ async fn init_monero_wallet(
     let monero_wallet = monero::Wallet::open_or_create(
         monero_wallet_rpc_process.endpoint(),
         MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME.to_string(),
+        None,
         env_config,
     )
     .await?;

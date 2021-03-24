@@ -37,8 +37,6 @@ use tracing_subscriber::filter::LevelFilter;
 #[macro_use]
 extern crate prettytable;
 
-const DEFAULT_WALLET_NAME: &str = "asb-wallet";
-
 #[tokio::main]
 async fn main() -> Result<()> {
     init_tracing(LevelFilter::DEBUG).expect("initialize tracing");
@@ -166,7 +164,8 @@ async fn init_wallets(
 
     let monero_wallet = monero::Wallet::open_or_create(
         config.monero.wallet_rpc_url.clone(),
-        DEFAULT_WALLET_NAME.to_string(),
+        config.monero.wallet_name,
+        Some(config.monero.wallet_password),
         env_config,
     )
     .await?;

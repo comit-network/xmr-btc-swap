@@ -19,18 +19,26 @@ pub struct Wallet {
     inner: Mutex<wallet::Client>,
     network: Network,
     name: String,
+    password: String,
     main_address: monero::Address,
     sync_interval: Duration,
 }
 
 impl Wallet {
     /// Connect to a wallet RPC and load the given wallet by name.
-    pub async fn open_or_create(url: Url, name: String, env_config: Config) -> Result<Self> {
+    pub async fn open_or_create(
+        url: Url,
+        name: String,
+        password: Option<String>,
+        env_config: Config,
+    ) -> Result<Self> {
         let client = wallet::Client::new(url);
 
-        let open_wallet_response = client.open_wallet(name.as_str()).await;
+        let password = password.unwrap_or_default();
+
+        let open_wallet_response = client.open_wallet(name.as_str(), password.as_str()).await;
         if open_wallet_response.is_err() {
-            client.create_wallet(name.as_str()).await.context(
+            client.create_wallet(name.as_str(), password.as_str()).await.context(
                 "Unable to create Monero wallet, please ensure that the monero-wallet-rpc is available",
             )?;
 
@@ -39,11 +47,16 @@ impl Wallet {
             debug!("Opened Monero wallet {}", name);
         }
 
-        Self::connect(client, name, env_config).await
+        Self::connect(client, name, password, env_config).await
     }
 
     /// Connects to a wallet RPC where a wallet is already loaded.
-    pub async fn connect(client: wallet::Client, name: String, env_config: Config) -> Result<Self> {
+    pub async fn connect(
+        client: wallet::Client,
+        name: String,
+        password: String,
+        env_config: Config,
+    ) -> Result<Self> {
         let main_address =
             monero::Address::from_str(client.get_address(0).await?.address.as_str())?;
         Ok(Self {
@@ -52,6 +65,7 @@ impl Wallet {
             name,
             main_address,
             sync_interval: env_config.monero_sync_interval(),
+            password,
         })
     }
 
@@ -60,7 +74,7 @@ impl Wallet {
         self.inner
             .lock()
             .await
-            .open_wallet(self.name.as_str())
+            .open_wallet(self.name.as_str(), self.password.as_str())
             .await?;
         Ok(())
     }
@@ -151,7 +165,9 @@ impl Wallet {
             }
         }
 
-        let _ = wallet.open_wallet(self.name.as_str()).await?;
+        let _ = wallet
+            .open_wallet(self.name.as_str(), self.password.as_str())
+            .await?;
 
         Ok(())
     }

@@ -2,7 +2,7 @@ use crate::fs::{default_data_dir, ensure_directory_exists};
 use anyhow::{Context, Result};
 use config::ConfigError;
 use dialoguer::theme::ColorfulTheme;
-use dialoguer::Input;
+use dialoguer::{Input, Password};
 use libp2p::core::Multiaddr;
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
@@ -14,6 +14,7 @@ use url::Url;
 const DEFAULT_LISTEN_ADDRESS: &str = "/ip4/0.0.0.0/tcp/9939";
 const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://electrum.blockstream.info:60002";
 const DEFAULT_MONERO_WALLET_RPC_TESTNET_URL: &str = "http://127.0.0.1:38083/json_rpc";
+const DEFAULT_WALLET_NAME: &str = "asb-wallet";
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct Config {
@@ -58,6 +59,8 @@ pub struct Bitcoin {
 #[serde(deny_unknown_fields)]
 pub struct Monero {
     pub wallet_rpc_url: Url,
+    pub wallet_name: String,
+    pub wallet_password: String,
 }
 
 #[derive(thiserror::Error, Debug, Clone, Copy)]
@@ -66,10 +69,7 @@ pub struct ConfigNotInitialized {}
 
 pub fn read_config(config_path: PathBuf) -> Result<Result<Config, ConfigNotInitialized>> {
     if config_path.exists() {
-        info!(
-            "Using config file at default path: {}",
-            config_path.display()
-        );
+        info!("Using config file: {}", config_path.display());
     } else {
         return Ok(Err(ConfigNotInitialized {}));
     }
@@ -129,6 +129,17 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
         .default(DEFAULT_MONERO_WALLET_RPC_TESTNET_URL.to_owned())
         .interact_text()?;
     let monero_wallet_rpc_url = monero_wallet_rpc_url.as_str().parse()?;
+
+    let monero_wallet_name = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter Monero Wallet Name or hit enter to use default. If the wallet with given name does not exist in the Monero RPC's wallet folder it will be created.")
+        .default(DEFAULT_WALLET_NAME.to_owned())
+        .interact_text()?;
+
+    let monero_wallet_password = Password::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter Monero Wallet Password or hit enter for empty password.")
+        .allow_empty_password(true)
+        .interact()?;
+
     println!();
 
     Ok(Config {
@@ -139,6 +150,8 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
         bitcoin: Bitcoin { electrum_rpc_url },
         monero: Monero {
             wallet_rpc_url: monero_wallet_rpc_url,
+            wallet_name: monero_wallet_name,
+            wallet_password: monero_wallet_password,
         },
     })
 }
@@ -167,6 +180,8 @@ mod tests {
 
             monero: Monero {
                 wallet_rpc_url: Url::from_str(DEFAULT_MONERO_WALLET_RPC_TESTNET_URL).unwrap(),
+                wallet_name: DEFAULT_WALLET_NAME.to_string(),
+                wallet_password: "".to_string(),
             },
         };
 
