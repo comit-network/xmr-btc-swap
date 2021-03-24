@@ -80,8 +80,6 @@ jobs:
           path: target/${{ matrix.target }}/debug/asb
 
   test:
-    env:
-      RUST_TEST_TASKS: 2
     strategy:
       matrix:
         os: [ ubuntu-latest, macos-latest ]
