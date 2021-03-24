@@ -1,7 +1,7 @@
 status = [
     "static_analysis",
-    "build (x86_64-unknown-linux-gnu, ubuntu-latest)",
-    "build (armv7-unknown-linux-gnueabihf, ubuntu-latest)",
+    "build (x86_64-unknown-linux-musl, ubuntu-latest)",
+    "build (armv7-unknown-linux-musleabihf, ubuntu-latest)",
     "build (x86_64-apple-darwin, macos-latest)",
     "build (x86_64-pc-windows-msvc, windows-latest)",
     "test (x86_64-unknown-linux-gnu, ubuntu-latest)",
