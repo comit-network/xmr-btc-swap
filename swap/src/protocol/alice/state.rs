@@ -74,7 +74,7 @@ impl fmt::Display for AliceState {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct State0 {
     pub a: bitcoin::SecretKey,
     pub s_a: monero::Scalar,
@@ -82,7 +82,6 @@ pub struct State0 {
     pub(crate) S_a_monero: monero::PublicKey,
     pub(crate) S_a_bitcoin: bitcoin::PublicKey,
     pub dleq_proof_s_a: CrossCurveDLEQProof,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub btc: bitcoin::Amount,
     pub xmr: monero::Amount,
     pub cancel_timelock: CancelTimelock,
@@ -168,7 +167,7 @@ impl State0 {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug)]
 pub struct State1 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
@@ -180,7 +179,6 @@ pub struct State1 {
     v: monero::PrivateViewKey,
     v_a: monero::PrivateViewKey,
     dleq_proof_s_a: CrossCurveDLEQProof,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     cancel_timelock: CancelTimelock,
@@ -223,7 +221,7 @@ impl State1 {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug)]
 pub struct State2 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
@@ -231,7 +229,6 @@ pub struct State2 {
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     cancel_timelock: CancelTimelock,

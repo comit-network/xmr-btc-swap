@@ -69,7 +69,7 @@ impl fmt::Display for BobState {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct State0 {
     b: bitcoin::SecretKey,
     s_b: monero::Scalar,
@@ -77,7 +77,6 @@ pub struct State0 {
     S_b_bitcoin: bitcoin::PublicKey,
     v_b: monero::PrivateViewKey,
     dleq_proof_s_b: CrossCurveDLEQProof,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     cancel_timelock: CancelTimelock,
@@ -170,7 +169,7 @@ impl State0 {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug)]
 pub struct State1 {
     A: bitcoin::PublicKey,
     b: bitcoin::SecretKey,
