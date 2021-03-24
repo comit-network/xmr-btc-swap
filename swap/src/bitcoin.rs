@@ -14,6 +14,7 @@ pub use crate::bitcoin::redeem::TxRedeem;
 pub use crate::bitcoin::refund::TxRefund;
 pub use crate::bitcoin::timelocks::{BlockHeight, ExpiredTimelocks};
 pub use ::bitcoin::util::amount::Amount;
+pub use ::bitcoin::util::psbt::PartiallySignedTransaction;
 pub use ::bitcoin::{Address, Network, Transaction, Txid};
 pub use ecdsa_fun::adaptor::EncryptedSignature;
 pub use ecdsa_fun::fun::Scalar;

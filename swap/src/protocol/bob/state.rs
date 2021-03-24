@@ -188,7 +188,7 @@ pub struct State1 {
 impl State1 {
     pub fn next_message(&self) -> Message2 {
         Message2 {
-            tx_lock: self.tx_lock.clone(),
+            psbt: self.tx_lock.clone().into(),
         }
     }
 

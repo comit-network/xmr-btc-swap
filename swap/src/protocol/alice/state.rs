@@ -200,8 +200,11 @@ impl State1 {
         }
     }
 
-    pub fn receive(self, msg: Message2) -> State2 {
-        State2 {
+    pub fn receive(self, msg: Message2) -> Result<State2> {
+        let tx_lock = bitcoin::TxLock::from_psbt(msg.psbt, self.a.public(), self.B, self.btc)
+            .context("Failed to re-construct TxLock from received PSBT")?;
+
+        Ok(State2 {
             a: self.a,
             B: self.B,
             s_a: self.s_a,
@@ -215,8 +218,8 @@ impl State1 {
             refund_address: self.refund_address,
             redeem_address: self.redeem_address,
             punish_address: self.punish_address,
-            tx_lock: msg.tx_lock,
-        }
+            tx_lock,
+        })
     }
 }
 

@@ -47,7 +47,7 @@ pub struct Message1 {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message2 {
-    tx_lock: bitcoin::TxLock,
+    psbt: bitcoin::PartiallySignedTransaction,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

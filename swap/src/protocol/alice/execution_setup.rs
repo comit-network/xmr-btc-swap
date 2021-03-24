@@ -57,7 +57,9 @@ impl Behaviour {
                 let message2 =
                     serde_cbor::from_slice::<Message2>(&substream.read_message(BUF_SIZE).await?)
                         .context("Failed to deserialize message2")?;
-                let state2 = state1.receive(message2);
+                let state2 = state1
+                    .receive(message2)
+                    .context("Failed to receive Message2")?;
 
                 substream
                     .write_message(

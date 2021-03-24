@@ -348,6 +348,39 @@ impl<B, D, C> Wallet<B, D, C> {
     }
 }
 
+#[cfg(test)]
+impl Wallet<(), bdk::database::MemoryDatabase, ()> {
+    /// Creates a new, funded wallet to be used within tests.
+    pub fn new_funded(amount: u64) -> Self {
+        use bdk::database::MemoryDatabase;
+        use bdk::{LocalUtxo, TransactionDetails};
+        use bitcoin::OutPoint;
+        use std::str::FromStr;
+        use testutils::testutils;
+
+        let descriptors = testutils!(@descriptors ("wpkh(tpubEBr4i6yk5nf5DAaJpsi9N2pPYBeJ7fZ5Z9rmN4977iYLCGco1VyjB9tvvuvYtfZzjD5A8igzgw3HeWeeKFmanHYqksqZXYXGsw5zjnj7KM9/*)"));
+
+        let mut database = MemoryDatabase::new();
+        bdk::populate_test_db!(
+            &mut database,
+            testutils! {
+                @tx ( (@external descriptors, 0) => amount ) (@confirmations 1)
+            },
+            Some(100)
+        );
+
+        let wallet =
+            bdk::Wallet::new_offline(&descriptors.0, None, Network::Regtest, database).unwrap();
+
+        Self {
+            client: Arc::new(Mutex::new(())),
+            wallet: Arc::new(Mutex::new(wallet)),
+            finality_confirmations: 1,
+            network: Network::Regtest,
+        }
+    }
+}
+
 /// Defines a watchable transaction.
 ///
 /// For a transaction to be watchable, we need to know two things: Its
