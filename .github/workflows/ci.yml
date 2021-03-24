@@ -84,14 +84,9 @@ jobs:
       RUST_TEST_TASKS: 2
     strategy:
       matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-          - target: x86_64-apple-darwin
-            os: macos-latest
+        os: [ ubuntu-latest, macos-latest ]
     runs-on: ${{ matrix.os }}
     steps:
-
       - name: Checkout sources
         uses: actions/checkout@v2
 
