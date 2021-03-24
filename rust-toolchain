@@ -1,4 +1,4 @@
 [toolchain]
 channel = "nightly-2021-01-31"
 components = ["rustfmt", "clippy"]
-targets = ["armv7-unknown-linux-gnueabihf"]
+targets = ["armv7-unknown-linux-musleabihf", "x86_64-unknown-linux-musl"]
