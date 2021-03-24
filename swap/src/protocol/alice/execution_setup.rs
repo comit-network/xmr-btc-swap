@@ -1,5 +1,5 @@
 use crate::bitcoin::{EncryptedSignature, Signature};
-use crate::network::request_response::BUF_SIZE;
+use crate::network::cbor_request_response::BUF_SIZE;
 use crate::protocol::alice::{State0, State3};
 use crate::protocol::bob::{Message0, Message2, Message4};
 use crate::{bitcoin, monero};

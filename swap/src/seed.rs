@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 
 pub const SEED_LENGTH: usize = 32;
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub struct Seed([u8; SEED_LENGTH]);
 
 impl Seed {

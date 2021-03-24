@@ -1,8 +1,9 @@
 use crate::bitcoin;
-use crate::network::request_response::CborCodec;
+use crate::network::cbor_request_response::CborCodec;
 use libp2p::core::ProtocolName;
 use libp2p::request_response::{
     ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
+    RequestResponseMessage,
 };
 use serde::{Deserialize, Serialize};
 
@@ -16,6 +17,8 @@ impl ProtocolName for BidQuoteProtocol {
         b"/comit/xmr/btc/bid-quote/1.0.0"
     }
 }
+
+pub type Message = RequestResponseMessage<(), BidQuote>;
 
 /// Represents a quote for buying XMR.
 #[derive(Serialize, Deserialize, Debug, Clone)]

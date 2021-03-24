@@ -3,16 +3,14 @@ use crate::database::Database;
 use crate::env::Config;
 use crate::monero::BalanceTooLow;
 use crate::network::quote::BidQuote;
-use crate::network::{spot_price, transport, TokioExecutor};
-use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State3, Swap, TransferProof};
-use crate::protocol::bob::EncryptedSignature;
-use crate::seed::Seed;
+use crate::network::{encrypted_signature, spot_price, transfer_proof};
+use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State3, Swap};
 use crate::{bitcoin, kraken, monero};
 use anyhow::{bail, Context, Result};
 use futures::future;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::{FuturesUnordered, StreamExt};
-use libp2p::core::Multiaddr;
+use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
 use rand::rngs::OsRng;
 use std::collections::HashMap;
@@ -25,7 +23,6 @@ use uuid::Uuid;
 #[allow(missing_debug_implementations)]
 pub struct EventLoop<RS> {
     swarm: libp2p::Swarm<Behaviour>,
-    peer_id: PeerId,
     env_config: Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
@@ -34,22 +31,25 @@ pub struct EventLoop<RS> {
     max_buy: bitcoin::Amount,
 
     /// Stores a sender per peer for incoming [`EncryptedSignature`]s.
-    recv_encrypted_signature: HashMap<PeerId, oneshot::Sender<EncryptedSignature>>,
+    recv_encrypted_signature: HashMap<PeerId, oneshot::Sender<encrypted_signature::Request>>,
     /// Stores a list of futures, waiting for transfer proof which will be sent
     /// to the given peer.
-    send_transfer_proof: FuturesUnordered<BoxFuture<'static, Result<(PeerId, TransferProof)>>>,
+    send_transfer_proof:
+        FuturesUnordered<BoxFuture<'static, Result<(PeerId, transfer_proof::Request)>>>,
 
     swap_sender: mpsc::Sender<Swap>,
+
+    /// Tracks [`transfer_proof::Request`]s which could not yet be sent because
+    /// we are currently disconnected from the peer.
+    buffered_transfer_proofs: HashMap<PeerId, transfer_proof::Request>,
 }
 
 impl<LR> EventLoop<LR>
 where
     LR: LatestRate,
 {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        listen_address: Multiaddr,
-        seed: Seed,
+        swarm: Swarm<Behaviour>,
         env_config: Config,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
@@ -57,25 +57,10 @@ where
         latest_rate: LR,
         max_buy: bitcoin::Amount,
     ) -> Result<(Self, mpsc::Receiver<Swap>)> {
-        let identity = seed.derive_libp2p_identity();
-        let behaviour = Behaviour::default();
-        let transport = transport::build(&identity)?;
-        let peer_id = PeerId::from(identity.public());
-
-        let mut swarm = libp2p::swarm::SwarmBuilder::new(transport, behaviour, peer_id)
-            .executor(Box::new(TokioExecutor {
-                handle: tokio::runtime::Handle::current(),
-            }))
-            .build();
-
-        Swarm::listen_on(&mut swarm, listen_address.clone())
-            .with_context(|| format!("Address is not supported: {:#}", listen_address))?;
-
         let swap_channel = MpscChannels::default();
 
         let event_loop = EventLoop {
             swarm,
-            peer_id,
             env_config,
             bitcoin_wallet,
             monero_wallet,
@@ -85,12 +70,13 @@ where
             max_buy,
             recv_encrypted_signature: Default::default(),
             send_transfer_proof: Default::default(),
+            buffered_transfer_proofs: Default::default(),
         };
         Ok((event_loop, swap_channel.receiver))
     }
 
     pub fn peer_id(&self) -> PeerId {
-        self.peer_id
+        *Swarm::local_peer_id(&self.swarm)
     }
 
     pub async fn run(mut self) {
@@ -100,13 +86,10 @@ where
 
         loop {
             tokio::select! {
-                swarm_event = self.swarm.next() => {
+                swarm_event = self.swarm.next_event() => {
                     match swarm_event {
-                        OutEvent::ConnectionEstablished(alice) => {
-                            debug!("Connection Established with {}", alice);
-                        }
-                        OutEvent::SpotPriceRequested { msg, channel, peer } => {
-                            let btc = msg.btc;
+                        SwarmEvent::Behaviour(OutEvent::SpotPriceRequested { request, channel, peer }) => {
+                            let btc = request.btc;
                             let xmr = match self.handle_spot_price_request(btc, self.monero_wallet.clone()).await {
                                 Ok(xmr) => xmr,
                                 Err(e) => {
@@ -131,7 +114,7 @@ where
                                 }
                             }
                         }
-                        OutEvent::QuoteRequested { channel, peer } => {
+                        SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer }) => {
                             let quote = match self.make_quote(self.max_buy).await {
                                 Ok(quote) => quote,
                                 Err(e) => {
@@ -149,13 +132,13 @@ where
                                 }
                             }
                         }
-                        OutEvent::ExecutionSetupDone{bob_peer_id, state3} => {
+                        SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone{bob_peer_id, state3}) => {
                             let _ = self.handle_execution_setup_done(bob_peer_id, *state3).await;
                         }
-                        OutEvent::TransferProofAcknowledged(peer) => {
+                        SwarmEvent::Behaviour(OutEvent::TransferProofAcknowledged(peer)) => {
                             trace!(%peer, "Bob acknowledged transfer proof");
                         }
-                        OutEvent::EncryptedSignature{ msg, channel, peer } => {
+                        SwarmEvent::Behaviour(OutEvent::EncryptedSignatureReceived{ msg, channel, peer }) => {
                             match self.recv_encrypted_signature.remove(&peer) {
                                 Some(sender) => {
                                     // this failing just means the receiver is no longer interested ...
@@ -166,20 +149,48 @@ where
                                 }
                             }
 
-                            if let Err(error) = self.swarm.send_encrypted_signature_ack(channel) {
-                                error!("Failed to send Encrypted Signature ack: {:?}", error);
-                            }
+                            self.swarm.send_encrypted_signature_ack(channel);
                         }
-                        OutEvent::ResponseSent => {}
-                        OutEvent::Failure {peer, error} => {
+                        SwarmEvent::Behaviour(OutEvent::ResponseSent) => {}
+                        SwarmEvent::Behaviour(OutEvent::Failure {peer, error}) => {
                             error!(%peer, "Communication error: {:#}", error);
                         }
+                        SwarmEvent::ConnectionEstablished { peer_id: peer, endpoint, .. } => {
+                            tracing::debug!(%peer, address = %endpoint.get_remote_address(), "New connection established");
+
+                            if let Some(transfer_proof) = self.buffered_transfer_proofs.remove(&peer) {
+                                tracing::debug!(%peer, "Found buffered transfer proof for peer");
+
+                                self.swarm
+                                    .send_transfer_proof(peer, transfer_proof)
+                                    .expect("must be able to send transfer proof after connection was established");
+                            }
+                        }
+                        SwarmEvent::IncomingConnectionError { send_back_addr: address, error, .. } => {
+                            tracing::warn!(%address, "Failed to set up connection with peer: {}", error);
+                        }
+                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause } if num_established == 0 => {
+                            match cause {
+                                Some(error) => {
+                                    tracing::warn!(%peer, address = %endpoint.get_remote_address(), "Lost connection: {}", error);
+                                },
+                                None => {
+                                    tracing::info!(%peer, address = %endpoint.get_remote_address(), "Successfully closed connection");
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 },
                 next_transfer_proof = self.send_transfer_proof.next() => {
                     match next_transfer_proof {
                         Some(Ok((peer, transfer_proof))) => {
-                            self.swarm.send_transfer_proof(peer, transfer_proof);
+                            let result = self.swarm.send_transfer_proof(peer, transfer_proof);
+
+                            if let Err(transfer_proof) = result {
+                                tracing::warn!(%peer, "No active connection to peer, buffering transfer proof");
+                                self.buffered_transfer_proofs.insert(peer, transfer_proof);
+                            }
                         },
                         Some(Err(_)) => {
                             tracing::debug!("A swap stopped without sending a transfer proof");
@@ -306,8 +317,8 @@ impl LatestRate for kraken::RateUpdateStream {
 
 #[derive(Debug)]
 pub struct EventLoopHandle {
-    recv_encrypted_signature: Option<oneshot::Receiver<EncryptedSignature>>,
-    send_transfer_proof: Option<oneshot::Sender<TransferProof>>,
+    recv_encrypted_signature: Option<oneshot::Receiver<encrypted_signature::Request>>,
+    send_transfer_proof: Option<oneshot::Sender<transfer_proof::Request>>,
 }
 
 impl EventLoopHandle {
@@ -327,7 +338,7 @@ impl EventLoopHandle {
             .send_transfer_proof
             .take()
             .context("Transfer proof was already sent")?
-            .send(TransferProof { tx_lock_proof: msg })
+            .send(transfer_proof::Request { tx_lock_proof: msg })
             .is_err()
         {
             bail!("Failed to send transfer proof, receiver no longer listening?")

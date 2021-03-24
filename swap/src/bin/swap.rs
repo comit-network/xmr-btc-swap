@@ -25,8 +25,9 @@ use swap::cli::command::{AliceConnectParams, Arguments, Command, Data, MoneroPar
 use swap::database::Database;
 use swap::env::{Config, GetConfig};
 use swap::network::quote::BidQuote;
+use swap::network::swarm;
 use swap::protocol::bob;
-use swap::protocol::bob::{Builder, EventLoop};
+use swap::protocol::bob::{Behaviour, Builder, EventLoop};
 use swap::seed::Seed;
 use swap::{bitcoin, env, monero};
 use tracing::{debug, error, info, warn, Level};
@@ -101,17 +102,17 @@ async fn main() -> Result<()> {
             }
 
             let bitcoin_wallet =
-                init_bitcoin_wallet(electrum_rpc_url, seed, data_dir.clone(), env_config).await?;
+                init_bitcoin_wallet(electrum_rpc_url, &seed, data_dir.clone(), env_config).await?;
             let (monero_wallet, _process) =
                 init_monero_wallet(data_dir, monero_daemon_host, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
-            let (event_loop, mut event_loop_handle) = EventLoop::new(
-                &seed.derive_libp2p_identity(),
-                alice_peer_id,
-                alice_addr,
-                bitcoin_wallet.clone(),
-            )?;
-            let handle = tokio::spawn(event_loop.run());
+
+            let mut swarm = swarm::new::<Behaviour>(&seed)?;
+            swarm.add_address(alice_peer_id, alice_addr);
+
+            let (event_loop, mut event_loop_handle) =
+                EventLoop::new(swarm, alice_peer_id, bitcoin_wallet.clone())?;
+            let event_loop = tokio::spawn(event_loop.run());
 
             let send_bitcoin = determine_btc_to_swap(
                 event_loop_handle.request_quote(),
@@ -142,13 +143,13 @@ async fn main() -> Result<()> {
             .with_init_params(send_bitcoin)
             .build()?;
 
-            let swap = bob::run(swap);
             tokio::select! {
-                event_loop_result = handle => {
-                    event_loop_result??;
+                result = event_loop => {
+                    result
+                        .context("EventLoop panicked")?;
                 },
-                swap_result = swap => {
-                    swap_result?;
+                result = bob::run(swap) => {
+                    result.context("Failed to complete swap")?;
                 }
             }
         }
@@ -183,17 +184,16 @@ async fn main() -> Result<()> {
             }
 
             let bitcoin_wallet =
-                init_bitcoin_wallet(electrum_rpc_url, seed, data_dir.clone(), env_config).await?;
+                init_bitcoin_wallet(electrum_rpc_url, &seed, data_dir.clone(), env_config).await?;
             let (monero_wallet, _process) =
                 init_monero_wallet(data_dir, monero_daemon_host, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
-            let (event_loop, event_loop_handle) = EventLoop::new(
-                &seed.derive_libp2p_identity(),
-                alice_peer_id,
-                alice_addr,
-                bitcoin_wallet.clone(),
-            )?;
+            let mut swarm = swarm::new::<Behaviour>(&seed)?;
+            swarm.add_address(alice_peer_id, alice_addr);
+
+            let (event_loop, event_loop_handle) =
+                EventLoop::new(swarm, alice_peer_id, bitcoin_wallet.clone())?;
             let handle = tokio::spawn(event_loop.run());
 
             let swap = Builder::new(
@@ -207,12 +207,11 @@ async fn main() -> Result<()> {
             )
             .build()?;
 
-            let swap = bob::run(swap);
             tokio::select! {
                 event_loop_result = handle => {
-                    event_loop_result??;
+                    event_loop_result?;
                 },
-                swap_result = swap => {
+                swap_result = bob::run(swap) => {
                     swap_result?;
                 }
             }
@@ -223,7 +222,7 @@ async fn main() -> Result<()> {
             electrum_rpc_url,
         } => {
             let bitcoin_wallet =
-                init_bitcoin_wallet(electrum_rpc_url, seed, data_dir, env_config).await?;
+                init_bitcoin_wallet(electrum_rpc_url, &seed, data_dir, env_config).await?;
 
             let resume_state = db.get_state(swap_id)?.try_into_bob()?.into();
             let cancel =
@@ -248,7 +247,7 @@ async fn main() -> Result<()> {
             electrum_rpc_url,
         } => {
             let bitcoin_wallet =
-                init_bitcoin_wallet(electrum_rpc_url, seed, data_dir, env_config).await?;
+                init_bitcoin_wallet(electrum_rpc_url, &seed, data_dir, env_config).await?;
 
             let resume_state = db.get_state(swap_id)?.try_into_bob()?.into();
 
@@ -260,7 +259,7 @@ async fn main() -> Result<()> {
 
 async fn init_bitcoin_wallet(
     electrum_rpc_url: Url,
-    seed: Seed,
+    seed: &Seed,
     data_dir: PathBuf,
     env_config: Config,
 ) -> Result<bitcoin::Wallet> {
@@ -314,7 +313,7 @@ async fn determine_btc_to_swap(
 ) -> Result<bitcoin::Amount> {
     debug!("Requesting quote");
 
-    let bid_quote = request_quote.await.context("Failed to request quote")?;
+    let bid_quote = request_quote.await?;
 
     info!("Received quote: 1 XMR ~ {}", bid_quote.price);
 

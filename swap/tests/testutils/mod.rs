@@ -7,9 +7,8 @@ use bitcoin_harness::{BitcoindRpcApi, Client};
 use futures::Future;
 use get_port::get_port;
 use libp2p::core::Multiaddr;
-use libp2p::PeerId;
+use libp2p::{PeerId, Swarm};
 use monero_harness::{image, Monero};
-use std::convert::Infallible;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -17,6 +16,7 @@ use swap::asb::FixedRate;
 use swap::bitcoin::{CancelTimelock, PunishTimelock};
 use swap::database::Database;
 use swap::env::{Config, GetConfig};
+use swap::network::swarm;
 use swap::protocol::alice::{AliceState, Swap};
 use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
@@ -43,7 +43,6 @@ pub struct StartingBalances {
     pub btc: bitcoin::Amount,
 }
 
-#[derive(Clone)]
 struct BobParams {
     seed: Seed,
     db_path: PathBuf,
@@ -71,16 +70,14 @@ impl BobParams {
     }
 
     pub fn new_eventloop(&self) -> Result<(bob::EventLoop, bob::EventLoopHandle)> {
-        bob::EventLoop::new(
-            &self.seed.derive_libp2p_identity(),
-            self.alice_peer_id,
-            self.alice_address.clone(),
-            self.bitcoin_wallet.clone(),
-        )
+        let mut swarm = swarm::new::<bob::Behaviour>(&self.seed)?;
+        swarm.add_address(self.alice_peer_id, self.alice_address.clone());
+
+        bob::EventLoop::new(swarm, self.alice_peer_id, self.bitcoin_wallet.clone())
     }
 }
 
-pub struct BobEventLoopJoinHandle(JoinHandle<Result<Infallible>>);
+pub struct BobEventLoopJoinHandle(JoinHandle<()>);
 
 impl BobEventLoopJoinHandle {
     pub fn abort(&self) {
@@ -385,9 +382,11 @@ where
     )
     .await;
 
+    let mut alice_swarm = swarm::new::<alice::Behaviour>(&alice_seed).unwrap();
+    Swarm::listen_on(&mut alice_swarm, alice_listen_address.clone()).unwrap();
+
     let (alice_event_loop, alice_swap_handle) = alice::EventLoop::new(
-        alice_listen_address.clone(),
-        alice_seed,
+        alice_swarm,
         env_config,
         alice_bitcoin_wallet.clone(),
         alice_monero_wallet.clone(),

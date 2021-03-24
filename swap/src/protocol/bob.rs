@@ -1,35 +1,31 @@
 use crate::database::Database;
 use crate::env::Config;
-use crate::network::{peer_tracker, spot_price};
-use crate::protocol::alice::TransferProof;
+use crate::network::{encrypted_signature, spot_price};
 use crate::protocol::bob;
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
 pub use execution_setup::{Message0, Message2, Message4};
 use libp2p::core::Multiaddr;
-use libp2p::request_response::{RequestResponseMessage, ResponseChannel};
+use libp2p::request_response::{RequestResponseEvent, RequestResponseMessage, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
 use std::sync::Arc;
 use tracing::debug;
 use uuid::Uuid;
 
 pub use self::cancel::cancel;
-pub use self::encrypted_signature::EncryptedSignature;
 pub use self::event_loop::{EventLoop, EventLoopHandle};
 pub use self::refund::refund;
 pub use self::state::*;
 pub use self::swap::{run, run_until};
-use crate::network::quote;
 use crate::network::quote::BidQuote;
+use crate::network::{quote, transfer_proof};
 
 pub mod cancel;
-mod encrypted_signature;
 pub mod event_loop;
 mod execution_setup;
 pub mod refund;
 pub mod state;
 pub mod swap;
-mod transfer_proof;
 
 pub struct Swap {
     pub state: BobState,
@@ -117,8 +113,8 @@ pub enum OutEvent {
     QuoteReceived(BidQuote),
     SpotPriceReceived(spot_price::Response),
     ExecutionSetupDone(Result<Box<State2>>),
-    TransferProof {
-        msg: Box<TransferProof>,
+    TransferProofReceived {
+        msg: Box<transfer_proof::Request>,
         channel: ResponseChannel<()>,
     },
     EncryptedSignatureAcknowledged,
@@ -126,11 +122,54 @@ pub enum OutEvent {
     CommunicationError(Error),
 }
 
-impl From<peer_tracker::OutEvent> for OutEvent {
-    fn from(event: peer_tracker::OutEvent) -> Self {
-        match event {
-            peer_tracker::OutEvent::ConnectionEstablished(id) => {
-                OutEvent::ConnectionEstablished(id)
+impl OutEvent {
+    fn unexpected_request() -> OutEvent {
+        OutEvent::CommunicationError(anyhow!("Unexpected request received"))
+    }
+
+    fn unexpected_response() -> OutEvent {
+        OutEvent::CommunicationError(anyhow!("Unexpected response received"))
+    }
+}
+
+impl From<quote::Message> for OutEvent {
+    fn from(message: quote::Message) -> Self {
+        match message {
+            quote::Message::Request { .. } => OutEvent::unexpected_request(),
+            quote::Message::Response { response, .. } => OutEvent::QuoteReceived(response),
+        }
+    }
+}
+
+impl From<spot_price::Message> for OutEvent {
+    fn from(message: spot_price::Message) -> Self {
+        match message {
+            spot_price::Message::Request { .. } => OutEvent::unexpected_request(),
+            spot_price::Message::Response { response, .. } => OutEvent::SpotPriceReceived(response),
+        }
+    }
+}
+
+impl From<transfer_proof::Message> for OutEvent {
+    fn from(message: transfer_proof::Message) -> Self {
+        match message {
+            transfer_proof::Message::Request {
+                request, channel, ..
+            } => OutEvent::TransferProofReceived {
+                msg: Box::new(request),
+                channel,
+            },
+            transfer_proof::Message::Response { .. } => OutEvent::unexpected_response(),
+        }
+    }
+}
+
+impl From<encrypted_signature::Message> for OutEvent {
+    fn from(message: encrypted_signature::Message) -> Self {
+        match message {
+            encrypted_signature::Message::Request { .. } => OutEvent::unexpected_request(),
+            encrypted_signature::Message::Response { .. } => {
+                OutEvent::EncryptedSignatureAcknowledged
             }
         }
     }
@@ -138,65 +177,47 @@ impl From<peer_tracker::OutEvent> for OutEvent {
 
 impl From<spot_price::OutEvent> for OutEvent {
     fn from(event: spot_price::OutEvent) -> Self {
-        match event {
-            spot_price::OutEvent::Message {
-                message: RequestResponseMessage::Response { response, .. },
-                ..
-            } => OutEvent::SpotPriceReceived(response),
-            spot_price::OutEvent::Message {
-                message: RequestResponseMessage::Request { .. },
-                ..
-            } => OutEvent::CommunicationError(anyhow!(
-                "Bob is only meant to receive spot prices, not hand them out"
-            )),
-            spot_price::OutEvent::ResponseSent { .. } => OutEvent::ResponseSent,
-            spot_price::OutEvent::InboundFailure { peer, error, .. } => {
-                OutEvent::CommunicationError(anyhow!(
-                    "spot_price protocol with peer {} failed due to {:?}",
-                    peer,
-                    error
-                ))
-            }
-            spot_price::OutEvent::OutboundFailure { peer, error, .. } => {
-                OutEvent::CommunicationError(anyhow!(
-                    "spot_price protocol with peer {} failed due to {:?}",
-                    peer,
-                    error
-                ))
-            }
-        }
+        map_rr_event_to_outevent(event)
     }
 }
 
 impl From<quote::OutEvent> for OutEvent {
     fn from(event: quote::OutEvent) -> Self {
-        match event {
-            quote::OutEvent::Message {
-                message: RequestResponseMessage::Response { response, .. },
-                ..
-            } => OutEvent::QuoteReceived(response),
-            quote::OutEvent::Message {
-                message: RequestResponseMessage::Request { .. },
-                ..
-            } => OutEvent::CommunicationError(anyhow!(
-                "Bob is only meant to receive quotes, not hand them out"
-            )),
-            quote::OutEvent::ResponseSent { .. } => OutEvent::ResponseSent,
-            quote::OutEvent::InboundFailure { peer, error, .. } => {
-                OutEvent::CommunicationError(anyhow!(
-                    "quote protocol with peer {} failed due to {:?}",
-                    peer,
-                    error
-                ))
-            }
-            quote::OutEvent::OutboundFailure { peer, error, .. } => {
-                OutEvent::CommunicationError(anyhow!(
-                    "quote protocol with peer {} failed due to {:?}",
-                    peer,
-                    error
-                ))
-            }
-        }
+        map_rr_event_to_outevent(event)
+    }
+}
+
+impl From<transfer_proof::OutEvent> for OutEvent {
+    fn from(event: transfer_proof::OutEvent) -> Self {
+        map_rr_event_to_outevent(event)
+    }
+}
+
+impl From<encrypted_signature::OutEvent> for OutEvent {
+    fn from(event: encrypted_signature::OutEvent) -> Self {
+        map_rr_event_to_outevent(event)
+    }
+}
+
+fn map_rr_event_to_outevent<I, O>(event: RequestResponseEvent<I, O>) -> OutEvent
+where
+    OutEvent: From<RequestResponseMessage<I, O>>,
+{
+    use RequestResponseEvent::*;
+
+    match event {
+        Message { message, .. } => OutEvent::from(message),
+        ResponseSent { .. } => OutEvent::ResponseSent,
+        InboundFailure { peer, error, .. } => OutEvent::CommunicationError(anyhow!(
+            "protocol with peer {} failed due to {:?}",
+            peer,
+            error
+        )),
+        OutboundFailure { peer, error, .. } => OutEvent::CommunicationError(anyhow!(
+            "protocol with peer {} failed due to {:?}",
+            peer,
+            error
+        )),
     }
 }
 
@@ -208,40 +229,11 @@ impl From<execution_setup::OutEvent> for OutEvent {
     }
 }
 
-impl From<transfer_proof::OutEvent> for OutEvent {
-    fn from(event: transfer_proof::OutEvent) -> Self {
-        use transfer_proof::OutEvent::*;
-        match event {
-            MsgReceived { msg, channel } => OutEvent::TransferProof {
-                msg: Box::new(msg),
-                channel,
-            },
-            AckSent => OutEvent::ResponseSent,
-            Failure(err) => {
-                OutEvent::CommunicationError(err.context("Failure with Transfer Proof"))
-            }
-        }
-    }
-}
-
-impl From<encrypted_signature::OutEvent> for OutEvent {
-    fn from(event: encrypted_signature::OutEvent) -> Self {
-        use encrypted_signature::OutEvent::*;
-        match event {
-            Acknowledged => OutEvent::EncryptedSignatureAcknowledged,
-            Failure(err) => {
-                OutEvent::CommunicationError(err.context("Failure with Encrypted Signature"))
-            }
-        }
-    }
-}
-
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Bob.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    pt: peer_tracker::Behaviour,
     quote: quote::Behaviour,
     spot_price: spot_price::Behaviour,
     execution_setup: execution_setup::Behaviour,
@@ -252,12 +244,11 @@ pub struct Behaviour {
 impl Default for Behaviour {
     fn default() -> Self {
         Self {
-            pt: Default::default(),
             quote: quote::bob(),
             spot_price: spot_price::bob(),
             execution_setup: Default::default(),
-            transfer_proof: Default::default(),
-            encrypted_signature: Default::default(),
+            transfer_proof: transfer_proof::bob(),
+            encrypted_signature: encrypted_signature::bob(),
         }
     }
 }
@@ -286,13 +277,16 @@ impl Behaviour {
         alice: PeerId,
         tx_redeem_encsig: bitcoin::EncryptedSignature,
     ) {
-        let msg = EncryptedSignature { tx_redeem_encsig };
-        self.encrypted_signature.send(alice, msg);
+        let msg = encrypted_signature::Request { tx_redeem_encsig };
+        self.encrypted_signature.send_request(&alice, msg);
         debug!("Encrypted signature sent");
     }
 
     /// Add a known address for the given peer
     pub fn add_address(&mut self, peer_id: PeerId, address: Multiaddr) {
-        self.pt.add_address(peer_id, address)
+        self.quote.add_address(&peer_id, address.clone());
+        self.spot_price.add_address(&peer_id, address.clone());
+        self.transfer_proof.add_address(&peer_id, address.clone());
+        self.encrypted_signature.add_address(&peer_id, address);
     }
 }

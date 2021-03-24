@@ -69,8 +69,6 @@ async fn run_until_internal(
         BobState::Started { btc_amount } => {
             let bitcoin_refund_address = bitcoin_wallet.new_address().await?;
 
-            event_loop_handle.dial().await?;
-
             let state2 = request_price_and_setup(
                 btc_amount,
                 &mut event_loop_handle,
@@ -82,8 +80,6 @@ async fn run_until_internal(
             BobState::ExecutionSetupDone(state2)
         }
         BobState::ExecutionSetupDone(state2) => {
-            // Do not lock Bitcoin if not connected to Alice.
-            event_loop_handle.dial().await?;
             // Alice and Bob have exchanged info
             let (state3, tx_lock) = state2.lock_btc().await?;
             let signed_tx = bitcoin_wallet
@@ -98,8 +94,6 @@ async fn run_until_internal(
         // Watch for Alice to Lock Xmr or for cancel timelock to elapse
         BobState::BtcLocked(state3) => {
             if let ExpiredTimelocks::None = state3.current_epoch(bitcoin_wallet.as_ref()).await? {
-                event_loop_handle.dial().await?;
-
                 let transfer_proof_watcher = event_loop_handle.recv_transfer_proof();
                 let cancel_timelock_expires =
                     state3.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
@@ -140,8 +134,6 @@ async fn run_until_internal(
             monero_wallet_restore_blockheight,
         } => {
             if let ExpiredTimelocks::None = state.current_epoch(bitcoin_wallet.as_ref()).await? {
-                event_loop_handle.dial().await?;
-
                 let watch_request = state.lock_xmr_watch_request(lock_transfer_proof);
 
                 select! {
@@ -166,7 +158,6 @@ async fn run_until_internal(
         }
         BobState::XmrLocked(state) => {
             if let ExpiredTimelocks::None = state.expired_timelock(bitcoin_wallet.as_ref()).await? {
-                event_loop_handle.dial().await?;
                 // Alice has locked Xmr
                 // Bob sends Alice his key
 

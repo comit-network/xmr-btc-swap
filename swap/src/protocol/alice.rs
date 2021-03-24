@@ -11,16 +11,13 @@ pub use self::event_loop::{EventLoop, EventLoopHandle};
 pub use self::execution_setup::Message1;
 pub use self::state::*;
 pub use self::swap::{run, run_until};
-pub use self::transfer_proof::TransferProof;
 pub use execution_setup::Message3;
 
 mod behaviour;
-mod encrypted_signature;
 pub mod event_loop;
 mod execution_setup;
 pub mod state;
 pub mod swap;
-mod transfer_proof;
 
 pub struct Swap {
     pub state: AliceState,

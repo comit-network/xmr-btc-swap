@@ -1,8 +1,9 @@
-use crate::network::request_response::CborCodec;
+use crate::network::cbor_request_response::CborCodec;
 use crate::{bitcoin, monero};
 use libp2p::core::ProtocolName;
 use libp2p::request_response::{
     ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
+    RequestResponseMessage,
 };
 use serde::{Deserialize, Serialize};
 
@@ -38,6 +39,8 @@ pub struct Response {
 }
 
 pub type Behaviour = RequestResponse<CborCodec<SpotPriceProtocol, Request, Response>>;
+
+pub type Message = RequestResponseMessage<Request, Response>;
 
 /// Constructs a new instance of the `spot-price` behaviour to be used by Alice.
 ///

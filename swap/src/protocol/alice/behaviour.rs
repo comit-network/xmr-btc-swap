@@ -1,22 +1,18 @@
 use crate::env::Config;
 use crate::network::quote::BidQuote;
-use crate::network::{peer_tracker, quote, spot_price};
-use crate::protocol::alice::{
-    encrypted_signature, execution_setup, transfer_proof, State0, State3, TransferProof,
-};
-use crate::protocol::bob::EncryptedSignature;
+use crate::network::{encrypted_signature, quote, spot_price, transfer_proof};
+use crate::protocol::alice::{execution_setup, State0, State3};
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
-use libp2p::request_response::{RequestResponseMessage, ResponseChannel};
+use libp2p::request_response::{RequestResponseEvent, RequestResponseMessage, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
 use rand::{CryptoRng, RngCore};
 use tracing::debug;
 
 #[derive(Debug)]
 pub enum OutEvent {
-    ConnectionEstablished(PeerId),
     SpotPriceRequested {
-        msg: spot_price::Request,
+        request: spot_price::Request,
         channel: ResponseChannel<spot_price::Response>,
         peer: PeerId,
     },
@@ -29,8 +25,8 @@ pub enum OutEvent {
         state3: Box<State3>,
     },
     TransferProofAcknowledged(PeerId),
-    EncryptedSignature {
-        msg: Box<EncryptedSignature>,
+    EncryptedSignatureReceived {
+        msg: Box<encrypted_signature::Request>,
         channel: ResponseChannel<()>,
         peer: PeerId,
     },
@@ -41,72 +37,111 @@ pub enum OutEvent {
     },
 }
 
-impl From<peer_tracker::OutEvent> for OutEvent {
-    fn from(event: peer_tracker::OutEvent) -> Self {
-        match event {
-            peer_tracker::OutEvent::ConnectionEstablished(id) => {
-                OutEvent::ConnectionEstablished(id)
-            }
+impl OutEvent {
+    fn unexpected_request(peer: PeerId) -> OutEvent {
+        OutEvent::Failure {
+            peer,
+            error: anyhow!("Unexpected request received"),
+        }
+    }
+
+    fn unexpected_response(peer: PeerId) -> OutEvent {
+        OutEvent::Failure {
+            peer,
+            error: anyhow!("Unexpected response received"),
+        }
+    }
+}
+
+impl From<(PeerId, quote::Message)> for OutEvent {
+    fn from((peer, message): (PeerId, quote::Message)) -> Self {
+        match message {
+            quote::Message::Request { channel, .. } => OutEvent::QuoteRequested { channel, peer },
+            quote::Message::Response { .. } => OutEvent::unexpected_response(peer),
+        }
+    }
+}
+
+impl From<(PeerId, spot_price::Message)> for OutEvent {
+    fn from((peer, message): (PeerId, spot_price::Message)) -> Self {
+        match message {
+            spot_price::Message::Request {
+                request, channel, ..
+            } => OutEvent::SpotPriceRequested {
+                request,
+                channel,
+                peer,
+            },
+            spot_price::Message::Response { .. } => OutEvent::unexpected_response(peer),
+        }
+    }
+}
+
+impl From<(PeerId, transfer_proof::Message)> for OutEvent {
+    fn from((peer, message): (PeerId, transfer_proof::Message)) -> Self {
+        match message {
+            transfer_proof::Message::Request { .. } => OutEvent::unexpected_request(peer),
+            transfer_proof::Message::Response { .. } => OutEvent::TransferProofAcknowledged(peer),
+        }
+    }
+}
+
+impl From<(PeerId, encrypted_signature::Message)> for OutEvent {
+    fn from((peer, message): (PeerId, encrypted_signature::Message)) -> Self {
+        match message {
+            encrypted_signature::Message::Request {
+                request, channel, ..
+            } => OutEvent::EncryptedSignatureReceived {
+                msg: Box::new(request),
+                channel,
+                peer,
+            },
+            encrypted_signature::Message::Response { .. } => OutEvent::unexpected_response(peer),
         }
     }
 }
 
 impl From<spot_price::OutEvent> for OutEvent {
     fn from(event: spot_price::OutEvent) -> Self {
-        match event {
-            spot_price::OutEvent::Message {
-                peer,
-                message:
-                    RequestResponseMessage::Request {
-                        channel,
-                        request: msg,
-                        ..
-                    },
-            } => OutEvent::SpotPriceRequested { msg, channel, peer },
-            spot_price::OutEvent::Message {
-                message: RequestResponseMessage::Response { .. },
-                peer,
-            } => OutEvent::Failure {
-                error: anyhow!("Alice is only meant to hand out spot prices, not receive them"),
-                peer,
-            },
-            spot_price::OutEvent::ResponseSent { .. } => OutEvent::ResponseSent,
-            spot_price::OutEvent::InboundFailure { peer, error, .. } => OutEvent::Failure {
-                error: anyhow!("spot_price protocol failed due to {:?}", error),
-                peer,
-            },
-            spot_price::OutEvent::OutboundFailure { peer, error, .. } => OutEvent::Failure {
-                error: anyhow!("spot_price protocol failed due to {:?}", error),
-                peer,
-            },
-        }
+        map_rr_event_to_outevent(event)
     }
 }
 
 impl From<quote::OutEvent> for OutEvent {
     fn from(event: quote::OutEvent) -> Self {
-        match event {
-            quote::OutEvent::Message {
-                peer,
-                message: RequestResponseMessage::Request { channel, .. },
-            } => OutEvent::QuoteRequested { channel, peer },
-            quote::OutEvent::Message {
-                message: RequestResponseMessage::Response { .. },
-                peer,
-            } => OutEvent::Failure {
-                error: anyhow!("Alice is only meant to hand out quotes, not receive them"),
-                peer,
-            },
-            quote::OutEvent::ResponseSent { .. } => OutEvent::ResponseSent,
-            quote::OutEvent::InboundFailure { peer, error, .. } => OutEvent::Failure {
-                error: anyhow!("quote protocol failed due to {:?}", error),
-                peer,
-            },
-            quote::OutEvent::OutboundFailure { peer, error, .. } => OutEvent::Failure {
-                error: anyhow!("quote protocol failed due to {:?}", error),
-                peer,
-            },
-        }
+        map_rr_event_to_outevent(event)
+    }
+}
+
+impl From<transfer_proof::OutEvent> for OutEvent {
+    fn from(event: transfer_proof::OutEvent) -> Self {
+        map_rr_event_to_outevent(event)
+    }
+}
+
+impl From<encrypted_signature::OutEvent> for OutEvent {
+    fn from(event: encrypted_signature::OutEvent) -> Self {
+        map_rr_event_to_outevent(event)
+    }
+}
+
+fn map_rr_event_to_outevent<I, O>(event: RequestResponseEvent<I, O>) -> OutEvent
+where
+    OutEvent: From<(PeerId, RequestResponseMessage<I, O>)>,
+{
+    use RequestResponseEvent::*;
+
+    match event {
+        Message { message, peer, .. } => OutEvent::from((peer, message)),
+        ResponseSent { .. } => OutEvent::ResponseSent,
+        InboundFailure { peer, error, .. } => OutEvent::Failure {
+            error: anyhow!("protocol failed due to {:?}", error),
+            peer,
+        },
+        OutboundFailure { peer, error, .. } => OutEvent::Failure {
+            error: anyhow!("protocol failed due to {:?}", error),
+            peer,
+        },
     }
 }
 
@@ -126,43 +161,11 @@ impl From<execution_setup::OutEvent> for OutEvent {
     }
 }
 
-impl From<transfer_proof::OutEvent> for OutEvent {
-    fn from(event: transfer_proof::OutEvent) -> Self {
-        use crate::protocol::alice::transfer_proof::OutEvent::*;
-        match event {
-            Acknowledged(peer) => OutEvent::TransferProofAcknowledged(peer),
-            Failure { peer, error } => OutEvent::Failure {
-                peer,
-                error: error.context("Failure with Transfer Proof"),
-            },
-        }
-    }
-}
-
-impl From<encrypted_signature::OutEvent> for OutEvent {
-    fn from(event: encrypted_signature::OutEvent) -> Self {
-        use crate::protocol::alice::encrypted_signature::OutEvent::*;
-        match event {
-            MsgReceived { msg, channel, peer } => OutEvent::EncryptedSignature {
-                msg: Box::new(msg),
-                channel,
-                peer,
-            },
-            AckSent => OutEvent::ResponseSent,
-            Failure { peer, error } => OutEvent::Failure {
-                peer,
-                error: error.context("Failure with Encrypted Signature"),
-            },
-        }
-    }
-}
-
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Alice.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    pt: peer_tracker::Behaviour,
     quote: quote::Behaviour,
     spot_price: spot_price::Behaviour,
     execution_setup: execution_setup::Behaviour,
@@ -173,12 +176,11 @@ pub struct Behaviour {
 impl Default for Behaviour {
     fn default() -> Self {
         Self {
-            pt: Default::default(),
             quote: quote::alice(),
             spot_price: spot_price::alice(),
             execution_setup: Default::default(),
-            transfer_proof: Default::default(),
-            encrypted_signature: Default::default(),
+            transfer_proof: transfer_proof::alice(),
+            encrypted_signature: encrypted_signature::alice(),
         }
     }
 }
@@ -231,12 +233,25 @@ impl Behaviour {
     }
 
     /// Send Transfer Proof to Bob.
-    pub fn send_transfer_proof(&mut self, bob: PeerId, msg: TransferProof) {
-        self.transfer_proof.send(bob, msg);
-        debug!("Sent Transfer Proof");
+    ///
+    /// Fails and returns the transfer proof if we are currently not connected
+    /// to this peer.
+    pub fn send_transfer_proof(
+        &mut self,
+        bob: PeerId,
+        msg: transfer_proof::Request,
+    ) -> Result<(), transfer_proof::Request> {
+        if !self.transfer_proof.is_connected(&bob) {
+            return Err(msg);
+        }
+        self.transfer_proof.send_request(&bob, msg);
+
+        debug!("Sending Transfer Proof");
+
+        Ok(())
     }
 
-    pub fn send_encrypted_signature_ack(&mut self, channel: ResponseChannel<()>) -> Result<()> {
-        self.encrypted_signature.send_ack(channel)
+    pub fn send_encrypted_signature_ack(&mut self, channel: ResponseChannel<()>) {
+        let _ = self.encrypted_signature.send_response(channel, ());
     }
 }
