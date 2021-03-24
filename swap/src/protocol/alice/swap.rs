@@ -1,8 +1,7 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use crate::bitcoin::{ExpiredTimelocks, TxRedeem};
+use crate::bitcoin::ExpiredTimelocks;
 use crate::env::Config;
-use crate::monero_ext::ScalarExt;
 use crate::protocol::alice;
 use crate::protocol::alice::event_loop::EventLoopHandle;
 use crate::protocol::alice::AliceState;
@@ -158,12 +157,7 @@ async fn next_state(
         } => match state3.expired_timelocks(bitcoin_wallet).await? {
             ExpiredTimelocks::None => {
                 let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
-                match TxRedeem::new(&state3.tx_lock, &state3.redeem_address).complete(
-                    *encrypted_signature,
-                    state3.a.clone(),
-                    state3.s_a.to_secpfun_scalar(),
-                    state3.B,
-                ) {
+                match state3.signed_redeem_transaction(*encrypted_signature) {
                     Ok(tx) => match bitcoin_wallet.broadcast(tx, "redeem").await {
                         Ok((_, subscription)) => match subscription.wait_until_final().await {
                             Ok(_) => AliceState::BtcRedeemed,
@@ -205,18 +199,14 @@ async fn next_state(
             state3,
             monero_wallet_restore_blockheight,
         } => {
-            let tx_cancel = state3.tx_cancel();
+            let transaction = state3.signed_cancel_transaction()?;
 
             // If Bob hasn't yet broadcasted the tx cancel, we do it
             if bitcoin_wallet
-                .get_raw_transaction(tx_cancel.txid())
+                .get_raw_transaction(transaction.txid())
                 .await
                 .is_err()
             {
-                let transaction = tx_cancel
-                    .complete_as_alice(state3.a.clone(), state3.B, state3.tx_cancel_sig_bob.clone())
-                    .context("Failed to complete Bitcoin cancel transaction")?;
-
                 if let Err(e) = bitcoin_wallet.broadcast(transaction, "cancel").await {
                     tracing::debug!(
                         "Assuming transaction is already broadcasted because: {:#}",
@@ -243,14 +233,9 @@ async fn next_state(
             select! {
                 seen_refund = tx_refund_status.wait_until_seen() => {
                     seen_refund.context("Failed to monitor refund transaction")?;
-                    let published_refund_tx = bitcoin_wallet.get_raw_transaction(state3.tx_refund().txid()).await?;
 
-                    let spend_key = state3.tx_refund().extract_monero_private_key(
-                        published_refund_tx,
-                        state3.s_a,
-                        state3.a.clone(),
-                        state3.S_b_bitcoin,
-                    )?;
+                    let published_refund_tx = bitcoin_wallet.get_raw_transaction(state3.tx_refund().txid()).await?;
+                    let spend_key = state3.extract_monero_private_key(published_refund_tx)?;
 
                     AliceState::BtcRefunded {
                         spend_key,
@@ -283,11 +268,7 @@ async fn next_state(
             state3,
             monero_wallet_restore_blockheight,
         } => {
-            let signed_tx_punish = state3.tx_punish().complete(
-                state3.tx_punish_sig_bob.clone(),
-                state3.a.clone(),
-                state3.B,
-            )?;
+            let signed_tx_punish = state3.signed_punish_transaction()?;
 
             let punish = async {
                 let (txid, subscription) =
@@ -313,16 +294,11 @@ async fn next_state(
                     // because a punish tx failure is not recoverable (besides re-trying) if the
                     // refund tx was not included.
 
-                    let tx_refund = state3.tx_refund();
-                    let published_refund_tx =
-                        bitcoin_wallet.get_raw_transaction(tx_refund.txid()).await?;
+                    let published_refund_tx = bitcoin_wallet
+                        .get_raw_transaction(state3.tx_refund().txid())
+                        .await?;
 
-                    let spend_key = tx_refund.extract_monero_private_key(
-                        published_refund_tx,
-                        state3.s_a,
-                        state3.a.clone(),
-                        state3.S_b_bitcoin,
-                    )?;
+                    let spend_key = state3.extract_monero_private_key(published_refund_tx)?;
 
                     AliceState::BtcRefunded {
                         spend_key,
