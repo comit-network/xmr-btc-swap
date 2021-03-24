@@ -21,6 +21,12 @@ jobs:
       - name: Give GitHub some time to process the deletion, otherwise our release shows up as draft. Sigh.
         run: sleep 10
 
+      - name: Extract changelog section for release
+        id: changelog
+        uses: coditory/changelog-parser@v1
+        with:
+          version: unreleased
+
       - name: Create 'preview' release
         uses: actions/create-release@v1
         env:
@@ -30,4 +36,4 @@ jobs:
           release_name: preview
           draft: false
           prerelease: true
-          body: Preview release of `asb` and `swap`
+          body: ${{ steps.changelog.outputs.description }}
