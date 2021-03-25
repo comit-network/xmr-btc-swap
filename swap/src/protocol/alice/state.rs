@@ -22,7 +22,17 @@ pub enum AliceState {
     BtcLocked {
         state3: Box<State3>,
     },
+    XmrLockTransactionSent {
+        monero_wallet_restore_blockheight: BlockHeight,
+        transfer_proof: TransferProof,
+        state3: Box<State3>,
+    },
     XmrLocked {
+        monero_wallet_restore_blockheight: BlockHeight,
+        transfer_proof: TransferProof,
+        state3: Box<State3>,
+    },
+    XmrLockTransferProofSent {
         monero_wallet_restore_blockheight: BlockHeight,
         state3: Box<State3>,
     },
@@ -59,7 +69,11 @@ impl fmt::Display for AliceState {
         match self {
             AliceState::Started { .. } => write!(f, "started"),
             AliceState::BtcLocked { .. } => write!(f, "btc is locked"),
+            AliceState::XmrLockTransactionSent { .. } => write!(f, "xmr lock transaction sent"),
             AliceState::XmrLocked { .. } => write!(f, "xmr is locked"),
+            AliceState::XmrLockTransferProofSent { .. } => {
+                write!(f, "xmr lock transfer proof sent")
+            }
             AliceState::EncSigLearned { .. } => write!(f, "encrypted signature is learned"),
             AliceState::BtcRedeemed => write!(f, "btc is redeemed"),
             AliceState::BtcCancelled { .. } => write!(f, "btc is cancelled"),

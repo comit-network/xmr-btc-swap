@@ -1,6 +1,6 @@
 use crate::bitcoin::EncryptedSignature;
 use crate::monero;
-use crate::monero::monero_private_key;
+use crate::monero::{monero_private_key, TransferProof};
 use crate::protocol::alice;
 use crate::protocol::alice::AliceState;
 use ::bitcoin::hashes::core::fmt::Display;
@@ -18,7 +18,17 @@ pub enum Alice {
     BtcLocked {
         state3: alice::State3,
     },
+    XmrLockTransactionSent {
+        monero_wallet_restore_blockheight: BlockHeight,
+        transfer_proof: TransferProof,
+        state3: alice::State3,
+    },
     XmrLocked {
+        monero_wallet_restore_blockheight: BlockHeight,
+        transfer_proof: TransferProof,
+        state3: alice::State3,
+    },
+    XmrLockTransferProofSent {
         monero_wallet_restore_blockheight: BlockHeight,
         state3: alice::State3,
     },
@@ -65,10 +75,28 @@ impl From<&AliceState> for Alice {
             AliceState::BtcLocked { state3 } => Alice::BtcLocked {
                 state3: state3.as_ref().clone(),
             },
+            AliceState::XmrLockTransactionSent {
+                monero_wallet_restore_blockheight,
+                transfer_proof,
+                state3,
+            } => Alice::XmrLockTransactionSent {
+                monero_wallet_restore_blockheight: *monero_wallet_restore_blockheight,
+                transfer_proof: transfer_proof.clone(),
+                state3: state3.as_ref().clone(),
+            },
             AliceState::XmrLocked {
                 monero_wallet_restore_blockheight,
+                transfer_proof,
                 state3,
             } => Alice::XmrLocked {
+                monero_wallet_restore_blockheight: *monero_wallet_restore_blockheight,
+                transfer_proof: transfer_proof.clone(),
+                state3: state3.as_ref().clone(),
+            },
+            AliceState::XmrLockTransferProofSent {
+                monero_wallet_restore_blockheight,
+                state3,
+            } => Alice::XmrLockTransferProofSent {
                 monero_wallet_restore_blockheight: *monero_wallet_restore_blockheight,
                 state3: state3.as_ref().clone(),
             },
@@ -130,10 +158,28 @@ impl From<Alice> for AliceState {
             Alice::BtcLocked { state3 } => AliceState::BtcLocked {
                 state3: Box::new(state3),
             },
+            Alice::XmrLockTransactionSent {
+                monero_wallet_restore_blockheight,
+                transfer_proof,
+                state3,
+            } => AliceState::XmrLockTransactionSent {
+                monero_wallet_restore_blockheight,
+                transfer_proof,
+                state3: Box::new(state3),
+            },
             Alice::XmrLocked {
                 monero_wallet_restore_blockheight,
+                transfer_proof,
                 state3,
             } => AliceState::XmrLocked {
+                monero_wallet_restore_blockheight,
+                transfer_proof,
+                state3: Box::new(state3),
+            },
+            Alice::XmrLockTransferProofSent {
+                monero_wallet_restore_blockheight,
+                state3,
+            } => AliceState::XmrLockTransferProofSent {
                 monero_wallet_restore_blockheight,
                 state3: Box::new(state3),
             },
@@ -192,7 +238,11 @@ impl Display for Alice {
         match self {
             Alice::Started { .. } => write!(f, "Started"),
             Alice::BtcLocked { .. } => f.write_str("Bitcoin locked"),
+            Alice::XmrLockTransactionSent { .. } => f.write_str("Monero lock transaction sent"),
             Alice::XmrLocked { .. } => f.write_str("Monero locked"),
+            Alice::XmrLockTransferProofSent { .. } => {
+                f.write_str("Monero lock transfer proof sent")
+            }
             Alice::CancelTimelockExpired { .. } => f.write_str("Cancel timelock is expired"),
             Alice::BtcCancelled { .. } => f.write_str("Bitcoin cancel transaction published"),
             Alice::BtcPunishable { .. } => f.write_str("Bitcoin punishable"),
