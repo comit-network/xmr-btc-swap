@@ -2,11 +2,13 @@ use ::monero::Network;
 use anyhow::{Context, Result};
 use big_bytes::BigByte;
 use futures::{StreamExt, TryStreamExt};
+use monero_rpc::wallet::Client;
 use reqwest::header::CONTENT_LENGTH;
 use reqwest::Url;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::time::Duration;
 use tokio::fs::{remove_file, OpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
@@ -146,11 +148,15 @@ impl WalletRpc {
 
         let mut reader = BufReader::new(stdout).lines();
 
-        while let Some(line) = reader.next_line().await? {
-            if line.contains("Starting wallet RPC server") {
-                break;
-            }
+        // If we do not hear from the monero_wallet_rpc process for 3 seconds we assume
+        // it is is ready
+        while let Ok(line) = tokio::time::timeout(Duration::from_secs(3), reader.next_line()).await
+        {
+            line?;
         }
+
+        // Send a json rpc request to make sure monero_wallet_rpc is ready
+        Client::localhost(port).get_version().await?;
 
         Ok(WalletRpcProcess {
             _child: child,

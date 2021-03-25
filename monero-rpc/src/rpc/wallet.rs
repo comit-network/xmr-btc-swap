@@ -357,6 +357,24 @@ impl Client {
         let r = serde_json::from_str::<Response<SweepAll>>(&response)?;
         Ok(r.result)
     }
+
+    pub async fn get_version(&self) -> Result<Version> {
+        let request = Request::new("get_version", "");
+
+        let response = self
+            .inner
+            .post(self.url.clone())
+            .json(&request)
+            .send()
+            .await?
+            .text()
+            .await?;
+
+        debug!("get_version RPC response: {}", response);
+
+        let r = serde_json::from_str::<Response<Version>>(&response)?;
+        Ok(r.result)
+    }
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -510,6 +528,11 @@ pub struct SweepAll {
     pub tx_hash_list: Vec<String>,
     unsigned_txset: String,
     weight_list: Vec<u32>,
+}
+
+#[derive(Debug, Copy, Clone, Deserialize)]
+pub struct Version {
+    version: u32,
 }
 
 #[cfg(test)]
