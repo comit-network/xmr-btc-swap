@@ -1,12 +1,12 @@
-name: "Release swap and asb"
+name: "Build swap and asb release binaries"
 
 on:
   release:
     types: [created]
 
 jobs:
-  release:
-    name: Release swap
+  build_binaries:
+    name: Build swap and asb binaries
     strategy:
       matrix:
         include:

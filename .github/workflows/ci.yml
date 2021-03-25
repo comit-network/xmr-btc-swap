@@ -1,12 +1,12 @@
 name: CI
 
 on:
-  pull_request:
+  pull_request: # Need to run on pull-requests, otherwise PRs from forks don't run
   push:
     branches:
-      - 'staging'
-      - 'trying'
-      - 'master'
+      - 'staging' # Bors uses this branch
+      - 'trying' # Bors uses this branch
+      - 'master' # Always build head of master for the badge in the README
 
 jobs:
   static_analysis:
@@ -30,6 +30,9 @@ jobs:
 
       - name: Check code formatting
         run: cargo fmt --all -- --check
+
+      - name: Check markdown formatting
+        uses: dprint/check@v1
 
       - name: Run clippy with default features
         run: cargo clippy --workspace --all-targets -- -D warnings
