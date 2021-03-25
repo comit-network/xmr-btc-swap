@@ -8,7 +8,6 @@ use reqwest::Url;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::time::Duration;
 use tokio::fs::{remove_file, OpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
@@ -125,6 +124,7 @@ impl WalletRpc {
         tracing::debug!("Starting monero-wallet-rpc on port {}", port);
 
         let mut child = Command::new(self.exec_path())
+            .env("LANG", "en_AU.UTF-8")
             .stdout(Stdio::piped())
             .kill_on_drop(true)
             .arg(match network {
@@ -148,9 +148,18 @@ impl WalletRpc {
 
         let mut reader = BufReader::new(stdout).lines();
 
+        #[cfg(not(target_os = "windows"))]
+        while let Some(line) = reader.next_line().await? {
+            if line.contains("Starting wallet RPC server") {
+                break;
+            }
+        }
+
         // If we do not hear from the monero_wallet_rpc process for 3 seconds we assume
         // it is is ready
-        while let Ok(line) = tokio::time::timeout(Duration::from_secs(3), reader.next_line()).await
+        #[cfg(target_os = "windows")]
+        while let Ok(line) =
+            tokio::time::timeout(std::time::Duration::from_secs(3), reader.next_line()).await
         {
             line?;
         }
