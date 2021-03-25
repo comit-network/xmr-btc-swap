@@ -835,7 +835,7 @@ pub struct FastCancelConfig;
 impl GetConfig for FastCancelConfig {
     fn get_config() -> Config {
         Config {
-            bitcoin_cancel_timelock: CancelTimelock::new(1),
+            bitcoin_cancel_timelock: CancelTimelock::new(10),
             ..env::Regtest::get_config()
         }
     }
@@ -846,7 +846,7 @@ pub struct FastPunishConfig;
 impl GetConfig for FastPunishConfig {
     fn get_config() -> Config {
         Config {
-            bitcoin_cancel_timelock: CancelTimelock::new(1),
+            bitcoin_cancel_timelock: CancelTimelock::new(10),
             bitcoin_punish_timelock: PunishTimelock::new(1),
             ..env::Regtest::get_config()
         }
