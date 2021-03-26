@@ -21,6 +21,7 @@ use swap::asb::command::{Arguments, Command};
 use swap::asb::config::{
     initial_setup, query_user_for_initial_testnet_config, read_config, Config, ConfigNotInitialized,
 };
+use swap::asb::trace::init_tracing;
 use swap::database::Database;
 use swap::env::GetConfig;
 use swap::fs::default_config_path;
@@ -29,7 +30,6 @@ use swap::network::swarm;
 use swap::protocol::alice::event_loop::KrakenRate;
 use swap::protocol::alice::{run, Behaviour, EventLoop};
 use swap::seed::Seed;
-use swap::trace::init_tracing;
 use swap::{bitcoin, env, kraken, monero};
 use tracing::{info, warn};
 use tracing_subscriber::filter::LevelFilter;
