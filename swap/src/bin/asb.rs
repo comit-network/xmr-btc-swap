@@ -29,7 +29,7 @@ use swap::env::GetConfig;
 use swap::fs::default_config_path;
 use swap::monero::Amount;
 use swap::network::swarm;
-use swap::protocol::alice::{run, Behaviour, EventLoop};
+use swap::protocol::alice::{run, EventLoop};
 use swap::seed::Seed;
 use swap::trace::init_tracing;
 use swap::{bitcoin, env, kraken, monero};
@@ -90,7 +90,7 @@ async fn main() -> Result<()> {
 
             let kraken_rate_updates = kraken::connect()?;
 
-            let mut swarm = swarm::new::<Behaviour>(&seed)?;
+            let mut swarm = swarm::alice(&seed)?;
             Swarm::listen_on(&mut swarm, config.network.listen)
                 .context("Failed to listen network interface")?;
 

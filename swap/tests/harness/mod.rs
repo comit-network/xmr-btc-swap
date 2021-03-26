@@ -73,7 +73,7 @@ impl BobParams {
     }
 
     pub fn new_eventloop(&self) -> Result<(bob::EventLoop, bob::EventLoopHandle)> {
-        let mut swarm = swarm::new::<bob::Behaviour>(&self.seed)?;
+        let mut swarm = swarm::bob(&self.seed)?;
         swarm.add_address(self.alice_peer_id, self.alice_address.clone());
 
         bob::EventLoop::new(swarm, self.alice_peer_id, self.bitcoin_wallet.clone())
@@ -591,7 +591,7 @@ fn start_alice(
 ) -> (AliceApplicationHandle, Receiver<alice::Swap>) {
     let db = Arc::new(Database::open(db_path.as_path()).unwrap());
 
-    let mut swarm = swarm::new::<alice::Behaviour>(&seed).unwrap();
+    let mut swarm = swarm::alice(&seed).unwrap();
     Swarm::listen_on(&mut swarm, listen_address).unwrap();
 
     let (event_loop, swap_handle) = alice::EventLoop::new(
