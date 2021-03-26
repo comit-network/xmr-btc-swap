@@ -1,13 +1,19 @@
 use crate::network::cbor_request_response::CborCodec;
+use crate::protocol::{alice, bob};
 use crate::{bitcoin, monero};
 use libp2p::core::ProtocolName;
 use libp2p::request_response::{
     ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
     RequestResponseMessage,
 };
+use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 
-pub type OutEvent = RequestResponseEvent<Request, Response>;
+const PROTOCOL: &str = "/comit/xmr/btc/spot-price/1.0.0";
+type OutEvent = RequestResponseEvent<Request, Response>;
+type Message = RequestResponseMessage<Request, Response>;
+
+pub type Behaviour = RequestResponse<CborCodec<SpotPriceProtocol, Request, Response>>;
 
 /// The spot price protocol allows parties to **initiate** a trade by requesting
 /// a spot price.
@@ -23,7 +29,7 @@ pub struct SpotPriceProtocol;
 
 impl ProtocolName for SpotPriceProtocol {
     fn protocol_name(&self) -> &[u8] {
-        b"/comit/xmr/btc/spot-price/1.0.0"
+        PROTOCOL.as_bytes()
     }
 }
 
@@ -37,10 +43,6 @@ pub struct Request {
 pub struct Response {
     pub xmr: monero::Amount,
 }
-
-pub type Behaviour = RequestResponse<CborCodec<SpotPriceProtocol, Request, Response>>;
-
-pub type Message = RequestResponseMessage<Request, Response>;
 
 /// Constructs a new instance of the `spot-price` behaviour to be used by Alice.
 ///
@@ -65,3 +67,35 @@ pub fn bob() -> Behaviour {
         RequestResponseConfig::default(),
     )
 }
+
+impl From<(PeerId, Message)> for alice::OutEvent {
+    fn from((peer, message): (PeerId, Message)) -> Self {
+        match message {
+            Message::Request {
+                request, channel, ..
+            } => Self::SpotPriceRequested {
+                request,
+                channel,
+                peer,
+            },
+            Message::Response { .. } => Self::unexpected_response(peer),
+        }
+    }
+}
+crate::impl_from_rr_event!(OutEvent, alice::OutEvent, PROTOCOL);
+
+impl From<(PeerId, Message)> for bob::OutEvent {
+    fn from((peer, message): (PeerId, Message)) -> Self {
+        match message {
+            Message::Request { .. } => Self::unexpected_request(peer),
+            Message::Response {
+                response,
+                request_id,
+            } => Self::SpotPriceReceived {
+                id: request_id,
+                response,
+            },
+        }
+    }
+}
+crate::impl_from_rr_event!(OutEvent, bob::OutEvent, PROTOCOL);

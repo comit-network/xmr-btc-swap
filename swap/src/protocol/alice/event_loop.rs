@@ -217,7 +217,6 @@ where
                                 channel
                             }.boxed());
                         }
-                        SwarmEvent::Behaviour(OutEvent::ResponseSent) => {}
                         SwarmEvent::Behaviour(OutEvent::Failure {peer, error}) => {
                             tracing::error!(%peer, "Communication error: {:#}", error);
                         }

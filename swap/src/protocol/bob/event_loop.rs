@@ -127,11 +127,8 @@ impl EventLoop {
                                 let _ = responder.respond(());
                             }
                         }
-                        SwarmEvent::Behaviour(OutEvent::ResponseSent) => {
-
-                        }
-                        SwarmEvent::Behaviour(OutEvent::CommunicationError(error)) => {
-                            tracing::warn!("Communication error: {:#}", error);
+                        SwarmEvent::Behaviour(OutEvent::Failure { peer, error }) => {
+                            tracing::warn!(%peer, "Communication error: {:#}", error);
                             return;
                         }
                         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } if peer_id == self.alice_peer_id => {

@@ -1,6 +1,6 @@
 use crate::network::cbor_request_response::BUF_SIZE;
 use crate::protocol::bob::{State0, State2};
-use crate::protocol::{Message1, Message3};
+use crate::protocol::{bob, Message1, Message3};
 use anyhow::{Context, Error, Result};
 use libp2p::PeerId;
 use libp2p_async_await::BehaviourOutEvent;
@@ -83,5 +83,13 @@ impl Behaviour {
 
             async move { tokio::time::timeout(Duration::from_secs(10), protocol).await? }
         })
+    }
+}
+
+impl From<OutEvent> for bob::OutEvent {
+    fn from(event: OutEvent) -> Self {
+        match event {
+            OutEvent::Done(res) => Self::ExecutionSetupDone(Box::new(res)),
+        }
     }
 }
