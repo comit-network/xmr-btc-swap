@@ -1,7 +1,6 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
 use crate::bitcoin::{ExpiredTimelocks, TxRedeem};
-use crate::database::Database;
 use crate::env::Config;
 use crate::monero_ext::ScalarExt;
 use crate::protocol::alice;
@@ -9,13 +8,10 @@ use crate::protocol::alice::event_loop::EventLoopHandle;
 use crate::protocol::alice::AliceState;
 use crate::{bitcoin, database, monero};
 use anyhow::{bail, Context, Result};
-use async_recursion::async_recursion;
 use rand::{CryptoRng, RngCore};
-use std::sync::Arc;
 use tokio::select;
 use tokio::time::timeout;
 use tracing::{error, info};
-use uuid::Uuid;
 
 trait Rng: RngCore + CryptoRng + Send {}
 
@@ -37,41 +33,40 @@ pub async fn run(swap: alice::Swap) -> Result<AliceState> {
 
 #[tracing::instrument(name = "swap", skip(swap,is_target_state), fields(id = %swap.swap_id))]
 pub async fn run_until(
-    swap: alice::Swap,
+    mut swap: alice::Swap,
     is_target_state: fn(&AliceState) -> bool,
 ) -> Result<AliceState> {
-    run_until_internal(
-        swap.state,
-        is_target_state,
-        swap.event_loop_handle,
-        swap.bitcoin_wallet,
-        swap.monero_wallet,
-        swap.env_config,
-        swap.swap_id,
-        swap.db,
-    )
-    .await
-}
+    let mut current_state = swap.state;
 
-// State machine driver for swap execution
-#[async_recursion]
-#[allow(clippy::too_many_arguments)]
-async fn run_until_internal(
-    state: AliceState,
-    is_target_state: fn(&AliceState) -> bool,
-    mut event_loop_handle: EventLoopHandle,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Wallet>,
-    env_config: Config,
-    swap_id: Uuid,
-    db: Arc<Database>,
-) -> Result<AliceState> {
-    info!("Current state: {}", state);
-    if is_target_state(&state) {
-        return Ok(state);
+    while !is_target_state(&current_state) {
+        current_state = next_state(
+            current_state,
+            &mut swap.event_loop_handle,
+            swap.bitcoin_wallet.as_ref(),
+            swap.monero_wallet.as_ref(),
+            &swap.env_config,
+        )
+        .await?;
+
+        let db_state = (&current_state).into();
+        swap.db
+            .insert_latest_state(swap.swap_id, database::Swap::Alice(db_state))
+            .await?;
     }
 
-    let new_state = match state {
+    Ok(current_state)
+}
+
+async fn next_state(
+    state: AliceState,
+    event_loop_handle: &mut EventLoopHandle,
+    bitcoin_wallet: &bitcoin::Wallet,
+    monero_wallet: &monero::Wallet,
+    env_config: &Config,
+) -> Result<AliceState> {
+    info!("Current state: {}", state);
+
+    Ok(match state {
         AliceState::Started { state3 } => {
             timeout(
                 env_config.bob_time_to_act,
@@ -121,10 +116,10 @@ async fn run_until_internal(
         AliceState::XmrLocked {
             state3,
             monero_wallet_restore_blockheight,
-        } => match state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {
+        } => match state3.expired_timelocks(bitcoin_wallet).await? {
             ExpiredTimelocks::None => {
                 select! {
-                    _ = state3.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()) => {
+                    _ = state3.wait_for_cancel_timelock_to_expire(bitcoin_wallet) => {
                         AliceState::CancelTimelockExpired {
                             state3,
                             monero_wallet_restore_blockheight,
@@ -150,7 +145,7 @@ async fn run_until_internal(
             state3,
             encrypted_signature,
             monero_wallet_restore_blockheight,
-        } => match state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {
+        } => match state3.expired_timelocks(bitcoin_wallet).await? {
             ExpiredTimelocks::None => {
                 match TxRedeem::new(&state3.tx_lock, &state3.redeem_address).complete(
                     *encrypted_signature,
@@ -168,7 +163,7 @@ async fn run_until_internal(
                         Err(e) => {
                             error!("Publishing the redeem transaction failed with {}, attempting to wait for cancellation now. If you restart the application before the timelock is expired publishing the redeem transaction will be retried.", e);
                             state3
-                                .wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref())
+                                .wait_for_cancel_timelock_to_expire(bitcoin_wallet)
                                 .await?;
 
                             AliceState::CancelTimelockExpired {
@@ -180,7 +175,7 @@ async fn run_until_internal(
                     Err(e) => {
                         error!("Constructing the redeem transaction failed with {}, attempting to wait for cancellation now.", e);
                         state3
-                            .wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref())
+                            .wait_for_cancel_timelock_to_expire(bitcoin_wallet)
                             .await?;
 
                         AliceState::CancelTimelockExpired {
@@ -336,20 +331,5 @@ async fn run_until_internal(
         AliceState::BtcRedeemed => AliceState::BtcRedeemed,
         AliceState::BtcPunished => AliceState::BtcPunished,
         AliceState::SafelyAborted => AliceState::SafelyAborted,
-    };
-
-    let db_state = (&new_state).into();
-    db.insert_latest_state(swap_id, database::Swap::Alice(db_state))
-        .await?;
-    run_until_internal(
-        new_state,
-        is_target_state,
-        event_loop_handle,
-        bitcoin_wallet,
-        monero_wallet,
-        env_config,
-        swap_id,
-        db,
-    )
-    .await
+    })
 }

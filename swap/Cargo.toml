@@ -11,7 +11,6 @@ name = "swap"
 [dependencies]
 anyhow = "1"
 async-compression = { version = "0.3", features = ["bzip2", "tokio"] }
-async-recursion = "0.3"
 async-trait = "0.1"
 atty = "0.2"
 backoff = { version = "0.3", features = ["tokio"] }

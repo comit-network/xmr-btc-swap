@@ -1,17 +1,14 @@
 use crate::bitcoin::ExpiredTimelocks;
-use crate::database::{Database, Swap};
+use crate::database::Swap;
 use crate::env::Config;
 use crate::protocol::bob;
 use crate::protocol::bob::event_loop::EventLoopHandle;
 use crate::protocol::bob::state::*;
 use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
-use async_recursion::async_recursion;
 use rand::rngs::OsRng;
-use std::sync::Arc;
 use tokio::select;
 use tracing::trace;
-use uuid::Uuid;
 
 pub fn is_complete(state: &BobState) -> bool {
     matches!(
@@ -29,49 +26,48 @@ pub async fn run(swap: bob::Swap) -> Result<BobState> {
 }
 
 pub async fn run_until(
-    swap: bob::Swap,
+    mut swap: bob::Swap,
     is_target_state: fn(&BobState) -> bool,
 ) -> Result<BobState> {
-    run_until_internal(
-        swap.state,
-        is_target_state,
-        swap.event_loop_handle,
-        swap.db,
-        swap.bitcoin_wallet,
-        swap.monero_wallet,
-        swap.swap_id,
-        swap.env_config,
-        swap.receive_monero_address,
-    )
-    .await
+    let mut current_state = swap.state;
+
+    while !is_target_state(&current_state) {
+        current_state = next_state(
+            current_state,
+            &mut swap.event_loop_handle,
+            swap.bitcoin_wallet.as_ref(),
+            swap.monero_wallet.as_ref(),
+            &swap.env_config,
+            swap.receive_monero_address,
+        )
+        .await?;
+
+        let db_state = current_state.clone().into();
+        swap.db
+            .insert_latest_state(swap.swap_id, Swap::Bob(db_state))
+            .await?;
+    }
+
+    Ok(current_state)
 }
 
-// State machine driver for swap execution
-#[allow(clippy::too_many_arguments)]
-#[async_recursion]
-async fn run_until_internal(
+async fn next_state(
     state: BobState,
-    is_target_state: fn(&BobState) -> bool,
-    mut event_loop_handle: EventLoopHandle,
-    db: Database,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Wallet>,
-    swap_id: Uuid,
-    env_config: Config,
+    event_loop_handle: &mut EventLoopHandle,
+    bitcoin_wallet: &bitcoin::Wallet,
+    monero_wallet: &monero::Wallet,
+    env_config: &Config,
     receive_monero_address: monero::Address,
 ) -> Result<BobState> {
     trace!("Current state: {}", state);
-    if is_target_state(&state) {
-        return Ok(state);
-    }
 
-    let new_state = match state {
+    Ok(match state {
         BobState::Started { btc_amount } => {
             let bitcoin_refund_address = bitcoin_wallet.new_address().await?;
 
             let state2 = request_price_and_setup(
                 btc_amount,
-                &mut event_loop_handle,
+                event_loop_handle,
                 env_config,
                 bitcoin_refund_address,
             )
@@ -93,10 +89,10 @@ async fn run_until_internal(
         // Bob has locked Btc
         // Watch for Alice to Lock Xmr or for cancel timelock to elapse
         BobState::BtcLocked(state3) => {
-            if let ExpiredTimelocks::None = state3.current_epoch(bitcoin_wallet.as_ref()).await? {
+            if let ExpiredTimelocks::None = state3.current_epoch(bitcoin_wallet).await? {
                 let transfer_proof_watcher = event_loop_handle.recv_transfer_proof();
                 let cancel_timelock_expires =
-                    state3.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref());
+                    state3.wait_for_cancel_timelock_to_expire(bitcoin_wallet);
 
                 // Record the current monero wallet block height so we don't have to scan from
                 // block 0 once we create the redeem wallet.
@@ -133,7 +129,7 @@ async fn run_until_internal(
             lock_transfer_proof,
             monero_wallet_restore_blockheight,
         } => {
-            if let ExpiredTimelocks::None = state.current_epoch(bitcoin_wallet.as_ref()).await? {
+            if let ExpiredTimelocks::None = state.current_epoch(bitcoin_wallet).await? {
                 let watch_request = state.lock_xmr_watch_request(lock_transfer_proof);
 
                 select! {
@@ -142,13 +138,13 @@ async fn run_until_internal(
                             Ok(()) => BobState::XmrLocked(state.xmr_locked(monero_wallet_restore_blockheight)),
                             Err(e) => {
                                  tracing::warn!("Waiting for refund because insufficient Monero have been locked! {}", e);
-                                 state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()).await?;
+                                 state.wait_for_cancel_timelock_to_expire(bitcoin_wallet).await?;
 
                                  BobState::CancelTimelockExpired(state.cancel())
                             },
                         }
                     }
-                    _ = state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()) => {
+                    _ = state.wait_for_cancel_timelock_to_expire(bitcoin_wallet) => {
                         BobState::CancelTimelockExpired(state.cancel())
                     }
                 }
@@ -157,7 +153,7 @@ async fn run_until_internal(
             }
         }
         BobState::XmrLocked(state) => {
-            if let ExpiredTimelocks::None = state.expired_timelock(bitcoin_wallet.as_ref()).await? {
+            if let ExpiredTimelocks::None = state.expired_timelock(bitcoin_wallet).await? {
                 // Alice has locked Xmr
                 // Bob sends Alice his key
 
@@ -165,7 +161,7 @@ async fn run_until_internal(
                     _ = event_loop_handle.send_encrypted_signature(state.tx_redeem_encsig()) => {
                         BobState::EncSigSent(state)
                     },
-                    _ = state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()) => {
+                    _ = state.wait_for_cancel_timelock_to_expire(bitcoin_wallet) => {
                         BobState::CancelTimelockExpired(state.cancel())
                     }
                 }
@@ -174,12 +170,12 @@ async fn run_until_internal(
             }
         }
         BobState::EncSigSent(state) => {
-            if let ExpiredTimelocks::None = state.expired_timelock(bitcoin_wallet.as_ref()).await? {
+            if let ExpiredTimelocks::None = state.expired_timelock(bitcoin_wallet).await? {
                 select! {
-                    state5 = state.watch_for_redeem_btc(bitcoin_wallet.as_ref()) => {
+                    state5 = state.watch_for_redeem_btc(bitcoin_wallet) => {
                         BobState::BtcRedeemed(state5?)
                     },
-                    _ = state.wait_for_cancel_timelock_to_expire(bitcoin_wallet.as_ref()) => {
+                    _ = state.wait_for_cancel_timelock_to_expire(bitcoin_wallet) => {
                         BobState::CancelTimelockExpired(state.cancel())
                     }
                 }
@@ -210,26 +206,22 @@ async fn run_until_internal(
             }
         }
         BobState::CancelTimelockExpired(state4) => {
-            if state4
-                .check_for_tx_cancel(bitcoin_wallet.as_ref())
-                .await
-                .is_err()
-            {
-                state4.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
+            if state4.check_for_tx_cancel(bitcoin_wallet).await.is_err() {
+                state4.submit_tx_cancel(bitcoin_wallet).await?;
             }
 
             BobState::BtcCancelled(state4)
         }
         BobState::BtcCancelled(state) => {
             // Bob has cancelled the swap
-            match state.expired_timelock(bitcoin_wallet.as_ref()).await? {
+            match state.expired_timelock(bitcoin_wallet).await? {
                 ExpiredTimelocks::None => {
                     bail!(
                         "Internal error: canceled state reached before cancel timelock was expired"
                     );
                 }
                 ExpiredTimelocks::Cancel => {
-                    state.refund_btc(bitcoin_wallet.as_ref()).await?;
+                    state.refund_btc(bitcoin_wallet).await?;
                     BobState::BtcRefunded(state)
                 }
                 ExpiredTimelocks::Punish => BobState::BtcPunished {
@@ -241,28 +233,13 @@ async fn run_until_internal(
         BobState::BtcPunished { tx_lock_id } => BobState::BtcPunished { tx_lock_id },
         BobState::SafelyAborted => BobState::SafelyAborted,
         BobState::XmrRedeemed { tx_lock_id } => BobState::XmrRedeemed { tx_lock_id },
-    };
-
-    let db_state = new_state.clone().into();
-    db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
-    run_until_internal(
-        new_state,
-        is_target_state,
-        event_loop_handle,
-        db,
-        bitcoin_wallet,
-        monero_wallet,
-        swap_id,
-        env_config,
-        receive_monero_address,
-    )
-    .await
+    })
 }
 
 pub async fn request_price_and_setup(
     btc: bitcoin::Amount,
     event_loop_handle: &mut EventLoopHandle,
-    env_config: Config,
+    env_config: &Config,
     bitcoin_refund_address: bitcoin::Address,
 ) -> Result<bob::state::State2> {
     let xmr = event_loop_handle.request_spot_price(btc).await?;
