@@ -93,6 +93,7 @@ async fn main() -> Result<()> {
             let mut swarm = swarm::alice(&seed)?;
             Swarm::listen_on(&mut swarm, config.network.listen)
                 .context("Failed to listen network interface")?;
+            swarm.bootstrap().context("Failed to bootstrap DHT")?;
 
             let (event_loop, mut swap_receiver) = EventLoop::new(
                 swarm,

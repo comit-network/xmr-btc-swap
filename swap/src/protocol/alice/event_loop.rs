@@ -10,6 +10,7 @@ use anyhow::{bail, Context, Result};
 use futures::future;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::{FuturesUnordered, StreamExt};
+use libp2p::kad::{BootstrapError, BootstrapOk};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
@@ -217,6 +218,17 @@ where
                                 channel
                             }.boxed());
                         }
+                        SwarmEvent::Behaviour(OutEvent::BootstrapComplete { result: Ok(BootstrapOk { .. }), stats }) => {
+                            let seconds = stats.duration().expect("finished query must have a duration").as_secs();
+                            let discovered_peers = stats.num_successes();
+
+                            tracing::info!(%discovered_peers, "DHT bootstrap completed successfully in {}s", seconds);
+                        }
+                        SwarmEvent::Behaviour(OutEvent::BootstrapComplete { result: Err(BootstrapError::Timeout { peer, .. }), stats }) => {
+                            let seconds = stats.duration().expect("finished query must have a duration").as_secs();
+
+                            tracing::warn!(%peer, "DHT bootstrap failed after {}s", seconds);
+                        }
                         SwarmEvent::Behaviour(OutEvent::Failure {peer, error}) => {
                             tracing::error!(%peer, "Communication error: {:#}", error);
                         }
@@ -236,12 +248,15 @@ where
                         SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause } if num_established == 0 => {
                             match cause {
                                 Some(error) => {
-                                    tracing::warn!(%peer, address = %endpoint.get_remote_address(), "Lost connection: {}", error);
+                                    tracing::debug!(%peer, address = %endpoint.get_remote_address(), "Lost connection: {}", error);
                                 },
                                 None => {
                                     tracing::info!(%peer, address = %endpoint.get_remote_address(), "Successfully closed connection");
                                 }
                             }
+                        }
+                        SwarmEvent::NewListenAddr(address) => {
+                            tracing::info!("Listening on {}", address);
                         }
                         _ => {}
                     }

@@ -160,8 +160,8 @@ pub struct Behaviour {
     pub encrypted_signature: encrypted_signature::Behaviour,
 }
 
-impl Default for Behaviour {
-    fn default() -> Self {
+impl From<PeerId> for Behaviour {
+    fn from(_: PeerId) -> Self {
         Self {
             quote: quote::bob(),
             spot_price: spot_price::bob(),
