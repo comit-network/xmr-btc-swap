@@ -1,6 +1,6 @@
 use crate::network::cbor_request_response::BUF_SIZE;
 use crate::protocol::alice::{State0, State3};
-use crate::protocol::{Message0, Message2, Message4};
+use crate::protocol::{alice, Message0, Message2, Message4};
 use anyhow::{Context, Error};
 use libp2p::PeerId;
 use libp2p_async_await::BehaviourOutEvent;
@@ -84,5 +84,22 @@ impl Behaviour {
 
                 Ok((bob, (swap_id, state3)))
             })
+    }
+}
+
+impl From<OutEvent> for alice::OutEvent {
+    fn from(event: OutEvent) -> Self {
+        match event {
+            OutEvent::Done {
+                bob_peer_id,
+                state3,
+                swap_id,
+            } => Self::ExecutionSetupDone {
+                bob_peer_id,
+                state3: Box::new(state3),
+                swap_id,
+            },
+            OutEvent::Failure { peer, error } => Self::Failure { peer, error },
+        }
     }
 }

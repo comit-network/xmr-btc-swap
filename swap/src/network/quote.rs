@@ -1,24 +1,28 @@
 use crate::bitcoin;
 use crate::network::cbor_request_response::CborCodec;
+use crate::protocol::{alice, bob};
 use libp2p::core::ProtocolName;
 use libp2p::request_response::{
     ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
     RequestResponseMessage,
 };
+use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 
-pub type OutEvent = RequestResponseEvent<(), BidQuote>;
+const PROTOCOL: &str = "/comit/xmr/btc/bid-quote/1.0.0";
+type OutEvent = RequestResponseEvent<(), BidQuote>;
+type Message = RequestResponseMessage<(), BidQuote>;
+
+pub type Behaviour = RequestResponse<CborCodec<BidQuoteProtocol, (), BidQuote>>;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct BidQuoteProtocol;
 
 impl ProtocolName for BidQuoteProtocol {
     fn protocol_name(&self) -> &[u8] {
-        b"/comit/xmr/btc/bid-quote/1.0.0"
+        PROTOCOL.as_bytes()
     }
 }
-
-pub type Message = RequestResponseMessage<(), BidQuote>;
 
 /// Represents a quote for buying XMR.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -30,8 +34,6 @@ pub struct BidQuote {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub max_quantity: bitcoin::Amount,
 }
-
-pub type Behaviour = RequestResponse<CborCodec<BidQuoteProtocol, (), BidQuote>>;
 
 /// Constructs a new instance of the `quote` behaviour to be used by Alice.
 ///
@@ -54,3 +56,29 @@ pub fn bob() -> Behaviour {
         RequestResponseConfig::default(),
     )
 }
+
+impl From<(PeerId, Message)> for alice::OutEvent {
+    fn from((peer, message): (PeerId, Message)) -> Self {
+        match message {
+            Message::Request { channel, .. } => Self::QuoteRequested { channel, peer },
+            Message::Response { .. } => Self::unexpected_response(peer),
+        }
+    }
+}
+crate::impl_from_rr_event!(OutEvent, alice::OutEvent, PROTOCOL);
+
+impl From<(PeerId, Message)> for bob::OutEvent {
+    fn from((peer, message): (PeerId, Message)) -> Self {
+        match message {
+            Message::Request { .. } => Self::unexpected_request(peer),
+            Message::Response {
+                response,
+                request_id,
+            } => Self::QuoteReceived {
+                id: request_id,
+                response,
+            },
+        }
+    }
+}
+crate::impl_from_rr_event!(OutEvent, bob::OutEvent, PROTOCOL);

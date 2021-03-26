@@ -6,9 +6,7 @@ use crate::protocol::bob;
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
 use libp2p::core::Multiaddr;
-use libp2p::request_response::{
-    RequestId, RequestResponseEvent, RequestResponseMessage, ResponseChannel,
-};
+use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -128,135 +126,27 @@ pub enum OutEvent {
     AllRedialAttemptsExhausted {
         peer: PeerId,
     },
-    ResponseSent, // Same variant is used for all messages as no processing is done
-    CommunicationError(Error),
+    Failure {
+        peer: PeerId,
+        error: Error,
+    },
+    /// "Fallback" variant that allows the event mapping code to swallow certain
+    /// events that we don't want the caller to deal with.
+    Other,
 }
 
 impl OutEvent {
-    fn unexpected_request() -> OutEvent {
-        OutEvent::CommunicationError(anyhow!("Unexpected request received"))
-    }
-
-    fn unexpected_response() -> OutEvent {
-        OutEvent::CommunicationError(anyhow!("Unexpected response received"))
-    }
-}
-
-impl From<quote::Message> for OutEvent {
-    fn from(message: quote::Message) -> Self {
-        match message {
-            quote::Message::Request { .. } => OutEvent::unexpected_request(),
-            quote::Message::Response {
-                response,
-                request_id,
-            } => OutEvent::QuoteReceived {
-                id: request_id,
-                response,
-            },
-        }
-    }
-}
-
-impl From<spot_price::Message> for OutEvent {
-    fn from(message: spot_price::Message) -> Self {
-        match message {
-            spot_price::Message::Request { .. } => OutEvent::unexpected_request(),
-            spot_price::Message::Response {
-                response,
-                request_id,
-            } => OutEvent::SpotPriceReceived {
-                id: request_id,
-                response,
-            },
-        }
-    }
-}
-
-impl From<transfer_proof::Message> for OutEvent {
-    fn from(message: transfer_proof::Message) -> Self {
-        match message {
-            transfer_proof::Message::Request {
-                request, channel, ..
-            } => OutEvent::TransferProofReceived {
-                msg: Box::new(request),
-                channel,
-            },
-            transfer_proof::Message::Response { .. } => OutEvent::unexpected_response(),
-        }
-    }
-}
-
-impl From<encrypted_signature::Message> for OutEvent {
-    fn from(message: encrypted_signature::Message) -> Self {
-        match message {
-            encrypted_signature::Message::Request { .. } => OutEvent::unexpected_request(),
-            encrypted_signature::Message::Response { request_id, .. } => {
-                OutEvent::EncryptedSignatureAcknowledged { id: request_id }
-            }
-        }
-    }
-}
-
-impl From<spot_price::OutEvent> for OutEvent {
-    fn from(event: spot_price::OutEvent) -> Self {
-        map_rr_event_to_outevent(event)
-    }
-}
-
-impl From<quote::OutEvent> for OutEvent {
-    fn from(event: quote::OutEvent) -> Self {
-        map_rr_event_to_outevent(event)
-    }
-}
-
-impl From<transfer_proof::OutEvent> for OutEvent {
-    fn from(event: transfer_proof::OutEvent) -> Self {
-        map_rr_event_to_outevent(event)
-    }
-}
-
-impl From<encrypted_signature::OutEvent> for OutEvent {
-    fn from(event: encrypted_signature::OutEvent) -> Self {
-        map_rr_event_to_outevent(event)
-    }
-}
-
-impl From<redial::OutEvent> for OutEvent {
-    fn from(event: redial::OutEvent) -> Self {
-        match event {
-            redial::OutEvent::AllAttemptsExhausted { peer } => {
-                OutEvent::AllRedialAttemptsExhausted { peer }
-            }
-        }
-    }
-}
-
-fn map_rr_event_to_outevent<I, O>(event: RequestResponseEvent<I, O>) -> OutEvent
-where
-    OutEvent: From<RequestResponseMessage<I, O>>,
-{
-    use RequestResponseEvent::*;
-
-    match event {
-        Message { message, .. } => OutEvent::from(message),
-        ResponseSent { .. } => OutEvent::ResponseSent,
-        InboundFailure { peer, error, .. } => OutEvent::CommunicationError(anyhow!(
-            "protocol with peer {} failed due to {:?}",
+    pub fn unexpected_request(peer: PeerId) -> OutEvent {
+        OutEvent::Failure {
             peer,
-            error
-        )),
-        OutboundFailure { peer, error, .. } => OutEvent::CommunicationError(anyhow!(
-            "protocol with peer {} failed due to {:?}",
-            peer,
-            error
-        )),
+            error: anyhow!("Unexpected request received"),
+        }
     }
-}
 
-impl From<execution_setup::OutEvent> for OutEvent {
-    fn from(event: execution_setup::OutEvent) -> Self {
-        match event {
-            execution_setup::OutEvent::Done(res) => OutEvent::ExecutionSetupDone(Box::new(res)),
+    pub fn unexpected_response(peer: PeerId) -> OutEvent {
+        OutEvent::Failure {
+            peer,
+            error: anyhow!("Unexpected response received"),
         }
     }
 }

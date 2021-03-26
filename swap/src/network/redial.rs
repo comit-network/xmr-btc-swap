@@ -1,3 +1,4 @@
+use crate::protocol::bob;
 use backoff::backoff::Backoff;
 use backoff::ExponentialBackoff;
 use futures::future::FutureExt;
@@ -115,5 +116,15 @@ impl NetworkBehaviour for Behaviour {
             peer_id: self.peer,
             condition: DialPeerCondition::Disconnected,
         })
+    }
+}
+
+impl From<OutEvent> for bob::OutEvent {
+    fn from(event: OutEvent) -> Self {
+        match event {
+            OutEvent::AllAttemptsExhausted { peer } => {
+                bob::OutEvent::AllRedialAttemptsExhausted { peer }
+            }
+        }
     }
 }
