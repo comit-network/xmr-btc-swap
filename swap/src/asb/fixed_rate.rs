@@ -1,6 +1,6 @@
 use crate::asb::Rate;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct FixedRate(Rate);
 
 impl FixedRate {

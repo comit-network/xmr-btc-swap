@@ -29,8 +29,9 @@ use tempfile::tempdir;
 use testcontainers::clients::Cli;
 use testcontainers::{Container, Docker, RunArgs};
 use tokio::sync::mpsc;
+use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
-use tokio::time::interval;
+use tokio::time::{interval, timeout};
 use tracing_subscriber::util::SubscriberInitExt;
 use url::Url;
 use uuid::Uuid;
@@ -79,24 +80,40 @@ impl BobParams {
     }
 }
 
-pub struct BobEventLoopJoinHandle(JoinHandle<()>);
+pub struct BobApplicationHandle(JoinHandle<()>);
 
-impl BobEventLoopJoinHandle {
+impl BobApplicationHandle {
     pub fn abort(&self) {
         self.0.abort()
     }
 }
 
-pub struct AliceEventLoopJoinHandle(JoinHandle<()>);
+pub struct AliceApplicationHandle {
+    handle: JoinHandle<()>,
+    peer_id: PeerId,
+}
+
+impl AliceApplicationHandle {
+    pub fn abort(&self) {
+        self.handle.abort()
+    }
+}
 
 pub struct TestContext {
+    env_config: Config,
+
     btc_amount: bitcoin::Amount,
     xmr_amount: monero::Amount,
+
+    alice_seed: Seed,
+    alice_db_path: PathBuf,
+    alice_listen_address: Multiaddr,
 
     alice_starting_balances: StartingBalances,
     alice_bitcoin_wallet: Arc<bitcoin::Wallet>,
     alice_monero_wallet: Arc<monero::Wallet>,
     alice_swap_handle: mpsc::Receiver<Swap>,
+    alice_handle: AliceApplicationHandle,
 
     bob_params: BobParams,
     bob_starting_balances: StartingBalances,
@@ -105,11 +122,30 @@ pub struct TestContext {
 }
 
 impl TestContext {
-    pub async fn alice_next_swap(&mut self) -> alice::Swap {
-        self.alice_swap_handle.recv().await.unwrap()
+    pub async fn restart_alice(&mut self) {
+        self.alice_handle.abort();
+
+        let (alice_handle, alice_swap_handle) = start_alice(
+            &self.alice_seed,
+            self.alice_db_path.clone(),
+            self.alice_listen_address.clone(),
+            self.env_config,
+            self.alice_bitcoin_wallet.clone(),
+            self.alice_monero_wallet.clone(),
+        );
+
+        self.alice_handle = alice_handle;
+        self.alice_swap_handle = alice_swap_handle;
     }
 
-    pub async fn bob_swap(&mut self) -> (bob::Swap, BobEventLoopJoinHandle) {
+    pub async fn alice_next_swap(&mut self) -> alice::Swap {
+        timeout(Duration::from_secs(10), self.alice_swap_handle.recv())
+            .await
+            .expect("No Alice swap within 10 seconds, aborting because this test is waiting for a swap forever...")
+            .unwrap()
+    }
+
+    pub async fn bob_swap(&mut self) -> (bob::Swap, BobApplicationHandle) {
         let (event_loop, event_loop_handle) = self.bob_params.new_eventloop().unwrap();
 
         let swap = self
@@ -123,13 +159,13 @@ impl TestContext {
 
         let join_handle = tokio::spawn(event_loop.run());
 
-        (swap, BobEventLoopJoinHandle(join_handle))
+        (swap, BobApplicationHandle(join_handle))
     }
 
     pub async fn stop_and_resume_bob_from_db(
         &mut self,
-        join_handle: BobEventLoopJoinHandle,
-    ) -> (bob::Swap, BobEventLoopJoinHandle) {
+        join_handle: BobApplicationHandle,
+    ) -> (bob::Swap, BobApplicationHandle) {
         join_handle.abort();
 
         let (event_loop, event_loop_handle) = self.bob_params.new_eventloop().unwrap();
@@ -144,7 +180,7 @@ impl TestContext {
 
         let join_handle = tokio::spawn(event_loop.run());
 
-        (swap, BobEventLoopJoinHandle(join_handle))
+        (swap, BobApplicationHandle(join_handle))
     }
 
     pub async fn assert_alice_redeemed(&mut self, state: AliceState) {
@@ -462,20 +498,12 @@ where
         btc: bitcoin::Amount::ZERO,
     };
 
-    let port = get_port().expect("Failed to find a free port");
-
-    let alice_listen_address: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", port)
-        .parse()
-        .expect("failed to parse Alice's address");
-
     let electrs_rpc_port = containers
         .electrs
         .get_host_port(harness::electrs::RPC_PORT)
         .expect("Could not map electrs rpc port");
 
     let alice_seed = Seed::random().unwrap();
-    let bob_seed = Seed::random().unwrap();
-
     let (alice_bitcoin_wallet, alice_monero_wallet) = init_test_wallets(
         MONERO_WALLET_NAME_ALICE,
         containers.bitcoind_url.clone(),
@@ -483,16 +511,27 @@ where
         alice_starting_balances.clone(),
         tempdir().unwrap().path(),
         electrs_rpc_port,
-        alice_seed,
+        &alice_seed,
         env_config,
     )
     .await;
 
-    let db_path = tempdir().unwrap();
-    let alice_db = Arc::new(Database::open(db_path.path()).unwrap());
+    let alice_listen_port = get_port().expect("Failed to find a free port");
+    let alice_listen_address: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", alice_listen_port)
+        .parse()
+        .expect("failed to parse Alice's address");
 
-    let alice_seed = Seed::random().unwrap();
+    let alice_db_path = tempdir().unwrap().into_path();
+    let (alice_handle, alice_swap_handle) = start_alice(
+        &alice_seed,
+        alice_db_path.clone(),
+        alice_listen_address.clone(),
+        env_config,
+        alice_bitcoin_wallet.clone(),
+        alice_monero_wallet.clone(),
+    );
 
+    let bob_seed = Seed::random().unwrap();
     let bob_starting_balances = StartingBalances {
         xmr: monero::Amount::ZERO,
         btc: btc_amount * 10,
@@ -505,28 +544,10 @@ where
         bob_starting_balances.clone(),
         tempdir().unwrap().path(),
         electrs_rpc_port,
-        bob_seed,
+        &bob_seed,
         env_config,
     )
     .await;
-
-    let mut alice_swarm = swarm::new::<alice::Behaviour>(&alice_seed).unwrap();
-    Swarm::listen_on(&mut alice_swarm, alice_listen_address.clone()).unwrap();
-
-    let (alice_event_loop, alice_swap_handle) = alice::EventLoop::new(
-        alice_swarm,
-        env_config,
-        alice_bitcoin_wallet.clone(),
-        alice_monero_wallet.clone(),
-        alice_db,
-        FixedRate::default(),
-        bitcoin::Amount::ONE_BTC,
-    )
-    .unwrap();
-
-    let alice_peer_id = alice_event_loop.peer_id();
-
-    tokio::spawn(alice_event_loop.run());
 
     let bob_params = BobParams {
         seed: Seed::random().unwrap(),
@@ -534,18 +555,23 @@ where
         swap_id: Uuid::new_v4(),
         bitcoin_wallet: bob_bitcoin_wallet.clone(),
         monero_wallet: bob_monero_wallet.clone(),
-        alice_address: alice_listen_address,
-        alice_peer_id,
+        alice_address: alice_listen_address.clone(),
+        alice_peer_id: alice_handle.peer_id,
         env_config,
     };
 
     let test = TestContext {
+        env_config,
         btc_amount,
         xmr_amount,
+        alice_seed,
+        alice_db_path,
+        alice_listen_address,
         alice_starting_balances,
         alice_bitcoin_wallet,
         alice_monero_wallet,
         alice_swap_handle,
+        alice_handle,
         bob_params,
         bob_starting_balances,
         bob_bitcoin_wallet,
@@ -553,6 +579,36 @@ where
     };
 
     testfn(test).await.unwrap()
+}
+
+fn start_alice(
+    seed: &Seed,
+    db_path: PathBuf,
+    listen_address: Multiaddr,
+    env_config: Config,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    monero_wallet: Arc<monero::Wallet>,
+) -> (AliceApplicationHandle, Receiver<alice::Swap>) {
+    let db = Arc::new(Database::open(db_path.as_path()).unwrap());
+
+    let mut swarm = swarm::new::<alice::Behaviour>(&seed).unwrap();
+    Swarm::listen_on(&mut swarm, listen_address).unwrap();
+
+    let (event_loop, swap_handle) = alice::EventLoop::new(
+        swarm,
+        env_config,
+        bitcoin_wallet,
+        monero_wallet,
+        db,
+        FixedRate::default(),
+        bitcoin::Amount::ONE_BTC,
+    )
+    .unwrap();
+
+    let peer_id = event_loop.peer_id();
+    let handle = tokio::spawn(event_loop.run());
+
+    (AliceApplicationHandle { handle, peer_id }, swap_handle)
 }
 
 fn random_prefix() -> String {
@@ -714,7 +770,7 @@ async fn init_test_wallets(
     starting_balances: StartingBalances,
     datadir: &Path,
     electrum_rpc_port: u16,
-    seed: Seed,
+    seed: &Seed,
     env_config: Config,
 ) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {
     monero
@@ -847,7 +903,7 @@ impl GetConfig for FastPunishConfig {
     fn get_config() -> Config {
         Config {
             bitcoin_cancel_timelock: CancelTimelock::new(10),
-            bitcoin_punish_timelock: PunishTimelock::new(1),
+            bitcoin_punish_timelock: PunishTimelock::new(10),
             ..env::Regtest::get_config()
         }
     }
