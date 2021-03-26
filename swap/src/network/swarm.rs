@@ -1,10 +1,19 @@
 use crate::network::transport;
+use crate::protocol::{alice, bob};
 use crate::seed::Seed;
 use anyhow::Result;
 use libp2p::swarm::{NetworkBehaviour, SwarmBuilder};
 use libp2p::Swarm;
 
-pub fn new<B>(seed: &Seed) -> Result<Swarm<B>>
+pub fn alice(seed: &Seed) -> Result<Swarm<alice::Behaviour>> {
+    new(seed)
+}
+
+pub fn bob(seed: &Seed) -> Result<Swarm<bob::Behaviour>> {
+    new(seed)
+}
+
+fn new<B>(seed: &Seed) -> Result<Swarm<B>>
 where
     B: NetworkBehaviour + Default,
 {

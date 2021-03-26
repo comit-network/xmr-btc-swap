@@ -27,7 +27,7 @@ use swap::env::{Config, GetConfig};
 use swap::network::quote::BidQuote;
 use swap::network::swarm;
 use swap::protocol::bob;
-use swap::protocol::bob::{Behaviour, Builder, EventLoop};
+use swap::protocol::bob::{Builder, EventLoop};
 use swap::seed::Seed;
 use swap::{bitcoin, cli, env, monero};
 use tracing::{debug, error, info, warn};
@@ -76,7 +76,7 @@ async fn main() -> Result<()> {
                 init_monero_wallet(data_dir, monero_daemon_host, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
-            let mut swarm = swarm::new::<Behaviour>(&seed)?;
+            let mut swarm = swarm::bob(&seed)?;
             swarm.add_address(alice_peer_id, alice_multiaddr);
 
             let swap_id = Uuid::new_v4();
@@ -171,7 +171,7 @@ async fn main() -> Result<()> {
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
             let alice_peer_id = db.get_peer_id(swap_id)?;
-            let mut swarm = swarm::new::<Behaviour>(&seed)?;
+            let mut swarm = swarm::bob(&seed)?;
             swarm.add_address(alice_peer_id, alice_multiaddr);
 
             let (event_loop, event_loop_handle) =
