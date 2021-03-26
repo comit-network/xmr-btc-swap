@@ -149,19 +149,14 @@ impl TestContext {
 
         self.alice_bitcoin_wallet.sync().await.unwrap();
 
-        let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
+        let btc_balance_after_swap = self.alice_bitcoin_wallet.balance().await.unwrap();
         assert_eq!(
             btc_balance_after_swap,
             self.alice_starting_balances.btc + self.btc_amount
                 - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
         );
 
-        let xmr_balance_after_swap = self
-            .alice_monero_wallet
-            .as_ref()
-            .get_balance()
-            .await
-            .unwrap();
+        let xmr_balance_after_swap = self.alice_monero_wallet.get_balance().await.unwrap();
         assert!(
             xmr_balance_after_swap <= self.alice_starting_balances.xmr - self.xmr_amount,
             "{} !< {} - {}",
@@ -176,17 +171,12 @@ impl TestContext {
 
         self.alice_bitcoin_wallet.sync().await.unwrap();
 
-        let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
+        let btc_balance_after_swap = self.alice_bitcoin_wallet.balance().await.unwrap();
         assert_eq!(btc_balance_after_swap, self.alice_starting_balances.btc);
 
         // Ensure that Alice's balance is refreshed as we use a newly created wallet
-        self.alice_monero_wallet.as_ref().refresh().await.unwrap();
-        let xmr_balance_after_swap = self
-            .alice_monero_wallet
-            .as_ref()
-            .get_balance()
-            .await
-            .unwrap();
+        self.alice_monero_wallet.refresh().await.unwrap();
+        let xmr_balance_after_swap = self.alice_monero_wallet.get_balance().await.unwrap();
 
         // Alice pays fees - comparison does not take exact lock fee into account
         assert!(
@@ -203,19 +193,14 @@ impl TestContext {
 
         self.alice_bitcoin_wallet.sync().await.unwrap();
 
-        let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
+        let btc_balance_after_swap = self.alice_bitcoin_wallet.balance().await.unwrap();
         assert_eq!(
             btc_balance_after_swap,
             self.alice_starting_balances.btc + self.btc_amount
                 - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE)
         );
 
-        let xmr_balance_after_swap = self
-            .alice_monero_wallet
-            .as_ref()
-            .get_balance()
-            .await
-            .unwrap();
+        let xmr_balance_after_swap = self.alice_monero_wallet.get_balance().await.unwrap();
         assert!(xmr_balance_after_swap <= self.alice_starting_balances.xmr - self.xmr_amount);
     }
 
@@ -234,7 +219,7 @@ impl TestContext {
             .await
             .unwrap();
 
-        let btc_balance_after_swap = self.bob_bitcoin_wallet.as_ref().balance().await.unwrap();
+        let btc_balance_after_swap = self.bob_bitcoin_wallet.balance().await.unwrap();
         assert_eq!(
             btc_balance_after_swap,
             self.bob_starting_balances.btc - self.btc_amount - lock_tx_bitcoin_fee
@@ -246,8 +231,8 @@ impl TestContext {
         self.bob_monero_wallet.refresh().await.unwrap();
 
         // Ensure that Bob's balance is refreshed as we use a newly created wallet
-        self.bob_monero_wallet.as_ref().refresh().await.unwrap();
-        let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().get_balance().await.unwrap();
+        self.bob_monero_wallet.refresh().await.unwrap();
+        let xmr_balance_after_swap = self.bob_monero_wallet.get_balance().await.unwrap();
         assert!(xmr_balance_after_swap > self.bob_starting_balances.xmr);
     }
 
@@ -265,7 +250,7 @@ impl TestContext {
             .await
             .unwrap();
 
-        let btc_balance_after_swap = self.bob_bitcoin_wallet.as_ref().balance().await.unwrap();
+        let btc_balance_after_swap = self.bob_bitcoin_wallet.balance().await.unwrap();
 
         let alice_submitted_cancel = btc_balance_after_swap
             == self.bob_starting_balances.btc
@@ -281,7 +266,7 @@ impl TestContext {
         // Since we cannot be sure who submitted it we have to assert accordingly
         assert!(alice_submitted_cancel || bob_submitted_cancel);
 
-        let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().get_balance().await.unwrap();
+        let xmr_balance_after_swap = self.bob_monero_wallet.get_balance().await.unwrap();
         assert_eq!(xmr_balance_after_swap, self.bob_starting_balances.xmr);
     }
 
@@ -300,13 +285,13 @@ impl TestContext {
             .await
             .unwrap();
 
-        let btc_balance_after_swap = self.bob_bitcoin_wallet.as_ref().balance().await.unwrap();
+        let btc_balance_after_swap = self.bob_bitcoin_wallet.balance().await.unwrap();
         assert_eq!(
             btc_balance_after_swap,
             self.bob_starting_balances.btc - self.btc_amount - lock_tx_bitcoin_fee
         );
 
-        let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().get_balance().await.unwrap();
+        let xmr_balance_after_swap = self.bob_monero_wallet.get_balance().await.unwrap();
         assert_eq!(xmr_balance_after_swap, self.bob_starting_balances.xmr);
     }
 }
