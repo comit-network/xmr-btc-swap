@@ -28,7 +28,7 @@ use testcontainers::{Container, Docker, RunArgs};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time::interval;
-use tracing::dispatcher::DefaultGuard;
+use tracing_subscriber::util::SubscriberInitExt;
 use url::Url;
 use uuid::Uuid;
 
@@ -319,7 +319,9 @@ where
 {
     let cli = Cli::default();
 
-    let _guard = init_tracing();
+    let _guard = tracing_subscriber::fmt()
+        .with_env_filter("warn,swap=debug,monero_harness=debug,monero_rpc=info,bitcoin_harness=info,testcontainers=info")
+        .set_default();
 
     let env_config = C::get_config();
 
@@ -656,19 +658,6 @@ struct Containers<'a> {
     bitcoind: Container<'a, Cli, bitcoind::Bitcoind>,
     monerods: Vec<Container<'a, Cli, image::Monero>>,
     electrs: Container<'a, Cli, electrs::Electrs>,
-}
-
-/// Utility function to initialize logging in the test environment.
-/// Note that you have to keep the `_guard` in scope after calling in test:
-///
-/// ```rust
-/// let _guard = init_tracing();
-/// ```
-pub fn init_tracing() -> DefaultGuard {
-    use tracing_subscriber::util::SubscriberInitExt as _;
-    tracing_subscriber::fmt()
-        .with_env_filter("warn,swap=debug,monero_harness=debug,monero_rpc=info,bitcoin_harness=info,testcontainers=info")
-        .set_default()
 }
 
 pub mod alice_run_until {
