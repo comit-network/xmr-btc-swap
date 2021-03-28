@@ -2004,7 +2004,6 @@ dependencies = [
  "testcontainers 0.12.0",
  "tokio",
  "tracing",
- "tracing-log",
  "tracing-subscriber",
 ]
 
@@ -3472,7 +3471,6 @@ dependencies = [
  "toml",
  "tracing",
  "tracing-futures",
- "tracing-log",
  "tracing-subscriber",
  "url",
  "uuid",
@@ -3862,6 +3860,7 @@ dependencies = [
  "thread_local",
  "tracing",
  "tracing-core",
+ "tracing-log",
 ]
 
 [[package]]

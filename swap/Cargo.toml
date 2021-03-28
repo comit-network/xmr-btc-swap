@@ -52,8 +52,7 @@ tokio-util = { version = "0.6", features = ["io"] }
 toml = "0.5"
 tracing = { version = "0.1", features = ["attributes"] }
 tracing-futures = { version = "0.2", features = ["std-future", "futures-03"] }
-tracing-log = "0.1"
-tracing-subscriber = { version = "0.2", default-features = false, features = ["fmt", "ansi", "env-filter", "chrono"] }
+tracing-subscriber = { version = "0.2", default-features = false, features = ["fmt", "ansi", "env-filter", "chrono", "tracing-log"] }
 url = { version = "2", features = ["serde"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
 void = "1"

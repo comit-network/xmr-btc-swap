@@ -29,7 +29,6 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time::interval;
 use tracing::dispatcher::DefaultGuard;
-use tracing_log::LogTracer;
 use url::Url;
 use uuid::Uuid;
 
@@ -666,11 +665,6 @@ struct Containers<'a> {
 /// let _guard = init_tracing();
 /// ```
 pub fn init_tracing() -> DefaultGuard {
-    // converts all log records into tracing events
-    // Note: Make sure to initialize without unwrapping, otherwise this causes
-    // trouble when running multiple tests.
-    let _ = LogTracer::init();
-
     use tracing_subscriber::util::SubscriberInitExt as _;
     tracing_subscriber::fmt()
         .with_env_filter("warn,swap=debug,monero_harness=debug,monero_rpc=info,bitcoin_harness=info,testcontainers=info")
