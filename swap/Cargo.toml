@@ -18,6 +18,7 @@ base64 = "0.13"
 bdk = { version = "0.5" }
 big-bytes = "1"
 bitcoin = { version = "0.26", features = ["rand", "use-serde"] }
+bmrng = "0.5"
 config = { version = "0.11", default-features = false, features = ["toml"] }
 conquer-once = "0.3"
 curve25519-dalek = "3"

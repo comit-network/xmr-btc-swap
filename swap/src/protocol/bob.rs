@@ -5,7 +5,9 @@ use crate::protocol::bob;
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
 use libp2p::core::Multiaddr;
-use libp2p::request_response::{RequestResponseEvent, RequestResponseMessage, ResponseChannel};
+use libp2p::request_response::{
+    RequestId, RequestResponseEvent, RequestResponseMessage, ResponseChannel,
+};
 use libp2p::{NetworkBehaviour, PeerId};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -107,14 +109,22 @@ impl Builder {
 
 #[derive(Debug)]
 pub enum OutEvent {
-    QuoteReceived(BidQuote),
-    SpotPriceReceived(spot_price::Response),
-    ExecutionSetupDone(Result<Box<State2>>),
+    QuoteReceived {
+        id: RequestId,
+        response: BidQuote,
+    },
+    SpotPriceReceived {
+        id: RequestId,
+        response: spot_price::Response,
+    },
+    ExecutionSetupDone(Box<Result<State2>>),
     TransferProofReceived {
         msg: Box<transfer_proof::Request>,
         channel: ResponseChannel<()>,
     },
-    EncryptedSignatureAcknowledged,
+    EncryptedSignatureAcknowledged {
+        id: RequestId,
+    },
     ResponseSent, // Same variant is used for all messages as no processing is done
     CommunicationError(Error),
 }
@@ -133,7 +143,13 @@ impl From<quote::Message> for OutEvent {
     fn from(message: quote::Message) -> Self {
         match message {
             quote::Message::Request { .. } => OutEvent::unexpected_request(),
-            quote::Message::Response { response, .. } => OutEvent::QuoteReceived(response),
+            quote::Message::Response {
+                response,
+                request_id,
+            } => OutEvent::QuoteReceived {
+                id: request_id,
+                response,
+            },
         }
     }
 }
@@ -142,7 +158,13 @@ impl From<spot_price::Message> for OutEvent {
     fn from(message: spot_price::Message) -> Self {
         match message {
             spot_price::Message::Request { .. } => OutEvent::unexpected_request(),
-            spot_price::Message::Response { response, .. } => OutEvent::SpotPriceReceived(response),
+            spot_price::Message::Response {
+                response,
+                request_id,
+            } => OutEvent::SpotPriceReceived {
+                id: request_id,
+                response,
+            },
         }
     }
 }
@@ -165,8 +187,8 @@ impl From<encrypted_signature::Message> for OutEvent {
     fn from(message: encrypted_signature::Message) -> Self {
         match message {
             encrypted_signature::Message::Request { .. } => OutEvent::unexpected_request(),
-            encrypted_signature::Message::Response { .. } => {
-                OutEvent::EncryptedSignatureAcknowledged
+            encrypted_signature::Message::Response { request_id, .. } => {
+                OutEvent::EncryptedSignatureAcknowledged { id: request_id }
             }
         }
     }
@@ -221,7 +243,7 @@ where
 impl From<execution_setup::OutEvent> for OutEvent {
     fn from(event: execution_setup::OutEvent) -> Self {
         match event {
-            execution_setup::OutEvent::Done(res) => OutEvent::ExecutionSetupDone(res.map(Box::new)),
+            execution_setup::OutEvent::Done(res) => OutEvent::ExecutionSetupDone(Box::new(res)),
         }
     }
 }
