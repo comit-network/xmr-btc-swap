@@ -11,7 +11,6 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio::time::Interval;
-use tracing::{debug, info};
 use url::Url;
 
 #[derive(Debug)]
@@ -34,9 +33,9 @@ impl Wallet {
                 "Unable to create Monero wallet, please ensure that the monero-wallet-rpc is available",
             )?;
 
-            debug!("Created Monero wallet {}", name);
+            tracing::debug!("Created Monero wallet {}", name);
         } else {
-            debug!("Opened Monero wallet {}", name);
+            tracing::debug!("Opened Monero wallet {}", name);
         }
 
         Self::connect(client, name, env_config).await
@@ -312,7 +311,7 @@ where
 
         if tx.confirmations > seen_confirmations {
             seen_confirmations = tx.confirmations;
-            info!(%txid, "Monero lock tx has {} out of {} confirmations", tx.confirmations, conf_target);
+            tracing::info!(%txid, "Monero lock tx has {} out of {} confirmations", tx.confirmations, conf_target);
         }
     }
 
