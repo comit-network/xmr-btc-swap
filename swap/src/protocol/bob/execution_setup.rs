@@ -5,6 +5,7 @@ use anyhow::{Context, Error, Result};
 use libp2p::PeerId;
 use libp2p_async_await::BehaviourOutEvent;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Debug)]
 pub enum OutEvent {
@@ -42,8 +43,8 @@ impl Behaviour {
         state0: State0,
         bitcoin_wallet: Arc<crate::bitcoin::Wallet>,
     ) {
-        self.inner
-            .do_protocol_dialer(alice, move |mut substream| async move {
+        self.inner.do_protocol_dialer(alice, move |mut substream| {
+            let protocol = async move {
                 tracing::debug!("Starting execution setup with {}", alice);
 
                 substream
@@ -78,6 +79,9 @@ impl Behaviour {
                     .await?;
 
                 Ok(state2)
-            })
+            };
+
+            async move { tokio::time::timeout(Duration::from_secs(10), protocol).await? }
+        })
     }
 }
