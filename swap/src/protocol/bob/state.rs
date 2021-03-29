@@ -83,7 +83,7 @@ pub struct State0 {
     cancel_timelock: CancelTimelock,
     punish_timelock: PunishTimelock,
     refund_address: bitcoin::Address,
-    min_monero_confirmations: u32,
+    min_monero_confirmations: u64,
 }
 
 impl State0 {
@@ -94,7 +94,7 @@ impl State0 {
         cancel_timelock: CancelTimelock,
         punish_timelock: PunishTimelock,
         refund_address: bitcoin::Address,
-        min_monero_confirmations: u32,
+        min_monero_confirmations: u64,
     ) -> Self {
         let b = bitcoin::SecretKey::new_random(rng);
 
@@ -185,7 +185,7 @@ pub struct State1 {
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
-    min_monero_confirmations: u32,
+    min_monero_confirmations: u64,
 }
 
 impl State1 {
@@ -245,7 +245,7 @@ pub struct State2 {
     tx_lock: bitcoin::TxLock,
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: bitcoin::EncryptedSignature,
-    min_monero_confirmations: u32,
+    min_monero_confirmations: u64,
 }
 
 impl State2 {
@@ -302,7 +302,7 @@ pub struct State3 {
     tx_lock: bitcoin::TxLock,
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: bitcoin::EncryptedSignature,
-    min_monero_confirmations: u32,
+    min_monero_confirmations: u64,
 }
 
 impl State3 {

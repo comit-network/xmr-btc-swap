@@ -271,7 +271,7 @@ pub struct WatchRequest {
     pub public_spend_key: PublicKey,
     pub public_view_key: PublicViewKey,
     pub transfer_proof: TransferProof,
-    pub conf_target: u32,
+    pub conf_target: u64,
     pub expected: Amount,
 }
 
@@ -280,12 +280,12 @@ async fn wait_for_confirmations<Fut>(
     fetch_tx: impl Fn(String) -> Fut,
     mut check_interval: Interval,
     expected: Amount,
-    conf_target: u32,
+    conf_target: u64,
 ) -> Result<(), InsufficientFunds>
 where
     Fut: Future<Output = Result<CheckTxKey>>,
 {
-    let mut seen_confirmations = 0u32;
+    let mut seen_confirmations = 0u64;
 
     while seen_confirmations < conf_target {
         check_interval.tick().await; // tick() at the beginning of the loop so every `continue` tick()s as well
@@ -323,7 +323,7 @@ where
 mod tests {
     use super::*;
     use monero_rpc::wallet::CheckTxKey;
-    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
     use std::sync::Arc;
 
     #[tokio::test]
@@ -364,9 +364,9 @@ mod tests {
     #[tokio::test]
     async fn visual_log_check() {
         let _ = tracing_subscriber::fmt().with_test_writer().try_init();
-        const MAX_REQUESTS: u32 = 20;
+        const MAX_REQUESTS: u64 = 20;
 
-        let requests = Arc::new(AtomicU32::new(0));
+        let requests = Arc::new(AtomicU64::new(0));
 
         let result = wait_for_confirmations(
             String::from("TXID"),
