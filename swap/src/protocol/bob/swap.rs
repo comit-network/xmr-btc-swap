@@ -188,8 +188,13 @@ async fn run_until_internal(
             }
         }
         BobState::BtcRedeemed(state) => {
-            // Bob redeems XMR using revealed s_a
-            state.claim_xmr(monero_wallet.as_ref()).await?;
+            let (spend_key, view_key) = state.xmr_keys();
+
+            // NOTE: This actually generates and opens a new wallet, closing the currently
+            // open one.
+            monero_wallet
+                .create_from_and_load(spend_key, view_key, state.monero_wallet_restore_blockheight)
+                .await?;
 
             // Ensure that the generated wallet is synced so we have a proper balance
             monero_wallet.refresh().await?;

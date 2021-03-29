@@ -485,23 +485,17 @@ pub struct State5 {
     s_b: monero::Scalar,
     v: monero::PrivateViewKey,
     tx_lock: bitcoin::TxLock,
-    monero_wallet_restore_blockheight: BlockHeight,
+    pub monero_wallet_restore_blockheight: BlockHeight,
 }
 
 impl State5 {
-    pub async fn claim_xmr(&self, monero_wallet: &monero::Wallet) -> Result<()> {
+    pub fn xmr_keys(&self) -> (monero::PrivateKey, monero::PrivateViewKey) {
         let s_b = monero::PrivateKey { scalar: self.s_b };
-
         let s = self.s_a + s_b;
 
-        // NOTE: This actually generates and opens a new wallet, closing the currently
-        // open one.
-        monero_wallet
-            .create_from_and_load(s, self.v, self.monero_wallet_restore_blockheight)
-            .await?;
-
-        Ok(())
+        (s, self.v)
     }
+
     pub fn tx_lock_id(&self) -> bitcoin::Txid {
         self.tx_lock.txid()
     }
