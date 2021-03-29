@@ -6,7 +6,8 @@ use std::path::PathBuf;
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(
     name = "asb",
-    about = "Automated Swap Backend for swapping XMR for BTC"
+    about = "Automated Swap Backend for swapping XMR for BTC",
+    author
 )]
 pub struct Arguments {
     #[structopt(
