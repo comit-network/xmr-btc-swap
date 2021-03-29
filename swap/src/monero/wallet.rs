@@ -288,6 +288,8 @@ where
     let mut seen_confirmations = 0u32;
 
     while seen_confirmations < conf_target {
+        check_interval.tick().await; // tick() at the beginning of the loop so every `continue` tick()s as well
+
         let tx = match fetch_tx(txid.clone()).await {
             Ok(proof) => proof,
             Err(error) => {
@@ -312,8 +314,6 @@ where
             seen_confirmations = tx.confirmations;
             info!(%txid, "Monero lock tx has {} out of {} confirmations", tx.confirmations, conf_target);
         }
-
-        check_interval.tick().await;
     }
 
     Ok(())
