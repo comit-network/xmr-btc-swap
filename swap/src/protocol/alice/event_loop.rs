@@ -4,7 +4,7 @@ use crate::env::Config;
 use crate::monero::BalanceTooLow;
 use crate::network::quote::BidQuote;
 use crate::network::{encrypted_signature, spot_price, transfer_proof};
-use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State3, Swap};
+use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State0, State3, Swap};
 use crate::{bitcoin, kraken, monero};
 use anyhow::{bail, Context, Result};
 use futures::future;
@@ -135,21 +135,24 @@ where
                                 }
                             };
 
-                            match self.swarm.send_spot_price(channel, spot_price::Response { xmr }) {
+                            match self.swarm.spot_price.send_response(channel, spot_price::Response { xmr }) {
                                 Ok(_) => {},
-                                Err(e) => {
+                                Err(_) => {
                                     // if we can't respond, the peer probably just disconnected so it is not a huge deal, only log this on debug
-                                    debug!(%peer, "failed to respond with spot price: {:#}", e);
+                                    debug!(%peer, "failed to respond with spot price");
                                     continue;
                                 }
                             }
 
-                            match self.swarm.start_execution_setup(peer, btc, xmr, self.env_config, self.bitcoin_wallet.as_ref(), &mut OsRng).await {
-                                Ok(_) => {},
+                            let state0 = match State0::new(btc, xmr, self.env_config, self.bitcoin_wallet.as_ref(), &mut OsRng).await {
+                                Ok(state) => state,
                                 Err(e) => {
-                                    tracing::warn!(%peer, "failed to start execution setup: {:#}", e);
+                                    tracing::warn!(%peer, "failed to make State0 for execution setup: {:#}", e);
+                                    continue;
                                 }
-                            }
+                            };
+
+                            self.swarm.execution_setup.run(peer, state0);
                         }
                         SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer }) => {
                             let quote = match self.make_quote(self.max_buy).await {
@@ -160,13 +163,8 @@ where
                                 }
                             };
 
-                            match self.swarm.send_quote(channel, quote) {
-                                Ok(_) => {},
-                                Err(e) => {
-                                    // if we can't respond, the peer probably just disconnected so it is not a huge deal, only log this on debug
-                                    debug!(%peer, "failed to respond with quote: {:#}", e);
-                                    continue;
-                                }
+                            if self.swarm.quote.send_response(channel, quote).is_err() {
+                                debug!(%peer, "failed to respond with quote");
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone{bob_peer_id, state3}) => {
@@ -186,7 +184,7 @@ where
                                 }
                             }
 
-                            self.swarm.send_encrypted_signature_ack(channel);
+                            let _ = self.swarm.encrypted_signature.send_response(channel, ());
                         }
                         SwarmEvent::Behaviour(OutEvent::ResponseSent) => {}
                         SwarmEvent::Behaviour(OutEvent::Failure {peer, error}) => {
@@ -198,9 +196,7 @@ where
                             if let Some(transfer_proof) = self.buffered_transfer_proofs.remove(&peer) {
                                 tracing::debug!(%peer, "Found buffered transfer proof for peer");
 
-                                self.swarm
-                                    .send_transfer_proof(peer, transfer_proof)
-                                    .expect("must be able to send transfer proof after connection was established");
+                                self.swarm.transfer_proof.send_request(&peer, transfer_proof);
                             }
                         }
                         SwarmEvent::IncomingConnectionError { send_back_addr: address, error, .. } => {
@@ -222,12 +218,13 @@ where
                 next_transfer_proof = self.send_transfer_proof.next() => {
                     match next_transfer_proof {
                         Some(Ok((peer, transfer_proof))) => {
-                            let result = self.swarm.send_transfer_proof(peer, transfer_proof);
-
-                            if let Err(transfer_proof) = result {
+                            if !self.swarm.transfer_proof.is_connected(&peer) {
                                 tracing::warn!(%peer, "No active connection to peer, buffering transfer proof");
                                 self.buffered_transfer_proofs.insert(peer, transfer_proof);
+                                continue;
                             }
+
+                            self.swarm.transfer_proof.send_request(&peer, transfer_proof);
                         },
                         Some(Err(_)) => {
                             tracing::debug!("A swap stopped without sending a transfer proof");

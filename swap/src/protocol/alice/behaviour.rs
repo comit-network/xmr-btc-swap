@@ -1,13 +1,9 @@
-use crate::env::Config;
 use crate::network::quote::BidQuote;
 use crate::network::{encrypted_signature, quote, spot_price, transfer_proof};
-use crate::protocol::alice::{execution_setup, State0, State3};
-use crate::{bitcoin, monero};
-use anyhow::{anyhow, Error, Result};
+use crate::protocol::alice::{execution_setup, State3};
+use anyhow::{anyhow, Error};
 use libp2p::request_response::{RequestResponseEvent, RequestResponseMessage, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
-use rand::{CryptoRng, RngCore};
-use tracing::debug;
 
 #[derive(Debug)]
 pub enum OutEvent {
@@ -166,11 +162,11 @@ impl From<execution_setup::OutEvent> for OutEvent {
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    quote: quote::Behaviour,
-    spot_price: spot_price::Behaviour,
-    execution_setup: execution_setup::Behaviour,
-    transfer_proof: transfer_proof::Behaviour,
-    encrypted_signature: encrypted_signature::Behaviour,
+    pub quote: quote::Behaviour,
+    pub spot_price: spot_price::Behaviour,
+    pub execution_setup: execution_setup::Behaviour,
+    pub transfer_proof: transfer_proof::Behaviour,
+    pub encrypted_signature: encrypted_signature::Behaviour,
 }
 
 impl Default for Behaviour {
@@ -182,76 +178,5 @@ impl Default for Behaviour {
             transfer_proof: transfer_proof::alice(),
             encrypted_signature: encrypted_signature::alice(),
         }
-    }
-}
-
-impl Behaviour {
-    pub fn send_quote(
-        &mut self,
-        channel: ResponseChannel<BidQuote>,
-        response: BidQuote,
-    ) -> Result<()> {
-        self.quote
-            .send_response(channel, response)
-            .map_err(|_| anyhow!("Failed to respond with quote"))?;
-
-        Ok(())
-    }
-
-    pub fn send_spot_price(
-        &mut self,
-        channel: ResponseChannel<spot_price::Response>,
-        response: spot_price::Response,
-    ) -> Result<()> {
-        self.spot_price
-            .send_response(channel, response)
-            .map_err(|_| anyhow!("Failed to respond with spot price"))?;
-
-        Ok(())
-    }
-
-    pub async fn start_execution_setup(
-        &mut self,
-        peer: PeerId,
-        btc: bitcoin::Amount,
-        xmr: monero::Amount,
-        env_config: Config,
-        bitcoin_wallet: &bitcoin::Wallet,
-        rng: &mut (impl RngCore + CryptoRng),
-    ) -> Result<()> {
-        let state0 = State0::new(btc, xmr, env_config, bitcoin_wallet, rng).await?;
-
-        tracing::info!(
-            %peer,
-            "Starting execution setup to sell {} for {}",
-            xmr, btc,
-        );
-
-        self.execution_setup.run(peer, state0);
-
-        Ok(())
-    }
-
-    /// Send Transfer Proof to Bob.
-    ///
-    /// Fails and returns the transfer proof if we are currently not connected
-    /// to this peer.
-    pub fn send_transfer_proof(
-        &mut self,
-        bob: PeerId,
-        msg: transfer_proof::Request,
-    ) -> Result<(), transfer_proof::Request> {
-        if !self.transfer_proof.is_connected(&bob) {
-            return Err(msg);
-        }
-        self.transfer_proof.send_request(&bob, msg);
-
-        debug!("Sending Transfer Proof");
-
-        Ok(())
-    }
-
-    pub fn send_encrypted_signature_ack(&mut self, channel: ResponseChannel<()>) {
-        let _ = self.encrypted_signature.send_response(channel, ());
     }
 }

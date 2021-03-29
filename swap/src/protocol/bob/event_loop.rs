@@ -1,6 +1,6 @@
 use crate::bitcoin::EncryptedSignature;
 use crate::network::quote::BidQuote;
-use crate::network::{spot_price, transfer_proof};
+use crate::network::{encrypted_signature, spot_price, transfer_proof};
 use crate::protocol::bob::{Behaviour, OutEvent, State0, State2};
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, Result};
@@ -21,7 +21,7 @@ pub struct EventLoop {
     start_execution_setup: Receiver<State0>,
     done_execution_setup: Sender<Result<State2>>,
     recv_transfer_proof: Sender<transfer_proof::Request>,
-    send_encrypted_signature: Receiver<EncryptedSignature>,
+    send_encrypted_signature: Receiver<encrypted_signature::Request>,
     request_quote: Receiver<()>,
     recv_quote: Sender<BidQuote>,
 }
@@ -135,24 +135,24 @@ impl EventLoop {
                 },
                 spot_price_request = self.request_spot_price.recv().fuse() => {
                     if let Some(request) = spot_price_request {
-                        self.swarm.request_spot_price(self.alice_peer_id, request);
+                        self.swarm.spot_price.send_request(&self.alice_peer_id, request);
                     }
                 },
                 quote_request = self.request_quote.recv().fuse() =>  {
                     if quote_request.is_some() {
-                        self.swarm.request_quote(self.alice_peer_id);
+                        self.swarm.quote.send_request(&self.alice_peer_id, ());
                     }
                 },
                 option = self.start_execution_setup.recv().fuse() => {
                     if let Some(state0) = option {
                         let _ = self
                             .swarm
-                            .start_execution_setup(self.alice_peer_id, state0, self.bitcoin_wallet.clone());
+                            .execution_setup.run(self.alice_peer_id, state0, self.bitcoin_wallet.clone());
                     }
                 },
                 encrypted_signature = self.send_encrypted_signature.recv().fuse() => {
                     if let Some(tx_redeem_encsig) = encrypted_signature {
-                        self.swarm.send_encrypted_signature(self.alice_peer_id, tx_redeem_encsig);
+                        self.swarm.encrypted_signature.send_request(&self.alice_peer_id, tx_redeem_encsig);
                     }
                 }
             }
@@ -165,7 +165,7 @@ pub struct EventLoopHandle {
     start_execution_setup: Sender<State0>,
     done_execution_setup: Receiver<Result<State2>>,
     recv_transfer_proof: Receiver<transfer_proof::Request>,
-    send_encrypted_signature: Sender<EncryptedSignature>,
+    send_encrypted_signature: Sender<encrypted_signature::Request>,
     request_spot_price: Sender<spot_price::Request>,
     recv_spot_price: Receiver<spot_price::Response>,
     request_quote: Sender<()>,
@@ -220,7 +220,9 @@ impl EventLoopHandle {
         &mut self,
         tx_redeem_encsig: EncryptedSignature,
     ) -> Result<()> {
-        self.send_encrypted_signature.send(tx_redeem_encsig).await?;
+        self.send_encrypted_signature
+            .send(encrypted_signature::Request { tx_redeem_encsig })
+            .await?;
 
         Ok(())
     }

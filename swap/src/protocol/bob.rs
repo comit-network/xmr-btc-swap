@@ -8,7 +8,6 @@ use libp2p::core::Multiaddr;
 use libp2p::request_response::{RequestResponseEvent, RequestResponseMessage, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
 use std::sync::Arc;
-use tracing::debug;
 use uuid::Uuid;
 
 pub use self::cancel::cancel;
@@ -232,11 +231,11 @@ impl From<execution_setup::OutEvent> for OutEvent {
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    quote: quote::Behaviour,
-    spot_price: spot_price::Behaviour,
-    execution_setup: execution_setup::Behaviour,
-    transfer_proof: transfer_proof::Behaviour,
-    encrypted_signature: encrypted_signature::Behaviour,
+    pub quote: quote::Behaviour,
+    pub spot_price: spot_price::Behaviour,
+    pub execution_setup: execution_setup::Behaviour,
+    pub transfer_proof: transfer_proof::Behaviour,
+    pub encrypted_signature: encrypted_signature::Behaviour,
 }
 
 impl Default for Behaviour {
@@ -252,34 +251,6 @@ impl Default for Behaviour {
 }
 
 impl Behaviour {
-    pub fn request_quote(&mut self, alice: PeerId) {
-        let _ = self.quote.send_request(&alice, ());
-    }
-
-    pub fn request_spot_price(&mut self, alice: PeerId, request: spot_price::Request) {
-        let _ = self.spot_price.send_request(&alice, request);
-    }
-
-    pub fn start_execution_setup(
-        &mut self,
-        alice_peer_id: PeerId,
-        state0: State0,
-        bitcoin_wallet: Arc<bitcoin::Wallet>,
-    ) {
-        self.execution_setup
-            .run(alice_peer_id, state0, bitcoin_wallet);
-    }
-
-    pub fn send_encrypted_signature(
-        &mut self,
-        alice: PeerId,
-        tx_redeem_encsig: bitcoin::EncryptedSignature,
-    ) {
-        let msg = encrypted_signature::Request { tx_redeem_encsig };
-        self.encrypted_signature.send_request(&alice, msg);
-        debug!("Encrypted signature sent");
-    }
-
     /// Add a known address for the given peer
     pub fn add_address(&mut self, peer_id: PeerId, address: Multiaddr) {
         self.quote.add_address(&peer_id, address.clone());
