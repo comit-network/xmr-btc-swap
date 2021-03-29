@@ -488,7 +488,7 @@ struct CheckTxKeyParams {
 
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub struct CheckTxKey {
-    pub confirmations: u32,
+    pub confirmations: u64,
     pub received: u64,
 }
 

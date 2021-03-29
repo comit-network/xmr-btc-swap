@@ -361,7 +361,7 @@ impl State3 {
     pub fn lock_xmr_watch_request(
         &self,
         transfer_proof: TransferProof,
-        conf_target: u32,
+        conf_target: u64,
     ) -> WatchRequest {
         let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey { scalar: self.s_a });
 

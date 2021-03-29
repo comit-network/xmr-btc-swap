@@ -2,13 +2,16 @@ mod bitcoind;
 mod electrs;
 
 use crate::testutils;
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
+use async_trait::async_trait;
 use bitcoin_harness::{BitcoindRpcApi, Client};
 use futures::Future;
 use get_port::get_port;
 use libp2p::core::Multiaddr;
 use libp2p::{PeerId, Swarm};
 use monero_harness::{image, Monero};
+use std::cmp::Ordering;
+use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -28,8 +31,7 @@ use testcontainers::{Container, Docker, RunArgs};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time::interval;
-use tracing::dispatcher::DefaultGuard;
-use tracing_log::LogTracer;
+use tracing_subscriber::util::SubscriberInitExt;
 use url::Url;
 use uuid::Uuid;
 
@@ -148,108 +150,83 @@ impl TestContext {
     pub async fn assert_alice_redeemed(&mut self, state: AliceState) {
         assert!(matches!(state, AliceState::BtcRedeemed));
 
-        self.alice_bitcoin_wallet.sync().await.unwrap();
+        assert_eventual_balance(
+            self.alice_bitcoin_wallet.as_ref(),
+            Ordering::Equal,
+            self.alice_redeemed_btc_balance(),
+        )
+        .await
+        .unwrap();
 
-        let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
-        assert_eq!(
-            btc_balance_after_swap,
-            self.alice_starting_balances.btc + self.btc_amount
-                - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
-        );
-
-        let xmr_balance_after_swap = self
-            .alice_monero_wallet
-            .as_ref()
-            .get_balance()
-            .await
-            .unwrap();
-        assert!(
-            xmr_balance_after_swap <= self.alice_starting_balances.xmr - self.xmr_amount,
-            "{} !< {} - {}",
-            xmr_balance_after_swap,
-            self.alice_starting_balances.xmr,
-            self.xmr_amount
-        );
+        assert_eventual_balance(
+            self.alice_monero_wallet.as_ref(),
+            Ordering::Less,
+            self.alice_redeemed_xmr_balance(),
+        )
+        .await
+        .unwrap();
     }
 
     pub async fn assert_alice_refunded(&mut self, state: AliceState) {
         assert!(matches!(state, AliceState::XmrRefunded));
 
-        self.alice_bitcoin_wallet.sync().await.unwrap();
-
-        let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
-        assert_eq!(btc_balance_after_swap, self.alice_starting_balances.btc);
-
-        // Ensure that Alice's balance is refreshed as we use a newly created wallet
-        self.alice_monero_wallet.as_ref().refresh().await.unwrap();
-        let xmr_balance_after_swap = self
-            .alice_monero_wallet
-            .as_ref()
-            .get_balance()
-            .await
-            .unwrap();
+        assert_eventual_balance(
+            self.alice_bitcoin_wallet.as_ref(),
+            Ordering::Equal,
+            self.alice_refunded_btc_balance(),
+        )
+        .await
+        .unwrap();
 
         // Alice pays fees - comparison does not take exact lock fee into account
-        assert!(
-            xmr_balance_after_swap > self.alice_starting_balances.xmr - self.xmr_amount,
-            "{} > {} - {}",
-            xmr_balance_after_swap,
-            self.alice_starting_balances.xmr,
-            self.xmr_amount
-        );
+        assert_eventual_balance(
+            self.alice_monero_wallet.as_ref(),
+            Ordering::Greater,
+            self.alice_refunded_xmr_balance(),
+        )
+        .await
+        .unwrap();
     }
 
     pub async fn assert_alice_punished(&self, state: AliceState) {
         assert!(matches!(state, AliceState::BtcPunished));
 
-        self.alice_bitcoin_wallet.sync().await.unwrap();
+        assert_eventual_balance(
+            self.alice_bitcoin_wallet.as_ref(),
+            Ordering::Equal,
+            self.alice_punished_btc_balance(),
+        )
+        .await
+        .unwrap();
 
-        let btc_balance_after_swap = self.alice_bitcoin_wallet.as_ref().balance().await.unwrap();
-        assert_eq!(
-            btc_balance_after_swap,
-            self.alice_starting_balances.btc + self.btc_amount
-                - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE)
-        );
-
-        let xmr_balance_after_swap = self
-            .alice_monero_wallet
-            .as_ref()
-            .get_balance()
-            .await
-            .unwrap();
-        assert!(xmr_balance_after_swap <= self.alice_starting_balances.xmr - self.xmr_amount);
+        assert_eventual_balance(
+            self.alice_monero_wallet.as_ref(),
+            Ordering::Less,
+            self.alice_punished_xmr_balance(),
+        )
+        .await
+        .unwrap();
     }
 
     pub async fn assert_bob_redeemed(&self, state: BobState) {
-        self.bob_bitcoin_wallet.sync().await.unwrap();
-
-        let lock_tx_id = if let BobState::XmrRedeemed { tx_lock_id } = state {
-            tx_lock_id
-        } else {
-            panic!("Bob in not in xmr redeemed state: {:?}", state);
-        };
-
-        let lock_tx_bitcoin_fee = self
-            .bob_bitcoin_wallet
-            .transaction_fee(lock_tx_id)
-            .await
-            .unwrap();
-
-        let btc_balance_after_swap = self.bob_bitcoin_wallet.as_ref().balance().await.unwrap();
-        assert_eq!(
-            btc_balance_after_swap,
-            self.bob_starting_balances.btc - self.btc_amount - lock_tx_bitcoin_fee
-        );
+        assert_eventual_balance(
+            self.bob_bitcoin_wallet.as_ref(),
+            Ordering::Equal,
+            self.bob_redeemed_btc_balance(state).await.unwrap(),
+        )
+        .await
+        .unwrap();
 
         // unload the generated wallet by opening the original wallet
         self.bob_monero_wallet.re_open().await.unwrap();
-        // refresh the original wallet to make sure the balance is caught up
-        self.bob_monero_wallet.refresh().await.unwrap();
 
-        // Ensure that Bob's balance is refreshed as we use a newly created wallet
-        self.bob_monero_wallet.as_ref().refresh().await.unwrap();
-        let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().get_balance().await.unwrap();
-        assert!(xmr_balance_after_swap > self.bob_starting_balances.xmr);
+        assert_eventual_balance(
+            self.bob_monero_wallet.as_ref(),
+            Ordering::Greater,
+            self.bob_redeemed_xmr_balance(),
+        )
+        .await
+        .unwrap();
     }
 
     pub async fn assert_bob_refunded(&self, state: BobState) {
@@ -266,7 +243,7 @@ impl TestContext {
             .await
             .unwrap();
 
-        let btc_balance_after_swap = self.bob_bitcoin_wallet.as_ref().balance().await.unwrap();
+        let btc_balance_after_swap = self.bob_bitcoin_wallet.balance().await.unwrap();
 
         let alice_submitted_cancel = btc_balance_after_swap
             == self.bob_starting_balances.btc
@@ -282,33 +259,181 @@ impl TestContext {
         // Since we cannot be sure who submitted it we have to assert accordingly
         assert!(alice_submitted_cancel || bob_submitted_cancel);
 
-        let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().get_balance().await.unwrap();
-        assert_eq!(xmr_balance_after_swap, self.bob_starting_balances.xmr);
+        assert_eventual_balance(
+            self.bob_monero_wallet.as_ref(),
+            Ordering::Equal,
+            self.bob_refunded_xmr_balance(),
+        )
+        .await
+        .unwrap();
     }
 
     pub async fn assert_bob_punished(&self, state: BobState) {
-        self.bob_bitcoin_wallet.sync().await.unwrap();
+        assert_eventual_balance(
+            self.bob_bitcoin_wallet.as_ref(),
+            Ordering::Equal,
+            self.bob_punished_btc_balance(state).await.unwrap(),
+        )
+        .await
+        .unwrap();
+
+        assert_eventual_balance(
+            self.bob_monero_wallet.as_ref(),
+            Ordering::Equal,
+            self.bob_punished_xmr_balance(),
+        )
+        .await
+        .unwrap();
+    }
+
+    fn alice_redeemed_xmr_balance(&self) -> monero::Amount {
+        self.alice_starting_balances.xmr - self.xmr_amount
+    }
+
+    fn alice_redeemed_btc_balance(&self) -> bitcoin::Amount {
+        self.alice_starting_balances.btc + self.btc_amount
+            - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
+    }
+
+    fn bob_redeemed_xmr_balance(&self) -> monero::Amount {
+        self.bob_starting_balances.xmr
+    }
+
+    async fn bob_redeemed_btc_balance(&self, state: BobState) -> Result<bitcoin::Amount> {
+        self.bob_bitcoin_wallet.sync().await?;
+
+        let lock_tx_id = if let BobState::XmrRedeemed { tx_lock_id } = state {
+            tx_lock_id
+        } else {
+            bail!("Bob in not in xmr redeemed state: {:?}", state);
+        };
+
+        let lock_tx_bitcoin_fee = self.bob_bitcoin_wallet.transaction_fee(lock_tx_id).await?;
+
+        Ok(self.bob_starting_balances.btc - self.btc_amount - lock_tx_bitcoin_fee)
+    }
+
+    fn alice_refunded_xmr_balance(&self) -> monero::Amount {
+        self.alice_starting_balances.xmr - self.xmr_amount
+    }
+
+    fn alice_refunded_btc_balance(&self) -> bitcoin::Amount {
+        self.alice_starting_balances.btc
+    }
+
+    fn bob_refunded_xmr_balance(&self) -> monero::Amount {
+        self.bob_starting_balances.xmr
+    }
+
+    fn alice_punished_xmr_balance(&self) -> monero::Amount {
+        self.alice_starting_balances.xmr - self.xmr_amount
+    }
+
+    fn alice_punished_btc_balance(&self) -> bitcoin::Amount {
+        self.alice_starting_balances.btc + self.btc_amount
+            - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE)
+    }
+
+    fn bob_punished_xmr_balance(&self) -> monero::Amount {
+        self.bob_starting_balances.xmr
+    }
+
+    async fn bob_punished_btc_balance(&self, state: BobState) -> Result<bitcoin::Amount> {
+        self.bob_bitcoin_wallet.sync().await?;
 
         let lock_tx_id = if let BobState::BtcPunished { tx_lock_id } = state {
             tx_lock_id
         } else {
-            panic!("Bob in not in btc punished state: {:?}", state);
+            bail!("Bob in not in btc punished state: {:?}", state);
         };
 
-        let lock_tx_bitcoin_fee = self
-            .bob_bitcoin_wallet
-            .transaction_fee(lock_tx_id)
-            .await
-            .unwrap();
+        let lock_tx_bitcoin_fee = self.bob_bitcoin_wallet.transaction_fee(lock_tx_id).await?;
 
-        let btc_balance_after_swap = self.bob_bitcoin_wallet.as_ref().balance().await.unwrap();
-        assert_eq!(
-            btc_balance_after_swap,
-            self.bob_starting_balances.btc - self.btc_amount - lock_tx_bitcoin_fee
+        Ok(self.bob_starting_balances.btc - self.btc_amount - lock_tx_bitcoin_fee)
+    }
+}
+
+async fn assert_eventual_balance<A: fmt::Display + PartialOrd>(
+    wallet: &impl Wallet<Amount = A>,
+    ordering: Ordering,
+    expected: A,
+) -> Result<()> {
+    let ordering_str = match ordering {
+        Ordering::Less => "less than",
+        Ordering::Equal => "equal to",
+        Ordering::Greater => "greater than",
+    };
+
+    let mut current_balance = wallet.get_balance().await?;
+
+    let assertion = async {
+        while current_balance.partial_cmp(&expected).unwrap() != ordering {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+
+            wallet.refresh().await?;
+            current_balance = wallet.get_balance().await?;
+        }
+
+        tracing::debug!(
+            "Assertion successful! Balance {} is {} {}",
+            current_balance,
+            ordering_str,
+            expected
         );
 
-        let xmr_balance_after_swap = self.bob_monero_wallet.as_ref().get_balance().await.unwrap();
-        assert_eq!(xmr_balance_after_swap, self.bob_starting_balances.xmr);
+        Result::<_, anyhow::Error>::Ok(())
+    };
+
+    let timeout = Duration::from_secs(10);
+
+    tokio::time::timeout(timeout, assertion)
+        .await
+        .with_context(|| {
+            format!(
+                "Expected balance to be {} {} after at most {}s but was {}",
+                ordering_str,
+                expected,
+                timeout.as_secs(),
+                current_balance
+            )
+        })??;
+
+    Ok(())
+}
+
+#[async_trait]
+trait Wallet {
+    type Amount;
+
+    async fn refresh(&self) -> Result<()>;
+    async fn get_balance(&self) -> Result<Self::Amount>;
+}
+
+#[async_trait]
+impl Wallet for monero::Wallet {
+    type Amount = monero::Amount;
+
+    async fn refresh(&self) -> Result<()> {
+        self.refresh().await?;
+
+        Ok(())
+    }
+
+    async fn get_balance(&self) -> Result<Self::Amount> {
+        self.get_balance().await
+    }
+}
+
+#[async_trait]
+impl Wallet for bitcoin::Wallet {
+    type Amount = bitcoin::Amount;
+
+    async fn refresh(&self) -> Result<()> {
+        self.sync().await
+    }
+
+    async fn get_balance(&self) -> Result<Self::Amount> {
+        self.balance().await
     }
 }
 
@@ -320,7 +445,10 @@ where
 {
     let cli = Cli::default();
 
-    let _guard = init_tracing();
+    let _guard = tracing_subscriber::fmt()
+        .with_env_filter("warn,swap=debug,monero_harness=debug,monero_rpc=info,bitcoin_harness=info,testcontainers=info")
+        .with_test_writer()
+        .set_default();
 
     let env_config = C::get_config();
 
@@ -657,24 +785,6 @@ struct Containers<'a> {
     bitcoind: Container<'a, Cli, bitcoind::Bitcoind>,
     monerods: Vec<Container<'a, Cli, image::Monero>>,
     electrs: Container<'a, Cli, electrs::Electrs>,
-}
-
-/// Utility function to initialize logging in the test environment.
-/// Note that you have to keep the `_guard` in scope after calling in test:
-///
-/// ```rust
-/// let _guard = init_tracing();
-/// ```
-pub fn init_tracing() -> DefaultGuard {
-    // converts all log records into tracing events
-    // Note: Make sure to initialize without unwrapping, otherwise this causes
-    // trouble when running multiple tests.
-    let _ = LogTracer::init();
-
-    use tracing_subscriber::util::SubscriberInitExt as _;
-    tracing_subscriber::fmt()
-        .with_env_filter("warn,swap=debug,monero_harness=debug,monero_rpc=info,bitcoin_harness=info,testcontainers=info")
-        .set_default()
 }
 
 pub mod alice_run_until {

@@ -12,7 +12,7 @@ pub struct Config {
     pub bitcoin_punish_timelock: PunishTimelock,
     pub bitcoin_network: bitcoin::Network,
     pub monero_avg_block_time: Duration,
-    pub monero_finality_confirmations: u32,
+    pub monero_finality_confirmations: u64,
     pub monero_network: monero::Network,
 }
 

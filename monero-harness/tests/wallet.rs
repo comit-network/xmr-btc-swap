@@ -1,15 +1,15 @@
-use crate::testutils::init_tracing;
 use monero_harness::{Monero, MoneroWalletRpc};
 use spectral::prelude::*;
 use std::time::Duration;
 use testcontainers::clients::Cli;
 use tokio::time::sleep;
-
-mod testutils;
+use tracing_subscriber::util::SubscriberInitExt;
 
 #[tokio::test]
 async fn fund_transfer_and_check_tx_key() {
-    let _guard = init_tracing();
+    let _guard = tracing_subscriber::fmt()
+        .with_env_filter("warn,test=debug,monero_harness=debug,monero_rpc=debug")
+        .set_default();
 
     let fund_alice: u64 = 1_000_000_000_000;
     let fund_bob = 0;
