@@ -21,7 +21,6 @@ pub struct EventLoop {
     start_execution_setup: Receiver<State0>,
     done_execution_setup: Sender<Result<State2>>,
     recv_transfer_proof: Sender<transfer_proof::Request>,
-    conn_established: Sender<PeerId>,
     send_encrypted_signature: Receiver<EncryptedSignature>,
     request_quote: Receiver<()>,
     recv_quote: Sender<BidQuote>,
@@ -36,7 +35,6 @@ impl EventLoop {
         let start_execution_setup = Channels::new();
         let done_execution_setup = Channels::new();
         let recv_transfer_proof = Channels::new();
-        let conn_established = Channels::new();
         let send_encrypted_signature = Channels::new();
         let request_spot_price = Channels::new();
         let recv_spot_price = Channels::new();
@@ -50,7 +48,6 @@ impl EventLoop {
             start_execution_setup: start_execution_setup.receiver,
             done_execution_setup: done_execution_setup.sender,
             recv_transfer_proof: recv_transfer_proof.sender,
-            conn_established: conn_established.sender,
             send_encrypted_signature: send_encrypted_signature.receiver,
             request_spot_price: request_spot_price.receiver,
             recv_spot_price: recv_spot_price.sender,
@@ -79,9 +76,6 @@ impl EventLoop {
             tokio::select! {
                 swarm_event = self.swarm.next_event().fuse() => {
                     match swarm_event {
-                        SwarmEvent::Behaviour(OutEvent::ConnectionEstablished(peer_id)) => {
-                            let _ = self.conn_established.send(peer_id).await;
-                        }
                         SwarmEvent::Behaviour(OutEvent::SpotPriceReceived(msg)) => {
                             let _ = self.recv_spot_price.send(msg).await;
                         }

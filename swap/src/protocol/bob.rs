@@ -108,7 +108,6 @@ impl Builder {
 
 #[derive(Debug)]
 pub enum OutEvent {
-    ConnectionEstablished(PeerId),
     QuoteReceived(BidQuote),
     SpotPriceReceived(spot_price::Response),
     ExecutionSetupDone(Result<Box<State2>>),
