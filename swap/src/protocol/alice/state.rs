@@ -315,19 +315,6 @@ pub struct State3 {
 }
 
 impl State3 {
-    pub async fn wait_for_cancel_timelock_to_expire(
-        &self,
-        bitcoin_wallet: &bitcoin::Wallet,
-    ) -> Result<()> {
-        bitcoin_wallet
-            .watch_until_status(&self.tx_lock, |status| {
-                status.is_confirmed_with(self.cancel_timelock)
-            })
-            .await?;
-
-        Ok(())
-    }
-
     pub async fn expired_timelocks(
         &self,
         bitcoin_wallet: &bitcoin::Wallet,

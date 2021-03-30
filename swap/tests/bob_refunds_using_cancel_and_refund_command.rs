@@ -21,8 +21,11 @@ async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
 
         // Ensure Bob's timelock is expired
         if let BobState::BtcLocked(state3) = bob_swap.state.clone() {
-            state3
-                .wait_for_cancel_timelock_to_expire(bob_swap.bitcoin_wallet.as_ref())
+            bob_swap
+                .bitcoin_wallet
+                .subscribe_to(state3.tx_lock)
+                .await
+                .wait_until_confirmed_with(state3.cancel_timelock)
                 .await?;
         } else {
             panic!("Bob in unexpected state {}", bob_swap.state);

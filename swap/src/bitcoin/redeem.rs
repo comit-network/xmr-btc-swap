@@ -15,7 +15,7 @@ use miniscript::{Descriptor, DescriptorTrait};
 use sha2::Sha256;
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TxRedeem {
     inner: Transaction,
     digest: SigHash,
