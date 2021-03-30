@@ -285,9 +285,9 @@ dependencies = [
 
 [[package]]
 name = "bdk-testutils"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6d9382c8dfda457f2be9b700ffd580f12babec5d34ee39343768f65724ddd64"
+checksum = "6687d59c3f65c5b318356154f00699e28dc75487abab31c09391c4febea51bbf"
 dependencies = [
  "bitcoin",
  "bitcoincore-rpc",
@@ -1500,7 +1500,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f9f7a97316d44c0af9b0301e65010573a853a9fc97046d7331d7f6bc0fd5a64"
 dependencies = [
  "futures-util",
- "hyper 0.14.4",
+ "hyper 0.14.5",
  "log 0.4.14",
  "rustls 0.19.0",
  "tokio",
@@ -2986,7 +2986,7 @@ dependencies = [
  "futures-util",
  "http",
  "http-body",
- "hyper 0.14.4",
+ "hyper 0.14.5",
  "hyper-rustls",
  "ipnet",
  "js-sys",
@@ -3626,7 +3626,7 @@ dependencies = [
  "ecdsa_fun",
  "futures",
  "get-port",
- "hyper 0.14.4",
+ "hyper 0.14.5",
  "libp2p",
  "libp2p-async-await",
  "miniscript",
