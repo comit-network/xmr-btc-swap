@@ -21,7 +21,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use structopt::StructOpt;
 use swap::bitcoin::{Amount, TxLock};
-use swap::cli::command::{AliceConnectParams, Arguments, Command, Data, MoneroParams};
+use swap::cli::command::{AliceMultiaddress, Arguments, Command, Data, MoneroParams};
 use swap::database::Database;
 use swap::env::{Config, GetConfig};
 use swap::network::quote::BidQuote;
@@ -81,9 +81,9 @@ async fn main() -> Result<()> {
 
     match args.cmd {
         Command::BuyXmr {
-            connect_params:
-                AliceConnectParams {
-                    peer_id: alice_peer_id,
+            alice_peer_id,
+            alice_multi_addr:
+                AliceMultiaddress {
                     multiaddr: alice_addr,
                 },
             monero_params:
@@ -131,9 +131,12 @@ async fn main() -> Result<()> {
             )
             .await?;
 
+            let swap_id = Uuid::new_v4();
+            db.insert_peer_id(swap_id, alice_peer_id).await?;
+
             let swap = Builder::new(
                 db,
-                Uuid::new_v4(),
+                swap_id,
                 bitcoin_wallet.clone(),
                 Arc::new(monero_wallet),
                 env_config,
@@ -167,9 +170,8 @@ async fn main() -> Result<()> {
         }
         Command::Resume {
             swap_id,
-            connect_params:
-                AliceConnectParams {
-                    peer_id: alice_peer_id,
+            alice_multi_addr:
+                AliceMultiaddress {
                     multiaddr: alice_addr,
                 },
             monero_params:
@@ -189,6 +191,7 @@ async fn main() -> Result<()> {
                 init_monero_wallet(data_dir, monero_daemon_host, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
+            let alice_peer_id = db.get_peer_id(swap_id)?;
             let mut swarm = swarm::new::<Behaviour>(&seed)?;
             swarm.add_address(alice_peer_id, alice_addr);
 
