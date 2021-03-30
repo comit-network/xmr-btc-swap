@@ -69,13 +69,25 @@ async fn next_state(
     Ok(match state {
         AliceState::Started { state3 } => {
             let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
-            timeout(env_config.bob_time_to_act, tx_lock_status.wait_until_seen())
-                .await
-                .context("Failed to find lock Bitcoin tx")??;
-
-            tx_lock_status.wait_until_final().await?;
-
-            AliceState::BtcLocked { state3 }
+            match timeout(
+                env_config.bitcoin_lock_confirmed_timeout,
+                tx_lock_status.wait_until_final(),
+            )
+            .await
+            {
+                Err(_) => {
+                    tracing::info!(
+                        "TxLock lock did not get {} confirmations in {} minutes",
+                        env_config.bitcoin_finality_confirmations,
+                        env_config.bitcoin_lock_confirmed_timeout.as_secs_f64() / 60.0
+                    );
+                    AliceState::SafelyAborted
+                }
+                Ok(res) => {
+                    res?;
+                    AliceState::BtcLocked { state3 }
+                }
+            }
         }
         AliceState::BtcLocked { state3 } => {
             // Record the current monero wallet block height so we don't have to scan from
