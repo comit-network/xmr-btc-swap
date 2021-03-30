@@ -2,7 +2,9 @@ use crate::network::quote::BidQuote;
 use crate::network::{encrypted_signature, quote, spot_price, transfer_proof};
 use crate::protocol::alice::{execution_setup, State3};
 use anyhow::{anyhow, Error};
-use libp2p::request_response::{RequestResponseEvent, RequestResponseMessage, ResponseChannel};
+use libp2p::request_response::{
+    RequestId, RequestResponseEvent, RequestResponseMessage, ResponseChannel,
+};
 use libp2p::{NetworkBehaviour, PeerId};
 
 #[derive(Debug)]
@@ -20,7 +22,10 @@ pub enum OutEvent {
         bob_peer_id: PeerId,
         state3: Box<State3>,
     },
-    TransferProofAcknowledged(PeerId),
+    TransferProofAcknowledged {
+        peer: PeerId,
+        id: RequestId,
+    },
     EncryptedSignatureReceived {
         msg: Box<encrypted_signature::Request>,
         channel: ResponseChannel<()>,
@@ -77,7 +82,12 @@ impl From<(PeerId, transfer_proof::Message)> for OutEvent {
     fn from((peer, message): (PeerId, transfer_proof::Message)) -> Self {
         match message {
             transfer_proof::Message::Request { .. } => OutEvent::unexpected_request(peer),
-            transfer_proof::Message::Response { .. } => OutEvent::TransferProofAcknowledged(peer),
+            transfer_proof::Message::Response { request_id, .. } => {
+                OutEvent::TransferProofAcknowledged {
+                    peer,
+                    id: request_id,
+                }
+            }
         }
     }
 }
