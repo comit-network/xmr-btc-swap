@@ -34,30 +34,36 @@ pub enum AliceState {
     },
     XmrLockTransferProofSent {
         monero_wallet_restore_blockheight: BlockHeight,
+        transfer_proof: TransferProof,
         state3: Box<State3>,
     },
     EncSigLearned {
         monero_wallet_restore_blockheight: BlockHeight,
+        transfer_proof: TransferProof,
         encrypted_signature: Box<bitcoin::EncryptedSignature>,
         state3: Box<State3>,
     },
     BtcRedeemed,
     BtcCancelled {
         monero_wallet_restore_blockheight: BlockHeight,
+        transfer_proof: TransferProof,
         state3: Box<State3>,
     },
     BtcRefunded {
         monero_wallet_restore_blockheight: BlockHeight,
+        transfer_proof: TransferProof,
         spend_key: monero::PrivateKey,
         state3: Box<State3>,
     },
     BtcPunishable {
         monero_wallet_restore_blockheight: BlockHeight,
+        transfer_proof: TransferProof,
         state3: Box<State3>,
     },
     XmrRefunded,
     CancelTimelockExpired {
         monero_wallet_restore_blockheight: BlockHeight,
+        transfer_proof: TransferProof,
         state3: Box<State3>,
     },
     BtcPunished,
