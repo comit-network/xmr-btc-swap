@@ -17,7 +17,6 @@ use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
-use tracing::{debug, error, trace};
 use uuid::Uuid;
 
 #[allow(missing_debug_implementations)]
@@ -139,7 +138,7 @@ where
                                 Ok(_) => {},
                                 Err(_) => {
                                     // if we can't respond, the peer probably just disconnected so it is not a huge deal, only log this on debug
-                                    debug!(%peer, "Failed to respond with spot price");
+                                    tracing::debug!(%peer, "Failed to respond with spot price");
                                     continue;
                                 }
                             }
@@ -164,14 +163,14 @@ where
                             };
 
                             if self.swarm.quote.send_response(channel, quote).is_err() {
-                                debug!(%peer, "Failed to respond with quote");
+                                tracing::debug!(%peer, "Failed to respond with quote");
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone{bob_peer_id, state3}) => {
                             let _ = self.handle_execution_setup_done(bob_peer_id, *state3).await;
                         }
                         SwarmEvent::Behaviour(OutEvent::TransferProofAcknowledged(peer)) => {
-                            trace!(%peer, "Bob acknowledged transfer proof");
+                            tracing::trace!(%peer, "Bob acknowledged transfer proof");
                         }
                         SwarmEvent::Behaviour(OutEvent::EncryptedSignatureReceived{ msg, channel, peer }) => {
                             match self.recv_encrypted_signature.remove(&peer) {
@@ -188,7 +187,7 @@ where
                         }
                         SwarmEvent::Behaviour(OutEvent::ResponseSent) => {}
                         SwarmEvent::Behaviour(OutEvent::Failure {peer, error}) => {
-                            error!(%peer, "Communication error: {:#}", error);
+                            tracing::error!(%peer, "Communication error: {:#}", error);
                         }
                         SwarmEvent::ConnectionEstablished { peer_id: peer, endpoint, .. } => {
                             tracing::debug!(%peer, address = %endpoint.get_remote_address(), "New connection established");
