@@ -1,14 +1,14 @@
-pub mod testutils;
+pub mod harness;
 
 use bob::cancel::Error;
+use harness::bob_run_until::is_btc_locked;
+use harness::SlowCancelConfig;
 use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
-use testutils::bob_run_until::is_btc_locked;
-use testutils::SlowCancelConfig;
 
 #[tokio::test]
 async fn given_bob_manually_cancels_when_timelock_not_expired_errors() {
-    testutils::setup_test(SlowCancelConfig, |mut ctx| async move {
+    harness::setup_test(SlowCancelConfig, |mut ctx| async move {
         let (bob_swap, bob_join_handle) = ctx.bob_swap().await;
         let bob_swap = tokio::spawn(bob::run_until(bob_swap, is_btc_locked));
 

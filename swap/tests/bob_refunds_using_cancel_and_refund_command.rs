@@ -1,13 +1,13 @@
-pub mod testutils;
+pub mod harness;
 
+use harness::bob_run_until::is_btc_locked;
+use harness::FastCancelConfig;
 use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
-use testutils::bob_run_until::is_btc_locked;
-use testutils::FastCancelConfig;
 
 #[tokio::test]
 async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
-    testutils::setup_test(FastCancelConfig, |mut ctx| async move {
+    harness::setup_test(FastCancelConfig, |mut ctx| async move {
         let (bob_swap, bob_join_handle) = ctx.bob_swap().await;
         let bob_swap = tokio::spawn(bob::run_until(bob_swap, is_btc_locked));
 

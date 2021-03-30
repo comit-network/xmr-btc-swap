@@ -4,9 +4,8 @@ use crate::bitcoin::{
 use crate::env::Config;
 use crate::monero::wallet::{TransferRequest, WatchRequest};
 use crate::monero::TransferProof;
-use crate::protocol::alice::{Message1, Message3};
-use crate::protocol::bob::{Message0, Message2, Message4};
-use crate::protocol::CROSS_CURVE_PROOF_SYSTEM;
+use crate::monero_ext::ScalarExt;
+use crate::protocol::{Message0, Message1, Message2, Message3, Message4, CROSS_CURVE_PROOF_SYSTEM};
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, bail, Context, Result};
 use monero_rpc::wallet::BlockHeight;
@@ -74,21 +73,20 @@ impl fmt::Display for AliceState {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct State0 {
-    pub a: bitcoin::SecretKey,
-    pub s_a: monero::Scalar,
-    pub v_a: monero::PrivateViewKey,
-    pub(crate) S_a_monero: monero::PublicKey,
-    pub(crate) S_a_bitcoin: bitcoin::PublicKey,
-    pub dleq_proof_s_a: CrossCurveDLEQProof,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
-    pub btc: bitcoin::Amount,
-    pub xmr: monero::Amount,
-    pub cancel_timelock: CancelTimelock,
-    pub punish_timelock: PunishTimelock,
-    pub redeem_address: bitcoin::Address,
-    pub punish_address: bitcoin::Address,
+    a: bitcoin::SecretKey,
+    s_a: monero::Scalar,
+    v_a: monero::PrivateViewKey,
+    S_a_monero: monero::PublicKey,
+    S_a_bitcoin: bitcoin::PublicKey,
+    dleq_proof_s_a: CrossCurveDLEQProof,
+    btc: bitcoin::Amount,
+    xmr: monero::Amount,
+    cancel_timelock: CancelTimelock,
+    punish_timelock: PunishTimelock,
+    redeem_address: bitcoin::Address,
+    punish_address: bitcoin::Address,
 }
 
 impl State0 {
@@ -168,7 +166,7 @@ impl State0 {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug)]
 pub struct State1 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
@@ -180,7 +178,6 @@ pub struct State1 {
     v: monero::PrivateViewKey,
     v_a: monero::PrivateViewKey,
     dleq_proof_s_a: CrossCurveDLEQProof,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     cancel_timelock: CancelTimelock,
@@ -203,8 +200,11 @@ impl State1 {
         }
     }
 
-    pub fn receive(self, msg: Message2) -> State2 {
-        State2 {
+    pub fn receive(self, msg: Message2) -> Result<State2> {
+        let tx_lock = bitcoin::TxLock::from_psbt(msg.psbt, self.a.public(), self.B, self.btc)
+            .context("Failed to re-construct TxLock from received PSBT")?;
+
+        Ok(State2 {
             a: self.a,
             B: self.B,
             s_a: self.s_a,
@@ -218,12 +218,12 @@ impl State1 {
             refund_address: self.refund_address,
             redeem_address: self.redeem_address,
             punish_address: self.punish_address,
-            tx_lock: msg.tx_lock,
-        }
+            tx_lock,
+        })
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug)]
 pub struct State2 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
@@ -231,7 +231,6 @@ pub struct State2 {
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     cancel_timelock: CancelTimelock,
@@ -295,23 +294,23 @@ impl State2 {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct State3 {
-    pub a: bitcoin::SecretKey,
-    pub B: bitcoin::PublicKey,
-    pub s_a: monero::Scalar,
-    pub S_b_monero: monero::PublicKey,
-    pub S_b_bitcoin: bitcoin::PublicKey,
+    a: bitcoin::SecretKey,
+    B: bitcoin::PublicKey,
+    s_a: monero::Scalar,
+    S_b_monero: monero::PublicKey,
+    S_b_bitcoin: bitcoin::PublicKey,
     pub v: monero::PrivateViewKey,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
-    pub btc: bitcoin::Amount,
-    pub xmr: monero::Amount,
+    btc: bitcoin::Amount,
+    xmr: monero::Amount,
     pub cancel_timelock: CancelTimelock,
     pub punish_timelock: PunishTimelock,
-    pub refund_address: bitcoin::Address,
-    pub redeem_address: bitcoin::Address,
-    pub punish_address: bitcoin::Address,
+    refund_address: bitcoin::Address,
+    redeem_address: bitcoin::Address,
+    punish_address: bitcoin::Address,
     pub tx_lock: bitcoin::TxLock,
-    pub tx_punish_sig_bob: bitcoin::Signature,
-    pub tx_cancel_sig_bob: bitcoin::Signature,
+    tx_punish_sig_bob: bitcoin::Signature,
+    tx_cancel_sig_bob: bitcoin::Signature,
 }
 
 impl State3 {
@@ -367,15 +366,48 @@ impl State3 {
         TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B)
     }
 
-    pub fn tx_punish(&self) -> TxPunish {
+    pub fn tx_refund(&self) -> TxRefund {
+        bitcoin::TxRefund::new(&self.tx_cancel(), &self.refund_address)
+    }
+
+    pub fn extract_monero_private_key(
+        &self,
+        published_refund_tx: bitcoin::Transaction,
+    ) -> Result<monero::PrivateKey> {
+        self.tx_refund().extract_monero_private_key(
+            published_refund_tx,
+            self.s_a,
+            self.a.clone(),
+            self.S_b_bitcoin,
+        )
+    }
+
+    pub fn signed_redeem_transaction(
+        &self,
+        sig: bitcoin::EncryptedSignature,
+    ) -> Result<bitcoin::Transaction> {
+        bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address)
+            .complete(sig, self.a.clone(), self.s_a.to_secpfun_scalar(), self.B)
+            .context("Failed to complete Bitcoin redeem transaction")
+    }
+
+    pub fn signed_cancel_transaction(&self) -> Result<bitcoin::Transaction> {
+        self.tx_cancel()
+            .complete_as_alice(self.a.clone(), self.B, self.tx_cancel_sig_bob.clone())
+            .context("Failed to complete Bitcoin cancel transaction")
+    }
+
+    pub fn signed_punish_transaction(&self) -> Result<bitcoin::Transaction> {
+        self.tx_punish()
+            .complete(self.tx_punish_sig_bob.clone(), self.a.clone(), self.B)
+            .context("Failed to complete Bitcoin punish transaction")
+    }
+
+    fn tx_punish(&self) -> TxPunish {
         bitcoin::TxPunish::new(
             &self.tx_cancel(),
             &self.punish_address,
             self.punish_timelock,
         )
-    }
-
-    pub fn tx_refund(&self) -> TxRefund {
-        bitcoin::TxRefund::new(&self.tx_cancel(), &self.refund_address)
     }
 }

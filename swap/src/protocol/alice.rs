@@ -8,10 +8,8 @@ use uuid::Uuid;
 
 pub use self::behaviour::{Behaviour, OutEvent};
 pub use self::event_loop::{EventLoop, EventLoopHandle};
-pub use self::execution_setup::Message1;
 pub use self::state::*;
 pub use self::swap::{run, run_until};
-pub use execution_setup::Message3;
 
 mod behaviour;
 pub mod event_loop;

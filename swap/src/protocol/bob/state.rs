@@ -6,9 +6,7 @@ use crate::monero;
 use crate::monero::wallet::WatchRequest;
 use crate::monero::{monero_private_key, TransferProof};
 use crate::monero_ext::ScalarExt;
-use crate::protocol::alice::{Message1, Message3};
-use crate::protocol::bob::{Message0, Message2, Message4};
-use crate::protocol::CROSS_CURVE_PROOF_SYSTEM;
+use crate::protocol::{Message0, Message1, Message2, Message3, Message4, CROSS_CURVE_PROOF_SYSTEM};
 use anyhow::{anyhow, bail, Context, Result};
 use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
 use ecdsa_fun::nonce::Deterministic;
@@ -69,7 +67,7 @@ impl fmt::Display for BobState {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct State0 {
     b: bitcoin::SecretKey,
     s_b: monero::Scalar,
@@ -77,7 +75,6 @@ pub struct State0 {
     S_b_bitcoin: bitcoin::PublicKey,
     v_b: monero::PrivateViewKey,
     dleq_proof_s_b: CrossCurveDLEQProof,
-    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     btc: bitcoin::Amount,
     xmr: monero::Amount,
     cancel_timelock: CancelTimelock,
@@ -170,7 +167,7 @@ impl State0 {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug)]
 pub struct State1 {
     A: bitcoin::PublicKey,
     b: bitcoin::SecretKey,
@@ -191,7 +188,7 @@ pub struct State1 {
 impl State1 {
     pub fn next_message(&self) -> Message2 {
         Message2 {
-            tx_lock: self.tx_lock.clone(),
+            psbt: self.tx_lock.clone().into(),
         }
     }
 

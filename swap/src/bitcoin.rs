@@ -14,6 +14,7 @@ pub use crate::bitcoin::redeem::TxRedeem;
 pub use crate::bitcoin::refund::TxRefund;
 pub use crate::bitcoin::timelocks::{BlockHeight, ExpiredTimelocks};
 pub use ::bitcoin::util::amount::Amount;
+pub use ::bitcoin::util::psbt::PartiallySignedTransaction;
 pub use ::bitcoin::{Address, Network, Transaction, Txid};
 pub use ecdsa_fun::adaptor::EncryptedSignature;
 pub use ecdsa_fun::fun::Scalar;
@@ -104,6 +105,13 @@ impl SecretKey {
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PublicKey(Point);
+
+impl PublicKey {
+    #[cfg(test)]
+    pub fn random() -> Self {
+        Self(Point::random(&mut rand::thread_rng()))
+    }
+}
 
 impl From<PublicKey> for Point {
     fn from(from: PublicKey) -> Self {
