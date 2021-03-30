@@ -130,7 +130,7 @@ where
                             let xmr = match self.handle_spot_price_request(btc, self.monero_wallet.clone()).await {
                                 Ok(xmr) => xmr,
                                 Err(e) => {
-                                    tracing::warn!(%peer, "failed to produce spot price for {}: {:#}", btc, e);
+                                    tracing::warn!(%peer, "Failed to produce spot price for {}: {:#}", btc, e);
                                     continue;
                                 }
                             };
@@ -139,7 +139,7 @@ where
                                 Ok(_) => {},
                                 Err(_) => {
                                     // if we can't respond, the peer probably just disconnected so it is not a huge deal, only log this on debug
-                                    debug!(%peer, "failed to respond with spot price");
+                                    debug!(%peer, "Failed to respond with spot price");
                                     continue;
                                 }
                             }
@@ -147,7 +147,7 @@ where
                             let state0 = match State0::new(btc, xmr, self.env_config, self.bitcoin_wallet.as_ref(), &mut OsRng).await {
                                 Ok(state) => state,
                                 Err(e) => {
-                                    tracing::warn!(%peer, "failed to make State0 for execution setup: {:#}", e);
+                                    tracing::warn!(%peer, "Failed to make State0 for execution setup: {:#}", e);
                                     continue;
                                 }
                             };
@@ -158,13 +158,13 @@ where
                             let quote = match self.make_quote(self.max_buy).await {
                                 Ok(quote) => quote,
                                 Err(e) => {
-                                    tracing::warn!(%peer, "failed to make quote: {:#}", e);
+                                    tracing::warn!(%peer, "Failed to make quote: {:#}", e);
                                     continue;
                                 }
                             };
 
                             if self.swarm.quote.send_response(channel, quote).is_err() {
-                                debug!(%peer, "failed to respond with quote");
+                                debug!(%peer, "Failed to respond with quote");
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone{bob_peer_id, state3}) => {
