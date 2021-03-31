@@ -5,7 +5,7 @@ use crate::network::{encrypted_signature, quote, spot_price, transfer_proof};
 use crate::protocol::bob;
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
-use libp2p::core::Multiaddr;
+use libp2p::core::{Multiaddr, PublicKey};
 use libp2p::kad::store::MemoryStore;
 use libp2p::kad::{Kademlia, KademliaEvent, QueryResult};
 use libp2p::request_response::{RequestId, ResponseChannel};
@@ -177,8 +177,10 @@ pub struct Behaviour {
     pub dht: Kademlia<MemoryStore>,
 }
 
-impl From<PeerId> for Behaviour {
-    fn from(peer_id: PeerId) -> Self {
+impl From<PublicKey> for Behaviour {
+    fn from(public_key: PublicKey) -> Self {
+        let peer_id = public_key.into_peer_id();
+
         Self {
             quote: quote::bob(),
             spot_price: spot_price::bob(),

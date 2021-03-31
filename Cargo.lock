@@ -1689,6 +1689,7 @@ dependencies = [
  "lazy_static",
  "libp2p-core",
  "libp2p-dns",
+ "libp2p-identify",
  "libp2p-kad",
  "libp2p-mplex",
  "libp2p-noise",
@@ -1758,6 +1759,22 @@ dependencies = [
  "log 0.4.14",
  "smallvec",
  "trust-dns-resolver",
+]
+
+[[package]]
+name = "libp2p-identify"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f88ebc841d744979176ab4b8b294a3e655a7ba4ef26a905d073a52b49ed4dff5"
+dependencies = [
+ "futures",
+ "libp2p-core",
+ "libp2p-swarm",
+ "log 0.4.14",
+ "prost",
+ "prost-build",
+ "smallvec",
+ "wasm-timer",
 ]
 
 [[package]]

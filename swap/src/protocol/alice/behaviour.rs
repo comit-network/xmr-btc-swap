@@ -2,7 +2,8 @@ use crate::network::quote::BidQuote;
 use crate::network::{encrypted_signature, quote, spot_price, transfer_proof};
 use crate::protocol::alice::{execution_setup, State3};
 use anyhow::{anyhow, Error, Result};
-use libp2p::core::Multiaddr;
+use libp2p::core::{Multiaddr, PublicKey};
+use libp2p::identify::{Identify, IdentifyEvent};
 use libp2p::kad::store::MemoryStore;
 use libp2p::kad::{BootstrapResult, Kademlia, KademliaEvent, QueryResult, QueryStats};
 use libp2p::request_response::{RequestId, ResponseChannel};
@@ -74,6 +75,12 @@ impl From<KademliaEvent> for OutEvent {
     }
 }
 
+impl From<IdentifyEvent> for OutEvent {
+    fn from(_: IdentifyEvent) -> Self {
+        OutEvent::Other
+    }
+}
+
 /// A `NetworkBehaviour` that represents an XMR/BTC swap node as Alice.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
@@ -84,18 +91,26 @@ pub struct Behaviour {
     pub execution_setup: execution_setup::Behaviour,
     pub transfer_proof: transfer_proof::Behaviour,
     pub encrypted_signature: encrypted_signature::Behaviour,
-    pub dht: Kademlia<MemoryStore>,
+    pub kad: Kademlia<MemoryStore>,
+    pub identify: Identify,
 }
 
-impl From<PeerId> for Behaviour {
-    fn from(peer_id: PeerId) -> Self {
+impl From<PublicKey> for Behaviour {
+    fn from(public_key: PublicKey) -> Self {
+        let peer_id = public_key.clone().into_peer_id();
+
         Self {
             quote: quote::alice(),
             spot_price: spot_price::alice(),
             execution_setup: Default::default(),
             transfer_proof: transfer_proof::alice(),
             encrypted_signature: encrypted_signature::alice(),
-            dht: Kademlia::new(peer_id, MemoryStore::new(peer_id)),
+            kad: Kademlia::new(peer_id, MemoryStore::new(peer_id)),
+            identify: Identify::new(
+                String::from("comit/1.0.0"),
+                format!("asb {}", env!("CARGO_PKG_VERSION")),
+                public_key,
+            ),
         }
     }
 }
@@ -107,10 +122,10 @@ impl Behaviour {
         let address = "/dnsaddr/bootstrap.libp2p.io".parse::<Multiaddr>()?;
 
         for node in LIBP2P_BOOTSTRAP_NODES {
-            self.dht.add_address(&node.parse()?, address.clone());
+            self.kad.add_address(&node.parse()?, address.clone());
         }
 
-        self.dht.bootstrap()?;
+        self.kad.bootstrap()?;
 
         Ok(())
     }

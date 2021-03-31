@@ -3,8 +3,9 @@ use crate::protocol::{alice, bob};
 use crate::seed::Seed;
 use anyhow::Result;
 use libp2p::core::network::ConnectionLimits;
+use libp2p::core::PublicKey;
 use libp2p::swarm::{NetworkBehaviour, SwarmBuilder};
-use libp2p::{PeerId, Swarm};
+use libp2p::Swarm;
 
 pub fn alice(seed: &Seed) -> Result<Swarm<alice::Behaviour>> {
     let connection_limits = ConnectionLimits::default()
@@ -20,12 +21,13 @@ pub fn bob(seed: &Seed) -> Result<Swarm<bob::Behaviour>> {
 
 fn new<B>(seed: &Seed, connection_limits: ConnectionLimits) -> Result<Swarm<B>>
 where
-    B: NetworkBehaviour + From<PeerId>,
+    B: NetworkBehaviour + From<PublicKey>,
 {
     let identity = seed.derive_libp2p_identity();
-    let local_peer_id = identity.public().into_peer_id();
+    let public_key = identity.public();
+    let local_peer_id = public_key.clone().into_peer_id();
 
-    let behaviour = B::from(local_peer_id);
+    let behaviour = B::from(public_key);
     let transport = transport::build(&identity)?;
 
     let swarm = SwarmBuilder::new(transport, behaviour, local_peer_id)
