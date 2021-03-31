@@ -24,7 +24,13 @@ pub async fn refund(
             BobState::EncSigSent(state4) => state4.cancel(),
             BobState::CancelTimelockExpired(state6) => state6,
             BobState::BtcCancelled(state6) => state6,
-            _ => bail!(
+            BobState::Started { .. }
+            | BobState::ExecutionSetupDone(_)
+            | BobState::BtcRedeemed(_)
+            | BobState::BtcRefunded(_)
+            | BobState::XmrRedeemed { .. }
+            | BobState::BtcPunished { .. }
+            | BobState::SafelyAborted => bail!(
                 "Cannot refund swap {} because it is in state {} which is not refundable.",
                 swap_id,
                 state
