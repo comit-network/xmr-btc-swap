@@ -134,10 +134,7 @@ impl EventLoop {
                             return;
                         }
                         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } if peer_id == self.alice_peer_id => {
-                            tracing::debug!("Connected to Alice at {}", endpoint.get_remote_address());
-                        }
-                        SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
-                            tracing::debug!("Connected to {} at {}", peer_id, endpoint.get_remote_address());
+                            tracing::info!("Connected to Alice at {}", endpoint.get_remote_address());
                         }
                         SwarmEvent::Dialing(peer_id) if peer_id == self.alice_peer_id => {
                             tracing::debug!("Dialling Alice at {}", peer_id);
