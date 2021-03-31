@@ -325,8 +325,6 @@ async fn determine_btc_to_swap(
     wait_for_deposit: impl Future<Output = Result<bitcoin::Amount>>,
     max_giveable: impl Future<Output = Result<bitcoin::Amount>>,
 ) -> Result<bitcoin::Amount> {
-    debug!("Requesting quote");
-
     let bid_quote = request_quote.await?;
 
     info!("Received quote: 1 XMR ~ {}", bid_quote.price);

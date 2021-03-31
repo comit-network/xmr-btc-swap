@@ -168,18 +168,26 @@ impl EventLoop {
                 // Handle to-be-sent requests for all our network protocols.
                 // Use `self.is_connected_to_alice` as a guard to "buffer" requests until we are connected.
                 Some((request, responder)) = self.spot_price_requests.next().fuse(), if self.is_connected_to_alice() => {
+                    tracing::debug!("Requesting spot price");
+
                     let id = self.swarm.spot_price.send_request(&self.alice_peer_id, request);
                     self.inflight_spot_price_requests.insert(id, responder);
                 },
                 Some(((), responder)) = self.quote_requests.next().fuse(), if self.is_connected_to_alice() => {
+                    tracing::debug!("Requesting quote");
+
                     let id = self.swarm.quote.send_request(&self.alice_peer_id, ());
                     self.inflight_quote_requests.insert(id, responder);
                 },
                 Some((request, responder)) = self.execution_setup_requests.next().fuse(), if self.is_connected_to_alice() => {
+                    tracing::debug!("Starting execution setup");
+
                     self.swarm.execution_setup.run(self.alice_peer_id, request, self.bitcoin_wallet.clone());
                     self.inflight_execution_setup = Some(responder);
                 },
                 Some((request, responder)) = self.encrypted_signature_requests.next().fuse(), if self.is_connected_to_alice() => {
+                    tracing::debug!("Sending encrypted signature");
+
                     let id = self.swarm.encrypted_signature.send_request(&self.alice_peer_id, request);
                     self.inflight_encrypted_signature_requests.insert(id, responder);
                 },
