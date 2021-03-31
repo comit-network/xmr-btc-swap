@@ -88,6 +88,7 @@ impl EventLoop {
         let _ = Swarm::dial(&mut self.swarm, &self.alice_peer_id);
 
         loop {
+            // Note: We are making very elaborate use of `select!` macro's feature here. Make sure to read the documentation thoroughly: https://docs.rs/tokio/1.4.0/tokio/macro.select.html
             tokio::select! {
                 swarm_event = self.swarm.next_event().fuse() => {
                     match swarm_event {
@@ -164,22 +165,26 @@ impl EventLoop {
                         _ => {}
                     }
                 },
-                Some((request, responder)) = self.spot_price_requests.next().fuse() => {
+
+                // Handle to-be-sent requests for all our network protocols.
+                // Use `self.is_connected_to_alice` as a guard to "buffer" requests until we are connected.
+                Some((request, responder)) = self.spot_price_requests.next().fuse(), if self.is_connected_to_alice() => {
                     let id = self.swarm.spot_price.send_request(&self.alice_peer_id, request);
                     self.inflight_spot_price_requests.insert(id, responder);
                 },
-                Some(((), responder)) = self.quote_requests.next().fuse() => {
+                Some(((), responder)) = self.quote_requests.next().fuse(), if self.is_connected_to_alice() => {
                     let id = self.swarm.quote.send_request(&self.alice_peer_id, ());
                     self.inflight_quote_requests.insert(id, responder);
                 },
-                Some((request, responder)) = self.execution_setup_requests.next().fuse() => {
+                Some((request, responder)) = self.execution_setup_requests.next().fuse(), if self.is_connected_to_alice() => {
                     self.swarm.execution_setup.run(self.alice_peer_id, request, self.bitcoin_wallet.clone());
                     self.inflight_execution_setup = Some(responder);
                 },
-                Some((request, responder)) = self.encrypted_signature_requests.next().fuse() => {
+                Some((request, responder)) = self.encrypted_signature_requests.next().fuse(), if self.is_connected_to_alice() => {
                     let id = self.swarm.encrypted_signature.send_request(&self.alice_peer_id, request);
                     self.inflight_encrypted_signature_requests.insert(id, responder);
                 },
+
                 Some(response_channel) = &mut self.pending_transfer_proof => {
                     let _ = self.swarm.transfer_proof.send_response(response_channel, ());
 
@@ -187,6 +192,10 @@ impl EventLoop {
                 }
             }
         }
+    }
+
+    fn is_connected_to_alice(&self) -> bool {
+        Swarm::is_connected(&self.swarm, &self.alice_peer_id)
     }
 }
 
