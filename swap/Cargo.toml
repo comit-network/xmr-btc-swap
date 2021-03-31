@@ -64,7 +64,7 @@ tokio-tar = { path = "../tokio-tar" }
 zip = "0.5"
 
 [dev-dependencies]
-bdk-testutils = { version = "0.3" }
+bdk-testutils = { version = "0.4" }
 bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs" }
 get-port = "3"
 hyper = "0.14"
