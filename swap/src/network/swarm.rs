@@ -7,11 +7,9 @@ use libp2p::swarm::{NetworkBehaviour, SwarmBuilder};
 use libp2p::{PeerId, Swarm};
 
 pub fn alice(seed: &Seed) -> Result<Swarm<alice::Behaviour>> {
-    // one outgoing connection is enough for Alice to publish her own address to the
-    // DHT
     let connection_limits = ConnectionLimits::default()
-        .with_max_established_outgoing(Some(1))
-        .with_max_pending_outgoing(Some(1));
+        .with_max_established_outgoing(Some(10))
+        .with_max_pending_outgoing(Some(5));
 
     new(seed, connection_limits)
 }
