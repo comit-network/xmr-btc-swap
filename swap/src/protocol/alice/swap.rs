@@ -8,37 +8,22 @@ use crate::protocol::alice::AliceState;
 use crate::protocol::alice::AliceState::XmrLockTransferProofSent;
 use crate::{bitcoin, database, monero};
 use anyhow::{bail, Context, Result};
-use rand::{CryptoRng, RngCore};
 use tokio::select;
 use tokio::time::timeout;
 use tracing::{error, info};
 
-trait Rng: RngCore + CryptoRng + Send {}
-
-impl<T> Rng for T where T: RngCore + CryptoRng + Send {}
-
-pub fn is_complete(state: &AliceState) -> bool {
-    matches!(
-        state,
-        AliceState::XmrRefunded
-            | AliceState::BtcRedeemed
-            | AliceState::BtcPunished
-            | AliceState::SafelyAborted
-    )
-}
-
 pub async fn run(swap: alice::Swap) -> Result<AliceState> {
-    run_until(swap, is_complete).await
+    run_until(swap, |_| false).await
 }
 
-#[tracing::instrument(name = "swap", skip(swap,is_target_state), fields(id = %swap.swap_id))]
+#[tracing::instrument(name = "swap", skip(swap,exit_early), fields(id = %swap.swap_id))]
 pub async fn run_until(
     mut swap: alice::Swap,
-    is_target_state: fn(&AliceState) -> bool,
+    exit_early: fn(&AliceState) -> bool,
 ) -> Result<AliceState> {
     let mut current_state = swap.state;
 
-    while !is_target_state(&current_state) {
+    while !is_complete(&current_state) && !exit_early(&current_state) {
         current_state = next_state(
             current_state,
             &mut swap.event_loop_handle,
@@ -371,4 +356,14 @@ async fn next_state(
         AliceState::BtcPunished => AliceState::BtcPunished,
         AliceState::SafelyAborted => AliceState::SafelyAborted,
     })
+}
+
+fn is_complete(state: &AliceState) -> bool {
+    matches!(
+        state,
+        AliceState::XmrRefunded
+            | AliceState::BtcRedeemed
+            | AliceState::BtcPunished
+            | AliceState::SafelyAborted
+    )
 }
