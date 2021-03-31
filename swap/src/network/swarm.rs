@@ -8,9 +8,13 @@ use libp2p::swarm::{NetworkBehaviour, SwarmBuilder};
 use libp2p::Swarm;
 
 pub fn alice(seed: &Seed) -> Result<Swarm<alice::Behaviour>> {
+    // One node is enough to establish ourselves in the DHT and resolve our public
+    // IP address.
     let connection_limits = ConnectionLimits::default()
-        .with_max_established_outgoing(Some(5))
-        .with_max_pending_outgoing(Some(5));
+        .with_max_established_outgoing(Some(1))
+        .with_max_pending_outgoing(Some(1))
+        .with_max_established_incoming(Some(20))
+        .with_max_pending_incoming(Some(10));
 
     new(seed, connection_limits)
 }
