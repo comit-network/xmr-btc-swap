@@ -7,7 +7,6 @@ use std::str::FromStr;
 use url::Url;
 use uuid::Uuid;
 
-pub const DEFAULT_ALICE_MULTIADDR: &str = "/dns4/xmr-btc-asb.coblox.tech/tcp/9876";
 pub const DEFAULT_ALICE_PEER_ID: &str = "12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
 
 // Port is assumed to be stagenet standard port 38081
@@ -118,10 +117,9 @@ pub enum Command {
 pub struct AliceMultiaddress {
     #[structopt(
         long = "seller-addr",
-        default_value = DEFAULT_ALICE_MULTIADDR,
         help = "The multiaddr of a specific swap partner can be optionally provided"
     )]
-    pub multiaddr: Multiaddr,
+    pub multiaddr: Option<Multiaddr>,
 }
 
 #[derive(structopt::StructOpt, Debug)]
@@ -178,8 +176,7 @@ fn parse_monero_address(s: &str) -> Result<monero::Address> {
 
 #[cfg(test)]
 mod tests {
-    use crate::cli::command::{DEFAULT_ALICE_MULTIADDR, DEFAULT_ALICE_PEER_ID};
-    use libp2p::core::Multiaddr;
+    use crate::cli::command::DEFAULT_ALICE_PEER_ID;
     use libp2p::PeerId;
 
     #[test]
@@ -187,12 +184,5 @@ mod tests {
         DEFAULT_ALICE_PEER_ID
             .parse::<PeerId>()
             .expect("default alice peer id str is a valid PeerId");
-    }
-
-    #[test]
-    fn parse_default_alice_multiaddr_success() {
-        DEFAULT_ALICE_MULTIADDR
-            .parse::<Multiaddr>()
-            .expect("default alice multiaddr str is a valid Multiaddr>");
     }
 }

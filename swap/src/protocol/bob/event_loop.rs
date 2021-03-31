@@ -85,8 +85,6 @@ impl EventLoop {
     }
 
     pub async fn run(mut self) {
-        let _ = Swarm::dial(&mut self.swarm, &self.alice_peer_id);
-
         loop {
             // Note: We are making very elaborate use of `select!` macro's feature here. Make sure to read the documentation thoroughly: https://docs.rs/tokio/1.4.0/tokio/macro.select.html
             tokio::select! {
@@ -127,7 +125,11 @@ impl EventLoop {
                                 let _ = responder.respond(());
                             }
                         }
-                        SwarmEvent::Behaviour(OutEvent::Failure { peer, error }) => {
+                        SwarmEvent::Behaviour(OutEvent::LookupAliceComplete) if !self.is_connected_to_alice() => {
+                            tracing::warn!("Failed to lookup Alice in DHT");
+                            return;
+                        }
+                        SwarmEvent::Behaviour(OutEvent::Failure { peer, error }) if peer == self.alice_peer_id => {
                             tracing::warn!(%peer, "Communication error: {:#}", error);
                             return;
                         }

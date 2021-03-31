@@ -13,6 +13,7 @@
 #![allow(non_snake_case)]
 
 use anyhow::{bail, Context, Result};
+use libp2p::Swarm;
 use prettytable::{row, Table};
 use std::cmp::min;
 use std::future::Future;
@@ -108,7 +109,12 @@ async fn main() -> Result<()> {
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
             let mut swarm = swarm::bob(&seed)?;
-            swarm.add_address(alice_peer_id, alice_addr);
+            if let Some(address_hint) = alice_addr {
+                swarm.add_address(alice_peer_id, address_hint);
+                Swarm::dial(&mut swarm, &alice_peer_id)?;
+            } else {
+                swarm.discover(alice_peer_id)?;
+            }
 
             let (event_loop, mut event_loop_handle) =
                 EventLoop::new(swarm, alice_peer_id, bitcoin_wallet.clone())?;
@@ -193,7 +199,12 @@ async fn main() -> Result<()> {
 
             let alice_peer_id = db.get_peer_id(swap_id)?;
             let mut swarm = swarm::bob(&seed)?;
-            swarm.add_address(alice_peer_id, alice_addr);
+            if let Some(address_hint) = alice_addr {
+                swarm.add_address(alice_peer_id, address_hint);
+                Swarm::dial(&mut swarm, &alice_peer_id)?;
+            } else {
+                swarm.discover(alice_peer_id)?;
+            }
 
             let (event_loop, event_loop_handle) =
                 EventLoop::new(swarm, alice_peer_id, bitcoin_wallet.clone())?;
