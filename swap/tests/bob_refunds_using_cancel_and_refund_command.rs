@@ -19,7 +19,7 @@ async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
 
         let (bob_swap, bob_join_handle) = ctx.stop_and_resume_bob_from_db(bob_join_handle).await;
 
-        // Ensure Bob's timelock is expired
+        // Ensure cancel timelock is expired
         if let BobState::BtcLocked(state3) = bob_swap.state.clone() {
             bob_swap
                 .bitcoin_wallet
