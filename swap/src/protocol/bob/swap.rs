@@ -8,7 +8,6 @@ use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
 use rand::rngs::OsRng;
 use tokio::select;
-use tracing::trace;
 
 pub fn is_complete(state: &BobState) -> bool {
     matches!(
@@ -59,7 +58,7 @@ async fn next_state(
     env_config: &Config,
     receive_monero_address: monero::Address,
 ) -> Result<BobState> {
-    trace!("Current state: {}", state);
+    tracing::trace!("Current state: {}", state);
 
     Ok(match state {
         BobState::Started { btc_amount } => {
