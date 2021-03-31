@@ -68,13 +68,13 @@ async fn main() -> Result<()> {
     let db = Database::open(config.data.dir.join(db_path).as_path())
         .context("Could not open database")?;
 
+    let seed =
+        Seed::from_file_or_generate(&config.data.dir).expect("Could not retrieve/initialize seed");
+
+    let env_config = env::Testnet::get_config();
+
     match opt.cmd {
         Command::Start { max_buy } => {
-            let seed = Seed::from_file_or_generate(&config.data.dir)
-                .expect("Could not retrieve/initialize seed");
-
-            let env_config = env::Testnet::get_config();
-
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
 
