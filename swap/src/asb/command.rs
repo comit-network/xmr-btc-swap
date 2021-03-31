@@ -1,6 +1,6 @@
 use crate::bitcoin::Amount;
 use bitcoin::util::amount::ParseAmountError;
-use bitcoin::Denomination;
+use bitcoin::{Address, Denomination};
 use std::path::PathBuf;
 
 #[derive(structopt::StructOpt, Debug)]
@@ -29,6 +29,15 @@ pub enum Command {
         max_buy: Amount,
     },
     History,
+    WithdrawBtc {
+        #[structopt(
+            long = "amount",
+            help = "Optionally specify the amount of Bitcoin to be withdrawn. If not specified the wallet will be drained."
+        )]
+        amount: Option<Amount>,
+        #[structopt(long = "address", help = "The address to receive the Bitcoin.")]
+        address: Address,
+    },
 }
 
 fn parse_btc(s: &str) -> Result<Amount, ParseAmountError> {

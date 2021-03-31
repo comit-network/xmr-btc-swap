@@ -127,6 +127,23 @@ async fn main() -> Result<()> {
             // Print the table to stdout
             table.printstd();
         }
+        Command::WithdrawBtc { amount, address } => {
+            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+
+            let amount = match amount {
+                Some(amount) => amount,
+                None => {
+                    bitcoin_wallet
+                        .max_giveable(address.script_pubkey().len())
+                        .await?
+                }
+            };
+
+            let psbt = bitcoin_wallet.send_to_address(address, amount).await?;
+            let signed_tx = bitcoin_wallet.sign_and_finalize(psbt).await?;
+
+            bitcoin_wallet.broadcast(signed_tx, "withdraw").await?;
+        }
     };
 
     Ok(())
