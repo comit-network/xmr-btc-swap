@@ -38,6 +38,7 @@ pub enum Command {
         #[structopt(long = "address", help = "The address to receive the Bitcoin.")]
         address: Address,
     },
+    Balance,
 }
 
 fn parse_btc(s: &str) -> Result<Amount, ParseAmountError> {

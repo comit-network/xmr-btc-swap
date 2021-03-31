@@ -78,6 +78,20 @@ async fn main() -> Result<()> {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
 
+            let bitcoin_balance = bitcoin_wallet.balance().await?;
+            info!("Bitcoin balance: {}", bitcoin_balance);
+
+            let monero_balance = monero_wallet.get_balance().await?;
+            if monero_balance == Amount::ZERO {
+                let deposit_address = monero_wallet.get_main_address();
+                warn!(
+                    "The Monero balance is 0, make sure to deposit funds at: {}",
+                    deposit_address
+                )
+            } else {
+                info!("Monero balance: {}", monero_balance);
+            }
+
             let kraken_rate_updates = kraken::connect()?;
 
             let mut swarm = swarm::new::<Behaviour>(&seed)?;
@@ -144,6 +158,15 @@ async fn main() -> Result<()> {
 
             bitcoin_wallet.broadcast(signed_tx, "withdraw").await?;
         }
+        Command::Balance => {
+            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+            let monero_wallet = init_monero_wallet(&config, env_config).await?;
+
+            let bitcoin_balance = bitcoin_wallet.balance().await?;
+            let monero_balance = monero_wallet.get_balance().await?;
+
+            tracing::info!("Current balance: {}, {}", bitcoin_balance, monero_balance);
+        }
     };
 
     Ok(())
@@ -167,12 +190,6 @@ async fn init_bitcoin_wallet(
 
     wallet.sync().await?;
 
-    let balance = wallet.balance().await?;
-    info!(
-        "Connection to Bitcoin wallet succeeded, balance: {}",
-        balance
-    );
-
     Ok(wallet)
 }
 
@@ -186,17 +203,6 @@ async fn init_monero_wallet(
         env_config,
     )
     .await?;
-
-    let balance = wallet.get_balance().await?;
-    if balance == Amount::ZERO {
-        let deposit_address = wallet.get_main_address();
-        warn!(
-            "The Monero balance is 0, make sure to deposit funds at: {}",
-            deposit_address
-        )
-    } else {
-        info!("Monero balance: {}", balance);
-    }
 
     Ok(wallet)
 }
