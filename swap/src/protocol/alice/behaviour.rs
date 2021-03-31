@@ -1,5 +1,7 @@
 use crate::network::quote::BidQuote;
-use crate::network::{encrypted_signature, quote, spot_price, transfer_proof};
+use crate::network::{
+    encrypted_signature, external_address_reporter, quote, spot_price, transfer_proof,
+};
 use crate::protocol::alice::{execution_setup, State3};
 use anyhow::{anyhow, Error, Result};
 use libp2p::core::{Multiaddr, PublicKey};
@@ -36,6 +38,9 @@ pub enum OutEvent {
     BootstrapComplete {
         result: BootstrapResult,
         stats: QueryStats,
+    },
+    NewExternalAddress {
+        addr: Multiaddr,
     },
     Failure {
         peer: PeerId,
@@ -93,6 +98,7 @@ pub struct Behaviour {
     pub encrypted_signature: encrypted_signature::Behaviour,
     pub kad: Kademlia<MemoryStore>,
     pub identify: Identify,
+    external_addr_reporter: external_address_reporter::Behaviour,
 }
 
 impl From<PublicKey> for Behaviour {
@@ -111,6 +117,7 @@ impl From<PublicKey> for Behaviour {
                 format!("asb {}", env!("CARGO_PKG_VERSION")),
                 public_key,
             ),
+            external_addr_reporter: Default::default(),
         }
     }
 }

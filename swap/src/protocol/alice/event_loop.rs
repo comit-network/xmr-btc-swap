@@ -229,6 +229,9 @@ where
 
                             tracing::warn!(%peer, "DHT bootstrap failed after {}s", seconds);
                         }
+                        SwarmEvent::Behaviour(OutEvent::NewExternalAddress { addr }) => {
+                            tracing::info!("Identified new external address: {}", addr);
+                        }
                         SwarmEvent::Behaviour(OutEvent::Failure {peer, error}) => {
                             tracing::error!(%peer, "Communication error: {:#}", error);
                         }

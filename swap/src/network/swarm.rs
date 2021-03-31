@@ -9,7 +9,7 @@ use libp2p::Swarm;
 
 pub fn alice(seed: &Seed) -> Result<Swarm<alice::Behaviour>> {
     let connection_limits = ConnectionLimits::default()
-        .with_max_established_outgoing(Some(10))
+        .with_max_established_outgoing(Some(5))
         .with_max_pending_outgoing(Some(5));
 
     new(seed, connection_limits)
