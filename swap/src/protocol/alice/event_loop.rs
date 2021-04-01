@@ -84,6 +84,43 @@ where
         // terminate forever.
         self.send_transfer_proof.push(future::pending().boxed());
 
+        let unfinished_swaps = match self.db.unfinished_alice() {
+            Ok(unfinished_swaps) => unfinished_swaps,
+            Err(_) => {
+                tracing::error!("Failed to load unfinished swaps");
+                return;
+            }
+        };
+
+        for (swap_id, state) in unfinished_swaps {
+            let peer_id = match self.db.get_peer_id(swap_id) {
+                Ok(peer_id) => peer_id,
+                Err(_) => {
+                    tracing::warn!(%swap_id, "Resuming swap skipped because no peer-id found for swap in database");
+                    continue;
+                }
+            };
+
+            let handle = self.new_handle(peer_id);
+
+            let swap = Swap {
+                event_loop_handle: handle,
+                bitcoin_wallet: self.bitcoin_wallet.clone(),
+                monero_wallet: self.monero_wallet.clone(),
+                env_config: self.env_config,
+                db: self.db.clone(),
+                state: state.into(),
+                swap_id,
+            };
+
+            match self.swap_sender.send(swap).await {
+                Ok(_) => tracing::info!(%swap_id, "Resuming swap"),
+                Err(_) => {
+                    tracing::warn!(%swap_id, "Failed to resume swap because receiver has been dropped")
+                }
+            }
+        }
+
         loop {
             tokio::select! {
                 swarm_event = self.swarm.next_event() => {
@@ -264,8 +301,18 @@ where
             swap_id,
         };
 
-        if let Err(error) = self.swap_sender.send(swap).await {
-            tracing::warn!(%swap_id, "Swap cannot be spawned: {}", error);
+        // TODO: Consider adding separate components for start/rsume of swaps
+
+        // swaps save peer id so we can resume
+        match self.db.insert_peer_id(swap_id, bob_peer_id).await {
+            Ok(_) => {
+                if let Err(error) = self.swap_sender.send(swap).await {
+                    tracing::warn!(%swap_id, "Swap cannot be spawned: {}", error);
+                }
+            }
+            Err(error) => {
+                tracing::warn!(%swap_id, "Unable to save peer-id, swap cannot be spawned: {}", error);
+            }
         }
     }
 

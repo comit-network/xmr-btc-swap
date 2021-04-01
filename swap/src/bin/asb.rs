@@ -130,7 +130,7 @@ async fn main() -> Result<()> {
 
             table.add_row(row!["SWAP ID", "STATE"]);
 
-            for (swap_id, state) in db.all()? {
+            for (swap_id, state) in db.all_alice()? {
                 table.add_row(row![swap_id, state]);
             }
 

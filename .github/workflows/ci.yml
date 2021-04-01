@@ -110,10 +110,13 @@ jobs:
             happy_path,
             happy_path_restart_bob_after_xmr_locked,
             happy_path_restart_bob_before_xmr_locked,
+            happy_path_restart_alice_after_xmr_locked,
             bob_refunds_using_cancel_and_refund_command,
             bob_refunds_using_cancel_and_refund_command_timelock_not_expired,
             bob_refunds_using_cancel_and_refund_command_timelock_not_expired_force,
-            punish
+            punish,
+            alice_punishes_after_restart_punish_timelock_expired,
+            alice_refunds_after_restart_bob_refunded
         ]
     runs-on: ubuntu-latest
     steps:

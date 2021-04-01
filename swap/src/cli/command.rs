@@ -37,8 +37,15 @@ pub struct Arguments {
 pub enum Command {
     /// Start a XMR for BTC swap
     BuyXmr {
+        #[structopt(
+        long = "seller-peer-id",
+        default_value = DEFAULT_ALICE_PEER_ID,
+        help = "The peer id of a specific swap partner can be optionally provided"
+        )]
+        alice_peer_id: PeerId,
+
         #[structopt(flatten)]
-        connect_params: AliceConnectParams,
+        alice_multi_addr: AliceMultiaddress,
 
         #[structopt(long = "electrum-rpc",
         help = "Provide the Bitcoin Electrum RPC URL",
@@ -60,7 +67,7 @@ pub enum Command {
         swap_id: Uuid,
 
         #[structopt(flatten)]
-        connect_params: AliceConnectParams,
+        alice_multi_addr: AliceMultiaddress,
 
         #[structopt(long = "electrum-rpc",
         help = "Provide the Bitcoin Electrum RPC URL",
@@ -108,14 +115,7 @@ pub enum Command {
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct AliceConnectParams {
-    #[structopt(
-        long = "seller-peer-id",
-        default_value = DEFAULT_ALICE_PEER_ID,
-        help = "The peer id of a specific swap partner can be optionally provided"
-    )]
-    pub peer_id: PeerId,
-
+pub struct AliceMultiaddress {
     #[structopt(
         long = "seller-addr",
         default_value = DEFAULT_ALICE_MULTIADDR,

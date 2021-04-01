@@ -7,9 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The `resume` command of the `swap` CLI no longer require the `--seller-peer-id` parameter.
+  This information is now saved in the database.
+
 ### Added
 
 - A changelog file.
+- Automatic resume of unfinished swaps for the `asb` upon startup.
+  Unfinished swaps from earlier versions will be skipped.
 
 ### Fixed
 

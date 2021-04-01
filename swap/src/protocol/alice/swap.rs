@@ -5,39 +5,25 @@ use crate::env::Config;
 use crate::protocol::alice;
 use crate::protocol::alice::event_loop::EventLoopHandle;
 use crate::protocol::alice::AliceState;
+use crate::protocol::alice::AliceState::XmrLockTransferProofSent;
 use crate::{bitcoin, database, monero};
 use anyhow::{bail, Context, Result};
-use rand::{CryptoRng, RngCore};
 use tokio::select;
 use tokio::time::timeout;
 use tracing::{error, info};
 
-trait Rng: RngCore + CryptoRng + Send {}
-
-impl<T> Rng for T where T: RngCore + CryptoRng + Send {}
-
-pub fn is_complete(state: &AliceState) -> bool {
-    matches!(
-        state,
-        AliceState::XmrRefunded
-            | AliceState::BtcRedeemed
-            | AliceState::BtcPunished
-            | AliceState::SafelyAborted
-    )
-}
-
 pub async fn run(swap: alice::Swap) -> Result<AliceState> {
-    run_until(swap, is_complete).await
+    run_until(swap, |_| false).await
 }
 
-#[tracing::instrument(name = "swap", skip(swap,is_target_state), fields(id = %swap.swap_id))]
+#[tracing::instrument(name = "swap", skip(swap,exit_early), fields(id = %swap.swap_id))]
 pub async fn run_until(
     mut swap: alice::Swap,
-    is_target_state: fn(&AliceState) -> bool,
+    exit_early: fn(&AliceState) -> bool,
 ) -> Result<AliceState> {
     let mut current_state = swap.state;
 
-    while !is_target_state(&current_state) {
+    while !is_complete(&current_state) && !exit_early(&current_state) {
         current_state = next_state(
             current_state,
             &mut swap.event_loop_handle,
@@ -89,38 +75,74 @@ async fn next_state(
             }
         }
         AliceState::BtcLocked { state3 } => {
-            // Record the current monero wallet block height so we don't have to scan from
-            // block 0 for scenarios where we create a refund wallet.
-            let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
+            match state3.expired_timelocks(bitcoin_wallet).await? {
+                ExpiredTimelocks::None => {
+                    // Record the current monero wallet block height so we don't have to scan from
+                    // block 0 for scenarios where we create a refund wallet.
+                    let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
 
-            let transfer_proof = monero_wallet
-                .transfer(state3.lock_xmr_transfer_request())
-                .await?;
+                    let transfer_proof = monero_wallet
+                        .transfer(state3.lock_xmr_transfer_request())
+                        .await?;
 
-            monero_wallet
-                .watch_for_transfer(state3.lock_xmr_watch_request(transfer_proof.clone(), 1))
-                .await?;
-
-            // TODO: Waiting for XMR confirmations should be done in a separate
-            //  state! We have to record that Alice has already sent the transaction.
-            //  Otherwise Alice might publish the lock tx twice!
-
-            event_loop_handle
-                .send_transfer_proof(transfer_proof.clone())
-                .await?;
-
-            monero_wallet
-                .watch_for_transfer(state3.lock_xmr_watch_request(transfer_proof, 10))
-                .await?;
-
-            AliceState::XmrLocked {
-                state3,
-                monero_wallet_restore_blockheight,
+                    AliceState::XmrLockTransactionSent {
+                        monero_wallet_restore_blockheight,
+                        transfer_proof,
+                        state3,
+                    }
+                }
+                _ => AliceState::SafelyAborted,
             }
         }
-        AliceState::XmrLocked {
-            state3,
+        AliceState::XmrLockTransactionSent {
             monero_wallet_restore_blockheight,
+            transfer_proof,
+            state3,
+        } => match state3.expired_timelocks(bitcoin_wallet).await? {
+            ExpiredTimelocks::None => {
+                monero_wallet
+                    .watch_for_transfer(state3.lock_xmr_watch_request(transfer_proof.clone(), 1))
+                    .await?;
+
+                AliceState::XmrLocked {
+                    monero_wallet_restore_blockheight,
+                    transfer_proof,
+                    state3,
+                }
+            }
+            _ => AliceState::CancelTimelockExpired {
+                monero_wallet_restore_blockheight,
+                transfer_proof,
+                state3,
+            },
+        },
+
+        AliceState::XmrLocked {
+            monero_wallet_restore_blockheight,
+            transfer_proof,
+            state3,
+        } => match state3.expired_timelocks(bitcoin_wallet).await? {
+            ExpiredTimelocks::None => {
+                event_loop_handle
+                    .send_transfer_proof(transfer_proof.clone())
+                    .await?;
+
+                XmrLockTransferProofSent {
+                    monero_wallet_restore_blockheight,
+                    transfer_proof,
+                    state3,
+                }
+            }
+            _ => AliceState::CancelTimelockExpired {
+                monero_wallet_restore_blockheight,
+                transfer_proof,
+                state3,
+            },
+        },
+        AliceState::XmrLockTransferProofSent {
+            monero_wallet_restore_blockheight,
+            transfer_proof,
+            state3,
         } => {
             let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
 
@@ -128,32 +150,36 @@ async fn next_state(
                 ExpiredTimelocks::None => {
                     select! {
                         _ = tx_lock_status.wait_until_confirmed_with(state3.cancel_timelock) => {
-                            AliceState::CancelTimelockExpired {
-                                state3,
-                                monero_wallet_restore_blockheight,
+                        AliceState::CancelTimelockExpired {
+                            monero_wallet_restore_blockheight,
+                            transfer_proof,
+                            state3,
                             }
                         }
                         enc_sig = event_loop_handle.recv_encrypted_signature() => {
                             tracing::info!("Received encrypted signature");
 
                             AliceState::EncSigLearned {
-                                state3,
-                                encrypted_signature: Box::new(enc_sig?),
                                 monero_wallet_restore_blockheight,
+                            transfer_proof,
+                                encrypted_signature: Box::new(enc_sig?),
+                                state3,
                             }
                         }
                     }
                 }
                 _ => AliceState::CancelTimelockExpired {
-                    state3,
                     monero_wallet_restore_blockheight,
+                    transfer_proof,
+                    state3,
                 },
             }
         }
         AliceState::EncSigLearned {
-            state3,
-            encrypted_signature,
             monero_wallet_restore_blockheight,
+            transfer_proof,
+            encrypted_signature,
+            state3,
         } => match state3.expired_timelocks(bitcoin_wallet).await? {
             ExpiredTimelocks::None => {
                 let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
@@ -172,8 +198,9 @@ async fn next_state(
                                 .await?;
 
                             AliceState::CancelTimelockExpired {
-                                state3,
                                 monero_wallet_restore_blockheight,
+                                transfer_proof,
+                                state3,
                             }
                         }
                     },
@@ -184,20 +211,23 @@ async fn next_state(
                             .await?;
 
                         AliceState::CancelTimelockExpired {
-                            state3,
                             monero_wallet_restore_blockheight,
+                            transfer_proof,
+                            state3,
                         }
                     }
                 }
             }
             _ => AliceState::CancelTimelockExpired {
-                state3,
                 monero_wallet_restore_blockheight,
+                transfer_proof,
+                state3,
             },
         },
         AliceState::CancelTimelockExpired {
-            state3,
             monero_wallet_restore_blockheight,
+            transfer_proof,
+            state3,
         } => {
             let transaction = state3.signed_cancel_transaction()?;
 
@@ -219,13 +249,15 @@ async fn next_state(
             }
 
             AliceState::BtcCancelled {
-                state3,
                 monero_wallet_restore_blockheight,
+                transfer_proof,
+                state3,
             }
         }
         AliceState::BtcCancelled {
-            state3,
             monero_wallet_restore_blockheight,
+            transfer_proof,
+            state3,
         } => {
             let tx_refund_status = bitcoin_wallet.subscribe_to(state3.tx_refund()).await;
             let tx_cancel_status = bitcoin_wallet.subscribe_to(state3.tx_cancel()).await;
@@ -238,25 +270,34 @@ async fn next_state(
                     let spend_key = state3.extract_monero_private_key(published_refund_tx)?;
 
                     AliceState::BtcRefunded {
+                        monero_wallet_restore_blockheight,
+                        transfer_proof,
                         spend_key,
                         state3,
-                        monero_wallet_restore_blockheight,
                     }
                 }
                 _ = tx_cancel_status.wait_until_confirmed_with(state3.punish_timelock) => {
                     AliceState::BtcPunishable {
-                        state3,
                         monero_wallet_restore_blockheight,
+                        transfer_proof,
+                        state3,
                     }
                 }
             }
         }
         AliceState::BtcRefunded {
+            monero_wallet_restore_blockheight,
+            transfer_proof,
             spend_key,
             state3,
-            monero_wallet_restore_blockheight,
         } => {
             let view_key = state3.v;
+
+            // Ensure that the XMR to be refunded are spendable by awaiting 10 confirmations
+            // on the lock transaction
+            monero_wallet
+                .watch_for_transfer(state3.lock_xmr_watch_request(transfer_proof, 10))
+                .await?;
 
             monero_wallet
                 .create_from(spend_key, view_key, monero_wallet_restore_blockheight)
@@ -265,8 +306,9 @@ async fn next_state(
             AliceState::XmrRefunded
         }
         AliceState::BtcPunishable {
-            state3,
             monero_wallet_restore_blockheight,
+            transfer_proof,
+            state3,
         } => {
             let signed_tx_punish = state3.signed_punish_transaction()?;
 
@@ -301,9 +343,10 @@ async fn next_state(
                     let spend_key = state3.extract_monero_private_key(published_refund_tx)?;
 
                     AliceState::BtcRefunded {
+                        monero_wallet_restore_blockheight,
+                        transfer_proof,
                         spend_key,
                         state3,
-                        monero_wallet_restore_blockheight,
                     }
                 }
             }
@@ -313,4 +356,14 @@ async fn next_state(
         AliceState::BtcPunished => AliceState::BtcPunished,
         AliceState::SafelyAborted => AliceState::SafelyAborted,
     })
+}
+
+fn is_complete(state: &AliceState) -> bool {
+    matches!(
+        state,
+        AliceState::XmrRefunded
+            | AliceState::BtcRedeemed
+            | AliceState::BtcPunished
+            | AliceState::SafelyAborted
+    )
 }
