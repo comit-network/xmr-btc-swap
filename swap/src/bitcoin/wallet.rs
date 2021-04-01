@@ -9,6 +9,7 @@ use bdk::database::BatchDatabase;
 use bdk::descriptor::Segwitv0;
 use bdk::electrum_client::{ElectrumApi, GetHistoryRes};
 use bdk::keys::DerivableKey;
+use bdk::wallet::AddressIndex;
 use bdk::{FeeRate, KeychainKind};
 use bitcoin::{Network, Script};
 use reqwest::Url;
@@ -255,7 +256,7 @@ where
             .wallet
             .lock()
             .await
-            .get_new_address()
+            .get_address(AddressIndex::New)
             .context("Failed to get new Bitcoin address")?;
 
         Ok(address)
