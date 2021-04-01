@@ -1,7 +1,7 @@
 use crate::asb::Rate;
 use anyhow::{anyhow, Context, Result};
 use futures::{SinkExt, StreamExt, TryStreamExt};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::convert::{Infallible, TryFrom};
 use std::sync::Arc;
 use std::time::Duration;
@@ -224,7 +224,7 @@ mod wire {
     use bitcoin::util::amount::ParseAmountError;
     use serde_json::Value;
 
-    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    #[derive(Debug, Deserialize, PartialEq)]
     #[serde(tag = "event")]
     pub enum Event {
         #[serde(rename = "systemStatus")]
@@ -247,18 +247,18 @@ mod wire {
         BitcoinParseAmount(#[from] ParseAmountError),
     }
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Deserialize)]
     #[serde(transparent)]
     pub struct TickerUpdate(Vec<TickerField>);
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Deserialize)]
     #[serde(untagged)]
     pub enum TickerField {
         Data(TickerData),
         Metadata(Value),
     }
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Deserialize)]
     pub struct TickerData {
         #[serde(rename = "a")]
         ask: Vec<RateElement>,
@@ -266,7 +266,7 @@ mod wire {
         bid: Vec<RateElement>,
     }
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Deserialize)]
     #[serde(untagged)]
     pub enum RateElement {
         Text(String),
