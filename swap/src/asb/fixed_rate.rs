@@ -13,8 +13,8 @@ impl FixedRate {
 
 impl Default for FixedRate {
     fn default() -> Self {
-        Self(Rate {
-            ask: bitcoin::Amount::from_btc(Self::RATE).expect("Static value should never fail"),
-        })
+        let ask = bitcoin::Amount::from_btc(Self::RATE).expect("Static value should never fail");
+
+        Self(Rate::new(ask))
     }
 }

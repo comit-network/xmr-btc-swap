@@ -9,13 +9,21 @@ use std::fmt::{Debug, Display, Formatter};
 /// sell 1 XMR.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Rate {
-    pub ask: bitcoin::Amount,
+    ask: bitcoin::Amount,
 }
 
 impl Rate {
     pub const ZERO: Rate = Rate {
         ask: bitcoin::Amount::ZERO,
     };
+
+    pub fn new(ask: bitcoin::Amount) -> Self {
+        Self { ask }
+    }
+
+    pub fn ask(&self) -> bitcoin::Amount {
+        self.ask
+    }
 
     // This function takes the quote amount as it is what Bob sends to Alice in the
     // swap request

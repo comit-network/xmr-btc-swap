@@ -278,7 +278,7 @@ where
             .context("Failed to get latest rate")?;
 
         Ok(BidQuote {
-            price: rate.ask,
+            price: rate.ask(),
             max_quantity: max_buy,
         })
     }
