@@ -26,6 +26,7 @@ use swap::env::GetConfig;
 use swap::fs::default_config_path;
 use swap::monero::Amount;
 use swap::network::swarm;
+use swap::protocol::alice::event_loop::KrakenRate;
 use swap::protocol::alice::{run, Behaviour, EventLoop};
 use swap::seed::Seed;
 use swap::trace::init_tracing;
@@ -74,7 +75,10 @@ async fn main() -> Result<()> {
     let env_config = env::Testnet::get_config();
 
     match opt.cmd {
-        Command::Start { max_buy } => {
+        Command::Start {
+            max_buy,
+            ask_spread,
+        } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
 
@@ -104,7 +108,7 @@ async fn main() -> Result<()> {
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
                 Arc::new(db),
-                kraken_price_updates,
+                KrakenRate::new(ask_spread, kraken_price_updates),
                 max_buy,
             )
             .unwrap();
