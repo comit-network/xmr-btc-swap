@@ -115,7 +115,8 @@ jobs:
             bob_refunds_using_cancel_and_refund_command_timelock_not_expired,
             bob_refunds_using_cancel_and_refund_command_timelock_not_expired_force,
             punish,
-            alice_punishes_after_restart_punish_timelock_expired
+            alice_punishes_after_restart_punish_timelock_expired,
+            alice_refunds_after_restart_bob_refunded
         ]
     runs-on: ubuntu-latest
     steps:
