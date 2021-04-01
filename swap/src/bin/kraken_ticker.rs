@@ -9,8 +9,8 @@ async fn main() -> Result<()> {
     let mut ticker = swap::kraken::connect().context("Failed to connect to kraken")?;
 
     loop {
-        match ticker.wait_for_update().await? {
-            Ok(rate) => println!("Rate update: {}", rate),
+        match ticker.wait_for_next_update().await? {
+            Ok(update) => println!("Price update: {}", update.ask),
             Err(e) => println!("Error: {:#}", e),
         }
     }

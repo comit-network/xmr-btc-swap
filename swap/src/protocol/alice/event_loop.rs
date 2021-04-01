@@ -354,11 +354,14 @@ impl LatestRate for FixedRate {
     }
 }
 
-impl LatestRate for kraken::RateUpdateStream {
+impl LatestRate for kraken::PriceUpdates {
     type Error = kraken::Error;
 
     fn latest_rate(&mut self) -> Result<Rate, Self::Error> {
-        self.latest_update()
+        let update = self.latest_update()?;
+        let rate = Rate::new(update.ask);
+
+        Ok(rate)
     }
 }
 

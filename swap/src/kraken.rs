@@ -1,4 +1,3 @@
-use crate::asb::Rate;
 use anyhow::{anyhow, Context, Result};
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use serde::Deserialize;
@@ -10,9 +9,9 @@ use tokio::sync::watch;
 /// Connect to Kraken websocket API for a constant stream of rate updates.
 ///
 /// If the connection fails, it will automatically be re-established.
-pub fn connect() -> Result<RateUpdateStream> {
-    let (rate_update, rate_update_receiver) = watch::channel(Err(Error::NotYetAvailable));
-    let rate_update = Arc::new(rate_update);
+pub fn connect() -> Result<PriceUpdates> {
+    let (price_update, price_update_receiver) = watch::channel(Err(Error::NotYetAvailable));
+    let price_update = Arc::new(price_update);
 
     tokio::spawn(async move {
         // The default backoff config is fine for us apart from one thing:
@@ -26,12 +25,12 @@ pub fn connect() -> Result<RateUpdateStream> {
         let result = backoff::future::retry_notify::<Infallible, _, _, _, _, _>(
             backoff,
             || {
-                let rate_update = rate_update.clone();
+                let price_update = price_update.clone();
                 async move {
                     let mut stream = connection::new().await?;
 
                     while let Some(update) = stream.try_next().await.map_err(to_backoff)? {
-                        let send_result = rate_update.send(Ok(Rate::new(update.ask)));
+                        let send_result = price_update.send(Ok(update));
 
                         if send_result.is_err() {
                             return Err(backoff::Error::Permanent(anyhow!(
@@ -54,30 +53,30 @@ pub fn connect() -> Result<RateUpdateStream> {
                 tracing::warn!("Rate updates incurred an unrecoverable error: {:#}", e);
 
                 // in case the retries fail permanently, let the subscribers know
-                rate_update.send(Err(Error::PermanentFailure))
+                price_update.send(Err(Error::PermanentFailure))
             }
             Ok(never) => match never {},
         }
     });
 
-    Ok(RateUpdateStream {
-        inner: rate_update_receiver,
+    Ok(PriceUpdates {
+        inner: price_update_receiver,
     })
 }
 
 #[derive(Clone, Debug)]
-pub struct RateUpdateStream {
-    inner: watch::Receiver<RateUpdate>,
+pub struct PriceUpdates {
+    inner: watch::Receiver<PriceUpdate>,
 }
 
-impl RateUpdateStream {
-    pub async fn wait_for_update(&mut self) -> Result<RateUpdate> {
+impl PriceUpdates {
+    pub async fn wait_for_next_update(&mut self) -> Result<PriceUpdate> {
         self.inner.changed().await?;
 
         Ok(self.inner.borrow().clone())
     }
 
-    pub fn latest_update(&mut self) -> RateUpdate {
+    pub fn latest_update(&mut self) -> PriceUpdate {
         self.inner.borrow().clone()
     }
 }
@@ -90,7 +89,7 @@ pub enum Error {
     PermanentFailure,
 }
 
-type RateUpdate = Result<Rate, Error>;
+type PriceUpdate = Result<wire::PriceUpdate, Error>;
 
 /// Maps a [`connection::Error`] to a backoff error, effectively defining our
 /// retry strategy.
@@ -246,7 +245,7 @@ mod wire {
     }
 
     /// Represents an update within the price ticker.
-    #[derive(Debug, Deserialize)]
+    #[derive(Clone, Debug, Deserialize)]
     #[serde(try_from = "TickerUpdate")]
     pub struct PriceUpdate {
         pub ask: bitcoin::Amount,

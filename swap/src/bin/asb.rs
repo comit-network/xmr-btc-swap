@@ -92,7 +92,7 @@ async fn main() -> Result<()> {
                 info!("Monero balance: {}", monero_balance);
             }
 
-            let kraken_rate_updates = kraken::connect()?;
+            let kraken_price_updates = kraken::connect()?;
 
             let mut swarm = swarm::new::<Behaviour>(&seed)?;
             Swarm::listen_on(&mut swarm, config.network.listen)
@@ -104,7 +104,7 @@ async fn main() -> Result<()> {
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
                 Arc::new(db),
-                kraken_rate_updates,
+                kraken_price_updates,
                 max_buy,
             )
             .unwrap();
