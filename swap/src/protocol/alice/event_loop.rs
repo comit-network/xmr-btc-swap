@@ -1,4 +1,4 @@
-use crate::asb::{FixedRate, Rate};
+use crate::asb::Rate;
 use crate::database::Database;
 use crate::env::Config;
 use crate::monero::BalanceTooLow;
@@ -346,6 +346,25 @@ pub trait LatestRate {
     fn latest_rate(&mut self) -> Result<Rate, Self::Error>;
 }
 
+#[derive(Clone, Debug)]
+pub struct FixedRate(Rate);
+
+impl FixedRate {
+    pub const RATE: f64 = 0.01;
+
+    pub fn value(&self) -> Rate {
+        self.0
+    }
+}
+
+impl Default for FixedRate {
+    fn default() -> Self {
+        let ask = bitcoin::Amount::from_btc(Self::RATE).expect("Static value should never fail");
+
+        Self(Rate::new(ask))
+    }
+}
+
 impl LatestRate for FixedRate {
     type Error = Infallible;
 
@@ -359,9 +378,8 @@ impl LatestRate for kraken::PriceUpdates {
 
     fn latest_rate(&mut self) -> Result<Rate, Self::Error> {
         let update = self.latest_update()?;
-        let rate = Rate::new(update.ask);
 
-        Ok(rate)
+        Ok(Rate::new(update.ask))
     }
 }
 
