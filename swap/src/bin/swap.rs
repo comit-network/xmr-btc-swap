@@ -239,9 +239,6 @@ async fn main() -> Result<()> {
                     "The Cancel Transaction cannot be published yet, \
                         because the timelock has not expired. Please try again later."
                 ),
-                Err(bob::cancel::Error::CancelTxAlreadyPublished) => {
-                    warn!("The Cancel Transaction has already been published.")
-                }
             }
         }
         Command::Refund {
