@@ -7,9 +7,6 @@ use std::str::FromStr;
 use url::Url;
 use uuid::Uuid;
 
-pub const DEFAULT_ALICE_MULTIADDR: &str = "/dns4/xmr-btc-asb.coblox.tech/tcp/9876";
-pub const DEFAULT_ALICE_PEER_ID: &str = "12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
-
 // Port is assumed to be stagenet standard port 38081
 pub const DEFAULT_STAGENET_MONERO_DAEMON_HOST: &str = "monero-stagenet.exan.tech";
 
@@ -37,18 +34,10 @@ pub struct Arguments {
 pub enum Command {
     /// Start a XMR for BTC swap
     BuyXmr {
-        #[structopt(
-        long = "seller-peer-id",
-        default_value = DEFAULT_ALICE_PEER_ID,
-        help = "The peer id of a specific swap partner can be optionally provided"
-        )]
+        #[structopt(long = "seller-peer-id", help = "The seller's peer id")]
         alice_peer_id: PeerId,
 
-        #[structopt(
-        long = "seller-addr",
-        default_value = DEFAULT_ALICE_MULTIADDR,
-        help = "The multiaddr of a specific swap partner can be optionally provided"
-        )]
+        #[structopt(long = "seller-addr", help = "The seller's multiaddress")]
         alice_multiaddr: Multiaddr,
 
         #[structopt(long = "electrum-rpc",
@@ -70,11 +59,7 @@ pub enum Command {
         )]
         swap_id: Uuid,
 
-        #[structopt(
-        long = "seller-addr",
-        default_value = DEFAULT_ALICE_MULTIADDR,
-        help = "The multiaddr of a specific swap partner can be optionally provided"
-        )]
+        #[structopt(long = "seller-addr", help = "The seller's multiaddress")]
         alice_multiaddr: Multiaddr,
 
         #[structopt(long = "electrum-rpc",
@@ -172,25 +157,4 @@ fn parse_monero_address(s: &str) -> Result<monero::Address> {
             s
         )
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::cli::command::{DEFAULT_ALICE_MULTIADDR, DEFAULT_ALICE_PEER_ID};
-    use libp2p::core::Multiaddr;
-    use libp2p::PeerId;
-
-    #[test]
-    fn parse_default_alice_peer_id_success() {
-        DEFAULT_ALICE_PEER_ID
-            .parse::<PeerId>()
-            .expect("default alice peer id str is a valid PeerId");
-    }
-
-    #[test]
-    fn parse_default_alice_multiaddr_success() {
-        DEFAULT_ALICE_MULTIADDR
-            .parse::<Multiaddr>()
-            .expect("default alice multiaddr str is a valid Multiaddr>");
-    }
 }
