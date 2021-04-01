@@ -40,7 +40,11 @@ pub async fn cancel(
         ),
     };
 
+    tracing::info!(%swap_id, "Manually cancelling swap");
+
     if !force {
+        tracing::debug!(%swap_id, "Checking if cancel timelock is expired");
+
         if let ExpiredTimelocks::None = state6.expired_timelock(bitcoin_wallet.as_ref()).await? {
             return Ok(Err(Error::CancelTimelockNotExpiredYet));
         }
@@ -50,6 +54,8 @@ pub async fn cancel(
             .await
             .is_ok()
         {
+            tracing::debug!(%swap_id, "Cancel transaction has already been published");
+
             let state = BobState::BtcCancelled(state6);
             let db_state = state.into();
             db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
