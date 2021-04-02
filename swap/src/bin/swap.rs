@@ -21,7 +21,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use structopt::StructOpt;
 use swap::bitcoin::{Amount, TxLock};
-use swap::cli::command::{Arguments, Command, Data, MoneroParams};
+use swap::cli::command::{Arguments, Command, MoneroParams};
+use swap::cli::trace::init_tracing;
 use swap::database::Database;
 use swap::env::{Config, GetConfig};
 use swap::network::quote::BidQuote;
@@ -30,8 +31,7 @@ use swap::protocol::bob;
 use swap::protocol::bob::{Behaviour, Builder, EventLoop};
 use swap::seed::Seed;
 use swap::{bitcoin, env, monero};
-use tracing::{debug, error, info, warn, Level};
-use tracing_subscriber::FmtSubscriber;
+use tracing::{debug, error, info, warn};
 use url::Url;
 use uuid::Uuid;
 
@@ -40,46 +40,9 @@ extern crate prettytable;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args = Arguments::from_args();
+    let Arguments { data, debug, cmd } = Arguments::from_args();
 
-    let is_terminal = atty::is(atty::Stream::Stderr);
-    let base_subscriber = |level| {
-        FmtSubscriber::builder()
-            .with_writer(std::io::stderr)
-            .with_ansi(is_terminal)
-            .with_target(false)
-            .with_env_filter(format!("swap={}", level))
-    };
-
-    if args.debug {
-        let subscriber = base_subscriber(Level::DEBUG)
-            .with_timer(tracing_subscriber::fmt::time::ChronoLocal::with_format(
-                "%F %T".to_owned(),
-            ))
-            .finish();
-
-        tracing::subscriber::set_global_default(subscriber)?;
-    } else {
-        let subscriber = base_subscriber(Level::INFO)
-            .without_time()
-            .with_level(false)
-            .finish();
-
-        tracing::subscriber::set_global_default(subscriber)?;
-    }
-
-    let data: Data = args.data;
-    let data_dir = data.0;
-
-    let db =
-        Database::open(data_dir.join("database").as_path()).context("Failed to open database")?;
-
-    let seed =
-        Seed::from_file_or_generate(data_dir.as_path()).context("Failed to read in seed file")?;
-
-    let env_config = env::Testnet::get_config();
-
-    match args.cmd {
+    match cmd {
         Command::BuyXmr {
             alice_peer_id,
             alice_multiaddr,
@@ -90,6 +53,16 @@ async fn main() -> Result<()> {
                 },
             electrum_rpc_url,
         } => {
+            let swap_id = Uuid::new_v4();
+
+            let data_dir = data.0;
+            init_tracing(debug, data_dir.join("logs"), swap_id)?;
+            let db = Database::open(data_dir.join("database").as_path())
+                .context("Failed to open database")?;
+            let seed = Seed::from_file_or_generate(data_dir.as_path())
+                .context("Failed to read in seed file")?;
+            let env_config = env::Testnet::get_config();
+
             if receive_monero_address.network != env_config.monero_network {
                 bail!(
                     "Given monero address is on network {:?}, expected address on network {:?}",
@@ -128,7 +101,6 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            let swap_id = Uuid::new_v4();
             db.insert_peer_id(swap_id, alice_peer_id).await?;
 
             let swap = Builder::new(
@@ -154,6 +126,11 @@ async fn main() -> Result<()> {
             }
         }
         Command::History => {
+            let data_dir = data.0;
+
+            let db = Database::open(data_dir.join("database").as_path())
+                .context("Failed to open database")?;
+
             let mut table = Table::new();
 
             table.add_row(row!["SWAP ID", "STATE"]);
@@ -175,6 +152,14 @@ async fn main() -> Result<()> {
                 },
             electrum_rpc_url,
         } => {
+            let data_dir = data.0;
+            init_tracing(debug, data_dir.join("logs"), swap_id)?;
+            let db = Database::open(data_dir.join("database").as_path())
+                .context("Failed to open database")?;
+            let seed = Seed::from_file_or_generate(data_dir.as_path())
+                .context("Failed to read in seed file")?;
+            let env_config = env::Testnet::get_config();
+
             if receive_monero_address.network != env_config.monero_network {
                 bail!("The given monero address is on network {:?}, expected address of network {:?}.", receive_monero_address.network, env_config.monero_network)
             }
@@ -218,6 +203,14 @@ async fn main() -> Result<()> {
             force,
             electrum_rpc_url,
         } => {
+            let data_dir = data.0;
+            init_tracing(debug, data_dir.join("logs"), swap_id)?;
+            let db = Database::open(data_dir.join("database").as_path())
+                .context("Failed to open database")?;
+            let seed = Seed::from_file_or_generate(data_dir.as_path())
+                .context("Failed to read in seed file")?;
+            let env_config = env::Testnet::get_config();
+
             let bitcoin_wallet =
                 init_bitcoin_wallet(electrum_rpc_url, &seed, data_dir, env_config).await?;
 
@@ -240,6 +233,14 @@ async fn main() -> Result<()> {
             force,
             electrum_rpc_url,
         } => {
+            let data_dir = data.0;
+            init_tracing(debug, data_dir.join("logs"), swap_id)?;
+            let db = Database::open(data_dir.join("database").as_path())
+                .context("Failed to open database")?;
+            let seed = Seed::from_file_or_generate(data_dir.as_path())
+                .context("Failed to read in seed file")?;
+            let env_config = env::Testnet::get_config();
+
             let bitcoin_wallet =
                 init_bitcoin_wallet(electrum_rpc_url, &seed, data_dir, env_config).await?;
 
