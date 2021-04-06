@@ -44,8 +44,12 @@ pub enum Command {
         )]
         alice_peer_id: PeerId,
 
-        #[structopt(flatten)]
-        alice_multi_addr: AliceMultiaddress,
+        #[structopt(
+        long = "seller-addr",
+        default_value = DEFAULT_ALICE_MULTIADDR,
+        help = "The multiaddr of a specific swap partner can be optionally provided"
+        )]
+        alice_multiaddr: Multiaddr,
 
         #[structopt(long = "electrum-rpc",
         help = "Provide the Bitcoin Electrum RPC URL",
@@ -66,8 +70,12 @@ pub enum Command {
         )]
         swap_id: Uuid,
 
-        #[structopt(flatten)]
-        alice_multi_addr: AliceMultiaddress,
+        #[structopt(
+        long = "seller-addr",
+        default_value = DEFAULT_ALICE_MULTIADDR,
+        help = "The multiaddr of a specific swap partner can be optionally provided"
+        )]
+        alice_multiaddr: Multiaddr,
 
         #[structopt(long = "electrum-rpc",
         help = "Provide the Bitcoin Electrum RPC URL",
@@ -112,16 +120,6 @@ pub enum Command {
         )]
         electrum_rpc_url: Url,
     },
-}
-
-#[derive(structopt::StructOpt, Debug)]
-pub struct AliceMultiaddress {
-    #[structopt(
-        long = "seller-addr",
-        default_value = DEFAULT_ALICE_MULTIADDR,
-        help = "The multiaddr of a specific swap partner can be optionally provided"
-    )]
-    pub multiaddr: Multiaddr,
 }
 
 #[derive(structopt::StructOpt, Debug)]
