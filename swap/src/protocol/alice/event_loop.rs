@@ -4,12 +4,13 @@ use crate::env::Config;
 use crate::network::quote::BidQuote;
 use crate::network::{spot_price, transfer_proof};
 use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State0, Swap};
-use crate::{bitcoin, kraken, monero};
+use crate::{bitcoin, env, kraken, monero};
 use anyhow::{bail, Context, Result};
 use future::pending;
 use futures::future;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::{FuturesUnordered, StreamExt};
+use libp2p::request_response::ResponseChannel;
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
 use rand::rngs::OsRng;
@@ -106,34 +107,10 @@ pub async fn new<LR>(
         tokio::select! {
             swarm_event = swarm.next_event() => {
                 match swarm_event {
-                    SwarmEvent::Behaviour(OutEvent::SpotPriceRequested { request, channel, peer }) => {
-                        let btc = request.btc;
-                        let xmr = match handle_spot_price_request(&mut latest_rate, btc, max_buy, monero_wallet.clone()).await {
-                            Ok(xmr) => xmr,
-                            Err(e) => {
-                                tracing::warn!(%peer, "Failed to produce spot price for {}: {:#}", btc, e);
-                                continue;
-                            }
+                    SwarmEvent::Behaviour(OutEvent::SpotPriceRequested { request: spot_price::Request { btc }, channel, peer }) => {
+                        if let Err(e) = handle_spot_price_request(&mut latest_rate, &mut swarm, monero_wallet.as_ref(), bitcoin_wallet.as_ref(), env_config, channel, peer, btc, max_buy).await {
+                            tracing::warn!(%peer, "Failed to handle spot price request for {}: {:#}", btc, e);
                         };
-
-                        match swarm.spot_price.send_response(channel, spot_price::Response { xmr }) {
-                            Ok(_) => {},
-                            Err(_) => {
-                                // if we can't respond, the peer probably just disconnected so it is not a huge deal, only log this on debug
-                                tracing::debug!(%peer, "Failed to respond with spot price");
-                                continue;
-                            }
-                        }
-
-                        let state0 = match State0::new(btc, xmr, env_config, bitcoin_wallet.as_ref(), &mut OsRng).await {
-                            Ok(state) => state,
-                            Err(e) => {
-                                tracing::warn!(%peer, "Failed to make State0 for execution setup: {:#}", e);
-                                continue;
-                            }
-                        };
-
-                        swarm.execution_setup.run(peer, state0);
                     }
                     SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer }) => {
                         let quote = match make_quote(&mut latest_rate, max_buy).await {
@@ -259,12 +236,18 @@ pub async fn new<LR>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_spot_price_request<LR: LatestRate>(
     latest_rate: &mut LR,
+    swarm: &mut Swarm<Behaviour>,
+    monero_wallet: &monero::Wallet,
+    bitcoin_wallet: &bitcoin::Wallet,
+    env_config: env::Config,
+    channel: ResponseChannel<spot_price::Response>,
+    peer: PeerId,
     btc: bitcoin::Amount,
     max_buy: bitcoin::Amount,
-    monero_wallet: Arc<monero::Wallet>,
-) -> Result<monero::Amount> {
+) -> Result<()> {
     let rate = latest_rate
         .latest_rate()
         .context("Failed to get latest rate")?;
@@ -285,7 +268,21 @@ async fn handle_spot_price_request<LR: LatestRate>(
         bail!("The balance is too low, current balance: {}", xmr_balance)
     }
 
-    Ok(xmr)
+    if swarm
+        .spot_price
+        .send_response(channel, spot_price::Response { xmr })
+        .is_err()
+    {
+        bail!("Failed to respond with spot price")
+    }
+
+    let state0 = State0::new(btc, xmr, env_config, bitcoin_wallet, &mut OsRng)
+        .await
+        .context("Failed to make State0 for execution setup: {:#}")?;
+
+    swarm.execution_setup.run(peer, state0);
+
+    Ok(())
 }
 
 async fn make_quote<LR: LatestRate>(
