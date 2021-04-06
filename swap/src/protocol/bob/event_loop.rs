@@ -141,9 +141,6 @@ impl EventLoop {
                                 let _ = responder.respond(());
                             }
                         }
-                        SwarmEvent::Behaviour(OutEvent::ResponseSent) => {
-
-                        }
                         SwarmEvent::Behaviour(OutEvent::CommunicationError(error)) => {
                             tracing::warn!("Communication error: {:#}", error);
                             return;
