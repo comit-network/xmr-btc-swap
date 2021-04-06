@@ -113,17 +113,9 @@ pub async fn new<LR>(
                         };
                     }
                     SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer }) => {
-                        let quote = match make_quote(&mut latest_rate, max_buy).await {
-                            Ok(quote) => quote,
-                            Err(e) => {
-                                tracing::warn!(%peer, "Failed to make quote: {:#}", e);
-                                continue;
-                            }
+                        if let Err(e) = handle_quote_request(&mut latest_rate, &mut swarm, channel, max_buy).await {
+                            tracing::warn!(%peer, "Failed to handle quote request: {:#}", e);
                         };
-
-                        if swarm.quote.send_response(channel, quote).is_err() {
-                            tracing::debug!(%peer, "Failed to respond with quote");
-                        }
                     }
                     SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone { bob_peer_id, state3, swap_id }) => {
                         let swap = Swap {
@@ -237,7 +229,7 @@ pub async fn new<LR>(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn handle_spot_price_request<LR: LatestRate>(
+async fn handle_spot_price_request<LR>(
     latest_rate: &mut LR,
     swarm: &mut Swarm<Behaviour>,
     monero_wallet: &monero::Wallet,
@@ -247,7 +239,10 @@ async fn handle_spot_price_request<LR: LatestRate>(
     peer: PeerId,
     btc: bitcoin::Amount,
     max_buy: bitcoin::Amount,
-) -> Result<()> {
+) -> Result<()>
+where
+    LR: LatestRate,
+{
     let rate = latest_rate
         .latest_rate()
         .context("Failed to get latest rate")?;
@@ -285,18 +280,29 @@ async fn handle_spot_price_request<LR: LatestRate>(
     Ok(())
 }
 
-async fn make_quote<LR: LatestRate>(
+async fn handle_quote_request<LR>(
     latest_rate: &mut LR,
+    swarm: &mut Swarm<Behaviour>,
+    channel: ResponseChannel<BidQuote>,
     max_buy: bitcoin::Amount,
-) -> Result<BidQuote> {
+) -> Result<()>
+where
+    LR: LatestRate,
+{
     let rate = latest_rate
         .latest_rate()
         .context("Failed to get latest rate")?;
 
-    Ok(BidQuote {
+    let quote = BidQuote {
         price: rate.ask().context("Failed to compute asking price")?,
         max_quantity: max_buy,
-    })
+    };
+
+    if swarm.quote.send_response(channel, quote).is_err() {
+        bail!("Failed to respond with quote")
+    }
+
+    Ok(())
 }
 
 /// Create a new [`EventLoopHandle`] that is scoped for communication with
