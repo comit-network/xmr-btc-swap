@@ -4,9 +4,8 @@ use crate::network::{encrypted_signature, spot_price};
 use crate::protocol::bob::{Behaviour, OutEvent, State0, State2};
 use crate::{bitcoin, monero};
 use anyhow::{Context, Result};
-use futures::future::{BoxFuture, OptionFuture};
+use futures::future::{OptionFuture};
 use futures::{FutureExt, StreamExt};
-use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
 use std::collections::HashMap;
@@ -27,24 +26,8 @@ pub struct EventLoop {
     encrypted_signatures: bmrng::RequestReceiverStream<EncryptedSignature, ()>,
     execution_setup_requests: bmrng::RequestReceiverStream<State0, Result<State2>>,
 
-    // these represents requests that are currently in-flight.
-    // once we get a response to a matching [`RequestId`], we will use the responder to relay the
-    // response.
-    inflight_spot_price_requests: HashMap<RequestId, bmrng::Responder<spot_price::Response>>,
-    inflight_quote_requests: HashMap<RequestId, bmrng::Responder<BidQuote>>,
-    inflight_encrypted_signature_requests: HashMap<RequestId, bmrng::Responder<()>>,
-    inflight_execution_setup: Option<bmrng::Responder<Result<State2>>>,
-
     /// The sender we will use to relay incoming transfer proofs.
     transfer_proof: bmrng::RequestSender<monero::TransferProof, ()>,
-    /// The future representing the successful handling of an incoming transfer
-    /// proof.
-    ///
-    /// Once we've sent a transfer proof to the ongoing swap, this future waits
-    /// until the swap took it "out" of the `EventLoopHandle`. As this future
-    /// resolves, we use the `ResponseChannel` returned from it to send an ACK
-    /// to Alice that we have successfully processed the transfer proof.
-    pending_transfer_proof: OptionFuture<BoxFuture<'static, ResponseChannel<()>>>,
 }
 
 impl EventLoop {
@@ -70,11 +53,6 @@ impl EventLoop {
             encrypted_signatures: encrypted_signature.1.into(),
             spot_price_requests: spot_price.1.into(),
             quote_requests: quote.1.into(),
-            inflight_spot_price_requests: HashMap::default(),
-            inflight_quote_requests: HashMap::default(),
-            inflight_execution_setup: None,
-            inflight_encrypted_signature_requests: HashMap::default(),
-            pending_transfer_proof: OptionFuture::from(None),
         };
 
         let handle = EventLoopHandle {
@@ -89,6 +67,23 @@ impl EventLoop {
     }
 
     pub async fn run(mut self) {
+        // these represents requests that are currently in-flight.
+        // once we get a response to a matching [`RequestId`], we will use the responder to relay the
+        // response.
+        let mut inflight_spot_price_requests= HashMap::<_, bmrng::Responder<spot_price::Response>>::new();
+        let mut inflight_quote_requests = HashMap::<_, bmrng::Responder<BidQuote>>::new();
+        let mut inflight_encrypted_signature_requests = HashMap::<_, bmrng::Responder<()>>::new();
+        let mut inflight_execution_setup = Option::<bmrng::Responder<Result<State2>>>::None;
+
+        /// The future representing the successful handling of an incoming transfer
+        /// proof.
+        ///
+        /// Once we've sent a transfer proof to the ongoing swap, this future waits
+        /// until the swap took it "out" of the `EventLoopHandle`. As this future
+        /// resolves, we use the `ResponseChannel` returned from it to send an ACK
+        /// to Alice that we have successfully processed the transfer proof.
+        let mut pending_transfer_proof = OptionFuture::from(None);
+
         let _ = Swarm::dial(&mut self.swarm, &self.alice_peer_id);
 
         loop {
@@ -97,22 +92,22 @@ impl EventLoop {
                 swarm_event = self.swarm.next_event().fuse() => {
                     match swarm_event {
                         SwarmEvent::Behaviour(OutEvent::SpotPriceReceived { id, response }) => {
-                            if let Some(responder) = self.inflight_spot_price_requests.remove(&id) {
+                            if let Some(responder) = inflight_spot_price_requests.remove(&id) {
                                 let _ = responder.respond(response);
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::QuoteReceived { id, response }) => {
-                            if let Some(responder) = self.inflight_quote_requests.remove(&id) {
+                            if let Some(responder) = inflight_quote_requests.remove(&id) {
                                 let _ = responder.respond(response);
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone(response)) => {
-                            if let Some(responder) = self.inflight_execution_setup.take() {
+                            if let Some(responder) = inflight_execution_setup.take() {
                                 let _ = responder.respond(*response);
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::EncryptedSignatureAcknowledged { id }) => {
-                            if let Some(responder) = self.inflight_encrypted_signature_requests.remove(&id) {
+                            if let Some(responder) = inflight_encrypted_signature_requests.remove(&id) {
                                 let _ = responder.respond(());
                             }
                         }
@@ -135,7 +130,7 @@ impl EventLoop {
                                 }
                             };
 
-                            self.pending_transfer_proof = OptionFuture::from(Some(async move {
+                            pending_transfer_proof = OptionFuture::from(Some(async move {
                                 let _ = responder.recv().await;
 
                                 channel
@@ -181,15 +176,15 @@ impl EventLoop {
                 // Use `self.is_connected_to_alice` as a guard to "buffer" requests until we are connected.
                 Some((request, responder)) = self.spot_price_requests.next().fuse(), if self.is_connected_to_alice() => {
                     let id = self.swarm.spot_price.send_request(&self.alice_peer_id, request);
-                    self.inflight_spot_price_requests.insert(id, responder);
+                    inflight_spot_price_requests.insert(id, responder);
                 },
                 Some(((), responder)) = self.quote_requests.next().fuse(), if self.is_connected_to_alice() => {
                     let id = self.swarm.quote.send_request(&self.alice_peer_id, ());
-                    self.inflight_quote_requests.insert(id, responder);
+                    inflight_quote_requests.insert(id, responder);
                 },
                 Some((request, responder)) = self.execution_setup_requests.next().fuse(), if self.is_connected_to_alice() => {
                     self.swarm.execution_setup.run(self.alice_peer_id, request, self.bitcoin_wallet.clone());
-                    self.inflight_execution_setup = Some(responder);
+                    inflight_execution_setup = Some(responder);
                 },
                 Some((tx_redeem_encsig, responder)) = self.encrypted_signatures.next().fuse(), if self.is_connected_to_alice() => {
                     let request = encrypted_signature::Request {
@@ -198,13 +193,13 @@ impl EventLoop {
                     };
 
                     let id = self.swarm.encrypted_signature.send_request(&self.alice_peer_id, request);
-                    self.inflight_encrypted_signature_requests.insert(id, responder);
+                    inflight_encrypted_signature_requests.insert(id, responder);
                 },
 
-                Some(response_channel) = &mut self.pending_transfer_proof => {
+                Some(response_channel) = &mut pending_transfer_proof => {
                     let _ = self.swarm.transfer_proof.send_response(response_channel, ());
 
-                    self.pending_transfer_proof = OptionFuture::from(None);
+                    pending_transfer_proof = OptionFuture::from(None);
                 }
             }
         }
