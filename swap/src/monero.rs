@@ -192,12 +192,6 @@ pub struct InsufficientFunds {
     pub actual: Amount,
 }
 
-#[derive(Debug, Clone, Copy, thiserror::Error)]
-#[error("The balance is too low, current balance: {balance}")]
-pub struct BalanceTooLow {
-    pub balance: Amount,
-}
-
 #[derive(thiserror::Error, Debug, Clone, PartialEq)]
 #[error("Overflow, cannot convert {0} to u64")]
 pub struct OverflowError(pub String);

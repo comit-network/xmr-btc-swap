@@ -1,7 +1,6 @@
 use crate::asb::Rate;
 use crate::database::Database;
 use crate::env::Config;
-use crate::monero::BalanceTooLow;
 use crate::network::quote::BidQuote;
 use crate::network::{spot_price, transfer_proof};
 use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State0, Swap};
@@ -275,10 +274,11 @@ async fn handle_spot_price_request<LR: LatestRate>(
         .context("Failed to get latest rate")?;
 
     if btc > max_buy {
-        bail!(MaximumBuyAmountExceeded {
-            actual: btc,
-            max: max_buy
-        })
+        bail!(
+            "Refusing to buy {} because the maximum configured limit is {}",
+            btc,
+            max_buy
+        )
     }
 
     let xmr_balance = monero_wallet.get_balance().await?;
@@ -286,9 +286,7 @@ async fn handle_spot_price_request<LR: LatestRate>(
     let xmr = rate.sell_quote(btc)?;
 
     if xmr_balance < xmr + xmr_lock_fees {
-        bail!(BalanceTooLow {
-            balance: xmr_balance
-        })
+        bail!("The balance is too low, current balance: {}", xmr_balance)
     }
 
     Ok(xmr)
@@ -440,11 +438,4 @@ impl EventLoopHandle {
 
         Ok(())
     }
-}
-
-#[derive(Debug, Clone, Copy, thiserror::Error)]
-#[error("Refusing to buy {actual} because the maximum configured limit is {max}")]
-pub struct MaximumBuyAmountExceeded {
-    pub max: bitcoin::Amount,
-    pub actual: bitcoin::Amount,
 }
