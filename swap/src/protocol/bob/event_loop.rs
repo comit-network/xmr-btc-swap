@@ -111,6 +111,11 @@ impl EventLoop {
                                 let _ = responder.respond(*response);
                             }
                         }
+                        SwarmEvent::Behaviour(OutEvent::EncryptedSignatureAcknowledged { id }) => {
+                            if let Some(responder) = self.inflight_encrypted_signature_requests.remove(&id) {
+                                let _ = responder.respond(());
+                            }
+                        }
                         SwarmEvent::Behaviour(OutEvent::TransferProofReceived { msg, channel }) => {
                             if msg.swap_id != self.swap_id {
 
@@ -136,20 +141,18 @@ impl EventLoop {
                                 channel
                             }.boxed()));
                         }
-                        SwarmEvent::Behaviour(OutEvent::EncryptedSignatureAcknowledged { id }) => {
-                            if let Some(responder) = self.inflight_encrypted_signature_requests.remove(&id) {
-                                let _ = responder.respond(());
-                            }
-                        }
-                        SwarmEvent::Behaviour(OutEvent::CommunicationError(error)) => {
-                            tracing::warn!("Communication error: {:#}", error);
-                            return;
-                        }
                         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } if peer_id == self.alice_peer_id => {
                             tracing::debug!("Connected to Alice at {}", endpoint.get_remote_address());
                         }
                         SwarmEvent::Dialing(peer_id) if peer_id == self.alice_peer_id => {
                             tracing::debug!("Dialling Alice at {}", peer_id);
+                        }
+                        SwarmEvent::UnreachableAddr { peer_id, address, attempts_remaining, error } if peer_id == self.alice_peer_id && attempts_remaining == 0 => {
+                            tracing::warn!("Failed to dial Alice at {}: {}", address, error);
+                        }
+                        SwarmEvent::Behaviour(OutEvent::CommunicationError(error)) => {
+                            tracing::warn!("Communication error: {:#}", error);
+                            return;
                         }
                         SwarmEvent::ConnectionClosed { peer_id, endpoint, num_established, cause } if peer_id == self.alice_peer_id && num_established == 0 => {
                             match cause {
@@ -169,9 +172,6 @@ impl EventLoop {
                                     return;
                                 }
                             }
-                        }
-                        SwarmEvent::UnreachableAddr { peer_id, address, attempts_remaining, error } if peer_id == self.alice_peer_id && attempts_remaining == 0 => {
-                            tracing::warn!("Failed to dial Alice at {}: {}", address, error);
                         }
                         _ => {}
                     }
