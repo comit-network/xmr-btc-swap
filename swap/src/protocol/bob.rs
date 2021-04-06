@@ -5,10 +5,11 @@ use crate::protocol::bob;
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
 use libp2p::core::Multiaddr;
-use libp2p::request_response::{RequestResponseEvent, RequestResponseMessage, ResponseChannel};
+use libp2p::request_response::{
+    RequestId, RequestResponseEvent, RequestResponseMessage, ResponseChannel,
+};
 use libp2p::{NetworkBehaviour, PeerId};
 use std::sync::Arc;
-use tracing::debug;
 use uuid::Uuid;
 
 pub use self::cancel::cancel;
@@ -108,15 +109,22 @@ impl Builder {
 
 #[derive(Debug)]
 pub enum OutEvent {
-    ConnectionEstablished(PeerId),
-    QuoteReceived(BidQuote),
-    SpotPriceReceived(spot_price::Response),
-    ExecutionSetupDone(Result<Box<State2>>),
+    QuoteReceived {
+        id: RequestId,
+        response: BidQuote,
+    },
+    SpotPriceReceived {
+        id: RequestId,
+        response: spot_price::Response,
+    },
+    ExecutionSetupDone(Box<Result<State2>>),
     TransferProofReceived {
         msg: Box<transfer_proof::Request>,
         channel: ResponseChannel<()>,
     },
-    EncryptedSignatureAcknowledged,
+    EncryptedSignatureAcknowledged {
+        id: RequestId,
+    },
     ResponseSent, // Same variant is used for all messages as no processing is done
     CommunicationError(Error),
 }
@@ -135,7 +143,13 @@ impl From<quote::Message> for OutEvent {
     fn from(message: quote::Message) -> Self {
         match message {
             quote::Message::Request { .. } => OutEvent::unexpected_request(),
-            quote::Message::Response { response, .. } => OutEvent::QuoteReceived(response),
+            quote::Message::Response {
+                response,
+                request_id,
+            } => OutEvent::QuoteReceived {
+                id: request_id,
+                response,
+            },
         }
     }
 }
@@ -144,7 +158,13 @@ impl From<spot_price::Message> for OutEvent {
     fn from(message: spot_price::Message) -> Self {
         match message {
             spot_price::Message::Request { .. } => OutEvent::unexpected_request(),
-            spot_price::Message::Response { response, .. } => OutEvent::SpotPriceReceived(response),
+            spot_price::Message::Response {
+                response,
+                request_id,
+            } => OutEvent::SpotPriceReceived {
+                id: request_id,
+                response,
+            },
         }
     }
 }
@@ -167,8 +187,8 @@ impl From<encrypted_signature::Message> for OutEvent {
     fn from(message: encrypted_signature::Message) -> Self {
         match message {
             encrypted_signature::Message::Request { .. } => OutEvent::unexpected_request(),
-            encrypted_signature::Message::Response { .. } => {
-                OutEvent::EncryptedSignatureAcknowledged
+            encrypted_signature::Message::Response { request_id, .. } => {
+                OutEvent::EncryptedSignatureAcknowledged { id: request_id }
             }
         }
     }
@@ -223,7 +243,7 @@ where
 impl From<execution_setup::OutEvent> for OutEvent {
     fn from(event: execution_setup::OutEvent) -> Self {
         match event {
-            execution_setup::OutEvent::Done(res) => OutEvent::ExecutionSetupDone(res.map(Box::new)),
+            execution_setup::OutEvent::Done(res) => OutEvent::ExecutionSetupDone(Box::new(res)),
         }
     }
 }
@@ -233,11 +253,11 @@ impl From<execution_setup::OutEvent> for OutEvent {
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
-    quote: quote::Behaviour,
-    spot_price: spot_price::Behaviour,
-    execution_setup: execution_setup::Behaviour,
-    transfer_proof: transfer_proof::Behaviour,
-    encrypted_signature: encrypted_signature::Behaviour,
+    pub quote: quote::Behaviour,
+    pub spot_price: spot_price::Behaviour,
+    pub execution_setup: execution_setup::Behaviour,
+    pub transfer_proof: transfer_proof::Behaviour,
+    pub encrypted_signature: encrypted_signature::Behaviour,
 }
 
 impl Default for Behaviour {
@@ -253,34 +273,6 @@ impl Default for Behaviour {
 }
 
 impl Behaviour {
-    pub fn request_quote(&mut self, alice: PeerId) {
-        let _ = self.quote.send_request(&alice, ());
-    }
-
-    pub fn request_spot_price(&mut self, alice: PeerId, request: spot_price::Request) {
-        let _ = self.spot_price.send_request(&alice, request);
-    }
-
-    pub fn start_execution_setup(
-        &mut self,
-        alice_peer_id: PeerId,
-        state0: State0,
-        bitcoin_wallet: Arc<bitcoin::Wallet>,
-    ) {
-        self.execution_setup
-            .run(alice_peer_id, state0, bitcoin_wallet);
-    }
-
-    pub fn send_encrypted_signature(
-        &mut self,
-        alice: PeerId,
-        tx_redeem_encsig: bitcoin::EncryptedSignature,
-    ) {
-        let msg = encrypted_signature::Request { tx_redeem_encsig };
-        self.encrypted_signature.send_request(&alice, msg);
-        debug!("Encrypted signature sent");
-    }
-
     /// Add a known address for the given peer
     pub fn add_address(&mut self, peer_id: PeerId, address: Multiaddr) {
         self.quote.add_address(&peer_id, address.clone());

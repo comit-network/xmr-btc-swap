@@ -8,7 +8,6 @@ use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
 use rand::rngs::OsRng;
 use tokio::select;
-use tracing::{info, trace};
 
 pub fn is_complete(state: &BobState) -> bool {
     matches!(
@@ -59,7 +58,7 @@ async fn next_state(
     env_config: &Config,
     receive_monero_address: monero::Address,
 ) -> Result<BobState> {
-    trace!("Current state: {}", state);
+    tracing::trace!("Current state: {}", state);
 
     Ok(match state {
         BobState::Started { btc_amount } => {
@@ -158,8 +157,6 @@ async fn next_state(
         }
         BobState::XmrLocked(state) => {
             let tx_lock_status = bitcoin_wallet.subscribe_to(state.tx_lock.clone()).await;
-
-            info!("{:?}", tx_lock_status);
 
             if let ExpiredTimelocks::None = state.expired_timelock(bitcoin_wallet).await? {
                 // Alice has locked Xmr

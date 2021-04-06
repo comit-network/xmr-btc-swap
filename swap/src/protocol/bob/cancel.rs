@@ -9,8 +9,6 @@ use uuid::Uuid;
 pub enum Error {
     #[error("The cancel timelock has not expired yet.")]
     CancelTimelockNotExpiredYet,
-    #[error("The cancel transaction has already been published.")]
-    CancelTxAlreadyPublished,
 }
 
 pub async fn cancel(
@@ -40,25 +38,23 @@ pub async fn cancel(
         ),
     };
 
+    tracing::info!(%swap_id, "Manually cancelling swap");
+
     if !force {
+        tracing::debug!(%swap_id, "Checking if cancel timelock is expired");
+
         if let ExpiredTimelocks::None = state6.expired_timelock(bitcoin_wallet.as_ref()).await? {
             return Ok(Err(Error::CancelTimelockNotExpiredYet));
         }
-
-        if state6
-            .check_for_tx_cancel(bitcoin_wallet.as_ref())
-            .await
-            .is_ok()
-        {
-            let state = BobState::BtcCancelled(state6);
-            let db_state = state.into();
-            db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
-
-            return Ok(Err(Error::CancelTxAlreadyPublished));
-        }
     }
 
-    let txid = state6.submit_tx_cancel(bitcoin_wallet.as_ref()).await?;
+    let txid = if let Ok(tx) = state6.check_for_tx_cancel(bitcoin_wallet.as_ref()).await {
+        tracing::debug!(%swap_id, "Cancel transaction has already been published");
+
+        tx.txid()
+    } else {
+        state6.submit_tx_cancel(bitcoin_wallet.as_ref()).await?
+    };
 
     let state = BobState::BtcCancelled(state6);
     let db_state = state.clone().into();
