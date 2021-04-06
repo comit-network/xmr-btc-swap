@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2021-04-06
+
 ### Changed
 
 - The `resume` command of the `swap` CLI no longer require the `--seller-peer-id` parameter.
@@ -38,4 +40,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[Unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/v0.3...HEAD
+[Unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.4.0...HEAD
+[0.4.0]: https://github.com/comit-network/xmr-btc-swap/compare/32912ebd4a11d0c0e6ae084283cb4a3188205a8c...0.4.0
