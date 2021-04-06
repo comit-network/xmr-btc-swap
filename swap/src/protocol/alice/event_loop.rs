@@ -6,6 +6,7 @@ use crate::network::{spot_price, transfer_proof};
 use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State0, Swap};
 use crate::{bitcoin, kraken, monero};
 use anyhow::{bail, Context, Result};
+use future::pending;
 use futures::future;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::{FuturesUnordered, StreamExt};
@@ -15,6 +16,7 @@ use rand::rngs::OsRng;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::convert::Infallible;
+use std::iter::FromIterator;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -48,21 +50,15 @@ pub async fn new<LR>(
     LR: LatestRate,
 {
     let mut recv_encrypted_signature = HashMap::new();
-    let mut inflight_encrypted_signatures = FuturesUnordered::new();
-    let mut send_transfer_proof = FuturesUnordered::new();
-
     // Tracks [`transfer_proof::Request`]s which could not yet be sent because
     // we are currently disconnected from the peer.
     let mut buffered_transfer_proofs = HashMap::new();
-
     // Tracks [`transfer_proof::Request`]s which are currently inflight and
     // awaiting an acknowledgement.
     let mut inflight_transfer_proofs = HashMap::<_, bmrng::Responder<()>>::new();
 
-    // ensure that these streams are NEVER empty, otherwise it will
-    // terminate forever.
-    send_transfer_proof.push(future::pending().boxed());
-    inflight_encrypted_signatures.push(future::pending().boxed());
+    let mut inflight_encrypted_signatures = FuturesUnordered::from_iter(vec![pending().boxed()]);
+    let mut send_transfer_proof = FuturesUnordered::from_iter(vec![pending().boxed()]);
 
     let unfinished_swaps = match db.unfinished_alice() {
         Ok(unfinished_swaps) => unfinished_swaps,
