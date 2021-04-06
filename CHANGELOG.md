@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A changelog file.
 - Automatic resume of unfinished swaps for the `asb` upon startup.
   Unfinished swaps from earlier versions will be skipped.
+- A configurable spread for the ASB that is applied to the asking price received from the Kraken price ticker.
+  The default value is 2% and can be configured using the `--ask-spread` parameter.
+  See `./asb --help` for details.
 
 ### Changed
 

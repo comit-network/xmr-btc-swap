@@ -1,4 +1,4 @@
-use crate::asb::{FixedRate, Rate};
+use crate::asb::Rate;
 use crate::database::Database;
 use crate::env::Config;
 use crate::monero::BalanceTooLow;
@@ -14,6 +14,7 @@ use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
 use rand::rngs::OsRng;
+use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::Arc;
@@ -311,7 +312,7 @@ where
             .context("Failed to get latest rate")?;
 
         Ok(BidQuote {
-            price: rate.ask,
+            price: rate.ask().context("Failed to compute asking price")?,
             max_quantity: max_buy,
         })
     }
@@ -381,6 +382,26 @@ pub trait LatestRate {
     fn latest_rate(&mut self) -> Result<Rate, Self::Error>;
 }
 
+#[derive(Clone, Debug)]
+pub struct FixedRate(Rate);
+
+impl FixedRate {
+    pub const RATE: f64 = 0.01;
+
+    pub fn value(&self) -> Rate {
+        self.0
+    }
+}
+
+impl Default for FixedRate {
+    fn default() -> Self {
+        let ask = bitcoin::Amount::from_btc(Self::RATE).expect("Static value should never fail");
+        let spread = Decimal::from(0u64);
+
+        Self(Rate::new(ask, spread))
+    }
+}
+
 impl LatestRate for FixedRate {
     type Error = Infallible;
 
@@ -389,11 +410,31 @@ impl LatestRate for FixedRate {
     }
 }
 
-impl LatestRate for kraken::RateUpdateStream {
+/// Produces [`Rate`]s based on [`PriceUpdate`]s from kraken and a configured
+/// spread.
+#[derive(Debug)]
+pub struct KrakenRate {
+    ask_spread: Decimal,
+    price_updates: kraken::PriceUpdates,
+}
+
+impl KrakenRate {
+    pub fn new(ask_spread: Decimal, price_updates: kraken::PriceUpdates) -> Self {
+        Self {
+            ask_spread,
+            price_updates,
+        }
+    }
+}
+
+impl LatestRate for KrakenRate {
     type Error = kraken::Error;
 
     fn latest_rate(&mut self) -> Result<Rate, Self::Error> {
-        self.latest_update()
+        let update = self.price_updates.latest_update()?;
+        let rate = Rate::new(update.ask, self.ask_spread);
+
+        Ok(rate)
     }
 }
 

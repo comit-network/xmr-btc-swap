@@ -96,6 +96,10 @@ impl Amount {
         Self::from_decimal(decimal)
     }
 
+    pub fn as_piconero_decimal(&self) -> Decimal {
+        Decimal::from(self.as_piconero())
+    }
+
     fn from_decimal(amount: Decimal) -> Result<Self> {
         let piconeros_dec =
             amount.mul(Decimal::from_u64(PICONERO_OFFSET).expect("constant to fit into u64"));

@@ -1,6 +1,7 @@
 use crate::bitcoin::Amount;
 use bitcoin::util::amount::ParseAmountError;
 use bitcoin::{Address, Denomination};
+use rust_decimal::Decimal;
 use std::path::PathBuf;
 
 #[derive(structopt::StructOpt, Debug)]
@@ -27,6 +28,12 @@ pub enum Command {
     Start {
         #[structopt(long = "max-buy-btc", help = "The maximum amount of BTC the ASB is willing to buy.", default_value="0.005", parse(try_from_str = parse_btc))]
         max_buy: Amount,
+        #[structopt(
+            long = "ask-spread",
+            help = "The spread in percent that should be applied to the asking price.",
+            default_value = "0.02"
+        )]
+        ask_spread: Decimal,
     },
     History,
     WithdrawBtc {
