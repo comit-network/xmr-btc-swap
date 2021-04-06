@@ -13,7 +13,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 pub use self::cancel::cancel;
-pub use self::event_loop::{EventLoop, EventLoopHandle};
+pub use self::event_loop::EventLoopHandle;
 pub use self::refund::refund;
 pub use self::state::*;
 pub use self::swap::{run, run_until};

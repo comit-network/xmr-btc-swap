@@ -4,94 +4,62 @@ use crate::network::{encrypted_signature, spot_price};
 use crate::protocol::bob::{Behaviour, OutEvent, State0, State2};
 use crate::{bitcoin, monero};
 use anyhow::{Context, Result};
-use futures::future::{OptionFuture};
+use futures::future::OptionFuture;
 use futures::{FutureExt, StreamExt};
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;
 
-#[allow(missing_debug_implementations)]
-pub struct EventLoop {
+pub fn new(
     swap_id: Uuid,
-    swarm: libp2p::Swarm<Behaviour>,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    mut swarm: Swarm<Behaviour>,
     alice_peer_id: PeerId,
+    bitcoin_wallet: Arc<bitcoin::Wallet>,
+) -> Result<(impl Future<Output = ()>, EventLoopHandle)> {
+    let execution_setup = bmrng::channel_with_timeout(1, Duration::from_secs(30));
+    let (transfer_proof_sender, transfer_proof_receiver) =
+        bmrng::channel_with_timeout(1, Duration::from_secs(30));
+    let encrypted_signature = bmrng::channel_with_timeout(1, Duration::from_secs(30));
+    let spot_price = bmrng::channel_with_timeout(1, Duration::from_secs(30));
+    let quote = bmrng::channel_with_timeout(1, Duration::from_secs(30));
 
-    // these streams represents outgoing requests that we have to make
-    quote_requests: bmrng::RequestReceiverStream<(), BidQuote>,
-    spot_price_requests: bmrng::RequestReceiverStream<spot_price::Request, spot_price::Response>,
-    encrypted_signatures: bmrng::RequestReceiverStream<EncryptedSignature, ()>,
-    execution_setup_requests: bmrng::RequestReceiverStream<State0, Result<State2>>,
+    let mut spot_price_requests = spot_price.1.into_stream();
+    let mut quote_requests = quote.1.into_stream();
+    let mut execution_setup_requests = execution_setup.1.into_stream();
+    let mut encrypted_signature_requests = encrypted_signature.1.into_stream();
 
-    /// The sender we will use to relay incoming transfer proofs.
-    transfer_proof: bmrng::RequestSender<monero::TransferProof, ()>,
-}
-
-impl EventLoop {
-    pub fn new(
-        swap_id: Uuid,
-        swarm: Swarm<Behaviour>,
-        alice_peer_id: PeerId,
-        bitcoin_wallet: Arc<bitcoin::Wallet>,
-    ) -> Result<(Self, EventLoopHandle)> {
-        let execution_setup = bmrng::channel_with_timeout(1, Duration::from_secs(30));
-        let transfer_proof = bmrng::channel_with_timeout(1, Duration::from_secs(30));
-        let encrypted_signature = bmrng::channel_with_timeout(1, Duration::from_secs(30));
-        let spot_price = bmrng::channel_with_timeout(1, Duration::from_secs(30));
-        let quote = bmrng::channel_with_timeout(1, Duration::from_secs(30));
-
-        let event_loop = EventLoop {
-            swap_id,
-            swarm,
-            alice_peer_id,
-            bitcoin_wallet,
-            execution_setup_requests: execution_setup.1.into(),
-            transfer_proof: transfer_proof.0,
-            encrypted_signatures: encrypted_signature.1.into(),
-            spot_price_requests: spot_price.1.into(),
-            quote_requests: quote.1.into(),
-        };
-
-        let handle = EventLoopHandle {
-            execution_setup: execution_setup.0,
-            transfer_proof: transfer_proof.1,
-            encrypted_signature: encrypted_signature.0,
-            spot_price: spot_price.0,
-            quote: quote.0,
-        };
-
-        Ok((event_loop, handle))
-    }
-
-    pub async fn run(mut self) {
+    let event_loop = async move {
         // these represents requests that are currently in-flight.
-        // once we get a response to a matching [`RequestId`], we will use the responder to relay the
-        // response.
-        let mut inflight_spot_price_requests= HashMap::<_, bmrng::Responder<spot_price::Response>>::new();
+        // once we get a response to a matching [`RequestId`], we will use the responder
+        // to relay the response.
+        let mut inflight_spot_price_requests =
+            HashMap::<_, bmrng::Responder<spot_price::Response>>::new();
         let mut inflight_quote_requests = HashMap::<_, bmrng::Responder<BidQuote>>::new();
         let mut inflight_encrypted_signature_requests = HashMap::<_, bmrng::Responder<()>>::new();
         let mut inflight_execution_setup = Option::<bmrng::Responder<Result<State2>>>::None;
 
-        /// The future representing the successful handling of an incoming transfer
-        /// proof.
-        ///
-        /// Once we've sent a transfer proof to the ongoing swap, this future waits
-        /// until the swap took it "out" of the `EventLoopHandle`. As this future
-        /// resolves, we use the `ResponseChannel` returned from it to send an ACK
-        /// to Alice that we have successfully processed the transfer proof.
+        // The future representing the successful handling of an incoming
+        // transfer proof.
+        //
+        // Once we've sent a transfer proof to the ongoing swap, this future
+        // waits until the swap took it "out" of the `EventLoopHandle`.
+        // As this future resolves, we use the `ResponseChannel`
+        // returned from it to send an ACK to Alice that we have
+        // successfully processed the transfer proof.
         let mut pending_transfer_proof = OptionFuture::from(None);
 
-        let _ = Swarm::dial(&mut self.swarm, &self.alice_peer_id);
+        let _ = Swarm::dial(&mut swarm, &alice_peer_id);
 
         loop {
-            let is_connected_to_alice = Swarm::is_connected(&self.swarm, &self.alice_peer_id);
+            let is_connected_to_alice = Swarm::is_connected(&swarm, &alice_peer_id);
 
             // Note: We are making very elaborate use of `select!` macro's feature here. Make sure to read the documentation thoroughly: https://docs.rs/tokio/1.4.0/tokio/macro.select.html
             tokio::select! {
-                swarm_event = self.swarm.next_event().fuse() => {
+                swarm_event = swarm.next_event().fuse() => {
                     match swarm_event {
                         SwarmEvent::Behaviour(OutEvent::SpotPriceReceived { id, response }) => {
                             if let Some(responder) = inflight_spot_price_requests.remove(&id) {
@@ -114,17 +82,17 @@ impl EventLoop {
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::TransferProofReceived { msg, channel }) => {
-                            if msg.swap_id != self.swap_id {
+                            if msg.swap_id != swap_id {
 
                                 // TODO: Save unexpected transfer proofs in the database and check for messages in the database when handling swaps
-                                tracing::warn!("Received unexpected transfer proof for swap {} while running swap {}. This transfer proof will be ignored.", msg.swap_id, self.swap_id);
+                                tracing::warn!("Received unexpected transfer proof for swap {} while running swap {}. This transfer proof will be ignored.", msg.swap_id, swap_id);
 
                                 // When receiving a transfer proof that is unexpected we still have to acknowledge that it was received
-                                let _ = self.swarm.transfer_proof.send_response(channel, ());
+                                let _ = swarm.transfer_proof.send_response(channel, ());
                                 continue;
                             }
 
-                            let mut responder = match self.transfer_proof.send(msg.tx_lock_proof).await {
+                            let mut responder = match transfer_proof_sender.send(msg.tx_lock_proof).await {
                                 Ok(responder) => responder,
                                 Err(e) => {
                                     tracing::warn!("Failed to pass on transfer proof: {:#}", e);
@@ -138,20 +106,20 @@ impl EventLoop {
                                 channel
                             }.boxed()));
                         }
-                        SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } if peer_id == self.alice_peer_id => {
+                        SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } if peer_id == alice_peer_id => {
                             tracing::debug!("Connected to Alice at {}", endpoint.get_remote_address());
                         }
-                        SwarmEvent::Dialing(peer_id) if peer_id == self.alice_peer_id => {
+                        SwarmEvent::Dialing(peer_id) if peer_id == alice_peer_id => {
                             tracing::debug!("Dialling Alice at {}", peer_id);
                         }
-                        SwarmEvent::UnreachableAddr { peer_id, address, attempts_remaining, error } if peer_id == self.alice_peer_id && attempts_remaining == 0 => {
+                        SwarmEvent::UnreachableAddr { peer_id, address, attempts_remaining, error } if peer_id == alice_peer_id && attempts_remaining == 0 => {
                             tracing::warn!("Failed to dial Alice at {}: {}", address, error);
                         }
                         SwarmEvent::Behaviour(OutEvent::CommunicationError(error)) => {
                             tracing::warn!("Communication error: {:#}", error);
                             return;
                         }
-                        SwarmEvent::ConnectionClosed { peer_id, endpoint, num_established, cause } if peer_id == self.alice_peer_id && num_established == 0 => {
+                        SwarmEvent::ConnectionClosed { peer_id, endpoint, num_established, cause } if peer_id == alice_peer_id && num_established == 0 => {
                             match cause {
                                 Some(error) => {
                                     tracing::warn!("Lost connection to Alice at {}, cause: {}", endpoint.get_remote_address(), error);
@@ -162,7 +130,7 @@ impl EventLoop {
                                     return;
                                 }
                             }
-                            match libp2p::Swarm::dial(&mut self.swarm, &self.alice_peer_id) {
+                            match libp2p::Swarm::dial(&mut swarm, &alice_peer_id) {
                                 Ok(()) => {},
                                 Err(e) => {
                                     tracing::warn!("Failed to re-dial Alice: {}", e);
@@ -176,35 +144,45 @@ impl EventLoop {
 
                 // Handle to-be-sent requests for all our network protocols.
                 // Use `is_connected_to_alice` as a guard to "buffer" requests until we are connected.
-                Some((request, responder)) = self.spot_price_requests.next().fuse(), if is_connected_to_alice => {
-                    let id = self.swarm.spot_price.send_request(&self.alice_peer_id, request);
+                Some((request, responder)) = spot_price_requests.next().fuse(), if is_connected_to_alice => {
+                    let id = swarm.spot_price.send_request(&alice_peer_id, request);
                     inflight_spot_price_requests.insert(id, responder);
                 },
-                Some(((), responder)) = self.quote_requests.next().fuse(), if is_connected_to_alice => {
-                    let id = self.swarm.quote.send_request(&self.alice_peer_id, ());
+                Some(((), responder)) = quote_requests.next().fuse(), if is_connected_to_alice => {
+                    let id = swarm.quote.send_request(&alice_peer_id, ());
                     inflight_quote_requests.insert(id, responder);
                 },
-                Some((request, responder)) = self.execution_setup_requests.next().fuse(), if is_connected_to_alice => {
-                    self.swarm.execution_setup.run(self.alice_peer_id, request, self.bitcoin_wallet.clone());
+                Some((request, responder)) = execution_setup_requests.next().fuse(), if is_connected_to_alice => {
+                    swarm.execution_setup.run(alice_peer_id, request, bitcoin_wallet.clone());
                     inflight_execution_setup = Some(responder);
                 },
-                Some((tx_redeem_encsig, responder)) = self.encrypted_signatures.next().fuse(), if is_connected_to_alice => {
+                Some((tx_redeem_encsig, responder)) = encrypted_signature_requests.next().fuse(), if is_connected_to_alice => {
                     let request = encrypted_signature::Request {
-                        swap_id: self.swap_id,
+                        swap_id,
                         tx_redeem_encsig
                     };
-                    let id = self.swarm.encrypted_signature.send_request(&self.alice_peer_id, request);
+                    let id = swarm.encrypted_signature.send_request(&alice_peer_id, request);
                     inflight_encrypted_signature_requests.insert(id, responder);
                 },
 
                 Some(response_channel) = &mut pending_transfer_proof => {
-                    let _ = self.swarm.transfer_proof.send_response(response_channel, ());
+                    let _ = swarm.transfer_proof.send_response(response_channel, ());
 
                     pending_transfer_proof = OptionFuture::from(None);
                 }
             }
         }
-    }
+    };
+
+    let handle = EventLoopHandle {
+        execution_setup: execution_setup.0,
+        transfer_proof: transfer_proof_receiver,
+        encrypted_signature: encrypted_signature.0,
+        spot_price: spot_price.0,
+        quote: quote.0,
+    };
+
+    Ok((event_loop, handle))
 }
 
 #[derive(Debug)]

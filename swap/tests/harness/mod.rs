@@ -114,11 +114,14 @@ impl BobParams {
         ))
     }
 
-    pub fn new_eventloop(&self, swap_id: Uuid) -> Result<(bob::EventLoop, bob::EventLoopHandle)> {
+    pub fn new_eventloop(
+        &self,
+        swap_id: Uuid,
+    ) -> Result<(impl Future<Output = ()>, bob::EventLoopHandle)> {
         let mut swarm = swarm::new::<bob::Behaviour>(&self.seed)?;
         swarm.add_address(self.alice_peer_id, self.alice_address.clone());
 
-        bob::EventLoop::new(
+        bob::event_loop::new(
             swap_id,
             swarm,
             self.alice_peer_id,
@@ -208,7 +211,7 @@ impl TestContext {
         // ensure the wallet is up to date for concurrent swap tests
         swap.bitcoin_wallet.sync().await.unwrap();
 
-        let join_handle = tokio::spawn(event_loop.run());
+        let join_handle = tokio::spawn(event_loop);
 
         (swap, BobApplicationHandle(join_handle))
     }
@@ -230,7 +233,7 @@ impl TestContext {
             .build()
             .unwrap();
 
-        let join_handle = tokio::spawn(event_loop.run());
+        let join_handle = tokio::spawn(event_loop);
 
         (swap, BobApplicationHandle(join_handle))
     }
