@@ -13,11 +13,8 @@
 #![allow(non_snake_case)]
 
 use anyhow::{Context, Result};
-use bdk::descriptor::Segwitv0;
-use bdk::keys::DerivableKey;
 use libp2p::Swarm;
 use prettytable::{row, Table};
-use std::path::Path;
 use std::sync::Arc;
 use structopt::StructOpt;
 use swap::asb::command::{Arguments, Command};
@@ -71,22 +68,29 @@ async fn main() -> Result<()> {
     let db = Database::open(config.data.dir.join(db_path).as_path())
         .context("Could not open database")?;
 
-    let wallet_data_dir = config.data.dir.join("wallet");
+    let seed =
+        Seed::from_file_or_generate(&config.data.dir).expect("Could not retrieve/initialize seed");
+
+    let env_config = env::Testnet::get_config();
 
     match opt.cmd {
         Command::Start { max_buy } => {
-            let seed = Seed::from_file_or_generate(&config.data.dir)
-                .expect("Could not retrieve/initialize seed");
+            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+            let monero_wallet = init_monero_wallet(&config, env_config).await?;
 
-            let env_config = env::Testnet::get_config();
+            let bitcoin_balance = bitcoin_wallet.balance().await?;
+            info!("Bitcoin balance: {}", bitcoin_balance);
 
-            let (bitcoin_wallet, monero_wallet) = init_wallets(
-                config.clone(),
-                &wallet_data_dir,
-                seed.derive_extended_private_key(env_config.bitcoin_network)?,
-                env_config,
-            )
-            .await?;
+            let monero_balance = monero_wallet.get_balance().await?;
+            if monero_balance == Amount::ZERO {
+                let deposit_address = monero_wallet.get_main_address();
+                warn!(
+                    "The Monero balance is 0, make sure to deposit funds at: {}",
+                    deposit_address
+                )
+            } else {
+                info!("Monero balance: {}", monero_balance);
+            }
 
             let kraken_rate_updates = kraken::connect()?;
 
@@ -137,50 +141,68 @@ async fn main() -> Result<()> {
             // Print the table to stdout
             table.printstd();
         }
+        Command::WithdrawBtc { amount, address } => {
+            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+
+            let amount = match amount {
+                Some(amount) => amount,
+                None => {
+                    bitcoin_wallet
+                        .max_giveable(address.script_pubkey().len())
+                        .await?
+                }
+            };
+
+            let psbt = bitcoin_wallet.send_to_address(address, amount).await?;
+            let signed_tx = bitcoin_wallet.sign_and_finalize(psbt).await?;
+
+            bitcoin_wallet.broadcast(signed_tx, "withdraw").await?;
+        }
+        Command::Balance => {
+            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+            let monero_wallet = init_monero_wallet(&config, env_config).await?;
+
+            let bitcoin_balance = bitcoin_wallet.balance().await?;
+            let monero_balance = monero_wallet.get_balance().await?;
+
+            tracing::info!("Current balance: {}, {}", bitcoin_balance, monero_balance);
+        }
     };
 
     Ok(())
 }
 
-async fn init_wallets(
-    config: Config,
-    bitcoin_wallet_data_dir: &Path,
-    key: impl DerivableKey<Segwitv0> + Clone,
-    env_config: env::Config,
-) -> Result<(bitcoin::Wallet, monero::Wallet)> {
-    let bitcoin_wallet = bitcoin::Wallet::new(
-        config.bitcoin.electrum_rpc_url,
-        bitcoin_wallet_data_dir,
-        key,
+async fn init_bitcoin_wallet(
+    config: &Config,
+    seed: &Seed,
+    env_config: swap::env::Config,
+) -> Result<bitcoin::Wallet> {
+    let wallet_dir = config.data.dir.join("wallet");
+
+    let wallet = bitcoin::Wallet::new(
+        config.bitcoin.electrum_rpc_url.clone(),
+        &wallet_dir,
+        seed.derive_extended_private_key(env_config.bitcoin_network)?,
         env_config,
     )
-    .await?;
+    .await
+    .context("Failed to initialize Bitcoin wallet")?;
 
-    bitcoin_wallet.sync().await?;
+    wallet.sync().await?;
 
-    let bitcoin_balance = bitcoin_wallet.balance().await?;
-    info!(
-        "Connection to Bitcoin wallet succeeded, balance: {}",
-        bitcoin_balance
-    );
+    Ok(wallet)
+}
 
-    let monero_wallet = monero::Wallet::open_or_create(
+async fn init_monero_wallet(
+    config: &Config,
+    env_config: swap::env::Config,
+) -> Result<monero::Wallet> {
+    let wallet = monero::Wallet::open_or_create(
         config.monero.wallet_rpc_url.clone(),
         DEFAULT_WALLET_NAME.to_string(),
         env_config,
     )
     .await?;
 
-    let balance = monero_wallet.get_balance().await?;
-    if balance == Amount::ZERO {
-        let deposit_address = monero_wallet.get_main_address();
-        warn!(
-            "The Monero balance is 0, make sure to deposit funds at: {}",
-            deposit_address
-        )
-    } else {
-        info!("Monero balance: {}", balance);
-    }
-
-    Ok((bitcoin_wallet, monero_wallet))
+    Ok(wallet)
 }
