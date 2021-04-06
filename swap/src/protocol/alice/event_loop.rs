@@ -78,7 +78,7 @@ pub async fn new<LR>(
             }
         };
 
-        let handle = new_handle(
+        let handle = EventLoopHandle::new(
             &mut recv_encrypted_signature,
             &mut send_transfer_proof,
             peer_id,
@@ -119,7 +119,7 @@ pub async fn new<LR>(
                     }
                     SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone { bob_peer_id, state3, swap_id }) => {
                         let swap = Swap {
-                            event_loop_handle: new_handle(&mut recv_encrypted_signature, &mut send_transfer_proof, bob_peer_id, swap_id),
+                            event_loop_handle: EventLoopHandle::new(&mut recv_encrypted_signature, &mut send_transfer_proof, bob_peer_id, swap_id),
                             bitcoin_wallet: bitcoin_wallet.clone(),
                             monero_wallet: monero_wallet.clone(),
                             env_config,
@@ -305,44 +305,6 @@ where
     Ok(())
 }
 
-/// Create a new [`EventLoopHandle`] that is scoped for communication with
-/// the given peer.
-fn new_handle(
-    recv_encrypted_signature: &mut HashMap<
-        Uuid,
-        bmrng::RequestSender<bitcoin::EncryptedSignature, ()>,
-    >,
-    send_transfer_proof: &mut FuturesUnordered<OutgoingTransferProof>,
-    peer: PeerId,
-    swap_id: Uuid,
-) -> EventLoopHandle {
-    // we deliberately don't put timeouts on these channels because the swap always
-    // races these futures against a timelock
-    let (transfer_proof_sender, mut transfer_proof_receiver) = bmrng::channel(1);
-    let encrypted_signature = bmrng::channel(1);
-
-    recv_encrypted_signature.insert(swap_id, encrypted_signature.0);
-
-    send_transfer_proof.push(
-        async move {
-            let (transfer_proof, responder) = transfer_proof_receiver.recv().await?;
-
-            let request = transfer_proof::Request {
-                swap_id,
-                tx_lock_proof: transfer_proof,
-            };
-
-            Ok((peer, request, responder))
-        }
-        .boxed(),
-    );
-
-    EventLoopHandle {
-        recv_encrypted_signature: Some(encrypted_signature.1),
-        send_transfer_proof: Some(transfer_proof_sender),
-    }
-}
-
 pub trait LatestRate {
     type Error: std::error::Error + Send + Sync + 'static;
 
@@ -412,6 +374,42 @@ pub struct EventLoopHandle {
 }
 
 impl EventLoopHandle {
+    /// Create a new [`EventLoopHandle`] that is scoped for communication with
+    /// the given peer.
+    fn new(
+        recv_encrypted_signature: &mut HashMap<
+            Uuid,
+            bmrng::RequestSender<bitcoin::EncryptedSignature, ()>,
+        >,
+        send_transfer_proof: &mut FuturesUnordered<OutgoingTransferProof>,
+        peer: PeerId,
+        swap_id: Uuid,
+    ) -> Self {
+        // we deliberately don't put timeouts on these channels because the swap always
+        // races these futures against a timelock
+        let (transfer_proof_sender, mut transfer_proof_receiver) = bmrng::channel(1);
+        let encrypted_signature = bmrng::channel(1);
+
+        recv_encrypted_signature.insert(swap_id, encrypted_signature.0);
+        send_transfer_proof.push(
+            async move {
+                let (msg, responder) = transfer_proof_receiver.recv().await?;
+                let request = transfer_proof::Request {
+                    swap_id,
+                    tx_lock_proof: msg,
+                };
+
+                Ok((peer, request, responder))
+            }
+            .boxed(),
+        );
+
+        EventLoopHandle {
+            recv_encrypted_signature: Some(encrypted_signature.1),
+            send_transfer_proof: Some(transfer_proof_sender),
+        }
+    }
+
     pub async fn recv_encrypted_signature(&mut self) -> Result<bitcoin::EncryptedSignature> {
         let (tx_redeem_encsig, responder) = self
             .recv_encrypted_signature
