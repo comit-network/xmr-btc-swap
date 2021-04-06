@@ -482,9 +482,9 @@ dependencies = [
 
 [[package]]
 name = "bmrng"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ba7ad917af2fc43efa0b20d2bf3b2c1bd1090fa2a6b8c73847458c8335dea2b"
+checksum = "c2beb18ef6d59c6aa23181cb6d4ac75e564ce15ed62a66974179a394d386ec27"
 dependencies = [
  "futures",
  "loom",
