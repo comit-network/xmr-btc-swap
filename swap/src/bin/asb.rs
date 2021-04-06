@@ -27,9 +27,10 @@ use swap::fs::default_config_path;
 use swap::monero::Amount;
 use swap::network::swarm;
 use swap::protocol::alice::event_loop::KrakenRate;
-use swap::protocol::alice::{run, Behaviour, EventLoop};
+use swap::protocol::alice::{event_loop, run, Behaviour};
 use swap::seed::Seed;
 use swap::{asb, bitcoin, env, kraken, monero};
+use tokio::sync::mpsc;
 use tracing::{info, warn};
 use tracing_subscriber::filter::LevelFilter;
 
@@ -101,7 +102,10 @@ async fn main() -> Result<()> {
             Swarm::listen_on(&mut swarm, config.network.listen)
                 .context("Failed to listen network interface")?;
 
-            let (event_loop, mut swap_receiver) = EventLoop::new(
+            info!("Our peer id is {}", Swarm::local_peer_id(&swarm));
+
+            let (swap_sender, mut swap_receiver) = mpsc::channel(100);
+            let event_loop = event_loop::new(
                 swarm,
                 env_config,
                 Arc::new(bitcoin_wallet),
@@ -109,8 +113,8 @@ async fn main() -> Result<()> {
                 Arc::new(db),
                 KrakenRate::new(ask_spread, kraken_price_updates),
                 max_buy,
-            )
-            .unwrap();
+                swap_sender,
+            );
 
             tokio::spawn(async move {
                 while let Some(swap) = swap_receiver.recv().await {
@@ -128,9 +132,7 @@ async fn main() -> Result<()> {
                 }
             });
 
-            info!("Our peer id is {}", event_loop.peer_id());
-
-            event_loop.run().await;
+            event_loop.await;
         }
         Command::History => {
             let mut table = Table::new();

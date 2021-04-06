@@ -29,7 +29,6 @@ use tempfile::tempdir;
 use testcontainers::clients::Cli;
 use testcontainers::{Container, Docker, RunArgs};
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
 use tokio::time::{interval, timeout};
 use tracing_subscriber::util::SubscriberInitExt;
@@ -638,13 +637,15 @@ fn start_alice(
     env_config: Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
-) -> (AliceApplicationHandle, Receiver<alice::Swap>) {
+) -> (AliceApplicationHandle, mpsc::Receiver<alice::Swap>) {
     let db = Arc::new(Database::open(db_path.as_path()).unwrap());
 
     let mut swarm = swarm::new::<alice::Behaviour>(&seed).unwrap();
     Swarm::listen_on(&mut swarm, listen_address).unwrap();
+    let peer_id = *Swarm::local_peer_id(&swarm);
 
-    let (event_loop, swap_handle) = alice::EventLoop::new(
+    let (swap_sender, swap_receiver) = mpsc::channel(1);
+    let event_loop = alice::event_loop::new(
         swarm,
         env_config,
         bitcoin_wallet,
@@ -652,13 +653,12 @@ fn start_alice(
         db,
         FixedRate::default(),
         bitcoin::Amount::ONE_BTC,
-    )
-    .unwrap();
+        swap_sender,
+    );
 
-    let peer_id = event_loop.peer_id();
-    let handle = tokio::spawn(event_loop.run());
+    let handle = tokio::spawn(event_loop);
 
-    (AliceApplicationHandle { handle, peer_id }, swap_handle)
+    (AliceApplicationHandle { handle, peer_id }, swap_receiver)
 }
 
 fn random_prefix() -> String {
