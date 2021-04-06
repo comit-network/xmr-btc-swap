@@ -8,7 +8,13 @@ More information about the protocol in this [presentation](https://youtu.be/Jj8r
 ## Quick start - CLI
 
 1. Download the [latest `swap` binary release](https://github.com/comit-network/xmr-btc-swap/releases/latest) for your operating system
-2. Run the binary: `./swap buy-xmr --receive-address <YOUR MONERO ADDRESS>`
+2. Run the binary specifying the monero address where you wish to receive monero and the connection details of the seller:
+   `./swap buy-xmr --receive-address <YOUR MONERO ADDRESS> --seller-peer-id <SELLERS PEER ID> --seller-multiaddr <SELLERS MULTIADDRESS>`
+   You can generate a receive address using your monero wallet.
+   The seller will provide you their peer id and multiaddress.
+   We are running an `asb` instance on testnet.
+   You can swap with to get familiar with the `swap` CLI.
+   Our peer id is `12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi` and our multiaddress is `/dns4/xmr-btc-asb.coblox.tech/tcp/9876`
 3. Follow the instructions printed to the terminal
 
 ## Limitations

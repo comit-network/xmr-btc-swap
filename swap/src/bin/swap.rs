@@ -21,7 +21,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use structopt::StructOpt;
 use swap::bitcoin::{Amount, TxLock};
-use swap::cli::command::{AliceMultiaddress, Arguments, Command, Data, MoneroParams};
+use swap::cli::command::{Arguments, Command, Data, MoneroParams};
 use swap::database::Database;
 use swap::env::{Config, GetConfig};
 use swap::network::quote::BidQuote;
@@ -82,10 +82,7 @@ async fn main() -> Result<()> {
     match args.cmd {
         Command::BuyXmr {
             alice_peer_id,
-            alice_multi_addr:
-                AliceMultiaddress {
-                    multiaddr: alice_addr,
-                },
+            alice_multiaddr,
             monero_params:
                 MoneroParams {
                     receive_monero_address,
@@ -108,7 +105,7 @@ async fn main() -> Result<()> {
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
             let mut swarm = swarm::new::<Behaviour>(&seed)?;
-            swarm.add_address(alice_peer_id, alice_addr);
+            swarm.add_address(alice_peer_id, alice_multiaddr);
 
             let (event_loop, mut event_loop_handle) =
                 EventLoop::new(swarm, alice_peer_id, bitcoin_wallet.clone())?;
@@ -170,10 +167,7 @@ async fn main() -> Result<()> {
         }
         Command::Resume {
             swap_id,
-            alice_multi_addr:
-                AliceMultiaddress {
-                    multiaddr: alice_addr,
-                },
+            alice_multiaddr,
             monero_params:
                 MoneroParams {
                     receive_monero_address,
@@ -193,7 +187,7 @@ async fn main() -> Result<()> {
 
             let alice_peer_id = db.get_peer_id(swap_id)?;
             let mut swarm = swarm::new::<Behaviour>(&seed)?;
-            swarm.add_address(alice_peer_id, alice_addr);
+            swarm.add_address(alice_peer_id, alice_multiaddr);
 
             let (event_loop, event_loop_handle) =
                 EventLoop::new(swarm, alice_peer_id, bitcoin_wallet.clone())?;
