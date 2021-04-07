@@ -2,12 +2,13 @@
 
 ## Quick Start ASB
 
-1. Ensure that you have the Monero Wallet RPC running with `--wallet-dir` and `--disable-rpc-login`:
+1. Download [latest release](https://github.com/comit-network/xmr-btc-swap/releases/latest) of the `asb` binary
+2. Ensure that you have the Monero Wallet RPC running with `--wallet-dir` and `--disable-rpc-login`:
    1. `monero-wallet-rpc --stagenet --daemon-host STAGENET-NODE-URL --rpc-bind-port STAGENET-NODE-PORT --disable-rpc-login --wallet-dir PATH/TO/WALLET/DIR`
-2. Run the ASB in terminal: `./asb start`
-3. Follow the setup wizard in the terminal
+3. Run the ASB in terminal: `./asb start`
+4. Follow the setup wizard in the terminal
 
-Public stagenet nodes:
+Public Monero stagenet nodes for running the Monero Wallet RPC:
 
 - `monero-stagenet.exan.tech:38081`
 - `stagenet.community.xmr.to:38081`
@@ -97,6 +98,7 @@ Currently the spot price is equal to the market price on Kraken.
 Swap execution within the ASB is automated.
 Incoming swaps request will be automatically processed and the swap will execute automatically.
 Swaps where Bob does not act, so Alice cannot redeem, will be automatically refunded or punished.
+When the ASB is restarted unfinished swaps will be resumed automatically.
 
 The refund scenario is a scenario where the CLI refunds the Bitcoin.
 The ASB can then refund the Monero which will be automatically transferred to the `asb-wallet`.
@@ -107,23 +109,9 @@ After a second timelock expires the ASB will automatically punish the CLI user b
 More information about the protocol in this [presentation](https://youtu.be/Jj8rd4WOEy0) and this [blog post](https://comit.network/blog/2020/10/06/monero-bitcoin).
 
 All claimed Bitcoin ends up in the internal Bitcoin wallet of the ASB.
+The ASB offers a commands to withdraw Bitcoin and check the balance, run `./asb --help` for details.
 
 If the ASB has insufficient Monero funds to accept a swap the swap setup is rejected.
 Note that currently there is no specific error sent back to the CLI for such kind of cases, so a user might not know why the swap execution was rejected.
 Note that there is currently no notification service implemented for low funds.
 The ASB provider has to monitor Monero funds to make sure the ASB still has liquidity.
-
-## Known Limitations
-
-Bitcoin wallet withdrawal and balance:
-
-- https://github.com/comit-network/xmr-btc-swap/issues/368
-
-Configurable Spread:
-
-- https://github.com/comit-network/xmr-btc-swap/issues/381
-
-Resuming unfinished Swaps:
-
-- https://github.com/comit-network/xmr-btc-swap/issues/374
-- https://github.com/comit-network/xmr-btc-swap/issues/378
