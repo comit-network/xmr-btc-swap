@@ -19,6 +19,7 @@ pub use self::state::*;
 pub use self::swap::{run, run_until};
 use crate::network::quote::BidQuote;
 use crate::network::{quote, transfer_proof};
+use libp2p::relay::Relay;
 
 pub mod cancel;
 pub mod event_loop;
@@ -136,6 +137,12 @@ impl OutEvent {
 
     fn unexpected_response() -> OutEvent {
         OutEvent::CommunicationError(anyhow!("Unexpected response received"))
+    }
+}
+
+impl From<()> for OutEvent {
+    fn from(_: ()) -> Self {
+        unimplemented!()
     }
 }
 
@@ -258,16 +265,18 @@ pub struct Behaviour {
     pub execution_setup: execution_setup::Behaviour,
     pub transfer_proof: transfer_proof::Behaviour,
     pub encrypted_signature: encrypted_signature::Behaviour,
+    pub relay: Relay,
 }
 
-impl Default for Behaviour {
-    fn default() -> Self {
+impl From<Relay> for Behaviour {
+    fn from(relay: Relay) -> Self {
         Self {
             quote: quote::bob(),
             spot_price: spot_price::bob(),
             execution_setup: Default::default(),
             transfer_proof: transfer_proof::bob(),
             encrypted_signature: encrypted_signature::bob(),
+            relay,
         }
     }
 }

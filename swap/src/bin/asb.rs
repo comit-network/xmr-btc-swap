@@ -33,6 +33,8 @@ use swap::trace::init_tracing;
 use swap::{bitcoin, env, kraken, monero};
 use tracing::{info, warn};
 use tracing_subscriber::filter::LevelFilter;
+use libp2p::core::Multiaddr;
+use std::str::FromStr;
 
 #[macro_use]
 extern crate prettytable;
@@ -99,7 +101,11 @@ async fn main() -> Result<()> {
             let kraken_price_updates = kraken::connect()?;
 
             let mut swarm = swarm::new::<Behaviour>(&seed)?;
-            Swarm::listen_on(&mut swarm, config.network.listen)
+
+
+            let relay_addr = Multiaddr::from_str("/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN/p2p-circuit/dns4/xmr-btc-asb.coblox.tech/tcp/8765/p2p/12D3KooWPZ69DRp4wbGB3wJsxxsg1XW1EVZ2evtVwcARCF3a1nrx").expect("default relay multiaddress to be valid");
+
+            Swarm::listen_on(&mut swarm, relay_addr)
                 .context("Failed to listen network interface")?;
 
             let (event_loop, mut swap_receiver) = EventLoop::new(

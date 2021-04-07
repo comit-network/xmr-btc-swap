@@ -6,6 +6,7 @@ use libp2p::request_response::{
     RequestId, RequestResponseEvent, RequestResponseMessage, ResponseChannel,
 };
 use libp2p::{NetworkBehaviour, PeerId};
+use libp2p::relay::Relay;
 
 #[derive(Debug)]
 pub enum OutEvent {
@@ -51,6 +52,12 @@ impl OutEvent {
             peer,
             error: anyhow!("Unexpected response received"),
         }
+    }
+}
+
+impl From<()> for OutEvent {
+    fn from(_: ()) -> Self {
+        unimplemented!()
     }
 }
 
@@ -177,16 +184,18 @@ pub struct Behaviour {
     pub execution_setup: execution_setup::Behaviour,
     pub transfer_proof: transfer_proof::Behaviour,
     pub encrypted_signature: encrypted_signature::Behaviour,
+    pub relay: Relay,
 }
 
-impl Default for Behaviour {
-    fn default() -> Self {
+impl From<Relay> for Behaviour {
+    fn from(relay: Relay) -> Self {
         Self {
             quote: quote::alice(),
             spot_price: spot_price::alice(),
             execution_setup: Default::default(),
             transfer_proof: transfer_proof::alice(),
             encrypted_signature: encrypted_signature::alice(),
+            relay,
         }
     }
 }

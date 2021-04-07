@@ -1690,6 +1690,7 @@ dependencies = [
  "libp2p-dns",
  "libp2p-mplex",
  "libp2p-noise",
+ "libp2p-relay",
  "libp2p-request-response",
  "libp2p-swarm",
  "libp2p-swarm-derive",
@@ -1796,6 +1797,29 @@ dependencies = [
  "static_assertions",
  "x25519-dalek",
  "zeroize",
+]
+
+[[package]]
+name = "libp2p-relay"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ff268be6a9d6f3c6cca3b81bbab597b15217f9ad8787c6c40fc548c1af7cd24"
+dependencies = [
+ "asynchronous-codec",
+ "bytes 1.0.1",
+ "futures",
+ "futures-timer",
+ "libp2p-core",
+ "libp2p-swarm",
+ "log 0.4.14",
+ "pin-project 1.0.5",
+ "prost",
+ "prost-build",
+ "rand 0.7.3",
+ "smallvec",
+ "unsigned-varint 0.7.0",
+ "void",
+ "wasm-timer",
 ]
 
 [[package]]
