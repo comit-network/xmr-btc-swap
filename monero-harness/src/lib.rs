@@ -98,7 +98,7 @@ impl<'c> Monero {
         Ok(wallet)
     }
 
-    pub async fn init(&self, wallet_amount: Vec<(&str, u64)>) -> Result<()> {
+    pub async fn init_miner(&self) -> Result<()> {
         let miner_wallet = self.wallet("miner")?;
         let miner_address = miner_wallet.address().await?.address;
 
@@ -108,16 +108,33 @@ impl<'c> Monero {
         tracing::info!("Generated {:?} blocks", res.blocks.len());
         miner_wallet.refresh().await?;
 
-        for (wallet, amount) in wallet_amount.iter() {
-            if *amount > 0 {
-                let wallet = self.wallet(wallet)?;
-                let address = wallet.address().await?.address;
-                miner_wallet.transfer(&address, *amount).await?;
+        Ok(())
+    }
+
+    pub async fn init_wallet(&self, name: &str, amount_in_outputs: Vec<u64>) -> Result<()> {
+        let miner_wallet = self.wallet("miner")?;
+        let miner_address = miner_wallet.address().await?.address;
+        let monerod = &self.monerod;
+
+        let wallet = self.wallet(name)?;
+        let address = wallet.address().await?.address;
+
+        for amount in amount_in_outputs {
+            if amount > 0 {
+                miner_wallet.transfer(&address, amount).await?;
                 tracing::info!("Funded {} wallet with {}", wallet.name, amount);
                 monerod.client().generate_blocks(10, &miner_address).await?;
                 wallet.refresh().await?;
             }
         }
+
+        Ok(())
+    }
+
+    pub async fn start_miner(&self) -> Result<()> {
+        let miner_wallet = self.wallet("miner")?;
+        let miner_address = miner_wallet.address().await?.address;
+        let monerod = &self.monerod;
 
         monerod.start_miner(&miner_address).await?;
 
@@ -127,6 +144,13 @@ impl<'c> Monero {
             .wait_for_wallet_height(block_height)
             .await
             .unwrap();
+
+        Ok(())
+    }
+
+    pub async fn init_and_start_miner(&self) -> Result<()> {
+        self.init_miner().await?;
+        self.start_miner().await?;
 
         Ok(())
     }

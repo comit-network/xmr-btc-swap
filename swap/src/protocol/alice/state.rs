@@ -13,6 +13,7 @@ use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQProof;
 use std::fmt;
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub enum AliceState {
@@ -146,7 +147,7 @@ impl State0 {
         })
     }
 
-    pub fn receive(self, msg: Message0) -> Result<State1> {
+    pub fn receive(self, msg: Message0) -> Result<(Uuid, State1)> {
         let valid = CROSS_CURVE_PROOF_SYSTEM.verify(
             &msg.dleq_proof_s_b,
             (
@@ -164,7 +165,7 @@ impl State0 {
 
         let v = self.v_a + msg.v_b;
 
-        Ok(State1 {
+        Ok((msg.swap_id, State1 {
             a: self.a,
             B: msg.B,
             s_a: self.s_a,
@@ -182,7 +183,7 @@ impl State0 {
             refund_address: msg.refund_address,
             redeem_address: self.redeem_address,
             punish_address: self.punish_address,
-        })
+        }))
     }
 }
 

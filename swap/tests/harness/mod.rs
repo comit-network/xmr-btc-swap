@@ -43,13 +43,52 @@ const BITCOIN_TEST_WALLET_NAME: &str = "testwallet";
 #[derive(Debug, Clone)]
 pub struct StartingBalances {
     pub xmr: monero::Amount,
+    pub xmr_outputs: Vec<monero::Amount>,
     pub btc: bitcoin::Amount,
+}
+
+impl StartingBalances {
+    /// If monero_outputs is specified the monero balance will be:
+    /// monero_outputs * new_xmr = self_xmr
+    pub fn new(btc: bitcoin::Amount, xmr: monero::Amount, monero_outputs: Option<u64>) -> Self {
+        match monero_outputs {
+            None => {
+                if xmr == monero::Amount::ZERO {
+                    return Self {
+                        xmr,
+                        xmr_outputs: vec![],
+                        btc,
+                    };
+                }
+
+                Self {
+                    xmr,
+                    xmr_outputs: vec![xmr],
+                    btc,
+                }
+            }
+            Some(outputs) => {
+                let mut xmr_outputs = Vec::new();
+                let mut sum_xmr = monero::Amount::ZERO;
+
+                for _ in 0..outputs {
+                    xmr_outputs.push(xmr);
+                    sum_xmr = sum_xmr + xmr;
+                }
+
+                Self {
+                    xmr: sum_xmr,
+                    xmr_outputs,
+                    btc,
+                }
+            }
+        }
+    }
 }
 
 struct BobParams {
     seed: Seed,
     db_path: PathBuf,
-    swap_id: Uuid,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
     alice_address: Multiaddr,
@@ -58,12 +97,16 @@ struct BobParams {
 }
 
 impl BobParams {
-    pub async fn builder(&self, event_loop_handle: bob::EventLoopHandle) -> Result<bob::Builder> {
+    pub async fn builder(
+        &self,
+        event_loop_handle: bob::EventLoopHandle,
+        swap_id: Uuid,
+    ) -> Result<bob::Builder> {
         let receive_address = self.monero_wallet.get_main_address();
 
         Ok(bob::Builder::new(
             Database::open(&self.db_path.clone().as_path()).unwrap(),
-            self.swap_id,
+            swap_id,
             self.bitcoin_wallet.clone(),
             self.monero_wallet.clone(),
             self.env_config,
@@ -72,11 +115,16 @@ impl BobParams {
         ))
     }
 
-    pub fn new_eventloop(&self) -> Result<(bob::EventLoop, bob::EventLoopHandle)> {
+    pub fn new_eventloop(&self, swap_id: Uuid) -> Result<(bob::EventLoop, bob::EventLoopHandle)> {
         let mut swarm = swarm::new::<bob::Behaviour>(&self.seed)?;
         swarm.add_address(self.alice_peer_id, self.alice_address.clone());
 
-        bob::EventLoop::new(swarm, self.alice_peer_id, self.bitcoin_wallet.clone())
+        bob::EventLoop::new(
+            swap_id,
+            swarm,
+            self.alice_peer_id,
+            self.bitcoin_wallet.clone(),
+        )
     }
 }
 
@@ -139,23 +187,27 @@ impl TestContext {
     }
 
     pub async fn alice_next_swap(&mut self) -> alice::Swap {
-        timeout(Duration::from_secs(10), self.alice_swap_handle.recv())
+        timeout(Duration::from_secs(20), self.alice_swap_handle.recv())
             .await
-            .expect("No Alice swap within 10 seconds, aborting because this test is waiting for a swap forever...")
+            .expect("No Alice swap within 20 seconds, aborting because this test is likely waiting for a swap forever...")
             .unwrap()
     }
 
     pub async fn bob_swap(&mut self) -> (bob::Swap, BobApplicationHandle) {
-        let (event_loop, event_loop_handle) = self.bob_params.new_eventloop().unwrap();
+        let swap_id = Uuid::new_v4();
+        let (event_loop, event_loop_handle) = self.bob_params.new_eventloop(swap_id).unwrap();
 
         let swap = self
             .bob_params
-            .builder(event_loop_handle)
+            .builder(event_loop_handle, swap_id)
             .await
             .unwrap()
             .with_init_params(self.btc_amount)
             .build()
             .unwrap();
+
+        // ensure the wallet is up to date for concurrent swap tests
+        swap.bitcoin_wallet.sync().await.unwrap();
 
         let join_handle = tokio::spawn(event_loop.run());
 
@@ -165,14 +217,15 @@ impl TestContext {
     pub async fn stop_and_resume_bob_from_db(
         &mut self,
         join_handle: BobApplicationHandle,
+        swap_id: Uuid,
     ) -> (bob::Swap, BobApplicationHandle) {
         join_handle.abort();
 
-        let (event_loop, event_loop_handle) = self.bob_params.new_eventloop().unwrap();
+        let (event_loop, event_loop_handle) = self.bob_params.new_eventloop(swap_id).unwrap();
 
         let swap = self
             .bob_params
-            .builder(event_loop_handle)
+            .builder(event_loop_handle, swap_id)
             .await
             .unwrap()
             .build()
@@ -489,14 +542,13 @@ where
     let env_config = C::get_config();
 
     let (monero, containers) = harness::init_containers(&cli).await;
+    monero.init_miner().await.unwrap();
 
     let btc_amount = bitcoin::Amount::from_sat(1_000_000);
     let xmr_amount = monero::Amount::from_monero(btc_amount.as_btc() / FixedRate::RATE).unwrap();
 
-    let alice_starting_balances = StartingBalances {
-        xmr: xmr_amount * 10,
-        btc: bitcoin::Amount::ZERO,
-    };
+    let alice_starting_balances =
+        StartingBalances::new(bitcoin::Amount::ZERO, xmr_amount, Some(10));
 
     let electrs_rpc_port = containers
         .electrs
@@ -532,10 +584,7 @@ where
     );
 
     let bob_seed = Seed::random().unwrap();
-    let bob_starting_balances = StartingBalances {
-        xmr: monero::Amount::ZERO,
-        btc: btc_amount * 10,
-    };
+    let bob_starting_balances = StartingBalances::new(btc_amount * 10, monero::Amount::ZERO, None);
 
     let (bob_bitcoin_wallet, bob_monero_wallet) = init_test_wallets(
         MONERO_WALLET_NAME_BOB,
@@ -552,13 +601,14 @@ where
     let bob_params = BobParams {
         seed: Seed::random().unwrap(),
         db_path: tempdir().unwrap().path().to_path_buf(),
-        swap_id: Uuid::new_v4(),
         bitcoin_wallet: bob_bitcoin_wallet.clone(),
         monero_wallet: bob_monero_wallet.clone(),
         alice_address: alice_listen_address.clone(),
         alice_peer_id: alice_handle.peer_id,
         env_config,
     };
+
+    monero.start_miner().await.unwrap();
 
     let test = TestContext {
         env_config,
@@ -774,7 +824,14 @@ async fn init_test_wallets(
     env_config: Config,
 ) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {
     monero
-        .init(vec![(name, starting_balances.xmr.as_piconero())])
+        .init_wallet(
+            name,
+            starting_balances
+                .xmr_outputs
+                .into_iter()
+                .map(|amount| amount.as_piconero())
+                .collect(),
+        )
         .await
         .unwrap();
 

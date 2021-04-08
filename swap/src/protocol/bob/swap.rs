@@ -8,6 +8,7 @@ use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
 use rand::rngs::OsRng;
 use tokio::select;
+use uuid::Uuid;
 
 pub fn is_complete(state: &BobState) -> bool {
     matches!(
@@ -32,6 +33,7 @@ pub async fn run_until(
 
     while !is_target_state(&current_state) {
         current_state = next_state(
+            swap.swap_id,
             current_state,
             &mut swap.event_loop_handle,
             swap.bitcoin_wallet.as_ref(),
@@ -51,6 +53,7 @@ pub async fn run_until(
 }
 
 async fn next_state(
+    swap_id: Uuid,
     state: BobState,
     event_loop_handle: &mut EventLoopHandle,
     bitcoin_wallet: &bitcoin::Wallet,
@@ -65,6 +68,7 @@ async fn next_state(
             let bitcoin_refund_address = bitcoin_wallet.new_address().await?;
 
             let state2 = request_price_and_setup(
+                swap_id,
                 btc_amount,
                 event_loop_handle,
                 env_config,
@@ -103,7 +107,7 @@ async fn next_state(
 
                 select! {
                     transfer_proof = transfer_proof_watcher => {
-                        let transfer_proof = transfer_proof?.tx_lock_proof;
+                        let transfer_proof = transfer_proof?;
 
                         tracing::info!(txid = %transfer_proof.tx_hash(), "Alice locked Monero");
 
@@ -244,6 +248,7 @@ async fn next_state(
 }
 
 pub async fn request_price_and_setup(
+    swap_id: Uuid,
     btc: bitcoin::Amount,
     event_loop_handle: &mut EventLoopHandle,
     env_config: &Config,
@@ -254,6 +259,7 @@ pub async fn request_price_and_setup(
     tracing::info!("Spot price for {} is {}", btc, xmr);
 
     let state0 = State0::new(
+        swap_id,
         &mut OsRng,
         btc,
         xmr,

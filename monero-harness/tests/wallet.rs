@@ -22,11 +22,10 @@ async fn fund_transfer_and_check_tx_key() {
     let alice_wallet = monero.wallet("alice").unwrap();
     let bob_wallet = monero.wallet("bob").unwrap();
 
-    // fund alice
-    monero
-        .init(vec![("alice", fund_alice), ("bob", fund_bob)])
-        .await
-        .unwrap();
+    monero.init_miner().await.unwrap();
+    monero.init_wallet("alice", vec![fund_alice]).await.unwrap();
+    monero.init_wallet("bob", vec![fund_bob]).await.unwrap();
+    monero.start_miner().await.unwrap();
 
     // check alice balance
     let got_alice_balance = alice_wallet.balance().await.unwrap();

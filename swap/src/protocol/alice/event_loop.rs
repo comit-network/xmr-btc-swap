@@ -3,7 +3,7 @@ use crate::database::Database;
 use crate::env::Config;
 use crate::monero::BalanceTooLow;
 use crate::network::quote::BidQuote;
-use crate::network::{encrypted_signature, spot_price, transfer_proof};
+use crate::network::{spot_price, transfer_proof};
 use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State0, State3, Swap};
 use crate::{bitcoin, kraken, monero};
 use anyhow::{bail, Context, Result};
@@ -43,9 +43,8 @@ pub struct EventLoop<RS> {
 
     swap_sender: mpsc::Sender<Swap>,
 
-    /// Stores a sender per peer for incoming [`EncryptedSignature`]s.
-    recv_encrypted_signature:
-        HashMap<PeerId, bmrng::RequestSender<encrypted_signature::Request, ()>>,
+    /// Stores incoming [`EncryptedSignature`]s per swap.
+    recv_encrypted_signature: HashMap<Uuid, bmrng::RequestSender<bitcoin::EncryptedSignature, ()>>,
     inflight_encrypted_signatures: FuturesUnordered<BoxFuture<'static, ResponseChannel<()>>>,
 
     send_transfer_proof: FuturesUnordered<OutgoingTransferProof>,
@@ -120,7 +119,7 @@ where
                 }
             };
 
-            let handle = self.new_handle(peer_id);
+            let handle = self.new_handle(peer_id, swap_id);
 
             let swap = Swap {
                 event_loop_handle: handle,
@@ -186,25 +185,26 @@ where
                                 tracing::debug!(%peer, "Failed to respond with quote");
                             }
                         }
-                        SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone{bob_peer_id, state3}) => {
-                            let _ = self.handle_execution_setup_done(bob_peer_id, *state3).await;
+                        SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone{bob_peer_id, swap_id, state3}) => {
+                            let _ = self.handle_execution_setup_done(bob_peer_id, swap_id, *state3).await;
                         }
                         SwarmEvent::Behaviour(OutEvent::TransferProofAcknowledged { peer, id }) => {
-                            tracing::trace!(%peer, "Bob acknowledged transfer proof");
+                            tracing::debug!(%peer, "Bob acknowledged transfer proof");
                             if let Some(responder) = self.inflight_transfer_proofs.remove(&id) {
                                 let _ = responder.respond(());
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::EncryptedSignatureReceived{ msg, channel, peer }) => {
-                            let sender = match self.recv_encrypted_signature.remove(&peer) {
+                            let sender = match self.recv_encrypted_signature.remove(&msg.swap_id) {
                                 Some(sender) => sender,
                                 None => {
+                                    // TODO: Don't just drop encsig if we currently don't have a running swap for it, save in db
                                     tracing::warn!(%peer, "No sender for encrypted signature, maybe already handled?");
                                     continue;
                                 }
                             };
 
-                            let mut responder = match sender.send(*msg).await {
+                            let mut responder = match sender.send(msg.tx_redeem_encsig).await {
                                 Ok(responder) => responder,
                                 Err(_) => {
                                     tracing::warn!(%peer, "Failed to relay encrypted signature to swap");
@@ -262,8 +262,8 @@ where
                             let id = self.swarm.transfer_proof.send_request(&peer, transfer_proof);
                             self.inflight_transfer_proofs.insert(id, responder);
                         },
-                        Some(Err(_)) => {
-                            tracing::debug!("A swap stopped without sending a transfer proof");
+                        Some(Err(e)) => {
+                            tracing::debug!("A swap stopped without sending a transfer proof: {:#}", e);
                         }
                         None => {
                             unreachable!("stream of transfer proof receivers must never terminate")
@@ -319,9 +319,13 @@ where
         })
     }
 
-    async fn handle_execution_setup_done(&mut self, bob_peer_id: PeerId, state3: State3) {
-        let swap_id = Uuid::new_v4();
-        let handle = self.new_handle(bob_peer_id);
+    async fn handle_execution_setup_done(
+        &mut self,
+        bob_peer_id: PeerId,
+        swap_id: Uuid,
+        state3: State3,
+    ) {
+        let handle = self.new_handle(bob_peer_id, swap_id);
 
         let initial_state = AliceState::Started {
             state3: Box::new(state3),
@@ -337,7 +341,7 @@ where
             swap_id,
         };
 
-        // TODO: Consider adding separate components for start/rsume of swaps
+        // TODO: Consider adding separate components for start/resume of swaps
 
         // swaps save peer id so we can resume
         match self.db.insert_peer_id(swap_id, bob_peer_id).await {
@@ -354,17 +358,24 @@ where
 
     /// Create a new [`EventLoopHandle`] that is scoped for communication with
     /// the given peer.
-    fn new_handle(&mut self, peer: PeerId) -> EventLoopHandle {
+    fn new_handle(&mut self, peer: PeerId, swap_id: Uuid) -> EventLoopHandle {
         // we deliberately don't put timeouts on these channels because the swap always
         // races these futures against a timelock
+
         let (transfer_proof_sender, mut transfer_proof_receiver) = bmrng::channel(1);
         let encrypted_signature = bmrng::channel(1);
 
         self.recv_encrypted_signature
-            .insert(peer, encrypted_signature.0);
+            .insert(swap_id, encrypted_signature.0);
+
         self.send_transfer_proof.push(
             async move {
-                let (request, responder) = transfer_proof_receiver.recv().await?;
+                let (transfer_proof, responder) = transfer_proof_receiver.recv().await?;
+
+                let request = transfer_proof::Request {
+                    swap_id,
+                    tx_lock_proof: transfer_proof,
+                };
 
                 Ok((peer, request, responder))
             }
@@ -442,13 +453,13 @@ impl LatestRate for KrakenRate {
 
 #[derive(Debug)]
 pub struct EventLoopHandle {
-    recv_encrypted_signature: Option<bmrng::RequestReceiver<encrypted_signature::Request, ()>>,
-    send_transfer_proof: Option<bmrng::RequestSender<transfer_proof::Request, ()>>,
+    recv_encrypted_signature: Option<bmrng::RequestReceiver<bitcoin::EncryptedSignature, ()>>,
+    send_transfer_proof: Option<bmrng::RequestSender<monero::TransferProof, ()>>,
 }
 
 impl EventLoopHandle {
     pub async fn recv_encrypted_signature(&mut self) -> Result<bitcoin::EncryptedSignature> {
-        let (request, responder) = self
+        let (tx_redeem_encsig, responder) = self
             .recv_encrypted_signature
             .take()
             .context("Encrypted signature was already received")?
@@ -459,14 +470,14 @@ impl EventLoopHandle {
             .respond(())
             .context("Failed to acknowledge receipt of encrypted signature")?;
 
-        Ok(request.tx_redeem_encsig)
+        Ok(tx_redeem_encsig)
     }
 
     pub async fn send_transfer_proof(&mut self, msg: monero::TransferProof) -> Result<()> {
         self.send_transfer_proof
             .take()
             .context("Transfer proof was already sent")?
-            .send_receive(transfer_proof::Request { tx_lock_proof: msg })
+            .send_receive(msg)
             .await
             .context("Failed to send transfer proof")?;
 
