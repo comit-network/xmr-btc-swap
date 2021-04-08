@@ -193,11 +193,18 @@ async fn next_state(
         BobState::BtcRedeemed(state) => {
             let (spend_key, view_key) = state.xmr_keys();
 
-            // NOTE: This actually generates and opens a new wallet, closing the currently
-            // open one.
-            monero_wallet
+            if monero_wallet
                 .create_from_and_load(spend_key, view_key, state.monero_wallet_restore_blockheight)
-                .await?;
+                .await
+                .is_err()
+            {
+                // In case we failed to refresh/sweep, when resuming the wallet might already
+                // exist! This is a very unlikely scenario, but if we don't take care of it we
+                // might not be able to ever transfer the Monero.
+                let wallet_name = &monero::PrivateKey::from(view_key).to_string();
+                tracing::warn!("Failed to generate monero wallet from keys, falling back to trying to open the the wallet if it already exists: {}", wallet_name);
+                monero_wallet.open(wallet_name).await?;
+            }
 
             // Ensure that the generated wallet is synced so we have a proper balance
             monero_wallet.refresh().await?;
