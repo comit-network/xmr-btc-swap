@@ -43,6 +43,8 @@ pub struct EventLoop {
     /// resolves, we use the `ResponseChannel` returned from it to send an ACK
     /// to Alice that we have successfully processed the transfer proof.
     pending_transfer_proof: OptionFuture<BoxFuture<'static, ResponseChannel<()>>>,
+
+    backoff_retry_dial_alice: Duration,
 }
 
 impl EventLoop {
@@ -71,6 +73,7 @@ impl EventLoop {
             inflight_execution_setup: None,
             inflight_encrypted_signature_requests: HashMap::default(),
             pending_transfer_proof: OptionFuture::from(None),
+            backoff_retry_dial_alice: Duration::from_secs(5),
         };
 
         let handle = EventLoopHandle {
@@ -151,16 +154,12 @@ impl EventLoop {
                                     return;
                                 }
                             }
-                            match libp2p::Swarm::dial(&mut self.swarm, &self.alice_peer_id) {
-                                Ok(()) => {},
-                                Err(e) => {
-                                    tracing::warn!("Failed to re-dial Alice: {}", e);
-                                    return;
-                                }
-                            }
+                            self.try_reconnect_to_alice().await;
                         }
                         SwarmEvent::UnreachableAddr { peer_id, address, attempts_remaining, error } if peer_id == self.alice_peer_id && attempts_remaining == 0 => {
                             tracing::warn!("Failed to dial Alice at {}: {}", address, error);
+
+                            self.try_reconnect_to_alice().await;
                         }
                         _ => {}
                     }
@@ -191,6 +190,23 @@ impl EventLoop {
                     self.pending_transfer_proof = OptionFuture::from(None);
                 }
             }
+        }
+    }
+
+    async fn try_reconnect_to_alice(&mut self) {
+        if self.backoff_retry_dial_alice <= Duration::from_secs(3600) {
+            tokio::time::sleep(self.backoff_retry_dial_alice).await;
+            match libp2p::Swarm::dial(&mut self.swarm, &self.alice_peer_id) {
+                Ok(()) => {}
+                Err(e) => {
+                    tracing::warn!("Failed to re-dial Alice: {}", e);
+                    return;
+                }
+            }
+
+            self.backoff_retry_dial_alice *= 2;
+        } else {
+            tracing::error!("Connection to alice could not be re-established after {:?}. Aborting the connection retry.", self.backoff_retry_dial_alice)
         }
     }
 
