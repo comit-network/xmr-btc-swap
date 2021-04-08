@@ -11,6 +11,7 @@ use anyhow::{bail, Context, Result};
 use tokio::select;
 use tokio::time::timeout;
 use tracing::{error, info};
+use uuid::Uuid;
 
 pub async fn run(swap: alice::Swap) -> Result<AliceState> {
     run_until(swap, |_| false).await
@@ -25,6 +26,7 @@ pub async fn run_until(
 
     while !is_complete(&current_state) && !exit_early(&current_state) {
         current_state = next_state(
+            swap.swap_id,
             current_state,
             &mut swap.event_loop_handle,
             swap.bitcoin_wallet.as_ref(),
@@ -43,6 +45,7 @@ pub async fn run_until(
 }
 
 async fn next_state(
+    swap_id: Uuid,
     state: AliceState,
     event_loop_handle: &mut EventLoopHandle,
     bitcoin_wallet: &bitcoin::Wallet,
@@ -296,7 +299,12 @@ async fn next_state(
                 .await?;
 
             monero_wallet
-                .create_from(spend_key, view_key, monero_wallet_restore_blockheight)
+                .create_from(
+                    &swap_id.to_string(),
+                    spend_key,
+                    view_key,
+                    monero_wallet_restore_blockheight,
+                )
                 .await?;
 
             AliceState::XmrRefunded

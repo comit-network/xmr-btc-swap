@@ -64,10 +64,16 @@ impl Wallet {
         Ok(())
     }
 
+    pub async fn open(&self, filename: &str) -> Result<()> {
+        self.inner.lock().await.open_wallet(filename).await?;
+        Ok(())
+    }
+
     /// Close the wallet and open (load) another wallet by generating it from
     /// keys. The generated wallet will remain loaded.
     pub async fn create_from_and_load(
         &self,
+        file_name: &str,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
         restore_height: BlockHeight,
@@ -85,6 +91,7 @@ impl Wallet {
 
         let _ = wallet
             .generate_from_keys(
+                file_name,
                 &address.to_string(),
                 &private_spend_key.to_string(),
                 &PrivateKey::from(private_view_key).to_string(),
@@ -101,6 +108,7 @@ impl Wallet {
     /// stored name.
     pub async fn create_from(
         &self,
+        file_name: &str,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
         restore_height: BlockHeight,
@@ -119,6 +127,7 @@ impl Wallet {
 
         let _ = wallet
             .generate_from_keys(
+                file_name,
                 &temp_wallet_address.to_string(),
                 &private_spend_key.to_string(),
                 &PrivateKey::from(private_view_key).to_string(),

@@ -287,6 +287,7 @@ impl Client {
 
     pub async fn generate_from_keys(
         &self,
+        filename: &str,
         address: &str,
         spend_key: &str,
         view_key: &str,
@@ -294,7 +295,7 @@ impl Client {
     ) -> Result<GenerateFromKeys> {
         let params = GenerateFromKeysParams {
             restore_height,
-            filename: view_key.into(),
+            filename: filename.into(),
             address: address.into(),
             spendkey: spend_key.into(),
             viewkey: view_key.into(),
