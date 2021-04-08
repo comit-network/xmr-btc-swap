@@ -52,7 +52,7 @@ pub struct EventLoop<RS> {
 
     /// Tracks [`transfer_proof::Request`]s which could not yet be sent because
     /// we are currently disconnected from the peer.
-    buffered_transfer_proofs: HashMap<PeerId, (transfer_proof::Request, bmrng::Responder<()>)>,
+    buffered_transfer_proofs: HashMap<PeerId, Vec<(transfer_proof::Request, bmrng::Responder<()>)>>,
 
     /// Tracks [`transfer_proof::Request`]s which are currently inflight and
     /// awaiting an acknowledgement.
@@ -225,11 +225,13 @@ where
                         SwarmEvent::ConnectionEstablished { peer_id: peer, endpoint, .. } => {
                             tracing::debug!(%peer, address = %endpoint.get_remote_address(), "New connection established");
 
-                            if let Some((transfer_proof, responder)) = self.buffered_transfer_proofs.remove(&peer) {
-                                tracing::debug!(%peer, "Found buffered transfer proof for peer");
+                            if let Some(transfer_proofs) = self.buffered_transfer_proofs.remove(&peer) {
+                                for (transfer_proof, responder) in transfer_proofs {
+                                    tracing::debug!(%peer, "Found buffered transfer proof for peer");
 
-                                let id = self.swarm.transfer_proof.send_request(&peer, transfer_proof);
-                                self.inflight_transfer_proofs.insert(id, responder);
+                                    let id = self.swarm.transfer_proof.send_request(&peer, transfer_proof);
+                                    self.inflight_transfer_proofs.insert(id, responder);
+                                }
                             }
                         }
                         SwarmEvent::IncomingConnectionError { send_back_addr: address, error, .. } => {
@@ -253,7 +255,7 @@ where
                         Some(Ok((peer, transfer_proof, responder))) => {
                             if !self.swarm.transfer_proof.is_connected(&peer) {
                                 tracing::warn!(%peer, "No active connection to peer, buffering transfer proof");
-                                self.buffered_transfer_proofs.insert(peer, (transfer_proof, responder));
+                                self.buffered_transfer_proofs.entry(peer).or_insert_with(Vec::new).push((transfer_proof, responder));
                                 continue;
                             }
 
