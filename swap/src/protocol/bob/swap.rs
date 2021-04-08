@@ -8,6 +8,7 @@ use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
 use rand::rngs::OsRng;
 use tokio::select;
+use uuid::Uuid;
 
 pub fn is_complete(state: &BobState) -> bool {
     matches!(
@@ -32,6 +33,7 @@ pub async fn run_until(
 
     while !is_target_state(&current_state) {
         current_state = next_state(
+            swap.swap_id,
             current_state,
             &mut swap.event_loop_handle,
             swap.bitcoin_wallet.as_ref(),
@@ -51,6 +53,7 @@ pub async fn run_until(
 }
 
 async fn next_state(
+    swap_id: Uuid,
     state: BobState,
     event_loop_handle: &mut EventLoopHandle,
     bitcoin_wallet: &bitcoin::Wallet,
@@ -193,17 +196,22 @@ async fn next_state(
         BobState::BtcRedeemed(state) => {
             let (spend_key, view_key) = state.xmr_keys();
 
+            let generated_wallet_file_name = &swap_id.to_string();
             if monero_wallet
-                .create_from_and_load(spend_key, view_key, state.monero_wallet_restore_blockheight)
+                .create_from_and_load(
+                    generated_wallet_file_name,
+                    spend_key,
+                    view_key,
+                    state.monero_wallet_restore_blockheight,
+                )
                 .await
                 .is_err()
             {
                 // In case we failed to refresh/sweep, when resuming the wallet might already
                 // exist! This is a very unlikely scenario, but if we don't take care of it we
                 // might not be able to ever transfer the Monero.
-                let wallet_name = &monero::PrivateKey::from(view_key).to_string();
-                tracing::warn!("Failed to generate monero wallet from keys, falling back to trying to open the the wallet if it already exists: {}", wallet_name);
-                monero_wallet.open(wallet_name).await?;
+                tracing::warn!("Failed to generate monero wallet from keys, falling back to trying to open the the wallet if it already exists: {}", swap_id);
+                monero_wallet.open(generated_wallet_file_name).await?;
             }
 
             // Ensure that the generated wallet is synced so we have a proper balance
