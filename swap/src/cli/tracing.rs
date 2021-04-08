@@ -8,7 +8,7 @@ use tracing_subscriber::layer::{Context, SubscriberExt};
 use tracing_subscriber::{fmt, EnvFilter, Layer, Registry};
 use uuid::Uuid;
 
-pub fn init_tracing(debug: bool, dir: impl AsRef<Path>, swap_id: Uuid) -> Result<()> {
+pub fn init(debug: bool, dir: impl AsRef<Path>, swap_id: Uuid) -> Result<()> {
     let level_filter = EnvFilter::try_new("swap=debug")?;
 
     let registry = Registry::default().with(level_filter);

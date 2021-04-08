@@ -22,7 +22,6 @@ use std::time::Duration;
 use structopt::StructOpt;
 use swap::bitcoin::{Amount, TxLock};
 use swap::cli::command::{Arguments, Command, MoneroParams};
-use swap::cli::trace::init_tracing;
 use swap::database::Database;
 use swap::env::{Config, GetConfig};
 use swap::network::quote::BidQuote;
@@ -30,7 +29,7 @@ use swap::network::swarm;
 use swap::protocol::bob;
 use swap::protocol::bob::{Behaviour, Builder, EventLoop};
 use swap::seed::Seed;
-use swap::{bitcoin, env, monero};
+use swap::{bitcoin, cli, env, monero};
 use tracing::{debug, error, info, warn};
 use url::Url;
 use uuid::Uuid;
@@ -56,7 +55,7 @@ async fn main() -> Result<()> {
             let swap_id = Uuid::new_v4();
 
             let data_dir = data.0;
-            init_tracing(debug, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -153,7 +152,7 @@ async fn main() -> Result<()> {
             electrum_rpc_url,
         } => {
             let data_dir = data.0;
-            init_tracing(debug, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -204,7 +203,7 @@ async fn main() -> Result<()> {
             electrum_rpc_url,
         } => {
             let data_dir = data.0;
-            init_tracing(debug, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -234,7 +233,7 @@ async fn main() -> Result<()> {
             electrum_rpc_url,
         } => {
             let data_dir = data.0;
-            init_tracing(debug, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())

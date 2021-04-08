@@ -2,7 +2,7 @@ use anyhow::Result;
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::FmtSubscriber;
 
-pub fn init_tracing(level: LevelFilter) -> Result<()> {
+pub fn init(level: LevelFilter) -> Result<()> {
     if level == LevelFilter::OFF {
         return Ok(());
     }

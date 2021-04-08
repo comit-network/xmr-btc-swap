@@ -21,7 +21,6 @@ use swap::asb::command::{Arguments, Command};
 use swap::asb::config::{
     initial_setup, query_user_for_initial_testnet_config, read_config, Config, ConfigNotInitialized,
 };
-use swap::asb::trace::init_tracing;
 use swap::database::Database;
 use swap::env::GetConfig;
 use swap::fs::default_config_path;
@@ -30,7 +29,7 @@ use swap::network::swarm;
 use swap::protocol::alice::event_loop::KrakenRate;
 use swap::protocol::alice::{run, Behaviour, EventLoop};
 use swap::seed::Seed;
-use swap::{bitcoin, env, kraken, monero};
+use swap::{asb, bitcoin, env, kraken, monero};
 use tracing::{info, warn};
 use tracing_subscriber::filter::LevelFilter;
 
@@ -41,7 +40,7 @@ const DEFAULT_WALLET_NAME: &str = "asb-wallet";
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    init_tracing(LevelFilter::DEBUG).expect("initialize tracing");
+    asb::tracing::init(LevelFilter::DEBUG).expect("initialize tracing");
 
     let opt = Arguments::from_args();
 
