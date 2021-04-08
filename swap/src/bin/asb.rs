@@ -98,8 +98,11 @@ async fn main() -> Result<()> {
             let kraken_price_updates = kraken::connect()?;
 
             let mut swarm = swarm::alice(&seed)?;
-            Swarm::listen_on(&mut swarm, config.network.listen)
-                .context("Failed to listen network interface")?;
+
+            for listen in config.network.listen {
+                Swarm::listen_on(&mut swarm, listen.clone())
+                    .with_context(|| format!("Failed to listen on network interface {}", listen))?;
+            }
 
             let (event_loop, mut swap_receiver) = EventLoop::new(
                 swarm,

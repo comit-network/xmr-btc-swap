@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This is a breaking change because the swap ID is now agreed upon between CLI and ASB during swap setup.
   Resuming swaps started prior to this change can result in unexpected behaviour.
 
+### Added
+
+- Websocket support for the ASB.
+  The ASB is now capable to listen on both TCP and Websocket connections.
+  Default websocket listening port is 9940.
+
 ## [0.4.0] - 2021-04-06
 
 ### Changed
