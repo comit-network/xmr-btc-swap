@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use sigma_fun::ext::dl_secp256k1_ed25519_eq::{CrossCurveDLEQ, CrossCurveDLEQProof};
 use sigma_fun::HashTranscript;
+use uuid::Uuid;
 
 pub mod alice;
 pub mod bob;
@@ -26,6 +27,7 @@ pub struct StartingBalances {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message0 {
+    swap_id: Uuid,
     B: bitcoin::PublicKey,
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,

@@ -12,6 +12,7 @@ use libp2p::{PeerId, Swarm};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+use uuid::Uuid;
 
 #[allow(missing_debug_implementations)]
 pub struct EventLoop {
@@ -240,11 +241,15 @@ impl EventLoopHandle {
 
     pub async fn send_encrypted_signature(
         &mut self,
+        swap_id: Uuid,
         tx_redeem_encsig: EncryptedSignature,
     ) -> Result<()> {
         Ok(self
             .encrypted_signature
-            .send_receive(encrypted_signature::Request { tx_redeem_encsig })
+            .send_receive(encrypted_signature::Request {
+                swap_id,
+                tx_redeem_encsig,
+            })
             .await?)
     }
 }

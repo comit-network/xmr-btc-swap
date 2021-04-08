@@ -6,6 +6,7 @@ use libp2p::request_response::{
     RequestResponseMessage,
 };
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 pub type OutEvent = RequestResponseEvent<Request, ()>;
 
@@ -20,6 +21,7 @@ impl ProtocolName for TransferProofProtocol {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Request {
+    pub swap_id: Uuid,
     pub tx_lock_proof: monero::TransferProof,
 }
 

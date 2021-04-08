@@ -43,9 +43,8 @@ pub struct EventLoop<RS> {
 
     swap_sender: mpsc::Sender<Swap>,
 
-    /// Stores a sender per peer for incoming [`EncryptedSignature`]s.
-    recv_encrypted_signature:
-        HashMap<PeerId, bmrng::RequestSender<encrypted_signature::Request, ()>>,
+    /// Stores incoming [`EncryptedSignature`]s per swap.
+    recv_encrypted_signature: HashMap<Uuid, bmrng::RequestSender<encrypted_signature::Request, ()>>,
     inflight_encrypted_signatures: FuturesUnordered<BoxFuture<'static, ResponseChannel<()>>>,
 
     send_transfer_proof: FuturesUnordered<OutgoingTransferProof>,
@@ -120,7 +119,7 @@ where
                 }
             };
 
-            let handle = self.new_handle(peer_id);
+            let handle = self.new_handle(peer_id, swap_id);
 
             let swap = Swap {
                 event_loop_handle: handle,
@@ -186,8 +185,8 @@ where
                                 tracing::debug!(%peer, "Failed to respond with quote");
                             }
                         }
-                        SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone{bob_peer_id, state3}) => {
-                            let _ = self.handle_execution_setup_done(bob_peer_id, *state3).await;
+                        SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone{bob_peer_id, swap_id, state3}) => {
+                            let _ = self.handle_execution_setup_done(bob_peer_id, swap_id, *state3).await;
                         }
                         SwarmEvent::Behaviour(OutEvent::TransferProofAcknowledged { peer, id }) => {
                             tracing::trace!(%peer, "Bob acknowledged transfer proof");
@@ -196,7 +195,7 @@ where
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::EncryptedSignatureReceived{ msg, channel, peer }) => {
-                            let sender = match self.recv_encrypted_signature.remove(&peer) {
+                            let sender = match self.recv_encrypted_signature.remove(&msg.swap_id) {
                                 Some(sender) => sender,
                                 None => {
                                     tracing::warn!(%peer, "No sender for encrypted signature, maybe already handled?");
@@ -319,9 +318,13 @@ where
         })
     }
 
-    async fn handle_execution_setup_done(&mut self, bob_peer_id: PeerId, state3: State3) {
-        let swap_id = Uuid::new_v4();
-        let handle = self.new_handle(bob_peer_id);
+    async fn handle_execution_setup_done(
+        &mut self,
+        bob_peer_id: PeerId,
+        swap_id: Uuid,
+        state3: State3,
+    ) {
+        let handle = self.new_handle(bob_peer_id, swap_id);
 
         let initial_state = AliceState::Started {
             state3: Box::new(state3),
@@ -354,14 +357,15 @@ where
 
     /// Create a new [`EventLoopHandle`] that is scoped for communication with
     /// the given peer.
-    fn new_handle(&mut self, peer: PeerId) -> EventLoopHandle {
+    fn new_handle(&mut self, peer: PeerId, swap_id: Uuid) -> EventLoopHandle {
         // we deliberately don't put timeouts on these channels because the swap always
         // races these futures against a timelock
         let (transfer_proof_sender, mut transfer_proof_receiver) = bmrng::channel(1);
         let encrypted_signature = bmrng::channel(1);
 
         self.recv_encrypted_signature
-            .insert(peer, encrypted_signature.0);
+            .insert(swap_id, encrypted_signature.0);
+
         self.send_transfer_proof.push(
             async move {
                 let (request, responder) = transfer_proof_receiver.recv().await?;
@@ -447,7 +451,9 @@ pub struct EventLoopHandle {
 }
 
 impl EventLoopHandle {
-    pub async fn recv_encrypted_signature(&mut self) -> Result<bitcoin::EncryptedSignature> {
+    pub async fn recv_encrypted_signature(
+        &mut self,
+    ) -> Result<(bitcoin::EncryptedSignature, Uuid)> {
         let (request, responder) = self
             .recv_encrypted_signature
             .take()
@@ -459,14 +465,21 @@ impl EventLoopHandle {
             .respond(())
             .context("Failed to acknowledge receipt of encrypted signature")?;
 
-        Ok(request.tx_redeem_encsig)
+        Ok((request.tx_redeem_encsig, request.swap_id))
     }
 
-    pub async fn send_transfer_proof(&mut self, msg: monero::TransferProof) -> Result<()> {
+    pub async fn send_transfer_proof(
+        &mut self,
+        swap_id: Uuid,
+        msg: monero::TransferProof,
+    ) -> Result<()> {
         self.send_transfer_proof
             .take()
             .context("Transfer proof was already sent")?
-            .send_receive(transfer_proof::Request { tx_lock_proof: msg })
+            .send_receive(transfer_proof::Request {
+                swap_id,
+                tx_lock_proof: msg,
+            })
             .await
             .context("Failed to send transfer proof")?;
 

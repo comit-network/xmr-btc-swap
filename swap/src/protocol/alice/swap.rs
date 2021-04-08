@@ -11,6 +11,7 @@ use anyhow::{bail, Context, Result};
 use tokio::select;
 use tokio::time::timeout;
 use tracing::{error, info};
+use uuid::Uuid;
 
 pub async fn run(swap: alice::Swap) -> Result<AliceState> {
     run_until(swap, |_| false).await
@@ -25,6 +26,7 @@ pub async fn run_until(
 
     while !is_complete(&current_state) && !exit_early(&current_state) {
         current_state = next_state(
+            swap.swap_id,
             current_state,
             &mut swap.event_loop_handle,
             swap.bitcoin_wallet.as_ref(),
@@ -43,6 +45,7 @@ pub async fn run_until(
 }
 
 async fn next_state(
+    swap_id: Uuid,
     state: AliceState,
     event_loop_handle: &mut EventLoopHandle,
     bitcoin_wallet: &bitcoin::Wallet,
@@ -124,7 +127,7 @@ async fn next_state(
             let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
 
             tokio::select! {
-                result = event_loop_handle.send_transfer_proof(transfer_proof.clone()) => {
+                result = event_loop_handle.send_transfer_proof(swap_id, transfer_proof.clone()) => {
                    result?;
 
                    XmrLockTransferProofSent {
@@ -160,13 +163,27 @@ async fn next_state(
                     }
                 }
                 enc_sig = event_loop_handle.recv_encrypted_signature() => {
-                    tracing::info!("Received encrypted signature");
+                    let (enc_sig, enc_sig_swap_id) = enc_sig?;
+                    if enc_sig_swap_id == swap_id {
+                        tracing::info!("Received encrypted signature");
 
-                    AliceState::EncSigLearned {
-                        monero_wallet_restore_blockheight,
-                        transfer_proof,
-                        encrypted_signature: Box::new(enc_sig?),
-                        state3,
+                        AliceState::EncSigLearned {
+                            monero_wallet_restore_blockheight,
+                            transfer_proof,
+                            encrypted_signature: Box::new(enc_sig),
+                            state3,
+                        }
+                    } else {
+                        // TODO: Remove unnecessary swap-id check
+                        // This should never happen, because the encsig is sent through the
+                        // channel by swap_id, however, to be save this was included for now
+                        tracing::warn!("Unexpected encsig for swap {} was meant to be for swap {}. \
+                            This encsig will be ignored.", swap_id, enc_sig_swap_id);
+                        AliceState::XmrLockTransferProofSent {
+                            monero_wallet_restore_blockheight,
+                            transfer_proof,
+                            state3,
+                        }
                     }
                 }
             }
