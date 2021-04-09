@@ -247,6 +247,9 @@ where
                                 }
                             }
                         }
+                        SwarmEvent::NewListenAddr(addr) => {
+                            tracing::info!("Listening on {}", addr);
+                        }
                         _ => {}
                     }
                 },

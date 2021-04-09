@@ -89,7 +89,13 @@ impl EventLoop {
     }
 
     pub async fn run(mut self) {
-        let _ = Swarm::dial(&mut self.swarm, &self.alice_peer_id);
+        match libp2p::Swarm::dial(&mut self.swarm, &self.alice_peer_id) {
+            Ok(()) => {}
+            Err(e) => {
+                tracing::error!("Failed to initiate dial to Alice: {}", e);
+                return;
+            }
+        }
 
         loop {
             // Note: We are making very elaborate use of `select!` macro's feature here. Make sure to read the documentation thoroughly: https://docs.rs/tokio/1.4.0/tokio/macro.select.html
@@ -141,6 +147,10 @@ impl EventLoop {
                                 let _ = responder.respond(());
                             }
                         }
+                        SwarmEvent::Behaviour(OutEvent::AllRedialAttemptsExhausted { peer }) if peer == self.alice_peer_id => {
+                            tracing::error!("Exhausted all re-dial attempts to Alice");
+                            return;
+                        }
                         SwarmEvent::Behaviour(OutEvent::ResponseSent) => {
 
                         }
@@ -149,7 +159,7 @@ impl EventLoop {
                             return;
                         }
                         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } if peer_id == self.alice_peer_id => {
-                            tracing::debug!("Connected to Alice at {}", endpoint.get_remote_address());
+                            tracing::info!("Connected to Alice at {}", endpoint.get_remote_address());
                         }
                         SwarmEvent::Dialing(peer_id) if peer_id == self.alice_peer_id => {
                             tracing::debug!("Dialling Alice at {}", peer_id);
@@ -165,16 +175,13 @@ impl EventLoop {
                                     return;
                                 }
                             }
-                            match libp2p::Swarm::dial(&mut self.swarm, &self.alice_peer_id) {
-                                Ok(()) => {},
-                                Err(e) => {
-                                    tracing::warn!("Failed to re-dial Alice: {}", e);
-                                    return;
-                                }
-                            }
                         }
                         SwarmEvent::UnreachableAddr { peer_id, address, attempts_remaining, error } if peer_id == self.alice_peer_id && attempts_remaining == 0 => {
-                            tracing::warn!("Failed to dial Alice at {}: {}", address, error);
+                            tracing::warn!(%address, "Failed to dial Alice: {}", error);
+
+                            if let Some(duration) = self.swarm.redial.until_next_redial() {
+                                tracing::info!("Next redial attempt in {}s", duration.as_secs());
+                            }
                         }
                         _ => {}
                     }

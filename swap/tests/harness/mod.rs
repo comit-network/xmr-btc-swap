@@ -116,7 +116,7 @@ impl BobParams {
     }
 
     pub fn new_eventloop(&self, swap_id: Uuid) -> Result<(bob::EventLoop, bob::EventLoopHandle)> {
-        let mut swarm = swarm::bob(&self.seed)?;
+        let mut swarm = swarm::bob(&self.seed, self.alice_peer_id)?;
         swarm.add_address(self.alice_peer_id, self.alice_address.clone());
 
         bob::EventLoop::new(

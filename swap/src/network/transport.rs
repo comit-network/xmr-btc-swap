@@ -7,6 +7,7 @@ use libp2p::dns::TokioDnsConfig;
 use libp2p::mplex::MplexConfig;
 use libp2p::noise::{self, NoiseConfig, X25519Spec};
 use libp2p::{yamux, PeerId};
+use std::time::Duration;
 
 /// Builds a libp2p transport with the following features:
 /// - TcpConnection
@@ -29,6 +30,7 @@ pub fn build(id_keys: &identity::Keypair) -> Result<SwapTransport> {
             yamux::YamuxConfig::default(),
             MplexConfig::new(),
         ))
+        .timeout(Duration::from_secs(20))
         .map(|(peer, muxer), _| (peer, StreamMuxerBox::new(muxer)))
         .boxed();
 
