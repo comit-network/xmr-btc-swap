@@ -111,8 +111,8 @@ impl EventLoop {
                         SwarmEvent::Behaviour(OutEvent::TransferProofReceived { msg, channel }) => {
                             let mut responder = match self.transfer_proof.send(*msg).await {
                                 Ok(responder) => responder,
-                                Err(_) => {
-                                    tracing::warn!("Failed to pass on transfer proof");
+                                Err(e) => {
+                                    tracing::warn!("Failed to pass on transfer proof: {:#}", e);
                                     continue;
                                 }
                             };

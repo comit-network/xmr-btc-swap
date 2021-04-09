@@ -120,6 +120,8 @@ async fn next_state(
                                 monero_wallet_restore_blockheight
                             }
                         } else {
+                            // TODO: More elaborate handling for "wrong" transfer proofs, we can store them in the db
+
                             tracing::warn!("Received transfer proof for swap {} but currently executing \
                                 swap {}. This transfer proof will be ignored!", transfer_proof.swap_id, swap_id);
                             // In case we receive a transfer proof that is not meant to be for this swap we

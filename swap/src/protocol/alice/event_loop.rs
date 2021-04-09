@@ -189,7 +189,7 @@ where
                             let _ = self.handle_execution_setup_done(bob_peer_id, swap_id, *state3).await;
                         }
                         SwarmEvent::Behaviour(OutEvent::TransferProofAcknowledged { peer, id }) => {
-                            tracing::trace!(%peer, "Bob acknowledged transfer proof");
+                            tracing::debug!(%peer, "Bob acknowledged transfer proof");
                             if let Some(responder) = self.inflight_transfer_proofs.remove(&id) {
                                 let _ = responder.respond(());
                             }
@@ -258,11 +258,12 @@ where
                                 continue;
                             }
 
+                            // TODO: This seems to internally dial the peer, Alice should not dial Bob - is this wanted behaviour?
                             let id = self.swarm.transfer_proof.send_request(&peer, transfer_proof);
                             self.inflight_transfer_proofs.insert(id, responder);
                         },
-                        Some(Err(_)) => {
-                            tracing::debug!("A swap stopped without sending a transfer proof");
+                        Some(Err(e)) => {
+                            tracing::debug!("A swap stopped without sending a transfer proof: {:#}", e);
                         }
                         None => {
                             unreachable!("stream of transfer proof receivers must never terminate")
@@ -340,7 +341,7 @@ where
             swap_id,
         };
 
-        // TODO: Consider adding separate components for start/rsume of swaps
+        // TODO: Consider adding separate components for start/resume of swaps
 
         // swaps save peer id so we can resume
         match self.db.insert_peer_id(swap_id, bob_peer_id).await {
@@ -360,7 +361,14 @@ where
     fn new_handle(&mut self, peer: PeerId, swap_id: Uuid) -> EventLoopHandle {
         // we deliberately don't put timeouts on these channels because the swap always
         // races these futures against a timelock
-        let (transfer_proof_sender, mut transfer_proof_receiver) = bmrng::channel(1);
+
+        // TODO: I had to increase the channel buffer to get
+        //  concurrent_bobs_after_xmr_lock_proof_sent test passing.
+        //  I don't really understand why. In my understanding the channel created here
+        //  is for one specific swap.  Send a transfer proof through this channel
+        //  should still only happen once, as this is a specific channel for a specific
+        //  swap. How is this triggered multiple times?
+        let (transfer_proof_sender, mut transfer_proof_receiver) = bmrng::channel(10);
         let encrypted_signature = bmrng::channel(1);
 
         self.recv_encrypted_signature

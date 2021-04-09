@@ -49,7 +49,6 @@ pub struct StartingBalances {
 struct BobParams {
     seed: Seed,
     db_path: PathBuf,
-    swap_id: Uuid,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
     alice_address: Multiaddr,
@@ -58,12 +57,16 @@ struct BobParams {
 }
 
 impl BobParams {
-    pub async fn builder(&self, event_loop_handle: bob::EventLoopHandle) -> Result<bob::Builder> {
+    pub async fn builder(
+        &self,
+        event_loop_handle: bob::EventLoopHandle,
+        swap_id: Uuid,
+    ) -> Result<bob::Builder> {
         let receive_address = self.monero_wallet.get_main_address();
 
         Ok(bob::Builder::new(
             Database::open(&self.db_path.clone().as_path()).unwrap(),
-            self.swap_id,
+            swap_id,
             self.bitcoin_wallet.clone(),
             self.monero_wallet.clone(),
             self.env_config,
@@ -148,9 +151,11 @@ impl TestContext {
     pub async fn bob_swap(&mut self) -> (bob::Swap, BobApplicationHandle) {
         let (event_loop, event_loop_handle) = self.bob_params.new_eventloop().unwrap();
 
+        let swap_id = Uuid::new_v4();
+
         let swap = self
             .bob_params
-            .builder(event_loop_handle)
+            .builder(event_loop_handle, swap_id)
             .await
             .unwrap()
             .with_init_params(self.btc_amount)
@@ -165,6 +170,7 @@ impl TestContext {
     pub async fn stop_and_resume_bob_from_db(
         &mut self,
         join_handle: BobApplicationHandle,
+        swap_id: Uuid,
     ) -> (bob::Swap, BobApplicationHandle) {
         join_handle.abort();
 
@@ -172,7 +178,7 @@ impl TestContext {
 
         let swap = self
             .bob_params
-            .builder(event_loop_handle)
+            .builder(event_loop_handle, swap_id)
             .await
             .unwrap()
             .build()
@@ -552,7 +558,6 @@ where
     let bob_params = BobParams {
         seed: Seed::random().unwrap(),
         db_path: tempdir().unwrap().path().to_path_buf(),
-        swap_id: Uuid::new_v4(),
         bitcoin_wallet: bob_bitcoin_wallet.clone(),
         monero_wallet: bob_monero_wallet.clone(),
         alice_address: alice_listen_address.clone(),
