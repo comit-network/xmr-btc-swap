@@ -482,7 +482,7 @@ where
     let cli = Cli::default();
 
     let _guard = tracing_subscriber::fmt()
-        .with_env_filter("warn,swap=debug,monero_harness=debug,monero_rpc=info,bitcoin_harness=info,testcontainers=info")
+        .with_env_filter("warn,swap=debug,monero_harness=debug,monero_rpc=debug,bitcoin_harness=info,testcontainers=info")
         .with_test_writer()
         .set_default();
 
