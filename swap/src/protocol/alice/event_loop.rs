@@ -10,7 +10,7 @@ use future::pending;
 use futures::future;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::{FuturesUnordered, StreamExt};
-use libp2p::request_response::ResponseChannel;
+use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
 use rand::rngs::OsRng;
@@ -50,17 +50,6 @@ pub async fn new<LR>(
 ) where
     LR: LatestRate,
 {
-    let mut recv_encrypted_signature = HashMap::new();
-    // Tracks [`transfer_proof::Request`]s which could not yet be sent because
-    // we are currently disconnected from the peer.
-    let mut buffered_transfer_proofs = HashMap::new();
-    // Tracks [`transfer_proof::Request`]s which are currently inflight and
-    // awaiting an acknowledgement.
-    let mut inflight_transfer_proofs = HashMap::<_, bmrng::Responder<()>>::new();
-
-    let mut inflight_encrypted_signatures = FuturesUnordered::from_iter(vec![pending().boxed()]);
-    let mut send_transfer_proof = FuturesUnordered::from_iter(vec![pending().boxed()]);
-
     let unfinished_swaps = match db.unfinished_alice() {
         Ok(unfinished_swaps) => unfinished_swaps,
         Err(_) => {
@@ -69,7 +58,9 @@ pub async fn new<LR>(
         }
     };
 
-    for (swap_id, state) in unfinished_swaps {
+    let mut state = State::default();
+
+    for (swap_id, swap_state) in unfinished_swaps {
         let peer_id = match db.get_peer_id(swap_id) {
             Ok(peer_id) => peer_id,
             Err(_) => {
@@ -79,8 +70,8 @@ pub async fn new<LR>(
         };
 
         let handle = EventLoopHandle::new(
-            &mut recv_encrypted_signature,
-            &mut send_transfer_proof,
+            &mut state.recv_encrypted_signature,
+            &mut state.send_transfer_proof,
             peer_id,
             swap_id,
         );
@@ -91,7 +82,7 @@ pub async fn new<LR>(
             monero_wallet: monero_wallet.clone(),
             env_config,
             db: db.clone(),
-            state: state.into(),
+            state: swap_state.into(),
             swap_id,
         };
 
@@ -119,7 +110,7 @@ pub async fn new<LR>(
                     }
                     SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone { bob_peer_id, state3, swap_id }) => {
                         let swap = Swap {
-                            event_loop_handle: EventLoopHandle::new(&mut recv_encrypted_signature, &mut send_transfer_proof, bob_peer_id, swap_id),
+                            event_loop_handle: EventLoopHandle::new(&mut state.recv_encrypted_signature, &mut state.send_transfer_proof, bob_peer_id, swap_id),
                             bitcoin_wallet: bitcoin_wallet.clone(),
                             monero_wallet: monero_wallet.clone(),
                             env_config,
@@ -142,12 +133,12 @@ pub async fn new<LR>(
                     }
                     SwarmEvent::Behaviour(OutEvent::TransferProofAcknowledged { peer, id }) => {
                         tracing::debug!(%peer, "Bob acknowledged transfer proof");
-                        if let Some(responder) = inflight_transfer_proofs.remove(&id) {
+                        if let Some(responder) = state.inflight_transfer_proofs.remove(&id) {
                             let _ = responder.respond(());
                         }
                     }
                     SwarmEvent::Behaviour(OutEvent::EncryptedSignatureReceived { msg, channel, peer }) => {
-                        let sender = match recv_encrypted_signature.remove(&msg.swap_id) {
+                        let sender = match state.recv_encrypted_signature.remove(&msg.swap_id) {
                             Some(sender) => sender,
                             None => {
                                     // TODO: Don't just drop encsig if we currently don't have a running swap for it, save in db
@@ -164,7 +155,7 @@ pub async fn new<LR>(
                             }
                         };
 
-                        inflight_encrypted_signatures.push(async move {
+                        state.inflight_encrypted_signatures.push(async move {
                             let _ = responder.recv().await;
 
                             channel
@@ -177,12 +168,12 @@ pub async fn new<LR>(
                     SwarmEvent::ConnectionEstablished { peer_id: peer, endpoint, .. } => {
                         tracing::debug!(%peer, address = %endpoint.get_remote_address(), "New connection established");
 
-                        if let Some(transfer_proofs) = buffered_transfer_proofs.remove(&peer) {
+                        if let Some(transfer_proofs) = state.buffered_transfer_proofs.remove(&peer) {
                                 for (transfer_proof, responder) in transfer_proofs {
                             tracing::debug!(%peer, "Found buffered transfer proof for peer");
 
                             let id = swarm.transfer_proof.send_request(&peer, transfer_proof);
-                            inflight_transfer_proofs.insert(id, responder);
+                            state.inflight_transfer_proofs.insert(id, responder);
                         }
                     }
                     }SwarmEvent::IncomingConnectionError { send_back_addr: address, error, .. } => {
@@ -201,17 +192,17 @@ pub async fn new<LR>(
                     _ => {}
                 }
             },
-            next_transfer_proof = send_transfer_proof.next() => {
+            next_transfer_proof = state.send_transfer_proof.next() => {
                 match next_transfer_proof {
                     Some(Ok((peer, transfer_proof, responder))) => {
                         if !swarm.transfer_proof.is_connected(&peer) {
                             tracing::warn!(%peer, "No active connection to peer, buffering transfer proof");
-                            buffered_transfer_proofs.entry(peer).or_insert_with(Vec::new).push( (transfer_proof, responder));
+                            state.buffered_transfer_proofs.entry(peer).or_insert_with(Vec::new).push( (transfer_proof, responder));
                             continue;
                         }
 
                         let id = swarm.transfer_proof.send_request(&peer, transfer_proof);
-                        inflight_transfer_proofs.insert(id, responder);
+                        state.inflight_transfer_proofs.insert(id, responder);
                     },
                     Some(Err(e)) => {
                         tracing::debug!("A swap stopped without sending a transfer proof: {:#}", e);
@@ -221,11 +212,57 @@ pub async fn new<LR>(
                     }
                 }
             }
-            Some(response_channel) = inflight_encrypted_signatures.next() => {
+            Some(response_channel) = state.inflight_encrypted_signatures.next() => {
                 let _ = swarm.encrypted_signature.send_response(response_channel, ());
             }
         }
     }
+}
+
+/// Holds the event-loop state.
+///
+/// All fields within this struct could also just be local variables in the
+/// event loop. Bundling them up in a struct allows us to add documentation to
+/// some of the fields which makes it clearer what they are used for.
+struct State {
+    /// Tracks the [`bmrng::RequestSender`]s for peers from which we expect to
+    /// be sent an encrypted signature.
+    recv_encrypted_signature: HashMap<Uuid, bmrng::RequestSender<bitcoin::EncryptedSignature, ()>>,
+    /// Tracks [`transfer_proof::Request`]s which could not yet be sent because
+    /// we are currently disconnected from the peer.
+    buffered_transfer_proofs: HashMap<PeerId, Vec<(transfer_proof::Request, bmrng::Responder<()>)>>,
+    /// Tracks [`transfer_proof::Request`]s which are currently inflight and
+    /// awaiting an acknowledgement.
+    inflight_transfer_proofs: HashMap<RequestId, bmrng::Responder<()>>,
+
+    inflight_encrypted_signatures: FuturesUnordered<BoxFuture<'static, ResponseChannel<()>>>,
+    send_transfer_proof: FuturesUnordered<OutgoingTransferProof>,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            recv_encrypted_signature: Default::default(),
+            buffered_transfer_proofs: Default::default(),
+            inflight_transfer_proofs: Default::default(),
+            inflight_encrypted_signatures: never_completing_futures_unordered(),
+            send_transfer_proof: never_completing_futures_unordered(),
+        }
+    }
+}
+
+/// Constructs a new instance of [`FuturesUnordered`] that will never fully
+/// complete.
+///
+/// For our use of [`FuturesUnordered`] within the `select!` macro, it is
+/// important that this stream never completes, otherwise it won't be polled
+/// again later. As such, we add a [`pending()`] future to it. By design, this
+/// future will never complete.
+fn never_completing_futures_unordered<T>() -> FuturesUnordered<BoxFuture<'static, T>>
+where
+    T: Send + 'static,
+{
+    FuturesUnordered::from_iter(vec![pending().boxed()])
 }
 
 #[allow(clippy::too_many_arguments)]
