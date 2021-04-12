@@ -1,0 +1,16 @@
+[package]
+name = "monero-wallet"
+version = "0.1.0"
+authors = ["CoBloX Team <team@coblox.tech>"]
+edition = "2018"
+
+[dependencies]
+monero = "0.11"
+
+[dev-dependencies]
+monero-harness = { path = "../monero-harness" }
+tokio = { version = "1", features = ["rt-multi-thread", "time", "macros", "sync", "process", "fs"] }
+testcontainers = "0.12"
+monero = "0.11"
+curve25519-dalek = "3"
+rand = "0.7"
