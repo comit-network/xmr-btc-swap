@@ -17,9 +17,7 @@ async fn fund_transfer_and_check_tx_key() {
     let send_to_bob = 5_000_000_000;
 
     let tc = Cli::default();
-    let (monero, _containers) = Monero::new(&tc, vec!["alice".to_string(), "bob".to_string()])
-        .await
-        .unwrap();
+    let (monero, _containers) = Monero::new(&tc, vec!["alice", "bob"]).await.unwrap();
     let alice_wallet = monero.wallet("alice").unwrap();
     let bob_wallet = monero.wallet("bob").unwrap();
 
