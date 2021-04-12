@@ -1,0 +1,12 @@
+[package]
+name = "monero-adaptor"
+version = "0.1.0"
+authors = ["CoBloX Team <team@coblox.tech>"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1"
+curve25519-dalek = "3"
+rand = "0.7"
+tiny-keccak = { version = "2", features = ["keccak"] }
+hash_edwards_to_edwards = { git = "https://github.com/comit-network/hash_edwards_to_edwards" }
