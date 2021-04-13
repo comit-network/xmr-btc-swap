@@ -68,13 +68,15 @@ impl<'c> Monero {
 
         let miner = "miner";
         tracing::info!("Starting miner wallet: {}", miner);
-        let (miner_wallet, miner_container) = MoneroWalletRpc::new(cli, &miner, &monerod).await?;
+        let (miner_wallet, miner_container) =
+            MoneroWalletRpc::new(cli, &miner, &monerod, prefix.clone()).await?;
 
         wallets.push(miner_wallet);
         containers.push(miner_container);
         for wallet in additional_wallets.iter() {
             tracing::info!("Starting wallet: {}", wallet);
-            let (wallet, container) = MoneroWalletRpc::new(cli, &wallet, &monerod).await?;
+            let (wallet, container) =
+                MoneroWalletRpc::new(cli, &wallet, &monerod, prefix.clone()).await?;
             wallets.push(wallet);
             containers.push(container);
         }
@@ -209,6 +211,7 @@ impl<'c> MoneroWalletRpc {
         cli: &'c Cli,
         name: &str,
         monerod: &Monerod,
+        prefix: String,
     ) -> Result<(Self, Container<'c, Cli, image::Monero>)> {
         let wallet_rpc_port: u16 =
             port_check::free_local_port().ok_or_else(|| anyhow!("Could not retrieve free port"))?;
@@ -218,7 +221,8 @@ impl<'c> MoneroWalletRpc {
 
         let network = monerod.network.clone();
         let run_args = RunArgs::default()
-            .with_name(name)
+            // prefix the container name so we can run multiple tests
+            .with_name(format!("{}{}", prefix, name))
             .with_network(network.clone())
             .with_mapped_port(Port {
                 local: wallet_rpc_port,
