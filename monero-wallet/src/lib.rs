@@ -2,8 +2,7 @@
 mod tests {
     use curve25519_dalek::scalar::Scalar;
     use monero::blockdata::transaction::TxOutTarget;
-    use monero::blockdata::TransactionPrefix;
-    use monero::consensus::encode::VarInt;
+    use monero::consensus::encode::{deserialize, VarInt};
     use monero::{TxIn, TxOut};
     use monero_harness::Monero;
     use testcontainers::*;
@@ -11,7 +10,8 @@ mod tests {
     #[tokio::test]
     async fn can_broadcast_locally_signed_transaction() {
         let cli = clients::Cli::default();
-        let (monero, containers) = Monero::new(&cli, vec!["Alice"]).await.unwrap();
+        let (monero, _containers) = Monero::new(&cli, vec!["alice"]).await.unwrap();
+        monero.init(vec![("alice", 10_000_000_000)]).await.unwrap();
 
         let view_key = monero::PrivateKey::from_scalar(Scalar::random(&mut rand::thread_rng()));
         let spend_key = monero::PrivateKey::from_scalar(Scalar::random(&mut rand::thread_rng()));
@@ -20,14 +20,19 @@ mod tests {
         let public_spend_key = monero::PublicKey::from_private_key(&spend_key);
 
         let address =
-            monero::Address::standard(monero::Network::Stagenet, public_spend_key, public_view_key);
+            monero::Address::standard(monero::Network::Mainnet, public_spend_key, public_view_key);
+
         let transfer = monero
-            .wallet("miner")
+            .wallet("alice")
             .unwrap()
             .client()
-            .transfer(0, 100_000, &address.to_string())
+            .transfer(0, 1, &address.to_string(), false)
             .await
             .unwrap();
+
+        let tx = hex::decode(&transfer.tx_blob).unwrap();
+        let tx = deserialize::<monero::Transaction>(&tx).unwrap();
+        dbg!(tx);
 
         // [k_image, k_image + offset_0, k_image + offset_0 + offset_1, ..]
         let mut transaction = monero::Transaction::default();

@@ -201,12 +201,13 @@ impl Client {
         account_index: u32,
         amount: u64,
         address: &str,
+        do_not_relay: bool,
     ) -> Result<Transfer> {
         let dest = vec![Destination {
             amount,
             address: address.to_owned(),
         }];
-        self.multi_transfer(account_index, dest).await
+        self.multi_transfer(account_index, dest, do_not_relay).await
     }
 
     /// Transfers moneroj from `account_index` to `destinations`.
@@ -214,11 +215,15 @@ impl Client {
         &self,
         account_index: u32,
         destinations: Vec<Destination>,
+        do_not_relay: bool,
     ) -> Result<Transfer> {
         let params = TransferParams {
             account_index,
             destinations,
             get_tx_key: true,
+            do_not_relay,
+            get_tx_hex: true,
+            get_tx_metadata: true,
         };
         let request = Request::new("transfer", params);
 
@@ -231,6 +236,7 @@ impl Client {
             .text()
             .await?;
 
+        dbg!("transfer RPC response: {}", &response);
         debug!("transfer RPC response: {}", response);
 
         let r = serde_json::from_str::<Response<Transfer>>(&response)?;
@@ -448,12 +454,18 @@ struct CreateWalletParams {
 
 #[derive(Serialize, Debug, Clone)]
 struct TransferParams {
-    // Transfer from this account.
+    /// Transfer from this account.
     account_index: u32,
-    // Destinations to receive XMR:
+    /// Destinations to receive XMR:
     destinations: Vec<Destination>,
-    // Return the transaction key after sending.
+    /// Return the transaction key after sending.
     get_tx_key: bool,
+    /// Do not relay the transaction.
+    do_not_relay: bool,
+    /// Return the tx_blob.
+    get_tx_hex: bool,
+    /// Return the metadata needed to relay the transaction later.
+    get_tx_metadata: bool,
 }
 
 #[derive(Serialize, Debug, Clone)]

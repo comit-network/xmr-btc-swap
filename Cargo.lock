@@ -2126,6 +2126,7 @@ name = "monero-rpc"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "monero",
  "reqwest",
  "serde",
  "serde_json",
@@ -2137,6 +2138,7 @@ name = "monero-wallet"
 version = "0.1.0"
 dependencies = [
  "curve25519-dalek",
+ "hex 0.4.3",
  "monero",
  "monero-harness",
  "rand 0.7.3",

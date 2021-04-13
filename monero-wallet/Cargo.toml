@@ -8,6 +8,7 @@ edition = "2018"
 monero = "0.11"
 
 [dev-dependencies]
+hex = "0.4"
 monero-harness = { path = "../monero-harness" }
 tokio = { version = "1", features = ["rt-multi-thread", "time", "macros", "sync", "process", "fs"] }
 testcontainers = "0.12"

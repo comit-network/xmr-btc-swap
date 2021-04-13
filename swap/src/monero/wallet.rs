@@ -178,7 +178,12 @@ impl Wallet {
             .inner
             .lock()
             .await
-            .transfer(0, amount.as_piconero(), &destination_address.to_string())
+            .transfer(
+                0,
+                amount.as_piconero(),
+                &destination_address.to_string(),
+                false,
+            )
             .await?;
 
         tracing::debug!(
