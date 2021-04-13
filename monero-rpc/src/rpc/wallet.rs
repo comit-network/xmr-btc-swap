@@ -279,7 +279,7 @@ impl Client {
             .text()
             .await?;
 
-        debug!("transfer RPC response: {}", response);
+        debug!("check_tx_key RPC response: {}", response);
 
         let r = serde_json::from_str::<Response<CheckTxKey>>(&response)?;
         Ok(r.result)
