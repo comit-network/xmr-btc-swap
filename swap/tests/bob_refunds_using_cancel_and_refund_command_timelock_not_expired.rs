@@ -10,6 +10,7 @@ use swap::protocol::{alice, bob};
 async fn given_bob_manually_cancels_when_timelock_not_expired_errors() {
     harness::setup_test(SlowCancelConfig, |mut ctx| async move {
         let (bob_swap, bob_join_handle) = ctx.bob_swap().await;
+        let bob_swap_id = bob_swap.swap_id;
         let bob_swap = tokio::spawn(bob::run_until(bob_swap, is_btc_locked));
 
         let alice_swap = ctx.alice_next_swap().await;
@@ -18,7 +19,9 @@ async fn given_bob_manually_cancels_when_timelock_not_expired_errors() {
         let bob_state = bob_swap.await??;
         assert!(matches!(bob_state, BobState::BtcLocked { .. }));
 
-        let (bob_swap, bob_join_handle) = ctx.stop_and_resume_bob_from_db(bob_join_handle).await;
+        let (bob_swap, bob_join_handle) = ctx
+            .stop_and_resume_bob_from_db(bob_join_handle, bob_swap_id)
+            .await;
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));
 
         // Bob tries but fails to manually cancel
@@ -35,7 +38,9 @@ async fn given_bob_manually_cancels_when_timelock_not_expired_errors() {
 
         assert!(matches!(result, Error::CancelTimelockNotExpiredYet));
 
-        let (bob_swap, bob_join_handle) = ctx.stop_and_resume_bob_from_db(bob_join_handle).await;
+        let (bob_swap, bob_join_handle) = ctx
+            .stop_and_resume_bob_from_db(bob_join_handle, bob_swap_id)
+            .await;
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));
 
         // Bob tries but fails to manually refund
@@ -50,7 +55,9 @@ async fn given_bob_manually_cancels_when_timelock_not_expired_errors() {
         .err()
         .unwrap();
 
-        let (bob_swap, _) = ctx.stop_and_resume_bob_from_db(bob_join_handle).await;
+        let (bob_swap, _) = ctx
+            .stop_and_resume_bob_from_db(bob_join_handle, bob_swap_id)
+            .await;
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));
 
         Ok(())

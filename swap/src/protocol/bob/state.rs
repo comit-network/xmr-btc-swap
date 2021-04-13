@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQProof;
 use std::fmt;
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub enum BobState {
@@ -69,6 +70,7 @@ impl fmt::Display for BobState {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct State0 {
+    swap_id: Uuid,
     b: bitcoin::SecretKey,
     s_b: monero::Scalar,
     S_b_monero: monero::PublicKey,
@@ -84,7 +86,9 @@ pub struct State0 {
 }
 
 impl State0 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new<R: RngCore + CryptoRng>(
+        swap_id: Uuid,
         rng: &mut R,
         btc: bitcoin::Amount,
         xmr: monero::Amount,
@@ -101,6 +105,7 @@ impl State0 {
         let (dleq_proof_s_b, (S_b_bitcoin, S_b_monero)) = CROSS_CURVE_PROOF_SYSTEM.prove(&s_b, rng);
 
         Self {
+            swap_id,
             b,
             s_b,
             v_b,
@@ -120,6 +125,7 @@ impl State0 {
 
     pub fn next_message(&self) -> Message0 {
         Message0 {
+            swap_id: self.swap_id,
             B: self.b.public(),
             S_b_monero: self.S_b_monero,
             S_b_bitcoin: self.S_b_bitcoin,

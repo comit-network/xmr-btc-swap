@@ -1,6 +1,6 @@
 use crate::bitcoin::EncryptedSignature;
 use crate::network::quote::BidQuote;
-use crate::network::{encrypted_signature, spot_price, transfer_proof};
+use crate::network::{encrypted_signature, spot_price};
 use crate::protocol::bob::{Behaviour, OutEvent, State0, State2};
 use crate::{bitcoin, monero};
 use anyhow::{Context, Result};
@@ -12,9 +12,11 @@ use libp2p::{PeerId, Swarm};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+use uuid::Uuid;
 
 #[allow(missing_debug_implementations)]
 pub struct EventLoop {
+    swap_id: Uuid,
     swarm: libp2p::Swarm<Behaviour>,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     alice_peer_id: PeerId,
@@ -22,7 +24,7 @@ pub struct EventLoop {
     // these streams represents outgoing requests that we have to make
     quote_requests: bmrng::RequestReceiverStream<(), BidQuote>,
     spot_price_requests: bmrng::RequestReceiverStream<spot_price::Request, spot_price::Response>,
-    encrypted_signature_requests: bmrng::RequestReceiverStream<encrypted_signature::Request, ()>,
+    encrypted_signatures: bmrng::RequestReceiverStream<EncryptedSignature, ()>,
     execution_setup_requests: bmrng::RequestReceiverStream<State0, Result<State2>>,
 
     // these represents requests that are currently in-flight.
@@ -34,7 +36,7 @@ pub struct EventLoop {
     inflight_execution_setup: Option<bmrng::Responder<Result<State2>>>,
 
     /// The sender we will use to relay incoming transfer proofs.
-    transfer_proof: bmrng::RequestSender<transfer_proof::Request, ()>,
+    transfer_proof: bmrng::RequestSender<monero::TransferProof, ()>,
     /// The future representing the successful handling of an incoming transfer
     /// proof.
     ///
@@ -47,6 +49,7 @@ pub struct EventLoop {
 
 impl EventLoop {
     pub fn new(
+        swap_id: Uuid,
         swarm: Swarm<Behaviour>,
         alice_peer_id: PeerId,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
@@ -58,12 +61,13 @@ impl EventLoop {
         let quote = bmrng::channel_with_timeout(1, Duration::from_secs(30));
 
         let event_loop = EventLoop {
+            swap_id,
             swarm,
             alice_peer_id,
             bitcoin_wallet,
             execution_setup_requests: execution_setup.1.into(),
             transfer_proof: transfer_proof.0,
-            encrypted_signature_requests: encrypted_signature.1.into(),
+            encrypted_signatures: encrypted_signature.1.into(),
             spot_price_requests: spot_price.1.into(),
             quote_requests: quote.1.into(),
             inflight_spot_price_requests: HashMap::default(),
@@ -108,10 +112,20 @@ impl EventLoop {
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::TransferProofReceived { msg, channel }) => {
-                            let mut responder = match self.transfer_proof.send(*msg).await {
+                            if msg.swap_id != self.swap_id {
+
+                                // TODO: Save unexpected transfer proofs in the database and check for messages in the database when handling swaps
+                                tracing::warn!("Received unexpected transfer proof for swap {} while running swap {}. This transfer proof will be ignored.", msg.swap_id, self.swap_id);
+
+                                // When receiving a transfer proof that is unexpected we still have to acknowledge that it was received
+                                let _ = self.swarm.transfer_proof.send_response(channel, ());
+                                continue;
+                            }
+
+                            let mut responder = match self.transfer_proof.send(msg.tx_lock_proof).await {
                                 Ok(responder) => responder,
-                                Err(_) => {
-                                    tracing::warn!("Failed to pass on transfer proof");
+                                Err(e) => {
+                                    tracing::warn!("Failed to pass on transfer proof: {:#}", e);
                                     continue;
                                 }
                             };
@@ -180,7 +194,12 @@ impl EventLoop {
                     self.swarm.execution_setup.run(self.alice_peer_id, request, self.bitcoin_wallet.clone());
                     self.inflight_execution_setup = Some(responder);
                 },
-                Some((request, responder)) = self.encrypted_signature_requests.next().fuse(), if self.is_connected_to_alice() => {
+                Some((tx_redeem_encsig, responder)) = self.encrypted_signatures.next().fuse(), if self.is_connected_to_alice() => {
+                    let request = encrypted_signature::Request {
+                        swap_id: self.swap_id,
+                        tx_redeem_encsig
+                    };
+
                     let id = self.swarm.encrypted_signature.send_request(&self.alice_peer_id, request);
                     self.inflight_encrypted_signature_requests.insert(id, responder);
                 },
@@ -202,8 +221,8 @@ impl EventLoop {
 #[derive(Debug)]
 pub struct EventLoopHandle {
     execution_setup: bmrng::RequestSender<State0, Result<State2>>,
-    transfer_proof: bmrng::RequestReceiver<transfer_proof::Request, ()>,
-    encrypted_signature: bmrng::RequestSender<encrypted_signature::Request, ()>,
+    transfer_proof: bmrng::RequestReceiver<monero::TransferProof, ()>,
+    encrypted_signature: bmrng::RequestSender<EncryptedSignature, ()>,
     spot_price: bmrng::RequestSender<spot_price::Request, spot_price::Response>,
     quote: bmrng::RequestSender<(), BidQuote>,
 }
@@ -213,8 +232,8 @@ impl EventLoopHandle {
         self.execution_setup.send_receive(state0).await?
     }
 
-    pub async fn recv_transfer_proof(&mut self) -> Result<transfer_proof::Request> {
-        let (request, responder) = self
+    pub async fn recv_transfer_proof(&mut self) -> Result<monero::TransferProof> {
+        let (transfer_proof, responder) = self
             .transfer_proof
             .recv()
             .await
@@ -223,7 +242,7 @@ impl EventLoopHandle {
             .respond(())
             .context("Failed to acknowledge receipt of transfer proof")?;
 
-        Ok(request)
+        Ok(transfer_proof)
     }
 
     pub async fn request_spot_price(&mut self, btc: bitcoin::Amount) -> Result<monero::Amount> {
@@ -244,7 +263,7 @@ impl EventLoopHandle {
     ) -> Result<()> {
         Ok(self
             .encrypted_signature
-            .send_receive(encrypted_signature::Request { tx_redeem_encsig })
+            .send_receive(tx_redeem_encsig)
             .await?)
     }
 }

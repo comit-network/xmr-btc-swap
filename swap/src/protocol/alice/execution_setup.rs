@@ -4,18 +4,27 @@ use crate::protocol::{Message0, Message2, Message4};
 use anyhow::{Context, Error};
 use libp2p::PeerId;
 use libp2p_async_await::BehaviourOutEvent;
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub enum OutEvent {
-    Done { bob_peer_id: PeerId, state3: State3 },
-    Failure { peer: PeerId, error: Error },
+    Done {
+        bob_peer_id: PeerId,
+        swap_id: Uuid,
+        state3: State3,
+    },
+    Failure {
+        peer: PeerId,
+        error: Error,
+    },
 }
 
-impl From<BehaviourOutEvent<(PeerId, State3), (), Error>> for OutEvent {
-    fn from(event: BehaviourOutEvent<(PeerId, State3), (), Error>) -> Self {
+impl From<BehaviourOutEvent<(PeerId, (Uuid, State3)), (), Error>> for OutEvent {
+    fn from(event: BehaviourOutEvent<(PeerId, (Uuid, State3)), (), Error>) -> Self {
         match event {
-            BehaviourOutEvent::Inbound(_, Ok((bob_peer_id, state3))) => OutEvent::Done {
+            BehaviourOutEvent::Inbound(_, Ok((bob_peer_id, (swap_id, state3)))) => OutEvent::Done {
                 bob_peer_id,
+                swap_id,
                 state3,
             },
             BehaviourOutEvent::Inbound(peer, Err(e)) => OutEvent::Failure { peer, error: e },
@@ -27,7 +36,7 @@ impl From<BehaviourOutEvent<(PeerId, State3), (), Error>> for OutEvent {
 #[derive(libp2p::NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
 pub struct Behaviour {
-    inner: libp2p_async_await::Behaviour<(PeerId, State3), (), anyhow::Error>,
+    inner: libp2p_async_await::Behaviour<(PeerId, (Uuid, State3)), (), anyhow::Error>,
 }
 
 impl Default for Behaviour {
@@ -45,7 +54,7 @@ impl Behaviour {
                 let message0 =
                     serde_cbor::from_slice::<Message0>(&substream.read_message(BUF_SIZE).await?)
                         .context("Failed to deserialize message0")?;
-                let state1 = state0.receive(message0)?;
+                let (swap_id, state1) = state0.receive(message0)?;
 
                 substream
                     .write_message(
@@ -73,7 +82,7 @@ impl Behaviour {
                         .context("Failed to deserialize message4")?;
                 let state3 = state2.receive(message4)?;
 
-                Ok((bob, state3))
+                Ok((bob, (swap_id, state3)))
             })
     }
 }

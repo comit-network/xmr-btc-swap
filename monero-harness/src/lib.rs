@@ -68,13 +68,15 @@ impl<'c> Monero {
 
         let miner = "miner";
         tracing::info!("Starting miner wallet: {}", miner);
-        let (miner_wallet, miner_container) = MoneroWalletRpc::new(cli, &miner, &monerod).await?;
+        let (miner_wallet, miner_container) =
+            MoneroWalletRpc::new(cli, &miner, &monerod, prefix.clone()).await?;
 
         wallets.push(miner_wallet);
         containers.push(miner_container);
         for wallet in additional_wallets.iter() {
             tracing::info!("Starting wallet: {}", wallet);
-            let (wallet, container) = MoneroWalletRpc::new(cli, &wallet, &monerod).await?;
+            let (wallet, container) =
+                MoneroWalletRpc::new(cli, &wallet, &monerod, prefix.clone()).await?;
             wallets.push(wallet);
             containers.push(container);
         }
@@ -96,7 +98,7 @@ impl<'c> Monero {
         Ok(wallet)
     }
 
-    pub async fn init(&self, wallet_amount: Vec<(&str, u64)>) -> Result<()> {
+    pub async fn init_miner(&self) -> Result<()> {
         let miner_wallet = self.wallet("miner")?;
         let miner_address = miner_wallet.address().await?.address;
 
@@ -106,16 +108,33 @@ impl<'c> Monero {
         tracing::info!("Generated {:?} blocks", res.blocks.len());
         miner_wallet.refresh().await?;
 
-        for (wallet, amount) in wallet_amount.iter() {
-            if *amount > 0 {
-                let wallet = self.wallet(wallet)?;
-                let address = wallet.address().await?.address;
-                miner_wallet.transfer(&address, *amount).await?;
+        Ok(())
+    }
+
+    pub async fn init_wallet(&self, name: &str, amount_in_outputs: Vec<u64>) -> Result<()> {
+        let miner_wallet = self.wallet("miner")?;
+        let miner_address = miner_wallet.address().await?.address;
+        let monerod = &self.monerod;
+
+        let wallet = self.wallet(name)?;
+        let address = wallet.address().await?.address;
+
+        for amount in amount_in_outputs {
+            if amount > 0 {
+                miner_wallet.transfer(&address, amount).await?;
                 tracing::info!("Funded {} wallet with {}", wallet.name, amount);
                 monerod.client().generate_blocks(10, &miner_address).await?;
                 wallet.refresh().await?;
             }
         }
+
+        Ok(())
+    }
+
+    pub async fn start_miner(&self) -> Result<()> {
+        let miner_wallet = self.wallet("miner")?;
+        let miner_address = miner_wallet.address().await?.address;
+        let monerod = &self.monerod;
 
         monerod.start_miner(&miner_address).await?;
 
@@ -125,6 +144,13 @@ impl<'c> Monero {
             .wait_for_wallet_height(block_height)
             .await
             .unwrap();
+
+        Ok(())
+    }
+
+    pub async fn init_and_start_miner(&self) -> Result<()> {
+        self.init_miner().await?;
+        self.start_miner().await?;
 
         Ok(())
     }
@@ -209,6 +235,7 @@ impl<'c> MoneroWalletRpc {
         cli: &'c Cli,
         name: &str,
         monerod: &Monerod,
+        prefix: String,
     ) -> Result<(Self, Container<'c, Cli, image::Monero>)> {
         let wallet_rpc_port: u16 =
             port_check::free_local_port().ok_or_else(|| anyhow!("Could not retrieve free port"))?;
@@ -218,7 +245,8 @@ impl<'c> MoneroWalletRpc {
 
         let network = monerod.network.clone();
         let run_args = RunArgs::default()
-            .with_name(name)
+            // prefix the container name so we can run multiple tests
+            .with_name(format!("{}{}", prefix, name))
             .with_network(network.clone())
             .with_mapped_port(Port {
                 local: wallet_rpc_port,

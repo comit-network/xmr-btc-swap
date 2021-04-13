@@ -6,6 +6,7 @@ use libp2p::request_response::{
     RequestId, RequestResponseEvent, RequestResponseMessage, ResponseChannel,
 };
 use libp2p::{NetworkBehaviour, PeerId};
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub enum OutEvent {
@@ -20,6 +21,7 @@ pub enum OutEvent {
     },
     ExecutionSetupDone {
         bob_peer_id: PeerId,
+        swap_id: Uuid,
         state3: Box<State3>,
     },
     TransferProofAcknowledged {
@@ -157,9 +159,11 @@ impl From<execution_setup::OutEvent> for OutEvent {
         match event {
             Done {
                 bob_peer_id,
+                swap_id,
                 state3,
             } => OutEvent::ExecutionSetupDone {
                 bob_peer_id,
+                swap_id,
                 state3: Box::new(state3),
             },
             Failure { peer, error } => OutEvent::Failure { peer, error },

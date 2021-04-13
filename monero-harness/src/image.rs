@@ -75,7 +75,7 @@ impl Image for Monero {
 impl Default for Monero {
     fn default() -> Self {
         Monero {
-            tag: "v0.16.0.3".into(),
+            tag: "v0.17.2.0".into(),
             args: Args::default(),
             entrypoint: Some("".into()),
             wait_for_message: "core RPC server started ok".to_string(),

@@ -79,8 +79,9 @@ async fn main() -> Result<()> {
             let mut swarm = swarm::new::<Behaviour>(&seed)?;
             swarm.add_address(alice_peer_id, alice_multiaddr);
 
+            let swap_id = Uuid::new_v4();
             let (event_loop, mut event_loop_handle) =
-                EventLoop::new(swarm, alice_peer_id, bitcoin_wallet.clone())?;
+                EventLoop::new(swap_id, swarm, alice_peer_id, bitcoin_wallet.clone())?;
             let event_loop = tokio::spawn(event_loop.run());
 
             let send_bitcoin = determine_btc_to_swap(
@@ -174,7 +175,7 @@ async fn main() -> Result<()> {
             swarm.add_address(alice_peer_id, alice_multiaddr);
 
             let (event_loop, event_loop_handle) =
-                EventLoop::new(swarm, alice_peer_id, bitcoin_wallet.clone())?;
+                EventLoop::new(swap_id, swarm, alice_peer_id, bitcoin_wallet.clone())?;
             let handle = tokio::spawn(event_loop.run());
 
             let swap = Builder::new(

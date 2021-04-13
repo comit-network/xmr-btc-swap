@@ -5,7 +5,6 @@ use crate::env::Config;
 use crate::protocol::alice;
 use crate::protocol::alice::event_loop::EventLoopHandle;
 use crate::protocol::alice::AliceState;
-use crate::protocol::alice::AliceState::XmrLockTransferProofSent;
 use crate::{bitcoin, database, monero};
 use anyhow::{bail, Context, Result};
 use tokio::select;
@@ -17,7 +16,7 @@ pub async fn run(swap: alice::Swap) -> Result<AliceState> {
     run_until(swap, |_| false).await
 }
 
-#[tracing::instrument(name = "swap", skip(swap,exit_early), fields(id = %swap.swap_id))]
+#[tracing::instrument(name = "swap", skip(swap,exit_early), fields(id = %swap.swap_id), err)]
 pub async fn run_until(
     mut swap: alice::Swap,
     exit_early: fn(&AliceState) -> bool,
@@ -130,7 +129,7 @@ async fn next_state(
                 result = event_loop_handle.send_transfer_proof(transfer_proof.clone()) => {
                    result?;
 
-                   XmrLockTransferProofSent {
+                   AliceState::XmrLockTransferProofSent {
                        monero_wallet_restore_blockheight,
                        transfer_proof,
                        state3,

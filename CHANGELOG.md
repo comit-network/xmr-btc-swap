@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Allow multiple concurrent swaps with the same peer on the ASB.
+  This is a breaking change because the swap ID is now agreed upon between CLI and ASB during swap setup.
+  Resuming swaps started prior to this change can result in unexpected behaviour.
+
 ## [0.4.0] - 2021-04-06
 
 ### Changed
