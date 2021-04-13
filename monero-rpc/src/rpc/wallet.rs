@@ -281,8 +281,17 @@ impl Client {
 
         debug!("check_tx_key RPC response: {}", response);
 
-        let r = serde_json::from_str::<Response<CheckTxKey>>(&response)?;
-        Ok(r.result)
+        let check_tx_key = serde_json::from_str::<Response<CheckTxKey>>(&response)?;
+        let mut check_tx_key = check_tx_key.result;
+
+        // Due to a bug in monerod that causes check_tx_key confirmations
+        // to overflow we safeguard the confirmations to avoid unwanted
+        // side effects.
+        if check_tx_key.confirmations > u64::MAX - 1000 {
+            check_tx_key.confirmations = 0u64;
+        }
+
+        Ok(check_tx_key)
     }
 
     pub async fn generate_from_keys(
