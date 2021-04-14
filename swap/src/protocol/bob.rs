@@ -1,6 +1,7 @@
 use crate::database::Database;
 use crate::env::Config;
-use crate::network::{encrypted_signature, spot_price};
+use crate::network::quote::BidQuote;
+use crate::network::{encrypted_signature, quote, redial, spot_price, transfer_proof};
 use crate::protocol::bob;
 use crate::{bitcoin, monero};
 use anyhow::{anyhow, Error, Result};
@@ -17,8 +18,7 @@ pub use self::event_loop::{EventLoop, EventLoopHandle};
 pub use self::refund::refund;
 pub use self::state::*;
 pub use self::swap::{run, run_until};
-use crate::network::quote::BidQuote;
-use crate::network::{quote, transfer_proof};
+use std::time::Duration;
 
 pub mod cancel;
 pub mod event_loop;
@@ -125,6 +125,9 @@ pub enum OutEvent {
     EncryptedSignatureAcknowledged {
         id: RequestId,
     },
+    AllRedialAttemptsExhausted {
+        peer: PeerId,
+    },
     ResponseSent, // Same variant is used for all messages as no processing is done
     CommunicationError(Error),
 }
@@ -218,6 +221,16 @@ impl From<encrypted_signature::OutEvent> for OutEvent {
     }
 }
 
+impl From<redial::OutEvent> for OutEvent {
+    fn from(event: redial::OutEvent) -> Self {
+        match event {
+            redial::OutEvent::AllAttemptsExhausted { peer } => {
+                OutEvent::AllRedialAttemptsExhausted { peer }
+            }
+        }
+    }
+}
+
 fn map_rr_event_to_outevent<I, O>(event: RequestResponseEvent<I, O>) -> OutEvent
 where
     OutEvent: From<RequestResponseMessage<I, O>>,
@@ -258,21 +271,21 @@ pub struct Behaviour {
     pub execution_setup: execution_setup::Behaviour,
     pub transfer_proof: transfer_proof::Behaviour,
     pub encrypted_signature: encrypted_signature::Behaviour,
+    pub redial: redial::Behaviour,
 }
 
-impl Default for Behaviour {
-    fn default() -> Self {
+impl Behaviour {
+    pub fn new(alice: PeerId) -> Self {
         Self {
             quote: quote::bob(),
             spot_price: spot_price::bob(),
             execution_setup: Default::default(),
             transfer_proof: transfer_proof::bob(),
             encrypted_signature: encrypted_signature::bob(),
+            redial: redial::Behaviour::new(alice, Duration::from_secs(2)),
         }
     }
-}
 
-impl Behaviour {
     /// Add a known address for the given peer
     pub fn add_address(&mut self, peer_id: PeerId, address: Multiaddr) {
         self.quote.add_address(&peer_id, address.clone());
