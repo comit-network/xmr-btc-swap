@@ -15,19 +15,19 @@ const RING_SIZE: usize = 11;
 fn final_challenge(
     i: usize,
     fake_responses: [Scalar; RING_SIZE - 1],
-    ring: [RistrettoPoint; RING_SIZE],
+    ring: &[RistrettoPoint],
     h_prev: Scalar,
-    I_a: RistrettoPoint,
-    I_b: RistrettoPoint,
+    I: RistrettoPoint,
     msg: [u8; 32],
 ) -> Scalar {
-    let L = fake_responses[i] * RISTRETTO_BASEPOINT_POINT + h_prev * ring[i];
+    let s_i = fake_responses[i];
+    let pk_i = ring[i];
 
-    let H_pk_i: RistrettoPoint =
-        RistrettoPoint::hash_from_bytes::<Sha512>(ring[i].compress().as_bytes());
+    let L_i = s_i * RISTRETTO_BASEPOINT_POINT + h_prev * pk_i;
 
-    let I = I_a + I_b;
-    let R = fake_responses[i] * H_pk_i + I;
+    let H_p_pk_i: RistrettoPoint =
+        RistrettoPoint::hash_from_bytes::<Sha512>(pk_i.compress().as_bytes());
+    let R_i = s_i * H_p_pk_i + h_prev * I;
 
     let tag = "CLSAG_0".to_string();
     let mut ring_concat = ring
@@ -40,8 +40,8 @@ fn final_challenge(
     bytes.append(&mut tag.as_bytes().to_vec());
     bytes.append(&mut ring_concat);
     bytes.append(&mut msg.to_vec());
-    bytes.append(&mut L.compress().as_bytes().to_vec());
-    bytes.append(&mut R.compress().as_bytes().to_vec());
+    bytes.append(&mut L_i.compress().as_bytes().to_vec());
+    bytes.append(&mut R_i.compress().as_bytes().to_vec());
 
     let hasher = Sha512::new().chain(bytes);
     let h = Scalar::from_hash(hasher);
@@ -49,7 +49,7 @@ fn final_challenge(
     if i >= RING_SIZE - 2 {
         h
     } else {
-        final_challenge(i + 1, fake_responses, ring, h, I_a, I_b, msg)
+        final_challenge(i + 1, fake_responses, ring, h, I, msg)
     }
 }
 
@@ -196,12 +196,11 @@ impl Alice0 {
         };
 
         let h_last = final_challenge(
-            1,
+            0,
             self.fake_responses,
-            self.ring,
+            &self.ring[1..],
             h_0,
-            self.I_a,
-            msg.I_b,
+            self.I_a + msg.I_b,
             self.msg,
         );
 
@@ -380,7 +379,14 @@ impl Bob1 {
             Scalar::from_hash(h_0)
         };
 
-        let h_last = final_challenge(1, fake_responses, self.ring, h_0, I_a, self.I_b, self.msg);
+        let h_last = final_challenge(
+            0,
+            fake_responses,
+            &self.ring[1..],
+            h_0,
+            I_a + self.I_b,
+            self.msg,
+        );
 
         let s_0_b = self.alpha_b - h_last * self.s_b;
 
