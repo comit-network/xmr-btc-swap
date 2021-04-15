@@ -2148,7 +2148,7 @@ name = "monero-rpc"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "jsonrpc_client 0.5.1 (git+https://github.com/thomaseizinger/rust-jsonrpc-client?branch=named-params)",
+ "jsonrpc_client 0.5.1 (git+https://github.com/thomaseizinger/rust-jsonrpc-client?branch=master)",
  "reqwest",
  "serde",
  "serde_json",
