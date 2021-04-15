@@ -7,14 +7,14 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libp2p = { version = "0.36", default-features = false }
+libp2p = { version = "0.37", default-features = false }
 log = "0.4"
 
 [dev-dependencies]
 anyhow = "1"
 serde_cbor = "0.11"
 tokio = { version = "1", features = ["macros", "rt", "time", "rt-multi-thread"] }
-libp2p = { version = "0.36", default-features = false, features = ["noise", "yamux"] }
+libp2p = { version = "0.37", default-features = false, features = ["noise", "yamux"] }
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 env_logger = "0.8"
