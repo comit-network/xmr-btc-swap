@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
+### Fixed
 
-- Allow multiple concurrent swaps with the same peer on the ASB.
-  This is a breaking change because the swap ID is now agreed upon between CLI and ASB during swap setup.
-  Resuming swaps started prior to this change can result in unexpected behaviour.
+- An issue where concurrent swaps with the same peer would cause the ASB to handle network communication incorrectly.
+  To fix this, all messages are now tagged with a unique identifier that is agreed upon at the start of the swap.
+  This is a breaking change in the network layer and hence old versions are not compatible with this version.
+  We advise to also not resume any swaps that have been created with an older version.
+  It is recommended to reset / delete the database after upgrading.
 - Quote protocol returns JSON encoded data instead of CBOR.
   This is a breaking change in the protocol handling, old CLI versions will not be able to process quote requests of ASBs running this version.
 
