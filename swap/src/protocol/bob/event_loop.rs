@@ -89,7 +89,7 @@ impl EventLoop {
     }
 
     pub async fn run(mut self) {
-        match libp2p::Swarm::dial(&mut self.swarm, &self.alice_peer_id) {
+        match self.swarm.dial(&self.alice_peer_id) {
             Ok(()) => {}
             Err(e) => {
                 tracing::error!("Failed to initiate dial to Alice: {}", e);
@@ -124,7 +124,7 @@ impl EventLoop {
                                 tracing::warn!("Received unexpected transfer proof for swap {} while running swap {}. This transfer proof will be ignored.", msg.swap_id, self.swap_id);
 
                                 // When receiving a transfer proof that is unexpected we still have to acknowledge that it was received
-                                let _ = self.swarm.transfer_proof.send_response(channel, ());
+                                let _ = self.swarm.behaviour_mut().transfer_proof.send_response(channel, ());
                                 continue;
                             }
 
@@ -176,7 +176,7 @@ impl EventLoop {
                         SwarmEvent::UnreachableAddr { peer_id, address, attempts_remaining, error } if peer_id == self.alice_peer_id && attempts_remaining == 0 => {
                             tracing::warn!(%address, "Failed to dial Alice: {}", error);
 
-                            if let Some(duration) = self.swarm.redial.until_next_redial() {
+                            if let Some(duration) = self.swarm.behaviour_mut().redial.until_next_redial() {
                                 tracing::info!("Next redial attempt in {}s", duration.as_secs());
                             }
                         }
@@ -187,15 +187,15 @@ impl EventLoop {
                 // Handle to-be-sent requests for all our network protocols.
                 // Use `self.is_connected_to_alice` as a guard to "buffer" requests until we are connected.
                 Some((request, responder)) = self.spot_price_requests.next().fuse(), if self.is_connected_to_alice() => {
-                    let id = self.swarm.spot_price.send_request(&self.alice_peer_id, request);
+                    let id = self.swarm.behaviour_mut().spot_price.send_request(&self.alice_peer_id, request);
                     self.inflight_spot_price_requests.insert(id, responder);
                 },
                 Some(((), responder)) = self.quote_requests.next().fuse(), if self.is_connected_to_alice() => {
-                    let id = self.swarm.quote.send_request(&self.alice_peer_id, ());
+                    let id = self.swarm.behaviour_mut().quote.send_request(&self.alice_peer_id, ());
                     self.inflight_quote_requests.insert(id, responder);
                 },
                 Some((request, responder)) = self.execution_setup_requests.next().fuse(), if self.is_connected_to_alice() => {
-                    self.swarm.execution_setup.run(self.alice_peer_id, request, self.bitcoin_wallet.clone());
+                    self.swarm.behaviour_mut().execution_setup.run(self.alice_peer_id, request, self.bitcoin_wallet.clone());
                     self.inflight_execution_setup = Some(responder);
                 },
                 Some((tx_redeem_encsig, responder)) = self.encrypted_signatures.next().fuse(), if self.is_connected_to_alice() => {
@@ -204,12 +204,12 @@ impl EventLoop {
                         tx_redeem_encsig
                     };
 
-                    let id = self.swarm.encrypted_signature.send_request(&self.alice_peer_id, request);
+                    let id = self.swarm.behaviour_mut().encrypted_signature.send_request(&self.alice_peer_id, request);
                     self.inflight_encrypted_signature_requests.insert(id, responder);
                 },
 
                 Some(response_channel) = &mut self.pending_transfer_proof => {
-                    let _ = self.swarm.transfer_proof.send_response(response_channel, ());
+                    let _ = self.swarm.behaviour_mut().transfer_proof.send_response(response_channel, ());
 
                     self.pending_transfer_proof = OptionFuture::from(None);
                 }
@@ -218,7 +218,7 @@ impl EventLoop {
     }
 
     fn is_connected_to_alice(&self) -> bool {
-        Swarm::is_connected(&self.swarm, &self.alice_peer_id)
+        self.swarm.is_connected(&self.alice_peer_id)
     }
 }
 

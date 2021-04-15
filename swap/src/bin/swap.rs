@@ -77,7 +77,9 @@ async fn main() -> Result<()> {
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
             let mut swarm = swarm::bob(&seed, alice_peer_id)?;
-            swarm.add_address(alice_peer_id, alice_multiaddr);
+            swarm
+                .behaviour_mut()
+                .add_address(alice_peer_id, alice_multiaddr);
 
             let swap_id = Uuid::new_v4();
             let (event_loop, mut event_loop_handle) =
@@ -172,7 +174,9 @@ async fn main() -> Result<()> {
 
             let alice_peer_id = db.get_peer_id(swap_id)?;
             let mut swarm = swarm::bob(&seed, alice_peer_id)?;
-            swarm.add_address(alice_peer_id, alice_multiaddr);
+            swarm
+                .behaviour_mut()
+                .add_address(alice_peer_id, alice_multiaddr);
 
             let (event_loop, event_loop_handle) =
                 EventLoop::new(swap_id, swarm, alice_peer_id, bitcoin_wallet.clone())?;
