@@ -640,33 +640,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "clear_on_drop"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9cc5db465b294c3fa986d5bbb0f3017cd850bff6dd6c52f9ccff8b4d21b7b08"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "cloudabi"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
 dependencies = [
  "bitflags",
-]
-
-[[package]]
-name = "clsag"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66ea6461bc0d5e7e762be243266e621318b4ff6740415ab0190d60cd07385e64"
-dependencies = [
- "curve25519-dalek 1.2.6",
- "merlin",
- "rand 0.6.5",
- "sha2 0.8.2",
 ]
 
 [[package]]
@@ -838,20 +817,6 @@ dependencies = [
 
 [[package]]
 name = "curve25519-dalek"
-version = "1.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57c0d59fed08e452f286b251f88b2fc64a01f50a7b263aa09557ad7285d9e7fa"
-dependencies = [
- "byteorder",
- "clear_on_drop",
- "digest 0.8.1",
- "rand_core 0.3.1",
- "serde",
- "subtle 2.4.0",
-]
-
-[[package]]
-name = "curve25519-dalek"
 version = "3.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f627126b946c25a4638eec0ea634fc52506dea98db118aae985118ce7c3d723f"
@@ -976,7 +941,7 @@ version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c762bae6dcaf24c4c84667b8579785430908723d5c889f469d76a41d59cc7a9d"
 dependencies = [
- "curve25519-dalek 3.0.2",
+ "curve25519-dalek",
  "ed25519",
  "rand 0.7.3",
  "serde",
@@ -1682,12 +1647,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "keccak"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67c21572b4949434e4fc1e1978b99c5f77064153c59d998bf13ecd96fb5ecba7"
-
-[[package]]
 name = "keccak-hash"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1835,7 +1794,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36db0f0db3b0433f5b9463f1c0cd9eadc0a3734a9170439ce501ff99733a88bd"
 dependencies = [
  "bytes 1.0.1",
- "curve25519-dalek 3.0.2",
+ "curve25519-dalek",
  "futures",
  "lazy_static",
  "libp2p-core",
@@ -2053,18 +2012,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "merlin"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b0942b357c1b4d0dc43ba724674ec89c3218e6ca2b3e8269e7cb53bcecd2f6e"
-dependencies = [
- "byteorder",
- "keccak",
- "rand_core 0.4.2",
- "zeroize",
-]
-
-[[package]]
 name = "mime"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2148,7 +2095,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dad9cdd100bffa1b21e9b1052394dd78246c6977b9e6f801b4acfd53ba62311e"
 dependencies = [
  "base58-monero",
- "curve25519-dalek 3.0.2",
+ "curve25519-dalek",
  "fixed-hash",
  "hex 0.4.3",
  "hex-literal",
@@ -2163,8 +2110,7 @@ name = "monero-adaptor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clsag",
- "curve25519-dalek 3.0.2",
+ "curve25519-dalek",
  "hex 0.4.3",
  "monero",
  "nazgul",
@@ -2205,7 +2151,7 @@ dependencies = [
 name = "monero-wallet"
 version = "0.1.0"
 dependencies = [
- "curve25519-dalek 3.0.2",
+ "curve25519-dalek",
  "hex 0.4.3",
  "monero",
  "monero-harness",
@@ -2267,7 +2213,7 @@ version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9dff2f512a99611eb14f9bbdcc69e900c93952c4cc94656d2278ea5aa294cec2"
 dependencies = [
- "curve25519-dalek 3.0.2",
+ "curve25519-dalek",
  "digest 0.9.0",
  "rand_core 0.5.1",
 ]
@@ -3406,7 +3352,7 @@ name = "sigma_fun"
 version = "0.1.3-alpha.0"
 source = "git+https://github.com/LLFourn/secp256kfun#8538ef22498170960a9769df2700c1986cc540fd"
 dependencies = [
- "curve25519-dalek 3.0.2",
+ "curve25519-dalek",
  "digest 0.9.0",
  "generic-array 0.14.4",
  "rand_core 0.5.1",
@@ -3678,7 +3624,7 @@ dependencies = [
  "bmrng",
  "config",
  "conquer-once",
- "curve25519-dalek 3.0.2",
+ "curve25519-dalek",
  "dialoguer",
  "directories-next",
  "ecdsa_fun",
@@ -4609,7 +4555,7 @@ version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc614d95359fd7afc321b66d2107ede58b246b844cf5d8a0adcca413e439f088"
 dependencies = [
- "curve25519-dalek 3.0.2",
+ "curve25519-dalek",
  "rand_core 0.5.1",
  "zeroize",
 ]

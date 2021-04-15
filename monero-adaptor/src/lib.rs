@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 
+use std::convert::TryInto;
+
 use anyhow::{bail, Result};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::digest::Digest;
@@ -27,9 +29,16 @@ fn final_challenge(
     let I = I_a + I_b;
     let R = fake_responses[i] * H_pk_i + I;
 
+    let tag = "CLSAG_0".to_string();
+    let mut ring_concat = ring
+        .iter()
+        .flat_map(|pk| pk.compress().as_bytes().to_vec())
+        .collect::<Vec<u8>>();
+
     let mut bytes = vec![];
 
-    // todo: add tag and ring
+    bytes.append(&mut tag.as_bytes().to_vec());
+    bytes.append(&mut ring_concat);
     bytes.append(&mut msg.to_vec());
     bytes.append(&mut L.compress().as_bytes().to_vec());
     bytes.append(&mut R.compress().as_bytes().to_vec());
@@ -44,13 +53,54 @@ fn final_challenge(
     }
 }
 
-pub struct AdaptorSig {
+pub struct AdaptorSignature {
     s_0_a: Scalar,
     s_0_b: Scalar,
     fake_responses: [Scalar; RING_SIZE - 1],
     h_0: Scalar,
     /// Key image of the real key in the ring.
     I: RistrettoPoint,
+}
+
+impl AdaptorSignature {
+    pub fn adapt(self, y: Scalar) -> Signature {
+        let r_0 = self.s_0_a + self.s_0_b + y;
+
+        let responses = [r_0]
+            .iter()
+            .chain(self.fake_responses.iter())
+            .copied()
+            .collect::<Vec<_>>()
+            .try_into()
+            .expect("correct response size");
+
+        Signature {
+            responses,
+            h_0: self.h_0,
+            I: self.I,
+        }
+    }
+}
+
+pub struct Signature {
+    pub responses: [Scalar; RING_SIZE],
+    pub h_0: Scalar,
+    /// Key image of the real key in the ring.
+    pub I: RistrettoPoint,
+}
+
+impl Signature {
+    #[cfg(test)]
+    fn to_nazgul_signature(&self, ring: &[RistrettoPoint; RING_SIZE]) -> nazgul::clsag::CLSAG {
+        let ring = ring.iter().map(|pk| vec![*pk]).collect();
+
+        nazgul::clsag::CLSAG {
+            challenge: self.h_0,
+            responses: self.responses.to_vec(),
+            ring,
+            key_images: vec![self.I],
+        }
+    }
 }
 
 pub struct Alice0 {
@@ -109,7 +159,7 @@ impl Alice0 {
                 T_a,
                 base_key_hashed_to_point,
                 I_hat_a,
-                self.s_prime_a,
+                self.alpha_a,
             ),
             c_a: Commitment::new(self.fake_responses, I_a, I_hat_a, T_a),
         }
@@ -130,7 +180,15 @@ impl Alice0 {
         let I_hat_a = self.alpha_a * base_key_hashed_to_point;
 
         let h_0 = {
+            let ring = self
+                .ring
+                .iter()
+                .flat_map(|pk| pk.compress().as_bytes().to_vec())
+                .collect::<Vec<u8>>();
+
             let h_0 = Sha512::new()
+                .chain("CLSAG_0".to_string())
+                .chain(ring)
                 .chain(self.msg)
                 .chain((T_a + msg.T_b + self.R_a).compress().as_bytes())
                 .chain(
@@ -157,9 +215,6 @@ impl Alice0 {
         Ok(Alice1 {
             ring: self.ring,
             fake_responses: self.fake_responses,
-            msg: self.msg,
-            R_a: self.R_a,
-            R_prime_a: self.R_prime_a,
             s_prime_a: self.s_prime_a,
             alpha_a: self.alpha_a,
             h_0,
@@ -173,11 +228,6 @@ pub struct Alice1 {
     // secret index is always 0
     ring: [RistrettoPoint; RING_SIZE],
     fake_responses: [Scalar; RING_SIZE - 1],
-    msg: [u8; 32],
-    // encryption key
-    R_a: RistrettoPoint,
-    // R'a = r_a*H_p(p_k) where p_k is the signing public key
-    R_prime_a: RistrettoPoint,
     // this is not s_a cos of something to with one-time-address??
     s_prime_a: Scalar,
     // secret value:
@@ -207,7 +257,7 @@ impl Alice1 {
         );
         let I_a = self.s_prime_a * base_key_hashed_to_point;
 
-        let adaptor_sig = AdaptorSig {
+        let adaptor_sig = AdaptorSignature {
             s_0_a: self.s_0_a,
             s_0_b: msg.s_0_b,
             fake_responses: self.fake_responses,
@@ -220,7 +270,7 @@ impl Alice1 {
 }
 
 pub struct Alice2 {
-    pub adaptor_sig: AdaptorSig,
+    pub adaptor_sig: AdaptorSignature,
 }
 
 pub struct Bob0 {
@@ -304,7 +354,7 @@ impl Bob1 {
                 T_b,
                 base_key_hashed_to_point,
                 I_hat_b,
-                self.s_b,
+                self.alpha_b,
             ),
         }
     }
@@ -339,7 +389,7 @@ impl Bob1 {
 
         let s_0_b = self.alpha_b - h_last * self.s_b;
 
-        let adaptor_sig = AdaptorSig {
+        let adaptor_sig = AdaptorSignature {
             s_0_a: msg.s_0_a,
             s_0_b,
             fake_responses,
@@ -353,7 +403,7 @@ impl Bob1 {
 
 pub struct Bob2 {
     s_0_b: Scalar,
-    pub adaptor_sig: AdaptorSig,
+    pub adaptor_sig: AdaptorSignature,
 }
 
 impl Bob2 {
@@ -380,18 +430,19 @@ impl DleqProof {
         let rH = r * H;
 
         let hash = Sha512::new()
-            .chain(dbg!(G.compress()).as_bytes())
-            .chain(dbg!(xG.compress()).as_bytes())
-            .chain(dbg!(H.compress()).as_bytes())
-            .chain(dbg!(xH.compress()).as_bytes())
-            .chain(dbg!(rG.compress()).as_bytes())
-            .chain(dbg!(rH.compress()).as_bytes());
+            .chain(G.compress().as_bytes())
+            .chain(xG.compress().as_bytes())
+            .chain(H.compress().as_bytes())
+            .chain(xH.compress().as_bytes())
+            .chain(rG.compress().as_bytes())
+            .chain(rH.compress().as_bytes());
         let c = Scalar::from_hash(hash);
 
         let s = r + c * x;
 
         Self { s, c }
     }
+
     fn verify(
         &self,
         G: RistrettoPoint,
@@ -402,25 +453,16 @@ impl DleqProof {
         let s = self.s;
         let c = self.c;
 
-        let rG = {
-            let sG = s * G;
-
-            sG - c * xG
-        };
-
-        let rH = {
-            let sH = s * H;
-
-            sH - c * xH
-        };
+        let rG = (s * G) + (-c * xG);
+        let rH = (s * H) + (-c * xH);
 
         let hash = Sha512::new()
-            .chain(dbg!(G.compress()).as_bytes())
-            .chain(dbg!(xG.compress()).as_bytes())
-            .chain(dbg!(H.compress()).as_bytes())
-            .chain(dbg!(xH.compress()).as_bytes())
-            .chain(dbg!(rG.compress()).as_bytes())
-            .chain(dbg!(rH.compress()).as_bytes());
+            .chain(G.compress().as_bytes())
+            .chain(xG.compress().as_bytes())
+            .chain(H.compress().as_bytes())
+            .chain(xH.compress().as_bytes())
+            .chain(rG.compress().as_bytes())
+            .chain(rH.compress().as_bytes());
         let c_prime = Scalar::from_hash(hash);
 
         if c != c_prime {
@@ -530,10 +572,12 @@ pub struct Message3 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use nazgul::clsag::CLSAG;
+    use nazgul::traits::Verify;
 
     #[test]
     fn sign_and_verify_success() {
-        let msg = b"hello world, monero is amazing!!";
+        let msg_to_sign = b"hello world, monero is amazing!!";
 
         let s_prime_a = Scalar::random(&mut OsRng);
         let s_b = Scalar::random(&mut OsRng);
@@ -554,12 +598,10 @@ mod tests {
         let mut ring = [RistrettoPoint::default(); RING_SIZE];
         ring[0] = pk;
 
-        for member in ring[1..].iter_mut().take(RING_SIZE - 1) {
-            *member = RistrettoPoint::random(&mut OsRng);
-        }
+        ring[1..].fill_with(|| RistrettoPoint::random(&mut OsRng));
 
-        let alice = Alice0::new(ring, *msg, R_a, R_prime_a, s_prime_a);
-        let bob = Bob0::new(ring, *msg, R_a, R_prime_a, s_b);
+        let alice = Alice0::new(ring, *msg_to_sign, R_a, R_prime_a, s_prime_a);
+        let bob = Bob0::new(ring, *msg_to_sign, R_a, R_prime_a, s_b);
 
         let msg = alice.next_message();
         let bob = bob.receive(msg);
@@ -572,5 +614,10 @@ mod tests {
 
         let msg = bob.next_message();
         let alice = alice.receive(msg);
+
+        let sig = alice.adaptor_sig.adapt(r_a);
+        let sig = sig.to_nazgul_signature(&ring);
+
+        assert!(CLSAG::verify::<Sha512>(sig, &msg_to_sign.to_vec()));
     }
 }
