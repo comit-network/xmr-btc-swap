@@ -1642,7 +1642,7 @@ version = "0.5.1"
 source = "git+https://github.com/thomaseizinger/rust-jsonrpc-client?branch=master#817b609e99c78857f686b6f606ccb62248b8d420"
 dependencies = [
  "async-trait",
- "jsonrpc_client_macro 0.2.0 (git+https://github.com/thomaseizinger/rust-jsonrpc-client?branch=named-params)",
+ "jsonrpc_client_macro 0.2.0 (git+https://github.com/thomaseizinger/rust-jsonrpc-client?branch=master)",
  "reqwest",
  "serde",
  "serde_json",
