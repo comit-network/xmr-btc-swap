@@ -2,6 +2,7 @@ mod impl_from_rr_event;
 
 pub mod cbor_request_response;
 pub mod encrypted_signature;
+pub mod json_pull_codec;
 pub mod quote;
 pub mod redial;
 pub mod spot_price;
