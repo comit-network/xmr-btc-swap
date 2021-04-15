@@ -28,7 +28,8 @@ use crate::image::{
 use anyhow::{anyhow, bail, Result};
 use monero_rpc::{
     monerod,
-    wallet::{self, GetAddress, Refreshed, Transfer},
+    monerod::MonerodRpc as _,
+    wallet::{self, GetAddress, MoneroWalletRpc as _, Refreshed, Transfer},
 };
 use std::time::Duration;
 use testcontainers::{clients::Cli, core::Port, Container, Docker, RunArgs};
@@ -104,7 +105,10 @@ impl<'c> Monero {
 
         // generate the first 70 as bulk
         let monerod = &self.monerod;
-        let res = monerod.client().generate_blocks(70, &miner_address).await?;
+        let res = monerod
+            .client()
+            .generateblocks(70, miner_address.clone())
+            .await?;
         tracing::info!("Generated {:?} blocks", res.blocks.len());
         miner_wallet.refresh().await?;
 
@@ -123,7 +127,10 @@ impl<'c> Monero {
             if amount > 0 {
                 miner_wallet.transfer(&address, amount).await?;
                 tracing::info!("Funded {} wallet with {}", wallet.name, amount);
-                monerod.client().generate_blocks(10, &miner_address).await?;
+                monerod
+                    .client()
+                    .generateblocks(10, miner_address.clone())
+                    .await?;
                 wallet.refresh().await?;
             }
         }
@@ -139,7 +146,7 @@ impl<'c> Monero {
         monerod.start_miner(&miner_address).await?;
 
         tracing::info!("Waiting for miner wallet to catch up...");
-        let block_height = monerod.client().get_block_count().await?;
+        let block_height = monerod.client().get_block_count().await?.count;
         miner_wallet
             .wait_for_wallet_height(block_height)
             .await
@@ -256,7 +263,7 @@ impl<'c> MoneroWalletRpc {
 
         // create new wallet
         wallet::Client::localhost(wallet_rpc_port)
-            .create_wallet(name)
+            .create_wallet(name.to_owned(), "English".to_owned())
             .await
             .unwrap();
 
@@ -277,7 +284,7 @@ impl<'c> MoneroWalletRpc {
     // It takes a little while for the wallet to sync with monerod.
     pub async fn wait_for_wallet_height(&self, height: u32) -> Result<()> {
         let mut retry: u8 = 0;
-        while self.client().block_height().await?.height < height {
+        while self.client().get_height().await?.height < height {
             if retry >= 30 {
                 // ~30 seconds
                 bail!("Wallet could not catch up with monerod after 30 retries.")
@@ -290,26 +297,28 @@ impl<'c> MoneroWalletRpc {
 
     /// Sends amount to address
     pub async fn transfer(&self, address: &str, amount: u64) -> Result<Transfer> {
-        self.client().transfer(0, amount, address).await
+        Ok(self.client().transfer_single(0, amount, address).await?)
     }
 
     pub async fn address(&self) -> Result<GetAddress> {
-        self.client().get_address(0).await
+        Ok(self.client().get_address(0).await?)
     }
 
     pub async fn balance(&self) -> Result<u64> {
         self.client().refresh().await?;
-        self.client().get_balance(0).await
+        let balance = self.client().get_balance(0).await?.balance;
+
+        Ok(balance)
     }
 
     pub async fn refresh(&self) -> Result<Refreshed> {
-        self.client().refresh().await
+        Ok(self.client().refresh().await?)
     }
 }
 /// Mine a block ever BLOCK_TIME_SECS seconds.
 async fn mine(monerod: monerod::Client, reward_address: String) -> Result<()> {
     loop {
         time::sleep(Duration::from_secs(BLOCK_TIME_SECS)).await;
-        monerod.generate_blocks(1, &reward_address).await?;
+        monerod.generateblocks(1, reward_address.clone()).await?;
     }
 }

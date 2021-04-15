@@ -104,7 +104,13 @@ async fn next_state(
             ExpiredTimelocks::None => {
                 monero_wallet
                     .watch_for_transfer(state3.lock_xmr_watch_request(transfer_proof.clone(), 1))
-                    .await?;
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Failed to watch for transfer of XMR in transaction {}",
+                            transfer_proof.tx_hash()
+                        )
+                    })?;
 
                 AliceState::XmrLocked {
                     monero_wallet_restore_blockheight,
@@ -299,7 +305,7 @@ async fn next_state(
 
             monero_wallet
                 .create_from(
-                    &swap_id.to_string(),
+                    swap_id.to_string(),
                     spend_key,
                     view_key,
                     monero_wallet_restore_blockheight,

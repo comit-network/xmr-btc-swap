@@ -12,6 +12,5 @@
 )]
 #![forbid(unsafe_code)]
 
-mod rpc;
-
-pub use self::rpc::*;
+pub mod monerod;
+pub mod wallet;
