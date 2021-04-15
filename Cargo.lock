@@ -1639,7 +1639,7 @@ dependencies = [
 [[package]]
 name = "jsonrpc_client"
 version = "0.5.1"
-source = "git+https://github.com/thomaseizinger/rust-jsonrpc-client?branch=named-params#7f2f77f0bf157a66ea6549834fcf28683ff94af4"
+source = "git+https://github.com/thomaseizinger/rust-jsonrpc-client?branch=master#817b609e99c78857f686b6f606ccb62248b8d420"
 dependencies = [
  "async-trait",
  "jsonrpc_client_macro 0.2.0 (git+https://github.com/thomaseizinger/rust-jsonrpc-client?branch=named-params)",
