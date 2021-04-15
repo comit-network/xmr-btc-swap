@@ -361,7 +361,15 @@ impl Bob1 {
             .verify(RISTRETTO_BASEPOINT_POINT, T_a, self.H_p_pk, I_hat_a)?;
 
         let h_0 = {
+            let ring = self
+                .ring
+                .iter()
+                .flat_map(|pk| pk.compress().as_bytes().to_vec())
+                .collect::<Vec<u8>>();
+
             let h_0 = Sha512::new()
+                .chain("CLSAG_0".to_string())
+                .chain(ring)
                 .chain(self.msg)
                 .chain((T_a + self.T_b + self.R_a).compress().as_bytes())
                 .chain(
