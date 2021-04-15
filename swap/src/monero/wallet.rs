@@ -5,7 +5,7 @@ use crate::monero::{
 use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::{Context, Result};
 use monero_rpc::wallet;
-use monero_rpc::wallet::{BlockHeight, CheckTxKey, Refreshed};
+use monero_rpc::wallet::{BlockHeight, CheckTxKey, MoneroWalletRpc as _, Refreshed};
 use std::future::Future;
 use std::str::FromStr;
 use std::time::Duration;
@@ -27,9 +27,9 @@ impl Wallet {
     pub async fn open_or_create(url: Url, name: String, env_config: Config) -> Result<Self> {
         let client = wallet::Client::new(url);
 
-        let open_wallet_response = client.open_wallet(name.as_str()).await;
+        let open_wallet_response = client.open_wallet(name.clone()).await;
         if open_wallet_response.is_err() {
-            client.create_wallet(name.as_str()).await.context(
+            client.create_wallet(name.clone(), "English".to_owned()).await.context(
                 "Unable to create Monero wallet, please ensure that the monero-wallet-rpc is available",
             )?;
 
@@ -59,12 +59,12 @@ impl Wallet {
         self.inner
             .lock()
             .await
-            .open_wallet(self.name.as_str())
+            .open_wallet(self.name.clone())
             .await?;
         Ok(())
     }
 
-    pub async fn open(&self, filename: &str) -> Result<()> {
+    pub async fn open(&self, filename: String) -> Result<()> {
         self.inner.lock().await.open_wallet(filename).await?;
         Ok(())
     }
@@ -73,7 +73,7 @@ impl Wallet {
     /// keys. The generated wallet will remain loaded.
     pub async fn create_from_and_load(
         &self,
-        file_name: &str,
+        file_name: String,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
         restore_height: BlockHeight,
@@ -92,10 +92,12 @@ impl Wallet {
         let _ = wallet
             .generate_from_keys(
                 file_name,
-                &address.to_string(),
-                &private_spend_key.to_string(),
-                &PrivateKey::from(private_view_key).to_string(),
+                address.to_string(),
+                private_spend_key.to_string(),
+                PrivateKey::from(private_view_key).to_string(),
                 restore_height.height,
+                String::from(""),
+                true,
             )
             .await?;
 
@@ -108,7 +110,7 @@ impl Wallet {
     /// stored name.
     pub async fn create_from(
         &self,
-        file_name: &str,
+        file_name: String,
         private_spend_key: PrivateKey,
         private_view_key: PrivateViewKey,
         restore_height: BlockHeight,
@@ -128,19 +130,18 @@ impl Wallet {
         let _ = wallet
             .generate_from_keys(
                 file_name,
-                &temp_wallet_address.to_string(),
-                &private_spend_key.to_string(),
-                &PrivateKey::from(private_view_key).to_string(),
+                temp_wallet_address.to_string(),
+                private_spend_key.to_string(),
+                PrivateKey::from(private_view_key).to_string(),
                 restore_height.height,
+                String::from(""),
+                true,
             )
             .await?;
 
         // Try to send all the funds from the generated wallet to the default wallet
         match wallet.refresh().await {
-            Ok(_) => match wallet
-                .sweep_all(self.main_address.to_string().as_str())
-                .await
-            {
+            Ok(_) => match wallet.sweep_all(self.main_address.to_string()).await {
                 Ok(sweep_all) => {
                     for tx in sweep_all.tx_hash_list {
                         tracing::info!(%tx, "Monero transferred back to default wallet {}", self.main_address);
@@ -159,7 +160,7 @@ impl Wallet {
             }
         }
 
-        let _ = wallet.open_wallet(self.name.as_str()).await?;
+        let _ = wallet.open_wallet(self.name.clone()).await?;
 
         Ok(())
     }
@@ -178,7 +179,7 @@ impl Wallet {
             .inner
             .lock()
             .await
-            .transfer(0, amount.as_piconero(), &destination_address.to_string())
+            .transfer_single(0, amount.as_piconero(), &destination_address.to_string())
             .await?;
 
         tracing::debug!(
@@ -210,16 +211,20 @@ impl Wallet {
         let address = Address::standard(self.network, public_spend_key, public_view_key.into());
 
         let check_interval = tokio::time::interval(self.sync_interval);
-        let key = &transfer_proof.tx_key().to_string();
+        let key = transfer_proof.tx_key().to_string();
 
         wait_for_confirmations(
             txid.0,
-            |txid| async move {
-                self.inner
-                    .lock()
-                    .await
-                    .check_tx_key(&txid, &key, &address.to_string())
-                    .await
+            move |txid| {
+                let key = key.clone();
+                async move {
+                    Ok(self
+                        .inner
+                        .lock()
+                        .await
+                        .check_tx_key(txid, key, address.to_string())
+                        .await?)
+                }
             },
             check_interval,
             expected,
@@ -235,7 +240,7 @@ impl Wallet {
             .inner
             .lock()
             .await
-            .sweep_all(address.to_string().as_str())
+            .sweep_all(address.to_string())
             .await?;
 
         let tx_hashes = sweep_all.tx_hash_list.into_iter().map(TxHash).collect();
@@ -250,7 +255,7 @@ impl Wallet {
     }
 
     pub async fn block_height(&self) -> Result<BlockHeight> {
-        self.inner.lock().await.block_height().await
+        Ok(self.inner.lock().await.get_height().await?)
     }
 
     pub fn get_main_address(&self) -> Address {
@@ -258,7 +263,7 @@ impl Wallet {
     }
 
     pub async fn refresh(&self) -> Result<Refreshed> {
-        self.inner.lock().await.refresh().await
+        Ok(self.inner.lock().await.refresh().await?)
     }
 
     pub fn static_tx_fee_estimate(&self) -> Amount {

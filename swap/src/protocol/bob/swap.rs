@@ -197,10 +197,10 @@ async fn next_state(
         BobState::BtcRedeemed(state) => {
             let (spend_key, view_key) = state.xmr_keys();
 
-            let generated_wallet_file_name = &swap_id.to_string();
+            let generated_wallet_file_name = swap_id.to_string();
             if monero_wallet
                 .create_from_and_load(
-                    generated_wallet_file_name,
+                    generated_wallet_file_name.clone(),
                     spend_key,
                     view_key,
                     state.monero_wallet_restore_blockheight,

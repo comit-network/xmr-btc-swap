@@ -299,7 +299,7 @@ async fn next_state(
 
             monero_wallet
                 .create_from(
-                    &swap_id.to_string(),
+                    swap_id.to_string(),
                     spend_key,
                     view_key,
                     monero_wallet_restore_blockheight,

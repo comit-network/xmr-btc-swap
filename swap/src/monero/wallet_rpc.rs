@@ -2,7 +2,7 @@ use ::monero::Network;
 use anyhow::{Context, Result};
 use big_bytes::BigByte;
 use futures::{StreamExt, TryStreamExt};
-use monero_rpc::wallet::Client;
+use monero_rpc::wallet::{Client, MoneroWalletRpc as _};
 use reqwest::header::CONTENT_LENGTH;
 use reqwest::Url;
 use std::io::ErrorKind;
