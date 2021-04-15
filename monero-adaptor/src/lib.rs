@@ -116,6 +116,10 @@ pub struct Alice0 {
     s_prime_a: Scalar,
     // secret value:
     alpha_a: Scalar,
+    H_p_pk: RistrettoPoint,
+    I_a: RistrettoPoint,
+    I_hat_a: RistrettoPoint,
+    T_a: RistrettoPoint,
 }
 
 impl Alice0 {
@@ -130,6 +134,14 @@ impl Alice0 {
         for response in fake_responses.iter_mut().take(RING_SIZE - 1) {
             *response = Scalar::random(&mut OsRng);
         }
+        let alpha_a = Scalar::random(&mut OsRng);
+
+        let p_k = ring[0].compress();
+        let H_p_pk: RistrettoPoint = RistrettoPoint::hash_from_bytes::<Sha512>(p_k.as_bytes());
+
+        let I_a = s_prime_a * H_p_pk;
+        let I_hat_a = alpha_a * H_p_pk;
+        let T_a = alpha_a * RISTRETTO_BASEPOINT_POINT;
 
         Alice0 {
             ring,
@@ -138,46 +150,30 @@ impl Alice0 {
             R_a,
             R_prime_a,
             s_prime_a,
-            alpha_a: Scalar::random(&mut OsRng),
+            alpha_a,
+            H_p_pk,
+            I_a,
+            I_hat_a,
+            T_a,
         }
     }
 
     pub fn next_message(&self) -> Message0 {
-        let p_k = self.ring.first().unwrap().compress();
-        // H_p(p_k)
-        let base_key_hashed_to_point: RistrettoPoint =
-            RistrettoPoint::hash_from_bytes::<Sha512>(p_k.as_bytes());
-        // key image
-        let I_a = self.s_prime_a * base_key_hashed_to_point;
-        let I_hat_a = self.alpha_a * base_key_hashed_to_point;
-
-        let T_a = self.alpha_a * RISTRETTO_BASEPOINT_POINT;
-
         Message0 {
             pi_a: DleqProof::new(
                 RISTRETTO_BASEPOINT_POINT,
-                T_a,
-                base_key_hashed_to_point,
-                I_hat_a,
+                self.T_a,
+                self.H_p_pk,
+                self.I_hat_a,
                 self.alpha_a,
             ),
-            c_a: Commitment::new(self.fake_responses, I_a, I_hat_a, T_a),
+            c_a: Commitment::new(self.fake_responses, self.I_a, self.I_hat_a, self.T_a),
         }
     }
 
     pub fn receive(self, msg: Message1) -> Result<Alice1> {
-        let p_k = self.ring.first().unwrap().compress();
-        let base_key_hashed_to_point: RistrettoPoint =
-            RistrettoPoint::hash_from_bytes::<Sha512>(p_k.as_bytes());
-        msg.pi_b.verify(
-            RISTRETTO_BASEPOINT_POINT,
-            msg.T_b,
-            base_key_hashed_to_point,
-            msg.I_hat_b,
-        )?;
-
-        let T_a = self.alpha_a * RISTRETTO_BASEPOINT_POINT;
-        let I_hat_a = self.alpha_a * base_key_hashed_to_point;
+        msg.pi_b
+            .verify(RISTRETTO_BASEPOINT_POINT, msg.T_b, self.H_p_pk, msg.I_hat_b)?;
 
         let h_0 = {
             let ring = self
@@ -190,22 +186,21 @@ impl Alice0 {
                 .chain("CLSAG_0".to_string())
                 .chain(ring)
                 .chain(self.msg)
-                .chain((T_a + msg.T_b + self.R_a).compress().as_bytes())
+                .chain((self.T_a + msg.T_b + self.R_a).compress().as_bytes())
                 .chain(
-                    (I_hat_a + msg.I_hat_b + self.R_prime_a)
+                    (self.I_hat_a + msg.I_hat_b + self.R_prime_a)
                         .compress()
                         .as_bytes(),
                 );
             Scalar::from_hash(h_0)
         };
 
-        let I_a = self.s_prime_a * base_key_hashed_to_point;
         let h_last = final_challenge(
             1,
             self.fake_responses,
             self.ring,
             h_0,
-            I_a,
+            self.I_a,
             msg.I_b,
             self.msg,
         );
@@ -213,25 +208,22 @@ impl Alice0 {
         let s_0_a = self.alpha_a - h_last * self.s_prime_a;
 
         Ok(Alice1 {
-            ring: self.ring,
             fake_responses: self.fake_responses,
-            s_prime_a: self.s_prime_a,
-            alpha_a: self.alpha_a,
             h_0,
             I_b: msg.I_b,
             s_0_a,
+            I_a: self.I_a,
+            I_hat_a: self.I_hat_a,
+            T_a: self.T_a,
         })
     }
 }
 
 pub struct Alice1 {
-    // secret index is always 0
-    ring: [RistrettoPoint; RING_SIZE],
     fake_responses: [Scalar; RING_SIZE - 1],
-    // this is not s_a cos of something to with one-time-address??
-    s_prime_a: Scalar,
-    // secret value:
-    alpha_a: Scalar,
+    I_a: RistrettoPoint,
+    I_hat_a: RistrettoPoint,
+    T_a: RistrettoPoint,
     h_0: Scalar,
     I_b: RistrettoPoint,
     s_0_a: Scalar,
@@ -239,30 +231,19 @@ pub struct Alice1 {
 
 impl Alice1 {
     pub fn next_message(&self) -> Message2 {
-        let base_key_hashed_to_point: RistrettoPoint = RistrettoPoint::hash_from_bytes::<Sha512>(
-            self.ring.first().unwrap().compress().as_bytes(),
-        );
-        let I_a = self.s_prime_a * base_key_hashed_to_point;
-        let T_a = self.alpha_a * RISTRETTO_BASEPOINT_POINT;
-        let I_hat_a = self.alpha_a * base_key_hashed_to_point;
         Message2 {
-            d_a: Opening::new(self.fake_responses, I_a, I_hat_a, T_a),
+            d_a: Opening::new(self.fake_responses, self.I_a, self.I_hat_a, self.T_a),
             s_0_a: self.s_0_a,
         }
     }
 
     pub fn receive(self, msg: Message3) -> Alice2 {
-        let base_key_hashed_to_point: RistrettoPoint = RistrettoPoint::hash_from_bytes::<Sha512>(
-            self.ring.first().unwrap().compress().as_bytes(),
-        );
-        let I_a = self.s_prime_a * base_key_hashed_to_point;
-
         let adaptor_sig = AdaptorSignature {
             s_0_a: self.s_0_a,
             s_0_b: msg.s_0_b,
             fake_responses: self.fake_responses,
             h_0: self.h_0,
-            I: I_a + self.I_b,
+            I: self.I_a + self.I_b,
         };
 
         Alice2 { adaptor_sig }
@@ -284,6 +265,10 @@ pub struct Bob0 {
     s_b: Scalar,
     // secret value:
     alpha_b: Scalar,
+    H_p_pk: RistrettoPoint,
+    I_b: RistrettoPoint,
+    I_hat_b: RistrettoPoint,
+    T_b: RistrettoPoint,
 }
 
 impl Bob0 {
@@ -294,13 +279,25 @@ impl Bob0 {
         R_prime_a: RistrettoPoint,
         s_b: Scalar,
     ) -> Self {
+        let alpha_b = Scalar::random(&mut OsRng);
+
+        let p_k = ring.first().unwrap().compress();
+        let H_p_pk: RistrettoPoint = RistrettoPoint::hash_from_bytes::<Sha512>(p_k.as_bytes());
+        let I_b = s_b * H_p_pk;
+        let I_hat_b = alpha_b * H_p_pk;
+        let T_b = alpha_b * RISTRETTO_BASEPOINT_POINT;
+
         Bob0 {
             ring,
             msg,
             R_a,
             R_prime_a,
-            alpha_b: Scalar::random(&mut OsRng),
             s_b,
+            alpha_b,
+            H_p_pk,
+            I_b,
+            I_hat_b,
+            T_b,
         }
     }
 
@@ -312,6 +309,10 @@ impl Bob0 {
             R_prime_a: self.R_prime_a,
             s_b: self.s_b,
             alpha_b: self.alpha_b,
+            H_p_pk: self.H_p_pk,
+            I_b: self.I_b,
+            I_hat_b: self.I_hat_b,
+            T_b: self.T_b,
             pi_a: msg.pi_a,
             c_a: msg.c_a,
         }
@@ -329,31 +330,25 @@ pub struct Bob1 {
     s_b: Scalar,
     // secret value:
     alpha_b: Scalar,
+    H_p_pk: RistrettoPoint,
+    I_b: RistrettoPoint,
+    I_hat_b: RistrettoPoint,
+    T_b: RistrettoPoint,
     pi_a: DleqProof,
     c_a: Commitment,
 }
 
 impl Bob1 {
     pub fn next_message(&self) -> Message1 {
-        let p_k = self.ring.first().unwrap().compress();
-        // H_p(p_k)
-        let base_key_hashed_to_point: RistrettoPoint =
-            RistrettoPoint::hash_from_bytes::<Sha512>(p_k.as_bytes());
-        // key image
-        let I_b = self.s_b * base_key_hashed_to_point;
-        let I_hat_b = self.alpha_b * base_key_hashed_to_point;
-
-        let T_b = self.alpha_b * RISTRETTO_BASEPOINT_POINT;
-
         Message1 {
-            I_b,
-            T_b,
-            I_hat_b,
+            I_b: self.I_b,
+            T_b: self.T_b,
+            I_hat_b: self.I_hat_b,
             pi_b: DleqProof::new(
                 RISTRETTO_BASEPOINT_POINT,
-                T_b,
-                base_key_hashed_to_point,
-                I_hat_b,
+                self.T_b,
+                self.H_p_pk,
+                self.I_hat_b,
                 self.alpha_b,
             ),
         }
@@ -362,30 +357,22 @@ impl Bob1 {
     pub fn receive(self, msg: Message2) -> Result<Bob2> {
         let (fake_responses, I_a, I_hat_a, T_a) = msg.d_a.open(self.c_a)?;
 
-        let base_key_hashed_to_point: RistrettoPoint = RistrettoPoint::hash_from_bytes::<Sha512>(
-            self.ring.first().unwrap().compress().as_bytes(),
-        );
-
-        self.pi_a.verify(
-            RISTRETTO_BASEPOINT_POINT,
-            T_a,
-            base_key_hashed_to_point,
-            I_hat_a,
-        )?;
-
-        let T_b = self.alpha_b * RISTRETTO_BASEPOINT_POINT;
-        let I_hat_b = self.alpha_b * base_key_hashed_to_point;
+        self.pi_a
+            .verify(RISTRETTO_BASEPOINT_POINT, T_a, self.H_p_pk, I_hat_a)?;
 
         let h_0 = {
             let h_0 = Sha512::new()
                 .chain(self.msg)
-                .chain((T_a + T_b + self.R_a).compress().as_bytes())
-                .chain((I_hat_a + I_hat_b + self.R_prime_a).compress().as_bytes());
+                .chain((T_a + self.T_b + self.R_a).compress().as_bytes())
+                .chain(
+                    (I_hat_a + self.I_hat_b + self.R_prime_a)
+                        .compress()
+                        .as_bytes(),
+                );
             Scalar::from_hash(h_0)
         };
 
-        let I_b = self.s_b * base_key_hashed_to_point;
-        let h_last = final_challenge(1, fake_responses, self.ring, h_0, I_a, I_b, self.msg);
+        let h_last = final_challenge(1, fake_responses, self.ring, h_0, I_a, self.I_b, self.msg);
 
         let s_0_b = self.alpha_b - h_last * self.s_b;
 
@@ -394,7 +381,7 @@ impl Bob1 {
             s_0_b,
             fake_responses,
             h_0,
-            I: I_a + I_b,
+            I: I_a + self.I_b,
         };
 
         Ok(Bob2 { s_0_b, adaptor_sig })
