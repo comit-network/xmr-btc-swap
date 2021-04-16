@@ -1,6 +1,5 @@
 use crate::database::Database;
 use crate::env::Config;
-use crate::protocol::bob;
 use crate::{bitcoin, monero};
 use anyhow::Result;
 use std::sync::Arc;
@@ -23,13 +22,13 @@ pub mod swap;
 
 pub struct Swap {
     pub state: BobState,
-    pub event_loop_handle: bob::EventLoopHandle,
+    pub event_loop_handle: EventLoopHandle,
     pub db: Database,
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
     pub env_config: Config,
     pub swap_id: Uuid,
-    pub receive_monero_address: ::monero::Address,
+    pub receive_monero_address: monero::Address,
 }
 
 pub struct Builder {
@@ -44,7 +43,7 @@ pub struct Builder {
 
     event_loop_handle: EventLoopHandle,
 
-    receive_monero_address: ::monero::Address,
+    receive_monero_address: monero::Address,
 }
 
 enum InitParams {
@@ -61,7 +60,7 @@ impl Builder {
         monero_wallet: Arc<monero::Wallet>,
         env_config: Config,
         event_loop_handle: EventLoopHandle,
-        receive_monero_address: ::monero::Address,
+        receive_monero_address: monero::Address,
     ) -> Self {
         Self {
             swap_id,
@@ -82,7 +81,7 @@ impl Builder {
         }
     }
 
-    pub fn build(self) -> Result<bob::Swap> {
+    pub fn build(self) -> Result<Swap> {
         let state = match self.init_params {
             InitParams::New { btc_amount } => BobState::Started { btc_amount },
             InitParams::None => self.db.get_state(self.swap_id)?.try_into_bob()?.into(),
