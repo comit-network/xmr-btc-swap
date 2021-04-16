@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 
 use anyhow::{bail, Result};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
@@ -11,25 +11,81 @@ use rand::rngs::OsRng;
 use sha2::Sha512;
 
 const RING_SIZE: usize = 11;
+const KEY_TAG: &str = "CSLAG_0";
+const DOMAIN_TAG: &str = "CSLAG_c";
+
+fn challenge(
+    s_i: Scalar,
+    pk_i: RistrettoPoint,
+    h_prev: Scalar,
+    I: RistrettoPoint,
+    prefix: Sha512,
+) -> Scalar {
+    let L_i = s_i * RISTRETTO_BASEPOINT_POINT + h_prev * pk_i;
+
+    let H_p_pk_i = {
+        let H_p = Sha512::new()
+            .chain(KEY_TAG.to_string())
+            .chain(pk_i.compress().as_bytes());
+        RistrettoPoint::from_hash(H_p)
+    };
+
+    let R_i = s_i * H_p_pk_i + h_prev * I;
+
+    let mut bytes = vec![];
+    bytes.append(&mut L_i.compress().as_bytes().to_vec());
+    bytes.append(&mut R_i.compress().as_bytes().to_vec());
+
+    let hasher = prefix.chain(bytes);
+    Scalar::from_hash(hasher)
+}
+
+fn foo(
+    fake_responses: [Scalar; RING_SIZE - 1],
+    ring: [RistrettoPoint; RING_SIZE],
+    T_a: RistrettoPoint,
+    T_b: RistrettoPoint,
+    R_a: RistrettoPoint,
+    I_hat_a: RistrettoPoint,
+    I_hat_b: RistrettoPoint,
+    R_prime_a: RistrettoPoint,
+    I_a: RistrettoPoint,
+    I_b: RistrettoPoint,
+    msg: [u8; 32],
+) -> (Scalar, Scalar) {
+    let h_0 = {
+        let ring = ring
+            .iter()
+            .flat_map(|pk| pk.compress().as_bytes().to_vec())
+            .collect::<Vec<u8>>();
+
+        let h_0 = Sha512::new()
+            .chain(DOMAIN_TAG.to_string())
+            .chain(ring)
+            .chain(msg)
+            .chain((T_a + T_b + R_a).compress().as_bytes())
+            .chain((I_hat_a + I_hat_b + R_prime_a).compress().as_bytes());
+        Scalar::from_hash(h_0)
+    };
+    // ring size is 11
+    let h_last = final_challenge(
+        fake_responses,
+        <[RistrettoPoint; 11]>::try_from(ring).unwrap(),
+        h_0,
+        I_a + I_b,
+        msg,
+    );
+
+    (h_last, h_0)
+}
 
 fn final_challenge(
-    i: usize,
     fake_responses: [Scalar; RING_SIZE - 1],
-    ring: &[RistrettoPoint],
-    h_prev: Scalar,
+    ring: [RistrettoPoint; RING_SIZE],
+    h_0: Scalar,
     I: RistrettoPoint,
     msg: [u8; 32],
 ) -> Scalar {
-    let s_i = fake_responses[i];
-    let pk_i = ring[i];
-
-    let L_i = s_i * RISTRETTO_BASEPOINT_POINT + h_prev * pk_i;
-
-    let H_p_pk_i: RistrettoPoint =
-        RistrettoPoint::hash_from_bytes::<Sha512>(pk_i.compress().as_bytes());
-    let R_i = s_i * H_p_pk_i + h_prev * I;
-
-    let tag = "CLSAG_0".to_string();
     let mut ring_concat = ring
         .iter()
         .flat_map(|pk| pk.compress().as_bytes().to_vec())
@@ -37,20 +93,20 @@ fn final_challenge(
 
     let mut bytes = vec![];
 
-    bytes.append(&mut tag.as_bytes().to_vec());
+    bytes.append(&mut DOMAIN_TAG.as_bytes().to_vec());
     bytes.append(&mut ring_concat);
     bytes.append(&mut msg.to_vec());
-    bytes.append(&mut L_i.compress().as_bytes().to_vec());
-    bytes.append(&mut R_i.compress().as_bytes().to_vec());
 
-    let hasher = Sha512::new().chain(bytes);
-    let h = Scalar::from_hash(hasher);
+    let prefix = Sha512::default().chain(bytes);
 
-    if i >= RING_SIZE - 2 {
-        h
-    } else {
-        final_challenge(i + 1, fake_responses, ring, h, I, msg)
+    let mut h = h_0;
+
+    for (i, s_i) in fake_responses.iter().enumerate() {
+        let pk_i = ring[i + 1];
+        h = challenge(*s_i, pk_i, h, I, prefix.clone());
     }
+
+    h
 }
 
 pub struct AdaptorSignature {
@@ -64,11 +120,12 @@ pub struct AdaptorSignature {
 
 impl AdaptorSignature {
     pub fn adapt(self, y: Scalar) -> Signature {
-        let r_0 = self.s_0_a + self.s_0_b + y;
+        let r_last = self.s_0_a + self.s_0_b + y;
 
-        let responses = [r_0]
+        let responses = self
+            .fake_responses
             .iter()
-            .chain(self.fake_responses.iter())
+            .chain([r_last].iter())
             .copied()
             .collect::<Vec<_>>()
             .try_into()
@@ -91,7 +148,7 @@ pub struct Signature {
 
 impl Signature {
     #[cfg(test)]
-    fn to_nazgul_signature(&self, ring: &[RistrettoPoint; RING_SIZE]) -> nazgul::clsag::CLSAG {
+    pub fn to_nazgul_signature(&self, ring: &[RistrettoPoint; RING_SIZE]) -> nazgul::clsag::CLSAG {
         let ring = ring.iter().map(|pk| vec![*pk]).collect();
 
         nazgul::clsag::CLSAG {
@@ -100,6 +157,30 @@ impl Signature {
             ring,
             key_images: vec![self.I],
         }
+    }
+
+    fn verify(&self, ring: [RistrettoPoint; RING_SIZE], msg: &[u8; 32]) -> bool {
+        let mut ring_concat = ring
+            .iter()
+            .flat_map(|pk| pk.compress().as_bytes().to_vec())
+            .collect::<Vec<u8>>();
+
+        let mut bytes = vec![];
+
+        bytes.append(&mut DOMAIN_TAG.as_bytes().to_vec());
+        bytes.append(&mut ring_concat);
+        bytes.append(&mut msg.to_vec());
+
+        let prefix = Sha512::default().chain(bytes);
+
+        let mut h = self.h_0;
+
+        for (i, s_i) in self.responses.iter().enumerate() {
+            let pk_i = ring[(i + 1) % RING_SIZE];
+            h = challenge(*s_i, pk_i, h, self.I, prefix.clone());
+        }
+
+        h == self.h_0
     }
 }
 
@@ -137,7 +218,12 @@ impl Alice0 {
         let alpha_a = Scalar::random(&mut OsRng);
 
         let p_k = ring[0].compress();
-        let H_p_pk: RistrettoPoint = RistrettoPoint::hash_from_bytes::<Sha512>(p_k.as_bytes());
+        let H_p_pk = {
+            let H_p = Sha512::new()
+                .chain(KEY_TAG.to_string())
+                .chain(p_k.as_bytes());
+            RistrettoPoint::from_hash(H_p)
+        };
 
         let I_a = s_prime_a * H_p_pk;
         let I_hat_a = alpha_a * H_p_pk;
@@ -175,32 +261,17 @@ impl Alice0 {
         msg.pi_b
             .verify(RISTRETTO_BASEPOINT_POINT, msg.T_b, self.H_p_pk, msg.I_hat_b)?;
 
-        let h_0 = {
-            let ring = self
-                .ring
-                .iter()
-                .flat_map(|pk| pk.compress().as_bytes().to_vec())
-                .collect::<Vec<u8>>();
-
-            let h_0 = Sha512::new()
-                .chain("CLSAG_0".to_string())
-                .chain(ring)
-                .chain(self.msg)
-                .chain((self.T_a + msg.T_b + self.R_a).compress().as_bytes())
-                .chain(
-                    (self.I_hat_a + msg.I_hat_b + self.R_prime_a)
-                        .compress()
-                        .as_bytes(),
-                );
-            Scalar::from_hash(h_0)
-        };
-
-        let h_last = final_challenge(
-            0,
+        let (h_last, h_0) = foo(
             self.fake_responses,
-            &self.ring[1..],
-            h_0,
-            self.I_a + msg.I_b,
+            self.ring,
+            self.T_a,
+            msg.T_b,
+            self.R_a,
+            self.I_hat_a,
+            msg.I_hat_b,
+            self.R_prime_a,
+            self.I_a,
+            msg.I_b,
             self.msg,
         );
 
@@ -281,7 +352,13 @@ impl Bob0 {
         let alpha_b = Scalar::random(&mut OsRng);
 
         let p_k = ring.first().unwrap().compress();
-        let H_p_pk: RistrettoPoint = RistrettoPoint::hash_from_bytes::<Sha512>(p_k.as_bytes());
+        let H_p_pk = {
+            let H_p = Sha512::new()
+                .chain(KEY_TAG.to_string())
+                .chain(p_k.as_bytes());
+            RistrettoPoint::from_hash(H_p)
+        };
+
         let I_b = s_b * H_p_pk;
         let I_hat_b = alpha_b * H_p_pk;
         let T_b = alpha_b * RISTRETTO_BASEPOINT_POINT;
@@ -359,32 +436,17 @@ impl Bob1 {
         self.pi_a
             .verify(RISTRETTO_BASEPOINT_POINT, T_a, self.H_p_pk, I_hat_a)?;
 
-        let h_0 = {
-            let ring = self
-                .ring
-                .iter()
-                .flat_map(|pk| pk.compress().as_bytes().to_vec())
-                .collect::<Vec<u8>>();
-
-            let h_0 = Sha512::new()
-                .chain("CLSAG_0".to_string())
-                .chain(ring)
-                .chain(self.msg)
-                .chain((T_a + self.T_b + self.R_a).compress().as_bytes())
-                .chain(
-                    (I_hat_a + self.I_hat_b + self.R_prime_a)
-                        .compress()
-                        .as_bytes(),
-                );
-            Scalar::from_hash(h_0)
-        };
-
-        let h_last = final_challenge(
-            0,
+        let (h_last, h_0) = foo(
             fake_responses,
-            &self.ring[1..],
-            h_0,
-            I_a + self.I_b,
+            self.ring,
+            T_a,
+            self.T_b,
+            self.R_a,
+            I_hat_a,
+            self.I_hat_b,
+            self.R_prime_a,
+            I_a,
+            self.I_b,
             self.msg,
         );
 
@@ -566,6 +628,7 @@ pub struct Message2 {
 }
 
 // Bob sends this to Alice
+#[derive(Clone, Copy)]
 pub struct Message3 {
     s_0_b: Scalar,
 }
@@ -573,7 +636,6 @@ pub struct Message3 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nazgul::clsag::CLSAG;
     use nazgul::traits::Verify;
 
     #[test]
@@ -589,8 +651,13 @@ mod tests {
             let r_a = Scalar::random(&mut OsRng);
             let R_a = r_a * RISTRETTO_BASEPOINT_POINT;
 
-            let pk_hashed_to_point: RistrettoPoint =
-                RistrettoPoint::hash_from_bytes::<Sha512>(pk.compress().as_bytes());
+            let pk_hashed_to_point = {
+                let H_p = Sha512::new()
+                    .chain(KEY_TAG.to_string())
+                    .chain(pk.compress().as_bytes());
+                RistrettoPoint::from_hash(H_p)
+            };
+
             let R_prime_a = r_a * pk_hashed_to_point;
 
             (r_a, R_a, R_prime_a)
@@ -617,8 +684,13 @@ mod tests {
         let alice = alice.receive(msg);
 
         let sig = alice.adaptor_sig.adapt(r_a);
-        let sig = sig.to_nazgul_signature(&ring);
 
-        assert!(CLSAG::verify::<Sha512>(sig, &msg_to_sign.to_vec()));
+        let nazgul_sig = sig.to_nazgul_signature(&ring);
+
+        assert!(sig.verify(ring, msg_to_sign));
+        // assert!(nazgul::clsag::CLSAG::verify::<Sha512>(
+        //     nazgul_sig,
+        //     &msg_to_sign.to_vec()
+        // ));
     }
 }
