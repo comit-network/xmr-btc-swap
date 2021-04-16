@@ -394,22 +394,41 @@ struct BobParams {
 }
 
 impl BobParams {
-    pub async fn builder(
-        &self,
-        event_loop_handle: bob::EventLoopHandle,
-        swap_id: Uuid,
-    ) -> Result<bob::Builder> {
-        let receive_address = self.monero_wallet.get_main_address();
+    pub fn new_swap_from_db(&self, swap_id: Uuid) -> Result<(bob::Swap, bob::EventLoop)> {
+        let (event_loop, handle) = self.new_eventloop(swap_id)?;
+        let db = Database::open(&self.db_path)?;
 
-        Ok(bob::Builder::new(
-            Database::open(&self.db_path.clone().as_path()).unwrap(),
+        let swap = bob::Swap::from_db(
+            db,
             swap_id,
             self.bitcoin_wallet.clone(),
             self.monero_wallet.clone(),
             self.env_config,
-            event_loop_handle,
-            receive_address,
-        ))
+            handle,
+            self.monero_wallet.get_main_address(),
+        )?;
+
+        Ok((swap, event_loop))
+    }
+
+    pub fn new_swap(&self, btc_amount: bitcoin::Amount) -> Result<(bob::Swap, bob::EventLoop)> {
+        let swap_id = Uuid::new_v4();
+
+        let (event_loop, handle) = self.new_eventloop(swap_id)?;
+        let db = Database::open(&self.db_path)?;
+
+        let swap = bob::Swap::new(
+            db,
+            swap_id,
+            self.bitcoin_wallet.clone(),
+            self.monero_wallet.clone(),
+            self.env_config,
+            handle,
+            self.monero_wallet.get_main_address(),
+            btc_amount,
+        );
+
+        Ok((swap, event_loop))
     }
 
     pub fn new_eventloop(&self, swap_id: Uuid) -> Result<(bob::EventLoop, bob::EventLoopHandle)> {
@@ -493,17 +512,7 @@ impl TestContext {
     }
 
     pub async fn bob_swap(&mut self) -> (bob::Swap, BobApplicationHandle) {
-        let swap_id = Uuid::new_v4();
-        let (event_loop, event_loop_handle) = self.bob_params.new_eventloop(swap_id).unwrap();
-
-        let swap = self
-            .bob_params
-            .builder(event_loop_handle, swap_id)
-            .await
-            .unwrap()
-            .with_init_params(self.btc_amount)
-            .build()
-            .unwrap();
+        let (swap, event_loop) = self.bob_params.new_swap(self.btc_amount).unwrap();
 
         // ensure the wallet is up to date for concurrent swap tests
         swap.bitcoin_wallet.sync().await.unwrap();
@@ -520,15 +529,7 @@ impl TestContext {
     ) -> (bob::Swap, BobApplicationHandle) {
         join_handle.abort();
 
-        let (event_loop, event_loop_handle) = self.bob_params.new_eventloop(swap_id).unwrap();
-
-        let swap = self
-            .bob_params
-            .builder(event_loop_handle, swap_id)
-            .await
-            .unwrap()
-            .build()
-            .unwrap();
+        let (swap, event_loop) = self.bob_params.new_swap_from_db(swap_id).unwrap();
 
         let join_handle = tokio::spawn(event_loop.run());
 

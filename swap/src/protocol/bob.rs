@@ -30,71 +30,50 @@ pub struct Swap {
     pub receive_monero_address: monero::Address,
 }
 
-pub struct Builder {
-    swap_id: Uuid,
-    db: Database,
-
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
-    monero_wallet: Arc<monero::Wallet>,
-
-    init_params: InitParams,
-    env_config: env::Config,
-
-    event_loop_handle: EventLoopHandle,
-
-    receive_monero_address: monero::Address,
-}
-
-enum InitParams {
-    None,
-    New { btc_amount: bitcoin::Amount },
-}
-
-impl Builder {
+impl Swap {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         db: Database,
-        swap_id: Uuid,
+        id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
         env_config: env::Config,
         event_loop_handle: EventLoopHandle,
         receive_monero_address: monero::Address,
+        btc_amount: bitcoin::Amount,
     ) -> Self {
         Self {
-            swap_id,
+            state: BobState::Started { btc_amount },
+            event_loop_handle,
             db,
             bitcoin_wallet,
             monero_wallet,
-            init_params: InitParams::None,
             env_config,
-            event_loop_handle,
+            id,
             receive_monero_address,
         }
     }
 
-    pub fn with_init_params(self, btc_amount: bitcoin::Amount) -> Self {
-        Self {
-            init_params: InitParams::New { btc_amount },
-            ..self
-        }
-    }
+    pub fn from_db(
+        db: Database,
+        id: Uuid,
+        bitcoin_wallet: Arc<bitcoin::Wallet>,
+        monero_wallet: Arc<monero::Wallet>,
+        env_config: env::Config,
+        event_loop_handle: EventLoopHandle,
+        receive_monero_address: monero::Address,
+    ) -> Result<Self> {
+        let state = db.get_state(id)?.try_into_bob()?.into();
 
-    pub fn build(self) -> Result<Swap> {
-        let state = match self.init_params {
-            InitParams::New { btc_amount } => BobState::Started { btc_amount },
-            InitParams::None => self.db.get_state(self.swap_id)?.try_into_bob()?.into(),
-        };
-
-        Ok(Swap {
+        Ok(Self {
             state,
-            event_loop_handle: self.event_loop_handle,
-            db: self.db,
-            bitcoin_wallet: self.bitcoin_wallet.clone(),
-            monero_wallet: self.monero_wallet.clone(),
-            id: self.swap_id,
-            env_config: self.env_config,
-            receive_monero_address: self.receive_monero_address,
+            event_loop_handle,
+            db,
+            bitcoin_wallet,
+            monero_wallet,
+            env_config,
+            id,
+            receive_monero_address,
         })
     }
 }

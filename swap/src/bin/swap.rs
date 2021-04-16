@@ -27,7 +27,7 @@ use swap::env::{Config, GetConfig};
 use swap::network::quote::BidQuote;
 use swap::network::swarm;
 use swap::protocol::bob;
-use swap::protocol::bob::{Builder, EventLoop};
+use swap::protocol::bob::{EventLoop, Swap};
 use swap::seed::Seed;
 use swap::{bitcoin, cli, env, monero};
 use tracing::{debug, error, info, warn};
@@ -105,17 +105,16 @@ async fn main() -> Result<()> {
 
             db.insert_peer_id(swap_id, alice_peer_id).await?;
 
-            let swap = Builder::new(
+            let swap = Swap::new(
                 db,
                 swap_id,
-                bitcoin_wallet.clone(),
+                bitcoin_wallet,
                 Arc::new(monero_wallet),
                 env_config,
                 event_loop_handle,
                 receive_monero_address,
-            )
-            .with_init_params(send_bitcoin)
-            .build()?;
+                send_bitcoin,
+            );
 
             tokio::select! {
                 result = event_loop => {
@@ -182,16 +181,15 @@ async fn main() -> Result<()> {
                 EventLoop::new(swap_id, swarm, alice_peer_id, bitcoin_wallet.clone())?;
             let handle = tokio::spawn(event_loop.run());
 
-            let swap = Builder::new(
+            let swap = Swap::from_db(
                 db,
                 swap_id,
-                bitcoin_wallet.clone(),
+                bitcoin_wallet,
                 Arc::new(monero_wallet),
                 env_config,
                 event_loop_handle,
                 receive_monero_address,
-            )
-            .build()?;
+            )?;
 
             tokio::select! {
                 event_loop_result = handle => {
