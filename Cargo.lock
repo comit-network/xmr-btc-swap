@@ -106,22 +106,9 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 
 [[package]]
 name = "asn1_der"
-version = "0.6.3"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6fce6b6a0ffdafebd82c87e79e3f40e8d2c523e5fea5566ff6b90509bf98d638"
-dependencies = [
- "asn1_der_derive",
-]
-
-[[package]]
-name = "asn1_der_derive"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d0864d84b8e07b145449be9a8537db86bf9de5ce03b913214694643b4743502"
-dependencies = [
- "quote",
- "syn",
-]
+checksum = "9d6e24d2cce90c53b948c46271bfb053e4bdc2db9b5d3f65e20f8cf28a1b7fc3"
 
 [[package]]
 name = "async-compression"
@@ -1714,8 +1701,8 @@ dependencies = [
  "libp2p-mplex",
  "libp2p-noise",
  "libp2p-request-response",
- "libp2p-swarm",
- "libp2p-swarm-derive",
+ "libp2p-swarm 0.28.0",
+ "libp2p-swarm-derive 0.22.0",
  "libp2p-tcp",
  "libp2p-websocket",
  "libp2p-yamux",
@@ -1727,19 +1714,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "libp2p"
+version = "0.37.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08053fbef67cd777049ef7a95ebaca2ece370b4ed7712c3fa404d69a88cb741b"
+dependencies = [
+ "atomic",
+ "bytes 1.0.1",
+ "futures",
+ "lazy_static",
+ "libp2p-core",
+ "libp2p-swarm 0.29.0",
+ "libp2p-swarm-derive 0.23.0",
+ "parity-multiaddr",
+ "parking_lot 0.11.1",
+ "pin-project 1.0.5",
+ "smallvec",
+ "wasm-timer",
+]
+
+[[package]]
 name = "libp2p-async-await"
 version = "0.1.0"
-source = "git+https://github.com/comit-network/rust-libp2p-async-await#7a9006ceddd132ef5d40a597936cf15381a5cfe1"
+source = "git+https://github.com/comit-network/rust-libp2p-async-await#50e781b12bbeda7986c0cada090f171f41093144"
 dependencies = [
- "libp2p",
+ "libp2p 0.37.1",
  "log 0.4.14",
 ]
 
 [[package]]
 name = "libp2p-core"
-version = "0.28.1"
+version = "0.28.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1e1797734bbd4c453664fefb029628f77c356ffc5bce98f06b18a7db3ebb0f7"
+checksum = "71dd51b562e14846e65bad00e5808d0644376e6588668c490d3c48e1dfeb4a9a"
 dependencies = [
  "asn1_der",
  "bs58",
@@ -1832,7 +1839,7 @@ dependencies = [
  "bytes 1.0.1",
  "futures",
  "libp2p-core",
- "libp2p-swarm",
+ "libp2p-swarm 0.28.0",
  "log 0.4.14",
  "lru",
  "minicbor",
@@ -1859,10 +1866,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "libp2p-swarm"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e04d8e1eef675029ec728ba14e8d0da7975d84b6679b699b4ae91a1de9c3a92"
+dependencies = [
+ "either",
+ "futures",
+ "libp2p-core",
+ "log 0.4.14",
+ "rand 0.7.3",
+ "smallvec",
+ "void",
+ "wasm-timer",
+]
+
+[[package]]
 name = "libp2p-swarm-derive"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c564ebaa36a64839f51eaddb0243aaaa29ce64affb56129193cc3248b72af273"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "libp2p-swarm-derive"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "365b0a699fea5168676840567582a012ea297b1ca02eee467e58301b9c9c5eed"
 dependencies = [
  "quote",
  "syn",
@@ -3663,7 +3696,7 @@ dependencies = [
  "get-port",
  "hyper 0.14.5",
  "itertools 0.10.0",
- "libp2p",
+ "libp2p 0.36.0",
  "libp2p-async-await",
  "miniscript",
  "monero",
