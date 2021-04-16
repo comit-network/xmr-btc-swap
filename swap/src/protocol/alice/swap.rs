@@ -2,9 +2,8 @@
 //! Alice holds XMR and wishes receive BTC.
 use crate::bitcoin::ExpiredTimelocks;
 use crate::env::Config;
-use crate::protocol::alice;
 use crate::protocol::alice::event_loop::EventLoopHandle;
-use crate::protocol::alice::AliceState;
+use crate::protocol::alice::{AliceState, Swap};
 use crate::{bitcoin, database, monero};
 use anyhow::{bail, Context, Result};
 use tokio::select;
@@ -12,15 +11,12 @@ use tokio::time::timeout;
 use tracing::{error, info};
 use uuid::Uuid;
 
-pub async fn run(swap: alice::Swap) -> Result<AliceState> {
+pub async fn run(swap: Swap) -> Result<AliceState> {
     run_until(swap, |_| false).await
 }
 
 #[tracing::instrument(name = "swap", skip(swap,exit_early), fields(id = %swap.swap_id), err)]
-pub async fn run_until(
-    mut swap: alice::Swap,
-    exit_early: fn(&AliceState) -> bool,
-) -> Result<AliceState> {
+pub async fn run_until(mut swap: Swap, exit_early: fn(&AliceState) -> bool) -> Result<AliceState> {
     let mut current_state = swap.state;
 
     while !is_complete(&current_state) && !exit_early(&current_state) {
