@@ -195,12 +195,10 @@ async fn init_monero_container(
     Monero,
     Vec<Container<'_, Cli, monero_harness::image::Monero>>,
 ) {
-    let (monero, monerods) = Monero::new(&cli, vec![
-        MONERO_WALLET_NAME_ALICE.to_owned(),
-        MONERO_WALLET_NAME_BOB.to_owned(),
-    ])
-    .await
-    .unwrap();
+    let (monero, monerods) =
+        Monero::new(&cli, vec![MONERO_WALLET_NAME_ALICE, MONERO_WALLET_NAME_BOB])
+            .await
+            .unwrap();
 
     (monero, monerods)
 }

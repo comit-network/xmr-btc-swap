@@ -56,7 +56,7 @@ impl<'c> Monero {
     /// miner wallet container name is: `miner`
     pub async fn new(
         cli: &'c Cli,
-        additional_wallets: Vec<String>,
+        additional_wallets: Vec<&'static str>,
     ) -> Result<(Self, Vec<Container<'c, Cli, image::Monero>>)> {
         let prefix = format!("{}_", random_prefix());
         let monerod_name = format!("{}{}", prefix, MONEROD_DAEMON_CONTAINER_NAME);
