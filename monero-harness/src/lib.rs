@@ -165,17 +165,11 @@ impl<'c> Monero {
 
 fn random_prefix() -> String {
     use rand::Rng;
-    const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyz";
-    const LEN: usize = 4;
-    let mut rng = rand::thread_rng();
 
-    let prefix: String = (0..LEN)
-        .map(|_| {
-            let idx = rng.gen_range(0, CHARSET.len());
-            CHARSET[idx] as char
-        })
-        .collect();
-    prefix
+    rand::thread_rng()
+        .sample_iter(rand::distributions::Alphanumeric)
+        .take(4)
+        .collect()
 }
 
 #[derive(Clone, Debug)]
