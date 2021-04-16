@@ -26,7 +26,7 @@ pub struct Swap {
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
     pub env_config: env::Config,
-    pub swap_id: Uuid,
+    pub id: Uuid,
     pub receive_monero_address: monero::Address,
 }
 
@@ -92,7 +92,7 @@ impl Builder {
             db: self.db,
             bitcoin_wallet: self.bitcoin_wallet.clone(),
             monero_wallet: self.monero_wallet.clone(),
-            swap_id: self.swap_id,
+            id: self.swap_id,
             env_config: self.env_config,
             receive_monero_address: self.receive_monero_address,
         })

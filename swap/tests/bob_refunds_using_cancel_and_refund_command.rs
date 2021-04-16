@@ -9,7 +9,7 @@ use swap::protocol::{alice, bob};
 async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
     harness::setup_test(FastCancelConfig, |mut ctx| async move {
         let (bob_swap, bob_join_handle) = ctx.bob_swap().await;
-        let bob_swap_id = bob_swap.swap_id;
+        let bob_swap_id = bob_swap.id;
         let bob_swap = tokio::spawn(bob::run_until(bob_swap, is_btc_locked));
 
         let alice_swap = ctx.alice_next_swap().await;
@@ -37,7 +37,7 @@ async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
         // Bob manually cancels
         bob_join_handle.abort();
         let (_, state) = bob::cancel(
-            bob_swap.swap_id,
+            bob_swap.id,
             bob_swap.state,
             bob_swap.bitcoin_wallet,
             bob_swap.db,
@@ -54,7 +54,7 @@ async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
         // Bob manually refunds
         bob_join_handle.abort();
         let bob_state = bob::refund(
-            bob_swap.swap_id,
+            bob_swap.id,
             bob_swap.state,
             bob_swap.bitcoin_wallet,
             bob_swap.db,

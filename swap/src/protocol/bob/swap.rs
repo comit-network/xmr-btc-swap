@@ -33,7 +33,7 @@ pub async fn run_until(
 
     while !is_target_state(&current_state) {
         current_state = next_state(
-            swap.swap_id,
+            swap.id,
             current_state,
             &mut swap.event_loop_handle,
             swap.bitcoin_wallet.as_ref(),
@@ -45,7 +45,7 @@ pub async fn run_until(
 
         let db_state = current_state.clone().into();
         swap.db
-            .insert_latest_state(swap.swap_id, Swap::Bob(db_state))
+            .insert_latest_state(swap.id, Swap::Bob(db_state))
             .await?;
     }
 

@@ -11,7 +11,7 @@ async fn concurrent_bobs_after_xmr_lock_proof_sent() {
     harness::setup_test(SlowCancelConfig, |mut ctx| async move {
         let (bob_swap_1, bob_join_handle_1) = ctx.bob_swap().await;
 
-        let swap_id = bob_swap_1.swap_id;
+        let swap_id = bob_swap_1.id;
 
         let bob_swap_1 = tokio::spawn(bob::run_until(bob_swap_1, is_xmr_locked));
 

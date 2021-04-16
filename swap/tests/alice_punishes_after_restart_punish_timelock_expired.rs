@@ -13,7 +13,7 @@ use swap::protocol::{alice, bob};
 async fn alice_punishes_after_restart_if_punish_timelock_expired() {
     harness::setup_test(FastPunishConfig, |mut ctx| async move {
         let (bob_swap, bob_join_handle) = ctx.bob_swap().await;
-        let bob_swap_id = bob_swap.swap_id;
+        let bob_swap_id = bob_swap.id;
         let bob_swap = tokio::spawn(bob::run_until(bob_swap, is_btc_locked));
 
         let alice_swap = ctx.alice_next_swap().await;
