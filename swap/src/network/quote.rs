@@ -1,5 +1,5 @@
 use crate::bitcoin;
-use crate::network::cbor_request_response::CborCodec;
+use crate::network::json_pull_codec::JsonPullCodec;
 use crate::protocol::{alice, bob};
 use libp2p::core::ProtocolName;
 use libp2p::request_response::{
@@ -13,7 +13,7 @@ const PROTOCOL: &str = "/comit/xmr/btc/bid-quote/1.0.0";
 type OutEvent = RequestResponseEvent<(), BidQuote>;
 type Message = RequestResponseMessage<(), BidQuote>;
 
-pub type Behaviour = RequestResponse<CborCodec<BidQuoteProtocol, (), BidQuote>>;
+pub type Behaviour = RequestResponse<JsonPullCodec<BidQuoteProtocol, BidQuote>>;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct BidQuoteProtocol;
@@ -40,7 +40,7 @@ pub struct BidQuote {
 /// Alice only supports inbound connections, i.e. handing out quotes.
 pub fn alice() -> Behaviour {
     Behaviour::new(
-        CborCodec::default(),
+        JsonPullCodec::default(),
         vec![(BidQuoteProtocol, ProtocolSupport::Inbound)],
         RequestResponseConfig::default(),
     )
@@ -51,7 +51,7 @@ pub fn alice() -> Behaviour {
 /// Bob only supports outbound connections, i.e. requesting quotes.
 pub fn bob() -> Behaviour {
     Behaviour::new(
-        CborCodec::default(),
+        JsonPullCodec::default(),
         vec![(BidQuoteProtocol, ProtocolSupport::Outbound)],
         RequestResponseConfig::default(),
     )

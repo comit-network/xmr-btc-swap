@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow multiple concurrent swaps with the same peer on the ASB.
   This is a breaking change because the swap ID is now agreed upon between CLI and ASB during swap setup.
   Resuming swaps started prior to this change can result in unexpected behaviour.
+- Quote protocol returns JSON encoded data instead of CBOR.
+  This is a breaking change in the protocol handling, old CLI versions will not be able to process quote requests of ASBs running this version.
+
+### Added
+
+- Websocket support for the ASB.
+  The ASB is now capable to listen on both TCP and Websocket connections.
+  Default websocket listening port is 9940.
 
 ## [0.4.0] - 2021-04-06
 

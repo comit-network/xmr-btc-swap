@@ -11,7 +11,8 @@ use std::path::{Path, PathBuf};
 use tracing::info;
 use url::Url;
 
-const DEFAULT_LISTEN_ADDRESS: &str = "/ip4/0.0.0.0/tcp/9939";
+const DEFAULT_LISTEN_ADDRESS_TCP: &str = "/ip4/0.0.0.0/tcp/9939";
+const DEFAULT_LISTEN_ADDRESS_WS: &str = "/ip4/0.0.0.0/tcp/9940/ws";
 const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://electrum.blockstream.info:60002";
 const DEFAULT_MONERO_WALLET_RPC_TESTNET_URL: &str = "http://127.0.0.1:38083/json_rpc";
 
@@ -45,7 +46,7 @@ pub struct Data {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Network {
-    pub listen: Multiaddr,
+    pub listen: Vec<Multiaddr>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -112,11 +113,14 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
         .interact_text()?;
     let data_dir = data_dir.as_str().parse()?;
 
-    let listen_address = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Enter multiaddress on which asb should list for peer-to-peer communications or hit return to use default")
-        .default(DEFAULT_LISTEN_ADDRESS.to_owned())
+    let listen_addresses = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter multiaddresses (comma separated) on which asb should list for peer-to-peer communications or hit return to use default")
+        .default( format!("{},{}", DEFAULT_LISTEN_ADDRESS_TCP, DEFAULT_LISTEN_ADDRESS_WS))
         .interact_text()?;
-    let listen_address = listen_address.as_str().parse()?;
+    let listen_addresses = listen_addresses
+        .split(',')
+        .map(|str| str.parse())
+        .collect::<Result<Vec<Multiaddr>, _>>()?;
 
     let electrum_rpc_url: String = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter Electrum RPC URL or hit return to use default")
@@ -134,7 +138,7 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
     Ok(Config {
         data: Data { dir: data_dir },
         network: Network {
-            listen: listen_address,
+            listen: listen_addresses,
         },
         bitcoin: Bitcoin { electrum_rpc_url },
         monero: Monero {
@@ -162,7 +166,10 @@ mod tests {
                 electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
             },
             network: Network {
-                listen: DEFAULT_LISTEN_ADDRESS.parse().unwrap(),
+                listen: vec![
+                    DEFAULT_LISTEN_ADDRESS_TCP.parse().unwrap(),
+                    DEFAULT_LISTEN_ADDRESS_WS.parse().unwrap(),
+                ],
             },
 
             monero: Monero {
