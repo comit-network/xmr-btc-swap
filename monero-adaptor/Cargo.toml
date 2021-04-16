@@ -13,3 +13,7 @@ curve25519-dalek = "3"
 rand = "0.7"
 nazgul = "0.1"
 sha2 = "0.9"
+
+[build-dependencies]
+bindgen = "0.58"
+cc = "1"

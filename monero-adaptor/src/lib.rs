@@ -1,6 +1,8 @@
 #![allow(non_snake_case)]
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
 
-use std::convert::{TryFrom, TryInto};
+include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 use anyhow::{bail, Result};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
@@ -9,6 +11,7 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use rand::rngs::OsRng;
 use sha2::Sha512;
+use std::convert::{TryFrom, TryInto};
 
 const RING_SIZE: usize = 11;
 const KEY_TAG: &str = "CSLAG_0";
@@ -692,5 +695,16 @@ mod tests {
         //     nazgul_sig,
         //     &msg_to_sign.to_vec()
         // ));
+    }
+}
+
+#[cfg(test)]
+mod tests2 {
+    use super::*;
+
+    #[test]
+    fn test_add() {
+        let a = unsafe { add(3.0, 2.0) };
+        dbg!(a);
     }
 }
