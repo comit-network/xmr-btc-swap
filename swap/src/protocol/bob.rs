@@ -1,6 +1,5 @@
 use crate::database::Database;
-use crate::env::Config;
-use crate::{bitcoin, monero};
+use crate::{bitcoin, env, monero};
 use anyhow::Result;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -26,7 +25,7 @@ pub struct Swap {
     pub db: Database,
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
-    pub env_config: Config,
+    pub env_config: env::Config,
     pub swap_id: Uuid,
     pub receive_monero_address: monero::Address,
 }
@@ -39,7 +38,7 @@ pub struct Builder {
     monero_wallet: Arc<monero::Wallet>,
 
     init_params: InitParams,
-    env_config: Config,
+    env_config: env::Config,
 
     event_loop_handle: EventLoopHandle,
 
@@ -58,7 +57,7 @@ impl Builder {
         swap_id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
-        env_config: Config,
+        env_config: env::Config,
         event_loop_handle: EventLoopHandle,
         receive_monero_address: monero::Address,
     ) -> Self {
