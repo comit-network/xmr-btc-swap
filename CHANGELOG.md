@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Quote protocol returns JSON encoded data instead of CBOR.
+- The quote protocol returns JSON encoded data instead of CBOR.
   This is a breaking change in the protocol handling, old CLI versions will not be able to process quote requests of ASBs running this version.
 
 ### Fixed
