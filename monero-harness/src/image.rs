@@ -11,7 +11,6 @@ pub const WALLET_RPC_PORT: u16 = 48083;
 
 #[derive(Debug)]
 pub struct Monero {
-    tag: String,
     args: Args,
     entrypoint: Option<String>,
     wait_for_message: String,
@@ -24,7 +23,7 @@ impl Image for Monero {
     type EntryPoint = str;
 
     fn descriptor(&self) -> String {
-        format!("xmrto/monero:{}", self.tag)
+        "xmrto/monero:v0.17.2.0".to_owned()
     }
 
     fn wait_until_ready<D: Docker>(&self, container: &Container<'_, D, Self>) {
@@ -75,7 +74,6 @@ impl Image for Monero {
 impl Default for Monero {
     fn default() -> Self {
         Monero {
-            tag: "v0.17.2.0".into(),
             args: Args::default(),
             entrypoint: Some("".into()),
             wait_for_message: "core RPC server started ok".to_string(),
@@ -84,13 +82,6 @@ impl Default for Monero {
 }
 
 impl Monero {
-    pub fn with_tag(self, tag_str: &str) -> Self {
-        Monero {
-            tag: tag_str.to_string(),
-            ..self
-        }
-    }
-
     pub fn wallet(name: &str, daemon_address: String) -> Self {
         let wallet = WalletArgs::new(name, daemon_address, WALLET_RPC_PORT);
         let default = Monero::default();
