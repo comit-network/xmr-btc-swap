@@ -705,13 +705,21 @@ mod tests {
 #[cfg(test)]
 mod tests2 {
     use super::*;
+    use curve25519_dalek;
 
     #[test]
     fn test_add() {
         let hash = [0u8; 32];
         let mut scalar = [0u8; 32];
 
+        let input = "59d28aeade98016722948bf596af0b7deb5dd641f1aa2a906bd4e1";
+        let output = "7d0b25809fc4032a81dd5b0f721a2b21f7f68157c834374f580876f5d91f7409";
+
+        let decoded_input = hex::decode(input).unwrap().as_slice();
+
         unsafe { hash_to_scalar(&hash as *const u8, 32, &mut scalar as *mut u8, 32) };
         dbg!(scalar);
+
+        curve25519_dalek::edwards::CompressedEdwardsY::from_slice(&scalar);
     }
 }
