@@ -10,6 +10,7 @@ fn main() {
     let mut base_config = cc::Build::new();
     base_config.include("depend/hash");
     base_config.file("depend/hash/hash.c");
+    base_config.file("depend/hash/crypto-ops.c");
     base_config.compile("hash");
 
     println!("cargo:rustc-link-lib=static=hash");

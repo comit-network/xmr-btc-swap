@@ -5,7 +5,8 @@
 // include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 extern "C" {
-    fn hash_to_scalar(i: *const u8, i_len: usize, md: *mut u8, md_len: usize);
+    fn hash_to_scalar(hash: *const u8, hash_len: usize, scalar: *mut u8, scalar_len: usize);
+    fn hash_to_p3(hash8_p3: *mut ge_p3, hash: *const u8, hash_len: usize);
 }
 
 use anyhow::{bail, Result};
@@ -20,6 +21,15 @@ use std::convert::{TryFrom, TryInto};
 const RING_SIZE: usize = 11;
 const KEY_TAG: &str = "CSLAG_0";
 const DOMAIN_TAG: &str = "CSLAG_c";
+
+#[repr(C)]
+#[derive(Debug)]
+struct ge_p3 {
+    X: [u32; 10],
+    Y: [u32; 10],
+    Z: [u32; 10],
+    T: [u32; 10],
+}
 
 fn challenge(
     s_i: Scalar,
@@ -722,5 +732,22 @@ mod tests2 {
             scalar_hex,
             "24f9167e1a3eaab18119c225577f0ecc7a488a309e54e2721cbaea62c3db3a06"
         );
+    }
+
+    #[test]
+    fn test_hash_to_p3() {
+        let input = "0b6a0ae839214674e9b275aa1986c6352ec7ec6c4ae583ab5a62b947a9dee972";
+        let decoded_input = hex::decode(input).unwrap();
+
+        let mut p3 = ge_p3 {
+            X: [0; 10],
+            Y: [0; 10],
+            Z: [0; 10],
+            T: [0; 10],
+        };
+
+        unsafe { hash_to_p3(&mut p3, decoded_input.as_ptr() as *const u8, 32) };
+
+        dbg!(p3);
     }
 }
