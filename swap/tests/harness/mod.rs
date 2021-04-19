@@ -150,11 +150,16 @@ async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
     let electrs = init_electrs_container(&cli, prefix.clone(), bitcoind_name, prefix)
         .await
         .expect("could not init electrs");
-    let (monero, monerods) = init_monero_container(&cli).await;
+    let (monero, monerod_container, monero_wallet_rpc_containers) =
+        Monero::new(&cli, vec![MONERO_WALLET_NAME_ALICE, MONERO_WALLET_NAME_BOB])
+            .await
+            .unwrap();
+
     (monero, Containers {
         bitcoind_url,
         bitcoind,
-        monerods,
+        monerod_container,
+        monero_wallet_rpc_containers,
         electrs,
     })
 }
@@ -187,20 +192,6 @@ async fn init_bitcoind_container(
     init_bitcoind(bitcoind_url.clone(), 5).await?;
 
     Ok((docker, bitcoind_url.clone()))
-}
-
-async fn init_monero_container(
-    cli: &Cli,
-) -> (
-    Monero,
-    Vec<Container<'_, Cli, monero_harness::image::Monero>>,
-) {
-    let (monero, monerods) =
-        Monero::new(&cli, vec![MONERO_WALLET_NAME_ALICE, MONERO_WALLET_NAME_BOB])
-            .await
-            .unwrap();
-
-    (monero, monerods)
 }
 
 pub async fn init_electrs_container(
@@ -892,7 +883,8 @@ pub async fn mint(node_url: Url, address: bitcoin::Address, amount: bitcoin::Amo
 struct Containers<'a> {
     bitcoind_url: Url,
     bitcoind: Container<'a, Cli, bitcoind::Bitcoind>,
-    monerods: Vec<Container<'a, Cli, image::Monero>>,
+    monerod_container: Container<'a, Cli, image::Monerod>,
+    monero_wallet_rpc_containers: Vec<Container<'a, Cli, image::MoneroWalletRpc>>,
     electrs: Container<'a, Cli, electrs::Electrs>,
 }
 

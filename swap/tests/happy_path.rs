@@ -4,8 +4,6 @@ use harness::SlowCancelConfig;
 use swap::protocol::{alice, bob};
 use tokio::join;
 
-/// Run the following tests with RUST_MIN_STACK=10000000
-
 #[tokio::test]
 async fn happy_path() {
     harness::setup_test(SlowCancelConfig, |mut ctx| async move {

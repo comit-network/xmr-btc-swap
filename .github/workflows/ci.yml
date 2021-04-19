@@ -131,5 +131,3 @@ jobs:
 
       - name: Run test ${{ matrix.test_name }}
         run: cargo test --package swap --all-features --test ${{ matrix.test_name }} ""
-        env:
-          MONERO_ADDITIONAL_SLEEP_PERIOD: 60000

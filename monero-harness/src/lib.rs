@@ -22,17 +22,15 @@
 //! Also provides standalone JSON RPC clients for monerod and monero-wallet-rpc.
 pub mod image;
 
-use crate::image::{
-    MONEROD_DAEMON_CONTAINER_NAME, MONEROD_DEFAULT_NETWORK, MONEROD_RPC_PORT, WALLET_RPC_PORT,
-};
-use anyhow::{anyhow, bail, Result};
+use crate::image::{MONEROD_DAEMON_CONTAINER_NAME, MONEROD_DEFAULT_NETWORK, RPC_PORT};
+use anyhow::{anyhow, bail, Context, Result};
 use monero_rpc::{
     monerod,
     monerod::MonerodRpc as _,
     wallet::{self, GetAddress, MoneroWalletRpc as _, Refreshed, Transfer},
 };
 use std::time::Duration;
-use testcontainers::{clients::Cli, core::Port, Container, Docker, RunArgs};
+use testcontainers::{clients::Cli, Container, Docker, RunArgs};
 use tokio::time;
 
 /// How often we mine a block.
@@ -57,14 +55,18 @@ impl<'c> Monero {
     pub async fn new(
         cli: &'c Cli,
         additional_wallets: Vec<&'static str>,
-    ) -> Result<(Self, Vec<Container<'c, Cli, image::Monero>>)> {
+    ) -> Result<(
+        Self,
+        Container<'c, Cli, image::Monerod>,
+        Vec<Container<'c, Cli, image::MoneroWalletRpc>>,
+    )> {
         let prefix = format!("{}_", random_prefix());
         let monerod_name = format!("{}{}", prefix, MONEROD_DAEMON_CONTAINER_NAME);
         let network = format!("{}{}", prefix, MONEROD_DEFAULT_NETWORK);
 
         tracing::info!("Starting monerod: {}", monerod_name);
         let (monerod, monerod_container) = Monerod::new(cli, monerod_name, network)?;
-        let mut containers = vec![monerod_container];
+        let mut containers = vec![];
         let mut wallets = vec![];
 
         let miner = "miner";
@@ -82,7 +84,7 @@ impl<'c> Monero {
             containers.push(container);
         }
 
-        Ok((Self { monerod, wallets }, containers))
+        Ok((Self { monerod, wallets }, monerod_container, containers))
     }
 
     pub fn monerod(&self) -> &Monerod {
@@ -194,19 +196,15 @@ impl<'c> Monerod {
         cli: &'c Cli,
         name: String,
         network: String,
-    ) -> Result<(Self, Container<'c, Cli, image::Monero>)> {
-        let monerod_rpc_port: u16 =
-            port_check::free_local_port().ok_or_else(|| anyhow!("Could not retrieve free port"))?;
-
-        let image = image::Monero::default();
+    ) -> Result<(Self, Container<'c, Cli, image::Monerod>)> {
+        let image = image::Monerod::default();
         let run_args = RunArgs::default()
             .with_name(name.clone())
-            .with_network(network.clone())
-            .with_mapped_port(Port {
-                local: monerod_rpc_port,
-                internal: MONEROD_RPC_PORT,
-            });
-        let docker = cli.run_with_args(image, run_args);
+            .with_network(network.clone());
+        let container = cli.run_with_args(image, run_args);
+        let monerod_rpc_port = container
+            .get_host_port(RPC_PORT)
+            .context("port not exposed")?;
 
         Ok((
             Self {
@@ -215,7 +213,7 @@ impl<'c> Monerod {
                 network,
                 client: monerod::Client::localhost(monerod_rpc_port)?,
             },
-            docker,
+            container,
         ))
     }
 
@@ -240,23 +238,19 @@ impl<'c> MoneroWalletRpc {
         name: &str,
         monerod: &Monerod,
         prefix: String,
-    ) -> Result<(Self, Container<'c, Cli, image::Monero>)> {
-        let wallet_rpc_port: u16 =
-            port_check::free_local_port().ok_or_else(|| anyhow!("Could not retrieve free port"))?;
-
-        let daemon_address = format!("{}:{}", monerod.name, MONEROD_RPC_PORT);
-        let image = image::Monero::wallet(&name, daemon_address);
+    ) -> Result<(Self, Container<'c, Cli, image::MoneroWalletRpc>)> {
+        let daemon_address = format!("{}:{}", monerod.name, RPC_PORT);
+        let image = image::MoneroWalletRpc::new(&name, daemon_address);
 
         let network = monerod.network.clone();
         let run_args = RunArgs::default()
             // prefix the container name so we can run multiple tests
             .with_name(format!("{}{}", prefix, name))
-            .with_network(network.clone())
-            .with_mapped_port(Port {
-                local: wallet_rpc_port,
-                internal: WALLET_RPC_PORT,
-            });
-        let docker = cli.run_with_args(image, run_args);
+            .with_network(network.clone());
+        let container = cli.run_with_args(image, run_args);
+        let wallet_rpc_port = container
+            .get_host_port(RPC_PORT)
+            .context("port not exposed")?;
 
         // create new wallet
         let client = wallet::Client::localhost(wallet_rpc_port)?;
@@ -272,7 +266,7 @@ impl<'c> MoneroWalletRpc {
                 network,
                 client,
             },
-            docker,
+            container,
         ))
     }
 
