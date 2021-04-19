@@ -7,8 +7,8 @@ include_directories(monero-adaptor/depend/hash)
 
 add_library(xmr_btc_swap_comit
         monero-adaptor/depend/hash/hash.c
-        monero-adaptor/depend/hash/hash.h
-        monero-adaptor/depend/hash/int-util.h
+        monero-adaptor/depend/hash/include/hash.h
+        monero-adaptor/depend/hash/include/int-util.h
         monero-adaptor/depend/hash/crypto-ops.c
-        monero-adaptor/depend/hash/crypto-ops.h
-        monero-adaptor/depend/hash/warnings.h)
+        monero-adaptor/depend/hash/include/crypto-ops.h
+        monero-adaptor/depend/hash/include/warnings.h)

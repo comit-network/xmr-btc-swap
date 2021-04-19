@@ -31,12 +31,21 @@
 #include <assert.h>
 #include <stdint.h>
 
-#include "warnings.h"
-#include "crypto-ops.h"
+#include "include/warnings.h"
+#include "include/crypto-ops.h"
 
 DISABLE_VS_WARNINGS(4146 4244)
 
 /* Predeclarations */
+
+const fe fe_ma2;
+const fe fe_ma;
+const fe fe_fffb1;
+const fe fe_fffb2;
+const fe fe_fffb3;
+const fe fe_fffb4;
+const fe fe_sqrtm1;
+const fe fe_d;
 
 static void fe_mul(fe, const fe, const fe);
 

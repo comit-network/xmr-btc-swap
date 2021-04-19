@@ -89,9 +89,6 @@ void ge_double_scalarmult_base_vartime_p3(ge_p3 *, const unsigned char *, const 
 
 /* From ge_frombytes.c, modified */
 
-extern const fe fe_sqrtm1;
-extern const fe fe_d;
-
 int ge_frombytes_vartime(ge_p3 *, const unsigned char *);
 
 /* From ge_p1p1_to_p2.c */
@@ -154,12 +151,6 @@ void ge_double_scalarmult_precomp_vartime2_p3(ge_p3 *, const unsigned char *, co
 
 void ge_mul8(ge_p1p1 *, const ge_p2 *);
 
-extern const fe fe_ma2;
-extern const fe fe_ma;
-extern const fe fe_fffb1;
-extern const fe fe_fffb2;
-extern const fe fe_fffb3;
-extern const fe fe_fffb4;
 extern const ge_p3 ge_p3_identity;
 extern const ge_p3 ge_p3_H;
 
