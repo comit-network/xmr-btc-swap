@@ -14,7 +14,7 @@ More information about the protocol in this [presentation](https://youtu.be/Jj8r
    The seller will provide you their peer id and multiaddress.
    We are running an `asb` instance on testnet.
    You can swap with to get familiar with the `swap` CLI.
-   Our peer id is `12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi` and our multiaddress is `/dns4/xmr-btc-asb.coblox.tech/tcp/9876`
+   Our peer id is `12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi` and our multiaddress is `/dns4/xmr-btc-asb.coblox.tech/tcp/9939`
 3. Follow the instructions printed to the terminal
 
 ## Limitations
