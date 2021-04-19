@@ -3699,6 +3699,7 @@ dependencies = [
  "tracing-appender",
  "tracing-futures",
  "tracing-subscriber",
+ "trust-dns-resolver",
  "url 2.2.1",
  "uuid",
  "void",

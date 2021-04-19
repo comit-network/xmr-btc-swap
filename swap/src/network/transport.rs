@@ -23,7 +23,9 @@ pub fn build(id_keys: &identity::Keypair) -> Result<SwapTransport> {
     let noise = NoiseConfig::xx(dh_keys).into_authenticated();
 
     let tcp = TokioTcpConfig::new().nodelay(true);
-    let dns = TokioDnsConfig::system(tcp)?;
+    let config = trust_dns_resolver::config::ResolverConfig::quad9();
+    let opts = trust_dns_resolver::config::ResolverOpts::default();
+    let dns = TokioDnsConfig::custom(tcp, config, opts)?;
     let websocket = WsConfig::new(dns.clone());
 
     let transport = websocket
