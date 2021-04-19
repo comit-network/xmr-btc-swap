@@ -704,7 +704,9 @@ mod tests2 {
 
     #[test]
     fn test_add() {
-        let a = unsafe { add(3.0, 2.0) };
-        dbg!(a);
+        let hash = [0u8; 32];
+        let mut scalar = [0u8; 32];
+        unsafe { hash_to_scalar(&hash as *const u8, 32, &mut scalar as *mut u8, 32) };
+        dbg!(scalar);
     }
 }
