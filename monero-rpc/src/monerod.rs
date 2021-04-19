@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use serde::Deserialize;
 
 #[jsonrpc_client::api(version = "2.0")]
@@ -17,13 +18,15 @@ pub struct Client {
 
 impl Client {
     /// New local host monerod RPC client.
-    pub fn localhost(port: u16) -> Self {
-        Self {
-            inner: reqwest::Client::new(),
+    pub fn localhost(port: u16) -> Result<Self> {
+        Ok(Self {
+            inner: reqwest::ClientBuilder::new()
+                .connection_verbose(true)
+                .build()?,
             base_url: format!("http://127.0.0.1:{}/json_rpc", port)
                 .parse()
-                .expect("url is well formed"),
-        }
+                .context("url is well formed")?,
+        })
     }
 }
 

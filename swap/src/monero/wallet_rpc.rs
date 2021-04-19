@@ -165,7 +165,7 @@ impl WalletRpc {
         }
 
         // Send a json rpc request to make sure monero_wallet_rpc is ready
-        Client::localhost(port).get_version().await?;
+        Client::localhost(port)?.get_version().await?;
 
         Ok(WalletRpcProcess {
             _child: child,

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::{de::Error, Deserialize, Deserializer, Serialize};
 
 #[jsonrpc_client::api(version = "2.0")]
@@ -43,20 +43,22 @@ pub struct Client {
 
 impl Client {
     /// Constructs a monero-wallet-rpc client with localhost endpoint.
-    pub fn localhost(port: u16) -> Self {
+    pub fn localhost(port: u16) -> Result<Self> {
         Client::new(
             format!("http://127.0.0.1:{}/json_rpc", port)
                 .parse()
-                .expect("url is well formed"),
+                .context("url is well formed")?,
         )
     }
 
     /// Constructs a monero-wallet-rpc client with `url` endpoint.
-    pub fn new(url: reqwest::Url) -> Self {
-        Self {
-            inner: reqwest::Client::new(),
+    pub fn new(url: reqwest::Url) -> Result<Self> {
+        Ok(Self {
+            inner: reqwest::ClientBuilder::new()
+                .connection_verbose(true)
+                .build()?,
             base_url: url,
-        }
+        })
     }
 
     /// Transfers `amount` monero from `account_index` to `address`.

@@ -177,6 +177,7 @@ pub struct Monerod {
     rpc_port: u16,
     name: String,
     network: String,
+    client: monerod::Client,
 }
 
 #[derive(Clone, Debug)]
@@ -184,6 +185,7 @@ pub struct MoneroWalletRpc {
     rpc_port: u16,
     name: String,
     network: String,
+    client: wallet::Client,
 }
 
 impl<'c> Monerod {
@@ -211,19 +213,20 @@ impl<'c> Monerod {
                 rpc_port: monerod_rpc_port,
                 name,
                 network,
+                client: monerod::Client::localhost(monerod_rpc_port)?,
             },
             docker,
         ))
     }
 
-    pub fn client(&self) -> monerod::Client {
-        monerod::Client::localhost(self.rpc_port)
+    pub fn client(&self) -> &monerod::Client {
+        &self.client
     }
 
     /// Spawns a task to mine blocks in a regular interval to the provided
     /// address
     pub async fn start_miner(&self, miner_wallet_address: &str) -> Result<()> {
-        let monerod = self.client();
+        let monerod = self.client().clone();
         let _ = tokio::spawn(mine(monerod, miner_wallet_address.to_string()));
         Ok(())
     }
@@ -256,23 +259,25 @@ impl<'c> MoneroWalletRpc {
         let docker = cli.run_with_args(image, run_args);
 
         // create new wallet
-        wallet::Client::localhost(wallet_rpc_port)
+        let client = wallet::Client::localhost(wallet_rpc_port)?;
+
+        client
             .create_wallet(name.to_owned(), "English".to_owned())
-            .await
-            .unwrap();
+            .await?;
 
         Ok((
             Self {
                 rpc_port: wallet_rpc_port,
                 name: name.to_string(),
                 network,
+                client,
             },
             docker,
         ))
     }
 
-    pub fn client(&self) -> wallet::Client {
-        wallet::Client::localhost(self.rpc_port)
+    pub fn client(&self) -> &wallet::Client {
+        &self.client
     }
 
     // It takes a little while for the wallet to sync with monerod.

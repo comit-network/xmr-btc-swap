@@ -25,7 +25,7 @@ pub struct Wallet {
 impl Wallet {
     /// Connect to a wallet RPC and load the given wallet by name.
     pub async fn open_or_create(url: Url, name: String, env_config: Config) -> Result<Self> {
-        let client = wallet::Client::new(url);
+        let client = wallet::Client::new(url)?;
 
         let open_wallet_response = client.open_wallet(name.clone()).await;
         if open_wallet_response.is_err() {

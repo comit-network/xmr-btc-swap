@@ -44,7 +44,7 @@ where
     let cli = Cli::default();
 
     let _guard = tracing_subscriber::fmt()
-        .with_env_filter("warn,swap=debug,monero_harness=debug,monero_rpc=debug,bitcoin_harness=info,testcontainers=info")
+        .with_env_filter("warn,swap=debug,monero_harness=debug,monero_rpc=debug,bitcoin_harness=info,testcontainers=info") // add `reqwest::connect::verbose=trace` if you want to logs of the RPC clients
         .with_test_writer()
         .set_default();
 
@@ -276,7 +276,7 @@ async fn init_test_wallets(
         .unwrap();
 
     let xmr_wallet = swap::monero::Wallet::connect(
-        monero.wallet(name).unwrap().client(),
+        monero.wallet(name).unwrap().client().clone(),
         name.to_string(),
         env_config,
     )
