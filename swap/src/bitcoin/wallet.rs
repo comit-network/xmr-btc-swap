@@ -43,8 +43,8 @@ impl Wallet {
         let db = bdk::sled::open(wallet_dir)?.open_tree(SLED_TREE_NAME)?;
 
         let wallet = bdk::Wallet::new(
-            bdk::template::BIP84(key.clone(), KeychainKind::External),
-            Some(bdk::template::BIP84(key, KeychainKind::Internal)),
+            bdk::template::Bip84(key.clone(), KeychainKind::External),
+            Some(bdk::template::Bip84(key, KeychainKind::Internal)),
             env_config.bitcoin_network,
             db,
             ElectrumBlockchain::from(client),
