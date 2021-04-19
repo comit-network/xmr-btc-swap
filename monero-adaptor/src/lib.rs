@@ -643,7 +643,6 @@ pub struct Message3 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nazgul::traits::Verify;
 
     #[test]
     fn sign_and_verify_success() {
@@ -692,34 +691,36 @@ mod tests {
 
         let sig = alice.adaptor_sig.adapt(r_a);
 
-        let nazgul_sig = sig.to_nazgul_signature(&ring);
-
         assert!(sig.verify(ring, msg_to_sign));
-        // assert!(nazgul::clsag::CLSAG::verify::<Sha512>(
-        //     nazgul_sig,
-        //     &msg_to_sign.to_vec()
-        // ));
     }
 }
 
 #[cfg(test)]
 mod tests2 {
     use super::*;
-    use curve25519_dalek;
 
     #[test]
-    fn test_add() {
-        let hash = [0u8; 32];
+    fn test_hash_to_scalar() {
         let mut scalar = [0u8; 32];
 
-        let input = "59d28aeade98016722948bf596af0b7deb5dd641f1aa2a906bd4e1";
-        let output = "7d0b25809fc4032a81dd5b0f721a2b21f7f68157c834374f580876f5d91f7409";
+        let input = "0b6a0ae839214674e9b275aa1986c6352ec7ec6c4ae583ab5a62b947a9dee972";
+        let decoded_input = hex::decode(input).unwrap();
 
-        let decoded_input = hex::decode(input).unwrap().as_slice();
+        unsafe {
+            hash_to_scalar(
+                decoded_input.as_ptr() as *const u8,
+                32,
+                &mut scalar as *mut u8,
+                32,
+            )
+        };
 
-        unsafe { hash_to_scalar(&hash as *const u8, 32, &mut scalar as *mut u8, 32) };
-        dbg!(scalar);
+        let scalar = Scalar::from_bytes_mod_order(scalar);
+        let scalar_hex = hex::encode(scalar.as_bytes());
 
-        curve25519_dalek::edwards::CompressedEdwardsY::from_slice(&scalar);
+        assert_eq!(
+            scalar_hex,
+            "24f9167e1a3eaab18119c225577f0ecc7a488a309e54e2721cbaea62c3db3a06"
+        );
     }
 }
