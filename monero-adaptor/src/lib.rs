@@ -2,7 +2,11 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+// include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+
+extern "C" {
+    fn hash_to_scalar(i: *const u8, i_len: usize, md: *mut u8, md_len: usize);
+}
 
 use anyhow::{bail, Result};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
@@ -706,6 +710,7 @@ mod tests2 {
     fn test_add() {
         let hash = [0u8; 32];
         let mut scalar = [0u8; 32];
+
         unsafe { hash_to_scalar(&hash as *const u8, 32, &mut scalar as *mut u8, 32) };
         dbg!(scalar);
     }

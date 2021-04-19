@@ -17,7 +17,6 @@ enum {
   HASH_DATA_AREA = 136
 };
 
-void hash_to_scalar(const uint8_t *in, size_t inlen, uint8_t *md, int mdlen);
 
 void keccak(const uint8_t *in, size_t inlen, uint8_t *md, int mdlen);
 void sc_reduce32(unsigned char *);
