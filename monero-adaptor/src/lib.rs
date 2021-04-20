@@ -2,17 +2,16 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 
-// include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-
 extern "C" {
     fn hash_to_scalar(hash: *const u8, scalar: *mut u8);
     fn hash_to_p3(hash: *const u8, p3: *mut ge_p3);
     fn ge_p3_tobytes(bytes: *mut u8, hash8_p3: *const ge_p3);
 }
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::digest::Digest;
+use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use rand::rngs::OsRng;
@@ -30,6 +29,28 @@ struct ge_p3 {
     Y: [i32; 10],
     Z: [i32; 10],
     T: [i32; 10],
+}
+
+pub fn hash_point_to_point(point: EdwardsPoint) -> Result<EdwardsPoint> {
+    let bytes = point.compress();
+
+    let mut compressed = [0u8; 32];
+    unsafe {
+        let mut p3 = ge_p3 {
+            X: [0; 10],
+            Y: [0; 10],
+            Z: [0; 10],
+            T: [0; 10],
+        };
+
+        hash_to_p3(bytes.as_bytes().as_ptr() as *const u8, &mut p3);
+        ge_p3_tobytes(&mut compressed as *mut u8, &p3);
+    };
+
+    let compressed = CompressedEdwardsY::from_slice(&compressed);
+    let point = compressed.decompress().context("not y-coordinate")?;
+
+    Ok(point)
 }
 
 fn challenge(
@@ -730,38 +751,16 @@ mod tests2 {
     }
 
     #[test]
-    fn test_hash_to_p3() {
-        // not zero assertion fails
-        // let input =
-        // "83efb774657700e37291f4b8dd10c839d1c739fd135c07a2fd7382334dafdd6a";
-        // let decoded_input = hex::decode(input).unwrap();
+    fn test_hash_point_to_point() {
+        let slice = hex::decode("a7fbdeeccb597c2d5fdaf2ea2e10cbfcd26b5740903e7f6d46bcbf9a90384fc6")
+            .unwrap();
+        let point = CompressedEdwardsY::from_slice(&slice).decompress().unwrap();
 
-        let input = "a7fbdeeccb597c2d5fdaf2ea2e10cbfcd26b5740903e7f6d46bcbf9a90384fc6";
-        let decoded_input = hex::decode(input).unwrap();
+        let actual = hash_point_to_point(point).unwrap();
 
-        let mut p3 = ge_p3 {
-            X: [0; 10],
-            Y: [0; 10],
-            Z: [0; 10],
-            T: [0; 10],
-        };
-
-        let mut compressed = [0u8; 32];
-
-        unsafe {
-            hash_to_p3(decoded_input.as_ptr() as *const u8, &mut p3);
-            dbg!(&p3);
-            ge_p3_tobytes(&mut compressed as *mut u8, &p3);
-        };
-
-        dbg!(&compressed);
-
-        let actual = CompressedEdwardsY::from_slice(&compressed[..]);
-
-        let decoded =
-            hex::decode("f055ba2d0d9828ce2e203d9896bfda494d7830e7e3a27fa27d5eaa825a79a19c")
-                .unwrap();
-        let expected = CompressedEdwardsY::from_slice(decoded.as_slice());
+        let slice = hex::decode("f055ba2d0d9828ce2e203d9896bfda494d7830e7e3a27fa27d5eaa825a79a19c")
+            .unwrap();
+        let expected = CompressedEdwardsY::from_slice(&slice).decompress().unwrap();
 
         assert_eq!(expected, actual);
     }
