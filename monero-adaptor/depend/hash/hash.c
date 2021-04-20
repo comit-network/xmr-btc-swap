@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include "include/keccak.h"
-#include "include/hash.h"
 #include "include/crypto-ops.h"
 
 void hash_to_scalar(const uint8_t *in, uint8_t *md) {

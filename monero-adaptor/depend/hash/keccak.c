@@ -9,7 +9,8 @@
 #include "include/hash-ops.h"
 #include "include/keccak.h"
 
-static void local_abort(const char *msg) {
+static void local_abort(const char *msg)
+{
     fprintf(stderr, "%s\n", msg);
 #ifdef NDEBUG
     _exit(1);
@@ -32,19 +33,20 @@ const uint64_t keccakf_rndc[24] =
 
 const int keccakf_rotc[24] =
         {
-                1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14,
-                27, 41, 56, 8, 25, 43, 62, 18, 39, 61, 20, 44
+                1,  3,  6,  10, 15, 21, 28, 36, 45, 55, 2,  14,
+                27, 41, 56, 8,  25, 43, 62, 18, 39, 61, 20, 44
         };
 
 const int keccakf_piln[24] =
         {
-                10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4,
-                15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1
+                10, 7,  11, 17, 18, 3, 5,  16, 8,  21, 24, 4,
+                15, 23, 19, 13, 12, 2, 20, 14, 22, 9,  6,  1
         };
 
 // update the state with given number of rounds
 
-void keccakf(uint64_t st[25], int rounds) {
+void keccakf(uint64_t st[25], int rounds)
+{
     int i, j, round;
     uint64_t t, bc[5];
 
@@ -85,13 +87,15 @@ void keccakf(uint64_t st[25], int rounds) {
 // compute a keccak hash (md) of given byte length from "in"
 typedef uint64_t state_t[25];
 
-void keccak(const uint8_t *in, size_t inlen, uint8_t *md, int mdlen) {
+void keccak(const uint8_t *in, size_t inlen, uint8_t *md, int mdlen)
+{
     state_t st;
     uint8_t temp[144];
     size_t i, rsiz, rsizw;
 
     static_assert(HASH_DATA_AREA <= sizeof(temp), "Bad keccak preconditions");
-    if (mdlen <= 0 || (mdlen > 100 && sizeof(st) != (size_t) mdlen)) {
+    if (mdlen <= 0 || (mdlen > 100 && sizeof(st) != (size_t)mdlen))
+    {
         local_abort("Bad keccak use");
     }
 
@@ -100,7 +104,7 @@ void keccak(const uint8_t *in, size_t inlen, uint8_t *md, int mdlen) {
 
     memset(st, 0, sizeof(st));
 
-    for (; inlen >= rsiz; inlen -= rsiz, in += rsiz) {
+    for ( ; inlen >= rsiz; inlen -= rsiz, in += rsiz) {
         for (i = 0; i < rsizw; i++) {
             uint64_t ina;
             memcpy(&ina, in + i * 8, 8);
@@ -110,8 +114,8 @@ void keccak(const uint8_t *in, size_t inlen, uint8_t *md, int mdlen) {
     }
 
     // last block and padding
-    if (inlen + 1 >= sizeof(temp) || inlen > rsiz || rsiz - inlen + inlen + 1 >= sizeof(temp) || rsiz == 0 ||
-        rsiz - 1 >= sizeof(temp) || rsizw * 8 > sizeof(temp)) {
+    if (inlen + 1 >= sizeof(temp) || inlen > rsiz || rsiz - inlen + inlen + 1 >= sizeof(temp) || rsiz == 0 || rsiz - 1 >= sizeof(temp) || rsizw * 8 > sizeof(temp))
+    {
         local_abort("Bad keccak use");
     }
 
@@ -126,13 +130,15 @@ void keccak(const uint8_t *in, size_t inlen, uint8_t *md, int mdlen) {
 
     keccakf(st, KECCAK_ROUNDS);
 
-    if (((size_t) mdlen % sizeof(uint64_t)) != 0) {
+    if (((size_t)mdlen % sizeof(uint64_t)) != 0)
+    {
         local_abort("Bad keccak use");
     }
-    memcpy_swap64le(md, st, mdlen / sizeof(uint64_t));
+    memcpy_swap64le(md, st, mdlen/sizeof(uint64_t));
 }
 
-void keccak1600(const uint8_t *in, size_t inlen, uint8_t *md) {
+void keccak1600(const uint8_t *in, size_t inlen, uint8_t *md)
+{
     keccak(in, inlen, md, sizeof(state_t));
 }
 
@@ -147,11 +153,11 @@ void keccak1600(const uint8_t *in, size_t inlen, uint8_t *md) {
     keccakf(st, KECCAK_ROUNDS); }
 
 
-void keccak_init(KECCAK_CTX *ctx) {
+void keccak_init(KECCAK_CTX * ctx){
     memset(ctx, 0, sizeof(KECCAK_CTX));
 }
 
-void keccak_update(KECCAK_CTX *ctx, const uint8_t *in, size_t inlen) {
+void keccak_update(KECCAK_CTX * ctx, const uint8_t *in, size_t inlen){
     if (ctx->rest & KECCAK_FINALIZED) {
         local_abort("Bad keccak use");
     }
@@ -162,12 +168,12 @@ void keccak_update(KECCAK_CTX *ctx, const uint8_t *in, size_t inlen) {
     // fill partial block
     if (idx) {
         size_t left = KECCAK_BLOCKLEN - idx;
-        memcpy((char *) ctx->message + idx, in, (inlen < left ? inlen : left));
+        memcpy((char*)ctx->message + idx, in, (inlen < left ? inlen : left));
         if (inlen < left) return;
 
         KECCAK_PROCESS_BLOCK(ctx->hash, ctx->message);
 
-        in += left;
+        in  += left;
         inlen -= left;
     }
 
@@ -175,7 +181,7 @@ void keccak_update(KECCAK_CTX *ctx, const uint8_t *in, size_t inlen) {
         memcpy(ctx->message, in, KECCAK_BLOCKLEN);
 
         KECCAK_PROCESS_BLOCK(ctx->hash, ctx->message);
-        in += KECCAK_BLOCKLEN;
+        in  += KECCAK_BLOCKLEN;
         inlen -= KECCAK_BLOCKLEN;
     }
     if (inlen) {
@@ -183,12 +189,13 @@ void keccak_update(KECCAK_CTX *ctx, const uint8_t *in, size_t inlen) {
     }
 }
 
-void keccak_finish(KECCAK_CTX *ctx, uint8_t *md) {
-    if (!(ctx->rest & KECCAK_FINALIZED)) {
+void keccak_finish(KECCAK_CTX * ctx, uint8_t *md){
+    if (!(ctx->rest & KECCAK_FINALIZED))
+    {
         // clear the rest of the data queue
-        memset((char *) ctx->message + ctx->rest, 0, KECCAK_BLOCKLEN - ctx->rest);
-        ((char *) ctx->message)[ctx->rest] |= 0x01;
-        ((char *) ctx->message)[KECCAK_BLOCKLEN - 1] |= 0x80;
+        memset((char*)ctx->message + ctx->rest, 0, KECCAK_BLOCKLEN - ctx->rest);
+        ((char*)ctx->message)[ctx->rest] |= 0x01;
+        ((char*)ctx->message)[KECCAK_BLOCKLEN - 1] |= 0x80;
 
         // process final block
         KECCAK_PROCESS_BLOCK(ctx->hash, ctx->message);

@@ -79,7 +79,7 @@ static inline uint64_t lo_dword(uint64_t val) {
     return val & 0xFFFFFFFF;
 }
 
-static inline uint64_t mul128(uint64_t multiplier, uint64_t multiplicand, uint64_t *product_hi) {
+static inline uint64_t mul128(uint64_t multiplier, uint64_t multiplicand, uint64_t* product_hi) {
     // multiplier   = ab = a * 2^32 + b
     // multiplicand = cd = c * 2^32 + d
     // ab * cd = a * c * 2^64 + (a * d + b * c) * 2^32 + b * d
@@ -105,15 +105,14 @@ static inline uint64_t mul128(uint64_t multiplier, uint64_t multiplicand, uint64
     return product_lo;
 }
 
-static inline uint64_t div_with_reminder(uint64_t dividend, uint32_t divisor, uint32_t *remainder) {
-    dividend |= ((uint64_t) *remainder) << 32;
+static inline uint64_t div_with_reminder(uint64_t dividend, uint32_t divisor, uint32_t* remainder) {
+    dividend |= ((uint64_t)*remainder) << 32;
     *remainder = dividend % divisor;
     return dividend / divisor;
 }
 
 // Long division with 2^32 base
-static inline uint32_t
-div128_32(uint64_t dividend_hi, uint64_t dividend_lo, uint32_t divisor, uint64_t *quotient_hi, uint64_t *quotient_lo) {
+static inline uint32_t div128_32(uint64_t dividend_hi, uint64_t dividend_lo, uint32_t divisor, uint64_t* quotient_hi, uint64_t* quotient_lo) {
     uint64_t dividend_dwords[4];
     uint32_t remainder = 0;
 
@@ -122,28 +121,28 @@ div128_32(uint64_t dividend_hi, uint64_t dividend_lo, uint32_t divisor, uint64_t
     dividend_dwords[1] = hi_dword(dividend_lo);
     dividend_dwords[0] = lo_dword(dividend_lo);
 
-    *quotient_hi = div_with_reminder(dividend_dwords[3], divisor, &remainder) << 32;
+    *quotient_hi  = div_with_reminder(dividend_dwords[3], divisor, &remainder) << 32;
     *quotient_hi |= div_with_reminder(dividend_dwords[2], divisor, &remainder);
-    *quotient_lo = div_with_reminder(dividend_dwords[1], divisor, &remainder) << 32;
+    *quotient_lo  = div_with_reminder(dividend_dwords[1], divisor, &remainder) << 32;
     *quotient_lo |= div_with_reminder(dividend_dwords[0], divisor, &remainder);
 
     return remainder;
 }
 
 // Long divisor with 2^64 base
-void
-div128_64(uint64_t dividend_hi, uint64_t dividend_lo, uint64_t divisor, uint64_t *quotient_hi, uint64_t *quotient_lo,
-          uint64_t *remainder_hi, uint64_t *remainder_lo);
+void div128_64(uint64_t dividend_hi, uint64_t dividend_lo, uint64_t divisor, uint64_t* quotient_hi, uint64_t *quotient_lo, uint64_t *remainder_hi, uint64_t *remainder_lo);
 
-static inline void add64clamp(uint64_t *value, uint64_t add) {
-    static const uint64_t maxval = (uint64_t) -1;
+static inline void add64clamp(uint64_t *value, uint64_t add)
+{
+    static const uint64_t maxval = (uint64_t)-1;
     if (*value > maxval - add)
         *value = maxval;
     else
         *value += add;
 }
 
-static inline void sub64clamp(uint64_t *value, uint64_t sub) {
+static inline void sub64clamp(uint64_t *value, uint64_t sub)
+{
     if (*value < sub)
         *value = 0;
     else
@@ -193,7 +192,7 @@ static inline uint32_t swap32(uint32_t x) {
 #      define swap64 __swap64
 #  elif !defined(swap64)
 static inline uint64_t swap64(uint64_t x) {
-    x = ((x & 0x00ff00ff00ff00ff) << 8) | ((x & 0xff00ff00ff00ff00) >> 8);
+    x = ((x & 0x00ff00ff00ff00ff) <<  8) | ((x & 0xff00ff00ff00ff00) >>  8);
     x = ((x & 0x0000ffff0000ffff) << 16) | ((x & 0xffff0000ffff0000) >> 16);
     return (x << 32) | (x >> 32);
 }
@@ -205,8 +204,7 @@ static inline uint64_t swap64(uint64_t x) {
 #else
 #define UNUSED
 #endif
-
-static inline void mem_inplace_ident(void *mem UNUSED, size_t n UNUSED) {}
+static inline void mem_inplace_ident(void *mem UNUSED, size_t n UNUSED) { }
 #undef UNUSED
 
 static inline void mem_inplace_swap16(void *mem, size_t n) {
