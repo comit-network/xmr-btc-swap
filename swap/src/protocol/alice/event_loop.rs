@@ -153,7 +153,7 @@ where
                                 }
                             };
 
-                            match self.swarm.spot_price.send_response(channel, spot_price::Response { xmr }) {
+                            match self.swarm.behaviour_mut().spot_price.send_response(channel, spot_price::Response { xmr }) {
                                 Ok(_) => {},
                                 Err(_) => {
                                     // if we can't respond, the peer probably just disconnected so it is not a huge deal, only log this on debug
@@ -170,7 +170,7 @@ where
                                 }
                             };
 
-                            self.swarm.execution_setup.run(peer, state0);
+                            self.swarm.behaviour_mut().execution_setup.run(peer, state0);
                         }
                         SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer }) => {
                             let quote = match self.make_quote(self.max_buy).await {
@@ -181,7 +181,7 @@ where
                                 }
                             };
 
-                            if self.swarm.quote.send_response(channel, quote).is_err() {
+                            if self.swarm.behaviour_mut().quote.send_response(channel, quote).is_err() {
                                 tracing::debug!(%peer, "Failed to respond with quote");
                             }
                         }
@@ -228,7 +228,7 @@ where
                                 for (transfer_proof, responder) in transfer_proofs {
                                     tracing::debug!(%peer, "Found buffered transfer proof for peer");
 
-                                    let id = self.swarm.transfer_proof.send_request(&peer, transfer_proof);
+                                    let id = self.swarm.behaviour_mut().transfer_proof.send_request(&peer, transfer_proof);
                                     self.inflight_transfer_proofs.insert(id, responder);
                                 }
                             }
@@ -255,13 +255,13 @@ where
                 next_transfer_proof = self.send_transfer_proof.next() => {
                     match next_transfer_proof {
                         Some(Ok((peer, transfer_proof, responder))) => {
-                            if !self.swarm.transfer_proof.is_connected(&peer) {
+                            if !self.swarm.behaviour_mut().transfer_proof.is_connected(&peer) {
                                 tracing::warn!(%peer, "No active connection to peer, buffering transfer proof");
                                 self.buffered_transfer_proofs.entry(peer).or_insert_with(Vec::new).push((transfer_proof, responder));
                                 continue;
                             }
 
-                            let id = self.swarm.transfer_proof.send_request(&peer, transfer_proof);
+                            let id = self.swarm.behaviour_mut().transfer_proof.send_request(&peer, transfer_proof);
                             self.inflight_transfer_proofs.insert(id, responder);
                         },
                         Some(Err(e)) => {
@@ -273,7 +273,7 @@ where
                     }
                 }
                 Some(response_channel) = self.inflight_encrypted_signatures.next() => {
-                    let _ = self.swarm.encrypted_signature.send_response(response_channel, ());
+                    let _ = self.swarm.behaviour_mut().encrypted_signature.send_response(response_channel, ());
                 }
             }
         }

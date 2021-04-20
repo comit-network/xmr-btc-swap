@@ -8,7 +8,7 @@ use bitcoin_harness::{BitcoindRpcApi, Client};
 use futures::Future;
 use get_port::get_port;
 use libp2p::core::Multiaddr;
-use libp2p::{PeerId, Swarm};
+use libp2p::PeerId;
 use monero_harness::{image, Monero};
 use std::cmp::Ordering;
 use std::fmt;
@@ -117,7 +117,9 @@ impl BobParams {
 
     pub fn new_eventloop(&self, swap_id: Uuid) -> Result<(bob::EventLoop, bob::EventLoopHandle)> {
         let mut swarm = swarm::bob(&self.seed, self.alice_peer_id)?;
-        swarm.add_address(self.alice_peer_id, self.alice_address.clone());
+        swarm
+            .behaviour_mut()
+            .add_address(self.alice_peer_id, self.alice_address.clone());
 
         bob::EventLoop::new(
             swap_id,
@@ -642,7 +644,7 @@ fn start_alice(
     let db = Arc::new(Database::open(db_path.as_path()).unwrap());
 
     let mut swarm = swarm::alice(&seed).unwrap();
-    Swarm::listen_on(&mut swarm, listen_address).unwrap();
+    swarm.listen_on(listen_address).unwrap();
 
     let (event_loop, swap_handle) = alice::EventLoop::new(
         swarm,
