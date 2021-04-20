@@ -736,7 +736,7 @@ mod tests2 {
         // "83efb774657700e37291f4b8dd10c839d1c739fd135c07a2fd7382334dafdd6a";
         // let decoded_input = hex::decode(input).unwrap();
 
-        let input = "e4bfca0ffc308fc7c344654307a32ab3008bcf5070523133093d4387341ce4d9";
+        let input = "a7fbdeeccb597c2d5fdaf2ea2e10cbfcd26b5740903e7f6d46bcbf9a90384fc6";
         let decoded_input = hex::decode(input).unwrap();
 
         let mut p3 = ge_p3 {
@@ -750,21 +750,19 @@ mod tests2 {
 
         unsafe {
             hash_to_p3(decoded_input.as_ptr() as *const u8, &mut p3);
-
             dbg!(&p3);
-            // dbg!(&compressed);
-            // ge_p3_tobytes(&mut compressed as *mut u8, &p3);
+            ge_p3_tobytes(&mut compressed as *mut u8, &p3);
         };
 
-        // let actual = CompressedEdwardsY::from_slice(&compressed[..]);
-        //
-        // let decoded = hex::decode(
-        //     "
-        // 2789ecbaf36e4fcb41c6157228001538b40ca379464b718d830c58caae7ea4ca",
-        // )
-        // .unwrap();
-        // let expected = CompressedEdwardsY::from_slice(decoded.as_slice());
-        //
-        // assert_eq!(expected, actual);
+        dbg!(&compressed);
+
+        let actual = CompressedEdwardsY::from_slice(&compressed[..]);
+
+        let decoded =
+            hex::decode("f055ba2d0d9828ce2e203d9896bfda494d7830e7e3a27fa27d5eaa825a79a19c")
+                .unwrap();
+        let expected = CompressedEdwardsY::from_slice(decoded.as_slice());
+
+        assert_eq!(expected, actual);
     }
 }
