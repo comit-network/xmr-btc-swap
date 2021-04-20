@@ -32,7 +32,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Check markdown formatting
-        uses: dprint/check@v1.2
+        uses: dprint/check@v1.3
 
       - name: Run clippy with default features
         run: cargo clippy --workspace --all-targets -- -D warnings
