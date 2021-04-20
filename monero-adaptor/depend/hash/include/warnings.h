@@ -11,7 +11,7 @@
 
 #else
 
-//#include <boost/preprocessor/stringize.hpp>
+#include <boost/preprocessor/stringize.hpp>
 
 #define PUSH_WARNINGS _Pragma("GCC diagnostic push")
 #define POP_WARNINGS _Pragma("GCC diagnostic pop")
@@ -25,6 +25,6 @@
 #define DISABLE_CLANG_WARNING(w)
 #endif
 
-//#define DISABLE_GCC_AND_CLANG_WARNING(w) _Pragma(BOOST_PP_STRINGIZE(GCC diagnostic ignored BOOST_PP_STRINGIZE(-W##w)))
+#define DISABLE_GCC_AND_CLANG_WARNING(w) _Pragma(BOOST_PP_STRINGIZE(GCC diagnostic ignored BOOST_PP_STRINGIZE(-W##w)))
 
 #endif

@@ -5,8 +5,9 @@
 // include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 extern "C" {
-    fn hash_to_scalar(hash: *const u8, hash_len: usize, scalar: *mut u8, scalar_len: usize);
-    fn hash_to_p3(hash8_p3: *mut ge_p3, hash: *const u8, hash_len: usize);
+    fn hash_to_scalar(hash: *const u8, scalar: *mut u8);
+    fn hash_to_p3(hash: *const u8, p3: *mut ge_p3);
+    fn ge_p3_tobytes(bytes: *mut u8, hash8_p3: *const ge_p3);
 }
 
 use anyhow::{bail, Result};
@@ -25,10 +26,10 @@ const DOMAIN_TAG: &str = "CSLAG_c";
 #[repr(C)]
 #[derive(Debug)]
 struct ge_p3 {
-    X: [u32; 10],
-    Y: [u32; 10],
-    Z: [u32; 10],
-    T: [u32; 10],
+    X: [i32; 10],
+    Y: [i32; 10],
+    Z: [i32; 10],
+    T: [i32; 10],
 }
 
 fn challenge(
@@ -708,6 +709,7 @@ mod tests {
 #[cfg(test)]
 mod tests2 {
     use super::*;
+    use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 
     #[test]
     fn test_hash_to_scalar() {
@@ -716,14 +718,7 @@ mod tests2 {
         let input = "0b6a0ae839214674e9b275aa1986c6352ec7ec6c4ae583ab5a62b947a9dee972";
         let decoded_input = hex::decode(input).unwrap();
 
-        unsafe {
-            hash_to_scalar(
-                decoded_input.as_ptr() as *const u8,
-                32,
-                &mut scalar as *mut u8,
-                32,
-            )
-        };
+        unsafe { hash_to_scalar(decoded_input.as_ptr() as *const u8, &mut scalar as *mut u8) };
 
         let scalar = Scalar::from_bytes_mod_order(scalar);
         let scalar_hex = hex::encode(scalar.as_bytes());
@@ -736,7 +731,12 @@ mod tests2 {
 
     #[test]
     fn test_hash_to_p3() {
-        let input = "0b6a0ae839214674e9b275aa1986c6352ec7ec6c4ae583ab5a62b947a9dee972";
+        // not zero assertion fails
+        // let input =
+        // "83efb774657700e37291f4b8dd10c839d1c739fd135c07a2fd7382334dafdd6a";
+        // let decoded_input = hex::decode(input).unwrap();
+
+        let input = "e4bfca0ffc308fc7c344654307a32ab3008bcf5070523133093d4387341ce4d9";
         let decoded_input = hex::decode(input).unwrap();
 
         let mut p3 = ge_p3 {
@@ -746,8 +746,25 @@ mod tests2 {
             T: [0; 10],
         };
 
-        unsafe { hash_to_p3(&mut p3, decoded_input.as_ptr() as *const u8, 32) };
+        let mut compressed = [0u8; 32];
 
-        dbg!(p3);
+        unsafe {
+            hash_to_p3(decoded_input.as_ptr() as *const u8, &mut p3);
+
+            dbg!(&p3);
+            // dbg!(&compressed);
+            // ge_p3_tobytes(&mut compressed as *mut u8, &p3);
+        };
+
+        // let actual = CompressedEdwardsY::from_slice(&compressed[..]);
+        //
+        // let decoded = hex::decode(
+        //     "
+        // 2789ecbaf36e4fcb41c6157228001538b40ca379464b718d830c58caae7ea4ca",
+        // )
+        // .unwrap();
+        // let expected = CompressedEdwardsY::from_slice(decoded.as_slice());
+        //
+        // assert_eq!(expected, actual);
     }
 }

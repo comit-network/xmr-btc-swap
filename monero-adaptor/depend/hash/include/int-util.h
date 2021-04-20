@@ -36,9 +36,7 @@
 #include <string.h>
 
 #ifndef _MSC_VER
-
 #include <sys/param.h>
-
 #endif
 
 #if defined(__ANDROID__)
@@ -172,41 +170,33 @@ static inline void sub64clamp(uint64_t *value, uint64_t sub) {
   (((uint64_t) (x) & 0xff00000000000000) >> 56))
 
 static inline uint16_t ident16(uint16_t x) { return x; }
-
 static inline uint32_t ident32(uint32_t x) { return x; }
-
 static inline uint64_t ident64(uint64_t x) { return x; }
 
 #ifndef __OpenBSD__
 #  if defined(__ANDROID__) && defined(__swap16) && !defined(swap16)
 #      define swap16 __swap16
 #  elif !defined(swap16)
-
 static inline uint16_t swap16(uint16_t x) {
     return ((x & 0x00ff) << 8) | ((x & 0xff00) >> 8);
 }
-
 #  endif
 #  if defined(__ANDROID__) && defined(__swap32) && !defined(swap32)
 #      define swap32 __swap32
 #  elif !defined(swap32)
-
 static inline uint32_t swap32(uint32_t x) {
     x = ((x & 0x00ff00ff) << 8) | ((x & 0xff00ff00) >> 8);
     return (x << 16) | (x >> 16);
 }
-
 #  endif
 #  if defined(__ANDROID__) && defined(__swap64) && !defined(swap64)
 #      define swap64 __swap64
 #  elif !defined(swap64)
-
 static inline uint64_t swap64(uint64_t x) {
     x = ((x & 0x00ff00ff00ff00ff) << 8) | ((x & 0xff00ff00ff00ff00) >> 8);
     x = ((x & 0x0000ffff0000ffff) << 16) | ((x & 0xffff0000ffff0000) >> 16);
     return (x << 32) | (x >> 32);
 }
-
 #  endif
 #endif /* __OpenBSD__ */
 
@@ -217,7 +207,6 @@ static inline uint64_t swap64(uint64_t x) {
 #endif
 
 static inline void mem_inplace_ident(void *mem UNUSED, size_t n UNUSED) {}
-
 #undef UNUSED
 
 static inline void mem_inplace_swap16(void *mem, size_t n) {
@@ -226,14 +215,12 @@ static inline void mem_inplace_swap16(void *mem, size_t n) {
         ((uint16_t *) mem)[i] = swap16(((const uint16_t *) mem)[i]);
     }
 }
-
 static inline void mem_inplace_swap32(void *mem, size_t n) {
     size_t i;
     for (i = 0; i < n; i++) {
         ((uint32_t *) mem)[i] = swap32(((const uint32_t *) mem)[i]);
     }
 }
-
 static inline void mem_inplace_swap64(void *mem, size_t n) {
     size_t i;
     for (i = 0; i < n; i++) {
@@ -244,11 +231,9 @@ static inline void mem_inplace_swap64(void *mem, size_t n) {
 static inline void memcpy_ident16(void *dst, const void *src, size_t n) {
     memcpy(dst, src, 2 * n);
 }
-
 static inline void memcpy_ident32(void *dst, const void *src, size_t n) {
     memcpy(dst, src, 4 * n);
 }
-
 static inline void memcpy_ident64(void *dst, const void *src, size_t n) {
     memcpy(dst, src, 8 * n);
 }
@@ -259,14 +244,12 @@ static inline void memcpy_swap16(void *dst, const void *src, size_t n) {
         ((uint16_t *) dst)[i] = swap16(((const uint16_t *) src)[i]);
     }
 }
-
 static inline void memcpy_swap32(void *dst, const void *src, size_t n) {
     size_t i;
     for (i = 0; i < n; i++) {
         ((uint32_t *) dst)[i] = swap32(((const uint32_t *) src)[i]);
     }
 }
-
 static inline void memcpy_swap64(void *dst, const void *src, size_t n) {
     size_t i;
     for (i = 0; i < n; i++) {

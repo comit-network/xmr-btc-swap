@@ -44,6 +44,8 @@ const fe fe_fffb1;
 const fe fe_fffb2;
 const fe fe_fffb3;
 const fe fe_fffb4;
+const ge_p3 ge_p3_identity;
+const ge_p3 ge_p3_H;
 const fe fe_sqrtm1;
 const fe fe_d;
 
@@ -2552,7 +2554,7 @@ void ge_mul8(ge_p1p1 *r, const ge_p2 *t) {
     ge_p2_dbl(r, &u);
 }
 
-void ge_fromfe_frombytes_vartime(ge_p2 *r, const unsigned char *s) {
+void ge_fromfe_frombytes_vartime(ge_p2 *r, const uint8_t *s) {
     fe u, v, w, x, y, z;
     unsigned char sign;
 
