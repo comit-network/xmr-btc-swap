@@ -36,6 +36,9 @@ A service provider has to manually provide the connection details to users that 
 The Peer-ID is printed upon startup of the ASB.
 The multi-address typically consists of IP-address or URL (if DNS entry configured) of the service provider.
 
+When configuring a domain name for the ASB through a DNS entry, a service provider can configure it by using the [`dnsaddr` format](https://github.com/multiformats/multiaddr/blob/master/protocols/DNSADDR.md) for the TXT entry.
+This will simplify the connection detail `--seller-addr` for CLI users connecting to the ASB and provides more flexibility with e.g. ports (i.e. `/dnsaddr/your.domain.tld` instead of `/dns4/your.domain.tld/tcp/port`).
+
 Each service provider running an ASB can decide how/where to share these connection details.
 
 ![Service Provider scenarios](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/comit-network/xmr-btc-swap/d2cf45d8b9f0c2e180cd85aa034f370965adc11c/docs/asb/diagrams/cli-asb-overview.puml)
