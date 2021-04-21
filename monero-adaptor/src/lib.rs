@@ -3,22 +3,19 @@
 #![allow(non_camel_case_types)]
 
 extern "C" {
-    fn hash_to_scalar(hash: *const u8, scalar: *mut u8);
     fn hash_to_p3(hash: *const u8, p3: *mut ge_p3);
     fn ge_p3_tobytes(bytes: *mut u8, hash8_p3: *const ge_p3);
 }
 
 use anyhow::{bail, Context, Result};
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-use curve25519_dalek::digest::Digest;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
 use rand::rngs::OsRng;
-use sha2::Sha512;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
+use tiny_keccak::{Hasher, Keccak};
 
 const RING_SIZE: usize = 11;
-const KEY_TAG: &str = "CSLAG_0";
 const DOMAIN_TAG: &str = "CSLAG_c";
 
 #[repr(C)]
@@ -57,7 +54,7 @@ fn challenge(
     pk_i: EdwardsPoint,
     h_prev: Scalar,
     I: EdwardsPoint,
-    prefix: Sha512,
+    mut prefix: Keccak,
 ) -> Result<Scalar> {
     let L_i = s_i * ED25519_BASEPOINT_POINT + h_prev * pk_i;
 
@@ -65,16 +62,17 @@ fn challenge(
 
     let R_i = s_i * H_p_pk_i + h_prev * I;
 
-    let mut bytes = vec![];
-    bytes.append(&mut L_i.compress().as_bytes().to_vec());
-    bytes.append(&mut R_i.compress().as_bytes().to_vec());
+    prefix.update(&L_i.compress().as_bytes().to_vec());
+    prefix.update(&R_i.compress().as_bytes().to_vec());
 
-    let hasher = prefix.chain(bytes);
+    let mut output = [0u8; 64];
+    prefix.finalize(&mut output);
 
-    Ok(Scalar::from_hash(hasher))
+    Ok(Scalar::from_bytes_mod_order_wide(&output))
 }
 
-fn foo(
+#[allow(clippy::too_many_arguments)]
+fn final_challenge(
     fake_responses: [Scalar; RING_SIZE - 1],
     ring: [EdwardsPoint; RING_SIZE],
     T_a: EdwardsPoint,
@@ -93,54 +91,40 @@ fn foo(
             .flat_map(|pk| pk.compress().as_bytes().to_vec())
             .collect::<Vec<u8>>();
 
-        let h_0 = Sha512::new()
-            .chain(DOMAIN_TAG.to_string())
-            .chain(ring)
-            .chain(msg)
-            .chain((T_a + T_b + R_a).compress().as_bytes())
-            .chain((I_hat_a + I_hat_b + R_prime_a).compress().as_bytes());
-        Scalar::from_hash(h_0)
+        let mut keccak = tiny_keccak::Keccak::v512();
+        keccak.update(DOMAIN_TAG.as_bytes());
+        keccak.update(ring.as_slice());
+        keccak.update(&msg);
+        keccak.update((T_a + T_b + R_a).compress().as_bytes());
+        keccak.update((I_hat_a + I_hat_b + R_prime_a).compress().as_bytes());
+        let mut output = [0u8; 64];
+        keccak.finalize(&mut output);
+
+        Scalar::from_bytes_mod_order_wide(&output)
     };
     // ring size is 11
-    let h_last = final_challenge(
-        fake_responses,
-        <[EdwardsPoint; 11]>::try_from(ring).unwrap(),
-        h_0,
-        I_a + I_b,
-        msg,
-    )?;
 
-    Ok((h_last, h_0))
-}
-
-fn final_challenge(
-    fake_responses: [Scalar; RING_SIZE - 1],
-    ring: [EdwardsPoint; RING_SIZE],
-    h_0: Scalar,
-    I: EdwardsPoint,
-    msg: [u8; 32],
-) -> Result<Scalar> {
-    let mut ring_concat = ring
+    let ring_concat = ring
         .iter()
         .flat_map(|pk| pk.compress().as_bytes().to_vec())
         .collect::<Vec<u8>>();
 
-    let mut bytes = vec![];
+    let mut keccak = tiny_keccak::Keccak::v512();
+    keccak.update(DOMAIN_TAG.as_bytes());
+    keccak.update(ring_concat.as_slice());
+    keccak.update(&msg);
 
-    bytes.append(&mut DOMAIN_TAG.as_bytes().to_vec());
-    bytes.append(&mut ring_concat);
-    bytes.append(&mut msg.to_vec());
+    let I = I_a + I_b;
 
-    let prefix = Sha512::default().chain(bytes);
+    let h_last = fake_responses
+        .iter()
+        .enumerate()
+        .fold(h_0, |h_prev, (i, s_i)| {
+            let pk_i = ring[i + 1];
+            challenge(*s_i, pk_i, h_prev, I, keccak.clone()).unwrap()
+        });
 
-    let mut h = h_0;
-
-    for (i, s_i) in fake_responses.iter().enumerate() {
-        let pk_i = ring[i + 1];
-        h = challenge(*s_i, pk_i, h, I, prefix.clone())?;
-    }
-
-    Ok(h)
+    Ok((h_last, h_0))
 }
 
 pub struct AdaptorSignature {
@@ -181,19 +165,17 @@ pub struct Signature {
 }
 
 impl Signature {
+    #[cfg(test)]
     fn verify(&self, ring: [EdwardsPoint; RING_SIZE], msg: &[u8; 32]) -> Result<bool> {
-        let mut ring_concat = ring
+        let ring_concat = ring
             .iter()
             .flat_map(|pk| pk.compress().as_bytes().to_vec())
             .collect::<Vec<u8>>();
 
-        let mut bytes = vec![];
-
-        bytes.append(&mut DOMAIN_TAG.as_bytes().to_vec());
-        bytes.append(&mut ring_concat);
-        bytes.append(&mut msg.to_vec());
-
-        let prefix = Sha512::default().chain(bytes);
+        let mut prefix = tiny_keccak::Keccak::v512();
+        prefix.update(DOMAIN_TAG.as_bytes());
+        prefix.update(ring_concat.as_slice());
+        prefix.update(msg);
 
         let mut h = self.h_0;
 
@@ -278,7 +260,7 @@ impl Alice0 {
         msg.pi_b
             .verify(ED25519_BASEPOINT_POINT, msg.T_b, self.H_p_pk, msg.I_hat_b)?;
 
-        let (h_last, h_0) = foo(
+        let (h_last, h_0) = final_challenge(
             self.fake_responses,
             self.ring,
             self.T_a,
@@ -448,7 +430,7 @@ impl Bob1 {
         self.pi_a
             .verify(ED25519_BASEPOINT_POINT, T_a, self.H_p_pk, I_hat_a)?;
 
-        let (h_last, h_0) = foo(
+        let (h_last, h_0) = final_challenge(
             fake_responses,
             self.ring,
             T_a,
@@ -504,14 +486,18 @@ impl DleqProof {
         let rG = r * G;
         let rH = r * H;
 
-        let hash = Sha512::new()
-            .chain(G.compress().as_bytes())
-            .chain(xG.compress().as_bytes())
-            .chain(H.compress().as_bytes())
-            .chain(xH.compress().as_bytes())
-            .chain(rG.compress().as_bytes())
-            .chain(rH.compress().as_bytes());
-        let c = Scalar::from_hash(hash);
+        let mut keccak = tiny_keccak::Keccak::v256();
+        keccak.update(G.compress().as_bytes());
+        keccak.update(xG.compress().as_bytes());
+        keccak.update(H.compress().as_bytes());
+        keccak.update(xH.compress().as_bytes());
+        keccak.update(rG.compress().as_bytes());
+        keccak.update(rH.compress().as_bytes());
+
+        let mut output = [0u8; 32];
+        keccak.finalize(&mut output);
+
+        let c = Scalar::from_bytes_mod_order(output);
 
         let s = r + c * x;
 
@@ -531,14 +517,18 @@ impl DleqProof {
         let rG = (s * G) + (-c * xG);
         let rH = (s * H) + (-c * xH);
 
-        let hash = Sha512::new()
-            .chain(G.compress().as_bytes())
-            .chain(xG.compress().as_bytes())
-            .chain(H.compress().as_bytes())
-            .chain(xH.compress().as_bytes())
-            .chain(rG.compress().as_bytes())
-            .chain(rH.compress().as_bytes());
-        let c_prime = Scalar::from_hash(hash);
+        let mut keccak = tiny_keccak::Keccak::v256();
+        keccak.update(G.compress().as_bytes());
+        keccak.update(xG.compress().as_bytes());
+        keccak.update(H.compress().as_bytes());
+        keccak.update(xH.compress().as_bytes());
+        keccak.update(rG.compress().as_bytes());
+        keccak.update(rH.compress().as_bytes());
+
+        let mut output = [0u8; 32];
+        keccak.finalize(&mut output);
+
+        let c_prime = Scalar::from_bytes_mod_order(output);
 
         if c != c_prime {
             bail!("invalid DLEQ proof")
@@ -549,7 +539,7 @@ impl DleqProof {
 }
 
 #[derive(PartialEq)]
-struct Commitment([u8; 64]);
+struct Commitment([u8; 32]);
 
 impl Commitment {
     fn new(
@@ -563,17 +553,16 @@ impl Commitment {
             .flat_map(|r| r.as_bytes().to_vec())
             .collect::<Vec<u8>>();
 
-        let hash = Sha512::new()
-            .chain(fake_responses)
-            .chain(I_a.compress().as_bytes())
-            .chain(I_hat_a.compress().as_bytes())
-            .chain(T_a.compress().as_bytes())
-            .finalize();
+        let mut keccak = tiny_keccak::Keccak::v256();
+        keccak.update(&fake_responses);
+        keccak.update(I_a.compress().as_bytes());
+        keccak.update(I_hat_a.compress().as_bytes());
+        keccak.update(T_a.compress().as_bytes());
 
-        let mut commitment = [0u8; 64];
-        commitment.copy_from_slice(&hash);
+        let mut output = [0u8; 32];
+        keccak.finalize(&mut output);
 
-        Self(commitment)
+        Self(output)
     }
 }
 
@@ -696,30 +685,6 @@ mod tests {
         let sig = alice.adaptor_sig.adapt(r_a);
 
         assert!(sig.verify(ring, msg_to_sign).unwrap());
-    }
-}
-
-#[cfg(test)]
-mod tests2 {
-    use super::*;
-    use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
-
-    #[test]
-    fn test_hash_to_scalar() {
-        let mut scalar = [0u8; 32];
-
-        let input = "0b6a0ae839214674e9b275aa1986c6352ec7ec6c4ae583ab5a62b947a9dee972";
-        let decoded_input = hex::decode(input).unwrap();
-
-        unsafe { hash_to_scalar(decoded_input.as_ptr() as *const u8, &mut scalar as *mut u8) };
-
-        let scalar = Scalar::from_bytes_mod_order(scalar);
-        let scalar_hex = hex::encode(scalar.as_bytes());
-
-        assert_eq!(
-            scalar_hex,
-            "24f9167e1a3eaab18119c225577f0ecc7a488a309e54e2721cbaea62c3db3a06"
-        );
     }
 
     #[test]

@@ -2202,16 +2202,16 @@ dependencies = [
 name = "monero-adaptor"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "bindgen",
- "cc",
- "curve25519-dalek",
- "hex 0.4.3",
- "monero",
- "nazgul",
- "rand 0.7.3",
- "sha2 0.9.3",
- "tokio 1.4.0",
+    "anyhow",
+    "bindgen",
+    "cc",
+    "curve25519-dalek",
+    "hex 0.4.3",
+    "monero",
+    "nazgul",
+    "rand 0.7.3",
+    "tiny-keccak",
+    "tokio 1.4.0",
 ]
 
 [[package]]

@@ -12,7 +12,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "time", "macros", "sync"
 curve25519-dalek = "3"
 rand = "0.7"
 nazgul = "0.1"
-sha2 = "0.9"
+tiny-keccak = "2"
 
 [build-dependencies]
 bindgen = "0.58"
