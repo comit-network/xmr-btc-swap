@@ -1372,6 +1372,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62aca2aba2d62b4a7f5b33f3712cb1b0692779a56fb510499d5c0aa594daeaf3"
 
 [[package]]
+name = "hash_edwards_to_edwards"
+version = "0.1.0"
+source = "git+https://github.com/comit-network/hash_edwards_to_edwards#b994b2bee919bf8abeb6116c9ec1288251b66abc"
+dependencies = [
+ "bindgen",
+ "cc",
+ "curve25519-dalek",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2202,16 +2212,11 @@ dependencies = [
 name = "monero-adaptor"
 version = "0.1.0"
 dependencies = [
-    "anyhow",
-    "bindgen",
-    "cc",
-    "curve25519-dalek",
-    "hex 0.4.3",
-    "monero",
-    "nazgul",
-    "rand 0.7.3",
-    "tiny-keccak",
-    "tokio 1.4.0",
+ "anyhow",
+ "curve25519-dalek",
+ "hash_edwards_to_edwards",
+ "rand 0.7.3",
+ "tiny-keccak",
 ]
 
 [[package]]
@@ -2300,17 +2305,6 @@ dependencies = [
  "pin-project 1.0.5",
  "smallvec",
  "unsigned-varint 0.7.0",
-]
-
-[[package]]
-name = "nazgul"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9dff2f512a99611eb14f9bbdcc69e900c93952c4cc94656d2278ea5aa294cec2"
-dependencies = [
- "curve25519-dalek",
- "digest 0.9.0",
- "rand_core 0.5.1",
 ]
 
 [[package]]

@@ -2,52 +2,17 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 
-extern "C" {
-    fn hash_to_p3(hash: *const u8, p3: *mut ge_p3);
-    fn ge_p3_tobytes(bytes: *mut u8, hash8_p3: *const ge_p3);
-}
-
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
+use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
+use hash_edwards_to_edwards::hash_point_to_point;
 use rand::rngs::OsRng;
 use std::convert::TryInto;
 use tiny_keccak::{Hasher, Keccak};
 
 const RING_SIZE: usize = 11;
 const DOMAIN_TAG: &str = "CSLAG_c";
-
-#[repr(C)]
-#[derive(Debug)]
-struct ge_p3 {
-    X: [i32; 10],
-    Y: [i32; 10],
-    Z: [i32; 10],
-    T: [i32; 10],
-}
-
-pub fn hash_point_to_point(point: EdwardsPoint) -> Result<EdwardsPoint> {
-    let bytes = point.compress();
-
-    let mut compressed = [0u8; 32];
-    unsafe {
-        let mut p3 = ge_p3 {
-            X: [0; 10],
-            Y: [0; 10],
-            Z: [0; 10],
-            T: [0; 10],
-        };
-
-        hash_to_p3(bytes.as_bytes().as_ptr() as *const u8, &mut p3);
-        ge_p3_tobytes(&mut compressed as *mut u8, &p3);
-    };
-
-    let compressed = CompressedEdwardsY::from_slice(&compressed);
-    let point = compressed.decompress().context("not y-coordinate")?;
-
-    Ok(point)
-}
 
 fn challenge(
     s_i: Scalar,
@@ -58,7 +23,7 @@ fn challenge(
 ) -> Result<Scalar> {
     let L_i = s_i * ED25519_BASEPOINT_POINT + h_prev * pk_i;
 
-    let H_p_pk_i = hash_point_to_point(pk_i)?;
+    let H_p_pk_i = hash_point_to_point(pk_i);
 
     let R_i = s_i * H_p_pk_i + h_prev * I;
 
@@ -121,6 +86,7 @@ fn final_challenge(
         .enumerate()
         .fold(h_0, |h_prev, (i, s_i)| {
             let pk_i = ring[i + 1];
+            // TODO: Do not unwrap here
             challenge(*s_i, pk_i, h_prev, I, keccak.clone()).unwrap()
         });
 
@@ -222,7 +188,7 @@ impl Alice0 {
         let alpha_a = Scalar::random(&mut OsRng);
 
         let p_k = ring[0];
-        let H_p_pk = hash_point_to_point(p_k)?;
+        let H_p_pk = hash_point_to_point(p_k);
 
         let I_a = s_prime_a * H_p_pk;
         let I_hat_a = alpha_a * H_p_pk;
@@ -350,8 +316,8 @@ impl Bob0 {
     ) -> Result<Self> {
         let alpha_b = Scalar::random(&mut OsRng);
 
-        let p_k = ring.first().unwrap();
-        let H_p_pk = hash_point_to_point(*p_k)?;
+        let p_k = ring[0];
+        let H_p_pk = hash_point_to_point(p_k);
 
         let I_b = s_b * H_p_pk;
         let I_hat_b = alpha_b * H_p_pk;
@@ -651,7 +617,7 @@ mod tests {
             let r_a = Scalar::random(&mut OsRng);
             let R_a = r_a * ED25519_BASEPOINT_POINT;
 
-            let pk_hashed_to_point = hash_point_to_point(pk).unwrap();
+            let pk_hashed_to_point = hash_point_to_point(pk);
 
             let R_prime_a = r_a * pk_hashed_to_point;
 
@@ -685,20 +651,5 @@ mod tests {
         let sig = alice.adaptor_sig.adapt(r_a);
 
         assert!(sig.verify(ring, msg_to_sign).unwrap());
-    }
-
-    #[test]
-    fn test_hash_point_to_point() {
-        let slice = hex::decode("a7fbdeeccb597c2d5fdaf2ea2e10cbfcd26b5740903e7f6d46bcbf9a90384fc6")
-            .unwrap();
-        let point = CompressedEdwardsY::from_slice(&slice).decompress().unwrap();
-
-        let actual = hash_point_to_point(point).unwrap();
-
-        let slice = hex::decode("f055ba2d0d9828ce2e203d9896bfda494d7830e7e3a27fa27d5eaa825a79a19c")
-            .unwrap();
-        let expected = CompressedEdwardsY::from_slice(&slice).decompress().unwrap();
-
-        assert_eq!(expected, actual);
     }
 }

@@ -5,15 +5,8 @@ authors = ["CoBloX Team <team@coblox.tech>"]
 edition = "2018"
 
 [dependencies]
-monero = "0.11"
 anyhow = "1"
-hex = "0.4"
-tokio = { version = "1", features = ["rt-multi-thread", "time", "macros", "sync", "process", "fs"] }
 curve25519-dalek = "3"
 rand = "0.7"
-nazgul = "0.1"
-tiny-keccak = "2"
-
-[build-dependencies]
-bindgen = "0.58"
-cc = "1"
+tiny-keccak = { version = "2", features = ["keccak"] }
+hash_edwards_to_edwards = { git = "https://github.com/comit-network/hash_edwards_to_edwards" }
