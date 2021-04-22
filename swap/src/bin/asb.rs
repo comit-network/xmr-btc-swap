@@ -13,8 +13,11 @@
 #![allow(non_snake_case)]
 
 use anyhow::{Context, Result};
+use libp2p::core::multiaddr::Protocol;
+use libp2p::core::Multiaddr;
 use libp2p::Swarm;
 use prettytable::{row, Table};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use structopt::StructOpt;
 use swap::asb::command::{Arguments, Command};
@@ -29,7 +32,8 @@ use swap::network::swarm;
 use swap::protocol::alice::event_loop::KrakenRate;
 use swap::protocol::alice::{run, EventLoop};
 use swap::seed::Seed;
-use swap::{asb, bitcoin, env, kraken, monero};
+use swap::tor::AuthenticatedClient;
+use swap::{asb, bitcoin, env, kraken, monero, tor};
 use tracing::{info, warn};
 use tracing_subscriber::filter::LevelFilter;
 
@@ -96,6 +100,23 @@ async fn main() -> Result<()> {
             }
 
             let kraken_price_updates = kraken::connect()?;
+
+            // setup Tor hidden services
+            let tor_client =
+                tor::Client::new(config.tor.socks5_port).with_control_port(config.tor.control_port);
+            let _ac = match tor_client.assert_tor_running().await {
+                Ok(_) => {
+                    tracing::info!("Tor found. Setting up hidden service. ");
+                    let ac =
+                        register_tor_services(config.network.clone().listen, tor_client, &seed)
+                            .await?;
+                    Some(ac)
+                }
+                Err(_) => {
+                    tracing::warn!("Tor not found. Running on clear net. ");
+                    None
+                }
+            };
 
             let mut swarm = swarm::alice(&seed)?;
 
@@ -211,4 +232,46 @@ async fn init_monero_wallet(
     .await?;
 
     Ok(wallet)
+}
+
+/// Registers a hidden service for each network.
+/// Note: Once ac goes out of scope, the services will be de-registered.
+async fn register_tor_services(
+    networks: Vec<Multiaddr>,
+    tor_client: tor::Client,
+    seed: &Seed,
+) -> Result<AuthenticatedClient> {
+    let mut ac = tor_client.into_authenticated_client().await?;
+
+    let hidden_services_details = networks
+        .iter()
+        .flat_map(|network| {
+            network.iter().map(|protocol| match protocol {
+                Protocol::Tcp(port) => Some((
+                    port,
+                    SocketAddr::new(IpAddr::from(Ipv4Addr::new(127, 0, 0, 1)), port),
+                )),
+                _ => {
+                    // We only care for Tcp for now.
+                    None
+                }
+            })
+        })
+        .filter_map(|details| details)
+        .collect::<Vec<_>>();
+
+    let key = seed.derive_torv3_key();
+
+    ac.add_services(&hidden_services_details, &key).await?;
+
+    let onion_address = key
+        .public()
+        .get_onion_address()
+        .get_address_without_dot_onion();
+
+    hidden_services_details.iter().for_each(|(port, _)| {
+        tracing::info!("/onion3/{}:{}", onion_address, port);
+    });
+
+    Ok(ac)
 }

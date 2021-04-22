@@ -13,6 +13,8 @@ pub const DEFAULT_STAGENET_MONERO_DAEMON_HOST: &str = "monero-stagenet.exan.tech
 pub const DEFAULT_ELECTRUM_HTTP_URL: &str = "https://blockstream.info/testnet/api/";
 const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://electrum.blockstream.info:60002";
 
+const DEFAULT_TOR_SOCKS5_PORT: &str = "9050";
+
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(name = "swap", about = "CLI for swapping BTC for XMR", author)]
 pub struct Arguments {
@@ -48,6 +50,9 @@ pub enum Command {
 
         #[structopt(flatten)]
         monero_params: MoneroParams,
+
+        #[structopt(long = "tor-socks5-port", help = "Your local Tor socks5 proxy port", default_value = DEFAULT_TOR_SOCKS5_PORT)]
+        tor_socks5_port: u16,
     },
     /// Show a list of past ongoing and completed swaps
     History,
@@ -70,6 +75,9 @@ pub enum Command {
 
         #[structopt(flatten)]
         monero_params: MoneroParams,
+
+        #[structopt(long = "tor-socks5-port", help = "Your local Tor socks5 proxy port", default_value = DEFAULT_TOR_SOCKS5_PORT)]
+        tor_socks5_port: u16,
     },
     /// Try to cancel an ongoing swap (expert users only)
     Cancel {

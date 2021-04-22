@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Websocket support for the ASB.
   The ASB is now capable to listen on both TCP and Websocket connections.
   Default websocket listening port is 9940.
+- Tor support as an optional feature.
+  If ASB detects that Tor's control port is open, an hidden service is created for
+  network it is listening on (currently 2).
+  The Tor control port as well as Tor socks5 proxy port is configurable.
 
 ## [0.4.0] - 2021-04-06
 

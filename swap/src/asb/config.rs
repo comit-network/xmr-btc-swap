@@ -1,4 +1,5 @@
 use crate::fs::{default_data_dir, ensure_directory_exists};
+use crate::tor::{DEFAULT_CONTROL_PORT, DEFAULT_SOCKS5_PORT};
 use anyhow::{Context, Result};
 use config::ConfigError;
 use dialoguer::theme::ColorfulTheme;
@@ -22,6 +23,7 @@ pub struct Config {
     pub network: Network,
     pub bitcoin: Bitcoin,
     pub monero: Monero,
+    pub tor: TorConf,
 }
 
 impl Config {
@@ -59,6 +61,22 @@ pub struct Bitcoin {
 #[serde(deny_unknown_fields)]
 pub struct Monero {
     pub wallet_rpc_url: Url,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TorConf {
+    pub control_port: u16,
+    pub socks5_port: u16,
+}
+
+impl Default for TorConf {
+    fn default() -> Self {
+        Self {
+            control_port: DEFAULT_CONTROL_PORT,
+            socks5_port: DEFAULT_SOCKS5_PORT,
+        }
+    }
 }
 
 #[derive(thiserror::Error, Debug, Clone, Copy)]
@@ -133,6 +151,17 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
         .default(DEFAULT_MONERO_WALLET_RPC_TESTNET_URL.to_owned())
         .interact_text()?;
     let monero_wallet_rpc_url = monero_wallet_rpc_url.as_str().parse()?;
+
+    let tor_control_port = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter Tor control port or hit enter to use default. If Tor is not running on your machine, no hidden service will be created.")
+        .default(DEFAULT_CONTROL_PORT.to_owned())
+        .interact_text()?;
+
+    let tor_socks5_port = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter Tor socks5 port or hit enter to use default")
+        .default(DEFAULT_SOCKS5_PORT.to_owned())
+        .interact_text()?;
+
     println!();
 
     Ok(Config {
@@ -143,6 +172,10 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
         bitcoin: Bitcoin { electrum_rpc_url },
         monero: Monero {
             wallet_rpc_url: monero_wallet_rpc_url,
+        },
+        tor: TorConf {
+            control_port: tor_control_port,
+            socks5_port: tor_socks5_port,
         },
     })
 }
@@ -175,6 +208,7 @@ mod tests {
             monero: Monero {
                 wallet_rpc_url: Url::from_str(DEFAULT_MONERO_WALLET_RPC_TESTNET_URL).unwrap(),
             },
+            tor: Default::default(),
         };
 
         initial_setup(config_path.clone(), || Ok(expected.clone())).unwrap();

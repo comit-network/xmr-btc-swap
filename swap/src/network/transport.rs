@@ -1,13 +1,14 @@
+use crate::network::tor_transport::TorTcpConfig;
 use anyhow::Result;
 use libp2p::core::muxing::StreamMuxerBox;
 use libp2p::core::transport::Boxed;
 use libp2p::core::upgrade::{SelectUpgrade, Version};
-use libp2p::core::{identity, Transport};
 use libp2p::dns::TokioDnsConfig;
 use libp2p::mplex::MplexConfig;
 use libp2p::noise::{self, NoiseConfig, X25519Spec};
+use libp2p::tcp::TokioTcpConfig;
 use libp2p::websocket::WsConfig;
-use libp2p::{yamux, PeerId};
+use libp2p::{identity, yamux, PeerId, Transport};
 use std::time::Duration;
 
 /// Builds a libp2p transport with the following features:
@@ -16,13 +17,41 @@ use std::time::Duration;
 /// - DNS name resolution
 /// - authentication via noise
 /// - multiplexing via yamux or mplex
-pub fn build(id_keys: &identity::Keypair) -> Result<SwapTransport> {
-    use libp2p::tcp::TokioTcpConfig;
-
+pub fn build_clear_net(id_keys: &identity::Keypair) -> Result<SwapTransport> {
     let dh_keys = noise::Keypair::<X25519Spec>::new().into_authentic(id_keys)?;
     let noise = NoiseConfig::xx(dh_keys).into_authenticated();
 
     let tcp = TokioTcpConfig::new().nodelay(true);
+    let dns = TokioDnsConfig::system(tcp)?;
+    let websocket = WsConfig::new(dns.clone());
+
+    let transport = websocket
+        .or_transport(dns)
+        .upgrade(Version::V1)
+        .authenticate(noise)
+        .multiplex(SelectUpgrade::new(
+            yamux::YamuxConfig::default(),
+            MplexConfig::new(),
+        ))
+        .timeout(Duration::from_secs(20))
+        .map(|(peer, muxer), _| (peer, StreamMuxerBox::new(muxer)))
+        .boxed();
+
+    Ok(transport)
+}
+
+/// Builds a libp2p transport with the following features:
+/// - TorTcpConnection
+/// - WebSocketConnection
+/// - DNS name resolution
+/// - authentication via noise
+/// - multiplexing via yamux or mplex
+pub fn build_tor(id_keys: &identity::Keypair, tor_socks5_port: u16) -> Result<SwapTransport> {
+    let dh_keys = noise::Keypair::<X25519Spec>::new().into_authentic(id_keys)?;
+    let noise = NoiseConfig::xx(dh_keys).into_authenticated();
+
+    let tcp = TokioTcpConfig::new().nodelay(true);
+    let tcp = TorTcpConfig::new(tcp, tor_socks5_port);
     let dns = TokioDnsConfig::system(tcp)?;
     let websocket = WsConfig::new(dns.clone());
 

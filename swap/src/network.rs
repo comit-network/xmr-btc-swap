@@ -7,5 +7,6 @@ pub mod quote;
 pub mod redial;
 pub mod spot_price;
 pub mod swarm;
+pub mod tor_transport;
 pub mod transfer_proof;
 pub mod transport;

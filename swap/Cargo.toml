@@ -22,6 +22,7 @@ bmrng = "0.5"
 config = { version = "0.11", default-features = false, features = ["toml"] }
 conquer-once = "0.3"
 curve25519-dalek = "3"
+data-encoding = "2.3"
 dialoguer = "0.8"
 directories-next = "2"
 ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", features = ["libsecp_compat", "serde"] }
@@ -36,7 +37,7 @@ pem = "0.8"
 prettytable-rs = "0.8"
 rand = "0.7"
 rand_chacha = "0.2"
-reqwest = { version = "0.11", features = ["rustls-tls", "stream"], default-features = false }
+reqwest = { version = "0.11", features = ["rustls-tls", "stream", "socks"], default-features = false }
 rust_decimal = "1"
 serde = { version = "1", features = ["derive"] }
 serde_cbor = "0.11"
@@ -48,10 +49,12 @@ structopt = "0.3"
 strum = { version = "0.20", features = ["derive"] }
 thiserror = "1"
 time = "0.2"
-tokio = { version = "1", features = ["rt-multi-thread", "time", "macros", "sync", "process", "fs"] }
+tokio = { version = "1", features = ["rt-multi-thread", "time", "macros", "sync", "process", "fs", "net"] }
+tokio-socks = "0.5"
 tokio-tungstenite = { version = "0.14", features = [ "rustls-tls" ] }
 tokio-util = { version = "0.6", features = ["io"] }
 toml = "0.5"
+torut = "0.1"
 tracing = { version = "0.1", features = ["attributes"] }
 tracing-appender = "0.1"
 tracing-futures = { version = "0.2", features = ["std-future", "futures-03"] }
