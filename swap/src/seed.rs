@@ -12,6 +12,7 @@ use std::fmt;
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use torut::onion::TorSecretKeyV3;
 
 pub const SEED_LENGTH: usize = 32;
 
@@ -45,6 +46,14 @@ impl Seed {
         let key = identity::ed25519::SecretKey::from_bytes(bytes).expect("we always pass 32 bytes");
 
         identity::Keypair::Ed25519(key.into())
+    }
+
+    pub fn derive_torv3_key(&self) -> TorSecretKeyV3 {
+        let bytes = self.derive(b"TOR").bytes();
+        let sk = ed25519_dalek::SecretKey::from_bytes(&bytes)
+            .expect("Failed to create a new extended secret key for Tor.");
+        let esk = ed25519_dalek::ExpandedSecretKey::from(&sk);
+        esk.to_bytes().into()
     }
 
     pub fn from_file_or_generate(data_dir: &Path) -> Result<Self, Error> {

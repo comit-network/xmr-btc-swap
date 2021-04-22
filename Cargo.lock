@@ -3742,6 +3742,7 @@ dependencies = [
  "dialoguer",
  "directories-next",
  "ecdsa_fun",
+ "ed25519-dalek",
  "futures",
  "get-port",
  "hyper 0.14.7",
