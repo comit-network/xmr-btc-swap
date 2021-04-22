@@ -13,7 +13,7 @@ use std::pin::Pin;
 use tokio_socks::tcp::Socks5Stream;
 use tokio_socks::IntoTargetAddr;
 
-/// Represents the configuration for a TCP/IP transport capability for libp2p.
+/// Represents the configuration for a Tor transport for libp2p.
 #[derive(Clone)]
 pub struct TorTcpConfig {
     inner: GenTcpConfig<Tcp>,
@@ -79,25 +79,12 @@ impl Transport for TorTcpConfig {
 fn to_address_string(multi: Multiaddr) -> Option<String> {
     let components = multi.iter();
     for protocol in components {
-        match protocol {
-            Protocol::Onion(addr, port) => {
-                tracing::warn!("Onion service v2 is being deprecated, consider upgrading to v3");
-                return Some(format!(
-                    "{}.onion:{}",
-                    BASE32.encode(addr.as_ref()).to_lowercase(),
-                    port
-                ));
-            }
-            Protocol::Onion3(addr) => {
-                return Some(format!(
-                    "{}.onion:{}",
-                    BASE32.encode(addr.hash()).to_lowercase(),
-                    addr.port()
-                ));
-            }
-            _ => {
-                // ignore
-            }
+        if let Protocol::Onion3(addr) = protocol {
+            return Some(format!(
+                "{}.onion:{}",
+                BASE32.encode(addr.hash()).to_lowercase(),
+                addr.port()
+            ));
         }
     }
 
