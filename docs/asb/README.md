@@ -45,7 +45,7 @@ Each service provider running an ASB can decide how/where to share these connect
 
 Eventually, more elaborate discovery mechanisms can be added.
 
-The **CLI** user can specify a service providers's multiaddress and peer-id with `--seller-addr` and `--seller-peer`, see `./swap --help` for details.
+The **CLI** user can specify a service providers's multiaddress and peer-id with `--seller-addr` and `--seller-peer-id`, see `./swap --help` for details.
 
 ### Setup Details
 
