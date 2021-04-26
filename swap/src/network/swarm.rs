@@ -19,8 +19,10 @@ where
 {
     let identity = seed.derive_libp2p_identity();
     let transport = transport::build(&identity)?;
+    let peer_id = identity.public().into_peer_id();
+    tracing::debug!("Our peer-id: {}", peer_id);
 
-    let swarm = SwarmBuilder::new(transport, behaviour, identity.public().into_peer_id())
+    let swarm = SwarmBuilder::new(transport, behaviour, peer_id)
         .executor(Box::new(|f| {
             tokio::spawn(f);
         }))
