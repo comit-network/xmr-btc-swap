@@ -174,6 +174,8 @@ async fn main() -> Result<()> {
 
             let alice_peer_id = db.get_peer_id(swap_id)?;
             let mut swarm = swarm::bob(&seed, alice_peer_id)?;
+            let bob_peer_id = swarm.local_peer_id();
+            tracing::debug!("Our peer-id: {}", bob_peer_id);
             swarm
                 .behaviour_mut()
                 .add_address(alice_peer_id, alice_multiaddr);
