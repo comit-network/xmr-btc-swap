@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 #[derive(thiserror::Error, Debug, Clone, Copy)]
 #[error("Cannot refund because swap {0} was not cancelled yet. Make sure to cancel the swap before trying to refund.")]
-pub struct SwapNotCancelledYet(Uuid);
+pub struct SwapNotCancelledYet(pub Uuid);
 
 pub async fn refund(
     swap_id: Uuid,

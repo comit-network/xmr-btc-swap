@@ -3,6 +3,7 @@ use bitcoin::util::amount::ParseAmountError;
 use bitcoin::{Address, Denomination};
 use rust_decimal::Decimal;
 use std::path::PathBuf;
+use uuid::Uuid;
 
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(
@@ -58,6 +59,42 @@ pub enum Command {
         about = "Prints the Bitcoin and Monero balance. Requires the monero-wallet-rpc to be running."
     )]
     Balance,
+    #[structopt(about = "Contains sub-commands for recovering a swap manually.")]
+    ManualRecovery(ManualRecovery),
+}
+
+#[derive(structopt::StructOpt, Debug)]
+pub enum ManualRecovery {
+    #[structopt(
+        about = "Publishes the Bitcoin cancel transaction. By default, the cancel timelock will be enforced. A confirmed cancel transaction enables refund and punish."
+    )]
+    Cancel {
+        #[structopt(flatten)]
+        cancel_params: RecoverCommandParams,
+    },
+    #[structopt(
+        about = "Publishes the Monero refund transaction. By default, a swap-state where the cancel transaction was already published will be enforced. This command requires the counterparty Bitcoin refund transaction and will error if it was not published yet. "
+    )]
+    Refund {
+        #[structopt(flatten)]
+        refund_params: RecoverCommandParams,
+    },
+}
+
+#[derive(structopt::StructOpt, Debug)]
+pub struct RecoverCommandParams {
+    #[structopt(
+        long = "swap-id",
+        help = "The swap id can be retrieved using the history subcommand"
+    )]
+    pub swap_id: Uuid,
+
+    #[structopt(
+        short,
+        long,
+        help = "Circumvents certain checks when recovering. It is recommended to run a recovery command without --force first to see what is returned."
+    )]
+    pub force: bool,
 }
 
 fn parse_btc(s: &str) -> Result<Amount, ParseAmountError> {

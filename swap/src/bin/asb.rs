@@ -20,7 +20,7 @@ use prettytable::{row, Table};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use structopt::StructOpt;
-use swap::asb::command::{Arguments, Command};
+use swap::asb::command::{Arguments, Command, ManualRecovery, RecoverCommandParams};
 use swap::asb::config::{
     default_config_path, initial_setup, query_user_for_initial_testnet_config, read_config, Config,
     ConfigNotInitialized,
@@ -29,6 +29,7 @@ use swap::database::Database;
 use swap::env::GetConfig;
 use swap::monero::Amount;
 use swap::network::swarm;
+use swap::protocol::alice;
 use swap::protocol::alice::event_loop::KrakenRate;
 use swap::protocol::alice::{run, EventLoop};
 use swap::seed::Seed;
@@ -204,6 +205,33 @@ async fn main() -> Result<()> {
             let monero_balance = monero_wallet.get_balance().await?;
 
             tracing::info!("Current balance: {}, {}", bitcoin_balance, monero_balance);
+        }
+        Command::ManualRecovery(ManualRecovery::Cancel {
+            cancel_params: RecoverCommandParams { swap_id, force },
+        }) => {
+            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+
+            let (txid, _) =
+                alice::cancel(swap_id, Arc::new(bitcoin_wallet), Arc::new(db), force).await??;
+
+            tracing::info!("Cancel transaction successfully published with id {}", txid);
+        }
+        Command::ManualRecovery(ManualRecovery::Refund {
+            refund_params: RecoverCommandParams { swap_id, force },
+        }) => {
+            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+            let monero_wallet = init_monero_wallet(&config, env_config).await?;
+
+            alice::refund(
+                swap_id,
+                Arc::new(bitcoin_wallet),
+                Arc::new(monero_wallet),
+                Arc::new(db),
+                force,
+            )
+            .await??;
+
+            tracing::info!("Monero successfully refunded");
         }
     };
 

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Cancel command for the ASB that allows cancelling a specific swap by id.
+  Using the cancel command requires the cancel timelock to be expired, but `--force` can be used to circumvent this check.
+- Refund command for the ASB that allows refunding a specific swap by id.
+  Using the refund command to refund the XMR locked by the ASB requires the CLI to first refund the BTC of the swap.
+  If the BTC was not refunded yet the command will print an error accordingly.
+  The command has a `--force` flag that allows executing the command without checking for cancel constraints.
 - Resume-only mode for the ASB.
   When started with `--resume-only` the ASB does not accept new, incoming swap requests but only finishes swaps that are resumed upon startup.
 

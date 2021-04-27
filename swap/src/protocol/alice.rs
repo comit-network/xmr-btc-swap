@@ -7,13 +7,17 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 pub use self::behaviour::{Behaviour, OutEvent};
+pub use self::cancel::cancel;
 pub use self::event_loop::{EventLoop, EventLoopHandle};
+pub use self::refund::refund;
 pub use self::state::*;
 pub use self::swap::{run, run_until};
 
 mod behaviour;
+pub mod cancel;
 pub mod event_loop;
 mod execution_setup;
+pub mod refund;
 mod spot_price;
 pub mod state;
 pub mod swap;
