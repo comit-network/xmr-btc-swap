@@ -356,7 +356,7 @@ dependencies = [
  "bitcoincore-rpc-json",
  "futures",
  "hex 0.4.3",
- "jsonrpc_client",
+ "jsonrpc_client 0.5.1",
  "reqwest",
  "serde",
  "serde_json",
@@ -1629,7 +1629,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc8515639023bf4260cf89475355fa77301685418f655c680528c380759e7782"
 dependencies = [
  "async-trait",
- "jsonrpc_client_macro",
+ "jsonrpc_client_macro 0.2.0",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "url 2.2.1",
+]
+
+[[package]]
+name = "jsonrpc_client"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a85cf2c5ce158eabf30b2ac4f535463d7b09ce7905502e11238b7d6048ef7d02"
+dependencies = [
+ "async-trait",
+ "jsonrpc_client_macro 0.3.0",
  "reqwest",
  "serde",
  "serde_json",
@@ -1641,6 +1655,16 @@ name = "jsonrpc_client_macro"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d5f3d1e50fefe4252d2e44c805663e73a8c0b2002b73f834ea055c8ed7fc46a8"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "jsonrpc_client_macro"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97c11e429f0eaa41fe659013680b459d2368d8f0a3e69dccfb7a35800b0dc27b"
 dependencies = [
  "quote",
  "syn",
@@ -2143,7 +2167,6 @@ dependencies = [
  "anyhow",
  "futures",
  "monero-rpc",
- "port_check",
  "rand 0.7.3",
  "spectral",
  "testcontainers 0.12.0",
@@ -2157,6 +2180,8 @@ name = "monero-rpc"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "jsonrpc_client 0.6.0",
+ "monero",
  "reqwest",
  "serde",
  "serde_json",

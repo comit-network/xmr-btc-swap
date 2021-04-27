@@ -33,7 +33,7 @@ pub async fn run_until(
 
     while !is_target_state(&current_state) {
         current_state = next_state(
-            swap.swap_id,
+            swap.id,
             current_state,
             &mut swap.event_loop_handle,
             swap.bitcoin_wallet.as_ref(),
@@ -45,7 +45,7 @@ pub async fn run_until(
 
         let db_state = current_state.clone().into();
         swap.db
-            .insert_latest_state(swap.swap_id, Swap::Bob(db_state))
+            .insert_latest_state(swap.id, Swap::Bob(db_state))
             .await?;
     }
 
@@ -197,21 +197,24 @@ async fn next_state(
         BobState::BtcRedeemed(state) => {
             let (spend_key, view_key) = state.xmr_keys();
 
-            let generated_wallet_file_name = &swap_id.to_string();
-            if monero_wallet
+            let generated_wallet_file_name = swap_id.to_string();
+            if let Err(e) = monero_wallet
                 .create_from_and_load(
-                    generated_wallet_file_name,
+                    generated_wallet_file_name.clone(),
                     spend_key,
                     view_key,
                     state.monero_wallet_restore_blockheight,
                 )
                 .await
-                .is_err()
             {
                 // In case we failed to refresh/sweep, when resuming the wallet might already
                 // exist! This is a very unlikely scenario, but if we don't take care of it we
                 // might not be able to ever transfer the Monero.
-                tracing::warn!("Failed to generate monero wallet from keys, falling back to trying to open the the wallet if it already exists: {}", swap_id);
+                tracing::warn!("Failed to generate monero wallet from keys: {:#}", e);
+                tracing::info!(
+                    "Falling back to trying to open the the wallet if it already exists: {}",
+                    swap_id
+                );
                 monero_wallet.open(generated_wallet_file_name).await?;
             }
 

@@ -1,4 +1,5 @@
 use monero_harness::{Monero, MoneroWalletRpc};
+use monero_rpc::wallet::MoneroWalletRpc as _;
 use spectral::prelude::*;
 use std::time::Duration;
 use testcontainers::clients::Cli;
@@ -16,9 +17,8 @@ async fn fund_transfer_and_check_tx_key() {
     let send_to_bob = 5_000_000_000;
 
     let tc = Cli::default();
-    let (monero, _containers) = Monero::new(&tc, vec!["alice".to_string(), "bob".to_string()])
-        .await
-        .unwrap();
+    let (monero, _monerod_container, _wallet_containers) =
+        Monero::new(&tc, vec!["alice", "bob"]).await.unwrap();
     let alice_wallet = monero.wallet("alice").unwrap();
     let bob_wallet = monero.wallet("bob").unwrap();
 
@@ -45,10 +45,10 @@ async fn fund_transfer_and_check_tx_key() {
 
     // check if tx was actually seen
     let tx_id = transfer.tx_hash;
-    let tx_key = transfer.tx_key;
+    let tx_key = transfer.tx_key.unwrap().to_string();
     let res = bob_wallet
         .client()
-        .check_tx_key(&tx_id, &tx_key, &bob_address)
+        .check_tx_key(tx_id, tx_key, bob_address)
         .await
         .expect("failed to check tx by key");
 

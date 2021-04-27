@@ -1,4 +1,5 @@
 use monero_harness::Monero;
+use monero_rpc::monerod::MonerodRpc as _;
 use spectral::prelude::*;
 use std::time::Duration;
 use testcontainers::clients::Cli;
@@ -12,7 +13,7 @@ async fn init_miner_and_mine_to_miner_address() {
         .set_default();
 
     let tc = Cli::default();
-    let (monero, _monerod_container) = Monero::new(&tc, vec![]).await.unwrap();
+    let (monero, _monerod_container, _wallet_containers) = Monero::new(&tc, vec![]).await.unwrap();
 
     monero.init_and_start_miner().await.unwrap();
 
@@ -25,7 +26,7 @@ async fn init_miner_and_mine_to_miner_address() {
     time::sleep(Duration::from_millis(1010)).await;
 
     // after a bit more than 1 sec another block should have been mined
-    let block_height = monerod.client().get_block_count().await.unwrap();
+    let block_height = monerod.client().get_block_count().await.unwrap().count;
 
     assert_that(&block_height).is_greater_than(70);
 }

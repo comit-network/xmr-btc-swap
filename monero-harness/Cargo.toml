@@ -8,7 +8,6 @@ edition = "2018"
 anyhow = "1"
 futures = "0.3"
 monero-rpc = { path = "../monero-rpc" }
-port_check = "0.1"
 rand = "0.7"
 spectral = "0.6"
 testcontainers = "0.12"

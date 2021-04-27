@@ -22,16 +22,15 @@
 //! Also provides standalone JSON RPC clients for monerod and monero-wallet-rpc.
 pub mod image;
 
-use crate::image::{
-    MONEROD_DAEMON_CONTAINER_NAME, MONEROD_DEFAULT_NETWORK, MONEROD_RPC_PORT, WALLET_RPC_PORT,
-};
-use anyhow::{anyhow, bail, Result};
+use crate::image::{MONEROD_DAEMON_CONTAINER_NAME, MONEROD_DEFAULT_NETWORK, RPC_PORT};
+use anyhow::{anyhow, bail, Context, Result};
 use monero_rpc::{
     monerod,
-    wallet::{self, GetAddress, Refreshed, Transfer},
+    monerod::MonerodRpc as _,
+    wallet::{self, GetAddress, MoneroWalletRpc as _, Refreshed, Transfer},
 };
 use std::time::Duration;
-use testcontainers::{clients::Cli, core::Port, Container, Docker, RunArgs};
+use testcontainers::{clients::Cli, Container, Docker, RunArgs};
 use tokio::time;
 
 /// How often we mine a block.
@@ -55,15 +54,19 @@ impl<'c> Monero {
     /// miner wallet container name is: `miner`
     pub async fn new(
         cli: &'c Cli,
-        additional_wallets: Vec<String>,
-    ) -> Result<(Self, Vec<Container<'c, Cli, image::Monero>>)> {
+        additional_wallets: Vec<&'static str>,
+    ) -> Result<(
+        Self,
+        Container<'c, Cli, image::Monerod>,
+        Vec<Container<'c, Cli, image::MoneroWalletRpc>>,
+    )> {
         let prefix = format!("{}_", random_prefix());
         let monerod_name = format!("{}{}", prefix, MONEROD_DAEMON_CONTAINER_NAME);
         let network = format!("{}{}", prefix, MONEROD_DEFAULT_NETWORK);
 
         tracing::info!("Starting monerod: {}", monerod_name);
         let (monerod, monerod_container) = Monerod::new(cli, monerod_name, network)?;
-        let mut containers = vec![monerod_container];
+        let mut containers = vec![];
         let mut wallets = vec![];
 
         let miner = "miner";
@@ -81,7 +84,7 @@ impl<'c> Monero {
             containers.push(container);
         }
 
-        Ok((Self { monerod, wallets }, containers))
+        Ok((Self { monerod, wallets }, monerod_container, containers))
     }
 
     pub fn monerod(&self) -> &Monerod {
@@ -104,7 +107,10 @@ impl<'c> Monero {
 
         // generate the first 70 as bulk
         let monerod = &self.monerod;
-        let res = monerod.client().generate_blocks(70, &miner_address).await?;
+        let res = monerod
+            .client()
+            .generateblocks(70, miner_address.clone())
+            .await?;
         tracing::info!("Generated {:?} blocks", res.blocks.len());
         miner_wallet.refresh().await?;
 
@@ -123,7 +129,10 @@ impl<'c> Monero {
             if amount > 0 {
                 miner_wallet.transfer(&address, amount).await?;
                 tracing::info!("Funded {} wallet with {}", wallet.name, amount);
-                monerod.client().generate_blocks(10, &miner_address).await?;
+                monerod
+                    .client()
+                    .generateblocks(10, miner_address.clone())
+                    .await?;
                 wallet.refresh().await?;
             }
         }
@@ -139,7 +148,7 @@ impl<'c> Monero {
         monerod.start_miner(&miner_address).await?;
 
         tracing::info!("Waiting for miner wallet to catch up...");
-        let block_height = monerod.client().get_block_count().await?;
+        let block_height = monerod.client().get_block_count().await?.count;
         miner_wallet
             .wait_for_wallet_height(block_height)
             .await
@@ -158,17 +167,11 @@ impl<'c> Monero {
 
 fn random_prefix() -> String {
     use rand::Rng;
-    const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyz";
-    const LEN: usize = 4;
-    let mut rng = rand::thread_rng();
 
-    let prefix: String = (0..LEN)
-        .map(|_| {
-            let idx = rng.gen_range(0, CHARSET.len());
-            CHARSET[idx] as char
-        })
-        .collect();
-    prefix
+    rand::thread_rng()
+        .sample_iter(rand::distributions::Alphanumeric)
+        .take(4)
+        .collect()
 }
 
 #[derive(Clone, Debug)]
@@ -176,6 +179,7 @@ pub struct Monerod {
     rpc_port: u16,
     name: String,
     network: String,
+    client: monerod::Client,
 }
 
 #[derive(Clone, Debug)]
@@ -183,6 +187,7 @@ pub struct MoneroWalletRpc {
     rpc_port: u16,
     name: String,
     network: String,
+    client: wallet::Client,
 }
 
 impl<'c> Monerod {
@@ -191,38 +196,35 @@ impl<'c> Monerod {
         cli: &'c Cli,
         name: String,
         network: String,
-    ) -> Result<(Self, Container<'c, Cli, image::Monero>)> {
-        let monerod_rpc_port: u16 =
-            port_check::free_local_port().ok_or_else(|| anyhow!("Could not retrieve free port"))?;
-
-        let image = image::Monero::default();
+    ) -> Result<(Self, Container<'c, Cli, image::Monerod>)> {
+        let image = image::Monerod::default();
         let run_args = RunArgs::default()
             .with_name(name.clone())
-            .with_network(network.clone())
-            .with_mapped_port(Port {
-                local: monerod_rpc_port,
-                internal: MONEROD_RPC_PORT,
-            });
-        let docker = cli.run_with_args(image, run_args);
+            .with_network(network.clone());
+        let container = cli.run_with_args(image, run_args);
+        let monerod_rpc_port = container
+            .get_host_port(RPC_PORT)
+            .context("port not exposed")?;
 
         Ok((
             Self {
                 rpc_port: monerod_rpc_port,
                 name,
                 network,
+                client: monerod::Client::localhost(monerod_rpc_port)?,
             },
-            docker,
+            container,
         ))
     }
 
-    pub fn client(&self) -> monerod::Client {
-        monerod::Client::localhost(self.rpc_port)
+    pub fn client(&self) -> &monerod::Client {
+        &self.client
     }
 
     /// Spawns a task to mine blocks in a regular interval to the provided
     /// address
     pub async fn start_miner(&self, miner_wallet_address: &str) -> Result<()> {
-        let monerod = self.client();
+        let monerod = self.client().clone();
         let _ = tokio::spawn(mine(monerod, miner_wallet_address.to_string()));
         Ok(())
     }
@@ -236,48 +238,46 @@ impl<'c> MoneroWalletRpc {
         name: &str,
         monerod: &Monerod,
         prefix: String,
-    ) -> Result<(Self, Container<'c, Cli, image::Monero>)> {
-        let wallet_rpc_port: u16 =
-            port_check::free_local_port().ok_or_else(|| anyhow!("Could not retrieve free port"))?;
-
-        let daemon_address = format!("{}:{}", monerod.name, MONEROD_RPC_PORT);
-        let image = image::Monero::wallet(&name, daemon_address);
+    ) -> Result<(Self, Container<'c, Cli, image::MoneroWalletRpc>)> {
+        let daemon_address = format!("{}:{}", monerod.name, RPC_PORT);
+        let image = image::MoneroWalletRpc::new(&name, daemon_address);
 
         let network = monerod.network.clone();
         let run_args = RunArgs::default()
             // prefix the container name so we can run multiple tests
             .with_name(format!("{}{}", prefix, name))
-            .with_network(network.clone())
-            .with_mapped_port(Port {
-                local: wallet_rpc_port,
-                internal: WALLET_RPC_PORT,
-            });
-        let docker = cli.run_with_args(image, run_args);
+            .with_network(network.clone());
+        let container = cli.run_with_args(image, run_args);
+        let wallet_rpc_port = container
+            .get_host_port(RPC_PORT)
+            .context("port not exposed")?;
 
         // create new wallet
-        wallet::Client::localhost(wallet_rpc_port)
-            .create_wallet(name)
-            .await
-            .unwrap();
+        let client = wallet::Client::localhost(wallet_rpc_port)?;
+
+        client
+            .create_wallet(name.to_owned(), "English".to_owned())
+            .await?;
 
         Ok((
             Self {
                 rpc_port: wallet_rpc_port,
                 name: name.to_string(),
                 network,
+                client,
             },
-            docker,
+            container,
         ))
     }
 
-    pub fn client(&self) -> wallet::Client {
-        wallet::Client::localhost(self.rpc_port)
+    pub fn client(&self) -> &wallet::Client {
+        &self.client
     }
 
     // It takes a little while for the wallet to sync with monerod.
     pub async fn wait_for_wallet_height(&self, height: u32) -> Result<()> {
         let mut retry: u8 = 0;
-        while self.client().block_height().await?.height < height {
+        while self.client().get_height().await?.height < height {
             if retry >= 30 {
                 // ~30 seconds
                 bail!("Wallet could not catch up with monerod after 30 retries.")
@@ -290,26 +290,28 @@ impl<'c> MoneroWalletRpc {
 
     /// Sends amount to address
     pub async fn transfer(&self, address: &str, amount: u64) -> Result<Transfer> {
-        self.client().transfer(0, amount, address).await
+        Ok(self.client().transfer_single(0, amount, address).await?)
     }
 
     pub async fn address(&self) -> Result<GetAddress> {
-        self.client().get_address(0).await
+        Ok(self.client().get_address(0).await?)
     }
 
     pub async fn balance(&self) -> Result<u64> {
         self.client().refresh().await?;
-        self.client().get_balance(0).await
+        let balance = self.client().get_balance(0).await?.balance;
+
+        Ok(balance)
     }
 
     pub async fn refresh(&self) -> Result<Refreshed> {
-        self.client().refresh().await
+        Ok(self.client().refresh().await?)
     }
 }
 /// Mine a block ever BLOCK_TIME_SECS seconds.
 async fn mine(monerod: monerod::Client, reward_address: String) -> Result<()> {
     loop {
         time::sleep(Duration::from_secs(BLOCK_TIME_SECS)).await;
-        monerod.generate_blocks(1, &reward_address).await?;
+        monerod.generateblocks(1, reward_address.clone()).await?;
     }
 }

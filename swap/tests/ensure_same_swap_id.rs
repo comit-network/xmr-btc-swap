@@ -7,7 +7,7 @@ use swap::protocol::bob;
 async fn ensure_same_swap_id_for_alice_and_bob() {
     harness::setup_test(SlowCancelConfig, |mut ctx| async move {
         let (bob_swap, _) = ctx.bob_swap().await;
-        let bob_swap_id = bob_swap.swap_id;
+        let bob_swap_id = bob_swap.id;
         let _ = tokio::spawn(bob::run(bob_swap));
 
         // once Bob's swap is spawned we can retrieve Alice's swap and assert on the
