@@ -1,6 +1,6 @@
 use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{
-    build_shared_output_descriptor, Address, Amount, PublicKey, Transaction, Wallet, TX_FEE,
+    build_shared_output_descriptor, Address, Amount, PublicKey, Transaction, Wallet,
 };
 use ::bitcoin::util::psbt::PartiallySignedTransaction;
 use ::bitcoin::{OutPoint, TxIn, TxOut, Txid};

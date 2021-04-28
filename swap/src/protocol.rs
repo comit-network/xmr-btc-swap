@@ -39,6 +39,8 @@ pub struct Message1 {
     v_a: monero::PrivateViewKey,
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    tx_redeem_fee: bitcoin::Amount,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -347,6 +347,19 @@ impl<B, D, C> Wallet<B, D, C> {
         // TODO: This should obviously not be a const :)
         FeeRate::from_sat_per_vb(5.0)
     }
+
+    pub fn estimate_fee(&self, weight: usize) -> bitcoin::Amount {
+        // Doing some heavy math here :)
+        // `usize` is 32 or 64 bits wide, but `f32`'s mantissa is only 23 bits wide
+        // This fine because such a big transaction cannot exist.
+        #[allow(clippy::cast_precision_loss)]
+        let calc_fee_bytes = (weight as f32) * self.select_feerate().as_sat_vb() / 4.0;
+        // There are no fractional satoshi, hence we just round to the next one and
+        // truncate. We also do not support negative fees.
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let calc_fee_bytes_rounded = ((calc_fee_bytes * 10.0).round() as u64) / 10;
+        bitcoin::Amount::from_sat(calc_fee_bytes_rounded)
+    }
 }
 
 #[cfg(test)]

@@ -35,6 +35,11 @@ use tracing_subscriber::util::SubscriberInitExt;
 use url::Url;
 use uuid::Uuid;
 
+// Note: this needs to be adopted if bitcoin::wallet.select_feerate() or
+// bitcoin::ESTIMATED_WEIGHT_TX_REDEEM changes.
+// TODO: see if there is a better way.
+const TX_REDEEM_FEE: u64 = 12500;
+
 pub async fn setup_test<T, F, C>(_config: C, testfn: T)
 where
     T: Fn(TestContext) -> F,
@@ -678,7 +683,7 @@ impl TestContext {
 
     fn alice_redeemed_btc_balance(&self) -> bitcoin::Amount {
         self.alice_starting_balances.btc + self.btc_amount
-            - bitcoin::Amount::from_sat(bitcoind::TX_FEE)
+            - bitcoin::Amount::from_sat(TX_REDEEM_FEE)
     }
 
     fn bob_redeemed_xmr_balance(&self) -> monero::Amount {

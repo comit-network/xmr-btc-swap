@@ -1,5 +1,6 @@
 use crate::bitcoin::{
     current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, TxCancel, TxPunish, TxRefund,
+    ESTIMATED_WEIGHT_TX_REDEEM,
 };
 use crate::env::Config;
 use crate::monero::wallet::{TransferRequest, WatchRequest};
@@ -108,6 +109,7 @@ pub struct State0 {
     punish_timelock: PunishTimelock,
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
+    tx_redeem_fee: bitcoin::Amount,
 }
 
 impl State0 {
@@ -144,6 +146,7 @@ impl State0 {
             xmr,
             cancel_timelock: env_config.bitcoin_cancel_timelock,
             punish_timelock: env_config.bitcoin_punish_timelock,
+            tx_redeem_fee: bitcoin_wallet.estimate_fee(ESTIMATED_WEIGHT_TX_REDEEM),
         })
     }
 
@@ -183,6 +186,7 @@ impl State0 {
             refund_address: msg.refund_address,
             redeem_address: self.redeem_address,
             punish_address: self.punish_address,
+            tx_redeem_fee: self.tx_redeem_fee,
         }))
     }
 }
@@ -206,6 +210,7 @@ pub struct State1 {
     refund_address: bitcoin::Address,
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
+    tx_redeem_fee: bitcoin::Amount,
 }
 
 impl State1 {
@@ -218,6 +223,7 @@ impl State1 {
             v_a: self.v_a,
             redeem_address: self.redeem_address.clone(),
             punish_address: self.punish_address.clone(),
+            tx_redeem_fee: self.tx_redeem_fee,
         }
     }
 
@@ -240,6 +246,7 @@ impl State1 {
             redeem_address: self.redeem_address,
             punish_address: self.punish_address,
             tx_lock,
+            tx_redeem_fee: self.tx_redeem_fee,
         })
     }
 }
@@ -260,6 +267,7 @@ pub struct State2 {
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
+    tx_redeem_fee: bitcoin::Amount,
 }
 
 impl State2 {
@@ -309,6 +317,7 @@ impl State2 {
             tx_lock: self.tx_lock,
             tx_punish_sig_bob: msg.tx_punish_sig,
             tx_cancel_sig_bob: msg.tx_cancel_sig,
+            tx_redeem_fee: self.tx_redeem_fee,
         })
     }
 }
@@ -332,6 +341,8 @@ pub struct State3 {
     pub tx_lock: bitcoin::TxLock,
     tx_punish_sig_bob: bitcoin::Signature,
     tx_cancel_sig_bob: bitcoin::Signature,
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    tx_redeem_fee: bitcoin::Amount,
 }
 
 impl State3 {
@@ -407,7 +418,7 @@ impl State3 {
         &self,
         sig: bitcoin::EncryptedSignature,
     ) -> Result<bitcoin::Transaction> {
-        bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address)
+        bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address, self.tx_redeem_fee)
             .complete(sig, self.a.clone(), self.s_a.to_secpfun_scalar(), self.B)
             .context("Failed to complete Bitcoin redeem transaction")
     }

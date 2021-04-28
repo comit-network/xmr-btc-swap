@@ -37,6 +37,8 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
 
+pub use crate::bitcoin::redeem::ESTIMATED_WEIGHT as ESTIMATED_WEIGHT_TX_REDEEM;
+
 // TODO: Configurable tx-fee (note: parties have to agree prior to swapping)
 // Current reasoning:
 // tx with largest weight (as determined by get_weight() upon broadcast in e2e

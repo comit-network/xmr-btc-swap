@@ -1,6 +1,6 @@
 use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{
-    verify_encsig, verify_sig, Address, EmptyWitnessStack, EncryptedSignature, NoInputs,
+    verify_encsig, verify_sig, Address, Amount, EmptyWitnessStack, EncryptedSignature, NoInputs,
     NotThreeWitnesses, PublicKey, SecretKey, TooManyInputs, Transaction, TxLock,
 };
 use ::bitcoin::util::bip143::SigHashCache;
@@ -15,6 +15,9 @@ use miniscript::{Descriptor, DescriptorTrait};
 use sha2::Sha256;
 use std::collections::HashMap;
 
+// TODO take real tx weight from past transaction
+pub const ESTIMATED_WEIGHT: usize = 10_000;
+
 #[derive(Clone, Debug)]
 pub struct TxRedeem {
     inner: Transaction,
@@ -24,10 +27,10 @@ pub struct TxRedeem {
 }
 
 impl TxRedeem {
-    pub fn new(tx_lock: &TxLock, redeem_address: &Address) -> Self {
+    pub fn new(tx_lock: &TxLock, redeem_address: &Address, spending_fee: Amount) -> Self {
         // lock_input is the shared output that is now being used as an input for the
         // redeem transaction
-        let tx_redeem = tx_lock.build_spend_transaction(redeem_address, None);
+        let tx_redeem = tx_lock.build_spend_transaction(redeem_address, None, spending_fee);
 
         let digest = SigHashCache::new(&tx_redeem).signature_hash(
             0, // Only one input: lock_input (lock transaction)

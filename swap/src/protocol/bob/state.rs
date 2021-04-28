@@ -169,6 +169,7 @@ impl State0 {
             punish_address: msg.punish_address,
             tx_lock,
             min_monero_confirmations: self.min_monero_confirmations,
+            tx_redeem_fee: msg.tx_redeem_fee,
         })
     }
 }
@@ -189,6 +190,7 @@ pub struct State1 {
     punish_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
     min_monero_confirmations: u64,
+    tx_redeem_fee: bitcoin::Amount,
 }
 
 impl State1 {
@@ -227,6 +229,7 @@ impl State1 {
             tx_cancel_sig_a: msg.tx_cancel_sig,
             tx_refund_encsig: msg.tx_refund_encsig,
             min_monero_confirmations: self.min_monero_confirmations,
+            tx_redeem_fee: self.tx_redeem_fee,
         })
     }
 }
@@ -249,6 +252,8 @@ pub struct State2 {
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: bitcoin::EncryptedSignature,
     min_monero_confirmations: u64,
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    tx_redeem_fee: bitcoin::Amount,
 }
 
 impl State2 {
@@ -283,6 +288,7 @@ impl State2 {
                 tx_cancel_sig_a: self.tx_cancel_sig_a,
                 tx_refund_encsig: self.tx_refund_encsig,
                 min_monero_confirmations: self.min_monero_confirmations,
+                tx_redeem_fee: self.tx_redeem_fee,
             },
             self.tx_lock,
         ))
@@ -306,6 +312,8 @@ pub struct State3 {
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: bitcoin::EncryptedSignature,
     min_monero_confirmations: u64,
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    tx_redeem_fee: bitcoin::Amount,
 }
 
 impl State3 {
@@ -338,6 +346,7 @@ impl State3 {
             tx_cancel_sig_a: self.tx_cancel_sig_a,
             tx_refund_encsig: self.tx_refund_encsig,
             monero_wallet_restore_blockheight,
+            tx_redeem_fee: self.tx_redeem_fee,
         }
     }
 
@@ -392,16 +401,20 @@ pub struct State4 {
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: bitcoin::EncryptedSignature,
     monero_wallet_restore_blockheight: BlockHeight,
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    tx_redeem_fee: bitcoin::Amount,
 }
 
 impl State4 {
     pub fn tx_redeem_encsig(&self) -> bitcoin::EncryptedSignature {
-        let tx_redeem = bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address);
+        let tx_redeem =
+            bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address, self.tx_redeem_fee);
         self.b.encsign(self.S_a_bitcoin, tx_redeem.digest())
     }
 
     pub async fn watch_for_redeem_btc(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<State5> {
-        let tx_redeem = bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address);
+        let tx_redeem =
+            bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address, self.tx_redeem_fee);
         let tx_redeem_encsig = self.b.encsign(self.S_a_bitcoin, tx_redeem.digest());
 
         bitcoin_wallet
