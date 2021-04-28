@@ -34,7 +34,7 @@ impl Image for Monerod {
         container
             .logs()
             .stdout
-            .wait_for_message("JOINING all threads")
+            .wait_for_message("RPC server started ok")
             .unwrap();
     }
 
@@ -87,7 +87,7 @@ impl Image for MoneroWalletRpc {
         container
             .logs()
             .stdout
-            .wait_for_message("JOINING all threads")
+            .wait_for_message("Run server thread name: RPC")
             .unwrap();
     }
 
