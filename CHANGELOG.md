@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Using the refund command to refund the XMR locked by the ASB requires the CLI to first refund the BTC of the swap.
   If the BTC was not refunded yet the command will print an error accordingly.
   The command has a `--force` flag that allows executing the command without checking for cancel constraints.
+- Punish command for the ASB that allows punishing a specific swap by id.
+  Includes a `--force` parameter that when set disables the punish timelock check and verifying that the swap is in a cancelled state already.
+- Abort command for the ASB that allows safely aborting a specific swap.
+  Only swaps in a state prior to locking XMR can be safely aborted.
+- Redeem command for the ASB that allows redeeming a specific swap.
+  Only swaps where we learned the encrypted signature are redeemable.
+  The command checks for expired timelocks to ensure redeeming is safe, but the timelock check can be disable using the `--force` flag.
+  By default we wait for finality of the redeem transaction; this can be disabled by setting `--do-not-await-finality`.
 - Resume-only mode for the ASB.
   When started with `--resume-only` the ASB does not accept new, incoming swap requests but only finishes swaps that are resumed upon startup.
 

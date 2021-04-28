@@ -7,17 +7,20 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 pub use self::behaviour::{Behaviour, OutEvent};
-pub use self::cancel::cancel;
 pub use self::event_loop::{EventLoop, EventLoopHandle};
-pub use self::refund::refund;
+pub use self::recovery::cancel::cancel;
+pub use self::recovery::punish::punish;
+pub use self::recovery::redeem::redeem;
+pub use self::recovery::refund::refund;
+pub use self::recovery::safely_abort::safely_abort;
+pub use self::recovery::{cancel, punish, redeem, refund, safely_abort};
 pub use self::state::*;
 pub use self::swap::{run, run_until};
 
 mod behaviour;
-pub mod cancel;
 pub mod event_loop;
 mod execution_setup;
-pub mod refund;
+mod recovery;
 mod spot_price;
 pub mod state;
 pub mod swap;

@@ -302,16 +302,7 @@ async fn next_state(
             transfer_proof,
             state3,
         } => {
-            let signed_tx_punish = state3.signed_punish_transaction()?;
-
-            let punish = async {
-                let (txid, subscription) =
-                    bitcoin_wallet.broadcast(signed_tx_punish, "punish").await?;
-                subscription.wait_until_final().await?;
-
-                Result::<_, anyhow::Error>::Ok(txid)
-            }
-            .await;
+            let punish = state3.punish_btc(bitcoin_wallet).await;
 
             match punish {
                 Ok(_) => AliceState::BtcPunished,

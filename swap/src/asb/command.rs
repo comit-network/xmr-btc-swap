@@ -66,6 +66,19 @@ pub enum Command {
 #[derive(structopt::StructOpt, Debug)]
 pub enum ManualRecovery {
     #[structopt(
+        about = "Publishes the Bitcoin redeem transaction. This requires that we learned the encrypted signature from Bob and is only safe if no timelock has expired."
+    )]
+    Redeem {
+        #[structopt(flatten)]
+        redeem_params: RecoverCommandParams,
+
+        #[structopt(
+            long = "do_not_await_finality",
+            help = "If this flag is present we exit directly after publishing the redeem transaction without waiting for the transaction to be included in a block"
+        )]
+        do_not_await_finality: bool,
+    },
+    #[structopt(
         about = "Publishes the Bitcoin cancel transaction. By default, the cancel timelock will be enforced. A confirmed cancel transaction enables refund and punish."
     )]
     Cancel {
@@ -78,6 +91,21 @@ pub enum ManualRecovery {
     Refund {
         #[structopt(flatten)]
         refund_params: RecoverCommandParams,
+    },
+    #[structopt(
+        about = "Publishes the Bitcoin punish transaction. By default, the punish timelock and a swap-state where the cancel transaction was already published will be enforced."
+    )]
+    Punish {
+        #[structopt(flatten)]
+        punish_params: RecoverCommandParams,
+    },
+    #[structopt(about = "Safely Abort requires the swap to be in a state prior to locking XMR.")]
+    SafelyAbort {
+        #[structopt(
+            long = "swap-id",
+            help = "The swap id can be retrieved using the history subcommand"
+        )]
+        swap_id: Uuid,
     },
 }
 
