@@ -634,12 +634,12 @@ impl TestContext {
         let alice_submitted_cancel = btc_balance_after_swap
             == self.bob_starting_balances.btc
                 - lock_tx_bitcoin_fee
-                - bitcoin::Amount::from_sat(bitcoin::TX_FEE);
+                - bitcoin::Amount::from_sat(bitcoind::TX_FEE);
 
         let bob_submitted_cancel = btc_balance_after_swap
             == self.bob_starting_balances.btc
                 - lock_tx_bitcoin_fee
-                - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE);
+                - bitcoin::Amount::from_sat(2 * bitcoind::TX_FEE);
 
         // The cancel tx can be submitted by both Alice and Bob.
         // Since we cannot be sure who submitted it we have to assert accordingly
@@ -678,7 +678,7 @@ impl TestContext {
 
     fn alice_redeemed_btc_balance(&self) -> bitcoin::Amount {
         self.alice_starting_balances.btc + self.btc_amount
-            - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
+            - bitcoin::Amount::from_sat(bitcoind::TX_FEE)
     }
 
     fn bob_redeemed_xmr_balance(&self) -> monero::Amount {
@@ -717,7 +717,7 @@ impl TestContext {
 
     fn alice_punished_btc_balance(&self) -> bitcoin::Amount {
         self.alice_starting_balances.btc + self.btc_amount
-            - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE)
+            - bitcoin::Amount::from_sat(2 * bitcoind::TX_FEE)
     }
 
     fn bob_punished_xmr_balance(&self) -> monero::Amount {
