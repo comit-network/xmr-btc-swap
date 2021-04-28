@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use data_encoding::BASE32;
 use futures::future::Ready;
 use futures::prelude::*;
@@ -6,7 +7,6 @@ use libp2p::core::transport::TransportError;
 use libp2p::core::Transport;
 use libp2p::tcp::tokio::{Tcp, TcpStream};
 use libp2p::tcp::{GenTcpConfig, TcpListenStream, TokioTcpConfig};
-use std::cmp::Ordering;
 use std::io;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::pin::Pin;
@@ -55,13 +55,14 @@ impl Transport for TorTcpConfig {
         }
 
         match to_address_string(addr.clone()) {
-            Some(tor_address_string) => {
+            Ok(tor_address_string) => {
                 Ok(Box::pin(do_tor_dial(self.socks_port, tor_address_string)))
             }
-            _ => {
+            Err(e) => {
                 tracing::warn!(
-                    "Address {} could not be formatted. Dialling via clear net",
-                    addr
+                    "Address {} could not be formatted. Dialling via clear net. Details: {}",
+                    addr,
+                    e
                 );
                 self.inner.dial(addr)
             }
@@ -76,68 +77,41 @@ impl Transport for TorTcpConfig {
 /// Tor expects an address format of ADDR:PORT.
 /// This helper function tries to convert the provided multi-address into this
 /// format. None is returned if an unsupported protocol was provided.
-fn to_address_string(multi: Multiaddr) -> Option<String> {
-    let components = multi.iter();
-    for protocol in components {
-        if let Protocol::Onion3(addr) = protocol {
-            return Some(format!(
+fn to_address_string(multi: Multiaddr) -> anyhow::Result<String> {
+    let mut protocols = multi.iter();
+    let address_string = match protocols.next() {
+        // if it is an Onion address, we have all we need and can return
+        Some(Protocol::Onion3(addr)) => {
+            return Ok(format!(
                 "{}.onion:{}",
                 BASE32.encode(addr.hash()).to_lowercase(),
                 addr.port()
-            ));
+            ))
         }
+        // Deal with non-onion addresses
+        Some(Protocol::Ip4(addr)) => Some(format!("{}", addr)),
+        Some(Protocol::Ip6(addr)) => Some(format!("{}", addr)),
+        Some(Protocol::Dns(addr)) => Some(format!("{}", addr)),
+        Some(Protocol::Dns4(addr)) => Some(format!("{}", addr)),
+        _ => None,
     }
-
-    // Deal with non-onion addresses
-    let protocols = multi.iter().collect::<Vec<_>>();
-    let address_string = protocols
-        .iter()
-        .filter_map(|protocol| match protocol {
-            Protocol::Ip4(addr) => Some(format!("{}", addr)),
-            Protocol::Ip6(addr) => Some(format!("{}", addr)),
-            Protocol::Dns(addr) => Some(format!("{}", addr)),
-            Protocol::Dns4(addr) => Some(format!("{}", addr)),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    if address_string.is_empty() {
-        tracing::warn!(
+    .ok_or_else(|| {
+        anyhow!(
             "Could not format address {}. Please consider reporting this issue. ",
             multi
-        );
-        return None;
-    }
+        )
+    })?;
 
-    let address_string = address_string
-        .get(0)
-        .expect("Valid multiaddr consist out of max 1 address")
-        .clone();
+    let port_string = match protocols.next() {
+        Some(Protocol::Tcp(port)) => Some(format!("{}", port)),
+        Some(Protocol::Udp(port)) => Some(format!("{}", port)),
+        _ => None,
+    };
 
-    // check for port
-    let port = protocols
-        .iter()
-        .filter_map(|protocol| match protocol {
-            Protocol::Tcp(port) => Some(format!("{}", port)),
-            Protocol::Udp(port) => Some(format!("{}", port)),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-
-    match port.len().cmp(&1) {
-        Ordering::Greater => {
-            tracing::warn!(
-                "Did not expect more than 1 port in address {}. Please consider reporting this issue.",
-                multi
-            );
-            Some(address_string)
-        }
-        Ordering::Less => Some(address_string),
-        Ordering::Equal => Some(format!(
-            "{}:{}",
-            address_string,
-            port.get(0)
-                .expect("Already verified the length of the vec.")
-        )),
+    if let Some(port) = port_string {
+        Ok(format!("{}:{}", address_string, port))
+    } else {
+        Ok(address_string)
     }
 }
 
@@ -219,7 +193,7 @@ pub mod test {
     #[test]
     fn dnsaddr_to_address_string_should_be_none() {
         let address = "/dnsaddr/randomdomain.com";
-        let address_string = to_address_string(address.parse().unwrap());
+        let address_string = to_address_string(address.parse().unwrap()).ok();
         assert_eq!(address_string, None);
     }
 }
