@@ -25,8 +25,9 @@ pub struct Arguments {
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(name = "xmr_btc-swap", about = "XMR BTC atomic swap")]
 pub enum Command {
+    #[structopt(about = "Main command to run the ASB.")]
     Start {
-        #[structopt(long = "max-buy-btc", help = "The maximum amount of BTC the ASB is willing to buy.", default_value="0.005", parse(try_from_str = parse_btc))]
+        #[structopt(long = "max-buy-btc", help = "The maximum amount of BTC the ASB is willing to buy.", default_value = "0.005", parse(try_from_str = parse_btc))]
         max_buy: Amount,
         #[structopt(
             long = "ask-spread",
@@ -41,7 +42,9 @@ pub enum Command {
         )]
         resume_only: bool,
     },
+    #[structopt(about = "Prints swap-id and the state of each swap ever made.")]
     History,
+    #[structopt(about = "Allows withdrawing BTC from the internal Bitcoin wallet.")]
     WithdrawBtc {
         #[structopt(
             long = "amount",
@@ -51,6 +54,9 @@ pub enum Command {
         #[structopt(long = "address", help = "The address to receive the Bitcoin.")]
         address: Address,
     },
+    #[structopt(
+        about = "Prints the Bitcoin and Monero balance. Requires the monero-wallet-rpc to be running."
+    )]
     Balance,
 }
 
