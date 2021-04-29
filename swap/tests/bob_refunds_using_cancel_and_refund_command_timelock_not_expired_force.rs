@@ -24,15 +24,9 @@ async fn given_bob_manually_forces_cancel_when_timelock_not_expired_errors() {
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));
 
         // Bob forces a cancel that will fail
-        let is_error = bob::cancel(
-            bob_swap.id,
-            bob_swap.state,
-            bob_swap.bitcoin_wallet,
-            bob_swap.db,
-            true,
-        )
-        .await
-        .is_err();
+        let is_error = bob::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, true)
+            .await
+            .is_err();
 
         assert!(is_error);
 
@@ -42,15 +36,9 @@ async fn given_bob_manually_forces_cancel_when_timelock_not_expired_errors() {
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));
 
         // Bob forces a refund that will fail
-        let is_error = bob::refund(
-            bob_swap.id,
-            bob_swap.state,
-            bob_swap.bitcoin_wallet,
-            bob_swap.db,
-            true,
-        )
-        .await
-        .is_err();
+        let is_error = bob::refund(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, true)
+            .await
+            .is_err();
 
         assert!(is_error);
         let (bob_swap, _) = ctx

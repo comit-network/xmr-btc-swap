@@ -13,11 +13,12 @@ pub enum Error {
 
 pub async fn cancel(
     swap_id: Uuid,
-    state: BobState,
     bitcoin_wallet: Arc<Wallet>,
     db: Database,
     force: bool,
 ) -> Result<Result<(Txid, BobState), Error>> {
+    let state = db.get_state(swap_id)?.try_into_bob()?.into();
+
     let state6 = match state {
         BobState::BtcLocked(state3) => state3.cancel(),
         BobState::XmrLockProofReceived { state, .. } => state.cancel(),

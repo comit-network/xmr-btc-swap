@@ -11,11 +11,12 @@ pub struct SwapNotCancelledYet(Uuid);
 
 pub async fn refund(
     swap_id: Uuid,
-    state: BobState,
     bitcoin_wallet: Arc<Wallet>,
     db: Database,
     force: bool,
 ) -> Result<Result<BobState, SwapNotCancelledYet>> {
+    let state = db.get_state(swap_id)?.try_into_bob()?.into();
+
     let state6 = if force {
         match state {
             BobState::BtcLocked(state3) => state3.cancel(),

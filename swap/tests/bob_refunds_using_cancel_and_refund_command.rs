@@ -36,14 +36,8 @@ async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
 
         // Bob manually cancels
         bob_join_handle.abort();
-        let (_, state) = bob::cancel(
-            bob_swap.id,
-            bob_swap.state,
-            bob_swap.bitcoin_wallet,
-            bob_swap.db,
-            false,
-        )
-        .await??;
+        let (_, state) =
+            bob::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false).await??;
         assert!(matches!(state, BobState::BtcCancelled { .. }));
 
         let (bob_swap, bob_join_handle) = ctx
@@ -53,14 +47,8 @@ async fn given_bob_manually_refunds_after_btc_locked_bob_refunds() {
 
         // Bob manually refunds
         bob_join_handle.abort();
-        let bob_state = bob::refund(
-            bob_swap.id,
-            bob_swap.state,
-            bob_swap.bitcoin_wallet,
-            bob_swap.db,
-            false,
-        )
-        .await??;
+        let bob_state =
+            bob::refund(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false).await??;
 
         ctx.assert_bob_refunded(bob_state).await;
 
