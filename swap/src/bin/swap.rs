@@ -51,6 +51,7 @@ async fn main() -> Result<()> {
                     monero_daemon_host,
                 },
             electrum_rpc_url,
+            tor_socks5_port,
         } => {
             let swap_id = Uuid::new_v4();
 
@@ -76,7 +77,7 @@ async fn main() -> Result<()> {
                 init_monero_wallet(data_dir, monero_daemon_host, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
-            let mut swarm = swarm::bob(&seed, alice_peer_id)?;
+            let mut swarm = swarm::bob(&seed, alice_peer_id, tor_socks5_port).await?;
             swarm
                 .behaviour_mut()
                 .add_address(alice_peer_id, alice_multiaddr);
@@ -152,6 +153,7 @@ async fn main() -> Result<()> {
                     monero_daemon_host,
                 },
             electrum_rpc_url,
+            tor_socks5_port,
         } => {
             let data_dir = data.0;
             cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
@@ -172,7 +174,8 @@ async fn main() -> Result<()> {
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
             let alice_peer_id = db.get_peer_id(swap_id)?;
-            let mut swarm = swarm::bob(&seed, alice_peer_id)?;
+
+            let mut swarm = swarm::bob(&seed, alice_peer_id, tor_socks5_port).await?;
             let bob_peer_id = swarm.local_peer_id();
             tracing::debug!("Our peer-id: {}", bob_peer_id);
             swarm

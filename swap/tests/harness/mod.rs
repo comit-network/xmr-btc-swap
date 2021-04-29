@@ -383,8 +383,8 @@ struct BobParams {
 }
 
 impl BobParams {
-    pub fn new_swap_from_db(&self, swap_id: Uuid) -> Result<(bob::Swap, bob::EventLoop)> {
-        let (event_loop, handle) = self.new_eventloop(swap_id)?;
+    pub async fn new_swap_from_db(&self, swap_id: Uuid) -> Result<(bob::Swap, bob::EventLoop)> {
+        let (event_loop, handle) = self.new_eventloop(swap_id).await?;
         let db = Database::open(&self.db_path)?;
 
         let swap = bob::Swap::from_db(
@@ -400,10 +400,13 @@ impl BobParams {
         Ok((swap, event_loop))
     }
 
-    pub fn new_swap(&self, btc_amount: bitcoin::Amount) -> Result<(bob::Swap, bob::EventLoop)> {
+    pub async fn new_swap(
+        &self,
+        btc_amount: bitcoin::Amount,
+    ) -> Result<(bob::Swap, bob::EventLoop)> {
         let swap_id = Uuid::new_v4();
 
-        let (event_loop, handle) = self.new_eventloop(swap_id)?;
+        let (event_loop, handle) = self.new_eventloop(swap_id).await?;
         let db = Database::open(&self.db_path)?;
 
         let swap = bob::Swap::new(
@@ -420,8 +423,13 @@ impl BobParams {
         Ok((swap, event_loop))
     }
 
-    pub fn new_eventloop(&self, swap_id: Uuid) -> Result<(bob::EventLoop, bob::EventLoopHandle)> {
-        let mut swarm = swarm::bob(&self.seed, self.alice_peer_id)?;
+    pub async fn new_eventloop(
+        &self,
+        swap_id: Uuid,
+    ) -> Result<(bob::EventLoop, bob::EventLoopHandle)> {
+        let tor_socks5_port = get_port()
+            .expect("We don't care about Tor in the tests so we get a free port to disable it.");
+        let mut swarm = swarm::bob(&self.seed, self.alice_peer_id, tor_socks5_port).await?;
         swarm
             .behaviour_mut()
             .add_address(self.alice_peer_id, self.alice_address.clone());
@@ -501,7 +509,7 @@ impl TestContext {
     }
 
     pub async fn bob_swap(&mut self) -> (bob::Swap, BobApplicationHandle) {
-        let (swap, event_loop) = self.bob_params.new_swap(self.btc_amount).unwrap();
+        let (swap, event_loop) = self.bob_params.new_swap(self.btc_amount).await.unwrap();
 
         // ensure the wallet is up to date for concurrent swap tests
         swap.bitcoin_wallet.sync().await.unwrap();
@@ -518,7 +526,7 @@ impl TestContext {
     ) -> (bob::Swap, BobApplicationHandle) {
         join_handle.abort();
 
-        let (swap, event_loop) = self.bob_params.new_swap_from_db(swap_id).unwrap();
+        let (swap, event_loop) = self.bob_params.new_swap_from_db(swap_id).await.unwrap();
 
         let join_handle = tokio::spawn(event_loop.run());
 
