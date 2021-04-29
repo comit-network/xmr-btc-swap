@@ -42,6 +42,7 @@ pub struct EventLoop<RS> {
     max_buy: bitcoin::Amount,
 
     swap_sender: mpsc::Sender<Swap>,
+    resume_only: bool,
 
     /// Stores incoming [`EncryptedSignature`]s per swap.
     recv_encrypted_signature: HashMap<Uuid, bmrng::RequestSender<bitcoin::EncryptedSignature, ()>>,
@@ -62,6 +63,7 @@ impl<LR> EventLoop<LR>
 where
     LR: LatestRate,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         swarm: Swarm<Behaviour>,
         env_config: Config,
@@ -70,6 +72,7 @@ where
         db: Arc<Database>,
         latest_rate: LR,
         max_buy: bitcoin::Amount,
+        resume_only: bool,
     ) -> Result<(Self, mpsc::Receiver<Swap>)> {
         let swap_channel = MpscChannels::default();
 
@@ -81,6 +84,7 @@ where
             db,
             latest_rate,
             swap_sender: swap_channel.sender,
+            resume_only,
             max_buy,
             recv_encrypted_signature: Default::default(),
             inflight_encrypted_signatures: Default::default(),
@@ -144,6 +148,20 @@ where
                 swarm_event = self.swarm.next_event() => {
                     match swarm_event {
                         SwarmEvent::Behaviour(OutEvent::SpotPriceRequested { request, channel, peer }) => {
+                            if self.resume_only {
+                                tracing::warn!(%peer, "Ignoring spot price request from {} because ASB started in resume-only mode", peer);
+
+                                match self.swarm.behaviour_mut().spot_price.send_response(channel, spot_price::Response { xmr: None, error: Some(spot_price::Error::MaintenanceMode) }) {
+                                    Ok(_) => {},
+                                    Err(_) => {
+                                        tracing::debug!(%peer, "Failed to respond with error to spot price request");
+                                        continue;
+                                    }
+                                }
+
+                                continue;
+                            }
+
                             let btc = request.btc;
                             let xmr = match self.handle_spot_price_request(btc, self.monero_wallet.clone()).await {
                                 Ok(xmr) => xmr,
@@ -153,7 +171,7 @@ where
                                 }
                             };
 
-                            match self.swarm.behaviour_mut().spot_price.send_response(channel, spot_price::Response { xmr }) {
+                            match self.swarm.behaviour_mut().spot_price.send_response(channel, spot_price::Response { xmr: Some(xmr), error: None }) {
                                 Ok(_) => {},
                                 Err(_) => {
                                     // if we can't respond, the peer probably just disconnected so it is not a huge deal, only log this on debug

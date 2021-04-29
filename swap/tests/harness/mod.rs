@@ -234,6 +234,7 @@ fn start_alice(
         db,
         FixedRate::default(),
         bitcoin::Amount::ONE_BTC,
+        false,
     )
     .unwrap();
 

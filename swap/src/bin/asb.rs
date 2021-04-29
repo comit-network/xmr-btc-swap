@@ -81,6 +81,7 @@ async fn main() -> Result<()> {
         Command::Start {
             max_buy,
             ask_spread,
+            resume_only,
         } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
@@ -133,6 +134,7 @@ async fn main() -> Result<()> {
                 Arc::new(db),
                 KrakenRate::new(ask_spread, kraken_price_updates),
                 max_buy,
+                resume_only,
             )
             .unwrap();
 

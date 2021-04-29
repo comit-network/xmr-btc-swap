@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Resume-only mode for the ASB.
+  When started with `--resume-only` the ASB does not accept new, incoming swap requests but only finishes swaps that are resumed upon startup.
+
 ### Fixed
 
 - An issue where both the ASB and the CLI point to the same default directory `xmr-btc-swap` for storing data.

@@ -41,7 +41,16 @@ pub struct Request {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Response {
-    pub xmr: monero::Amount,
+    pub xmr: Option<monero::Amount>,
+    pub error: Option<Error>,
+}
+
+#[derive(Clone, Debug, thiserror::Error, Serialize, Deserialize)]
+pub enum Error {
+    #[error(
+        "This seller currently does not accept incoming swap requests, please try again later"
+    )]
+    MaintenanceMode,
 }
 
 /// Constructs a new instance of the `spot-price` behaviour to be used by Alice.

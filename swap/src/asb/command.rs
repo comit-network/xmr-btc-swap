@@ -34,6 +34,12 @@ pub enum Command {
             default_value = "0.02"
         )]
         ask_spread: Decimal,
+
+        #[structopt(
+            long = "resume-only",
+            help = "For maintenance only. When set, no new swap requests will be accepted, but existing unfinished swaps will be resumed."
+        )]
+        resume_only: bool,
     },
     History,
     WithdrawBtc {
