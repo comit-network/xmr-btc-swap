@@ -21,6 +21,7 @@ pub enum OutEvent {
     TransferProofReceived {
         msg: Box<transfer_proof::Request>,
         channel: ResponseChannel<()>,
+        peer: PeerId,
     },
     EncryptedSignatureAcknowledged {
         id: RequestId,

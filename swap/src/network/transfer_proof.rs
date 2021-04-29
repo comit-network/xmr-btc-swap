@@ -68,6 +68,7 @@ impl From<(PeerId, Message)> for bob::OutEvent {
             } => Self::TransferProofReceived {
                 msg: Box::new(request),
                 channel,
+                peer,
             },
             Message::Response { .. } => Self::unexpected_response(peer),
         }

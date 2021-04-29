@@ -117,11 +117,22 @@ impl EventLoop {
                                 let _ = responder.respond(*response);
                             }
                         }
-                        SwarmEvent::Behaviour(OutEvent::TransferProofReceived { msg, channel }) => {
-                            if msg.swap_id != self.swap_id {
+                        SwarmEvent::Behaviour(OutEvent::TransferProofReceived { msg, channel, peer }) => {
+                            let swap_id = msg.swap_id;
+
+                            if peer != self.alice_peer_id {
+                                tracing::warn!(
+                                            %swap_id,
+                                            "Ignoring malicious transfer proof from {}, expected to receive it from {}",
+                                            peer,
+                                            self.alice_peer_id);
+                                        continue;
+                            }
+
+                            if swap_id != self.swap_id {
 
                                 // TODO: Save unexpected transfer proofs in the database and check for messages in the database when handling swaps
-                                tracing::warn!("Received unexpected transfer proof for swap {} while running swap {}. This transfer proof will be ignored.", msg.swap_id, self.swap_id);
+                                tracing::warn!("Received unexpected transfer proof for swap {} while running swap {}. This transfer proof will be ignored.", swap_id, self.swap_id);
 
                                 // When receiving a transfer proof that is unexpected we still have to acknowledge that it was received
                                 let _ = self.swarm.behaviour_mut().transfer_proof.send_response(channel, ());

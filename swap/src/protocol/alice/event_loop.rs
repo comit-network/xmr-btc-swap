@@ -195,11 +195,32 @@ where
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::EncryptedSignatureReceived{ msg, channel, peer }) => {
-                            let sender = match self.recv_encrypted_signature.remove(&msg.swap_id) {
+                            let swap_id = msg.swap_id;
+                            let swap_peer = self.db.get_peer_id(swap_id);
+
+                            // Ensure that an incoming encrypted signature is sent by the peer-id associated with the swap
+                            let swap_peer = match swap_peer {
+                                Ok(swap_peer) => swap_peer,
+                                Err(_) => {
+                                    tracing::warn!("Ignoring encrypted signature for unknown swap {} from {}", swap_id, peer);
+                                    continue;
+                                }
+                            };
+
+                            if swap_peer != peer {
+                                tracing::warn!(
+                                    %swap_id,
+                                    "Ignoring malicious encrypted signature from {}, expected to receive it from {}",
+                                    peer,
+                                    swap_peer);
+                                continue;
+                            }
+
+                            let sender = match self.recv_encrypted_signature.remove(&swap_id) {
                                 Some(sender) => sender,
                                 None => {
                                     // TODO: Don't just drop encsig if we currently don't have a running swap for it, save in db
-                                    tracing::warn!(%peer, "No sender for encrypted signature, maybe already handled?");
+                                    tracing::warn!(%swap_id, "No sender for encrypted signature, maybe already handled?");
                                     continue;
                                 }
                             };
@@ -207,7 +228,7 @@ where
                             let mut responder = match sender.send(msg.tx_redeem_encsig).await {
                                 Ok(responder) => responder,
                                 Err(_) => {
-                                    tracing::warn!(%peer, "Failed to relay encrypted signature to swap");
+                                    tracing::warn!(%swap_id, "Failed to relay encrypted signature to swap");
                                     continue;
                                 }
                             };
