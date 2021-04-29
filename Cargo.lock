@@ -2215,6 +2215,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "monero-wallet"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "curve25519-dalek",
+ "monero",
+ "monero-harness",
+ "monero-rpc",
+ "rand 0.7.3",
+ "testcontainers 0.12.0",
+ "tokio",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "multihash"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

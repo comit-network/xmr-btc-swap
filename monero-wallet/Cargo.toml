@@ -1,0 +1,19 @@
+[package]
+name = "monero-wallet"
+version = "0.1.0"
+authors = [ "CoBloX Team <team@coblox.tech>" ]
+edition = "2018"
+
+[dependencies]
+anyhow = "1"
+monero = "0.12"
+monero-rpc = { path = "../monero-rpc" }
+rand = "0.7"
+
+[dev-dependencies]
+curve25519-dalek = "3"
+monero-harness = { path = "../monero-harness" }
+rand = "0.7"
+testcontainers = "0.12"
+tokio = { version = "1", features = [ "rt-multi-thread", "time", "macros", "sync", "process", "fs" ] }
+tracing-subscriber = { version = "0.2", default-features = false, features = [ "fmt", "ansi", "env-filter", "chrono", "tracing-log" ] }
