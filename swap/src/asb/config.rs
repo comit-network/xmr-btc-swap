@@ -1,9 +1,10 @@
-use crate::fs::{default_data_dir, ensure_directory_exists};
+use crate::fs::ensure_directory_exists;
 use crate::tor::{DEFAULT_CONTROL_PORT, DEFAULT_SOCKS5_PORT};
 use anyhow::{Context, Result};
 use config::ConfigError;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::Input;
+use directories_next::ProjectDirs;
 use libp2p::core::Multiaddr;
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
@@ -99,6 +100,24 @@ pub fn read_config(config_path: PathBuf) -> Result<Result<Config, ConfigNotIniti
     Ok(Ok(file))
 }
 
+/// This is to store the configuration and seed files
+// Linux: /home/<user>/.config/xmr-btc-swap/config.toml
+// OSX: /Users/<user>/Library/Preferences/xmr-btc-swap/config.toml
+pub fn default_config_path() -> Result<PathBuf> {
+    ProjectDirs::from("", "", "xmr-btc-swap-asb")
+        .map(|proj_dirs| proj_dirs.config_dir().to_path_buf())
+        .map(|dir| Path::join(&dir, "config.toml"))
+        .context("Could not generate default configuration path")
+}
+
+/// This is the default location for storing data for the ASB
+// Linux: /home/<user>/.local/share/xmr-btc-swap-asb/
+// OSX: /Users/<user>/Library/Application Support/xmr-btc-swap-asb/
+fn asb_default_data_dir() -> Option<std::path::PathBuf> {
+    ProjectDirs::from("", "", "xmr-btc-swap-asb")
+        .map(|proj_dirs| proj_dirs.data_dir().to_path_buf())
+}
+
 pub fn initial_setup<F>(config_path: PathBuf, config_file: F) -> Result<()>
 where
     F: Fn() -> Result<Config>,
@@ -122,7 +141,7 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
     let data_dir = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter data directory for asb or hit return to use default")
         .default(
-            default_data_dir()
+            asb_default_data_dir()
                 .context("No default data dir value for this system")?
                 .to_str()
                 .context("Unsupported characters in default path")?
