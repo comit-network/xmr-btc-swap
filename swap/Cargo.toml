@@ -32,7 +32,7 @@ itertools = "0.10"
 libp2p = { version = "0.37", default-features = false, features = [ "tcp-tokio", "yamux", "mplex", "dns-tokio", "noise", "request-response", "websocket" ] }
 libp2p-async-await = { git = "https://github.com/comit-network/rust-libp2p-async-await" }
 miniscript = { version = "5", features = [ "serde" ] }
-monero = { version = "0.11", features = [ "serde_support" ] }
+monero = { version = "0.12", features = [ "serde_support" ] }
 monero-rpc = { path = "../monero-rpc" }
 pem = "0.8"
 prettytable-rs = "0.8"

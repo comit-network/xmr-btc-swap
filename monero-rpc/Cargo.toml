@@ -6,9 +6,17 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1"
+curve25519-dalek = "3.1"
+hex = "0.4"
 jsonrpc_client = { version = "0.6", features = [ "reqwest" ] }
-monero = "0.11"
+monero = "0.12"
+monero-epee-bin-serde = "1"
+rand = "0.7"
 reqwest = { version = "0.11", default-features = false, features = [ "json" ] }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = "1.0"
 tracing = "0.1"
+
+[dev-dependencies]
+hex-literal = "0.3"
+tokio = { version = "1", features = [ "full" ] }
