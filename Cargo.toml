@@ -1,5 +1,5 @@
 [workspace]
-members = ["monero-harness", "monero-rpc", "swap"]
+members = [ "monero-harness", "monero-rpc", "swap" ]
 
 [patch.crates-io]
-torut = { git = "https://github.com/bonomat/torut/", branch = "feature-flag-tor-secret-keys", default-features = false, features = ["v3", "control"] }
+torut = { git = "https://github.com/bonomat/torut/", branch = "feature-flag-tor-secret-keys", default-features = false, features = [ "v3", "control" ] }

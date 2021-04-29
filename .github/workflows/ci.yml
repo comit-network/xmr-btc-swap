@@ -16,22 +16,11 @@ jobs:
         uses: actions/checkout@v2
 
       - uses: Swatinem/rust-cache@v1.2.0
-        id: cache
-
-      - name: Install tomlfmt
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: cargo install cargo-tomlfmt
-
-      - name: Check Cargo.toml formatting
-        run: |
-          cargo tomlfmt -d -p Cargo.toml
-          cargo tomlfmt -d -p monero-harness/Cargo.toml
-          cargo tomlfmt -d -p swap/Cargo.toml
 
       - name: Check code formatting
         run: cargo fmt --all -- --check
 
-      - name: Check markdown formatting
+      - name: Check formatting
         uses: dprint/check@v1.3
 
       - name: Run clippy with default features
