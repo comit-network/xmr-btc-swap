@@ -37,7 +37,9 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
 
+pub use crate::bitcoin::punish::ESTIMATED_WEIGHT as ESTIMATED_WEIGHT_TX_PUNISH;
 pub use crate::bitcoin::redeem::ESTIMATED_WEIGHT as ESTIMATED_WEIGHT_TX_REDEEM;
+pub use crate::bitcoin::refund::ESTIMATED_WEIGHT as ESTIMATED_WEIGHT_TX_REFUND;
 
 // TODO: Configurable tx-fee (note: parties have to agree prior to swapping)
 // Current reasoning:

@@ -28,6 +28,8 @@ pub struct Message0 {
     dleq_proof_s_b: CrossCurveDLEQProof,
     v_b: monero::PrivateViewKey,
     refund_address: bitcoin::Address,
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    tx_refund_fee: bitcoin::Amount,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -41,6 +43,8 @@ pub struct Message1 {
     punish_address: bitcoin::Address,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     tx_redeem_fee: bitcoin::Amount,
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    tx_punish_fee: bitcoin::Amount,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

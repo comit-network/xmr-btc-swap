@@ -216,6 +216,7 @@ impl TxCancel {
         &self,
         spend_address: &Address,
         sequence: Option<PunishTimelock>,
+        spending_fee: Amount,
     ) -> Transaction {
         let previous_output = self.as_outpoint();
 
@@ -227,7 +228,7 @@ impl TxCancel {
         };
 
         let tx_out = TxOut {
-            value: self.amount().as_sat() - TX_FEE,
+            value: self.amount().as_sat() - spending_fee.as_sat(),
             script_pubkey: spend_address.script_pubkey(),
         };
 

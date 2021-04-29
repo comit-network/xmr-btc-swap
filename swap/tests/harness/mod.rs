@@ -1,6 +1,7 @@
 mod bitcoind;
 mod electrs;
 
+use crate::harness::bitcoind::TX_FEE;
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use bitcoin_harness::{BitcoindRpcApi, Client};
@@ -39,6 +40,8 @@ use uuid::Uuid;
 // bitcoin::ESTIMATED_WEIGHT_TX_REDEEM changes.
 // TODO: see if there is a better way.
 const TX_REDEEM_FEE: u64 = 12500;
+const TX_REFUND_FEE: u64 = 12500;
+const TX_CANCEL_FEE: u64 = TX_FEE;
 
 pub async fn setup_test<T, F, C>(_config: C, testfn: T)
 where
@@ -636,19 +639,13 @@ impl TestContext {
 
         let btc_balance_after_swap = self.bob_bitcoin_wallet.balance().await.unwrap();
 
-        let alice_submitted_cancel = btc_balance_after_swap
+        let bob_cancelled_and_refunded = btc_balance_after_swap
             == self.bob_starting_balances.btc
                 - lock_tx_bitcoin_fee
-                - bitcoin::Amount::from_sat(bitcoind::TX_FEE);
+                - bitcoin::Amount::from_sat(TX_CANCEL_FEE)
+                - bitcoin::Amount::from_sat(TX_REFUND_FEE);
 
-        let bob_submitted_cancel = btc_balance_after_swap
-            == self.bob_starting_balances.btc
-                - lock_tx_bitcoin_fee
-                - bitcoin::Amount::from_sat(2 * bitcoind::TX_FEE);
-
-        // The cancel tx can be submitted by both Alice and Bob.
-        // Since we cannot be sure who submitted it we have to assert accordingly
-        assert!(alice_submitted_cancel || bob_submitted_cancel);
+        assert!(bob_cancelled_and_refunded);
 
         assert_eventual_balance(
             self.bob_monero_wallet.as_ref(),

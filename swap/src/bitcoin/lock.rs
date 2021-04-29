@@ -136,6 +136,7 @@ impl TxLock {
         &self,
         spend_address: &Address,
         sequence: Option<u32>,
+        spending_fee: Amount,
     ) -> Transaction {
         let previous_output = self.as_outpoint();
 
@@ -147,7 +148,8 @@ impl TxLock {
         };
 
         let tx_out = TxOut {
-            value: self.inner.clone().extract_tx().output[self.lock_output_vout()].value - TX_FEE,
+            value: self.inner.clone().extract_tx().output[self.lock_output_vout()].value
+                - spending_fee.as_sat(),
             script_pubkey: spend_address.script_pubkey(),
         };
 

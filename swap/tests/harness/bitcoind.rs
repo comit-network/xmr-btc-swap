@@ -10,7 +10,7 @@ pub const DATADIR: &str = "/home/bdk";
 
 // Bitcoin regtest TX fee. The fee itself does not matter for our tests. It just
 // has to be static so that we can assert on the amounts.
-pub const TX_FEE: u64 = 10_000;
+pub const TX_FEE: u64 = 15_000;
 
 #[derive(Debug)]
 pub struct Bitcoind {

@@ -1,11 +1,14 @@
 use crate::bitcoin::wallet::Watchable;
-use crate::bitcoin::{self, Address, PunishTimelock, Transaction, TxCancel, Txid};
+use crate::bitcoin::{self, Address, Amount, PunishTimelock, Transaction, TxCancel, Txid};
 use ::bitcoin::util::bip143::SigHashCache;
 use ::bitcoin::{SigHash, SigHashType};
 use anyhow::{Context, Result};
 use bdk::bitcoin::Script;
 use miniscript::{Descriptor, DescriptorTrait};
 use std::collections::HashMap;
+
+// TODO take real tx weight from past transaction
+pub const ESTIMATED_WEIGHT: usize = 10_000;
 
 #[derive(Debug)]
 pub struct TxPunish {
@@ -20,8 +23,10 @@ impl TxPunish {
         tx_cancel: &TxCancel,
         punish_address: &Address,
         punish_timelock: PunishTimelock,
+        spending_fee: Amount,
     ) -> Self {
-        let tx_punish = tx_cancel.build_spend_transaction(punish_address, Some(punish_timelock));
+        let tx_punish =
+            tx_cancel.build_spend_transaction(punish_address, Some(punish_timelock), spending_fee);
 
         let digest = SigHashCache::new(&tx_punish).signature_hash(
             0, // Only one input: cancel transaction

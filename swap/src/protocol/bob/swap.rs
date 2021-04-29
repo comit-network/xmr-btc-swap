@@ -66,6 +66,7 @@ async fn next_state(
     Ok(match state {
         BobState::Started { btc_amount } => {
             let bitcoin_refund_address = bitcoin_wallet.new_address().await?;
+            let tx_refund_fee = bitcoin_wallet.estimate_fee(bitcoin::ESTIMATED_WEIGHT_TX_REDEEM);
 
             let state2 = request_price_and_setup(
                 swap_id,
@@ -73,6 +74,7 @@ async fn next_state(
                 event_loop_handle,
                 env_config,
                 bitcoin_refund_address,
+                tx_refund_fee,
             )
             .await?;
 
@@ -268,6 +270,7 @@ pub async fn request_price_and_setup(
     event_loop_handle: &mut EventLoopHandle,
     env_config: &Config,
     bitcoin_refund_address: bitcoin::Address,
+    tx_refund_fee: bitcoin::Amount,
 ) -> Result<bob::state::State2> {
     let xmr = event_loop_handle.request_spot_price(btc).await?;
 
@@ -282,6 +285,7 @@ pub async fn request_price_and_setup(
         env_config.bitcoin_punish_timelock,
         bitcoin_refund_address,
         env_config.monero_finality_confirmations,
+        tx_refund_fee,
     );
 
     let state2 = event_loop_handle.execution_setup(state0).await?;
