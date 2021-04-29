@@ -30,6 +30,8 @@ pub struct Message0 {
     refund_address: bitcoin::Address,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     tx_refund_fee: bitcoin::Amount,
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    tx_cancel_fee: bitcoin::Amount,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

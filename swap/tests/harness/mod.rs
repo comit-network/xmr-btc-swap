@@ -1,7 +1,6 @@
 mod bitcoind;
 mod electrs;
 
-use crate::harness::bitcoind::TX_FEE;
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use bitcoin_harness::{BitcoindRpcApi, Client};
@@ -41,7 +40,8 @@ use uuid::Uuid;
 // TODO: see if there is a better way.
 const TX_REDEEM_FEE: u64 = 12500;
 const TX_REFUND_FEE: u64 = 12500;
-const TX_CANCEL_FEE: u64 = TX_FEE;
+const TX_CANCEL_FEE: u64 = 12500;
+const TX_PUNISH_FEE: u64 = 12500;
 
 pub async fn setup_test<T, F, C>(_config: C, testfn: T)
 where
@@ -719,7 +719,8 @@ impl TestContext {
 
     fn alice_punished_btc_balance(&self) -> bitcoin::Amount {
         self.alice_starting_balances.btc + self.btc_amount
-            - bitcoin::Amount::from_sat(2 * bitcoind::TX_FEE)
+            - bitcoin::Amount::from_sat(TX_CANCEL_FEE)
+            - bitcoin::Amount::from_sat(TX_PUNISH_FEE)
     }
 
     fn bob_punished_xmr_balance(&self) -> monero::Amount {

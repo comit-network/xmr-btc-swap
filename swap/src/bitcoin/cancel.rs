@@ -2,7 +2,6 @@ use crate::bitcoin;
 use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{
     build_shared_output_descriptor, Address, Amount, BlockHeight, PublicKey, Transaction, TxLock,
-    TX_FEE,
 };
 use ::bitcoin::util::bip143::SigHashCache;
 use ::bitcoin::{OutPoint, Script, SigHash, SigHashType, TxIn, TxOut, Txid};
@@ -13,6 +12,9 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ops::Add;
+
+// TODO take real tx weight from past transaction
+pub const ESTIMATED_WEIGHT: usize = 10_000;
 
 /// Represent a timelock, expressed in relative block height as defined in
 /// [BIP68](https://github.com/bitcoin/bips/blob/master/bip-0068.mediawiki).
@@ -96,6 +98,7 @@ impl TxCancel {
         cancel_timelock: CancelTimelock,
         A: PublicKey,
         B: PublicKey,
+        spending_fee: Amount,
     ) -> Self {
         let cancel_output_descriptor = build_shared_output_descriptor(A.0, B.0);
 
@@ -107,7 +110,7 @@ impl TxCancel {
         };
 
         let tx_out = TxOut {
-            value: tx_lock.lock_amount().as_sat() - TX_FEE,
+            value: tx_lock.lock_amount().as_sat() - spending_fee.as_sat(),
             script_pubkey: cancel_output_descriptor.script_pubkey(),
         };
 

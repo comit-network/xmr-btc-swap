@@ -37,18 +37,10 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
 
+pub use crate::bitcoin::cancel::ESTIMATED_WEIGHT as ESTIMATED_WEIGHT_TX_CANCEL;
 pub use crate::bitcoin::punish::ESTIMATED_WEIGHT as ESTIMATED_WEIGHT_TX_PUNISH;
 pub use crate::bitcoin::redeem::ESTIMATED_WEIGHT as ESTIMATED_WEIGHT_TX_REDEEM;
 pub use crate::bitcoin::refund::ESTIMATED_WEIGHT as ESTIMATED_WEIGHT_TX_REFUND;
-
-// TODO: Configurable tx-fee (note: parties have to agree prior to swapping)
-// Current reasoning:
-// tx with largest weight (as determined by get_weight() upon broadcast in e2e
-// test) = 609 assuming segwit and 60 sat/vB:
-// (609 / 4) * 60 (sat/vB) = 9135 sats
-// Recommended: Overpay a bit to ensure we don't have to wait too long for test
-// runs.
-pub const TX_FEE: u64 = 15_000;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct SecretKey {

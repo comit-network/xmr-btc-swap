@@ -191,6 +191,7 @@ impl State0 {
             tx_redeem_fee: self.tx_redeem_fee,
             tx_punish_fee: self.tx_punish_fee,
             tx_refund_fee: msg.tx_refund_fee,
+            tx_cancel_fee: msg.tx_cancel_fee,
         }))
     }
 }
@@ -217,6 +218,7 @@ pub struct State1 {
     tx_redeem_fee: bitcoin::Amount,
     tx_punish_fee: bitcoin::Amount,
     tx_refund_fee: bitcoin::Amount,
+    tx_cancel_fee: bitcoin::Amount,
 }
 
 impl State1 {
@@ -256,6 +258,7 @@ impl State1 {
             tx_redeem_fee: self.tx_redeem_fee,
             tx_punish_fee: self.tx_punish_fee,
             tx_refund_fee: self.tx_refund_fee,
+            tx_cancel_fee: self.tx_cancel_fee,
         })
     }
 }
@@ -279,12 +282,18 @@ pub struct State2 {
     tx_redeem_fee: bitcoin::Amount,
     tx_punish_fee: bitcoin::Amount,
     tx_refund_fee: bitcoin::Amount,
+    tx_cancel_fee: bitcoin::Amount,
 }
 
 impl State2 {
     pub fn next_message(&self) -> Message3 {
-        let tx_cancel =
-            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
+        let tx_cancel = bitcoin::TxCancel::new(
+            &self.tx_lock,
+            self.cancel_timelock,
+            self.a.public(),
+            self.B,
+            self.tx_cancel_fee,
+        );
 
         let tx_refund =
             bitcoin::TxRefund::new(&tx_cancel, &self.refund_address, self.tx_refund_fee);
@@ -303,8 +312,13 @@ impl State2 {
     }
 
     pub fn receive(self, msg: Message4) -> Result<State3> {
-        let tx_cancel =
-            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
+        let tx_cancel = bitcoin::TxCancel::new(
+            &self.tx_lock,
+            self.cancel_timelock,
+            self.a.public(),
+            self.B,
+            self.tx_cancel_fee,
+        );
         bitcoin::verify_sig(&self.B, &tx_cancel.digest(), &msg.tx_cancel_sig)
             .context("Failed to verify cancel transaction")?;
         let tx_punish = bitcoin::TxPunish::new(
@@ -336,6 +350,7 @@ impl State2 {
             tx_redeem_fee: self.tx_redeem_fee,
             tx_punish_fee: self.tx_punish_fee,
             tx_refund_fee: self.tx_refund_fee,
+            tx_cancel_fee: self.tx_cancel_fee,
         })
     }
 }
@@ -365,6 +380,8 @@ pub struct State3 {
     tx_punish_fee: bitcoin::Amount,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     tx_refund_fee: bitcoin::Amount,
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    tx_cancel_fee: bitcoin::Amount,
 }
 
 impl State3 {
@@ -417,7 +434,13 @@ impl State3 {
     }
 
     pub fn tx_cancel(&self) -> TxCancel {
-        TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B)
+        TxCancel::new(
+            &self.tx_lock,
+            self.cancel_timelock,
+            self.a.public(),
+            self.B,
+            self.tx_cancel_fee,
+        )
     }
 
     pub fn tx_refund(&self) -> TxRefund {
