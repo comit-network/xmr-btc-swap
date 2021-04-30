@@ -1,5 +1,6 @@
 use crate::bitcoin::EncryptedSignature;
 use crate::network::quote::BidQuote;
+use crate::network::spot_price::Response;
 use crate::network::{encrypted_signature, spot_price};
 use crate::protocol::bob::{Behaviour, OutEvent, State0, State2};
 use crate::{bitcoin, monero};
@@ -266,15 +267,10 @@ impl EventLoopHandle {
             .send_receive(spot_price::Request { btc })
             .await?;
 
-        match (response.xmr, response.error) {
-            (Some(xmr), None) => Ok(xmr),
-            (_, Some(error)) => {
+        match response {
+            Response::Xmr(xmr) => Ok(xmr),
+            Response::Error(error) => {
                 bail!(error);
-            }
-            (None, None) => {
-                bail!(
-                    "Unexpected response for spot-price request, neither price nor error received"
-                );
             }
         }
     }

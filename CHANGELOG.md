@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   If you want to access data created by a previous version you will have to rename the data folder or one of the following:
   1. For the CLI you can use `--data-dir` to point to the old directory.
   2. For the ASB you can change the data-dir in the config file of the ASB.
+- The CLI receives proper Error messages if setting up a swap with the ASB fails.
+  This is a breaking change because the spot-price protocol response changed.
+  Expected errors scenarios that are now reported back to the CLI:
+  1. Balance of ASB too low
+  2. Buy amount sent by CLI exceeds maximum buy amount accepted by ASB
+  3. ASB is running in resume-only mode and does not accept incoming swap requests
 
 ## [0.5.0] - 2021-04-17
 

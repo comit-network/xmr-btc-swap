@@ -1,6 +1,6 @@
+use crate::monero;
 use crate::network::cbor_request_response::CborCodec;
 use crate::protocol::{alice, bob};
-use crate::{bitcoin, monero};
 use libp2p::core::ProtocolName;
 use libp2p::request_response::{
     ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
@@ -40,9 +40,9 @@ pub struct Request {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Response {
-    pub xmr: Option<monero::Amount>,
-    pub error: Option<Error>,
+pub enum Response {
+    Xmr(monero::Amount),
+    Error(Error),
 }
 
 #[derive(Clone, Debug, thiserror::Error, Serialize, Deserialize)]
@@ -51,6 +51,18 @@ pub enum Error {
         "This seller currently does not accept incoming swap requests, please try again later"
     )]
     MaintenanceMode,
+    #[error("Seller refused to buy {buy} because the maximum configured buy limit is {max}")]
+    MaxBuyAmountExceeded {
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        max: bitcoin::Amount,
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        buy: bitcoin::Amount,
+    },
+    #[error("This seller's XMR balance is currently too low to fulfill the swap request to buy {buy}, please try again later")]
+    BalanceTooLow {
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        buy: bitcoin::Amount,
+    },
 }
 
 /// Constructs a new instance of the `spot-price` behaviour to be used by Alice.

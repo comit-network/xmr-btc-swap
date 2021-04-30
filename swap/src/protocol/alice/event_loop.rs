@@ -1,12 +1,11 @@
 use crate::asb::Rate;
 use crate::database::Database;
 use crate::env::Config;
-use crate::monero::BalanceTooLow;
 use crate::network::quote::BidQuote;
 use crate::network::{spot_price, transfer_proof};
 use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State0, State3, Swap};
 use crate::{bitcoin, kraken, monero};
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use futures::future;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::{FuturesUnordered, StreamExt};
@@ -148,30 +147,30 @@ where
                 swarm_event = self.swarm.next_event() => {
                     match swarm_event {
                         SwarmEvent::Behaviour(OutEvent::SpotPriceRequested { request, channel, peer }) => {
-                            if self.resume_only {
-                                tracing::warn!(%peer, "Ignoring spot price request from {} because ASB started in resume-only mode", peer);
-
-                                match self.swarm.behaviour_mut().spot_price.send_response(channel, spot_price::Response { xmr: None, error: Some(spot_price::Error::MaintenanceMode) }) {
-                                    Ok(_) => {},
-                                    Err(_) => {
-                                        tracing::debug!(%peer, "Failed to respond with error to spot price request");
-                                        continue;
-                                    }
-                                }
-
-                                continue;
-                            }
-
                             let btc = request.btc;
                             let xmr = match self.handle_spot_price_request(btc, self.monero_wallet.clone()).await {
-                                Ok(xmr) => xmr,
+                                Ok(xmr) => match xmr {
+                                    Ok(xmr) => xmr,
+                                    Err(e) => {
+                                        tracing::warn!(%peer, "Ignoring spot price request from {} because: {:#}", peer, e);
+                                        match self.swarm.behaviour_mut().spot_price.send_response(channel, spot_price::Response::Error(e)) {
+                                            Ok(_) => {
+                                                continue;
+                                            },
+                                            Err(_) => {
+                                                tracing::debug!(%peer, "Failed to respond with error to spot price request");
+                                                continue;
+                                            }
+                                        }
+                                    }
+                                },
                                 Err(e) => {
-                                    tracing::warn!(%peer, "Failed to produce spot price for {}: {:#}", btc, e);
+                                    tracing::error!(%peer, "Unrecoverable error while producing spot price for {}: {:#}", btc, e);
                                     continue;
                                 }
                             };
 
-                            match self.swarm.behaviour_mut().spot_price.send_response(channel, spot_price::Response { xmr: Some(xmr), error: None }) {
+                            match self.swarm.behaviour_mut().spot_price.send_response(channel, spot_price::Response::Xmr(xmr)) {
                                 Ok(_) => {},
                                 Err(_) => {
                                     // if we can't respond, the peer probably just disconnected so it is not a huge deal, only log this on debug
@@ -365,17 +364,21 @@ where
         &mut self,
         btc: bitcoin::Amount,
         monero_wallet: Arc<monero::Wallet>,
-    ) -> Result<monero::Amount> {
+    ) -> Result<Result<monero::Amount, spot_price::Error>> {
+        if self.resume_only {
+            return Ok(Err(spot_price::Error::MaintenanceMode));
+        }
+
         let rate = self
             .latest_rate
             .latest_rate()
             .context("Failed to get latest rate")?;
 
         if btc > self.max_buy {
-            bail!(MaximumBuyAmountExceeded {
-                actual: btc,
-                max: self.max_buy
-            })
+            return Ok(Err(spot_price::Error::MaxBuyAmountExceeded {
+                buy: btc,
+                max: self.max_buy,
+            }));
         }
 
         let xmr_balance = monero_wallet.get_balance().await?;
@@ -383,12 +386,10 @@ where
         let xmr = rate.sell_quote(btc)?;
 
         if xmr_balance < xmr + xmr_lock_fees {
-            bail!(BalanceTooLow {
-                balance: xmr_balance
-            })
+            return Ok(Err(spot_price::Error::BalanceTooLow { buy: btc }));
         }
 
-        Ok(xmr)
+        Ok(Ok(xmr))
     }
 
     async fn make_quote(&mut self, max_buy: bitcoin::Amount) -> Result<BidQuote> {
@@ -567,13 +568,6 @@ impl EventLoopHandle {
 
         Ok(())
     }
-}
-
-#[derive(Debug, Clone, Copy, thiserror::Error)]
-#[error("Refusing to buy {actual} because the maximum configured limit is {max}")]
-pub struct MaximumBuyAmountExceeded {
-    pub max: bitcoin::Amount,
-    pub actual: bitcoin::Amount,
 }
 
 #[allow(missing_debug_implementations)]
