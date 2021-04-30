@@ -1,8 +1,8 @@
-use crate::fs::default_data_dir;
+use crate::fs::system_data_dir;
 use anyhow::{Context, Result};
 use libp2p::core::Multiaddr;
 use libp2p::PeerId;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use url::Url;
 use uuid::Uuid;
@@ -134,9 +134,15 @@ pub struct MoneroParams {
 #[derive(Clone, Debug)]
 pub struct Data(pub PathBuf);
 
+/// Default location for storing data for the CLI
+// Takes the default system data-dir and adds a `/cli`
 impl Default for Data {
     fn default() -> Self {
-        Data(default_data_dir().expect("computed valid path for data dir"))
+        Data(
+            system_data_dir()
+                .map(|proj_dir| Path::join(&proj_dir, "cli"))
+                .expect("computed valid path for data dir"),
+        )
     }
 }
 

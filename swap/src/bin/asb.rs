@@ -22,11 +22,11 @@ use std::sync::Arc;
 use structopt::StructOpt;
 use swap::asb::command::{Arguments, Command};
 use swap::asb::config::{
-    initial_setup, query_user_for_initial_testnet_config, read_config, Config, ConfigNotInitialized,
+    default_config_path, initial_setup, query_user_for_initial_testnet_config, read_config, Config,
+    ConfigNotInitialized,
 };
 use swap::database::Database;
 use swap::env::GetConfig;
-use swap::fs::default_config_path;
 use swap::monero::Amount;
 use swap::network::swarm;
 use swap::protocol::alice::event_loop::KrakenRate;

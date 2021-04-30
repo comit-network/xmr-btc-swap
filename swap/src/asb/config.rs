@@ -1,4 +1,4 @@
-use crate::fs::{default_data_dir, ensure_directory_exists};
+use crate::fs::{ensure_directory_exists, system_config_dir, system_data_dir};
 use crate::tor::{DEFAULT_CONTROL_PORT, DEFAULT_SOCKS5_PORT};
 use anyhow::{Context, Result};
 use config::ConfigError;
@@ -97,6 +97,23 @@ pub fn read_config(config_path: PathBuf) -> Result<Result<Config, ConfigNotIniti
         .with_context(|| format!("Failed to read config file at {}", config_path.display()))?;
 
     Ok(Ok(file))
+}
+
+/// Default location for storing the config file for the ASB
+// Takes the default system config-dir and adds a `/asb/config.toml`
+pub fn default_config_path() -> Result<PathBuf> {
+    system_config_dir()
+        .map(|dir| Path::join(&dir, "asb"))
+        .map(|dir| Path::join(&dir, "config.toml"))
+        .context("Could not generate default config file path")
+}
+
+/// Default location for storing data for the CLI
+// Takes the default system data-dir and adds a `/asb`
+fn default_data_dir() -> Result<PathBuf> {
+    system_data_dir()
+        .map(|proj_dir| Path::join(&proj_dir, "asb"))
+        .context("Could not generate default data dir")
 }
 
 pub fn initial_setup<F>(config_path: PathBuf, config_file: F) -> Result<()>
