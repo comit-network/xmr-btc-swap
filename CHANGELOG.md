@@ -10,11 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - An issue where both the ASB and the CLI point to the same default directory `xmr-btc-swap` for storing data.
-  The asb now uses `xmr-btc-swap-asb` and the CLI `xmr-btc-swap-cli` as default directory.
+  The asb now uses `xmr-btc-swap/asb` and the CLI `xmr-btc-swap/cli` as default directory.
   This is a breaking change.
-  If you want to access data created by a previous version you will have to rename the data folder or one of the following.
-  For the CLI you can use `--data-dir` to point to the old directory.
-  For the ASB you can change the data-dir in the config file of the ASB.
+  If you want to access data created by a previous version you will have to rename the data folder or one of the following:
+  1. For the CLI you can use `--data-dir` to point to the old directory.
+  2. For the ASB you can change the data-dir in the config file of the ASB.
 
 ## [0.5.0] - 2021-04-17
 

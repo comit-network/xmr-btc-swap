@@ -1,8 +1,8 @@
+use crate::fs::system_data_dir;
 use anyhow::{Context, Result};
-use directories_next::ProjectDirs;
 use libp2p::core::Multiaddr;
 use libp2p::PeerId;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use url::Url;
 use uuid::Uuid;
@@ -135,13 +135,12 @@ pub struct MoneroParams {
 pub struct Data(pub PathBuf);
 
 /// Default location for storing data for the CLI
-// Linux: /home/<user>/.local/share/xmr-btc-swap-cli/
-// OSX: /Users/<user>/Library/Application Support/xmr-btc-swap-cli/
+// Takes the default system data-dir and adds a `/cli`
 impl Default for Data {
     fn default() -> Self {
         Data(
-            ProjectDirs::from("", "", "xmr-btc-swap-cli")
-                .map(|proj_dirs| proj_dirs.data_dir().to_path_buf())
+            system_data_dir()
+                .map(|proj_dir| Path::join(&proj_dir, "cli"))
                 .expect("computed valid path for data dir"),
         )
     }
