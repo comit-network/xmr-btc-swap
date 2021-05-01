@@ -15,8 +15,9 @@ use miniscript::{Descriptor, DescriptorTrait};
 use sha2::Sha256;
 use std::collections::HashMap;
 
-// TODO take real tx weight from past transaction
-pub const ESTIMATED_WEIGHT: usize = 10_000;
+// Taken from https://mempool.space/testnet/tx/80c265f5c3862075aab2bd8c94e261b092bc13a34294c6fb4071717fbf46c801
+// The weight might fluctuate slightly in reality.
+pub const ESTIMATED_WEIGHT: usize = 547;
 
 #[derive(Clone, Debug)]
 pub struct TxRedeem {

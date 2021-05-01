@@ -66,8 +66,12 @@ async fn next_state(
     Ok(match state {
         BobState::Started { btc_amount } => {
             let bitcoin_refund_address = bitcoin_wallet.new_address().await?;
-            let tx_refund_fee = bitcoin_wallet.estimate_fee(bitcoin::ESTIMATED_WEIGHT_TX_REDEEM);
-            let tx_cancel_fee = bitcoin_wallet.estimate_fee(bitcoin::ESTIMATED_WEIGHT_TX_CANCEL);
+            let tx_refund_fee = bitcoin_wallet
+                .estimate_fee(bitcoin::ESTIMATED_WEIGHT_TX_REDEEM)
+                .await?;
+            let tx_cancel_fee = bitcoin_wallet
+                .estimate_fee(bitcoin::ESTIMATED_WEIGHT_TX_CANCEL)
+                .await?;
 
             let state2 = request_price_and_setup(
                 swap_id,

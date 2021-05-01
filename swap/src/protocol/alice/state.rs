@@ -132,6 +132,12 @@ impl State0 {
         let s_a = monero::Scalar::random(rng);
         let (dleq_proof_s_a, (S_a_bitcoin, S_a_monero)) = CROSS_CURVE_PROOF_SYSTEM.prove(&s_a, rng);
 
+        let tx_redeem_fee = bitcoin_wallet
+            .estimate_fee(ESTIMATED_WEIGHT_TX_REDEEM)
+            .await?;
+        let tx_punish_fee = bitcoin_wallet
+            .estimate_fee(ESTIMATED_WEIGHT_TX_PUNISH)
+            .await?;
         Ok(Self {
             a,
             s_a,
@@ -147,8 +153,8 @@ impl State0 {
             xmr,
             cancel_timelock: env_config.bitcoin_cancel_timelock,
             punish_timelock: env_config.bitcoin_punish_timelock,
-            tx_redeem_fee: bitcoin_wallet.estimate_fee(ESTIMATED_WEIGHT_TX_REDEEM),
-            tx_punish_fee: bitcoin_wallet.estimate_fee(ESTIMATED_WEIGHT_TX_PUNISH),
+            tx_redeem_fee,
+            tx_punish_fee,
         })
     }
 

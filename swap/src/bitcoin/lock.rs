@@ -1,4 +1,4 @@
-use crate::bitcoin::wallet::Watchable;
+use crate::bitcoin::wallet::{EstimateFeeRate, Watchable};
 use crate::bitcoin::{
     build_shared_output_descriptor, Address, Amount, PublicKey, Transaction, Wallet,
 };
@@ -26,6 +26,7 @@ impl TxLock {
         B: PublicKey,
     ) -> Result<Self>
     where
+        C: EstimateFeeRate,
         D: BatchDatabase,
     {
         let lock_output_descriptor = build_shared_output_descriptor(A.0, B.0);
@@ -147,9 +148,10 @@ impl TxLock {
             witness: Vec::new(),
         };
 
+        let i = spending_fee.as_sat();
+        tracing::debug!("Redeem tx fee: {}", i);
         let tx_out = TxOut {
-            value: self.inner.clone().extract_tx().output[self.lock_output_vout()].value
-                - spending_fee.as_sat(),
+            value: self.inner.clone().extract_tx().output[self.lock_output_vout()].value - i,
             script_pubkey: spend_address.script_pubkey(),
         };
 
@@ -181,11 +183,23 @@ impl Watchable for TxLock {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bdk::FeeRate;
+
+    struct StaticFeeRate {}
+    impl EstimateFeeRate for StaticFeeRate {
+        fn estimate_feerate(&self, _target_block: usize) -> Result<FeeRate> {
+            Ok(FeeRate::default_min_relay_fee())
+        }
+
+        fn min_relay_fee(&self) -> Result<bitcoin::Amount> {
+            Ok(bitcoin::Amount::from_sat(1_000))
+        }
+    }
 
     #[tokio::test]
     async fn given_bob_sends_good_psbt_when_reconstructing_then_succeeeds() {
         let (A, B) = alice_and_bob();
-        let wallet = Wallet::new_funded(50000);
+        let wallet = Wallet::new_funded(50000, StaticFeeRate {});
         let agreed_amount = Amount::from_sat(10000);
 
         let psbt = bob_make_psbt(A, B, &wallet, agreed_amount).await;
@@ -199,7 +213,7 @@ mod tests {
         let (A, B) = alice_and_bob();
         let fees = 610;
         let agreed_amount = Amount::from_sat(10000);
-        let wallet = Wallet::new_funded(agreed_amount.as_sat() + fees);
+        let wallet = Wallet::new_funded(agreed_amount.as_sat() + fees, StaticFeeRate {});
 
         let psbt = bob_make_psbt(A, B, &wallet, agreed_amount).await;
         assert_eq!(
@@ -215,7 +229,7 @@ mod tests {
     #[tokio::test]
     async fn given_bob_is_sending_less_than_agreed_when_reconstructing_txlock_then_fails() {
         let (A, B) = alice_and_bob();
-        let wallet = Wallet::new_funded(50000);
+        let wallet = Wallet::new_funded(50000, StaticFeeRate {});
         let agreed_amount = Amount::from_sat(10000);
 
         let bad_amount = Amount::from_sat(5000);
@@ -228,7 +242,7 @@ mod tests {
     #[tokio::test]
     async fn given_bob_is_sending_to_a_bad_output_reconstructing_txlock_then_fails() {
         let (A, B) = alice_and_bob();
-        let wallet = Wallet::new_funded(50000);
+        let wallet = Wallet::new_funded(50000, StaticFeeRate {});
         let agreed_amount = Amount::from_sat(10000);
 
         let E = eve();
@@ -244,7 +258,7 @@ mod tests {
     async fn bob_make_psbt(
         A: PublicKey,
         B: PublicKey,
-        wallet: &Wallet<(), bdk::database::MemoryDatabase, ()>,
+        wallet: &Wallet<(), bdk::database::MemoryDatabase, StaticFeeRate>,
         amount: Amount,
     ) -> PartiallySignedTransaction {
         TxLock::new(&wallet, amount, A, B).await.unwrap().into()

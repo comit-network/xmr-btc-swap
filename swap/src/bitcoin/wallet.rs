@@ -28,6 +28,7 @@ pub struct Wallet<B = ElectrumBlockchain, D = bdk::sled::Tree, C = Client> {
     wallet: Arc<Mutex<bdk::Wallet<B, D>>>,
     finality_confirmations: u32,
     network: Network,
+    target_block: usize,
 }
 
 impl Wallet {
@@ -36,6 +37,7 @@ impl Wallet {
         wallet_dir: &Path,
         key: impl DerivableKey<Segwitv0> + Clone,
         env_config: env::Config,
+        target_block: usize,
     ) -> Result<Self> {
         let client = bdk::electrum_client::Client::new(electrum_rpc_url.as_str())
             .context("Failed to initialize Electrum RPC client")?;
@@ -63,6 +65,7 @@ impl Wallet {
             wallet: Arc::new(Mutex::new(wallet)),
             finality_confirmations: env_config.bitcoin_finality_confirmations,
             network,
+            target_block,
         })
     }
 
@@ -238,6 +241,7 @@ impl Subscription {
 
 impl<B, D, C> Wallet<B, D, C>
 where
+    C: EstimateFeeRate,
     D: BatchDatabase,
 {
     pub async fn balance(&self) -> Result<Amount> {
@@ -282,10 +286,12 @@ where
         amount: Amount,
     ) -> Result<PartiallySignedTransaction> {
         let wallet = self.wallet.lock().await;
+        let client = self.client.lock().await;
+        let fee_rate = client.estimate_feerate(self.target_block)?;
 
         let mut tx_builder = wallet.build_tx();
         tx_builder.add_recipient(address.script_pubkey(), amount.as_sat());
-        tx_builder.fee_rate(self.select_feerate());
+        tx_builder.fee_rate(fee_rate);
         let (psbt, _details) = tx_builder.finish()?;
 
         Ok(psbt)
@@ -298,18 +304,56 @@ where
     /// transaction confirmed.
     pub async fn max_giveable(&self, locking_script_size: usize) -> Result<Amount> {
         let wallet = self.wallet.lock().await;
+        let client = self.client.lock().await;
+        let fee_rate = client.estimate_feerate(self.target_block)?;
 
         let mut tx_builder = wallet.build_tx();
 
         let dummy_script = Script::from(vec![0u8; locking_script_size]);
         tx_builder.set_single_recipient(dummy_script);
         tx_builder.drain_wallet();
-        tx_builder.fee_rate(self.select_feerate());
+        tx_builder.fee_rate(fee_rate);
         let (_, details) = tx_builder.finish().context("Failed to build transaction")?;
 
         let max_giveable = details.sent - details.fees;
 
         Ok(Amount::from_sat(max_giveable))
+    }
+
+    /// Estimate total tx fee based for a pre-defined target block based on the
+    /// transaction weight
+    pub async fn estimate_fee(&self, weight: usize) -> Result<bitcoin::Amount> {
+        let client = self.client.lock().await;
+        let fee_rate = client.estimate_feerate(self.target_block)?;
+
+        let min_relay_fee = client.min_relay_fee()?;
+        tracing::debug!("Min relay fee: {}", min_relay_fee);
+        // Doing some heavy math here :)
+        // `usize` is 32 or 64 bits wide, but `f32`'s mantissa is only 23 bits wide.
+        // This fine because such a big transaction cannot exist and there are also no
+        // negative fees.
+        #[allow(
+            clippy::cast_precision_loss,
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss
+        )]
+        let sats_per_vbyte = ((weight as f32) / 4.0 * fee_rate.as_sat_vb()) as u64;
+        tracing::debug!(
+            "Estimated fee for weight: {} for fee_rate: {:?} is in total: {}",
+            weight,
+            fee_rate,
+            sats_per_vbyte
+        );
+        if sats_per_vbyte < min_relay_fee.as_sat() {
+            tracing::warn!(
+                "Estimated fee of {} is smaller than the min relay fee, defaulting to min relay fee {}",
+                sats_per_vbyte,
+                min_relay_fee.as_sat()
+            );
+            Ok(min_relay_fee)
+        } else {
+            Ok(bitcoin::Amount::from_sat(sats_per_vbyte))
+        }
     }
 }
 
@@ -340,32 +384,20 @@ impl<B, D, C> Wallet<B, D, C> {
     pub fn get_network(&self) -> bitcoin::Network {
         self.network
     }
+}
 
-    /// Selects an appropriate [`FeeRate`] to be used for getting transactions
-    /// confirmed within a reasonable amount of time.
-    fn select_feerate(&self) -> FeeRate {
-        // TODO: This should obviously not be a const :)
-        FeeRate::from_sat_per_vb(5.0)
-    }
-
-    pub fn estimate_fee(&self, weight: usize) -> bitcoin::Amount {
-        // Doing some heavy math here :)
-        // `usize` is 32 or 64 bits wide, but `f32`'s mantissa is only 23 bits wide
-        // This fine because such a big transaction cannot exist.
-        #[allow(clippy::cast_precision_loss)]
-        let calc_fee_bytes = (weight as f32) * self.select_feerate().as_sat_vb() / 4.0;
-        // There are no fractional satoshi, hence we just round to the next one and
-        // truncate. We also do not support negative fees.
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let calc_fee_bytes_rounded = ((calc_fee_bytes * 10.0).round() as u64) / 10;
-        bitcoin::Amount::from_sat(calc_fee_bytes_rounded)
-    }
+pub trait EstimateFeeRate {
+    fn estimate_feerate(&self, target_block: usize) -> Result<FeeRate>;
+    fn min_relay_fee(&self) -> Result<bitcoin::Amount>;
 }
 
 #[cfg(test)]
-impl Wallet<(), bdk::database::MemoryDatabase, ()> {
+impl<EFR> Wallet<(), bdk::database::MemoryDatabase, EFR>
+where
+    EFR: EstimateFeeRate,
+{
     /// Creates a new, funded wallet to be used within tests.
-    pub fn new_funded(amount: u64) -> Self {
+    pub fn new_funded(amount: u64, estimate_fee_rate: EFR) -> Self {
         use bdk::database::MemoryDatabase;
         use bdk::{LocalUtxo, TransactionDetails};
         use bitcoin::OutPoint;
@@ -387,10 +419,11 @@ impl Wallet<(), bdk::database::MemoryDatabase, ()> {
             bdk::Wallet::new_offline(&descriptors.0, None, Network::Regtest, database).unwrap();
 
         Self {
-            client: Arc::new(Mutex::new(())),
+            client: Arc::new(Mutex::new(estimate_fee_rate)),
             wallet: Arc::new(Mutex::new(wallet)),
             finality_confirmations: 1,
             network: Network::Regtest,
+            target_block: 1,
         }
     }
 }
@@ -554,6 +587,24 @@ impl Client {
         self.script_history = scripts.zip(histories).collect::<BTreeMap<_, _>>();
 
         Ok(())
+    }
+}
+
+impl EstimateFeeRate for Client {
+    fn estimate_feerate(&self, target_block: usize) -> Result<FeeRate> {
+        // https://github.com/romanz/electrs/blob/f9cf5386d1b5de6769ee271df5eef324aa9491bc/src/rpc.rs#L213
+        // Returned estimated fees are per BTC/kb.
+        let fee_per_byte = self.electrum.estimate_fee(target_block)?;
+        // we do not expect fees being that high.
+        #[allow(clippy::cast_possible_truncation)]
+        Ok(FeeRate::from_btc_per_kvb(fee_per_byte as f32))
+    }
+
+    fn min_relay_fee(&self) -> Result<bitcoin::Amount> {
+        // https://github.com/romanz/electrs/blob/f9cf5386d1b5de6769ee271df5eef324aa9491bc/src/rpc.rs#L219
+        // Returned fee is in BTC/kb
+        let relay_fee = bitcoin::Amount::from_btc(self.electrum.relay_fee()?)?;
+        Ok(relay_fee)
     }
 }
 

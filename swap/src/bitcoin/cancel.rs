@@ -13,8 +13,9 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ops::Add;
 
-// TODO take real tx weight from past transaction
-pub const ESTIMATED_WEIGHT: usize = 10_000;
+// Taken from https://mempool.space/testnet/tx/8da32d6cada4903c7043563c50cacce656a8be9e02f233201996739df5368b1f
+// The weight might fluctuate slightly in reality.
+pub const ESTIMATED_WEIGHT: usize = 485;
 
 /// Represent a timelock, expressed in relative block height as defined in
 /// [BIP68](https://github.com/bitcoin/bips/blob/master/bip-0068.mediawiki).
