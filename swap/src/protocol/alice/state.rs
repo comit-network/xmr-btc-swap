@@ -1,6 +1,6 @@
 use crate::bitcoin::{
     current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, TxCancel, TxPunish, TxRefund,
-    ESTIMATED_WEIGHT_TX_PUNISH, ESTIMATED_WEIGHT_TX_REDEEM,
+    TX_PUNISH_ESTIMATED_WEIGHT, TX_REDEEM_ESTIMATED_WEIGHT,
 };
 use crate::env::Config;
 use crate::monero::wallet::{TransferRequest, WatchRequest};
@@ -133,10 +133,10 @@ impl State0 {
         let (dleq_proof_s_a, (S_a_bitcoin, S_a_monero)) = CROSS_CURVE_PROOF_SYSTEM.prove(&s_a, rng);
 
         let tx_redeem_fee = bitcoin_wallet
-            .estimate_fee(ESTIMATED_WEIGHT_TX_REDEEM)
+            .estimate_fee(TX_REDEEM_ESTIMATED_WEIGHT)
             .await?;
         let tx_punish_fee = bitcoin_wallet
-            .estimate_fee(ESTIMATED_WEIGHT_TX_PUNISH)
+            .estimate_fee(TX_PUNISH_ESTIMATED_WEIGHT)
             .await?;
         Ok(Self {
             a,

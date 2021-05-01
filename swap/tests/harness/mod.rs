@@ -15,8 +15,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use swap::bitcoin::{
-    CancelTimelock, PunishTimelock, ESTIMATED_WEIGHT_TX_CANCEL, ESTIMATED_WEIGHT_TX_REDEEM,
-    ESTIMATED_WEIGHT_TX_REFUND,
+    CancelTimelock, PunishTimelock, TX_CANCEL_ESTIMATED_WEIGHT, TX_PUNISH_ESTIMATED_WEIGHT,
+    TX_REDEEM_ESTIMATED_WEIGHT, TX_REFUND_ESTIMATED_WEIGHT,
 };
 use swap::database::Database;
 use swap::env::{Config, GetConfig};
@@ -637,12 +637,12 @@ impl TestContext {
 
         let cancel_fee = self
             .alice_bitcoin_wallet
-            .estimate_fee(ESTIMATED_WEIGHT_TX_CANCEL)
+            .estimate_fee(TX_CANCEL_ESTIMATED_WEIGHT)
             .await
             .expect("To estimate fee correctly");
         let refund_fee = self
             .alice_bitcoin_wallet
-            .estimate_fee(ESTIMATED_WEIGHT_TX_REFUND)
+            .estimate_fee(TX_REFUND_ESTIMATED_WEIGHT)
             .await
             .expect("To estimate fee correctly");
 
@@ -685,7 +685,7 @@ impl TestContext {
     async fn alice_redeemed_btc_balance(&self) -> bitcoin::Amount {
         let fee = self
             .alice_bitcoin_wallet
-            .estimate_fee(ESTIMATED_WEIGHT_TX_REDEEM)
+            .estimate_fee(TX_REDEEM_ESTIMATED_WEIGHT)
             .await
             .expect("To estimate fee correctly");
         self.alice_starting_balances.btc + self.btc_amount - fee
@@ -728,12 +728,12 @@ impl TestContext {
     async fn alice_punished_btc_balance(&self) -> bitcoin::Amount {
         let cancel_fee = self
             .alice_bitcoin_wallet
-            .estimate_fee(ESTIMATED_WEIGHT_TX_CANCEL)
+            .estimate_fee(TX_CANCEL_ESTIMATED_WEIGHT)
             .await
             .expect("To estimate fee correctly");
         let punish_fee = self
             .alice_bitcoin_wallet
-            .estimate_fee(ESTIMATED_WEIGHT_TX_REFUND)
+            .estimate_fee(TX_PUNISH_ESTIMATED_WEIGHT)
             .await
             .expect("To estimate fee correctly");
         self.alice_starting_balances.btc + self.btc_amount - cancel_fee - punish_fee

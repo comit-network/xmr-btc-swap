@@ -37,10 +37,10 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
 
-pub use crate::bitcoin::cancel::ESTIMATED_WEIGHT as ESTIMATED_WEIGHT_TX_CANCEL;
-pub use crate::bitcoin::punish::ESTIMATED_WEIGHT as ESTIMATED_WEIGHT_TX_PUNISH;
-pub use crate::bitcoin::redeem::ESTIMATED_WEIGHT as ESTIMATED_WEIGHT_TX_REDEEM;
-pub use crate::bitcoin::refund::ESTIMATED_WEIGHT as ESTIMATED_WEIGHT_TX_REFUND;
+pub use crate::bitcoin::cancel::ESTIMATED_WEIGHT as TX_CANCEL_ESTIMATED_WEIGHT;
+pub use crate::bitcoin::punish::ESTIMATED_WEIGHT as TX_PUNISH_ESTIMATED_WEIGHT;
+pub use crate::bitcoin::redeem::ESTIMATED_WEIGHT as TX_REDEEM_ESTIMATED_WEIGHT;
+pub use crate::bitcoin::refund::ESTIMATED_WEIGHT as TX_REFUND_ESTIMATED_WEIGHT;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct SecretKey {
