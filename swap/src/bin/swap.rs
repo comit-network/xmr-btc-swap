@@ -52,6 +52,7 @@ async fn main() -> Result<()> {
                 },
             electrum_rpc_url,
             tor_socks5_port,
+            bitcoin_target_block,
         } => {
             let swap_id = Uuid::new_v4();
 
@@ -71,8 +72,14 @@ async fn main() -> Result<()> {
                 )
             }
 
-            let bitcoin_wallet =
-                init_bitcoin_wallet(electrum_rpc_url, &seed, data_dir.clone(), env_config).await?;
+            let bitcoin_wallet = init_bitcoin_wallet(
+                electrum_rpc_url,
+                &seed,
+                data_dir.clone(),
+                env_config,
+                bitcoin_target_block,
+            )
+            .await?;
             let (monero_wallet, _process) =
                 init_monero_wallet(data_dir, monero_daemon_host, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
@@ -154,6 +161,7 @@ async fn main() -> Result<()> {
                 },
             electrum_rpc_url,
             tor_socks5_port,
+            bitcoin_target_block,
         } => {
             let data_dir = data.0;
             cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
@@ -167,8 +175,14 @@ async fn main() -> Result<()> {
                 bail!("The given monero address is on network {:?}, expected address of network {:?}.", receive_monero_address.network, env_config.monero_network)
             }
 
-            let bitcoin_wallet =
-                init_bitcoin_wallet(electrum_rpc_url, &seed, data_dir.clone(), env_config).await?;
+            let bitcoin_wallet = init_bitcoin_wallet(
+                electrum_rpc_url,
+                &seed,
+                data_dir.clone(),
+                env_config,
+                bitcoin_target_block,
+            )
+            .await?;
             let (monero_wallet, _process) =
                 init_monero_wallet(data_dir, monero_daemon_host, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
@@ -209,6 +223,7 @@ async fn main() -> Result<()> {
             swap_id,
             force,
             electrum_rpc_url,
+            bitcoin_target_block,
         } => {
             let data_dir = data.0;
             cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
@@ -218,8 +233,14 @@ async fn main() -> Result<()> {
                 .context("Failed to read in seed file")?;
             let env_config = env::Testnet::get_config();
 
-            let bitcoin_wallet =
-                init_bitcoin_wallet(electrum_rpc_url, &seed, data_dir, env_config).await?;
+            let bitcoin_wallet = init_bitcoin_wallet(
+                electrum_rpc_url,
+                &seed,
+                data_dir,
+                env_config,
+                bitcoin_target_block,
+            )
+            .await?;
 
             let resume_state = db.get_state(swap_id)?.try_into_bob()?.into();
             let cancel =
@@ -239,6 +260,7 @@ async fn main() -> Result<()> {
             swap_id,
             force,
             electrum_rpc_url,
+            bitcoin_target_block,
         } => {
             let data_dir = data.0;
             cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
@@ -248,8 +270,14 @@ async fn main() -> Result<()> {
                 .context("Failed to read in seed file")?;
             let env_config = env::Testnet::get_config();
 
-            let bitcoin_wallet =
-                init_bitcoin_wallet(electrum_rpc_url, &seed, data_dir, env_config).await?;
+            let bitcoin_wallet = init_bitcoin_wallet(
+                electrum_rpc_url,
+                &seed,
+                data_dir,
+                env_config,
+                bitcoin_target_block,
+            )
+            .await?;
 
             let resume_state = db.get_state(swap_id)?.try_into_bob()?.into();
 
@@ -264,6 +292,7 @@ async fn init_bitcoin_wallet(
     seed: &Seed,
     data_dir: PathBuf,
     env_config: Config,
+    bitcoin_target_block: usize,
 ) -> Result<bitcoin::Wallet> {
     let wallet_dir = data_dir.join("wallet");
 
@@ -272,7 +301,7 @@ async fn init_bitcoin_wallet(
         &wallet_dir,
         seed.derive_extended_private_key(env_config.bitcoin_network)?,
         env_config,
-        6, // TODO move this into config
+        bitcoin_target_block,
     )
     .await
     .context("Failed to initialize Bitcoin wallet")?;
