@@ -1,4 +1,5 @@
 use crate::asb::Rate;
+use crate::bitcoin::TX_PUNISH_ESTIMATED_WEIGHT;
 use crate::database::Database;
 use crate::env::Config;
 use crate::monero::BalanceTooLow;
@@ -161,8 +162,26 @@ where
                                     continue;
                                 }
                             }
+                            // TODO: This should be cleaned up.
+                            let tx_redeem_fee = self.bitcoin_wallet
+                                .estimate_fee(bitcoin::TxRedeem::weight())
+                                .await.unwrap();
+                            let tx_punish_fee = self.bitcoin_wallet
+                                .estimate_fee(TX_PUNISH_ESTIMATED_WEIGHT)
+                                .await.unwrap();
+                            let redeem_address = self.bitcoin_wallet.new_address().await.unwrap();
+                            let punish_address = self.bitcoin_wallet.new_address().await.unwrap();
 
-                            let state0 = match State0::new(btc, xmr, self.env_config, self.bitcoin_wallet.as_ref(), &mut OsRng).await {
+                            let state0 = match State0::new(
+                                btc,
+                                xmr,
+                                self.env_config,
+                                redeem_address,
+                                punish_address,
+                                tx_redeem_fee,
+                                tx_punish_fee,
+                                &mut OsRng
+                            ) {
                                 Ok(state) => state,
                                 Err(e) => {
                                     tracing::warn!(%peer, "Failed to make State0 for execution setup: {:#}", e);

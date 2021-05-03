@@ -1,6 +1,5 @@
 use crate::bitcoin::{
     current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, TxCancel, TxPunish, TxRefund,
-    TX_PUNISH_ESTIMATED_WEIGHT, TX_REDEEM_ESTIMATED_WEIGHT,
 };
 use crate::env::Config;
 use crate::monero::wallet::{TransferRequest, WatchRequest};
@@ -114,11 +113,14 @@ pub struct State0 {
 }
 
 impl State0 {
-    pub async fn new<R>(
+    pub fn new<R>(
         btc: bitcoin::Amount,
         xmr: monero::Amount,
         env_config: Config,
-        bitcoin_wallet: &bitcoin::Wallet,
+        redeem_address: bitcoin::Address,
+        punish_address: bitcoin::Address,
+        tx_redeem_fee: bitcoin::Amount,
+        tx_punish_fee: bitcoin::Amount,
         rng: &mut R,
     ) -> Result<Self>
     where
@@ -126,18 +128,10 @@ impl State0 {
     {
         let a = bitcoin::SecretKey::new_random(rng);
         let v_a = monero::PrivateViewKey::new_random(rng);
-        let redeem_address = bitcoin_wallet.new_address().await?;
-        let punish_address = bitcoin_wallet.new_address().await?;
 
         let s_a = monero::Scalar::random(rng);
         let (dleq_proof_s_a, (S_a_bitcoin, S_a_monero)) = CROSS_CURVE_PROOF_SYSTEM.prove(&s_a, rng);
 
-        let tx_redeem_fee = bitcoin_wallet
-            .estimate_fee(TX_REDEEM_ESTIMATED_WEIGHT)
-            .await?;
-        let tx_punish_fee = bitcoin_wallet
-            .estimate_fee(TX_PUNISH_ESTIMATED_WEIGHT)
-            .await?;
         Ok(Self {
             a,
             s_a,
