@@ -22,6 +22,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::{watch, Mutex};
 
 const SLED_TREE_NAME: &str = "default_tree";
+const MAX_TX_FEE: u64 = 100_000;
 
 pub struct Wallet<B = ElectrumBlockchain, D = bdk::sled::Tree, C = Client> {
     client: Arc<Mutex<C>>,
@@ -344,6 +345,7 @@ where
             fee_rate,
             sats_per_vbyte
         );
+
         if sats_per_vbyte < min_relay_fee.as_sat() {
             tracing::warn!(
                 "Estimated fee of {} is smaller than the min relay fee, defaulting to min relay fee {}",
@@ -351,6 +353,12 @@ where
                 min_relay_fee.as_sat()
             );
             Ok(min_relay_fee)
+        } else if sats_per_vbyte > MAX_TX_FEE {
+            tracing::warn!(
+                "Hard bound of max transaction fees reached. Falling back to: {} sats",
+                MAX_TX_FEE
+            );
+            Ok(bitcoin::Amount::from_sat(MAX_TX_FEE))
         } else {
             Ok(bitcoin::Amount::from_sat(sats_per_vbyte))
         }
