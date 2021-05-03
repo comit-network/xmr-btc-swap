@@ -1,3 +1,4 @@
+use crate::bitcoin::wallet::EstimateFeeRate;
 use crate::bitcoin::{
     self, current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, Transaction, TxCancel,
     TxLock, Txid,
@@ -8,6 +9,7 @@ use crate::monero::{monero_private_key, TransferProof};
 use crate::monero_ext::ScalarExt;
 use crate::protocol::{Message0, Message1, Message2, Message3, Message4, CROSS_CURVE_PROOF_SYSTEM};
 use anyhow::{anyhow, bail, Context, Result};
+use bdk::database::BatchDatabase;
 use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
 use ecdsa_fun::nonce::Deterministic;
 use ecdsa_fun::Signature;
@@ -143,7 +145,15 @@ impl State0 {
         }
     }
 
-    pub async fn receive(self, wallet: &bitcoin::Wallet, msg: Message1) -> Result<State1> {
+    pub async fn receive<B, D, C>(
+        self,
+        wallet: &bitcoin::Wallet<B, D, C>,
+        msg: Message1,
+    ) -> Result<State1>
+    where
+        C: EstimateFeeRate,
+        D: BatchDatabase,
+    {
         let valid = CROSS_CURVE_PROOF_SYSTEM.verify(
             &msg.dleq_proof_s_a,
             (
