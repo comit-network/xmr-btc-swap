@@ -113,6 +113,7 @@ pub struct State0 {
 }
 
 impl State0 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new<R>(
         btc: bitcoin::Amount,
         xmr: monero::Amount,

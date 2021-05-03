@@ -11,10 +11,6 @@ use ecdsa_fun::Signature;
 use miniscript::{Descriptor, DescriptorTrait};
 use std::collections::HashMap;
 
-// Taken from https://mempool.space/testnet/tx/10aef570973bcf524b1a6e8d2eaf3bc1522e776381fc7520fd8987fba96e5424
-// The weight might fluctuate slightly in reality.
-pub const ESTIMATED_WEIGHT: usize = 547;
-
 #[derive(Debug)]
 pub struct TxRefund {
     inner: Transaction,
@@ -140,6 +136,10 @@ impl TxRefund {
             .context("Neither signature on witness stack verifies against B")?;
 
         Ok(sig)
+    }
+
+    pub fn weight() -> usize {
+        548
     }
 }
 

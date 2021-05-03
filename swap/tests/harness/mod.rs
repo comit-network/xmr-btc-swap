@@ -14,10 +14,7 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use swap::bitcoin::{
-    CancelTimelock, PunishTimelock, TX_CANCEL_ESTIMATED_WEIGHT, TX_PUNISH_ESTIMATED_WEIGHT,
-    TX_REDEEM_ESTIMATED_WEIGHT, TX_REFUND_ESTIMATED_WEIGHT,
-};
+use swap::bitcoin::{CancelTimelock, PunishTimelock, TxCancel, TxPunish, TxRedeem, TxRefund};
 use swap::database::Database;
 use swap::env::{Config, GetConfig};
 use swap::network::swarm;
@@ -637,12 +634,12 @@ impl TestContext {
 
         let cancel_fee = self
             .alice_bitcoin_wallet
-            .estimate_fee(TX_CANCEL_ESTIMATED_WEIGHT)
+            .estimate_fee(TxCancel::weight())
             .await
             .expect("To estimate fee correctly");
         let refund_fee = self
             .alice_bitcoin_wallet
-            .estimate_fee(TX_REFUND_ESTIMATED_WEIGHT)
+            .estimate_fee(TxRefund::weight())
             .await
             .expect("To estimate fee correctly");
 
@@ -685,7 +682,7 @@ impl TestContext {
     async fn alice_redeemed_btc_balance(&self) -> bitcoin::Amount {
         let fee = self
             .alice_bitcoin_wallet
-            .estimate_fee(TX_REDEEM_ESTIMATED_WEIGHT)
+            .estimate_fee(TxRedeem::weight())
             .await
             .expect("To estimate fee correctly");
         self.alice_starting_balances.btc + self.btc_amount - fee
@@ -728,12 +725,12 @@ impl TestContext {
     async fn alice_punished_btc_balance(&self) -> bitcoin::Amount {
         let cancel_fee = self
             .alice_bitcoin_wallet
-            .estimate_fee(TX_CANCEL_ESTIMATED_WEIGHT)
+            .estimate_fee(TxCancel::weight())
             .await
             .expect("To estimate fee correctly");
         let punish_fee = self
             .alice_bitcoin_wallet
-            .estimate_fee(TX_PUNISH_ESTIMATED_WEIGHT)
+            .estimate_fee(TxPunish::weight())
             .await
             .expect("To estimate fee correctly");
         self.alice_starting_balances.btc + self.btc_amount - cancel_fee - punish_fee

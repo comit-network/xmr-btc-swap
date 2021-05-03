@@ -7,10 +7,6 @@ use bdk::bitcoin::Script;
 use miniscript::{Descriptor, DescriptorTrait};
 use std::collections::HashMap;
 
-// Taken from https://mempool.space/testnet/tx/ed4d60bc1fd172feca444ed3d06cccb90346b9098c2d28d2d034dac66f608f68
-// The weight might fluctuate slightly in reality.
-pub const ESTIMATED_WEIGHT: usize = 547;
-
 #[derive(Debug)]
 pub struct TxPunish {
     inner: Transaction,
@@ -76,6 +72,10 @@ impl TxPunish {
             .context("Failed to satisfy inputs with given signatures")?;
 
         Ok(tx_punish)
+    }
+
+    pub fn weight() -> usize {
+        548
     }
 }
 

@@ -1,5 +1,4 @@
 use crate::asb::Rate;
-use crate::bitcoin::TX_PUNISH_ESTIMATED_WEIGHT;
 use crate::database::Database;
 use crate::env::Config;
 use crate::monero::BalanceTooLow;
@@ -165,12 +164,24 @@ where
                             // TODO: This should be cleaned up.
                             let tx_redeem_fee = self.bitcoin_wallet
                                 .estimate_fee(bitcoin::TxRedeem::weight())
-                                .await.unwrap();
+                                .await;
                             let tx_punish_fee = self.bitcoin_wallet
-                                .estimate_fee(TX_PUNISH_ESTIMATED_WEIGHT)
-                                .await.unwrap();
-                            let redeem_address = self.bitcoin_wallet.new_address().await.unwrap();
-                            let punish_address = self.bitcoin_wallet.new_address().await.unwrap();
+                                .estimate_fee(bitcoin::TxPunish::weight())
+                                .await;
+                            let redeem_address = self.bitcoin_wallet.new_address().await;
+                            let punish_address = self.bitcoin_wallet.new_address().await;
+
+                            let (tx_redeem_fee, tx_punish_fee, redeem_address, punish_address) = match (
+                                tx_redeem_fee,
+                                tx_punish_fee,
+                                redeem_address,
+                                punish_address,
+                            ) {
+                                (Ok(tx_redeem_fee), Ok(tx_punish_fee), Ok(redeem_address), Ok(punish_address)) => {
+                                    (tx_redeem_fee, tx_punish_fee, redeem_address, punish_address)
+                                }
+                                _ => { continue; }
+                            };
 
                             let state0 = match State0::new(
                                 btc,

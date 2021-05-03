@@ -646,7 +646,15 @@ impl State6 {
         Ok(tx_id)
     }
 
-    pub async fn refund_btc(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<()> {
+    pub async fn publish_refund_btc(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<()> {
+        let signed_tx_refund = self.signed_refund_transaction()?;
+        let (_, subscription) = bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
+        subscription.wait_until_final().await?;
+
+        Ok(())
+    }
+
+    pub fn signed_refund_transaction(&self) -> Result<Transaction> {
         let tx_cancel = bitcoin::TxCancel::new(
             &self.tx_lock,
             self.cancel_timelock,
@@ -665,12 +673,7 @@ impl State6 {
 
         let signed_tx_refund =
             tx_refund.add_signatures((self.A, sig_a), (self.b.public(), sig_b))?;
-
-        let (_, subscription) = bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
-
-        subscription.wait_until_final().await?;
-
-        Ok(())
+        Ok(signed_tx_refund)
     }
 
     pub fn tx_lock_id(&self) -> bitcoin::Txid {

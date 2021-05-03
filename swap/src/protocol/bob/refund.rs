@@ -45,7 +45,7 @@ pub async fn refund(
         }
     };
 
-    state6.refund_btc(bitcoin_wallet.as_ref()).await?;
+    state6.publish_refund_btc(bitcoin_wallet.as_ref()).await?;
 
     let state = BobState::BtcRefunded(state6);
     let db_state = state.clone().into();

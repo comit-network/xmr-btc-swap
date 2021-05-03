@@ -1,4 +1,4 @@
-use crate::bitcoin::ExpiredTimelocks;
+use crate::bitcoin::{ExpiredTimelocks, TxCancel, TxRefund};
 use crate::database::Swap;
 use crate::env::Config;
 use crate::protocol::bob;
@@ -66,12 +66,8 @@ async fn next_state(
     Ok(match state {
         BobState::Started { btc_amount } => {
             let bitcoin_refund_address = bitcoin_wallet.new_address().await?;
-            let tx_refund_fee = bitcoin_wallet
-                .estimate_fee(bitcoin::TX_REFUND_ESTIMATED_WEIGHT)
-                .await?;
-            let tx_cancel_fee = bitcoin_wallet
-                .estimate_fee(bitcoin::TX_CANCEL_ESTIMATED_WEIGHT)
-                .await?;
+            let tx_refund_fee = bitcoin_wallet.estimate_fee(TxRefund::weight()).await?;
+            let tx_cancel_fee = bitcoin_wallet.estimate_fee(TxCancel::weight()).await?;
 
             let state2 = request_price_and_setup(
                 swap_id,
@@ -255,7 +251,7 @@ async fn next_state(
                     );
                 }
                 ExpiredTimelocks::Cancel => {
-                    state.refund_btc(bitcoin_wallet).await?;
+                    state.publish_refund_btc(bitcoin_wallet).await?;
                     BobState::BtcRefunded(state)
                 }
                 ExpiredTimelocks::Punish => BobState::BtcPunished {
