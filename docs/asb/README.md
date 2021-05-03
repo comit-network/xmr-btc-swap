@@ -121,10 +121,9 @@ The ASB provider has to monitor Monero funds to make sure the ASB still has liqu
 
 #### Tor and hidden services
 
-The ASB supports will automatically create a Tor hidden service if the Tor control port can be found.
+The ASB supports Tor and will automatically create a Tor hidden service if the Tor control port can be found.
 By default, the ASB will look for the control port under `localhost:9051`.
-To allow the ASB to create hidden services, enable the control port and authentication in your torrc file.
-Concretely, add these lines:
+To allow the ASB to create a hidden service, enable the control port and authentication in your torrc file:
 
 ```
 ControlPort 9051
@@ -135,7 +134,7 @@ CookieAuthFileGroupReadable 1
 It is important that the user running the ASB has the correct user rights, i.e. is in the same group as the user running Tor.
 E.g. if running on debian and having Tor install via apt, add your user to the following group:
 `sudo adduser $(whoami) debian-tor`.
-When configured correctly, your ASB will print the created onion addresses:
+When configured correctly, your ASB will print the created onion addresses upon startup:
 
 ```bash
 ./bin/asb start
