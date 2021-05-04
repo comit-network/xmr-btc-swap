@@ -52,7 +52,7 @@ impl Client {
             .inner
             .post(self.get_transactions.clone())
             .json(&GetTransactionsPayload {
-                txs_hashes: txids.iter().map(|id| format!("{:x}", id)).collect()
+                txs_hashes: txids.iter().map(|id| format!("{:x}", id)).collect(),
             })
             .send()
             .await?;
@@ -67,9 +67,10 @@ impl Client {
     }
 
     pub async fn get_o_indexes(&self, txid: Hash) -> Result<GetOIndexesResponse> {
-        self.binary_request(self.get_o_indexes_bin_url.clone(), GetOIndexesPayload {
-            txid,
-        })
+        self.binary_request(
+            self.get_o_indexes_bin_url.clone(),
+            GetOIndexesPayload { txid },
+        )
         .await
     }
 
@@ -106,7 +107,7 @@ pub struct GenerateBlocks {
     pub height: u32,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Copy, Clone, Debug, Deserialize)]
 pub struct BlockCount {
     pub count: u32,
 }
@@ -154,7 +155,7 @@ struct GetTransactionsResponse {
 #[derive(Clone, Debug, Deserialize)]
 struct GetTransactionsResponseEntry {
     #[serde(with = "monero_serde_hex_transaction")]
-    as_hex: Transaction
+    as_hex: Transaction,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -168,20 +169,20 @@ struct GetOutsPayload {
     outputs: Vec<GetOutputsOut>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Copy, Clone, Debug, Serialize, PartialEq)]
 pub struct GetOutputsOut {
     pub amount: u64,
     pub index: u64,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct GetOutsResponse {
     #[serde(flatten)]
     pub base: BaseResponse,
     pub outs: Vec<OutKey>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct OutKey {
     pub height: u64,
     #[serde(with = "byte_array")]
@@ -193,7 +194,7 @@ pub struct OutKey {
     pub unlocked: bool,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct BaseResponse {
     pub credits: u64,
     pub status: Status,
@@ -201,7 +202,7 @@ pub struct BaseResponse {
     pub untrusted: bool,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct GetOIndexesResponse {
     #[serde(flatten)]
     pub base: BaseResponse,
@@ -209,7 +210,7 @@ pub struct GetOIndexesResponse {
     pub o_indexes: Vec<u64>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Copy, Clone, Debug, Deserialize, PartialEq)]
 pub enum Status {
     #[serde(rename = "OK")]
     Ok,

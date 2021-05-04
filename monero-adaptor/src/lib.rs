@@ -11,7 +11,7 @@ use rand::rngs::OsRng;
 use std::convert::TryInto;
 use tiny_keccak::{Hasher, Keccak};
 
-const RING_SIZE: usize = 11;
+pub const RING_SIZE: usize = 11;
 const DOMAIN_TAG: &str = "CSLAG_c";
 
 fn challenge(
@@ -151,6 +151,24 @@ impl Signature {
         }
 
         Ok(h == self.h_0)
+    }
+}
+
+impl From<Signature> for monero::util::ringct::Clsag {
+    fn from(from: Signature) -> Self {
+        Self {
+            s: from
+                .responses
+                .iter()
+                .map(|s| monero::util::ringct::Key { key: s.to_bytes() })
+                .collect(),
+            c1: monero::util::ringct::Key {
+                key: from.h_0.to_bytes(),
+            },
+            D: monero::util::ringct::Key {
+                key: from.I.compress().to_bytes(),
+            },
+        }
     }
 }
 
