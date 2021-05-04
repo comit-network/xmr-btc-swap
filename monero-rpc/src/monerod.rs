@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use monero::{cryptonote::hash::Hash, util::ringct, PublicKey};
+use monero::{cryptonote::hash::Hash, util::ringct, PublicKey, Transaction};
 use serde::{de::DeserializeOwned, Deserialize, Serialize, Serializer};
 
 #[jsonrpc_client::api(version = "2.0")]
@@ -18,6 +18,7 @@ pub struct Client {
     base_url: reqwest::Url,
     get_o_indexes_bin_url: reqwest::Url,
     get_outs_bin_url: reqwest::Url,
+    get_transactions: reqwest::Url,
 }
 
 impl Client {
@@ -40,7 +41,29 @@ impl Client {
             get_outs_bin_url: format!("http://{}:{}/get_outs.bin", host, port)
                 .parse()
                 .context("url is well formed")?,
+            get_transactions: format!("http://{}:{}/get_transactions", host, port)
+                .parse()
+                .context("url is well formed")?,
         })
+    }
+
+    pub async fn get_transactions(&self, txids: &[Hash]) -> Result<Vec<Transaction>> {
+        let response = self
+            .inner
+            .post(self.get_transactions.clone())
+            .json(&GetTransactionsPayload {
+                txs_hashes: txids.iter().map(|id| format!("{:x}", id)).collect()
+            })
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            anyhow::bail!("Request failed with status code {}", response.status())
+        }
+
+        let response = response.json::<GetTransactionsResponse>().await?;
+
+        Ok(response.txs.into_iter().map(|e| e.as_hex).collect())
     }
 
     pub async fn get_o_indexes(&self, txid: Hash) -> Result<GetOIndexesResponse> {
@@ -83,7 +106,7 @@ pub struct GenerateBlocks {
     pub height: u32,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct BlockCount {
     pub count: u32,
 }
@@ -119,6 +142,22 @@ pub struct GetIndexesResponse {
 }
 
 #[derive(Clone, Debug, Serialize)]
+struct GetTransactionsPayload {
+    txs_hashes: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct GetTransactionsResponse {
+    txs: Vec<GetTransactionsResponseEntry>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct GetTransactionsResponseEntry {
+    #[serde(with = "monero_serde_hex_transaction")]
+    as_hex: Transaction
+}
+
+#[derive(Clone, Debug, Serialize)]
 struct GetOIndexesPayload {
     #[serde(with = "byte_array")]
     txid: Hash,
@@ -129,20 +168,20 @@ struct GetOutsPayload {
     outputs: Vec<GetOutputsOut>,
 }
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct GetOutputsOut {
     pub amount: u64,
     pub index: u64,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct GetOutsResponse {
     #[serde(flatten)]
     pub base: BaseResponse,
     pub outs: Vec<OutKey>,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct OutKey {
     pub height: u64,
     #[serde(with = "byte_array")]
@@ -154,7 +193,7 @@ pub struct OutKey {
     pub unlocked: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct BaseResponse {
     pub credits: u64,
     pub status: Status,
@@ -162,7 +201,7 @@ pub struct BaseResponse {
     pub untrusted: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct GetOIndexesResponse {
     #[serde(flatten)]
     pub base: BaseResponse,
@@ -170,7 +209,7 @@ pub struct GetOIndexesResponse {
     pub o_indexes: Vec<u64>,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize)]
 pub enum Status {
     #[serde(rename = "OK")]
     Ok,
@@ -194,6 +233,27 @@ mod monero_serde_hex_block {
         let mut cursor = Cursor::new(bytes);
 
         let block = monero::Block::consensus_decode(&mut cursor).map_err(D::Error::custom)?;
+
+        Ok(block)
+    }
+}
+
+mod monero_serde_hex_transaction {
+    use super::*;
+    use monero::consensus::Decodable;
+    use serde::{de::Error, Deserialize, Deserializer};
+    use std::io::Cursor;
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<monero::Transaction, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let hex = String::deserialize(deserializer)?;
+
+        let bytes = hex::decode(&hex).map_err(D::Error::custom)?;
+        let mut cursor = Cursor::new(bytes);
+
+        let block = monero::Transaction::consensus_decode(&mut cursor).map_err(D::Error::custom)?;
 
         Ok(block)
     }

@@ -3,20 +3,35 @@ use monero::consensus::encode::VarInt;
 use monero::cryptonote::hash::Hashable;
 use monero_rpc::monerod;
 use monero_rpc::monerod::{GetBlockResponse, MonerodRpc as _};
-use rand::Rng;
+use rand::{Rng, RngCore, CryptoRng};
 
 pub struct Wallet {
     client: monerod::Client,
+    key: monero::KeyPair
 }
 
 impl Wallet {
+    pub fn new_random<R: CryptoRng + RngCore>(client: monerod::Client, rng: &mut R) -> Self {
+        Self {
+            client,
+            key: monero::KeyPair {
+                view: monero::PrivateKey::from_scalar(curve25519_dalek::scalar::Scalar::random(rng)),
+                spend: monero::PrivateKey::from_scalar(curve25519_dalek::scalar::Scalar::random(rng)),
+            }
+        }
+    }
+
+    pub fn get_address(&self, network: monero::Network) -> monero::Address {
+        monero::Address::from_keypair(network, &self.key)
+    }
+
     /// Chooses 10 random key offsets for use within a new confidential
     /// transactions.
     ///
     /// Choosing these offsets randomly is not ideal for privacy, instead they
     /// should be chosen in a way that mimics a real spending pattern as much as
     /// possible.
-    pub async fn choose_ten_random_key_offsets(&self) -> Result<[VarInt; 10]> {
+    pub async fn calculate_key_offset_boundaries(&self) -> Result<(VarInt, VarInt)> {
         let latest_block = self.client.get_block_count().await?;
         let latest_spendable_block = latest_block.count - 10;
 
@@ -38,20 +53,7 @@ impl Wallet {
             .context("Expected at least one output index")?;
         let oldest_index = last_index - (last_index / 100) * 40; // oldest index must be within last 40% TODO: CONFIRM THIS
 
-        let mut rng = rand::thread_rng();
-
-        Ok([
-            VarInt(rng.gen_range(oldest_index, last_index)),
-            VarInt(rng.gen_range(oldest_index, last_index)),
-            VarInt(rng.gen_range(oldest_index, last_index)),
-            VarInt(rng.gen_range(oldest_index, last_index)),
-            VarInt(rng.gen_range(oldest_index, last_index)),
-            VarInt(rng.gen_range(oldest_index, last_index)),
-            VarInt(rng.gen_range(oldest_index, last_index)),
-            VarInt(rng.gen_range(oldest_index, last_index)),
-            VarInt(rng.gen_range(oldest_index, last_index)),
-            VarInt(rng.gen_range(oldest_index, last_index)),
-        ])
+        Ok((VarInt(oldest_index), VarInt(last_index)))
     }
 }
 
@@ -71,23 +73,26 @@ mod tests {
         rpc_client.generateblocks(150, "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".to_owned()).await.unwrap();
         let wallet = Wallet {
             client: rpc_client.clone(),
+            key: todo!()
         };
 
-        let key_offsets = wallet.choose_ten_random_key_offsets().await.unwrap();
-        let result = rpc_client
-            .get_outs(
-                key_offsets
-                    .to_vec()
-                    .into_iter()
-                    .map(|varint| GetOutputsOut {
-                        amount: 0,
-                        index: varint.0,
-                    })
-                    .collect(),
-            )
-            .await
-            .unwrap();
+        let (lower, upper) = wallet.calculate_key_offset_boundaries().await.unwrap();
 
-        assert_eq!(result.outs.len(), 10);
+        todo!("fix");
+        // let result = rpc_client
+        //     .get_outs(
+        //         key_offsets
+        //             .to_vec()
+        //             .into_iter()
+        //             .map(|varint| GetOutputsOut {
+        //                 amount: 0,
+        //                 index: varint.0,
+        //             })
+        //             .collect(),
+        //     )
+        //     .await
+        //     .unwrap();
+
+        // assert_eq!(result.outs.len(), 10);
     }
 }

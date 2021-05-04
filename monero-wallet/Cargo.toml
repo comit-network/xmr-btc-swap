@@ -9,9 +9,9 @@ anyhow = "1"
 monero = "0.12"
 monero-rpc = { path = "../monero-rpc" }
 rand = "0.7"
+curve25519-dalek = "3"
 
 [dev-dependencies]
-curve25519-dalek = "3"
 monero-harness = { path = "../monero-harness" }
 rand = "0.7"
 testcontainers = "0.12"

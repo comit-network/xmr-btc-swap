@@ -82,7 +82,7 @@ pub struct GetAddress {
     pub address: String,
 }
 
-#[derive(Deserialize, Debug, Clone, Copy)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct GetBalance {
     pub balance: u64,
     pub blocks_to_unlock: u32,
@@ -133,19 +133,19 @@ pub struct Transfer {
     pub unsigned_txset: String,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct BlockHeight {
     pub height: u32,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(from = "CheckTxKeyResponse")]
 pub struct CheckTxKey {
     pub confirmations: u64,
     pub received: u64,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 struct CheckTxKeyResponse {
     pub confirmations: u64,
     pub received: u64,
@@ -175,7 +175,7 @@ pub struct GenerateFromKeys {
     pub info: String,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Refreshed {
     pub blocks_fetched: u32,
     pub received_money: bool,
@@ -191,7 +191,7 @@ pub struct SweepAll {
     weight_list: Vec<u32>,
 }
 
-#[derive(Debug, Copy, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Version {
     pub version: u32,
 }
@@ -207,7 +207,7 @@ pub type WalletOpened = Empty;
 /// what the response of every RPC call is. Unfortunately, monerod likes to
 /// return empty objects instead of `null`s in certain cases. We use this struct
 /// to all the "deserialization" to happily continue.
-#[derive(Debug, Copy, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Empty {}
 
 fn opt_key_from_blank<'de, D>(deserializer: D) -> Result<Option<monero::PrivateKey>, D::Error>
