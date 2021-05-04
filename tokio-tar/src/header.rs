@@ -516,11 +516,7 @@ impl Header {
     pub fn username_bytes(&self) -> Option<&[u8]> {
         if let Some(ustar) = self.as_ustar() {
             Some(ustar.username_bytes())
-        } else if let Some(gnu) = self.as_gnu() {
-            Some(gnu.username_bytes())
-        } else {
-            None
-        }
+        } else { self.as_gnu().map(|gnu| gnu.username_bytes()) }
     }
 
     /// Sets the username inside this header.
@@ -558,10 +554,8 @@ impl Header {
     pub fn groupname_bytes(&self) -> Option<&[u8]> {
         if let Some(ustar) = self.as_ustar() {
             Some(ustar.groupname_bytes())
-        } else if let Some(gnu) = self.as_gnu() {
-            Some(gnu.groupname_bytes())
         } else {
-            None
+            self.as_gnu().map(|gnu| gnu.groupname_bytes())
         }
     }
 

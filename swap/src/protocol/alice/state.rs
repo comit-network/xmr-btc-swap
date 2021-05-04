@@ -274,11 +274,11 @@ impl State2 {
         // recover(encsign(a, S_b, d), sign(a, d), S_b) = s_b where d is a digest, (a,
         // A) is alice's keypair and (s_b, S_b) is bob's keypair.
         let tx_refund_encsig = self.a.encsign(self.S_b_bitcoin, tx_refund.digest());
-
         let tx_cancel_sig = self.a.sign(tx_cancel.digest());
+
         Message3 {
-            tx_refund_encsig,
             tx_cancel_sig,
+            tx_refund_encsig,
         }
     }
 
