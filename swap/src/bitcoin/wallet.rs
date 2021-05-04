@@ -22,7 +22,12 @@ use std::time::{Duration, Instant};
 use tokio::sync::{watch, Mutex};
 
 const SLED_TREE_NAME: &str = "default_tree";
-const MAX_TX_FEE: u64 = 100_000;
+
+// TODO make these values configurable
+/// Assuming we add a spread of 3% we don't want to pay more than 3% of the
+/// amount for tx fees.
+const MAX_RELATIVE_TX_FEE: f64 = 0.03;
+const MAX_ABSOLUTE_TX_FEE: u64 = 100_000;
 
 pub struct Wallet<B = ElectrumBlockchain, D = bdk::sled::Tree, C = Client> {
     client: Arc<Mutex<C>>,
@@ -322,46 +327,81 @@ where
     }
 
     /// Estimate total tx fee based for a pre-defined target block based on the
-    /// transaction weight
-    pub async fn estimate_fee(&self, weight: usize) -> Result<bitcoin::Amount> {
+    /// transaction weight. The max fee cannot be more than MAX_PERCENTAGE_FEE
+    /// of amount
+    pub async fn estimate_fee(
+        &self,
+        weight: usize,
+        transfer_amount: bitcoin::Amount,
+    ) -> Result<bitcoin::Amount> {
         let client = self.client.lock().await;
         let fee_rate = client.estimate_feerate(self.target_block)?;
 
         let min_relay_fee = client.min_relay_fee()?;
         tracing::debug!("Min relay fee: {}", min_relay_fee);
-        // Doing some heavy math here :)
-        // `usize` is 32 or 64 bits wide, but `f32`'s mantissa is only 23 bits wide.
-        // This fine because such a big transaction cannot exist and there are also no
-        // negative fees.
-        #[allow(
-            clippy::cast_precision_loss,
-            clippy::cast_possible_truncation,
-            clippy::cast_sign_loss
-        )]
-        let sats_per_vbyte = ((weight as f32) / 4.0 * fee_rate.as_sat_vb()) as u64;
-        tracing::debug!(
-            "Estimated fee for weight: {} for fee_rate: {:?} is in total: {}",
-            weight,
-            fee_rate,
-            sats_per_vbyte
-        );
 
-        if sats_per_vbyte < min_relay_fee.as_sat() {
-            tracing::warn!(
-                "Estimated fee of {} is smaller than the min relay fee, defaulting to min relay fee {}",
-                sats_per_vbyte,
-                min_relay_fee.as_sat()
-            );
-            Ok(min_relay_fee)
-        } else if sats_per_vbyte > MAX_TX_FEE {
-            tracing::warn!(
-                "Hard bound of max transaction fees reached. Falling back to: {} sats",
-                MAX_TX_FEE
-            );
-            Ok(bitcoin::Amount::from_sat(MAX_TX_FEE))
-        } else {
-            Ok(bitcoin::Amount::from_sat(sats_per_vbyte))
-        }
+        Ok(estimate_fee(
+            weight,
+            transfer_amount,
+            fee_rate,
+            min_relay_fee,
+        ))
+    }
+}
+
+fn estimate_fee(
+    weight: usize,
+    transfer_amount: Amount,
+    fee_rate: FeeRate,
+    min_relay_fee: Amount,
+) -> Amount {
+    // Doing some heavy math here :)
+    // `usize` is 32 or 64 bits wide, but `f32`'s mantissa is only 23 bits wide.
+    // This fine because such a big transaction cannot exist and there are also no
+    // negative fees.
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss
+    )]
+    let sats_per_vbyte = ((weight as f32) / 4.0 * fee_rate.as_sat_vb()) as u64;
+    tracing::debug!(
+        "Estimated fee for weight: {} for fee_rate: {:?} is in total: {}",
+        weight,
+        fee_rate,
+        sats_per_vbyte
+    );
+
+    // Similar as above: we do not care about fractional fees and have to cast a
+    // couple of times.
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss
+    )]
+    let max_allowed_fee = (transfer_amount.as_sat() as f64 * MAX_RELATIVE_TX_FEE).ceil() as u64;
+
+    if sats_per_vbyte < min_relay_fee.as_sat() {
+        tracing::warn!(
+            "Estimated fee of {} is smaller than the min relay fee, defaulting to min relay fee {}",
+            sats_per_vbyte,
+            min_relay_fee.as_sat()
+        );
+        min_relay_fee
+    } else if sats_per_vbyte > max_allowed_fee && sats_per_vbyte > MAX_ABSOLUTE_TX_FEE {
+        tracing::warn!(
+            "Hard bound of transaction fees reached. Falling back to: {} sats",
+            MAX_ABSOLUTE_TX_FEE
+        );
+        bitcoin::Amount::from_sat(MAX_ABSOLUTE_TX_FEE)
+    } else if sats_per_vbyte > max_allowed_fee {
+        tracing::warn!(
+            "Relative bound of transaction fees reached. Falling back to: {} sats",
+            max_allowed_fee
+        );
+        bitcoin::Amount::from_sat(max_allowed_fee)
+    } else {
+        bitcoin::Amount::from_sat(sats_per_vbyte)
     }
 }
 
@@ -733,5 +773,77 @@ mod tests {
         let confirmed = Confirmed::from_inclusion_and_latest_block(included_in, latest_block);
 
         assert_eq!(confirmed.depth, 0)
+    }
+
+    #[test]
+    fn given_one_BTC_and_100k_sats_per_vb_fees_should_not_hit_max() {
+        // 400 weight = 100 vbyte
+        let weight = 400;
+        let amount = bitcoin::Amount::from_sat(100_000_000);
+
+        let sat_per_vb = 100.0;
+        let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb);
+
+        let relay_fee = bitcoin::Amount::ONE_SAT;
+        let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee);
+
+        // weight / 4.0 *  sat_per_vb
+        let should_fee = bitcoin::Amount::from_sat(10_000);
+        assert_eq!(is_fee, should_fee);
+    }
+
+    #[test]
+    fn given_1BTC_and_1_sat_per_vb_fees_and_100ksat_min_relay_fee_should_hit_min() {
+        // 400 weight = 100 vbyte
+        let weight = 400;
+        let amount = bitcoin::Amount::from_sat(100_000_000);
+
+        let sat_per_vb = 1.0;
+        let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb);
+
+        let relay_fee = bitcoin::Amount::from_sat(100_000);
+        let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee);
+
+        // weight / 4.0 *  sat_per_vb would be smaller than relay fee hence we take min
+        // relay fee
+        let should_fee = bitcoin::Amount::from_sat(100_000);
+        assert_eq!(is_fee, should_fee);
+    }
+
+    #[test]
+    fn given_1mio_sat_and_1k_sats_per_vb_fees_should_hit_relative_max() {
+        // 400 weight = 100 vbyte
+        let weight = 400;
+        let amount = bitcoin::Amount::from_sat(1_000_000);
+
+        let sat_per_vb = 1_000.0;
+        let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb);
+
+        let relay_fee = bitcoin::Amount::ONE_SAT;
+        let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee);
+
+        // weight / 4.0 *  sat_per_vb would be greater than 0.03% hence we take max
+        // relative fee.
+        let should_fee = bitcoin::Amount::from_sat(30_000);
+        assert_eq!(is_fee, should_fee);
+    }
+
+    #[test]
+    fn given_1BTC_and_4mio_sats_per_vb_fees_should_hit_total_max() {
+        // even if we send 1BTC we don't want to pay 0.3BTC in fees. This would be
+        // $1,650 at the moment.
+        let weight = 400;
+        let amount = bitcoin::Amount::from_sat(100_000_000);
+
+        let sat_per_vb = 4_000_000.0;
+        let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb);
+
+        let relay_fee = bitcoin::Amount::ONE_SAT;
+        let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee);
+
+        // weight / 4.0 *  sat_per_vb would be greater than 0.03% hence we take total
+        // max allowed fee.
+        let should_fee = bitcoin::Amount::from_sat(MAX_ABSOLUTE_TX_FEE);
+        assert_eq!(is_fee, should_fee);
     }
 }

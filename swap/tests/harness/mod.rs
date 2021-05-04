@@ -634,12 +634,12 @@ impl TestContext {
 
         let cancel_fee = self
             .alice_bitcoin_wallet
-            .estimate_fee(TxCancel::weight())
+            .estimate_fee(TxCancel::weight(), self.btc_amount)
             .await
             .expect("To estimate fee correctly");
         let refund_fee = self
             .alice_bitcoin_wallet
-            .estimate_fee(TxRefund::weight())
+            .estimate_fee(TxRefund::weight(), self.btc_amount)
             .await
             .expect("To estimate fee correctly");
 
@@ -682,7 +682,7 @@ impl TestContext {
     async fn alice_redeemed_btc_balance(&self) -> bitcoin::Amount {
         let fee = self
             .alice_bitcoin_wallet
-            .estimate_fee(TxRedeem::weight())
+            .estimate_fee(TxRedeem::weight(), self.btc_amount)
             .await
             .expect("To estimate fee correctly");
         self.alice_starting_balances.btc + self.btc_amount - fee
@@ -725,12 +725,12 @@ impl TestContext {
     async fn alice_punished_btc_balance(&self) -> bitcoin::Amount {
         let cancel_fee = self
             .alice_bitcoin_wallet
-            .estimate_fee(TxCancel::weight())
+            .estimate_fee(TxCancel::weight(), self.btc_amount)
             .await
             .expect("To estimate fee correctly");
         let punish_fee = self
             .alice_bitcoin_wallet
-            .estimate_fee(TxPunish::weight())
+            .estimate_fee(TxPunish::weight(), self.btc_amount)
             .await
             .expect("To estimate fee correctly");
         self.alice_starting_balances.btc + self.btc_amount - cancel_fee - punish_fee

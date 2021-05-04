@@ -325,8 +325,14 @@ mod tests {
         let btc_amount = Amount::from_sat(500_000);
         let xmr_amount = crate::monero::Amount::from_piconero(10000);
 
-        let tx_redeem_fee = alice_wallet.estimate_fee(TxRedeem::weight()).await.unwrap();
-        let tx_punish_fee = alice_wallet.estimate_fee(TxPunish::weight()).await.unwrap();
+        let tx_redeem_fee = alice_wallet
+            .estimate_fee(TxRedeem::weight(), btc_amount)
+            .await
+            .unwrap();
+        let tx_punish_fee = alice_wallet
+            .estimate_fee(TxPunish::weight(), btc_amount)
+            .await
+            .unwrap();
         let redeem_address = alice_wallet.new_address().await.unwrap();
         let punish_address = alice_wallet.new_address().await.unwrap();
 

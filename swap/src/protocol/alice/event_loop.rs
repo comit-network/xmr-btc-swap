@@ -163,10 +163,10 @@ where
                             }
                             // TODO: This should be cleaned up.
                             let tx_redeem_fee = self.bitcoin_wallet
-                                .estimate_fee(bitcoin::TxRedeem::weight())
+                                .estimate_fee(bitcoin::TxRedeem::weight(), btc)
                                 .await;
                             let tx_punish_fee = self.bitcoin_wallet
-                                .estimate_fee(bitcoin::TxPunish::weight())
+                                .estimate_fee(bitcoin::TxPunish::weight(), btc)
                                 .await;
                             let redeem_address = self.bitcoin_wallet.new_address().await;
                             let punish_address = self.bitcoin_wallet.new_address().await;
