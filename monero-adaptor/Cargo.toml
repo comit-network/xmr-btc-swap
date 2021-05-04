@@ -10,3 +10,10 @@ curve25519-dalek = "3"
 rand = "0.7"
 tiny-keccak = { version = "2", features = ["keccak"] }
 hash_edwards_to_edwards = { git = "https://github.com/comit-network/hash_edwards_to_edwards" }
+monero = "0.12"
+
+[dev-dependencies]
+monero-harness = { path = "../monero-harness" }
+monero-rpc = { path = "../monero-rpc" }
+monero-wallet = { path = "../monero-wallet" }
+tokio = { version = "1", features = ["full"] }

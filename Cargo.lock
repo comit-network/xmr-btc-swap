@@ -661,6 +661,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "clear_on_drop"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9cc5db465b294c3fa986d5bbb0f3017cd850bff6dd6c52f9ccff8b4d21b7b08"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "cloudabi"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1642,6 +1651,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "integer-encoding"
+version = "3.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90c11140ffea82edce8dcd74137ce9324ec24b3cf0175fc9d7e29164da9915b8"
+
+[[package]]
 name = "ipconfig"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2250,17 +2265,22 @@ dependencies = [
 [[package]]
 name = "monero"
 version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c73108ba5cf025e437600990935234241f95ada3c4621960d50912cde739af6"
+source = "git+https://github.com/comit-network/monero-rs?branch=fix-ci#baed70b50e7eee97733df3d580f0476c461bd4ab"
 dependencies = [
  "base58-monero",
+ "clear_on_drop",
  "curve25519-dalek",
  "fixed-hash",
+ "hash_edwards_to_edwards",
  "hex 0.4.3",
  "hex-literal",
+ "integer-encoding",
  "keccak-hash",
+ "lazy_static",
+ "rand 0.7.3",
  "serde",
  "serde-big-array",
+ "subtle 2.4.0",
  "thiserror",
 ]
 
@@ -2271,8 +2291,13 @@ dependencies = [
  "anyhow",
  "curve25519-dalek",
  "hash_edwards_to_edwards",
+ "monero",
+ "monero-harness",
+ "monero-rpc",
+ "monero-wallet",
  "rand 0.7.3",
  "tiny-keccak",
+ "tokio",
 ]
 
 [[package]]
