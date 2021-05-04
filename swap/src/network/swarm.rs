@@ -1,13 +1,27 @@
 use crate::network::transport;
+use crate::protocol::alice::event_loop::LatestRate;
 use crate::protocol::{alice, bob};
 use crate::seed::Seed;
-use crate::tor;
+use crate::{monero, tor};
 use anyhow::Result;
 use libp2p::swarm::{NetworkBehaviour, SwarmBuilder};
 use libp2p::{PeerId, Swarm};
 
-pub fn alice(seed: &Seed) -> Result<Swarm<alice::Behaviour>> {
-    with_clear_net(seed, alice::Behaviour::default())
+pub fn alice<LR>(
+    seed: &Seed,
+    balance: monero::Amount,
+    lock_fee: monero::Amount,
+    max_buy: bitcoin::Amount,
+    latest_rate: LR,
+    resume_only: bool,
+) -> Result<Swarm<alice::Behaviour<LR>>>
+where
+    LR: LatestRate + Send + 'static,
+{
+    with_clear_net(
+        seed,
+        alice::Behaviour::new(balance, lock_fee, max_buy, latest_rate, resume_only),
+    )
 }
 
 pub async fn bob(

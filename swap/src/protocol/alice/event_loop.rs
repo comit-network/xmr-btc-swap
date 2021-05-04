@@ -2,7 +2,7 @@ use crate::asb::Rate;
 use crate::database::Database;
 use crate::env::Config;
 use crate::network::quote::BidQuote;
-use crate::network::{spot_price, transfer_proof};
+use crate::network::transfer_proof;
 use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State0, State3, Swap};
 use crate::{bitcoin, kraken, monero};
 use anyhow::{Context, Result};
@@ -31,17 +31,16 @@ type OutgoingTransferProof =
     BoxFuture<'static, Result<(PeerId, transfer_proof::Request, bmrng::Responder<()>)>>;
 
 #[allow(missing_debug_implementations)]
-pub struct EventLoop<RS> {
-    swarm: libp2p::Swarm<Behaviour>,
+pub struct EventLoop<LR: LatestRate + Send + 'static> {
+    swarm: libp2p::Swarm<Behaviour<LR>>,
     env_config: Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
     db: Arc<Database>,
-    latest_rate: RS,
+    latest_rate: LR,
     max_buy: bitcoin::Amount,
 
     swap_sender: mpsc::Sender<Swap>,
-    resume_only: bool,
 
     /// Stores incoming [`EncryptedSignature`]s per swap.
     recv_encrypted_signature: HashMap<Uuid, bmrng::RequestSender<bitcoin::EncryptedSignature, ()>>,
@@ -60,18 +59,17 @@ pub struct EventLoop<RS> {
 
 impl<LR> EventLoop<LR>
 where
-    LR: LatestRate,
+    LR: LatestRate + Send + 'static,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        swarm: Swarm<Behaviour>,
+        swarm: Swarm<Behaviour<LR>>,
         env_config: Config,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
         db: Arc<Database>,
         latest_rate: LR,
         max_buy: bitcoin::Amount,
-        resume_only: bool,
     ) -> Result<(Self, mpsc::Receiver<Swap>)> {
         let swap_channel = MpscChannels::default();
 
@@ -83,7 +81,6 @@ where
             db,
             latest_rate,
             swap_sender: swap_channel.sender,
-            resume_only,
             max_buy,
             recv_encrypted_signature: Default::default(),
             inflight_encrypted_signatures: Default::default(),
@@ -146,38 +143,8 @@ where
             tokio::select! {
                 swarm_event = self.swarm.next_event() => {
                     match swarm_event {
-                        SwarmEvent::Behaviour(OutEvent::SpotPriceRequested { request, channel, peer }) => {
-                            let btc = request.btc;
-                            let xmr = match self.handle_spot_price_request(btc, self.monero_wallet.clone()).await {
-                                Ok(xmr) => match xmr {
-                                    Ok(xmr) => xmr,
-                                    Err(e) => {
-                                        tracing::warn!(%peer, "Ignoring spot price request from {} because: {:#}", peer, e);
-                                        match self.swarm.behaviour_mut().spot_price.send_response(channel, spot_price::Response::Error(e)) {
-                                            Ok(_) => {
-                                                continue;
-                                            },
-                                            Err(_) => {
-                                                tracing::debug!(%peer, "Failed to respond with error to spot price request");
-                                                continue;
-                                            }
-                                        }
-                                    }
-                                },
-                                Err(e) => {
-                                    tracing::error!(%peer, "Unrecoverable error while producing spot price for {}: {:#}", btc, e);
-                                    continue;
-                                }
-                            };
+                        SwarmEvent::Behaviour(OutEvent::ExecutionSetupStart { peer, btc, xmr }) => {
 
-                            match self.swarm.behaviour_mut().spot_price.send_response(channel, spot_price::Response::Xmr(xmr)) {
-                                Ok(_) => {},
-                                Err(_) => {
-                                    // if we can't respond, the peer probably just disconnected so it is not a huge deal, only log this on debug
-                                    tracing::debug!(%peer, "Failed to respond with spot price");
-                                    continue;
-                                }
-                            }
                             let tx_redeem_fee = self.bitcoin_wallet
                                 .estimate_fee(bitcoin::TxRedeem::weight(), btc)
                                 .await;
@@ -195,7 +162,7 @@ where
                                     (redeem_address, punish_address)
                                 }
                                 _ => {
-                                    tracing::error!("Could not get new address.");
+                                    tracing::error!(%peer, "Failed to get new address during execution setup.");
                                     continue;
                                 }
                             };
@@ -208,7 +175,7 @@ where
                                     (tx_redeem_fee, tx_punish_fee)
                                 }
                                 _ => {
-                                    tracing::error!("Could not calculate transaction fees.");
+                                    tracing::error!(%peer, "Failed to calculate transaction fees during execution setup.");
                                     continue;
                                 }
                             };
@@ -233,6 +200,17 @@ where
                             self.swarm.behaviour_mut().execution_setup.run(peer, state0);
                         }
                         SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer }) => {
+                            // TODO: Move the spot-price update into dedicated update stream to decouple it from quote requests
+                            let current_balance = self.monero_wallet.get_balance().await;
+                            match current_balance {
+                                Ok(balance) => {
+                                    self.swarm.behaviour_mut().spot_price.update_balance(balance);
+                                }
+                                Err(e) => {
+                                    tracing::error!("Failed to fetch Monero balance: {:#}", e);
+                                }
+                            }
+
                             let quote = match self.make_quote(self.max_buy).await {
                                 Ok(quote) => quote,
                                 Err(e) => {
@@ -360,38 +338,6 @@ where
         }
     }
 
-    async fn handle_spot_price_request(
-        &mut self,
-        btc: bitcoin::Amount,
-        monero_wallet: Arc<monero::Wallet>,
-    ) -> Result<Result<monero::Amount, spot_price::Error>> {
-        if self.resume_only {
-            return Ok(Err(spot_price::Error::MaintenanceMode));
-        }
-
-        let rate = self
-            .latest_rate
-            .latest_rate()
-            .context("Failed to get latest rate")?;
-
-        if btc > self.max_buy {
-            return Ok(Err(spot_price::Error::MaxBuyAmountExceeded {
-                buy: btc,
-                max: self.max_buy,
-            }));
-        }
-
-        let xmr_balance = monero_wallet.get_balance().await?;
-        let xmr_lock_fees = monero_wallet.static_tx_fee_estimate();
-        let xmr = rate.sell_quote(btc)?;
-
-        if xmr_balance < xmr + xmr_lock_fees {
-            return Ok(Err(spot_price::Error::BalanceTooLow { buy: btc }));
-        }
-
-        Ok(Ok(xmr))
-    }
-
     async fn make_quote(&mut self, max_buy: bitcoin::Amount) -> Result<BidQuote> {
         let rate = self
             .latest_rate
@@ -510,7 +456,7 @@ impl LatestRate for FixedRate {
 
 /// Produces [`Rate`]s based on [`PriceUpdate`]s from kraken and a configured
 /// spread.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KrakenRate {
     ask_spread: Decimal,
     price_updates: kraken::PriceUpdates,

@@ -1,6 +1,6 @@
 use crate::monero;
 use crate::network::cbor_request_response::CborCodec;
-use crate::protocol::{alice, bob};
+use crate::protocol::bob;
 use libp2p::core::ProtocolName;
 use libp2p::request_response::{
     ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
@@ -10,7 +10,7 @@ use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 
 const PROTOCOL: &str = "/comit/xmr/btc/spot-price/1.0.0";
-type OutEvent = RequestResponseEvent<Request, Response>;
+pub type OutEvent = RequestResponseEvent<Request, Response>;
 type Message = RequestResponseMessage<Request, Response>;
 
 pub type Behaviour = RequestResponse<CborCodec<SpotPriceProtocol, Request, Response>>;
@@ -50,7 +50,7 @@ pub enum Error {
     #[error(
         "This seller currently does not accept incoming swap requests, please try again later"
     )]
-    MaintenanceMode,
+    NoSwapsAccepted,
     #[error("Seller refused to buy {buy} because the maximum configured buy limit is {max}")]
     MaxBuyAmountExceeded {
         #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
@@ -63,18 +63,11 @@ pub enum Error {
         #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
         buy: bitcoin::Amount,
     },
-}
 
-/// Constructs a new instance of the `spot-price` behaviour to be used by Alice.
-///
-/// Alice only supports inbound connections, i.e. providing spot prices for BTC
-/// in XMR.
-pub fn alice() -> Behaviour {
-    Behaviour::new(
-        CborCodec::default(),
-        vec![(SpotPriceProtocol, ProtocolSupport::Inbound)],
-        RequestResponseConfig::default(),
-    )
+    /// To be used for errors that cannot be explained on the CLI side (e.g.
+    /// rate update problems on the seller side)
+    #[error("The seller encountered a problem, please try again later.")]
+    Other,
 }
 
 /// Constructs a new instance of the `spot-price` behaviour to be used by Bob.
@@ -88,22 +81,6 @@ pub fn bob() -> Behaviour {
         RequestResponseConfig::default(),
     )
 }
-
-impl From<(PeerId, Message)> for alice::OutEvent {
-    fn from((peer, message): (PeerId, Message)) -> Self {
-        match message {
-            Message::Request {
-                request, channel, ..
-            } => Self::SpotPriceRequested {
-                request,
-                channel,
-                peer,
-            },
-            Message::Response { .. } => Self::unexpected_response(peer),
-        }
-    }
-}
-crate::impl_from_rr_event!(OutEvent, alice::OutEvent, PROTOCOL);
 
 impl From<(PeerId, Message)> for bob::OutEvent {
     fn from((peer, message): (PeerId, Message)) -> Self {
