@@ -516,7 +516,9 @@ impl Header {
     pub fn username_bytes(&self) -> Option<&[u8]> {
         if let Some(ustar) = self.as_ustar() {
             Some(ustar.username_bytes())
-        } else { self.as_gnu().map(|gnu| gnu.username_bytes()) }
+        } else {
+            self.as_gnu().map(|gnu| gnu.username_bytes())
+        }
     }
 
     /// Sets the username inside this header.

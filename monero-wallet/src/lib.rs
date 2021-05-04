@@ -3,39 +3,49 @@ use monero::consensus::encode::VarInt;
 use monero::cryptonote::hash::Hashable;
 use monero_rpc::monerod;
 use monero_rpc::monerod::{GetBlockResponse, MonerodRpc as _};
-use rand::{Rng, RngCore, CryptoRng};
+use rand::{CryptoRng, Rng, RngCore};
 
 pub struct Wallet {
-    client: monerod::Client,
-    key: monero::KeyPair
+    key: monero::KeyPair,
 }
 
 impl Wallet {
-    pub fn new_random<R: CryptoRng + RngCore>(client: monerod::Client, rng: &mut R) -> Self {
+    pub fn new_random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
         Self {
-            client,
             key: monero::KeyPair {
-                view: monero::PrivateKey::from_scalar(curve25519_dalek::scalar::Scalar::random(rng)),
-                spend: monero::PrivateKey::from_scalar(curve25519_dalek::scalar::Scalar::random(rng)),
-            }
+                view: monero::PrivateKey::from_scalar(curve25519_dalek::scalar::Scalar::random(
+                    rng,
+                )),
+                spend: monero::PrivateKey::from_scalar(curve25519_dalek::scalar::Scalar::random(
+                    rng,
+                )),
+            },
         }
     }
 
     pub fn get_address(&self, network: monero::Network) -> monero::Address {
         monero::Address::from_keypair(network, &self.key)
     }
+}
 
+#[async_trait::async_trait]
+pub trait MonerodClientExt {
+    async fn calculate_key_offset_boundaries(&self) -> Result<(VarInt, VarInt)>;
+}
+
+#[async_trait::async_trait]
+impl MonerodClientExt for monerod::Client {
     /// Chooses 10 random key offsets for use within a new confidential
     /// transactions.
     ///
     /// Choosing these offsets randomly is not ideal for privacy, instead they
     /// should be chosen in a way that mimics a real spending pattern as much as
     /// possible.
-    pub async fn calculate_key_offset_boundaries(&self) -> Result<(VarInt, VarInt)> {
-        let latest_block = self.client.get_block_count().await?;
+    async fn calculate_key_offset_boundaries(&self) -> Result<(VarInt, VarInt)> {
+        let latest_block = self.get_block_count().await?;
         let latest_spendable_block = latest_block.count - 10;
 
-        let block: GetBlockResponse = self.client.get_block(latest_spendable_block).await?;
+        let block: GetBlockResponse = self.get_block(latest_spendable_block).await?;
 
         let tx_hash = block
             .blob
@@ -44,7 +54,7 @@ impl Wallet {
             .copied()
             .unwrap_or_else(|| block.blob.miner_tx.hash());
 
-        let indices = self.client.get_o_indexes(tx_hash).await?;
+        let indices = self.get_o_indexes(tx_hash).await?;
 
         let last_index = indices
             .o_indexes
@@ -73,7 +83,7 @@ mod tests {
         rpc_client.generateblocks(150, "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".to_owned()).await.unwrap();
         let wallet = Wallet {
             client: rpc_client.clone(),
-            key: todo!()
+            key: todo!(),
         };
 
         let (lower, upper) = wallet.calculate_key_offset_boundaries().await.unwrap();

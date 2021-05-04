@@ -2350,6 +2350,7 @@ name = "monero-wallet"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "curve25519-dalek",
  "monero",
  "monero-harness",

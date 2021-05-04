@@ -10,6 +10,7 @@ monero = "0.12"
 monero-rpc = { path = "../monero-rpc" }
 rand = "0.7"
 curve25519-dalek = "3"
+async-trait = "0.1"
 
 [dev-dependencies]
 monero-harness = { path = "../monero-harness" }
