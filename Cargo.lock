@@ -4127,8 +4127,9 @@ dependencies = [
 
 [[package]]
 name = "torut"
-version = "0.1.8"
-source = "git+https://github.com/bonomat/torut/?branch=feature-flag-tor-secret-keys#d4f9858e3b4452c2056ff7ee4e50836cdcb62572"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05253df8056cc5830af67e5e86d6bb88bef83221238e698783f2560048584757"
 dependencies = [
  "base32",
  "base64 0.10.1",
