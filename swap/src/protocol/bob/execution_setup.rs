@@ -81,7 +81,7 @@ impl Behaviour {
                 Ok(state2)
             };
 
-            async move { tokio::time::timeout(Duration::from_secs(10), protocol).await? }
+            async move { tokio::time::timeout(Duration::from_secs(60), protocol).await? }
         })
     }
 }
