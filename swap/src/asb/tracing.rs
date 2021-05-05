@@ -21,6 +21,7 @@ pub fn init(level: LevelFilter) -> Result<()> {
         builder.init();
     }
 
+    tracing
     tracing::info!("Initialized tracing with level: {}", level);
 
     Ok(())
