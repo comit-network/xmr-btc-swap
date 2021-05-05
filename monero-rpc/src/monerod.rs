@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use monero::{cryptonote::hash::Hash, util::ringct, PublicKey};
-use serde::{de::DeserializeOwned, Deserialize, Serialize, Serializer};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_with::{serde_as, TryFromInto};
 
 #[jsonrpc_client::api(version = "2.0")]
 pub trait MonerodRpc {
@@ -118,9 +119,10 @@ pub struct GetIndexesResponse {
     pub o_indexes: Vec<u32>,
 }
 
+#[serde_as]
 #[derive(Clone, Debug, Serialize)]
 struct GetOIndexesPayload {
-    #[serde(with = "byte_array")]
+    #[serde_as(as = "TryFromInto<[u8; 32]>")]
     txid: Hash,
 }
 
@@ -142,14 +144,15 @@ pub struct GetOutsResponse {
     pub outs: Vec<OutKey>,
 }
 
+#[serde_as]
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 pub struct OutKey {
     pub height: u64,
-    #[serde(with = "byte_array")]
+    #[serde_as(as = "TryFromInto<[u8; 32]>")]
     pub key: PublicKey,
-    #[serde(with = "byte_array")]
+    #[serde_as(as = "TryFromInto<[u8; 32]>")]
     pub mask: ringct::Key,
-    #[serde(with = "byte_array")]
+    #[serde_as(as = "TryFromInto<[u8; 32]>")]
     pub txid: Hash,
     pub unlocked: bool,
 }
@@ -196,57 +199,5 @@ mod monero_serde_hex_block {
         let block = monero::Block::consensus_decode(&mut cursor).map_err(D::Error::custom)?;
 
         Ok(block)
-    }
-}
-
-mod byte_array {
-    use super::*;
-    use serde::{de::Error, Deserializer};
-    use std::{convert::TryFrom, fmt, marker::PhantomData};
-
-    pub fn serialize<S, B>(bytes: B, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        B: AsRef<[u8]>,
-    {
-        serializer.serialize_bytes(bytes.as_ref())
-    }
-
-    pub fn deserialize<'de, D, B, const N: usize>(deserializer: D) -> Result<B, D::Error>
-    where
-        D: Deserializer<'de>,
-        B: TryFrom<[u8; N]>,
-    {
-        struct Visitor<T, const N: usize> {
-            phantom: PhantomData<(T, [u8; N])>,
-        }
-
-        impl<'de, T, const N: usize> serde::de::Visitor<'de> for Visitor<T, N>
-        where
-            T: TryFrom<[u8; N]>,
-        {
-            type Value = T;
-
-            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "a byte buffer")
-            }
-
-            fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
-            where
-                E: Error,
-            {
-                let bytes = <[u8; N]>::try_from(v).map_err(|_| {
-                    E::custom(format!("Failed to construct [u8; {}] from buffer", N))
-                })?;
-                let result = T::try_from(bytes)
-                    .map_err(|_| E::custom(format!("Failed to construct T from [u8; {}]", N)))?;
-
-                Ok(result)
-            }
-        }
-
-        deserializer.deserialize_byte_buf(Visitor {
-            phantom: PhantomData,
-        })
     }
 }
