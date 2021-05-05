@@ -6,6 +6,7 @@ use crate::{monero, tor};
 use anyhow::Result;
 use libp2p::swarm::{NetworkBehaviour, SwarmBuilder};
 use libp2p::{PeerId, Swarm};
+use std::fmt::Debug;
 
 pub fn alice<LR>(
     seed: &Seed,
@@ -16,7 +17,7 @@ pub fn alice<LR>(
     resume_only: bool,
 ) -> Result<Swarm<alice::Behaviour<LR>>>
 where
-    LR: LatestRate + Send + 'static,
+    LR: LatestRate + Send + 'static + Debug,
 {
     with_clear_net(
         seed,

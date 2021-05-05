@@ -6,6 +6,7 @@ use crate::protocol::alice::{execution_setup, spot_price, State3};
 use anyhow::{anyhow, Error};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
+use std::fmt::Debug;
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -62,7 +63,10 @@ impl OutEvent {
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
-pub struct Behaviour<LR: LatestRate + Send + 'static> {
+pub struct Behaviour<LR>
+where
+    LR: LatestRate + Send + 'static + Debug,
+{
     pub quote: quote::Behaviour,
     pub spot_price: spot_price::Behaviour<LR>,
     pub execution_setup: execution_setup::Behaviour,
@@ -72,7 +76,7 @@ pub struct Behaviour<LR: LatestRate + Send + 'static> {
 
 impl<LR> Behaviour<LR>
 where
-    LR: LatestRate + Send + 'static,
+    LR: LatestRate + Send + 'static + Debug,
 {
     pub fn new(
         balance: monero::Amount,

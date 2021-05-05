@@ -11,6 +11,7 @@ use libp2p::request_response::{
 use libp2p::swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters};
 use libp2p::{NetworkBehaviour, PeerId};
 use std::collections::VecDeque;
+use std::fmt::Debug;
 use std::task::{Context, Poll};
 
 pub struct OutEvent {
@@ -22,7 +23,10 @@ pub struct OutEvent {
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", poll_method = "poll", event_process = true)]
 #[allow(missing_debug_implementations)]
-pub struct Behaviour<LR: LatestRate + Send + 'static> {
+pub struct Behaviour<LR>
+where
+    LR: LatestRate + Send + 'static + Debug,
+{
     behaviour: spot_price::Behaviour,
 
     #[behaviour(ignore)]
@@ -46,7 +50,7 @@ pub struct Behaviour<LR: LatestRate + Send + 'static> {
 /// bubbled up to the parent behaviour.
 impl<LR> Behaviour<LR>
 where
-    LR: LatestRate + Send + 'static,
+    LR: LatestRate + Send + 'static + Debug,
 {
     pub fn new(
         balance: monero::Amount,
@@ -78,11 +82,22 @@ where
         &mut self,
         peer: PeerId,
         channel: ResponseChannel<spot_price::Response>,
-        error: spot_price::Error,
+        error: Error<LR>,
     ) {
+        match error {
+            Error::ResumeOnlyMode | Error::MaxBuyAmountExceeded { .. } => {
+                tracing::warn!(%peer, "Ignoring spot price request because: {}", error);
+            }
+            Error::BalanceTooLow { .. }
+            | Error::LatestRateFetchFailed(_)
+            | Error::SellQuoteCalculationFailed(_) => {
+                tracing::error!(%peer, "Ignoring spot price request because: {}", error);
+            }
+        }
+
         if self
             .behaviour
-            .send_response(channel, spot_price::Response::Error(error))
+            .send_response(channel, spot_price::Response::Error(error.into()))
             .is_err()
         {
             tracing::debug!(%peer, "Unable to send error response for spot price request");
@@ -105,7 +120,7 @@ where
 
 impl<LR> NetworkBehaviourEventProcess<spot_price::OutEvent> for Behaviour<LR>
 where
-    LR: LatestRate + Send + 'static,
+    LR: LatestRate + Send + 'static + Debug,
 {
     fn inject_event(&mut self, event: spot_price::OutEvent) {
         let (peer, message) = match event {
@@ -135,15 +150,13 @@ where
         };
 
         if self.resume_only {
-            tracing::warn!(%peer, "Ignoring spot price request from {} because ASB is running in resume-only mode", peer);
-            self.send_error_response(peer, channel, spot_price::Error::NoSwapsAccepted);
+            self.send_error_response(peer, channel, Error::ResumeOnlyMode);
             return;
         }
 
         let btc = request.btc;
         if btc > self.max_buy {
-            tracing::warn!(%peer, "Ignoring spot price request from {} because max muy amount exceeded", peer);
-            self.send_error_response(peer, channel, spot_price::Error::MaxBuyAmountExceeded {
+            self.send_error_response(peer, channel, Error::MaxBuyAmountExceeded {
                 max: self.max_buy,
                 buy: btc,
             });
@@ -153,16 +166,14 @@ where
         let rate = match self.latest_rate.latest_rate() {
             Ok(rate) => rate,
             Err(e) => {
-                tracing::error!(%peer, "Ignoring spot price request from {} because we encountered a problem with fetching the latest rate: {:#}", peer, e);
-                self.send_error_response(peer, channel, spot_price::Error::Other);
+                self.send_error_response(peer, channel, Error::LatestRateFetchFailed(e));
                 return;
             }
         };
         let xmr = match rate.sell_quote(btc) {
             Ok(xmr) => xmr,
             Err(e) => {
-                tracing::error!(%peer, "Ignoring spot price request from {} because we encountered a problem with calculating the amount from rate: {:#}", peer, e);
-                self.send_error_response(peer, channel, spot_price::Error::Other);
+                self.send_error_response(peer, channel, Error::SellQuoteCalculationFailed(e));
                 return;
             }
         };
@@ -171,8 +182,7 @@ where
         let xmr_lock_fees = self.lock_fee;
 
         if xmr_balance < xmr + xmr_lock_fees {
-            tracing::error!(%peer, "Ignoring spot price request from {} because the XMR balance is too low to fulfill the swap: {}", peer, xmr_balance);
-            self.send_error_response(peer, channel, spot_price::Error::BalanceTooLow { buy: btc });
+            self.send_error_response(peer, channel, Error::BalanceTooLow { buy: btc });
             return;
         }
 
@@ -196,4 +206,44 @@ impl From<OutEvent> for alice::OutEvent {
             xmr: event.xmr,
         }
     }
+}
+
+impl<LR> From<Error<LR>> for spot_price::Error
+where
+    LR: LatestRate + Debug,
+{
+    fn from(error: Error<LR>) -> Self {
+        match error {
+            Error::ResumeOnlyMode => spot_price::Error::NoSwapsAccepted,
+            Error::MaxBuyAmountExceeded { max, buy } => {
+                spot_price::Error::MaxBuyAmountExceeded { max, buy }
+            }
+            Error::BalanceTooLow { buy } => spot_price::Error::BalanceTooLow { buy },
+            Error::LatestRateFetchFailed(_) | Error::SellQuoteCalculationFailed(_) => {
+                spot_price::Error::Other
+            }
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error<LR>
+where
+    LR: LatestRate + Debug,
+{
+    #[error("ASB is running in resume-only mode")]
+    ResumeOnlyMode,
+    #[error("Maximum buy {max} exceeded {buy}")]
+    MaxBuyAmountExceeded {
+        max: bitcoin::Amount,
+        buy: bitcoin::Amount,
+    },
+    #[error("This seller's XMR balance is currently too low to fulfill the swap request to buy {buy}, please try again later")]
+    BalanceTooLow { buy: bitcoin::Amount },
+
+    #[error("Failed to fetch latest rate")]
+    LatestRateFetchFailed(LR::Error),
+
+    #[error("Failed to calculate quote: {0}")]
+    SellQuoteCalculationFailed(anyhow::Error),
 }

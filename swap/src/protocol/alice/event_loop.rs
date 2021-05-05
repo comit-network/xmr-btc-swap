@@ -16,6 +16,7 @@ use rand::rngs::OsRng;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::convert::Infallible;
+use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -31,7 +32,10 @@ type OutgoingTransferProof =
     BoxFuture<'static, Result<(PeerId, transfer_proof::Request, bmrng::Responder<()>)>>;
 
 #[allow(missing_debug_implementations)]
-pub struct EventLoop<LR: LatestRate + Send + 'static> {
+pub struct EventLoop<LR>
+where
+    LR: LatestRate + Send + 'static + Debug,
+{
     swarm: libp2p::Swarm<Behaviour<LR>>,
     env_config: Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
@@ -59,7 +63,7 @@ pub struct EventLoop<LR: LatestRate + Send + 'static> {
 
 impl<LR> EventLoop<LR>
 where
-    LR: LatestRate + Send + 'static,
+    LR: LatestRate + Send + 'static + Debug,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
