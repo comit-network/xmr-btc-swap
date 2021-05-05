@@ -3,6 +3,7 @@ pub mod harness;
 use harness::alice_run_until::is_xmr_lock_transaction_sent;
 use harness::bob_run_until::is_btc_locked;
 use harness::FastPunishConfig;
+use swap::protocol::alice::event_loop::FixedRate;
 use swap::protocol::alice::AliceState;
 use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
@@ -19,7 +20,11 @@ async fn alice_punishes_after_restart_if_bob_dead() {
         let alice_swap = ctx.alice_next_swap().await;
         let alice_bitcoin_wallet = alice_swap.bitcoin_wallet.clone();
 
-        let alice_swap = tokio::spawn(alice::run_until(alice_swap, is_xmr_lock_transaction_sent));
+        let alice_swap = tokio::spawn(alice::run_until(
+            alice_swap,
+            is_xmr_lock_transaction_sent,
+            FixedRate::default(),
+        ));
 
         let bob_state = bob_swap.await??;
         assert!(matches!(bob_state, BobState::BtcLocked { .. }));
@@ -40,7 +45,7 @@ async fn alice_punishes_after_restart_if_bob_dead() {
 
         ctx.restart_alice().await;
         let alice_swap = ctx.alice_next_swap().await;
-        let alice_swap = tokio::spawn(alice::run(alice_swap));
+        let alice_swap = tokio::spawn(alice::run(alice_swap, FixedRate::default()));
 
         let alice_state = alice_swap.await??;
         ctx.assert_alice_punished(alice_state).await;

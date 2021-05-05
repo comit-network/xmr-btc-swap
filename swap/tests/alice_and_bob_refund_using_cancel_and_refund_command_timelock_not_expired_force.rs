@@ -3,6 +3,7 @@ pub mod harness;
 use harness::alice_run_until::is_xmr_lock_transaction_sent;
 use harness::bob_run_until::is_btc_locked;
 use harness::SlowCancelConfig;
+use swap::protocol::alice::event_loop::FixedRate;
 use swap::protocol::alice::AliceState;
 use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
@@ -15,7 +16,11 @@ async fn given_alice_and_bob_manually_force_cancel_when_timelock_not_expired_err
         let bob_swap = tokio::spawn(bob::run_until(bob_swap, is_btc_locked));
 
         let alice_swap = ctx.alice_next_swap().await;
-        let alice_swap = tokio::spawn(alice::run_until(alice_swap, is_xmr_lock_transaction_sent));
+        let alice_swap = tokio::spawn(alice::run_until(
+            alice_swap,
+            is_xmr_lock_transaction_sent,
+            FixedRate::default(),
+        ));
 
         let bob_state = bob_swap.await??;
         assert!(matches!(bob_state, BobState::BtcLocked { .. }));

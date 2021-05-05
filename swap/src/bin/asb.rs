@@ -140,7 +140,7 @@ async fn main() -> Result<()> {
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
                 Arc::new(db),
-                kraken_rate,
+                kraken_rate.clone(),
                 config.maker.min_buy_btc,
                 config.maker.max_buy_btc,
             )
@@ -148,9 +148,10 @@ async fn main() -> Result<()> {
 
             tokio::spawn(async move {
                 while let Some(swap) = swap_receiver.recv().await {
+                    let rate = kraken_rate.clone();
                     tokio::spawn(async move {
                         let swap_id = swap.swap_id;
-                        match run(swap).await {
+                        match run(swap, rate).await {
                             Ok(state) => {
                                 tracing::debug!(%swap_id, "Swap finished with state {}", state)
                             }

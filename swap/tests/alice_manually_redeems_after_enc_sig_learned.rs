@@ -2,6 +2,7 @@ pub mod harness;
 
 use harness::alice_run_until::is_encsig_learned;
 use harness::SlowCancelConfig;
+use swap::protocol::alice::event_loop::FixedRate;
 use swap::protocol::alice::redeem::Finality;
 use swap::protocol::alice::AliceState;
 use swap::protocol::{alice, bob};
@@ -15,7 +16,11 @@ async fn alice_manually_redeems_after_enc_sig_learned() {
         let bob_swap = tokio::spawn(bob::run(bob_swap));
 
         let alice_swap = ctx.alice_next_swap().await;
-        let alice_swap = tokio::spawn(alice::run_until(alice_swap, is_encsig_learned));
+        let alice_swap = tokio::spawn(alice::run_until(
+            alice_swap,
+            is_encsig_learned,
+            FixedRate::default(),
+        ));
 
         let alice_state = alice_swap.await??;
         assert!(matches!(alice_state, AliceState::EncSigLearned { .. }));

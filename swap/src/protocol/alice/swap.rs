@@ -2,7 +2,7 @@
 //! Alice holds XMR and wishes receive BTC.
 use crate::bitcoin::ExpiredTimelocks;
 use crate::env::Config;
-use crate::protocol::alice::event_loop::EventLoopHandle;
+use crate::protocol::alice::event_loop::{EventLoopHandle, LatestRate};
 use crate::protocol::alice::{AliceState, Swap};
 use crate::{bitcoin, database, monero};
 use anyhow::{bail, Context, Result};
@@ -11,12 +11,22 @@ use tokio::time::timeout;
 use tracing::{error, info};
 use uuid::Uuid;
 
-pub async fn run(swap: Swap) -> Result<AliceState> {
-    run_until(swap, |_| false).await
+pub async fn run<LR>(swap: Swap, rate_service: LR) -> Result<AliceState>
+where
+    LR: LatestRate + Clone,
+{
+    run_until(swap, |_| false, rate_service).await
 }
 
-#[tracing::instrument(name = "swap", skip(swap,exit_early), fields(id = %swap.swap_id), err)]
-pub async fn run_until(mut swap: Swap, exit_early: fn(&AliceState) -> bool) -> Result<AliceState> {
+#[tracing::instrument(name = "swap", skip(swap,exit_early,rate_service), fields(id = %swap.swap_id), err)]
+pub async fn run_until<LR>(
+    mut swap: Swap,
+    exit_early: fn(&AliceState) -> bool,
+    rate_service: LR,
+) -> Result<AliceState>
+where
+    LR: LatestRate + Clone,
+{
     let mut current_state = swap.state;
 
     while !is_complete(&current_state) && !exit_early(&current_state) {
@@ -27,6 +37,7 @@ pub async fn run_until(mut swap: Swap, exit_early: fn(&AliceState) -> bool) -> R
             swap.bitcoin_wallet.as_ref(),
             swap.monero_wallet.as_ref(),
             &swap.env_config,
+            rate_service.clone(),
         )
         .await?;
 
@@ -39,15 +50,23 @@ pub async fn run_until(mut swap: Swap, exit_early: fn(&AliceState) -> bool) -> R
     Ok(current_state)
 }
 
-async fn next_state(
+async fn next_state<LR>(
     swap_id: Uuid,
     state: AliceState,
     event_loop_handle: &mut EventLoopHandle,
     bitcoin_wallet: &bitcoin::Wallet,
     monero_wallet: &monero::Wallet,
     env_config: &Config,
-) -> Result<AliceState> {
-    info!("Current state: {}", state);
+    mut rate_service: LR,
+) -> Result<AliceState>
+where
+    LR: LatestRate,
+{
+    let rate = rate_service
+        .latest_rate()
+        .map_or("NaN".to_string(), |rate| format!("{}", rate));
+
+    info!(%state, %rate, "Update");
 
     Ok(match state {
         AliceState::Started { state3 } => {

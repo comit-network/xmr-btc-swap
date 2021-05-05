@@ -2,6 +2,7 @@ pub mod harness;
 
 use harness::bob_run_until::is_btc_locked;
 use harness::FastPunishConfig;
+use swap::protocol::alice::event_loop::FixedRate;
 use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
 
@@ -15,7 +16,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         let bob_swap = tokio::spawn(bob::run_until(bob_swap, is_btc_locked));
 
         let alice_swap = ctx.alice_next_swap().await;
-        let alice_swap = tokio::spawn(alice::run(alice_swap));
+        let alice_swap = tokio::spawn(alice::run(alice_swap, FixedRate::default()));
 
         let bob_state = bob_swap.await??;
         assert!(matches!(bob_state, BobState::BtcLocked { .. }));
