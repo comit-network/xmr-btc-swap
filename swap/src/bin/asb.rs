@@ -35,7 +35,7 @@ use swap::protocol::alice::{redeem, run, EventLoop};
 use swap::seed::Seed;
 use swap::tor::AuthenticatedClient;
 use swap::{asb, bitcoin, env, kraken, monero, tor};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use tracing_subscriber::filter::LevelFilter;
 
 #[macro_use]
@@ -64,8 +64,8 @@ async fn main() -> Result<()> {
     };
 
     info!(
-        "Database and Seed will be stored in directory: {}",
-        config.data.dir.display()
+        db_folder = %config.data.dir.display(),
+        "Database and Seed will be stored in",
     );
 
     let db_path = config.data.dir.join("database");
@@ -81,20 +81,21 @@ async fn main() -> Result<()> {
     match opt.cmd {
         Command::Start { resume_only } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
 
             let bitcoin_balance = bitcoin_wallet.balance().await?;
-            info!("Bitcoin balance: {}", bitcoin_balance);
+            info!(%bitcoin_balance, "Initialized Bitcoin wallet");
 
             let monero_balance = monero_wallet.get_balance().await?;
             if monero_balance == Amount::ZERO {
-                let deposit_address = monero_wallet.get_main_address();
+                let monero_address = monero_wallet.get_main_address();
                 warn!(
-                    "The Monero balance is 0, make sure to deposit funds at: {}",
-                    deposit_address
+                    %monero_address,
+                    "The Monero balance is 0, make sure to deposit funds",
                 )
             } else {
-                info!("Monero balance: {}", monero_balance);
+                info!(%monero_balance, "Initialized Monero wallet");
             }
 
             let kraken_price_updates = kraken::connect()?;
@@ -104,14 +105,14 @@ async fn main() -> Result<()> {
                 tor::Client::new(config.tor.socks5_port).with_control_port(config.tor.control_port);
             let _ac = match tor_client.assert_tor_running().await {
                 Ok(_) => {
-                    tracing::info!("Tor found. Setting up hidden service. ");
+                    tracing::info!("Tor found. Setting up hidden service");
                     let ac =
                         register_tor_services(config.network.clone().listen, tor_client, &seed)
                             .await?;
                     Some(ac)
                 }
                 Err(_) => {
-                    tracing::warn!("Tor not found. Running on clear net. ");
+                    tracing::warn!("Tor not found. Running on clear net");
                     None
                 }
             };
@@ -153,17 +154,17 @@ async fn main() -> Result<()> {
                         let swap_id = swap.swap_id;
                         match run(swap, rate).await {
                             Ok(state) => {
-                                tracing::debug!(%swap_id, "Swap finished with state {}", state)
+                                tracing::debug!(%swap_id, %state, "Swap finished with state")
                             }
-                            Err(e) => {
-                                tracing::error!(%swap_id, "Swap failed with {:#}", e)
+                            Err(error) => {
+                                tracing::error!(%swap_id, %error, "Swap failed")
                             }
                         }
                     });
                 }
             });
 
-            info!("Our peer id is {}", event_loop.peer_id());
+            info!(perr_id = %event_loop.peer_id(), "Our peer id");
 
             event_loop.run().await;
         }
@@ -203,7 +204,10 @@ async fn main() -> Result<()> {
             let bitcoin_balance = bitcoin_wallet.balance().await?;
             let monero_balance = monero_wallet.get_balance().await?;
 
-            tracing::info!("Current balance: {}, {}", bitcoin_balance, monero_balance);
+            tracing::info!(
+                %bitcoin_balance,
+                %monero_balance,
+                "Current balance");
         }
         Command::ManualRecovery(ManualRecovery::Cancel {
             cancel_params: RecoverCommandParams { swap_id, force },
@@ -274,6 +278,7 @@ async fn init_bitcoin_wallet(
     seed: &Seed,
     env_config: swap::env::Config,
 ) -> Result<bitcoin::Wallet> {
+    debug!("Opening Bitcoin wallet");
     let wallet_dir = config.data.dir.join("wallet");
 
     let wallet = bitcoin::Wallet::new(
@@ -295,6 +300,7 @@ async fn init_monero_wallet(
     config: &Config,
     env_config: swap::env::Config,
 ) -> Result<monero::Wallet> {
+    debug!("Opening Monero wallet");
     let wallet = monero::Wallet::open_or_create(
         config.monero.wallet_rpc_url.clone(),
         DEFAULT_WALLET_NAME.to_string(),
@@ -341,7 +347,8 @@ async fn register_tor_services(
         .get_address_without_dot_onion();
 
     hidden_services_details.iter().for_each(|(port, _)| {
-        tracing::info!("/onion3/{}:{}", onion_address, port);
+        let onion_address = format!("/onion3/{}:{}", onion_address, port);
+        tracing::info!(%onion_address);
     });
 
     Ok(ac)

@@ -59,10 +59,8 @@ where
             .await
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         let mut de = serde_json::Deserializer::from_slice(&message);
-        let msg = Res::deserialize(&mut de).map_err(|e| {
-            tracing::debug!("serde read_response error: {:?}", e);
-            io::Error::new(io::ErrorKind::InvalidData, e)
-        })?;
+        let msg = Res::deserialize(&mut de)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
 
         Ok(msg)
     }
@@ -88,10 +86,8 @@ where
     where
         T: AsyncWrite + Unpin + Send,
     {
-        let bytes = serde_json::to_vec(&res).map_err(|e| {
-            tracing::debug!("serde write_response error: {:?}", e);
-            io::Error::new(io::ErrorKind::InvalidData, e)
-        })?;
+        let bytes = serde_json::to_vec(&res)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
         upgrade::write_one(io, &bytes).await?;
 
         Ok(())

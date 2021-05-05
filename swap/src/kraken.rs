@@ -50,7 +50,9 @@ pub fn connect() -> Result<PriceUpdates> {
 
         match result {
             Err(e) => {
-                tracing::warn!("Rate updates incurred an unrecoverable error: {:#}", e);
+                tracing::warn!(
+                    error = %e,
+                    "Rate updates incurred an unrecoverable error.");
 
                 // in case the retries fail permanently, let the subscribers know
                 price_update.send(Err(Error::PermanentFailure))
@@ -183,8 +185,8 @@ mod connection {
             // if the message is not an event, it is a ticker update or an unknown event
             Err(_) => match serde_json::from_str::<wire::PriceUpdate>(&msg) {
                 Ok(ticker) => ticker,
-                Err(e) => {
-                    tracing::warn!(%e, "Failed to deserialize message '{}' as ticker update", msg);
+                Err(error) => {
+                    tracing::warn!(%error, %msg, "Failed to deserialize message as ticker update.");
 
                     return Ok(None);
                 }

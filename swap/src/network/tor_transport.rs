@@ -58,11 +58,11 @@ impl Transport for TorTcpConfig {
             Ok(tor_address_string) => {
                 Ok(Box::pin(do_tor_dial(self.socks_port, tor_address_string)))
             }
-            Err(e) => {
+            Err(error) => {
                 tracing::warn!(
-                    "Address {} could not be formatted. Dialling via clear net. Details: {}",
-                    addr,
-                    e
+                    address = %addr,
+                    %error,
+                    "Address could not be formatted. Dialling via clear net.",
                 );
                 self.inner.dial(addr)
             }

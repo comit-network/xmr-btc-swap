@@ -105,8 +105,8 @@ pub struct ConfigNotInitialized {}
 pub fn read_config(config_path: PathBuf) -> Result<Result<Config, ConfigNotInitialized>> {
     if config_path.exists() {
         info!(
-            "Using config file at default path: {}",
-            config_path.display()
+            path = %config_path.display(),
+            "Using config file at path",
         );
     } else {
         return Ok(Err(ConfigNotInitialized {}));
@@ -148,8 +148,8 @@ where
     fs::write(&config_path, toml)?;
 
     info!(
-        "Initial setup complete, config file created at {} ",
-        config_path.as_path().display()
+        path = %config_path.as_path().display(),
+        "Initial setup complete, config file created",
     );
     Ok(())
 }

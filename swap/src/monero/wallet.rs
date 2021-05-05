@@ -33,9 +33,9 @@ impl Wallet {
                 "Unable to create Monero wallet, please ensure that the monero-wallet-rpc is available",
             )?;
 
-            tracing::debug!("Created Monero wallet {}", name);
+            tracing::debug!(monero_wallet_name = %name, "Created Monero wallet");
         } else {
-            tracing::debug!("Opened Monero wallet {}", name);
+            tracing::debug!(monero_wallet_name = %name, "Opened Monero wallet");
         }
 
         Self::connect(client, name, env_config).await
@@ -148,19 +148,22 @@ impl Wallet {
             Ok(_) => match wallet.sweep_all(self.main_address.to_string()).await {
                 Ok(sweep_all) => {
                     for tx in sweep_all.tx_hash_list {
-                        tracing::info!(%tx, "Monero transferred back to default wallet {}", self.main_address);
+                        tracing::info!(
+                            %tx,
+                            monero_address = %self.main_address,
+                            "Monero transferred back to default wallet");
                     }
                 }
-                Err(e) => {
+                Err(error) => {
                     tracing::warn!(
-                        "Transferring Monero back to default wallet {} failed with {:#}",
-                        self.main_address,
-                        e
+                        address = %self.main_address,
+                        %error,
+                        "Transferring Monero back to default wallet failed",
                     );
                 }
             },
-            Err(e) => {
-                tracing::warn!("Refreshing the generated wallet failed with {:#}", e);
+            Err(error) => {
+                tracing::warn!(%error, "Refreshing the generated wallet failed");
             }
         }
 
@@ -187,10 +190,10 @@ impl Wallet {
             .await?;
 
         tracing::debug!(
-            "sent transfer of {} to {} in {}",
-            amount,
-            public_spend_key,
-            res.tx_hash
+            %amount,
+            to = %public_spend_key,
+            tx_id = %res.tx_hash,
+            "Sent transfer"
         );
 
         Ok(TransferProof::new(
@@ -211,7 +214,11 @@ impl Wallet {
 
         let txid = transfer_proof.tx_hash();
 
-        tracing::info!(%txid, "Waiting for {} confirmation{} of Monero transaction", conf_target, if conf_target > 1 { "s" } else { "" });
+        tracing::info!(
+            %txid,
+            target_confirmations = %conf_target,
+            "Waiting for Monero transaction finality"
+        );
 
         let address = Address::standard(self.network, public_spend_key, public_view_key.into());
 
@@ -311,7 +318,11 @@ where
         let tx = match fetch_tx(txid.clone()).await {
             Ok(proof) => proof,
             Err(error) => {
-                tracing::debug!(%txid, "Failed to retrieve tx from blockchain: {:#}", error);
+                tracing::debug!(
+                    %txid,
+                    %error,
+                    "Failed to retrieve tx from blockchain"
+                );
                 continue; // treating every error as transient and retrying
                           // is obviously wrong but the jsonrpc client is
                           // too primitive to differentiate between all the
@@ -330,7 +341,12 @@ where
 
         if tx.confirmations > seen_confirmations {
             seen_confirmations = tx.confirmations;
-            tracing::info!(%txid, "Monero lock tx has {} out of {} confirmations", tx.confirmations, conf_target);
+            tracing::info!(
+                %txid,
+                %seen_confirmations,
+                needed_confirmations = %conf_target,
+                "Received new confirmation for Monero lock tx"
+            );
         }
     }
 

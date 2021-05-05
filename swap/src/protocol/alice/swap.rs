@@ -8,7 +8,7 @@ use crate::{bitcoin, database, monero};
 use anyhow::{bail, Context, Result};
 use tokio::select;
 use tokio::time::timeout;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 pub async fn run<LR>(swap: Swap, rate_service: LR) -> Result<AliceState>
@@ -66,7 +66,7 @@ where
         .latest_rate()
         .map_or("NaN".to_string(), |rate| format!("{}", rate));
 
-    info!(%state, %rate, "Update");
+    info!(%state, %rate, "Advancing state");
 
     Ok(match state {
         AliceState::Started { state3 } => {
@@ -78,10 +78,10 @@ where
             .await
             {
                 Err(_) => {
-                    tracing::info!(
-                        "TxLock lock did not get {} confirmations in {} minutes",
-                        env_config.bitcoin_finality_confirmations,
-                        env_config.bitcoin_lock_confirmed_timeout.as_secs_f64() / 60.0
+                    info!(
+                        confirmations_needed = %env_config.bitcoin_finality_confirmations,
+                        minutes = %env_config.bitcoin_lock_confirmed_timeout.as_secs_f64() / 60.0,
+                        "TxLock lock did not get enough confirmations in time",
                     );
                     AliceState::SafelyAborted
                 }
@@ -183,7 +183,7 @@ where
                     }
                 }
                 enc_sig = event_loop_handle.recv_encrypted_signature() => {
-                    tracing::info!("Received encrypted signature");
+                    info!("Received encrypted signature");
 
                     AliceState::EncSigLearned {
                         monero_wallet_restore_blockheight,
@@ -210,8 +210,10 @@ where
                                 bail!("Waiting for Bitcoin transaction finality failed with {}! The redeem transaction was published, but it is not ensured that the transaction was included! You're screwed.", e)
                             }
                         },
-                        Err(e) => {
-                            error!("Publishing the redeem transaction failed with {}, attempting to wait for cancellation now. If you restart the application before the timelock is expired publishing the redeem transaction will be retried.", e);
+                        Err(error) => {
+                            error!(
+                                %error,
+                                "Publishing the redeem transaction failed");
                             tx_lock_status
                                 .wait_until_confirmed_with(state3.cancel_timelock)
                                 .await?;
@@ -223,8 +225,10 @@ where
                             }
                         }
                     },
-                    Err(e) => {
-                        error!("Constructing the redeem transaction failed with {}, attempting to wait for cancellation now.", e);
+                    Err(error) => {
+                        error!(
+                            %error,
+                            "Constructing the redeem transaction failed. Attempting to wait for cancellation now");
                         tx_lock_status
                             .wait_until_confirmed_with(state3.cancel_timelock)
                             .await?;
@@ -325,10 +329,10 @@ where
 
             match punish {
                 Ok(_) => AliceState::BtcPunished,
-                Err(e) => {
-                    tracing::warn!(
-                        "Falling back to refund because punish transaction failed with {:#}",
-                        e
+                Err(error) => {
+                    warn!(
+                        %error,
+                        "Falling back to refund because punish transaction failed"
                     );
 
                     // Upon punish failure we assume that the refund tx was included but we
