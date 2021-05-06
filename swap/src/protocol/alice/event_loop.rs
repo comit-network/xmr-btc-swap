@@ -161,7 +161,6 @@ where
                                     continue;
                                 }
                             }
-                            // TODO: This should be cleaned up.
                             let tx_redeem_fee = self.bitcoin_wallet
                                 .estimate_fee(bitcoin::TxRedeem::weight(), btc)
                                 .await;
