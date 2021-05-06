@@ -100,7 +100,7 @@ impl Client {
         let response = response.json::<SendRawTransactionResponse>().await?;
 
         if response.status == Status::Failed {
-            anyhow::bail!("Response status failed")
+            anyhow::bail!("Response status failed: {:?}", response)
         }
 
         Ok(())
@@ -218,6 +218,14 @@ pub struct SendRawTransactionRequest {
 pub struct SendRawTransactionResponse {
     pub status: Status,
     pub reason: String,
+    pub double_spend: bool,
+    pub fee_too_low: bool,
+    pub invalid_input: bool,
+    pub invalid_output: bool,
+    pub low_mixin: bool,
+    pub not_relayed: bool,
+    pub overspend: bool,
+    pub too_big: bool,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]

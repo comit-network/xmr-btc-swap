@@ -15,7 +15,7 @@ use monero::{PrivateKey, PublicKey};
 use monero::{Transaction, TransactionPrefix, TxIn, TxOut, VarInt};
 use monero_rpc::monerod;
 use monero_rpc::monerod::{GetOutputsOut, MonerodRpc};
-use monero_wallet::{MonerodClientExt, Wallet};
+use monero_wallet::{MonerodClientExt};
 use rand::rngs::OsRng;
 use rand::{Rng, SeedableRng};
 use std::convert::TryInto;
@@ -28,7 +28,7 @@ use std::iter;
 async fn make_blocks() {
     let client = monerod::Client::localhost(18081).unwrap();
 
-    client.generateblocks(10, "47HCnKkBEeYfX5pScvBETAKdjBEPN7FcXEJPUqDPzWGCc6wC8VAdS8CjdtgKuSaY72K8fkoswjp176vbSPS8hzS17EZv8gj".to_owned()).await.unwrap();
+    client.generateblocks(10, "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".to_owned()).await.unwrap();
 }
 
 #[tokio::test]
@@ -45,14 +45,19 @@ async fn monerod_integration_test() {
 
     let lock_address = monero::Address::from_keypair(monero::Network::Mainnet, &lock_kp);
 
-    let spend_tx = "c9b8c57097fe3af0bffcc7470355afa804be2cad0c559a99506ac040cb93d62d"
+    dbg!(lock_address.to_string());
+
+    let lock_tx = "fccc6c5177f3af65c6c9b26199854da1efcd9b826502d55582ba4882c35410e0"
         .parse()
         .unwrap();
 
-    let mut o_indexes_response = client.get_o_indexes(spend_tx).await.unwrap();
+    let o_indexes_response = client.get_o_indexes(lock_tx).await.unwrap();
 
-    // TODO: Cannot rely on this, because outputs are shuffled
-    let real_key_offset = o_indexes_response.o_indexes.pop().unwrap();
+    let transaction = client.get_transactions(&[lock_tx]).await.unwrap().pop().unwrap();
+
+    let our_output = transaction.check_outputs(&ViewPair::from(&lock_kp), 0..1, 0..1).expect("to have outputs in this transaction").pop().expect("to own at least one output");
+
+    let real_key_offset = o_indexes_response.o_indexes[our_output.index];
 
     let (lower, upper) = client.calculate_key_offset_boundaries().await.unwrap();
 
@@ -96,7 +101,7 @@ async fn monerod_integration_test() {
 
     let relative_key_offsets = to_relative_offsets(&key_offsets);
 
-    let lock_amount = 10_000_000;
+    let lock_amount = 1_000_000_000_000;
     let fee = 10_000;
     let spend_amount = lock_amount - fee;
     // TODO: Pay lock amount to shared address (s_prime_a + s_b)
@@ -109,6 +114,7 @@ async fn monerod_integration_test() {
     // TODO: Modify API to let us determine the blindings ahead of time
     let (bulletproof, out_pk) =
         monero::make_bulletproof(&mut rng, &[spend_amount], &[out_blinding]).unwrap();
+
     let out_pk = out_pk
         .iter()
         .map(|c| monero::util::ringct::CtKey {
@@ -155,7 +161,7 @@ async fn monerod_integration_test() {
 
     let pseudo_out = {
         let amount = Scalar::from(lock_amount);
-        let blinding = -out_blinding;
+        let blinding = out_blinding;
 
         let commitment = (blinding * ED25519_BASEPOINT_POINT) + (amount * H.point.decompress().unwrap());
 
