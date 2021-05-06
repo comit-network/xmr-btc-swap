@@ -6,11 +6,14 @@ use crate::protocol::alice::{execution_setup, spot_price, State3};
 use anyhow::{anyhow, Error};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
-use std::fmt::Debug;
 use uuid::Uuid;
 
 #[derive(Debug)]
 pub enum OutEvent {
+    SwapRequestDeclined {
+        peer: PeerId,
+        error: spot_price::Error,
+    },
     ExecutionSetupStart {
         peer: PeerId,
         btc: bitcoin::Amount,
@@ -65,7 +68,7 @@ impl OutEvent {
 #[allow(missing_debug_implementations)]
 pub struct Behaviour<LR>
 where
-    LR: LatestRate + Send + 'static + Debug,
+    LR: LatestRate + Send + 'static,
 {
     pub quote: quote::Behaviour,
     pub spot_price: spot_price::Behaviour<LR>,
@@ -76,7 +79,7 @@ where
 
 impl<LR> Behaviour<LR>
 where
-    LR: LatestRate + Send + 'static + Debug,
+    LR: LatestRate + Send + 'static,
 {
     pub fn new(
         balance: monero::Amount,
