@@ -23,7 +23,6 @@ use tokio::sync::{watch, Mutex};
 
 const SLED_TREE_NAME: &str = "default_tree";
 
-// TODO make these values configurable
 /// Assuming we add a spread of 3% we don't want to pay more than 3% of the
 /// amount for tx fees.
 const MAX_RELATIVE_TX_FEE: f64 = 0.03;
