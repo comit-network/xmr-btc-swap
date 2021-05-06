@@ -415,7 +415,9 @@ mod tests {
         );
     }
 
-    // Weights fluctuate -+2 wu assuming because of the length of the signatures.
+    // Weights fluctuate -+1 wu because of the length of the signatures.
+    // Some of our transactions have 2 signatures and hence the weight can fluctuate
+    // +-2
     fn assert_weight(is_weight: usize, expected_weight: usize, tx_name: &str) {
         assert!(
             is_weight + 1 == expected_weight
