@@ -16,7 +16,7 @@ pub mod cancel;
 pub mod event_loop;
 mod execution_setup;
 pub mod refund;
-mod spot_price;
+pub mod spot_price;
 pub mod state;
 pub mod swap;
 

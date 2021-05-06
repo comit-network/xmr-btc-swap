@@ -6,7 +6,7 @@ use libp2p::request_response::{ProtocolSupport, RequestResponseConfig};
 use libp2p::PeerId;
 
 const PROTOCOL: &str = spot_price::PROTOCOL;
-type SpotPriceOutEvent = spot_price::OutEvent;
+pub type SpotPriceOutEvent = spot_price::OutEvent;
 
 /// Constructs a new instance of the `spot-price` behaviour to be used by Bob.
 ///
@@ -37,7 +37,7 @@ impl From<(PeerId, spot_price::Message)> for OutEvent {
 
 crate::impl_from_rr_event!(SpotPriceOutEvent, OutEvent, PROTOCOL);
 
-#[derive(Clone, Debug, thiserror::Error)]
+#[derive(Clone, Debug, thiserror::Error, PartialEq)]
 pub enum Error {
     #[error("Seller currently does not accept incoming swap requests, please try again later")]
     NoSwapsAccepted,

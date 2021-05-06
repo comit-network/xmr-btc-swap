@@ -14,6 +14,7 @@ use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::task::{Context, Poll};
 
+#[derive(Debug)]
 pub enum OutEvent {
     ExecutionSetupParams {
         peer: PeerId,
@@ -240,6 +241,389 @@ impl Error {
             Error::BalanceTooLow { buy } => spot_price::Error::BalanceTooLow { buy: *buy },
             Error::LatestRateFetchFailed(_) | Error::SellQuoteCalculationFailed(_) => {
                 spot_price::Error::Other
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::asb::Rate;
+    use crate::monero;
+    use crate::network::test::{await_events_or_timeout, connect, new_swarm};
+    use crate::protocol::{alice, bob};
+    use anyhow::anyhow;
+    use libp2p::Swarm;
+    use rust_decimal::Decimal;
+
+    impl Default for AliceBehaviourValues {
+        fn default() -> Self {
+            Self {
+                balance: monero::Amount::from_monero(1.0).unwrap(),
+                lock_fee: monero::Amount::ZERO,
+                max_buy: bitcoin::Amount::from_btc(0.01).unwrap(),
+                rate: TestRate::default(), // 0.01
+                resume_only: false,
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn given_alice_has_sufficient_balance_then_returns_price() {
+        let mut test = SpotPriceTest::setup(AliceBehaviourValues::default()).await;
+
+        let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
+        let expected_xmr = monero::Amount::from_monero(1.0).unwrap();
+
+        let request = spot_price::Request { btc: btc_to_swap };
+
+        test.send_request(request);
+        test.assert_price((btc_to_swap, expected_xmr), expected_xmr)
+            .await;
+    }
+
+    #[tokio::test]
+    async fn given_alice_has_insufficient_balance_then_returns_error() {
+        let mut test = SpotPriceTest::setup(
+            AliceBehaviourValues::default().with_balance(monero::Amount::ZERO),
+        )
+        .await;
+
+        let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
+
+        let request = spot_price::Request { btc: btc_to_swap };
+
+        test.send_request(request);
+        test.assert_error(
+            alice::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
+            bob::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn given_alice_has_insufficient_balance_after_balance_update_then_returns_error() {
+        let mut test = SpotPriceTest::setup(AliceBehaviourValues::default()).await;
+
+        let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
+        let expected_xmr = monero::Amount::from_monero(1.0).unwrap();
+
+        let request = spot_price::Request { btc: btc_to_swap };
+
+        test.send_request(request);
+        test.assert_price((btc_to_swap, expected_xmr), expected_xmr)
+            .await;
+
+        test.alice_swarm
+            .behaviour_mut()
+            .update_balance(monero::Amount::ZERO);
+
+        let request = spot_price::Request { btc: btc_to_swap };
+
+        test.send_request(request);
+        test.assert_error(
+            alice::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
+            bob::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn given_alice_has_insufficient_balance_because_of_lock_fee_then_returns_error() {
+        let mut test = SpotPriceTest::setup(
+            AliceBehaviourValues::default().with_lock_fee(monero::Amount::from_piconero(1)),
+        )
+        .await;
+
+        let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
+
+        let request = spot_price::Request { btc: btc_to_swap };
+
+        test.send_request(request);
+        test.assert_error(
+            alice::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
+            bob::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn given_max_buy_exceeded_then_returns_error() {
+        let max_buy = bitcoin::Amount::from_btc(0.001).unwrap();
+
+        let mut test =
+            SpotPriceTest::setup(AliceBehaviourValues::default().with_max_buy(max_buy)).await;
+
+        let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
+
+        let request = spot_price::Request { btc: btc_to_swap };
+
+        test.send_request(request);
+        test.assert_error(
+            alice::spot_price::Error::MaxBuyAmountExceeded {
+                buy: btc_to_swap,
+                max: max_buy,
+            },
+            bob::spot_price::Error::MaxBuyAmountExceeded {
+                buy: btc_to_swap,
+                max: max_buy,
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn given_alice_in_resume_only_mode_then_returns_error() {
+        let mut test =
+            SpotPriceTest::setup(AliceBehaviourValues::default().with_resume_only(true)).await;
+
+        let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
+
+        let request = spot_price::Request { btc: btc_to_swap };
+
+        test.send_request(request);
+        test.assert_error(
+            alice::spot_price::Error::ResumeOnlyMode,
+            bob::spot_price::Error::NoSwapsAccepted,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn given_rate_fetch_problem_then_returns_error() {
+        let mut test =
+            SpotPriceTest::setup(AliceBehaviourValues::default().with_rate(TestRate::error_rate()))
+                .await;
+
+        let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
+
+        let request = spot_price::Request { btc: btc_to_swap };
+
+        test.send_request(request);
+        test.assert_error(
+            alice::spot_price::Error::LatestRateFetchFailed(Box::new(TestRateError {})),
+            bob::spot_price::Error::Other,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn given_rate_calculation_problem_then_returns_error() {
+        let mut test = SpotPriceTest::setup(
+            AliceBehaviourValues::default().with_rate(TestRate::from_rate_and_spread(0.0, 0)),
+        )
+        .await;
+
+        let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
+
+        let request = spot_price::Request { btc: btc_to_swap };
+
+        test.send_request(request);
+        test.assert_error(
+            alice::spot_price::Error::SellQuoteCalculationFailed(anyhow!(
+                "Error text irrelevant, won't be checked here"
+            )),
+            bob::spot_price::Error::Other,
+        )
+        .await;
+    }
+
+    struct SpotPriceTest {
+        alice_swarm: Swarm<alice::spot_price::Behaviour<TestRate>>,
+        bob_swarm: Swarm<spot_price::Behaviour>,
+
+        alice_peer_id: PeerId,
+    }
+
+    impl SpotPriceTest {
+        pub async fn setup(values: AliceBehaviourValues) -> Self {
+            let (mut alice_swarm, _, alice_peer_id) = new_swarm(|_, _| {
+                Behaviour::new(
+                    values.balance,
+                    values.lock_fee,
+                    values.max_buy,
+                    values.rate.clone(),
+                    values.resume_only,
+                )
+            });
+            let (mut bob_swarm, ..) = new_swarm(|_, _| bob::spot_price::bob());
+
+            connect(&mut alice_swarm, &mut bob_swarm).await;
+
+            Self {
+                alice_swarm,
+                bob_swarm,
+                alice_peer_id,
+            }
+        }
+
+        pub fn send_request(&mut self, spot_price_request: spot_price::Request) {
+            self.bob_swarm
+                .behaviour_mut()
+                .send_request(&self.alice_peer_id, spot_price_request);
+        }
+
+        async fn assert_price(
+            &mut self,
+            alice_assert: (bitcoin::Amount, monero::Amount),
+            bob_assert: monero::Amount,
+        ) {
+            match await_events_or_timeout(self.alice_swarm.next(), self.bob_swarm.next()).await {
+                (
+                    alice::spot_price::OutEvent::ExecutionSetupParams { btc, xmr, .. },
+                    spot_price::OutEvent::Message { message, .. },
+                ) => {
+                    assert_eq!(alice_assert, (btc, xmr));
+
+                    let response = match message {
+                        RequestResponseMessage::Response { response, .. } => response,
+                        _ => panic!("Unexpected message {:?} for Bob", message),
+                    };
+
+                    match response {
+                        spot_price::Response::Xmr(xmr) => {
+                            assert_eq!(bob_assert, xmr)
+                        }
+                        _ => panic!("Unexpected response {:?} for Bob", response),
+                    }
+                }
+                (alice_event, bob_event) => panic!(
+                    "Received unexpected event, alice emitted {:?} and bob emitted {:?}",
+                    alice_event, bob_event
+                ),
+            }
+        }
+
+        async fn assert_error(
+            &mut self,
+            alice_assert: alice::spot_price::Error,
+            bob_assert: bob::spot_price::Error,
+        ) {
+            match await_events_or_timeout(self.alice_swarm.next(), self.bob_swarm.next()).await {
+                (
+                    alice::spot_price::OutEvent::Error { error, .. },
+                    spot_price::OutEvent::Message { message, .. },
+                ) => {
+                    // TODO: Somehow make PartialEq work on Alice's spot_price::Error
+                    match (alice_assert, error) {
+                        (
+                            alice::spot_price::Error::BalanceTooLow { .. },
+                            alice::spot_price::Error::BalanceTooLow { .. },
+                        )
+                        | (
+                            alice::spot_price::Error::MaxBuyAmountExceeded { .. },
+                            alice::spot_price::Error::MaxBuyAmountExceeded { .. },
+                        )
+                        | (
+                            alice::spot_price::Error::LatestRateFetchFailed(_),
+                            alice::spot_price::Error::LatestRateFetchFailed(_),
+                        )
+                        | (
+                            alice::spot_price::Error::SellQuoteCalculationFailed(_),
+                            alice::spot_price::Error::SellQuoteCalculationFailed(_),
+                        )
+                        | (
+                            alice::spot_price::Error::ResumeOnlyMode,
+                            alice::spot_price::Error::ResumeOnlyMode,
+                        ) => {}
+                        (alice_assert, error) => {
+                            panic!("Expected: {:?} Actual: {:?}", alice_assert, error)
+                        }
+                    }
+
+                    let response = match message {
+                        RequestResponseMessage::Response { response, .. } => response,
+                        _ => panic!("Unexpected message {:?} for Bob", message),
+                    };
+
+                    match response {
+                        spot_price::Response::Error(error) => {
+                            assert_eq!(bob_assert, error.into())
+                        }
+                        _ => panic!("Unexpected response {:?} for Bob", response),
+                    }
+                }
+                (alice_event, bob_event) => panic!(
+                    "Received unexpected event, alice emitted {:?} and bob emitted {:?}",
+                    alice_event, bob_event
+                ),
+            }
+        }
+    }
+
+    struct AliceBehaviourValues {
+        pub balance: monero::Amount,
+        pub lock_fee: monero::Amount,
+        pub max_buy: bitcoin::Amount,
+        pub rate: TestRate, // 0.01
+        pub resume_only: bool,
+    }
+
+    impl AliceBehaviourValues {
+        pub fn with_balance(mut self, balance: monero::Amount) -> AliceBehaviourValues {
+            self.balance = balance;
+            self
+        }
+
+        pub fn with_lock_fee(mut self, lock_fee: monero::Amount) -> AliceBehaviourValues {
+            self.lock_fee = lock_fee;
+            self
+        }
+
+        pub fn with_max_buy(mut self, max_buy: bitcoin::Amount) -> AliceBehaviourValues {
+            self.max_buy = max_buy;
+            self
+        }
+
+        pub fn with_resume_only(mut self, resume_only: bool) -> AliceBehaviourValues {
+            self.resume_only = resume_only;
+            self
+        }
+
+        pub fn with_rate(mut self, rate: TestRate) -> AliceBehaviourValues {
+            self.rate = rate;
+            self
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub enum TestRate {
+        Rate(Rate),
+        Err(TestRateError),
+    }
+
+    impl TestRate {
+        pub const RATE: f64 = 0.01;
+
+        pub fn from_rate_and_spread(rate: f64, spread: u64) -> Self {
+            let ask = bitcoin::Amount::from_btc(rate).expect("Static value should never fail");
+            let spread = Decimal::from(spread);
+            Self::Rate(Rate::new(ask, spread))
+        }
+
+        pub fn error_rate() -> Self {
+            Self::Err(TestRateError {})
+        }
+    }
+
+    impl Default for TestRate {
+        fn default() -> Self {
+            TestRate::from_rate_and_spread(Self::RATE, 0)
+        }
+    }
+
+    #[derive(Debug, Clone, thiserror::Error)]
+    #[error("Could not fetch rate")]
+    pub struct TestRateError {}
+
+    impl LatestRate for TestRate {
+        type Error = TestRateError;
+
+        fn latest_rate(&mut self) -> Result<Rate, Self::Error> {
+            match self {
+                TestRate::Rate(rate) => Ok(*rate),
+                TestRate::Err(error) => Err(error.clone()),
             }
         }
     }
