@@ -148,10 +148,11 @@ impl TxLock {
             witness: Vec::new(),
         };
 
-        let i = spending_fee.as_sat();
-        tracing::debug!("Redeem tx fee: {}", i);
+        let spending_fee = spending_fee.as_sat();
+        tracing::debug!(%spending_fee, "Redeem tx fee");
         let tx_out = TxOut {
-            value: self.inner.clone().extract_tx().output[self.lock_output_vout()].value - i,
+            value: self.inner.clone().extract_tx().output[self.lock_output_vout()].value
+                - spending_fee,
             script_pubkey: spend_address.script_pubkey(),
         };
 
