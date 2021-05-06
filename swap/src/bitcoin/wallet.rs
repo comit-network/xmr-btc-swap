@@ -326,7 +326,7 @@ where
         Ok(Amount::from_sat(max_giveable))
     }
 
-    /// Estimate total tx fee based for a pre-defined target block based on the
+    /// Estimate total tx fee for a pre-defined target block based on the
     /// transaction weight. The max fee cannot be more than MAX_PERCENTAGE_FEE
     /// of amount
     pub async fn estimate_fee(
@@ -357,7 +357,7 @@ fn estimate_fee(
 ) -> Amount {
     // Doing some heavy math here :)
     // `usize` is 32 or 64 bits wide, but `f32`'s mantissa is only 23 bits wide.
-    // This fine because such a big transaction cannot exist and there are also no
+    // This is fine because such a big transaction cannot exist and there are also no
     // negative fees.
     #[allow(
         clippy::cast_precision_loss,
