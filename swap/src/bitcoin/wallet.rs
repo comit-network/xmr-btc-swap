@@ -356,8 +356,8 @@ fn estimate_fee(
 ) -> Amount {
     // Doing some heavy math here :)
     // `usize` is 32 or 64 bits wide, but `f32`'s mantissa is only 23 bits wide.
-    // This is fine because such a big transaction cannot exist and there are also no
-    // negative fees.
+    // This is fine because such a big transaction cannot exist and there are also
+    // no negative fees.
     #[allow(
         clippy::cast_precision_loss,
         clippy::cast_possible_truncation,
