@@ -13,7 +13,6 @@ use monero::cryptonote::onetime_key::KeyGenerator;
 use monero::util::ringct::{EcdhInfo, RctSig, RctSigBase, RctSigPrunable, RctType};
 use monero::{PrivateKey, PublicKey};
 use monero::{Transaction, TransactionPrefix, TxIn, TxOut, VarInt};
-use monero_rpc::wallet::MoneroWalletRpc as _;
 use monero_rpc::monerod;
 use monero_rpc::monerod::{GetOutputsOut, MonerodRpc};
 use monero_wallet::{MonerodClientExt, Wallet};
@@ -183,12 +182,7 @@ async fn monerod_integration_test() {
         },
     };
 
-    let wallet_client = monero_rpc::wallet::Client::localhost(0).unwrap();
-
-    let tx_hex = hex::encode(monero::consensus::encode::serialize(&transaction));
-    let tx_hash = wallet_client.submit_transfer(tx_hex).await.unwrap();
-
-    dbg!(tx_hash);
+    client.send_raw_transaction(transaction).await.unwrap();
 }
 
 fn to_relative_offsets(offsets: &[VarInt]) -> Vec<VarInt> {

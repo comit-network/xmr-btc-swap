@@ -19,6 +19,7 @@ pub struct Client {
     get_o_indexes_bin_url: reqwest::Url,
     get_outs_bin_url: reqwest::Url,
     get_transactions: reqwest::Url,
+    send_raw_transaction: reqwest::Url,
 }
 
 impl Client {
@@ -42,6 +43,9 @@ impl Client {
                 .parse()
                 .context("url is well formed")?,
             get_transactions: format!("http://{}:{}/get_transactions", host, port)
+                .parse()
+                .context("url is well formed")?,
+            send_raw_transaction: format!("http://{}:{}/send_raw_transaction", host, port)
                 .parse()
                 .context("url is well formed")?,
         })
@@ -77,6 +81,29 @@ impl Client {
     pub async fn get_outs(&self, outputs: Vec<GetOutputsOut>) -> Result<GetOutsResponse> {
         self.binary_request(self.get_outs_bin_url.clone(), GetOutsPayload { outputs })
             .await
+    }
+
+    pub async fn send_raw_transaction(&self, tx: Transaction) -> Result<()> {
+        let tx_as_hex = hex::encode(monero::consensus::encode::serialize(&tx));
+
+        let response = self
+            .inner
+            .post(self.send_raw_transaction.clone())
+            .json(&SendRawTransactionRequest { tx_as_hex })
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            anyhow::bail!("Request failed with status code {}", response.status())
+        }
+
+        let response = response.json::<SendRawTransactionResponse>().await?;
+
+        if response.status == Status::Failed {
+            anyhow::bail!("Response status failed")
+        }
+
+        Ok(())
     }
 
     async fn binary_request<Req, Res>(&self, url: reqwest::Url, request: Req) -> Result<Res>
@@ -180,6 +207,17 @@ pub struct GetOutsResponse {
     #[serde(flatten)]
     pub base: BaseResponse,
     pub outs: Vec<OutKey>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub struct SendRawTransactionRequest {
+    pub tx_as_hex: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct SendRawTransactionResponse {
+    pub status: Status,
+    pub reason: String,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
