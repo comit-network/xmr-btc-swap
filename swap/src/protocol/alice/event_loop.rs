@@ -171,16 +171,30 @@ where
                             let redeem_address = self.bitcoin_wallet.new_address().await;
                             let punish_address = self.bitcoin_wallet.new_address().await;
 
-                            let (tx_redeem_fee, tx_punish_fee, redeem_address, punish_address) = match (
-                                tx_redeem_fee,
-                                tx_punish_fee,
+                            let (redeem_address, punish_address) = match (
                                 redeem_address,
                                 punish_address,
                             ) {
-                                (Ok(tx_redeem_fee), Ok(tx_punish_fee), Ok(redeem_address), Ok(punish_address)) => {
-                                    (tx_redeem_fee, tx_punish_fee, redeem_address, punish_address)
+                                (Ok(redeem_address), Ok(punish_address)) => {
+                                    (redeem_address, punish_address)
                                 }
-                                _ => { continue; }
+                                _ => {
+                                    tracing::error!("Could not get new address.");
+                                    continue;
+                                }
+                            };
+
+                            let (tx_redeem_fee, tx_punish_fee) = match (
+                                tx_redeem_fee,
+                                tx_punish_fee,
+                            ) {
+                                (Ok(tx_redeem_fee), Ok(tx_punish_fee)) => {
+                                    (tx_redeem_fee, tx_punish_fee)
+                                }
+                                _ => {
+                                    tracing::error!("Could not calculate transaction fees.");
+                                    continue;
+                                }
                             };
 
                             let state0 = match State0::new(
