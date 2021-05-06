@@ -745,6 +745,7 @@ impl fmt::Display for ScriptStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     #[test]
     fn given_depth_0_should_meet_confirmation_target_one() {
@@ -821,7 +822,7 @@ mod tests {
         let relay_fee = bitcoin::Amount::ONE_SAT;
         let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee);
 
-        // weight / 4.0 *  sat_per_vb would be greater than 0.03% hence we take max
+        // weight / 4.0 *  sat_per_vb would be greater than 3% hence we take max
         // relative fee.
         let should_fee = bitcoin::Amount::from_sat(30_000);
         assert_eq!(is_fee, should_fee);
@@ -840,9 +841,65 @@ mod tests {
         let relay_fee = bitcoin::Amount::ONE_SAT;
         let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee);
 
-        // weight / 4.0 *  sat_per_vb would be greater than 0.03% hence we take total
+        // weight / 4.0 *  sat_per_vb would be greater than 3% hence we take total
         // max allowed fee.
         let should_fee = bitcoin::Amount::from_sat(MAX_ABSOLUTE_TX_FEE);
         assert_eq!(is_fee, should_fee);
+    }
+
+    proptest! {
+        #[test]
+        fn given_randon_amount_random_fee_and_random_relay_rate_but_fix_weight_does_not_panic(
+            amount in prop::num::u64::ANY,
+            sat_per_vb in prop::num::f32::POSITIVE,
+            relay_fee in prop::num::u64::ANY
+        ) {
+            let weight = 400;
+            let amount = bitcoin::Amount::from_sat(amount);
+
+            let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb);
+
+            let relay_fee = bitcoin::Amount::from_sat(relay_fee);
+            let _is_fee = estimate_fee(weight, amount, fee_rate, relay_fee);
+
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn given_amount_in_range_fix_fee_fix_relay_rate_fix_weight_fee_always_smaller_max(
+            amount in 0u64..100_000_000,
+        ) {
+            let weight = 400;
+            let amount = bitcoin::Amount::from_sat(amount);
+
+            let sat_per_vb = 100.0;
+            let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb);
+
+            let relay_fee = bitcoin::Amount::ONE_SAT;
+            let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee);
+
+            // weight / 4 * 1_000 is always lower than MAX_ABSOLUTE_TX_FEE
+            assert!(is_fee.as_sat() < MAX_ABSOLUTE_TX_FEE);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn given_amount_high_fix_fee_fix_relay_rate_fix_weight_fee_always_max(
+            amount in 100_000_000u64..,
+        ) {
+            let weight = 400;
+            let amount = bitcoin::Amount::from_sat(amount);
+
+            let sat_per_vb = 1_000.0;
+            let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb);
+
+            let relay_fee = bitcoin::Amount::ONE_SAT;
+            let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee);
+
+            // weight / 4 * 1_000  is always higher than MAX_ABSOLUTE_TX_FEE
+            assert!(is_fee.as_sat() >= MAX_ABSOLUTE_TX_FEE);
+        }
     }
 }
