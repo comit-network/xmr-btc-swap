@@ -3,7 +3,7 @@ use monero::consensus::encode::VarInt;
 use monero::cryptonote::hash::Hashable;
 use monero_rpc::monerod;
 use monero_rpc::monerod::{GetBlockResponse, MonerodRpc as _};
-use rand::{CryptoRng, Rng, RngCore};
+use rand::{CryptoRng, RngCore};
 
 pub struct Wallet {
     key: monero::KeyPair,

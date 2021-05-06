@@ -16,6 +16,10 @@ pub trait MoneroWalletRpc {
         destinations: Vec<Destination>,
         get_tx_key: bool,
     ) -> Transfer;
+    async fn submit_transfer(
+        &self,
+        tx_data_hex: String,
+    ) -> Vec<String>;
     async fn get_height(&self) -> BlockHeight;
     async fn check_tx_key(&self, txid: String, tx_key: String, address: String) -> CheckTxKey;
     #[allow(clippy::too_many_arguments)]

@@ -13,6 +13,7 @@ hash_edwards_to_edwards = { git = "https://github.com/comit-network/hash_edwards
 monero = "0.12"
 
 [dev-dependencies]
+hex = "0.4"
 monero-harness = { path = "../monero-harness" }
 monero-rpc = { path = "../monero-rpc" }
 monero-wallet = { path = "../monero-wallet" }

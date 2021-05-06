@@ -2265,7 +2265,7 @@ dependencies = [
 [[package]]
 name = "monero"
 version = "0.12.0"
-source = "git+https://github.com/comit-network/monero-rs#680ba69708d5112d8650a76aa032fdb2be56ff55"
+source = "git+https://github.com/comit-network/monero-rs#f6a500b72dc3a011b8ab3145f98f573dd0d20a2f"
 dependencies = [
  "base58-monero",
  "clear_on_drop",
@@ -2291,6 +2291,7 @@ dependencies = [
  "anyhow",
  "curve25519-dalek",
  "hash_edwards_to_edwards",
+ "hex 0.4.3",
  "itertools 0.10.0",
  "monero",
  "monero-harness",

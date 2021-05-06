@@ -182,7 +182,7 @@ pub struct GetOutsResponse {
     pub outs: Vec<OutKey>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 pub struct OutKey {
     pub height: u64,
     #[serde(with = "byte_array")]
