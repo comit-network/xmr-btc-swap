@@ -43,7 +43,7 @@ impl MonerodClientExt for monerod::Client {
     /// possible.
     async fn calculate_key_offset_boundaries(&self) -> Result<(VarInt, VarInt)> {
         let latest_block = self.get_block_count().await?;
-        let latest_spendable_block = latest_block.count - 10;
+        let latest_spendable_block = latest_block.count - 50;
 
         let block: GetBlockResponse = self.get_block(latest_spendable_block).await?;
 

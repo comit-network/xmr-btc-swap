@@ -28,7 +28,7 @@ use std::iter;
 async fn make_blocks() {
     let client = monerod::Client::localhost(18081).unwrap();
 
-    client.generateblocks(110, "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".to_owned()).await.unwrap();
+    // client.generateblocks(110, "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".to_owned()).await.unwrap();
     client.generateblocks(10, "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".to_owned()).await.unwrap();
 }
 
@@ -89,6 +89,8 @@ async fn monerod_integration_test() {
         }
     }
 
+    dbg!(&key_offsets);
+
     let response = client
         .get_outs(
             key_offsets
@@ -120,11 +122,14 @@ async fn monerod_integration_test() {
 
     let target_address = "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".parse::<monero::Address>().unwrap();
 
-    let ecdh_key = PrivateKey::random(&mut rng);
-    let (ecdh_info, out_blinding) = EcdhInfo::new_bulletproof(spend_amount, ecdh_key.scalar);
-
+    let ecdh_key_0 = PrivateKey::random(&mut rng);
+    let (ecdh_info_0, out_blinding_0) = EcdhInfo::new_bulletproof(spend_amount, ecdh_key_0.scalar);
+    
+    let ecdh_key_1 = PrivateKey::random(&mut rng);
+    let (ecdh_info_1, out_blinding_1) = EcdhInfo::new_bulletproof(spend_amount, ecdh_key_1.scalar);
+    
     let (bulletproof, out_pk) =
-        monero::make_bulletproof(&mut rng, &[spend_amount], &[out_blinding]).unwrap();
+        monero::make_bulletproof(&mut rng, &[spend_amount, 0], &[out_blinding_0, out_blinding_1]).unwrap();
 
     let k_image = {
         let k = lock_kp.spend.scalar;
@@ -148,17 +153,29 @@ async fn monerod_integration_test() {
                 key: KeyGenerator::from_random(
                     target_address.public_view,
                     target_address.public_spend,
-                    ecdh_key,
+                    ecdh_key_0,
                 )
                 .one_time_key(0), // TODO: It works with 1 output, but we must choose it based on the output index
             },
+        }, TxOut {
+            amount: VarInt(0),
+            target: TxOutTarget::ToKey {
+                key: KeyGenerator::from_random(
+                    target_address.public_view,
+                    target_address.public_spend,
+                    ecdh_key_1,
+                )
+                    .one_time_key(1), // TODO: It works with 1 output, but we must choose it based on the output index
+            },
         }],
         extra: ExtraField(vec![SubField::TxPublicKey(PublicKey::from_private_key(
-            &ecdh_key,
+            &ecdh_key_0,
+        )), SubField::TxPublicKey(PublicKey::from_private_key(
+            &ecdh_key_1,
         ))]),
     };
 
-    assert_eq!(prefix.hash(), "8e39c037fdc8ada919abfa0c535c07222cc5162d17872673bd7bcb83cc630ca7".parse().unwrap());
+    // assert_eq!(prefix.hash(), "c3ded4d1a8cddd4f76c09b63edff4e312e759b3afc46beda4e1fd75c9c68d997".parse().unwrap());
 
     let (adaptor_sig, adaptor) =
         single_party_adaptor_sig(s_prime_a, s_b, ring, &prefix.hash().to_bytes());
@@ -177,7 +194,7 @@ async fn monerod_integration_test() {
 
     let fee_key = Scalar::from(fee) * H.point.decompress().unwrap();
 
-    let pseudo_out = fee_key + out_pk[0].decompress().unwrap();
+    let pseudo_out = fee_key + out_pk[0].decompress().unwrap() + out_pk[1].decompress().unwrap();
 
     let out_pk = out_pk
         .iter()
@@ -194,7 +211,7 @@ async fn monerod_integration_test() {
                 rct_type: RctType::Clsag,
                 txn_fee: VarInt(fee),
                 pseudo_outs: Vec::new(),
-                ecdh_info: vec![ecdh_info],
+                ecdh_info: vec![ecdh_info_0, ecdh_info_1],
                 out_pk,
             }),
             p: Some(RctSigPrunable {
