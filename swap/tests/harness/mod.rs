@@ -14,7 +14,7 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use swap::bitcoin::{CancelTimelock, PunishTimelock};
+use swap::bitcoin::{CancelTimelock, PunishTimelock, TxCancel, TxPunish, TxRedeem, TxRefund};
 use swap::database::Database;
 use swap::env::{Config, GetConfig};
 use swap::network::swarm;
@@ -285,6 +285,7 @@ async fn init_test_wallets(
         seed.derive_extended_private_key(env_config.bitcoin_network)
             .expect("Could not create extended private key from seed"),
         env_config,
+        1,
     )
     .await
     .expect("could not init btc wallet");
@@ -539,7 +540,7 @@ impl TestContext {
         assert_eventual_balance(
             self.alice_bitcoin_wallet.as_ref(),
             Ordering::Equal,
-            self.alice_redeemed_btc_balance(),
+            self.alice_redeemed_btc_balance().await,
         )
         .await
         .unwrap();
@@ -580,7 +581,7 @@ impl TestContext {
         assert_eventual_balance(
             self.alice_bitcoin_wallet.as_ref(),
             Ordering::Equal,
-            self.alice_punished_btc_balance(),
+            self.alice_punished_btc_balance().await,
         )
         .await
         .unwrap();
@@ -631,19 +632,21 @@ impl TestContext {
 
         let btc_balance_after_swap = self.bob_bitcoin_wallet.balance().await.unwrap();
 
-        let alice_submitted_cancel = btc_balance_after_swap
-            == self.bob_starting_balances.btc
-                - lock_tx_bitcoin_fee
-                - bitcoin::Amount::from_sat(bitcoin::TX_FEE);
+        let cancel_fee = self
+            .alice_bitcoin_wallet
+            .estimate_fee(TxCancel::weight(), self.btc_amount)
+            .await
+            .expect("To estimate fee correctly");
+        let refund_fee = self
+            .alice_bitcoin_wallet
+            .estimate_fee(TxRefund::weight(), self.btc_amount)
+            .await
+            .expect("To estimate fee correctly");
 
-        let bob_submitted_cancel = btc_balance_after_swap
-            == self.bob_starting_balances.btc
-                - lock_tx_bitcoin_fee
-                - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE);
+        let bob_cancelled_and_refunded = btc_balance_after_swap
+            == self.bob_starting_balances.btc - lock_tx_bitcoin_fee - cancel_fee - refund_fee;
 
-        // The cancel tx can be submitted by both Alice and Bob.
-        // Since we cannot be sure who submitted it we have to assert accordingly
-        assert!(alice_submitted_cancel || bob_submitted_cancel);
+        assert!(bob_cancelled_and_refunded);
 
         assert_eventual_balance(
             self.bob_monero_wallet.as_ref(),
@@ -676,9 +679,13 @@ impl TestContext {
         self.alice_starting_balances.xmr - self.xmr_amount
     }
 
-    fn alice_redeemed_btc_balance(&self) -> bitcoin::Amount {
-        self.alice_starting_balances.btc + self.btc_amount
-            - bitcoin::Amount::from_sat(bitcoin::TX_FEE)
+    async fn alice_redeemed_btc_balance(&self) -> bitcoin::Amount {
+        let fee = self
+            .alice_bitcoin_wallet
+            .estimate_fee(TxRedeem::weight(), self.btc_amount)
+            .await
+            .expect("To estimate fee correctly");
+        self.alice_starting_balances.btc + self.btc_amount - fee
     }
 
     fn bob_redeemed_xmr_balance(&self) -> monero::Amount {
@@ -715,9 +722,18 @@ impl TestContext {
         self.alice_starting_balances.xmr - self.xmr_amount
     }
 
-    fn alice_punished_btc_balance(&self) -> bitcoin::Amount {
-        self.alice_starting_balances.btc + self.btc_amount
-            - bitcoin::Amount::from_sat(2 * bitcoin::TX_FEE)
+    async fn alice_punished_btc_balance(&self) -> bitcoin::Amount {
+        let cancel_fee = self
+            .alice_bitcoin_wallet
+            .estimate_fee(TxCancel::weight(), self.btc_amount)
+            .await
+            .expect("To estimate fee correctly");
+        let punish_fee = self
+            .alice_bitcoin_wallet
+            .estimate_fee(TxPunish::weight(), self.btc_amount)
+            .await
+            .expect("To estimate fee correctly");
+        self.alice_starting_balances.btc + self.btc_amount - cancel_fee - punish_fee
     }
 
     fn bob_punished_xmr_balance(&self) -> monero::Amount {

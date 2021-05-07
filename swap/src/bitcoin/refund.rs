@@ -1,7 +1,7 @@
 use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{
-    verify_sig, Address, EmptyWitnessStack, NoInputs, NotThreeWitnesses, PublicKey, TooManyInputs,
-    Transaction, TxCancel,
+    verify_sig, Address, Amount, EmptyWitnessStack, NoInputs, NotThreeWitnesses, PublicKey,
+    TooManyInputs, Transaction, TxCancel,
 };
 use crate::{bitcoin, monero};
 use ::bitcoin::util::bip143::SigHashCache;
@@ -20,10 +20,10 @@ pub struct TxRefund {
 }
 
 impl TxRefund {
-    pub fn new(tx_cancel: &TxCancel, refund_address: &Address) -> Self {
-        let tx_punish = tx_cancel.build_spend_transaction(refund_address, None);
+    pub fn new(tx_cancel: &TxCancel, refund_address: &Address, spending_fee: Amount) -> Self {
+        let tx_refund = tx_cancel.build_spend_transaction(refund_address, None, spending_fee);
 
-        let digest = SigHashCache::new(&tx_punish).signature_hash(
+        let digest = SigHashCache::new(&tx_refund).signature_hash(
             0, // Only one input: cancel transaction
             &tx_cancel.output_descriptor.script_code(),
             tx_cancel.amount().as_sat(),
@@ -31,7 +31,7 @@ impl TxRefund {
         );
 
         Self {
-            inner: tx_punish,
+            inner: tx_refund,
             digest,
             cancel_output_descriptor: tx_cancel.output_descriptor.clone(),
             watch_script: refund_address.script_pubkey(),
@@ -136,6 +136,10 @@ impl TxRefund {
             .context("Neither signature on witness stack verifies against B")?;
 
         Ok(sig)
+    }
+
+    pub fn weight() -> usize {
+        548
     }
 }
 

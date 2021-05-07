@@ -108,14 +108,20 @@ pub struct State0 {
     punish_timelock: PunishTimelock,
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
+    tx_redeem_fee: bitcoin::Amount,
+    tx_punish_fee: bitcoin::Amount,
 }
 
 impl State0 {
-    pub async fn new<R>(
+    #[allow(clippy::too_many_arguments)]
+    pub fn new<R>(
         btc: bitcoin::Amount,
         xmr: monero::Amount,
         env_config: Config,
-        bitcoin_wallet: &bitcoin::Wallet,
+        redeem_address: bitcoin::Address,
+        punish_address: bitcoin::Address,
+        tx_redeem_fee: bitcoin::Amount,
+        tx_punish_fee: bitcoin::Amount,
         rng: &mut R,
     ) -> Result<Self>
     where
@@ -123,8 +129,6 @@ impl State0 {
     {
         let a = bitcoin::SecretKey::new_random(rng);
         let v_a = monero::PrivateViewKey::new_random(rng);
-        let redeem_address = bitcoin_wallet.new_address().await?;
-        let punish_address = bitcoin_wallet.new_address().await?;
 
         let s_a = monero::Scalar::random(rng);
         let (dleq_proof_s_a, (S_a_bitcoin, S_a_monero)) = CROSS_CURVE_PROOF_SYSTEM.prove(&s_a, rng);
@@ -144,6 +148,8 @@ impl State0 {
             xmr,
             cancel_timelock: env_config.bitcoin_cancel_timelock,
             punish_timelock: env_config.bitcoin_punish_timelock,
+            tx_redeem_fee,
+            tx_punish_fee,
         })
     }
 
@@ -183,6 +189,10 @@ impl State0 {
             refund_address: msg.refund_address,
             redeem_address: self.redeem_address,
             punish_address: self.punish_address,
+            tx_redeem_fee: self.tx_redeem_fee,
+            tx_punish_fee: self.tx_punish_fee,
+            tx_refund_fee: msg.tx_refund_fee,
+            tx_cancel_fee: msg.tx_cancel_fee,
         }))
     }
 }
@@ -206,6 +216,10 @@ pub struct State1 {
     refund_address: bitcoin::Address,
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
+    tx_redeem_fee: bitcoin::Amount,
+    tx_punish_fee: bitcoin::Amount,
+    tx_refund_fee: bitcoin::Amount,
+    tx_cancel_fee: bitcoin::Amount,
 }
 
 impl State1 {
@@ -218,6 +232,8 @@ impl State1 {
             v_a: self.v_a,
             redeem_address: self.redeem_address.clone(),
             punish_address: self.punish_address.clone(),
+            tx_redeem_fee: self.tx_redeem_fee,
+            tx_punish_fee: self.tx_punish_fee,
         }
     }
 
@@ -240,6 +256,10 @@ impl State1 {
             redeem_address: self.redeem_address,
             punish_address: self.punish_address,
             tx_lock,
+            tx_redeem_fee: self.tx_redeem_fee,
+            tx_punish_fee: self.tx_punish_fee,
+            tx_refund_fee: self.tx_refund_fee,
+            tx_cancel_fee: self.tx_cancel_fee,
         })
     }
 }
@@ -260,14 +280,24 @@ pub struct State2 {
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
+    tx_redeem_fee: bitcoin::Amount,
+    tx_punish_fee: bitcoin::Amount,
+    tx_refund_fee: bitcoin::Amount,
+    tx_cancel_fee: bitcoin::Amount,
 }
 
 impl State2 {
     pub fn next_message(&self) -> Message3 {
-        let tx_cancel =
-            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
+        let tx_cancel = bitcoin::TxCancel::new(
+            &self.tx_lock,
+            self.cancel_timelock,
+            self.a.public(),
+            self.B,
+            self.tx_cancel_fee,
+        );
 
-        let tx_refund = bitcoin::TxRefund::new(&tx_cancel, &self.refund_address);
+        let tx_refund =
+            bitcoin::TxRefund::new(&tx_cancel, &self.refund_address, self.tx_refund_fee);
         // Alice encsigns the refund transaction(bitcoin) digest with Bob's monero
         // pubkey(S_b). The refund transaction spends the output of
         // tx_lock_bitcoin to Bob's refund address.
@@ -283,12 +313,21 @@ impl State2 {
     }
 
     pub fn receive(self, msg: Message4) -> Result<State3> {
-        let tx_cancel =
-            bitcoin::TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B);
+        let tx_cancel = bitcoin::TxCancel::new(
+            &self.tx_lock,
+            self.cancel_timelock,
+            self.a.public(),
+            self.B,
+            self.tx_cancel_fee,
+        );
         bitcoin::verify_sig(&self.B, &tx_cancel.digest(), &msg.tx_cancel_sig)
             .context("Failed to verify cancel transaction")?;
-        let tx_punish =
-            bitcoin::TxPunish::new(&tx_cancel, &self.punish_address, self.punish_timelock);
+        let tx_punish = bitcoin::TxPunish::new(
+            &tx_cancel,
+            &self.punish_address,
+            self.punish_timelock,
+            self.tx_punish_fee,
+        );
         bitcoin::verify_sig(&self.B, &tx_punish.digest(), &msg.tx_punish_sig)
             .context("Failed to verify punish transaction")?;
 
@@ -309,6 +348,10 @@ impl State2 {
             tx_lock: self.tx_lock,
             tx_punish_sig_bob: msg.tx_punish_sig,
             tx_cancel_sig_bob: msg.tx_cancel_sig,
+            tx_redeem_fee: self.tx_redeem_fee,
+            tx_punish_fee: self.tx_punish_fee,
+            tx_refund_fee: self.tx_refund_fee,
+            tx_cancel_fee: self.tx_cancel_fee,
         })
     }
 }
@@ -332,6 +375,14 @@ pub struct State3 {
     pub tx_lock: bitcoin::TxLock,
     tx_punish_sig_bob: bitcoin::Signature,
     tx_cancel_sig_bob: bitcoin::Signature,
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    tx_redeem_fee: bitcoin::Amount,
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    tx_punish_fee: bitcoin::Amount,
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    tx_refund_fee: bitcoin::Amount,
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    tx_cancel_fee: bitcoin::Amount,
 }
 
 impl State3 {
@@ -384,11 +435,17 @@ impl State3 {
     }
 
     pub fn tx_cancel(&self) -> TxCancel {
-        TxCancel::new(&self.tx_lock, self.cancel_timelock, self.a.public(), self.B)
+        TxCancel::new(
+            &self.tx_lock,
+            self.cancel_timelock,
+            self.a.public(),
+            self.B,
+            self.tx_cancel_fee,
+        )
     }
 
     pub fn tx_refund(&self) -> TxRefund {
-        bitcoin::TxRefund::new(&self.tx_cancel(), &self.refund_address)
+        bitcoin::TxRefund::new(&self.tx_cancel(), &self.refund_address, self.tx_refund_fee)
     }
 
     pub fn extract_monero_private_key(
@@ -407,7 +464,7 @@ impl State3 {
         &self,
         sig: bitcoin::EncryptedSignature,
     ) -> Result<bitcoin::Transaction> {
-        bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address)
+        bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address, self.tx_redeem_fee)
             .complete(sig, self.a.clone(), self.s_a.to_secpfun_scalar(), self.B)
             .context("Failed to complete Bitcoin redeem transaction")
     }
@@ -429,6 +486,7 @@ impl State3 {
             &self.tx_cancel(),
             &self.punish_address,
             self.punish_timelock,
+            self.tx_punish_fee,
         )
     }
 }

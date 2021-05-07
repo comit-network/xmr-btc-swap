@@ -37,15 +37,6 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
 
-// TODO: Configurable tx-fee (note: parties have to agree prior to swapping)
-// Current reasoning:
-// tx with largest weight (as determined by get_weight() upon broadcast in e2e
-// test) = 609 assuming segwit and 60 sat/vB:
-// (609 / 4) * 60 (sat/vB) = 9135 sats
-// Recommended: Overpay a bit to ensure we don't have to wait too long for test
-// runs.
-pub const TX_FEE: u64 = 15_000;
-
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct SecretKey {
     inner: Scalar,
@@ -263,6 +254,12 @@ pub struct NotThreeWitnesses(usize);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bitcoin::wallet::EstimateFeeRate;
+    use crate::env::{GetConfig, Regtest};
+    use crate::protocol::{alice, bob};
+    use bdk::FeeRate;
+    use rand::rngs::OsRng;
+    use uuid::Uuid;
 
     #[test]
     fn lock_confirmations_le_to_cancel_timelock_no_timelock_expired() {
@@ -307,5 +304,129 @@ mod tests {
         );
 
         assert_eq!(expired_timelock, ExpiredTimelocks::Punish)
+    }
+
+    struct StaticFeeRate {}
+    impl EstimateFeeRate for StaticFeeRate {
+        fn estimate_feerate(&self, _target_block: usize) -> Result<FeeRate> {
+            Ok(FeeRate::default_min_relay_fee())
+        }
+
+        fn min_relay_fee(&self) -> Result<bitcoin::Amount> {
+            Ok(bitcoin::Amount::from_sat(1_000))
+        }
+    }
+
+    #[tokio::test]
+    async fn calculate_transaction_weights() {
+        let alice_wallet = Wallet::new_funded(Amount::ONE_BTC.as_sat(), StaticFeeRate {});
+        let bob_wallet = Wallet::new_funded(Amount::ONE_BTC.as_sat(), StaticFeeRate {});
+        let spending_fee = Amount::from_sat(1_000);
+        let btc_amount = Amount::from_sat(500_000);
+        let xmr_amount = crate::monero::Amount::from_piconero(10000);
+
+        let tx_redeem_fee = alice_wallet
+            .estimate_fee(TxRedeem::weight(), btc_amount)
+            .await
+            .unwrap();
+        let tx_punish_fee = alice_wallet
+            .estimate_fee(TxPunish::weight(), btc_amount)
+            .await
+            .unwrap();
+        let redeem_address = alice_wallet.new_address().await.unwrap();
+        let punish_address = alice_wallet.new_address().await.unwrap();
+
+        let config = Regtest::get_config();
+        let alice_state0 = alice::State0::new(
+            btc_amount,
+            xmr_amount,
+            config,
+            redeem_address,
+            punish_address,
+            tx_redeem_fee,
+            tx_punish_fee,
+            &mut OsRng,
+        )
+        .unwrap();
+
+        let bob_state0 = bob::State0::new(
+            Uuid::new_v4(),
+            &mut OsRng,
+            btc_amount,
+            xmr_amount,
+            config.bitcoin_cancel_timelock,
+            config.bitcoin_punish_timelock,
+            bob_wallet.new_address().await.unwrap(),
+            config.monero_finality_confirmations,
+            spending_fee,
+            spending_fee,
+        );
+
+        let message0 = bob_state0.next_message();
+
+        let (_, alice_state1) = alice_state0.receive(message0).unwrap();
+        let alice_message1 = alice_state1.next_message();
+
+        let bob_state1 = bob_state0
+            .receive(&bob_wallet, alice_message1)
+            .await
+            .unwrap();
+        let bob_message2 = bob_state1.next_message();
+
+        let alice_state2 = alice_state1.receive(bob_message2).unwrap();
+        let alice_message3 = alice_state2.next_message();
+
+        let bob_state2 = bob_state1.receive(alice_message3).unwrap();
+        let bob_message4 = bob_state2.next_message();
+
+        let alice_state3 = alice_state2.receive(bob_message4).unwrap();
+
+        let (bob_state3, _tx_lock) = bob_state2.lock_btc().await.unwrap();
+        let bob_state4 = bob_state3.xmr_locked(monero_rpc::wallet::BlockHeight { height: 0 });
+        let encrypted_signature = bob_state4.tx_redeem_encsig();
+        let bob_state6 = bob_state4.cancel();
+
+        let cancel_transaction = alice_state3.signed_cancel_transaction().unwrap();
+        let punish_transaction = alice_state3.signed_punish_transaction().unwrap();
+        let redeem_transaction = alice_state3
+            .signed_redeem_transaction(encrypted_signature)
+            .unwrap();
+        let refund_transaction = bob_state6.signed_refund_transaction().unwrap();
+
+        assert_weight(
+            redeem_transaction.get_weight(),
+            TxRedeem::weight(),
+            "TxRedeem",
+        );
+        assert_weight(
+            cancel_transaction.get_weight(),
+            TxCancel::weight(),
+            "TxCancel",
+        );
+        assert_weight(
+            punish_transaction.get_weight(),
+            TxPunish::weight(),
+            "TxPunish",
+        );
+        assert_weight(
+            refund_transaction.get_weight(),
+            TxRefund::weight(),
+            "TxRefund",
+        );
+    }
+
+    // Weights fluctuate -+1 wu because of the length of the signatures.
+    // Some of our transactions have 2 signatures and hence the weight can fluctuate
+    // +-2
+    fn assert_weight(is_weight: usize, expected_weight: usize, tx_name: &str) {
+        assert!(
+            is_weight + 1 == expected_weight
+                || is_weight + 2 == expected_weight
+                || is_weight == expected_weight,
+            "{} to have weight {}, but was {}",
+            tx_name,
+            expected_weight,
+            is_weight
+        )
     }
 }

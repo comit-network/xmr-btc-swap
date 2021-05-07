@@ -211,6 +211,7 @@ async fn init_bitcoin_wallet(
         &wallet_dir,
         seed.derive_extended_private_key(env_config.bitcoin_network)?,
         env_config,
+        config.bitcoin.target_block,
     )
     .await
     .context("Failed to initialize Bitcoin wallet")?;

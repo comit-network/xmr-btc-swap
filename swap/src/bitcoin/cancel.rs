@@ -2,7 +2,6 @@ use crate::bitcoin;
 use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{
     build_shared_output_descriptor, Address, Amount, BlockHeight, PublicKey, Transaction, TxLock,
-    TX_FEE,
 };
 use ::bitcoin::util::bip143::SigHashCache;
 use ::bitcoin::{OutPoint, Script, SigHash, SigHashType, TxIn, TxOut, Txid};
@@ -96,6 +95,7 @@ impl TxCancel {
         cancel_timelock: CancelTimelock,
         A: PublicKey,
         B: PublicKey,
+        spending_fee: Amount,
     ) -> Self {
         let cancel_output_descriptor = build_shared_output_descriptor(A.0, B.0);
 
@@ -107,7 +107,7 @@ impl TxCancel {
         };
 
         let tx_out = TxOut {
-            value: tx_lock.lock_amount().as_sat() - TX_FEE,
+            value: tx_lock.lock_amount().as_sat() - spending_fee.as_sat(),
             script_pubkey: cancel_output_descriptor.script_pubkey(),
         };
 
@@ -216,6 +216,7 @@ impl TxCancel {
         &self,
         spend_address: &Address,
         sequence: Option<PunishTimelock>,
+        spending_fee: Amount,
     ) -> Transaction {
         let previous_output = self.as_outpoint();
 
@@ -227,7 +228,7 @@ impl TxCancel {
         };
 
         let tx_out = TxOut {
-            value: self.amount().as_sat() - TX_FEE,
+            value: self.amount().as_sat() - spending_fee.as_sat(),
             script_pubkey: spend_address.script_pubkey(),
         };
 
@@ -237,6 +238,10 @@ impl TxCancel {
             input: vec![tx_in],
             output: vec![tx_out],
         }
+    }
+
+    pub fn weight() -> usize {
+        596
     }
 }
 

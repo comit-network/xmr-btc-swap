@@ -16,6 +16,7 @@ const DEFAULT_LISTEN_ADDRESS_TCP: &str = "/ip4/0.0.0.0/tcp/9939";
 const DEFAULT_LISTEN_ADDRESS_WS: &str = "/ip4/0.0.0.0/tcp/9940/ws";
 const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://electrum.blockstream.info:60002";
 const DEFAULT_MONERO_WALLET_RPC_TESTNET_URL: &str = "http://127.0.0.1:38083/json_rpc";
+const DEFAULT_BITCOIN_CONFIRMATION_TARGET: usize = 3;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct Config {
@@ -55,6 +56,7 @@ pub struct Network {
 #[serde(deny_unknown_fields)]
 pub struct Bitcoin {
     pub electrum_rpc_url: Url,
+    pub target_block: usize,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -148,6 +150,10 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
         .interact_text()?;
     let data_dir = data_dir.as_str().parse()?;
 
+    let target_block = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("How fast should your Bitcoin transactions be confirmed? Your transaction fee will be calculated based on this target. Hit return to use default")
+        .default(DEFAULT_BITCOIN_CONFIRMATION_TARGET)
+        .interact_text()?;
     let listen_addresses = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter multiaddresses (comma separated) on which asb should list for peer-to-peer communications or hit return to use default")
         .default( format!("{},{}", DEFAULT_LISTEN_ADDRESS_TCP, DEFAULT_LISTEN_ADDRESS_WS))
@@ -186,7 +192,10 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
         network: Network {
             listen: listen_addresses,
         },
-        bitcoin: Bitcoin { electrum_rpc_url },
+        bitcoin: Bitcoin {
+            electrum_rpc_url,
+            target_block,
+        },
         monero: Monero {
             wallet_rpc_url: monero_wallet_rpc_url,
         },
@@ -214,6 +223,7 @@ mod tests {
             },
             bitcoin: Bitcoin {
                 electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
+                target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET,
             },
             network: Network {
                 listen: vec![

@@ -161,8 +161,51 @@ where
                                     continue;
                                 }
                             }
+                            let tx_redeem_fee = self.bitcoin_wallet
+                                .estimate_fee(bitcoin::TxRedeem::weight(), btc)
+                                .await;
+                            let tx_punish_fee = self.bitcoin_wallet
+                                .estimate_fee(bitcoin::TxPunish::weight(), btc)
+                                .await;
+                            let redeem_address = self.bitcoin_wallet.new_address().await;
+                            let punish_address = self.bitcoin_wallet.new_address().await;
 
-                            let state0 = match State0::new(btc, xmr, self.env_config, self.bitcoin_wallet.as_ref(), &mut OsRng).await {
+                            let (redeem_address, punish_address) = match (
+                                redeem_address,
+                                punish_address,
+                            ) {
+                                (Ok(redeem_address), Ok(punish_address)) => {
+                                    (redeem_address, punish_address)
+                                }
+                                _ => {
+                                    tracing::error!("Could not get new address.");
+                                    continue;
+                                }
+                            };
+
+                            let (tx_redeem_fee, tx_punish_fee) = match (
+                                tx_redeem_fee,
+                                tx_punish_fee,
+                            ) {
+                                (Ok(tx_redeem_fee), Ok(tx_punish_fee)) => {
+                                    (tx_redeem_fee, tx_punish_fee)
+                                }
+                                _ => {
+                                    tracing::error!("Could not calculate transaction fees.");
+                                    continue;
+                                }
+                            };
+
+                            let state0 = match State0::new(
+                                btc,
+                                xmr,
+                                self.env_config,
+                                redeem_address,
+                                punish_address,
+                                tx_redeem_fee,
+                                tx_punish_fee,
+                                &mut OsRng
+                            ) {
                                 Ok(state) => state,
                                 Err(e) => {
                                     tracing::warn!(%peer, "Failed to make State0 for execution setup: {:#}", e);

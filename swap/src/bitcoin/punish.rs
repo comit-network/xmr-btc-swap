@@ -1,5 +1,5 @@
 use crate::bitcoin::wallet::Watchable;
-use crate::bitcoin::{self, Address, PunishTimelock, Transaction, TxCancel, Txid};
+use crate::bitcoin::{self, Address, Amount, PunishTimelock, Transaction, TxCancel, Txid};
 use ::bitcoin::util::bip143::SigHashCache;
 use ::bitcoin::{SigHash, SigHashType};
 use anyhow::{Context, Result};
@@ -20,8 +20,10 @@ impl TxPunish {
         tx_cancel: &TxCancel,
         punish_address: &Address,
         punish_timelock: PunishTimelock,
+        spending_fee: Amount,
     ) -> Self {
-        let tx_punish = tx_cancel.build_spend_transaction(punish_address, Some(punish_timelock));
+        let tx_punish =
+            tx_cancel.build_spend_transaction(punish_address, Some(punish_timelock), spending_fee);
 
         let digest = SigHashCache::new(&tx_punish).signature_hash(
             0, // Only one input: cancel transaction
@@ -70,6 +72,10 @@ impl TxPunish {
             .context("Failed to satisfy inputs with given signatures")?;
 
         Ok(tx_punish)
+    }
+
+    pub fn weight() -> usize {
+        548
     }
 }
 
