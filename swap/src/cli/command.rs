@@ -16,7 +16,7 @@ const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://electrum.blockstream.info:60002";
 const DEFAULT_TOR_SOCKS5_PORT: &str = "9050";
 
 // Bitcoin transactions should be confirmed within X blocks
-const DEFAUL_BITCOIN_CONFIRMATION_TARGET: &str = "3";
+const DEFAULT_BITCOIN_CONFIRMATION_TARGET: &str = "3";
 
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(name = "swap", about = "CLI for swapping BTC for XMR", author)]
@@ -57,7 +57,7 @@ pub enum Command {
         #[structopt(long = "tor-socks5-port", help = "Your local Tor socks5 proxy port", default_value = DEFAULT_TOR_SOCKS5_PORT)]
         tor_socks5_port: u16,
 
-        #[structopt(long = "bitcoin-target-block", help = "Within how many blocks should the Bitcoin transactions be confirmed.", default_value = DEFAUL_BITCOIN_CONFIRMATION_TARGET)]
+        #[structopt(long = "bitcoin-target-block", help = "Within how many blocks should the Bitcoin transactions be confirmed.", default_value = DEFAULT_BITCOIN_CONFIRMATION_TARGET)]
         bitcoin_target_block: usize,
     },
     /// Show a list of past ongoing and completed swaps
@@ -85,7 +85,7 @@ pub enum Command {
         #[structopt(long = "tor-socks5-port", help = "Your local Tor socks5 proxy port", default_value = DEFAULT_TOR_SOCKS5_PORT)]
         tor_socks5_port: u16,
 
-        #[structopt(long = "bitcoin-target-block", help = "Within how many blocks should the Bitcoin transactions be confirmed.", default_value = DEFAUL_BITCOIN_CONFIRMATION_TARGET)]
+        #[structopt(long = "bitcoin-target-block", help = "Within how many blocks should the Bitcoin transactions be confirmed.", default_value = DEFAULT_BITCOIN_CONFIRMATION_TARGET)]
         bitcoin_target_block: usize,
     },
     /// Try to cancel an ongoing swap (expert users only)
@@ -105,7 +105,7 @@ pub enum Command {
         )]
         electrum_rpc_url: Url,
 
-        #[structopt(long = "bitcoin-target-block", help = "Within how many blocks should the Bitcoin transactions be confirmed.", default_value = DEFAUL_BITCOIN_CONFIRMATION_TARGET)]
+        #[structopt(long = "bitcoin-target-block", help = "Within how many blocks should the Bitcoin transactions be confirmed.", default_value = DEFAULT_BITCOIN_CONFIRMATION_TARGET)]
         bitcoin_target_block: usize,
     },
     /// Try to cancel a swap and refund my BTC (expert users only)
@@ -125,7 +125,7 @@ pub enum Command {
         )]
         electrum_rpc_url: Url,
 
-        #[structopt(long = "bitcoin-target-block", help = "Within how many blocks should the Bitcoin transactions be confirmed.", default_value = DEFAUL_BITCOIN_CONFIRMATION_TARGET)]
+        #[structopt(long = "bitcoin-target-block", help = "Within how many blocks should the Bitcoin transactions be confirmed.", default_value = DEFAULT_BITCOIN_CONFIRMATION_TARGET)]
         bitcoin_target_block: usize,
     },
 }
