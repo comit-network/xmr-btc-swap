@@ -46,8 +46,7 @@ fn final_challenge(
     I_hat_a: EdwardsPoint,
     I_hat_b: EdwardsPoint,
     R_prime_a: EdwardsPoint,
-    I_a: EdwardsPoint,
-    I_b: EdwardsPoint,
+    I: EdwardsPoint,
     msg: [u8; 32],
 ) -> Result<(Scalar, Scalar)> {
     let h_0 = {
@@ -78,8 +77,6 @@ fn final_challenge(
     keccak.update(DOMAIN_TAG.as_bytes());
     keccak.update(ring_concat.as_slice());
     keccak.update(&msg);
-
-    let I = I_a + I_b;
 
     let h_last = fake_responses
         .iter()
@@ -255,8 +252,7 @@ impl Alice0 {
             self.I_hat_a,
             msg.I_hat_b,
             self.R_prime_a,
-            self.I_a,
-            msg.I_b,
+            self.I_a + msg.I_b,
             self.msg,
         )?;
 
@@ -427,8 +423,7 @@ impl Bob1 {
             I_hat_a,
             self.I_hat_b,
             self.R_prime_a,
-            I_a,
-            self.I_b,
+            I_a + self.I_b,
             self.msg,
         )?;
 
