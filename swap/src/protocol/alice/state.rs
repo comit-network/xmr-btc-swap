@@ -513,13 +513,10 @@ impl State3 {
     pub async fn punish_btc(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<Txid> {
         let signed_tx_punish = self.signed_punish_transaction()?;
 
-        async {
-            let (txid, subscription) = bitcoin_wallet.broadcast(signed_tx_punish, "punish").await?;
-            subscription.wait_until_final().await?;
+        let (txid, subscription) = bitcoin_wallet.broadcast(signed_tx_punish, "punish").await?;
+        subscription.wait_until_final().await?;
 
-            Result::<_, anyhow::Error>::Ok(txid)
-        }
-        .await
+        Ok(txid)
     }
 
     pub fn signed_redeem_transaction(

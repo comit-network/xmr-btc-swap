@@ -7,10 +7,10 @@ use uuid::Uuid;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    // Errors indicating the the swap can *currently* not be refunded but might be later
-    #[error("Cannot punish because swap is not in a cancelled state. Make sure to cancel the swap before trying to punish or use --force.")]
+    // Errors indicating the swap can *currently* not be punished but might be later
+    #[error("Swap is not in a cancelled state Make sure to cancel the swap before trying to punish or use --force.")]
     SwapNotCancelled,
-    #[error("The punish timelock has not expired yet because the timelock has not expired. Please try again later")]
+    #[error("The punish transaction cannot be published because the punish timelock has not expired yet. Please try again later")]
     PunishTimelockNotExpiredYet,
 
     // Errors indicating that the swap cannot be refunded because it is in a abort/final state

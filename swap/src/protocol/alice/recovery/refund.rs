@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    // Errors indicating the the swap can *currently* not be refunded but might be later
+    // Errors indicating the swap can *currently* not be refunded but might be later
     #[error("Swap is not in a cancelled state. Make sure to cancel the swap before trying to refund or use --force.")]
     SwapNotCancelled,
     #[error(
@@ -19,7 +19,7 @@ pub enum Error {
 
     // Errors indicating that the swap cannot be refunded because because it is in a abort/final
     // state
-    #[error("Swa is in state {0} where no XMR was locked. Try aborting instead.")]
+    #[error("Swap is in state {0} where no XMR was locked. Try aborting instead.")]
     NoXmrLocked(AliceState),
     #[error("Swap is in state {0} which is not refundable")]
     SwapNotRefundable(AliceState),
