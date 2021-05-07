@@ -81,6 +81,7 @@ async fn main() -> Result<()> {
         Command::Start {
             max_buy,
             ask_spread,
+            resume_only,
         } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
@@ -118,7 +119,17 @@ async fn main() -> Result<()> {
                 }
             };
 
-            let mut swarm = swarm::alice(&seed)?;
+            let current_balance = monero_wallet.get_balance().await?;
+            let lock_fee = monero_wallet.static_tx_fee_estimate();
+            let kraken_rate = KrakenRate::new(ask_spread, kraken_price_updates);
+            let mut swarm = swarm::alice(
+                &seed,
+                current_balance,
+                lock_fee,
+                max_buy,
+                kraken_rate.clone(),
+                resume_only,
+            )?;
 
             for listen in config.network.listen {
                 Swarm::listen_on(&mut swarm, listen.clone())
@@ -131,7 +142,7 @@ async fn main() -> Result<()> {
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
                 Arc::new(db),
-                KrakenRate::new(ask_spread, kraken_price_updates),
+                kraken_rate,
                 max_buy,
             )
             .unwrap();

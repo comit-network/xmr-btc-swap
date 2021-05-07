@@ -1,9 +1,11 @@
 use crate::bitcoin::EncryptedSignature;
 use crate::network::quote::BidQuote;
+use crate::network::spot_price::Response;
 use crate::network::{encrypted_signature, spot_price};
+use crate::protocol::bob;
 use crate::protocol::bob::{Behaviour, OutEvent, State0, State2};
 use crate::{bitcoin, monero};
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use futures::future::{BoxFuture, OptionFuture};
 use futures::{FutureExt, StreamExt};
 use libp2p::request_response::{RequestId, ResponseChannel};
@@ -261,11 +263,18 @@ impl EventLoopHandle {
     }
 
     pub async fn request_spot_price(&mut self, btc: bitcoin::Amount) -> Result<monero::Amount> {
-        Ok(self
+        let response = self
             .spot_price
             .send_receive(spot_price::Request { btc })
-            .await?
-            .xmr)
+            .await?;
+
+        match response {
+            Response::Xmr(xmr) => Ok(xmr),
+            Response::Error(error) => {
+                let error: bob::spot_price::Error = error.into();
+                bail!(error);
+            }
+        }
     }
 
     pub async fn request_quote(&mut self) -> Result<BidQuote> {

@@ -14,6 +14,7 @@ pub use self::swap::{run, run_until};
 mod behaviour;
 pub mod event_loop;
 mod execution_setup;
+mod spot_price;
 pub mod state;
 pub mod swap;
 

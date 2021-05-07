@@ -1,5 +1,6 @@
 use crate::network::quote::BidQuote;
 use crate::network::{encrypted_signature, quote, redial, spot_price, transfer_proof};
+use crate::protocol::bob;
 use crate::protocol::bob::{execution_setup, State2};
 use anyhow::{anyhow, Error, Result};
 use libp2p::core::Multiaddr;
@@ -71,7 +72,7 @@ impl Behaviour {
     pub fn new(alice: PeerId) -> Self {
         Self {
             quote: quote::bob(),
-            spot_price: spot_price::bob(),
+            spot_price: bob::spot_price::bob(),
             execution_setup: Default::default(),
             transfer_proof: transfer_proof::bob(),
             encrypted_signature: encrypted_signature::bob(),

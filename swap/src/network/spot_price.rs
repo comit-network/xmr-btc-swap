@@ -1,17 +1,12 @@
+use crate::monero;
 use crate::network::cbor_request_response::CborCodec;
-use crate::protocol::{alice, bob};
-use crate::{bitcoin, monero};
 use libp2p::core::ProtocolName;
-use libp2p::request_response::{
-    ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
-    RequestResponseMessage,
-};
-use libp2p::PeerId;
+use libp2p::request_response::{RequestResponse, RequestResponseEvent, RequestResponseMessage};
 use serde::{Deserialize, Serialize};
 
-const PROTOCOL: &str = "/comit/xmr/btc/spot-price/1.0.0";
-type OutEvent = RequestResponseEvent<Request, Response>;
-type Message = RequestResponseMessage<Request, Response>;
+pub const PROTOCOL: &str = "/comit/xmr/btc/spot-price/1.0.0";
+pub type OutEvent = RequestResponseEvent<Request, Response>;
+pub type Message = RequestResponseMessage<Request, Response>;
 
 pub type Behaviour = RequestResponse<CborCodec<SpotPriceProtocol, Request, Response>>;
 
@@ -40,62 +35,62 @@ pub struct Request {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Response {
-    pub xmr: monero::Amount,
+pub enum Response {
+    Xmr(monero::Amount),
+    Error(Error),
 }
 
-/// Constructs a new instance of the `spot-price` behaviour to be used by Alice.
-///
-/// Alice only supports inbound connections, i.e. providing spot prices for BTC
-/// in XMR.
-pub fn alice() -> Behaviour {
-    Behaviour::new(
-        CborCodec::default(),
-        vec![(SpotPriceProtocol, ProtocolSupport::Inbound)],
-        RequestResponseConfig::default(),
-    )
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Error {
+    NoSwapsAccepted,
+    MaxBuyAmountExceeded {
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        max: bitcoin::Amount,
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        buy: bitcoin::Amount,
+    },
+    BalanceTooLow {
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        buy: bitcoin::Amount,
+    },
+    /// To be used for errors that cannot be explained on the CLI side (e.g.
+    /// rate update problems on the seller side)
+    Other,
 }
 
-/// Constructs a new instance of the `spot-price` behaviour to be used by Bob.
-///
-/// Bob only supports outbound connections, i.e. requesting a spot price for a
-/// given amount of BTC in XMR.
-pub fn bob() -> Behaviour {
-    Behaviour::new(
-        CborCodec::default(),
-        vec![(SpotPriceProtocol, ProtocolSupport::Outbound)],
-        RequestResponseConfig::default(),
-    )
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::monero;
 
-impl From<(PeerId, Message)> for alice::OutEvent {
-    fn from((peer, message): (PeerId, Message)) -> Self {
-        match message {
-            Message::Request {
-                request, channel, ..
-            } => Self::SpotPriceRequested {
-                request,
-                channel,
-                peer,
-            },
-            Message::Response { .. } => Self::unexpected_response(peer),
-        }
+    #[test]
+    fn snapshot_test_serialize() {
+        let amount = monero::Amount::from_piconero(100_000u64);
+        let xmr = r#"{"Xmr":100000}"#.to_string();
+        let serialized = serde_json::to_string(&Response::Xmr(amount)).unwrap();
+        assert_eq!(xmr, serialized);
+
+        let error = r#"{"Error":"NoSwapsAccepted"}"#.to_string();
+        let serialized = serde_json::to_string(&Response::Error(Error::NoSwapsAccepted)).unwrap();
+        assert_eq!(error, serialized);
+
+        let error = r#"{"Error":{"MaxBuyAmountExceeded":{"max":0,"buy":0}}}"#.to_string();
+        let serialized = serde_json::to_string(&Response::Error(Error::MaxBuyAmountExceeded {
+            max: Default::default(),
+            buy: Default::default(),
+        }))
+        .unwrap();
+        assert_eq!(error, serialized);
+
+        let error = r#"{"Error":{"BalanceTooLow":{"buy":0}}}"#.to_string();
+        let serialized = serde_json::to_string(&Response::Error(Error::BalanceTooLow {
+            buy: Default::default(),
+        }))
+        .unwrap();
+        assert_eq!(error, serialized);
+
+        let error = r#"{"Error":"Other"}"#.to_string();
+        let serialized = serde_json::to_string(&Response::Error(Error::Other)).unwrap();
+        assert_eq!(error, serialized);
     }
 }
-crate::impl_from_rr_event!(OutEvent, alice::OutEvent, PROTOCOL);
-
-impl From<(PeerId, Message)> for bob::OutEvent {
-    fn from((peer, message): (PeerId, Message)) -> Self {
-        match message {
-            Message::Request { .. } => Self::unexpected_request(peer),
-            Message::Response {
-                response,
-                request_id,
-            } => Self::SpotPriceReceived {
-                id: request_id,
-                response,
-            },
-        }
-    }
-}
-crate::impl_from_rr_event!(OutEvent, bob::OutEvent, PROTOCOL);

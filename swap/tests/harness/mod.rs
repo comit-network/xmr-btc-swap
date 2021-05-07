@@ -90,7 +90,8 @@ where
         env_config,
         alice_bitcoin_wallet.clone(),
         alice_monero_wallet.clone(),
-    );
+    )
+    .await;
 
     let bob_seed = Seed::random().unwrap();
     let bob_starting_balances = StartingBalances::new(btc_amount * 10, monero::Amount::ZERO, None);
@@ -213,7 +214,7 @@ pub async fn init_electrs_container(
     Ok(docker)
 }
 
-fn start_alice(
+async fn start_alice(
     seed: &Seed,
     db_path: PathBuf,
     listen_address: Multiaddr,
@@ -223,7 +224,21 @@ fn start_alice(
 ) -> (AliceApplicationHandle, Receiver<alice::Swap>) {
     let db = Arc::new(Database::open(db_path.as_path()).unwrap());
 
-    let mut swarm = swarm::alice(&seed).unwrap();
+    let current_balance = monero_wallet.get_balance().await.unwrap();
+    let lock_fee = monero_wallet.static_tx_fee_estimate();
+    let max_buy = bitcoin::Amount::from_sat(u64::MAX);
+    let latest_rate = FixedRate::default();
+    let resume_only = false;
+
+    let mut swarm = swarm::alice(
+        &seed,
+        current_balance,
+        lock_fee,
+        max_buy,
+        latest_rate,
+        resume_only,
+    )
+    .unwrap();
     swarm.listen_on(listen_address).unwrap();
 
     let (event_loop, swap_handle) = alice::EventLoop::new(
@@ -496,7 +511,8 @@ impl TestContext {
             self.env_config,
             self.alice_bitcoin_wallet.clone(),
             self.alice_monero_wallet.clone(),
-        );
+        )
+        .await;
 
         self.alice_handle = alice_handle;
         self.alice_swap_handle = alice_swap_handle;
