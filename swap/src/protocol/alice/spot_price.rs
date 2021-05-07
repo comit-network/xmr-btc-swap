@@ -183,7 +183,10 @@ where
         let xmr_lock_fees = self.lock_fee;
 
         if xmr_balance < xmr + xmr_lock_fees {
-            self.decline(peer, channel, Error::BalanceTooLow { buy: btc });
+            self.decline(peer, channel, Error::BalanceTooLow {
+                balance: xmr_balance,
+                buy: btc,
+            });
             return;
         }
 
@@ -220,8 +223,11 @@ pub enum Error {
         max: bitcoin::Amount,
         buy: bitcoin::Amount,
     },
-    #[error("This seller's XMR balance is currently too low to fulfill the swap request to buy {buy}, please try again later")]
-    BalanceTooLow { buy: bitcoin::Amount },
+    #[error("Balance {balance} too low to fulfill swapping {buy}")]
+    BalanceTooLow {
+        balance: monero::Amount,
+        buy: bitcoin::Amount,
+    },
 
     #[error("Failed to fetch latest rate")]
     LatestRateFetchFailed(#[source] Box<dyn std::error::Error + Send + 'static>),
@@ -238,7 +244,7 @@ impl Error {
                 max: *max,
                 buy: *buy,
             },
-            Error::BalanceTooLow { buy } => spot_price::Error::BalanceTooLow { buy: *buy },
+            Error::BalanceTooLow { buy, .. } => spot_price::Error::BalanceTooLow { buy: *buy },
             Error::LatestRateFetchFailed(_) | Error::SellQuoteCalculationFailed(_) => {
                 spot_price::Error::Other
             }
@@ -296,7 +302,10 @@ mod tests {
 
         test.send_request(request);
         test.assert_error(
-            alice::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
+            alice::spot_price::Error::BalanceTooLow {
+                balance: monero::Amount::ZERO,
+                buy: btc_to_swap,
+            },
             bob::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
         )
         .await;
@@ -323,7 +332,10 @@ mod tests {
 
         test.send_request(request);
         test.assert_error(
-            alice::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
+            alice::spot_price::Error::BalanceTooLow {
+                balance: monero::Amount::ZERO,
+                buy: btc_to_swap,
+            },
             bob::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
         )
         .await;
@@ -331,8 +343,12 @@ mod tests {
 
     #[tokio::test]
     async fn given_alice_has_insufficient_balance_because_of_lock_fee_then_returns_error() {
+        let balance = monero::Amount::from_monero(1.0).unwrap();
+
         let mut test = SpotPriceTest::setup(
-            AliceBehaviourValues::default().with_lock_fee(monero::Amount::from_piconero(1)),
+            AliceBehaviourValues::default()
+                .with_balance(balance)
+                .with_lock_fee(monero::Amount::from_piconero(1)),
         )
         .await;
 
@@ -342,7 +358,10 @@ mod tests {
 
         test.send_request(request);
         test.assert_error(
-            alice::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
+            alice::spot_price::Error::BalanceTooLow {
+                balance,
+                buy: btc_to_swap,
+            },
             bob::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
         )
         .await;
@@ -508,10 +527,19 @@ mod tests {
                     // TODO: Somehow make PartialEq work on Alice's spot_price::Error
                     match (alice_assert, error) {
                         (
-                            alice::spot_price::Error::BalanceTooLow { .. },
-                            alice::spot_price::Error::BalanceTooLow { .. },
-                        )
-                        | (
+                            alice::spot_price::Error::BalanceTooLow {
+                                balance: balance1,
+                                buy: buy1,
+                            },
+                            alice::spot_price::Error::BalanceTooLow {
+                                balance: balance2,
+                                buy: buy2,
+                            },
+                        ) => {
+                            assert_eq!(balance1, balance2);
+                            assert_eq!(buy1, buy2);
+                        }
+                        (
                             alice::spot_price::Error::MaxBuyAmountExceeded { .. },
                             alice::spot_price::Error::MaxBuyAmountExceeded { .. },
                         )
