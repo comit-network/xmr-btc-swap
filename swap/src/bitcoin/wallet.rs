@@ -13,6 +13,9 @@ use bdk::wallet::AddressIndex;
 use bdk::{FeeRate, KeychainKind};
 use bitcoin::{Network, Script};
 use reqwest::Url;
+use rust_decimal::prelude::*;
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::fmt;
@@ -25,8 +28,8 @@ const SLED_TREE_NAME: &str = "default_tree";
 
 /// Assuming we add a spread of 3% we don't want to pay more than 3% of the
 /// amount for tx fees.
-const MAX_RELATIVE_TX_FEE: f64 = 0.03;
-const MAX_ABSOLUTE_TX_FEE: u64 = 100_000;
+const MAX_RELATIVE_TX_FEE: Decimal = dec!(0.03);
+const MAX_ABSOLUTE_TX_FEE: Decimal = dec!(100_000);
 
 pub struct Wallet<B = ElectrumBlockchain, D = bdk::sled::Tree, C = Client> {
     client: Arc<Mutex<C>>,
@@ -339,12 +342,7 @@ where
         let min_relay_fee = client.min_relay_fee()?;
         tracing::debug!("Min relay fee: {}", min_relay_fee);
 
-        Ok(estimate_fee(
-            weight,
-            transfer_amount,
-            fee_rate,
-            min_relay_fee,
-        ))
+        estimate_fee(weight, transfer_amount, fee_rate, min_relay_fee)
     }
 }
 
@@ -353,17 +351,30 @@ fn estimate_fee(
     transfer_amount: Amount,
     fee_rate: FeeRate,
     min_relay_fee: Amount,
-) -> Amount {
-    // Doing some heavy math here :)
-    // `usize` is 32 or 64 bits wide, but `f32`'s mantissa is only 23 bits wide.
-    // This is fine because such a big transaction cannot exist and there are also
-    // no negative fees.
-    #[allow(
-        clippy::cast_precision_loss,
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss
-    )]
-    let sats_per_vbyte = ((weight as f32) / 4.0 * fee_rate.as_sat_vb()) as u64;
+) -> Result<Amount> {
+    if transfer_amount.as_sat() <= 546 {
+        bail!("Amounts needs to be greater than Bitcoin dust amount.")
+    }
+    let fee_rate_svb = fee_rate.as_sat_vb();
+    if fee_rate_svb <= 0.0 {
+        bail!("Fee rate needs to be > 0")
+    }
+    if fee_rate_svb > 100_000_000.0 || min_relay_fee.as_sat() > 100_000_000 {
+        bail!("A fee_rate or min_relay_fee of > 1BTC does not make sense")
+    }
+
+    let min_relay_fee = if min_relay_fee.as_sat() == 0 {
+        // if min_relay_fee is 0 we don't fail, we just set it to 1 satoshi;
+        Amount::ONE_SAT
+    } else {
+        min_relay_fee
+    };
+
+    let weight = Decimal::from(weight);
+    let weight_factor = dec!(4.0);
+    let fee_rate = Decimal::from_f32(fee_rate_svb).context("Could not parse fee_rate.")?;
+
+    let sats_per_vbyte = weight / weight_factor * fee_rate;
     tracing::debug!(
         "Estimated fee for weight: {} for fee_rate: {:?} is in total: {}",
         weight,
@@ -371,37 +382,36 @@ fn estimate_fee(
         sats_per_vbyte
     );
 
-    // Similar as above: we do not care about fractional fees and have to cast a
-    // couple of times.
-    #[allow(
-        clippy::cast_precision_loss,
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss
-    )]
-    let max_allowed_fee = (transfer_amount.as_sat() as f64 * MAX_RELATIVE_TX_FEE).ceil() as u64;
+    let transfer_amount = Decimal::from(transfer_amount.as_sat());
+    let max_allowed_fee = transfer_amount * MAX_RELATIVE_TX_FEE;
 
-    if sats_per_vbyte < min_relay_fee.as_sat() {
+    let min_relay_fee = Decimal::from(min_relay_fee.as_sat());
+    let recommended_fee = if sats_per_vbyte < min_relay_fee {
         tracing::warn!(
             "Estimated fee of {} is smaller than the min relay fee, defaulting to min relay fee {}",
             sats_per_vbyte,
-            min_relay_fee.as_sat()
+            min_relay_fee
         );
-        min_relay_fee
+        min_relay_fee.to_u64()
     } else if sats_per_vbyte > max_allowed_fee && sats_per_vbyte > MAX_ABSOLUTE_TX_FEE {
         tracing::warn!(
             "Hard bound of transaction fees reached. Falling back to: {} sats",
             MAX_ABSOLUTE_TX_FEE
         );
-        bitcoin::Amount::from_sat(MAX_ABSOLUTE_TX_FEE)
+        MAX_ABSOLUTE_TX_FEE.to_u64()
     } else if sats_per_vbyte > max_allowed_fee {
         tracing::warn!(
             "Relative bound of transaction fees reached. Falling back to: {} sats",
             max_allowed_fee
         );
-        bitcoin::Amount::from_sat(max_allowed_fee)
+        max_allowed_fee.to_u64()
     } else {
-        bitcoin::Amount::from_sat(sats_per_vbyte)
-    }
+        sats_per_vbyte.to_u64()
+    };
+    let amount = recommended_fee
+        .map(bitcoin::Amount::from_sat)
+        .context("Could not estimate tranasction fee.")?;
+    Ok(amount)
 }
 
 impl<B, D, C> Wallet<B, D, C>
@@ -448,7 +458,6 @@ where
         use bdk::database::MemoryDatabase;
         use bdk::{LocalUtxo, TransactionDetails};
         use bitcoin::OutPoint;
-        use std::str::FromStr;
         use testutils::testutils;
 
         let descriptors = testutils!(@descriptors ("wpkh(tpubEBr4i6yk5nf5DAaJpsi9N2pPYBeJ7fZ5Z9rmN4977iYLCGco1VyjB9tvvuvYtfZzjD5A8igzgw3HeWeeKFmanHYqksqZXYXGsw5zjnj7KM9/*)"));
@@ -785,7 +794,7 @@ mod tests {
         let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb);
 
         let relay_fee = bitcoin::Amount::ONE_SAT;
-        let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee);
+        let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
 
         // weight / 4.0 *  sat_per_vb
         let should_fee = bitcoin::Amount::from_sat(10_000);
@@ -802,7 +811,7 @@ mod tests {
         let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb);
 
         let relay_fee = bitcoin::Amount::from_sat(100_000);
-        let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee);
+        let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
 
         // weight / 4.0 *  sat_per_vb would be smaller than relay fee hence we take min
         // relay fee
@@ -820,7 +829,7 @@ mod tests {
         let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb);
 
         let relay_fee = bitcoin::Amount::ONE_SAT;
-        let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee);
+        let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
 
         // weight / 4.0 *  sat_per_vb would be greater than 3% hence we take max
         // relative fee.
@@ -839,20 +848,19 @@ mod tests {
         let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb);
 
         let relay_fee = bitcoin::Amount::ONE_SAT;
-        let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee);
+        let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
 
         // weight / 4.0 *  sat_per_vb would be greater than 3% hence we take total
         // max allowed fee.
-        let should_fee = bitcoin::Amount::from_sat(MAX_ABSOLUTE_TX_FEE);
-        assert_eq!(is_fee, should_fee);
+        assert_eq!(is_fee.as_sat(), MAX_ABSOLUTE_TX_FEE.to_u64().unwrap());
     }
 
     proptest! {
         #[test]
-        fn given_randon_amount_random_fee_and_random_relay_rate_but_fix_weight_does_not_panic(
-            amount in prop::num::u64::ANY,
-            sat_per_vb in prop::num::f32::POSITIVE,
-            relay_fee in prop::num::u64::ANY
+        fn given_randon_amount_random_fee_and_random_relay_rate_but_fix_weight_does_not_error(
+            amount in 547u64..,
+            sat_per_vb in 1.0f32..100_000_000.0f32,
+            relay_fee in 0u64..100_000_000u64
         ) {
             let weight = 400;
             let amount = bitcoin::Amount::from_sat(amount);
@@ -860,7 +868,7 @@ mod tests {
             let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb);
 
             let relay_fee = bitcoin::Amount::from_sat(relay_fee);
-            let _is_fee = estimate_fee(weight, amount, fee_rate, relay_fee);
+            let _is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
 
         }
     }
@@ -868,7 +876,7 @@ mod tests {
     proptest! {
         #[test]
         fn given_amount_in_range_fix_fee_fix_relay_rate_fix_weight_fee_always_smaller_max(
-            amount in 0u64..100_000_000,
+            amount in 1u64..100_000_000,
         ) {
             let weight = 400;
             let amount = bitcoin::Amount::from_sat(amount);
@@ -877,10 +885,10 @@ mod tests {
             let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb);
 
             let relay_fee = bitcoin::Amount::ONE_SAT;
-            let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee);
+            let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
 
             // weight / 4 * 1_000 is always lower than MAX_ABSOLUTE_TX_FEE
-            assert!(is_fee.as_sat() < MAX_ABSOLUTE_TX_FEE);
+            assert!(is_fee.as_sat() < MAX_ABSOLUTE_TX_FEE.to_u64().unwrap());
         }
     }
 
@@ -896,10 +904,41 @@ mod tests {
             let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb);
 
             let relay_fee = bitcoin::Amount::ONE_SAT;
-            let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee);
+            let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
 
             // weight / 4 * 1_000  is always higher than MAX_ABSOLUTE_TX_FEE
-            assert!(is_fee.as_sat() >= MAX_ABSOLUTE_TX_FEE);
+            assert!(is_fee.as_sat() >= MAX_ABSOLUTE_TX_FEE.to_u64().unwrap());
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn given_fee_above_max_should_always_errors(
+            sat_per_vb in 100_000_000.0f32..,
+        ) {
+            let weight = 400;
+            let amount = bitcoin::Amount::from_sat(547u64);
+
+            let fee_rate = FeeRate::from_sat_per_vb(sat_per_vb);
+
+            let relay_fee = bitcoin::Amount::from_sat(1);
+            assert!(estimate_fee(weight, amount, fee_rate, relay_fee).is_err());
+
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn given_relay_fee_above_max_should_always_errors(
+            relay_fee in 100_000_000u64..
+        ) {
+            let weight = 400;
+            let amount = bitcoin::Amount::from_sat(547u64);
+
+            let fee_rate = FeeRate::from_sat_per_vb(1.0);
+
+            let relay_fee = bitcoin::Amount::from_sat(relay_fee);
+            assert!(estimate_fee(weight, amount, fee_rate, relay_fee).is_err());
         }
     }
 }
