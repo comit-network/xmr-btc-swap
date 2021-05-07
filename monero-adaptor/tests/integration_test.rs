@@ -4,7 +4,7 @@ use monero::blockdata::transaction::KeyImage;
 use monero::util::key::H;
 use monero::ViewPair;
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-use curve25519_dalek::edwards::EdwardsPoint;
+use curve25519_dalek::edwards::{EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
 use monero::blockdata::transaction::{ExtraField, SubField, TxOutTarget};
@@ -17,7 +17,7 @@ use monero_rpc::monerod;
 use monero_rpc::monerod::{GetOutputsOut, MonerodRpc};
 use monero_wallet::{MonerodClientExt};
 use rand::rngs::OsRng;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, SeedableRng, thread_rng};
 use std::convert::TryInto;
 use std::iter;
 
@@ -28,6 +28,7 @@ use std::iter;
 async fn make_blocks() {
     let client = monerod::Client::localhost(18081).unwrap();
 
+    client.generateblocks(110, "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".to_owned()).await.unwrap();
     client.generateblocks(10, "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".to_owned()).await.unwrap();
 }
 
@@ -43,11 +44,15 @@ async fn monerod_integration_test() {
         spend: monero::PrivateKey::from_scalar(s_prime_a + s_b),
     };
 
+    let lock_amount = 1_000_000_000_000;
+    let fee = 10_000;
+    let spend_amount = lock_amount - fee;
+
     let lock_address = monero::Address::from_keypair(monero::Network::Mainnet, &lock_kp);
 
-    dbg!(lock_address.to_string());
+    dbg!(lock_address.to_string()); // 45BcRKAHaA4b5A9SdamF2f1w7zk1mKkBPhaqVoDWzuAtMoSAytzm5A6b2fE6ruupkAFmStrQzdojUExt96mR3oiiSKp8Exf
 
-    let lock_tx = "fccc6c5177f3af65c6c9b26199854da1efcd9b826502d55582ba4882c35410e0"
+    let lock_tx = "c73c42dbd9082639fd475ea570c04eeddf068c3897ceae1b501beae7571779de"
         .parse()
         .unwrap();
 
@@ -55,7 +60,12 @@ async fn monerod_integration_test() {
 
     let transaction = client.get_transactions(&[lock_tx]).await.unwrap().pop().unwrap();
 
-    let our_output = transaction.check_outputs(&ViewPair::from(&lock_kp), 0..1, 0..1).expect("to have outputs in this transaction").pop().expect("to own at least one output");
+    let viewpair = ViewPair::from(&lock_kp);
+
+    let our_output = transaction.check_outputs(&viewpair, 0..1, 0..1).expect("to have outputs in this transaction").pop().expect("to own at least one output");
+    let actual_lock_amount = transaction.get_amount(&viewpair, &our_output).unwrap();
+
+    assert_eq!(actual_lock_amount, lock_amount);
 
     let real_key_offset = o_indexes_response.o_indexes[our_output.index];
 
@@ -101,26 +111,13 @@ async fn monerod_integration_test() {
 
     let relative_key_offsets = to_relative_offsets(&key_offsets);
 
-    let lock_amount = 1_000_000_000_000;
-    let fee = 10_000;
-    let spend_amount = lock_amount - fee;
-    // TODO: Pay lock amount to shared address (s_prime_a + s_b)
-
     let target_address = "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".parse::<monero::Address>().unwrap();
 
     let ecdh_key = PrivateKey::random(&mut rng);
     let (ecdh_info, out_blinding) = EcdhInfo::new_bulletproof(spend_amount, ecdh_key.scalar);
 
-    // TODO: Modify API to let us determine the blindings ahead of time
     let (bulletproof, out_pk) =
         monero::make_bulletproof(&mut rng, &[spend_amount], &[out_blinding]).unwrap();
-
-    let out_pk = out_pk
-        .iter()
-        .map(|c| monero::util::ringct::CtKey {
-            mask: monero::util::ringct::Key { key: c.to_bytes() },
-        })
-        .collect();
 
     let k_image = {
         let k = lock_kp.spend.scalar;
@@ -159,14 +156,25 @@ async fn monerod_integration_test() {
 
     let sig = adaptor_sig.adapt(adaptor);
 
-    let pseudo_out = {
-        let amount = Scalar::from(lock_amount);
-        let blinding = out_blinding;
+    // let pseudo_out = {
+    //     let lock_amount = Scalar::from(lock_amount);
+    //
+    //     (out_blinding * ED25519_BASEPOINT_POINT) + (lock_amount * H.point.decompress().unwrap())
+    // };
 
-        let commitment = (blinding * ED25519_BASEPOINT_POINT) + (amount * H.point.decompress().unwrap());
+    let fee_key = Scalar::from(fee) * H.point.decompress().unwrap();
 
-        monero::util::ringct::Key { key: commitment.compress().to_bytes() }
-    };
+    let pseudo_out = fee_key + out_pk[0].decompress().unwrap();
+
+    monero::verify_bulletproof(&mut thread_rng(), bulletproof.clone(), out_pk.clone()).unwrap();
+
+    let out_pk = out_pk
+        .iter()
+        .map(|c| monero::util::ringct::CtKey {
+            mask: monero::util::ringct::Key { key: c.to_bytes() },
+        })
+        .collect::<Vec<_>>();
+
     let transaction = Transaction {
         prefix,
         signatures: Vec::new(),
@@ -183,7 +191,7 @@ async fn monerod_integration_test() {
                 bulletproofs: vec![bulletproof],
                 MGs: Vec::new(),
                 Clsags: vec![sig.into()],
-                pseudo_outs: vec![pseudo_out],
+                pseudo_outs: vec![monero::util::ringct::Key { key: pseudo_out.compress().0 }],
             }),
         },
     };
