@@ -9,7 +9,7 @@ use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
 use monero::blockdata::transaction::{ExtraField, SubField, TxOutTarget};
 use monero::cryptonote::hash::Hashable;
-use monero::cryptonote::onetime_key::KeyGenerator;
+use monero::cryptonote::onetime_key::{KeyGenerator, MONERO_MUL_FACTOR};
 use monero::util::ringct::{EcdhInfo, RctSig, RctSigBase, RctSigPrunable, RctType};
 use monero::{PrivateKey, PublicKey};
 use monero::{Transaction, TransactionPrefix, TxIn, TxOut, VarInt};
@@ -45,7 +45,7 @@ async fn monerod_integration_test() {
     };
 
     let lock_amount = 1_000_000_000_000;
-    let fee = 10_000;
+    let fee = 400_000_000;
     let spend_amount = lock_amount - fee;
 
     let lock_address = monero::Address::from_keypair(monero::Network::Mainnet, &lock_kp);
@@ -59,6 +59,8 @@ async fn monerod_integration_test() {
     let o_indexes_response = client.get_o_indexes(lock_tx).await.unwrap();
 
     let transaction = client.get_transactions(&[lock_tx]).await.unwrap().pop().unwrap();
+
+    dbg!(&transaction.prefix.inputs);
 
     let viewpair = ViewPair::from(&lock_kp);
 
@@ -99,6 +101,9 @@ async fn monerod_integration_test() {
         )
         .await
         .unwrap();
+
+    dbg!(&response);
+
     let ring = response
         .outs
         .iter()
@@ -110,6 +115,8 @@ async fn monerod_integration_test() {
     key_offsets.sort();
 
     let relative_key_offsets = to_relative_offsets(&key_offsets);
+
+    dbg!(&relative_key_offsets);
 
     let target_address = "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".parse::<monero::Address>().unwrap();
 
@@ -151,6 +158,8 @@ async fn monerod_integration_test() {
         ))]),
     };
 
+    assert_eq!(prefix.hash(), "8e39c037fdc8ada919abfa0c535c07222cc5162d17872673bd7bcb83cc630ca7".parse().unwrap());
+
     let (adaptor_sig, adaptor) =
         single_party_adaptor_sig(s_prime_a, s_b, ring, &prefix.hash().to_bytes());
 
@@ -162,11 +171,13 @@ async fn monerod_integration_test() {
     //     (out_blinding * ED25519_BASEPOINT_POINT) + (lock_amount * H.point.decompress().unwrap())
     // };
 
+    monero::verify_bulletproof(&mut thread_rng(), bulletproof.clone(), out_pk.clone()).unwrap();
+
+    let out_pk = out_pk.into_iter().map(|p| (p.decompress().unwrap() * Scalar::from(MONERO_MUL_FACTOR)).compress()).collect::<Vec<_>>();
+
     let fee_key = Scalar::from(fee) * H.point.decompress().unwrap();
 
     let pseudo_out = fee_key + out_pk[0].decompress().unwrap();
-
-    monero::verify_bulletproof(&mut thread_rng(), bulletproof.clone(), out_pk.clone()).unwrap();
 
     let out_pk = out_pk
         .iter()

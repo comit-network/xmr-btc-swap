@@ -61,9 +61,9 @@ impl MonerodClientExt for monerod::Client {
             .into_iter()
             .max()
             .context("Expected at least one output index")?;
-        let oldest_index = last_index - (last_index / 100) * 40; // oldest index must be within last 40% TODO: CONFIRM THIS
+        // let oldest_index = last_index - (last_index / 100) * 40; // oldest index must be within last 40% TODO: CONFIRM THIS
 
-        Ok((VarInt(oldest_index), VarInt(last_index)))
+        Ok((VarInt(0), VarInt(last_index)))
     }
 }
 
