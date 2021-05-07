@@ -7,9 +7,9 @@ use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
-use rand::rngs::OsRng;
 use std::convert::TryInto;
 use tiny_keccak::{Hasher, Keccak};
+use rand::{Rng, CryptoRng};
 
 pub const RING_SIZE: usize = 11;
 const DOMAIN_TAG: &str = "CSLAG_c";
@@ -198,12 +198,13 @@ impl Alice0 {
         R_a: EdwardsPoint,
         R_prime_a: EdwardsPoint,
         s_prime_a: Scalar,
+        rng: &mut (impl Rng + CryptoRng)
     ) -> Result<Self> {
         let mut fake_responses = [Scalar::zero(); RING_SIZE - 1];
         for response in fake_responses.iter_mut().take(RING_SIZE - 1) {
-            *response = Scalar::random(&mut OsRng);
+            *response = Scalar::random(rng);
         }
-        let alpha_a = Scalar::random(&mut OsRng);
+        let alpha_a = Scalar::random(rng);
 
         let p_k = ring[0];
         let H_p_pk = hash_point_to_point(p_k);
@@ -227,7 +228,7 @@ impl Alice0 {
         })
     }
 
-    pub fn next_message(&self) -> Message0 {
+    pub fn next_message(&self, rng: &mut (impl Rng + CryptoRng)) -> Message0 {
         Message0 {
             pi_a: DleqProof::new(
                 ED25519_BASEPOINT_POINT,
@@ -235,6 +236,7 @@ impl Alice0 {
                 self.H_p_pk,
                 self.I_hat_a,
                 self.alpha_a,
+                rng
             ),
             c_a: Commitment::new(self.fake_responses, self.I_a, self.I_hat_a, self.T_a),
         }
@@ -331,8 +333,9 @@ impl Bob0 {
         R_a: EdwardsPoint,
         R_prime_a: EdwardsPoint,
         s_b: Scalar,
+        rng: &mut (impl Rng + CryptoRng)
     ) -> Result<Self> {
-        let alpha_b = Scalar::random(&mut OsRng);
+        let alpha_b = Scalar::random(rng);
 
         let p_k = ring[0];
         let H_p_pk = hash_point_to_point(p_k);
@@ -393,7 +396,7 @@ pub struct Bob1 {
 }
 
 impl Bob1 {
-    pub fn next_message(&self) -> Message1 {
+    pub fn next_message(&self, rng: &mut (impl Rng + CryptoRng)) -> Message1 {
         Message1 {
             I_b: self.I_b,
             T_b: self.T_b,
@@ -404,6 +407,7 @@ impl Bob1 {
                 self.H_p_pk,
                 self.I_hat_b,
                 self.alpha_b,
+                rng
             ),
         }
     }
@@ -465,8 +469,9 @@ impl DleqProof {
         H: EdwardsPoint,
         xH: EdwardsPoint,
         x: Scalar,
+        rng: &mut (impl Rng + CryptoRng)
     ) -> Self {
-        let r = Scalar::random(&mut OsRng);
+        let r = Scalar::random(rng);
         let rG = r * G;
         let rH = r * H;
 

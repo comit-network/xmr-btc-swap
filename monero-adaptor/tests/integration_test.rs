@@ -17,7 +17,7 @@ use monero_rpc::monerod;
 use monero_rpc::monerod::{GetOutputsOut, MonerodRpc};
 use monero_wallet::{MonerodClientExt};
 use rand::rngs::OsRng;
-use rand::{Rng, SeedableRng, thread_rng};
+use rand::{Rng, SeedableRng, thread_rng, CryptoRng};
 use std::convert::TryInto;
 use std::iter;
 
@@ -37,11 +37,11 @@ async fn monerod_integration_test() {
     let client = monerod::Client::localhost(18081).unwrap();
     let mut rng = rand::rngs::StdRng::from_seed([0u8; 32]);
 
-    let s_prime_a = curve25519_dalek::scalar::Scalar::random(&mut rng);
+    let s_a = curve25519_dalek::scalar::Scalar::random(&mut rng);
     let s_b = curve25519_dalek::scalar::Scalar::random(&mut rng);
     let lock_kp = monero::KeyPair {
         view: monero::PrivateKey::from_scalar(curve25519_dalek::scalar::Scalar::random(&mut rng)),
-        spend: monero::PrivateKey::from_scalar(s_prime_a + s_b),
+        spend: monero::PrivateKey::from_scalar(s_a + s_b),
     };
 
     let lock_amount = 1_000_000_000_000;
@@ -155,7 +155,7 @@ async fn monerod_integration_test() {
                     target_address.public_spend,
                     ecdh_key_0,
                 )
-                .one_time_key(0), // TODO: It works with 1 output, but we must choose it based on the output index
+                .one_time_key(0)// TODO: This must be the output index
             },
         }, TxOut {
             amount: VarInt(0),
@@ -165,7 +165,7 @@ async fn monerod_integration_test() {
                     target_address.public_spend,
                     ecdh_key_1,
                 )
-                    .one_time_key(1), // TODO: It works with 1 output, but we must choose it based on the output index
+                    .one_time_key(1), // TODO: This must be the output index
             },
         }],
         extra: ExtraField(vec![SubField::TxPublicKey(PublicKey::from_private_key(
@@ -177,8 +177,10 @@ async fn monerod_integration_test() {
 
     // assert_eq!(prefix.hash(), "c3ded4d1a8cddd4f76c09b63edff4e312e759b3afc46beda4e1fd75c9c68d997".parse().unwrap());
 
+    let s_prime_a = s_a + KeyGenerator::from_key(&viewpair, our_output.tx_pubkey).get_rvn_scalar(our_output.index).scalar;
+
     let (adaptor_sig, adaptor) =
-        single_party_adaptor_sig(s_prime_a, s_b, ring, &prefix.hash().to_bytes());
+        single_party_adaptor_sig(s_prime_a, s_b, ring, &prefix.hash().to_bytes(), &mut rng);
 
     let sig = adaptor_sig.adapt(adaptor);
 
@@ -243,6 +245,7 @@ fn single_party_adaptor_sig(
     s_b: Scalar,
     ring: [EdwardsPoint; monero_adaptor::RING_SIZE],
     msg: &[u8; 32],
+    rng: &mut (impl Rng + CryptoRng)
 ) -> (monero_adaptor::AdaptorSignature, Scalar) {
     let (r_a, R_a, R_prime_a) = {
         let r_a = Scalar::random(&mut OsRng);
@@ -255,13 +258,13 @@ fn single_party_adaptor_sig(
         (r_a, R_a, R_prime_a)
     };
 
-    let alice = monero_adaptor::Alice0::new(ring, *msg, R_a, R_prime_a, s_prime_a).unwrap();
-    let bob = monero_adaptor::Bob0::new(ring, *msg, R_a, R_prime_a, s_b).unwrap();
+    let alice = monero_adaptor::Alice0::new(ring, *msg, R_a, R_prime_a, s_prime_a, rng).unwrap();
+    let bob = monero_adaptor::Bob0::new(ring, *msg, R_a, R_prime_a, s_b, rng).unwrap();
 
-    let msg = alice.next_message();
+    let msg = alice.next_message(rng);
     let bob = bob.receive(msg);
 
-    let msg = bob.next_message();
+    let msg = bob.next_message(rng);
     let alice = alice.receive(msg).unwrap();
 
     let msg = alice.next_message();
