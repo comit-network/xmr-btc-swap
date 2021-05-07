@@ -123,10 +123,11 @@ where
     F: Fn() -> Result<Config>,
 {
     info!("Config file not found, running initial setup...");
-    ensure_directory_exists(config_path.as_path())?;
     let initial_config = config_file()?;
 
     let toml = toml::to_string(&initial_config)?;
+
+    ensure_directory_exists(config_path.as_path())?;
     fs::write(&config_path, toml)?;
 
     info!(
