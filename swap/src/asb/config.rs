@@ -20,6 +20,7 @@ const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://electrum.blockstream.info:60002";
 const DEFAULT_MONERO_WALLET_RPC_TESTNET_URL: &str = "http://127.0.0.1:38083/json_rpc";
 const DEFAULT_BITCOIN_CONFIRMATION_TARGET: usize = 3;
 
+const DEFAULT_MIN_BUY_AMOUNT: f64 = 0.002f64;
 const DEFAULT_MAX_BUY_AMOUNT: f64 = 0.02f64;
 const DEFAULT_SPREAD: f64 = 0.02f64;
 
@@ -81,6 +82,8 @@ pub struct TorConf {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Maker {
+    #[serde(with = "::bitcoin::util::amount::serde::as_btc")]
+    pub min_buy_btc: bitcoin::Amount,
     #[serde(with = "::bitcoin::util::amount::serde::as_btc")]
     pub max_buy_btc: bitcoin::Amount,
     pub ask_spread: Decimal,
@@ -200,6 +203,12 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
         .default(DEFAULT_SOCKS5_PORT.to_owned())
         .interact_text()?;
 
+    let min_buy = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter minimum Bitcoin amount you are willing to accept per swap or hit enter to use default.")
+        .default(DEFAULT_MIN_BUY_AMOUNT)
+        .interact_text()?;
+    let min_buy = bitcoin::Amount::from_btc(min_buy)?;
+
     let max_buy = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter maximum Bitcoin amount you are willing to accept per swap or hit enter to use default.")
         .default(DEFAULT_MAX_BUY_AMOUNT)
@@ -234,6 +243,7 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
             socks5_port: tor_socks5_port,
         },
         maker: Maker {
+            min_buy_btc: min_buy,
             max_buy_btc: max_buy,
             ask_spread,
         },
@@ -271,6 +281,7 @@ mod tests {
             },
             tor: Default::default(),
             maker: Maker {
+                min_buy_btc: bitcoin::Amount::from_btc(DEFAULT_MIN_BUY_AMOUNT).unwrap(),
                 max_buy_btc: bitcoin::Amount::from_btc(DEFAULT_MAX_BUY_AMOUNT).unwrap(),
                 ask_spread: Decimal::from_f64(DEFAULT_SPREAD).unwrap(),
             },

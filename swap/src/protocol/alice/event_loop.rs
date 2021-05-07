@@ -43,6 +43,7 @@ where
     monero_wallet: Arc<monero::Wallet>,
     db: Arc<Database>,
     latest_rate: LR,
+    min_buy: bitcoin::Amount,
     max_buy: bitcoin::Amount,
 
     swap_sender: mpsc::Sender<Swap>,
@@ -74,6 +75,7 @@ where
         monero_wallet: Arc<monero::Wallet>,
         db: Arc<Database>,
         latest_rate: LR,
+        min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,
     ) -> Result<(Self, mpsc::Receiver<Swap>)> {
         let swap_channel = MpscChannels::default();
@@ -86,6 +88,7 @@ where
             db,
             latest_rate,
             swap_sender: swap_channel.sender,
+            min_buy,
             max_buy,
             recv_encrypted_signature: Default::default(),
             inflight_encrypted_signatures: Default::default(),
@@ -206,7 +209,9 @@ where
                         }
                         SwarmEvent::Behaviour(OutEvent::SwapRequestDeclined { peer, error }) => {
                             match error {
-                                Error::ResumeOnlyMode | Error::MaxBuyAmountExceeded { .. } => {
+                                Error::ResumeOnlyMode
+                                | Error::AmountBelowMinimum { .. }
+                                | Error::AmountAboveMaximum { .. } => {
                                     tracing::warn!(%peer, "Ignoring spot price request because: {}", error);
                                 }
                                 Error::BalanceTooLow { .. }
@@ -228,7 +233,7 @@ where
                                 }
                             }
 
-                            let quote = match self.make_quote(self.max_buy).await {
+                            let quote = match self.make_quote(self.min_buy, self.max_buy).await {
                                 Ok(quote) => quote,
                                 Err(e) => {
                                     tracing::warn!(%peer, "Failed to make quote: {:#}", e);
@@ -355,7 +360,11 @@ where
         }
     }
 
-    async fn make_quote(&mut self, max_buy: bitcoin::Amount) -> Result<BidQuote> {
+    async fn make_quote(
+        &mut self,
+        min_buy: bitcoin::Amount,
+        max_buy: bitcoin::Amount,
+    ) -> Result<BidQuote> {
         let rate = self
             .latest_rate
             .latest_rate()
@@ -363,6 +372,7 @@ where
 
         Ok(BidQuote {
             price: rate.ask().context("Failed to compute asking price")?,
+            min_quantity: min_buy,
             max_quantity: max_buy,
         })
     }

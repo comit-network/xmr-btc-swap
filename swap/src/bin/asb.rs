@@ -123,6 +123,7 @@ async fn main() -> Result<()> {
                 &seed,
                 current_balance,
                 lock_fee,
+                config.maker.min_buy_btc,
                 config.maker.max_buy_btc,
                 kraken_rate.clone(),
                 resume_only,
@@ -140,6 +141,7 @@ async fn main() -> Result<()> {
                 Arc::new(monero_wallet),
                 Arc::new(db),
                 kraken_rate,
+                config.maker.min_buy_btc,
                 config.maker.max_buy_btc,
             )
             .unwrap();
