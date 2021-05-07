@@ -1,10 +1,12 @@
 use crate::fs::{ensure_directory_exists, system_config_dir, system_data_dir};
 use crate::tor::{DEFAULT_CONTROL_PORT, DEFAULT_SOCKS5_PORT};
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use config::ConfigError;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::Input;
 use libp2p::core::Multiaddr;
+use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
 use std::fs;
@@ -18,6 +20,9 @@ const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://electrum.blockstream.info:60002";
 const DEFAULT_MONERO_WALLET_RPC_TESTNET_URL: &str = "http://127.0.0.1:38083/json_rpc";
 const DEFAULT_BITCOIN_CONFIRMATION_TARGET: usize = 3;
 
+const DEFAULT_MAX_BUY_AMOUNT: f64 = 0.02f64;
+const DEFAULT_SPREAD: f64 = 0.02f64;
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct Config {
     pub data: Data,
@@ -25,6 +30,7 @@ pub struct Config {
     pub bitcoin: Bitcoin,
     pub monero: Monero,
     pub tor: TorConf,
+    pub maker: Maker,
 }
 
 impl Config {
@@ -70,6 +76,14 @@ pub struct Monero {
 pub struct TorConf {
     pub control_port: u16,
     pub socks5_port: u16,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Maker {
+    #[serde(with = "::bitcoin::util::amount::serde::as_btc")]
+    pub max_buy_btc: bitcoin::Amount,
+    pub ask_spread: Decimal,
 }
 
 impl Default for TorConf {
@@ -186,6 +200,21 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
         .default(DEFAULT_SOCKS5_PORT.to_owned())
         .interact_text()?;
 
+    let max_buy = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter maximum Bitcoin amount you are willing to accept per swap or hit enter to use default.")
+        .default(DEFAULT_MAX_BUY_AMOUNT)
+        .interact_text()?;
+    let max_buy = bitcoin::Amount::from_btc(max_buy)?;
+
+    let ask_spread = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter spread (in percent; value between 0.x and 1.0) to be used on top of the market rate or hit enter to use default.")
+        .default(DEFAULT_SPREAD)
+        .interact_text()?;
+    if !(0.0..=1.0).contains(&ask_spread) {
+        bail!(format!("Invalid spread {}. For the spread value floating point number in interval [0..1] are allowed.", ask_spread))
+    }
+    let ask_spread = Decimal::from_f64(ask_spread).context("Unable to parse spread")?;
+
     println!();
 
     Ok(Config {
@@ -203,6 +232,10 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
         tor: TorConf {
             control_port: tor_control_port,
             socks5_port: tor_socks5_port,
+        },
+        maker: Maker {
+            max_buy_btc: max_buy,
+            ask_spread,
         },
     })
 }
@@ -237,6 +270,10 @@ mod tests {
                 wallet_rpc_url: Url::from_str(DEFAULT_MONERO_WALLET_RPC_TESTNET_URL).unwrap(),
             },
             tor: Default::default(),
+            maker: Maker {
+                max_buy_btc: bitcoin::Amount::from_btc(DEFAULT_MAX_BUY_AMOUNT).unwrap(),
+                ask_spread: Decimal::from_f64(DEFAULT_SPREAD).unwrap(),
+            },
         };
 
         initial_setup(config_path.clone(), || Ok(expected.clone())).unwrap();

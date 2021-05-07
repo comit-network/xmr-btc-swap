@@ -41,6 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2. Buy amount sent by CLI exceeds maximum buy amount accepted by ASB
   3. ASB is running in resume-only mode and does not accept incoming swap requests
 
+### Changed
+
+- The ASB's `--max-buy`  and `ask-spread` parameter were removed in favour of entries in the config file.
+  The initial setup includes setting these two values now.
+
 ## [0.5.0] - 2021-04-17
 
 ### Changed
