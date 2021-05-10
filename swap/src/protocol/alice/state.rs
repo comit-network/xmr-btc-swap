@@ -1,5 +1,6 @@
 use crate::bitcoin::{
-    current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, TxCancel, TxPunish, TxRefund,
+    current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, Transaction, TxCancel,
+    TxPunish, TxRefund, Txid,
 };
 use crate::env::Config;
 use crate::monero::wallet::{TransferRequest, WatchRequest};
@@ -458,6 +459,64 @@ impl State3 {
             self.a.clone(),
             self.S_b_bitcoin,
         )
+    }
+
+    pub async fn check_for_tx_cancel(
+        &self,
+        bitcoin_wallet: &bitcoin::Wallet,
+    ) -> Result<Transaction> {
+        let tx_cancel = self.tx_cancel();
+        let tx = bitcoin_wallet.get_raw_transaction(tx_cancel.txid()).await?;
+        Ok(tx)
+    }
+
+    pub async fn fetch_tx_refund(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<Transaction> {
+        let tx_refund = self.tx_refund();
+        let tx = bitcoin_wallet.get_raw_transaction(tx_refund.txid()).await?;
+        Ok(tx)
+    }
+
+    pub async fn submit_tx_cancel(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<Txid> {
+        let transaction = self.signed_cancel_transaction()?;
+        let (tx_id, _) = bitcoin_wallet.broadcast(transaction, "cancel").await?;
+        Ok(tx_id)
+    }
+
+    pub async fn refund_xmr(
+        &self,
+        monero_wallet: &monero::Wallet,
+        monero_wallet_restore_blockheight: BlockHeight,
+        file_name: String,
+        spend_key: monero::PrivateKey,
+        transfer_proof: TransferProof,
+    ) -> Result<()> {
+        let view_key = self.v;
+
+        // Ensure that the XMR to be refunded are spendable by awaiting 10 confirmations
+        // on the lock transaction
+        monero_wallet
+            .watch_for_transfer(self.lock_xmr_watch_request(transfer_proof, 10))
+            .await?;
+
+        monero_wallet
+            .create_from(
+                file_name,
+                spend_key,
+                view_key,
+                monero_wallet_restore_blockheight,
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn punish_btc(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<Txid> {
+        let signed_tx_punish = self.signed_punish_transaction()?;
+
+        let (txid, subscription) = bitcoin_wallet.broadcast(signed_tx_punish, "punish").await?;
+        subscription.wait_until_final().await?;
+
+        Ok(txid)
     }
 
     pub fn signed_redeem_transaction(

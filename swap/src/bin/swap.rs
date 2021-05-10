@@ -242,9 +242,7 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            let resume_state = db.get_state(swap_id)?.try_into_bob()?.into();
-            let cancel =
-                bob::cancel(swap_id, resume_state, Arc::new(bitcoin_wallet), db, force).await?;
+            let cancel = bob::cancel(swap_id, Arc::new(bitcoin_wallet), db, force).await?;
 
             match cancel {
                 Ok((txid, _)) => {
@@ -279,9 +277,7 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            let resume_state = db.get_state(swap_id)?.try_into_bob()?.into();
-
-            bob::refund(swap_id, resume_state, Arc::new(bitcoin_wallet), db, force).await??;
+            bob::refund(swap_id, Arc::new(bitcoin_wallet), db, force).await??;
         }
     };
     Ok(())

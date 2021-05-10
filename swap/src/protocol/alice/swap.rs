@@ -229,23 +229,17 @@ async fn next_state(
             transfer_proof,
             state3,
         } => {
-            let transaction = state3.signed_cancel_transaction()?;
-
-            // If Bob hasn't yet broadcasted the tx cancel, we do it
-            if bitcoin_wallet
-                .get_raw_transaction(transaction.txid())
-                .await
-                .is_err()
-            {
-                if let Err(e) = bitcoin_wallet.broadcast(transaction, "cancel").await {
+            if state3.check_for_tx_cancel(bitcoin_wallet).await.is_err() {
+                // If Bob hasn't yet broadcasted the cancel transaction, Alice has to publish it
+                // to be able to eventually punish. Since the punish timelock is
+                // relative to the publication of the cancel transaction we have to ensure it
+                // gets published once the cancel timelock expires.
+                if let Err(e) = state3.submit_tx_cancel(bitcoin_wallet).await {
                     tracing::debug!(
-                        "Assuming transaction is already broadcasted because: {:#}",
+                        "Assuming cancel transaction is already broadcasted because: {:#}",
                         e
                     )
                 }
-
-                // TODO(Franck): Wait until transaction is mined and
-                // returned mined block height
             }
 
             AliceState::BtcCancelled {
@@ -291,20 +285,13 @@ async fn next_state(
             spend_key,
             state3,
         } => {
-            let view_key = state3.v;
-
-            // Ensure that the XMR to be refunded are spendable by awaiting 10 confirmations
-            // on the lock transaction
-            monero_wallet
-                .watch_for_transfer(state3.lock_xmr_watch_request(transfer_proof, 10))
-                .await?;
-
-            monero_wallet
-                .create_from(
+            state3
+                .refund_xmr(
+                    monero_wallet,
+                    monero_wallet_restore_blockheight,
                     swap_id.to_string(),
                     spend_key,
-                    view_key,
-                    monero_wallet_restore_blockheight,
+                    transfer_proof,
                 )
                 .await?;
 
@@ -315,16 +302,7 @@ async fn next_state(
             transfer_proof,
             state3,
         } => {
-            let signed_tx_punish = state3.signed_punish_transaction()?;
-
-            let punish = async {
-                let (txid, subscription) =
-                    bitcoin_wallet.broadcast(signed_tx_punish, "punish").await?;
-                subscription.wait_until_final().await?;
-
-                Result::<_, anyhow::Error>::Ok(txid)
-            }
-            .await;
+            let punish = state3.punish_btc(bitcoin_wallet).await;
 
             match punish {
                 Ok(_) => AliceState::BtcPunished,

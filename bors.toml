@@ -10,13 +10,15 @@ status = [
     "docker_tests (happy_path_restart_bob_after_xmr_locked)",
     "docker_tests (happy_path_restart_alice_after_xmr_locked)",
     "docker_tests (happy_path_restart_bob_before_xmr_locked)",
-    "docker_tests (bob_refunds_using_cancel_and_refund_command)",
-    "docker_tests (bob_refunds_using_cancel_and_refund_command_timelock_not_expired_force)",
-    "docker_tests (bob_refunds_using_cancel_and_refund_command_timelock_not_expired)",
+    "docker_tests (alice_and_bob_refund_using_cancel_and_refund_command)",
+    "docker_tests (alice_and_bob_refund_using_cancel_and_refund_command_timelock_not_expired)",
+    "docker_tests (alice_and_bob_refund_using_cancel_and_refund_command_timelock_not_expired_force)",
     "docker_tests (punish)",
-    "docker_tests (alice_punishes_after_restart_punish_timelock_expired)",
+    "docker_tests (alice_punishes_after_restart_bob_dead)",
+    "docker_tests (alice_manually_punishes_after_bob_dead)",
     "docker_tests (alice_refunds_after_restart_bob_refunded)",
     "docker_tests (ensure_same_swap_id)",
     "docker_tests (concurrent_bobs_after_xmr_lock_proof_sent)",
-    "docker_tests (concurrent_bobs_before_xmr_lock_proof_sent)"
+    "docker_tests (concurrent_bobs_before_xmr_lock_proof_sent)",
+    "docker_tests (alice_manually_redeems_after_enc_sig_learned)"
 ]

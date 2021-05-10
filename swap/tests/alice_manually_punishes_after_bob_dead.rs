@@ -8,9 +8,10 @@ use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
 
 /// Bob locks Btc and Alice locks Xmr. Bob does not act; he fails to send Alice
-/// the encsig and fail to refund or redeem. Alice punishes.
+/// the encsig and fail to refund or redeem. Alice punishes using the cancel and
+/// punish command.
 #[tokio::test]
-async fn alice_punishes_after_restart_if_punish_timelock_expired() {
+async fn alice_manually_punishes_after_bob_dead() {
     harness::setup_test(FastPunishConfig, |mut ctx| async move {
         let (bob_swap, bob_join_handle) = ctx.bob_swap().await;
         let bob_swap_id = bob_swap.id;
@@ -26,10 +27,33 @@ async fn alice_punishes_after_restart_if_punish_timelock_expired() {
 
         let alice_state = alice_swap.await??;
 
-        // Ensure punish timelock is expired
+        // Ensure cancel timelock is expired
         if let AliceState::XmrLockTransactionSent { state3, .. } = alice_state {
             alice_bitcoin_wallet
                 .subscribe_to(state3.tx_lock)
+                .await
+                .wait_until_confirmed_with(state3.cancel_timelock)
+                .await?;
+        } else {
+            panic!("Alice in unexpected state {}", alice_state);
+        }
+
+        // manual cancel (required to be able to punish)
+
+        ctx.restart_alice().await;
+        let alice_swap = ctx.alice_next_swap().await;
+        let (_, alice_state) = alice::cancel(
+            alice_swap.swap_id,
+            alice_swap.bitcoin_wallet,
+            alice_swap.db,
+            false,
+        )
+        .await??;
+
+        // Ensure punish timelock is expired
+        if let AliceState::BtcCancelled { state3, .. } = alice_state {
+            alice_bitcoin_wallet
+                .subscribe_to(state3.tx_cancel())
                 .await
                 .wait_until_confirmed_with(state3.punish_timelock)
                 .await?;
@@ -37,11 +61,17 @@ async fn alice_punishes_after_restart_if_punish_timelock_expired() {
             panic!("Alice in unexpected state {}", alice_state);
         }
 
+        // manual punish
+
         ctx.restart_alice().await;
         let alice_swap = ctx.alice_next_swap().await;
-        let alice_swap = tokio::spawn(alice::run(alice_swap));
-
-        let alice_state = alice_swap.await??;
+        let (_, alice_state) = alice::punish(
+            alice_swap.swap_id,
+            alice_swap.bitcoin_wallet,
+            alice_swap.db,
+            false,
+        )
+        .await??;
         ctx.assert_alice_punished(alice_state).await;
 
         // Restart Bob after Alice punished to ensure Bob transitions to
