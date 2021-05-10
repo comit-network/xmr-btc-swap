@@ -1,4 +1,3 @@
-use crate::xmr_first_protocol::Persist;
 use std::collections::VecDeque;
 use std::task::Poll;
 
@@ -35,14 +34,6 @@ impl StateMachine {
                 }
                 _ => {}
             },
-            // State::WaitingForT2 => match event {
-            //     Event::T2Elapsed => {
-            //         self.actions.push_back(Action::SignAndBroadcastBtcPunish);
-            //         self.actions.push_back(Action::BroadcastXmrRefund);
-            //         self.state = State::Success;
-            //     }
-            //     _ => {}
-            // },
             _ => {}
         }
     }
@@ -56,17 +47,10 @@ impl StateMachine {
     }
 }
 
-impl Persist for Event {
-    fn persist(&self) {
-        todo!()
-    }
-}
-
 #[derive(PartialEq, Debug)]
 pub enum State {
     WatchingForBtcLock,
     WatchingForXmrRedeem,
-    // WaitingForT2,
     Punished,
     Success,
     Aborted,
@@ -100,11 +84,9 @@ mod tests {
             events: Default::default(),
         };
         state_machine.inject_event(Event::BtcLockSeenInMempool);
-        assert_eq!(state_machine.poll())
         state_machine.inject_event(Event::XmrRedeemSeenInMempool);
         assert_eq!(state_machine.state, State::Success);
     }
-
 
     #[test]
     fn bob_fails_to_lock_btc() {

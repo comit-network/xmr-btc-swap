@@ -1,5 +1,4 @@
 use crate::monero::TransferProof;
-use crate::xmr_first_protocol::Persist;
 use std::collections::VecDeque;
 
 pub struct StateMachine {
@@ -50,12 +49,6 @@ impl StateMachine {
     }
 }
 
-impl Persist for Event {
-    fn persist(&self) {
-        todo!()
-    }
-}
-
 #[derive(PartialEq, Debug)]
 pub enum State {
     WatchingForXmrLock,
@@ -66,7 +59,6 @@ pub enum State {
 }
 
 pub enum Event {
-    // todo: do we simply wait for confirmations are is mempool sufficient?
     XmrConfirmed,
     // This will contain the s_a allowing bob to build xmr_redeem
     BtcRedeemSeenInMempool,

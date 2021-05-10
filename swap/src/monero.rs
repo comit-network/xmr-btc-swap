@@ -3,7 +3,7 @@ mod wallet_rpc;
 
 pub use ::monero::{Address, Network, PrivateKey, PublicKey};
 pub use curve25519_dalek::scalar::Scalar;
-pub use wallet::Wallet;
+pub use wallet::{TransferRequest, Wallet};
 pub use wallet_rpc::{WalletRpc, WalletRpcProcess};
 
 use crate::bitcoin;
@@ -40,8 +40,8 @@ impl PrivateViewKey {
         Self(private_key)
     }
 
-    pub fn public(&self) -> PublicViewKey {
-        PublicViewKey(PublicKey::from_private_key(&self.0))
+    pub fn public(&self) -> PrivateViewKey {
+        PrivateViewKey(PublicKey::from_private_key(&self.0))
     }
 }
 
@@ -59,14 +59,14 @@ impl From<PrivateViewKey> for PrivateKey {
     }
 }
 
-impl From<PublicViewKey> for PublicKey {
-    fn from(from: PublicViewKey) -> Self {
+impl From<PrivateViewKey> for PublicKey {
+    fn from(from: PrivateViewKey) -> Self {
         from.0
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct PublicViewKey(PublicKey);
+pub struct PrivateViewKey(PublicKey);
 
 #[derive(Debug, Copy, Clone, Deserialize, Serialize, PartialEq, PartialOrd)]
 pub struct Amount(u64);

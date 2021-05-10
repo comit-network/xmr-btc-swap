@@ -11,8 +11,8 @@ use rand::rngs::OsRng;
 use std::convert::TryInto;
 use tiny_keccak::{Hasher, Keccak};
 
-mod alice;
-mod bob;
+pub mod alice;
+pub mod bob;
 
 const RING_SIZE: usize = 11;
 const DOMAIN_TAG: &str = "CSLAG_c";
@@ -135,7 +135,7 @@ pub struct Signature {
 
 impl Signature {
     #[cfg(test)]
-    fn verify(&self, ring: [EdwardsPoint; RING_SIZE], msg: &[u8; 32]) -> Result<bool> {
+    pub fn verify(&self, ring: [EdwardsPoint; RING_SIZE], msg: &[u8; 32]) -> Result<bool> {
         let ring_concat = ring
             .iter()
             .flat_map(|pk| pk.compress().as_bytes().to_vec())
