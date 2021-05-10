@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-use curve25519_dalek::edwards::EdwardsPoint;
+use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
 use monero::blockdata::transaction::{ExtraField, KeyImage, SubField, TxOutTarget};
@@ -210,18 +210,13 @@ async fn monerod_integration_test() {
             .get_rvn_scalar(our_output.index)
             .scalar;
 
-    let (adaptor_sig, adaptor) =
-        single_party_adaptor_sig(s_prime_a, s_b, ring, &prefix.hash().to_bytes(), &mut rng);
-
-    let sig = adaptor_sig.adapt(adaptor);
-
-    // let pseudo_out = {
-    //     let lock_amount = Scalar::from(lock_amount);
-    //
-    //     (out_blinding * ED25519_BASEPOINT_POINT) + (lock_amount *
-    // H.point.decompress().unwrap()) };
-
-    monero::verify_bulletproof(&mut thread_rng(), bulletproof.clone(), out_pk.clone()).unwrap();
+    let commitment_ring = response
+        .outs
+        .iter()
+        .map(|out| CompressedEdwardsY(out.mask.key).decompress().unwrap())
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
 
     let out_pk = out_pk
         .into_iter()
@@ -231,6 +226,25 @@ async fn monerod_integration_test() {
     let fee_key = Scalar::from(fee) * H.point.decompress().unwrap();
 
     let pseudo_out = fee_key + out_pk[0].decompress().unwrap() + out_pk[1].decompress().unwrap();
+
+    let (_, real_commitment_blinder) = transaction.clone().rct_signatures.sig.unwrap().ecdh_info
+        [our_output.index]
+        .open_commitment(&viewpair, &our_output.tx_pubkey, our_output.index);
+
+    let (adaptor_sig, adaptor) = single_party_adaptor_sig(
+        s_prime_a,
+        s_b,
+        ring,
+        commitment_ring,
+        pseudo_out,
+        real_commitment_blinder,
+        out_blinding_0 + out_blinding_1, /* TODO: These haven't been multiplied by 8. Is that
+                                          * correct? */
+        &prefix.hash().to_bytes(),
+        &mut rng,
+    );
+
+    let sig = adaptor_sig.adapt(adaptor);
 
     let out_pk = out_pk
         .iter()
@@ -280,6 +294,10 @@ fn single_party_adaptor_sig(
     s_prime_a: Scalar,
     s_b: Scalar,
     ring: [EdwardsPoint; monero_adaptor::RING_SIZE],
+    commitment_ring: [EdwardsPoint; monero_adaptor::RING_SIZE],
+    pseudo_output_commitment: EdwardsPoint,
+    real_commitment_blinding: Scalar,
+    pseudo_output_commitment_blinding: Scalar,
     msg: &[u8; 32],
     rng: &mut (impl Rng + CryptoRng),
 ) -> (monero_adaptor::AdaptorSignature, Scalar) {
@@ -294,17 +312,39 @@ fn single_party_adaptor_sig(
         (r_a, R_a, R_prime_a)
     };
 
-    let alice = monero_adaptor::Alice0::new(ring, *msg, R_a, R_prime_a, s_prime_a, rng).unwrap();
-    let bob = monero_adaptor::Bob0::new(ring, *msg, R_a, R_prime_a, s_b, rng).unwrap();
+    let alice = monero_adaptor::Alice0::new(
+        ring,
+        *msg,
+        commitment_ring,
+        pseudo_output_commitment,
+        R_a,
+        R_prime_a,
+        s_prime_a,
+        rng,
+    )
+    .unwrap();
+    let bob = monero_adaptor::Bob0::new(
+        ring,
+        *msg,
+        commitment_ring,
+        pseudo_output_commitment,
+        R_a,
+        R_prime_a,
+        s_b,
+        rng,
+    )
+    .unwrap();
 
     let msg = alice.next_message(rng);
     let bob = bob.receive(msg);
 
+    let z = real_commitment_blinding - pseudo_output_commitment_blinding;
+
     let msg = bob.next_message(rng);
-    let alice = alice.receive(msg).unwrap();
+    let alice = alice.receive(msg, z).unwrap();
 
     let msg = alice.next_message();
-    let bob = bob.receive(msg).unwrap();
+    let bob = bob.receive(msg, z).unwrap();
 
     let msg = bob.next_message();
     let alice = alice.receive(msg);

@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
+#![warn(clippy::needless_pass_by_value)]
 
 use anyhow::{bail, Result};
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
@@ -10,7 +11,7 @@ use hash_edwards_to_edwards::hash_point_to_point;
 use rand::{CryptoRng, Rng};
 use ring::Ring;
 use std::convert::TryInto;
-use tiny_keccak::Hasher;
+use tiny_keccak::{Hasher, Keccak};
 
 mod ring;
 
@@ -19,16 +20,6 @@ const HASH_KEY_CLSAG_AGG_0: &str = "CLSAG_agg_0";
 const HASH_KEY_CLSAG_AGG_1: &str = "CLSAG_agg_1";
 const HASH_KEY_CLSAG_ROUND: &str = "CLSAG_round";
 
-// for every iteration we compute:
-// c_p = h_prev * mu_P; and
-// c_c = h_prev * mu_C.
-//
-// L_i = s_i * G + c_p * pk_i + c_c * (commitment_i - pseudoutcommitment)
-// R_i = s_i * H_p_pk_i + c_p * I + c_c * (z * hash_to_point(signing pk))
-//
-// h = keccak256("CLSAG_round" || ring
-//     ring of commitments || pseudooutput commitment || msg || L_i || R_i)
-
 struct AggregationHashes {
     mu_P: Scalar,
     mu_C: Scalar,
@@ -36,8 +27,8 @@ struct AggregationHashes {
 
 impl AggregationHashes {
     pub fn new(
-        ring: Ring,
-        commitment_ring: Ring,
+        ring: &Ring,
+        commitment_ring: &Ring,
         I: EdwardsPoint,
         z: Scalar,
         H_p_pk: EdwardsPoint,
@@ -84,7 +75,7 @@ impl AggregationHashes {
         z_key_image: &CompressedEdwardsY,
         pseudo_output_commitment: &CompressedEdwardsY,
     ) -> Scalar {
-        let mut hasher = tiny_keccak::Keccak::v256();
+        let mut hasher = Keccak::v256();
         hasher.update(domain_prefix.as_bytes());
         hasher.update(ring);
         hasher.update(commitment_ring);
@@ -99,19 +90,27 @@ impl AggregationHashes {
     }
 }
 
+// for every iteration we compute:
+// c_p = h_prev * mu_P; and
+// c_c = h_prev * mu_C.
+//
+
+// h = keccak256("CLSAG_round" || ring
+//     ring of commitments || pseudooutput commitment || msg || L_i || R_i)
+
 fn challenge(
     prefix: &[u8],
     s_i: Scalar,
     pk_i: EdwardsPoint,
+    adjusted_commitment_i: EdwardsPoint,
     h_prev: Scalar,
     I: EdwardsPoint,
+    mus: &AggregationHashes,
 ) -> Result<Scalar> {
-    let L_i = s_i * ED25519_BASEPOINT_POINT + h_prev * pk_i;
+    let L_i = compute_L(h_prev, mus, s_i, pk_i, adjusted_commitment_i);
+    let R_i = compute_R(h_prev, mus, pk_i, s_i, I, adjusted_commitment_i);
 
-    let H_p_pk_i = hash_point_to_point(pk_i);
-    let R_i = s_i * H_p_pk_i + h_prev * I;
-
-    let mut hasher = tiny_keccak::Keccak::v256();
+    let mut hasher = Keccak::v256();
     hasher.update(prefix);
     hasher.update(&L_i.compress().as_bytes().to_vec());
     hasher.update(&R_i.compress().as_bytes().to_vec());
@@ -122,19 +121,59 @@ fn challenge(
     Ok(Scalar::from_bytes_mod_order(output))
 }
 
-/// Compute the prefix for the hash common to every iteration of the ring signature algorithm.
+// L_i = s_i * G + c_p * pk_i + c_c * (commitment_i - pseudoutcommitment)
+fn compute_L(
+    h_prev: Scalar,
+    mus: &AggregationHashes,
+    s_i: Scalar,
+    pk_i: EdwardsPoint,
+    adjusted_commitment_i: EdwardsPoint,
+) -> EdwardsPoint {
+    let c_p = h_prev * mus.mu_P;
+    let c_c = h_prev * mus.mu_C;
+
+    (s_i * ED25519_BASEPOINT_POINT) + (c_p * pk_i) + c_c * adjusted_commitment_i
+}
+
+// R_i = s_i * H_p_pk_i + c_p * I + c_c * (z * hash_to_point(signing pk))
+fn compute_R(
+    h_prev: Scalar,
+    mus: &AggregationHashes,
+    pk_i: EdwardsPoint,
+    s_i: Scalar,
+    I: EdwardsPoint,
+    z_key_image: EdwardsPoint,
+) -> EdwardsPoint {
+    let c_p = h_prev * mus.mu_P;
+    let c_c = h_prev * mus.mu_C;
+
+    let H_p_pk_i = hash_point_to_point(pk_i);
+
+    (s_i * H_p_pk_i) + (c_p * I) + c_c * z_key_image
+}
+
+/// Compute the prefix for the hash common to every iteration of the ring
+/// signature algorithm.
 ///
-/// "CLSAG_round" || ring || ring of commitments || pseudooutput commitment || msg || alpha * G
+/// "CLSAG_round" || ring || ring of commitments || pseudooutput commitment ||
+/// msg || alpha * G
 fn clsag_round_hash_prefix(
     ring: &[u8],
     commitment_ring: &[u8],
-    pseudo_output_commitment: &EdwardsPoint,
+    pseudo_output_commitment: EdwardsPoint,
     msg: &[u8],
 ) -> Vec<u8> {
     let domain_prefix = HASH_KEY_CLSAG_ROUND.as_bytes();
-    let pseudo_output_commitment = pseudo_output_commitment.compress().as_bytes();
+    let pseudo_output_commitment = pseudo_output_commitment.compress();
+    let pseudo_output_commitment = pseudo_output_commitment.as_bytes();
 
-    let mut prefix = Vec::with_capacity(domain_prefix.len() + ring.len() + commitment_ring.len() + pseudo_output_commitment.len() + msg.len());
+    let mut prefix = Vec::with_capacity(
+        domain_prefix.len()
+            + ring.len()
+            + commitment_ring.len()
+            + pseudo_output_commitment.len()
+            + msg.len(),
+    );
 
     prefix.extend(domain_prefix);
     prefix.extend(ring);
@@ -145,38 +184,53 @@ fn clsag_round_hash_prefix(
     prefix
 }
 
-#[allow(clippy::too_many_arguments)]
 fn final_challenge(
     fake_responses: [Scalar; RING_SIZE - 1],
     ring: Ring,
-    T_a: EdwardsPoint,
-    T_b: EdwardsPoint,
-    R_a: EdwardsPoint,
-    I_hat_a: EdwardsPoint,
-    I_hat_b: EdwardsPoint,
-    R_prime_a: EdwardsPoint,
+    commitment_ring: Ring,
+    H_p_pk: EdwardsPoint,
+    pseudo_output_commitment: EdwardsPoint,
+    z: Scalar,
+    L: EdwardsPoint,
+    R: EdwardsPoint,
     I: EdwardsPoint,
     msg: &[u8],
 ) -> Result<(Scalar, Scalar)> {
-    let prefix = clsag_round_hash_prefix(ring.as_ref(), todo!(), todo!(), msg);
+    let prefix = clsag_round_hash_prefix(
+        ring.as_ref(),
+        commitment_ring.as_ref(),
+        pseudo_output_commitment,
+        msg,
+    );
     let h_0 = {
-        let mut keccak = tiny_keccak::Keccak::v256();
+        let mut keccak = Keccak::v256();
         keccak.update(&prefix);
-        keccak.update((T_a + T_b + R_a).compress().as_bytes());
-        keccak.update((I_hat_a + I_hat_b + R_prime_a).compress().as_bytes());
+        keccak.update(L.compress().as_bytes());
+        keccak.update(R.compress().as_bytes());
         let mut output = [0u8; 64];
         keccak.finalize(&mut output);
 
         Scalar::from_bytes_mod_order_wide(&output)
     };
 
+    let mus = AggregationHashes::new(
+        &ring,
+        &commitment_ring,
+        I,
+        z,
+        H_p_pk,
+        pseudo_output_commitment,
+    );
+
     let h_last = fake_responses
         .iter()
         .enumerate()
         .fold(h_0, |h_prev, (i, s_i)| {
             let pk_i = ring[i + 1];
+            let adjusted_commitment_i = commitment_ring[i] - pseudo_output_commitment;
+
             // TODO: Do not unwrap here
-            challenge(&prefix, *s_i, pk_i, h_prev, I).unwrap()
+            challenge(&prefix, *s_i, pk_i, adjusted_commitment_i, h_prev, I, &mus).unwrap()
         });
 
     Ok((h_last, h_0))
@@ -189,6 +243,7 @@ pub struct AdaptorSignature {
     h_0: Scalar,
     /// Key image of the real key in the ring.
     I: EdwardsPoint,
+    // TODO: Add commitment key image D = z * H_p_pk
 }
 
 impl AdaptorSignature {
@@ -235,8 +290,10 @@ impl Signature {
                 &clsag_round_hash_prefix(&ring_concat, todo!(), todo!(), msg),
                 *s_i,
                 pk_i,
+                todo!(),
                 h,
                 self.I,
+                todo!(),
             )?;
         }
 
@@ -255,6 +312,7 @@ impl From<Signature> for monero::util::ringct::Clsag {
             c1: monero::util::ringct::Key {
                 key: from.h_0.to_bytes(),
             },
+            // TODO: Must use commitment key image D = z * H_p_pk
             D: monero::util::ringct::Key {
                 key: from.I.compress().to_bytes(),
             },
@@ -266,6 +324,8 @@ pub struct Alice0 {
     // secret index is always 0
     ring: Ring,
     fake_responses: [Scalar; RING_SIZE - 1],
+    commitment_ring: Ring,
+    pseudo_output_commitment: EdwardsPoint,
     msg: [u8; 32],
     // encryption key
     R_a: EdwardsPoint,
@@ -285,12 +345,15 @@ impl Alice0 {
     pub fn new(
         ring: [EdwardsPoint; RING_SIZE],
         msg: [u8; 32],
+        commitment_ring: [EdwardsPoint; RING_SIZE],
+        pseudo_output_commitment: EdwardsPoint,
         R_a: EdwardsPoint,
         R_prime_a: EdwardsPoint,
         s_prime_a: Scalar,
         rng: &mut (impl Rng + CryptoRng),
     ) -> Result<Self> {
         let ring = Ring::new(ring);
+        let commitment_ring = Ring::new(commitment_ring);
 
         let mut fake_responses = [Scalar::zero(); RING_SIZE - 1];
         for response in fake_responses.iter_mut().take(RING_SIZE - 1) {
@@ -308,6 +371,8 @@ impl Alice0 {
         Ok(Alice0 {
             ring,
             fake_responses,
+            commitment_ring,
+            pseudo_output_commitment,
             msg,
             R_a,
             R_prime_a,
@@ -334,19 +399,20 @@ impl Alice0 {
         }
     }
 
-    pub fn receive(self, msg: Message1) -> Result<Alice1> {
+    // TODO: Pass commitment-related data as an argument to this function, like z
+    pub fn receive(self, msg: Message1, z: Scalar) -> Result<Alice1> {
         msg.pi_b
             .verify(ED25519_BASEPOINT_POINT, msg.T_b, self.H_p_pk, msg.I_hat_b)?;
 
         let (h_last, h_0) = final_challenge(
             self.fake_responses,
             self.ring,
-            self.T_a,
-            msg.T_b,
-            self.R_a,
-            self.I_hat_a,
-            msg.I_hat_b,
-            self.R_prime_a,
+            self.commitment_ring,
+            self.H_p_pk,
+            self.pseudo_output_commitment,
+            z,
+            self.T_a + msg.T_b + self.R_a,
+            self.I_hat_a + msg.I_hat_b + self.R_prime_a,
             self.I_a + msg.I_b,
             &self.msg,
         )?;
@@ -356,12 +422,12 @@ impl Alice0 {
 
         Ok(Alice1 {
             fake_responses: self.fake_responses,
-            h_0,
-            I_b: msg.I_b,
-            s_0_a,
             I_a: self.I_a,
             I_hat_a: self.I_hat_a,
             T_a: self.T_a,
+            h_0,
+            I_b: msg.I_b,
+            s_0_a,
         })
     }
 }
@@ -402,15 +468,13 @@ pub struct Alice2 {
 }
 
 pub struct Bob0 {
-    // secret index is always 0
     ring: Ring,
     msg: [u8; 32],
-    // encryption key
+    commitment_ring: Ring,
+    pseudo_output_commitment: EdwardsPoint,
     R_a: EdwardsPoint,
-    // R'a = r_a*H_p(p_k) where p_k is the signing public key
     R_prime_a: EdwardsPoint,
     s_b: Scalar,
-    // secret value:
     alpha_b: Scalar,
     H_p_pk: EdwardsPoint,
     I_b: EdwardsPoint,
@@ -422,12 +486,15 @@ impl Bob0 {
     pub fn new(
         ring: [EdwardsPoint; RING_SIZE],
         msg: [u8; 32],
+        commitment_ring: [EdwardsPoint; RING_SIZE],
+        pseudo_output_commitment: EdwardsPoint,
         R_a: EdwardsPoint,
         R_prime_a: EdwardsPoint,
         s_b: Scalar,
         rng: &mut (impl Rng + CryptoRng),
     ) -> Result<Self> {
         let ring = Ring::new(ring);
+        let commitment_ring = Ring::new(commitment_ring);
 
         let alpha_b = Scalar::random(rng);
 
@@ -441,6 +508,8 @@ impl Bob0 {
         Ok(Bob0 {
             ring,
             msg,
+            commitment_ring,
+            pseudo_output_commitment,
             R_a,
             R_prime_a,
             s_b,
@@ -456,6 +525,8 @@ impl Bob0 {
         Bob1 {
             ring: self.ring,
             msg: self.msg,
+            commitment_ring: self.commitment_ring,
+            pseudo_output_commitment: self.pseudo_output_commitment,
             R_a: self.R_a,
             R_prime_a: self.R_prime_a,
             s_b: self.s_b,
@@ -471,15 +542,13 @@ impl Bob0 {
 }
 
 pub struct Bob1 {
-    // secret index is always 0
     ring: Ring,
     msg: [u8; 32],
-    // encryption key
+    commitment_ring: Ring,
+    pseudo_output_commitment: EdwardsPoint,
     R_a: EdwardsPoint,
-    // R'a = r_a*H_p(p_k) where p_k is the signing public key
     R_prime_a: EdwardsPoint,
     s_b: Scalar,
-    // secret value:
     alpha_b: Scalar,
     H_p_pk: EdwardsPoint,
     I_b: EdwardsPoint,
@@ -506,7 +575,8 @@ impl Bob1 {
         }
     }
 
-    pub fn receive(self, msg: Message2) -> Result<Bob2> {
+    // TODO: Pass commitment-related data as an argument to this function, like z
+    pub fn receive(self, msg: Message2, z: Scalar) -> Result<Bob2> {
         let (fake_responses, I_a, I_hat_a, T_a) = msg.d_a.open(self.c_a)?;
 
         self.pi_a
@@ -515,12 +585,12 @@ impl Bob1 {
         let (h_last, h_0) = final_challenge(
             fake_responses,
             self.ring,
-            T_a,
-            self.T_b,
-            self.R_a,
-            I_hat_a,
-            self.I_hat_b,
-            self.R_prime_a,
+            self.commitment_ring,
+            self.H_p_pk,
+            self.pseudo_output_commitment,
+            z,
+            T_a + self.T_b + self.R_a,
+            I_hat_a + self.I_hat_b + self.R_prime_a,
             I_a + self.I_b,
             &self.msg,
         )?;
@@ -569,7 +639,7 @@ impl DleqProof {
         let rG = r * G;
         let rH = r * H;
 
-        let mut keccak = tiny_keccak::Keccak::v256();
+        let mut keccak = Keccak::v256();
         keccak.update(G.compress().as_bytes());
         keccak.update(xG.compress().as_bytes());
         keccak.update(H.compress().as_bytes());
@@ -600,7 +670,7 @@ impl DleqProof {
         let rG = (s * G) + (-c * xG);
         let rH = (s * H) + (-c * xH);
 
-        let mut keccak = tiny_keccak::Keccak::v256();
+        let mut keccak = Keccak::v256();
         keccak.update(G.compress().as_bytes());
         keccak.update(xG.compress().as_bytes());
         keccak.update(H.compress().as_bytes());
@@ -636,7 +706,7 @@ impl Commitment {
             .flat_map(|r| r.as_bytes().to_vec())
             .collect::<Vec<u8>>();
 
-        let mut keccak = tiny_keccak::Keccak::v256();
+        let mut keccak = Keccak::v256();
         keccak.update(&fake_responses);
         keccak.update(I_a.compress().as_bytes());
         keccak.update(I_hat_a.compress().as_bytes());
@@ -747,21 +817,53 @@ mod tests {
 
         ring[1..].fill_with(|| {
             let x = Scalar::random(&mut OsRng);
-
             x * ED25519_BASEPOINT_POINT
         });
 
-        let alice = Alice0::new(ring, *msg_to_sign, R_a, R_prime_a, s_prime_a, &mut OsRng).unwrap();
-        let bob = Bob0::new(ring, *msg_to_sign, R_a, R_prime_a, s_b, &mut OsRng).unwrap();
+        let mut commitment_ring = [EdwardsPoint::default(); RING_SIZE];
+
+        let real_commitment_blinding = Scalar::random(&mut OsRng);
+        commitment_ring[0] = real_commitment_blinding * ED25519_BASEPOINT_POINT; // + 0 * H
+        commitment_ring[1..].fill_with(|| {
+            let x = Scalar::random(&mut OsRng);
+            x * ED25519_BASEPOINT_POINT
+        });
+
+        // TODO: document
+        let pseudo_output_commitment = commitment_ring[0];
+
+        let alice = Alice0::new(
+            ring,
+            *msg_to_sign,
+            commitment_ring,
+            pseudo_output_commitment,
+            R_a,
+            R_prime_a,
+            s_prime_a,
+            &mut OsRng,
+        )
+        .unwrap();
+        let bob = Bob0::new(
+            ring,
+            *msg_to_sign,
+            commitment_ring,
+            pseudo_output_commitment,
+            R_a,
+            R_prime_a,
+            s_b,
+            &mut OsRng,
+        )
+        .unwrap();
 
         let msg = alice.next_message(&mut OsRng);
         let bob = bob.receive(msg);
 
+        // TODO: Document this
         let msg = bob.next_message(&mut OsRng);
-        let alice = alice.receive(msg).unwrap();
+        let alice = alice.receive(msg, Scalar::zero()).unwrap();
 
         let msg = alice.next_message();
-        let bob = bob.receive(msg).unwrap();
+        let bob = bob.receive(msg, Scalar::zero()).unwrap();
 
         let msg = bob.next_message();
         let alice = alice.receive(msg);

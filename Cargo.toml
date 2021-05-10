@@ -3,4 +3,4 @@ members = ["monero-adaptor", "monero-harness", "monero-rpc", "swap", "monero-wal
 
 [patch.crates-io]
 torut = { git = "https://github.com/bonomat/torut/", branch = "feature-flag-tor-secret-keys", default-features = false, features = [ "v3", "control" ] }
-monero = { git = "https://github.com/comit-network/monero-rs" }
+monero = { git = "https://github.com/comit-network/monero-rs", branch = "ecdh_recover_mask" }

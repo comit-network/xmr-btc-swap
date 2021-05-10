@@ -2,6 +2,7 @@ use std::ops::Index;
 
 use curve25519_dalek::edwards::EdwardsPoint;
 
+#[derive(Clone)]
 pub struct Ring {
     elements: [EdwardsPoint; 11],
     bytes: [u8; 32 * 11],
