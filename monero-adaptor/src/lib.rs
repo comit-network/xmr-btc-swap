@@ -7,9 +7,9 @@ use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
+use rand::{CryptoRng, Rng};
 use std::convert::TryInto;
 use tiny_keccak::{Hasher, Keccak};
-use rand::{Rng, CryptoRng};
 
 pub const RING_SIZE: usize = 11;
 const DOMAIN_TAG: &str = "CSLAG_c";
@@ -195,7 +195,7 @@ impl Alice0 {
         R_a: EdwardsPoint,
         R_prime_a: EdwardsPoint,
         s_prime_a: Scalar,
-        rng: &mut (impl Rng + CryptoRng)
+        rng: &mut (impl Rng + CryptoRng),
     ) -> Result<Self> {
         let mut fake_responses = [Scalar::zero(); RING_SIZE - 1];
         for response in fake_responses.iter_mut().take(RING_SIZE - 1) {
@@ -233,7 +233,7 @@ impl Alice0 {
                 self.H_p_pk,
                 self.I_hat_a,
                 self.alpha_a,
-                rng
+                rng,
             ),
             c_a: Commitment::new(self.fake_responses, self.I_a, self.I_hat_a, self.T_a),
         }
@@ -329,7 +329,7 @@ impl Bob0 {
         R_a: EdwardsPoint,
         R_prime_a: EdwardsPoint,
         s_b: Scalar,
-        rng: &mut (impl Rng + CryptoRng)
+        rng: &mut (impl Rng + CryptoRng),
     ) -> Result<Self> {
         let alpha_b = Scalar::random(rng);
 
@@ -403,7 +403,7 @@ impl Bob1 {
                 self.H_p_pk,
                 self.I_hat_b,
                 self.alpha_b,
-                rng
+                rng,
             ),
         }
     }
@@ -464,7 +464,7 @@ impl DleqProof {
         H: EdwardsPoint,
         xH: EdwardsPoint,
         x: Scalar,
-        rng: &mut (impl Rng + CryptoRng)
+        rng: &mut (impl Rng + CryptoRng),
     ) -> Self {
         let r = Scalar::random(rng);
         let rG = r * G;
@@ -621,6 +621,7 @@ pub struct Message3 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::rngs::OsRng;
 
     #[test]
     fn sign_and_verify_success() {
@@ -651,13 +652,13 @@ mod tests {
             x * ED25519_BASEPOINT_POINT
         });
 
-        let alice = Alice0::new(ring, *msg_to_sign, R_a, R_prime_a, s_prime_a).unwrap();
-        let bob = Bob0::new(ring, *msg_to_sign, R_a, R_prime_a, s_b).unwrap();
+        let alice = Alice0::new(ring, *msg_to_sign, R_a, R_prime_a, s_prime_a, &mut OsRng).unwrap();
+        let bob = Bob0::new(ring, *msg_to_sign, R_a, R_prime_a, s_b, &mut OsRng).unwrap();
 
-        let msg = alice.next_message();
+        let msg = alice.next_message(&mut OsRng);
         let bob = bob.receive(msg);
 
-        let msg = bob.next_message();
+        let msg = bob.next_message(&mut OsRng);
         let alice = alice.receive(msg).unwrap();
 
         let msg = alice.next_message();

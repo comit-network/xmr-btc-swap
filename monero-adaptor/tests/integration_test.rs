@@ -1,40 +1,60 @@
 #![allow(non_snake_case)]
 
-use monero::blockdata::transaction::KeyImage;
-use monero::util::key::H;
-use monero::ViewPair;
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-use curve25519_dalek::edwards::{EdwardsPoint};
+use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
-use monero::blockdata::transaction::{ExtraField, SubField, TxOutTarget};
+use monero::blockdata::transaction::{ExtraField, KeyImage, SubField, TxOutTarget};
 use monero::cryptonote::hash::Hashable;
 use monero::cryptonote::onetime_key::{KeyGenerator, MONERO_MUL_FACTOR};
+use monero::util::key::H;
 use monero::util::ringct::{EcdhInfo, RctSig, RctSigBase, RctSigPrunable, RctType};
-use monero::{PrivateKey, PublicKey};
-use monero::{Transaction, TransactionPrefix, TxIn, TxOut, VarInt};
+use monero::{
+    PrivateKey, PublicKey, Transaction, TransactionPrefix, TxIn, TxOut, VarInt, ViewPair,
+};
+use monero_harness::Monero;
 use monero_rpc::monerod;
 use monero_rpc::monerod::{GetOutputsOut, MonerodRpc};
-use monero_wallet::{MonerodClientExt};
+use monero_wallet::MonerodClientExt;
 use rand::rngs::OsRng;
-use rand::{Rng, SeedableRng, thread_rng, CryptoRng};
+use rand::{thread_rng, CryptoRng, Rng, SeedableRng};
 use std::convert::TryInto;
 use std::iter;
+use testcontainers::clients::Cli;
 
-// [0u8; 32] = 466iKkx7MqVGD46dje3kwvSQRMfhNCvGaXTRATbQgz7kS8XTMmRmoTw9oJRRj523kTdQj8gXnF2xU9fmEPy9WXTr6pwetQj
-// [1u8; 32] = 47HCnKkBEeYfX5pScvBETAKdjBEPN7FcXEJPUqDPzWGCc6wC8VAdS8CjdtgKuSaY72K8fkoswjp176vbSPS8hzS17EZv8gj
+async fn prepare_nodes(address: monero::Address, amount: u64) -> (monerod::Client, monero::Hash) {
+    let cli = Cli::default();
 
-#[tokio::test]
-async fn make_blocks() {
-    let client = monerod::Client::localhost(18081).unwrap();
+    let (monero, _monerod_container, _monero_wallet_rpc_containers) =
+        Monero::new(&cli, vec![]).await.unwrap();
 
-    // client.generateblocks(110, "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".to_owned()).await.unwrap();
-    client.generateblocks(10, "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".to_owned()).await.unwrap();
+    monero.init_miner().await.unwrap();
+
+    let wallet = monero.wallet("miner").expect("wallet to exist");
+
+    let transfer = wallet
+        .transfer(&address.to_string(), amount)
+        .await
+        .expect("lock to succeed");
+
+    let monerod = monero.monerod().client();
+    let miner_address = wallet
+        .address()
+        .await
+        .expect("miner address to exist")
+        .address;
+    monerod
+        .generateblocks(10, miner_address)
+        .await
+        .expect("can generate blocks");
+
+    let lock_tx_hash = transfer.tx_hash.parse().unwrap();
+
+    (monerod.clone(), lock_tx_hash)
 }
 
 #[tokio::test]
 async fn monerod_integration_test() {
-    let client = monerod::Client::localhost(18081).unwrap();
     let mut rng = rand::rngs::StdRng::from_seed([0u8; 32]);
 
     let s_a = curve25519_dalek::scalar::Scalar::random(&mut rng);
@@ -52,19 +72,26 @@ async fn monerod_integration_test() {
 
     dbg!(lock_address.to_string()); // 45BcRKAHaA4b5A9SdamF2f1w7zk1mKkBPhaqVoDWzuAtMoSAytzm5A6b2fE6ruupkAFmStrQzdojUExt96mR3oiiSKp8Exf
 
-    let lock_tx = "c73c42dbd9082639fd475ea570c04eeddf068c3897ceae1b501beae7571779de"
-        .parse()
-        .unwrap();
+    let (client, lock_tx) = prepare_nodes(lock_address, lock_amount).await;
 
     let o_indexes_response = client.get_o_indexes(lock_tx).await.unwrap();
 
-    let transaction = client.get_transactions(&[lock_tx]).await.unwrap().pop().unwrap();
+    let transaction = client
+        .get_transactions(&[lock_tx])
+        .await
+        .unwrap()
+        .pop()
+        .unwrap();
 
     dbg!(&transaction.prefix.inputs);
 
     let viewpair = ViewPair::from(&lock_kp);
 
-    let our_output = transaction.check_outputs(&viewpair, 0..1, 0..1).expect("to have outputs in this transaction").pop().expect("to own at least one output");
+    let our_output = transaction
+        .check_outputs(&viewpair, 0..1, 0..1)
+        .expect("to have outputs in this transaction")
+        .pop()
+        .expect("to own at least one output");
     let actual_lock_amount = transaction.get_amount(&viewpair, &our_output).unwrap();
 
     assert_eq!(actual_lock_amount, lock_amount);
@@ -124,19 +151,24 @@ async fn monerod_integration_test() {
 
     let ecdh_key_0 = PrivateKey::random(&mut rng);
     let (ecdh_info_0, out_blinding_0) = EcdhInfo::new_bulletproof(spend_amount, ecdh_key_0.scalar);
-    
+
     let ecdh_key_1 = PrivateKey::random(&mut rng);
     let (ecdh_info_1, out_blinding_1) = EcdhInfo::new_bulletproof(spend_amount, ecdh_key_1.scalar);
-    
-    let (bulletproof, out_pk) =
-        monero::make_bulletproof(&mut rng, &[spend_amount, 0], &[out_blinding_0, out_blinding_1]).unwrap();
+
+    let (bulletproof, out_pk) = monero::make_bulletproof(&mut rng, &[spend_amount, 0], &[
+        out_blinding_0,
+        out_blinding_1,
+    ])
+    .unwrap();
 
     let k_image = {
         let k = lock_kp.spend.scalar;
         let K = ViewPair::from(&lock_kp).spend.point;
 
         let k_image = k * hash_point_to_point(K.decompress().unwrap());
-        KeyImage { image: monero::cryptonote::hash::Hash(k_image.compress().to_bytes()) }
+        KeyImage {
+            image: monero::cryptonote::hash::Hash(k_image.compress().to_bytes()),
+        }
     };
 
     let prefix = TransactionPrefix {
@@ -147,37 +179,44 @@ async fn monerod_integration_test() {
             key_offsets: relative_key_offsets,
             k_image,
         }],
-        outputs: vec![TxOut {
-            amount: VarInt(0),
-            target: TxOutTarget::ToKey {
-                key: KeyGenerator::from_random(
-                    target_address.public_view,
-                    target_address.public_spend,
-                    ecdh_key_0,
-                )
-                .one_time_key(0)// TODO: This must be the output index
+        outputs: vec![
+            TxOut {
+                amount: VarInt(0),
+                target: TxOutTarget::ToKey {
+                    key: KeyGenerator::from_random(
+                        target_address.public_view,
+                        target_address.public_spend,
+                        ecdh_key_0,
+                    )
+                    .one_time_key(0), // TODO: This must be the output index
+                },
             },
-        }, TxOut {
-            amount: VarInt(0),
-            target: TxOutTarget::ToKey {
-                key: KeyGenerator::from_random(
-                    target_address.public_view,
-                    target_address.public_spend,
-                    ecdh_key_1,
-                )
+            TxOut {
+                amount: VarInt(0),
+                target: TxOutTarget::ToKey {
+                    key: KeyGenerator::from_random(
+                        target_address.public_view,
+                        target_address.public_spend,
+                        ecdh_key_1,
+                    )
                     .one_time_key(1), // TODO: This must be the output index
+                },
             },
-        }],
-        extra: ExtraField(vec![SubField::TxPublicKey(PublicKey::from_private_key(
-            &ecdh_key_0,
-        )), SubField::TxPublicKey(PublicKey::from_private_key(
-            &ecdh_key_1,
-        ))]),
+        ],
+        extra: ExtraField(vec![
+            SubField::TxPublicKey(PublicKey::from_private_key(&ecdh_key_0)),
+            SubField::TxPublicKey(PublicKey::from_private_key(&ecdh_key_1)),
+        ]),
     };
 
-    // assert_eq!(prefix.hash(), "c3ded4d1a8cddd4f76c09b63edff4e312e759b3afc46beda4e1fd75c9c68d997".parse().unwrap());
+    // assert_eq!(prefix.hash(),
+    // "c3ded4d1a8cddd4f76c09b63edff4e312e759b3afc46beda4e1fd75c9c68d997".parse().
+    // unwrap());
 
-    let s_prime_a = s_a + KeyGenerator::from_key(&viewpair, our_output.tx_pubkey).get_rvn_scalar(our_output.index).scalar;
+    let s_prime_a = s_a
+        + KeyGenerator::from_key(&viewpair, our_output.tx_pubkey)
+            .get_rvn_scalar(our_output.index)
+            .scalar;
 
     let (adaptor_sig, adaptor) =
         single_party_adaptor_sig(s_prime_a, s_b, ring, &prefix.hash().to_bytes(), &mut rng);
@@ -187,12 +226,15 @@ async fn monerod_integration_test() {
     // let pseudo_out = {
     //     let lock_amount = Scalar::from(lock_amount);
     //
-    //     (out_blinding * ED25519_BASEPOINT_POINT) + (lock_amount * H.point.decompress().unwrap())
-    // };
+    //     (out_blinding * ED25519_BASEPOINT_POINT) + (lock_amount *
+    // H.point.decompress().unwrap()) };
 
     monero::verify_bulletproof(&mut thread_rng(), bulletproof.clone(), out_pk.clone()).unwrap();
 
-    let out_pk = out_pk.into_iter().map(|p| (p.decompress().unwrap() * Scalar::from(MONERO_MUL_FACTOR)).compress()).collect::<Vec<_>>();
+    let out_pk = out_pk
+        .into_iter()
+        .map(|p| (p.decompress().unwrap() * Scalar::from(MONERO_MUL_FACTOR)).compress())
+        .collect::<Vec<_>>();
 
     let fee_key = Scalar::from(fee) * H.point.decompress().unwrap();
 
@@ -221,7 +263,9 @@ async fn monerod_integration_test() {
                 bulletproofs: vec![bulletproof],
                 MGs: Vec::new(),
                 Clsags: vec![sig.into()],
-                pseudo_outs: vec![monero::util::ringct::Key { key: pseudo_out.compress().0 }],
+                pseudo_outs: vec![monero::util::ringct::Key {
+                    key: pseudo_out.compress().0,
+                }],
             }),
         },
     };
@@ -245,7 +289,7 @@ fn single_party_adaptor_sig(
     s_b: Scalar,
     ring: [EdwardsPoint; monero_adaptor::RING_SIZE],
     msg: &[u8; 32],
-    rng: &mut (impl Rng + CryptoRng)
+    rng: &mut (impl Rng + CryptoRng),
 ) -> (monero_adaptor::AdaptorSignature, Scalar) {
     let (r_a, R_a, R_prime_a) = {
         let r_a = Scalar::random(&mut OsRng);
@@ -298,21 +342,18 @@ mod tests {
 
         let relative_offsets = to_relative_offsets(&key_offsets);
 
-        assert_eq!(
-            &relative_offsets,
-            &[
-                VarInt(78),
-                VarInt(3),
-                VarInt(10),
-                VarInt(0),
-                VarInt(5),
-                VarInt(2),
-                VarInt(3),
-                VarInt(11),
-                VarInt(1),
-                VarInt(1),
-                VarInt(3),
-            ]
-        )
+        assert_eq!(&relative_offsets, &[
+            VarInt(78),
+            VarInt(3),
+            VarInt(10),
+            VarInt(0),
+            VarInt(5),
+            VarInt(2),
+            VarInt(3),
+            VarInt(11),
+            VarInt(1),
+            VarInt(1),
+            VarInt(3),
+        ])
     }
 }

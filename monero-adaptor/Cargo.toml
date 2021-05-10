@@ -17,5 +17,6 @@ hex = "0.4"
 monero-harness = { path = "../monero-harness" }
 monero-rpc = { path = "../monero-rpc" }
 monero-wallet = { path = "../monero-wallet" }
+testcontainers = "0.12"
 tokio = { version = "1", features = ["full"] }
 itertools = "0.10"
