@@ -109,7 +109,7 @@ impl<'c> Monero {
         let monerod = &self.monerod;
         let res = monerod
             .client()
-            .generateblocks(70, miner_address.clone())
+            .generateblocks(150, miner_address.clone())
             .await?;
         tracing::info!("Generated {:?} blocks", res.blocks.len());
         miner_wallet.refresh().await?;

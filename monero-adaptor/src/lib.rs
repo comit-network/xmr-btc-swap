@@ -4,23 +4,17 @@
 
 use anyhow::{bail, Result};
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-use curve25519_dalek::edwards::EdwardsPoint;
+use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
 use rand::{CryptoRng, Rng};
 use std::convert::TryInto;
-use tiny_keccak::{Hasher, Keccak};
+use tiny_keccak::Hasher;
 
 pub const RING_SIZE: usize = 11;
-const DOMAIN_TAG: &str = "CSLAG_c";
-
-#[rustfmt::skip]
-// aggregation hashes:
-// mu_{P, C} =
-// keccak256("CLSAG_agg_{0, 1}" ||
-//     ring || ring of commitments || I || z * hash_to_point(signing pk) || pseudooutput commitment)
-//
-// where z = blinding of real commitment - blinding of pseudooutput commitment.
+const HASH_KEY_CLSAG_AGG_0: &str = "CLSAG_agg_0";
+const HASH_KEY_CLSAG_AGG_1: &str = "CLSAG_agg_1";
+const HASH_KEY_CLSAG_ROUND: &str = "CLSAG_round";
 
 // for every iteration we compute:
 // c_p = h_prev * mu_P; and
@@ -31,33 +25,132 @@ const DOMAIN_TAG: &str = "CSLAG_c";
 //
 // h = keccak256("CLSAG_round" || ring
 //     ring of commitments || pseudooutput commitment || msg || L_i || R_i)
+
+struct AggregationHashes {
+    mu_P: Scalar,
+    mu_C: Scalar,
+}
+
+impl AggregationHashes {
+    pub fn new(
+        ring: [EdwardsPoint; RING_SIZE],
+        commitment_ring: [EdwardsPoint; RING_SIZE],
+        I: EdwardsPoint,
+        z: Scalar,
+        H_p_pk: EdwardsPoint,
+        pseudo_output_commitment: EdwardsPoint,
+    ) -> Self {
+        let z_key_image = z * H_p_pk;
+
+        let ring = ring
+            .iter()
+            .flat_map(|pk| pk.compress().as_bytes().to_vec())
+            .collect::<Vec<u8>>();
+        let commitment_ring = commitment_ring
+            .iter()
+            .flat_map(|pk| pk.compress().as_bytes().to_vec())
+            .collect::<Vec<u8>>();
+        let I = I.compress();
+        let z_key_image = z_key_image.compress();
+        let pseudo_output_commitment = pseudo_output_commitment.compress();
+
+        let mu_P = Self::hash(
+            HASH_KEY_CLSAG_AGG_0,
+            &ring,
+            &commitment_ring,
+            &I,
+            &z_key_image,
+            &pseudo_output_commitment,
+        );
+        let mu_C = Self::hash(
+            HASH_KEY_CLSAG_AGG_1,
+            &ring,
+            &commitment_ring,
+            &I,
+            &z_key_image,
+            &pseudo_output_commitment,
+        );
+
+        Self { mu_P, mu_C }
+    }
+
+    // aggregation hashes:
+    // mu_{P, C} =
+    // keccak256("CLSAG_agg_{0, 1}" ||
+    //     ring || ring of commitments || I || z * hash_to_point(signing pk) ||
+    // pseudooutput commitment)
+    //
+    // where z = blinding of real commitment - blinding of pseudooutput commitment.
+    fn hash(
+        domain_prefix: &str,
+        ring: &[u8],
+        commitment_ring: &[u8],
+        I: &CompressedEdwardsY,
+        z_key_image: &CompressedEdwardsY,
+        pseudo_output_commitment: &CompressedEdwardsY,
+    ) -> Scalar {
+        let mut hasher = tiny_keccak::Keccak::v256();
+        hasher.update(domain_prefix.as_bytes());
+        hasher.update(ring);
+        hasher.update(commitment_ring);
+        hasher.update(I.as_bytes());
+        hasher.update(z_key_image.as_bytes());
+        hasher.update(pseudo_output_commitment.as_bytes());
+
+        let mut hash = [0u8; 32];
+        hasher.finalize(&mut hash);
+
+        Scalar::from_bytes_mod_order(hash)
+    }
+}
+
 fn challenge(
+    prefix: &[u8],
     s_i: Scalar,
     pk_i: EdwardsPoint,
     h_prev: Scalar,
     I: EdwardsPoint,
-    mut prefix: Keccak,
 ) -> Result<Scalar> {
     let L_i = s_i * ED25519_BASEPOINT_POINT + h_prev * pk_i;
 
     let H_p_pk_i = hash_point_to_point(pk_i);
-
     let R_i = s_i * H_p_pk_i + h_prev * I;
 
-    prefix.update(&L_i.compress().as_bytes().to_vec());
-    prefix.update(&R_i.compress().as_bytes().to_vec());
+    let mut hasher = tiny_keccak::Keccak::v256();
+    hasher.update(prefix);
+    hasher.update(&L_i.compress().as_bytes().to_vec());
+    hasher.update(&R_i.compress().as_bytes().to_vec());
 
-    let mut output = [0u8; 64];
-    prefix.finalize(&mut output);
+    let mut output = [0u8; 32];
+    hasher.finalize(&mut output);
 
-    Ok(Scalar::from_bytes_mod_order_wide(&output))
+    Ok(Scalar::from_bytes_mod_order(output))
 }
 
-#[rustfmt::skip]
-// h_0 = keccak256("CLSAG_round" || ring
-//     ring of commitments || pseudooutput commitment || msg || alpha * G || alpha * hash_to_point(signing pk))
+// h_0 = keccak256("CLSAG_round" || ring ||
+//     ring of commitments || pseudooutput commitment || msg || alpha * G ||
+// alpha * hash_to_point(signing pk))
 //
 // where alpha is random
+
+// TODO: Create ring newtype
+fn clsag_round_hash_prefix(
+    ring: &[u8],
+    commitment_ring: &[u8],
+    pseudo_output_commitment: &EdwardsPoint,
+    msg: &[u8],
+) -> Vec<u8> {
+    // TODO: Set capacity
+    let mut prefix = Vec::new();
+
+    prefix.extend(HASH_KEY_CLSAG_ROUND.as_bytes());
+    prefix.extend(ring);
+    prefix.extend(commitment_ring);
+    prefix.extend(pseudo_output_commitment.compress().as_bytes());
+    prefix.extend(msg);
+
+    prefix
+}
 
 #[allow(clippy::too_many_arguments)]
 fn final_challenge(
@@ -70,18 +163,16 @@ fn final_challenge(
     I_hat_b: EdwardsPoint,
     R_prime_a: EdwardsPoint,
     I: EdwardsPoint,
-    msg: [u8; 32],
+    msg: &[u8],
 ) -> Result<(Scalar, Scalar)> {
+    let ring_concat = ring
+        .iter()
+        .flat_map(|pk| pk.compress().as_bytes().to_vec())
+        .collect::<Vec<u8>>();
+    let prefix = clsag_round_hash_prefix(&ring_concat, todo!(), todo!(), msg);
     let h_0 = {
-        let ring = ring
-            .iter()
-            .flat_map(|pk| pk.compress().as_bytes().to_vec())
-            .collect::<Vec<u8>>();
-
-        let mut keccak = tiny_keccak::Keccak::v512();
-        keccak.update(DOMAIN_TAG.as_bytes());
-        keccak.update(ring.as_slice());
-        keccak.update(&msg);
+        let mut keccak = tiny_keccak::Keccak::v256();
+        keccak.update(&prefix);
         keccak.update((T_a + T_b + R_a).compress().as_bytes());
         keccak.update((I_hat_a + I_hat_b + R_prime_a).compress().as_bytes());
         let mut output = [0u8; 64];
@@ -89,17 +180,11 @@ fn final_challenge(
 
         Scalar::from_bytes_mod_order_wide(&output)
     };
-    // ring size is 11
 
     let ring_concat = ring
         .iter()
         .flat_map(|pk| pk.compress().as_bytes().to_vec())
         .collect::<Vec<u8>>();
-
-    let mut keccak = tiny_keccak::Keccak::v512();
-    keccak.update(DOMAIN_TAG.as_bytes());
-    keccak.update(ring_concat.as_slice());
-    keccak.update(&msg);
 
     let h_last = fake_responses
         .iter()
@@ -107,7 +192,7 @@ fn final_challenge(
         .fold(h_0, |h_prev, (i, s_i)| {
             let pk_i = ring[i + 1];
             // TODO: Do not unwrap here
-            challenge(*s_i, pk_i, h_prev, I, keccak.clone()).unwrap()
+            challenge(&prefix, *s_i, pk_i, h_prev, I).unwrap()
         });
 
     Ok((h_last, h_0))
@@ -158,16 +243,17 @@ impl Signature {
             .flat_map(|pk| pk.compress().as_bytes().to_vec())
             .collect::<Vec<u8>>();
 
-        let mut prefix = tiny_keccak::Keccak::v512();
-        prefix.update(DOMAIN_TAG.as_bytes());
-        prefix.update(ring_concat.as_slice());
-        prefix.update(msg);
-
         let mut h = self.h_0;
 
         for (i, s_i) in self.responses.iter().enumerate() {
             let pk_i = ring[(i + 1) % RING_SIZE];
-            h = challenge(*s_i, pk_i, h, self.I, prefix.clone())?;
+            h = challenge(
+                &clsag_round_hash_prefix(&ring_concat, todo!(), todo!(), msg),
+                *s_i,
+                pk_i,
+                h,
+                self.I,
+            )?;
         }
 
         Ok(h == self.h_0)
@@ -276,11 +362,10 @@ impl Alice0 {
             msg.I_hat_b,
             self.R_prime_a,
             self.I_a + msg.I_b,
-            self.msg,
+            &self.msg,
         )?;
 
-        // TODO: Final scalar is computed slightly differentley for Monero (involves
-        // mu_P and mu_C constants)
+        // TODO: alpha_a - h_last * (mu_P * s_prime_a + mu_C * z)
         let s_0_a = self.alpha_a - h_last * self.s_prime_a;
 
         Ok(Alice1 {
@@ -449,9 +534,10 @@ impl Bob1 {
             self.I_hat_b,
             self.R_prime_a,
             I_a + self.I_b,
-            self.msg,
+            &self.msg,
         )?;
 
+        // TODO: alpha_b - h_last * (mu_P * s_b + mu_C * z);
         let s_0_b = self.alpha_b - h_last * self.s_b;
 
         let adaptor_sig = AdaptorSignature {

@@ -13,7 +13,6 @@ use monero::{
     PrivateKey, PublicKey, Transaction, TransactionPrefix, TxIn, TxOut, VarInt, ViewPair,
 };
 use monero_harness::Monero;
-use monero_rpc::monerod;
 use monero_rpc::monerod::{GetOutputsOut, MonerodRpc};
 use monero_wallet::MonerodClientExt;
 use rand::rngs::OsRng;
@@ -22,40 +21,13 @@ use std::convert::TryInto;
 use std::iter;
 use testcontainers::clients::Cli;
 
-async fn prepare_nodes(address: monero::Address, amount: u64) -> (monerod::Client, monero::Hash) {
-    let cli = Cli::default();
-
-    let (monero, _monerod_container, _monero_wallet_rpc_containers) =
-        Monero::new(&cli, vec![]).await.unwrap();
-
-    monero.init_miner().await.unwrap();
-
-    let wallet = monero.wallet("miner").expect("wallet to exist");
-
-    let transfer = wallet
-        .transfer(&address.to_string(), amount)
-        .await
-        .expect("lock to succeed");
-
-    let monerod = monero.monerod().client();
-    let miner_address = wallet
-        .address()
-        .await
-        .expect("miner address to exist")
-        .address;
-    monerod
-        .generateblocks(10, miner_address)
-        .await
-        .expect("can generate blocks");
-
-    let lock_tx_hash = transfer.tx_hash.parse().unwrap();
-
-    (monerod.clone(), lock_tx_hash)
-}
-
 #[tokio::test]
 async fn monerod_integration_test() {
     let mut rng = rand::rngs::StdRng::from_seed([0u8; 32]);
+
+    let cli = Cli::default();
+    let (monero, _monerod_container, _monero_wallet_rpc_containers) =
+        Monero::new(&cli, vec![]).await.unwrap();
 
     let s_a = curve25519_dalek::scalar::Scalar::random(&mut rng);
     let s_b = curve25519_dalek::scalar::Scalar::random(&mut rng);
@@ -72,7 +44,27 @@ async fn monerod_integration_test() {
 
     dbg!(lock_address.to_string()); // 45BcRKAHaA4b5A9SdamF2f1w7zk1mKkBPhaqVoDWzuAtMoSAytzm5A6b2fE6ruupkAFmStrQzdojUExt96mR3oiiSKp8Exf
 
-    let (client, lock_tx) = prepare_nodes(lock_address, lock_amount).await;
+    monero.init_miner().await.unwrap();
+    let wallet = monero.wallet("miner").expect("wallet to exist");
+
+    let transfer = wallet
+        .transfer(&lock_address.to_string(), lock_amount)
+        .await
+        .expect("lock to succeed");
+
+    let client = monero.monerod().client();
+
+    let miner_address = wallet
+        .address()
+        .await
+        .expect("miner address to exist")
+        .address;
+    client
+        .generateblocks(10, miner_address)
+        .await
+        .expect("can generate blocks");
+
+    let lock_tx = transfer.tx_hash.parse().unwrap();
 
     let o_indexes_response = client.get_o_indexes(lock_tx).await.unwrap();
 
