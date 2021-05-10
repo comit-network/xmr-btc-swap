@@ -122,26 +122,24 @@ fn challenge(
     Ok(Scalar::from_bytes_mod_order(output))
 }
 
-// h_0 = keccak256("CLSAG_round" || ring ||
-//     ring of commitments || pseudooutput commitment || msg || alpha * G ||
-// alpha * hash_to_point(signing pk))
-//
-// where alpha is random
-
-// TODO: Create ring newtype
+/// Compute the prefix for the hash common to every iteration of the ring signature algorithm.
+///
+/// "CLSAG_round" || ring || ring of commitments || pseudooutput commitment || msg || alpha * G
 fn clsag_round_hash_prefix(
     ring: &[u8],
     commitment_ring: &[u8],
     pseudo_output_commitment: &EdwardsPoint,
     msg: &[u8],
 ) -> Vec<u8> {
-    // TODO: Set capacity
-    let mut prefix = Vec::new();
+    let domain_prefix = HASH_KEY_CLSAG_ROUND.as_bytes();
+    let pseudo_output_commitment = pseudo_output_commitment.compress().as_bytes();
 
-    prefix.extend(HASH_KEY_CLSAG_ROUND.as_bytes());
+    let mut prefix = Vec::with_capacity(domain_prefix.len() + ring.len() + commitment_ring.len() + pseudo_output_commitment.len() + msg.len());
+
+    prefix.extend(domain_prefix);
     prefix.extend(ring);
     prefix.extend(commitment_ring);
-    prefix.extend(pseudo_output_commitment.compress().as_bytes());
+    prefix.extend(pseudo_output_commitment);
     prefix.extend(msg);
 
     prefix
