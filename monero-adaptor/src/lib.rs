@@ -8,6 +8,7 @@ use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
 use rand::{CryptoRng, Rng};
+use ring::Ring;
 use std::convert::TryInto;
 use tiny_keccak::Hasher;
 
@@ -35,8 +36,8 @@ struct AggregationHashes {
 
 impl AggregationHashes {
     pub fn new(
-        ring: [EdwardsPoint; RING_SIZE],
-        commitment_ring: [EdwardsPoint; RING_SIZE],
+        ring: Ring,
+        commitment_ring: Ring,
         I: EdwardsPoint,
         z: Scalar,
         H_p_pk: EdwardsPoint,
@@ -44,30 +45,22 @@ impl AggregationHashes {
     ) -> Self {
         let z_key_image = z * H_p_pk;
 
-        let ring = ring
-            .iter()
-            .flat_map(|pk| pk.compress().as_bytes().to_vec())
-            .collect::<Vec<u8>>();
-        let commitment_ring = commitment_ring
-            .iter()
-            .flat_map(|pk| pk.compress().as_bytes().to_vec())
-            .collect::<Vec<u8>>();
         let I = I.compress();
         let z_key_image = z_key_image.compress();
         let pseudo_output_commitment = pseudo_output_commitment.compress();
 
         let mu_P = Self::hash(
             HASH_KEY_CLSAG_AGG_0,
-            &ring,
-            &commitment_ring,
+            ring.as_ref(),
+            commitment_ring.as_ref(),
             &I,
             &z_key_image,
             &pseudo_output_commitment,
         );
         let mu_C = Self::hash(
             HASH_KEY_CLSAG_AGG_1,
-            &ring,
-            &commitment_ring,
+            ring.as_ref(),
+            commitment_ring.as_ref(),
             &I,
             &z_key_image,
             &pseudo_output_commitment,
@@ -157,7 +150,7 @@ fn clsag_round_hash_prefix(
 #[allow(clippy::too_many_arguments)]
 fn final_challenge(
     fake_responses: [Scalar; RING_SIZE - 1],
-    ring: [EdwardsPoint; RING_SIZE],
+    ring: Ring,
     T_a: EdwardsPoint,
     T_b: EdwardsPoint,
     R_a: EdwardsPoint,
@@ -167,11 +160,7 @@ fn final_challenge(
     I: EdwardsPoint,
     msg: &[u8],
 ) -> Result<(Scalar, Scalar)> {
-    let ring_concat = ring
-        .iter()
-        .flat_map(|pk| pk.compress().as_bytes().to_vec())
-        .collect::<Vec<u8>>();
-    let prefix = clsag_round_hash_prefix(&ring_concat, todo!(), todo!(), msg);
+    let prefix = clsag_round_hash_prefix(ring.as_ref(), todo!(), todo!(), msg);
     let h_0 = {
         let mut keccak = tiny_keccak::Keccak::v256();
         keccak.update(&prefix);
@@ -182,11 +171,6 @@ fn final_challenge(
 
         Scalar::from_bytes_mod_order_wide(&output)
     };
-
-    let ring_concat = ring
-        .iter()
-        .flat_map(|pk| pk.compress().as_bytes().to_vec())
-        .collect::<Vec<u8>>();
 
     let h_last = fake_responses
         .iter()
@@ -282,7 +266,7 @@ impl From<Signature> for monero::util::ringct::Clsag {
 
 pub struct Alice0 {
     // secret index is always 0
-    ring: [EdwardsPoint; RING_SIZE],
+    ring: Ring,
     fake_responses: [Scalar; RING_SIZE - 1],
     msg: [u8; 32],
     // encryption key
@@ -308,6 +292,8 @@ impl Alice0 {
         s_prime_a: Scalar,
         rng: &mut (impl Rng + CryptoRng),
     ) -> Result<Self> {
+        let ring = Ring::new(ring);
+
         let mut fake_responses = [Scalar::zero(); RING_SIZE - 1];
         for response in fake_responses.iter_mut().take(RING_SIZE - 1) {
             *response = Scalar::random(rng);
@@ -419,7 +405,7 @@ pub struct Alice2 {
 
 pub struct Bob0 {
     // secret index is always 0
-    ring: [EdwardsPoint; RING_SIZE],
+    ring: Ring,
     msg: [u8; 32],
     // encryption key
     R_a: EdwardsPoint,
@@ -443,6 +429,8 @@ impl Bob0 {
         s_b: Scalar,
         rng: &mut (impl Rng + CryptoRng),
     ) -> Result<Self> {
+        let ring = Ring::new(ring);
+
         let alpha_b = Scalar::random(rng);
 
         let p_k = ring[0];
@@ -486,7 +474,7 @@ impl Bob0 {
 
 pub struct Bob1 {
     // secret index is always 0
-    ring: [EdwardsPoint; RING_SIZE],
+    ring: Ring,
     msg: [u8; 32],
     // encryption key
     R_a: EdwardsPoint,
