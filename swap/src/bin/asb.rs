@@ -45,9 +45,8 @@ const DEFAULT_WALLET_NAME: &str = "asb-wallet";
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    asb::tracing::init(LevelFilter::DEBUG).expect("initialize tracing");
-
     let opt = Arguments::from_args();
+    asb::tracing::init(LevelFilter::DEBUG, opt.json).expect("initialize tracing");
 
     let config_path = if let Some(config_path) = opt.config {
         config_path

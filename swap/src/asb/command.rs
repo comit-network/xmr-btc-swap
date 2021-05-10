@@ -11,6 +11,13 @@ use uuid::Uuid;
 )]
 pub struct Arguments {
     #[structopt(
+        short,
+        long = "json",
+        help = "Changes the log messages to json vs plain-text. If you run ASB as a service, it is recommended to set this to true to simplify log analyses."
+    )]
+    pub json: bool,
+
+    #[structopt(
         long = "config",
         help = "Provide a custom path to the configuration file. The configuration file must be a toml file.",
         parse(from_os_str)
