@@ -11,6 +11,8 @@ use rand::{CryptoRng, Rng};
 use std::convert::TryInto;
 use tiny_keccak::Hasher;
 
+mod ring;
+
 pub const RING_SIZE: usize = 11;
 const HASH_KEY_CLSAG_AGG_0: &str = "CLSAG_agg_0";
 const HASH_KEY_CLSAG_AGG_1: &str = "CLSAG_agg_1";
