@@ -12,7 +12,7 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use libp2p::core::multiaddr::Protocol;
 use libp2p::core::Multiaddr;
 use libp2p::Swarm;
@@ -22,8 +22,8 @@ use std::sync::Arc;
 use structopt::StructOpt;
 use swap::asb::command::{Arguments, Command, ManualRecovery, RecoverCommandParams};
 use swap::asb::config::{
-    default_config_path, initial_setup, query_user_for_initial_testnet_config, read_config, Config,
-    ConfigNotInitialized,
+    initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
+    GetDefaults,
 };
 use swap::database::Database;
 use swap::env::GetConfig;
@@ -45,22 +45,48 @@ const DEFAULT_WALLET_NAME: &str = "asb-wallet";
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let opt = Arguments::from_args();
-    asb::tracing::init(LevelFilter::DEBUG, opt.json).expect("initialize tracing");
+    let Arguments {
+        testnet,
+        json,
+        config,
+        cmd,
+    } = Arguments::from_args();
+    asb::tracing::init(LevelFilter::DEBUG, json).expect("initialize tracing");
 
-    let config_path = if let Some(config_path) = opt.config {
+    let config_path = if let Some(config_path) = config {
         config_path
+    } else if testnet {
+        env::Testnet::getConfigFileDefaults()?.config_path
     } else {
-        default_config_path()?
+        env::Mainnet::getConfigFileDefaults()?.config_path
     };
 
     let config = match read_config(config_path.clone())? {
         Ok(config) => config,
         Err(ConfigNotInitialized {}) => {
-            initial_setup(config_path.clone(), query_user_for_initial_testnet_config)?;
+            initial_setup(config_path.clone(), query_user_for_initial_config, testnet)?;
             read_config(config_path)?.expect("after initial setup config can be read")
         }
     };
+
+    let env_config = if testnet {
+        env::Testnet::get_config()
+    } else {
+        env::Mainnet::get_config()
+    };
+
+    if config.monero.network != env_config.monero_network {
+        bail!(format!(
+            "Expected monero network in config file to be {:?} but was {:?}",
+            env_config.monero_network, config.monero.network
+        ));
+    }
+    if config.bitcoin.network != env_config.bitcoin_network {
+        bail!(format!(
+            "Expected bitcoin network in config file to be {:?} but was {:?}",
+            env_config.bitcoin_network, config.bitcoin.network
+        ));
+    }
 
     info!(
         db_folder = %config.data.dir.display(),
@@ -75,9 +101,7 @@ async fn main() -> Result<()> {
     let seed =
         Seed::from_file_or_generate(&config.data.dir).expect("Could not retrieve/initialize seed");
 
-    let env_config = env::Testnet::get_config();
-
-    match opt.cmd {
+    match cmd {
         Command::Start { resume_only } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
 

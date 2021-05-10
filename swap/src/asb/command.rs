@@ -10,6 +10,9 @@ use uuid::Uuid;
     author
 )]
 pub struct Arguments {
+    #[structopt(long, help = "Swap on testnet")]
+    pub testnet: bool,
+
     #[structopt(
         short,
         long = "json",
