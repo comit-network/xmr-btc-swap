@@ -14,6 +14,23 @@ use tiny_keccak::{Hasher, Keccak};
 pub const RING_SIZE: usize = 11;
 const DOMAIN_TAG: &str = "CSLAG_c";
 
+#[rustfmt::skip]
+// aggregation hashes:
+// mu_{P, C} =
+// keccak256("CLSAG_agg_{0, 1}" ||
+//     ring || ring of commitments || I || z * hash_to_point(signing pk) || pseudooutput commitment)
+//
+// where z = blinding of real commitment - blinding of pseudooutput commitment.
+
+// for every iteration we compute:
+// c_p = h_prev * mu_P; and
+// c_c = h_prev * mu_C.
+//
+// L_i = s_i * G + c_p * pk_i + c_c * (commitment_i - pseudoutcommitment)
+// R_i = s_i * H_p_pk_i + c_p * I + c_c * (z * hash_to_point(signing pk))
+//
+// h = keccak256("CLSAG_round" || ring
+//     ring of commitments || pseudooutput commitment || msg || L_i || R_i)
 fn challenge(
     s_i: Scalar,
     pk_i: EdwardsPoint,
@@ -35,6 +52,12 @@ fn challenge(
 
     Ok(Scalar::from_bytes_mod_order_wide(&output))
 }
+
+#[rustfmt::skip]
+// h_0 = keccak256("CLSAG_round" || ring
+//     ring of commitments || pseudooutput commitment || msg || alpha * G || alpha * hash_to_point(signing pk))
+//
+// where alpha is random
 
 #[allow(clippy::too_many_arguments)]
 fn final_challenge(
@@ -256,6 +279,8 @@ impl Alice0 {
             self.msg,
         )?;
 
+        // TODO: Final scalar is computed slightly differentley for Monero (involves
+        // mu_P and mu_C constants)
         let s_0_a = self.alpha_a - h_last * self.s_prime_a;
 
         Ok(Alice1 {
