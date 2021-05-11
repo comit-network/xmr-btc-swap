@@ -8,18 +8,18 @@ use tiny_keccak::{Hasher, Keccak};
 pub const RING_SIZE: usize = 11;
 
 pub fn sign(
-    fake_responses: [Scalar; RING_SIZE - 1],
+    msg: &[u8],
+    signing_key: Scalar,
+    H_p_pk: EdwardsPoint,
+    alpha: Scalar,
     ring: Ring,
     commitment_ring: Ring,
+    fake_responses: [Scalar; RING_SIZE - 1],
     z: Scalar,
-    H_p_pk: EdwardsPoint,
     pseudo_output_commitment: EdwardsPoint,
     L: EdwardsPoint,
     R: EdwardsPoint,
     I: EdwardsPoint,
-    msg: &[u8],
-    signing_key: Scalar,
-    alpha: Scalar,
 ) -> Signature {
     let D = z * H_p_pk;
     let D_inv_8 = D * Scalar::from(8u8).invert();

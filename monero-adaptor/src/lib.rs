@@ -166,18 +166,18 @@ impl Alice0 {
             .verify(ED25519_BASEPOINT_POINT, msg.T_b, self.H_p_pk, msg.I_hat_b)?;
 
         let sig = clsag::sign(
-            self.fake_responses,
+            &self.msg,
+            self.s_prime_a,
+            self.H_p_pk,
+            self.alpha_a,
             self.ring,
             self.commitment_ring,
+            self.fake_responses,
             z,
-            self.H_p_pk,
             self.pseudo_output_commitment,
             self.T_a + msg.T_b + self.R_a,
             self.I_hat_a + msg.I_hat_b + self.R_prime_a,
             self.I_a + msg.I_b,
-            &self.msg,
-            self.s_prime_a,
-            self.alpha_a,
         );
 
         let sig = HalfAdaptorSignature {
@@ -342,18 +342,18 @@ impl Bob1 {
 
         let I = I_a + self.I_b;
         let sig = clsag::sign(
-            fake_responses,
+            &self.msg,
+            self.s_b,
+            self.H_p_pk,
+            self.alpha_b,
             self.ring,
             self.commitment_ring,
+            fake_responses,
             z,
-            self.H_p_pk,
             self.pseudo_output_commitment,
             T_a + self.T_b + self.R_a,
             I_hat_a + self.I_hat_b + self.R_prime_a,
             I,
-            &self.msg,
-            self.s_b,
-            self.alpha_b,
         );
 
         let s_0_b = sig.responses[10];
