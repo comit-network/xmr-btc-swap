@@ -37,6 +37,7 @@ pub fn sign(
     let mu_C = hash_to_scalar!(
         b"CLSAG_agg_1" || ring || commitment_ring || I || H_p_pk || pseudo_output_commitment
     );
+    let adjusted_commitment_ring = &commitment_ring - pseudo_output_commitment;
 
     let compute_ring_element = |L: EdwardsPoint, R: EdwardsPoint| {
         hash_to_scalar!(
@@ -45,7 +46,6 @@ pub fn sign(
     };
 
     let h_0 = compute_ring_element(L_0, R_0);
-    let adjusted_commitment_ring = &commitment_ring - pseudo_output_commitment;
 
     let h_last = fake_responses
         .iter()
