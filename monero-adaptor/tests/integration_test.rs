@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
+use curve25519_dalek::edwards::{CompressedEdwardsY};
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
 use monero::blockdata::transaction::{ExtraField, KeyImage, SubField, TxOutTarget};
@@ -15,8 +15,7 @@ use monero::{
 use monero_harness::Monero;
 use monero_rpc::monerod::{GetOutputsOut, MonerodRpc};
 use monero_wallet::MonerodClientExt;
-use rand::rngs::OsRng;
-use rand::{CryptoRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
 use std::convert::TryInto;
 use std::iter;
 use testcontainers::clients::Cli;
@@ -29,11 +28,10 @@ async fn monerod_integration_test() {
     let (monero, _monerod_container, _monero_wallet_rpc_containers) =
         Monero::new(&cli, vec![]).await.unwrap();
 
-    let s_a = curve25519_dalek::scalar::Scalar::random(&mut rng);
-    let s_b = curve25519_dalek::scalar::Scalar::random(&mut rng);
+    let signing_key = curve25519_dalek::scalar::Scalar::random(&mut rng);
     let lock_kp = monero::KeyPair {
         view: monero::PrivateKey::from_scalar(curve25519_dalek::scalar::Scalar::random(&mut rng)),
-        spend: monero::PrivateKey::from_scalar(s_a + s_b),
+        spend: monero::PrivateKey::from_scalar(signing_key),
     };
 
     let lock_amount = 1_000_000_000_000;
@@ -206,7 +204,7 @@ async fn monerod_integration_test() {
     // "c3ded4d1a8cddd4f76c09b63edff4e312e759b3afc46beda4e1fd75c9c68d997".parse().
     // unwrap());
 
-    let s_prime_a = s_a
+    let signing_key = signing_key
         + KeyGenerator::from_key(&viewpair, our_output.tx_pubkey)
             .get_rvn_scalar(our_output.index)
             .scalar;
@@ -232,19 +230,23 @@ async fn monerod_integration_test() {
         [our_output.index]
         .open_commitment(&viewpair, &our_output.tx_pubkey, our_output.index);
 
-    let (adaptor_sig, adaptor) = single_party_adaptor_sig(
-        s_prime_a,
-        s_b,
-        ring,
-        commitment_ring,
-        pseudo_out,
-        real_commitment_blinder,
-        (out_blinding_0 + out_blinding_1) * Scalar::from(MONERO_MUL_FACTOR),
-        &prefix.hash().to_bytes(),
-        &mut rng,
-    );
+    let H_p_pk = hash_point_to_point(signing_key * ED25519_BASEPOINT_POINT);
+    let alpha = Scalar::random(&mut rng);
 
-    let sig = adaptor_sig.adapt(adaptor);
+    let sig = monero_adaptor::clsag::sign(
+        &prefix.hash().to_bytes(),
+        signing_key,
+        H_p_pk,
+        alpha,
+        &ring,
+        &commitment_ring,
+        random_array(|| Scalar::random(&mut rng)),
+        real_commitment_blinder - (out_blinding_0 + out_blinding_1) * Scalar::from(MONERO_MUL_FACTOR),
+        pseudo_out,
+        alpha * ED25519_BASEPOINT_POINT,
+        alpha * H_p_pk,
+        signing_key * H_p_pk,
+    );
 
     let out_pk = out_pk
         .iter()
@@ -289,67 +291,11 @@ fn to_relative_offsets(offsets: &[VarInt]) -> Vec<VarInt> {
     iter::once(offsets[0].clone()).chain(diffs).collect()
 }
 
-/// First element of ring is the real pk.
-fn single_party_adaptor_sig(
-    s_prime_a: Scalar,
-    s_b: Scalar,
-    ring: [EdwardsPoint; 11],
-    commitment_ring: [EdwardsPoint; 11],
-    pseudo_output_commitment: EdwardsPoint,
-    real_commitment_blinding: Scalar,
-    pseudo_output_commitment_blinding: Scalar,
-    msg: &[u8; 32],
-    rng: &mut (impl Rng + CryptoRng),
-) -> (monero_adaptor::AdaptorSignature, Scalar) {
-    let (r_a, R_a, R_prime_a) = {
-        let r_a = Scalar::random(&mut OsRng);
-        let R_a = r_a * ED25519_BASEPOINT_POINT;
+fn random_array<T: Default + Copy, const N: usize>(rng: impl FnMut() -> T) -> [T; N] {
+    let mut ring = [T::default(); N];
+    ring[..].fill_with(rng);
 
-        let pk_hashed_to_point = hash_point_to_point(ring[0]);
-
-        let R_prime_a = r_a * pk_hashed_to_point;
-
-        (r_a, R_a, R_prime_a)
-    };
-
-    let alice = monero_adaptor::Alice0::new(
-        ring,
-        *msg,
-        commitment_ring,
-        pseudo_output_commitment,
-        R_a,
-        R_prime_a,
-        s_prime_a,
-        rng,
-    )
-    .unwrap();
-    let bob = monero_adaptor::Bob0::new(
-        ring,
-        *msg,
-        commitment_ring,
-        pseudo_output_commitment,
-        R_a,
-        R_prime_a,
-        s_b,
-        rng,
-    )
-    .unwrap();
-
-    let msg = alice.next_message(rng);
-    let bob = bob.receive(msg);
-
-    let z = real_commitment_blinding - pseudo_output_commitment_blinding;
-
-    let msg = bob.next_message(rng);
-    let alice = alice.receive(msg, z).unwrap();
-
-    let msg = alice.next_message();
-    let bob = bob.receive(msg, z).unwrap();
-
-    let msg = bob.next_message();
-    let alice = alice.receive(msg);
-
-    (alice.adaptor_sig, r_a)
+    ring
 }
 
 #[cfg(test)]

@@ -56,7 +56,14 @@ pub fn sign(
         .fold(h_0, |h_prev, (i, s_i)| {
             let pk_i = ring[i + 1];
 
-            let L_i = compute_L(h_prev, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_ring[i + 1]);
+            let L_i = compute_L(
+                h_prev,
+                mu_P,
+                mu_C,
+                *s_i,
+                pk_i,
+                adjusted_commitment_ring[i + 1],
+            );
             let R_i = compute_R(h_prev, mu_P, mu_C, *s_i, pk_i, I, D_inv_8);
 
             compute_ring_element(L_i, R_i)
@@ -116,7 +123,14 @@ pub fn verify(
     for (i, s_i) in responses.iter().enumerate() {
         let pk_i = ring[(i + 1) % RING_SIZE];
 
-        let L_i = compute_L(h, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_ring[(i + 1) % RING_SIZE]);
+        let L_i = compute_L(
+            h,
+            mu_P,
+            mu_C,
+            *s_i,
+            pk_i,
+            adjusted_commitment_ring[(i + 1) % RING_SIZE],
+        );
         let R_i = compute_R(h, mu_P, mu_C, *s_i, pk_i, I, D);
 
         h = hash_to_scalar!(
@@ -266,7 +280,8 @@ mod tests {
         ring[0] = signing_pk;
 
         let real_commitment_blinding = Scalar::random(&mut OsRng);
-        let mut commitment_ring = random_array(|| Scalar::random(&mut OsRng) * ED25519_BASEPOINT_POINT);
+        let mut commitment_ring =
+            random_array(|| Scalar::random(&mut OsRng) * ED25519_BASEPOINT_POINT);
         commitment_ring[0] = real_commitment_blinding * ED25519_BASEPOINT_POINT; /* + 0 * H */
 
         // TODO: document

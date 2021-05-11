@@ -17,15 +17,7 @@ use clsag::{Signature, RING_SIZE};
 
 #[macro_use]
 mod macros;
-mod clsag;
-
-// for every iteration we compute:
-// c_p = h_prev * mu_P; and
-// c_c = h_prev * mu_C.
-//
-
-// h = keccak256("CLSAG_round" || ring
-//     ring of commitments || pseudooutput commitment || msg || L_i || R_i)
+pub mod clsag;
 
 pub struct AdaptorSignature {
     s_0: Scalar,
