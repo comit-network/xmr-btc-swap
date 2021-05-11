@@ -61,8 +61,7 @@ impl Transport for TorTcpConfig {
             Err(error) => {
                 tracing::warn!(
                     address = %addr,
-                    %error,
-                    "Address could not be formatted. Dialling via clear net.",
+                    "Address could not be formatted. Dialling via clear net. Error {:#}", error,
                 );
                 self.inner.dial(addr)
             }

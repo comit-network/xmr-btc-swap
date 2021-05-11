@@ -157,13 +157,12 @@ impl Wallet {
                 Err(error) => {
                     tracing::warn!(
                         address = %self.main_address,
-                        %error,
-                        "Transferring Monero back to default wallet failed",
+                        "Transferring Monero back to default wallet failed. Error {:#}", error
                     );
                 }
             },
             Err(error) => {
-                tracing::warn!(%error, "Refreshing the generated wallet failed");
+                tracing::warn!("Refreshing the generated wallet failed. Error {:#}", error);
             }
         }
 
@@ -320,8 +319,7 @@ where
             Err(error) => {
                 tracing::debug!(
                     %txid,
-                    %error,
-                    "Failed to retrieve tx from blockchain"
+                    "Failed to retrieve tx from blockchain. Error {:#}", error
                 );
                 continue; // treating every error as transient and retrying
                           // is obviously wrong but the jsonrpc client is

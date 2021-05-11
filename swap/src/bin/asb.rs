@@ -157,7 +157,7 @@ async fn main() -> Result<()> {
                                 tracing::debug!(%swap_id, %state, "Swap finished with state")
                             }
                             Err(error) => {
-                                tracing::error!(%swap_id, %error, "Swap failed")
+                                tracing::error!(%swap_id, "Swap failed. Error {:#}", error)
                             }
                         }
                     });

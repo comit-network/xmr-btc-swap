@@ -43,16 +43,18 @@ pub fn connect() -> Result<PriceUpdates> {
                 }
             },
             |error, next: Duration| {
-                tracing::info!(%error, "Kraken websocket connection failed, retrying in {}ms", next.as_millis());
-            }
+                tracing::info!(
+                    "Kraken websocket connection failed, retrying in {}ms. Error {:#}",
+                    next.as_millis(),
+                    error
+                );
+            },
         )
         .await;
 
         match result {
             Err(e) => {
-                tracing::warn!(
-                    error = %e,
-                    "Rate updates incurred an unrecoverable error.");
+                tracing::warn!("Rate updates incurred an unrecoverable error: {:#}", e);
 
                 // in case the retries fail permanently, let the subscribers know
                 price_update.send(Err(Error::PermanentFailure))
@@ -186,8 +188,7 @@ mod connection {
             Err(_) => match serde_json::from_str::<wire::PriceUpdate>(&msg) {
                 Ok(ticker) => ticker,
                 Err(error) => {
-                    tracing::warn!(%error, %msg, "Failed to deserialize message as ticker update.");
-
+                    tracing::warn!(%msg, "Failed to deserialize message as ticker update. Error {:#}", error);
                     return Ok(None);
                 }
             },

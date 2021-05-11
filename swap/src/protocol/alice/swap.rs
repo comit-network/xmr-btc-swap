@@ -212,8 +212,9 @@ where
                         },
                         Err(error) => {
                             error!(
-                                %error,
-                                "Publishing the redeem transaction failed");
+                                "Publishing the redeem transaction failed. Error {:#}",
+                                error
+                            );
                             tx_lock_status
                                 .wait_until_confirmed_with(state3.cancel_timelock)
                                 .await?;
@@ -227,8 +228,7 @@ where
                     },
                     Err(error) => {
                         error!(
-                            %error,
-                            "Constructing the redeem transaction failed. Attempting to wait for cancellation now");
+                            "Constructing the redeem transaction failed. Attempting to wait for cancellation now. Error {:#}", error);
                         tx_lock_status
                             .wait_until_confirmed_with(state3.cancel_timelock)
                             .await?;
@@ -331,8 +331,8 @@ where
                 Ok(_) => AliceState::BtcPunished,
                 Err(error) => {
                     warn!(
-                        %error,
-                        "Falling back to refund because punish transaction failed"
+                        "Falling back to refund because punish transaction failed. Error {:#}",
+                        error
                     );
 
                     // Upon punish failure we assume that the refund tx was included but we
