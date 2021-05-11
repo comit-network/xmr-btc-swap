@@ -2,7 +2,8 @@ use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
-use std::ops::Index;
+use std::convert::TryInto;
+use std::ops::{Index, Sub};
 
 pub const RING_SIZE: usize = 11;
 
@@ -40,15 +41,15 @@ pub fn sign(
     let h_0 = hash_to_scalar!(
         b"CLSAG_round" || ring || commitment_ring || pseudo_output_commitment || msg || L_0 || R_0
     );
+    let adjusted_commitment_ring = &commitment_ring - pseudo_output_commitment;
 
     let h_last = fake_responses
         .iter()
         .enumerate()
         .fold(h_0, |h_prev, (i, s_i)| {
             let pk_i = ring[i + 1];
-            let adjusted_commitment_i = commitment_ring[i] - pseudo_output_commitment;
 
-            let L_i = compute_L(h_prev, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_i);
+            let L_i = compute_L(h_prev, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_ring[i]);
             let R_i = compute_R(h_prev, mu_P, mu_C, pk_i, *s_i, I, D_inv_8);
 
             hash_to_scalar!(
@@ -108,14 +109,14 @@ pub fn verify(
     let mu_C = hash_to_scalar!(
         b"CLSAG_agg_1" || ring || commitment_ring || I || H_p_pk || pseudo_output_commitment
     );
+    let adjusted_commitment_ring = &commitment_ring - pseudo_output_commitment;
 
     let mut h = h_0;
 
     for (i, s_i) in responses.iter().enumerate() {
         let pk_i = ring[(i + 1) % RING_SIZE];
-        let adjusted_commitment_i = commitment_ring[i] - pseudo_output_commitment;
 
-        let L_i = compute_L(h, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_i);
+        let L_i = compute_L(h, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_ring[i]);
         let R_i = compute_R(h, mu_P, mu_C, pk_i, *s_i, I, D);
 
         h = hash_to_scalar!(
@@ -193,22 +194,35 @@ impl From<Signature> for monero::util::ringct::Clsag {
 
 #[derive(Clone)]
 pub(crate) struct Ring<'a> {
-    elements: &'a [EdwardsPoint; 11],
+    points: &'a [EdwardsPoint; 11],
     bytes: [u8; 32 * 11],
 }
 
 impl<'a> Ring<'a> {
-    fn new(elements: &[EdwardsPoint; 11]) -> Ring<'_> {
+    fn new(points: &[EdwardsPoint; 11]) -> Ring<'_> {
         let mut bytes = [0u8; 32 * 11];
 
-        for (i, element) in elements.iter().enumerate() {
+        for (i, element) in points.iter().enumerate() {
             let start = i * 32;
             let end = (i + 1) * 32;
 
             bytes[start..end].copy_from_slice(element.compress().as_bytes());
         }
 
-        Ring { elements, bytes }
+        Ring { points, bytes }
+    }
+}
+
+impl<'a, 'b> Sub<EdwardsPoint> for &'b Ring<'a> {
+    type Output = [EdwardsPoint; 11];
+
+    fn sub(self, rhs: EdwardsPoint) -> Self::Output {
+        self.points
+            .iter()
+            .map(|point| point - rhs)
+            .collect::<Vec<_>>()
+            .try_into()
+            .expect("arrays have same length")
     }
 }
 
@@ -222,7 +236,7 @@ impl<'a> Index<usize> for Ring<'a> {
     type Output = EdwardsPoint;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.elements[index]
+        &self.points[index]
     }
 }
 
