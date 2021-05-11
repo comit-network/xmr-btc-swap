@@ -1,6 +1,6 @@
 use crate::ring::Ring;
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
+use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
 use tiny_keccak::{Hasher, Keccak};
@@ -33,13 +33,24 @@ pub fn sign(
     let compressed_pseudo_output_commitment = pseudo_output_commitment.compress();
     let L_0 = L_0.compress();
     let R_0 = R_0.compress();
+    let compressed_I = I.compress();
+    let H_p_pk = H_p_pk.compress();
 
-    let mus = AggregationHashes::new(
-        &ring,
-        &commitment_ring,
-        I.compress(),
-        compressed_pseudo_output_commitment,
-        H_p_pk.compress(),
+    let mu_P = hash_to_scalar!(
+        b"CLSAG_agg_0"
+            || ring
+            || commitment_ring
+            || compressed_I
+            || H_p_pk
+            || compressed_pseudo_output_commitment
+    );
+    let mu_C = hash_to_scalar!(
+        b"CLSAG_agg_1"
+            || ring
+            || commitment_ring
+            || compressed_I
+            || H_p_pk
+            || compressed_pseudo_output_commitment
     );
 
     let h_0 = hash_to_scalar!(
@@ -59,8 +70,8 @@ pub fn sign(
             let pk_i = ring[i + 1];
             let adjusted_commitment_i = commitment_ring[i] - pseudo_output_commitment;
 
-            let L_i = compute_L(h_prev, &mus, *s_i, pk_i, adjusted_commitment_i).compress();
-            let R_i = compute_R(h_prev, &mus, pk_i, *s_i, I, D_inv_8).compress();
+            let L_i = compute_L(h_prev, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_i).compress();
+            let R_i = compute_R(h_prev, mu_P, mu_C, pk_i, *s_i, I, D_inv_8).compress();
 
             hash_to_scalar!(
                 b"CLSAG_round"
@@ -73,7 +84,7 @@ pub fn sign(
             )
         });
 
-    let s_last = alpha - h_last * ((mus.mu_P * signing_key) + (mus.mu_C * z));
+    let s_last = alpha - h_last * ((mu_P * signing_key) + (mu_C * z));
 
     Signature {
         responses: [
@@ -106,14 +117,25 @@ pub fn verify(
 ) -> bool {
     let ring = Ring::new(ring);
     let commitment_ring = Ring::new(commitment_ring);
-
     let compressed_pseudo_output_commitment = pseudo_output_commitment.compress();
-    let mus = AggregationHashes::new(
-        &ring,
-        &commitment_ring,
-        sig.I.compress(),
-        compressed_pseudo_output_commitment,
-        H_p_pk.compress(),
+    let I = sig.I.compress();
+    let H_p_pk = H_p_pk.compress();
+
+    let mu_P = hash_to_scalar!(
+        b"CLSAG_agg_0"
+            || ring
+            || commitment_ring
+            || I
+            || H_p_pk
+            || compressed_pseudo_output_commitment
+    );
+    let mu_C = hash_to_scalar!(
+        b"CLSAG_agg_1"
+            || ring
+            || commitment_ring
+            || I
+            || H_p_pk
+            || compressed_pseudo_output_commitment
     );
 
     let mut h = sig.h_0;
@@ -122,8 +144,8 @@ pub fn verify(
         let pk_i = ring[(i + 1) % RING_SIZE];
         let adjusted_commitment_i = commitment_ring[i] - pseudo_output_commitment;
 
-        let L_i = compute_L(h, &mus, *s_i, pk_i, adjusted_commitment_i).compress();
-        let R_i = compute_R(h, &mus, pk_i, *s_i, sig.I, sig.D).compress();
+        let L_i = compute_L(h, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_i).compress();
+        let R_i = compute_R(h, mu_P, mu_C, pk_i, *s_i, sig.I, sig.D).compress();
 
         h = hash_to_scalar!(
             b"CLSAG_round"
@@ -150,13 +172,14 @@ pub struct Signature {
 // L_i = s_i * G + c_p * pk_i + c_c * (commitment_i - pseudoutcommitment)
 fn compute_L(
     h_prev: Scalar,
-    mus: &AggregationHashes,
+    mu_P: Scalar,
+    mu_C: Scalar,
     s_i: Scalar,
     pk_i: EdwardsPoint,
     adjusted_commitment_i: EdwardsPoint,
 ) -> EdwardsPoint {
-    let c_p = h_prev * mus.mu_P;
-    let c_c = h_prev * mus.mu_C;
+    let c_p = h_prev * mu_P;
+    let c_c = h_prev * mu_C;
 
     (s_i * ED25519_BASEPOINT_POINT) + (c_p * pk_i) + c_c * adjusted_commitment_i
 }
@@ -164,42 +187,19 @@ fn compute_L(
 // R_i = s_i * H_p_pk_i + c_p * I + c_c * (z * hash_to_point(signing pk))
 fn compute_R(
     h_prev: Scalar,
-    mus: &AggregationHashes,
+    mu_P: Scalar,
+    mu_C: Scalar,
     pk_i: EdwardsPoint,
     s_i: Scalar,
     I: EdwardsPoint,
     D: EdwardsPoint,
 ) -> EdwardsPoint {
-    let c_p = h_prev * mus.mu_P;
-    let c_c = h_prev * mus.mu_C;
+    let c_p = h_prev * mu_P;
+    let c_c = h_prev * mu_C;
 
     let H_p_pk_i = hash_point_to_point(pk_i);
 
     (s_i * H_p_pk_i) + (c_p * I) + c_c * D
-}
-
-struct AggregationHashes {
-    mu_P: Scalar,
-    mu_C: Scalar,
-}
-
-impl AggregationHashes {
-    fn new(
-        ring: &Ring,
-        commitment_ring: &Ring,
-        I: CompressedEdwardsY,
-        pseudo_output_commitment: CompressedEdwardsY,
-        D: CompressedEdwardsY,
-    ) -> Self {
-        Self {
-            mu_P: hash_to_scalar!(
-                b"CLSAG_agg_0" || ring || commitment_ring || I || D || pseudo_output_commitment
-            ),
-            mu_C: hash_to_scalar!(
-                b"CLSAG_agg_1" || ring || commitment_ring || I || D || pseudo_output_commitment
-            ),
-        }
-    }
 }
 
 impl From<Signature> for monero::util::ringct::Clsag {
