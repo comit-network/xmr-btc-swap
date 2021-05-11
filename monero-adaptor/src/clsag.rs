@@ -29,37 +29,16 @@ pub fn sign(
     let D_inv_8 = D * INV_EIGHT;
     let ring = Ring::new(ring);
     let commitment_ring = Ring::new(commitment_ring);
-    let compressed_pseudo_output_commitment = pseudo_output_commitment.compress();
-    let L_0 = L_0.compress();
-    let R_0 = R_0.compress();
-    let compressed_I = I.compress();
-    let H_p_pk = H_p_pk.compress();
 
     let mu_P = hash_to_scalar!(
-        b"CLSAG_agg_0"
-            || ring
-            || commitment_ring
-            || compressed_I
-            || H_p_pk
-            || compressed_pseudo_output_commitment
+        b"CLSAG_agg_0" || ring || commitment_ring || I || H_p_pk || pseudo_output_commitment
     );
     let mu_C = hash_to_scalar!(
-        b"CLSAG_agg_1"
-            || ring
-            || commitment_ring
-            || compressed_I
-            || H_p_pk
-            || compressed_pseudo_output_commitment
+        b"CLSAG_agg_1" || ring || commitment_ring || I || H_p_pk || pseudo_output_commitment
     );
 
     let h_0 = hash_to_scalar!(
-        b"CLSAG_round"
-            || ring
-            || commitment_ring
-            || compressed_pseudo_output_commitment
-            || msg
-            || L_0
-            || R_0
+        b"CLSAG_round" || ring || commitment_ring || pseudo_output_commitment || msg || L_0 || R_0
     );
 
     let h_last = fake_responses
@@ -69,14 +48,14 @@ pub fn sign(
             let pk_i = ring[i + 1];
             let adjusted_commitment_i = commitment_ring[i] - pseudo_output_commitment;
 
-            let L_i = compute_L(h_prev, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_i).compress();
-            let R_i = compute_R(h_prev, mu_P, mu_C, pk_i, *s_i, I, D_inv_8).compress();
+            let L_i = compute_L(h_prev, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_i);
+            let R_i = compute_R(h_prev, mu_P, mu_C, pk_i, *s_i, I, D_inv_8);
 
             hash_to_scalar!(
                 b"CLSAG_round"
                     || ring
                     || commitment_ring
-                    || compressed_pseudo_output_commitment
+                    || pseudo_output_commitment
                     || msg
                     || L_i
                     || R_i
@@ -116,25 +95,13 @@ pub fn verify(
 ) -> bool {
     let ring = Ring::new(ring);
     let commitment_ring = Ring::new(commitment_ring);
-    let compressed_pseudo_output_commitment = pseudo_output_commitment.compress();
-    let I = sig.I.compress();
-    let H_p_pk = H_p_pk.compress();
+    let I = sig.I;
 
     let mu_P = hash_to_scalar!(
-        b"CLSAG_agg_0"
-            || ring
-            || commitment_ring
-            || I
-            || H_p_pk
-            || compressed_pseudo_output_commitment
+        b"CLSAG_agg_0" || ring || commitment_ring || I || H_p_pk || pseudo_output_commitment
     );
     let mu_C = hash_to_scalar!(
-        b"CLSAG_agg_1"
-            || ring
-            || commitment_ring
-            || I
-            || H_p_pk
-            || compressed_pseudo_output_commitment
+        b"CLSAG_agg_1" || ring || commitment_ring || I || H_p_pk || pseudo_output_commitment
     );
 
     let mut h = sig.h_0;
@@ -143,14 +110,14 @@ pub fn verify(
         let pk_i = ring[(i + 1) % RING_SIZE];
         let adjusted_commitment_i = commitment_ring[i] - pseudo_output_commitment;
 
-        let L_i = compute_L(h, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_i).compress();
-        let R_i = compute_R(h, mu_P, mu_C, pk_i, *s_i, sig.I, sig.D).compress();
+        let L_i = compute_L(h, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_i);
+        let R_i = compute_R(h, mu_P, mu_C, pk_i, *s_i, sig.I, sig.D);
 
         h = hash_to_scalar!(
             b"CLSAG_round"
                 || ring
                 || commitment_ring
-                || compressed_pseudo_output_commitment
+                || pseudo_output_commitment
                 || msg
                 || L_i
                 || R_i
