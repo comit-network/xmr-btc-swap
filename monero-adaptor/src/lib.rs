@@ -194,8 +194,11 @@ fn sign(
     R: EdwardsPoint,
     I: EdwardsPoint,
     msg: &[u8],
-) -> Result<(Scalar, Scalar)> {
-    let D_inv_8 = (z * H_p_pk) * Scalar::from(8u8).invert();
+    signing_key: Scalar,
+    alpha: Scalar,
+) -> Result<Signature> {
+    let D = z * H_p_pk;
+    let D_inv_8 = D * Scalar::from(8u8).invert();
 
     let prefix = clsag_round_hash_prefix(
         ring.as_ref(),
@@ -208,10 +211,10 @@ fn sign(
         keccak.update(&prefix);
         keccak.update(L.compress().as_bytes());
         keccak.update(R.compress().as_bytes());
-        let mut output = [0u8; 64];
+        let mut output = [0u8; 32];
         keccak.finalize(&mut output);
 
-        Scalar::from_bytes_mod_order_wide(&output)
+        Scalar::from_bytes_mod_order(output)
     };
 
     let mus = AggregationHashes::new(&ring, &commitment_ring, I, pseudo_output_commitment, H_p_pk);
@@ -237,12 +240,30 @@ fn sign(
             .unwrap()
         });
 
-    Ok((h_last, h_0))
+    let s_last = alpha - h_last * ((mus.mu_P * signing_key) + (mus.mu_C * z));
+
+    Ok(Signature {
+        responses: [
+            fake_responses[0],
+            fake_responses[1],
+            fake_responses[2],
+            fake_responses[3],
+            fake_responses[4],
+            fake_responses[5],
+            fake_responses[6],
+            fake_responses[7],
+            fake_responses[8],
+            fake_responses[9],
+            s_last,
+        ],
+        h_0,
+        I,
+        D,
+    })
 }
 
 pub struct AdaptorSignature {
-    s_0_a: Scalar,
-    s_0_b: Scalar,
+    s_0: Scalar,
     fake_responses: [Scalar; RING_SIZE - 1],
     h_0: Scalar,
     /// Key image of the real key in the ring.
@@ -251,9 +272,31 @@ pub struct AdaptorSignature {
     D: EdwardsPoint,
 }
 
+pub struct HalfAdaptorSignature {
+    s_0_half: Scalar,
+    fake_responses: [Scalar; RING_SIZE - 1],
+    h_0: Scalar,
+    /// Key image of the real key in the ring.
+    I: EdwardsPoint,
+    /// Commitment key image `D = z * hash_to_p3(signing_public_key)`
+    D: EdwardsPoint,
+}
+
+impl HalfAdaptorSignature {
+    fn complete(self, s_other_half: Scalar) -> AdaptorSignature {
+        AdaptorSignature {
+            s_0: self.s_0_half + s_other_half,
+            fake_responses: self.fake_responses,
+            h_0: self.h_0,
+            I: self.I,
+            D: self.D,
+        }
+    }
+}
+
 impl AdaptorSignature {
     pub fn adapt(self, y: Scalar) -> Signature {
-        let r_last = self.s_0_a + self.s_0_b + y;
+        let r_last = self.s_0 + y;
 
         let responses = self
             .fake_responses
@@ -411,7 +454,7 @@ impl Alice0 {
         msg.pi_b
             .verify(ED25519_BASEPOINT_POINT, msg.T_b, self.H_p_pk, msg.I_hat_b)?;
 
-        let (h_last, h_0) = sign(
+        let sig = sign(
             self.fake_responses,
             self.ring,
             self.commitment_ring,
@@ -422,20 +465,24 @@ impl Alice0 {
             self.I_hat_a + msg.I_hat_b + self.R_prime_a,
             self.I_a + msg.I_b,
             &self.msg,
+            self.s_prime_a,
+            self.alpha_a,
         )?;
 
-        // TODO: alpha_a - h_last * (mu_P * s_prime_a + mu_C * z)
-        let s_0_a = self.alpha_a - h_last * self.s_prime_a;
+        let sig = HalfAdaptorSignature {
+            s_0_half: sig.responses[10],
+            fake_responses: self.fake_responses,
+            h_0: sig.h_0,
+            I: sig.I,
+            D: sig.D,
+        };
 
         Ok(Alice1 {
             fake_responses: self.fake_responses,
             I_a: self.I_a,
             I_hat_a: self.I_hat_a,
             T_a: self.T_a,
-            h_0,
-            I_b: msg.I_b,
-            s_0_a,
-            D: z * self.H_p_pk,
+            sig,
         })
     }
 }
@@ -445,29 +492,19 @@ pub struct Alice1 {
     I_a: EdwardsPoint,
     I_hat_a: EdwardsPoint,
     T_a: EdwardsPoint,
-    h_0: Scalar,
-    I_b: EdwardsPoint,
-    s_0_a: Scalar,
-    D: EdwardsPoint,
+    sig: HalfAdaptorSignature,
 }
 
 impl Alice1 {
     pub fn next_message(&self) -> Message2 {
         Message2 {
             d_a: Opening::new(self.fake_responses, self.I_a, self.I_hat_a, self.T_a),
-            s_0_a: self.s_0_a,
+            s_0_a: self.sig.s_0_half,
         }
     }
 
     pub fn receive(self, msg: Message3) -> Alice2 {
-        let adaptor_sig = AdaptorSignature {
-            s_0_a: self.s_0_a,
-            s_0_b: msg.s_0_b,
-            fake_responses: self.fake_responses,
-            h_0: self.h_0,
-            I: self.I_a + self.I_b,
-            D: self.D,
-        };
+        let adaptor_sig = self.sig.complete(msg.s_0_b);
 
         Alice2 { adaptor_sig }
     }
@@ -592,7 +629,8 @@ impl Bob1 {
         self.pi_a
             .verify(ED25519_BASEPOINT_POINT, T_a, self.H_p_pk, I_hat_a)?;
 
-        let (h_last, h_0) = sign(
+        let I = I_a + self.I_b;
+        let sig = sign(
             fake_responses,
             self.ring,
             self.commitment_ring,
@@ -601,21 +639,21 @@ impl Bob1 {
             self.pseudo_output_commitment,
             T_a + self.T_b + self.R_a,
             I_hat_a + self.I_hat_b + self.R_prime_a,
-            I_a + self.I_b,
+            I,
             &self.msg,
+            self.s_b,
+            self.alpha_b,
         )?;
 
-        // TODO: alpha_b - h_last * (mu_P * s_b + mu_C * z);
-        let s_0_b = self.alpha_b - h_last * self.s_b;
-
-        let adaptor_sig = AdaptorSignature {
-            s_0_a: msg.s_0_a,
-            s_0_b,
+        let s_0_b = sig.responses[10];
+        let sig = HalfAdaptorSignature {
+            s_0_half: s_0_b,
             fake_responses,
-            h_0,
-            I: I_a + self.I_b,
-            D: z * self.H_p_pk,
+            h_0: sig.h_0,
+            I: sig.I,
+            D: sig.D,
         };
+        let adaptor_sig = sig.complete(msg.s_0_a);
 
         Ok(Bob2 { s_0_b, adaptor_sig })
     }

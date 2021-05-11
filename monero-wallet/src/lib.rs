@@ -71,7 +71,7 @@ impl MonerodClientExt for monerod::Client {
 mod tests {
     use super::*;
     use monero_harness::image::Monerod;
-    use monero_rpc::monerod::{Client, GetOutputsOut};
+    use monero_rpc::monerod::Client;
     use testcontainers::clients::Cli;
     use testcontainers::Docker;
 
