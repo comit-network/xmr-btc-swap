@@ -14,7 +14,6 @@ use rand::{CryptoRng, Rng};
 use tiny_keccak::{Hasher, Keccak};
 
 use clsag::{Signature, RING_SIZE};
-use ring::Ring;
 
 mod clsag;
 mod ring;
@@ -83,9 +82,9 @@ impl AdaptorSignature {
 
 pub struct Alice0 {
     // secret index is always 0
-    ring: Ring,
+    ring: [EdwardsPoint; RING_SIZE],
     fake_responses: [Scalar; RING_SIZE - 1],
-    commitment_ring: Ring,
+    commitment_ring: [EdwardsPoint; RING_SIZE],
     pseudo_output_commitment: EdwardsPoint,
     msg: [u8; 32],
     // encryption key
@@ -113,9 +112,6 @@ impl Alice0 {
         s_prime_a: Scalar,
         rng: &mut (impl Rng + CryptoRng),
     ) -> Result<Self> {
-        let ring = Ring::new(ring);
-        let commitment_ring = Ring::new(commitment_ring);
-
         let mut fake_responses = [Scalar::zero(); RING_SIZE - 1];
         for response in fake_responses.iter_mut().take(RING_SIZE - 1) {
             *response = Scalar::random(rng);
@@ -226,9 +222,9 @@ pub struct Alice2 {
 }
 
 pub struct Bob0 {
-    ring: Ring,
+    ring: [EdwardsPoint; RING_SIZE],
     msg: [u8; 32],
-    commitment_ring: Ring,
+    commitment_ring: [EdwardsPoint; RING_SIZE],
     pseudo_output_commitment: EdwardsPoint,
     R_a: EdwardsPoint,
     R_prime_a: EdwardsPoint,
@@ -251,9 +247,6 @@ impl Bob0 {
         s_b: Scalar,
         rng: &mut (impl Rng + CryptoRng),
     ) -> Result<Self> {
-        let ring = Ring::new(ring);
-        let commitment_ring = Ring::new(commitment_ring);
-
         let alpha_b = Scalar::random(rng);
 
         let p_k = ring[0];
@@ -300,9 +293,9 @@ impl Bob0 {
 }
 
 pub struct Bob1 {
-    ring: Ring,
+    ring: [EdwardsPoint; RING_SIZE],
     msg: [u8; 32],
-    commitment_ring: Ring,
+    commitment_ring: [EdwardsPoint; RING_SIZE],
     pseudo_output_commitment: EdwardsPoint,
     R_a: EdwardsPoint,
     R_prime_a: EdwardsPoint,
@@ -634,9 +627,9 @@ mod tests {
         assert!(clsag::verify(
             &sig,
             msg_to_sign,
-            todo!(),
-            todo!(),
-            todo!(),
+            &ring,
+            &commitment_ring,
+            pseudo_output_commitment,
             todo!()
         ));
     }

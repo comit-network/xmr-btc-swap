@@ -3,13 +3,13 @@ use std::ops::Index;
 use curve25519_dalek::edwards::EdwardsPoint;
 
 #[derive(Clone)]
-pub struct Ring {
-    elements: [EdwardsPoint; 11],
+pub struct Ring<'a> {
+    elements: &'a [EdwardsPoint; 11],
     bytes: [u8; 32 * 11],
 }
 
-impl Ring {
-    pub fn new(elements: [EdwardsPoint; 11]) -> Ring {
+impl<'a> Ring<'a> {
+    pub fn new(elements: &[EdwardsPoint; 11]) -> Ring<'_> {
         let mut bytes = [0u8; 32 * 11];
 
         for (i, element) in elements.iter().enumerate() {
@@ -23,13 +23,13 @@ impl Ring {
     }
 }
 
-impl AsRef<[u8]> for Ring {
+impl<'a> AsRef<[u8]> for Ring<'a> {
     fn as_ref(&self) -> &[u8] {
         self.bytes.as_ref()
     }
 }
 
-impl Index<usize> for Ring {
+impl<'a> Index<usize> for Ring<'a> {
     type Output = EdwardsPoint;
 
     fn index(&self, index: usize) -> &Self::Output {

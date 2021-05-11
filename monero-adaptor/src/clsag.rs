@@ -17,8 +17,8 @@ pub fn sign(
     signing_key: Scalar,
     H_p_pk: EdwardsPoint,
     alpha: Scalar,
-    ring: &Ring,
-    commitment_ring: &Ring,
+    ring: &[EdwardsPoint; RING_SIZE],
+    commitment_ring: &[EdwardsPoint; RING_SIZE],
     fake_responses: [Scalar; RING_SIZE - 1],
     z: Scalar,
     pseudo_output_commitment: EdwardsPoint,
@@ -28,6 +28,8 @@ pub fn sign(
 ) -> Signature {
     let D = z * H_p_pk;
     let D_inv_8 = D * INV_EIGHT;
+    let ring = Ring::new(ring);
+    let commitment_ring = Ring::new(commitment_ring);
 
     let mus = AggregationHashes::new(
         &ring,
@@ -92,11 +94,14 @@ pub fn sign(
 pub fn verify(
     sig: &Signature,
     msg: &[u8],
-    ring: &Ring,
-    commitment_ring: &Ring,
+    ring: &[EdwardsPoint; RING_SIZE],
+    commitment_ring: &[EdwardsPoint; RING_SIZE],
     pseudo_output_commitment: EdwardsPoint,
     H_p_pk: EdwardsPoint,
 ) -> bool {
+    let ring = Ring::new(ring);
+    let commitment_ring = Ring::new(commitment_ring);
+
     let mus = AggregationHashes::new(
         &ring,
         &commitment_ring,
@@ -312,8 +317,6 @@ mod tests {
             x * ED25519_BASEPOINT_POINT
         });
 
-        let ring = Ring::new(ring);
-
         let mut commitment_ring = [EdwardsPoint::default(); RING_SIZE];
 
         let real_commitment_blinding = Scalar::random(&mut OsRng);
@@ -322,8 +325,6 @@ mod tests {
             let x = Scalar::random(&mut OsRng);
             x * ED25519_BASEPOINT_POINT
         });
-
-        let commitment_ring = Ring::new(commitment_ring);
 
         // TODO: document
         let pseudo_output_commitment = commitment_ring[0];
