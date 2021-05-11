@@ -170,8 +170,8 @@ impl Alice0 {
             self.s_prime_a,
             self.H_p_pk,
             self.alpha_a,
-            self.ring,
-            self.commitment_ring,
+            &self.ring,
+            &self.commitment_ring,
             self.fake_responses,
             z,
             self.pseudo_output_commitment,
@@ -346,8 +346,8 @@ impl Bob1 {
             self.s_b,
             self.H_p_pk,
             self.alpha_b,
-            self.ring,
-            self.commitment_ring,
+            &self.ring,
+            &self.commitment_ring,
             fake_responses,
             z,
             self.pseudo_output_commitment,
@@ -631,6 +631,13 @@ mod tests {
 
         let sig = alice.adaptor_sig.adapt(r_a);
 
-        assert!(clsag::verify(&sig, msg_to_sign, todo!(), todo!(), todo!(), todo!()));
+        assert!(clsag::verify(
+            &sig,
+            msg_to_sign,
+            todo!(),
+            todo!(),
+            todo!(),
+            todo!()
+        ));
     }
 }

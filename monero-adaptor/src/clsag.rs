@@ -17,8 +17,8 @@ pub fn sign(
     signing_key: Scalar,
     H_p_pk: EdwardsPoint,
     alpha: Scalar,
-    ring: Ring,
-    commitment_ring: Ring,
+    ring: &Ring,
+    commitment_ring: &Ring,
     fake_responses: [Scalar; RING_SIZE - 1],
     z: Scalar,
     pseudo_output_commitment: EdwardsPoint,
@@ -89,8 +89,14 @@ pub fn sign(
 }
 
 #[must_use]
-pub fn verify(sig: &Signature, msg: &[u8], ring: Ring, commitment_ring: Ring, pseudo_output_commitment: EdwardsPoint, H_p_pk: EdwardsPoint) -> bool {
-
+pub fn verify(
+    sig: &Signature,
+    msg: &[u8],
+    ring: &Ring,
+    commitment_ring: &Ring,
+    pseudo_output_commitment: EdwardsPoint,
+    H_p_pk: EdwardsPoint,
+) -> bool {
     let mus = AggregationHashes::new(
         &ring,
         &commitment_ring,
@@ -103,7 +109,12 @@ pub fn verify(sig: &Signature, msg: &[u8], ring: Ring, commitment_ring: Ring, ps
 
     for (i, s_i) in sig.responses.iter().enumerate() {
         let pk_i = ring[(i + 1) % RING_SIZE];
-        let prefix = clsag_round_hash_prefix(ring.as_ref(), commitment_ring.as_ref(), pseudo_output_commitment, msg);
+        let prefix = clsag_round_hash_prefix(
+            ring.as_ref(),
+            commitment_ring.as_ref(),
+            pseudo_output_commitment,
+            msg,
+        );
         let adjusted_commitment_i = commitment_ring[i] - pseudo_output_commitment;
 
         let L_i = compute_L(h, &mus, *s_i, pk_i, adjusted_commitment_i);
@@ -317,8 +328,28 @@ mod tests {
         // TODO: document
         let pseudo_output_commitment = commitment_ring[0];
 
-        let signature = sign(msg_to_sign, s_prime_a, todo!(), todo!(), ring.clone(), commitment_ring.clone(), todo!(), todo!(), pseudo_output_commitment, todo!(), todo!(), todo!());
+        let signature = sign(
+            msg_to_sign,
+            s_prime_a,
+            todo!(),
+            todo!(),
+            &ring,
+            &commitment_ring,
+            todo!(),
+            todo!(),
+            pseudo_output_commitment,
+            todo!(),
+            todo!(),
+            todo!(),
+        );
 
-        assert!(verify(&signature, msg_to_sign, ring, commitment_ring, pseudo_output_commitment, todo!()))
+        assert!(verify(
+            &signature,
+            msg_to_sign,
+            &ring,
+            &commitment_ring,
+            pseudo_output_commitment,
+            todo!()
+        ))
     }
 }
