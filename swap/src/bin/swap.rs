@@ -82,8 +82,13 @@ async fn main() -> Result<()> {
                 .add_address(seller_peer_id, seller_addr);
 
             let swap_id = Uuid::new_v4();
-            let (event_loop, mut event_loop_handle) =
-                EventLoop::new(swap_id, swarm, seller_peer_id, bitcoin_wallet.clone())?;
+            let (event_loop, mut event_loop_handle) = EventLoop::new(
+                swap_id,
+                swarm,
+                seller_peer_id,
+                bitcoin_wallet.clone(),
+                env_config,
+            )?;
             let event_loop = tokio::spawn(event_loop.run());
 
             let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
@@ -151,7 +156,7 @@ async fn main() -> Result<()> {
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
 
-            if monero_receive_address.network != env_config.monero_network.into() {
+            if monero_receive_address.network != env_config.monero_network {
                 bail!("The given monero address is on network {:?}, expected address of network {:?}.", monero_receive_address.network, env_config.monero_network)
             }
 
@@ -176,8 +181,13 @@ async fn main() -> Result<()> {
                 .behaviour_mut()
                 .add_address(seller_peer_id, seller_addr);
 
-            let (event_loop, event_loop_handle) =
-                EventLoop::new(swap_id, swarm, seller_peer_id, bitcoin_wallet.clone())?;
+            let (event_loop, event_loop_handle) = EventLoop::new(
+                swap_id,
+                swarm,
+                seller_peer_id,
+                bitcoin_wallet.clone(),
+                env_config,
+            )?;
             let handle = tokio::spawn(event_loop.run());
 
             let swap = Swap::from_db(
@@ -294,7 +304,7 @@ async fn init_monero_wallet(
     let monero_wallet_rpc = monero::WalletRpc::new(data_dir.join("monero")).await?;
 
     let monero_wallet_rpc_process = monero_wallet_rpc
-        .run(network.into(), monero_daemon_address.as_str())
+        .run(network, monero_daemon_address.as_str())
         .await?;
 
     let monero_wallet = monero::Wallet::open_or_create(

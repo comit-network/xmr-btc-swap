@@ -54,6 +54,12 @@ pub enum Error {
     #[error("Seller's XMR balance is currently too low to fulfill the swap request to buy {buy}, please try again later")]
     BalanceTooLow { buy: bitcoin::Amount },
 
+    #[error("Seller blockchain network {asb:?} setup did not match your blockchain network setup {cli:?}")]
+    BlockchainNetworkMismatch {
+        cli: spot_price::BlockchainNetwork,
+        asb: spot_price::BlockchainNetwork,
+    },
+
     /// To be used for errors that cannot be explained on the CLI side (e.g.
     /// rate update problems on the seller side)
     #[error("Seller encountered a problem, please try again later.")]
@@ -71,6 +77,9 @@ impl From<spot_price::Error> for Error {
                 Error::AmountAboveMaximum { max, buy }
             }
             spot_price::Error::BalanceTooLow { buy } => Error::BalanceTooLow { buy },
+            spot_price::Error::BlockchainNetworkMismatch { cli, asb } => {
+                Error::BlockchainNetworkMismatch { cli, asb }
+            }
             spot_price::Error::Other => Error::Other,
         }
     }

@@ -1,5 +1,4 @@
 use crate::bitcoin::{CancelTimelock, PunishTimelock};
-use crate::monero;
 use std::cmp::max;
 use std::time::Duration;
 use time::NumericalStdDurationShort;

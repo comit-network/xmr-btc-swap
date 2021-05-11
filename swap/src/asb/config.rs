@@ -1,6 +1,5 @@
 use crate::env::{Mainnet, Testnet};
 use crate::fs::{ensure_directory_exists, system_config_dir, system_data_dir};
-use crate::monero;
 use crate::tor::{DEFAULT_CONTROL_PORT, DEFAULT_SOCKS5_PORT};
 use anyhow::{bail, Context, Result};
 use config::ConfigError;
@@ -121,6 +120,8 @@ pub struct Network {
 pub struct Bitcoin {
     pub electrum_rpc_url: Url,
     pub target_block: usize,
+    pub finality_confirmations: Option<u32>,
+    #[serde(with = "crate::bitcoin::network")]
     pub network: bitcoin::Network,
 }
 
@@ -128,6 +129,8 @@ pub struct Bitcoin {
 #[serde(deny_unknown_fields)]
 pub struct Monero {
     pub wallet_rpc_url: Url,
+    pub finality_confirmations: Option<u64>,
+    #[serde(with = "crate::monero::network")]
     pub network: monero::Network,
 }
 
@@ -335,7 +338,7 @@ mod tests {
 
             monero: Monero {
                 wallet_rpc_url: defaults.monero_wallet_rpc_url,
-                network: monero::Network::Testnet,
+                network: monero::Network::Stagenet,
             },
             tor: Default::default(),
             maker: Maker {

@@ -151,6 +151,7 @@ async fn main() -> Result<()> {
                 config.maker.max_buy_btc,
                 kraken_rate.clone(),
                 resume_only,
+                env_config,
             )?;
 
             for listen in config.network.listen {
