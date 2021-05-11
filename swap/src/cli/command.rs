@@ -42,20 +42,14 @@ pub enum Command {
         #[structopt(long = "seller-addr", help = "The seller's multiaddress")]
         alice_multiaddr: Multiaddr,
 
-        #[structopt(long = "electrum-rpc",
-        help = "Provide the Bitcoin Electrum RPC URL",
-        default_value = DEFAULT_ELECTRUM_RPC_URL
-        )]
-        electrum_rpc_url: Url,
+        #[structopt(flatten)]
+        bitcoin_params: BitcoinParams,
 
         #[structopt(flatten)]
         monero_params: MoneroParams,
 
         #[structopt(long = "tor-socks5-port", help = "Your local Tor socks5 proxy port", default_value = DEFAULT_TOR_SOCKS5_PORT)]
         tor_socks5_port: u16,
-
-        #[structopt(long = "bitcoin-target-block", help = "Within how many blocks should the Bitcoin transactions be confirmed.", default_value = DEFAULT_BITCOIN_CONFIRMATION_TARGET)]
-        bitcoin_target_block: usize,
     },
     /// Show a list of past ongoing and completed swaps
     History,
@@ -70,20 +64,14 @@ pub enum Command {
         #[structopt(long = "seller-addr", help = "The seller's multiaddress")]
         alice_multiaddr: Multiaddr,
 
-        #[structopt(long = "electrum-rpc",
-        help = "Provide the Bitcoin Electrum RPC URL",
-        default_value = DEFAULT_ELECTRUM_RPC_URL
-        )]
-        electrum_rpc_url: Url,
+        #[structopt(flatten)]
+        bitcoin_params: BitcoinParams,
 
         #[structopt(flatten)]
         monero_params: MoneroParams,
 
         #[structopt(long = "tor-socks5-port", help = "Your local Tor socks5 proxy port", default_value = DEFAULT_TOR_SOCKS5_PORT)]
         tor_socks5_port: u16,
-
-        #[structopt(long = "bitcoin-target-block", help = "Within how many blocks should the Bitcoin transactions be confirmed.", default_value = DEFAULT_BITCOIN_CONFIRMATION_TARGET)]
-        bitcoin_target_block: usize,
     },
     /// Try to cancel an ongoing swap (expert users only)
     Cancel {
@@ -96,14 +84,8 @@ pub enum Command {
         #[structopt(short, long)]
         force: bool,
 
-        #[structopt(long = "electrum-rpc",
-        help = "Provide the Bitcoin Electrum RPC URL",
-        default_value = DEFAULT_ELECTRUM_RPC_URL
-        )]
-        electrum_rpc_url: Url,
-
-        #[structopt(long = "bitcoin-target-block", help = "Within how many blocks should the Bitcoin transactions be confirmed.", default_value = DEFAULT_BITCOIN_CONFIRMATION_TARGET)]
-        bitcoin_target_block: usize,
+        #[structopt(flatten)]
+        bitcoin_params: BitcoinParams,
     },
     /// Try to cancel a swap and refund my BTC (expert users only)
     Refund {
@@ -116,14 +98,8 @@ pub enum Command {
         #[structopt(short, long)]
         force: bool,
 
-        #[structopt(long = "electrum-rpc",
-        help = "Provide the Bitcoin Electrum RPC URL",
-        default_value = DEFAULT_ELECTRUM_RPC_URL
-        )]
-        electrum_rpc_url: Url,
-
-        #[structopt(long = "bitcoin-target-block", help = "Within how many blocks should the Bitcoin transactions be confirmed.", default_value = DEFAULT_BITCOIN_CONFIRMATION_TARGET)]
-        bitcoin_target_block: usize,
+        #[structopt(flatten)]
+        bitcoin_params: BitcoinParams,
     },
 }
 
@@ -141,6 +117,18 @@ pub struct MoneroParams {
         default_value = DEFAULT_STAGENET_MONERO_DAEMON_HOST
     )]
     pub monero_daemon_host: String,
+}
+
+#[derive(structopt::StructOpt, Debug)]
+pub struct BitcoinParams {
+    #[structopt(long = "electrum-rpc",
+    help = "Provide the Bitcoin Electrum RPC URL",
+    default_value = DEFAULT_ELECTRUM_RPC_URL
+    )]
+    pub electrum_rpc_url: Url,
+
+    #[structopt(long = "bitcoin-target-block", help = "Within how many blocks should the Bitcoin transactions be confirmed.", default_value = DEFAULT_BITCOIN_CONFIRMATION_TARGET)]
+    pub bitcoin_target_block: usize,
 }
 
 #[derive(Clone, Debug)]

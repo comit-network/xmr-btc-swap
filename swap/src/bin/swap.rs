@@ -21,7 +21,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use structopt::StructOpt;
 use swap::bitcoin::TxLock;
-use swap::cli::command::{Arguments, Command, MoneroParams};
+use swap::cli::command::{Arguments, BitcoinParams, Command, MoneroParams};
 use swap::database::Database;
 use swap::env::{Config, GetConfig};
 use swap::network::quote::BidQuote;
@@ -45,14 +45,17 @@ async fn main() -> Result<()> {
         Command::BuyXmr {
             alice_peer_id,
             alice_multiaddr,
+            bitcoin_params:
+                BitcoinParams {
+                    electrum_rpc_url,
+                    bitcoin_target_block,
+                },
             monero_params:
                 MoneroParams {
                     receive_monero_address,
                     monero_daemon_host,
                 },
-            electrum_rpc_url,
             tor_socks5_port,
-            bitcoin_target_block,
         } => {
             let swap_id = Uuid::new_v4();
 
@@ -149,14 +152,17 @@ async fn main() -> Result<()> {
         Command::Resume {
             swap_id,
             alice_multiaddr,
+            bitcoin_params:
+                BitcoinParams {
+                    electrum_rpc_url,
+                    bitcoin_target_block,
+                },
             monero_params:
                 MoneroParams {
                     receive_monero_address,
                     monero_daemon_host,
                 },
-            electrum_rpc_url,
             tor_socks5_port,
-            bitcoin_target_block,
         } => {
             let data_dir = data.0;
             cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
@@ -217,8 +223,11 @@ async fn main() -> Result<()> {
         Command::Cancel {
             swap_id,
             force,
-            electrum_rpc_url,
-            bitcoin_target_block,
+            bitcoin_params:
+                BitcoinParams {
+                    electrum_rpc_url,
+                    bitcoin_target_block,
+                },
         } => {
             let data_dir = data.0;
             cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
@@ -251,8 +260,11 @@ async fn main() -> Result<()> {
         Command::Refund {
             swap_id,
             force,
-            electrum_rpc_url,
-            bitcoin_target_block,
+            bitcoin_params:
+                BitcoinParams {
+                    electrum_rpc_url,
+                    bitcoin_target_block,
+                },
         } => {
             let data_dir = data.0;
             cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
