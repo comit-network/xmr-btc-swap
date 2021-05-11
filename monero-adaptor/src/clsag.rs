@@ -105,7 +105,7 @@ fn clsag_round_hash_prefix(
     pseudo_output_commitment: EdwardsPoint,
     msg: &[u8],
 ) -> Vec<u8> {
-    let domain_prefix = HASH_KEY_CLSAG_ROUND.as_bytes();
+    let domain_prefix = b"CLSAG_round";
     let pseudo_output_commitment = pseudo_output_commitment.compress();
     let pseudo_output_commitment = pseudo_output_commitment.as_bytes();
 
@@ -181,10 +181,6 @@ fn compute_R(
     (s_i * H_p_pk_i) + (c_p * I) + c_c * D
 }
 
-const HASH_KEY_CLSAG_AGG_0: &str = "CLSAG_agg_0";
-const HASH_KEY_CLSAG_AGG_1: &str = "CLSAG_agg_1";
-const HASH_KEY_CLSAG_ROUND: &str = "CLSAG_round";
-
 struct AggregationHashes {
     mu_P: Scalar,
     mu_C: Scalar,
@@ -204,7 +200,7 @@ impl AggregationHashes {
         let pseudo_output_commitment = pseudo_output_commitment.compress();
 
         let mu_P = Self::hash(
-            HASH_KEY_CLSAG_AGG_0,
+            b"CLSAG_agg_0",
             ring.as_ref(),
             commitment_ring.as_ref(),
             &I,
@@ -212,7 +208,7 @@ impl AggregationHashes {
             &pseudo_output_commitment,
         );
         let mu_C = Self::hash(
-            HASH_KEY_CLSAG_AGG_1,
+            b"CLSAG_agg_1",
             ring.as_ref(),
             commitment_ring.as_ref(),
             &I,
@@ -231,7 +227,7 @@ impl AggregationHashes {
     //
     // where z = blinding of real commitment - blinding of pseudooutput commitment.
     fn hash(
-        domain_prefix: &str,
+        domain_prefix: &[u8],
         ring: &[u8],
         commitment_ring: &[u8],
         I: &CompressedEdwardsY,
@@ -239,7 +235,7 @@ impl AggregationHashes {
         pseudo_output_commitment: &CompressedEdwardsY,
     ) -> Scalar {
         let mut hasher = Keccak::v256();
-        hasher.update(domain_prefix.as_bytes());
+        hasher.update(domain_prefix);
         hasher.update(ring);
         hasher.update(commitment_ring);
         hasher.update(I.as_bytes());
