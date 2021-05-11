@@ -183,18 +183,19 @@ fn clsag_round_hash_prefix(
     prefix
 }
 
-fn final_challenge(
+fn sign(
     fake_responses: [Scalar; RING_SIZE - 1],
     ring: Ring,
     commitment_ring: Ring,
-    D: EdwardsPoint,
+    z: Scalar,
+    H_p_pk: EdwardsPoint,
     pseudo_output_commitment: EdwardsPoint,
     L: EdwardsPoint,
     R: EdwardsPoint,
     I: EdwardsPoint,
     msg: &[u8],
 ) -> Result<(Scalar, Scalar)> {
-    let D_inv_8 = D * Scalar::from(8u8).invert();
+    let D_inv_8 = (z * H_p_pk) * Scalar::from(8u8).invert();
 
     let prefix = clsag_round_hash_prefix(
         ring.as_ref(),
@@ -213,7 +214,7 @@ fn final_challenge(
         Scalar::from_bytes_mod_order_wide(&output)
     };
 
-    let mus = AggregationHashes::new(&ring, &commitment_ring, I, pseudo_output_commitment, D);
+    let mus = AggregationHashes::new(&ring, &commitment_ring, I, pseudo_output_commitment, H_p_pk);
 
     let h_last = fake_responses
         .iter()
@@ -223,7 +224,17 @@ fn final_challenge(
             let adjusted_commitment_i = commitment_ring[i] - pseudo_output_commitment;
 
             // TODO: Do not unwrap here
-            challenge(&prefix, *s_i, pk_i, adjusted_commitment_i, D_inv_8, h_prev, I, &mus, ).unwrap()
+            challenge(
+                &prefix,
+                *s_i,
+                pk_i,
+                adjusted_commitment_i,
+                D_inv_8,
+                h_prev,
+                I,
+                &mus,
+            )
+            .unwrap()
         });
 
     Ok((h_last, h_0))
@@ -400,13 +411,12 @@ impl Alice0 {
         msg.pi_b
             .verify(ED25519_BASEPOINT_POINT, msg.T_b, self.H_p_pk, msg.I_hat_b)?;
 
-        let D = z * self.H_p_pk;
-
-        let (h_last, h_0) = final_challenge(
+        let (h_last, h_0) = sign(
             self.fake_responses,
             self.ring,
             self.commitment_ring,
-            D,
+            z,
+            self.H_p_pk,
             self.pseudo_output_commitment,
             self.T_a + msg.T_b + self.R_a,
             self.I_hat_a + msg.I_hat_b + self.R_prime_a,
@@ -425,7 +435,7 @@ impl Alice0 {
             h_0,
             I_b: msg.I_b,
             s_0_a,
-            D,
+            D: z * self.H_p_pk,
         })
     }
 }
@@ -582,13 +592,12 @@ impl Bob1 {
         self.pi_a
             .verify(ED25519_BASEPOINT_POINT, T_a, self.H_p_pk, I_hat_a)?;
 
-        let D = z * self.H_p_pk;
-
-        let (h_last, h_0) = final_challenge(
+        let (h_last, h_0) = sign(
             fake_responses,
             self.ring,
             self.commitment_ring,
-            D,
+            z,
+            self.H_p_pk,
             self.pseudo_output_commitment,
             T_a + self.T_b + self.R_a,
             I_hat_a + self.I_hat_b + self.R_prime_a,
@@ -605,7 +614,7 @@ impl Bob1 {
             fake_responses,
             h_0,
             I: I_a + self.I_b,
-            D,
+            D: z * self.H_p_pk,
         };
 
         Ok(Bob2 { s_0_b, adaptor_sig })
