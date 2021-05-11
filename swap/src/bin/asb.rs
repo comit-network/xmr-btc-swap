@@ -91,7 +91,7 @@ async fn main() -> Result<()> {
                 let monero_address = monero_wallet.get_main_address();
                 warn!(
                     %monero_address,
-                    "The Monero balance is 0, make sure to deposit funds",
+                    "The Monero balance is 0, make sure to deposit funds at",
                 )
             } else {
                 info!(%monero_balance, "Initialized Monero wallet");

@@ -106,7 +106,7 @@ pub fn read_config(config_path: PathBuf) -> Result<Result<Config, ConfigNotIniti
     if config_path.exists() {
         info!(
             path = %config_path.display(),
-            "Using config file at path",
+            "Using config file at",
         );
     } else {
         return Ok(Err(ConfigNotInitialized {}));

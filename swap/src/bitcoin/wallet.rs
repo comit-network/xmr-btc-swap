@@ -161,7 +161,7 @@ impl Wallet {
                         };
 
                         if Some(new_status) != last_status {
-                            tracing::debug!(%txid, status = %new_status, "Transaction status");
+                            tracing::debug!(%txid, status = %new_status, "Transaction");
                         }
 
                         last_status = Some(new_status);

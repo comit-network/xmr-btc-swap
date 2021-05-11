@@ -122,8 +122,8 @@ impl WalletRpc {
             .port();
 
         tracing::debug!(
-            monero_wallet_rpc_port = %port,
-            "Starting monero-wallet-rpc on port"
+            %port,
+            "Starting monero-wallet-rpc on"
         );
 
         let mut child = Command::new(self.exec_path())
