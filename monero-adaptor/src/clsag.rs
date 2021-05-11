@@ -45,11 +45,7 @@ pub fn sign(
         pseudo_output_commitment,
         msg,
     );
-    let h_0 = hash_to_scalar(&[
-        &prefix,
-        L_0.compress().as_bytes(),
-        R_0.compress().as_bytes(),
-    ]);
+    let h_0 = hash_to_scalar!(prefix, L_0.compress(), R_0.compress());
 
     let h_last = fake_responses
         .iter()
@@ -61,11 +57,7 @@ pub fn sign(
             let L_i = compute_L(h_prev, &mus, *s_i, pk_i, adjusted_commitment_i);
             let R_i = compute_R(h_prev, &mus, pk_i, *s_i, I, D_inv_8);
 
-            hash_to_scalar(&[
-                &prefix,
-                L_i.compress().as_bytes().as_ref(),
-                R_i.compress().as_bytes().as_ref(),
-            ])
+            hash_to_scalar!(prefix, L_i.compress(), R_i.compress())
         });
 
     let s_last = alpha - h_last * ((mus.mu_P * signing_key) + (mus.mu_C * z));
@@ -125,11 +117,7 @@ pub fn verify(
         let L_i = compute_L(h, &mus, *s_i, pk_i, adjusted_commitment_i);
         let R_i = compute_R(h, &mus, pk_i, *s_i, sig.I, sig.D);
 
-        h = hash_to_scalar(&[
-            &prefix,
-            L_i.compress().as_bytes().as_ref(),
-            R_i.compress().as_bytes().as_ref(),
-        ])
+        h = hash_to_scalar!(prefix, L_i.compress(), R_i.compress())
     }
 
     h == sig.h_0
@@ -219,28 +207,22 @@ impl AggregationHashes {
         pseudo_output_commitment: CompressedEdwardsY,
         D: CompressedEdwardsY,
     ) -> Self {
-        let ring = ring.as_ref();
-        let commitment_ring = commitment_ring.as_ref();
-        let I = I.as_bytes().as_ref();
-        let D = D.as_bytes().as_ref();
-        let pseudo_output_commitment = pseudo_output_commitment.as_bytes().as_ref();
-
-        let mu_P = hash_to_scalar(&[
+        let mu_P = hash_to_scalar!(
             b"CLSAG_agg_0",
             ring,
             commitment_ring,
             I,
             D,
-            pseudo_output_commitment,
-        ]);
-        let mu_C = hash_to_scalar(&[
+            pseudo_output_commitment
+        );
+        let mu_C = hash_to_scalar!(
             b"CLSAG_agg_1",
             ring,
             commitment_ring,
             I,
             D,
-            pseudo_output_commitment,
-        ]);
+            pseudo_output_commitment
+        );
 
         Self { mu_P, mu_C }
     }
@@ -262,19 +244,6 @@ impl From<Signature> for monero::util::ringct::Clsag {
             },
         }
     }
-}
-
-fn hash_to_scalar(elements: &[&[u8]]) -> Scalar {
-    let mut hasher = Keccak::v256();
-
-    for element in elements {
-        hasher.update(element);
-    }
-
-    let mut hash = [0u8; 32];
-    hasher.finalize(&mut hash);
-
-    Scalar::from_bytes_mod_order(hash)
 }
 
 #[cfg(test)]

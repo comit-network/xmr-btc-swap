@@ -15,6 +15,8 @@ use tiny_keccak::{Hasher, Keccak};
 
 use clsag::{Signature, RING_SIZE};
 
+#[macro_use]
+mod macros;
 mod clsag;
 mod ring;
 
