@@ -42,6 +42,12 @@ impl<const N: usize> AsByteSlice for [u8; N] {
     }
 }
 
+impl AsByteSlice for &[u8] {
+    fn as_byte_slice(&self) -> &[u8] {
+        self
+    }
+}
+
 impl<'a> AsByteSlice for Ring<'a> {
     fn as_byte_slice(&self) -> &[u8] {
         self.as_ref()

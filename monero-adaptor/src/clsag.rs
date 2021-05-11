@@ -30,25 +30,27 @@ pub fn sign(
     let D_inv_8 = D * INV_EIGHT;
     let ring = Ring::new(ring);
     let commitment_ring = Ring::new(commitment_ring);
+    let compressed_pseudo_output_commitment = pseudo_output_commitment.compress();
+    let L_0 = L_0.compress();
+    let R_0 = R_0.compress();
 
     let mus = AggregationHashes::new(
         &ring,
         &commitment_ring,
         I.compress(),
-        pseudo_output_commitment.compress(),
+        compressed_pseudo_output_commitment,
         H_p_pk.compress(),
     );
 
-    let prefix = clsag_round_hash_prefix(
-        ring.as_ref(),
-        commitment_ring.as_ref(),
-        pseudo_output_commitment,
-        msg,
+    let h_0 = hash_to_scalar!(
+        b"CLSAG_round"
+            || ring
+            || commitment_ring
+            || compressed_pseudo_output_commitment
+            || msg
+            || L_0
+            || R_0
     );
-    let L_0 = L_0.compress();
-    let R_0 = R_0.compress();
-
-    let h_0 = hash_to_scalar!(prefix || L_0 || R_0);
 
     let h_last = fake_responses
         .iter()
@@ -60,7 +62,15 @@ pub fn sign(
             let L_i = compute_L(h_prev, &mus, *s_i, pk_i, adjusted_commitment_i).compress();
             let R_i = compute_R(h_prev, &mus, pk_i, *s_i, I, D_inv_8).compress();
 
-            hash_to_scalar!(prefix || L_i || R_i)
+            hash_to_scalar!(
+                b"CLSAG_round"
+                    || ring
+                    || commitment_ring
+                    || compressed_pseudo_output_commitment
+                    || msg
+                    || L_i
+                    || R_i
+            )
         });
 
     let s_last = alpha - h_last * ((mus.mu_P * signing_key) + (mus.mu_C * z));
@@ -97,11 +107,12 @@ pub fn verify(
     let ring = Ring::new(ring);
     let commitment_ring = Ring::new(commitment_ring);
 
+    let compressed_pseudo_output_commitment = pseudo_output_commitment.compress();
     let mus = AggregationHashes::new(
         &ring,
         &commitment_ring,
         sig.I.compress(),
-        pseudo_output_commitment.compress(),
+        compressed_pseudo_output_commitment,
         H_p_pk.compress(),
     );
 
@@ -109,18 +120,20 @@ pub fn verify(
 
     for (i, s_i) in sig.responses.iter().enumerate() {
         let pk_i = ring[(i + 1) % RING_SIZE];
-        let prefix = clsag_round_hash_prefix(
-            ring.as_ref(),
-            commitment_ring.as_ref(),
-            pseudo_output_commitment,
-            msg,
-        );
         let adjusted_commitment_i = commitment_ring[i] - pseudo_output_commitment;
 
         let L_i = compute_L(h, &mus, *s_i, pk_i, adjusted_commitment_i).compress();
         let R_i = compute_R(h, &mus, pk_i, *s_i, sig.I, sig.D).compress();
 
-        h = hash_to_scalar!(prefix || L_i || R_i)
+        h = hash_to_scalar!(
+            b"CLSAG_round"
+                || ring
+                || commitment_ring
+                || compressed_pseudo_output_commitment
+                || msg
+                || L_i
+                || R_i
+        );
     }
 
     h == sig.h_0
@@ -132,38 +145,6 @@ pub struct Signature {
     /// Key image of the real key in the ring.
     pub I: EdwardsPoint,
     pub D: EdwardsPoint,
-}
-
-/// Compute the prefix for the hash common to every iteration of the ring
-/// signature algorithm.
-///
-/// "CLSAG_round" || ring || ring of commitments || pseudooutput commitment ||
-/// msg || alpha * G
-fn clsag_round_hash_prefix(
-    ring: &[u8],
-    commitment_ring: &[u8],
-    pseudo_output_commitment: EdwardsPoint,
-    msg: &[u8],
-) -> Vec<u8> {
-    let domain_prefix = b"CLSAG_round";
-    let pseudo_output_commitment = pseudo_output_commitment.compress();
-    let pseudo_output_commitment = pseudo_output_commitment.as_bytes();
-
-    let mut prefix = Vec::with_capacity(
-        domain_prefix.len()
-            + ring.len()
-            + commitment_ring.len()
-            + pseudo_output_commitment.len()
-            + msg.len(),
-    );
-
-    prefix.extend(domain_prefix);
-    prefix.extend(ring);
-    prefix.extend(commitment_ring);
-    prefix.extend(pseudo_output_commitment);
-    prefix.extend(msg);
-
-    prefix
 }
 
 // L_i = s_i * G + c_p * pk_i + c_c * (commitment_i - pseudoutcommitment)
