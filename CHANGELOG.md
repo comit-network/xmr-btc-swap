@@ -50,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The ASB's `--max-buy` and `ask-spread` parameter were removed in favour of entries in the config file.
   The initial setup includes setting these two values now.
+- From this version on the CLI and ASB run on **mainnet** by default!
+  When running either application with `--testnet` Monero network defaults to `stagenet` and Bitcoin network to `testnet3`.
+  This is a breaking change.
+  It is recommended to run the applications with `--testnet` first and not just run the application on `mainnet` without experience.
 
 ## [0.5.0] - 2021-04-17
 
