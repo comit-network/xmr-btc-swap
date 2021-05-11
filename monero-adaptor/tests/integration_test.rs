@@ -238,8 +238,7 @@ async fn monerod_integration_test() {
         commitment_ring,
         pseudo_out,
         real_commitment_blinder,
-        out_blinding_0 + out_blinding_1, /* TODO: These haven't been multiplied by 8. Is that
-                                          * correct? */
+        (out_blinding_0 + out_blinding_1) * Scalar::from(MONERO_MUL_FACTOR),
         &prefix.hash().to_bytes(),
         &mut rng,
     );
