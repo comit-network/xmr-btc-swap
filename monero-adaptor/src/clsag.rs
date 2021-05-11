@@ -3,7 +3,6 @@ use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
-use tiny_keccak::{Hasher, Keccak};
 
 pub const RING_SIZE: usize = 11;
 

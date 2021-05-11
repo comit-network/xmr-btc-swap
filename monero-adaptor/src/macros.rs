@@ -5,8 +5,9 @@ macro_rules! hash_to_scalar {
     ($($e:tt) || +) => {
         {
             use crate::macros::AsByteSlice as _;
+            use tiny_keccak::Hasher as _;
 
-            let mut hasher = Keccak::v256();
+            let mut hasher = tiny_keccak::Keccak::v256();
 
             $(
                 hasher.update($e.as_byte_slice());
