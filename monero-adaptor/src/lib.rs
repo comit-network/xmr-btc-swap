@@ -101,12 +101,13 @@ fn challenge(
     s_i: Scalar,
     pk_i: EdwardsPoint,
     adjusted_commitment_i: EdwardsPoint,
+    D: EdwardsPoint,
     h_prev: Scalar,
     I: EdwardsPoint,
     mus: &AggregationHashes,
 ) -> Result<Scalar> {
     let L_i = compute_L(h_prev, mus, s_i, pk_i, adjusted_commitment_i);
-    let R_i = compute_R(h_prev, mus, pk_i, s_i, I, adjusted_commitment_i);
+    let R_i = compute_R(h_prev, mus, pk_i, s_i, I, D);
 
     let mut hasher = Keccak::v256();
     hasher.update(prefix);
@@ -140,14 +141,14 @@ fn compute_R(
     pk_i: EdwardsPoint,
     s_i: Scalar,
     I: EdwardsPoint,
-    z_key_image: EdwardsPoint,
+    D: EdwardsPoint,
 ) -> EdwardsPoint {
     let c_p = h_prev * mus.mu_P;
     let c_c = h_prev * mus.mu_C;
 
     let H_p_pk_i = hash_point_to_point(pk_i);
 
-    (s_i * H_p_pk_i) + (c_p * I) + c_c * z_key_image
+    (s_i * H_p_pk_i) + (c_p * I) + c_c * D
 }
 
 /// Compute the prefix for the hash common to every iteration of the ring
@@ -193,6 +194,8 @@ fn final_challenge(
     I: EdwardsPoint,
     msg: &[u8],
 ) -> Result<(Scalar, Scalar)> {
+    let D_inv_8 = D * Scalar::from(8u8).invert();
+
     let prefix = clsag_round_hash_prefix(
         ring.as_ref(),
         commitment_ring.as_ref(),
@@ -220,7 +223,7 @@ fn final_challenge(
             let adjusted_commitment_i = commitment_ring[i] - pseudo_output_commitment;
 
             // TODO: Do not unwrap here
-            challenge(&prefix, *s_i, pk_i, adjusted_commitment_i, h_prev, I, &mus).unwrap()
+            challenge(&prefix, *s_i, pk_i, adjusted_commitment_i, D_inv_8, h_prev, I, &mus, ).unwrap()
         });
 
     Ok((h_last, h_0))
@@ -283,6 +286,7 @@ impl Signature {
                 &clsag_round_hash_prefix(&ring_concat, todo!(), todo!(), msg),
                 *s_i,
                 pk_i,
+                todo!(),
                 todo!(),
                 h,
                 self.I,
