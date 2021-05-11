@@ -10,13 +10,10 @@ use uuid::Uuid;
 // Port is assumed to be stagenet standard port 38081
 pub const DEFAULT_STAGENET_MONERO_DAEMON_HOST: &str = "monero-stagenet.exan.tech";
 
-pub const DEFAULT_ELECTRUM_HTTP_URL: &str = "https://blockstream.info/testnet/api/";
 const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://electrum.blockstream.info:60002";
+const DEFAULT_BITCOIN_CONFIRMATION_TARGET: &str = "3";
 
 const DEFAULT_TOR_SOCKS5_PORT: &str = "9050";
-
-// Bitcoin transactions should be confirmed within X blocks
-const DEFAULT_BITCOIN_CONFIRMATION_TARGET: &str = "3";
 
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(name = "swap", about = "CLI for swapping BTC for XMR", author)]
