@@ -630,8 +630,7 @@ mod tests {
             msg_to_sign,
             &ring,
             &commitment_ring,
-            pseudo_output_commitment,
-            todo!()
+            pseudo_output_commitment
         ));
     }
 }

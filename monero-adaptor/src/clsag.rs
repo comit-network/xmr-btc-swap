@@ -32,11 +32,12 @@ pub fn sign(
     let commitment_ring = Ring::new(commitment_ring);
 
     let mu_P = hash_to_scalar!(
-        b"CLSAG_agg_0" || ring || commitment_ring || I || H_p_pk || pseudo_output_commitment
+        b"CLSAG_agg_0" || ring || commitment_ring || I || D_inv_8 || pseudo_output_commitment
     );
     let mu_C = hash_to_scalar!(
-        b"CLSAG_agg_1" || ring || commitment_ring || I || H_p_pk || pseudo_output_commitment
+        b"CLSAG_agg_1" || ring || commitment_ring || I || D_inv_8 || pseudo_output_commitment
     );
+
     let adjusted_commitment_ring = &commitment_ring - pseudo_output_commitment;
 
     let compute_ring_element = |L: EdwardsPoint, R: EdwardsPoint| {
@@ -47,14 +48,16 @@ pub fn sign(
 
     let h_0 = compute_ring_element(L_0, R_0);
 
+    dbg!(h_0);
+
     let h_last = fake_responses
         .iter()
         .enumerate()
         .fold(h_0, |h_prev, (i, s_i)| {
             let pk_i = ring[i + 1];
 
-            let L_i = compute_L(h_prev, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_ring[i]);
-            let R_i = compute_R(h_prev, mu_P, mu_C, pk_i, *s_i, I, D_inv_8);
+            let L_i = compute_L(h_prev, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_ring[i + 1]);
+            let R_i = compute_R(h_prev, mu_P, mu_C, *s_i, pk_i, I, D_inv_8);
 
             compute_ring_element(L_i, R_i)
         });
@@ -77,7 +80,7 @@ pub fn sign(
         ],
         h_0,
         I,
-        D,
+        D: D_inv_8,
     }
 }
 
@@ -86,7 +89,7 @@ pub fn verify(
     &Signature {
         I,
         h_0,
-        D,
+        D: D_inv_8,
         responses,
         ..
     }: &Signature,
@@ -94,17 +97,18 @@ pub fn verify(
     ring: &[EdwardsPoint; RING_SIZE],
     commitment_ring: &[EdwardsPoint; RING_SIZE],
     pseudo_output_commitment: EdwardsPoint,
-    H_p_pk: EdwardsPoint,
 ) -> bool {
     let ring = Ring::new(ring);
     let commitment_ring = Ring::new(commitment_ring);
+    let D = D_inv_8 * Scalar::from(8u8);
 
     let mu_P = hash_to_scalar!(
-        b"CLSAG_agg_0" || ring || commitment_ring || I || H_p_pk || pseudo_output_commitment
+        b"CLSAG_agg_0" || ring || commitment_ring || I || D_inv_8 || pseudo_output_commitment
     );
     let mu_C = hash_to_scalar!(
-        b"CLSAG_agg_1" || ring || commitment_ring || I || H_p_pk || pseudo_output_commitment
+        b"CLSAG_agg_1" || ring || commitment_ring || I || D_inv_8 || pseudo_output_commitment
     );
+
     let adjusted_commitment_ring = &commitment_ring - pseudo_output_commitment;
 
     let mut h = h_0;
@@ -112,8 +116,8 @@ pub fn verify(
     for (i, s_i) in responses.iter().enumerate() {
         let pk_i = ring[(i + 1) % RING_SIZE];
 
-        let L_i = compute_L(h, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_ring[i]);
-        let R_i = compute_R(h, mu_P, mu_C, pk_i, *s_i, I, D);
+        let L_i = compute_L(h, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_ring[(i + 1) % RING_SIZE]);
+        let R_i = compute_R(h, mu_P, mu_C, *s_i, pk_i, I, D);
 
         h = hash_to_scalar!(
             b"CLSAG_round"
@@ -157,8 +161,8 @@ fn compute_R(
     h_prev: Scalar,
     mu_P: Scalar,
     mu_C: Scalar,
-    pk_i: EdwardsPoint,
     s_i: Scalar,
+    pk_i: EdwardsPoint,
     I: EdwardsPoint,
     D: EdwardsPoint,
 ) -> EdwardsPoint {
@@ -252,55 +256,35 @@ mod tests {
     fn sign_and_verify() {
         let msg_to_sign = b"hello world, monero is amazing!!";
 
-        let s_prime_a = Scalar::random(&mut OsRng);
-        let s_b = Scalar::random(&mut OsRng);
+        let signing_key = Scalar::random(&mut OsRng);
+        let signing_pk = signing_key * ED25519_BASEPOINT_POINT;
+        let H_p_pk = hash_point_to_point(signing_pk);
 
-        let pk = (s_prime_a + s_b) * ED25519_BASEPOINT_POINT;
+        let alpha = Scalar::random(&mut OsRng);
 
-        let (r_a, R_a, R_prime_a) = {
-            let r_a = Scalar::random(&mut OsRng);
-            let R_a = r_a * ED25519_BASEPOINT_POINT;
-
-            let pk_hashed_to_point = hash_point_to_point(pk);
-
-            let R_prime_a = r_a * pk_hashed_to_point;
-
-            (r_a, R_a, R_prime_a)
-        };
-
-        let mut ring = [EdwardsPoint::default(); RING_SIZE];
-        ring[0] = pk;
-
-        ring[1..].fill_with(|| {
-            let x = Scalar::random(&mut OsRng);
-            x * ED25519_BASEPOINT_POINT
-        });
-
-        let mut commitment_ring = [EdwardsPoint::default(); RING_SIZE];
+        let mut ring = random_array(|| Scalar::random(&mut OsRng) * ED25519_BASEPOINT_POINT);
+        ring[0] = signing_pk;
 
         let real_commitment_blinding = Scalar::random(&mut OsRng);
-        commitment_ring[0] = real_commitment_blinding * ED25519_BASEPOINT_POINT; // + 0 * H
-        commitment_ring[1..].fill_with(|| {
-            let x = Scalar::random(&mut OsRng);
-            x * ED25519_BASEPOINT_POINT
-        });
+        let mut commitment_ring = random_array(|| Scalar::random(&mut OsRng) * ED25519_BASEPOINT_POINT);
+        commitment_ring[0] = real_commitment_blinding * ED25519_BASEPOINT_POINT; /* + 0 * H */
 
         // TODO: document
         let pseudo_output_commitment = commitment_ring[0];
 
         let signature = sign(
             msg_to_sign,
-            s_prime_a,
-            todo!(),
-            todo!(),
+            signing_key,
+            H_p_pk,
+            alpha,
             &ring,
             &commitment_ring,
-            todo!(),
-            todo!(),
+            random_array(|| Scalar::random(&mut OsRng)),
+            Scalar::zero(),
             pseudo_output_commitment,
-            todo!(),
-            todo!(),
-            todo!(),
+            alpha * ED25519_BASEPOINT_POINT,
+            alpha * H_p_pk,
+            signing_key * H_p_pk,
         );
 
         assert!(verify(
@@ -308,8 +292,14 @@ mod tests {
             msg_to_sign,
             &ring,
             &commitment_ring,
-            pseudo_output_commitment,
-            todo!()
+            pseudo_output_commitment
         ))
+    }
+
+    fn random_array<T: Default + Copy, const N: usize>(rng: impl FnMut() -> T) -> [T; N] {
+        let mut ring = [T::default(); N];
+        ring[..].fill_with(rng);
+
+        ring
     }
 }
