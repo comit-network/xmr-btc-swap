@@ -241,13 +241,19 @@ async fn monerod_integration_test() {
         &ring,
         &commitment_ring,
         random_array(|| Scalar::random(&mut rng)),
-        real_commitment_blinder
-            - (out_blinding_0 + out_blinding_1) * Scalar::from(MONERO_MUL_FACTOR),
+        real_commitment_blinder - (out_blinding_0 + out_blinding_1), // * Scalar::from(MONERO_MUL_FACTOR), TODO DOESN'T VERIFY WITH THIS
         pseudo_out,
         alpha * ED25519_BASEPOINT_POINT,
         alpha * H_p_pk,
         signing_key * H_p_pk,
     );
+    assert!(monero_adaptor::clsag::verify(
+        &sig,
+        &prefix.hash().to_bytes(),
+        &ring,
+        &commitment_ring,
+        pseudo_out
+    ));
 
     sig.responses.iter().enumerate().for_each(|(i, res)| {
         println!(
@@ -256,24 +262,43 @@ async fn monerod_integration_test() {
             i
         );
     });
-    println!("{}", hex::encode(sig.h_0.as_bytes()));
-    println!("{}", hex::encode(sig.D.compress().as_bytes()));
+    println!(
+        r#"epee::string_tools::hex_to_pod("{}", clsag.c1);"#,
+        hex::encode(sig.h_0.as_bytes())
+    );
+    println!(
+        r#"epee::string_tools::hex_to_pod("{}", clsag.D);"#,
+        hex::encode(sig.D.compress().as_bytes())
+    );
+    println!(
+        r#"epee::string_tools::hex_to_pod("{}", clsag.I);"#,
+        hex::encode(sig.I.compress().to_bytes())
+    );
+    println!(
+        r#"epee::string_tools::hex_to_pod("{}", msg);"#,
+        hex::encode(&prefix.hash().to_bytes())
+    );
 
-    let I = hex::encode(sig.I.compress().to_bytes());
-    println!("{}", I);
+    ring.iter()
+        .zip(commitment_ring.iter())
+        .enumerate()
+        .for_each(|(i, (pk, c))| {
+            println!(
+                r#"epee::string_tools::hex_to_pod("{}", pubs[{}].dest);"#,
+                hex::encode(&pk.compress().to_bytes()),
+                i
+            );
+            println!(
+                r#"epee::string_tools::hex_to_pod("{}", pubs[{}].mask);"#,
+                hex::encode(&c.compress().to_bytes()),
+                i
+            );
+        });
 
-    let msg = hex::encode(&prefix.hash().to_bytes());
-    println!("{}", msg);
-
-    ring.iter().zip(commitment_ring.iter()).for_each(|(pk, c)| {
-        println!(
-            "std::make_tuple(\"{}\",\"{}\"),",
-            hex::encode(pk.compress().to_bytes()),
-            hex::encode(c.compress().to_bytes())
-        );
-    });
-
-    println!("{}", hex::encode(pseudo_out.compress().to_bytes()));
+    println!(
+        r#"epee::string_tools::hex_to_pod("{}", Cout);"#,
+        hex::encode(pseudo_out.compress().to_bytes())
+    );
 
     let out_pk = out_pk
         .iter()

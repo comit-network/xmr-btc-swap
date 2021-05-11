@@ -15,6 +15,7 @@ hex = "0.4"
 
 [dev-dependencies]
 hex = "0.4"
+hex-literal = "0.3"
 monero-harness = { path = "../monero-harness" }
 monero-rpc = { path = "../monero-rpc" }
 monero-wallet = { path = "../monero-wallet" }

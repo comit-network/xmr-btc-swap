@@ -2292,6 +2292,7 @@ dependencies = [
  "curve25519-dalek",
  "hash_edwards_to_edwards",
  "hex 0.4.3",
+ "hex-literal",
  "itertools 0.10.0",
  "monero",
  "monero-harness",
