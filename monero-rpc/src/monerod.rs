@@ -1,6 +1,9 @@
 use anyhow::{Context, Result};
-use monero::{cryptonote::hash::Hash, util::ringct, PublicKey};
-use serde::{de::DeserializeOwned, Deserialize, Serialize, Serializer};
+use monero::cryptonote::hash::Hash;
+use monero::util::ringct;
+use monero::PublicKey;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize, Serializer};
 
 #[jsonrpc_client::api(version = "2.0")]
 pub trait MonerodRpc {
@@ -181,7 +184,8 @@ pub enum Status {
 mod monero_serde_hex_block {
     use super::*;
     use monero::consensus::Decodable;
-    use serde::{de::Error, Deserialize, Deserializer};
+    use serde::de::Error;
+    use serde::{Deserialize, Deserializer};
     use std::io::Cursor;
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<monero::Block, D::Error>
@@ -201,8 +205,11 @@ mod monero_serde_hex_block {
 
 mod byte_array {
     use super::*;
-    use serde::{de::Error, Deserializer};
-    use std::{convert::TryFrom, fmt, marker::PhantomData};
+    use serde::de::Error;
+    use serde::Deserializer;
+    use std::convert::TryFrom;
+    use std::fmt;
+    use std::marker::PhantomData;
 
     pub fn serialize<S, B>(bytes: B, serializer: S) -> Result<S::Ok, S::Error>
     where
