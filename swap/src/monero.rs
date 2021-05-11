@@ -1,7 +1,7 @@
 pub mod wallet;
 mod wallet_rpc;
 
-pub use ::monero::{Address, Network, PrivateKey, PublicKey};
+pub use ::monero::{Address, PrivateKey, PublicKey};
 pub use curve25519_dalek::scalar::Scalar;
 pub use wallet::Wallet;
 pub use wallet_rpc::{WalletRpc, WalletRpcProcess};
@@ -18,6 +18,33 @@ use std::ops::{Add, Mul, Sub};
 use std::str::FromStr;
 
 pub const PICONERO_OFFSET: u64 = 1_000_000_000_000;
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
+pub enum Network {
+    Mainnet,
+    Stagenet,
+    Testnet,
+}
+
+impl From<monero::Network> for Network {
+    fn from(network: monero::Network) -> Self {
+        match network {
+            monero::Network::Mainnet => Self::Mainnet,
+            monero::Network::Stagenet => Self::Stagenet,
+            monero::Network::Testnet => Self::Testnet,
+        }
+    }
+}
+
+impl From<Network> for monero::Network {
+    fn from(network: Network) -> Self {
+        match network {
+            Network::Mainnet => monero::Network::Mainnet,
+            Network::Stagenet => monero::Network::Stagenet,
+            Network::Testnet => monero::Network::Testnet,
+        }
+    }
+}
 
 pub fn private_key_from_secp256k1_scalar(scalar: bitcoin::Scalar) -> PrivateKey {
     let mut bytes = scalar.to_bytes();
