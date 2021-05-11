@@ -49,11 +49,11 @@ fn with_clear_net<B>(seed: &Seed, behaviour: B) -> Result<Swarm<B>>
 where
     B: NetworkBehaviour,
 {
-    tracing::info!("All connections will go through clear net.");
+    tracing::info!("All connections will go through clear net");
     let identity = seed.derive_libp2p_identity();
     let transport = transport::build_clear_net(&identity)?;
     let peer_id = identity.public().into_peer_id();
-    tracing::debug!("Our peer-id: {}", peer_id);
+    tracing::debug!(%peer_id, "Our peer-id");
 
     let swarm = SwarmBuilder::new(transport, behaviour, peer_id)
         .executor(Box::new(|f| {
@@ -68,11 +68,11 @@ async fn with_tor<B>(seed: &Seed, behaviour: B, tor_socks5_port: u16) -> Result<
 where
     B: NetworkBehaviour,
 {
-    tracing::info!("All connections will go through Tor socks5 proxy.");
+    tracing::info!("All connections will go through Tor socks5 proxy");
     let identity = seed.derive_libp2p_identity();
     let transport = transport::build_tor(&identity, tor_socks5_port)?;
     let peer_id = identity.public().into_peer_id();
-    tracing::debug!("Our peer-id: {}", peer_id);
+    tracing::debug!(%peer_id, "Our peer-id");
 
     let swarm = SwarmBuilder::new(transport, behaviour, peer_id)
         .executor(Box::new(|f| {

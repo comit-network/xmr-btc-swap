@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   When started with `--resume-only` the ASB does not accept new, incoming swap requests but only finishes swaps that are resumed upon startup.
 - A minimum accepted Bitcoin amount for the ASB similar to the maximum amount already present.
   For the CLI the minimum amount is enforced by waiting until at least the minimum is available as max-giveable amount.
+- Added a new argument to ASB: `--json` or `-j`. If set, log messages will be printed in JSON format.
 
 ### Fixed
 

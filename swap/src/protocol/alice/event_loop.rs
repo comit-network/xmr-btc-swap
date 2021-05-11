@@ -170,7 +170,7 @@ where
                                     (redeem_address, punish_address)
                                 }
                                 _ => {
-                                    tracing::error!(%peer, "Failed to get new address during execution setup.");
+                                    tracing::error!(%peer, "Failed to get new address during execution setup");
                                     continue;
                                 }
                             };
@@ -183,7 +183,7 @@ where
                                     (tx_redeem_fee, tx_punish_fee)
                                 }
                                 _ => {
-                                    tracing::error!(%peer, "Failed to calculate transaction fees during execution setup.");
+                                    tracing::error!(%peer, "Failed to calculate transaction fees during execution setup");
                                     continue;
                                 }
                             };
@@ -199,8 +199,8 @@ where
                                 &mut OsRng
                             ) {
                                 Ok(state) => state,
-                                Err(e) => {
-                                    tracing::warn!(%peer, "Failed to make State0 for execution setup: {:#}", e);
+                                Err(error) => {
+                                    tracing::warn!(%peer, "Failed to make State0 for execution setup. Error {:#}", error);
                                     continue;
                                 }
                             };
@@ -235,8 +235,8 @@ where
 
                             let quote = match self.make_quote(self.min_buy, self.max_buy).await {
                                 Ok(quote) => quote,
-                                Err(e) => {
-                                    tracing::warn!(%peer, "Failed to make quote: {:#}", e);
+                                Err(error) => {
+                                    tracing::warn!(%peer, "Failed to make quote. Error {:#}", error);
                                     continue;
                                 }
                             };
@@ -262,7 +262,10 @@ where
                             let swap_peer = match swap_peer {
                                 Ok(swap_peer) => swap_peer,
                                 Err(_) => {
-                                    tracing::warn!("Ignoring encrypted signature for unknown swap {} from {}", swap_id, peer);
+                                    tracing::warn!(
+                                        unknown_swap_id = %swap_id,
+                                        from = %peer,
+                                        "Ignoring encrypted signature for unknown swap");
                                     continue;
                                 }
                             };
@@ -270,9 +273,10 @@ where
                             if swap_peer != peer {
                                 tracing::warn!(
                                     %swap_id,
-                                    "Ignoring malicious encrypted signature from {}, expected to receive it from {}",
-                                    peer,
-                                    swap_peer);
+                                    received_from = %peer,
+                                    expected_from = %swap_peer,
+                                    "Ignoring malicious encrypted signature which was not expected from this peer",
+                                    );
                                 continue;
                             }
 
@@ -300,7 +304,9 @@ where
                             }.boxed());
                         }
                         SwarmEvent::Behaviour(OutEvent::Failure {peer, error}) => {
-                            tracing::error!(%peer, "Communication error: {:#}", error);
+                            tracing::error!(
+                                %peer,
+                                "Communication error. Error {:#}", error);
                         }
                         SwarmEvent::ConnectionEstablished { peer_id: peer, endpoint, .. } => {
                             tracing::debug!(%peer, address = %endpoint.get_remote_address(), "New connection established");
@@ -315,20 +321,20 @@ where
                             }
                         }
                         SwarmEvent::IncomingConnectionError { send_back_addr: address, error, .. } => {
-                            tracing::warn!(%address, "Failed to set up connection with peer: {}", error);
+                            tracing::warn!(%address, "Failed to set up connection with peer. Error {:#}", error);
                         }
                         SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause } if num_established == 0 => {
                             match cause {
                                 Some(error) => {
-                                    tracing::warn!(%peer, address = %endpoint.get_remote_address(), "Lost connection: {}", error);
+                                    tracing::warn!(%peer, address = %endpoint.get_remote_address(), "Lost connection. Error {:#}", error);
                                 },
                                 None => {
                                     tracing::info!(%peer, address = %endpoint.get_remote_address(), "Successfully closed connection");
                                 }
                             }
                         }
-                        SwarmEvent::NewListenAddr(addr) => {
-                            tracing::info!("Listening on {}", addr);
+                        SwarmEvent::NewListenAddr(address) => {
+                            tracing::info!(%address, "Listening on");
                         }
                         _ => {}
                     }
@@ -345,8 +351,8 @@ where
                             let id = self.swarm.behaviour_mut().transfer_proof.send_request(&peer, transfer_proof);
                             self.inflight_transfer_proofs.insert(id, responder);
                         },
-                        Some(Err(e)) => {
-                            tracing::debug!("A swap stopped without sending a transfer proof: {:#}", e);
+                        Some(Err(error)) => {
+                            tracing::debug!("A swap stopped without sending a transfer proof. Error {:#}", error);
                         }
                         None => {
                             unreachable!("stream of transfer proof receivers must never terminate")

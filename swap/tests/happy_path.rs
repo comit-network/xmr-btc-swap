@@ -1,6 +1,7 @@
 pub mod harness;
 
 use harness::SlowCancelConfig;
+use swap::protocol::alice::event_loop::FixedRate;
 use swap::protocol::{alice, bob};
 use tokio::join;
 
@@ -11,7 +12,7 @@ async fn happy_path() {
         let bob_swap = tokio::spawn(bob::run(bob_swap));
 
         let alice_swap = ctx.alice_next_swap().await;
-        let alice_swap = tokio::spawn(alice::run(alice_swap));
+        let alice_swap = tokio::spawn(alice::run(alice_swap, FixedRate::default()));
 
         let (bob_state, alice_state) = join!(bob_swap, alice_swap);
 

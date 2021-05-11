@@ -102,7 +102,7 @@ impl Wallet {
                 format!("Failed to broadcast Bitcoin {} transaction {}", kind, txid)
             })?;
 
-        tracing::info!(%txid, "Published Bitcoin {} transaction", kind);
+        tracing::info!(%txid, %kind, "Published Bitcoin transaction");
 
         Ok((txid, subscription))
     }
@@ -154,15 +154,16 @@ impl Wallet {
 
                         let new_status = match client.lock().await.status_of_script(&tx) {
                             Ok(new_status) => new_status,
-                            Err(e) => {
-                                tracing::warn!(%txid, "Failed to get status of script: {:#}", e);
+                            Err(error) => {
+                                tracing::warn!(%txid, "Failed to get status of script. Error {:#}", error);
                                 return;
                             }
                         };
 
                         if Some(new_status) != last_status {
-                            tracing::debug!(%txid, "Transaction is {}", new_status);
+                            tracing::debug!(%txid, status = %new_status, "Transaction");
                         }
+
                         last_status = Some(new_status);
 
                         let all_receivers_gone = sender.send(new_status).is_err();
@@ -200,7 +201,7 @@ impl Subscription {
         let conf_target = self.finality_confirmations;
         let txid = self.txid;
 
-        tracing::info!(%txid, "Waiting for {} confirmation{} of Bitcoin transaction", conf_target, if conf_target > 1 { "s" } else { "" });
+        tracing::info!(%txid, required_confirmation=%conf_target, "Waiting for Bitcoin transaction finality");
 
         let mut seen_confirmations = 0;
 
@@ -209,15 +210,18 @@ impl Subscription {
                 let confirmations = inner.confirmations();
 
                 if confirmations > seen_confirmations {
-                    tracing::info!(%txid, "Bitcoin tx has {} out of {} confirmation{}", confirmations, conf_target, if conf_target > 1 { "s" } else { "" });
+                    tracing::info!(%txid,
+                        seen_confirmations = %confirmations,
+                        needed_confirmations = %conf_target,
+                        "Waiting for Bitcoin transaction finality");
                     seen_confirmations = confirmations;
                 }
 
                 inner.meets_target(conf_target)
-            },
-            _ => false
+            }
+            _ => false,
         })
-            .await
+        .await
     }
 
     pub async fn wait_until_seen(&self) -> Result<()> {
@@ -589,7 +593,7 @@ impl Client {
             [] => Ok(ScriptStatus::Unseen),
             [remaining @ .., last] => {
                 if !remaining.is_empty() {
-                    tracing::warn!("Found more than a single history entry for script. This is highly unexpected and those history entries will be ignored.")
+                    tracing::warn!("Found more than a single history entry for script. This is highly unexpected and those history entries will be ignored")
                 }
 
                 if last.height <= 0 {
@@ -614,8 +618,8 @@ impl Client {
 
         if let Some(new_block) = latest_block {
             tracing::debug!(
-                "Got notification for new block at height {}",
-                new_block.height
+                block_height = new_block.height,
+                "Got notification for new block"
             );
             self.latest_block = BlockHeight::try_from(new_block)?;
         }

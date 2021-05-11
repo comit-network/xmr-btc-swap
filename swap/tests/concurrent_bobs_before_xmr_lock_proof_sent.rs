@@ -2,6 +2,7 @@ pub mod harness;
 
 use harness::bob_run_until::is_btc_locked;
 use harness::SlowCancelConfig;
+use swap::protocol::alice::event_loop::FixedRate;
 use swap::protocol::alice::AliceState;
 use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
@@ -16,7 +17,7 @@ async fn concurrent_bobs_before_xmr_lock_proof_sent() {
         let bob_swap_1 = tokio::spawn(bob::run_until(bob_swap_1, is_btc_locked));
 
         let alice_swap_1 = ctx.alice_next_swap().await;
-        let alice_swap_1 = tokio::spawn(alice::run(alice_swap_1));
+        let alice_swap_1 = tokio::spawn(alice::run(alice_swap_1, FixedRate::default()));
 
         let bob_state_1 = bob_swap_1.await??;
         assert!(matches!(bob_state_1, BobState::BtcLocked(_)));
@@ -28,7 +29,7 @@ async fn concurrent_bobs_before_xmr_lock_proof_sent() {
         let bob_swap_2 = tokio::spawn(bob::run(bob_swap_2));
 
         let alice_swap_2 = ctx.alice_next_swap().await;
-        let alice_swap_2 = tokio::spawn(alice::run(alice_swap_2));
+        let alice_swap_2 = tokio::spawn(alice::run(alice_swap_2, FixedRate::default()));
 
         // The 2nd swap ALWAYS finish successfully in this
         // scenario, but will receive an "unwanted" transfer proof that is ignored in

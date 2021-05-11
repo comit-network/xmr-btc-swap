@@ -121,7 +121,10 @@ impl WalletRpc {
             .local_addr()?
             .port();
 
-        tracing::debug!("Starting monero-wallet-rpc on port {}", port);
+        tracing::debug!(
+            %port,
+            "Starting monero-wallet-rpc on"
+        );
 
         let mut child = Command::new(self.exec_path())
             .env("LANG", "en_AU.UTF-8")

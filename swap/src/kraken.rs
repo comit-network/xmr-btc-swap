@@ -43,8 +43,12 @@ pub fn connect() -> Result<PriceUpdates> {
                 }
             },
             |error, next: Duration| {
-                tracing::info!(%error, "Kraken websocket connection failed, retrying in {}ms", next.as_millis());
-            }
+                tracing::info!(
+                    "Kraken websocket connection failed, retrying in {}ms. Error {:#}",
+                    next.as_millis(),
+                    error
+                );
+            },
         )
         .await;
 
@@ -183,9 +187,8 @@ mod connection {
             // if the message is not an event, it is a ticker update or an unknown event
             Err(_) => match serde_json::from_str::<wire::PriceUpdate>(&msg) {
                 Ok(ticker) => ticker,
-                Err(e) => {
-                    tracing::warn!(%e, "Failed to deserialize message '{}' as ticker update", msg);
-
+                Err(error) => {
+                    tracing::warn!(%msg, "Failed to deserialize message as ticker update. Error {:#}", error);
                     return Ok(None);
                 }
             },

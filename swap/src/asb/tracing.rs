@@ -1,8 +1,9 @@
 use anyhow::Result;
 use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::fmt::time::ChronoLocal;
 use tracing_subscriber::FmtSubscriber;
 
-pub fn init(level: LevelFilter) -> Result<()> {
+pub fn init(level: LevelFilter, json_format: bool) -> Result<()> {
     if level == LevelFilter::OFF {
         return Ok(());
     }
@@ -13,15 +14,18 @@ pub fn init(level: LevelFilter) -> Result<()> {
         .with_env_filter(format!("asb={},swap={}", level, level))
         .with_writer(std::io::stderr)
         .with_ansi(is_terminal)
+        .with_timer(ChronoLocal::with_format("%F %T".to_owned()))
         .with_target(false);
 
-    if !is_terminal {
-        builder.without_time().init();
-    } else {
+    if json_format {
+        builder.json().init();
+    } else if is_terminal {
         builder.init();
+    } else {
+        builder.without_time().init();
     }
 
-    tracing::info!("Initialized tracing with level: {}", level);
+    tracing::info!(%level, "Initialized tracing");
 
     Ok(())
 }

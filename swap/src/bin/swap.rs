@@ -245,8 +245,7 @@ async fn main() -> Result<()> {
                     debug!("Cancel transaction successfully published with id {}", txid)
                 }
                 Err(bob::cancel::Error::CancelTimelockNotExpiredYet) => error!(
-                    "The Cancel Transaction cannot be published yet, \
-                        because the timelock has not expired. Please try again later."
+                    "The Cancel Transaction cannot be published yet, because the timelock has not expired. Please try again later"
                 ),
             }
         }
