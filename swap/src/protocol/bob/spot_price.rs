@@ -41,8 +41,13 @@ crate::impl_from_rr_event!(SpotPriceOutEvent, OutEvent, PROTOCOL);
 pub enum Error {
     #[error("Seller currently does not accept incoming swap requests, please try again later")]
     NoSwapsAccepted,
+    #[error("Seller refused to buy {buy} because the minimum configured buy limit is {min}")]
+    AmountBelowMinimum {
+        min: bitcoin::Amount,
+        buy: bitcoin::Amount,
+    },
     #[error("Seller refused to buy {buy} because the maximum configured buy limit is {max}")]
-    MaxBuyAmountExceeded {
+    AmountAboveMaximum {
         max: bitcoin::Amount,
         buy: bitcoin::Amount,
     },
@@ -59,8 +64,11 @@ impl From<spot_price::Error> for Error {
     fn from(error: spot_price::Error) -> Self {
         match error {
             spot_price::Error::NoSwapsAccepted => Error::NoSwapsAccepted,
-            spot_price::Error::MaxBuyAmountExceeded { max, buy } => {
-                Error::MaxBuyAmountExceeded { max, buy }
+            spot_price::Error::AmountBelowMinimum { min, buy } => {
+                Error::AmountBelowMinimum { min, buy }
+            }
+            spot_price::Error::AmountAboveMaximum { max, buy } => {
+                Error::AmountAboveMaximum { max, buy }
             }
             spot_price::Error::BalanceTooLow { buy } => Error::BalanceTooLow { buy },
             spot_price::Error::Other => Error::Other,

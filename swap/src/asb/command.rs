@@ -1,7 +1,5 @@
 use crate::bitcoin::Amount;
-use bitcoin::util::amount::ParseAmountError;
-use bitcoin::{Address, Denomination};
-use rust_decimal::Decimal;
+use bitcoin::Address;
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -28,15 +26,6 @@ pub struct Arguments {
 pub enum Command {
     #[structopt(about = "Main command to run the ASB.")]
     Start {
-        #[structopt(long = "max-buy-btc", help = "The maximum amount of BTC the ASB is willing to buy.", default_value = "0.005", parse(try_from_str = parse_btc))]
-        max_buy: Amount,
-        #[structopt(
-            long = "ask-spread",
-            help = "The spread in percent that should be applied to the asking price.",
-            default_value = "0.02"
-        )]
-        ask_spread: Decimal,
-
         #[structopt(
             long = "resume-only",
             help = "For maintenance only. When set, no new swap requests will be accepted, but existing unfinished swaps will be resumed."
@@ -123,8 +112,4 @@ pub struct RecoverCommandParams {
         help = "Circumvents certain checks when recovering. It is recommended to run a recovery command without --force first to see what is returned."
     )]
     pub force: bool,
-}
-
-fn parse_btc(s: &str) -> Result<Amount, ParseAmountError> {
-    Amount::from_str_in(s, Denomination::Bitcoin)
 }

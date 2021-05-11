@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   By default we wait for finality of the redeem transaction; this can be disabled by setting `--do-not-await-finality`.
 - Resume-only mode for the ASB.
   When started with `--resume-only` the ASB does not accept new, incoming swap requests but only finishes swaps that are resumed upon startup.
+- A minimum accepted Bitcoin amount for the ASB similar to the maximum amount already present.
+  For the CLI the minimum amount is enforced by waiting until at least the minimum is available as max-giveable amount.
 
 ### Fixed
 
@@ -40,6 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   1. Balance of ASB too low
   2. Buy amount sent by CLI exceeds maximum buy amount accepted by ASB
   3. ASB is running in resume-only mode and does not accept incoming swap requests
+
+### Changed
+
+- The ASB's `--max-buy` and `ask-spread` parameter were removed in favour of entries in the config file.
+  The initial setup includes setting these two values now.
 
 ## [0.5.0] - 2021-04-17
 

@@ -226,6 +226,7 @@ async fn start_alice(
 
     let current_balance = monero_wallet.get_balance().await.unwrap();
     let lock_fee = monero_wallet.static_tx_fee_estimate();
+    let min_buy = bitcoin::Amount::from_sat(u64::MIN);
     let max_buy = bitcoin::Amount::from_sat(u64::MAX);
     let latest_rate = FixedRate::default();
     let resume_only = false;
@@ -234,6 +235,7 @@ async fn start_alice(
         &seed,
         current_balance,
         lock_fee,
+        min_buy,
         max_buy,
         latest_rate,
         resume_only,
@@ -248,7 +250,8 @@ async fn start_alice(
         monero_wallet,
         db,
         FixedRate::default(),
-        bitcoin::Amount::ONE_BTC,
+        min_buy,
+        max_buy,
     )
     .unwrap();
 

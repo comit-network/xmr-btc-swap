@@ -30,6 +30,9 @@ pub struct BidQuote {
     /// The price at which the maker is willing to buy at.
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub price: bitcoin::Amount,
+    /// The minimum quantity the maker is willing to buy.
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    pub min_quantity: bitcoin::Amount,
     /// The maximum quantity the maker is willing to buy.
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub max_quantity: bitcoin::Amount,

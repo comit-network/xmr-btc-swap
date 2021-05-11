@@ -12,6 +12,7 @@ pub fn alice<LR>(
     seed: &Seed,
     balance: monero::Amount,
     lock_fee: monero::Amount,
+    min_buy: bitcoin::Amount,
     max_buy: bitcoin::Amount,
     latest_rate: LR,
     resume_only: bool,
@@ -21,7 +22,14 @@ where
 {
     with_clear_net(
         seed,
-        alice::Behaviour::new(balance, lock_fee, max_buy, latest_rate, resume_only),
+        alice::Behaviour::new(
+            balance,
+            lock_fee,
+            min_buy,
+            max_buy,
+            latest_rate,
+            resume_only,
+        ),
     )
 }
 

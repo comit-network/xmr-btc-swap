@@ -43,7 +43,13 @@ pub enum Response {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Error {
     NoSwapsAccepted,
-    MaxBuyAmountExceeded {
+    AmountBelowMinimum {
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        min: bitcoin::Amount,
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        buy: bitcoin::Amount,
+    },
+    AmountAboveMaximum {
         #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
         max: bitcoin::Amount,
         #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
@@ -74,8 +80,16 @@ mod tests {
         let serialized = serde_json::to_string(&Response::Error(Error::NoSwapsAccepted)).unwrap();
         assert_eq!(error, serialized);
 
-        let error = r#"{"Error":{"MaxBuyAmountExceeded":{"max":0,"buy":0}}}"#.to_string();
-        let serialized = serde_json::to_string(&Response::Error(Error::MaxBuyAmountExceeded {
+        let error = r#"{"Error":{"AmountBelowMinimum":{"min":0,"buy":0}}}"#.to_string();
+        let serialized = serde_json::to_string(&Response::Error(Error::AmountBelowMinimum {
+            min: Default::default(),
+            buy: Default::default(),
+        }))
+        .unwrap();
+        assert_eq!(error, serialized);
+
+        let error = r#"{"Error":{"AmountAboveMaximum":{"max":0,"buy":0}}}"#.to_string();
+        let serialized = serde_json::to_string(&Response::Error(Error::AmountAboveMaximum {
             max: Default::default(),
             buy: Default::default(),
         }))

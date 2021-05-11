@@ -44,6 +44,8 @@ where
     #[behaviour(ignore)]
     lock_fee: monero::Amount,
     #[behaviour(ignore)]
+    min_buy: bitcoin::Amount,
+    #[behaviour(ignore)]
     max_buy: bitcoin::Amount,
     #[behaviour(ignore)]
     latest_rate: LR,
@@ -62,6 +64,7 @@ where
     pub fn new(
         balance: monero::Amount,
         lock_fee: monero::Amount,
+        min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,
         latest_rate: LR,
         resume_only: bool,
@@ -75,6 +78,7 @@ where
             events: Default::default(),
             balance,
             lock_fee,
+            min_buy,
             max_buy,
             latest_rate,
             resume_only,
@@ -156,8 +160,17 @@ where
         }
 
         let btc = request.btc;
+
+        if btc < self.min_buy {
+            self.decline(peer, channel, Error::AmountBelowMinimum {
+                min: self.min_buy,
+                buy: btc,
+            });
+            return;
+        }
+
         if btc > self.max_buy {
-            self.decline(peer, channel, Error::MaxBuyAmountExceeded {
+            self.decline(peer, channel, Error::AmountAboveMaximum {
                 max: self.max_buy,
                 buy: btc,
             });
@@ -183,7 +196,10 @@ where
         let xmr_lock_fees = self.lock_fee;
 
         if xmr_balance < xmr + xmr_lock_fees {
-            self.decline(peer, channel, Error::BalanceTooLow { buy: btc });
+            self.decline(peer, channel, Error::BalanceTooLow {
+                balance: xmr_balance,
+                buy: btc,
+            });
             return;
         }
 
@@ -215,13 +231,21 @@ impl From<OutEvent> for alice::OutEvent {
 pub enum Error {
     #[error("ASB is running in resume-only mode")]
     ResumeOnlyMode,
-    #[error("Maximum buy {max} exceeded {buy}")]
-    MaxBuyAmountExceeded {
+    #[error("Amount {buy} below minimum {min}")]
+    AmountBelowMinimum {
+        min: bitcoin::Amount,
+        buy: bitcoin::Amount,
+    },
+    #[error("Amount {buy} above maximum {max}")]
+    AmountAboveMaximum {
         max: bitcoin::Amount,
         buy: bitcoin::Amount,
     },
-    #[error("This seller's XMR balance is currently too low to fulfill the swap request to buy {buy}, please try again later")]
-    BalanceTooLow { buy: bitcoin::Amount },
+    #[error("Balance {balance} too low to fulfill swapping {buy}")]
+    BalanceTooLow {
+        balance: monero::Amount,
+        buy: bitcoin::Amount,
+    },
 
     #[error("Failed to fetch latest rate")]
     LatestRateFetchFailed(#[source] Box<dyn std::error::Error + Send + 'static>),
@@ -234,11 +258,15 @@ impl Error {
     pub fn to_error_response(&self) -> spot_price::Error {
         match self {
             Error::ResumeOnlyMode => spot_price::Error::NoSwapsAccepted,
-            Error::MaxBuyAmountExceeded { max, buy } => spot_price::Error::MaxBuyAmountExceeded {
+            Error::AmountBelowMinimum { min, buy } => spot_price::Error::AmountBelowMinimum {
+                min: *min,
+                buy: *buy,
+            },
+            Error::AmountAboveMaximum { max, buy } => spot_price::Error::AmountAboveMaximum {
                 max: *max,
                 buy: *buy,
             },
-            Error::BalanceTooLow { buy } => spot_price::Error::BalanceTooLow { buy: *buy },
+            Error::BalanceTooLow { buy, .. } => spot_price::Error::BalanceTooLow { buy: *buy },
             Error::LatestRateFetchFailed(_) | Error::SellQuoteCalculationFailed(_) => {
                 spot_price::Error::Other
             }
@@ -262,6 +290,7 @@ mod tests {
             Self {
                 balance: monero::Amount::from_monero(1.0).unwrap(),
                 lock_fee: monero::Amount::ZERO,
+                min_buy: bitcoin::Amount::from_btc(0.001).unwrap(),
                 max_buy: bitcoin::Amount::from_btc(0.01).unwrap(),
                 rate: TestRate::default(), // 0.01
                 resume_only: false,
@@ -296,7 +325,10 @@ mod tests {
 
         test.send_request(request);
         test.assert_error(
-            alice::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
+            alice::spot_price::Error::BalanceTooLow {
+                balance: monero::Amount::ZERO,
+                buy: btc_to_swap,
+            },
             bob::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
         )
         .await;
@@ -323,7 +355,10 @@ mod tests {
 
         test.send_request(request);
         test.assert_error(
-            alice::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
+            alice::spot_price::Error::BalanceTooLow {
+                balance: monero::Amount::ZERO,
+                buy: btc_to_swap,
+            },
             bob::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
         )
         .await;
@@ -331,8 +366,12 @@ mod tests {
 
     #[tokio::test]
     async fn given_alice_has_insufficient_balance_because_of_lock_fee_then_returns_error() {
+        let balance = monero::Amount::from_monero(1.0).unwrap();
+
         let mut test = SpotPriceTest::setup(
-            AliceBehaviourValues::default().with_lock_fee(monero::Amount::from_piconero(1)),
+            AliceBehaviourValues::default()
+                .with_balance(balance)
+                .with_lock_fee(monero::Amount::from_piconero(1)),
         )
         .await;
 
@@ -342,14 +381,42 @@ mod tests {
 
         test.send_request(request);
         test.assert_error(
-            alice::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
+            alice::spot_price::Error::BalanceTooLow {
+                balance,
+                buy: btc_to_swap,
+            },
             bob::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
         )
         .await;
     }
 
     #[tokio::test]
-    async fn given_max_buy_exceeded_then_returns_error() {
+    async fn given_below_min_buy_then_returns_error() {
+        let min_buy = bitcoin::Amount::from_btc(0.001).unwrap();
+
+        let mut test =
+            SpotPriceTest::setup(AliceBehaviourValues::default().with_min_buy(min_buy)).await;
+
+        let btc_to_swap = bitcoin::Amount::from_btc(0.0001).unwrap();
+
+        let request = spot_price::Request { btc: btc_to_swap };
+
+        test.send_request(request);
+        test.assert_error(
+            alice::spot_price::Error::AmountBelowMinimum {
+                buy: btc_to_swap,
+                min: min_buy,
+            },
+            bob::spot_price::Error::AmountBelowMinimum {
+                buy: btc_to_swap,
+                min: min_buy,
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn given_above_max_buy_then_returns_error() {
         let max_buy = bitcoin::Amount::from_btc(0.001).unwrap();
 
         let mut test =
@@ -361,11 +428,11 @@ mod tests {
 
         test.send_request(request);
         test.assert_error(
-            alice::spot_price::Error::MaxBuyAmountExceeded {
+            alice::spot_price::Error::AmountAboveMaximum {
                 buy: btc_to_swap,
                 max: max_buy,
             },
-            bob::spot_price::Error::MaxBuyAmountExceeded {
+            bob::spot_price::Error::AmountAboveMaximum {
                 buy: btc_to_swap,
                 max: max_buy,
             },
@@ -442,6 +509,7 @@ mod tests {
                 Behaviour::new(
                     values.balance,
                     values.lock_fee,
+                    values.min_buy,
                     values.max_buy,
                     values.rate.clone(),
                     values.resume_only,
@@ -508,12 +576,25 @@ mod tests {
                     // TODO: Somehow make PartialEq work on Alice's spot_price::Error
                     match (alice_assert, error) {
                         (
-                            alice::spot_price::Error::BalanceTooLow { .. },
-                            alice::spot_price::Error::BalanceTooLow { .. },
+                            alice::spot_price::Error::BalanceTooLow {
+                                balance: balance1,
+                                buy: buy1,
+                            },
+                            alice::spot_price::Error::BalanceTooLow {
+                                balance: balance2,
+                                buy: buy2,
+                            },
+                        ) => {
+                            assert_eq!(balance1, balance2);
+                            assert_eq!(buy1, buy2);
+                        }
+                        (
+                            alice::spot_price::Error::AmountBelowMinimum { .. },
+                            alice::spot_price::Error::AmountBelowMinimum { .. },
                         )
                         | (
-                            alice::spot_price::Error::MaxBuyAmountExceeded { .. },
-                            alice::spot_price::Error::MaxBuyAmountExceeded { .. },
+                            alice::spot_price::Error::AmountAboveMaximum { .. },
+                            alice::spot_price::Error::AmountAboveMaximum { .. },
                         )
                         | (
                             alice::spot_price::Error::LatestRateFetchFailed(_),
@@ -555,6 +636,7 @@ mod tests {
     struct AliceBehaviourValues {
         pub balance: monero::Amount,
         pub lock_fee: monero::Amount,
+        pub min_buy: bitcoin::Amount,
         pub max_buy: bitcoin::Amount,
         pub rate: TestRate, // 0.01
         pub resume_only: bool,
@@ -568,6 +650,11 @@ mod tests {
 
         pub fn with_lock_fee(mut self, lock_fee: monero::Amount) -> AliceBehaviourValues {
             self.lock_fee = lock_fee;
+            self
+        }
+
+        pub fn with_min_buy(mut self, min_buy: bitcoin::Amount) -> AliceBehaviourValues {
+            self.min_buy = min_buy;
             self
         }
 
