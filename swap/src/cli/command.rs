@@ -7,8 +7,7 @@ use std::str::FromStr;
 use url::Url;
 use uuid::Uuid;
 
-// Port is assumed to be stagenet standard port 38081
-pub const DEFAULT_STAGENET_MONERO_DAEMON_HOST: &str = "monero-stagenet.exan.tech";
+pub const DEFAULT_STAGENET_MONERO_DAEMON_ADDRESS: &str = "monero-stagenet.exan.tech:38081";
 
 const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://electrum.blockstream.info:60002";
 const DEFAULT_BITCOIN_CONFIRMATION_TARGET: &str = "3";
@@ -103,11 +102,11 @@ pub struct Monero {
     pub receive_monero_address: monero::Address,
 
     #[structopt(
-        long = "monero-daemon-host",
-        help = "Specify to connect to a monero daemon of your choice",
-        default_value = DEFAULT_STAGENET_MONERO_DAEMON_HOST
+        long = "monero-daemon-address",
+        help = "Specify to connect to a monero daemon of your choice: <host>:<port>",
+        default_value = DEFAULT_STAGENET_MONERO_DAEMON_ADDRESS
     )]
-    pub monero_daemon_host: String,
+    pub monero_daemon_address: String,
 }
 
 #[derive(structopt::StructOpt, Debug)]

@@ -115,7 +115,7 @@ impl WalletRpc {
         Ok(monero_wallet_rpc)
     }
 
-    pub async fn run(&self, network: Network, daemon_host: &str) -> Result<WalletRpcProcess> {
+    pub async fn run(&self, network: Network, daemon_address: &str) -> Result<WalletRpcProcess> {
         let port = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await?
             .local_addr()?
@@ -135,8 +135,8 @@ impl WalletRpc {
                 Network::Stagenet => "--stagenet",
                 Network::Testnet => "--testnet",
             })
-            .arg("--daemon-host")
-            .arg(daemon_host)
+            .arg("--daemon-address")
+            .arg(daemon_address)
             .arg("--rpc-bind-port")
             .arg(format!("{}", port))
             .arg("--disable-rpc-login")

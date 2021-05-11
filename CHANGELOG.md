@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   1. Balance of ASB too low
   2. Buy amount sent by CLI exceeds maximum buy amount accepted by ASB
   3. ASB is running in resume-only mode and does not accept incoming swap requests
+- An issue where the monero daemon port used by the `monero-wallet-rpc` could not be specified.
+  The CLI parameter `--monero-daemon-host` was changed to `--monero-daemon-address` where host and port have to be specified.
 
 ### Changed
 
