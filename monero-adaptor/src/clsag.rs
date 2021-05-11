@@ -7,6 +7,8 @@ use tiny_keccak::{Hasher, Keccak};
 
 pub const RING_SIZE: usize = 11;
 
+const INV_EIGHT: Scalar = Scalar::from_bits([121, 47, 220, 226, 41, 229, 6, 97, 208, 218, 28, 125, 179, 157, 211, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6]);
+
 pub fn sign(
     msg: &[u8],
     signing_key: Scalar,
@@ -22,7 +24,7 @@ pub fn sign(
     I: EdwardsPoint,
 ) -> Signature {
     let D = z * H_p_pk;
-    let D_inv_8 = D * Scalar::from(8u8).invert();
+    let D_inv_8 = D * INV_EIGHT;
 
     let prefix = clsag_round_hash_prefix(
         ring.as_ref(),
@@ -249,4 +251,16 @@ fn hash_to_scalar(elements: &[&[u8]]) -> Scalar {
     hasher.finalize(&mut hash);
 
     Scalar::from_bytes_mod_order(hash)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn const_is_inv_eight() {
+        let inv_eight = Scalar::from(8u8).invert();
+
+        assert_eq!(inv_eight, INV_EIGHT);
+    }
 }
