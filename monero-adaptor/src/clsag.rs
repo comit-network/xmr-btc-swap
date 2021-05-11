@@ -41,17 +41,14 @@ pub fn sign(
             let pk_i = ring[i + 1];
             let adjusted_commitment_i = commitment_ring[i] - pseudo_output_commitment;
 
-            // TODO: Do not unwrap here
-            challenge(
+            let L_i = compute_L(h_prev, &mus, *s_i, pk_i, adjusted_commitment_i);
+            let R_i = compute_R(h_prev, &mus, pk_i, *s_i, I, D_inv_8);
+
+            hash_to_scalar(&[
                 &prefix,
-                *s_i,
-                pk_i,
-                adjusted_commitment_i,
-                D_inv_8,
-                h_prev,
-                I,
-                &mus,
-            )
+                L_i.compress().as_bytes().as_ref(),
+                R_i.compress().as_bytes().as_ref(),
+            ])
         });
 
     let s_last = alpha - h_last * ((mus.mu_P * signing_key) + (mus.mu_C * z));
@@ -114,26 +111,6 @@ fn clsag_round_hash_prefix(
     prefix.extend(msg);
 
     prefix
-}
-
-fn challenge(
-    prefix: &[u8],
-    s_i: Scalar,
-    pk_i: EdwardsPoint,
-    adjusted_commitment_i: EdwardsPoint,
-    D: EdwardsPoint,
-    h_prev: Scalar,
-    I: EdwardsPoint,
-    mus: &AggregationHashes,
-) -> Scalar {
-    let L_i = compute_L(h_prev, mus, s_i, pk_i, adjusted_commitment_i);
-    let R_i = compute_R(h_prev, mus, pk_i, s_i, I, D);
-
-    hash_to_scalar(&[
-        prefix,
-        L_i.compress().as_bytes().as_ref(),
-        R_i.compress().as_bytes().as_ref(),
-    ])
 }
 
 // L_i = s_i * G + c_p * pk_i + c_c * (commitment_i - pseudoutcommitment)
@@ -241,18 +218,20 @@ impl Signature {
 
         let mut h = self.h_0;
 
+        let mus = todo!();
+        let adjusted_commitment_i = todo!();
+
         for (i, s_i) in self.responses.iter().enumerate() {
             let pk_i = ring[(i + 1) % RING_SIZE];
-            h = challenge(
-                &clsag_round_hash_prefix(&ring_concat, todo!(), todo!(), msg),
-                *s_i,
-                pk_i,
-                todo!(),
-                todo!(),
-                h,
-                self.I,
-                todo!(),
-            );
+            let prefix = clsag_round_hash_prefix(&ring_concat, todo!(), todo!(), msg);
+            let L_i = compute_L(h, mus, *s_i, pk_i, adjusted_commitment_i);
+            let R_i = compute_R(h, mus, pk_i, *s_i, self.I, self.D);
+
+            h = hash_to_scalar(&[
+                &prefix,
+                L_i.compress().as_bytes().as_ref(),
+                R_i.compress().as_bytes().as_ref(),
+            ])
         }
 
         Ok(h == self.h_0)
