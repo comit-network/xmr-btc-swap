@@ -1,170 +1,11 @@
+use crate::ring::Ring;
+use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
 use tiny_keccak::{Hasher, Keccak};
 
-use crate::ring::Ring;
-use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-
 pub const RING_SIZE: usize = 11;
-const HASH_KEY_CLSAG_AGG_0: &str = "CLSAG_agg_0";
-const HASH_KEY_CLSAG_AGG_1: &str = "CLSAG_agg_1";
-const HASH_KEY_CLSAG_ROUND: &str = "CLSAG_round";
-
-struct AggregationHashes {
-    mu_P: Scalar,
-    mu_C: Scalar,
-}
-
-impl AggregationHashes {
-    pub fn new(
-        ring: &Ring,
-        commitment_ring: &Ring,
-        I: EdwardsPoint,
-        pseudo_output_commitment: EdwardsPoint,
-        D: EdwardsPoint,
-    ) -> Self {
-        let I = I.compress();
-        let D = D.compress();
-
-        let pseudo_output_commitment = pseudo_output_commitment.compress();
-
-        let mu_P = Self::hash(
-            HASH_KEY_CLSAG_AGG_0,
-            ring.as_ref(),
-            commitment_ring.as_ref(),
-            &I,
-            &D,
-            &pseudo_output_commitment,
-        );
-        let mu_C = Self::hash(
-            HASH_KEY_CLSAG_AGG_1,
-            ring.as_ref(),
-            commitment_ring.as_ref(),
-            &I,
-            &D,
-            &pseudo_output_commitment,
-        );
-
-        Self { mu_P, mu_C }
-    }
-
-    // aggregation hashes:
-    // mu_{P, C} =
-    // keccak256("CLSAG_agg_{0, 1}" ||
-    //     ring || ring of commitments || I || z * hash_to_point(signing pk) ||
-    // pseudooutput commitment)
-    //
-    // where z = blinding of real commitment - blinding of pseudooutput commitment.
-    fn hash(
-        domain_prefix: &str,
-        ring: &[u8],
-        commitment_ring: &[u8],
-        I: &CompressedEdwardsY,
-        z_key_image: &CompressedEdwardsY,
-        pseudo_output_commitment: &CompressedEdwardsY,
-    ) -> Scalar {
-        let mut hasher = Keccak::v256();
-        hasher.update(domain_prefix.as_bytes());
-        hasher.update(ring);
-        hasher.update(commitment_ring);
-        hasher.update(I.as_bytes());
-        hasher.update(z_key_image.as_bytes());
-        hasher.update(pseudo_output_commitment.as_bytes());
-
-        let mut hash = [0u8; 32];
-        hasher.finalize(&mut hash);
-
-        Scalar::from_bytes_mod_order(hash)
-    }
-}
-
-fn challenge(
-    prefix: &[u8],
-    s_i: Scalar,
-    pk_i: EdwardsPoint,
-    adjusted_commitment_i: EdwardsPoint,
-    D: EdwardsPoint,
-    h_prev: Scalar,
-    I: EdwardsPoint,
-    mus: &AggregationHashes,
-) -> anyhow::Result<Scalar> {
-    let L_i = compute_L(h_prev, mus, s_i, pk_i, adjusted_commitment_i);
-    let R_i = compute_R(h_prev, mus, pk_i, s_i, I, D);
-
-    let mut hasher = Keccak::v256();
-    hasher.update(prefix);
-    hasher.update(&L_i.compress().as_bytes().to_vec());
-    hasher.update(&R_i.compress().as_bytes().to_vec());
-
-    let mut output = [0u8; 32];
-    hasher.finalize(&mut output);
-
-    Ok(Scalar::from_bytes_mod_order(output))
-}
-
-// L_i = s_i * G + c_p * pk_i + c_c * (commitment_i - pseudoutcommitment)
-fn compute_L(
-    h_prev: Scalar,
-    mus: &AggregationHashes,
-    s_i: Scalar,
-    pk_i: EdwardsPoint,
-    adjusted_commitment_i: EdwardsPoint,
-) -> EdwardsPoint {
-    let c_p = h_prev * mus.mu_P;
-    let c_c = h_prev * mus.mu_C;
-
-    (s_i * ED25519_BASEPOINT_POINT) + (c_p * pk_i) + c_c * adjusted_commitment_i
-}
-
-// R_i = s_i * H_p_pk_i + c_p * I + c_c * (z * hash_to_point(signing pk))
-fn compute_R(
-    h_prev: Scalar,
-    mus: &AggregationHashes,
-    pk_i: EdwardsPoint,
-    s_i: Scalar,
-    I: EdwardsPoint,
-    D: EdwardsPoint,
-) -> EdwardsPoint {
-    let c_p = h_prev * mus.mu_P;
-    let c_c = h_prev * mus.mu_C;
-
-    let H_p_pk_i = hash_point_to_point(pk_i);
-
-    (s_i * H_p_pk_i) + (c_p * I) + c_c * D
-}
-
-/// Compute the prefix for the hash common to every iteration of the ring
-/// signature algorithm.
-///
-/// "CLSAG_round" || ring || ring of commitments || pseudooutput commitment ||
-/// msg || alpha * G
-fn clsag_round_hash_prefix(
-    ring: &[u8],
-    commitment_ring: &[u8],
-    pseudo_output_commitment: EdwardsPoint,
-    msg: &[u8],
-) -> Vec<u8> {
-    let domain_prefix = HASH_KEY_CLSAG_ROUND.as_bytes();
-    let pseudo_output_commitment = pseudo_output_commitment.compress();
-    let pseudo_output_commitment = pseudo_output_commitment.as_bytes();
-
-    let mut prefix = Vec::with_capacity(
-        domain_prefix.len()
-            + ring.len()
-            + commitment_ring.len()
-            + pseudo_output_commitment.len()
-            + msg.len(),
-    );
-
-    prefix.extend(domain_prefix);
-    prefix.extend(ring);
-    prefix.extend(commitment_ring);
-    prefix.extend(pseudo_output_commitment);
-    prefix.extend(msg);
-
-    prefix
-}
 
 pub fn sign(
     fake_responses: [Scalar; RING_SIZE - 1],
@@ -251,6 +92,165 @@ pub struct Signature {
     /// Key image of the real key in the ring.
     pub I: EdwardsPoint,
     pub D: EdwardsPoint,
+}
+
+/// Compute the prefix for the hash common to every iteration of the ring
+/// signature algorithm.
+///
+/// "CLSAG_round" || ring || ring of commitments || pseudooutput commitment ||
+/// msg || alpha * G
+fn clsag_round_hash_prefix(
+    ring: &[u8],
+    commitment_ring: &[u8],
+    pseudo_output_commitment: EdwardsPoint,
+    msg: &[u8],
+) -> Vec<u8> {
+    let domain_prefix = HASH_KEY_CLSAG_ROUND.as_bytes();
+    let pseudo_output_commitment = pseudo_output_commitment.compress();
+    let pseudo_output_commitment = pseudo_output_commitment.as_bytes();
+
+    let mut prefix = Vec::with_capacity(
+        domain_prefix.len()
+            + ring.len()
+            + commitment_ring.len()
+            + pseudo_output_commitment.len()
+            + msg.len(),
+    );
+
+    prefix.extend(domain_prefix);
+    prefix.extend(ring);
+    prefix.extend(commitment_ring);
+    prefix.extend(pseudo_output_commitment);
+    prefix.extend(msg);
+
+    prefix
+}
+
+fn challenge(
+    prefix: &[u8],
+    s_i: Scalar,
+    pk_i: EdwardsPoint,
+    adjusted_commitment_i: EdwardsPoint,
+    D: EdwardsPoint,
+    h_prev: Scalar,
+    I: EdwardsPoint,
+    mus: &AggregationHashes,
+) -> anyhow::Result<Scalar> {
+    let L_i = compute_L(h_prev, mus, s_i, pk_i, adjusted_commitment_i);
+    let R_i = compute_R(h_prev, mus, pk_i, s_i, I, D);
+
+    let mut hasher = Keccak::v256();
+    hasher.update(prefix);
+    hasher.update(&L_i.compress().as_bytes().to_vec());
+    hasher.update(&R_i.compress().as_bytes().to_vec());
+
+    let mut output = [0u8; 32];
+    hasher.finalize(&mut output);
+
+    Ok(Scalar::from_bytes_mod_order(output))
+}
+
+// L_i = s_i * G + c_p * pk_i + c_c * (commitment_i - pseudoutcommitment)
+fn compute_L(
+    h_prev: Scalar,
+    mus: &AggregationHashes,
+    s_i: Scalar,
+    pk_i: EdwardsPoint,
+    adjusted_commitment_i: EdwardsPoint,
+) -> EdwardsPoint {
+    let c_p = h_prev * mus.mu_P;
+    let c_c = h_prev * mus.mu_C;
+
+    (s_i * ED25519_BASEPOINT_POINT) + (c_p * pk_i) + c_c * adjusted_commitment_i
+}
+
+// R_i = s_i * H_p_pk_i + c_p * I + c_c * (z * hash_to_point(signing pk))
+fn compute_R(
+    h_prev: Scalar,
+    mus: &AggregationHashes,
+    pk_i: EdwardsPoint,
+    s_i: Scalar,
+    I: EdwardsPoint,
+    D: EdwardsPoint,
+) -> EdwardsPoint {
+    let c_p = h_prev * mus.mu_P;
+    let c_c = h_prev * mus.mu_C;
+
+    let H_p_pk_i = hash_point_to_point(pk_i);
+
+    (s_i * H_p_pk_i) + (c_p * I) + c_c * D
+}
+
+const HASH_KEY_CLSAG_AGG_0: &str = "CLSAG_agg_0";
+const HASH_KEY_CLSAG_AGG_1: &str = "CLSAG_agg_1";
+const HASH_KEY_CLSAG_ROUND: &str = "CLSAG_round";
+
+struct AggregationHashes {
+    mu_P: Scalar,
+    mu_C: Scalar,
+}
+
+impl AggregationHashes {
+    pub fn new(
+        ring: &Ring,
+        commitment_ring: &Ring,
+        I: EdwardsPoint,
+        pseudo_output_commitment: EdwardsPoint,
+        D: EdwardsPoint,
+    ) -> Self {
+        let I = I.compress();
+        let D = D.compress();
+
+        let pseudo_output_commitment = pseudo_output_commitment.compress();
+
+        let mu_P = Self::hash(
+            HASH_KEY_CLSAG_AGG_0,
+            ring.as_ref(),
+            commitment_ring.as_ref(),
+            &I,
+            &D,
+            &pseudo_output_commitment,
+        );
+        let mu_C = Self::hash(
+            HASH_KEY_CLSAG_AGG_1,
+            ring.as_ref(),
+            commitment_ring.as_ref(),
+            &I,
+            &D,
+            &pseudo_output_commitment,
+        );
+
+        Self { mu_P, mu_C }
+    }
+
+    // aggregation hashes:
+    // mu_{P, C} =
+    // keccak256("CLSAG_agg_{0, 1}" ||
+    //     ring || ring of commitments || I || z * hash_to_point(signing pk) ||
+    // pseudooutput commitment)
+    //
+    // where z = blinding of real commitment - blinding of pseudooutput commitment.
+    fn hash(
+        domain_prefix: &str,
+        ring: &[u8],
+        commitment_ring: &[u8],
+        I: &CompressedEdwardsY,
+        z_key_image: &CompressedEdwardsY,
+        pseudo_output_commitment: &CompressedEdwardsY,
+    ) -> Scalar {
+        let mut hasher = Keccak::v256();
+        hasher.update(domain_prefix.as_bytes());
+        hasher.update(ring);
+        hasher.update(commitment_ring);
+        hasher.update(I.as_bytes());
+        hasher.update(z_key_image.as_bytes());
+        hasher.update(pseudo_output_commitment.as_bytes());
+
+        let mut hash = [0u8; 32];
+        hasher.finalize(&mut hash);
+
+        Scalar::from_bytes_mod_order(hash)
+    }
 }
 
 impl Signature {
