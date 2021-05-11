@@ -631,6 +631,6 @@ mod tests {
 
         let sig = alice.adaptor_sig.adapt(r_a);
 
-        assert!(clsag::verify(&sig, ring, msg_to_sign));
+        assert!(clsag::verify(&sig, msg_to_sign, todo!(), todo!(), todo!(), todo!()));
     }
 }
