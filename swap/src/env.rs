@@ -3,7 +3,7 @@ use std::cmp::max;
 use std::time::Duration;
 use time::NumericalStdDurationShort;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Config {
     pub bitcoin_lock_confirmed_timeout: Duration,
     pub bitcoin_finality_confirmations: u32,
