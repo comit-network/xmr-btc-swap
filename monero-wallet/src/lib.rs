@@ -81,12 +81,12 @@ mod tests {
         let container = cli.run(Monerod::default());
         let rpc_client = Client::localhost(container.get_host_port(18081).unwrap()).unwrap();
         rpc_client.generateblocks(150, "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".to_owned()).await.unwrap();
-        let wallet = Wallet {
-            client: rpc_client.clone(),
-            key: todo!(),
-        };
-
-        let (lower, upper) = wallet.calculate_key_offset_boundaries().await.unwrap();
+        // let wallet = Wallet {
+        //     client: rpc_client.clone(),
+        //     key: todo!(),
+        // };
+        //
+        // let (lower, upper) = wallet.calculate_key_offset_boundaries().await.unwrap();
 
         todo!("fix");
         // let result = rpc_client

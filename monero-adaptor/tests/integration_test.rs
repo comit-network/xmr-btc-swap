@@ -16,7 +16,7 @@ use monero_harness::Monero;
 use monero_rpc::monerod::{GetOutputsOut, MonerodRpc};
 use monero_wallet::MonerodClientExt;
 use rand::rngs::OsRng;
-use rand::{thread_rng, CryptoRng, Rng, SeedableRng};
+use rand::{CryptoRng, Rng, SeedableRng};
 use std::convert::TryInto;
 use std::iter;
 use testcontainers::clients::Cli;
@@ -147,10 +147,11 @@ async fn monerod_integration_test() {
     let ecdh_key_1 = PrivateKey::random(&mut rng);
     let (ecdh_info_1, out_blinding_1) = EcdhInfo::new_bulletproof(spend_amount, ecdh_key_1.scalar);
 
-    let (bulletproof, out_pk) = monero::make_bulletproof(&mut rng, &[spend_amount, 0], &[
-        out_blinding_0,
-        out_blinding_1,
-    ])
+    let (bulletproof, out_pk) = monero::make_bulletproof(
+        &mut rng,
+        &[spend_amount, 0],
+        &[out_blinding_0, out_blinding_1],
+    )
     .unwrap();
 
     let k_image = {
@@ -373,18 +374,21 @@ mod tests {
 
         let relative_offsets = to_relative_offsets(&key_offsets);
 
-        assert_eq!(&relative_offsets, &[
-            VarInt(78),
-            VarInt(3),
-            VarInt(10),
-            VarInt(0),
-            VarInt(5),
-            VarInt(2),
-            VarInt(3),
-            VarInt(11),
-            VarInt(1),
-            VarInt(1),
-            VarInt(3),
-        ])
+        assert_eq!(
+            &relative_offsets,
+            &[
+                VarInt(78),
+                VarInt(3),
+                VarInt(10),
+                VarInt(0),
+                VarInt(5),
+                VarInt(2),
+                VarInt(3),
+                VarInt(11),
+                VarInt(1),
+                VarInt(1),
+                VarInt(3),
+            ]
+        )
     }
 }
