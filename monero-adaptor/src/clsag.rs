@@ -13,7 +13,7 @@ const INV_EIGHT: Scalar = Scalar::from_bits([
 ]);
 
 pub fn sign(
-    msg: &[u8],
+    msg: &[u8; 32],
     signing_key: Scalar,
     H_p_pk: EdwardsPoint,
     alpha: Scalar,
@@ -32,20 +32,10 @@ pub fn sign(
     let commitment_ring = Ring::new(commitment_ring);
 
     let mu_P = hash_to_scalar!(
-        b"CLSAG_agg_0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-            || ring
-            || commitment_ring
-            || I
-            || D_inv_8
-            || pseudo_output_commitment
+        b"CLSAG_agg_0" || ring || commitment_ring || I || D_inv_8 || pseudo_output_commitment
     );
     let mu_C = hash_to_scalar!(
-        b"CLSAG_agg_1\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-            || ring
-            || commitment_ring
-            || I
-            || D_inv_8
-            || pseudo_output_commitment
+        b"CLSAG_agg_1" || ring || commitment_ring || I || D_inv_8 || pseudo_output_commitment
     );
 
     dbg!(hex::encode(mu_P.as_bytes()));
@@ -55,13 +45,7 @@ pub fn sign(
 
     let compute_ring_element = |L: EdwardsPoint, R: EdwardsPoint| {
         hash_to_scalar!(
-            b"CLSAG_round\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-                || ring
-                || commitment_ring
-                || pseudo_output_commitment
-                || msg
-                || L
-                || R
+            b"CLSAG_round" || ring || commitment_ring || pseudo_output_commitment || msg || L || R
         )
     };
 
@@ -123,7 +107,7 @@ pub fn verify(
         responses,
         ..
     }: &Signature,
-    msg: &[u8],
+    msg: &[u8; 32],
     ring: &[EdwardsPoint; RING_SIZE],
     commitment_ring: &[EdwardsPoint; RING_SIZE],
     pseudo_output_commitment: EdwardsPoint,
@@ -133,20 +117,10 @@ pub fn verify(
     let D = D_inv_8 * Scalar::from(8u8);
 
     let mu_P = hash_to_scalar!(
-        b"CLSAG_agg_0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-            || ring
-            || commitment_ring
-            || I
-            || D_inv_8
-            || pseudo_output_commitment
+        b"CLSAG_agg_0" || ring || commitment_ring || I || D_inv_8 || pseudo_output_commitment
     );
     let mu_C = hash_to_scalar!(
-        b"CLSAG_agg_1\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-            || ring
-            || commitment_ring
-            || I
-            || D_inv_8
-            || pseudo_output_commitment
+        b"CLSAG_agg_1" || ring || commitment_ring || I || D_inv_8 || pseudo_output_commitment
     );
 
     let adjusted_commitment_ring = &commitment_ring - pseudo_output_commitment;
@@ -167,7 +141,7 @@ pub fn verify(
         let R_i = compute_R(h, mu_P, mu_C, *s_i, pk_i, I, D);
 
         h = hash_to_scalar!(
-            b"CLSAG_round\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+            b"CLSAG_round"
                 || ring
                 || commitment_ring
                 || pseudo_output_commitment

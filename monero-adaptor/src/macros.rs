@@ -11,7 +11,11 @@ macro_rules! hash_to_scalar {
             let mut hasher = tiny_keccak::Keccak::v256();
 
             $(
-                hasher.update($e.to_cow_bytes().as_ref());
+                let bytes_vec = $e.to_cow_bytes();
+
+                for el in bytes_vec {
+                    hasher.update(el.as_ref());
+                }
             )+
 
             let mut hash = [0u8; 32];
@@ -22,44 +26,53 @@ macro_rules! hash_to_scalar {
     };
 }
 
-type CowBytes<'a> = Cow<'a, [u8]>;
+type CowBytes<'a> = Cow<'a, [u8; 32]>;
 
 pub(crate) trait ToCowBytes {
-    fn to_cow_bytes(&self) -> CowBytes<'_>;
+    fn to_cow_bytes(&self) -> Vec<CowBytes<'_>>;
 }
 
 impl ToCowBytes for CompressedEdwardsY {
-    fn to_cow_bytes(&self) -> CowBytes<'_> {
-        CowBytes::Borrowed(self.0.as_ref())
+    fn to_cow_bytes(&self) -> Vec<CowBytes<'_>> {
+        vec![CowBytes::Borrowed(&self.0)]
     }
 }
 
 impl ToCowBytes for EdwardsPoint {
-    fn to_cow_bytes(&self) -> CowBytes<'_> {
-        CowBytes::Owned(self.compress().0.to_vec())
+    fn to_cow_bytes(&self) -> Vec<CowBytes<'_>> {
+        vec![CowBytes::Owned(self.compress().0)]
     }
 }
 
-impl ToCowBytes for Vec<u8> {
-    fn to_cow_bytes(&self) -> CowBytes<'_> {
-        CowBytes::Borrowed(self.as_ref())
+impl ToCowBytes for [u8; 32] {
+    fn to_cow_bytes(&self) -> Vec<CowBytes<'_>> {
+        vec![CowBytes::Borrowed(&self)]
     }
 }
 
-impl<const N: usize> ToCowBytes for [u8; N] {
-    fn to_cow_bytes(&self) -> CowBytes<'_> {
-        CowBytes::Borrowed(self.as_ref())
-    }
-}
+impl ToCowBytes for [u8; 11] {
+    fn to_cow_bytes(&self) -> Vec<CowBytes<'_>> {
+        let mut bytes = [0u8; 32];
+        bytes[0..11].copy_from_slice(self);
 
-impl ToCowBytes for &[u8] {
-    fn to_cow_bytes(&self) -> CowBytes<'_> {
-        CowBytes::Borrowed(self)
+        vec![CowBytes::Owned(bytes)]
     }
 }
 
 impl<'a> ToCowBytes for Ring<'a> {
-    fn to_cow_bytes(&self) -> CowBytes<'_> {
-        CowBytes::Borrowed(self.as_ref())
+    fn to_cow_bytes(&self) -> Vec<CowBytes<'_>> {
+        vec![
+            CowBytes::Owned(self[0].compress().0),
+            CowBytes::Owned(self[1].compress().0),
+            CowBytes::Owned(self[2].compress().0),
+            CowBytes::Owned(self[3].compress().0),
+            CowBytes::Owned(self[4].compress().0),
+            CowBytes::Owned(self[5].compress().0),
+            CowBytes::Owned(self[6].compress().0),
+            CowBytes::Owned(self[7].compress().0),
+            CowBytes::Owned(self[8].compress().0),
+            CowBytes::Owned(self[9].compress().0),
+            CowBytes::Owned(self[10].compress().0),
+        ]
     }
 }
