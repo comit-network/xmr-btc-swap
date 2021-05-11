@@ -30,16 +30,7 @@ pub fn sign(
         pseudo_output_commitment,
         msg,
     );
-    let h_0 = {
-        let mut keccak = Keccak::v256();
-        keccak.update(&prefix);
-        keccak.update(L.compress().as_bytes());
-        keccak.update(R.compress().as_bytes());
-        let mut output = [0u8; 32];
-        keccak.finalize(&mut output);
-
-        Scalar::from_bytes_mod_order(output)
-    };
+    let h_0 = hash_to_scalar(&[&prefix, L.compress().as_bytes(), R.compress().as_bytes()]);
 
     let mus = AggregationHashes::new(&ring, &commitment_ring, I, pseudo_output_commitment, H_p_pk);
 
@@ -138,15 +129,11 @@ fn challenge(
     let L_i = compute_L(h_prev, mus, s_i, pk_i, adjusted_commitment_i);
     let R_i = compute_R(h_prev, mus, pk_i, s_i, I, D);
 
-    let mut hasher = Keccak::v256();
-    hasher.update(prefix);
-    hasher.update(&L_i.compress().as_bytes().to_vec());
-    hasher.update(&R_i.compress().as_bytes().to_vec());
-
-    let mut output = [0u8; 32];
-    hasher.finalize(&mut output);
-
-    Scalar::from_bytes_mod_order(output)
+    hash_to_scalar(&[
+        prefix,
+        L_i.compress().as_bytes().as_ref(),
+        R_i.compress().as_bytes().as_ref(),
+    ])
 }
 
 // L_i = s_i * G + c_p * pk_i + c_c * (commitment_i - pseudoutcommitment)
@@ -233,18 +220,14 @@ impl AggregationHashes {
         z_key_image: &CompressedEdwardsY,
         pseudo_output_commitment: &CompressedEdwardsY,
     ) -> Scalar {
-        let mut hasher = Keccak::v256();
-        hasher.update(domain_prefix);
-        hasher.update(ring);
-        hasher.update(commitment_ring);
-        hasher.update(I.as_bytes());
-        hasher.update(z_key_image.as_bytes());
-        hasher.update(pseudo_output_commitment.as_bytes());
-
-        let mut hash = [0u8; 32];
-        hasher.finalize(&mut hash);
-
-        Scalar::from_bytes_mod_order(hash)
+        hash_to_scalar(&[
+            domain_prefix,
+            ring,
+            commitment_ring,
+            I.as_bytes(),
+            z_key_image.as_bytes(),
+            pseudo_output_commitment.as_bytes(),
+        ])
     }
 }
 
@@ -292,4 +275,17 @@ impl From<Signature> for monero::util::ringct::Clsag {
             },
         }
     }
+}
+
+fn hash_to_scalar(elements: &[&[u8]]) -> Scalar {
+    let mut hasher = Keccak::v256();
+
+    for element in elements {
+        hasher.update(element);
+    }
+
+    let mut hash = [0u8; 32];
+    hasher.finalize(&mut hash);
+
+    Scalar::from_bytes_mod_order(hash)
 }
