@@ -7,7 +7,10 @@ use tiny_keccak::{Hasher, Keccak};
 
 pub const RING_SIZE: usize = 11;
 
-const INV_EIGHT: Scalar = Scalar::from_bits([121, 47, 220, 226, 41, 229, 6, 97, 208, 218, 28, 125, 179, 157, 211, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6]);
+const INV_EIGHT: Scalar = Scalar::from_bits([
+    121, 47, 220, 226, 41, 229, 6, 97, 208, 218, 28, 125, 179, 157, 211, 7, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 6,
+]);
 
 pub fn sign(
     msg: &[u8],
@@ -40,7 +43,11 @@ pub fn sign(
         pseudo_output_commitment,
         msg,
     );
-    let h_0 = hash_to_scalar(&[&prefix, L_0.compress().as_bytes(), R_0.compress().as_bytes()]);
+    let h_0 = hash_to_scalar(&[
+        &prefix,
+        L_0.compress().as_bytes(),
+        R_0.compress().as_bytes(),
+    ]);
 
     let h_last = fake_responses
         .iter()
@@ -81,43 +88,40 @@ pub fn sign(
     }
 }
 
+#[must_use]
+pub fn verify(sig: &Signature, ring: [EdwardsPoint; RING_SIZE], msg: &[u8; 32]) -> bool {
+    let ring_concat = ring
+        .iter()
+        .flat_map(|pk| pk.compress().as_bytes().to_vec())
+        .collect::<Vec<u8>>();
+
+    let mut h = sig.h_0;
+
+    let mus = todo!();
+    let adjusted_commitment_i = todo!();
+
+    for (i, s_i) in sig.responses.iter().enumerate() {
+        let pk_i = ring[(i + 1) % RING_SIZE];
+        let prefix = clsag_round_hash_prefix(&ring_concat, todo!(), todo!(), msg);
+        let L_i = compute_L(h, mus, *s_i, pk_i, adjusted_commitment_i);
+        let R_i = compute_R(h, mus, pk_i, *s_i, sig.I, sig.D);
+
+        h = hash_to_scalar(&[
+            &prefix,
+            L_i.compress().as_bytes().as_ref(),
+            R_i.compress().as_bytes().as_ref(),
+        ])
+    }
+
+    h == sig.h_0
+}
+
 pub struct Signature {
     pub responses: [Scalar; RING_SIZE],
     pub h_0: Scalar,
     /// Key image of the real key in the ring.
     pub I: EdwardsPoint,
     pub D: EdwardsPoint,
-}
-
-impl Signature {
-    #[cfg(test)]
-    #[must_use]
-    pub fn verify(&self, ring: [EdwardsPoint; RING_SIZE], msg: &[u8; 32]) -> bool {
-        let ring_concat = ring
-            .iter()
-            .flat_map(|pk| pk.compress().as_bytes().to_vec())
-            .collect::<Vec<u8>>();
-
-        let mut h = self.h_0;
-
-        let mus = todo!();
-        let adjusted_commitment_i = todo!();
-
-        for (i, s_i) in self.responses.iter().enumerate() {
-            let pk_i = ring[(i + 1) % RING_SIZE];
-            let prefix = clsag_round_hash_prefix(&ring_concat, todo!(), todo!(), msg);
-            let L_i = compute_L(h, mus, *s_i, pk_i, adjusted_commitment_i);
-            let R_i = compute_R(h, mus, pk_i, *s_i, self.I, self.D);
-
-            h = hash_to_scalar(&[
-                &prefix,
-                L_i.compress().as_bytes().as_ref(),
-                R_i.compress().as_bytes().as_ref(),
-            ])
-        }
-
-        h == self.h_0
-    }
 }
 
 /// Compute the prefix for the hash common to every iteration of the ring
