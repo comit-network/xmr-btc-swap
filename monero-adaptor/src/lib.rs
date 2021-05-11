@@ -30,14 +30,12 @@ impl AggregationHashes {
         ring: &Ring,
         commitment_ring: &Ring,
         I: EdwardsPoint,
-        z: Scalar,
-        H_p_pk: EdwardsPoint,
         pseudo_output_commitment: EdwardsPoint,
+        D: EdwardsPoint,
     ) -> Self {
-        let z_key_image = z * H_p_pk;
-
         let I = I.compress();
-        let z_key_image = z_key_image.compress();
+        let D = D.compress();
+
         let pseudo_output_commitment = pseudo_output_commitment.compress();
 
         let mu_P = Self::hash(
@@ -45,7 +43,7 @@ impl AggregationHashes {
             ring.as_ref(),
             commitment_ring.as_ref(),
             &I,
-            &z_key_image,
+            &D,
             &pseudo_output_commitment,
         );
         let mu_C = Self::hash(
@@ -53,7 +51,7 @@ impl AggregationHashes {
             ring.as_ref(),
             commitment_ring.as_ref(),
             &I,
-            &z_key_image,
+            &D,
             &pseudo_output_commitment,
         );
 
@@ -188,9 +186,8 @@ fn final_challenge(
     fake_responses: [Scalar; RING_SIZE - 1],
     ring: Ring,
     commitment_ring: Ring,
-    H_p_pk: EdwardsPoint,
+    D: EdwardsPoint,
     pseudo_output_commitment: EdwardsPoint,
-    z: Scalar,
     L: EdwardsPoint,
     R: EdwardsPoint,
     I: EdwardsPoint,
@@ -213,14 +210,7 @@ fn final_challenge(
         Scalar::from_bytes_mod_order_wide(&output)
     };
 
-    let mus = AggregationHashes::new(
-        &ring,
-        &commitment_ring,
-        I,
-        z,
-        H_p_pk,
-        pseudo_output_commitment,
-    );
+    let mus = AggregationHashes::new(&ring, &commitment_ring, I, pseudo_output_commitment, D);
 
     let h_last = fake_responses
         .iter()
@@ -243,7 +233,8 @@ pub struct AdaptorSignature {
     h_0: Scalar,
     /// Key image of the real key in the ring.
     I: EdwardsPoint,
-    // TODO: Add commitment key image D = z * H_p_pk
+    /// Commitment key image `D = z * hash_to_p3(signing_public_key)`
+    D: EdwardsPoint,
 }
 
 impl AdaptorSignature {
@@ -263,6 +254,7 @@ impl AdaptorSignature {
             responses,
             h_0: self.h_0,
             I: self.I,
+            D: self.D,
         }
     }
 }
@@ -272,6 +264,7 @@ pub struct Signature {
     pub h_0: Scalar,
     /// Key image of the real key in the ring.
     pub I: EdwardsPoint,
+    pub D: EdwardsPoint,
 }
 
 impl Signature {
@@ -312,9 +305,8 @@ impl From<Signature> for monero::util::ringct::Clsag {
             c1: monero::util::ringct::Key {
                 key: from.h_0.to_bytes(),
             },
-            // TODO: Must use commitment key image D = z * H_p_pk
             D: monero::util::ringct::Key {
-                key: from.I.compress().to_bytes(),
+                key: from.D.compress().to_bytes(),
             },
         }
     }
@@ -404,13 +396,14 @@ impl Alice0 {
         msg.pi_b
             .verify(ED25519_BASEPOINT_POINT, msg.T_b, self.H_p_pk, msg.I_hat_b)?;
 
+        let D = z * self.H_p_pk;
+
         let (h_last, h_0) = final_challenge(
             self.fake_responses,
             self.ring,
             self.commitment_ring,
-            self.H_p_pk,
+            D,
             self.pseudo_output_commitment,
-            z,
             self.T_a + msg.T_b + self.R_a,
             self.I_hat_a + msg.I_hat_b + self.R_prime_a,
             self.I_a + msg.I_b,
@@ -428,6 +421,7 @@ impl Alice0 {
             h_0,
             I_b: msg.I_b,
             s_0_a,
+            D,
         })
     }
 }
@@ -440,6 +434,7 @@ pub struct Alice1 {
     h_0: Scalar,
     I_b: EdwardsPoint,
     s_0_a: Scalar,
+    D: EdwardsPoint,
 }
 
 impl Alice1 {
@@ -457,6 +452,7 @@ impl Alice1 {
             fake_responses: self.fake_responses,
             h_0: self.h_0,
             I: self.I_a + self.I_b,
+            D: self.D,
         };
 
         Alice2 { adaptor_sig }
@@ -582,13 +578,14 @@ impl Bob1 {
         self.pi_a
             .verify(ED25519_BASEPOINT_POINT, T_a, self.H_p_pk, I_hat_a)?;
 
+        let D = z * self.H_p_pk;
+
         let (h_last, h_0) = final_challenge(
             fake_responses,
             self.ring,
             self.commitment_ring,
-            self.H_p_pk,
+            D,
             self.pseudo_output_commitment,
-            z,
             T_a + self.T_b + self.R_a,
             I_hat_a + self.I_hat_b + self.R_prime_a,
             I_a + self.I_b,
@@ -604,6 +601,7 @@ impl Bob1 {
             fake_responses,
             h_0,
             I: I_a + self.I_b,
+            D,
         };
 
         Ok(Bob2 { s_0_b, adaptor_sig })
