@@ -2,7 +2,7 @@ use crate::ring::Ring;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 
 macro_rules! hash_to_scalar {
-    ($($e:expr),+) => {
+    ($($e:tt) || +) => {
         {
             use crate::macros::AsByteSlice as _;
 

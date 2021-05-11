@@ -45,7 +45,10 @@ pub fn sign(
         pseudo_output_commitment,
         msg,
     );
-    let h_0 = hash_to_scalar!(prefix, L_0.compress(), R_0.compress());
+    let L_0 = L_0.compress();
+    let R_0 = R_0.compress();
+
+    let h_0 = hash_to_scalar!(prefix || L_0 || R_0);
 
     let h_last = fake_responses
         .iter()
@@ -54,10 +57,10 @@ pub fn sign(
             let pk_i = ring[i + 1];
             let adjusted_commitment_i = commitment_ring[i] - pseudo_output_commitment;
 
-            let L_i = compute_L(h_prev, &mus, *s_i, pk_i, adjusted_commitment_i);
-            let R_i = compute_R(h_prev, &mus, pk_i, *s_i, I, D_inv_8);
+            let L_i = compute_L(h_prev, &mus, *s_i, pk_i, adjusted_commitment_i).compress();
+            let R_i = compute_R(h_prev, &mus, pk_i, *s_i, I, D_inv_8).compress();
 
-            hash_to_scalar!(prefix, L_i.compress(), R_i.compress())
+            hash_to_scalar!(prefix || L_i || R_i)
         });
 
     let s_last = alpha - h_last * ((mus.mu_P * signing_key) + (mus.mu_C * z));
@@ -114,10 +117,10 @@ pub fn verify(
         );
         let adjusted_commitment_i = commitment_ring[i] - pseudo_output_commitment;
 
-        let L_i = compute_L(h, &mus, *s_i, pk_i, adjusted_commitment_i);
-        let R_i = compute_R(h, &mus, pk_i, *s_i, sig.I, sig.D);
+        let L_i = compute_L(h, &mus, *s_i, pk_i, adjusted_commitment_i).compress();
+        let R_i = compute_R(h, &mus, pk_i, *s_i, sig.I, sig.D).compress();
 
-        h = hash_to_scalar!(prefix, L_i.compress(), R_i.compress())
+        h = hash_to_scalar!(prefix || L_i || R_i)
     }
 
     h == sig.h_0
@@ -207,24 +210,14 @@ impl AggregationHashes {
         pseudo_output_commitment: CompressedEdwardsY,
         D: CompressedEdwardsY,
     ) -> Self {
-        let mu_P = hash_to_scalar!(
-            b"CLSAG_agg_0",
-            ring,
-            commitment_ring,
-            I,
-            D,
-            pseudo_output_commitment
-        );
-        let mu_C = hash_to_scalar!(
-            b"CLSAG_agg_1",
-            ring,
-            commitment_ring,
-            I,
-            D,
-            pseudo_output_commitment
-        );
-
-        Self { mu_P, mu_C }
+        Self {
+            mu_P: hash_to_scalar!(
+                b"CLSAG_agg_0" || ring || commitment_ring || I || D || pseudo_output_commitment
+            ),
+            mu_C: hash_to_scalar!(
+                b"CLSAG_agg_1" || ring || commitment_ring || I || D || pseudo_output_commitment
+            ),
+        }
     }
 }
 
