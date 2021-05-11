@@ -18,7 +18,6 @@ use clsag::{Signature, RING_SIZE};
 #[macro_use]
 mod macros;
 mod clsag;
-mod ring;
 
 // for every iteration we compute:
 // c_p = h_prev * mu_P; and

@@ -1,4 +1,4 @@
-use crate::ring::Ring;
+use crate::clsag::Ring;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use std::borrow::Cow;
 
