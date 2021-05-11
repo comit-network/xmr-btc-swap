@@ -293,8 +293,8 @@ fn to_relative_offsets(offsets: &[VarInt]) -> Vec<VarInt> {
 fn single_party_adaptor_sig(
     s_prime_a: Scalar,
     s_b: Scalar,
-    ring: [EdwardsPoint; monero_adaptor::RING_SIZE],
-    commitment_ring: [EdwardsPoint; monero_adaptor::RING_SIZE],
+    ring: [EdwardsPoint; 11],
+    commitment_ring: [EdwardsPoint; 11],
     pseudo_output_commitment: EdwardsPoint,
     real_commitment_blinding: Scalar,
     pseudo_output_commitment_blinding: Scalar,
