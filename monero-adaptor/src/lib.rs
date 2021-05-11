@@ -178,7 +178,7 @@ impl Alice0 {
             &self.msg,
             self.s_prime_a,
             self.alpha_a,
-        )?;
+        );
 
         let sig = HalfAdaptorSignature {
             s_0_half: sig.responses[10],
@@ -354,7 +354,7 @@ impl Bob1 {
             &self.msg,
             self.s_b,
             self.alpha_b,
-        )?;
+        );
 
         let s_0_b = sig.responses[10];
         let sig = HalfAdaptorSignature {

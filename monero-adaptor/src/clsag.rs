@@ -20,7 +20,7 @@ pub fn sign(
     msg: &[u8],
     signing_key: Scalar,
     alpha: Scalar,
-) -> anyhow::Result<Signature> {
+) -> Signature {
     let D = z * H_p_pk;
     let D_inv_8 = D * Scalar::from(8u8).invert();
 
@@ -61,12 +61,11 @@ pub fn sign(
                 I,
                 &mus,
             )
-            .unwrap()
         });
 
     let s_last = alpha - h_last * ((mus.mu_P * signing_key) + (mus.mu_C * z));
 
-    Ok(Signature {
+    Signature {
         responses: [
             fake_responses[0],
             fake_responses[1],
@@ -83,7 +82,7 @@ pub fn sign(
         h_0,
         I,
         D,
-    })
+    }
 }
 
 pub struct Signature {
@@ -135,7 +134,7 @@ fn challenge(
     h_prev: Scalar,
     I: EdwardsPoint,
     mus: &AggregationHashes,
-) -> anyhow::Result<Scalar> {
+) -> Scalar {
     let L_i = compute_L(h_prev, mus, s_i, pk_i, adjusted_commitment_i);
     let R_i = compute_R(h_prev, mus, pk_i, s_i, I, D);
 
@@ -147,7 +146,7 @@ fn challenge(
     let mut output = [0u8; 32];
     hasher.finalize(&mut output);
 
-    Ok(Scalar::from_bytes_mod_order(output))
+    Scalar::from_bytes_mod_order(output)
 }
 
 // L_i = s_i * G + c_p * pk_i + c_c * (commitment_i - pseudoutcommitment)
@@ -270,7 +269,7 @@ impl Signature {
                 h,
                 self.I,
                 todo!(),
-            )?;
+            );
         }
 
         Ok(h == self.h_0)
