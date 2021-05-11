@@ -393,40 +393,26 @@ mod tests {
             .unwrap();
         let refund_transaction = bob_state6.signed_refund_transaction().unwrap();
 
-        assert_weight(
-            redeem_transaction.get_weight(),
-            TxRedeem::weight(),
-            "TxRedeem",
-        );
-        assert_weight(
-            cancel_transaction.get_weight(),
-            TxCancel::weight(),
-            "TxCancel",
-        );
-        assert_weight(
-            punish_transaction.get_weight(),
-            TxPunish::weight(),
-            "TxPunish",
-        );
-        assert_weight(
-            refund_transaction.get_weight(),
-            TxRefund::weight(),
-            "TxRefund",
-        );
+        assert_weight(redeem_transaction, TxRedeem::weight(), "TxRedeem");
+        assert_weight(cancel_transaction, TxCancel::weight(), "TxCancel");
+        assert_weight(punish_transaction, TxPunish::weight(), "TxPunish");
+        assert_weight(refund_transaction, TxRefund::weight(), "TxRefund");
     }
 
-    // Weights fluctuate -+1 wu because of the length of the signatures.
-    // Some of our transactions have 2 signatures and hence the weight can fluctuate
-    // +-2
-    fn assert_weight(is_weight: usize, expected_weight: usize, tx_name: &str) {
+    // Weights fluctuate because of the length of the signatures. Valid ecdsa
+    // signatures can have 68, 69, 70, 71, or 72 bytes. Since most of our
+    // transactions have 2 signatures the weight can be up to 8 bytes less than
+    // the static weight (4 bytes per signature).
+    fn assert_weight(transaction: Transaction, expected_weight: usize, tx_name: &str) {
+        let is_weight = transaction.get_weight();
+
         assert!(
-            is_weight + 1 == expected_weight
-                || is_weight + 2 == expected_weight
-                || is_weight == expected_weight,
-            "{} to have weight {}, but was {}",
+            expected_weight - is_weight <= 8,
+            "{} to have weight {}, but was {}. Transaction: {:#?}",
             tx_name,
             expected_weight,
-            is_weight
+            is_weight,
+            transaction
         )
     }
 }
