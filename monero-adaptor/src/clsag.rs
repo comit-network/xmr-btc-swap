@@ -19,20 +19,12 @@ pub fn sign(
     fake_responses: [Scalar; RING_SIZE - 1],
     z: Scalar,
     pseudo_output_commitment: EdwardsPoint,
-    L: EdwardsPoint,
-    R: EdwardsPoint,
+    L_0: EdwardsPoint,
+    R_0: EdwardsPoint,
     I: EdwardsPoint,
 ) -> Signature {
     let D = z * H_p_pk;
     let D_inv_8 = D * INV_EIGHT;
-
-    let prefix = clsag_round_hash_prefix(
-        ring.as_ref(),
-        commitment_ring.as_ref(),
-        pseudo_output_commitment,
-        msg,
-    );
-    let h_0 = hash_to_scalar(&[&prefix, L.compress().as_bytes(), R.compress().as_bytes()]);
 
     let mus = AggregationHashes::new(
         &ring,
@@ -41,6 +33,14 @@ pub fn sign(
         pseudo_output_commitment.compress(),
         H_p_pk.compress(),
     );
+
+    let prefix = clsag_round_hash_prefix(
+        ring.as_ref(),
+        commitment_ring.as_ref(),
+        pseudo_output_commitment,
+        msg,
+    );
+    let h_0 = hash_to_scalar(&[&prefix, L_0.compress().as_bytes(), R_0.compress().as_bytes()]);
 
     let h_last = fake_responses
         .iter()
