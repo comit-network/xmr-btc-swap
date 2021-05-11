@@ -32,23 +32,40 @@ pub fn sign(
     let commitment_ring = Ring::new(commitment_ring);
 
     let mu_P = hash_to_scalar!(
-        b"CLSAG_agg_0" || ring || commitment_ring || I || D_inv_8 || pseudo_output_commitment
+        b"CLSAG_agg_0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+            || ring
+            || commitment_ring
+            || I
+            || D_inv_8
+            || pseudo_output_commitment
     );
     let mu_C = hash_to_scalar!(
-        b"CLSAG_agg_1" || ring || commitment_ring || I || D_inv_8 || pseudo_output_commitment
+        b"CLSAG_agg_1\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+            || ring
+            || commitment_ring
+            || I
+            || D_inv_8
+            || pseudo_output_commitment
     );
+
+    dbg!(hex::encode(mu_P.as_bytes()));
+    dbg!(hex::encode(mu_C.as_bytes()));
 
     let adjusted_commitment_ring = &commitment_ring - pseudo_output_commitment;
 
     let compute_ring_element = |L: EdwardsPoint, R: EdwardsPoint| {
         hash_to_scalar!(
-            b"CLSAG_round" || ring || commitment_ring || pseudo_output_commitment || msg || L || R
+            b"CLSAG_round\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+                || ring
+                || commitment_ring
+                || pseudo_output_commitment
+                || msg
+                || L
+                || R
         )
     };
 
     let h_0 = compute_ring_element(L_0, R_0);
-
-    dbg!(h_0);
 
     let h_last = fake_responses
         .iter()
@@ -66,7 +83,13 @@ pub fn sign(
             );
             let R_i = compute_R(h_prev, mu_P, mu_C, *s_i, pk_i, I, D_inv_8);
 
-            compute_ring_element(L_i, R_i)
+            dbg!(hex::encode(L_i.compress().as_bytes()));
+            dbg!(hex::encode(R_i.compress().as_bytes()));
+
+            let h = compute_ring_element(L_i, R_i);
+            dbg!(hex::encode(h.as_bytes()));
+
+            h
         });
 
     let s_last = alpha - h_last * ((mu_P * signing_key) + (mu_C * z));
@@ -110,10 +133,20 @@ pub fn verify(
     let D = D_inv_8 * Scalar::from(8u8);
 
     let mu_P = hash_to_scalar!(
-        b"CLSAG_agg_0" || ring || commitment_ring || I || D_inv_8 || pseudo_output_commitment
+        b"CLSAG_agg_0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+            || ring
+            || commitment_ring
+            || I
+            || D_inv_8
+            || pseudo_output_commitment
     );
     let mu_C = hash_to_scalar!(
-        b"CLSAG_agg_1" || ring || commitment_ring || I || D_inv_8 || pseudo_output_commitment
+        b"CLSAG_agg_1\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+            || ring
+            || commitment_ring
+            || I
+            || D_inv_8
+            || pseudo_output_commitment
     );
 
     let adjusted_commitment_ring = &commitment_ring - pseudo_output_commitment;
@@ -134,7 +167,7 @@ pub fn verify(
         let R_i = compute_R(h, mu_P, mu_C, *s_i, pk_i, I, D);
 
         h = hash_to_scalar!(
-            b"CLSAG_round"
+            b"CLSAG_round\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
                 || ring
                 || commitment_ring
                 || pseudo_output_commitment
@@ -147,6 +180,7 @@ pub fn verify(
     h == h_0
 }
 
+#[derive(Clone, Debug)]
 pub struct Signature {
     pub responses: [Scalar; RING_SIZE],
     pub h_0: Scalar,
@@ -257,7 +291,9 @@ impl<'a> Index<usize> for Ring<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use itertools::Itertools;
     use rand::rngs::OsRng;
+    use rand::SeedableRng;
 
     #[test]
     fn const_is_inv_eight() {
@@ -268,21 +304,23 @@ mod tests {
 
     #[test]
     fn sign_and_verify() {
+        let mut rng = rand::rngs::StdRng::from_seed([0u8; 32]);
+
         let msg_to_sign = b"hello world, monero is amazing!!";
 
-        let signing_key = Scalar::random(&mut OsRng);
+        let signing_key = Scalar::random(&mut rng);
         let signing_pk = signing_key * ED25519_BASEPOINT_POINT;
         let H_p_pk = hash_point_to_point(signing_pk);
 
-        let alpha = Scalar::random(&mut OsRng);
+        let alpha = Scalar::random(&mut rng);
 
-        let mut ring = random_array(|| Scalar::random(&mut OsRng) * ED25519_BASEPOINT_POINT);
+        let mut ring = random_array(|| Scalar::random(&mut rng) * ED25519_BASEPOINT_POINT);
         ring[0] = signing_pk;
 
-        let real_commitment_blinding = Scalar::random(&mut OsRng);
+        let real_commitment_blinding = Scalar::random(&mut rng);
         let mut commitment_ring =
-            random_array(|| Scalar::random(&mut OsRng) * ED25519_BASEPOINT_POINT);
-        commitment_ring[0] = real_commitment_blinding * ED25519_BASEPOINT_POINT; /* + 0 * H */
+            random_array(|| Scalar::random(&mut rng) * ED25519_BASEPOINT_POINT);
+        commitment_ring[0] = real_commitment_blinding * ED25519_BASEPOINT_POINT; // + 0 * H
 
         // TODO: document
         let pseudo_output_commitment = commitment_ring[0];
@@ -294,12 +332,41 @@ mod tests {
             alpha,
             &ring,
             &commitment_ring,
-            random_array(|| Scalar::random(&mut OsRng)),
+            random_array(|| Scalar::random(&mut rng)),
             Scalar::zero(),
             pseudo_output_commitment,
             alpha * ED25519_BASEPOINT_POINT,
             alpha * H_p_pk,
             signing_key * H_p_pk,
+        );
+
+        signature.responses.iter().enumerate().for_each(|(i, res)| {
+            println!(
+                r#"epee::string_tools::hex_to_pod("{}", clsag.s[{}]);"#,
+                hex::encode(res.as_bytes()),
+                i
+            );
+        });
+        println!("{}", hex::encode(signature.h_0.as_bytes()));
+        println!("{}", hex::encode(signature.D.compress().as_bytes()));
+
+        let I = hex::encode(signature.I.compress().to_bytes());
+        println!("{}", I);
+
+        let msg = hex::encode(msg_to_sign);
+        println!("{}", msg);
+
+        ring.iter().zip(commitment_ring.iter()).for_each(|(pk, c)| {
+            println!(
+                "std::make_tuple(\"{}\",\"{}\"),",
+                hex::encode(pk.compress().to_bytes()),
+                hex::encode(c.compress().to_bytes())
+            );
+        });
+
+        println!(
+            "{}",
+            hex::encode(pseudo_output_commitment.compress().to_bytes())
         );
 
         assert!(verify(

@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-use curve25519_dalek::edwards::{CompressedEdwardsY};
+use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
 use monero::blockdata::transaction::{ExtraField, KeyImage, SubField, TxOutTarget};
@@ -145,11 +145,10 @@ async fn monerod_integration_test() {
     let ecdh_key_1 = PrivateKey::random(&mut rng);
     let (ecdh_info_1, out_blinding_1) = EcdhInfo::new_bulletproof(spend_amount, ecdh_key_1.scalar);
 
-    let (bulletproof, out_pk) = monero::make_bulletproof(
-        &mut rng,
-        &[spend_amount, 0],
-        &[out_blinding_0, out_blinding_1],
-    )
+    let (bulletproof, out_pk) = monero::make_bulletproof(&mut rng, &[spend_amount, 0], &[
+        out_blinding_0,
+        out_blinding_1,
+    ])
     .unwrap();
 
     let k_image = {
@@ -241,12 +240,39 @@ async fn monerod_integration_test() {
         &ring,
         &commitment_ring,
         random_array(|| Scalar::random(&mut rng)),
-        real_commitment_blinder - (out_blinding_0 + out_blinding_1) * Scalar::from(MONERO_MUL_FACTOR),
+        real_commitment_blinder
+            - (out_blinding_0 + out_blinding_1) * Scalar::from(MONERO_MUL_FACTOR),
         pseudo_out,
         alpha * ED25519_BASEPOINT_POINT,
         alpha * H_p_pk,
         signing_key * H_p_pk,
     );
+
+    sig.responses.iter().enumerate().for_each(|(i, res)| {
+        println!(
+            r#"epee::string_tools::hex_to_pod("{}", clsag.s[{}]);"#,
+            hex::encode(res.as_bytes()),
+            i
+        );
+    });
+    println!("{}", hex::encode(sig.h_0.as_bytes()));
+    println!("{}", hex::encode(sig.D.compress().as_bytes()));
+
+    let I = hex::encode(sig.I.compress().to_bytes());
+    println!("{}", I);
+
+    let msg = hex::encode(&prefix.hash().to_bytes());
+    println!("{}", msg);
+
+    ring.iter().zip(commitment_ring.iter()).for_each(|(pk, c)| {
+        println!(
+            "std::make_tuple(\"{}\",\"{}\"),",
+            hex::encode(pk.compress().to_bytes()),
+            hex::encode(c.compress().to_bytes())
+        );
+    });
+
+    println!("{}", hex::encode(pseudo_out.compress().to_bytes()));
 
     let out_pk = out_pk
         .iter()
@@ -320,21 +346,18 @@ mod tests {
 
         let relative_offsets = to_relative_offsets(&key_offsets);
 
-        assert_eq!(
-            &relative_offsets,
-            &[
-                VarInt(78),
-                VarInt(3),
-                VarInt(10),
-                VarInt(0),
-                VarInt(5),
-                VarInt(2),
-                VarInt(3),
-                VarInt(11),
-                VarInt(1),
-                VarInt(1),
-                VarInt(3),
-            ]
-        )
+        assert_eq!(&relative_offsets, &[
+            VarInt(78),
+            VarInt(3),
+            VarInt(10),
+            VarInt(0),
+            VarInt(5),
+            VarInt(2),
+            VarInt(3),
+            VarInt(11),
+            VarInt(1),
+            VarInt(1),
+            VarInt(3),
+        ])
     }
 }
