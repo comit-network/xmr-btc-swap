@@ -86,7 +86,13 @@ pub fn sign(
 
 #[must_use]
 pub fn verify(
-    sig: &Signature,
+    &Signature {
+        I,
+        h_0,
+        D,
+        responses,
+        ..
+    }: &Signature,
     msg: &[u8],
     ring: &[EdwardsPoint; RING_SIZE],
     commitment_ring: &[EdwardsPoint; RING_SIZE],
@@ -95,7 +101,6 @@ pub fn verify(
 ) -> bool {
     let ring = Ring::new(ring);
     let commitment_ring = Ring::new(commitment_ring);
-    let I = sig.I;
 
     let mu_P = hash_to_scalar!(
         b"CLSAG_agg_0" || ring || commitment_ring || I || H_p_pk || pseudo_output_commitment
@@ -104,14 +109,14 @@ pub fn verify(
         b"CLSAG_agg_1" || ring || commitment_ring || I || H_p_pk || pseudo_output_commitment
     );
 
-    let mut h = sig.h_0;
+    let mut h = h_0;
 
-    for (i, s_i) in sig.responses.iter().enumerate() {
+    for (i, s_i) in responses.iter().enumerate() {
         let pk_i = ring[(i + 1) % RING_SIZE];
         let adjusted_commitment_i = commitment_ring[i] - pseudo_output_commitment;
 
         let L_i = compute_L(h, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_i);
-        let R_i = compute_R(h, mu_P, mu_C, pk_i, *s_i, sig.I, sig.D);
+        let R_i = compute_R(h, mu_P, mu_C, pk_i, *s_i, I, D);
 
         h = hash_to_scalar!(
             b"CLSAG_round"
@@ -124,7 +129,7 @@ pub fn verify(
         );
     }
 
-    h == sig.h_0
+    h == h_0
 }
 
 pub struct Signature {
