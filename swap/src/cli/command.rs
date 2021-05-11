@@ -43,10 +43,10 @@ pub enum Command {
         alice_multiaddr: Multiaddr,
 
         #[structopt(flatten)]
-        bitcoin_params: BitcoinParams,
+        bitcoin: Bitcoin,
 
         #[structopt(flatten)]
-        monero_params: MoneroParams,
+        monero: Monero,
 
         #[structopt(long = "tor-socks5-port", help = "Your local Tor socks5 proxy port", default_value = DEFAULT_TOR_SOCKS5_PORT)]
         tor_socks5_port: u16,
@@ -65,10 +65,10 @@ pub enum Command {
         alice_multiaddr: Multiaddr,
 
         #[structopt(flatten)]
-        bitcoin_params: BitcoinParams,
+        bitcoin: Bitcoin,
 
         #[structopt(flatten)]
-        monero_params: MoneroParams,
+        monero: Monero,
 
         #[structopt(long = "tor-socks5-port", help = "Your local Tor socks5 proxy port", default_value = DEFAULT_TOR_SOCKS5_PORT)]
         tor_socks5_port: u16,
@@ -85,7 +85,7 @@ pub enum Command {
         force: bool,
 
         #[structopt(flatten)]
-        bitcoin_params: BitcoinParams,
+        bitcoin: Bitcoin,
     },
     /// Try to cancel a swap and refund my BTC (expert users only)
     Refund {
@@ -99,12 +99,12 @@ pub enum Command {
         force: bool,
 
         #[structopt(flatten)]
-        bitcoin_params: BitcoinParams,
+        bitcoin: Bitcoin,
     },
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct MoneroParams {
+pub struct Monero {
     #[structopt(long = "receive-address",
         help = "Provide the monero address where you would like to receive monero",
         parse(try_from_str = parse_monero_address)
@@ -120,7 +120,7 @@ pub struct MoneroParams {
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct BitcoinParams {
+pub struct Bitcoin {
     #[structopt(long = "electrum-rpc",
     help = "Provide the Bitcoin Electrum RPC URL",
     default_value = DEFAULT_ELECTRUM_RPC_URL

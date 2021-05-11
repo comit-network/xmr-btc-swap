@@ -21,7 +21,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use structopt::StructOpt;
 use swap::bitcoin::TxLock;
-use swap::cli::command::{Arguments, BitcoinParams, Command, MoneroParams};
+use swap::cli::command::{Arguments, Bitcoin, Command, Monero};
 use swap::database::Database;
 use swap::env::{Config, GetConfig};
 use swap::network::quote::BidQuote;
@@ -45,13 +45,13 @@ async fn main() -> Result<()> {
         Command::BuyXmr {
             alice_peer_id,
             alice_multiaddr,
-            bitcoin_params:
-                BitcoinParams {
+            bitcoin:
+                Bitcoin {
                     electrum_rpc_url,
                     bitcoin_target_block,
                 },
-            monero_params:
-                MoneroParams {
+            monero:
+                Monero {
                     receive_monero_address,
                     monero_daemon_host,
                 },
@@ -152,13 +152,13 @@ async fn main() -> Result<()> {
         Command::Resume {
             swap_id,
             alice_multiaddr,
-            bitcoin_params:
-                BitcoinParams {
+            bitcoin:
+                Bitcoin {
                     electrum_rpc_url,
                     bitcoin_target_block,
                 },
-            monero_params:
-                MoneroParams {
+            monero:
+                Monero {
                     receive_monero_address,
                     monero_daemon_host,
                 },
@@ -223,8 +223,8 @@ async fn main() -> Result<()> {
         Command::Cancel {
             swap_id,
             force,
-            bitcoin_params:
-                BitcoinParams {
+            bitcoin:
+                Bitcoin {
                     electrum_rpc_url,
                     bitcoin_target_block,
                 },
@@ -260,8 +260,8 @@ async fn main() -> Result<()> {
         Command::Refund {
             swap_id,
             force,
-            bitcoin_params:
-                BitcoinParams {
+            bitcoin:
+                Bitcoin {
                     electrum_rpc_url,
                     bitcoin_target_block,
                 },
