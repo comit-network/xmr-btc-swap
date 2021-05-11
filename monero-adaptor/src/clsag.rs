@@ -89,7 +89,7 @@ pub fn sign(
 }
 
 #[must_use]
-pub fn verify(sig: &Signature, ring: [EdwardsPoint; RING_SIZE], msg: &[u8; 32]) -> bool {
+pub fn verify(sig: &Signature, ring: [EdwardsPoint; RING_SIZE], msg: &[u8]) -> bool {
     let ring_concat = ring
         .iter()
         .flat_map(|pk| pk.compress().as_bytes().to_vec())
@@ -261,11 +261,57 @@ fn hash_to_scalar(elements: &[&[u8]]) -> Scalar {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::rngs::OsRng;
 
     #[test]
     fn const_is_inv_eight() {
         let inv_eight = Scalar::from(8u8).invert();
 
         assert_eq!(inv_eight, INV_EIGHT);
+    }
+
+    #[test]
+    fn sign_and_verify() {
+        let msg_to_sign = b"hello world, monero is amazing!!";
+
+        let s_prime_a = Scalar::random(&mut OsRng);
+        let s_b = Scalar::random(&mut OsRng);
+
+        let pk = (s_prime_a + s_b) * ED25519_BASEPOINT_POINT;
+
+        let (r_a, R_a, R_prime_a) = {
+            let r_a = Scalar::random(&mut OsRng);
+            let R_a = r_a * ED25519_BASEPOINT_POINT;
+
+            let pk_hashed_to_point = hash_point_to_point(pk);
+
+            let R_prime_a = r_a * pk_hashed_to_point;
+
+            (r_a, R_a, R_prime_a)
+        };
+
+        let mut ring = [EdwardsPoint::default(); RING_SIZE];
+        ring[0] = pk;
+
+        ring[1..].fill_with(|| {
+            let x = Scalar::random(&mut OsRng);
+            x * ED25519_BASEPOINT_POINT
+        });
+
+        let mut commitment_ring = [EdwardsPoint::default(); RING_SIZE];
+
+        let real_commitment_blinding = Scalar::random(&mut OsRng);
+        commitment_ring[0] = real_commitment_blinding * ED25519_BASEPOINT_POINT; // + 0 * H
+        commitment_ring[1..].fill_with(|| {
+            let x = Scalar::random(&mut OsRng);
+            x * ED25519_BASEPOINT_POINT
+        });
+
+        // TODO: document
+        let pseudo_output_commitment = commitment_ring[0];
+
+        let signature = sign(msg_to_sign, todo!(), todo!(), todo!(), todo!(), todo!(), todo!(), todo!(), todo!(), todo!(), todo!(), todo!());
+
+        assert!(verify(&signature, todo!(), todo!()))
     }
 }
