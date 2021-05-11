@@ -32,7 +32,13 @@ pub fn sign(
     );
     let h_0 = hash_to_scalar(&[&prefix, L.compress().as_bytes(), R.compress().as_bytes()]);
 
-    let mus = AggregationHashes::new(&ring, &commitment_ring, I, pseudo_output_commitment, H_p_pk);
+    let mus = AggregationHashes::new(
+        &ring,
+        &commitment_ring,
+        I.compress(),
+        pseudo_output_commitment.compress(),
+        H_p_pk.compress(),
+    );
 
     let h_last = fake_responses
         .iter()
@@ -153,58 +159,34 @@ impl AggregationHashes {
     pub fn new(
         ring: &Ring,
         commitment_ring: &Ring,
-        I: EdwardsPoint,
-        pseudo_output_commitment: EdwardsPoint,
-        D: EdwardsPoint,
+        I: CompressedEdwardsY,
+        pseudo_output_commitment: CompressedEdwardsY,
+        D: CompressedEdwardsY,
     ) -> Self {
-        let I = I.compress();
-        let D = D.compress();
+        let ring = ring.as_ref();
+        let commitment_ring = commitment_ring.as_ref();
+        let I = I.as_bytes().as_ref();
+        let D = D.as_bytes().as_ref();
+        let pseudo_output_commitment = pseudo_output_commitment.as_bytes().as_ref();
 
-        let pseudo_output_commitment = pseudo_output_commitment.compress();
-
-        let mu_P = Self::hash(
+        let mu_P = hash_to_scalar(&[
             b"CLSAG_agg_0",
-            ring.as_ref(),
-            commitment_ring.as_ref(),
-            &I,
-            &D,
-            &pseudo_output_commitment,
-        );
-        let mu_C = Self::hash(
-            b"CLSAG_agg_1",
-            ring.as_ref(),
-            commitment_ring.as_ref(),
-            &I,
-            &D,
-            &pseudo_output_commitment,
-        );
-
-        Self { mu_P, mu_C }
-    }
-
-    // aggregation hashes:
-    // mu_{P, C} =
-    // keccak256("CLSAG_agg_{0, 1}" ||
-    //     ring || ring of commitments || I || z * hash_to_point(signing pk) ||
-    // pseudooutput commitment)
-    //
-    // where z = blinding of real commitment - blinding of pseudooutput commitment.
-    fn hash(
-        domain_prefix: &[u8],
-        ring: &[u8],
-        commitment_ring: &[u8],
-        I: &CompressedEdwardsY,
-        z_key_image: &CompressedEdwardsY,
-        pseudo_output_commitment: &CompressedEdwardsY,
-    ) -> Scalar {
-        hash_to_scalar(&[
-            domain_prefix,
             ring,
             commitment_ring,
-            I.as_bytes(),
-            z_key_image.as_bytes(),
-            pseudo_output_commitment.as_bytes(),
-        ])
+            I,
+            D,
+            pseudo_output_commitment,
+        ]);
+        let mu_C = hash_to_scalar(&[
+            b"CLSAG_agg_1",
+            ring,
+            commitment_ring,
+            I,
+            D,
+            pseudo_output_commitment,
+        ]);
+
+        Self { mu_P, mu_C }
     }
 }
 
