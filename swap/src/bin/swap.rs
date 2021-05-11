@@ -21,7 +21,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use structopt::StructOpt;
 use swap::bitcoin::TxLock;
-use swap::cli::command::{Arguments, Bitcoin, Command, Monero};
+use swap::cli::command::{Arguments, Bitcoin, Command, Monero, SellerAddr, SwapId, Tor};
 use swap::database::Database;
 use swap::env::{Config, GetConfig};
 use swap::network::quote::BidQuote;
@@ -43,8 +43,8 @@ async fn main() -> Result<()> {
 
     match cmd {
         Command::BuyXmr {
-            alice_peer_id,
-            alice_multiaddr,
+            seller_peer_id,
+            seller_addr: SellerAddr { seller_addr },
             bitcoin:
                 Bitcoin {
                     electrum_rpc_url,
@@ -55,7 +55,7 @@ async fn main() -> Result<()> {
                     receive_monero_address,
                     monero_daemon_host,
                 },
-            tor_socks5_port,
+            tor: Tor { tor_socks5_port },
         } => {
             let swap_id = Uuid::new_v4();
 
@@ -87,14 +87,14 @@ async fn main() -> Result<()> {
                 init_monero_wallet(data_dir, monero_daemon_host, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
-            let mut swarm = swarm::bob(&seed, alice_peer_id, tor_socks5_port).await?;
+            let mut swarm = swarm::bob(&seed, seller_peer_id, tor_socks5_port).await?;
             swarm
                 .behaviour_mut()
-                .add_address(alice_peer_id, alice_multiaddr);
+                .add_address(seller_peer_id, seller_addr);
 
             let swap_id = Uuid::new_v4();
             let (event_loop, mut event_loop_handle) =
-                EventLoop::new(swap_id, swarm, alice_peer_id, bitcoin_wallet.clone())?;
+                EventLoop::new(swap_id, swarm, seller_peer_id, bitcoin_wallet.clone())?;
             let event_loop = tokio::spawn(event_loop.run());
 
             let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
@@ -109,7 +109,7 @@ async fn main() -> Result<()> {
 
             info!("Swapping {} with {} fees", send_bitcoin, fees);
 
-            db.insert_peer_id(swap_id, alice_peer_id).await?;
+            db.insert_peer_id(swap_id, seller_peer_id).await?;
 
             let swap = Swap::new(
                 db,
@@ -150,8 +150,8 @@ async fn main() -> Result<()> {
             table.printstd();
         }
         Command::Resume {
-            swap_id,
-            alice_multiaddr,
+            swap_id: SwapId { swap_id },
+            seller_addr: SellerAddr { seller_addr },
             bitcoin:
                 Bitcoin {
                     electrum_rpc_url,
@@ -162,7 +162,7 @@ async fn main() -> Result<()> {
                     receive_monero_address,
                     monero_daemon_host,
                 },
-            tor_socks5_port,
+            tor: Tor { tor_socks5_port },
         } => {
             let data_dir = data.0;
             cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
@@ -188,17 +188,17 @@ async fn main() -> Result<()> {
                 init_monero_wallet(data_dir, monero_daemon_host, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
-            let alice_peer_id = db.get_peer_id(swap_id)?;
+            let seller_peer_id = db.get_peer_id(swap_id)?;
 
-            let mut swarm = swarm::bob(&seed, alice_peer_id, tor_socks5_port).await?;
+            let mut swarm = swarm::bob(&seed, seller_peer_id, tor_socks5_port).await?;
             let bob_peer_id = swarm.local_peer_id();
             tracing::debug!("Our peer-id: {}", bob_peer_id);
             swarm
                 .behaviour_mut()
-                .add_address(alice_peer_id, alice_multiaddr);
+                .add_address(seller_peer_id, seller_addr);
 
             let (event_loop, event_loop_handle) =
-                EventLoop::new(swap_id, swarm, alice_peer_id, bitcoin_wallet.clone())?;
+                EventLoop::new(swap_id, swarm, seller_peer_id, bitcoin_wallet.clone())?;
             let handle = tokio::spawn(event_loop.run());
 
             let swap = Swap::from_db(
@@ -221,7 +221,7 @@ async fn main() -> Result<()> {
             }
         }
         Command::Cancel {
-            swap_id,
+            swap_id: SwapId { swap_id },
             force,
             bitcoin:
                 Bitcoin {
@@ -258,7 +258,7 @@ async fn main() -> Result<()> {
             }
         }
         Command::Refund {
-            swap_id,
+            swap_id: SwapId { swap_id },
             force,
             bitcoin:
                 Bitcoin {

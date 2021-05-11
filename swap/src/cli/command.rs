@@ -37,10 +37,10 @@ pub enum Command {
     /// Start a XMR for BTC swap
     BuyXmr {
         #[structopt(long = "seller-peer-id", help = "The seller's peer id")]
-        alice_peer_id: PeerId,
+        seller_peer_id: PeerId,
 
-        #[structopt(long = "seller-addr", help = "The seller's multiaddress")]
-        alice_multiaddr: Multiaddr,
+        #[structopt(flatten)]
+        seller_addr: SellerAddr,
 
         #[structopt(flatten)]
         bitcoin: Bitcoin,
@@ -48,21 +48,18 @@ pub enum Command {
         #[structopt(flatten)]
         monero: Monero,
 
-        #[structopt(long = "tor-socks5-port", help = "Your local Tor socks5 proxy port", default_value = DEFAULT_TOR_SOCKS5_PORT)]
-        tor_socks5_port: u16,
+        #[structopt(flatten)]
+        tor: Tor,
     },
     /// Show a list of past ongoing and completed swaps
     History,
     /// Resume a swap
     Resume {
-        #[structopt(
-            long = "swap-id",
-            help = "The swap id can be retrieved using the history subcommand"
-        )]
-        swap_id: Uuid,
+        #[structopt(flatten)]
+        swap_id: SwapId,
 
-        #[structopt(long = "seller-addr", help = "The seller's multiaddress")]
-        alice_multiaddr: Multiaddr,
+        #[structopt(flatten)]
+        seller_addr: SellerAddr,
 
         #[structopt(flatten)]
         bitcoin: Bitcoin,
@@ -70,16 +67,13 @@ pub enum Command {
         #[structopt(flatten)]
         monero: Monero,
 
-        #[structopt(long = "tor-socks5-port", help = "Your local Tor socks5 proxy port", default_value = DEFAULT_TOR_SOCKS5_PORT)]
-        tor_socks5_port: u16,
+        #[structopt(flatten)]
+        tor: Tor,
     },
     /// Try to cancel an ongoing swap (expert users only)
     Cancel {
-        #[structopt(
-            long = "swap-id",
-            help = "The swap id can be retrieved using the history subcommand"
-        )]
-        swap_id: Uuid,
+        #[structopt(flatten)]
+        swap_id: SwapId,
 
         #[structopt(short, long)]
         force: bool,
@@ -89,11 +83,8 @@ pub enum Command {
     },
     /// Try to cancel a swap and refund my BTC (expert users only)
     Refund {
-        #[structopt(
-            long = "swap-id",
-            help = "The swap id can be retrieved using the history subcommand"
-        )]
-        swap_id: Uuid,
+        #[structopt(flatten)]
+        swap_id: SwapId,
 
         #[structopt(short, long)]
         force: bool,
@@ -129,6 +120,27 @@ pub struct Bitcoin {
 
     #[structopt(long = "bitcoin-target-block", help = "Within how many blocks should the Bitcoin transactions be confirmed.", default_value = DEFAULT_BITCOIN_CONFIRMATION_TARGET)]
     pub bitcoin_target_block: usize,
+}
+
+#[derive(structopt::StructOpt, Debug)]
+pub struct Tor {
+    #[structopt(long = "tor-socks5-port", help = "Your local Tor socks5 proxy port", default_value = DEFAULT_TOR_SOCKS5_PORT)]
+    pub tor_socks5_port: u16,
+}
+
+#[derive(structopt::StructOpt, Debug)]
+pub struct SwapId {
+    #[structopt(
+        long = "swap-id",
+        help = "The swap id can be retrieved using the history subcommand"
+    )]
+    pub swap_id: Uuid,
+}
+
+#[derive(structopt::StructOpt, Debug)]
+pub struct SellerAddr {
+    #[structopt(long = "seller-addr", help = "The seller's multiaddress")]
+    pub seller_addr: Multiaddr,
 }
 
 #[derive(Clone, Debug)]
