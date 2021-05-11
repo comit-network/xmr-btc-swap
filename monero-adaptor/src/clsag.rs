@@ -89,6 +89,37 @@ pub struct Signature {
     pub D: EdwardsPoint,
 }
 
+impl Signature {
+    #[cfg(test)]
+    #[must_use]
+    pub fn verify(&self, ring: [EdwardsPoint; RING_SIZE], msg: &[u8; 32]) -> bool {
+        let ring_concat = ring
+            .iter()
+            .flat_map(|pk| pk.compress().as_bytes().to_vec())
+            .collect::<Vec<u8>>();
+
+        let mut h = self.h_0;
+
+        let mus = todo!();
+        let adjusted_commitment_i = todo!();
+
+        for (i, s_i) in self.responses.iter().enumerate() {
+            let pk_i = ring[(i + 1) % RING_SIZE];
+            let prefix = clsag_round_hash_prefix(&ring_concat, todo!(), todo!(), msg);
+            let L_i = compute_L(h, mus, *s_i, pk_i, adjusted_commitment_i);
+            let R_i = compute_R(h, mus, pk_i, *s_i, self.I, self.D);
+
+            h = hash_to_scalar(&[
+                &prefix,
+                L_i.compress().as_bytes().as_ref(),
+                R_i.compress().as_bytes().as_ref(),
+            ])
+        }
+
+        h == self.h_0
+    }
+}
+
 /// Compute the prefix for the hash common to every iteration of the ring
 /// signature algorithm.
 ///
@@ -158,7 +189,7 @@ struct AggregationHashes {
 }
 
 impl AggregationHashes {
-    pub fn new(
+    fn new(
         ring: &Ring,
         commitment_ring: &Ring,
         I: CompressedEdwardsY,
@@ -189,36 +220,6 @@ impl AggregationHashes {
         ]);
 
         Self { mu_P, mu_C }
-    }
-}
-
-impl Signature {
-    #[cfg(test)]
-    pub fn verify(&self, ring: [EdwardsPoint; RING_SIZE], msg: &[u8; 32]) -> anyhow::Result<bool> {
-        let ring_concat = ring
-            .iter()
-            .flat_map(|pk| pk.compress().as_bytes().to_vec())
-            .collect::<Vec<u8>>();
-
-        let mut h = self.h_0;
-
-        let mus = todo!();
-        let adjusted_commitment_i = todo!();
-
-        for (i, s_i) in self.responses.iter().enumerate() {
-            let pk_i = ring[(i + 1) % RING_SIZE];
-            let prefix = clsag_round_hash_prefix(&ring_concat, todo!(), todo!(), msg);
-            let L_i = compute_L(h, mus, *s_i, pk_i, adjusted_commitment_i);
-            let R_i = compute_R(h, mus, pk_i, *s_i, self.I, self.D);
-
-            h = hash_to_scalar(&[
-                &prefix,
-                L_i.compress().as_bytes().as_ref(),
-                R_i.compress().as_bytes().as_ref(),
-            ])
-        }
-
-        Ok(h == self.h_0)
     }
 }
 

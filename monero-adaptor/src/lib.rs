@@ -631,6 +631,6 @@ mod tests {
 
         let sig = alice.adaptor_sig.adapt(r_a);
 
-        assert!(sig.verify(ring, msg_to_sign).unwrap());
+        assert!(sig.verify(ring, msg_to_sign));
     }
 }
