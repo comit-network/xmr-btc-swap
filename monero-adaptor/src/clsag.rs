@@ -38,9 +38,13 @@ pub fn sign(
         b"CLSAG_agg_1" || ring || commitment_ring || I || H_p_pk || pseudo_output_commitment
     );
 
-    let h_0 = hash_to_scalar!(
-        b"CLSAG_round" || ring || commitment_ring || pseudo_output_commitment || msg || L_0 || R_0
-    );
+    let compute_ring_element = |L: EdwardsPoint, R: EdwardsPoint| {
+        hash_to_scalar!(
+            b"CLSAG_round" || ring || commitment_ring || pseudo_output_commitment || msg || L || R
+        )
+    };
+
+    let h_0 = compute_ring_element(L_0, R_0);
     let adjusted_commitment_ring = &commitment_ring - pseudo_output_commitment;
 
     let h_last = fake_responses
@@ -52,15 +56,7 @@ pub fn sign(
             let L_i = compute_L(h_prev, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_ring[i]);
             let R_i = compute_R(h_prev, mu_P, mu_C, pk_i, *s_i, I, D_inv_8);
 
-            hash_to_scalar!(
-                b"CLSAG_round"
-                    || ring
-                    || commitment_ring
-                    || pseudo_output_commitment
-                    || msg
-                    || L_i
-                    || R_i
-            )
+            compute_ring_element(L_i, R_i)
         });
 
     let s_last = alpha - h_last * ((mu_P * signing_key) + (mu_C * z));
