@@ -24,7 +24,7 @@ jobs:
 
       - name: Extract changelog section for release
         id: changelog
-        uses: coditory/changelog-parser@v1
+        uses: coditory/changelog-parser@v1.0.2
         with:
           version: ${{ steps.extract-version.outputs.version }}
 
