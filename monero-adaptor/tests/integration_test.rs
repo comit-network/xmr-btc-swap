@@ -19,6 +19,7 @@ use rand::{Rng, SeedableRng};
 use std::convert::TryInto;
 use std::iter;
 use testcontainers::clients::Cli;
+use tiny_keccak::{Hasher, Keccak};
 
 #[tokio::test]
 async fn monerod_integration_test() {
@@ -62,27 +63,27 @@ async fn monerod_integration_test() {
         .await
         .expect("can generate blocks");
 
-    let lock_tx = transfer.tx_hash.parse().unwrap();
+    let lock_tx_hash = transfer.tx_hash.parse().unwrap();
 
-    let o_indexes_response = client.get_o_indexes(lock_tx).await.unwrap();
+    let o_indexes_response = client.get_o_indexes(lock_tx_hash).await.unwrap();
 
-    let transaction = client
-        .get_transactions(&[lock_tx])
+    let lock_tx = client
+        .get_transactions(&[lock_tx_hash])
         .await
         .unwrap()
         .pop()
         .unwrap();
 
-    dbg!(&transaction.prefix.inputs);
+    dbg!(&lock_tx.prefix.inputs);
 
     let viewpair = ViewPair::from(&lock_kp);
 
-    let our_output = transaction
+    let our_output = lock_tx
         .check_outputs(&viewpair, 0..1, 0..1)
         .expect("to have outputs in this transaction")
         .pop()
         .expect("to own at least one output");
-    let actual_lock_amount = transaction.get_amount(&viewpair, &our_output).unwrap();
+    let actual_lock_amount = lock_tx.get_amount(&viewpair, &our_output).unwrap();
 
     assert_eq!(actual_lock_amount, lock_amount);
 
@@ -215,7 +216,7 @@ async fn monerod_integration_test() {
 
     let pseudo_out = fee_key + out_pk[0].decompress().unwrap() + out_pk[1].decompress().unwrap();
 
-    let (_, real_commitment_blinder) = transaction.clone().rct_signatures.sig.unwrap().ecdh_info
+    let (_, real_commitment_blinder) = lock_tx.clone().rct_signatures.sig.unwrap().ecdh_info
         [our_output.index]
         .open_commitment(&viewpair, &our_output.tx_pubkey, our_output.index);
 
@@ -224,8 +225,69 @@ async fn monerod_integration_test() {
     let mut responses = random_array(|| Scalar::random(&mut rng));
     responses[0] = signing_key;
 
+    let out_pk = out_pk
+        .iter()
+        .map(|c| monero::util::ringct::CtKey {
+            mask: monero::util::ringct::Key { key: c.to_bytes() },
+        })
+        .collect::<Vec<_>>();
+
+    let rct_sig_base = RctSigBase {
+        rct_type: RctType::Clsag,
+        txn_fee: VarInt(fee),
+        pseudo_outs: Vec::new(),
+        ecdh_info: vec![ecdh_info_0, ecdh_info_1],
+        out_pk,
+    };
+
+    let message = {
+        let tx_prefix_hash = prefix.hash().to_bytes();
+
+        let mut rct_sig_base_hash = [0u8; 32];
+        let mut keccak = Keccak::v256();
+        keccak.update(&monero::consensus::serialize(&rct_sig_base));
+        keccak.finalize(&mut rct_sig_base_hash);
+
+        let bp_hash = {
+            let mut keccak = Keccak::v256();
+            keccak.update(&bulletproof.A.key);
+            keccak.update(&bulletproof.S.key);
+            keccak.update(&bulletproof.T1.key);
+            keccak.update(&bulletproof.T2.key);
+            keccak.update(&bulletproof.taux.key);
+            keccak.update(&bulletproof.mu.key);
+
+            for i in &bulletproof.L {
+                keccak.update(&i.key);
+            }
+
+            for i in &bulletproof.R {
+                keccak.update(&i.key);
+            }
+
+            keccak.update(&bulletproof.a.key);
+            keccak.update(&bulletproof.b.key);
+            keccak.update(&bulletproof.t.key);
+
+            let mut hash = [0u8; 32];
+            keccak.finalize(&mut hash);
+
+            hash
+        };
+
+        let mut keccak = Keccak::v256();
+        keccak.update(&tx_prefix_hash);
+        keccak.update(&rct_sig_base_hash);
+        keccak.update(&bp_hash);
+
+        let mut hash = [0u8; 32];
+        keccak.finalize(&mut hash);
+
+        hash
+    };
+
     let sig = monero_adaptor::clsag::sign(
-        &prefix.hash().to_bytes(),
+        &message,
         H_p_pk,
         alpha,
         &ring,
@@ -240,7 +302,7 @@ async fn monerod_integration_test() {
     );
     assert!(monero_adaptor::clsag::verify(
         &sig,
-        &prefix.hash().to_bytes(),
+        &message,
         &ring,
         &commitment_ring,
         pseudo_out
@@ -267,7 +329,7 @@ async fn monerod_integration_test() {
     );
     println!(
         r#"epee::string_tools::hex_to_pod("{}", msg);"#,
-        hex::encode(&prefix.hash().to_bytes())
+        hex::encode(&message)
     );
 
     ring.iter()
@@ -291,24 +353,11 @@ async fn monerod_integration_test() {
         hex::encode(pseudo_out.compress().to_bytes())
     );
 
-    let out_pk = out_pk
-        .iter()
-        .map(|c| monero::util::ringct::CtKey {
-            mask: monero::util::ringct::Key { key: c.to_bytes() },
-        })
-        .collect::<Vec<_>>();
-
     let transaction = Transaction {
         prefix,
         signatures: Vec::new(),
         rct_signatures: RctSig {
-            sig: Some(RctSigBase {
-                rct_type: RctType::Clsag,
-                txn_fee: VarInt(fee),
-                pseudo_outs: Vec::new(),
-                ecdh_info: vec![ecdh_info_0, ecdh_info_1],
-                out_pk,
-            }),
+            sig: Some(rct_sig_base),
             p: Some(RctSigPrunable {
                 range_sigs: Vec::new(),
                 bulletproofs: vec![bulletproof],
