@@ -343,7 +343,12 @@ where
 {
     debug!("Requesting quote");
     let bid_quote = bid_quote.await?;
-    info!("Received quote: 1 XMR ~ {}", bid_quote.price);
+    info!(
+        minimum_amount = %bid_quote.min_quantity,
+        maximum_amount = %bid_quote.max_quantity,
+        "Received quote: 1 XMR ~ {}",
+        bid_quote.price
+    );
 
     let mut current_maximum_giveable = max_giveable().await?;
 
