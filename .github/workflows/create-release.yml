@@ -29,7 +29,7 @@ jobs:
           version: ${{ steps.extract-version.outputs.version }}
 
       - name: Create release
-        uses: actions/create-release@v1
+        uses: actions/create-release@v1.1.4
         env:
           GITHUB_TOKEN: ${{ secrets.BOTTY_GITHUB_TOKEN }}
         with:
