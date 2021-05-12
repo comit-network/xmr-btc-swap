@@ -697,9 +697,12 @@ checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
 name = "cpufeatures"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5cd5a7748210e7ec1a9696610b1015e6e31fbf58f77a160801f124bd1c36592a"
+checksum = "dec1028182c380cc45a2e2c5ec841134f2dfd0f8f5f0a5bcd68004f81b5efdf4"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "cpuid-bool"
@@ -958,7 +961,7 @@ dependencies = [
  "ed25519",
  "rand 0.7.3",
  "serde",
- "sha2 0.9.4",
+ "sha2 0.9.5",
  "zeroize",
 ]
 
@@ -1804,7 +1807,7 @@ dependencies = [
  "rand 0.7.3",
  "ring",
  "rw-stream-sink",
- "sha2 0.9.4",
+ "sha2 0.9.5",
  "smallvec",
  "thiserror",
  "unsigned-varint 0.7.0",
@@ -1858,7 +1861,7 @@ dependencies = [
  "prost",
  "prost-build",
  "rand 0.7.3",
- "sha2 0.9.4",
+ "sha2 0.9.5",
  "snow",
  "static_assertions",
  "x25519-dalek",
@@ -2259,7 +2262,7 @@ dependencies = [
  "digest 0.9.0",
  "generic-array 0.14.4",
  "multihash-derive",
- "sha2 0.9.4",
+ "sha2 0.9.5",
  "unsigned-varint 0.5.1",
 ]
 
@@ -3495,9 +3498,9 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.9.4"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8f6b75b17576b792bef0db1bcc4b8b8bcdf9506744cf34b974195487af6cff2"
+checksum = "b362ae5752fd2137731f9fa25fd4d9058af34666ca1966fb969119cc35719f12"
 dependencies = [
  "block-buffer 0.9.0",
  "cfg-if 1.0.0",
@@ -3597,7 +3600,7 @@ dependencies = [
  "rand_core 0.5.1",
  "ring",
  "rustc_version",
- "sha2 0.9.4",
+ "sha2 0.9.5",
  "subtle 2.4.0",
  "x25519-dalek",
 ]
@@ -3849,7 +3852,7 @@ dependencies = [
  "serde",
  "serde_cbor",
  "serde_json",
- "sha2 0.9.4",
+ "sha2 0.9.5",
  "sigma_fun",
  "sled",
  "spectral",
@@ -3958,7 +3961,7 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "serde_json",
- "sha2 0.9.4",
+ "sha2 0.9.5",
 ]
 
 [[package]]
@@ -3973,7 +3976,7 @@ dependencies = [
  "rand 0.8.3",
  "serde",
  "serde_json",
- "sha2 0.9.4",
+ "sha2 0.9.5",
 ]
 
 [[package]]
