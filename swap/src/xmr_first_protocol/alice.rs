@@ -1,115 +1,83 @@
-use std::collections::VecDeque;
-use std::task::Poll;
+use anyhow::Result;
+use monero::PublicKey;
+use rand::rngs::OsRng;
 
-pub struct StateMachine {
-    state: State,
-    actions: VecDeque<Action>,
-    events: VecDeque<Event>,
+use monero_adaptor::alice::Alice2;
+use monero_adaptor::AdaptorSignature;
+
+use crate::bitcoin::TxLock;
+use crate::monero::{Scalar, TransferRequest};
+use curve25519_dalek::edwards::EdwardsPoint;
+
+// start
+pub struct Alice3 {
+    pub xmr_swap_amount: crate::monero::Amount,
+    pub btc_swap_amount: crate::bitcoin::Amount,
+    // pub adaptor_sig: AdaptorSignature,
+    pub a: crate::bitcoin::SecretKey,
+    pub B: crate::bitcoin::PublicKey,
+    pub s_a: Scalar,
+    pub S_b_monero: EdwardsPoint,
+    pub v_a: crate::monero::PrivateViewKey,
 }
 
-impl StateMachine {
-    fn inject_event(&mut self, event: Event) {
-        match self.state {
-            State::WatchingForBtcLock => match event {
-                Event::BtcLockSeenInMempool => {
-                    self.actions.push_back(Action::SignAndBroadcastBtcRedeem);
-                    self.actions.push_back(Action::WatchForXmrRedeem);
-                    self.state = State::WatchingForXmrRedeem;
-                }
-                Event::BtcLockTimeoutElapsed => {
-                    self.actions.push_back(Action::BroadcastXmrRefund);
-                    self.state = State::Aborted;
-                }
-                _ => {}
-            },
-            State::WatchingForXmrRedeem => match event {
-                Event::T2Elapsed => {
-                    self.actions.push_back(Action::BroadcastXmrRefund);
-                    self.actions.push_back(Action::SignAndBroadcastBtcPunish);
-                    self.state = State::Punished;
-                }
-                Event::XmrRedeemSeenInMempool => {
-                    self.actions.push_back(Action::SignAndBroadcastBtcPunish);
-                    self.state = State::Success;
-                }
-                _ => {}
-            },
-            _ => {}
+// published xmr_lock, watching for btc_lock
+pub struct Alice4 {
+    a: crate::bitcoin::SecretKey,
+    B: crate::bitcoin::PublicKey,
+    btc_swap_amount: crate::bitcoin::Amount,
+    // pub adaptor_sig: AdaptorSignature,
+}
+
+// published seen btc_lock, published btc_redeem
+pub struct Alice5;
+
+impl Alice3 {
+    pub fn new(
+        S_b_monero: EdwardsPoint,
+        B: crate::bitcoin::PublicKey,
+        xmr_swap_amount: crate::monero::Amount,
+        btc_swap_amount: crate::bitcoin::Amount,
+    ) -> Self {
+        Self {
+            xmr_swap_amount,
+            btc_swap_amount,
+            // adaptor_sig: alice2.adaptor_sig,
+            a: crate::bitcoin::SecretKey::new_random(&mut OsRng),
+            B,
+            s_a: Scalar::random(&mut OsRng),
+            S_b_monero,
+            v_a: crate::monero::PrivateViewKey::new_random(&mut OsRng),
         }
     }
+    pub async fn publish_xmr_lock(&self, wallet: &crate::monero::Wallet) -> Result<Alice4> {
+        let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey { scalar: self.s_a });
 
-    fn poll(&mut self) -> Poll<Action> {
-        if let Some(action) = self.actions.pop_front() {
-            Poll::Ready(action)
-        } else {
-            Poll::Pending
-        }
+        let public_spend_key = S_a + self.S_b_monero;
+        let public_view_key = self.v_a.public();
+
+        let req = TransferRequest {
+            public_spend_key,
+            public_view_key,
+            amount: self.xmr_swap_amount,
+        };
+
+        // we may have to send this to Bob
+        let _ = wallet.transfer(req).await?;
+
+        Ok(Alice4 {
+            a: self.a.clone(),
+            B: self.B,
+            btc_swap_amount: Default::default(),
+            // adaptor_sig: self.adaptor_sig.clone(),
+        })
     }
 }
 
-#[derive(PartialEq, Debug)]
-pub enum State {
-    WatchingForBtcLock,
-    WatchingForXmrRedeem,
-    Punished,
-    Success,
-    Aborted,
-}
-
-pub enum Event {
-    BtcLockSeenInMempool,
-    T2Elapsed,
-    BtcLockTimeoutElapsed,
-    XmrRedeemSeenInMempool,
-}
-
-// These actions should not fail (are retried until successful) and should be
-// idempotent This allows us to greatly simplify the state machine
-pub enum Action {
-    WatchForXmrRedeem,
-    SignAndBroadcastBtcPunish,
-    SignAndBroadcastBtcRedeem,
-    BroadcastXmrRefund,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn happy_path() {
-        let mut state_machine = StateMachine {
-            state: State::WatchingForBtcLock,
-            actions: Default::default(),
-            events: Default::default(),
-        };
-        state_machine.inject_event(Event::BtcLockSeenInMempool);
-        state_machine.inject_event(Event::XmrRedeemSeenInMempool);
-        assert_eq!(state_machine.state, State::Success);
-    }
-
-    #[test]
-    fn bob_fails_to_lock_btc() {
-        let mut state_machine = StateMachine {
-            state: State::WatchingForBtcLock,
-            actions: Default::default(),
-            events: Default::default(),
-        };
-        state_machine.events.push_back(Event::BtcLockTimeoutElapsed);
-        state_machine.run();
-        assert_eq!(state_machine.state, State::Aborted);
-    }
-
-    #[test]
-    fn bob_fails_to_redeem_xmr_before_t2() {
-        let mut state_machine = StateMachine {
-            state: State::WatchingForBtcLock,
-            actions: Default::default(),
-            events: Default::default(),
-        };
-        state_machine.events.push_back(Event::BtcLockSeenInMempool);
-        state_machine.events.push_back(Event::T2Elapsed);
-        state_machine.run();
-        assert_eq!(state_machine.state, State::Punished);
+impl Alice4 {
+    pub async fn watch_for_btc_lock(&self, wallet: &crate::bitcoin::Wallet) -> Result<Alice5> {
+        let btc_lock = TxLock::new(wallet, self.btc_swap_amount, self.a.public(), self.B).await?;
+        wallet.subscribe_to(btc_lock);
+        Ok(Alice5)
     }
 }

@@ -1,5 +1,7 @@
 use crate::env::Config;
-use crate::monero::{Amount, InsufficientFunds, PrivateViewKey, TransferProof, TxHash};
+use crate::monero::{
+    Amount, InsufficientFunds, PrivateViewKey, PublicViewKey, TransferProof, TxHash,
+};
 use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::{Context, Result};
 use monero_rpc::wallet;
@@ -273,14 +275,14 @@ impl Wallet {
 #[derive(Debug)]
 pub struct TransferRequest {
     pub public_spend_key: PublicKey,
-    pub public_view_key: PrivateViewKey,
+    pub public_view_key: PublicViewKey,
     pub amount: Amount,
 }
 
 #[derive(Debug)]
 pub struct WatchRequest {
     pub public_spend_key: PublicKey,
-    pub public_view_key: PrivateViewKey,
+    pub public_view_key: PublicViewKey,
     pub transfer_proof: TransferProof,
     pub conf_target: u64,
     pub expected: Amount,

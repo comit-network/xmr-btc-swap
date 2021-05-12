@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TxLock {
     inner: PartiallySignedTransaction,
-    pub(in crate::bitcoin) output_descriptor: Descriptor<::bitcoin::PublicKey>,
+    pub(crate) output_descriptor: Descriptor<::bitcoin::PublicKey>,
 }
 
 impl TxLock {

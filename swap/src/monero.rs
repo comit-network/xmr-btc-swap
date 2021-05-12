@@ -40,8 +40,8 @@ impl PrivateViewKey {
         Self(private_key)
     }
 
-    pub fn public(&self) -> PrivateViewKey {
-        PrivateViewKey(PublicKey::from_private_key(&self.0))
+    pub fn public(&self) -> PublicViewKey {
+        PublicViewKey(PublicKey::from_private_key(&self.0))
     }
 }
 
@@ -59,14 +59,14 @@ impl From<PrivateViewKey> for PrivateKey {
     }
 }
 
-impl From<PrivateViewKey> for PublicKey {
-    fn from(from: PrivateViewKey) -> Self {
+impl From<PublicViewKey> for PublicKey {
+    fn from(from: PublicViewKey) -> Self {
         from.0
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct PrivateViewKey(PublicKey);
+pub struct PublicViewKey(PublicKey);
 
 #[derive(Debug, Copy, Clone, Deserialize, Serialize, PartialEq, PartialOrd)]
 pub struct Amount(u64);

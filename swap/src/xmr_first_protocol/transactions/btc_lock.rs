@@ -3,7 +3,7 @@ use crate::bitcoin::{
     build_shared_output_descriptor, Address, Amount, PartiallySignedTransaction, PublicKey,
     Transaction, Txid, Wallet, TX_FEE,
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 use bdk::bitcoin::{OutPoint, Script, TxIn, TxOut};
 use bdk::database::BatchDatabase;
 use bdk::descriptor::Descriptor;
@@ -11,7 +11,7 @@ use ecdsa_fun::fun::Point;
 use miniscript::DescriptorTrait;
 use rand::thread_rng;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BtcLock {
     inner: PartiallySignedTransaction,
     pub(crate) output_descriptor: Descriptor<::bitcoin::PublicKey>,
@@ -27,7 +27,7 @@ impl BtcLock {
     where
         D: BatchDatabase,
     {
-        let lock_output_descriptor = build_shared_output_descriptor(A.0, B.0);
+        let lock_output_descriptor = build_shared_output_descriptor(A.into(), B.into());
         let address = lock_output_descriptor
             .address(wallet.get_network())
             .expect("can derive address from descriptor");
@@ -77,7 +77,7 @@ impl BtcLock {
             }
         };
 
-        let descriptor = build_shared_output_descriptor(A.0, B.0);
+        let descriptor = build_shared_output_descriptor(A.into(), B.into());
         let legit_shared_output_script = descriptor.script_pubkey();
 
         if shared_output_candidate.script_pubkey != legit_shared_output_script {

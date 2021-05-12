@@ -27,6 +27,6 @@ pub mod monero;
 pub mod network;
 pub mod protocol;
 pub mod seed;
-mod xmr_first_protocol;
+pub mod xmr_first_protocol;
 
 mod monero_ext;

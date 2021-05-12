@@ -1,5 +1,5 @@
 mod bitcoind;
-mod electrs;
+pub mod electrs;
 
 use crate::harness;
 use anyhow::{bail, Context, Result};
@@ -625,7 +625,7 @@ fn random_prefix() -> String {
     chars
 }
 
-async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
+pub async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
     let prefix = random_prefix();
     let bitcoind_name = format!("{}_{}", prefix, "bitcoind");
     let (bitcoind, bitcoind_url) =
@@ -761,7 +761,7 @@ async fn init_monero_container(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn init_test_wallets(
+pub async fn init_test_wallets(
     name: &str,
     bitcoind_url: Url,
     monero: &Monero,
@@ -835,10 +835,10 @@ async fn init_test_wallets(
 // This is just to keep the containers alive
 #[allow(dead_code)]
 struct Containers<'a> {
-    bitcoind_url: Url,
+    pub bitcoind_url: Url,
     bitcoind: Container<'a, Cli, bitcoind::Bitcoind>,
     monerods: Vec<Container<'a, Cli, image::Monero>>,
-    electrs: Container<'a, Cli, electrs::Electrs>,
+    pub electrs: Container<'a, Cli, electrs::Electrs>,
 }
 
 pub mod alice_run_until {

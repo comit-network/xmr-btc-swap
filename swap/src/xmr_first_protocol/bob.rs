@@ -1,119 +1,35 @@
-use crate::monero::TransferProof;
-use std::collections::VecDeque;
+use anyhow::Result;
+use monero::PublicKey;
+use rand::rngs::OsRng;
 
-pub struct StateMachine {
-    state: State,
-    actions: VecDeque<Action>,
-    events: VecDeque<Event>,
+use monero_adaptor::alice::Alice2;
+use monero_adaptor::AdaptorSignature;
+
+use crate::bitcoin::Txid;
+use crate::monero::wallet::WatchRequest;
+use crate::monero::{Scalar, TransferRequest};
+use crate::xmr_first_protocol::transactions::xmr_lock::XmrLock;
+
+// watching for xmr_lock
+pub struct Bob3 {
+    pub xmr_swap_amount: crate::monero::Amount,
+    pub btc_swap_amount: crate::bitcoin::Amount,
+    pub xmr_lock: XmrLock,
+    v_b: crate::monero::PrivateViewKey,
 }
 
-impl StateMachine {
-    fn next(&mut self, event: Event) {
-        match self.state {
-            State::WatchingForXmrLock => match event {
-                Event::XmrConfirmed => {
-                    self.actions.push_back(Action::SignAndBroadcastBtcLock);
-                    self.state = State::WaitingForBtcRedeem;
-                }
-                Event::T1Elapsed => {
-                    self.state = State::Aborted;
-                }
-                Event::XmrRefundSeenInMempool => {
-                    self.state = State::Aborted;
-                }
-                _ => panic!("unhandled scenario"),
-            },
-            State::WaitingForBtcRedeem => match event {
-                Event::BtcRedeemSeenInMempool => {
-                    self.actions.push_back(Action::BroadcastXmrRedeem);
-                    self.state = State::Success;
-                }
-                Event::T1Elapsed => {
-                    self.actions.push_back(Action::SignAndBroadcastBtcRefund);
-                    self.state = State::Refunded;
-                }
-                Event::XmrRefundSeenInMempool => {
-                    self.actions.push_back(Action::SignAndBroadcastBtcRefund);
-                    self.state = State::Refunded;
-                }
-                _ => panic!("unhandled scenario"),
-            },
-            _ => {}
-        }
-    }
-
-    fn run(&mut self) {
-        while let Some(event) = self.events.pop_front() {
-            self.next(event);
-        }
-    }
-}
-
-#[derive(PartialEq, Debug)]
-pub enum State {
-    WatchingForXmrLock,
-    WaitingForBtcRedeem,
-    Success,
-    Refunded,
-    Aborted,
-}
-
-pub enum Event {
-    XmrConfirmed,
-    // This will contain the s_a allowing bob to build xmr_redeem
-    BtcRedeemSeenInMempool,
-    XmrRefundSeenInMempool,
-    T1Elapsed,
-}
-
-pub enum Action {
-    SignAndBroadcastBtcLock,
-    BroadcastXmrRedeem,
-    SignAndBroadcastBtcRefund,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn happy_path() {
-        let mut state_machine = StateMachine {
-            state: State::WatchingForXmrLock,
-            actions: Default::default(),
-            events: Default::default(),
+impl Bob3 {
+    pub fn watch_for_lock_xmr(&self, wallet: &crate::monero::Wallet) {
+        let req = WatchRequest {
+            public_spend_key: self.xmr_lock.public_spend_key,
+            public_view_key: self.v_b.public(),
+            transfer_proof: self.xmr_lock.transfer_proof.clone(),
+            conf_target: 1,
+            expected: self.xmr_swap_amount,
         };
-        state_machine.events.push_back(Event::XmrConfirmed);
-        state_machine
-            .events
-            .push_back(Event::BtcRedeemSeenInMempool);
-        state_machine.run();
-        assert_eq!(state_machine.state, State::Success);
-    }
-
-    #[test]
-    fn alice_fails_to_redeem_btc_before_t1() {
-        let mut state_machine = StateMachine {
-            state: State::WatchingForXmrLock,
-            actions: Default::default(),
-            events: Default::default(),
-        };
-        state_machine.events.push_back(Event::XmrConfirmed);
-        state_machine.events.push_back(Event::T1Elapsed);
-        state_machine.run();
-        assert_eq!(state_machine.state, State::Refunded);
-    }
-
-    #[test]
-    fn alice_tries_to_refund_xmr_after_redeeming_btc() {
-        let mut state_machine = StateMachine {
-            state: State::WatchingForXmrLock,
-            actions: Default::default(),
-            events: Default::default(),
-        };
-        state_machine.events.push_back(Event::XmrConfirmed);
-        state_machine.events.push_back(Event::T1Elapsed);
-        state_machine.run();
-        assert_eq!(state_machine.state, State::Refunded);
+        wallet.watch_for_transfer(req);
     }
 }
+
+// published btc_lock, watching for xmr_redeem
+pub struct Bob4;

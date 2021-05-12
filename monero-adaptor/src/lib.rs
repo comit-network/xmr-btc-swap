@@ -96,6 +96,7 @@ fn final_challenge(
     Ok((h_last, h_0))
 }
 
+#[derive(Clone)]
 pub struct AdaptorSignature {
     s_0_a: Scalar,
     s_0_b: Scalar,
