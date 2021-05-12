@@ -2,6 +2,7 @@ use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
+use std::iter::{Cycle, Skip, Take};
 
 pub const RING_SIZE: usize = 11;
 
@@ -12,16 +13,16 @@ const INV_EIGHT: Scalar = Scalar::from_bits([
 
 pub fn sign(
     msg: &[u8; 32],
-    signing_key: Scalar,
     H_p_pk: EdwardsPoint,
     alpha: Scalar,
     ring: &[EdwardsPoint; RING_SIZE],
     commitment_ring: &[EdwardsPoint; RING_SIZE],
-    fake_responses: [Scalar; RING_SIZE - 1],
+    mut responses: [Scalar; RING_SIZE],
+    signing_key_index: usize,
     z: Scalar,
     pseudo_output_commitment: EdwardsPoint,
-    L_0: EdwardsPoint,
-    R_0: EdwardsPoint,
+    L: EdwardsPoint,
+    R: EdwardsPoint,
     I: EdwardsPoint,
 ) -> Signature {
     let D = z * H_p_pk;
@@ -45,28 +46,19 @@ pub fn sign(
         )
     };
 
-    let h_1 = compute_ring_element(L_0, R_0); // if our real key is on index 0, the first hash is index 1
+    let h = compute_ring_element(L, R);
 
-    dbg!(hex::encode(L_0.compress().as_bytes()));
-    dbg!(hex::encode(R_0.compress().as_bytes()));
-    dbg!(hex::encode(h_1.as_bytes()));
+    dbg!(hex::encode(L.compress().as_bytes()));
+    dbg!(hex::encode(R.compress().as_bytes()));
+    dbg!(hex::encode(h.as_bytes()));
 
-    // if we start at h_1, the final element is h_0
-    let h_0 = fake_responses
-        .iter()
-        .enumerate()
-        .fold(h_1, |h_prev, (i, s_i)| {
-            let pk_i = ring[i + 1];
-
-            let L_i = compute_L(
-                h_prev,
-                mu_P,
-                mu_C,
-                *s_i,
-                pk_i,
-                adjusted_commitment_ring[i + 1],
-            );
-            let R_i = compute_R(h_prev, mu_P, mu_C, *s_i, pk_i, I, D);
+    let element_after_signing_key = signing_key_index + 1;
+    let h_0 = itertools::izip!(responses, ring, adjusted_commitment_ring)
+        .shift_by(element_after_signing_key)
+        .take(RING_SIZE - 1)
+        .fold(h, |h_prev, (s, P, C)| {
+            let L_i = compute_L(h_prev, mu_P, mu_C, s, *P, C);
+            let R_i = compute_R(h_prev, mu_P, mu_C, s, *P, I, D);
 
             dbg!(hex::encode(L_i.compress().as_bytes()));
             dbg!(hex::encode(R_i.compress().as_bytes()));
@@ -77,23 +69,11 @@ pub fn sign(
             h
         });
 
-    // h_0 gives us s_0
-    let s_0 = alpha - h_0 * ((mu_P * signing_key) + (mu_C * z));
+    responses[signing_key_index] =
+        alpha - h_0 * ((mu_P * responses[signing_key_index]) + (mu_C * z));
 
     Signature {
-        responses: [
-            s_0,
-            fake_responses[0],
-            fake_responses[1],
-            fake_responses[2],
-            fake_responses[3],
-            fake_responses[4],
-            fake_responses[5],
-            fake_responses[6],
-            fake_responses[7],
-            fake_responses[8],
-            fake_responses[9],
-        ],
+        responses,
         h_0,
         I,
         D: D_inv_8,
@@ -220,10 +200,55 @@ impl From<Signature> for monero::util::ringct::Clsag {
     }
 }
 
+trait IteratorExt {
+    fn shift_by(self, num: usize) -> ShiftBy<Self>
+    where
+        Self: ExactSizeIterator + Sized + Clone,
+    {
+        let length = self.len();
+
+        ShiftBy::new(self, num, length)
+    }
+}
+
+struct ShiftBy<I> {
+    inner: Take<Skip<Cycle<I>>>,
+}
+
+impl<I: Iterator + Clone> ShiftBy<I> {
+    fn new(iter: I, num: usize, length: usize) -> Self {
+        Self {
+            inner: iter.cycle().skip(num).take(length),
+        }
+    }
+}
+
+impl<I> IteratorExt for I where I: ExactSizeIterator {}
+
+impl<I> Iterator for ShiftBy<I>
+where
+    I: Iterator + Clone,
+{
+    type Item = I::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use rand::SeedableRng;
+
+    #[test]
+    fn test_shift_by() {
+        let array = ["a", "b", "c", "d", "e"];
+
+        let shifted = array.iter().copied().shift_by(2).collect::<Vec<_>>();
+
+        assert_eq!(shifted, vec!["c", "d", "e", "a", "b"])
+    }
 
     #[test]
     fn const_is_inv_eight() {
@@ -307,14 +332,17 @@ mod tests {
         // TODO: document
         let pseudo_output_commitment = commitment_ring[0];
 
+        let mut responses = random_array(|| Scalar::random(&mut rng));
+        responses[0] = signing_key;
+
         let signature = sign(
             msg_to_sign,
-            signing_key,
             H_p_pk,
             alpha,
             &ring,
             &commitment_ring,
-            random_array(|| Scalar::random(&mut rng)),
+            responses,
+            0,
             Scalar::zero(),
             pseudo_output_commitment,
             alpha * ED25519_BASEPOINT_POINT,
@@ -349,6 +377,57 @@ mod tests {
         println!(
             "{}",
             hex::encode(pseudo_output_commitment.compress().to_bytes())
+        );
+
+        assert!(verify(
+            &signature,
+            msg_to_sign,
+            &ring,
+            &commitment_ring,
+            pseudo_output_commitment
+        ))
+    }
+
+    #[test]
+    fn sign_and_verify_non_zero_signing_index() {
+        // TODO: FIX THIS TEST
+        let mut rng = rand::rngs::StdRng::from_seed([0u8; 32]);
+
+        let msg_to_sign = b"hello world, monero is amazing!!";
+
+        let signing_key = Scalar::random(&mut rng);
+        let signing_pk = signing_key * ED25519_BASEPOINT_POINT;
+        let H_p_pk = hash_point_to_point(signing_pk);
+
+        let alpha = Scalar::random(&mut rng);
+
+        let mut ring = random_array(|| Scalar::random(&mut rng) * ED25519_BASEPOINT_POINT);
+        ring[0] = signing_pk;
+
+        let real_commitment_blinding = Scalar::random(&mut rng);
+        let mut commitment_ring =
+            random_array(|| Scalar::random(&mut rng) * ED25519_BASEPOINT_POINT);
+        commitment_ring[0] = real_commitment_blinding * ED25519_BASEPOINT_POINT; // + 0 * H
+
+        // TODO: document
+        let pseudo_output_commitment = commitment_ring[0];
+
+        let mut responses = random_array(|| Scalar::random(&mut rng));
+        responses[3] = signing_key;
+
+        let signature = sign(
+            msg_to_sign,
+            H_p_pk,
+            alpha,
+            &ring,
+            &commitment_ring,
+            responses,
+            3,
+            Scalar::zero(),
+            pseudo_output_commitment,
+            alpha * ED25519_BASEPOINT_POINT,
+            alpha * H_p_pk,
+            signing_key * H_p_pk,
         );
 
         assert!(verify(

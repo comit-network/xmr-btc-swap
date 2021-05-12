@@ -155,14 +155,28 @@ impl Alice0 {
         msg.pi_b
             .verify(ED25519_BASEPOINT_POINT, msg.T_b, self.H_p_pk, msg.I_hat_b)?;
 
+        let responses = [
+            self.s_prime_a,
+            self.fake_responses[0],
+            self.fake_responses[1],
+            self.fake_responses[2],
+            self.fake_responses[3],
+            self.fake_responses[4],
+            self.fake_responses[5],
+            self.fake_responses[6],
+            self.fake_responses[7],
+            self.fake_responses[8],
+            self.fake_responses[9],
+        ];
+
         let sig = clsag::sign(
             &self.msg,
-            self.s_prime_a,
             self.H_p_pk,
             self.alpha_a,
             &self.ring,
             &self.commitment_ring,
-            self.fake_responses,
+            responses,
+            0,
             z,
             self.pseudo_output_commitment,
             self.T_a + msg.T_b + self.R_a,
@@ -327,15 +341,29 @@ impl Bob1 {
         self.pi_a
             .verify(ED25519_BASEPOINT_POINT, T_a, self.H_p_pk, I_hat_a)?;
 
+        let responses = [
+            self.s_b,
+            fake_responses[0],
+            fake_responses[1],
+            fake_responses[2],
+            fake_responses[3],
+            fake_responses[4],
+            fake_responses[5],
+            fake_responses[6],
+            fake_responses[7],
+            fake_responses[8],
+            fake_responses[9],
+        ];
+
         let I = I_a + self.I_b;
         let sig = clsag::sign(
             &self.msg,
-            self.s_b,
             self.H_p_pk,
             self.alpha_b,
             &self.ring,
             &self.commitment_ring,
-            fake_responses,
+            responses,
+            0,
             z,
             self.pseudo_output_commitment,
             T_a + self.T_b + self.R_a,
@@ -623,7 +651,7 @@ mod tests {
             msg_to_sign,
             &ring,
             &commitment_ring,
-            pseudo_output_commitment
+            pseudo_output_commitment,
         ));
     }
 }

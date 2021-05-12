@@ -233,14 +233,17 @@ async fn monerod_integration_test() {
     let H_p_pk = hash_point_to_point(signing_key * ED25519_BASEPOINT_POINT);
     let alpha = Scalar::random(&mut rng);
 
+    let mut responses = random_array(|| Scalar::random(&mut rng));
+    responses[0] = signing_key;
+
     let sig = monero_adaptor::clsag::sign(
         &prefix.hash().to_bytes(),
-        signing_key,
         H_p_pk,
         alpha,
         &ring,
         &commitment_ring,
-        random_array(|| Scalar::random(&mut rng)),
+        responses,
+        0,
         real_commitment_blinder - (out_blinding_0 + out_blinding_1), // * Scalar::from(MONERO_MUL_FACTOR), TODO DOESN'T VERIFY WITH THIS
         pseudo_out,
         alpha * ED25519_BASEPOINT_POINT,

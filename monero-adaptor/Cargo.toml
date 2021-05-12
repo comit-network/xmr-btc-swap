@@ -12,6 +12,7 @@ tiny-keccak = { version = "2", features = ["keccak"] }
 hash_edwards_to_edwards = { git = "https://github.com/comit-network/hash_edwards_to_edwards" }
 monero = "0.12"
 hex = "0.4"
+itertools = "0.10"
 
 [dev-dependencies]
 hex = "0.4"
