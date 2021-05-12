@@ -2,8 +2,6 @@ use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
-use std::convert::TryInto;
-use std::ops::{Index, Sub};
 
 pub const RING_SIZE: usize = 11;
 
@@ -28,8 +26,6 @@ pub fn sign(
 ) -> Signature {
     let D = z * H_p_pk;
     let D_inv_8 = D * INV_EIGHT;
-    let ring = Ring::new(ring);
-    let commitment_ring = Ring::new(commitment_ring);
 
     let mu_P = hash_to_scalar!(
         b"CLSAG_agg_0" || ring || commitment_ring || I || D_inv_8 || pseudo_output_commitment
@@ -41,7 +37,7 @@ pub fn sign(
     dbg!(hex::encode(mu_P.as_bytes()));
     dbg!(hex::encode(mu_C.as_bytes()));
 
-    let adjusted_commitment_ring = &commitment_ring - pseudo_output_commitment;
+    let adjusted_commitment_ring = commitment_ring.map(|point| point - pseudo_output_commitment);
 
     let compute_ring_element = |L: EdwardsPoint, R: EdwardsPoint| {
         hash_to_scalar!(
@@ -118,8 +114,6 @@ pub fn verify(
     commitment_ring: &[EdwardsPoint; RING_SIZE],
     pseudo_output_commitment: EdwardsPoint,
 ) -> bool {
-    let ring = Ring::new(ring);
-    let commitment_ring = Ring::new(commitment_ring);
     let D = D_inv_8 * Scalar::from(8u8);
 
     let mu_P = hash_to_scalar!(
@@ -132,7 +126,7 @@ pub fn verify(
     dbg!(hex::encode(mu_P.as_bytes()));
     dbg!(hex::encode(mu_C.as_bytes()));
 
-    let adjusted_commitment_ring = &commitment_ring - pseudo_output_commitment;
+    let adjusted_commitment_ring = commitment_ring.map(|point| point - pseudo_output_commitment);
 
     let mut h = h_0;
 
@@ -226,69 +220,9 @@ impl From<Signature> for monero::util::ringct::Clsag {
     }
 }
 
-#[derive(Clone)]
-pub(crate) struct Ring<'a> {
-    points: &'a [EdwardsPoint; 11],
-    bytes: [u8; 32 * 11],
-}
-
-impl<'a> Ring<'a> {
-    fn new(points: &[EdwardsPoint; 11]) -> Ring<'_> {
-        let mut bytes = [0u8; 32 * 11];
-
-        for (i, element) in points.iter().enumerate() {
-            let start = i * 32;
-            let end = (i + 1) * 32;
-
-            bytes[start..end].copy_from_slice(element.compress().as_bytes());
-        }
-
-        Ring { points, bytes }
-    }
-}
-
-impl<'a, 'b> Sub<EdwardsPoint> for &'b Ring<'a> {
-    type Output = [EdwardsPoint; 11];
-
-    fn sub(self, rhs: EdwardsPoint) -> Self::Output {
-        self.points
-            .iter()
-            .map(|point| {
-                dbg!(hex::encode(point.compress().as_bytes()));
-                dbg!(hex::encode(rhs.compress().as_bytes()));
-
-                let result = point - rhs;
-
-                dbg!(hex::encode(result.compress().as_bytes()));
-
-                result
-            })
-            .collect::<Vec<_>>()
-            .try_into()
-            .expect("arrays have same length")
-    }
-}
-
-impl<'a> AsRef<[u8]> for Ring<'a> {
-    fn as_ref(&self) -> &[u8] {
-        self.bytes.as_ref()
-    }
-}
-
-impl<'a> Index<usize> for Ring<'a> {
-    type Output = EdwardsPoint;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.points[index]
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use curve25519_dalek::edwards::CompressedEdwardsY;
-    use itertools::Itertools;
-    use rand::rngs::OsRng;
     use rand::SeedableRng;
 
     #[test]

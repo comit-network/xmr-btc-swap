@@ -1,4 +1,3 @@
-use crate::clsag::Ring;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use std::borrow::Cow;
 
@@ -59,7 +58,7 @@ impl ToCowBytes for [u8; 11] {
     }
 }
 
-impl<'a> ToCowBytes for Ring<'a> {
+impl<'a> ToCowBytes for [EdwardsPoint; 11] {
     fn to_cow_bytes(&self) -> Vec<CowBytes<'_>> {
         vec![
             CowBytes::Owned(self[0].compress().0),
