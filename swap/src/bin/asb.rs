@@ -26,7 +26,6 @@ use swap::asb::config::{
     GetDefaults,
 };
 use swap::database::Database;
-use swap::env::GetConfig;
 use swap::monero::Amount;
 use swap::network::swarm;
 use swap::protocol::alice;
@@ -69,11 +68,7 @@ async fn main() -> Result<()> {
         }
     };
 
-    let env_config = if testnet {
-        env::Testnet::get_config()
-    } else {
-        env::Mainnet::get_config()
-    };
+    let env_config = env::new(testnet, &config);
 
     if config.monero.network != env_config.monero_network {
         bail!(format!(

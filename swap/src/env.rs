@@ -1,3 +1,4 @@
+use crate::asb;
 use crate::bitcoin::{CancelTimelock, PunishTimelock};
 use std::cmp::max;
 use std::time::Duration;
@@ -89,6 +90,33 @@ impl GetConfig for Regtest {
 
 fn sync_interval(avg_block_time: Duration) -> Duration {
     max(avg_block_time / 10, Duration::from_secs(1))
+}
+
+pub fn new(is_testnet: bool, asb_config: &asb::config::Config) -> Config {
+    let env_config = if is_testnet {
+        Testnet::get_config()
+    } else {
+        Mainnet::get_config()
+    };
+
+    let env_config =
+        if let Some(bitcoin_finality_confirmations) = asb_config.bitcoin.finality_confirmations {
+            Config {
+                bitcoin_finality_confirmations,
+                ..env_config
+            }
+        } else {
+            env_config
+        };
+
+    if let Some(monero_finality_confirmations) = asb_config.monero.finality_confirmations {
+        Config {
+            monero_finality_confirmations,
+            ..env_config
+        }
+    } else {
+        env_config
+    }
 }
 
 #[cfg(test)]
