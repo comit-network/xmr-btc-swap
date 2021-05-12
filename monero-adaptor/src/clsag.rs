@@ -108,36 +108,32 @@ pub fn verify(
 
     let adjusted_commitment_ring = commitment_ring.map(|point| point - pseudo_output_commitment);
 
-    let mut h = h_0;
+    let h_0_computed = itertools::izip!(responses, ring, adjusted_commitment_ring).fold(
+        h_0,
+        |h, (s_i, pk_i, adjusted_commitment_i)| {
+            dbg!(hex::encode(h.as_bytes()));
+            dbg!(hex::encode(pk_i.compress().as_bytes()));
+            dbg!(hex::encode(adjusted_commitment_i.compress().as_bytes()));
 
-    for (i, s_i) in responses.iter().enumerate() {
-        let pk_i = ring[i % RING_SIZE];
+            let L_i = compute_L(h, mu_P, mu_C, s_i, *pk_i, adjusted_commitment_i);
+            let R_i = compute_R(h, mu_P, mu_C, s_i, *pk_i, I, D);
 
-        let adjusted_commitment_i = adjusted_commitment_ring[i % RING_SIZE];
+            dbg!(hex::encode(L_i.compress().as_bytes()));
+            dbg!(hex::encode(R_i.compress().as_bytes()));
 
-        dbg!(hex::encode(pk_i.compress().as_bytes()));
-        dbg!(hex::encode(adjusted_commitment_i.compress().as_bytes()));
+            hash_to_scalar!(
+                b"CLSAG_round"
+                    || ring
+                    || commitment_ring
+                    || pseudo_output_commitment
+                    || msg
+                    || L_i
+                    || R_i
+            )
+        },
+    );
 
-        let L_i = compute_L(h, mu_P, mu_C, *s_i, pk_i, adjusted_commitment_i);
-        let R_i = compute_R(h, mu_P, mu_C, *s_i, pk_i, I, D);
-
-        dbg!(hex::encode(L_i.compress().as_bytes()));
-        dbg!(hex::encode(R_i.compress().as_bytes()));
-
-        h = hash_to_scalar!(
-            b"CLSAG_round"
-                || ring
-                || commitment_ring
-                || pseudo_output_commitment
-                || msg
-                || L_i
-                || R_i
-        );
-
-        dbg!(hex::encode(h.as_bytes()));
-    }
-
-    h == h_0
+    h_0_computed == h_0
 }
 
 #[derive(Clone, Debug)]
