@@ -152,15 +152,11 @@ async fn monerod_integration_test() {
     )
     .unwrap();
 
-    let k_image = {
-        let k = lock_kp.spend.scalar;
-        let K = ViewPair::from(&lock_kp).spend.point;
-
-        let k_image = k * hash_point_to_point(K.decompress().unwrap());
-        KeyImage {
-            image: monero::cryptonote::hash::Hash(k_image.compress().to_bytes()),
-        }
-    };
+    let signing_key = signing_key
+        + KeyGenerator::from_key(&viewpair, our_output.tx_pubkey)
+            .get_rvn_scalar(our_output.index)
+            .scalar;
+    let H_p_pk = hash_point_to_point(signing_key * ED25519_BASEPOINT_POINT);
 
     let prefix = TransactionPrefix {
         version: VarInt(2),
@@ -168,7 +164,9 @@ async fn monerod_integration_test() {
         inputs: vec![TxIn::ToKey {
             amount: VarInt(0),
             key_offsets: relative_key_offsets,
-            k_image,
+            k_image: KeyImage {
+                image: monero::cryptonote::hash::Hash(H_p_pk.compress().to_bytes()),
+            },
         }],
         outputs: vec![
             TxOut {
@@ -200,15 +198,6 @@ async fn monerod_integration_test() {
         ]),
     };
 
-    // assert_eq!(prefix.hash(),
-    // "c3ded4d1a8cddd4f76c09b63edff4e312e759b3afc46beda4e1fd75c9c68d997".parse().
-    // unwrap());
-
-    let signing_key = signing_key
-        + KeyGenerator::from_key(&viewpair, our_output.tx_pubkey)
-            .get_rvn_scalar(our_output.index)
-            .scalar;
-
     let commitment_ring = response
         .outs
         .iter()
@@ -230,7 +219,6 @@ async fn monerod_integration_test() {
         [our_output.index]
         .open_commitment(&viewpair, &our_output.tx_pubkey, our_output.index);
 
-    let H_p_pk = hash_point_to_point(signing_key * ED25519_BASEPOINT_POINT);
     let alpha = Scalar::random(&mut rng);
 
     let mut responses = random_array(|| Scalar::random(&mut rng));
