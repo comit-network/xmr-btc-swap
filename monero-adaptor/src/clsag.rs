@@ -497,6 +497,51 @@ mod tests {
             signing_key * H_p_pk,
         );
 
+        signature.responses.iter().enumerate().for_each(|(i, res)| {
+            println!(
+                r#"epee::string_tools::hex_to_pod("{}", clsag.s[{}]);"#,
+                hex::encode(res.as_bytes()),
+                i
+            );
+        });
+        println!(
+            r#"epee::string_tools::hex_to_pod("{}", clsag.c1);"#,
+            hex::encode(signature.h_0.as_bytes())
+        );
+        println!(
+            r#"epee::string_tools::hex_to_pod("{}", clsag.D);"#,
+            hex::encode(signature.D.compress().as_bytes())
+        );
+        println!(
+            r#"epee::string_tools::hex_to_pod("{}", clsag.I);"#,
+            hex::encode(signature.I.compress().to_bytes())
+        );
+        println!(
+            r#"epee::string_tools::hex_to_pod("{}", msg);"#,
+            hex::encode(&msg_to_sign)
+        );
+
+        ring.iter()
+            .zip(commitment_ring.iter())
+            .enumerate()
+            .for_each(|(i, (pk, c))| {
+                println!(
+                    r#"epee::string_tools::hex_to_pod("{}", pubs[{}].dest);"#,
+                    hex::encode(&pk.compress().to_bytes()),
+                    i
+                );
+                println!(
+                    r#"epee::string_tools::hex_to_pod("{}", pubs[{}].mask);"#,
+                    hex::encode(&c.compress().to_bytes()),
+                    i
+                );
+            });
+
+        println!(
+            r#"epee::string_tools::hex_to_pod("{}", Cout);"#,
+            hex::encode(pseudo_output_commitment.compress().to_bytes())
+        );
+
         let expected_signature = Signature {
             responses: [
                 Scalar::from_bytes_mod_order([
