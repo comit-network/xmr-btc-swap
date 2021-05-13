@@ -86,6 +86,14 @@ async fn monerod_integration_test() {
         .expect("to own at least one output");
     let actual_lock_amount = lock_tx.get_amount(&viewpair, &our_output).unwrap();
 
+    // We appear to be using the correct signing key, because we can
+    // find it in the ring! Conversely, the point corresponding to the
+    // "original" signing key is not part of the ring
+    let actual_signing_key = signing_key
+        + KeyGenerator::from_key(&viewpair, our_output.tx_pubkey)
+            .get_rvn_scalar(our_output.index)
+            .scalar;
+
     assert_eq!(actual_lock_amount, lock_amount);
 
     let real_key_offset = o_indexes_response.o_indexes[our_output.index];
@@ -149,16 +157,9 @@ async fn monerod_integration_test() {
     let ring: [EdwardsPoint; 11] = ring.try_into().unwrap();
     let commitment_ring = commitment_ring.try_into().unwrap();
 
-    // We appear to be using the correct signing key, because we can
-    // find it in the ring! Conversely, the point corresponding to the
-    // "original" signing key is not part of the ring
-    let signing_key = signing_key
-        + KeyGenerator::from_key(&viewpair, our_output.tx_pubkey)
-            .get_rvn_scalar(our_output.index)
-            .scalar;
     let (signing_index, _) = ring
         .iter()
-        .find_position(|key| **key == signing_key * ED25519_BASEPOINT_POINT)
+        .find_position(|key| **key == actual_signing_key * ED25519_BASEPOINT_POINT)
         .unwrap();
 
     let relative_key_offsets = to_relative_offsets(&key_offsets);
@@ -180,8 +181,8 @@ async fn monerod_integration_test() {
     )
     .unwrap();
 
-    let H_p_pk = hash_point_to_point(signing_key * ED25519_BASEPOINT_POINT);
-    let I = signing_key * H_p_pk;
+    let H_p_pk = hash_point_to_point(actual_signing_key * ED25519_BASEPOINT_POINT);
+    let I = actual_signing_key * H_p_pk;
 
     let prefix = TransactionPrefix {
         version: VarInt(2),
@@ -239,7 +240,7 @@ async fn monerod_integration_test() {
     let alpha = Scalar::random(&mut rng);
 
     let mut responses = random_array(|| Scalar::random(&mut rng));
-    responses[signing_index] = signing_key;
+    responses[signing_index] = actual_signing_key;
 
     let out_pk = out_pk
         .iter()
@@ -314,7 +315,7 @@ async fn monerod_integration_test() {
         pseudo_out,
         alpha * ED25519_BASEPOINT_POINT,
         alpha * H_p_pk,
-        signing_key * H_p_pk,
+        actual_signing_key * H_p_pk,
     );
     assert!(monero_adaptor::clsag::verify(
         &sig,
