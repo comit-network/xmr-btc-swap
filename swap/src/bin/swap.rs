@@ -97,7 +97,6 @@ async fn main() -> Result<()> {
             let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
             let (send_bitcoin, fees) = determine_btc_to_swap(
                 event_loop_handle.request_quote(),
-                max_givable().await?,
                 bitcoin_wallet.new_address(),
                 || bitcoin_wallet.balance(),
                 max_givable,
@@ -329,7 +328,6 @@ async fn init_monero_wallet(
 
 async fn determine_btc_to_swap<FB, TB, FMG, TMG, FS, TS>(
     bid_quote: impl Future<Output = Result<BidQuote>>,
-    mut current_maximum_giveable: bitcoin::Amount,
     get_new_address: impl Future<Output = Result<bitcoin::Address>>,
     balance: FB,
     max_giveable: FMG,
@@ -345,7 +343,14 @@ where
 {
     debug!("Requesting quote");
     let bid_quote = bid_quote.await?;
-    info!("Received quote: 1 XMR ~ {}", bid_quote.price);
+    info!(
+        minimum_amount = %bid_quote.min_quantity,
+        maximum_amount = %bid_quote.max_quantity,
+        "Received quote: 1 XMR ~ {}",
+        bid_quote.price
+    );
+
+    let mut current_maximum_giveable = max_giveable().await?;
 
     let max_giveable = if current_maximum_giveable == bitcoin::Amount::ZERO
         || current_maximum_giveable < bid_quote.min_quantity
@@ -411,18 +416,47 @@ mod tests {
     use super::*;
     use crate::determine_btc_to_swap;
     use ::bitcoin::Amount;
+    use std::sync::Mutex;
     use tracing::subscriber;
+
+    struct MaxGiveable {
+        amounts: Vec<Amount>,
+        call_counter: usize,
+    }
+
+    impl MaxGiveable {
+        fn new(amounts: Vec<Amount>) -> Self {
+            Self {
+                amounts,
+                call_counter: 0,
+            }
+        }
+        fn give(&mut self) -> Result<Amount> {
+            let amount = self
+                .amounts
+                .get(self.call_counter)
+                .ok_or_else(|| anyhow::anyhow!("No more balances available"))?;
+            self.call_counter += 1;
+            Ok(*amount)
+        }
+    }
 
     #[tokio::test]
     async fn given_no_balance_and_transfers_less_than_max_swaps_max_giveable() {
         let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+        let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
+            Amount::ZERO,
+            Amount::from_btc(0.0009).unwrap(),
+        ])));
 
         let (amount, fees) = determine_btc_to_swap(
             async { Ok(quote_with_max(0.01)) },
-            Amount::ZERO,
             get_dummy_address(),
             || async { Ok(Amount::from_btc(0.001)?) },
-            || async { Ok(Amount::from_btc(0.0009)?) },
+            || async {
+                let mut result = givable.lock().unwrap();
+                result.give()
+            },
             || async { Ok(()) },
         )
         .await
@@ -433,17 +467,22 @@ mod tests {
 
         assert_eq!((amount, fees), (expected_amount, expected_fees))
     }
-
     #[tokio::test]
     async fn given_no_balance_and_transfers_more_then_swaps_max_quantity_from_quote() {
         let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+        let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
+            Amount::ZERO,
+            Amount::from_btc(0.1).unwrap(),
+        ])));
 
         let (amount, fees) = determine_btc_to_swap(
             async { Ok(quote_with_max(0.01)) },
-            Amount::ZERO,
             get_dummy_address(),
             || async { Ok(Amount::from_btc(0.1001)?) },
-            || async { Ok(Amount::from_btc(0.1)?) },
+            || async {
+                let mut result = givable.lock().unwrap();
+                result.give()
+            },
             || async { Ok(()) },
         )
         .await
@@ -458,13 +497,19 @@ mod tests {
     #[tokio::test]
     async fn given_initial_balance_below_max_quantity_swaps_max_givable() {
         let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+        let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
+            Amount::from_btc(0.0049).unwrap(),
+            Amount::from_btc(99.9).unwrap(),
+        ])));
 
         let (amount, fees) = determine_btc_to_swap(
             async { Ok(quote_with_max(0.01)) },
-            Amount::from_btc(0.0049).unwrap(),
-            async { panic!("should not request new address when initial balance is > 0") },
+            async { panic!("should not request new address when initial balance  is > 0") },
             || async { Ok(Amount::from_btc(0.005)?) },
-            || async { panic!("should not wait for deposit when initial balance > 0") },
+            || async {
+                let mut result = givable.lock().unwrap();
+                result.give()
+            },
             || async { Ok(()) },
         )
         .await
@@ -479,13 +524,19 @@ mod tests {
     #[tokio::test]
     async fn given_initial_balance_above_max_quantity_swaps_max_quantity() {
         let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+        let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
+            Amount::from_btc(0.1).unwrap(),
+            Amount::from_btc(99.9).unwrap(),
+        ])));
 
         let (amount, fees) = determine_btc_to_swap(
             async { Ok(quote_with_max(0.01)) },
-            Amount::from_btc(0.1).unwrap(),
             async { panic!("should not request new address when initial balance is > 0") },
             || async { Ok(Amount::from_btc(0.1001)?) },
-            || async { panic!("should not wait for deposit when initial balance > 0") },
+            || async {
+                let mut result = givable.lock().unwrap();
+                result.give()
+            },
             || async { Ok(()) },
         )
         .await
@@ -500,13 +551,19 @@ mod tests {
     #[tokio::test]
     async fn given_no_initial_balance_then_min_wait_for_sufficient_deposit() {
         let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+        let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
+            Amount::ZERO,
+            Amount::from_btc(0.01).unwrap(),
+        ])));
 
         let (amount, fees) = determine_btc_to_swap(
             async { Ok(quote_with_min(0.01)) },
-            Amount::ZERO,
             get_dummy_address(),
             || async { Ok(Amount::from_btc(0.0101)?) },
-            || async { Ok(Amount::from_btc(0.01)?) },
+            || async {
+                let mut result = givable.lock().unwrap();
+                result.give()
+            },
             || async { Ok(()) },
         )
         .await
@@ -521,13 +578,19 @@ mod tests {
     #[tokio::test]
     async fn given_balance_less_then_min_wait_for_sufficient_deposit() {
         let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+        let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
+            Amount::from_btc(0.0001).unwrap(),
+            Amount::from_btc(0.01).unwrap(),
+        ])));
 
         let (amount, fees) = determine_btc_to_swap(
             async { Ok(quote_with_min(0.01)) },
-            Amount::from_btc(0.0001).unwrap(),
             get_dummy_address(),
             || async { Ok(Amount::from_btc(0.0101)?) },
-            || async { Ok(Amount::from_btc(0.01)?) },
+            || async {
+                let mut result = givable.lock().unwrap();
+                result.give()
+            },
             || async { Ok(()) },
         )
         .await
@@ -542,15 +605,24 @@ mod tests {
     #[tokio::test]
     async fn given_no_initial_balance_and_transfers_less_than_min_keep_waiting() {
         let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+        let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
+            Amount::ZERO,
+            Amount::from_btc(0.01).unwrap(),
+            Amount::from_btc(0.01).unwrap(),
+            Amount::from_btc(0.01).unwrap(),
+            Amount::from_btc(0.01).unwrap(),
+        ])));
 
         let error = tokio::time::timeout(
             Duration::from_secs(1),
             determine_btc_to_swap(
                 async { Ok(quote_with_min(0.1)) },
-                Amount::ZERO,
                 get_dummy_address(),
                 || async { Ok(Amount::from_btc(0.0101)?) },
-                || async { Ok(Amount::from_btc(0.01)?) },
+                || async {
+                    let mut result = givable.lock().unwrap();
+                    result.give()
+                },
                 || async { Ok(()) },
             ),
         )

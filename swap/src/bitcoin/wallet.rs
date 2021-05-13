@@ -30,6 +30,7 @@ const SLED_TREE_NAME: &str = "default_tree";
 /// amount for tx fees.
 const MAX_RELATIVE_TX_FEE: Decimal = dec!(0.03);
 const MAX_ABSOLUTE_TX_FEE: Decimal = dec!(100_000);
+const DUST_AMOUNT: u64 = 546;
 
 pub struct Wallet<B = ElectrumBlockchain, D = bdk::sled::Tree, C = Client> {
     client: Arc<Mutex<C>>,
@@ -316,7 +317,17 @@ where
     /// transaction confirmed.
     pub async fn max_giveable(&self, locking_script_size: usize) -> Result<Amount> {
         let wallet = self.wallet.lock().await;
+        let balance = wallet.get_balance()?;
+        if balance < DUST_AMOUNT {
+            return Ok(Amount::ZERO);
+        }
         let client = self.client.lock().await;
+        let min_relay_fee = client.min_relay_fee()?.as_sat();
+
+        if balance < min_relay_fee {
+            return Ok(Amount::ZERO);
+        }
+
         let fee_rate = client.estimate_feerate(self.target_block)?;
 
         let mut tx_builder = wallet.build_tx();
@@ -325,11 +336,16 @@ where
         tx_builder.set_single_recipient(dummy_script);
         tx_builder.drain_wallet();
         tx_builder.fee_rate(fee_rate);
-        let (_, details) = tx_builder.finish().context("Failed to build transaction")?;
 
-        let max_giveable = details.sent - details.fees;
-
-        Ok(Amount::from_sat(max_giveable))
+        let response = tx_builder.finish();
+        match response {
+            Ok((_, details)) => {
+                let max_giveable = details.sent - details.fees;
+                Ok(Amount::from_sat(max_giveable))
+            }
+            Err(bdk::Error::InsufficientFunds { .. }) => Ok(Amount::ZERO),
+            Err(e) => bail!("Failed to build transaction. {:#}", e),
+        }
     }
 
     /// Estimate total tx fee for a pre-defined target block based on the
@@ -758,6 +774,7 @@ impl fmt::Display for ScriptStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bitcoin::TxLock;
     use proptest::prelude::*;
 
     #[test]
@@ -944,5 +961,47 @@ mod tests {
             let relay_fee = bitcoin::Amount::from_sat(relay_fee);
             assert!(estimate_fee(weight, amount, fee_rate, relay_fee).is_err());
         }
+    }
+
+    struct StaticFeeRate {
+        min_relay_fee: u64,
+    }
+
+    impl EstimateFeeRate for StaticFeeRate {
+        fn estimate_feerate(&self, _target_block: usize) -> Result<FeeRate> {
+            Ok(FeeRate::default_min_relay_fee())
+        }
+
+        fn min_relay_fee(&self) -> Result<bitcoin::Amount> {
+            Ok(bitcoin::Amount::from_sat(self.min_relay_fee))
+        }
+    }
+
+    #[tokio::test]
+    async fn given_no_balance_returns_amount_0() {
+        let wallet = Wallet::new_funded(0, StaticFeeRate { min_relay_fee: 1 });
+        let amount = wallet.max_giveable(TxLock::script_size()).await.unwrap();
+
+        assert_eq!(amount, Amount::ZERO);
+    }
+
+    #[tokio::test]
+    async fn given_balance_below_min_relay_fee_returns_amount_0() {
+        let wallet = Wallet::new_funded(1000, StaticFeeRate {
+            min_relay_fee: 1001,
+        });
+        let amount = wallet.max_giveable(TxLock::script_size()).await.unwrap();
+
+        assert_eq!(amount, Amount::ZERO);
+    }
+
+    #[tokio::test]
+    async fn given_balance_above_relay_fee_returns_amount_greater_0() {
+        let wallet = Wallet::new_funded(10_000, StaticFeeRate {
+            min_relay_fee: 1000,
+        });
+        let amount = wallet.max_giveable(TxLock::script_size()).await.unwrap();
+
+        assert!(amount.as_sat() > 0);
     }
 }
