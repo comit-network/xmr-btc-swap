@@ -63,7 +63,7 @@ async fn main() -> Result<()> {
     let config = match read_config(config_path.clone())? {
         Ok(config) => config,
         Err(ConfigNotInitialized {}) => {
-            initial_setup(config_path.clone(), query_user_for_initial_config, testnet)?;
+            initial_setup(config_path.clone(), query_user_for_initial_config(testnet)?)?;
             read_config(config_path)?.expect("after initial setup config can be read")
         }
     };

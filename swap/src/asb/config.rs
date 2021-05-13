@@ -180,12 +180,8 @@ pub fn read_config(config_path: PathBuf) -> Result<Result<Config, ConfigNotIniti
     Ok(Ok(file))
 }
 
-pub fn initial_setup<F>(config_path: PathBuf, config_file: F, testnet: bool) -> Result<()>
-where
-    F: Fn(bool) -> Result<Config>,
-{
-    let initial_config = config_file(testnet)?;
-    let toml = toml::to_string(&initial_config)?;
+pub fn initial_setup(config_path: PathBuf, config: Config) -> Result<()> {
+    let toml = toml::to_string(&config)?;
 
     ensure_directory_exists(config_path.as_path())?;
     fs::write(&config_path, toml)?;
@@ -352,7 +348,7 @@ mod tests {
             },
         };
 
-        initial_setup(config_path.clone(), |_| Ok(expected.clone()), false).unwrap();
+        initial_setup(config_path.clone(), expected.clone()).unwrap();
         let actual = read_config(config_path).unwrap().unwrap();
 
         assert_eq!(expected, actual);
@@ -392,7 +388,7 @@ mod tests {
             },
         };
 
-        initial_setup(config_path.clone(), |_| Ok(expected.clone()), true).unwrap();
+        initial_setup(config_path.clone(), expected.clone()).unwrap();
         let actual = read_config(config_path).unwrap().unwrap();
 
         assert_eq!(expected, actual);
