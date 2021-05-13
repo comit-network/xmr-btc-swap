@@ -126,15 +126,23 @@ impl WalletRpc {
             "Starting monero-wallet-rpc on"
         );
 
+        let network_flag = match network {
+            Network::Mainnet => {
+                vec![]
+            }
+            Network::Stagenet => {
+                vec!["--stagenet"]
+            }
+            Network::Testnet => {
+                vec!["--testnet"]
+            }
+        };
+
         let mut child = Command::new(self.exec_path())
             .env("LANG", "en_AU.UTF-8")
             .stdout(Stdio::piped())
             .kill_on_drop(true)
-            .arg(match network {
-                Network::Mainnet => "--mainnet",
-                Network::Stagenet => "--stagenet",
-                Network::Testnet => "--testnet",
-            })
+            .args(network_flag)
             .arg("--daemon-address")
             .arg(daemon_address)
             .arg("--rpc-bind-port")
