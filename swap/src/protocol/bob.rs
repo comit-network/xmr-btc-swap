@@ -24,7 +24,8 @@ pub struct Swap {
     pub state: BobState,
     pub event_loop_handle: EventLoopHandle,
     pub db: Database,
-    pub bitcoin_wallet: Arc<bitcoin::Wallet>,
+    pub internal_bitcoin_wallet: Arc<bitcoin::Wallet>,
+    pub personal_bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
     pub env_config: env::Config,
     pub id: Uuid,
@@ -36,7 +37,8 @@ impl Swap {
     pub fn new(
         db: Database,
         id: Uuid,
-        bitcoin_wallet: Arc<bitcoin::Wallet>,
+        internal_bitcoin_wallet: Arc<bitcoin::Wallet>,
+        personal_bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
         env_config: env::Config,
         event_loop_handle: EventLoopHandle,
@@ -47,7 +49,8 @@ impl Swap {
             state: BobState::Started { btc_amount },
             event_loop_handle,
             db,
-            bitcoin_wallet,
+            internal_bitcoin_wallet,
+            personal_bitcoin_wallet,
             monero_wallet,
             env_config,
             id,
@@ -55,10 +58,12 @@ impl Swap {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn from_db(
         db: Database,
         id: Uuid,
-        bitcoin_wallet: Arc<bitcoin::Wallet>,
+        internal_bitcoin_wallet: Arc<bitcoin::Wallet>,
+        personal_bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
         env_config: env::Config,
         event_loop_handle: EventLoopHandle,
@@ -70,7 +75,8 @@ impl Swap {
             state,
             event_loop_handle,
             db,
-            bitcoin_wallet,
+            internal_bitcoin_wallet,
+            personal_bitcoin_wallet,
             monero_wallet,
             env_config,
             id,

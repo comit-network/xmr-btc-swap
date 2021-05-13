@@ -98,7 +98,7 @@ where
     let bob_seed = Seed::random().unwrap();
     let bob_starting_balances = StartingBalances::new(btc_amount * 10, monero::Amount::ZERO, None);
 
-    let (bob_bitcoin_wallet, _bob_personal_bitcoin_wallet, bob_monero_wallet) = init_test_wallets(
+    let (bob_bitcoin_wallet, bob_personal_bitcoin_wallet, bob_monero_wallet) = init_test_wallets(
         MONERO_WALLET_NAME_BOB,
         containers.bitcoind_url,
         &monero,
@@ -113,7 +113,8 @@ where
     let bob_params = BobParams {
         seed: Seed::random().unwrap(),
         db_path: tempdir().unwrap().path().to_path_buf(),
-        bitcoin_wallet: bob_bitcoin_wallet.clone(),
+        protocol_bitcoin_wallet: bob_bitcoin_wallet.clone(),
+        personal_bitcoin_wallet: bob_personal_bitcoin_wallet,
         monero_wallet: bob_monero_wallet.clone(),
         alice_address: alice_listen_address.clone(),
         alice_peer_id: alice_handle.peer_id,
@@ -417,7 +418,8 @@ impl StartingBalances {
 struct BobParams {
     seed: Seed,
     db_path: PathBuf,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    protocol_bitcoin_wallet: Arc<bitcoin::Wallet>,
+    personal_bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
     alice_address: Multiaddr,
     alice_peer_id: PeerId,
@@ -432,7 +434,8 @@ impl BobParams {
         let swap = bob::Swap::from_db(
             db,
             swap_id,
-            self.bitcoin_wallet.clone(),
+            self.protocol_bitcoin_wallet.clone(),
+            self.personal_bitcoin_wallet.clone(),
             self.monero_wallet.clone(),
             self.env_config,
             handle,
@@ -454,7 +457,8 @@ impl BobParams {
         let swap = bob::Swap::new(
             db,
             swap_id,
-            self.bitcoin_wallet.clone(),
+            self.protocol_bitcoin_wallet.clone(),
+            self.personal_bitcoin_wallet.clone(),
             self.monero_wallet.clone(),
             self.env_config,
             handle,
@@ -480,7 +484,7 @@ impl BobParams {
             swap_id,
             swarm,
             self.alice_peer_id,
-            self.bitcoin_wallet.clone(),
+            self.protocol_bitcoin_wallet.clone(),
         )
     }
 }
@@ -557,7 +561,7 @@ impl TestContext {
         let (swap, event_loop) = self.bob_params.new_swap(self.btc_amount).await.unwrap();
 
         // ensure the wallet is up to date for concurrent swap tests
-        swap.bitcoin_wallet.sync().await.unwrap();
+        swap.protocol_bitcoin_wallet.sync().await.unwrap();
 
         let join_handle = tokio::spawn(event_loop.run());
 

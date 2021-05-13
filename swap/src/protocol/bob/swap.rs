@@ -20,7 +20,6 @@ pub fn is_complete(state: &BobState) -> bool {
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 pub async fn run(swap: bob::Swap) -> Result<BobState> {
     run_until(swap, is_complete).await
 }
@@ -36,7 +35,8 @@ pub async fn run_until(
             swap.id,
             current_state,
             &mut swap.event_loop_handle,
-            swap.bitcoin_wallet.as_ref(),
+            swap.internal_bitcoin_wallet.as_ref(),
+            swap.personal_bitcoin_wallet.as_ref(),
             swap.monero_wallet.as_ref(),
             &swap.env_config,
             swap.receive_monero_address,
@@ -52,11 +52,13 @@ pub async fn run_until(
     Ok(current_state)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn next_state(
     swap_id: Uuid,
     state: BobState,
     event_loop_handle: &mut EventLoopHandle,
     bitcoin_wallet: &bitcoin::Wallet,
+    personal_bitcoin_wallet: &bitcoin::Wallet,
     monero_wallet: &monero::Wallet,
     env_config: &Config,
     receive_monero_address: monero::Address,
@@ -65,8 +67,7 @@ async fn next_state(
 
     Ok(match state {
         BobState::Started { btc_amount } => {
-            // todo (phh) use new wallet
-            let bitcoin_refund_address = bitcoin_wallet.new_address().await?;
+            let bitcoin_refund_address = personal_bitcoin_wallet.new_address().await?;
             let tx_refund_fee = bitcoin_wallet
                 .estimate_fee(TxRefund::weight(), btc_amount)
                 .await?;

@@ -38,7 +38,7 @@ async fn given_alice_and_bob_manually_refund_after_funds_locked_both_refund() {
         // Ensure cancel timelock is expired
         if let BobState::BtcLocked(state3) = bob_swap.state.clone() {
             bob_swap
-                .bitcoin_wallet
+                .internal_bitcoin_wallet
                 .subscribe_to(state3.tx_lock)
                 .await
                 .wait_until_confirmed_with(state3.cancel_timelock)
@@ -49,8 +49,13 @@ async fn given_alice_and_bob_manually_refund_after_funds_locked_both_refund() {
 
         // Bob manually cancels
         bob_join_handle.abort();
-        let (_, state) =
-            bob::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false).await??;
+        let (_, state) = bob::cancel(
+            bob_swap.id,
+            bob_swap.internal_bitcoin_wallet,
+            bob_swap.db,
+            false,
+        )
+        .await??;
         assert!(matches!(state, BobState::BtcCancelled { .. }));
 
         let (bob_swap, bob_join_handle) = ctx
@@ -60,8 +65,13 @@ async fn given_alice_and_bob_manually_refund_after_funds_locked_both_refund() {
 
         // Bob manually refunds
         bob_join_handle.abort();
-        let bob_state =
-            bob::refund(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false).await??;
+        let bob_state = bob::refund(
+            bob_swap.id,
+            bob_swap.internal_bitcoin_wallet,
+            bob_swap.db,
+            false,
+        )
+        .await??;
 
         ctx.assert_bob_refunded(bob_state).await;
 

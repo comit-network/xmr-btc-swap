@@ -37,9 +37,14 @@ async fn given_alice_and_bob_manually_cancel_when_timelock_not_expired_errors() 
         ));
 
         // Bob tries but fails to manually cancel
-        let result = bob::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false)
-            .await?
-            .unwrap_err();
+        let result = bob::cancel(
+            bob_swap.id,
+            bob_swap.internal_bitcoin_wallet,
+            bob_swap.db,
+            false,
+        )
+        .await?
+        .unwrap_err();
         assert!(matches!(
             result,
             bob::cancel::Error::CancelTimelockNotExpiredYet
@@ -72,9 +77,14 @@ async fn given_alice_and_bob_manually_cancel_when_timelock_not_expired_errors() 
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));
 
         // Bob tries but fails to manually refund
-        let result = bob::refund(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false)
-            .await?
-            .unwrap_err();
+        let result = bob::refund(
+            bob_swap.id,
+            bob_swap.internal_bitcoin_wallet,
+            bob_swap.db,
+            false,
+        )
+        .await?
+        .unwrap_err();
         assert!(matches!(result, bob::refund::SwapNotCancelledYet(_)));
 
         let (bob_swap, _) = ctx
