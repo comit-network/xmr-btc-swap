@@ -1,9 +1,10 @@
 #![allow(non_snake_case)]
 
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-use curve25519_dalek::edwards::CompressedEdwardsY;
+use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
+use itertools::{izip, Itertools};
 use monero::blockdata::transaction::{ExtraField, KeyImage, SubField, TxOutTarget};
 use monero::cryptonote::hash::Hashable;
 use monero::cryptonote::onetime_key::{KeyGenerator, MONERO_MUL_FACTOR};
@@ -127,12 +128,38 @@ async fn monerod_integration_test() {
     let ring = response
         .outs
         .iter()
-        .map(|out| out.key.point.decompress().unwrap())
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap();
+        .map(|out| out.key.point.decompress().unwrap());
+    let commitment_ring = response
+        .outs
+        .iter()
+        .map(|out| CompressedEdwardsY(out.mask.key).decompress().unwrap());
 
-    key_offsets.sort();
+    let (key_offsets, ring, commitment_ring) = izip!(key_offsets, ring, commitment_ring)
+        .sorted_by(|(a, ..), (b, ..)| Ord::cmp(a, b))
+        .fold(
+            (Vec::new(), Vec::new(), Vec::new()),
+            |(mut key_offsets, mut ring, mut commitment_ring), (key_offset, key, commitment)| {
+                key_offsets.push(key_offset);
+                ring.push(key);
+                commitment_ring.push(commitment);
+
+                (key_offsets, ring, commitment_ring)
+            },
+        );
+    let ring: [EdwardsPoint; 11] = ring.try_into().unwrap();
+    let commitment_ring = commitment_ring.try_into().unwrap();
+
+    // We appear to be using the correct signing key, because we can
+    // find it in the ring! Conversely, the point corresponding to the
+    // "original" signing key is not part of the ring
+    let signing_key = signing_key
+        + KeyGenerator::from_key(&viewpair, our_output.tx_pubkey)
+            .get_rvn_scalar(our_output.index)
+            .scalar;
+    let (signing_index, _) = ring
+        .iter()
+        .find_position(|key| **key == signing_key * ED25519_BASEPOINT_POINT)
+        .unwrap();
 
     let relative_key_offsets = to_relative_offsets(&key_offsets);
 
@@ -146,18 +173,14 @@ async fn monerod_integration_test() {
     let ecdh_key_1 = PrivateKey::random(&mut rng);
     let (ecdh_info_1, out_blinding_1) = EcdhInfo::new_bulletproof(spend_amount, ecdh_key_1.scalar);
 
-    let (bulletproof, out_pk) = monero::make_bulletproof(
-        &mut rng,
-        &[spend_amount, 0],
-        &[out_blinding_0, out_blinding_1],
-    )
+    let (bulletproof, out_pk) = monero::make_bulletproof(&mut rng, &[spend_amount, 0], &[
+        out_blinding_0,
+        out_blinding_1,
+    ])
     .unwrap();
 
-    let signing_key = signing_key
-        + KeyGenerator::from_key(&viewpair, our_output.tx_pubkey)
-            .get_rvn_scalar(our_output.index)
-            .scalar;
     let H_p_pk = hash_point_to_point(signing_key * ED25519_BASEPOINT_POINT);
+    let I = signing_key * H_p_pk;
 
     let prefix = TransactionPrefix {
         version: VarInt(2),
@@ -166,7 +189,7 @@ async fn monerod_integration_test() {
             amount: VarInt(0),
             key_offsets: relative_key_offsets,
             k_image: KeyImage {
-                image: monero::cryptonote::hash::Hash(H_p_pk.compress().to_bytes()),
+                image: monero::cryptonote::hash::Hash(I.compress().to_bytes()),
             },
         }],
         outputs: vec![
@@ -199,14 +222,6 @@ async fn monerod_integration_test() {
         ]),
     };
 
-    let commitment_ring = response
-        .outs
-        .iter()
-        .map(|out| CompressedEdwardsY(out.mask.key).decompress().unwrap())
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap();
-
     let out_pk = out_pk
         .into_iter()
         .map(|p| (p.decompress().unwrap() * Scalar::from(MONERO_MUL_FACTOR)).compress())
@@ -223,7 +238,7 @@ async fn monerod_integration_test() {
     let alpha = Scalar::random(&mut rng);
 
     let mut responses = random_array(|| Scalar::random(&mut rng));
-    responses[0] = signing_key;
+    responses[signing_index] = signing_key;
 
     let out_pk = out_pk
         .iter()
@@ -293,20 +308,20 @@ async fn monerod_integration_test() {
         &ring,
         &commitment_ring,
         responses,
-        0,
+        signing_index,
         real_commitment_blinder - (out_blinding_0 + out_blinding_1), // * Scalar::from(MONERO_MUL_FACTOR), TODO DOESN'T VERIFY WITH THIS
         pseudo_out,
         alpha * ED25519_BASEPOINT_POINT,
         alpha * H_p_pk,
         signing_key * H_p_pk,
     );
-    assert!(monero_adaptor::clsag::verify(
-        &sig,
-        &message,
-        &ring,
-        &commitment_ring,
-        pseudo_out
-    ));
+    // assert!(monero_adaptor::clsag::verify(
+    //     &sig,
+    //     &message,
+    //     &ring,
+    //     &commitment_ring,
+    //     pseudo_out
+    // ));
 
     sig.responses.iter().enumerate().for_each(|(i, res)| {
         println!(
@@ -412,21 +427,18 @@ mod tests {
 
         let relative_offsets = to_relative_offsets(&key_offsets);
 
-        assert_eq!(
-            &relative_offsets,
-            &[
-                VarInt(78),
-                VarInt(3),
-                VarInt(10),
-                VarInt(0),
-                VarInt(5),
-                VarInt(2),
-                VarInt(3),
-                VarInt(11),
-                VarInt(1),
-                VarInt(1),
-                VarInt(3),
-            ]
-        )
+        assert_eq!(&relative_offsets, &[
+            VarInt(78),
+            VarInt(3),
+            VarInt(10),
+            VarInt(0),
+            VarInt(5),
+            VarInt(2),
+            VarInt(3),
+            VarInt(11),
+            VarInt(1),
+            VarInt(1),
+            VarInt(3),
+        ])
     }
 }
