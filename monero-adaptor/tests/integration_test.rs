@@ -224,7 +224,7 @@ async fn monerod_integration_test() {
         ]),
     };
 
-    let out_pk = out_pk
+    let out_pk = out_pk // TODO: Should this happen inside the bulletproof module?
         .into_iter()
         .map(|p| (p.decompress().unwrap() * Scalar::from(MONERO_MUL_FACTOR)).compress())
         .collect::<Vec<_>>();
