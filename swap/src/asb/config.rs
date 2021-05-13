@@ -33,15 +33,10 @@ pub struct Defaults {
 impl GetDefaults for Testnet {
     fn getConfigFileDefaults() -> Result<Defaults> {
         let defaults = Defaults {
-            config_path: system_config_dir()
-                .map(|dir| Path::join(&dir, "asb"))
-                .map(|dir| Path::join(&dir, "testnet"))
-                .map(|dir| Path::join(&dir, "config.toml"))
-                .context("Could not generate default config file path")?,
-            data_dir: system_data_dir()
-                .map(|proj_dir| Path::join(&proj_dir, "asb"))
-                .map(|proj_dir| Path::join(&proj_dir, "testnet"))
-                .context("Could not generate default data dir")?,
+            config_path: default_asb_config_dir()?
+                .join("testnet")
+                .join("config.toml"),
+            data_dir: default_asb_data_dir()?.join("testnet"),
             listen_address_tcp: Multiaddr::from_str("/ip4/0.0.0.0/tcp/9939")?,
             listen_address_ws: Multiaddr::from_str("/ip4/0.0.0.0/tcp/9940/ws")?,
             electrum_rpc_url: Url::parse("ssl://electrum.blockstream.info:60002")?,
@@ -56,15 +51,10 @@ impl GetDefaults for Testnet {
 impl GetDefaults for Mainnet {
     fn getConfigFileDefaults() -> Result<Defaults> {
         let defaults = Defaults {
-            config_path: system_config_dir()
-                .map(|dir| Path::join(&dir, "asb"))
-                .map(|dir| Path::join(&dir, "mainnet"))
-                .map(|dir| Path::join(&dir, "config.toml"))
-                .context("Could not generate default config file path")?,
-            data_dir: system_data_dir()
-                .map(|proj_dir| Path::join(&proj_dir, "asb"))
-                .map(|proj_dir| Path::join(&proj_dir, "mainnet"))
-                .context("Could not generate default data dir")?,
+            config_path: default_asb_config_dir()?
+                .join("mainnet")
+                .join("config.toml"),
+            data_dir: default_asb_data_dir()?.join("mainnet"),
             listen_address_tcp: Multiaddr::from_str("/ip4/0.0.0.0/tcp/9939")?,
             listen_address_ws: Multiaddr::from_str("/ip4/0.0.0.0/tcp/9940/ws")?,
             electrum_rpc_url: Url::parse("ssl://electrum.blockstream.info:50002")?,
@@ -74,6 +64,18 @@ impl GetDefaults for Mainnet {
 
         Ok(defaults)
     }
+}
+
+fn default_asb_config_dir() -> Result<PathBuf> {
+    system_config_dir()
+        .map(|dir| Path::join(&dir, "asb"))
+        .context("Could not generate default config file path")
+}
+
+fn default_asb_data_dir() -> Result<PathBuf> {
+    system_data_dir()
+        .map(|dir| Path::join(&dir, "asb"))
+        .context("Could not generate default config file path")
 }
 
 const DEFAULT_MIN_BUY_AMOUNT: f64 = 0.002f64;
