@@ -174,7 +174,7 @@ pub fn verify(
     h_0_computed == h_0
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Signature {
     pub responses: [Scalar; RING_SIZE],
     pub h_0: Scalar,
@@ -273,6 +273,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use curve25519_dalek::edwards::CompressedEdwardsY;
+    use monero::util::key::H;
     use rand::SeedableRng;
 
     #[test]
@@ -291,111 +293,6 @@ mod tests {
         assert_eq!(inv_eight, INV_EIGHT);
     }
 
-    // #[test]
-    // fn verify_own() {
-    //     use hex_literal::hex;
-    //
-    //     let signature = Signature {
-    //         responses: [
-    //
-    // Scalar::from_bytes_mod_order(hex!("
-    // 3a890a9668162dcbaf507644a4ee267c8f724199a2e7cd88cb6ecaee6687a007")),
-    //
-    // Scalar::from_bytes_mod_order(hex!("
-    // fabef4c7e78f64bd776c671d4a6ce6446abccc9a39ed8e366a13f38022112e08")),
-    //
-    // Scalar::from_bytes_mod_order(hex!("
-    // 24bc969dbecbf35aac0d935827dba5cd4f15421d3b556542bd3bf8007440070a")),
-    //
-    // Scalar::from_bytes_mod_order(hex!("
-    // b2724373414086ab487c49314c10bbb29dc929184bb67ee8a2af08cd42df0100")),
-    //
-    // Scalar::from_bytes_mod_order(hex!("
-    // a61f5827347d7539259690ef2dd5c66c6220b5818e93d7fed103f30329b1290b")),
-    //
-    // Scalar::from_bytes_mod_order(hex!("
-    // f1377aba0ab16e0cc39f05e3732a47a2710a3d4a37b41a5fbf8ce700a4c20006")),
-    //
-    // Scalar::from_bytes_mod_order(hex!("
-    // b31c6c8e2b3f3d590bf40d0279ca8a8dd1efb825f9942bcf15abc44dea9e200b")),
-    //
-    // Scalar::from_bytes_mod_order(hex!("
-    // 076a931f7763b54599aae33b4eda2dd6b89392f558a38e11dfe60d109fd4c806")),
-    //
-    // Scalar::from_bytes_mod_order(hex!("
-    // a8f3351144db0f827e8ec22044f843c89df996bf95db8a06134de4f26c214905")),
-    //
-    // Scalar::from_bytes_mod_order(hex!("
-    // c69c078d0bcb5485e296377b522af29d0317eba9ef05bfeb8214e7569944c00a")),
-    //
-    // Scalar::from_bytes_mod_order(hex!("
-    // 060a75a948f5e58dcfe9f2e5a026f837bf6f13f6297ad0c0218fea6f0385ca0c")),
-    //         ],
-    //         h_0:
-    // Scalar::from_bytes_mod_order(hex!("
-    // 18d972021968f19022810d6e2312b6a8d5f9e6a1d4d70169a2132844674ba10a")),
-    //         I:
-    // CompressedEdwardsY(hex!("
-    // bb96750d51722c25bfac800163dc1c44ba00801f70458b57da1dbb0a98e2196f")).
-    // decompress().unwrap(),         D:
-    // CompressedEdwardsY(hex!("
-    // ab3954aa6bda2476c34a657a2624150e4c76a19ddb9fcd5f15ed5c2b62a34b91")).
-    // decompress().unwrap()     };
-    //
-    //     let result = verify(&signature,
-    // &hex!("f9bde7592500046752e751303b466d8906749c58ee8fc9b9dd768c12378dcd8e"), &[
-    //         CompressedEdwardsY(hex!("
-    // f17e12d090554a3f5b3e0368e54bbf2301bf0ab431762e630acc6f6e85887dc6")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // a6404a8f9733810f54ac052abcd422f7afdc3744d0a036c3df1e5f57e9a46cee")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // 1e3aa56f30207ae6b8128d0e94bc25ebfd10e9b3cfcb8d0fec78b4871db1a284")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // 94972ef98177cd72c2e65c5dcdf003b601409e2d362d0e658203611c8e6ab1bf")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // 8cb12ad1b64ac557a628304dbe2f9c028284be82a4d62fcfcd121082f5684bdc")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // 0328c0a04722bcaa47756a9fb9fc185ca801e18d7cc8838afbc2e3370a399574")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // b6bf5222add24b62f3a892dbdecc64f9726e2a3f4062aafb53b7299be0ff3a4d")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // 1a5b92bb34e8e6f67e880a0286f749682ca04e438caf1d0f070bca05dc1b3f3d")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // 4e6b517d7bbffce134ee464d98e05c8eee6bcadac36b9d9e1e322b53a7ec97b5")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // 911824d7a6b35e47a96ddba6e1c0e622763dd3734c85ddcb2b8cb27becfdb200")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // cb441384992cede75c9d4044126728c89796aa2aae1936208bafd0ab1eb4d83c")).
-    // decompress().unwrap(),     ], &[
-    //         CompressedEdwardsY(hex!("
-    // 7e8066f0fcb0ae40cafc953bc7508ee08fd64abeb0c155ef61248ee740e0c4be")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // 29b9cdf249ad0647966a57ba907ab7764a830cc2fb504bae0b6a2d0edc1278b7")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // 110ffbc7b76b0b1ba7759e2339007ca2463db0ee2aeedce15a27af85436d4614")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // 9bb749be705747d9c28168c0446d589b3ac18949fa0087e230805aaff5a9982f")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // 36c39958ddcad401d85d63883da510505650321ad7a26859e8b1b6c28204d274")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // 05b58165401774696e788bd57a1257834358222d2f4384e39e4001403713dff2")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // aa2c0ec04f2a37942cbb11b48add610f50323a531b9a16ddf4e9661082ac34f1")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // f034b8ff2cbd2729a7c19c0cc59a053fcbe1123f10acb0ec9e86bf122f0d3b12")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // 50a3f64bab0f0136578d06613239b914f3746baba8855bd95b8a56f671b6dcee")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // 96e9dc7a96a19c9ebaeb33ab94e7e9d86d88df1c1b11006b297b74f529f37f5a")).
-    // decompress().unwrap(),         CompressedEdwardsY(hex!("
-    // ead60b7504850c7293e99f0f13823d0f0e99dd5f0dcce6f71a5f1990dd25e8ae")).
-    // decompress().unwrap(),     ], CompressedEdwardsY(hex!("
-    // cd0d4bf52b489bff3a9f4d50587908c3cb16274e86b8514d67178321e75a491b")).
-    // decompress().unwrap());
-    //
-    //     assert!(result)
-    // }
-
     #[test]
     fn sign_and_verify() {
         let mut rng = rand::rngs::StdRng::from_seed([0u8; 32]);
@@ -408,16 +305,26 @@ mod tests {
 
         let alpha = Scalar::random(&mut rng);
 
+        let amount_to_spend = 1000000u32;
+        let fee = 10000u32;
+        let output_amount = amount_to_spend - fee;
+
         let mut ring = random_array(|| Scalar::random(&mut rng) * ED25519_BASEPOINT_POINT);
         ring[0] = signing_pk;
 
         let real_commitment_blinding = Scalar::random(&mut rng);
         let mut commitment_ring =
             random_array(|| Scalar::random(&mut rng) * ED25519_BASEPOINT_POINT);
-        commitment_ring[0] = real_commitment_blinding * ED25519_BASEPOINT_POINT; // + 0 * H
+        commitment_ring[0] = real_commitment_blinding * ED25519_BASEPOINT_POINT
+            + Scalar::from(amount_to_spend) * H.point.decompress().unwrap();
 
-        // TODO: document
-        let pseudo_output_commitment = commitment_ring[0];
+        let fee_key = Scalar::from(fee) * H.point.decompress().unwrap();
+
+        let out_pk_blinding = Scalar::random(&mut rng);
+        let out_pk = out_pk_blinding * ED25519_BASEPOINT_POINT
+            + Scalar::from(output_amount) * H.point.decompress().unwrap();
+
+        let pseudo_output_commitment = fee_key + out_pk;
 
         let mut responses = random_array(|| Scalar::random(&mut rng));
         responses[0] = signing_key;
@@ -430,7 +337,7 @@ mod tests {
             &commitment_ring,
             responses,
             0,
-            Scalar::zero(),
+            real_commitment_blinding - out_pk_blinding,
             pseudo_output_commitment,
             alpha * ED25519_BASEPOINT_POINT,
             alpha * H_p_pk,
@@ -477,7 +384,6 @@ mod tests {
 
     #[test]
     fn sign_and_verify_non_zero_signing_index() {
-        // TODO: FIX THIS TEST
         let mut rng = rand::rngs::StdRng::from_seed([0u8; 32]);
 
         let msg_to_sign = b"hello world, monero is amazing!!";
@@ -488,17 +394,28 @@ mod tests {
 
         let alpha = Scalar::random(&mut rng);
 
+        let amount_to_spend = 1000000u32;
+        let fee = 10000u32;
+        let output_amount = amount_to_spend - fee;
+
         let signing_key_index = 3;
+
         let mut ring = random_array(|| Scalar::random(&mut rng) * ED25519_BASEPOINT_POINT);
         ring[signing_key_index] = signing_pk;
 
         let real_commitment_blinding = Scalar::random(&mut rng);
         let mut commitment_ring =
             random_array(|| Scalar::random(&mut rng) * ED25519_BASEPOINT_POINT);
-        commitment_ring[signing_key_index] = real_commitment_blinding * ED25519_BASEPOINT_POINT; // + 0 * H
+        commitment_ring[signing_key_index] = real_commitment_blinding * ED25519_BASEPOINT_POINT
+            + Scalar::from(amount_to_spend) * H.point.decompress().unwrap();
 
-        // TODO: document
-        let pseudo_output_commitment = commitment_ring[0];
+        let fee_key = Scalar::from(fee) * H.point.decompress().unwrap();
+
+        let out_pk_blinding = Scalar::random(&mut rng);
+        let out_pk = out_pk_blinding * ED25519_BASEPOINT_POINT
+            + Scalar::from(output_amount) * H.point.decompress().unwrap();
+
+        let pseudo_output_commitment = fee_key + out_pk;
 
         let mut responses = random_array(|| Scalar::random(&mut rng));
         responses[signing_key_index] = signing_key;
@@ -511,14 +428,12 @@ mod tests {
             &commitment_ring,
             responses,
             signing_key_index,
-            Scalar::zero(),
+            real_commitment_blinding - out_pk_blinding,
             pseudo_output_commitment,
             alpha * ED25519_BASEPOINT_POINT,
             alpha * H_p_pk,
             signing_key * H_p_pk,
         );
-
-        dbg!(signature.h_0);
 
         assert!(verify(
             &signature,
@@ -527,6 +442,137 @@ mod tests {
             &commitment_ring,
             pseudo_output_commitment
         ))
+    }
+
+    #[test]
+    fn static_assert() {
+        let mut rng = rand::rngs::StdRng::from_seed([0u8; 32]);
+
+        let msg_to_sign = b"hello world, monero is amazing!!";
+
+        let signing_key = Scalar::random(&mut rng);
+        let signing_pk = signing_key * ED25519_BASEPOINT_POINT;
+        let H_p_pk = hash_point_to_point(signing_pk);
+
+        let alpha = Scalar::random(&mut rng);
+
+        let amount_to_spend = 1000000u32;
+        let fee = 10000u32;
+        let output_amount = amount_to_spend - fee;
+
+        let signing_key_index = 3;
+
+        let mut ring = random_array(|| Scalar::random(&mut rng) * ED25519_BASEPOINT_POINT);
+        ring[signing_key_index] = signing_pk;
+
+        let real_commitment_blinding = Scalar::random(&mut rng);
+        let mut commitment_ring =
+            random_array(|| Scalar::random(&mut rng) * ED25519_BASEPOINT_POINT);
+        commitment_ring[signing_key_index] = real_commitment_blinding * ED25519_BASEPOINT_POINT
+            + Scalar::from(amount_to_spend) * H.point.decompress().unwrap();
+
+        let fee_key = Scalar::from(fee) * H.point.decompress().unwrap();
+
+        let out_pk_blinding = Scalar::random(&mut rng);
+        let out_pk = out_pk_blinding * ED25519_BASEPOINT_POINT
+            + Scalar::from(output_amount) * H.point.decompress().unwrap();
+
+        let pseudo_output_commitment = fee_key + out_pk;
+
+        let mut responses = random_array(|| Scalar::random(&mut rng));
+        responses[signing_key_index] = signing_key;
+
+        let signature = sign(
+            msg_to_sign,
+            H_p_pk,
+            alpha,
+            &ring,
+            &commitment_ring,
+            responses,
+            signing_key_index,
+            real_commitment_blinding - out_pk_blinding,
+            pseudo_output_commitment,
+            alpha * ED25519_BASEPOINT_POINT,
+            alpha * H_p_pk,
+            signing_key * H_p_pk,
+        );
+
+        let expected_signature = Signature {
+            responses: [
+                Scalar::from_bytes_mod_order([
+                    127, 142, 51, 31, 218, 255, 98, 112, 178, 104, 118, 103, 42, 209, 28, 255, 175,
+                    29, 138, 139, 68, 163, 81, 163, 67, 147, 22, 122, 147, 68, 92, 9,
+                ]),
+                Scalar::from_bytes_mod_order([
+                    55, 39, 188, 124, 195, 144, 38, 253, 71, 140, 38, 58, 171, 17, 180, 6, 190,
+                    186, 215, 8, 221, 240, 236, 13, 35, 83, 180, 101, 185, 38, 24, 7,
+                ]),
+                Scalar::from_bytes_mod_order([
+                    178, 43, 254, 4, 205, 192, 188, 255, 9, 191, 86, 139, 224, 193, 97, 50, 207,
+                    87, 107, 168, 241, 80, 216, 69, 94, 148, 214, 13, 241, 171, 101, 4,
+                ]),
+                Scalar::from_bytes_mod_order([
+                    153, 106, 211, 43, 37, 114, 141, 155, 71, 44, 95, 94, 105, 251, 233, 25, 150,
+                    218, 135, 42, 8, 197, 134, 108, 40, 180, 142, 7, 11, 131, 221, 5,
+                ]),
+                Scalar::from_bytes_mod_order([
+                    84, 122, 135, 162, 200, 132, 34, 227, 238, 27, 159, 142, 81, 164, 223, 65, 58,
+                    17, 233, 222, 253, 52, 5, 62, 246, 249, 23, 155, 221, 211, 120, 3,
+                ]),
+                Scalar::from_bytes_mod_order([
+                    169, 56, 43, 12, 229, 34, 23, 219, 132, 73, 217, 100, 237, 187, 48, 61, 105,
+                    241, 193, 229, 231, 8, 32, 73, 39, 207, 13, 74, 86, 145, 183, 12,
+                ]),
+                Scalar::from_bytes_mod_order([
+                    2, 190, 48, 136, 226, 121, 206, 13, 155, 94, 222, 193, 23, 157, 75, 230, 88,
+                    194, 56, 236, 197, 82, 150, 7, 66, 95, 201, 13, 187, 112, 75, 14,
+                ]),
+                Scalar::from_bytes_mod_order([
+                    230, 241, 238, 19, 133, 32, 25, 92, 11, 232, 189, 24, 58, 32, 193, 154, 8, 3,
+                    209, 81, 241, 44, 188, 197, 104, 156, 219, 19, 219, 47, 147, 6,
+                ]),
+                Scalar::from_bytes_mod_order([
+                    141, 52, 223, 252, 61, 32, 137, 198, 134, 251, 231, 16, 39, 85, 248, 169, 134,
+                    142, 170, 78, 24, 62, 141, 41, 232, 202, 54, 7, 222, 100, 36, 8,
+                ]),
+                Scalar::from_bytes_mod_order([
+                    4, 202, 35, 58, 27, 151, 118, 247, 118, 36, 208, 126, 2, 161, 233, 57, 151,
+                    110, 172, 133, 160, 248, 53, 50, 31, 99, 20, 2, 205, 7, 51, 7,
+                ]),
+                Scalar::from_bytes_mod_order([
+                    10, 170, 95, 224, 138, 210, 12, 240, 229, 196, 185, 129, 209, 241, 52, 97, 215,
+                    199, 36, 116, 183, 243, 83, 157, 179, 216, 14, 206, 110, 36, 216, 2,
+                ]),
+            ],
+            h_0: Scalar::from_bytes_mod_order([
+                60, 49, 64, 139, 212, 108, 178, 124, 109, 0, 127, 114, 21, 125, 105, 19, 5, 26,
+                213, 68, 136, 72, 0, 234, 108, 167, 116, 85, 57, 112, 166, 14,
+            ]),
+            I: CompressedEdwardsY([
+                173, 170, 74, 7, 45, 185, 155, 35, 46, 139, 60, 64, 47, 7, 169, 45, 119, 126, 207,
+                95, 125, 217, 110, 236, 27, 126, 228, 106, 254, 188, 101, 80,
+            ])
+            .decompress()
+            .unwrap(),
+            D: CompressedEdwardsY([
+                38, 225, 116, 236, 62, 79, 109, 179, 10, 190, 180, 148, 105, 45, 232, 16, 92, 125,
+                110, 50, 198, 186, 16, 217, 245, 22, 178, 155, 200, 68, 100, 86,
+            ])
+            .decompress()
+            .unwrap(),
+        };
+
+        assert_eq!(signature.I, expected_signature.I);
+        assert_eq!(signature.D, expected_signature.D);
+        assert_eq!(signature.h_0, expected_signature.h_0);
+
+        for (actual, expected) in signature
+            .responses
+            .iter()
+            .zip(expected_signature.responses.iter())
+        {
+            assert_eq!(actual, expected)
+        }
     }
 
     fn random_array<T: Default + Copy, const N: usize>(rng: impl FnMut() -> T) -> [T; N] {
