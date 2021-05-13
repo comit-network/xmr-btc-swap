@@ -239,8 +239,7 @@ async fn monerod_integration_test() {
 
     let alpha = Scalar::random(&mut rng);
 
-    let mut responses = random_array(|| Scalar::random(&mut rng));
-    responses[signing_index] = actual_signing_key;
+    let responses = random_array(|| Scalar::random(&mut rng));
 
     let out_pk = out_pk
         .iter()
@@ -305,12 +304,13 @@ async fn monerod_integration_test() {
 
     let sig = monero_adaptor::clsag::sign(
         &message,
+        actual_signing_key,
+        signing_index,
         H_p_pk,
         alpha,
         &ring,
         &commitment_ring,
         responses,
-        signing_index,
         real_commitment_blinder - (out_blinding_0 + out_blinding_1), // * Scalar::from(MONERO_MUL_FACTOR), TODO DOESN'T VERIFY WITH THIS
         pseudo_out,
         alpha * ED25519_BASEPOINT_POINT,

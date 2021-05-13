@@ -13,87 +13,13 @@ const INV_EIGHT: Scalar = Scalar::from_bits([
 
 pub fn sign(
     msg: &[u8; 32],
-    H_p_pk: EdwardsPoint,
-    alpha: Scalar,
-    ring: &[EdwardsPoint; RING_SIZE],
-    commitment_ring: &[EdwardsPoint; RING_SIZE],
-    mut responses: [Scalar; RING_SIZE],
+    signing_key: Scalar,
     signing_key_index: usize,
-    z: Scalar,
-    pseudo_output_commitment: EdwardsPoint,
-    L: EdwardsPoint,
-    R: EdwardsPoint,
-    I: EdwardsPoint,
-) -> Signature {
-    let D = z * H_p_pk;
-    let D_inv_8 = D * INV_EIGHT;
-
-    let mu_P = hash_to_scalar!(
-        b"CLSAG_agg_0" || ring || commitment_ring || I || D_inv_8 || pseudo_output_commitment
-    );
-    let mu_C = hash_to_scalar!(
-        b"CLSAG_agg_1" || ring || commitment_ring || I || D_inv_8 || pseudo_output_commitment
-    );
-
-    let adjusted_commitment_ring = commitment_ring.map(|point| point - pseudo_output_commitment);
-
-    let compute_ring_element = |L: EdwardsPoint, R: EdwardsPoint| {
-        hash_to_scalar!(
-            b"CLSAG_round" || ring || commitment_ring || pseudo_output_commitment || msg || L || R
-        )
-    };
-
-    let h_signing_index = compute_ring_element(L, R);
-
-    let mut h_prev = h_signing_index;
-    let mut i = (signing_key_index + 1) % RING_SIZE;
-    let mut h_0 = Scalar::zero();
-
-    if i == 0 {
-        h_0 = h_signing_index
-    }
-
-    while i != signing_key_index {
-        let L_i = compute_L(
-            h_prev,
-            mu_P,
-            mu_C,
-            responses[i],
-            ring[i],
-            adjusted_commitment_ring[i],
-        );
-        let R_i = compute_R(h_prev, mu_P, mu_C, responses[i], ring[i], I, D);
-
-        let h = compute_ring_element(L_i, R_i);
-
-        i = (i + 1) % RING_SIZE;
-        if i == 0 {
-            h_0 = h
-        }
-
-        h_prev = h
-    }
-
-    responses[signing_key_index] =
-        alpha - h_prev * ((mu_P * responses[signing_key_index]) + (mu_C * z));
-
-    Signature {
-        responses,
-        h_0,
-        I,
-        D: D_inv_8,
-    }
-}
-
-fn sign2(
-    msg: &[u8; 32],
     H_p_pk: EdwardsPoint,
     alpha: Scalar,
     ring: &[EdwardsPoint; RING_SIZE],
     commitment_ring: &[EdwardsPoint; RING_SIZE],
     fake_responses: [Scalar; RING_SIZE - 1],
-    signing_key: Scalar,
-    signing_key_index: usize,
     z: Scalar,
     pseudo_output_commitment: EdwardsPoint,
     L: EdwardsPoint,
@@ -362,79 +288,15 @@ mod tests {
 
             let pseudo_output_commitment = fee_key + out_pk;
 
-            let mut responses = random_array(|| Scalar::random(&mut rng));
-            responses[signing_key_index] = signing_key;
-
             let signature = sign(
                 msg_to_sign,
-                H_p_pk,
-                alpha,
-                &ring,
-                &commitment_ring,
-                responses,
-                signing_key_index,
-                real_commitment_blinding - out_pk_blinding,
-                pseudo_output_commitment,
-                alpha * ED25519_BASEPOINT_POINT,
-                alpha * H_p_pk,
-                signing_key * H_p_pk,
-            );
-
-            assert!(verify(
-                &signature,
-                msg_to_sign,
-                &ring,
-                &commitment_ring,
-                pseudo_output_commitment
-            ))
-        }
-    }
-
-    #[test]
-    fn sign2_and_verify_at_every_index() {
-        for signing_key_index in 0..11 {
-            let mut rng = rand::rngs::StdRng::from_seed([0u8; 32]);
-
-            let msg_to_sign = b"hello world, monero is amazing!!";
-
-            let signing_key = Scalar::random(&mut rng);
-            let signing_pk = signing_key * ED25519_BASEPOINT_POINT;
-            let H_p_pk = hash_point_to_point(signing_pk);
-
-            let alpha = Scalar::random(&mut rng);
-
-            let amount_to_spend = 1000000u32;
-            let fee = 10000u32;
-            let output_amount = amount_to_spend - fee;
-
-            let mut ring = random_array(|| Scalar::random(&mut rng) * ED25519_BASEPOINT_POINT);
-            ring[signing_key_index] = signing_pk;
-
-            let real_commitment_blinding = Scalar::random(&mut rng);
-            let mut commitment_ring =
-                random_array(|| Scalar::random(&mut rng) * ED25519_BASEPOINT_POINT);
-            commitment_ring[signing_key_index] = real_commitment_blinding * ED25519_BASEPOINT_POINT
-                + Scalar::from(amount_to_spend) * H.point.decompress().unwrap();
-
-            let fee_key = Scalar::from(fee) * H.point.decompress().unwrap();
-
-            let out_pk_blinding = Scalar::random(&mut rng);
-            let out_pk = out_pk_blinding * ED25519_BASEPOINT_POINT
-                + Scalar::from(output_amount) * H.point.decompress().unwrap();
-
-            let pseudo_output_commitment = fee_key + out_pk;
-
-            let responses = random_array(|| Scalar::random(&mut rng));
-
-            let signature = sign2(
-                msg_to_sign,
-                H_p_pk,
-                alpha,
-                &ring,
-                &commitment_ring,
-                responses,
                 signing_key,
                 signing_key_index,
+                H_p_pk,
+                alpha,
+                &ring,
+                &commitment_ring,
+                random_array(|| Scalar::random(&mut rng)),
                 real_commitment_blinding - out_pk_blinding,
                 pseudo_output_commitment,
                 alpha * ED25519_BASEPOINT_POINT,
