@@ -315,7 +315,7 @@ async fn monerod_integration_test() {
         pseudo_out,
         alpha * ED25519_BASEPOINT_POINT,
         alpha * H_p_pk,
-        actual_signing_key * H_p_pk,
+        I,
     );
     assert!(monero_adaptor::clsag::verify(
         &sig,
