@@ -315,13 +315,13 @@ async fn monerod_integration_test() {
         alpha * H_p_pk,
         signing_key * H_p_pk,
     );
-    // assert!(monero_adaptor::clsag::verify(
-    //     &sig,
-    //     &message,
-    //     &ring,
-    //     &commitment_ring,
-    //     pseudo_out
-    // ));
+    assert!(monero_adaptor::clsag::verify(
+        &sig,
+        &message,
+        &ring,
+        &commitment_ring,
+        pseudo_out
+    ));
 
     sig.responses.iter().enumerate().for_each(|(i, res)| {
         println!(
