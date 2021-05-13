@@ -1,14 +1,16 @@
 use crate::bitcoin::timelocks::BlockHeight;
 use crate::bitcoin::{Address, Amount, Transaction};
 use crate::env;
+use crate::env::Config;
 use ::bitcoin::util::psbt::PartiallySignedTransaction;
 use ::bitcoin::Txid;
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Context, Error, Result};
 use bdk::blockchain::{noop_progress, Blockchain, ElectrumBlockchain};
 use bdk::database::BatchDatabase;
-use bdk::descriptor::Segwitv0;
+use bdk::descriptor::{IntoWalletDescriptor, Segwitv0};
 use bdk::electrum_client::{ElectrumApi, GetHistoryRes};
 use bdk::keys::DerivableKey;
+use bdk::template::Bip84Public;
 use bdk::wallet::AddressIndex;
 use bdk::{FeeRate, KeychainKind};
 use bitcoin::{Network, Script};
@@ -41,21 +43,66 @@ pub struct Wallet<B = ElectrumBlockchain, D = bdk::sled::Tree, C = Client> {
 }
 
 impl Wallet {
-    pub async fn new(
+    pub fn new(
         electrum_rpc_url: Url,
         wallet_dir: &Path,
         key: impl DerivableKey<Segwitv0> + Clone,
         env_config: env::Config,
         target_block: usize,
     ) -> Result<Self> {
+        let descriptor = bdk::template::Bip84(key.clone(), KeychainKind::External);
+        let change_descriptor = Some(bdk::template::Bip84(key, KeychainKind::Internal));
+        Wallet::_new(
+            electrum_rpc_url,
+            wallet_dir,
+            env_config,
+            target_block,
+            descriptor,
+            change_descriptor,
+        )
+    }
+
+    pub fn new_readonly(
+        electrum_rpc_url: Url,
+        wallet_dir: &Path,
+        key: impl DerivableKey<Segwitv0> + Clone,
+        env_config: env::Config,
+    ) -> Result<Self> {
+        // TODO (phh): figure out what exactly this should be. It will influence the
+        // addresses derived from this key
+        let fingerprint = bitcoin::util::bip32::Fingerprint::from_str("2b4497f1")?;
+        let descriptor = Bip84Public(key.clone(), fingerprint, KeychainKind::Internal);
+        let change_descriptor = Some(Bip84Public(key, fingerprint, KeychainKind::External));
+
+        Wallet::_new(
+            electrum_rpc_url,
+            wallet_dir,
+            env_config,
+            0, // not important for a read only wallet
+            descriptor,
+            change_descriptor,
+        )
+    }
+
+    fn _new<E>(
+        electrum_rpc_url: Url,
+        wallet_dir: &Path,
+        env_config: Config,
+        target_block: usize,
+        descriptor: E,
+        change_descriptor: Option<E>,
+    ) -> Result<Wallet, Error>
+    where
+        E: IntoWalletDescriptor,
+    {
         let client = bdk::electrum_client::Client::new(electrum_rpc_url.as_str())
             .context("Failed to initialize Electrum RPC client")?;
 
         let db = bdk::sled::open(wallet_dir)?.open_tree(SLED_TREE_NAME)?;
 
         let wallet = bdk::Wallet::new(
-            bdk::template::Bip84(key.clone(), KeychainKind::External),
-            Some(bdk::template::Bip84(key, KeychainKind::Internal)),
+            descriptor,
+            change_descriptor,
             env_config.bitcoin_network,
             db,
             ElectrumBlockchain::from(client),
@@ -268,6 +315,7 @@ where
         Ok(Amount::from_sat(balance))
     }
 
+    // TODO(philipp) remove me
     pub async fn new_address(&self) -> Result<Address> {
         let address = self
             .wallet

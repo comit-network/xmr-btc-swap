@@ -79,7 +79,7 @@ async fn main() -> Result<()> {
 
     match opt.cmd {
         Command::Start { resume_only } => {
-            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+            let bitcoin_wallet = init_bitcoin_wallets(&config, &seed, env_config).await?;
 
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
 
@@ -180,7 +180,7 @@ async fn main() -> Result<()> {
             table.printstd();
         }
         Command::WithdrawBtc { amount, address } => {
-            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+            let bitcoin_wallet = init_bitcoin_wallets(&config, &seed, env_config).await?;
 
             let amount = match amount {
                 Some(amount) => amount,
@@ -197,7 +197,7 @@ async fn main() -> Result<()> {
             bitcoin_wallet.broadcast(signed_tx, "withdraw").await?;
         }
         Command::Balance => {
-            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+            let bitcoin_wallet = init_bitcoin_wallets(&config, &seed, env_config).await?;
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
 
             let bitcoin_balance = bitcoin_wallet.balance().await?;
@@ -211,7 +211,7 @@ async fn main() -> Result<()> {
         Command::ManualRecovery(ManualRecovery::Cancel {
             cancel_params: RecoverCommandParams { swap_id, force },
         }) => {
-            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+            let bitcoin_wallet = init_bitcoin_wallets(&config, &seed, env_config).await?;
 
             let (txid, _) =
                 alice::cancel(swap_id, Arc::new(bitcoin_wallet), Arc::new(db), force).await??;
@@ -221,7 +221,7 @@ async fn main() -> Result<()> {
         Command::ManualRecovery(ManualRecovery::Refund {
             refund_params: RecoverCommandParams { swap_id, force },
         }) => {
-            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+            let bitcoin_wallet = init_bitcoin_wallets(&config, &seed, env_config).await?;
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
 
             alice::refund(
@@ -238,7 +238,7 @@ async fn main() -> Result<()> {
         Command::ManualRecovery(ManualRecovery::Punish {
             punish_params: RecoverCommandParams { swap_id, force },
         }) => {
-            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+            let bitcoin_wallet = init_bitcoin_wallets(&config, &seed, env_config).await?;
 
             let (txid, _) =
                 alice::punish(swap_id, Arc::new(bitcoin_wallet), Arc::new(db), force).await??;
@@ -254,7 +254,7 @@ async fn main() -> Result<()> {
             redeem_params: RecoverCommandParams { swap_id, force },
             do_not_await_finality,
         }) => {
-            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+            let bitcoin_wallet = init_bitcoin_wallets(&config, &seed, env_config).await?;
 
             let (txid, _) = alice::redeem(
                 swap_id,
@@ -272,27 +272,36 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn init_bitcoin_wallet(
+async fn init_bitcoin_wallets(
     config: &Config,
     seed: &Seed,
     env_config: swap::env::Config,
 ) -> Result<bitcoin::Wallet> {
-    debug!("Opening Bitcoin wallet");
-    let wallet_dir = config.data.dir.join("wallet");
-
-    let wallet = bitcoin::Wallet::new(
+    debug!("Opening Bitcoin wallets");
+    let wallet_dir = config.data.dir.join("protocol_wallet");
+    let protocol_wallet = bitcoin::Wallet::new(
         config.bitcoin.electrum_rpc_url.clone(),
         &wallet_dir,
         seed.derive_extended_private_key(env_config.bitcoin_network)?,
         env_config,
         config.bitcoin.target_block,
     )
-    .await
-    .context("Failed to initialize Bitcoin wallet")?;
+    .context("Failed to initialize protocol Bitcoin wallet")?;
 
-    wallet.sync().await?;
+    // todo (phh): clean this up and use it.
+    let wallet_dir = config.data.dir.join("personal_wallet");
+    let _personal_wallet = bitcoin::Wallet::new_readonly(
+        config.bitcoin.electrum_rpc_url.clone(),
+        &wallet_dir,
+        seed.derive_extended_private_key(env_config.bitcoin_network)?,
+        env_config,
+    )
+    .context("Failed to initialize personal Bitcoin wallet")?;
 
-    Ok(wallet)
+    protocol_wallet.sync().await?;
+    _personal_wallet.sync().await?;
+
+    Ok(protocol_wallet)
 }
 
 async fn init_monero_wallet(

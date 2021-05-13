@@ -284,21 +284,30 @@ async fn init_bitcoin_wallet(
     env_config: Config,
     bitcoin_target_block: usize,
 ) -> Result<bitcoin::Wallet> {
-    let wallet_dir = data_dir.join("wallet");
+    let wallet_dir = data_dir.join("protocol_wallet");
 
-    let wallet = bitcoin::Wallet::new(
+    let protocol_wallet = bitcoin::Wallet::new(
         electrum_rpc_url.clone(),
         &wallet_dir,
         seed.derive_extended_private_key(env_config.bitcoin_network)?,
         env_config,
         bitcoin_target_block,
     )
-    .await
     .context("Failed to initialize Bitcoin wallet")?;
 
-    wallet.sync().await?;
+    let wallet_dir = data_dir.join("personal_wallet");
+    let _personal_wallet = bitcoin::wallet::Wallet::new_readonly(
+        electrum_rpc_url.clone(),
+        &wallet_dir,
+        seed.derive_extended_private_key(env_config.bitcoin_network)?,
+        env_config,
+    )
+    .context("Failed to initialize Bitcoin wallet")?;
 
-    Ok(wallet)
+    protocol_wallet.sync().await?;
+    _personal_wallet.sync().await?;
+
+    Ok(protocol_wallet)
 }
 
 async fn init_monero_wallet(

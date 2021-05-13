@@ -305,7 +305,6 @@ async fn init_test_wallets(
         env_config,
         1,
     )
-    .await
     .expect("could not init btc wallet");
 
     if starting_balances.btc != bitcoin::Amount::ZERO {

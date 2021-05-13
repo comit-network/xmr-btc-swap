@@ -65,6 +65,7 @@ async fn next_state(
 
     Ok(match state {
         BobState::Started { btc_amount } => {
+            // todo (phh) use new wallet
             let bitcoin_refund_address = bitcoin_wallet.new_address().await?;
             let tx_refund_fee = bitcoin_wallet
                 .estimate_fee(TxRefund::weight(), btc_amount)
