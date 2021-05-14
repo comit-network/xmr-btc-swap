@@ -65,6 +65,7 @@ where
         .expect("Could not map electrs rpc port");
 
     let alice_seed = Seed::random().unwrap();
+    let alice_personal_seed = Seed::random().unwrap();
     let (alice_internal_bitcoin_wallet, alice_personal_bitcoin_wallet, alice_monero_wallet) =
         init_test_wallets(
             MONERO_WALLET_NAME_ALICE,
@@ -74,6 +75,7 @@ where
             tempdir().unwrap().path(),
             electrs_rpc_port,
             &alice_seed,
+            &alice_personal_seed,
             env_config,
         )
         .await;
@@ -96,6 +98,7 @@ where
     .await;
 
     let bob_seed = Seed::random().unwrap();
+    let bob_personal_seed = Seed::random().unwrap();
     let bob_starting_balances = StartingBalances::new(btc_amount * 10, monero::Amount::ZERO, None);
 
     let (bob_internal_bitcoin_wallet, bob_personal_bitcoin_wallet, bob_monero_wallet) =
@@ -107,6 +110,7 @@ where
             tempdir().unwrap().path(),
             electrs_rpc_port,
             &bob_seed,
+            &bob_personal_seed,
             env_config,
         )
         .await;
@@ -115,7 +119,7 @@ where
         seed: Seed::random().unwrap(),
         db_path: tempdir().unwrap().path().to_path_buf(),
         internal_bitcoin_wallet: bob_internal_bitcoin_wallet.clone(),
-        personal_bitcoin_wallet: bob_personal_bitcoin_wallet,
+        personal_bitcoin_wallet: bob_personal_bitcoin_wallet.clone(),
         monero_wallet: bob_monero_wallet.clone(),
         alice_address: alice_listen_address.clone(),
         alice_peer_id: alice_handle.peer_id,
@@ -140,6 +144,7 @@ where
         bob_params,
         bob_starting_balances,
         bob_internal_bitcoin_wallet,
+        bob_personal_bitcoin_wallet,
         bob_monero_wallet,
     };
 
@@ -277,6 +282,7 @@ async fn init_test_wallets(
     datadir: &Path,
     electrum_rpc_port: u16,
     seed: &Seed,
+    personal_seed: &Seed,
     env_config: Config,
 ) -> (
     Arc<bitcoin::Wallet>,
@@ -349,13 +355,13 @@ async fn init_test_wallets(
     }
     let tmpdir = tempfile::tempdir().unwrap();
 
-    let personal_btc_wallet = swap::bitcoin::Wallet::new(
+    let personal_btc_wallet = swap::bitcoin::Wallet::new_readonly(
         electrum_rpc_url,
         tmpdir.path(),
-        seed.derive_extended_private_key(env_config.bitcoin_network)
+        personal_seed
+            .derive_extended_public_key(env_config.bitcoin_network)
             .expect("Could not create extended private key from seed"),
         env_config,
-        1,
     )
     .expect("could not init btc wallet");
 
@@ -529,6 +535,7 @@ pub struct TestContext {
     bob_params: BobParams,
     bob_starting_balances: StartingBalances,
     bob_internal_bitcoin_wallet: Arc<bitcoin::Wallet>,
+    bob_personal_bitcoin_wallet: Arc<bitcoin::Wallet>,
     bob_monero_wallet: Arc<monero::Wallet>,
 }
 
@@ -587,7 +594,7 @@ impl TestContext {
         assert!(matches!(state, AliceState::BtcRedeemed));
 
         assert_eventual_balance(
-            self.alice_internal_bitcoin_wallet.as_ref(),
+            self.alice_personal_bitcoin_wallet.as_ref(),
             Ordering::Equal,
             self.alice_redeemed_btc_balance().await,
         )
@@ -645,10 +652,12 @@ impl TestContext {
     }
 
     pub async fn assert_bob_redeemed(&self, state: BobState) {
+        assert!(matches!(state, BobState::XmrRedeemed { .. }));
+
         assert_eventual_balance(
-            self.bob_internal_bitcoin_wallet.as_ref(),
+            self.bob_personal_bitcoin_wallet.as_ref(),
             Ordering::Equal,
-            self.bob_redeemed_btc_balance(state).await.unwrap(),
+            self.bob_redeemed_btc_balance().await,
         )
         .await
         .unwrap();
@@ -734,28 +743,15 @@ impl TestContext {
             .estimate_fee(TxRedeem::weight(), self.btc_amount)
             .await
             .expect("To estimate fee correctly");
-        self.alice_starting_balances.btc + self.btc_amount - fee
+        self.btc_amount - fee
     }
 
     fn bob_redeemed_xmr_balance(&self) -> monero::Amount {
         self.bob_starting_balances.xmr
     }
 
-    async fn bob_redeemed_btc_balance(&self, state: BobState) -> Result<bitcoin::Amount> {
-        self.bob_internal_bitcoin_wallet.sync().await?;
-
-        let lock_tx_id = if let BobState::XmrRedeemed { tx_lock_id } = state {
-            tx_lock_id
-        } else {
-            bail!("Bob in not in xmr redeemed state: {:?}", state);
-        };
-
-        let lock_tx_bitcoin_fee = self
-            .bob_internal_bitcoin_wallet
-            .transaction_fee(lock_tx_id)
-            .await?;
-
-        Ok(self.bob_starting_balances.btc - self.btc_amount - lock_tx_bitcoin_fee)
+    async fn bob_redeemed_btc_balance(&self) -> bitcoin::Amount {
+        bitcoin::Amount::ZERO
     }
 
     fn alice_refunded_xmr_balance(&self) -> monero::Amount {
