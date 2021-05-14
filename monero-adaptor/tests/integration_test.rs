@@ -89,10 +89,7 @@ async fn monerod_integration_test() {
     // We appear to be using the correct signing key, because we can
     // find it in the ring! Conversely, the point corresponding to the
     // "original" signing key is not part of the ring
-    let actual_signing_key = signing_key
-        + KeyGenerator::from_key(&viewpair, our_output.tx_pubkey)
-            .get_rvn_scalar(our_output.index)
-            .scalar;
+    let actual_signing_key = our_output.recover_key(&lock_kp).scalar;
 
     assert_eq!(actual_lock_amount, lock_amount);
 
