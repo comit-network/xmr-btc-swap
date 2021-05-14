@@ -126,7 +126,7 @@ impl ConfidentialTransactionBuilder {
     fn compute_pseudo_out(&mut self, commitments: Vec<EdwardsPoint>) -> EdwardsPoint {
         let sum_commitments = commitments
             .iter()
-            .map(|p| p * Scalar::from(8u8)) // TODO: Should this happen inside the bulletproof module?
+            .map(|p| p * Scalar::from(8u8)) // TODO: Should this happen inside the bulletproof module? => yes
             .sum::<EdwardsPoint>();
 
         let fee = self.compute_fee();
