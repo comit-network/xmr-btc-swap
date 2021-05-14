@@ -6,7 +6,6 @@ use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
 use itertools::{izip, Itertools};
 use monero::blockdata::transaction::{ExtraField, KeyImage, SubField, TxOutTarget};
-use monero::cryptonote::hash::Hashable;
 use monero::cryptonote::onetime_key::{KeyGenerator, MONERO_MUL_FACTOR};
 use monero::util::key::H;
 use monero::util::ringct::{EcdhInfo, RctSig, RctSigBase, RctSigPrunable, RctType};
@@ -20,7 +19,6 @@ use rand::{Rng, SeedableRng};
 use std::convert::TryInto;
 use std::iter;
 use testcontainers::clients::Cli;
-use tiny_keccak::{Hasher, Keccak};
 
 #[tokio::test]
 async fn monerod_integration_test() {
@@ -42,7 +40,7 @@ async fn monerod_integration_test() {
 
     let lock_address = monero::Address::from_keypair(monero::Network::Mainnet, &lock_kp);
 
-    dbg!(lock_address.to_string()); // 45BcRKAHaA4b5A9SdamF2f1w7zk1mKkBPhaqVoDWzuAtMoSAytzm5A6b2fE6ruupkAFmStrQzdojUExt96mR3oiiSKp8Exf
+    dbg!(lock_address.to_string());
 
     monero.init_miner().await.unwrap();
     let wallet = monero.wallet("miner").expect("wallet to exist");
@@ -245,62 +243,33 @@ async fn monerod_integration_test() {
         })
         .collect::<Vec<_>>();
 
-    let rct_sig_base = RctSigBase {
-        rct_type: RctType::Clsag,
-        txn_fee: VarInt(fee),
-        pseudo_outs: Vec::new(),
-        ecdh_info: vec![ecdh_info_0, ecdh_info_1],
-        out_pk,
+    let mut transaction = Transaction {
+        prefix,
+        signatures: Vec::new(),
+        rct_signatures: RctSig {
+            sig: Some(RctSigBase {
+                rct_type: RctType::Clsag,
+                txn_fee: VarInt(fee),
+                pseudo_outs: Vec::new(),
+                ecdh_info: vec![ecdh_info_0, ecdh_info_1],
+                out_pk,
+            }),
+            p: Some(RctSigPrunable {
+                range_sigs: Vec::new(),
+                bulletproofs: vec![bulletproof],
+                MGs: Vec::new(),
+                Clsags: Vec::new(),
+                pseudo_outs: vec![monero::util::ringct::Key {
+                    key: pseudo_out.compress().0,
+                }],
+            }),
+        },
     };
 
-    let message = {
-        let tx_prefix_hash = prefix.hash().to_bytes();
+    let message = transaction.signature_hash().unwrap();
 
-        let mut rct_sig_base_hash = [0u8; 32];
-        let mut keccak = Keccak::v256();
-        keccak.update(&monero::consensus::serialize(&rct_sig_base));
-        keccak.finalize(&mut rct_sig_base_hash);
-
-        let bp_hash = {
-            let mut keccak = Keccak::v256();
-            keccak.update(&bulletproof.A.key);
-            keccak.update(&bulletproof.S.key);
-            keccak.update(&bulletproof.T1.key);
-            keccak.update(&bulletproof.T2.key);
-            keccak.update(&bulletproof.taux.key);
-            keccak.update(&bulletproof.mu.key);
-
-            for i in &bulletproof.L {
-                keccak.update(&i.key);
-            }
-
-            for i in &bulletproof.R {
-                keccak.update(&i.key);
-            }
-
-            keccak.update(&bulletproof.a.key);
-            keccak.update(&bulletproof.b.key);
-            keccak.update(&bulletproof.t.key);
-
-            let mut hash = [0u8; 32];
-            keccak.finalize(&mut hash);
-
-            hash
-        };
-
-        let mut keccak = Keccak::v256();
-        keccak.update(&tx_prefix_hash);
-        keccak.update(&rct_sig_base_hash);
-        keccak.update(&bp_hash);
-
-        let mut hash = [0u8; 32];
-        keccak.finalize(&mut hash);
-
-        hash
-    };
-
-    let sig = monero_adaptor::clsag::sign(
-        &message,
+    let sig = monero::clsag::sign(
+        message.as_fixed_bytes(),
         actual_signing_key,
         signing_index,
         H_p_pk,
@@ -314,75 +283,15 @@ async fn monerod_integration_test() {
         alpha * H_p_pk,
         I,
     );
-    assert!(monero_adaptor::clsag::verify(
+    assert!(monero::clsag::verify(
         &sig,
-        &message,
+        message.as_fixed_bytes(),
         &ring,
         &commitment_ring,
+        I,
         pseudo_out
     ));
-
-    sig.responses.iter().enumerate().for_each(|(i, res)| {
-        println!(
-            r#"epee::string_tools::hex_to_pod("{}", clsag.s[{}]);"#,
-            hex::encode(res.as_bytes()),
-            i
-        );
-    });
-    println!(
-        r#"epee::string_tools::hex_to_pod("{}", clsag.c1);"#,
-        hex::encode(sig.h_0.as_bytes())
-    );
-    println!(
-        r#"epee::string_tools::hex_to_pod("{}", clsag.D);"#,
-        hex::encode(sig.D.compress().as_bytes())
-    );
-    println!(
-        r#"epee::string_tools::hex_to_pod("{}", clsag.I);"#,
-        hex::encode(sig.I.compress().to_bytes())
-    );
-    println!(
-        r#"epee::string_tools::hex_to_pod("{}", msg);"#,
-        hex::encode(&message)
-    );
-
-    ring.iter()
-        .zip(commitment_ring.iter())
-        .enumerate()
-        .for_each(|(i, (pk, c))| {
-            println!(
-                r#"epee::string_tools::hex_to_pod("{}", pubs[{}].dest);"#,
-                hex::encode(&pk.compress().to_bytes()),
-                i
-            );
-            println!(
-                r#"epee::string_tools::hex_to_pod("{}", pubs[{}].mask);"#,
-                hex::encode(&c.compress().to_bytes()),
-                i
-            );
-        });
-
-    println!(
-        r#"epee::string_tools::hex_to_pod("{}", Cout);"#,
-        hex::encode(pseudo_out.compress().to_bytes())
-    );
-
-    let transaction = Transaction {
-        prefix,
-        signatures: Vec::new(),
-        rct_signatures: RctSig {
-            sig: Some(rct_sig_base),
-            p: Some(RctSigPrunable {
-                range_sigs: Vec::new(),
-                bulletproofs: vec![bulletproof],
-                MGs: Vec::new(),
-                Clsags: vec![sig.into()],
-                pseudo_outs: vec![monero::util::ringct::Key {
-                    key: pseudo_out.compress().0,
-                }],
-            }),
-        },
-    };
+    transaction.rct_signatures.p.as_mut().unwrap().Clsags.push(sig);
 
     client.send_raw_transaction(transaction).await.unwrap();
 }

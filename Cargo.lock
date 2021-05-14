@@ -2265,7 +2265,7 @@ dependencies = [
 [[package]]
 name = "monero"
 version = "0.12.0"
-source = "git+https://github.com/comit-network/monero-rs?branch=ecdh_recover_mask#103dc4d3353f46870c5a3405d27e961f4b195350"
+source = "git+https://github.com/comit-network/monero-rs?branch=clsag#4c3b87d562f4b4119eff2739894a91e8c6e5381d"
 dependencies = [
  "base58-monero",
  "clear_on_drop",
@@ -2275,6 +2275,7 @@ dependencies = [
  "hex 0.4.3",
  "hex-literal",
  "integer-encoding",
+ "itertools 0.10.0",
  "keccak-hash",
  "lazy_static",
  "rand 0.7.3",
@@ -2282,6 +2283,7 @@ dependencies = [
  "serde-big-array",
  "subtle 2.4.0",
  "thiserror",
+ "tiny-keccak",
 ]
 
 [[package]]

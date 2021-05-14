@@ -1,4 +1,3 @@
-#![feature(array_map)]
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
@@ -14,15 +13,11 @@ use hash_edwards_to_edwards::hash_point_to_point;
 use rand::{CryptoRng, Rng};
 use tiny_keccak::{Hasher, Keccak};
 
-use clsag::{Signature, RING_SIZE};
-
-#[macro_use]
-mod macros;
-pub mod clsag;
+use monero::util::ringct::Clsag;
 
 pub struct AdaptorSignature {
     s_0: Scalar,
-    fake_responses: [Scalar; RING_SIZE - 1],
+    fake_responses: [Scalar; 10],
     h_0: Scalar,
     /// Key image of the real key in the ring.
     I: EdwardsPoint,
@@ -32,7 +27,7 @@ pub struct AdaptorSignature {
 
 pub struct HalfAdaptorSignature {
     s_0_half: Scalar,
-    fake_responses: [Scalar; RING_SIZE - 1],
+    fake_responses: [Scalar; 10],
     h_0: Scalar,
     /// Key image of the real key in the ring.
     I: EdwardsPoint,
@@ -53,10 +48,10 @@ impl HalfAdaptorSignature {
 }
 
 impl AdaptorSignature {
-    pub fn adapt(self, y: Scalar) -> Signature {
+    pub fn adapt(self, y: Scalar) -> Clsag {
         let r_last = self.s_0 + y;
 
-        let responses = self
+        let _responses: [Scalar; 11] = self
             .fake_responses
             .iter()
             .chain([r_last].iter())
@@ -65,20 +60,21 @@ impl AdaptorSignature {
             .try_into()
             .expect("correct response size");
 
-        Signature {
-            responses,
-            h_0: self.h_0,
-            I: self.I,
-            D: self.D,
-        }
+        todo!()
+        // Signature {
+        //     responses,
+        //     h_0: self.h_0,
+        //     I: self.I,
+        //     D: self.D,
+        // }
     }
 }
 
 pub struct Alice0 {
     // secret index is always 0
-    ring: [EdwardsPoint; RING_SIZE],
-    fake_responses: [Scalar; RING_SIZE - 1],
-    commitment_ring: [EdwardsPoint; RING_SIZE],
+    ring: [EdwardsPoint; 11],
+    fake_responses: [Scalar; 10],
+    commitment_ring: [EdwardsPoint; 11],
     pseudo_output_commitment: EdwardsPoint,
     msg: [u8; 32],
     // encryption key
@@ -97,17 +93,17 @@ pub struct Alice0 {
 
 impl Alice0 {
     pub fn new(
-        ring: [EdwardsPoint; RING_SIZE],
+        ring: [EdwardsPoint; 11],
         msg: [u8; 32],
-        commitment_ring: [EdwardsPoint; RING_SIZE],
+        commitment_ring: [EdwardsPoint; 11],
         pseudo_output_commitment: EdwardsPoint,
         R_a: EdwardsPoint,
         R_prime_a: EdwardsPoint,
         s_prime_a: Scalar,
         rng: &mut (impl Rng + CryptoRng),
     ) -> Result<Self> {
-        let mut fake_responses = [Scalar::zero(); RING_SIZE - 1];
-        for response in fake_responses.iter_mut().take(RING_SIZE - 1) {
+        let mut fake_responses = [Scalar::zero(); 10];
+        for response in fake_responses.iter_mut().take(10) {
             *response = Scalar::random(rng);
         }
         let alpha_a = Scalar::random(rng);
@@ -155,7 +151,8 @@ impl Alice0 {
         msg.pi_b
             .verify(ED25519_BASEPOINT_POINT, msg.T_b, self.H_p_pk, msg.I_hat_b)?;
 
-        let sig = clsag::sign(
+        let I = self.I_a + msg.I_b;
+        let sig = monero::clsag::sign(
             &self.msg,
             self.s_prime_a,
             0,
@@ -168,15 +165,15 @@ impl Alice0 {
             self.pseudo_output_commitment,
             self.T_a + msg.T_b + self.R_a,
             self.I_hat_a + msg.I_hat_b + self.R_prime_a,
-            self.I_a + msg.I_b,
+            I,
         );
 
         let sig = HalfAdaptorSignature {
-            s_0_half: sig.responses[10],
+            s_0_half: todo!(),
             fake_responses: self.fake_responses,
-            h_0: sig.h_0,
-            I: sig.I,
-            D: sig.D,
+            h_0: todo!(),
+            I,
+            D: todo!(),
         };
 
         Ok(Alice1 {
@@ -190,7 +187,7 @@ impl Alice0 {
 }
 
 pub struct Alice1 {
-    fake_responses: [Scalar; RING_SIZE - 1],
+    fake_responses: [Scalar; 10],
     I_a: EdwardsPoint,
     I_hat_a: EdwardsPoint,
     T_a: EdwardsPoint,
@@ -217,9 +214,9 @@ pub struct Alice2 {
 }
 
 pub struct Bob0 {
-    ring: [EdwardsPoint; RING_SIZE],
+    ring: [EdwardsPoint; 11],
     msg: [u8; 32],
-    commitment_ring: [EdwardsPoint; RING_SIZE],
+    commitment_ring: [EdwardsPoint; 11],
     pseudo_output_commitment: EdwardsPoint,
     R_a: EdwardsPoint,
     R_prime_a: EdwardsPoint,
@@ -233,9 +230,9 @@ pub struct Bob0 {
 
 impl Bob0 {
     pub fn new(
-        ring: [EdwardsPoint; RING_SIZE],
+        ring: [EdwardsPoint; 11],
         msg: [u8; 32],
-        commitment_ring: [EdwardsPoint; RING_SIZE],
+        commitment_ring: [EdwardsPoint; 11],
         pseudo_output_commitment: EdwardsPoint,
         R_a: EdwardsPoint,
         R_prime_a: EdwardsPoint,
@@ -288,9 +285,9 @@ impl Bob0 {
 }
 
 pub struct Bob1 {
-    ring: [EdwardsPoint; RING_SIZE],
+    ring: [EdwardsPoint; 11],
     msg: [u8; 32],
-    commitment_ring: [EdwardsPoint; RING_SIZE],
+    commitment_ring: [EdwardsPoint; 11],
     pseudo_output_commitment: EdwardsPoint,
     R_a: EdwardsPoint,
     R_prime_a: EdwardsPoint,
@@ -329,7 +326,7 @@ impl Bob1 {
             .verify(ED25519_BASEPOINT_POINT, T_a, self.H_p_pk, I_hat_a)?;
 
         let I = I_a + self.I_b;
-        let sig = clsag::sign(
+        let sig = monero::clsag::sign(
             &self.msg,
             self.s_b,
             0,
@@ -345,13 +342,13 @@ impl Bob1 {
             I,
         );
 
-        let s_0_b = sig.responses[10];
+        let s_0_b = todo!();
         let sig = HalfAdaptorSignature {
             s_0_half: s_0_b,
             fake_responses,
-            h_0: sig.h_0,
-            I: sig.I,
-            D: sig.D,
+            h_0: todo!(),
+            I,
+            D: todo!(),
         };
         let adaptor_sig = sig.complete(msg.s_0_a);
 
@@ -445,7 +442,7 @@ struct Commitment([u8; 32]);
 
 impl Commitment {
     fn new(
-        fake_responses: [Scalar; RING_SIZE - 1],
+        fake_responses: [Scalar; 10],
         I_a: EdwardsPoint,
         I_hat_a: EdwardsPoint,
         T_a: EdwardsPoint,
@@ -469,7 +466,7 @@ impl Commitment {
 }
 
 struct Opening {
-    fake_responses: [Scalar; RING_SIZE - 1],
+    fake_responses: [Scalar; 10],
     I_a: EdwardsPoint,
     I_hat_a: EdwardsPoint,
     T_a: EdwardsPoint,
@@ -477,7 +474,7 @@ struct Opening {
 
 impl Opening {
     fn new(
-        fake_responses: [Scalar; RING_SIZE - 1],
+        fake_responses: [Scalar; 10],
         I_a: EdwardsPoint,
         I_hat_a: EdwardsPoint,
         T_a: EdwardsPoint,
@@ -493,12 +490,7 @@ impl Opening {
     fn open(
         self,
         commitment: Commitment,
-    ) -> Result<(
-        [Scalar; RING_SIZE - 1],
-        EdwardsPoint,
-        EdwardsPoint,
-        EdwardsPoint,
-    )> {
+    ) -> Result<([Scalar; 10], EdwardsPoint, EdwardsPoint, EdwardsPoint)> {
         let self_commitment =
             Commitment::new(self.fake_responses, self.I_a, self.I_hat_a, self.T_a);
 
@@ -562,7 +554,7 @@ mod tests {
             (r_a, R_a, R_prime_a)
         };
 
-        let mut ring = [EdwardsPoint::default(); RING_SIZE];
+        let mut ring = [EdwardsPoint::default(); 11];
         ring[0] = pk;
 
         ring[1..].fill_with(|| {
@@ -570,7 +562,7 @@ mod tests {
             x * ED25519_BASEPOINT_POINT
         });
 
-        let mut commitment_ring = [EdwardsPoint::default(); RING_SIZE];
+        let mut commitment_ring = [EdwardsPoint::default(); 11];
 
         let real_commitment_blinding = Scalar::random(&mut OsRng);
         commitment_ring[0] = real_commitment_blinding * ED25519_BASEPOINT_POINT; // + 0 * H
@@ -618,13 +610,15 @@ mod tests {
         let msg = bob.next_message();
         let alice = alice.receive(msg);
 
+        let I = alice.adaptor_sig.I;
         let sig = alice.adaptor_sig.adapt(r_a);
 
-        assert!(clsag::verify(
+        assert!(monero::clsag::verify(
             &sig,
             msg_to_sign,
             &ring,
             &commitment_ring,
+            I,
             pseudo_output_commitment,
         ));
     }
