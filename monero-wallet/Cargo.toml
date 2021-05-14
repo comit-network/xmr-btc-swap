@@ -11,6 +11,9 @@ monero-rpc = { path = "../monero-rpc" }
 rand = "0.7"
 curve25519-dalek = "3"
 async-trait = "0.1"
+itertools = "0.10"
+hash_edwards_to_edwards = { git = "https://github.com/comit-network/hash_edwards_to_edwards" }
+hex = "0.4"
 
 [dev-dependencies]
 monero-harness = { path = "../monero-harness" }
