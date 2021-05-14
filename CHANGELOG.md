@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A minimum accepted Bitcoin amount for the ASB similar to the maximum amount already present.
   For the CLI the minimum amount is enforced by waiting until at least the minimum is available as max-giveable amount.
 - Added a new argument to ASB: `--json` or `-j`. If set, log messages will be printed in JSON format.
+- New read-only wallet for ASB which enables users to provide a xpub key to derive redeem/punish address from.
+  If not provided in the config, an internal wallet will be used. Users can still withdraw all their funds from the
+  internal wall.
 
 ### Fixed
 
@@ -48,6 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The ASB's `--max-buy` and `ask-spread` parameter were removed in favour of entries in the config file.
   The initial setup includes setting these two values now.
+- Introduce a new read-only wallet for the ASB. This means, we now have two wallets within the ASB as well as
+  the Swap CLI. Because of this a new folder structure was introduced:
+  - `{data-dir}/wallet` can now be found in `{data-dir}/internal_wallet`. Note: an existing wallet will NOT.
+    automatically be moved to the new folder.
+  - `{data-dir}/personal_wallet` is the new read-only wallet.
+    This is a breaking change!
 
 ## [0.5.0] - 2021-04-17
 

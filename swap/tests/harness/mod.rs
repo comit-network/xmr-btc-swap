@@ -65,17 +65,18 @@ where
         .expect("Could not map electrs rpc port");
 
     let alice_seed = Seed::random().unwrap();
-    let (alice_bitcoin_wallet, alice_monero_wallet) = init_test_wallets(
-        MONERO_WALLET_NAME_ALICE,
-        containers.bitcoind_url.clone(),
-        &monero,
-        alice_starting_balances.clone(),
-        tempdir().unwrap().path(),
-        electrs_rpc_port,
-        &alice_seed,
-        env_config,
-    )
-    .await;
+    let (alice_bitcoin_wallet, alice_personal_bitcoin_wallet, alice_monero_wallet) =
+        init_test_wallets(
+            MONERO_WALLET_NAME_ALICE,
+            containers.bitcoind_url.clone(),
+            &monero,
+            alice_starting_balances.clone(),
+            tempdir().unwrap().path(),
+            electrs_rpc_port,
+            &alice_seed,
+            env_config,
+        )
+        .await;
 
     let alice_listen_port = get_port().expect("Failed to find a free port");
     let alice_listen_address: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", alice_listen_port)
@@ -89,6 +90,7 @@ where
         alice_listen_address.clone(),
         env_config,
         alice_bitcoin_wallet.clone(),
+        alice_personal_bitcoin_wallet.clone(),
         alice_monero_wallet.clone(),
     )
     .await;
@@ -96,7 +98,7 @@ where
     let bob_seed = Seed::random().unwrap();
     let bob_starting_balances = StartingBalances::new(btc_amount * 10, monero::Amount::ZERO, None);
 
-    let (bob_bitcoin_wallet, bob_monero_wallet) = init_test_wallets(
+    let (bob_bitcoin_wallet, _bob_personal_bitcoin_wallet, bob_monero_wallet) = init_test_wallets(
         MONERO_WALLET_NAME_BOB,
         containers.bitcoind_url,
         &monero,
@@ -129,6 +131,7 @@ where
         alice_listen_address,
         alice_starting_balances,
         alice_bitcoin_wallet,
+        alice_personal_bitcoin_wallet,
         alice_monero_wallet,
         alice_swap_handle,
         alice_handle,
@@ -220,6 +223,7 @@ async fn start_alice(
     listen_address: Multiaddr,
     env_config: Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
+    personal_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
 ) -> (AliceApplicationHandle, Receiver<alice::Swap>) {
     let db = Arc::new(Database::open(db_path.as_path()).unwrap());
@@ -247,6 +251,7 @@ async fn start_alice(
         swarm,
         env_config,
         bitcoin_wallet,
+        personal_wallet,
         monero_wallet,
         db,
         FixedRate::default(),
@@ -271,7 +276,11 @@ async fn init_test_wallets(
     electrum_rpc_port: u16,
     seed: &Seed,
     env_config: Config,
-) -> (Arc<bitcoin::Wallet>, Arc<monero::Wallet>) {
+) -> (
+    Arc<bitcoin::Wallet>,
+    Arc<bitcoin::Wallet>,
+    Arc<monero::Wallet>,
+) {
     monero
         .init_wallet(
             name,
@@ -298,7 +307,7 @@ async fn init_test_wallets(
     };
 
     let btc_wallet = swap::bitcoin::Wallet::new(
-        electrum_rpc_url,
+        electrum_rpc_url.clone(),
         datadir,
         seed.derive_extended_private_key(env_config.bitcoin_network)
             .expect("Could not create extended private key from seed"),
@@ -336,8 +345,23 @@ async fn init_test_wallets(
             interval.tick().await;
         }
     }
+    let tmpdir = tempfile::tempdir().unwrap();
 
-    (Arc::new(btc_wallet), Arc::new(xmr_wallet))
+    let personal_btc_wallet = swap::bitcoin::Wallet::new(
+        electrum_rpc_url,
+        tmpdir.path(),
+        seed.derive_extended_private_key(env_config.bitcoin_network)
+            .expect("Could not create extended private key from seed"),
+        env_config,
+        1,
+    )
+    .expect("could not init btc wallet");
+
+    (
+        Arc::new(btc_wallet),
+        Arc::new(personal_btc_wallet),
+        Arc::new(xmr_wallet),
+    )
 }
 
 const MONERO_WALLET_NAME_BOB: &str = "bob";
@@ -492,6 +516,7 @@ pub struct TestContext {
 
     alice_starting_balances: StartingBalances,
     alice_bitcoin_wallet: Arc<bitcoin::Wallet>,
+    alice_personal_bitcoin_wallet: Arc<bitcoin::Wallet>,
     alice_monero_wallet: Arc<monero::Wallet>,
     alice_swap_handle: mpsc::Receiver<Swap>,
     alice_handle: AliceApplicationHandle,
@@ -512,6 +537,7 @@ impl TestContext {
             self.alice_listen_address.clone(),
             self.env_config,
             self.alice_bitcoin_wallet.clone(),
+            self.alice_personal_bitcoin_wallet.clone(),
             self.alice_monero_wallet.clone(),
         )
         .await;

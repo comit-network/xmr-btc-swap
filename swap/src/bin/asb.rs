@@ -79,11 +79,12 @@ async fn main() -> Result<()> {
 
     match opt.cmd {
         Command::Start { resume_only } => {
-            let bitcoin_wallet = init_bitcoin_wallets(&config, &seed, env_config).await?;
+            let (internal_wallet, personal_wallet) =
+                init_bitcoin_wallets(&config, &seed, env_config).await?;
 
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
 
-            let bitcoin_balance = bitcoin_wallet.balance().await?;
+            let bitcoin_balance = internal_wallet.balance().await?;
             info!(%bitcoin_balance, "Initialized Bitcoin wallet");
 
             let monero_balance = monero_wallet.get_balance().await?;
@@ -137,7 +138,8 @@ async fn main() -> Result<()> {
             let (event_loop, mut swap_receiver) = EventLoop::new(
                 swarm,
                 env_config,
-                Arc::new(bitcoin_wallet),
+                Arc::new(internal_wallet),
+                Arc::new(personal_wallet),
                 Arc::new(monero_wallet),
                 Arc::new(db),
                 kraken_rate.clone(),
@@ -180,27 +182,30 @@ async fn main() -> Result<()> {
             table.printstd();
         }
         Command::WithdrawBtc { amount, address } => {
-            let bitcoin_wallet = init_bitcoin_wallets(&config, &seed, env_config).await?;
+            // Todo (phh): does this still make sense?
+            let (internal_wallet, _personal_wallet) =
+                init_bitcoin_wallets(&config, &seed, env_config).await?;
 
             let amount = match amount {
                 Some(amount) => amount,
                 None => {
-                    bitcoin_wallet
+                    internal_wallet
                         .max_giveable(address.script_pubkey().len())
                         .await?
                 }
             };
 
-            let psbt = bitcoin_wallet.send_to_address(address, amount).await?;
-            let signed_tx = bitcoin_wallet.sign_and_finalize(psbt).await?;
+            let psbt = internal_wallet.send_to_address(address, amount).await?;
+            let signed_tx = internal_wallet.sign_and_finalize(psbt).await?;
 
-            bitcoin_wallet.broadcast(signed_tx, "withdraw").await?;
+            internal_wallet.broadcast(signed_tx, "withdraw").await?;
         }
         Command::Balance => {
-            let bitcoin_wallet = init_bitcoin_wallets(&config, &seed, env_config).await?;
+            let (internal_wallet, _personal_wallet) =
+                init_bitcoin_wallets(&config, &seed, env_config).await?;
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
 
-            let bitcoin_balance = bitcoin_wallet.balance().await?;
+            let bitcoin_balance = internal_wallet.balance().await?;
             let monero_balance = monero_wallet.get_balance().await?;
 
             tracing::info!(
@@ -211,22 +216,24 @@ async fn main() -> Result<()> {
         Command::ManualRecovery(ManualRecovery::Cancel {
             cancel_params: RecoverCommandParams { swap_id, force },
         }) => {
-            let bitcoin_wallet = init_bitcoin_wallets(&config, &seed, env_config).await?;
+            let (internal_wallet, _personal_wallet) =
+                init_bitcoin_wallets(&config, &seed, env_config).await?;
 
             let (txid, _) =
-                alice::cancel(swap_id, Arc::new(bitcoin_wallet), Arc::new(db), force).await??;
+                alice::cancel(swap_id, Arc::new(internal_wallet), Arc::new(db), force).await??;
 
             tracing::info!("Cancel transaction successfully published with id {}", txid);
         }
         Command::ManualRecovery(ManualRecovery::Refund {
             refund_params: RecoverCommandParams { swap_id, force },
         }) => {
-            let bitcoin_wallet = init_bitcoin_wallets(&config, &seed, env_config).await?;
+            let (internal_wallet, _personal_wallet) =
+                init_bitcoin_wallets(&config, &seed, env_config).await?;
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
 
             alice::refund(
                 swap_id,
-                Arc::new(bitcoin_wallet),
+                Arc::new(internal_wallet),
                 Arc::new(monero_wallet),
                 Arc::new(db),
                 force,
@@ -238,10 +245,11 @@ async fn main() -> Result<()> {
         Command::ManualRecovery(ManualRecovery::Punish {
             punish_params: RecoverCommandParams { swap_id, force },
         }) => {
-            let bitcoin_wallet = init_bitcoin_wallets(&config, &seed, env_config).await?;
+            let (internal_wallet, _personal_wallet) =
+                init_bitcoin_wallets(&config, &seed, env_config).await?;
 
             let (txid, _) =
-                alice::punish(swap_id, Arc::new(bitcoin_wallet), Arc::new(db), force).await??;
+                alice::punish(swap_id, Arc::new(internal_wallet), Arc::new(db), force).await??;
 
             tracing::info!("Punish transaction successfully published with id {}", txid);
         }
@@ -254,11 +262,12 @@ async fn main() -> Result<()> {
             redeem_params: RecoverCommandParams { swap_id, force },
             do_not_await_finality,
         }) => {
-            let bitcoin_wallet = init_bitcoin_wallets(&config, &seed, env_config).await?;
+            let (internal_wallet, _personal_wallet) =
+                init_bitcoin_wallets(&config, &seed, env_config).await?;
 
             let (txid, _) = alice::redeem(
                 swap_id,
-                Arc::new(bitcoin_wallet),
+                Arc::new(internal_wallet),
                 Arc::new(db),
                 force,
                 redeem::Finality::from_bool(do_not_await_finality),
@@ -276,10 +285,10 @@ async fn init_bitcoin_wallets(
     config: &Config,
     seed: &Seed,
     env_config: swap::env::Config,
-) -> Result<bitcoin::Wallet> {
+) -> Result<(bitcoin::Wallet, bitcoin::Wallet)> {
     debug!("Opening Bitcoin wallets");
-    let wallet_dir = config.data.dir.join("protocol_wallet");
-    let protocol_wallet = bitcoin::Wallet::new(
+    let wallet_dir = config.data.dir.join("internal_wallet");
+    let internal_wallet = bitcoin::Wallet::new(
         config.bitcoin.electrum_rpc_url.clone(),
         &wallet_dir,
         seed.derive_extended_private_key(env_config.bitcoin_network)?,
@@ -288,9 +297,8 @@ async fn init_bitcoin_wallets(
     )
     .context("Failed to initialize protocol Bitcoin wallet")?;
 
-    // todo (phh): clean this up and use it.
     let wallet_dir = config.data.dir.join("personal_wallet");
-    let _personal_wallet = bitcoin::Wallet::new_readonly(
+    let personal_wallet = bitcoin::wallet::Wallet::new_readonly(
         config.bitcoin.electrum_rpc_url.clone(),
         &wallet_dir,
         seed.derive_extended_private_key(env_config.bitcoin_network)?,
@@ -298,10 +306,10 @@ async fn init_bitcoin_wallets(
     )
     .context("Failed to initialize personal Bitcoin wallet")?;
 
-    protocol_wallet.sync().await?;
-    _personal_wallet.sync().await?;
+    internal_wallet.sync().await?;
+    personal_wallet.sync().await?;
 
-    Ok(protocol_wallet)
+    Ok((internal_wallet, personal_wallet))
 }
 
 async fn init_monero_wallet(

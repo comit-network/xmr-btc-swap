@@ -39,7 +39,8 @@ where
 {
     swarm: libp2p::Swarm<Behaviour<LR>>,
     env_config: Config,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
+    internal_bitcoin_wallet: Arc<bitcoin::Wallet>,
+    personal_bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
     db: Arc<Database>,
     latest_rate: LR,
@@ -71,7 +72,8 @@ where
     pub fn new(
         swarm: Swarm<Behaviour<LR>>,
         env_config: Config,
-        bitcoin_wallet: Arc<bitcoin::Wallet>,
+        internal_bitcoin_wallet: Arc<bitcoin::Wallet>,
+        personal_bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
         db: Arc<Database>,
         latest_rate: LR,
@@ -83,7 +85,8 @@ where
         let event_loop = EventLoop {
             swarm,
             env_config,
-            bitcoin_wallet,
+            internal_bitcoin_wallet,
+            personal_bitcoin_wallet,
             monero_wallet,
             db,
             latest_rate,
@@ -131,7 +134,7 @@ where
 
             let swap = Swap {
                 event_loop_handle: handle,
-                bitcoin_wallet: self.bitcoin_wallet.clone(),
+                bitcoin_wallet: self.internal_bitcoin_wallet.clone(),
                 monero_wallet: self.monero_wallet.clone(),
                 env_config: self.env_config,
                 db: self.db.clone(),
@@ -153,14 +156,14 @@ where
                     match swarm_event {
                         SwarmEvent::Behaviour(OutEvent::ExecutionSetupStart { peer, btc, xmr }) => {
 
-                            let tx_redeem_fee = self.bitcoin_wallet
+                            let tx_redeem_fee = self.internal_bitcoin_wallet
                                 .estimate_fee(bitcoin::TxRedeem::weight(), btc)
                                 .await;
-                            let tx_punish_fee = self.bitcoin_wallet
+                            let tx_punish_fee = self.internal_bitcoin_wallet
                                 .estimate_fee(bitcoin::TxPunish::weight(), btc)
                                 .await;
-                            let redeem_address = self.bitcoin_wallet.new_address().await;
-                            let punish_address = self.bitcoin_wallet.new_address().await;
+                            let redeem_address = self.personal_bitcoin_wallet.new_address().await;
+                            let punish_address = self.personal_bitcoin_wallet.new_address().await;
 
                             let (redeem_address, punish_address) = match (
                                 redeem_address,
@@ -397,7 +400,7 @@ where
 
         let swap = Swap {
             event_loop_handle: handle,
-            bitcoin_wallet: self.bitcoin_wallet.clone(),
+            bitcoin_wallet: self.internal_bitcoin_wallet.clone(),
             monero_wallet: self.monero_wallet.clone(),
             env_config: self.env_config,
             db: self.db.clone(),
