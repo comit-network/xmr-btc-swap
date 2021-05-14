@@ -9,9 +9,7 @@ use monero::blockdata::transaction::{ExtraField, KeyImage, SubField, TxOutTarget
 use monero::cryptonote::onetime_key::{KeyGenerator, MONERO_MUL_FACTOR};
 use monero::util::key::H;
 use monero::util::ringct::{EcdhInfo, RctSig, RctSigBase, RctSigPrunable, RctType};
-use monero::{
-    PrivateKey, PublicKey, Transaction, TransactionPrefix, TxIn, TxOut, VarInt, ViewPair,
-};
+use monero::{PrivateKey, PublicKey, Transaction, TransactionPrefix, TxIn, TxOut, VarInt};
 use monero_harness::Monero;
 use monero_rpc::monerod::{GetOutputsOut, MonerodRpc};
 use monero_wallet::MonerodClientExt;
@@ -64,39 +62,26 @@ async fn monerod_integration_test() {
 
     let lock_tx_hash = transfer.tx_hash.parse().unwrap();
 
-    let o_indexes_response = client.get_o_indexes(lock_tx_hash).await.unwrap();
-
     let lock_tx = client
         .get_transactions(&[lock_tx_hash])
         .await
         .unwrap()
         .pop()
         .unwrap();
-
-    dbg!(&lock_tx.prefix.inputs);
-
-    let viewpair = ViewPair::from(&lock_kp);
+    let output_indices = client.get_o_indexes(lock_tx_hash).await.unwrap().o_indexes;
 
     let our_output = lock_tx
-        .check_outputs(&viewpair, 0..1, 0..1)
-        .expect("to have outputs in this transaction")
+        .open_outputs(&lock_kp, 0..1, 0..1)
+        .unwrap()
         .pop()
-        .expect("to own at least one output");
-    let actual_lock_amount = lock_tx.get_amount(&viewpair, &our_output).unwrap();
-
-    // We appear to be using the correct signing key, because we can
-    // find it in the ring! Conversely, the point corresponding to the
-    // "original" signing key is not part of the ring
-    let actual_signing_key = our_output.recover_key(&lock_kp).scalar;
-
-    assert_eq!(actual_lock_amount, lock_amount);
-
-    let real_key_offset = o_indexes_response.o_indexes[our_output.index];
+        .unwrap();
+    let actual_signing_key = our_output.signing_key.scalar;
+    let real_commitment_blinder = our_output.blinding_factor;
 
     let (lower, upper) = client.calculate_key_offset_boundaries().await.unwrap();
 
     let mut key_offsets = Vec::with_capacity(11);
-    key_offsets.push(VarInt(real_key_offset));
+    key_offsets.push(VarInt(output_indices[our_output.index]));
 
     for _ in 0..10 {
         loop {
@@ -228,10 +213,6 @@ async fn monerod_integration_test() {
 
     let pseudo_out = fee_key + out_pk[0].decompress().unwrap() + out_pk[1].decompress().unwrap();
 
-    let (_, real_commitment_blinder) = lock_tx.clone().rct_signatures.sig.unwrap().ecdh_info
-        [our_output.index]
-        .open_commitment(&viewpair, &our_output.tx_pubkey, our_output.index);
-
     let alpha = Scalar::random(&mut rng);
 
     let responses = random_array(|| Scalar::random(&mut rng));
@@ -291,7 +272,13 @@ async fn monerod_integration_test() {
         I,
         pseudo_out
     ));
-    transaction.rct_signatures.p.as_mut().unwrap().Clsags.push(sig);
+    transaction
+        .rct_signatures
+        .p
+        .as_mut()
+        .unwrap()
+        .Clsags
+        .push(sig);
 
     client.send_raw_transaction(transaction).await.unwrap();
 }
