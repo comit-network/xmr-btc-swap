@@ -297,11 +297,15 @@ async fn init_bitcoin_wallets(
     )
     .context("Failed to initialize protocol Bitcoin wallet")?;
 
+    let xpub = match config.bitcoin.xpub {
+        None => seed.derive_extended_public_key(env_config.bitcoin_network)?,
+        Some(key) => key,
+    };
     let wallet_dir = config.data.dir.join("personal_wallet");
     let personal_wallet = bitcoin::wallet::Wallet::new_readonly(
         config.bitcoin.electrum_rpc_url.clone(),
         &wallet_dir,
-        seed.derive_extended_private_key(env_config.bitcoin_network)?,
+        xpub,
         env_config,
     )
     .context("Failed to initialize personal Bitcoin wallet")?;

@@ -4,6 +4,8 @@ use ::bitcoin::secp256k1::{self, SecretKey};
 use anyhow::{Context, Result};
 use bdk::bitcoin::util::bip32::ExtendedPrivKey;
 use bitcoin::hashes::{sha256, Hash, HashEngine};
+use bitcoin::secp256k1::Secp256k1;
+use bitcoin::util::bip32::{ChildNumber, ExtendedPubKey};
 use libp2p::identity;
 use pem::{encode, Pem};
 use rand::prelude::*;
@@ -39,6 +41,19 @@ impl Seed {
             .context("Failed to create new master extended private key")?;
 
         Ok(private_key)
+    }
+
+    /// Returns a non-hardened xpub derived from a xprv which in return is
+    /// derived from the seed
+    pub fn derive_extended_public_key(&self, network: bitcoin::Network) -> Result<ExtendedPubKey> {
+        let priv_key = self.derive_extended_private_key(network)?;
+        let secp = Secp256k1::new();
+
+        // we take the first child private key to derive a non_hardened xpub key
+        let non_hardened_xprv = priv_key.ckd_priv(&secp, ChildNumber::from_normal_idx(0)?)?;
+
+        let public_key = ExtendedPubKey::from_private(&secp, &non_hardened_xprv);
+        Ok(public_key)
     }
 
     pub fn derive_libp2p_identity(&self) -> identity::Keypair {
@@ -250,5 +265,36 @@ mbKANv2qKGmNVg1qtquj6Hx1pFPelpqOfE2JaJJAMEg1FlFhNRNlFlE=
 
         let rinsed = Seed::from_file(tmpfile).expect("Read from temp file");
         assert_eq!(seed.0, rinsed.0);
+    }
+
+    #[test]
+    fn derive_non_hardened_xpub_from_seed() {
+        let seed = Seed::from(*b"this string is exactly 32 bytes!");
+        let xpub = seed
+            .derive_extended_public_key(bitcoin::Network::Regtest)
+            .unwrap();
+        assert!(xpub.child_number.is_normal());
+        assert!(!xpub.child_number.is_hardened());
+    }
+
+    #[test]
+    fn ensure_derivation_relation_between_seed_and_xpub() {
+        let seed = Seed::from(*b"this string is exactly 32 bytes!");
+        let network = bitcoin::Network::Regtest;
+        let secp = Secp256k1::new();
+
+        let xprv = seed.derive_extended_private_key(network).unwrap();
+        let xpub = seed.derive_extended_public_key(network).unwrap();
+
+        // we always want to ensure that the xpub is from the first child
+        let priv_key = xprv
+            .ckd_priv(&secp, ChildNumber::from_normal_idx(0).unwrap())
+            .unwrap()
+            .private_key;
+        let should_pub_key = bitcoin::PublicKey::from_private_key(&secp, &priv_key);
+
+        let is_pub_key = xpub.public_key;
+
+        assert_eq!(is_pub_key, should_pub_key);
     }
 }

@@ -1,6 +1,7 @@
 use crate::fs::{ensure_directory_exists, system_config_dir, system_data_dir};
 use crate::tor::{DEFAULT_CONTROL_PORT, DEFAULT_SOCKS5_PORT};
 use anyhow::{bail, Context, Result};
+use bdk::bitcoin::util::bip32::ExtendedPubKey;
 use config::ConfigError;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::Input;
@@ -11,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use tracing::info;
 use url::Url;
 
@@ -64,6 +66,7 @@ pub struct Network {
 pub struct Bitcoin {
     pub electrum_rpc_url: Url,
     pub target_block: usize,
+    pub xpub: Option<ExtendedPubKey>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -224,6 +227,17 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
     }
     let ask_spread = Decimal::from_f64(ask_spread).context("Unable to parse spread")?;
 
+    let key: String = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Provide an xpub key if you want to receive your Bitcoin to an address outside of this application. Hit enter if you want to use an internal wallet.")
+        .default("".to_string())
+        .interact_text()?;
+
+    let xpub = if key.is_empty() {
+        None
+    } else {
+        Some(ExtendedPubKey::from_str(key.as_str()).context("Invalid xpub provided")?)
+    };
+
     println!();
 
     Ok(Config {
@@ -234,6 +248,7 @@ pub fn query_user_for_initial_testnet_config() -> Result<Config> {
         bitcoin: Bitcoin {
             electrum_rpc_url,
             target_block,
+            xpub,
         },
         monero: Monero {
             wallet_rpc_url: monero_wallet_rpc_url,
@@ -268,6 +283,7 @@ mod tests {
             bitcoin: Bitcoin {
                 electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
                 target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET,
+                xpub : Some(ExtendedPubKey::from_str("tpubDC2Qwo2TFsaNC4ju8nrUJ9mqVT3eSgdmy1yPqhgkjwmke3PRXutNGRYAUo6RCHTcVQaDR3ohNU9we59brGHuEKPvH1ags2nevW5opEE9Z5Q").unwrap())
             },
             network: Network {
                 listen: vec![
