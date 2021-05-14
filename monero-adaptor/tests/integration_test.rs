@@ -152,7 +152,7 @@ async fn monerod_integration_test() {
     let (ecdh_info_0, out_blinding_0) = EcdhInfo::new_bulletproof(spend_amount, ecdh_key_0.scalar);
 
     let ecdh_key_1 = PrivateKey::random(&mut rng);
-    let (ecdh_info_1, out_blinding_1) = EcdhInfo::new_bulletproof(spend_amount, ecdh_key_1.scalar);
+    let (ecdh_info_1, out_blinding_1) = EcdhInfo::new_bulletproof(0, ecdh_key_1.scalar);
 
     let (bulletproof, out_pk) = monero::make_bulletproof(
         &mut rng,
