@@ -643,7 +643,7 @@ impl TestContext {
         assert!(matches!(state, AliceState::BtcPunished));
 
         assert_eventual_balance(
-            self.alice_internal_bitcoin_wallet.as_ref(),
+            self.alice_personal_bitcoin_wallet.as_ref(),
             Ordering::Equal,
             self.alice_punished_btc_balance().await,
         )
@@ -782,7 +782,7 @@ impl TestContext {
             .estimate_fee(TxPunish::weight(), self.btc_amount)
             .await
             .expect("To estimate fee correctly");
-        self.alice_starting_balances.btc + self.btc_amount - cancel_fee - punish_fee
+        self.btc_amount - cancel_fee - punish_fee
     }
 
     fn bob_punished_xmr_balance(&self) -> monero::Amount {
