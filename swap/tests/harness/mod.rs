@@ -621,6 +621,14 @@ impl TestContext {
         .await
         .unwrap();
 
+        assert_eventual_balance(
+            self.alice_personal_bitcoin_wallet.as_ref(),
+            Ordering::Equal,
+            bitcoin::Amount::ZERO,
+        )
+        .await
+        .unwrap();
+
         // Alice pays fees - comparison does not take exact lock fee into account
         assert_eventual_balance(
             self.alice_monero_wallet.as_ref(),
@@ -675,36 +683,15 @@ impl TestContext {
     }
 
     pub async fn assert_bob_refunded(&self, state: BobState) {
-        self.bob_internal_bitcoin_wallet.sync().await.unwrap();
+        assert!(matches!(state, BobState::BtcRefunded(..)));
 
-        let lock_tx_id = if let BobState::BtcRefunded(state4) = state {
-            state4.tx_lock_id()
-        } else {
-            panic!("Bob in not in btc refunded state: {:?}", state);
-        };
-        let lock_tx_bitcoin_fee = self
-            .bob_internal_bitcoin_wallet
-            .transaction_fee(lock_tx_id)
-            .await
-            .unwrap();
-
-        let btc_balance_after_swap = self.bob_internal_bitcoin_wallet.balance().await.unwrap();
-
-        let cancel_fee = self
-            .alice_internal_bitcoin_wallet
-            .estimate_fee(TxCancel::weight(), self.btc_amount)
-            .await
-            .expect("To estimate fee correctly");
-        let refund_fee = self
-            .alice_internal_bitcoin_wallet
-            .estimate_fee(TxRefund::weight(), self.btc_amount)
-            .await
-            .expect("To estimate fee correctly");
-
-        let bob_cancelled_and_refunded = btc_balance_after_swap
-            == self.bob_starting_balances.btc - lock_tx_bitcoin_fee - cancel_fee - refund_fee;
-
-        assert!(bob_cancelled_and_refunded);
+        assert_eventual_balance(
+            self.bob_personal_bitcoin_wallet.as_ref(),
+            Ordering::Equal,
+            self.bob_refunded_btc_balance().await.unwrap(),
+        )
+        .await
+        .unwrap();
 
         assert_eventual_balance(
             self.bob_monero_wallet.as_ref(),
@@ -759,11 +746,25 @@ impl TestContext {
     }
 
     fn alice_refunded_btc_balance(&self) -> bitcoin::Amount {
-        self.alice_starting_balances.btc
+        bitcoin::Amount::ZERO
     }
 
     fn bob_refunded_xmr_balance(&self) -> monero::Amount {
         self.bob_starting_balances.xmr
+    }
+
+    async fn bob_refunded_btc_balance(&self) -> Result<bitcoin::Amount> {
+        let cancel_fee = self
+            .bob_internal_bitcoin_wallet
+            .estimate_fee(TxCancel::weight(), self.btc_amount)
+            .await
+            .expect("To estimate fee correctly");
+        let refund_fee = self
+            .bob_internal_bitcoin_wallet
+            .estimate_fee(TxRefund::weight(), self.btc_amount)
+            .await
+            .expect("To estimate fee correctly");
+        Ok(self.btc_amount - cancel_fee - refund_fee)
     }
 
     fn alice_punished_xmr_balance(&self) -> monero::Amount {
