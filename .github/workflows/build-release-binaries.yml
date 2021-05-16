@@ -100,7 +100,7 @@ jobs:
           7z a -tzip ${{ steps.create-archive-name.outputs.archive }} ./${{ matrix.bin }}.exe
 
       - name: Upload archive
-        uses: actions/upload-release-asset@v1
+        uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.BOTTY_GITHUB_TOKEN }}
         with:
