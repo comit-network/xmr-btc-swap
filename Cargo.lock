@@ -4154,12 +4154,12 @@ dependencies = [
 [[package]]
 name = "tokio-tar"
 version = "0.2.0"
+source = "git+https://github.com/vorot93/tokio-tar#cda9a198530bc730692507b4623696f4f0dd2a76"
 dependencies = [
  "filetime",
  "futures-core",
  "libc",
  "redox_syscall 0.2.5",
- "tempfile",
  "tokio",
  "tokio-stream",
  "xattr",
