@@ -6,7 +6,7 @@ use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
 use itertools::Itertools;
-use monero::blockdata::transaction::{KeyImage, SubField, TxOutTarget};
+use monero::blockdata::transaction::{ExtraField, KeyImage, SubField, TxOutTarget};
 use monero::cryptonote::hash::Hashable;
 use monero::cryptonote::onetime_key::KeyGenerator;
 use monero::util::key::H;
@@ -22,9 +22,9 @@ use std::convert::TryInto;
 use std::iter;
 
 pub struct ConfidentialTransactionBuilder {
-    prefix: TransactionPrefix,
-    base: RctSigBase,
-    prunable: RctSigPrunable,
+    outputs: Vec<TxOut>,
+    ecdh_info: Vec<EcdhInfo>,
+    extra: ExtraField,
 
     blinding_factors: Vec<Scalar>,
     amounts: Vec<u64>,
@@ -47,30 +47,13 @@ impl ConfidentialTransactionBuilder {
         decoy_inputs: [DecoyInput; 10],
         keys: KeyPair,
     ) -> Self {
-        let prefix = TransactionPrefix {
-            version: VarInt(2),
-            ..TransactionPrefix::default()
-        };
-
         let actual_signing_key = input_to_spend.recover_key(&keys).scalar;
         let signing_pk = actual_signing_key * ED25519_BASEPOINT_POINT;
 
         Self {
-            prefix,
-            base: RctSigBase {
-                rct_type: RctType::Clsag,
-                txn_fee: VarInt(0),
-                pseudo_outs: vec![],
-                ecdh_info: vec![],
-                out_pk: vec![],
-            },
-            prunable: RctSigPrunable {
-                range_sigs: vec![],
-                bulletproofs: vec![],
-                MGs: vec![],
-                Clsags: vec![],
-                pseudo_outs: vec![],
-            },
+            outputs: vec![],
+            ecdh_info: vec![],
+            extra: Default::default(),
             blinding_factors: vec![],
             amounts: vec![],
             decoy_inputs,
@@ -90,7 +73,7 @@ impl ConfidentialTransactionBuilder {
         amount: u64,
         rng: &mut (impl RngCore + CryptoRng),
     ) -> Self {
-        let next_index = self.prefix.outputs.len();
+        let next_index = self.outputs.len();
 
         let ecdh_key = PrivateKey::random(rng);
         let (ecdh_info, blinding_factor) = EcdhInfo::new_bulletproof(amount, ecdh_key.scalar);
@@ -103,22 +86,20 @@ impl ConfidentialTransactionBuilder {
             },
         };
 
-        self.prefix.outputs.push(out);
-        self.prefix
-            .extra
+        self.outputs.push(out);
+        self.extra
             .0
             .push(SubField::TxPublicKey(PublicKey::from_private_key(
                 &ecdh_key,
             )));
-        self.base.ecdh_info.push(ecdh_info);
+        self.ecdh_info.push(ecdh_info);
         self.blinding_factors.push(blinding_factor);
         self.amounts.push(amount);
 
         // sanity checks
-        debug_assert_eq!(self.prefix.outputs.len(), self.prefix.extra.0.len());
-        debug_assert_eq!(self.prefix.outputs.len(), self.blinding_factors.len());
-        debug_assert_eq!(self.prefix.outputs.len(), self.amounts.len());
-        debug_assert_eq!(self.prefix.outputs.len(), self.base.ecdh_info.len());
+        debug_assert_eq!(self.outputs.len(), self.extra.0.len());
+        debug_assert_eq!(self.outputs.len(), self.blinding_factors.len());
+        debug_assert_eq!(self.outputs.len(), self.amounts.len());
 
         self
     }
@@ -127,31 +108,18 @@ impl ConfidentialTransactionBuilder {
         self.spend_amount - self.amounts.iter().sum::<u64>()
     }
 
-    fn compute_pseudo_out(&mut self, commitments: Vec<EdwardsPoint>) -> EdwardsPoint {
+    fn compute_pseudo_out(&mut self, commitments: &[EdwardsPoint]) -> EdwardsPoint {
         let sum_commitments = commitments.iter().sum::<EdwardsPoint>();
 
         let fee = self.compute_fee();
 
-        // TODO: Don't mutate in here
-        self.base.txn_fee = VarInt(fee);
-        self.base.out_pk = commitments
-            .iter()
-            .map(|p| CtKey {
-                mask: Key {
-                    key: p.compress().0,
-                },
-            })
-            .collect();
-
         let fee_key = Scalar::from(fee) * H.point.decompress().unwrap();
 
-        let pseudo_out = fee_key + sum_commitments;
+        fee_key + sum_commitments
+    }
 
-        self.prunable.pseudo_outs = vec![Key {
-            key: pseudo_out.compress().0,
-        }];
-
-        pseudo_out
+    fn compute_key_image(&self) -> EdwardsPoint {
+        self.actual_signing_key * self.H_p_pk
     }
 
     pub fn build(mut self, rng: &mut (impl RngCore + CryptoRng)) -> Transaction {
@@ -167,7 +135,6 @@ impl ConfidentialTransactionBuilder {
             self.blinding_factors.as_slice(),
         )
         .unwrap();
-        self.prunable.bulletproofs = vec![bulletproof];
 
         // TODO: move to ctor
         let (key_offsets, ring, commitment_ring) = self
@@ -208,25 +175,53 @@ impl ConfidentialTransactionBuilder {
             .unwrap();
 
         let relative_key_offsets = to_relative_offsets(&key_offsets);
-        let I = self.actual_signing_key * self.H_p_pk;
+        let I = self.compute_key_image();
+        let pseudo_out = self.compute_pseudo_out(output_commitments.as_slice());
+        let fee = self.compute_fee();
 
-        self.prefix.inputs = vec![TxIn::ToKey {
-            amount: VarInt(0),
-            key_offsets: relative_key_offsets,
-            k_image: KeyImage {
-                image: monero::cryptonote::hash::Hash(I.compress().to_bytes()),
-            },
-        }];
-
-        let pseudo_out = self.compute_pseudo_out(output_commitments); // TODO: either mutate or return
-
+        let prefix = TransactionPrefix {
+            version: VarInt(2),
+            unlock_time: Default::default(),
+            inputs: vec![TxIn::ToKey {
+                amount: VarInt(0),
+                key_offsets: relative_key_offsets,
+                k_image: KeyImage {
+                    image: monero::cryptonote::hash::Hash(I.compress().to_bytes()),
+                },
+            }],
+            outputs: self.outputs,
+            extra: self.extra,
+        };
+        let rct_sig_base = RctSigBase {
+            rct_type: RctType::Clsag,
+            txn_fee: VarInt(fee),
+            out_pk: output_commitments
+                .iter()
+                .map(|p| CtKey {
+                    mask: Key {
+                        key: p.compress().0,
+                    },
+                })
+                .collect(),
+            ecdh_info: self.ecdh_info,
+            pseudo_outs: vec![], // legacy
+        };
+        let rct_sig_prunable = RctSigPrunable {
+            range_sigs: vec![], // legacy
+            bulletproofs: vec![bulletproof],
+            MGs: vec![], // legacy
+            Clsags: vec![],
+            pseudo_outs: vec![Key {
+                key: pseudo_out.compress().to_bytes(),
+            }],
+        };
         let mut transaction = Transaction {
-            prefix: self.prefix,
+            prefix,
             rct_signatures: RctSig {
-                sig: Some(self.base),
-                p: Some(self.prunable),
+                sig: Some(rct_sig_base),
+                p: Some(rct_sig_prunable),
             },
-            ..Transaction::default()
+            signatures: vec![], // legacy
         };
 
         let alpha = Scalar::random(rng);
