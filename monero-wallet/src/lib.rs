@@ -8,7 +8,7 @@ use monero::blockdata::transaction::{KeyImage, SubField, TxOutTarget};
 use monero::cryptonote::hash::Hashable;
 use monero::cryptonote::onetime_key::KeyGenerator;
 use monero::util::key::H;
-use monero::util::ringct::{CtKey, EcdhInfo, Key, RctSigBase, RctSigPrunable, RctType};
+use monero::util::ringct::{CtKey, EcdhInfo, Key, RctSig, RctSigBase, RctSigPrunable, RctType};
 use monero::{
     Address, KeyPair, OwnedTxOut, PrivateKey, PublicKey, Transaction, TransactionPrefix, TxIn,
     TxOut, VarInt,
@@ -45,8 +45,10 @@ impl ConfidentialTransactionBuilder {
         decoy_inputs: [DecoyInput; 10],
         keys: KeyPair,
     ) -> Self {
-        let mut prefix = TransactionPrefix::default();
-        prefix.version = VarInt(2);
+        let prefix = TransactionPrefix {
+            version: VarInt(2),
+            ..TransactionPrefix::default()
+        };
 
         let actual_signing_key = input_to_spend.recover_key(&keys).scalar;
         let signing_pk = actual_signing_key * ED25519_BASEPOINT_POINT;
@@ -224,10 +226,14 @@ impl ConfidentialTransactionBuilder {
             .collect(); // TODO: Return EdwardsPoints from bulletproof lib
         let pseudo_out = self.compute_pseudo_out(output_commitments); // TODO: either mutate or return
 
-        let mut transaction = Transaction::default();
-        transaction.prefix = self.prefix;
-        transaction.rct_signatures.sig = Some(dbg!(self.base));
-        transaction.rct_signatures.p = Some(self.prunable);
+        let mut transaction = Transaction {
+            prefix: self.prefix,
+            rct_signatures: RctSig {
+                sig: Some(self.base),
+                p: Some(self.prunable),
+            },
+            ..Transaction::default()
+        };
 
         let alpha = Scalar::random(rng);
         let fake_responses = random_array(|| Scalar::random(rng));

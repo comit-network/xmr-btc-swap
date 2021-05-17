@@ -88,11 +88,15 @@ async fn monerod_integration_test() {
 
     let target_address = "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".parse().unwrap();
 
-    let transaction =
-        ConfidentialTransactionBuilder::new(input_to_spend, global_output_index, decoy_inputs, lock_kp)
-            .with_output(target_address, spend_amount, &mut rng)
-            .with_output(target_address, 0, &mut rng) // TODO: Do this inside `build`
-            .build(&mut rng);
+    let transaction = ConfidentialTransactionBuilder::new(
+        input_to_spend,
+        global_output_index,
+        decoy_inputs,
+        lock_kp,
+    )
+    .with_output(target_address, spend_amount, &mut rng)
+    .with_output(target_address, 0, &mut rng) // TODO: Do this inside `build`
+    .build(&mut rng);
 
     client.send_raw_transaction(transaction).await.unwrap();
 }
