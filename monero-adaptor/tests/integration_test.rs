@@ -63,7 +63,7 @@ async fn monerod_integration_test() {
         .unwrap()
         .pop()
         .unwrap();
-    let global_output_index = output_indices[input_to_spend.index];
+    let global_output_index = output_indices[input_to_spend.index()];
 
     let (lower, upper) = client.calculate_key_offset_boundaries().await.unwrap();
 

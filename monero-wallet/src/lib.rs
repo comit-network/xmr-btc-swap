@@ -73,10 +73,10 @@ impl ConfidentialTransactionBuilder {
             actual_signing_key,
             signing_pk,
             H_p_pk: hash_point_to_point(signing_pk),
-            input_commitment: input_to_spend.commitment.unwrap(), // TODO: Error handling
-            spend_amount: input_to_spend.amount.unwrap(),         // TODO: Error handling,
+            input_commitment: input_to_spend.commitment().unwrap(), // TODO: Error handling
+            spend_amount: input_to_spend.amount().unwrap(),         // TODO: Error handling,
             global_output_index,
-            real_commitment_blinder: input_to_spend.blinding_factor.unwrap(), // TODO: Error handling
+            real_commitment_blinder: input_to_spend.blinding_factor().unwrap(), // TODO: Error handling
         }
     }
 
