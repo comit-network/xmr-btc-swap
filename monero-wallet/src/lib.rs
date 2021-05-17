@@ -1,3 +1,5 @@
+mod v2;
+
 use anyhow::{Context, Result};
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
@@ -278,13 +280,17 @@ fn random_array<T: Default + Copy, const N: usize>(rng: impl FnMut() -> T) -> [T
 }
 
 #[async_trait::async_trait]
-pub trait MonerodClientExt {
+pub trait CalculateKeyOffsetBoundaries {
     async fn calculate_key_offset_boundaries(&self) -> Result<(VarInt, VarInt)>;
+}
+
+#[async_trait::async_trait]
+pub trait FetchDecoyInputs {
     async fn fetch_decoy_inputs(&self, indices: [u64; 10]) -> Result<[DecoyInput; 10]>;
 }
 
 #[async_trait::async_trait]
-impl MonerodClientExt for monerod::Client {
+impl CalculateKeyOffsetBoundaries for monerod::Client {
     /// Chooses 10 random key offsets for use within a new confidential
     /// transactions.
     ///
@@ -315,7 +321,10 @@ impl MonerodClientExt for monerod::Client {
 
         Ok((VarInt(0), VarInt(last_index)))
     }
+}
 
+#[async_trait::async_trait]
+impl FetchDecoyInputs for monerod::Client {
     async fn fetch_decoy_inputs(&self, indices: [u64; 10]) -> Result<[DecoyInput; 10]> {
         let response = self
             .get_outs(
@@ -403,7 +412,7 @@ mod tests {
         //     key: todo!(),
         // };
         //
-        // let (lower, upper) = wallet.calculate_key_offset_boundaries().await.unwrap();
+        // let (lower, upper) = wallet.CalculateKeyOffsetBoundaries().await.unwrap();
 
         todo!("fix");
         // let result = rpc_client

@@ -3,7 +3,9 @@
 use monero::ViewPair;
 use monero_harness::Monero;
 use monero_rpc::monerod::MonerodRpc;
-use monero_wallet::{ConfidentialTransactionBuilder, MonerodClientExt};
+use monero_wallet::{
+    CalculateKeyOffsetBoundaries, ConfidentialTransactionBuilder, FetchDecoyInputs,
+};
 use rand::{Rng, SeedableRng};
 use std::convert::TryInto;
 use testcontainers::clients::Cli;
