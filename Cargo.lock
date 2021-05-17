@@ -2265,7 +2265,7 @@ dependencies = [
 [[package]]
 name = "monero"
 version = "0.12.0"
-source = "git+https://github.com/comit-network/monero-rs?branch=open-outputs#9f93483d9b648cdbe4a4e0db2c5b0b306473b424"
+source = "git+https://github.com/comit-network/monero-rs?branch=fix-bulletproofs#fae784dabbbc7c759334a031a2802813fffec792"
 dependencies = [
  "base58-monero",
  "clear_on_drop",
