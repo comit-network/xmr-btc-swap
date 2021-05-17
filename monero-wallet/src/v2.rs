@@ -8,19 +8,22 @@ use rand::{CryptoRng, RngCore};
 pub struct EmptyTransaction {}
 
 impl EmptyTransaction {
-    pub fn spend_from(input: OwnedTxOut<'_>, global_output_index: u64) -> InputAdded {
+    // TODO: Need to validate that given index matches with tx pubkey and commitment
+    pub fn spend_from(input: OwnedTxOut<'_>, global_output_index: u64) -> Result<InputAdded, MissingOpening> {
         todo!()
     }
 }
 
+pub struct MissingOpening; // The opening was missing from the TX
+
 pub struct InputAdded {}
 
 impl InputAdded {
-    pub fn with_static_decoy_inputs(self, decoys: [DecoyInput; 10]) -> DecoyOffsetsAdded {
+    pub fn with_decoys(self, decoys: [DecoyInput; 10]) -> Result<DecoyOffsetsAdded, DuplicateIndex> {
         todo!()
     }
 
-    pub fn with_random_decoy_inputs(
+    pub fn with_random_decoys(
         self,
         rng: &mut impl RngCore,
         client: &(impl FetchDecoyInputs + CalculateKeyOffsetBoundaries),
@@ -32,10 +35,12 @@ impl InputAdded {
         self,
         decoy_indices: [u64; 10],
         client: &(impl FetchDecoyInputs),
-    ) -> DecoyOffsetsAdded {
+    ) -> Result<DecoyOffsetsAdded, DuplicateIndex> {
         todo!()
     }
 }
+
+pub struct DuplicateIndex; // One of the indices was an evil twin
 
 pub struct DecoyOffsetsAdded {}
 
@@ -45,10 +50,12 @@ impl DecoyOffsetsAdded {
         to: Address,
         amount: u64,
         rng: &mut (impl RngCore + CryptoRng),
-    ) -> OutputsAdded {
+    ) -> Result<OutputsAdded, InsufficientFunds> {
         todo!()
     }
 }
+
+pub struct InsufficientFunds;
 
 pub struct OutputsAdded {}
 
@@ -58,7 +65,7 @@ impl OutputsAdded {
         to: Address,
         amount: u64,
         rng: &mut (impl RngCore + CryptoRng),
-    ) -> Self {
+    ) -> Result<Self, InsufficientFunds> {
         todo!()
     }
 
