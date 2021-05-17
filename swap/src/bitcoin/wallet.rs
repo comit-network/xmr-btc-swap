@@ -528,8 +528,8 @@ impl Watchable for (Txid, Script) {
 pub struct Client {
     electrum: bdk::electrum_client::Client,
     latest_block_height: BlockHeight,
-    last_ping: Instant,
-    interval: Duration,
+    last_sync: Instant,
+    sync_interval: Duration,
     script_history: BTreeMap<Script, Vec<GetHistoryRes>>,
     subscriptions: HashMap<(Txid, Script), Subscription>,
 }
@@ -545,42 +545,20 @@ impl Client {
         Ok(Self {
             electrum,
             latest_block_height: BlockHeight::try_from(latest_block)?,
-            last_ping: Instant::now(),
-            interval,
+            last_sync: Instant::now(),
+            sync_interval: interval,
             script_history: Default::default(),
             subscriptions: Default::default(),
         })
     }
 
-    /// Ping the electrum server unless we already did within the set interval.
-    ///
-    /// Returns a boolean indicating whether we actually pinged the server.
-    fn ping(&mut self) -> bool {
-        if self.last_ping.elapsed() <= self.interval {
-            return false;
-        }
-
-        match self.electrum.ping() {
-            Ok(()) => {
-                self.last_ping = Instant::now();
-
-                true
-            }
-            Err(error) => {
-                tracing::debug!(?error, "Failed to ping electrum server");
-
-                false
-            }
-        }
-    }
-
     fn update_state(&mut self) -> Result<()> {
-        let pinged = self.ping();
-
-        if !pinged {
+        let now = Instant::now();
+        if now < self.last_sync + self.sync_interval {
             return Ok(());
         }
 
+        self.last_sync = now;
         self.update_latest_block()?;
         self.update_script_histories()?;
 
