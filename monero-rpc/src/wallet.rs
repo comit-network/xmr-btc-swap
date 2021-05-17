@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
-use serde::{de::Error, Deserialize, Deserializer, Serialize};
+use serde::de::Error;
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[jsonrpc_client::api(version = "2.0")]
 pub trait MoneroWalletRpc {

@@ -24,13 +24,12 @@ pub mod image;
 
 use crate::image::{MONEROD_DAEMON_CONTAINER_NAME, MONEROD_DEFAULT_NETWORK, RPC_PORT};
 use anyhow::{anyhow, bail, Context, Result};
-use monero_rpc::{
-    monerod,
-    monerod::MonerodRpc as _,
-    wallet::{self, GetAddress, MoneroWalletRpc as _, Refreshed, Transfer},
-};
+use monero_rpc::monerod;
+use monero_rpc::monerod::MonerodRpc as _;
+use monero_rpc::wallet::{self, GetAddress, MoneroWalletRpc as _, Refreshed, Transfer};
 use std::time::Duration;
-use testcontainers::{clients::Cli, Container, Docker, RunArgs};
+use testcontainers::clients::Cli;
+use testcontainers::{Container, Docker, RunArgs};
 use tokio::time;
 
 /// How often we mine a block.

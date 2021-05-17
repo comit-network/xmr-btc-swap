@@ -1,8 +1,6 @@
 use std::collections::HashMap;
-use testcontainers::{
-    core::{Container, Docker, WaitForMessage},
-    Image,
-};
+use testcontainers::core::{Container, Docker, WaitForMessage};
+use testcontainers::Image;
 
 pub const MONEROD_DAEMON_CONTAINER_NAME: &str = "monerod";
 pub const MONEROD_DEFAULT_NETWORK: &str = "monero_network";
