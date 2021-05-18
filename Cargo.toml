@@ -1,5 +1,2 @@
 [workspace]
 members = [ "monero-harness", "monero-rpc", "swap", "monero-wallet" ]
-
-[patch.crates-io]
-tokio-tar = { git = "https://github.com/vorot93/tokio-tar" }
