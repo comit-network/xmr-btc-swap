@@ -17,6 +17,7 @@ impl EmptyTransaction {
     }
 }
 
+#[derive(Debug)]
 pub struct MissingOpening; // The opening was missing from the TX
 
 pub struct InputAdded {}
@@ -46,6 +47,7 @@ impl InputAdded {
     }
 }
 
+#[derive(Debug)]
 pub struct DuplicateIndex; // One of the indices was an evil twin
 
 pub struct DecoyOffsetsAdded {}
@@ -61,6 +63,7 @@ impl DecoyOffsetsAdded {
     }
 }
 
+#[derive(Debug)]
 pub struct InsufficientFunds;
 
 pub struct OutputsAdded {}
@@ -108,6 +111,7 @@ impl OutputsBlinded {
     }
 }
 
+#[derive(Debug)]
 pub struct InvalidSignature;
 
 // TODO: We can break the CLSAG fn signature down into two parts:
@@ -123,4 +127,22 @@ pub struct SignatureParameters {
     // We need to know the public key to know the index.
     // signing_key_index: usize,
     pseudo_output_commitment: EdwardsPoint,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::thread_rng;
+
+    // #[test]
+    // fn api_test() {
+    //     let tx = EmptyTransaction::spend_from(todo!(), todo!())
+    //         .unwrap()
+    //         .with_random_decoys(&mut thread_rng(), todo!())
+    //         .add_output(todo!(), todo!(), &mut thread_rng())
+    //         .unwrap()
+    //         .blind_outputs(todo!());
+    //
+    //     tx.with_signature(todo!());
+    // }
 }
