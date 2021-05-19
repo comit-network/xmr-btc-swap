@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use monero::util::key::ScalarExt;
 use serde::{de::Error, Deserialize, Deserializer, Serialize};
 
 #[jsonrpc_client::api(version = "2.0")]
@@ -220,7 +221,9 @@ where
         return Ok(None);
     }
 
-    Ok(Some(string.parse().map_err(D::Error::custom)?))
+    Ok(Some(
+        monero::PrivateKey::from_str(&string).map_err(D::Error::custom)?,
+    ))
 }
 
 #[cfg(test)]

@@ -8,6 +8,7 @@ pub use wallet_rpc::{WalletRpc, WalletRpcProcess};
 
 use crate::bitcoin;
 use anyhow::Result;
+use monero::util::key::EdwardsPointExt;
 use rand::{CryptoRng, RngCore};
 use rust_decimal::prelude::*;
 use rust_decimal::Decimal;
@@ -26,7 +27,7 @@ pub fn private_key_from_secp256k1_scalar(scalar: bitcoin::Scalar) -> PrivateKey 
     // ed25519 scalar is little endian
     bytes.reverse();
 
-    PrivateKey::from_scalar(Scalar::from_bytes_mod_order(bytes))
+    Scalar::from_bytes_mod_order(bytes)
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
@@ -34,10 +35,7 @@ pub struct PrivateViewKey(#[serde(with = "monero_private_key")] PrivateKey);
 
 impl PrivateViewKey {
     pub fn new_random<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
-        let scalar = Scalar::random(rng);
-        let private_key = PrivateKey::from_scalar(scalar);
-
-        Self(private_key)
+        Self(Scalar::random(rng))
     }
 
     pub fn public(&self) -> PublicViewKey {
@@ -345,9 +343,7 @@ mod tests {
 
     #[test]
     fn serde_monero_private_key() {
-        let key = MoneroPrivateKey(monero::PrivateKey::from_scalar(
-            crate::monero::Scalar::random(&mut OsRng),
-        ));
+        let key = MoneroPrivateKey(crate::monero::Scalar::random(&mut OsRng));
         let encoded = serde_cbor::to_vec(&key).unwrap();
         let decoded: MoneroPrivateKey = serde_cbor::from_slice(&encoded).unwrap();
         assert_eq!(key, decoded);

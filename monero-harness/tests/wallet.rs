@@ -1,3 +1,4 @@
+use monero::util::key::ScalarExt;
 use monero_harness::{Monero, MoneroWalletRpc};
 use monero_rpc::wallet::MoneroWalletRpc as _;
 use spectral::prelude::*;
@@ -45,7 +46,7 @@ async fn fund_transfer_and_check_tx_key() {
 
     // check if tx was actually seen
     let tx_id = transfer.tx_hash;
-    let tx_key = transfer.tx_key.unwrap().to_string();
+    let tx_key = transfer.tx_key.unwrap().display_hex().to_string();
     let res = bob_wallet
         .client()
         .check_tx_key(tx_id, tx_key, bob_address)

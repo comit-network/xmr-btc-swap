@@ -18,10 +18,9 @@ async fn monerod_integration_test() {
     let (monero, _monerod_container, _monero_wallet_rpc_containers) =
         Monero::new(&cli, vec![]).await.unwrap();
 
-    let signing_key = curve25519_dalek::scalar::Scalar::random(&mut rng);
     let lock_kp = monero::KeyPair {
-        view: monero::PrivateKey::from_scalar(curve25519_dalek::scalar::Scalar::random(&mut rng)),
-        spend: monero::PrivateKey::from_scalar(signing_key),
+        view: monero::PrivateKey::random(&mut rng),
+        spend: monero::PrivateKey::random(&mut rng),
     };
 
     let spend_amount = 999600000000;

@@ -233,7 +233,7 @@ pub struct OutKey {
     #[serde(with = "byte_array")]
     pub key: PublicKey,
     #[serde(with = "byte_array")]
-    pub mask: ringct::Key,
+    pub mask: PublicKey,
     #[serde(with = "byte_array")]
     pub txid: Hash,
     pub unlocked: bool,

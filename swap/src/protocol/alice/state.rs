@@ -7,7 +7,8 @@ use crate::monero::TransferProof;
 use crate::monero_ext::ScalarExt;
 use crate::protocol::{Message0, Message1, Message2, Message3, Message4, CROSS_CURVE_PROOF_SYSTEM};
 use crate::{bitcoin, monero};
-use anyhow::{anyhow, bail, Context, Result};
+use ::monero::util::key::EdwardsPointExt;
+use anyhow::{bail, Context, Result};
 use monero_rpc::wallet::BlockHeight;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -134,9 +135,7 @@ impl State0 {
             s_a,
             v_a,
             S_a_bitcoin: S_a_bitcoin.into(),
-            S_a_monero: monero::PublicKey {
-                point: S_a_monero.compress(),
-            },
+            S_a_monero,
             dleq_proof_s_a,
             redeem_address,
             punish_address,
@@ -150,13 +149,7 @@ impl State0 {
     pub fn receive(self, msg: Message0) -> Result<(Uuid, State1)> {
         let valid = CROSS_CURVE_PROOF_SYSTEM.verify(
             &msg.dleq_proof_s_b,
-            (
-                msg.S_b_bitcoin.into(),
-                msg.S_b_monero
-                    .point
-                    .decompress()
-                    .ok_or_else(|| anyhow!("S_b is not a monero curve point"))?,
-            ),
+            (msg.S_b_bitcoin.into(), msg.S_b_monero),
         );
 
         if !valid {
@@ -353,7 +346,7 @@ impl State3 {
     }
 
     pub fn lock_xmr_transfer_request(&self) -> TransferRequest {
-        let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey { scalar: self.s_a });
+        let S_a = monero::PublicKey::from_private_key(&self.s_a);
 
         let public_spend_key = S_a + self.S_b_monero;
         let public_view_key = self.v.public();
@@ -370,7 +363,7 @@ impl State3 {
         transfer_proof: TransferProof,
         conf_target: u64,
     ) -> WatchRequest {
-        let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey { scalar: self.s_a });
+        let S_a = monero::PublicKey::from_private_key(&self.s_a);
 
         let public_spend_key = S_a + self.S_b_monero;
         let public_view_key = self.v.public();

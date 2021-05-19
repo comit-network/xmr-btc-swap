@@ -7,7 +7,8 @@ use crate::monero::wallet::WatchRequest;
 use crate::monero::{monero_private_key, TransferProof};
 use crate::monero_ext::ScalarExt;
 use crate::protocol::{Message0, Message1, Message2, Message3, Message4, CROSS_CURVE_PROOF_SYSTEM};
-use anyhow::{anyhow, bail, Context, Result};
+use ::monero::util::key::EdwardsPointExt;
+use anyhow::{bail, Context, Result};
 use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
 use ecdsa_fun::nonce::Deterministic;
 use ecdsa_fun::Signature;
@@ -110,9 +111,7 @@ impl State0 {
             s_b,
             v_b,
             S_b_bitcoin: bitcoin::PublicKey::from(S_b_bitcoin),
-            S_b_monero: monero::PublicKey {
-                point: S_b_monero.compress(),
-            },
+            S_b_monero,
             btc,
             xmr,
             dleq_proof_s_b,
@@ -138,13 +137,7 @@ impl State0 {
     pub async fn receive(self, wallet: &bitcoin::Wallet, msg: Message1) -> Result<State1> {
         let valid = CROSS_CURVE_PROOF_SYSTEM.verify(
             &msg.dleq_proof_s_a,
-            (
-                msg.S_a_bitcoin.into(),
-                msg.S_a_monero
-                    .point
-                    .decompress()
-                    .ok_or_else(|| anyhow!("S_a is not a monero curve point"))?,
-            ),
+            (msg.S_a_bitcoin.into(), msg.S_a_monero),
         );
 
         if !valid {
@@ -310,8 +303,7 @@ pub struct State3 {
 
 impl State3 {
     pub fn lock_xmr_watch_request(&self, transfer_proof: TransferProof) -> WatchRequest {
-        let S_b_monero =
-            monero::PublicKey::from_private_key(&monero::PrivateKey::from_scalar(self.s_b));
+        let S_b_monero = monero::PublicKey::from_private_key(&self.s_b);
         let S = self.S_a_monero + S_b_monero;
 
         WatchRequest {
@@ -470,8 +462,7 @@ pub struct State5 {
 
 impl State5 {
     pub fn xmr_keys(&self) -> (monero::PrivateKey, monero::PrivateViewKey) {
-        let s_b = monero::PrivateKey { scalar: self.s_b };
-        let s = self.s_a + s_b;
+        let s = self.s_a + self.s_b;
 
         (s, self.v)
     }

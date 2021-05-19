@@ -84,8 +84,6 @@ impl TxRefund {
         a: bitcoin::SecretKey,
         S_b_bitcoin: bitcoin::PublicKey,
     ) -> Result<monero::PrivateKey> {
-        let s_a = monero::PrivateKey { scalar: s_a };
-
         let tx_refund_sig = self
             .extract_signature_by_key(published_refund_tx, a.public())
             .context("Failed to extract signature from Bitcoin refund tx")?;

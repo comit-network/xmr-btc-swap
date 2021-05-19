@@ -2,15 +2,15 @@ mod v2;
 
 use anyhow::{Context, Result};
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
+use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use hash_edwards_to_edwards::hash_point_to_point;
 use itertools::Itertools;
 use monero::blockdata::transaction::{ExtraField, KeyImage, SubField, TxOutTarget};
 use monero::cryptonote::hash::Hashable;
 use monero::cryptonote::onetime_key::KeyGenerator;
-use monero::util::key::H;
-use monero::util::ringct::{CtKey, EcdhInfo, Key, RctSig, RctSigBase, RctSigPrunable, RctType};
+use monero::util::key::{EdwardsPointExt, H};
+use monero::util::ringct::{EcdhInfo, RctSig, RctSigBase, RctSigPrunable, RctType};
 use monero::{
     Address, KeyPair, OwnedTxOut, PrivateKey, PublicKey, Transaction, TransactionPrefix, TxIn,
     TxOut, VarInt,
@@ -47,7 +47,7 @@ impl ConfidentialTransactionBuilder {
         decoy_inputs: [DecoyInput; 10],
         keys: KeyPair,
     ) -> Self {
-        let actual_signing_key = input_to_spend.recover_key(&keys).scalar;
+        let actual_signing_key = input_to_spend.recover_key(&keys);
         let signing_pk = actual_signing_key * ED25519_BASEPOINT_POINT;
 
         Self {
@@ -77,13 +77,17 @@ impl ConfidentialTransactionBuilder {
         let next_index = self.outputs.len();
 
         let ecdh_key = PrivateKey::random(rng);
-        let (ecdh_info, blinding_factor) = EcdhInfo::new_bulletproof(amount, ecdh_key.scalar);
+        let (ecdh_info, blinding_factor) = EcdhInfo::new_bulletproof(amount, ecdh_key);
 
         let out = TxOut {
             amount: VarInt(0),
             target: TxOutTarget::ToKey {
-                key: KeyGenerator::from_random(to.public_view, to.public_spend, ecdh_key)
-                    .one_time_key(dbg!(next_index)),
+                key: KeyGenerator::from_random(
+                    to.public_view.decompress().unwrap(),
+                    to.public_spend.decompress().unwrap(),
+                    ecdh_key,
+                )
+                .one_time_key(dbg!(next_index)),
             },
         };
 
@@ -114,7 +118,7 @@ impl ConfidentialTransactionBuilder {
 
         let fee = self.compute_fee();
 
-        let fee_key = Scalar::from(fee) * H.point.decompress().unwrap();
+        let fee_key = Scalar::from(fee) * *H;
 
         fee_key + sum_commitments
     }
@@ -196,14 +200,7 @@ impl ConfidentialTransactionBuilder {
         let rct_sig_base = RctSigBase {
             rct_type: RctType::Clsag,
             txn_fee: VarInt(fee),
-            out_pk: output_commitments
-                .iter()
-                .map(|p| CtKey {
-                    mask: Key {
-                        key: p.compress().0,
-                    },
-                })
-                .collect(),
+            out_pk: output_commitments,
             ecdh_info: self.ecdh_info,
             pseudo_outs: vec![], // legacy
         };
@@ -212,9 +209,7 @@ impl ConfidentialTransactionBuilder {
             bulletproofs: vec![bulletproof],
             MGs: vec![], // legacy
             Clsags: vec![],
-            pseudo_outs: vec![Key {
-                key: pseudo_out.compress().to_bytes(),
-            }],
+            pseudo_outs: vec![pseudo_out],
         };
         let mut transaction = Transaction {
             prefix,
@@ -339,13 +334,10 @@ impl FetchDecoyInputs for monerod::Client {
             .outs
             .into_iter()
             .zip(indices.iter())
-            .map(|(out_key, index)| {
-                DecoyInput {
-                    global_output_index: *index,
-                    key: out_key.key.point.decompress().unwrap(), /* TODO: should decompress on
-                                                                   * deserialization */
-                    commitment: CompressedEdwardsY(out_key.mask.key).decompress().unwrap(),
-                }
+            .map(|(out_key, index)| DecoyInput {
+                global_output_index: *index,
+                key: out_key.key,
+                commitment: out_key.mask,
             })
             .collect::<Vec<_>>()
             .try_into()

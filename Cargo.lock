@@ -848,8 +848,7 @@ dependencies = [
 [[package]]
 name = "curve25519-dalek"
 version = "3.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "639891fde0dbea823fc3d798a0fdf9d2f9440a42d64a78ab3488b0ca025117b3"
+source = "git+https://github.com/thomaseizinger/curve25519-dalek?rev=8cc9ad36bd30ceab6073ff64655473c6b5aa4aab#8cc9ad36bd30ceab6073ff64655473c6b5aa4aab"
 dependencies = [
  "byteorder",
  "digest 0.9.0",
@@ -2265,10 +2264,11 @@ dependencies = [
 [[package]]
 name = "monero"
 version = "0.12.0"
-source = "git+https://github.com/comit-network/monero-rs?branch=fix-bulletproofs#fae784dabbbc7c759334a031a2802813fffec792"
+source = "git+https://github.com/comit-network/monero-rs?rev=fee1f7054a4b8500dcf7867ebd1b9e7f693cd566#fee1f7054a4b8500dcf7867ebd1b9e7f693cd566"
 dependencies = [
  "base58-monero",
  "clear_on_drop",
+ "conquer-once",
  "curve25519-dalek",
  "fixed-hash",
  "hash_edwards_to_edwards",
@@ -2277,7 +2277,6 @@ dependencies = [
  "integer-encoding",
  "itertools 0.10.0",
  "keccak-hash",
- "lazy_static",
  "rand 0.7.3",
  "serde",
  "serde-big-array",
@@ -2309,8 +2308,7 @@ dependencies = [
 [[package]]
 name = "monero-epee-bin-serde"
 version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13be5b525af150f294b98d4291b0ec01e5bc157db740de2822827c17561d3960"
+source = "git+https://github.com/comit-network/monero-epee-bin-serde#f2c8baa39f04ac4e7a71c76a16c2c6f9a5ee3e3b"
 dependencies = [
  "byteorder",
  "serde",
@@ -2322,6 +2320,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "futures",
+ "monero",
  "monero-rpc",
  "rand 0.7.3",
  "spectral",

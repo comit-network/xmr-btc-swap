@@ -4,6 +4,7 @@ use crate::monero::{
 };
 use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::{Context, Result};
+use monero::util::key::{EdwardsPointExt, ScalarExt};
 use monero_rpc::wallet;
 use monero_rpc::wallet::{BlockHeight, CheckTxKey, MoneroWalletRpc as _, Refreshed};
 use std::future::Future;
@@ -96,8 +97,8 @@ impl Wallet {
             .generate_from_keys(
                 file_name,
                 address.to_string(),
-                private_spend_key.to_string(),
-                PrivateKey::from(private_view_key).to_string(),
+                private_spend_key.display_hex().to_string(),
+                PrivateKey::from(private_view_key).display_hex().to_string(),
                 restore_height.height,
                 String::from(""),
                 true,
@@ -135,8 +136,8 @@ impl Wallet {
             .generate_from_keys(
                 file_name,
                 temp_wallet_address.to_string(),
-                private_spend_key.to_string(),
-                PrivateKey::from(private_view_key).to_string(),
+                private_spend_key.display_hex().to_string(),
+                PrivateKey::from(private_view_key).display_hex().to_string(),
                 restore_height.height,
                 String::from(""),
                 true,
@@ -189,7 +190,7 @@ impl Wallet {
         tracing::debug!(
             "sent transfer of {} to {} in {}",
             amount,
-            public_spend_key,
+            public_spend_key.display_hex(),
             res.tx_hash
         );
 
@@ -216,7 +217,7 @@ impl Wallet {
         let address = Address::standard(self.network, public_spend_key, public_view_key.into());
 
         let check_interval = tokio::time::interval(self.sync_interval);
-        let key = transfer_proof.tx_key().to_string();
+        let key = transfer_proof.tx_key().display_hex().to_string();
 
         wait_for_confirmations(
             txid.0,
