@@ -16,6 +16,7 @@ use reqwest::Url;
 use rust_decimal::prelude::*;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::fmt;
@@ -106,18 +107,6 @@ impl Wallet {
         tracing::info!(%txid, %kind, "Published Bitcoin transaction");
 
         Ok((txid, subscription))
-    }
-
-    pub async fn sign_and_finalize(&self, psbt: PartiallySignedTransaction) -> Result<Transaction> {
-        let (signed_psbt, finalized) = self.wallet.lock().await.sign(psbt, None)?;
-
-        if !finalized {
-            bail!("PSBT is not finalized")
-        }
-
-        let tx = signed_psbt.extract_tx();
-
-        Ok(tx)
     }
 
     pub async fn get_raw_transaction(&self, txid: Txid) -> Result<Transaction> {
@@ -257,6 +246,18 @@ where
     C: EstimateFeeRate,
     D: BatchDatabase,
 {
+    pub async fn sign_and_finalize(&self, psbt: PartiallySignedTransaction) -> Result<Transaction> {
+        let (signed_psbt, finalized) = self.wallet.lock().await.sign(psbt, None)?;
+
+        if !finalized {
+            bail!("PSBT is not finalized")
+        }
+
+        let tx = signed_psbt.extract_tx();
+
+        Ok(tx)
+    }
+
     pub async fn balance(&self) -> Result<Amount> {
         let balance = self
             .wallet
@@ -293,6 +294,10 @@ where
         Ok(Amount::from_sat(fees))
     }
 
+    /// Builds a partially signed transaction
+    ///
+    /// Ensures that the address script is at output index `0`
+    /// for the partially signed transaction.
     pub async fn send_to_address(
         &self,
         address: Address,
@@ -301,11 +306,30 @@ where
         let wallet = self.wallet.lock().await;
         let client = self.client.lock().await;
         let fee_rate = client.estimate_feerate(self.target_block)?;
+        let script = address.script_pubkey();
 
         let mut tx_builder = wallet.build_tx();
-        tx_builder.add_recipient(address.script_pubkey(), amount.as_sat());
+        tx_builder.add_recipient(script.clone(), amount.as_sat());
         tx_builder.fee_rate(fee_rate);
         let (psbt, _details) = tx_builder.finish()?;
+        let mut psbt: PartiallySignedTransaction = psbt;
+
+        // When subscribing to transactions we depend on the relevant script being at
+        // output index 0, thus we ensure the relevant output to be at index `0`.
+        psbt.outputs.sort_by(|a, _| {
+            if a.witness_script.as_ref() == Some(&script) {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            }
+        });
+        psbt.global.unsigned_tx.output.sort_by(|a, _| {
+            if a.script_pubkey == script {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            }
+        });
 
         Ok(psbt)
     }
@@ -480,7 +504,7 @@ where
         use bitcoin::OutPoint;
         use testutils::testutils;
 
-        let descriptors = testutils!(@descriptors ("wpkh(tpubEBr4i6yk5nf5DAaJpsi9N2pPYBeJ7fZ5Z9rmN4977iYLCGco1VyjB9tvvuvYtfZzjD5A8igzgw3HeWeeKFmanHYqksqZXYXGsw5zjnj7KM9/*)"));
+        let descriptors = testutils!(@descriptors ("wpkh(tprv8ZgxMBicQKsPeZRHk4rTG6orPS2CRNFX3njhUXx5vj9qGog5ZMH4uGReDWN5kCkY3jmWEtWause41CDvBRXD1shKknAMKxT99o9qUTRVC6m/*)"));
 
         let mut database = MemoryDatabase::new();
         bdk::populate_test_db!(
@@ -760,7 +784,7 @@ impl fmt::Display for ScriptStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bitcoin::TxLock;
+    use crate::bitcoin::{PublicKey, TxLock};
     use proptest::prelude::*;
 
     #[test]
@@ -989,5 +1013,52 @@ mod tests {
         let amount = wallet.max_giveable(TxLock::script_size()).await.unwrap();
 
         assert!(amount.as_sat() > 0);
+    }
+
+    /// This test ensures that the relevant script output of the transaction
+    /// created out of the PSBT is at index 0. This is important because
+    /// subscriptions to the transaction are on index `0` when broadcasting the
+    /// transaction.
+    #[tokio::test]
+    async fn given_amounts_with_change_outputs_when_signing_tx_then_output_index_0_is_ensured_for_script(
+    ) {
+        // We don't care about fees in this test, thus use a zero fee rate
+        struct NoFeeRate();
+        impl EstimateFeeRate for NoFeeRate {
+            fn estimate_feerate(&self, _target_block: usize) -> Result<FeeRate> {
+                Ok(FeeRate::from_sat_per_vb(0.0))
+            }
+
+            fn min_relay_fee(&self) -> Result<bitcoin::Amount> {
+                Ok(bitcoin::Amount::from_sat(0))
+            }
+        }
+
+        // This value is somewhat arbitrary but the indexation problem usually occurred
+        // on the first or second value (i.e. 547, 548) We keep the test
+        // iterations relatively low because these tests are expensive.
+        let above_dust = 547;
+        let balance = 2000;
+
+        let wallet = Wallet::new_funded(balance, NoFeeRate());
+
+        // sorting is only relevant for amounts that have a change output
+        // if the change output is below dust it will be dropped by the BDK
+        for amount in above_dust..(balance - (above_dust - 1)) {
+            let (A, B) = (PublicKey::random(), PublicKey::random());
+            let txlock = TxLock::new(&wallet, bitcoin::Amount::from_sat(amount), A, B)
+                .await
+                .unwrap();
+            let txlock_output = txlock.script_pubkey();
+
+            let tx = wallet.sign_and_finalize(txlock.into()).await.unwrap();
+            let tx_output = tx.output[0].script_pubkey.clone();
+
+            assert_eq!(
+                tx_output, txlock_output,
+                "Output {:?} index mismatch for amount {} and balance {}",
+                tx.output, amount, balance
+            );
+        }
     }
 }
