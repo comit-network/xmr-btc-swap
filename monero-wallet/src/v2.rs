@@ -9,7 +9,10 @@ pub struct EmptyTransaction {}
 
 impl EmptyTransaction {
     // TODO: Need to validate that given index matches with tx pubkey and commitment
-    pub fn spend_from(input: OwnedTxOut<'_>, global_output_index: u64) -> Result<InputAdded, MissingOpening> {
+    pub fn spend_from(
+        input: OwnedTxOut<'_>,
+        global_output_index: u64,
+    ) -> Result<InputAdded, MissingOpening> {
         todo!()
     }
 }
@@ -19,7 +22,10 @@ pub struct MissingOpening; // The opening was missing from the TX
 pub struct InputAdded {}
 
 impl InputAdded {
-    pub fn with_decoys(self, decoys: [DecoyInput; 10]) -> Result<DecoyOffsetsAdded, DuplicateIndex> {
+    pub fn with_decoys(
+        self,
+        decoys: [DecoyInput; 10],
+    ) -> Result<DecoyOffsetsAdded, DuplicateIndex> {
         todo!()
     }
 
@@ -83,7 +89,9 @@ impl OutputsBlinded {
 
     /// Signs the transaction.
     ///
-    /// This function calls the CLSAG sign algorithm with a set of parameters that will work. This however, assumes the caller does not want to have control over these parameters.
+    /// This function calls the CLSAG sign algorithm with a set of parameters
+    /// that will work. This however, assumes the caller does not want to have
+    /// control over these parameters.
     pub fn sign(self, keys: KeyPair, rng: &mut (impl RngCore + CryptoRng)) -> Transaction {
         // TODO: Do we want a sign_recommended API in monero::clsag?
 
@@ -92,8 +100,9 @@ impl OutputsBlinded {
 
     /// Use the given signature for the internal transaction.
     ///
-    /// This function is useful if the caller wants to have full control over certain parameters such as responses, L, R or I.
-    /// The provided signature will be validated to make sure it is correct.
+    /// This function is useful if the caller wants to have full control over
+    /// certain parameters such as responses, L, R or I. The provided
+    /// signature will be validated to make sure it is correct.
     pub fn with_signature(self, sig: Clsag) -> Result<Transaction, InvalidSignature> {
         todo!()
     }

@@ -155,16 +155,13 @@ async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
             .await
             .unwrap();
 
-    (
-        monero,
-        Containers {
-            bitcoind_url,
-            bitcoind,
-            monerod_container,
-            monero_wallet_rpc_containers,
-            electrs,
-        },
-    )
+    (monero, Containers {
+        bitcoind_url,
+        bitcoind,
+        monerod_container,
+        monero_wallet_rpc_containers,
+        electrs,
+    })
 }
 
 async fn init_bitcoind_container(

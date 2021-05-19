@@ -63,7 +63,8 @@ impl ConfidentialTransactionBuilder {
             input_commitment: input_to_spend.commitment().unwrap(), // TODO: Error handling
             spend_amount: input_to_spend.amount().unwrap(),         // TODO: Error handling,
             global_output_index,
-            real_commitment_blinder: input_to_spend.blinding_factor().unwrap(), // TODO: Error handling
+            real_commitment_blinder: input_to_spend.blinding_factor().unwrap(), /* TODO: Error
+                                                                                 * handling */
         }
     }
 
@@ -312,7 +313,8 @@ impl CalculateKeyOffsetBoundaries for monerod::Client {
             .into_iter()
             .max()
             .context("Expected at least one output index")?;
-        // let oldest_index = last_index - (last_index / 100) * 40; // oldest index must be within last 40% TODO: CONFIRM THIS
+        // let oldest_index = last_index - (last_index / 100) * 40; // oldest index must
+        // be within last 40% TODO: CONFIRM THIS
 
         Ok((VarInt(0), VarInt(last_index)))
     }
@@ -340,7 +342,8 @@ impl FetchDecoyInputs for monerod::Client {
             .map(|(out_key, index)| {
                 DecoyInput {
                     global_output_index: *index,
-                    key: out_key.key.point.decompress().unwrap(), // TODO: should decompress on deserialization
+                    key: out_key.key.point.decompress().unwrap(), /* TODO: should decompress on
+                                                                   * deserialization */
                     commitment: CompressedEdwardsY(out_key.mask.key).decompress().unwrap(),
                 }
             })
@@ -378,22 +381,19 @@ mod tests {
 
         let relative_offsets = to_relative_offsets(&key_offsets);
 
-        assert_eq!(
-            &relative_offsets,
-            &[
-                VarInt(78),
-                VarInt(3),
-                VarInt(10),
-                VarInt(0),
-                VarInt(5),
-                VarInt(2),
-                VarInt(3),
-                VarInt(11),
-                VarInt(1),
-                VarInt(1),
-                VarInt(3),
-            ]
-        )
+        assert_eq!(&relative_offsets, &[
+            VarInt(78),
+            VarInt(3),
+            VarInt(10),
+            VarInt(0),
+            VarInt(5),
+            VarInt(2),
+            VarInt(3),
+            VarInt(11),
+            VarInt(1),
+            VarInt(1),
+            VarInt(3),
+        ])
     }
 
     #[tokio::test]
