@@ -44,13 +44,13 @@ impl GetConfig for Mainnet {
     fn get_config() -> Config {
         Config {
             bitcoin_lock_confirmed_timeout: 24.hours(),
-            bitcoin_finality_confirmations: 3,
+            bitcoin_finality_confirmations: 2,
             bitcoin_avg_block_time: 10.minutes(),
             bitcoin_cancel_timelock: CancelTimelock::new(72),
             bitcoin_punish_timelock: PunishTimelock::new(72),
             bitcoin_network: bitcoin::Network::Bitcoin,
             monero_avg_block_time: 2.minutes(),
-            monero_finality_confirmations: 15,
+            monero_finality_confirmations: 10,
             monero_network: monero::Network::Mainnet,
         }
     }
@@ -60,13 +60,13 @@ impl GetConfig for Testnet {
     fn get_config() -> Config {
         Config {
             bitcoin_lock_confirmed_timeout: 12.hours(),
-            bitcoin_finality_confirmations: 3,
+            bitcoin_finality_confirmations: 2,
             bitcoin_avg_block_time: 10.minutes(),
             bitcoin_cancel_timelock: CancelTimelock::new(12),
             bitcoin_punish_timelock: PunishTimelock::new(6),
             bitcoin_network: bitcoin::Network::Testnet,
             monero_avg_block_time: 2.minutes(),
-            monero_finality_confirmations: 15,
+            monero_finality_confirmations: 10,
             monero_network: monero::Network::Stagenet,
         }
     }
