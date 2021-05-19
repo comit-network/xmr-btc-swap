@@ -2333,17 +2333,9 @@ dependencies = [
  "anyhow",
  "curve25519-dalek",
  "hash_edwards_to_edwards",
- "hex 0.4.3",
- "hex-literal",
- "itertools 0.10.0",
  "monero",
- "monero-harness",
- "monero-rpc",
- "monero-wallet",
  "rand 0.7.3",
- "testcontainers 0.12.0",
  "tiny-keccak",
- "tokio",
 ]
 
 [[package]]

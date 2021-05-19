@@ -41,7 +41,7 @@ impl InputAdded {
     pub fn with_decoys_from_indices(
         self,
         decoy_indices: [u64; 10],
-        client: &(impl FetchDecoyInputs),
+        client: &impl FetchDecoyInputs,
     ) -> Result<DecoyOffsetsAdded, DuplicateIndex> {
         todo!()
     }

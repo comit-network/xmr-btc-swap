@@ -11,15 +11,3 @@ rand = "0.7"
 tiny-keccak = { version = "2", features = ["keccak"] }
 hash_edwards_to_edwards = { git = "https://github.com/comit-network/hash_edwards_to_edwards" }
 monero = "0.12"
-hex = "0.4"
-itertools = "0.10"
-
-[dev-dependencies]
-hex = "0.4"
-hex-literal = "0.3"
-monero-harness = { path = "../monero-harness" }
-monero-rpc = { path = "../monero-rpc" }
-monero-wallet = { path = "../monero-wallet" }
-testcontainers = "0.12"
-tokio = { version = "1", features = ["full"] }
-itertools = "0.10"
