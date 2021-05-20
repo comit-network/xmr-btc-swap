@@ -100,6 +100,8 @@ async fn main() -> Result<()> {
                 .behaviour_mut()
                 .add_address(seller_peer_id, seller_addr);
 
+            let our_peer_id = swarm.local_peer_id();
+            tracing::debug!(peer_id = %our_peer_id, "Initializing network module");
             let (event_loop, mut event_loop_handle) = EventLoop::new(
                 swap_id,
                 swarm,
@@ -110,7 +112,7 @@ async fn main() -> Result<()> {
             let event_loop = tokio::spawn(event_loop.run());
 
             let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
-            let (send_bitcoin, fees) = determine_btc_to_swap(
+            let (amount, fees) = determine_btc_to_swap(
                 event_loop_handle.request_quote(),
                 bitcoin_wallet.new_address(),
                 || bitcoin_wallet.balance(),
@@ -119,7 +121,7 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            info!("Swapping {} with {} fees", send_bitcoin, fees);
+            info!(%amount, %fees, %swap_id,  "Swapping");
 
             db.insert_peer_id(swap_id, seller_peer_id).await?;
 
@@ -131,7 +133,7 @@ async fn main() -> Result<()> {
                 env_config,
                 event_loop_handle,
                 monero_receive_address,
-                send_bitcoin,
+                amount,
             );
 
             tokio::select! {
@@ -193,8 +195,8 @@ async fn main() -> Result<()> {
             let seller_peer_id = db.get_peer_id(swap_id)?;
 
             let mut swarm = swarm::bob(&seed, seller_peer_id, tor_socks5_port).await?;
-            let bob_peer_id = swarm.local_peer_id();
-            tracing::debug!("Our peer-id: {}", bob_peer_id);
+            let our_peer_id = swarm.local_peer_id();
+            tracing::debug!(peer_id = %our_peer_id, "Initializing network module");
             swarm
                 .behaviour_mut()
                 .add_address(seller_peer_id, seller_addr);
@@ -353,10 +355,10 @@ where
     debug!("Requesting quote");
     let bid_quote = bid_quote.await?;
     info!(
+        price = %bid_quote.price,
         minimum_amount = %bid_quote.min_quantity,
         maximum_amount = %bid_quote.max_quantity,
-        "Received quote: 1 XMR ~ {}",
-        bid_quote.price
+        "Received quote: 1 XMR ~ ",
     );
 
     let mut current_maximum_giveable = max_giveable().await?;

@@ -61,7 +61,7 @@ async fn next_state(
     env_config: &Config,
     receive_monero_address: monero::Address,
 ) -> Result<BobState> {
-    tracing::trace!("Current state: {}", state);
+    tracing::trace!(%state, "Advancing state");
 
     Ok(match state {
         BobState::Started { btc_amount } => {
@@ -152,7 +152,7 @@ async fn next_state(
                         match received_xmr {
                             Ok(()) => BobState::XmrLocked(state.xmr_locked(monero_wallet_restore_blockheight)),
                             Err(e) => {
-                                 tracing::warn!("Waiting for refund because insufficient Monero have been locked! {}", e);
+                                 tracing::warn!("Waiting for refund because insufficient Monero have been locked! {:#}", e);
                                  tx_lock_status.wait_until_confirmed_with(state.cancel_timelock).await?;
 
                                  BobState::CancelTimelockExpired(state.cancel())
@@ -205,10 +205,10 @@ async fn next_state(
         BobState::BtcRedeemed(state) => {
             let (spend_key, view_key) = state.xmr_keys();
 
-            let generated_wallet_file_name = swap_id.to_string();
+            let wallet_file_name = swap_id.to_string();
             if let Err(e) = monero_wallet
                 .create_from_and_load(
-                    generated_wallet_file_name.clone(),
+                    wallet_file_name.clone(),
                     spend_key,
                     view_key,
                     state.monero_wallet_restore_blockheight,
@@ -219,11 +219,10 @@ async fn next_state(
                 // exist! This is a very unlikely scenario, but if we don't take care of it we
                 // might not be able to ever transfer the Monero.
                 tracing::warn!("Failed to generate monero wallet from keys: {:#}", e);
-                tracing::info!(
-                    "Falling back to trying to open the the wallet if it already exists: {}",
-                    swap_id
+                tracing::info!(%wallet_file_name,
+                    "Falling back to trying to open the the wallet if it already exists",
                 );
-                monero_wallet.open(generated_wallet_file_name).await?;
+                monero_wallet.open(wallet_file_name).await?;
             }
 
             // Ensure that the generated wallet is synced so we have a proper balance
@@ -232,7 +231,7 @@ async fn next_state(
             let tx_hashes = monero_wallet.sweep_all(receive_monero_address).await?;
 
             for tx_hash in tx_hashes {
-                tracing::info!("Sent XMR to {} in tx {}", receive_monero_address, tx_hash.0);
+                tracing::info!(%receive_monero_address, txid=%tx_hash.0, "Sent XMR to");
             }
 
             BobState::XmrRedeemed {
@@ -281,7 +280,7 @@ pub async fn request_price_and_setup(
 ) -> Result<bob::state::State2> {
     let xmr = event_loop_handle.request_spot_price(btc).await?;
 
-    tracing::info!("Spot price for {} is {}", btc, xmr);
+    tracing::info!(%btc, %xmr, "Spot price");
 
     let state0 = State0::new(
         swap_id,
