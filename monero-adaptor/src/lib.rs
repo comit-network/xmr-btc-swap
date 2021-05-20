@@ -14,47 +14,44 @@ pub use self::bob::*;
 pub use self::commitment::*;
 pub use self::messages::*;
 
-use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use monero::util::ringct::Clsag;
 
 pub struct AdaptorSignature {
-    s_0: Scalar,
-    fake_responses: [Scalar; 10],
-    h_0: Scalar,
-    /// Commitment key image `D = z * hash_to_p3(signing_public_key)`
-    D: EdwardsPoint,
+    inner: Clsag,
+    signing_kex_index: usize,
 }
 
 pub struct HalfAdaptorSignature {
-    s_0_half: Scalar,
-    fake_responses: [Scalar; 10],
-    h_0: Scalar,
-    /// Commitment key image `D = z * hash_to_p3(signing_public_key)`
-    D: EdwardsPoint,
+    inner: Clsag,
+    signing_kex_index: usize,
+    stupid_constant: Scalar,
 }
 
 impl HalfAdaptorSignature {
     fn complete(self, s_other_half: Scalar) -> AdaptorSignature {
+        let mut sig = self.inner;
+        let signing_kex_index = self.signing_kex_index;
+
+        sig.s[signing_kex_index] += s_other_half;
+        sig.s[signing_kex_index] += self.stupid_constant;
+
         AdaptorSignature {
-            s_0: self.s_0_half + s_other_half,
-            fake_responses: self.fake_responses,
-            h_0: self.h_0,
-            D: self.D,
+            inner: sig,
+            signing_kex_index,
         }
+    }
+
+    fn s_half(&self) -> Scalar {
+        self.inner.s[self.signing_kex_index]
     }
 }
 
 impl AdaptorSignature {
     pub fn adapt(self, y: Scalar) -> Clsag {
-        let r_last = self.s_0 + y;
+        let mut sig = self.inner;
+        sig.s[self.signing_kex_index] += y;
 
-        Clsag {
-            s: std::iter::once(r_last)
-                .chain(self.fake_responses.iter().copied())
-                .collect(),
-            D: self.D,
-            c1: self.h_0,
-        }
+        sig
     }
 }

@@ -3,6 +3,6 @@ members = ["monero-adaptor", "monero-harness", "monero-rpc", "swap", "monero-wal
 
 [patch.crates-io]
 torut = { git = "https://github.com/bonomat/torut/", branch = "feature-flag-tor-secret-keys", default-features = false, features = [ "v3", "control" ] }
-monero = { git = "https://github.com/comit-network/monero-rs", rev = "fee1f7054a4b8500dcf7867ebd1b9e7f693cd566" }
+monero = { git = "https://github.com/comit-network/monero-rs", rev = "2fe0280c5c8a6fadcd8fed780875e1a9e830e57e" }
 monero-epee-bin-serde = { git = "https://github.com/comit-network/monero-epee-bin-serde" }
 curve25519-dalek = { git = "https://github.com/thomaseizinger/curve25519-dalek", rev = "8cc9ad36bd30ceab6073ff64655473c6b5aa4aab" }

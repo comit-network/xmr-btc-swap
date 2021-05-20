@@ -126,7 +126,7 @@ impl Bob1 {
             .verify(ED25519_BASEPOINT_POINT, T_a, self.H_p_pk, I_hat_a)?;
 
         let I = I_a + self.I_b;
-        let sig = monero::clsag::sign(
+        let (sig, stupid_constant) = monero::clsag::sign(
             &self.msg,
             self.s_b,
             0,
@@ -142,13 +142,12 @@ impl Bob1 {
             I,
         );
 
-        let s_0_b = sig.s[0];
         let sig = HalfAdaptorSignature {
-            s_0_half: s_0_b,
-            fake_responses,
-            h_0: sig.c1,
-            D: sig.D,
+            inner: sig,
+            signing_kex_index: 0,
+            stupid_constant,
         };
+        let s_0_b = sig.s_half();
         let adaptor_sig = sig.complete(msg.s_0_a);
 
         Ok(Bob2 { s_0_b, adaptor_sig })

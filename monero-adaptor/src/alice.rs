@@ -43,9 +43,7 @@ impl Alice0 {
         rng: &mut (impl Rng + CryptoRng),
     ) -> anyhow::Result<Self> {
         let mut fake_responses = [Scalar::zero(); 10];
-        for response in fake_responses.iter_mut().take(10) {
-            *response = Scalar::random(rng);
-        }
+        fake_responses.fill_with(|| Scalar::random(rng));
         let alpha_a = Scalar::random(rng);
 
         let p_k = ring[0];
@@ -92,7 +90,7 @@ impl Alice0 {
             .verify(ED25519_BASEPOINT_POINT, msg.T_b, self.H_p_pk, msg.I_hat_b)?;
 
         let I = self.I_a + msg.I_b;
-        let sig = monero::clsag::sign(
+        let (sig, stupid_constant) = monero::clsag::sign(
             &self.msg,
             self.s_prime_a,
             0,
@@ -109,10 +107,9 @@ impl Alice0 {
         );
 
         let sig = HalfAdaptorSignature {
-            s_0_half: sig.s[0],
-            fake_responses: self.fake_responses,
-            h_0: sig.c1,
-            D: sig.D,
+            inner: sig,
+            signing_kex_index: 0,
+            stupid_constant,
         };
 
         Ok(Alice1 {
@@ -139,7 +136,7 @@ impl Alice1 {
     pub fn next_message(&self) -> Message2 {
         Message2 {
             d_a: Opening::new(self.fake_responses, self.I_a, self.I_hat_a, self.T_a),
-            s_0_a: self.sig.s_0_half,
+            s_0_a: self.sig.s_half(),
         }
     }
 
