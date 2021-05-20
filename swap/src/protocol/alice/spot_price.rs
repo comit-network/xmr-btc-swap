@@ -1,9 +1,9 @@
-use crate::monero;
 use crate::network::cbor_request_response::CborCodec;
 use crate::network::spot_price;
-use crate::network::spot_price::SpotPriceProtocol;
+use crate::network::spot_price::{BlockchainNetwork, SpotPriceProtocol};
 use crate::protocol::alice;
 use crate::protocol::alice::event_loop::LatestRate;
+use crate::{env, monero};
 use libp2p::request_response::{
     ProtocolSupport, RequestResponseConfig, RequestResponseEvent, RequestResponseMessage,
     ResponseChannel,
@@ -48,6 +48,8 @@ where
     #[behaviour(ignore)]
     max_buy: bitcoin::Amount,
     #[behaviour(ignore)]
+    env_config: env::Config,
+    #[behaviour(ignore)]
     latest_rate: LR,
     #[behaviour(ignore)]
     resume_only: bool,
@@ -66,6 +68,7 @@ where
         lock_fee: monero::Amount,
         min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,
+        env_config: env::Config,
         latest_rate: LR,
         resume_only: bool,
     ) -> Self {
@@ -80,6 +83,7 @@ where
             lock_fee,
             min_buy,
             max_buy,
+            env_config,
             latest_rate,
             resume_only,
         }
@@ -153,6 +157,19 @@ where
                 return;
             }
         };
+
+        let blockchain_network = BlockchainNetwork {
+            bitcoin: self.env_config.bitcoin_network,
+            monero: self.env_config.monero_network,
+        };
+
+        if request.blockchain_network != blockchain_network {
+            self.decline(peer, channel, Error::BlockchainNetworkMismatch {
+                cli: request.blockchain_network,
+                asb: blockchain_network,
+            });
+            return;
+        }
 
         if self.resume_only {
             self.decline(peer, channel, Error::ResumeOnlyMode);
@@ -246,12 +263,15 @@ pub enum Error {
         balance: monero::Amount,
         buy: bitcoin::Amount,
     },
-
     #[error("Failed to fetch latest rate")]
     LatestRateFetchFailed(#[source] Box<dyn std::error::Error + Send + 'static>),
-
     #[error("Failed to calculate quote: {0}")]
     SellQuoteCalculationFailed(#[source] anyhow::Error),
+    #[error("Blockchain networks did not match, we are on {asb:?}, but request from {cli:?}")]
+    BlockchainNetworkMismatch {
+        cli: spot_price::BlockchainNetwork,
+        asb: spot_price::BlockchainNetwork,
+    },
 }
 
 impl Error {
@@ -267,6 +287,12 @@ impl Error {
                 buy: *buy,
             },
             Error::BalanceTooLow { buy, .. } => spot_price::Error::BalanceTooLow { buy: *buy },
+            Error::BlockchainNetworkMismatch { cli, asb } => {
+                spot_price::Error::BlockchainNetworkMismatch {
+                    cli: *cli,
+                    asb: *asb,
+                }
+            }
             Error::LatestRateFetchFailed(_) | Error::SellQuoteCalculationFailed(_) => {
                 spot_price::Error::Other
             }
@@ -278,6 +304,7 @@ impl Error {
 mod tests {
     use super::*;
     use crate::asb::Rate;
+    use crate::env::GetConfig;
     use crate::monero;
     use crate::network::test::{await_events_or_timeout, connect, new_swarm};
     use crate::protocol::{alice, bob};
@@ -294,6 +321,7 @@ mod tests {
                 max_buy: bitcoin::Amount::from_btc(0.01).unwrap(),
                 rate: TestRate::default(), // 0.01
                 resume_only: false,
+                env_config: env::Testnet::get_config(),
             }
         }
     }
@@ -305,9 +333,7 @@ mod tests {
         let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
         let expected_xmr = monero::Amount::from_monero(1.0).unwrap();
 
-        let request = spot_price::Request { btc: btc_to_swap };
-
-        test.send_request(request);
+        test.construct_and_send_request(btc_to_swap);
         test.assert_price((btc_to_swap, expected_xmr), expected_xmr)
             .await;
     }
@@ -321,9 +347,7 @@ mod tests {
 
         let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
 
-        let request = spot_price::Request { btc: btc_to_swap };
-
-        test.send_request(request);
+        test.construct_and_send_request(btc_to_swap);
         test.assert_error(
             alice::spot_price::Error::BalanceTooLow {
                 balance: monero::Amount::ZERO,
@@ -341,9 +365,7 @@ mod tests {
         let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
         let expected_xmr = monero::Amount::from_monero(1.0).unwrap();
 
-        let request = spot_price::Request { btc: btc_to_swap };
-
-        test.send_request(request);
+        test.construct_and_send_request(btc_to_swap);
         test.assert_price((btc_to_swap, expected_xmr), expected_xmr)
             .await;
 
@@ -351,9 +373,7 @@ mod tests {
             .behaviour_mut()
             .update_balance(monero::Amount::ZERO);
 
-        let request = spot_price::Request { btc: btc_to_swap };
-
-        test.send_request(request);
+        test.construct_and_send_request(btc_to_swap);
         test.assert_error(
             alice::spot_price::Error::BalanceTooLow {
                 balance: monero::Amount::ZERO,
@@ -376,10 +396,7 @@ mod tests {
         .await;
 
         let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
-
-        let request = spot_price::Request { btc: btc_to_swap };
-
-        test.send_request(request);
+        test.construct_and_send_request(btc_to_swap);
         test.assert_error(
             alice::spot_price::Error::BalanceTooLow {
                 balance,
@@ -398,10 +415,7 @@ mod tests {
             SpotPriceTest::setup(AliceBehaviourValues::default().with_min_buy(min_buy)).await;
 
         let btc_to_swap = bitcoin::Amount::from_btc(0.0001).unwrap();
-
-        let request = spot_price::Request { btc: btc_to_swap };
-
-        test.send_request(request);
+        test.construct_and_send_request(btc_to_swap);
         test.assert_error(
             alice::spot_price::Error::AmountBelowMinimum {
                 buy: btc_to_swap,
@@ -424,9 +438,7 @@ mod tests {
 
         let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
 
-        let request = spot_price::Request { btc: btc_to_swap };
-
-        test.send_request(request);
+        test.construct_and_send_request(btc_to_swap);
         test.assert_error(
             alice::spot_price::Error::AmountAboveMaximum {
                 buy: btc_to_swap,
@@ -446,10 +458,7 @@ mod tests {
             SpotPriceTest::setup(AliceBehaviourValues::default().with_resume_only(true)).await;
 
         let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
-
-        let request = spot_price::Request { btc: btc_to_swap };
-
-        test.send_request(request);
+        test.construct_and_send_request(btc_to_swap);
         test.assert_error(
             alice::spot_price::Error::ResumeOnlyMode,
             bob::spot_price::Error::NoSwapsAccepted,
@@ -464,10 +473,7 @@ mod tests {
                 .await;
 
         let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
-
-        let request = spot_price::Request { btc: btc_to_swap };
-
-        test.send_request(request);
+        test.construct_and_send_request(btc_to_swap);
         test.assert_error(
             alice::spot_price::Error::LatestRateFetchFailed(Box::new(TestRateError {})),
             bob::spot_price::Error::Other,
@@ -484,14 +490,85 @@ mod tests {
 
         let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
 
-        let request = spot_price::Request { btc: btc_to_swap };
-
-        test.send_request(request);
+        test.construct_and_send_request(btc_to_swap);
         test.assert_error(
             alice::spot_price::Error::SellQuoteCalculationFailed(anyhow!(
                 "Error text irrelevant, won't be checked here"
             )),
             bob::spot_price::Error::Other,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn given_alice_mainnnet_bob_testnet_then_network_mismatch_error() {
+        let mut test = SpotPriceTest::setup(
+            AliceBehaviourValues::default().with_env_config(env::Mainnet::get_config()),
+        )
+        .await;
+
+        let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
+        test.construct_and_send_request(btc_to_swap);
+        test.assert_error(
+            alice::spot_price::Error::BlockchainNetworkMismatch {
+                cli: BlockchainNetwork {
+                    bitcoin: bitcoin::Network::Testnet,
+                    monero: monero::Network::Stagenet,
+                },
+                asb: BlockchainNetwork {
+                    bitcoin: bitcoin::Network::Bitcoin,
+                    monero: monero::Network::Mainnet,
+                },
+            },
+            bob::spot_price::Error::BlockchainNetworkMismatch {
+                cli: BlockchainNetwork {
+                    bitcoin: bitcoin::Network::Testnet,
+                    monero: monero::Network::Stagenet,
+                },
+                asb: BlockchainNetwork {
+                    bitcoin: bitcoin::Network::Bitcoin,
+                    monero: monero::Network::Mainnet,
+                },
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn given_alice_testnet_bob_mainnet_then_network_mismatch_error() {
+        let mut test = SpotPriceTest::setup(AliceBehaviourValues::default()).await;
+
+        let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
+        let request = spot_price::Request {
+            btc: btc_to_swap,
+            blockchain_network: BlockchainNetwork {
+                bitcoin: bitcoin::Network::Bitcoin,
+                monero: monero::Network::Mainnet,
+            },
+        };
+
+        test.send_request(request);
+        test.assert_error(
+            alice::spot_price::Error::BlockchainNetworkMismatch {
+                cli: BlockchainNetwork {
+                    bitcoin: bitcoin::Network::Bitcoin,
+                    monero: monero::Network::Mainnet,
+                },
+                asb: BlockchainNetwork {
+                    bitcoin: bitcoin::Network::Testnet,
+                    monero: monero::Network::Stagenet,
+                },
+            },
+            bob::spot_price::Error::BlockchainNetworkMismatch {
+                cli: BlockchainNetwork {
+                    bitcoin: bitcoin::Network::Bitcoin,
+                    monero: monero::Network::Mainnet,
+                },
+                asb: BlockchainNetwork {
+                    bitcoin: bitcoin::Network::Testnet,
+                    monero: monero::Network::Stagenet,
+                },
+            },
         )
         .await;
     }
@@ -511,6 +588,7 @@ mod tests {
                     values.lock_fee,
                     values.min_buy,
                     values.max_buy,
+                    values.env_config,
                     values.rate.clone(),
                     values.resume_only,
                 )
@@ -524,6 +602,17 @@ mod tests {
                 bob_swarm,
                 alice_peer_id,
             }
+        }
+
+        pub fn construct_and_send_request(&mut self, btc_to_swap: bitcoin::Amount) {
+            let request = spot_price::Request {
+                btc: btc_to_swap,
+                blockchain_network: BlockchainNetwork {
+                    bitcoin: bitcoin::Network::Testnet,
+                    monero: monero::Network::Stagenet,
+                },
+            };
+            self.send_request(request);
         }
 
         pub fn send_request(&mut self, spot_price_request: spot_price::Request) {
@@ -589,6 +678,19 @@ mod tests {
                             assert_eq!(buy1, buy2);
                         }
                         (
+                            alice::spot_price::Error::BlockchainNetworkMismatch {
+                                cli: cli1,
+                                asb: asb1,
+                            },
+                            alice::spot_price::Error::BlockchainNetworkMismatch {
+                                cli: cli2,
+                                asb: asb2,
+                            },
+                        ) => {
+                            assert_eq!(cli1, cli2);
+                            assert_eq!(asb1, asb2);
+                        }
+                        (
                             alice::spot_price::Error::AmountBelowMinimum { .. },
                             alice::spot_price::Error::AmountBelowMinimum { .. },
                         )
@@ -640,6 +742,7 @@ mod tests {
         pub max_buy: bitcoin::Amount,
         pub rate: TestRate, // 0.01
         pub resume_only: bool,
+        pub env_config: env::Config,
     }
 
     impl AliceBehaviourValues {
@@ -670,6 +773,11 @@ mod tests {
 
         pub fn with_rate(mut self, rate: TestRate) -> AliceBehaviourValues {
             self.rate = rate;
+            self
+        }
+
+        pub fn with_env_config(mut self, env_config: env::Config) -> AliceBehaviourValues {
+            self.env_config = env_config;
             self
         }
     }

@@ -1,9 +1,10 @@
+use crate::asb;
 use crate::bitcoin::{CancelTimelock, PunishTimelock};
 use std::cmp::max;
 use std::time::Duration;
 use time::NumericalStdDurationShort;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Config {
     pub bitcoin_lock_confirmed_timeout: Duration,
     pub bitcoin_finality_confirmations: u32,
@@ -43,13 +44,13 @@ impl GetConfig for Mainnet {
     fn get_config() -> Config {
         Config {
             bitcoin_lock_confirmed_timeout: 24.hours(),
-            bitcoin_finality_confirmations: 3,
+            bitcoin_finality_confirmations: 2,
             bitcoin_avg_block_time: 10.minutes(),
             bitcoin_cancel_timelock: CancelTimelock::new(72),
             bitcoin_punish_timelock: PunishTimelock::new(72),
             bitcoin_network: bitcoin::Network::Bitcoin,
             monero_avg_block_time: 2.minutes(),
-            monero_finality_confirmations: 15,
+            monero_finality_confirmations: 10,
             monero_network: monero::Network::Mainnet,
         }
     }
@@ -59,8 +60,8 @@ impl GetConfig for Testnet {
     fn get_config() -> Config {
         Config {
             bitcoin_lock_confirmed_timeout: 12.hours(),
-            bitcoin_finality_confirmations: 1,
-            bitcoin_avg_block_time: 5.minutes(),
+            bitcoin_finality_confirmations: 2,
+            bitcoin_avg_block_time: 10.minutes(),
             bitcoin_cancel_timelock: CancelTimelock::new(12),
             bitcoin_punish_timelock: PunishTimelock::new(6),
             bitcoin_network: bitcoin::Network::Testnet,
@@ -89,6 +90,33 @@ impl GetConfig for Regtest {
 
 fn sync_interval(avg_block_time: Duration) -> Duration {
     max(avg_block_time / 10, Duration::from_secs(1))
+}
+
+pub fn new(is_testnet: bool, asb_config: &asb::config::Config) -> Config {
+    let env_config = if is_testnet {
+        Testnet::get_config()
+    } else {
+        Mainnet::get_config()
+    };
+
+    let env_config =
+        if let Some(bitcoin_finality_confirmations) = asb_config.bitcoin.finality_confirmations {
+            Config {
+                bitcoin_finality_confirmations,
+                ..env_config
+            }
+        } else {
+            env_config
+        };
+
+    if let Some(monero_finality_confirmations) = asb_config.monero.finality_confirmations {
+        Config {
+            monero_finality_confirmations,
+            ..env_config
+        }
+    } else {
+        env_config
+    }
 }
 
 #[cfg(test)]

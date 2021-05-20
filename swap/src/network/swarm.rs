@@ -2,12 +2,13 @@ use crate::network::transport;
 use crate::protocol::alice::event_loop::LatestRate;
 use crate::protocol::{alice, bob};
 use crate::seed::Seed;
-use crate::{monero, tor};
+use crate::{env, monero, tor};
 use anyhow::Result;
 use libp2p::swarm::{NetworkBehaviour, SwarmBuilder};
 use libp2p::{PeerId, Swarm};
 use std::fmt::Debug;
 
+#[allow(clippy::too_many_arguments)]
 pub fn alice<LR>(
     seed: &Seed,
     balance: monero::Amount,
@@ -16,6 +17,7 @@ pub fn alice<LR>(
     max_buy: bitcoin::Amount,
     latest_rate: LR,
     resume_only: bool,
+    env_config: env::Config,
 ) -> Result<Swarm<alice::Behaviour<LR>>>
 where
     LR: LatestRate + Send + 'static + Debug,
@@ -29,6 +31,7 @@ where
             max_buy,
             latest_rate,
             resume_only,
+            env_config,
         ),
     )
 }

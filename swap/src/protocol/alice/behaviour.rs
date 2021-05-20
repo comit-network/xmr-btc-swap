@@ -1,8 +1,8 @@
-use crate::monero;
 use crate::network::quote::BidQuote;
 use crate::network::{encrypted_signature, quote, transfer_proof};
 use crate::protocol::alice::event_loop::LatestRate;
 use crate::protocol::alice::{execution_setup, spot_price, State3};
+use crate::{env, monero};
 use anyhow::{anyhow, Error};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
@@ -88,6 +88,7 @@ where
         max_buy: bitcoin::Amount,
         latest_rate: LR,
         resume_only: bool,
+        env_config: env::Config,
     ) -> Self {
         Self {
             quote: quote::alice(),
@@ -96,6 +97,7 @@ where
                 lock_fee,
                 min_buy,
                 max_buy,
+                env_config,
                 latest_rate,
                 resume_only,
             ),

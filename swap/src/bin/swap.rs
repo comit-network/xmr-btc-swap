@@ -15,21 +15,21 @@
 use anyhow::{bail, Context, Result};
 use prettytable::{row, Table};
 use std::cmp::min;
+use std::env;
 use std::future::Future;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use structopt::StructOpt;
 use swap::bitcoin::TxLock;
-use swap::cli::command::{Arguments, Command, MoneroParams};
+use swap::cli::command::{parse_args_and_apply_defaults, Arguments, Command};
 use swap::database::Database;
-use swap::env::{Config, GetConfig};
+use swap::env::Config;
 use swap::network::quote::BidQuote;
 use swap::network::swarm;
 use swap::protocol::bob;
 use swap::protocol::bob::{EventLoop, Swap};
 use swap::seed::Seed;
-use swap::{bitcoin, cli, env, monero};
+use swap::{bitcoin, cli, monero};
 use tracing::{debug, error, info, warn};
 use url::Url;
 use uuid::Uuid;
@@ -39,41 +39,33 @@ extern crate prettytable;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let Arguments { data, debug, cmd } = Arguments::from_args();
+    let Arguments {
+        env_config,
+        data_dir,
+        debug,
+        cmd,
+    } = parse_args_and_apply_defaults(env::args_os())?;
 
     match cmd {
         Command::BuyXmr {
-            alice_peer_id,
-            alice_multiaddr,
-            monero_params:
-                MoneroParams {
-                    receive_monero_address,
-                    monero_daemon_host,
-                },
-            electrum_rpc_url,
-            tor_socks5_port,
+            seller_peer_id,
+            seller_addr,
+            bitcoin_electrum_rpc_url,
             bitcoin_target_block,
+            monero_receive_address,
+            monero_daemon_address,
+            tor_socks5_port,
         } => {
             let swap_id = Uuid::new_v4();
 
-            let data_dir = data.0;
             cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
-            let env_config = env::Testnet::get_config();
-
-            if receive_monero_address.network != env_config.monero_network {
-                bail!(
-                    "Given monero address is on network {:?}, expected address on network {:?}",
-                    receive_monero_address.network,
-                    env_config.monero_network
-                )
-            }
 
             let bitcoin_wallet = init_bitcoin_wallet(
-                electrum_rpc_url,
+                bitcoin_electrum_rpc_url,
                 &seed,
                 data_dir.clone(),
                 env_config,
@@ -81,17 +73,22 @@ async fn main() -> Result<()> {
             )
             .await?;
             let (monero_wallet, _process) =
-                init_monero_wallet(data_dir, monero_daemon_host, env_config).await?;
+                init_monero_wallet(data_dir, monero_daemon_address, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
-            let mut swarm = swarm::bob(&seed, alice_peer_id, tor_socks5_port).await?;
+            let mut swarm = swarm::bob(&seed, seller_peer_id, tor_socks5_port).await?;
             swarm
                 .behaviour_mut()
-                .add_address(alice_peer_id, alice_multiaddr);
+                .add_address(seller_peer_id, seller_addr);
 
             let swap_id = Uuid::new_v4();
-            let (event_loop, mut event_loop_handle) =
-                EventLoop::new(swap_id, swarm, alice_peer_id, bitcoin_wallet.clone())?;
+            let (event_loop, mut event_loop_handle) = EventLoop::new(
+                swap_id,
+                swarm,
+                seller_peer_id,
+                bitcoin_wallet.clone(),
+                env_config,
+            )?;
             let event_loop = tokio::spawn(event_loop.run());
 
             let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
@@ -106,7 +103,7 @@ async fn main() -> Result<()> {
 
             info!("Swapping {} with {} fees", send_bitcoin, fees);
 
-            db.insert_peer_id(swap_id, alice_peer_id).await?;
+            db.insert_peer_id(swap_id, seller_peer_id).await?;
 
             let swap = Swap::new(
                 db,
@@ -115,7 +112,7 @@ async fn main() -> Result<()> {
                 Arc::new(monero_wallet),
                 env_config,
                 event_loop_handle,
-                receive_monero_address,
+                monero_receive_address,
                 send_bitcoin,
             );
 
@@ -130,8 +127,6 @@ async fn main() -> Result<()> {
             }
         }
         Command::History => {
-            let data_dir = data.0;
-
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
 
@@ -148,30 +143,25 @@ async fn main() -> Result<()> {
         }
         Command::Resume {
             swap_id,
-            alice_multiaddr,
-            monero_params:
-                MoneroParams {
-                    receive_monero_address,
-                    monero_daemon_host,
-                },
-            electrum_rpc_url,
-            tor_socks5_port,
+            seller_addr,
+            bitcoin_electrum_rpc_url,
             bitcoin_target_block,
+            monero_receive_address,
+            monero_daemon_address,
+            tor_socks5_port,
         } => {
-            let data_dir = data.0;
             cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
-            let env_config = env::Testnet::get_config();
 
-            if receive_monero_address.network != env_config.monero_network {
-                bail!("The given monero address is on network {:?}, expected address of network {:?}.", receive_monero_address.network, env_config.monero_network)
+            if monero_receive_address.network != env_config.monero_network {
+                bail!("The given monero address is on network {:?}, expected address of network {:?}.", monero_receive_address.network, env_config.monero_network)
             }
 
             let bitcoin_wallet = init_bitcoin_wallet(
-                electrum_rpc_url,
+                bitcoin_electrum_rpc_url,
                 &seed,
                 data_dir.clone(),
                 env_config,
@@ -179,20 +169,25 @@ async fn main() -> Result<()> {
             )
             .await?;
             let (monero_wallet, _process) =
-                init_monero_wallet(data_dir, monero_daemon_host, env_config).await?;
+                init_monero_wallet(data_dir, monero_daemon_address, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
-            let alice_peer_id = db.get_peer_id(swap_id)?;
+            let seller_peer_id = db.get_peer_id(swap_id)?;
 
-            let mut swarm = swarm::bob(&seed, alice_peer_id, tor_socks5_port).await?;
+            let mut swarm = swarm::bob(&seed, seller_peer_id, tor_socks5_port).await?;
             let bob_peer_id = swarm.local_peer_id();
             tracing::debug!("Our peer-id: {}", bob_peer_id);
             swarm
                 .behaviour_mut()
-                .add_address(alice_peer_id, alice_multiaddr);
+                .add_address(seller_peer_id, seller_addr);
 
-            let (event_loop, event_loop_handle) =
-                EventLoop::new(swap_id, swarm, alice_peer_id, bitcoin_wallet.clone())?;
+            let (event_loop, event_loop_handle) = EventLoop::new(
+                swap_id,
+                swarm,
+                seller_peer_id,
+                bitcoin_wallet.clone(),
+                env_config,
+            )?;
             let handle = tokio::spawn(event_loop.run());
 
             let swap = Swap::from_db(
@@ -202,7 +197,7 @@ async fn main() -> Result<()> {
                 Arc::new(monero_wallet),
                 env_config,
                 event_loop_handle,
-                receive_monero_address,
+                monero_receive_address,
             )?;
 
             tokio::select! {
@@ -217,19 +212,17 @@ async fn main() -> Result<()> {
         Command::Cancel {
             swap_id,
             force,
-            electrum_rpc_url,
+            bitcoin_electrum_rpc_url,
             bitcoin_target_block,
         } => {
-            let data_dir = data.0;
             cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
-            let env_config = env::Testnet::get_config();
 
             let bitcoin_wallet = init_bitcoin_wallet(
-                electrum_rpc_url,
+                bitcoin_electrum_rpc_url,
                 &seed,
                 data_dir,
                 env_config,
@@ -251,19 +244,17 @@ async fn main() -> Result<()> {
         Command::Refund {
             swap_id,
             force,
-            electrum_rpc_url,
+            bitcoin_electrum_rpc_url,
             bitcoin_target_block,
         } => {
-            let data_dir = data.0;
             cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
-            let env_config = env::Testnet::get_config();
 
             let bitcoin_wallet = init_bitcoin_wallet(
-                electrum_rpc_url,
+                bitcoin_electrum_rpc_url,
                 &seed,
                 data_dir,
                 env_config,
@@ -303,7 +294,7 @@ async fn init_bitcoin_wallet(
 
 async fn init_monero_wallet(
     data_dir: PathBuf,
-    monero_daemon_host: String,
+    monero_daemon_address: String,
     env_config: Config,
 ) -> Result<(monero::Wallet, monero::WalletRpcProcess)> {
     let network = env_config.monero_network;
@@ -313,7 +304,7 @@ async fn init_monero_wallet(
     let monero_wallet_rpc = monero::WalletRpc::new(data_dir.join("monero")).await?;
 
     let monero_wallet_rpc_process = monero_wallet_rpc
-        .run(network, monero_daemon_host.as_str())
+        .run(network, monero_daemon_address.as_str())
         .await?;
 
     let monero_wallet = monero::Wallet::open_or_create(

@@ -32,6 +32,7 @@ impl ProtocolName for SpotPriceProtocol {
 pub struct Request {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub btc: bitcoin::Amount,
+    pub blockchain_network: BlockchainNetwork,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -59,9 +60,21 @@ pub enum Error {
         #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
         buy: bitcoin::Amount,
     },
+    BlockchainNetworkMismatch {
+        cli: BlockchainNetwork,
+        asb: BlockchainNetwork,
+    },
     /// To be used for errors that cannot be explained on the CLI side (e.g.
     /// rate update problems on the seller side)
     Other,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+pub struct BlockchainNetwork {
+    #[serde(with = "crate::bitcoin::network")]
+    pub bitcoin: bitcoin::Network,
+    #[serde(with = "crate::monero::network")]
+    pub monero: monero::Network,
 }
 
 #[cfg(test)]
@@ -101,6 +114,21 @@ mod tests {
             buy: Default::default(),
         }))
         .unwrap();
+        assert_eq!(error, serialized);
+
+        let error = r#"{"Error":{"BlockchainNetworkMismatch":{"cli":{"bitcoin":"Mainnet","monero":"Mainnet"},"asb":{"bitcoin":"Testnet","monero":"Stagenet"}}}}"#.to_string();
+        let serialized =
+            serde_json::to_string(&Response::Error(Error::BlockchainNetworkMismatch {
+                cli: BlockchainNetwork {
+                    bitcoin: bitcoin::Network::Bitcoin,
+                    monero: monero::Network::Mainnet,
+                },
+                asb: BlockchainNetwork {
+                    bitcoin: bitcoin::Network::Testnet,
+                    monero: monero::Network::Stagenet,
+                },
+            }))
+            .unwrap();
         assert_eq!(error, serialized);
 
         let error = r#"{"Error":"Other"}"#.to_string();

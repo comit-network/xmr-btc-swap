@@ -211,7 +211,8 @@ where
                             match error {
                                 Error::ResumeOnlyMode
                                 | Error::AmountBelowMinimum { .. }
-                                | Error::AmountAboveMaximum { .. } => {
+                                | Error::AmountAboveMaximum { .. }
+                                | Error::BlockchainNetworkMismatch { .. } => {
                                     tracing::warn!(%peer, "Ignoring spot price request because: {}", error);
                                 }
                                 Error::BalanceTooLow { .. }

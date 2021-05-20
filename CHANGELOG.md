@@ -43,11 +43,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   1. Balance of ASB too low
   2. Buy amount sent by CLI exceeds maximum buy amount accepted by ASB
   3. ASB is running in resume-only mode and does not accept incoming swap requests
+- An issue where the monero daemon port used by the `monero-wallet-rpc` could not be specified.
+  The CLI parameter `--monero-daemon-host` was changed to `--monero-daemon-address` where host and port have to be specified.
 
 ### Changed
 
 - The ASB's `--max-buy` and `ask-spread` parameter were removed in favour of entries in the config file.
   The initial setup includes setting these two values now.
+- From this version on the CLI and ASB run on **mainnet** by default!
+  When running either application with `--testnet` Monero network defaults to `stagenet` and Bitcoin network to `testnet3`.
+  This is a breaking change.
+  It is recommended to run the applications with `--testnet` first and not just run the application on `mainnet` without experience.
 
 ## [0.5.0] - 2021-04-17
 

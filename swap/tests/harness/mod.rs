@@ -239,6 +239,7 @@ async fn start_alice(
         max_buy,
         latest_rate,
         resume_only,
+        env_config,
     )
     .unwrap();
     swarm.listen_on(listen_address).unwrap();
@@ -458,6 +459,7 @@ impl BobParams {
             swarm,
             self.alice_peer_id,
             self.bitcoin_wallet.clone(),
+            self.env_config,
         )
     }
 }

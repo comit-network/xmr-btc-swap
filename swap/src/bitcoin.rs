@@ -37,6 +37,17 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::str::FromStr;
 
+#[derive(Serialize, Deserialize)]
+#[serde(remote = "Network")]
+#[allow(non_camel_case_types)]
+pub enum network {
+    #[serde(rename = "Mainnet")]
+    Bitcoin,
+    Testnet,
+    Signet,
+    Regtest,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct SecretKey {
     inner: Scalar,
