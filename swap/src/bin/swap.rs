@@ -45,6 +45,7 @@ async fn main() -> Result<()> {
         env_config,
         data_dir,
         debug,
+        json,
         cmd,
     } = match parse_args_and_apply_defaults(env::args_os()) {
         Ok(args) => args,
@@ -76,7 +77,7 @@ async fn main() -> Result<()> {
         } => {
             let swap_id = Uuid::new_v4();
 
-            cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, json, data_dir.join("logs"), swap_id)?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -167,7 +168,7 @@ async fn main() -> Result<()> {
             monero_daemon_address,
             tor_socks5_port,
         } => {
-            cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, json, data_dir.join("logs"), swap_id)?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -232,7 +233,7 @@ async fn main() -> Result<()> {
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
         } => {
-            cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, json, data_dir.join("logs"), swap_id)?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -264,7 +265,7 @@ async fn main() -> Result<()> {
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
         } => {
-            cli::tracing::init(debug, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, json, data_dir.join("logs"), swap_id)?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
