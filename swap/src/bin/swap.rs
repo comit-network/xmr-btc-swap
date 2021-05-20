@@ -81,7 +81,6 @@ async fn main() -> Result<()> {
                 .behaviour_mut()
                 .add_address(seller_peer_id, seller_addr);
 
-            let swap_id = Uuid::new_v4();
             let (event_loop, mut event_loop_handle) = EventLoop::new(
                 swap_id,
                 swarm,
