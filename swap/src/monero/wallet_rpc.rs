@@ -85,8 +85,9 @@ impl WalletRpc {
                 .parse::<u64>()?;
 
             tracing::info!(
-                "Downloading monero-wallet-rpc ({})",
-                content_length.big_byte(2)
+                "Downloading monero-wallet-rpc ({}) from {}",
+                content_length.big_byte(2),
+                DOWNLOAD_URL
             );
 
             let byte_stream = response
