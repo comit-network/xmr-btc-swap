@@ -29,6 +29,7 @@ const DEFAULT_TOR_SOCKS5_PORT: &str = "9050";
 pub struct Arguments {
     pub env_config: env::Config,
     pub debug: bool,
+    pub json: bool,
     pub data_dir: PathBuf,
     pub cmd: Command,
 }
@@ -42,6 +43,7 @@ where
     let args = RawArguments::from_clap(&matches);
 
     let debug = args.debug;
+    let json = args.json;
     let is_testnet = args.testnet;
     let data = args.data;
 
@@ -63,6 +65,7 @@ where
         } => Ok(Arguments {
             env_config: env_config_from(is_testnet),
             debug,
+            json,
             data_dir: data::data_dir_from(data, is_testnet)?,
             cmd: Command::BuyXmr {
                 seller_peer_id,
@@ -86,6 +89,7 @@ where
         RawCommand::History => Ok(Arguments {
             env_config: env_config_from(is_testnet),
             debug,
+            json,
             data_dir: data::data_dir_from(data, is_testnet)?,
             cmd: Command::History,
         }),
@@ -106,6 +110,7 @@ where
         } => Ok(Arguments {
             env_config: env_config_from(is_testnet),
             debug,
+            json,
             data_dir: data::data_dir_from(data, is_testnet)?,
             cmd: Command::Resume {
                 swap_id,
@@ -134,6 +139,7 @@ where
         } => Ok(Arguments {
             env_config: env_config_from(is_testnet),
             debug,
+            json,
             data_dir: data::data_dir_from(data, is_testnet)?,
             cmd: Command::Cancel {
                 swap_id,
@@ -156,6 +162,7 @@ where
         } => Ok(Arguments {
             env_config: env_config_from(is_testnet),
             debug,
+            json,
             data_dir: data::data_dir_from(data, is_testnet)?,
             cmd: Command::Refund {
                 swap_id,
@@ -224,6 +231,13 @@ pub struct RawArguments {
 
     #[structopt(long, help = "Activate debug logging.")]
     pub debug: bool,
+
+    #[structopt(
+        short,
+        long = "json",
+        help = "Changes the log messages to json vs plain-text. This can be helpful to simplify automated log analyses."
+    )]
+    pub json: bool,
 
     #[structopt(subcommand)]
     pub cmd: RawCommand,
@@ -765,11 +779,77 @@ mod tests {
         assert_eq!(args, Arguments::resume_testnet_defaults().with_debug());
     }
 
+    #[test]
+    fn given_with_json_then_json_set() {
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--json",
+            "buy-xmr",
+            "--receive-address",
+            MONERO_MAINNET_ADDRESS,
+            "--seller-addr",
+            MUTLI_ADDRESS,
+            "--seller-peer-id",
+            PEER_ID,
+        ];
+
+        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+        assert_eq!(args, Arguments::buy_xmr_mainnet_defaults().with_json());
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "--json",
+            "buy-xmr",
+            "--receive-address",
+            MONERO_STAGENET_ADDRESS,
+            "--seller-addr",
+            MUTLI_ADDRESS,
+            "--seller-peer-id",
+            PEER_ID,
+        ];
+
+        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+        assert_eq!(args, Arguments::buy_xmr_testnet_defaults().with_json());
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--json",
+            "resume",
+            "--swap-id",
+            SWAP_ID,
+            "--receive-address",
+            MONERO_MAINNET_ADDRESS,
+            "--seller-addr",
+            MUTLI_ADDRESS,
+        ];
+
+        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+        assert_eq!(args, Arguments::resume_mainnet_defaults().with_json());
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "--json",
+            "resume",
+            "--swap-id",
+            SWAP_ID,
+            "--receive-address",
+            MONERO_STAGENET_ADDRESS,
+            "--seller-addr",
+            MUTLI_ADDRESS,
+        ];
+
+        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+        assert_eq!(args, Arguments::resume_testnet_defaults().with_json());
+    }
+
     impl Arguments {
         pub fn buy_xmr_testnet_defaults() -> Self {
             Self {
                 env_config: env::Testnet::get_config(),
                 debug: false,
+                json: false,
                 data_dir: data_dir_path_cli().join(TESTNET),
                 cmd: Command::BuyXmr {
                     seller_peer_id: PeerId::from_str(PEER_ID).unwrap(),
@@ -789,6 +869,7 @@ mod tests {
             Self {
                 env_config: env::Mainnet::get_config(),
                 debug: false,
+                json: false,
                 data_dir: data_dir_path_cli().join(MAINNET),
                 cmd: Command::BuyXmr {
                     seller_peer_id: PeerId::from_str(PEER_ID).unwrap(),
@@ -807,6 +888,7 @@ mod tests {
             Self {
                 env_config: env::Testnet::get_config(),
                 debug: false,
+                json: false,
                 data_dir: data_dir_path_cli().join(TESTNET),
                 cmd: Command::Resume {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
@@ -826,6 +908,7 @@ mod tests {
             Self {
                 env_config: env::Mainnet::get_config(),
                 debug: false,
+                json: false,
                 data_dir: data_dir_path_cli().join(MAINNET),
                 cmd: Command::Resume {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
@@ -844,6 +927,7 @@ mod tests {
             Self {
                 env_config: env::Testnet::get_config(),
                 debug: false,
+                json: false,
                 data_dir: data_dir_path_cli().join(TESTNET),
                 cmd: Command::Cancel {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
@@ -859,6 +943,7 @@ mod tests {
             Self {
                 env_config: env::Mainnet::get_config(),
                 debug: false,
+                json: false,
                 data_dir: data_dir_path_cli().join(MAINNET),
                 cmd: Command::Cancel {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
@@ -873,6 +958,7 @@ mod tests {
             Self {
                 env_config: env::Testnet::get_config(),
                 debug: false,
+                json: false,
                 data_dir: data_dir_path_cli().join(TESTNET),
                 cmd: Command::Refund {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
@@ -888,6 +974,7 @@ mod tests {
             Self {
                 env_config: env::Mainnet::get_config(),
                 debug: false,
+                json: false,
                 data_dir: data_dir_path_cli().join(MAINNET),
                 cmd: Command::Refund {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
@@ -905,6 +992,11 @@ mod tests {
 
         pub fn with_debug(mut self) -> Self {
             self.debug = true;
+            self
+        }
+
+        pub fn with_json(mut self) -> Self {
+            self.json = true;
             self
         }
     }

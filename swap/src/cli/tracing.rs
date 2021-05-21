@@ -5,30 +5,48 @@ use tracing::{Event, Level, Subscriber};
 use tracing_subscriber::fmt::format::{DefaultFields, Format};
 use tracing_subscriber::fmt::time::ChronoLocal;
 use tracing_subscriber::layer::{Context, SubscriberExt};
-use tracing_subscriber::{fmt, EnvFilter, Layer, Registry};
+use tracing_subscriber::{fmt, EnvFilter, FmtSubscriber, Layer, Registry};
 use uuid::Uuid;
 
-pub fn init(debug: bool, dir: impl AsRef<Path>, swap_id: Uuid) -> Result<()> {
-    let level_filter = EnvFilter::try_new("swap=debug")?;
+pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>, swap_id: Uuid) -> Result<()> {
+    if json {
+        let level = if debug { Level::DEBUG } else { Level::INFO };
 
-    let registry = Registry::default().with(level_filter);
+        let is_terminal = atty::is(atty::Stream::Stderr);
 
-    let appender = tracing_appender::rolling::never(dir, format!("swap-{}.log", swap_id));
-    let (appender, guard) = tracing_appender::non_blocking(appender);
+        FmtSubscriber::builder()
+            .with_env_filter(format!("swap={}", level))
+            .with_writer(std::io::stderr)
+            .with_ansi(is_terminal)
+            .with_timer(ChronoLocal::with_format("%F %T".to_owned()))
+            .with_target(false)
+            .json()
+            .init();
 
-    std::mem::forget(guard);
-
-    let file_logger = fmt::layer()
-        .with_ansi(false)
-        .with_target(false)
-        .with_writer(appender);
-
-    if debug {
-        set_global_default(registry.with(file_logger).with(debug_terminal_printer()))?;
+        Ok(())
     } else {
-        set_global_default(registry.with(file_logger).with(info_terminal_printer()))?;
+        let level_filter = EnvFilter::try_new("swap=debug")?;
+
+        let registry = Registry::default().with(level_filter);
+
+        let appender = tracing_appender::rolling::never(dir, format!("swap-{}.log", swap_id));
+        let (appender, guard) = tracing_appender::non_blocking(appender);
+
+        std::mem::forget(guard);
+
+        let file_logger = fmt::layer()
+            .with_ansi(false)
+            .with_target(false)
+            .with_writer(appender);
+
+        if debug {
+            set_global_default(registry.with(file_logger).with(debug_terminal_printer()))?;
+        } else {
+            set_global_default(registry.with(file_logger).with(info_terminal_printer()))?;
+        }
+
+        Ok(())
     }
-    Ok(())
 }
 
 pub struct StdErrPrinter<L> {
