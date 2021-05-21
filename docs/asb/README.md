@@ -2,10 +2,14 @@
 
 ## Quick Start ASB
 
+From version `0.6.0` onwards the software default to running on `mainnet`.
+It is recommended to try the software on testnet first, which can be achieved by providing the `--testnet` flag.
+This quickstart guide assumes that you are running the software on testnet (i.e. Bitcoin testnet3 and Monero stagenet):
+
 1. Download [latest release](https://github.com/comit-network/xmr-btc-swap/releases/latest) of the `asb` binary
 2. Ensure that you have the Monero Wallet RPC running with `--wallet-dir` and `--disable-rpc-login`:
    1. `monero-wallet-rpc --stagenet --daemon-host STAGENET-NODE-URL --rpc-bind-port STAGENET-NODE-PORT --disable-rpc-login --wallet-dir PATH/TO/WALLET/DIR`
-3. Run the ASB in terminal: `./asb start`
+3. Run the ASB in terminal: `./asb --testnet start`
 4. Follow the setup wizard in the terminal
 
 Public Monero stagenet nodes for running the Monero Wallet RPC:
@@ -14,6 +18,14 @@ Public Monero stagenet nodes for running the Monero Wallet RPC:
 - `stagenet.community.xmr.to:38081`
 
 Run `./asb --help` for more information.
+
+### Running on mainnet
+
+Public Monero mainnet nodes can be found [here](https://moneroworld.com/#nodes).
+The default mainnet node is set to `node.moneroworld.com:18089`.
+
+For running the ASB on mainnet you will have to change you `monero-wallet-rpc` setup to mainnet.
+The default port for expecting the `monero-wallet-rpc` when running the ASB on mainnet is `18083`.
 
 ## ASB Details
 
