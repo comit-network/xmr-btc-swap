@@ -30,7 +30,7 @@ pub fn private_key_from_secp256k1_scalar(scalar: bitcoin::Scalar) -> PrivateKey 
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
-pub struct PrivateViewKey(#[serde(with = "monero_private_key")] PrivateKey);
+pub struct PrivateViewKey(#[serde(with = "monero_private_key")] pub PrivateKey);
 
 impl PrivateViewKey {
     pub fn new_random<R: RngCore + CryptoRng>(rng: &mut R) -> Self {

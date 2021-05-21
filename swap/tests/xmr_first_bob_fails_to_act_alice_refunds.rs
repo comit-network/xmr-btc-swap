@@ -1,16 +1,24 @@
 pub mod harness;
 
 use rand::rngs::OsRng;
-use swap::bitcoin::TxLock;
+use swap::bitcoin::BtcLock;
 use swap::env::GetConfig;
 use swap::monero;
+use swap::monero::TransferRequest;
 use swap::protocol::alice::event_loop::FixedRate;
 use swap::protocol::CROSS_CURVE_PROOF_SYSTEM;
 use swap::seed::Seed;
 use swap::xmr_first_protocol::alice::{publish_xmr_refund, Alice3};
 use swap::xmr_first_protocol::bob::Bob3;
+use swap::xmr_first_protocol::transactions::btc_lock::BtcLock;
+use swap::xmr_first_protocol::transactions::xmr_lock::XmrLock;
+use swap::xmr_first_protocol::transactions::xmr_refund::XmrRefund;
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
+use swap::xmr_first_protocol::transactions::btc_redeem::BtcRedeem;
+use monero::{PublicKey, PrivateKey};
+use swap::xmr_first_protocol::setup;
+use swap::xmr_first_protocol::transactions::xmr_redeem::XmrRedeem;
 
 #[tokio::test]
 async fn refund() {
@@ -63,48 +71,60 @@ async fn refund() {
         &bob_seed,
         env_config,
     )
-    .await;
+        .await;
 
-    let a = swap::bitcoin::SecretKey::new_random(&mut OsRng);
-    let b = swap::bitcoin::SecretKey::new_random(&mut OsRng);
+    let (alice, bob) = setup();
 
-    let s_a = monero::Scalar::random(&mut OsRng);
-    let S_a = monero::PublicKey::from_private_key(&monero::PrivateKey { scalar: s_a });
+    let btc_redeem_address = alice_bitcoin_wallet.new_address().await.unwrap();
 
-    let s_b = monero::Scalar::random(&mut OsRng);
-    let S_b = monero::PublicKey::from_private_key(&monero::PrivateKey { scalar: s_b });
+    // transactions
+    let btc_lock =
+        BtcLock::new(&bob_bitcoin_wallet, btc_swap_amount, a.public(), b.public()).await?;
+    let btc_redeem = BtcRedeem::new(&btc_lock, &btc_redeem_address);
+    let xmr_lock = XmrLock::new(alice.S_a.into(), alice.S_b, alice.v_a, alice.v_b, xmr_swap_amount);
+    //let xmr_redeem = XmrRedeem::new(s_a, PrivateKey::from_scalar(bob.s_b), alice.v_a, alice.v_b, xmr_swap_amount);
+    let xmr_refund = XmrRefund::new(sig, xmr_swap_amount);
 
-    let (dleq_proof_s_b, (S_b_bitcoin, S_b_monero)) =
-        CROSS_CURVE_PROOF_SYSTEM.prove(&s_b, &mut OsRng);
+    // Alice publishes xmr_lock
+    let xmr_lock_transfer_proof = alice_monero_wallet
+        .transfer(xmr_lock.transfer_request())
+        .await
+        .unwrap();
 
-    let v_a = monero::PrivateViewKey::new_random(&mut OsRng);
-    let v_b = monero::PrivateViewKey::new_random(&mut OsRng);
+    // Bob waits until xmr_lock is seen
+    let _ = bob_monero_wallet
+        .watch_for_transfer(xmr_lock.watch_request(xmr_lock_transfer_proof))
+        .await
+        .unwrap();
 
-    let tx_lock = TxLock::new(&bob_bitcoin_wallet, btc_swap_amount, a.public(), b.public()).await?;
+    // Bob publishes btc_lock
+    let signed_tx_lock = bob_bitcoin_wallet
+        .sign_and_finalize(btc_lock.clone().into())
+        .await?;
+    let (_txid, sub) = bob_bitcoin_wallet.broadcast(signed_tx_lock, "lock").await.unwrap();
+    let _ = sub.wait_until_confirmed_with(1).await?;
 
-    let alice = Alice3 {
-        xmr_swap_amount,
-        btc_swap_amount,
-        a,
-        B: b.public(),
-        s_a,
-        S_b_monero: monero::PublicKey {
-            point: S_b_monero.compress(),
-        },
-        v_a,
-        redeem_address: alice_bitcoin_wallet.new_address().await?,
-    };
+    // alice publishes xmr_refund
+    // let xmr_refund_transfer_proof = alice_monero_wallet
+    //     .transfer(xmr_refund.transfer_request())
+    //     .await
+    //     .unwrap();
 
-    let bob = Bob3 {
-        xmr_swap_amount,
-        btc_swap_amount,
-        tx_lock,
-        S: S_b,
-        v_b,
-        alice_redeem_address: bob_bitcoin_wallet.new_address().await?,
-    };
+    // alice publishes btc_redeem
+    btc_redeem.encsig((), ());
+    let (_, btc_redeem_sub) = alice_bitcoin_wallet.broadcast(btc_redeem.build_transaction(alice.a, alice.s_a, alice.pk_b, btc_lock.), "redeem")
+        .await
+        .unwrap();
 
-    let alice = alice.publish_xmr_lock(&alice_monero_wallet).await.unwrap();
+    // bob sees xmr_refund and btc_redeem
+    let _ = bob_monero_wallet
+        .watch_for_transfer(xmr_lock.watch_request(xmr_refund_transfer_proof))
+        .await
+        .unwrap();
+    let _ = btc_redeem_sub.wait_until_seen()
+        .await
+        .unwrap();
 
-    publish_xmr_refund(&alice_bitcoin_wallet).await.unwrap();
+    // extract r_a from xmr_refund
+    let _ = bob_bitcoin_wallet.broadcast("redeem")
 }

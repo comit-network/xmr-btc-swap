@@ -26,6 +26,7 @@ dialoguer = "0.8"
 directories-next = "2"
 ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", features = ["libsecp_compat", "serde"] }
 futures = { version = "0.3", default-features = false }
+hash_edwards_to_edwards = { git = "https://github.com/comit-network/hash_edwards_to_edwards" }
 itertools = "0.10"
 libp2p = { version = "0.36", default-features = false, features = ["tcp-tokio", "yamux", "mplex", "dns-tokio", "noise", "request-response"] }
 libp2p-async-await = { git = "https://github.com/comit-network/rust-libp2p-async-await" }

@@ -1,12 +1,14 @@
 use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{
     verify_encsig, verify_sig, Address, EmptyWitnessStack, EncryptedSignature, NoInputs,
-    NotThreeWitnesses, PublicKey, SecretKey, TooManyInputs, Transaction, TxLock,
+    NotThreeWitnesses, PublicKey, SecretKey, TooManyInputs, Transaction, TX_FEE,
 };
+use crate::xmr_first_protocol::transactions::btc_lock::BtcLock;
 use ::bitcoin::util::bip143::SigHashCache;
 use ::bitcoin::{SigHash, SigHashType, Txid};
 use anyhow::{bail, Context, Result};
-use bitcoin::Script;
+use bdk::bitcoin::Script;
+use bitcoin::{PrivateKey, TxIn, TxOut};
 use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
 use ecdsa_fun::fun::Scalar;
 use ecdsa_fun::nonce::Deterministic;
@@ -16,15 +18,15 @@ use sha2::Sha256;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
-pub struct TxRedeem {
+pub struct BtcRedeem {
     inner: Transaction,
     digest: SigHash,
     lock_output_descriptor: Descriptor<::bitcoin::PublicKey>,
     watch_script: Script,
 }
 
-impl TxRedeem {
-    pub fn new(tx_lock: &TxLock, redeem_address: &Address) -> Self {
+impl BtcRedeem {
+    pub fn new(tx_lock: &BtcLock, redeem_address: &Address) -> Self {
         // lock_input is the shared output that is now being used as an input for the
         // redeem transaction
         let tx_redeem = tx_lock.build_spend_transaction(redeem_address, None);
@@ -52,12 +54,20 @@ impl TxRedeem {
         self.digest
     }
 
+    pub fn encsig(
+        &self,
+        b: SecretKey,
+        S_a_bitcoin: PublicKey,
+    ) -> crate::bitcoin::EncryptedSignature {
+        b.encsign(S_a_bitcoin, self.digest())
+    }
+
     pub fn complete(
         mut self,
-        encrypted_signature: EncryptedSignature,
         a: SecretKey,
         s_a: Scalar,
         B: PublicKey,
+        encrypted_signature: EncryptedSignature,
     ) -> Result<Transaction> {
         verify_encsig(
             B,
@@ -76,11 +86,11 @@ impl TxRedeem {
 
             let A = ::bitcoin::PublicKey {
                 compressed: true,
-                key: a.public().into(),
+                key: a.public.into(),
             };
             let B = ::bitcoin::PublicKey {
                 compressed: true,
-                key: B.into(),
+                key: B.0.into(),
             };
 
             // The order in which these are inserted doesn't matter
@@ -104,7 +114,7 @@ impl TxRedeem {
     ) -> Result<Signature> {
         let input = match candidate_transaction.input.as_slice() {
             [input] => input,
-            [] => bail!(NoInputs),
+            [] => bail!("no inputs"),
             [inputs @ ..] => bail!("too many inputs"),
         };
 
@@ -122,7 +132,7 @@ impl TxRedeem {
                         .map(Signature::from)
                 })
                 .collect::<std::result::Result<Vec<_>, _>>(),
-            [] => bail!(EmptyWitnessStack),
+            [] => bail!("empty witness stack"),
             [witnesses @ ..] => bail!("not three witnesses"),
         }?;
 
@@ -133,9 +143,47 @@ impl TxRedeem {
 
         Ok(sig)
     }
+
+    pub fn build_transaction(
+        &self,
+        a: SecretKey,
+        s_a: Scalar,
+        B: PublicKey,
+        encsig: EncryptedSignature,
+    ) -> Transaction {
+        let signed_tx_redeem = self.complete(a, s_a, B, encsig)?;
+        signed_tx_redeem
+    }
+
+    pub fn build_take_transaction(
+        &self,
+        spend_address: &Address,
+        sequence: Option<u32>,
+    ) -> Transaction {
+        let previous_output = self.as_outpoint();
+
+        let tx_in = TxIn {
+            previous_output,
+            script_sig: Default::default(),
+            sequence: sequence.unwrap_or(0xFFFF_FFFF),
+            witness: Vec::new(),
+        };
+
+        let tx_out = TxOut {
+            value: self.inner.clone().extract_tx().output[self.lock_output_vout()].value - TX_FEE,
+            script_pubkey: spend_address.script_pubkey(),
+        };
+
+        Transaction {
+            version: 2,
+            lock_time: 0,
+            input: vec![tx_in],
+            output: vec![tx_out],
+        }
+    }
 }
 
-impl Watchable for TxRedeem {
+impl Watchable for BtcRedeem {
     fn id(&self) -> Txid {
         self.txid()
     }

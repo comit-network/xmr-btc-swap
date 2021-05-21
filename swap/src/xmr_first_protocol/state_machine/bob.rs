@@ -7,7 +7,7 @@ pub struct StateMachine {
 }
 
 impl StateMachine {
-    fn next(&mut self, event: Event) {
+    fn inject_event(&mut self, event: Event) {
         match self.state {
             State::WatchingForXmrLock => match event {
                 Event::XmrConfirmed => {
@@ -41,9 +41,11 @@ impl StateMachine {
         }
     }
 
-    fn run(&mut self) {
-        while let Some(event) = self.events.pop_front() {
-            self.next(event);
+    fn poll(&mut self) -> Poll<Action> {
+        if let Some(action) = self.actions.pop_front() {
+            Poll::Ready(action)
+        } else {
+            Poll::Pending
         }
     }
 }

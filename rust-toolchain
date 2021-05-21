@@ -1,4 +1,4 @@
 [toolchain]
-channel = "nightly-2021-04-15"
+channel = "nightly-2021-05-17"
 components = ["rustfmt", "clippy"]
 targets = ["armv7-unknown-linux-gnueabihf"]

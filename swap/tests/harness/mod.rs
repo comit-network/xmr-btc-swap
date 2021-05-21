@@ -834,7 +834,7 @@ pub async fn init_test_wallets(
 
 // This is just to keep the containers alive
 #[allow(dead_code)]
-struct Containers<'a> {
+pub struct Containers<'a> {
     pub bitcoind_url: Url,
     bitcoind: Container<'a, Cli, bitcoind::Bitcoind>,
     monerods: Vec<Container<'a, Cli, image::Monero>>,

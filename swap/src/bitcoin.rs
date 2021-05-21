@@ -49,7 +49,7 @@ pub const TX_FEE: u64 = 15_000;
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct SecretKey {
     inner: Scalar,
-    public: Point,
+    pub(crate) public: Point,
 }
 
 impl SecretKey {
@@ -104,7 +104,7 @@ impl SecretKey {
 }
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq)]
-pub struct PublicKey(Point);
+pub struct PublicKey(pub(crate) Point);
 
 impl PublicKey {
     #[cfg(test)]

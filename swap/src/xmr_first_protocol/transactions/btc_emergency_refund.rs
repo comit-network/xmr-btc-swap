@@ -4,6 +4,7 @@ use crate::bitcoin::{
     NotThreeWitnesses, PublicKey, SecretKey, TooManyInputs, Transaction,
 };
 use crate::xmr_first_protocol::transactions::btc_lock::BtcLock;
+use crate::xmr_first_protocol::transactions::btc_redeem::BtcRedeem;
 use ::bitcoin::util::bip143::SigHashCache;
 use ::bitcoin::{SigHash, SigHashType, Txid};
 use anyhow::{bail, Context, Result};
@@ -17,30 +18,28 @@ use sha2::Sha256;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
-pub struct EmergencyRefund {
+pub struct BtcEmergencyRefund {
     inner: Transaction,
     digest: SigHash,
     lock_output_descriptor: Descriptor<::bitcoin::PublicKey>,
     watch_script: Script,
 }
 
-impl EmergencyRefund {
-    pub fn new(tx_lock: &BtcLock, redeem_address: &Address) -> Self {
-        // lock_input is the shared output that is now being used as an input for the
-        // redeem transaction
-        let tx_redeem = tx_lock.build_spend_transaction(redeem_address, None);
+impl BtcEmergencyRefund {
+    pub fn new(tx_redeem: &BtcRedeem, redeem_address: &Address) -> Self {
+        let tx_refund = tx_redeem.build_take_transaction(redeem_address, None);
 
-        let digest = SigHashCache::new(&tx_redeem).signature_hash(
+        let digest = SigHashCache::new(&tx_refund).signature_hash(
             0, // Only one input: lock_input (lock transaction)
-            &tx_lock.output_descriptor.script_code(),
-            tx_lock.lock_amount().as_sat(),
+            &tx_refund.output_descriptor.script_code(),
+            tx_refund.lock_amount().as_sat(),
             SigHashType::All,
         );
 
         Self {
-            inner: tx_redeem,
+            inner: tx_refund,
             digest,
-            lock_output_descriptor: tx_lock.output_descriptor.clone(),
+            lock_output_descriptor: tx_refund.output_descriptor.clone(),
             watch_script: redeem_address.script_pubkey(),
         }
     }
@@ -51,14 +50,6 @@ impl EmergencyRefund {
 
     pub fn digest(&self) -> SigHash {
         self.digest
-    }
-
-    pub fn encsig(
-        &self,
-        b: SecretKey,
-        S_a_bitcoin: PublicKey,
-    ) -> crate::bitcoin::EncryptedSignature {
-        b.encsign(S_a_bitcoin, self.digest())
     }
 
     pub fn complete(
@@ -105,46 +96,9 @@ impl EmergencyRefund {
 
         Ok(self.inner)
     }
-
-    pub fn extract_signature_by_key(
-        &self,
-        candidate_transaction: Transaction,
-        B: PublicKey,
-    ) -> Result<Signature> {
-        let input = match candidate_transaction.input.as_slice() {
-            [input] => input,
-            [] => bail!("no inputs"),
-            [inputs @ ..] => bail!("too many inputs"),
-        };
-
-        let sigs = match input
-            .witness
-            .iter()
-            .map(|vec| vec.as_slice())
-            .collect::<Vec<_>>()
-            .as_slice()
-        {
-            [sig_1, sig_2, _script] => [sig_1, sig_2]
-                .iter()
-                .map(|sig| {
-                    bitcoin::secp256k1::Signature::from_der(&sig[..sig.len() - 1])
-                        .map(Signature::from)
-                })
-                .collect::<std::result::Result<Vec<_>, _>>(),
-            [] => bail!("empty witness stack"),
-            [witnesses @ ..] => bail!("not three witnesses"),
-        }?;
-
-        let sig = sigs
-            .into_iter()
-            .find(|sig| verify_sig(&B, &self.digest(), &sig).is_ok())
-            .context("Neither signature on witness stack verifies against B")?;
-
-        Ok(sig)
-    }
 }
 
-impl Watchable for EmergencyRefund {
+impl Watchable for BtcEmergencyRefund {
     fn id(&self) -> Txid {
         self.txid()
     }
