@@ -50,19 +50,39 @@ pub async fn redeem(
             let redeem_tx = state3.signed_redeem_transaction(*encrypted_signature)?;
             let (txid, subscription) = bitcoin_wallet.broadcast(redeem_tx, "redeem").await?;
 
+            subscription.wait_until_seen().await?;
+
+            let state = AliceState::BtcRedeemTransactionPublished { state3 };
+            let db_state = (&state).into();
+            db.insert_latest_state(swap_id, Swap::Alice(db_state))
+                .await?;
+
             if let Finality::Await = finality {
                 subscription.wait_until_final().await?;
             }
 
             let state = AliceState::BtcRedeemed;
             let db_state = (&state).into();
-
             db.insert_latest_state(swap_id, Swap::Alice(db_state))
                 .await?;
 
             Ok((txid, state))
         }
+        AliceState::BtcRedeemTransactionPublished { state3 } => {
+            let subscription = bitcoin_wallet.subscribe_to(state3.tx_redeem()).await;
+            if let Finality::Await = finality {
+                subscription.wait_until_final().await?;
+            }
 
+            let state = AliceState::BtcRedeemed;
+            let db_state = (&state).into();
+            db.insert_latest_state(swap_id, Swap::Alice(db_state))
+                .await?;
+
+            let txid = state3.tx_redeem().txid();
+
+            Ok((txid, state))
+        }
         AliceState::Started { .. }
         | AliceState::BtcLocked { .. }
         | AliceState::XmrLockTransactionSent { .. }

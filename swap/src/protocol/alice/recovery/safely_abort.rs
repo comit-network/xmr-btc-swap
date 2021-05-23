@@ -22,6 +22,7 @@ pub async fn safely_abort(swap_id: Uuid, db: Arc<Database>) -> Result<AliceState
         | AliceState::XmrLocked { .. }
         | AliceState::XmrLockTransferProofSent { .. }
         | AliceState::EncSigLearned { .. }
+        | AliceState::BtcRedeemTransactionPublished { .. }
         | AliceState::CancelTimelockExpired { .. }
         | AliceState::BtcCancelled { .. }
         | AliceState::BtcRefunded { .. }

@@ -204,10 +204,10 @@ where
                 let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
                 match state3.signed_redeem_transaction(*encrypted_signature) {
                     Ok(tx) => match bitcoin_wallet.broadcast(tx, "redeem").await {
-                        Ok((_, subscription)) => match subscription.wait_until_final().await {
-                            Ok(_) => AliceState::BtcRedeemed,
+                        Ok((_, subscription)) => match subscription.wait_until_seen().await {
+                            Ok(_) => AliceState::BtcRedeemTransactionPublished { state3 },
                             Err(e) => {
-                                bail!("Waiting for Bitcoin transaction finality failed with {}! The redeem transaction was published, but it is not ensured that the transaction was included! You're screwed.", e)
+                                bail!("Waiting for Bitcoin redeem transaction to be in mempool failed with {}! The redeem transaction was published, but it is not ensured that the transaction was included! You're screwed.", e)
                             }
                         },
                         Err(error) => {
@@ -247,6 +247,16 @@ where
                 state3,
             },
         },
+        AliceState::BtcRedeemTransactionPublished { state3 } => {
+            let subscription = bitcoin_wallet.subscribe_to(state3.tx_redeem()).await;
+
+            match subscription.wait_until_final().await {
+                Ok(_) => AliceState::BtcRedeemed,
+                Err(e) => {
+                    bail!("The Bitcoin redeem transaction was seen in mempool, but waiting for finality timed out with {}. Manual investigation might be needed to ensure that the transaction was included.", e)
+                }
+            }
+        }
         AliceState::CancelTimelockExpired {
             monero_wallet_restore_blockheight,
             transfer_proof,

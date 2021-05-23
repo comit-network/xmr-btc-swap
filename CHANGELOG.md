@@ -45,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   3. ASB is running in resume-only mode and does not accept incoming swap requests
 - An issue where the monero daemon port used by the `monero-wallet-rpc` could not be specified.
   The CLI parameter `--monero-daemon-host` was changed to `--monero-daemon-address` where host and port have to be specified.
+- An issue where an ASB redeem scenario can transition to a cancel and publish scenario that will fail.
+  This is a breaking change for the ASB, because it introduces a new state into the database.
 
 ### Changed
 

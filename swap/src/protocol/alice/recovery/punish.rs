@@ -50,7 +50,8 @@ pub async fn punish(
             }
 
             // If the swap was refunded it cannot be punished
-            AliceState::BtcRefunded {..}
+            AliceState::BtcRedeemTransactionPublished { .. }
+            | AliceState::BtcRefunded {..}
             // Alice already in final state
             | AliceState::BtcRedeemed
             | AliceState::XmrRefunded
