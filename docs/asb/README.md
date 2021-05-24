@@ -21,11 +21,12 @@ Run `./asb --help` for more information.
 
 ### Running on mainnet
 
-Public Monero mainnet nodes can be found [here](https://moneroworld.com/#nodes).
-The default mainnet node is set to `node.moneroworld.com:18089`.
-
 For running the ASB on mainnet you will have to change you `monero-wallet-rpc` setup to mainnet.
-The default port for expecting the `monero-wallet-rpc` when running the ASB on mainnet is `18083`.
+
+It is recommended that you run your own Monero and Bitcoin node when running on mainnet.
+It is possible to plug into public blockchain nodes but be aware that you might lose some privacy doing so.
+Public Monero mainnet nodes can be found [here](https://moneroworld.com/#nodes).
+Public Electrum mainnet nodes can be found [here](https://1209k.com/bitcoin-eye/ele.php?chain=btc).
 
 ## ASB Details
 
