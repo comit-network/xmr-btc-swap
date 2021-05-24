@@ -12,7 +12,7 @@ use url::Url;
 use uuid::Uuid;
 
 // See: https://moneroworld.com/
-pub const DEFAULT_MONERO_DAEMON_ADDRESS: &str = "node.moneroworld.com:18089";
+pub const DEFAULT_MONERO_DAEMON_ADDRESS: &str = "node.xmr.to:18081";
 pub const DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET: &str = "monero-stagenet.exan.tech:38081";
 
 // See: https://1209k.com/bitcoin-eye/ele.php?chain=btc
