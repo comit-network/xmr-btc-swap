@@ -18,13 +18,17 @@ use tokio_util::io::StreamReader;
 compile_error!("unsupported operating system");
 
 #[cfg(target_os = "macos")]
-const DOWNLOAD_URL: &str = "http://downloads.getmonero.org/cli/monero-mac-x64-v0.17.1.9.tar.bz2";
+const DOWNLOAD_URL: &str = "http://downloads.getmonero.org/cli/monero-mac-x64-v0.17.2.0.tar.bz2";
 
-#[cfg(target_os = "linux")]
-const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-linux-x64-v0.17.1.9.tar.bz2";
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-linux-x64-v0.17.2.0.tar.bz2";
+
+#[cfg(all(target_os = "linux", target_arch = "arm"))]
+const DOWNLOAD_URL: &str =
+    "https://downloads.getmonero.org/cli/monero-linux-armv7-v0.17.2.0.tar.bz2";
 
 #[cfg(target_os = "windows")]
-const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-win-x64-v0.17.1.9.zip";
+const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-win-x64-v0.17.2.0.zip";
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 const PACKED_FILE: &str = "monero-wallet-rpc";
@@ -85,8 +89,9 @@ impl WalletRpc {
                 .parse::<u64>()?;
 
             tracing::info!(
-                "Downloading monero-wallet-rpc ({})",
-                content_length.big_byte(2)
+                "Downloading monero-wallet-rpc ({}) from {}",
+                content_length.big_byte(2),
+                DOWNLOAD_URL
             );
 
             let byte_stream = response
