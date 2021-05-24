@@ -15,6 +15,10 @@ jobs:
             os: ubuntu-latest
             archive_ext: tar
           - bin: swap
+            target: armv7-unknown-linux-gnueabihf
+            os: ubuntu-latest
+            archive_ext: tar
+          - bin: swap
             target: x86_64-apple-darwin
             os: macos-latest
             archive_ext: tar
