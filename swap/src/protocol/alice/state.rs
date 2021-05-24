@@ -1,6 +1,6 @@
 use crate::bitcoin::{
     current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, Transaction, TxCancel,
-    TxPunish, TxRefund, Txid,
+    TxPunish, TxRedeem, TxRefund, Txid,
 };
 use crate::env::Config;
 use crate::monero::wallet::{TransferRequest, WatchRequest};
@@ -45,6 +45,9 @@ pub enum AliceState {
         encrypted_signature: Box<bitcoin::EncryptedSignature>,
         state3: Box<State3>,
     },
+    BtcRedeemTransactionPublished {
+        state3: Box<State3>,
+    },
     BtcRedeemed,
     BtcCancelled {
         monero_wallet_restore_blockheight: BlockHeight,
@@ -83,6 +86,9 @@ impl fmt::Display for AliceState {
                 write!(f, "xmr lock transfer proof sent")
             }
             AliceState::EncSigLearned { .. } => write!(f, "encrypted signature is learned"),
+            AliceState::BtcRedeemTransactionPublished { .. } => {
+                write!(f, "bitcoin redeem transaction published")
+            }
             AliceState::BtcRedeemed => write!(f, "btc is redeemed"),
             AliceState::BtcCancelled { .. } => write!(f, "btc is cancelled"),
             AliceState::BtcRefunded { .. } => write!(f, "btc is refunded"),
@@ -447,6 +453,10 @@ impl State3 {
 
     pub fn tx_refund(&self) -> TxRefund {
         bitcoin::TxRefund::new(&self.tx_cancel(), &self.refund_address, self.tx_refund_fee)
+    }
+
+    pub fn tx_redeem(&self) -> TxRedeem {
+        TxRedeem::new(&self.tx_lock, &self.redeem_address, self.tx_redeem_fee)
     }
 
     pub fn extract_monero_private_key(

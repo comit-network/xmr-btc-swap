@@ -39,6 +39,9 @@ pub enum Alice {
         encrypted_signature: EncryptedSignature,
         state3: alice::State3,
     },
+    BtcRedeemTransactionPublished {
+        state3: alice::State3,
+    },
     CancelTimelockExpired {
         monero_wallet_restore_blockheight: BlockHeight,
         transfer_proof: TransferProof,
@@ -119,6 +122,11 @@ impl From<&AliceState> for Alice {
                 state3: state3.as_ref().clone(),
                 encrypted_signature: *encrypted_signature.clone(),
             },
+            AliceState::BtcRedeemTransactionPublished { state3 } => {
+                Alice::BtcRedeemTransactionPublished {
+                    state3: state3.as_ref().clone(),
+                }
+            }
             AliceState::BtcRedeemed => Alice::Done(AliceEndState::BtcRedeemed),
             AliceState::BtcCancelled {
                 monero_wallet_restore_blockheight,
@@ -212,6 +220,11 @@ impl From<Alice> for AliceState {
                 state3: Box::new(state),
                 encrypted_signature: Box::new(encrypted_signature),
             },
+            Alice::BtcRedeemTransactionPublished { state3 } => {
+                AliceState::BtcRedeemTransactionPublished {
+                    state3: Box::new(state3),
+                }
+            }
             Alice::CancelTimelockExpired {
                 monero_wallet_restore_blockheight,
                 transfer_proof,
@@ -271,12 +284,15 @@ impl Display for Alice {
             Alice::XmrLockTransferProofSent { .. } => {
                 f.write_str("Monero lock transfer proof sent")
             }
+            Alice::EncSigLearned { .. } => f.write_str("Encrypted signature learned"),
+            Alice::BtcRedeemTransactionPublished { .. } => {
+                f.write_str("Bitcoin redeem transaction published")
+            }
             Alice::CancelTimelockExpired { .. } => f.write_str("Cancel timelock is expired"),
             Alice::BtcCancelled { .. } => f.write_str("Bitcoin cancel transaction published"),
             Alice::BtcPunishable { .. } => f.write_str("Bitcoin punishable"),
             Alice::BtcRefunded { .. } => f.write_str("Monero refundable"),
             Alice::Done(end_state) => write!(f, "Done: {}", end_state),
-            Alice::EncSigLearned { .. } => f.write_str("Encrypted signature learned"),
         }
     }
 }

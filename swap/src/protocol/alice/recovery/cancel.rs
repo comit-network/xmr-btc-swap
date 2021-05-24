@@ -34,6 +34,9 @@ pub async fn cancel(
             (monero_wallet_restore_blockheight, transfer_proof, state3)
         }
 
+        // The redeem transaction was already published, it is not safe to cancel anymore
+        AliceState::BtcRedeemTransactionPublished { .. } => bail!(" The redeem transaction was already published, it is not safe to cancel anymore"),
+
         // The cancel tx was already published, but Alice not yet in final state
         AliceState::BtcCancelled { .. }
         | AliceState::BtcRefunded { .. }
@@ -43,7 +46,7 @@ pub async fn cancel(
         | AliceState::BtcRedeemed
         | AliceState::XmrRefunded
         | AliceState::BtcPunished
-        | AliceState::SafelyAborted => bail!("Cannot cancel swap {} because it is in state {} which is not cancelable", swap_id, state),
+        | AliceState::SafelyAborted => bail!("Swap is is in state {} which is not cancelable", state),
     };
 
     tracing::info!(%swap_id, "Trying to manually cancel swap");
