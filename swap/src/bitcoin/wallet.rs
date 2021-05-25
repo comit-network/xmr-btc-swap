@@ -303,6 +303,10 @@ where
         address: Address,
         amount: Amount,
     ) -> Result<PartiallySignedTransaction> {
+        if self.network != address.network {
+            bail!("Cannot build PSBT because network of given address is {} but wallet is on network {}", address.network, self.network);
+        }
+
         let wallet = self.wallet.lock().await;
         let client = self.client.lock().await;
         let fee_rate = client.estimate_feerate(self.target_block)?;
