@@ -183,7 +183,7 @@ async fn main() -> Result<()> {
                 }
             });
 
-            info!(perr_id = %event_loop.peer_id(), "Our peer id");
+            info!(peer_id = %event_loop.peer_id(), "Our peer-id");
 
             event_loop.run().await;
         }
