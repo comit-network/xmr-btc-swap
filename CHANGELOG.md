@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- An issue where ASB Bitcoin withdrawal can be done to an address on the wrong network.
+  A network check was added that compares the wallet's network against the network of the given address when building the transaction.
+
 ## [0.6.0] - 2021-05-24
 
 ### Added
