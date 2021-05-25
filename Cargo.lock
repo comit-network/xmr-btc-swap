@@ -826,8 +826,21 @@ dependencies = [
  "byteorder",
  "digest 0.9.0",
  "rand_core 0.5.1",
- "serde",
  "subtle 2.4.0",
+ "zeroize",
+]
+
+[[package]]
+name = "curve25519-dalek-ng"
+version = "4.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "574d8b2cd0bae5434fd50d53280f8299d95557a978686555880aaf5b8f4f81e9"
+dependencies = [
+ "byteorder",
+ "digest 0.9.0",
+ "rand_core 0.6.2",
+ "serde",
+ "subtle-ng",
  "zeroize",
 ]
 
@@ -932,11 +945,11 @@ checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
 
 [[package]]
 name = "ecdsa_fun"
-version = "0.4.2-alpha.0"
-source = "git+https://github.com/LLFourn/secp256kfun#8538ef22498170960a9769df2700c1986cc540fd"
+version = "0.6.2-alpha.0"
+source = "git+https://github.com/LLFourn/secp256kfun#84134daf34845434d7f38cdae7ffc31730a3b1e9"
 dependencies = [
  "bincode",
- "rand_chacha 0.2.2",
+ "rand_chacha 0.3.0",
  "secp256kfun",
  "serde",
  "sigma_fun",
@@ -2182,11 +2195,10 @@ dependencies = [
 [[package]]
 name = "monero"
 version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c73108ba5cf025e437600990935234241f95ada3c4621960d50912cde739af6"
+source = "git+https://github.com/comit-network/monero-rs?rev=818f38b#818f38b043e2a9fa38d74fec5310a270f510844e"
 dependencies = [
  "base58-monero",
- "curve25519-dalek",
+ "curve25519-dalek-ng",
  "fixed-hash",
  "hex 0.4.3",
  "hex-literal",
@@ -3347,24 +3359,24 @@ dependencies = [
 
 [[package]]
 name = "secp256kfun"
-version = "0.4.2-alpha.0"
-source = "git+https://github.com/LLFourn/secp256kfun#8538ef22498170960a9769df2700c1986cc540fd"
+version = "0.6.2-alpha.0"
+source = "git+https://github.com/LLFourn/secp256kfun#84134daf34845434d7f38cdae7ffc31730a3b1e9"
 dependencies = [
  "digest 0.9.0",
- "rand_core 0.5.1",
+ "rand_core 0.6.2",
  "secp256k1",
  "secp256kfun_parity_backend",
  "serde",
- "subtle 2.4.0",
+ "subtle-ng",
 ]
 
 [[package]]
 name = "secp256kfun_parity_backend"
-version = "0.1.4-alpha.0"
-source = "git+https://github.com/LLFourn/secp256kfun#8538ef22498170960a9769df2700c1986cc540fd"
+version = "0.1.6-alpha.0"
+source = "git+https://github.com/LLFourn/secp256kfun#84134daf34845434d7f38cdae7ffc31730a3b1e9"
 dependencies = [
  "crunchy",
- "subtle 2.4.0",
+ "subtle-ng",
 ]
 
 [[package]]
@@ -3535,13 +3547,13 @@ dependencies = [
 
 [[package]]
 name = "sigma_fun"
-version = "0.1.3-alpha.0"
-source = "git+https://github.com/LLFourn/secp256kfun#8538ef22498170960a9769df2700c1986cc540fd"
+version = "0.3.2-alpha.0"
+source = "git+https://github.com/LLFourn/secp256kfun#84134daf34845434d7f38cdae7ffc31730a3b1e9"
 dependencies = [
- "curve25519-dalek",
+ "curve25519-dalek-ng",
  "digest 0.9.0",
  "generic-array 0.14.4",
- "rand_core 0.5.1",
+ "rand_core 0.6.2",
  "secp256kfun",
  "serde",
 ]
@@ -3809,6 +3821,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e81da0851ada1f3e9d4312c704aa4f8806f0f9d69faaf8df2f3464b4a9437c2"
 
 [[package]]
+name = "subtle-ng"
+version = "2.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8049cf85f0e715d6af38dde439cb0ccb91f67fb9f5f63c80f8b43e48356e1a3f"
+
+[[package]]
 name = "swap"
 version = "0.5.0"
 dependencies = [
@@ -3826,7 +3844,7 @@ dependencies = [
  "bmrng",
  "config",
  "conquer-once",
- "curve25519-dalek",
+ "curve25519-dalek-ng",
  "data-encoding",
  "dialoguer",
  "directories-next",
@@ -3846,8 +3864,8 @@ dependencies = [
  "port_check",
  "prettytable-rs",
  "proptest",
- "rand 0.7.3",
- "rand_chacha 0.2.2",
+ "rand 0.8.3",
+ "rand_chacha 0.3.0",
  "reqwest",
  "rust_decimal",
  "rust_decimal_macros",

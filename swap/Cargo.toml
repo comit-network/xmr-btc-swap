@@ -21,11 +21,11 @@ bitcoin = { version = "0.26", features = [ "rand", "use-serde" ] }
 bmrng = "0.5"
 config = { version = "0.11", default-features = false, features = [ "toml" ] }
 conquer-once = "0.3"
-curve25519-dalek = "3"
+curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
 data-encoding = "2.3"
 dialoguer = "0.8"
 directories-next = "2"
-ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", features = [ "libsecp_compat", "serde" ] }
+ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", default-features = false, features = [ "libsecp_compat", "serde" ] }
 ed25519-dalek = "1"
 futures = { version = "0.3", default-features = false }
 itertools = "0.10"
@@ -37,8 +37,8 @@ monero-rpc = { path = "../monero-rpc" }
 pem = "0.8"
 prettytable-rs = "0.8"
 proptest = "1"
-rand = "0.7"
-rand_chacha = "0.2"
+rand = "0.8"
+rand_chacha = "0.3"
 reqwest = { version = "0.11", features = [ "rustls-tls", "stream", "socks" ], default-features = false }
 rust_decimal = { version = "1", features = [ "serde-float" ] }
 rust_decimal_macros = "1"
@@ -46,7 +46,7 @@ serde = { version = "1", features = [ "derive" ] }
 serde_cbor = "0.11"
 serde_json = "1"
 sha2 = "0.9"
-sigma_fun = { git = "https://github.com/LLFourn/secp256kfun", features = [ "ed25519", "serde" ] }
+sigma_fun = { git = "https://github.com/LLFourn/secp256kfun", default-features = false, features = [ "ed25519", "serde" ] }
 sled = "0.34"
 structopt = "0.3"
 strum = { version = "0.20", features = [ "derive" ] }
