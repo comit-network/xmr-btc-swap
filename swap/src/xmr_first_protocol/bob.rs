@@ -1,9 +1,8 @@
-use crate::monero::wallet::{TransferRequest, WatchRequest};
+use crate::monero::wallet::WatchRequest;
 use crate::monero::TransferProof;
 use crate::xmr_first_protocol::transactions::btc_lock::BtcLock;
 use crate::xmr_first_protocol::transactions::btc_redeem::BtcRedeem;
 use anyhow::Result;
-use monero_rpc::wallet::BlockHeight;
 use uuid::Uuid;
 
 // watching for xmr_lock
@@ -53,40 +52,6 @@ impl Bob3 {
             S_a_bitcoin: self.S_a_bitcoin,
             tx_lock: self.tx_lock.clone(),
             alice_redeem_address,
-            v: self.v,
-        })
-    }
-
-    pub async fn emergency_refund_if_refund_xmr_seen(
-        &self,
-        xmr_wallet: &crate::monero::Wallet,
-        btc_wallet: &crate::bitcoin::Wallet,
-        transfer_proof: TransferProof,
-    ) -> Result<Bob4> {
-        let req = WatchRequest {
-            public_spend_key: todo!(),
-            public_view_key: todo!(),
-            transfer_proof,
-            conf_target: 1,
-            expected: self.xmr_swap_amount,
-        };
-        let _ = xmr_wallet.watch_for_transfer(req).await?;
-
-        let emergency_refund = btc_wallet
-            .sign_and_finalize(self.tx_lock.clone().into())
-            .await?;
-
-        let (_txid, sub) = btc_wallet.broadcast(emergency_refund, "lock").await?;
-
-        let _ = sub.wait_until_confirmed_with(1).await?;
-
-        Ok(Bob4 {
-            b: self.b.clone(),
-            A: self.A,
-            s_b: self.s_b,
-            S_a_bitcoin: self.S_a_bitcoin,
-            tx_lock: self.tx_lock.clone(),
-            alice_redeem_address: self.alice_redeem_address.clone(),
             v: self.v,
         })
     }

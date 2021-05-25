@@ -3777,11 +3777,11 @@ dependencies = [
     "tracing",
     "tracing-appender",
     "tracing-futures",
- "tracing-subscriber",
- "url 2.2.1",
- "uuid",
- "void",
- "zip",
+    "tracing-subscriber",
+    "url 2.2.1",
+    "uuid",
+    "void",
+    "zip",
 ]
 
 [[package]]

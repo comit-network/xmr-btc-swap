@@ -1,11 +1,9 @@
-use crate::bitcoin::Txid;
 use crate::protocol::CROSS_CURVE_PROOF_SYSTEM;
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use ecdsa_fun::fun::Point;
 use hash_edwards_to_edwards::hash_point_to_point;
-use monero_adaptor::AdaptorSignature;
 use rand::rngs::OsRng;
 
 pub mod alice;

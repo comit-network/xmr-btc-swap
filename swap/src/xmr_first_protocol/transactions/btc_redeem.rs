@@ -7,7 +7,7 @@ use crate::xmr_first_protocol::transactions::btc_lock::BtcLock;
 use ::bitcoin::util::bip143::SigHashCache;
 use ::bitcoin::{SigHash, SigHashType, Txid};
 use anyhow::{bail, Context, Result};
-use bdk::bitcoin::Script;
+use bdk::bitcoin::{OutPoint, Script};
 use bitcoin::{PrivateKey, TxIn, TxOut};
 use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
 use ecdsa_fun::fun::Scalar;
@@ -48,6 +48,25 @@ impl BtcRedeem {
 
     pub fn txid(&self) -> Txid {
         self.inner.txid()
+    }
+
+    pub fn as_outpoint(&self) -> OutPoint {
+        // This is fine because a transaction that has that many outputs is not
+        // realistic
+        #[allow(clippy::cast_possible_truncation)]
+        OutPoint::new(self.txid(), self.lock_output_vout() as u32)
+    }
+
+    /// Retreive the index of the locked output in the transaction outputs
+    /// vector
+    fn lock_output_vout(&self) -> usize {
+        self.inner
+            .clone()
+            .extract_tx()
+            .output
+            .iter()
+            .position(|output| output.script_pubkey == self.output_descriptor.script_pubkey())
+            .expect("transaction contains lock output")
     }
 
     pub fn digest(&self) -> SigHash {
@@ -144,16 +163,16 @@ impl BtcRedeem {
         Ok(sig)
     }
 
-    pub fn build_transaction(
-        &self,
-        a: SecretKey,
-        s_a: Scalar,
-        B: PublicKey,
-        encsig: EncryptedSignature,
-    ) -> Transaction {
-        let signed_tx_redeem = self.complete(a, s_a, B, encsig)?;
-        signed_tx_redeem
-    }
+    // pub fn build_transaction(
+    //     &self,
+    //     a: SecretKey,
+    //     s_a: Scalar,
+    //     B: PublicKey,
+    //     encsig: EncryptedSignature,
+    // ) -> Transaction {
+    //     let signed_tx_redeem = self.complete(a, s_a, B, encsig)?;
+    //     signed_tx_redeem
+    // }
 
     pub fn build_take_transaction(
         &self,

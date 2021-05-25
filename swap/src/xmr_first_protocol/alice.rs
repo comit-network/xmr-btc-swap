@@ -6,7 +6,6 @@ use crate::monero::{Scalar, TransferProof, TransferRequest};
 use crate::monero_ext::ScalarExt;
 use crate::xmr_first_protocol::transactions::btc_lock::BtcLock;
 use crate::xmr_first_protocol::transactions::btc_redeem::BtcRedeem;
-use crate::xmr_first_protocol::transactions::xmr_refund::XmrRefund;
 
 // start
 pub struct Alice3 {
