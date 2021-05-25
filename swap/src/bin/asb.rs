@@ -353,7 +353,7 @@ async fn register_tor_services(
                 }
             })
         })
-        .filter_map(|details| details)
+        .flatten()
         .collect::<Vec<_>>();
 
     let key = seed.derive_torv3_key();

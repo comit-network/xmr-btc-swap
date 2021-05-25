@@ -1,4 +1,4 @@
 [toolchain]
-channel = "nightly-2021-01-31"
+channel = "1.52"
 components = ["clippy"]
 targets = ["armv7-unknown-linux-gnueabihf"]
