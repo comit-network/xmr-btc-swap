@@ -4,6 +4,7 @@ use crate::protocol::alice::event_loop::LatestRate;
 use crate::protocol::alice::{execution_setup, spot_price, State3};
 use crate::{env, monero};
 use anyhow::{anyhow, Error};
+use libp2p::ping::{Ping, PingEvent};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
 use uuid::Uuid;
@@ -75,6 +76,11 @@ where
     pub execution_setup: execution_setup::Behaviour,
     pub transfer_proof: transfer_proof::Behaviour,
     pub encrypted_signature: encrypted_signature::Behaviour,
+
+    /// Ping behaviour that ensures that the underlying network connection is
+    /// still alive. If the ping fails a connection close event will be
+    /// emitted that is picked up as swarm event.
+    ping: Ping,
 }
 
 impl<LR> Behaviour<LR>
@@ -104,6 +110,13 @@ where
             execution_setup: Default::default(),
             transfer_proof: transfer_proof::alice(),
             encrypted_signature: encrypted_signature::alice(),
+            ping: Ping::default(),
         }
+    }
+}
+
+impl From<PingEvent> for OutEvent {
+    fn from(_: PingEvent) -> Self {
+        OutEvent::Other
     }
 }

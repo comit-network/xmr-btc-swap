@@ -4,6 +4,7 @@ use crate::protocol::bob;
 use crate::protocol::bob::{execution_setup, State2};
 use anyhow::{anyhow, Error, Result};
 use libp2p::core::Multiaddr;
+use libp2p::ping::{Ping, PingEvent};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
 use std::time::Duration;
@@ -66,6 +67,11 @@ pub struct Behaviour {
     pub transfer_proof: transfer_proof::Behaviour,
     pub encrypted_signature: encrypted_signature::Behaviour,
     pub redial: redial::Behaviour,
+
+    /// Ping behaviour that ensures that the underlying network connection is
+    /// still alive. If the ping fails a connection close event will be
+    /// emitted that is picked up as swarm event.
+    ping: Ping,
 }
 
 impl Behaviour {
@@ -77,6 +83,7 @@ impl Behaviour {
             transfer_proof: transfer_proof::bob(),
             encrypted_signature: encrypted_signature::bob(),
             redial: redial::Behaviour::new(alice, Duration::from_secs(2)),
+            ping: Ping::default(),
         }
     }
 
@@ -86,5 +93,11 @@ impl Behaviour {
         self.spot_price.add_address(&peer_id, address.clone());
         self.transfer_proof.add_address(&peer_id, address.clone());
         self.encrypted_signature.add_address(&peer_id, address);
+    }
+}
+
+impl From<PingEvent> for OutEvent {
+    fn from(_: PingEvent) -> Self {
+        OutEvent::Other
     }
 }
