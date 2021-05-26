@@ -34,7 +34,10 @@ pub fn build_clear_net(id_keys: &identity::Keypair) -> Result<SwapTransport> {
             MplexConfig::new(),
         ))
         .timeout(Duration::from_secs(20))
-        .map(|(peer, muxer), _| (peer, StreamMuxerBox::new(muxer)))
+        .map(|(peer, muxer), _| {
+            tracing::debug!("Muxer peer id: {}", peer);
+            (peer, StreamMuxerBox::new(muxer))
+        })
         .boxed();
 
     Ok(transport)
