@@ -311,9 +311,8 @@ mod tests {
     use crate::asb::Rate;
     use crate::env::GetConfig;
     use crate::monero;
-    use crate::network::asb;
     use crate::network::test::{await_events_or_timeout, connect, new_swarm};
-    use crate::protocol::bob;
+    use crate::network::{asb, cli};
 
     use super::*;
 
@@ -358,7 +357,7 @@ mod tests {
                 balance: monero::Amount::ZERO,
                 buy: btc_to_swap,
             },
-            bob::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
+            cli::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
         )
         .await;
     }
@@ -384,7 +383,7 @@ mod tests {
                 balance: monero::Amount::ZERO,
                 buy: btc_to_swap,
             },
-            bob::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
+            cli::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
         )
         .await;
     }
@@ -407,7 +406,7 @@ mod tests {
                 balance,
                 buy: btc_to_swap,
             },
-            bob::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
+            cli::spot_price::Error::BalanceTooLow { buy: btc_to_swap },
         )
         .await;
     }
@@ -426,7 +425,7 @@ mod tests {
                 buy: btc_to_swap,
                 min: min_buy,
             },
-            bob::spot_price::Error::AmountBelowMinimum {
+            cli::spot_price::Error::AmountBelowMinimum {
                 buy: btc_to_swap,
                 min: min_buy,
             },
@@ -449,7 +448,7 @@ mod tests {
                 buy: btc_to_swap,
                 max: max_buy,
             },
-            bob::spot_price::Error::AmountAboveMaximum {
+            cli::spot_price::Error::AmountAboveMaximum {
                 buy: btc_to_swap,
                 max: max_buy,
             },
@@ -466,7 +465,7 @@ mod tests {
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
             asb::spot_price::Error::ResumeOnlyMode,
-            bob::spot_price::Error::NoSwapsAccepted,
+            cli::spot_price::Error::NoSwapsAccepted,
         )
         .await;
     }
@@ -481,7 +480,7 @@ mod tests {
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
             asb::spot_price::Error::LatestRateFetchFailed(Box::new(TestRateError {})),
-            bob::spot_price::Error::Other,
+            cli::spot_price::Error::Other,
         )
         .await;
     }
@@ -500,7 +499,7 @@ mod tests {
             asb::spot_price::Error::SellQuoteCalculationFailed(anyhow!(
                 "Error text irrelevant, won't be checked here"
             )),
-            bob::spot_price::Error::Other,
+            cli::spot_price::Error::Other,
         )
         .await;
     }
@@ -525,7 +524,7 @@ mod tests {
                     monero: monero::Network::Mainnet,
                 },
             },
-            bob::spot_price::Error::BlockchainNetworkMismatch {
+            cli::spot_price::Error::BlockchainNetworkMismatch {
                 cli: BlockchainNetwork {
                     bitcoin: bitcoin::Network::Testnet,
                     monero: monero::Network::Stagenet,
@@ -564,7 +563,7 @@ mod tests {
                     monero: monero::Network::Stagenet,
                 },
             },
-            bob::spot_price::Error::BlockchainNetworkMismatch {
+            cli::spot_price::Error::BlockchainNetworkMismatch {
                 cli: BlockchainNetwork {
                     bitcoin: bitcoin::Network::Bitcoin,
                     monero: monero::Network::Mainnet,
@@ -598,7 +597,7 @@ mod tests {
                     values.resume_only,
                 )
             });
-            let (mut bob_swarm, ..) = new_swarm(|_, _| bob::spot_price::bob());
+            let (mut bob_swarm, ..) = new_swarm(|_, _| cli::spot_price::bob());
 
             connect(&mut alice_swarm, &mut bob_swarm).await;
 
@@ -660,7 +659,7 @@ mod tests {
         async fn assert_error(
             &mut self,
             alice_assert: asb::spot_price::Error,
-            bob_assert: bob::spot_price::Error,
+            bob_assert: cli::spot_price::Error,
         ) {
             match await_events_or_timeout(self.alice_swarm.next(), self.bob_swarm.next()).await {
                 (

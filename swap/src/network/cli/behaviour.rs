@@ -1,12 +1,14 @@
-use crate::network::quote::BidQuote;
-use crate::network::{encrypted_signature, quote, redial, spot_price, transfer_proof};
-use crate::protocol::bob;
-use crate::protocol::bob::{execution_setup, State2};
+use std::time::Duration;
+
 use anyhow::{anyhow, Error, Result};
 use libp2p::core::Multiaddr;
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
-use std::time::Duration;
+
+use crate::network::cli::execution_setup;
+use crate::network::quote::BidQuote;
+use crate::network::{cli, encrypted_signature, quote, redial, spot_price, transfer_proof};
+use crate::protocol::bob::State2;
 
 #[derive(Debug)]
 pub enum OutEvent {
@@ -72,7 +74,7 @@ impl Behaviour {
     pub fn new(alice: PeerId) -> Self {
         Self {
             quote: quote::bob(),
-            spot_price: bob::spot_price::bob(),
+            spot_price: cli::spot_price::bob(),
             execution_setup: Default::default(),
             transfer_proof: transfer_proof::bob(),
             encrypted_signature: encrypted_signature::bob(),

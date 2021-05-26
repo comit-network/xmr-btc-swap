@@ -1,22 +1,21 @@
-use crate::database::Database;
-use crate::{bitcoin, env, monero};
-use anyhow::Result;
 use std::sync::Arc;
+
+use anyhow::Result;
 use uuid::Uuid;
 
-pub use self::behaviour::{Behaviour, OutEvent};
+use crate::database::Database;
+pub use crate::network::cli::behaviour::{Behaviour, OutEvent};
+use crate::{bitcoin, env, monero};
+
 pub use self::cancel::cancel;
 pub use self::event_loop::{EventLoop, EventLoopHandle};
 pub use self::refund::refund;
 pub use self::state::*;
 pub use self::swap::{run, run_until};
 
-mod behaviour;
 pub mod cancel;
 pub mod event_loop;
-mod execution_setup;
 pub mod refund;
-pub mod spot_price;
 pub mod state;
 pub mod swap;
 

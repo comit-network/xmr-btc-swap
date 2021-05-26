@@ -1,20 +1,21 @@
-use crate::bitcoin::EncryptedSignature;
-use crate::network::quote::BidQuote;
-use crate::network::spot_price::{BlockchainNetwork, Response};
-use crate::network::{encrypted_signature, spot_price};
-use crate::protocol::bob;
-use crate::protocol::bob::{Behaviour, OutEvent, State0, State2};
-use crate::{bitcoin, env, monero};
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
+
 use anyhow::{bail, Context, Result};
 use futures::future::{BoxFuture, OptionFuture};
 use futures::{FutureExt, StreamExt};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::Duration;
 use uuid::Uuid;
+
+use crate::bitcoin::EncryptedSignature;
+use crate::network::quote::BidQuote;
+use crate::network::spot_price::{BlockchainNetwork, Response};
+use crate::network::{cli, encrypted_signature, spot_price};
+use crate::protocol::bob::{Behaviour, OutEvent, State0, State2};
+use crate::{bitcoin, env, monero};
 
 #[allow(missing_debug_implementations)]
 pub struct EventLoop {
@@ -280,7 +281,7 @@ impl EventLoopHandle {
         match response {
             Response::Xmr(xmr) => Ok(xmr),
             Response::Error(error) => {
-                let error: bob::spot_price::Error = error.into();
+                let error: cli::spot_price::Error = error.into();
                 bail!(error);
             }
         }
