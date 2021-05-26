@@ -1,18 +1,20 @@
-use crate::network::cbor_request_response::CborCodec;
-use crate::network::spot_price;
-use crate::network::spot_price::{BlockchainNetwork, SpotPriceProtocol};
-use crate::protocol::alice;
-use crate::protocol::alice::event_loop::LatestRate;
-use crate::{env, monero};
+use std::collections::VecDeque;
+use std::fmt::Debug;
+use std::task::{Context, Poll};
+
 use libp2p::request_response::{
     ProtocolSupport, RequestResponseConfig, RequestResponseEvent, RequestResponseMessage,
     ResponseChannel,
 };
 use libp2p::swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters};
 use libp2p::{NetworkBehaviour, PeerId};
-use std::collections::VecDeque;
-use std::fmt::Debug;
-use std::task::{Context, Poll};
+
+use crate::network::cbor_request_response::CborCodec;
+use crate::network::spot_price;
+use crate::network::spot_price::{BlockchainNetwork, SpotPriceProtocol};
+use crate::protocol::alice;
+use crate::protocol::alice::event_loop::LatestRate;
+use crate::{env, monero};
 
 #[derive(Debug)]
 pub enum OutEvent {
@@ -302,15 +304,18 @@ impl Error {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::asb::Rate;
-    use crate::env::GetConfig;
-    use crate::monero;
-    use crate::network::test::{await_events_or_timeout, connect, new_swarm};
-    use crate::protocol::{alice, bob};
     use anyhow::anyhow;
     use libp2p::Swarm;
     use rust_decimal::Decimal;
+
+    use crate::asb::Rate;
+    use crate::env::GetConfig;
+    use crate::monero;
+    use crate::network::asb;
+    use crate::network::test::{await_events_or_timeout, connect, new_swarm};
+    use crate::protocol::bob;
+
+    use super::*;
 
     impl Default for AliceBehaviourValues {
         fn default() -> Self {
@@ -349,7 +354,7 @@ mod tests {
 
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::BalanceTooLow {
+            asb::spot_price::Error::BalanceTooLow {
                 balance: monero::Amount::ZERO,
                 buy: btc_to_swap,
             },
@@ -375,7 +380,7 @@ mod tests {
 
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::BalanceTooLow {
+            asb::spot_price::Error::BalanceTooLow {
                 balance: monero::Amount::ZERO,
                 buy: btc_to_swap,
             },
@@ -398,7 +403,7 @@ mod tests {
         let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::BalanceTooLow {
+            asb::spot_price::Error::BalanceTooLow {
                 balance,
                 buy: btc_to_swap,
             },
@@ -417,7 +422,7 @@ mod tests {
         let btc_to_swap = bitcoin::Amount::from_btc(0.0001).unwrap();
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::AmountBelowMinimum {
+            asb::spot_price::Error::AmountBelowMinimum {
                 buy: btc_to_swap,
                 min: min_buy,
             },
@@ -440,7 +445,7 @@ mod tests {
 
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::AmountAboveMaximum {
+            asb::spot_price::Error::AmountAboveMaximum {
                 buy: btc_to_swap,
                 max: max_buy,
             },
@@ -460,7 +465,7 @@ mod tests {
         let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::ResumeOnlyMode,
+            asb::spot_price::Error::ResumeOnlyMode,
             bob::spot_price::Error::NoSwapsAccepted,
         )
         .await;
@@ -475,7 +480,7 @@ mod tests {
         let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::LatestRateFetchFailed(Box::new(TestRateError {})),
+            asb::spot_price::Error::LatestRateFetchFailed(Box::new(TestRateError {})),
             bob::spot_price::Error::Other,
         )
         .await;
@@ -492,7 +497,7 @@ mod tests {
 
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::SellQuoteCalculationFailed(anyhow!(
+            asb::spot_price::Error::SellQuoteCalculationFailed(anyhow!(
                 "Error text irrelevant, won't be checked here"
             )),
             bob::spot_price::Error::Other,
@@ -510,7 +515,7 @@ mod tests {
         let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::BlockchainNetworkMismatch {
+            asb::spot_price::Error::BlockchainNetworkMismatch {
                 cli: BlockchainNetwork {
                     bitcoin: bitcoin::Network::Testnet,
                     monero: monero::Network::Stagenet,
@@ -549,7 +554,7 @@ mod tests {
 
         test.send_request(request);
         test.assert_error(
-            alice::spot_price::Error::BlockchainNetworkMismatch {
+            asb::spot_price::Error::BlockchainNetworkMismatch {
                 cli: BlockchainNetwork {
                     bitcoin: bitcoin::Network::Bitcoin,
                     monero: monero::Network::Mainnet,
@@ -574,7 +579,7 @@ mod tests {
     }
 
     struct SpotPriceTest {
-        alice_swarm: Swarm<alice::spot_price::Behaviour<TestRate>>,
+        alice_swarm: Swarm<asb::spot_price::Behaviour<TestRate>>,
         bob_swarm: Swarm<spot_price::Behaviour>,
 
         alice_peer_id: PeerId,
@@ -628,7 +633,7 @@ mod tests {
         ) {
             match await_events_or_timeout(self.alice_swarm.next(), self.bob_swarm.next()).await {
                 (
-                    alice::spot_price::OutEvent::ExecutionSetupParams { btc, xmr, .. },
+                    asb::spot_price::OutEvent::ExecutionSetupParams { btc, xmr, .. },
                     spot_price::OutEvent::Message { message, .. },
                 ) => {
                     assert_eq!(alice_assert, (btc, xmr));
@@ -654,22 +659,22 @@ mod tests {
 
         async fn assert_error(
             &mut self,
-            alice_assert: alice::spot_price::Error,
+            alice_assert: asb::spot_price::Error,
             bob_assert: bob::spot_price::Error,
         ) {
             match await_events_or_timeout(self.alice_swarm.next(), self.bob_swarm.next()).await {
                 (
-                    alice::spot_price::OutEvent::Error { error, .. },
+                    asb::spot_price::OutEvent::Error { error, .. },
                     spot_price::OutEvent::Message { message, .. },
                 ) => {
                     // TODO: Somehow make PartialEq work on Alice's spot_price::Error
                     match (alice_assert, error) {
                         (
-                            alice::spot_price::Error::BalanceTooLow {
+                            asb::spot_price::Error::BalanceTooLow {
                                 balance: balance1,
                                 buy: buy1,
                             },
-                            alice::spot_price::Error::BalanceTooLow {
+                            asb::spot_price::Error::BalanceTooLow {
                                 balance: balance2,
                                 buy: buy2,
                             },
@@ -678,11 +683,11 @@ mod tests {
                             assert_eq!(buy1, buy2);
                         }
                         (
-                            alice::spot_price::Error::BlockchainNetworkMismatch {
+                            asb::spot_price::Error::BlockchainNetworkMismatch {
                                 cli: cli1,
                                 asb: asb1,
                             },
-                            alice::spot_price::Error::BlockchainNetworkMismatch {
+                            asb::spot_price::Error::BlockchainNetworkMismatch {
                                 cli: cli2,
                                 asb: asb2,
                             },
@@ -691,24 +696,24 @@ mod tests {
                             assert_eq!(asb1, asb2);
                         }
                         (
-                            alice::spot_price::Error::AmountBelowMinimum { .. },
-                            alice::spot_price::Error::AmountBelowMinimum { .. },
+                            asb::spot_price::Error::AmountBelowMinimum { .. },
+                            asb::spot_price::Error::AmountBelowMinimum { .. },
                         )
                         | (
-                            alice::spot_price::Error::AmountAboveMaximum { .. },
-                            alice::spot_price::Error::AmountAboveMaximum { .. },
+                            asb::spot_price::Error::AmountAboveMaximum { .. },
+                            asb::spot_price::Error::AmountAboveMaximum { .. },
                         )
                         | (
-                            alice::spot_price::Error::LatestRateFetchFailed(_),
-                            alice::spot_price::Error::LatestRateFetchFailed(_),
+                            asb::spot_price::Error::LatestRateFetchFailed(_),
+                            asb::spot_price::Error::LatestRateFetchFailed(_),
                         )
                         | (
-                            alice::spot_price::Error::SellQuoteCalculationFailed(_),
-                            alice::spot_price::Error::SellQuoteCalculationFailed(_),
+                            asb::spot_price::Error::SellQuoteCalculationFailed(_),
+                            asb::spot_price::Error::SellQuoteCalculationFailed(_),
                         )
                         | (
-                            alice::spot_price::Error::ResumeOnlyMode,
-                            alice::spot_price::Error::ResumeOnlyMode,
+                            asb::spot_price::Error::ResumeOnlyMode,
+                            asb::spot_price::Error::ResumeOnlyMode,
                         ) => {}
                         (alice_assert, error) => {
                             panic!("Expected: {:?} Actual: {:?}", alice_assert, error)

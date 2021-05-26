@@ -1,12 +1,14 @@
-use crate::network::quote::BidQuote;
-use crate::network::{encrypted_signature, quote, transfer_proof};
-use crate::protocol::alice::event_loop::LatestRate;
-use crate::protocol::alice::{execution_setup, spot_price, State3};
-use crate::{env, monero};
 use anyhow::{anyhow, Error};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
 use uuid::Uuid;
+
+use crate::network::asb::{execution_setup, spot_price};
+use crate::network::quote::BidQuote;
+use crate::network::{encrypted_signature, quote, transfer_proof};
+use crate::protocol::alice::event_loop::LatestRate;
+use crate::protocol::alice::State3;
+use crate::{env, monero};
 
 #[derive(Debug)]
 pub enum OutEvent {

@@ -1,9 +1,9 @@
 use crate::asb::Rate;
 use crate::database::Database;
 use crate::env::Config;
+use crate::network::asb::spot_price::Error;
 use crate::network::quote::BidQuote;
 use crate::network::transfer_proof;
-use crate::protocol::alice::spot_price::Error;
 use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State0, State3, Swap};
 use crate::{bitcoin, kraken, monero};
 use anyhow::{Context, Result};
