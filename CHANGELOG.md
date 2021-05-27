@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- An issue where long-running connections are dead without a connection closure being reported back to the swarm.
+  Adding a periodic ping ensures that the connection is kept alive, and a broken connection is reported back resulting in a close event on the swarm.
+  This fixes the error of the ASB being unable to send a transfer proof to the CLI.
+
 ## [0.6.0] - 2021-05-24
 
 ### Added

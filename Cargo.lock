@@ -1767,6 +1767,7 @@ dependencies = [
  "libp2p-dns",
  "libp2p-mplex",
  "libp2p-noise",
+ "libp2p-ping",
  "libp2p-request-response",
  "libp2p-swarm",
  "libp2p-swarm-derive",
@@ -1874,6 +1875,21 @@ dependencies = [
  "static_assertions",
  "x25519-dalek",
  "zeroize",
+]
+
+[[package]]
+name = "libp2p-ping"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf4bfaffac63bf3c7ec11ed9d8879d455966ddea7e78ee14737f0b6dce0d1cd1"
+dependencies = [
+ "futures",
+ "libp2p-core",
+ "libp2p-swarm",
+ "log 0.4.14",
+ "rand 0.7.3",
+ "void",
+ "wasm-timer",
 ]
 
 [[package]]
