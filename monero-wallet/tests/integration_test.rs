@@ -2,7 +2,7 @@
 
 use monero::ViewPair;
 use monero_harness::Monero;
-use monero_rpc::monerod::MonerodRpc;
+use monero_rpc::monerod::{Client, MonerodRpc};
 use monero_wallet::{
     CalculateKeyOffsetBoundaries, ConfidentialTransactionBuilder, FetchDecoyInputs,
 };
@@ -14,40 +14,31 @@ use testcontainers::clients::Cli;
 async fn monerod_integration_test() {
     let mut rng = rand::rngs::StdRng::from_seed([0u8; 32]);
 
-    let cli = Cli::default();
-    let (monero, _monerod_container, _monero_wallet_rpc_containers) =
-        Monero::new(&cli, vec![]).await.unwrap();
+    let s_a = monero::PrivateKey::from_canonical_bytes([
+        146, 74, 223, 240, 209, 247, 144, 163, 20, 194, 1, 57, 226, 43, 37, 91, 207, 19, 121, 71,
+        156, 217, 25, 138, 86, 22, 4, 40, 160, 103, 146, 1,
+    ])
+    .unwrap();
+    let s_b = monero::PrivateKey::from_canonical_bytes([
+        172, 121, 31, 191, 236, 27, 215, 81, 213, 34, 185, 248, 161, 212, 138, 11, 73, 79, 251,
+        205, 128, 70, 58, 232, 37, 71, 1, 110, 72, 114, 47, 6,
+    ])
+    .unwrap();
 
     let lock_kp = monero::KeyPair {
-        view: monero::PrivateKey::random(&mut rng),
-        spend: monero::PrivateKey::random(&mut rng),
+        view: monero::PrivateKey::from_canonical_bytes([
+            167, 4, 78, 117, 31, 113, 199, 197, 193, 40, 228, 194, 1, 190, 82, 210, 4, 141, 166,
+            109, 55, 64, 127, 65, 181, 248, 126, 146, 224, 241, 111, 13,
+        ])
+        .unwrap(),
+        spend: s_a + s_b,
     };
 
-    let spend_amount = 999600000000;
+    let client = Client::new("localhost".to_string(), 38081).unwrap();
 
-    let lock_address = monero::Address::from_keypair(monero::Network::Mainnet, &lock_kp);
-
-    monero.init_miner().await.unwrap();
-    let wallet = monero.wallet("miner").expect("wallet to exist");
-
-    let transfer = wallet
-        .transfer(&lock_address.to_string(), 1_000_000_000_000)
-        .await
-        .expect("lock to succeed");
-
-    let client = monero.monerod().client();
-
-    let miner_address = wallet
-        .address()
-        .await
-        .expect("miner address to exist")
-        .address;
-    client
-        .generateblocks(10, miner_address)
-        .await
-        .expect("can generate blocks");
-
-    let lock_tx_hash = transfer.tx_hash.parse().unwrap();
+    let lock_tx_hash = "09e361acb3e6e71d627a945a30672776a6f8fec7c97f4cae5e09b0780b75c158"
+        .parse()
+        .unwrap();
 
     let lock_tx = client
         .get_transactions(&[lock_tx_hash])
@@ -55,6 +46,7 @@ async fn monerod_integration_test() {
         .unwrap()
         .pop()
         .unwrap();
+
     let output_indices = client.get_o_indexes(lock_tx_hash).await.unwrap().o_indexes;
 
     let lock_vp = ViewPair::from(&lock_kp);
@@ -64,6 +56,9 @@ async fn monerod_integration_test() {
         .unwrap()
         .pop()
         .unwrap();
+
+    dbg!(input_to_spend.amount().unwrap());
+
     let global_output_index = output_indices[input_to_spend.index()];
 
     let (lower, upper) = client.calculate_key_offset_boundaries().await.unwrap();
@@ -87,7 +82,9 @@ async fn monerod_integration_test() {
         .await
         .unwrap();
 
-    let target_address = "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".parse().unwrap();
+    let target_address = "58hKkN5JrirdNehmTXaHhTEg3N5zRYZ6Wb5g5jwDk3wRC4rtNCJvx7hENsbLmfPakC3spGhciosagdVbSqq9vfXsV3zusCn".parse().unwrap();
+
+    let spend_amount = 149720581473;
 
     let transaction = ConfidentialTransactionBuilder::new(
         input_to_spend,

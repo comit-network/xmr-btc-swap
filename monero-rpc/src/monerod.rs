@@ -30,7 +30,7 @@ impl Client {
         Self::new("127.0.0.1".to_owned(), port)
     }
 
-    fn new(host: String, port: u16) -> Result<Self> {
+    pub fn new(host: String, port: u16) -> Result<Self> {
         Ok(Self {
             inner: reqwest::ClientBuilder::new()
                 .connection_verbose(true)

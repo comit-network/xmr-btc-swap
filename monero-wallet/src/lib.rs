@@ -90,7 +90,7 @@ impl ConfidentialTransactionBuilder {
                     to.public_spend.decompress().unwrap(),
                     ecdh_key,
                 )
-                .one_time_key(dbg!(next_index)),
+                .one_time_key(next_index),
             },
         };
 
@@ -227,7 +227,7 @@ impl ConfidentialTransactionBuilder {
         let fake_responses = random_array(|| Scalar::random(rng));
         let message = transaction.signature_hash().unwrap();
 
-        let sig = monero::clsag::sign(
+        let (sig, _) = monero::clsag::sign(
             message.as_fixed_bytes(),
             self.actual_signing_key,
             signing_index,
@@ -245,7 +245,7 @@ impl ConfidentialTransactionBuilder {
 
         transaction.rct_signatures.p.as_mut().unwrap().Clsags = vec![sig];
 
-        dbg!(transaction)
+        transaction
     }
 }
 
@@ -293,7 +293,7 @@ impl CalculateKeyOffsetBoundaries for monerod::Client {
     /// possible.
     async fn calculate_key_offset_boundaries(&self) -> Result<(VarInt, VarInt)> {
         let latest_block = self.get_block_count().await?;
-        let latest_spendable_block = latest_block.count - 100;
+        let latest_spendable_block = latest_block.count - 10;
 
         let block: GetBlockResponse = self.get_block(latest_spendable_block).await?;
 
@@ -314,7 +314,7 @@ impl CalculateKeyOffsetBoundaries for monerod::Client {
         // let oldest_index = last_index - (last_index / 100) * 40; // oldest index must
         // be within last 40% TODO: CONFIRM THIS
 
-        Ok((VarInt(0), VarInt(last_index)))
+        Ok((VarInt(1000000), VarInt(last_index)))
     }
 }
 
