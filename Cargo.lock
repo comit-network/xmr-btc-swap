@@ -2341,7 +2341,7 @@ dependencies = [
 [[package]]
 name = "monero-epee-bin-serde"
 version = "1.0.0"
-source = "git+https://github.com/comit-network/monero-epee-bin-serde#f2c8baa39f04ac4e7a71c76a16c2c6f9a5ee3e3b"
+source = "git+https://github.com/comit-network/monero-epee-bin-serde#174912f04e6c594507da8248025b84ca1838da69"
 dependencies = [
  "byteorder",
  "serde",
