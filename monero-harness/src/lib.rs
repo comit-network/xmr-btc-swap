@@ -31,7 +31,6 @@ use std::time::Duration;
 use testcontainers::clients::Cli;
 use testcontainers::{Container, Docker, RunArgs};
 use tokio::time;
-use tokio::time::sleep;
 
 /// How often we mine a block.
 const BLOCK_TIME_SECS: u64 = 1;
@@ -78,8 +77,21 @@ impl<'c> Monero {
         containers.push(miner_container);
         for wallet in additional_wallets.iter() {
             tracing::info!("Starting wallet: {}", wallet);
-            let (wallet, container) =
-                MoneroWalletRpc::new(cli, &wallet, &monerod, prefix.clone()).await?;
+
+            // Create new wallet, the RPC sometimes has startup problems so we allow retries
+            // (drop the container that failed and try again) Times out after
+            // trying for 5 minutes
+            let (wallet, container) = tokio::time::timeout(Duration::from_secs(300), async {
+                loop {
+                    let result = MoneroWalletRpc::new(cli, &wallet, &monerod, prefix.clone()).await;
+
+                    match result {
+                        Ok(tuple) => { return tuple; }
+                        Err(e) => { tracing::warn!("Monero wallet RPC emitted error {} - retrying to create wallet in 2 seconds...", e); }
+                    }
+                }
+            }).await.context("All retry attempts for creating a wallet exhausted")?;
+
             wallets.push(wallet);
             containers.push(container);
         }
@@ -254,22 +266,9 @@ impl<'c> MoneroWalletRpc {
 
         let client = wallet::Client::localhost(wallet_rpc_port)?;
 
-        // Create new wallet, the RPC sometimes has startup problems so we allow some
-        // retries
-        tokio::time::timeout(Duration::from_secs(10), async {
-            loop {
-                let result = client
-                    .create_wallet(name.to_owned(), "English".to_owned())
-                    .await;
-
-                match result {
-                    Ok(_) => { break; }
-                    Err(e) => { tracing::warn!("Monero wallet RPC emitted error {} - retrying to create wallet in 2 seconds...", e); }
-                }
-
-                sleep(Duration::from_secs(2)).await;
-            }
-        }).await.context("All retry attempts for creating a wallet exhausted")?;
+        client
+            .create_wallet(name.to_owned(), "English".to_owned())
+            .await?;
 
         Ok((
             Self {
