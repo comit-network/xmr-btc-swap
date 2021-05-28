@@ -17,13 +17,14 @@ use libp2p::core::multiaddr::Protocol;
 use libp2p::core::Multiaddr;
 use libp2p::Swarm;
 use prettytable::{row, Table};
+use std::env;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
-use structopt::StructOpt;
-use swap::asb::command::{Arguments, Command, ManualRecovery, RecoverCommandParams};
+use structopt::clap;
+use structopt::clap::ErrorKind;
+use swap::asb::command::{parse_args, Arguments, Command};
 use swap::asb::config::{
     initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
-    GetDefaults,
 };
 use swap::database::Database;
 use swap::monero::Amount;
@@ -33,7 +34,7 @@ use swap::protocol::alice::event_loop::KrakenRate;
 use swap::protocol::alice::{redeem, run, EventLoop};
 use swap::seed::Seed;
 use swap::tor::AuthenticatedClient;
-use swap::{asb, bitcoin, env, kraken, monero, tor};
+use swap::{asb, bitcoin, kraken, monero, tor};
 use tracing::{debug, info, warn};
 use tracing_subscriber::filter::LevelFilter;
 
@@ -47,18 +48,28 @@ async fn main() -> Result<()> {
     let Arguments {
         testnet,
         json,
-        config,
+        config_path,
+        env_config,
         cmd,
-    } = Arguments::from_args();
-    asb::tracing::init(LevelFilter::DEBUG, json).expect("initialize tracing");
-
-    let config_path = if let Some(config_path) = config {
-        config_path
-    } else if testnet {
-        env::Testnet::getConfigFileDefaults()?.config_path
-    } else {
-        env::Mainnet::getConfigFileDefaults()?.config_path
+    } = match parse_args(env::args_os()) {
+        Ok(args) => args,
+        Err(e) => {
+            if let Some(clap_err) = e.downcast_ref::<clap::Error>() {
+                match clap_err.kind {
+                    ErrorKind::HelpDisplayed | ErrorKind::VersionDisplayed => {
+                        println!("{}", clap_err.message);
+                        std::process::exit(0);
+                    }
+                    _ => {
+                        bail!(e);
+                    }
+                }
+            }
+            bail!(e);
+        }
     };
+
+    asb::tracing::init(LevelFilter::DEBUG, json).expect("initialize tracing");
 
     let config = match read_config(config_path.clone())? {
         Ok(config) => config,
@@ -67,8 +78,6 @@ async fn main() -> Result<()> {
             read_config(config_path)?.expect("after initial setup config can be read")
         }
     };
-
-    let env_config = env::new(testnet, &config);
 
     if config.monero.network != env_config.monero_network {
         bail!(format!(
@@ -228,9 +237,7 @@ async fn main() -> Result<()> {
                 %monero_balance,
                 "Current balance");
         }
-        Command::ManualRecovery(ManualRecovery::Cancel {
-            cancel_params: RecoverCommandParams { swap_id, force },
-        }) => {
+        Command::Cancel { swap_id, force } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
 
             let (txid, _) =
@@ -238,9 +245,7 @@ async fn main() -> Result<()> {
 
             tracing::info!("Cancel transaction successfully published with id {}", txid);
         }
-        Command::ManualRecovery(ManualRecovery::Refund {
-            refund_params: RecoverCommandParams { swap_id, force },
-        }) => {
+        Command::Refund { swap_id, force } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
 
@@ -255,9 +260,7 @@ async fn main() -> Result<()> {
 
             tracing::info!("Monero successfully refunded");
         }
-        Command::ManualRecovery(ManualRecovery::Punish {
-            punish_params: RecoverCommandParams { swap_id, force },
-        }) => {
+        Command::Punish { swap_id, force } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
 
             let (txid, _) =
@@ -265,15 +268,16 @@ async fn main() -> Result<()> {
 
             tracing::info!("Punish transaction successfully published with id {}", txid);
         }
-        Command::ManualRecovery(ManualRecovery::SafelyAbort { swap_id }) => {
+        Command::SafelyAbort { swap_id } => {
             alice::safely_abort(swap_id, Arc::new(db)).await?;
 
             tracing::info!("Swap safely aborted");
         }
-        Command::ManualRecovery(ManualRecovery::Redeem {
-            redeem_params: RecoverCommandParams { swap_id, force },
+        Command::Redeem {
+            swap_id,
+            force,
             do_not_await_finality,
-        }) => {
+        } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
 
             let (txid, _) = alice::redeem(
@@ -287,7 +291,7 @@ async fn main() -> Result<()> {
 
             tracing::info!("Redeem transaction successfully published with id {}", txid);
         }
-    };
+    }
 
     Ok(())
 }

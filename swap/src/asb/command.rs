@@ -1,7 +1,202 @@
+use crate::asb::config::GetDefaults;
 use crate::bitcoin::Amount;
+use crate::env;
+use crate::env::GetConfig;
+use anyhow::{bail, Result};
 use bitcoin::Address;
+use serde::Serialize;
+use std::ffi::OsString;
 use std::path::PathBuf;
+use structopt::StructOpt;
 use uuid::Uuid;
+
+pub fn parse_args<I, T>(raw_args: I) -> Result<Arguments>
+where
+    I: IntoIterator<Item = T>,
+    T: Into<OsString> + Clone,
+{
+    let matches = RawArguments::clap().get_matches_from_safe(raw_args)?;
+    let args = RawArguments::from_clap(&matches);
+
+    let is_json = args.json;
+    let is_testnet = args.testnet;
+    let config = args.config;
+    let command: RawCommand = args.cmd;
+
+    let arguments = match command {
+        RawCommand::Start { resume_only } => Arguments {
+            testnet: is_testnet,
+            json: is_json,
+            config_path: config_path(config, is_testnet)?,
+            env_config: env_config(is_testnet),
+            cmd: Command::Start { resume_only },
+        },
+        RawCommand::History => Arguments {
+            testnet: is_testnet,
+            json: is_json,
+            config_path: config_path(config, is_testnet)?,
+            env_config: env_config(is_testnet),
+            cmd: Command::History,
+        },
+        RawCommand::WithdrawBtc { amount, address } => Arguments {
+            testnet: is_testnet,
+            json: is_json,
+            config_path: config_path(config, is_testnet)?,
+            env_config: env_config(is_testnet),
+            cmd: Command::WithdrawBtc {
+                amount,
+                address: bitcoin_address(address, is_testnet)?,
+            },
+        },
+        RawCommand::Balance => Arguments {
+            testnet: is_testnet,
+            json: is_json,
+            config_path: config_path(config, is_testnet)?,
+            env_config: env_config(is_testnet),
+            cmd: Command::Balance,
+        },
+        RawCommand::ManualRecovery(manual_recovery) => match manual_recovery {
+            ManualRecovery::Redeem {
+                redeem_params: RecoverCommandParams { swap_id, force },
+                do_not_await_finality,
+            } => Arguments {
+                testnet: is_testnet,
+                json: is_json,
+                config_path: config_path(config, is_testnet)?,
+                env_config: env_config(is_testnet),
+                cmd: Command::Redeem {
+                    swap_id,
+                    force,
+                    do_not_await_finality,
+                },
+            },
+            ManualRecovery::Cancel {
+                cancel_params: RecoverCommandParams { swap_id, force },
+            } => Arguments {
+                testnet: is_testnet,
+                json: is_json,
+                config_path: config_path(config, is_testnet)?,
+                env_config: env_config(is_testnet),
+                cmd: Command::Cancel { swap_id, force },
+            },
+            ManualRecovery::Refund {
+                refund_params: RecoverCommandParams { swap_id, force },
+            } => Arguments {
+                testnet: is_testnet,
+                json: is_json,
+                config_path: config_path(config, is_testnet)?,
+                env_config: env_config(is_testnet),
+                cmd: Command::Refund { swap_id, force },
+            },
+            ManualRecovery::Punish {
+                punish_params: RecoverCommandParams { swap_id, force },
+            } => Arguments {
+                testnet: is_testnet,
+                json: is_json,
+                config_path: config_path(config, is_testnet)?,
+                env_config: env_config(is_testnet),
+                cmd: Command::Punish { swap_id, force },
+            },
+            ManualRecovery::SafelyAbort { swap_id } => Arguments {
+                testnet: is_testnet,
+                json: is_json,
+                config_path: config_path(config, is_testnet)?,
+                env_config: env_config(is_testnet),
+                cmd: Command::SafelyAbort { swap_id },
+            },
+        },
+    };
+
+    Ok(arguments)
+}
+
+fn bitcoin_address(address: Address, is_testnet: bool) -> Result<Address> {
+    let network = if is_testnet {
+        bitcoin::Network::Testnet
+    } else {
+        bitcoin::Network::Bitcoin
+    };
+
+    if address.network != network {
+        bail!(BitcoinAddressNetworkMismatch {
+            expected: network,
+            actual: address.network
+        });
+    }
+
+    Ok(address)
+}
+
+fn config_path(config: Option<PathBuf>, is_testnet: bool) -> Result<PathBuf> {
+    let config_path = if let Some(config_path) = config {
+        config_path
+    } else if is_testnet {
+        env::Testnet::getConfigFileDefaults()?.config_path
+    } else {
+        env::Mainnet::getConfigFileDefaults()?.config_path
+    };
+
+    Ok(config_path)
+}
+
+fn env_config(is_testnet: bool) -> env::Config {
+    if is_testnet {
+        env::Testnet::get_config()
+    } else {
+        env::Mainnet::get_config()
+    }
+}
+
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Serialize)]
+#[error("Invalid Bitcoin address provided, expected address on network {expected:?}  but address provided is on {actual:?}")]
+pub struct BitcoinAddressNetworkMismatch {
+    #[serde(with = "crate::bitcoin::network")]
+    expected: bitcoin::Network,
+    #[serde(with = "crate::bitcoin::network")]
+    actual: bitcoin::Network,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Arguments {
+    pub testnet: bool,
+    pub json: bool,
+    pub config_path: PathBuf,
+    pub env_config: env::Config,
+    pub cmd: Command,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Command {
+    Start {
+        resume_only: bool,
+    },
+    History,
+    WithdrawBtc {
+        amount: Option<Amount>,
+        address: Address,
+    },
+    Balance,
+    Redeem {
+        swap_id: Uuid,
+        force: bool,
+        do_not_await_finality: bool,
+    },
+    Cancel {
+        swap_id: Uuid,
+        force: bool,
+    },
+    Refund {
+        swap_id: Uuid,
+        force: bool,
+    },
+    Punish {
+        swap_id: Uuid,
+        force: bool,
+    },
+    SafelyAbort {
+        swap_id: Uuid,
+    },
+}
 
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(
@@ -9,7 +204,7 @@ use uuid::Uuid;
     about = "Automated Swap Backend for swapping XMR for BTC",
     author
 )]
-pub struct Arguments {
+pub struct RawArguments {
     #[structopt(long, help = "Swap on testnet")]
     pub testnet: bool,
 
@@ -28,12 +223,12 @@ pub struct Arguments {
     pub config: Option<PathBuf>,
 
     #[structopt(subcommand)]
-    pub cmd: Command,
+    pub cmd: RawCommand,
 }
 
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(name = "xmr_btc-swap", about = "XMR BTC atomic swap")]
-pub enum Command {
+pub enum RawCommand {
     #[structopt(about = "Main command to run the ASB.")]
     Start {
         #[structopt(
@@ -122,4 +317,334 @@ pub struct RecoverCommandParams {
         help = "Circumvents certain checks when recovering. It is recommended to run a recovery command without --force first to see what is returned."
     )]
     pub force: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+
+    const BINARY_NAME: &str = "asb";
+    const BITCOIN_MAINNET_ADDRESS: &str = "1KFHE7w8BhaENAswwryaoccDb6qcT6DbYY";
+    const BITCOIN_TESTNET_ADDRESS: &str = "tb1qyccwk4yun26708qg5h6g6we8kxln232wclxf5a";
+    const SWAP_ID: &str = "ea030832-3be9-454f-bb98-5ea9a788406b";
+
+    #[test]
+    fn ensure_command_mapping_for_mainnet() {
+        let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
+        let mainnet_env_config = env::Mainnet::get_config();
+
+        let raw_ars = vec![BINARY_NAME, "start"];
+        let expected_args = Arguments {
+            testnet: false,
+            json: false,
+            config_path: default_mainnet_conf_path.clone(),
+            env_config: mainnet_env_config,
+            cmd: Command::Start { resume_only: false },
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+
+        let raw_ars = vec![BINARY_NAME, "history"];
+        let expected_args = Arguments {
+            testnet: false,
+            json: false,
+            config_path: default_mainnet_conf_path.clone(),
+            env_config: mainnet_env_config,
+            cmd: Command::History,
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+
+        let raw_ars = vec![BINARY_NAME, "balance"];
+        let expected_args = Arguments {
+            testnet: false,
+            json: false,
+            config_path: default_mainnet_conf_path.clone(),
+            env_config: mainnet_env_config,
+            cmd: Command::Balance,
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "withdraw-btc",
+            "--address",
+            BITCOIN_MAINNET_ADDRESS,
+        ];
+        let expected_args = Arguments {
+            testnet: false,
+            json: false,
+            config_path: default_mainnet_conf_path.clone(),
+            env_config: mainnet_env_config,
+            cmd: Command::WithdrawBtc {
+                amount: None,
+                address: Address::from_str(BITCOIN_MAINNET_ADDRESS).unwrap(),
+            },
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "manual-recovery",
+            "cancel",
+            "--swap-id",
+            SWAP_ID,
+        ];
+        let expected_args = Arguments {
+            testnet: false,
+            json: false,
+            config_path: default_mainnet_conf_path.clone(),
+            env_config: mainnet_env_config,
+            cmd: Command::Cancel {
+                swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
+                force: false,
+            },
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "manual-recovery",
+            "refund",
+            "--swap-id",
+            SWAP_ID,
+        ];
+        let expected_args = Arguments {
+            testnet: false,
+            json: false,
+            config_path: default_mainnet_conf_path.clone(),
+            env_config: mainnet_env_config,
+            cmd: Command::Refund {
+                swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
+                force: false,
+            },
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "manual-recovery",
+            "punish",
+            "--swap-id",
+            SWAP_ID,
+        ];
+        let expected_args = Arguments {
+            testnet: false,
+            json: false,
+            config_path: default_mainnet_conf_path.clone(),
+            env_config: mainnet_env_config,
+            cmd: Command::Punish {
+                swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
+                force: false,
+            },
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "manual-recovery",
+            "safely-abort",
+            "--swap-id",
+            SWAP_ID,
+        ];
+        let expected_args = Arguments {
+            testnet: false,
+            json: false,
+            config_path: default_mainnet_conf_path,
+            env_config: mainnet_env_config,
+            cmd: Command::SafelyAbort {
+                swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
+            },
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_command_mapping_for_testnet() {
+        let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
+        let testnet_env_config = env::Testnet::get_config();
+
+        let raw_ars = vec![BINARY_NAME, "--testnet", "start"];
+        let expected_args = Arguments {
+            testnet: true,
+            json: false,
+            config_path: default_testnet_conf_path.clone(),
+            env_config: testnet_env_config,
+            cmd: Command::Start { resume_only: false },
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+
+        let raw_ars = vec![BINARY_NAME, "--testnet", "history"];
+        let expected_args = Arguments {
+            testnet: true,
+            json: false,
+            config_path: default_testnet_conf_path.clone(),
+            env_config: testnet_env_config,
+            cmd: Command::History,
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+
+        let raw_ars = vec![BINARY_NAME, "--testnet", "balance"];
+        let expected_args = Arguments {
+            testnet: true,
+            json: false,
+            config_path: default_testnet_conf_path.clone(),
+            env_config: testnet_env_config,
+            cmd: Command::Balance,
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "withdraw-btc",
+            "--address",
+            BITCOIN_TESTNET_ADDRESS,
+        ];
+        let expected_args = Arguments {
+            testnet: true,
+            json: false,
+            config_path: default_testnet_conf_path.clone(),
+            env_config: testnet_env_config,
+            cmd: Command::WithdrawBtc {
+                amount: None,
+                address: Address::from_str(BITCOIN_TESTNET_ADDRESS).unwrap(),
+            },
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "manual-recovery",
+            "cancel",
+            "--swap-id",
+            SWAP_ID,
+        ];
+        let expected_args = Arguments {
+            testnet: true,
+            json: false,
+            config_path: default_testnet_conf_path.clone(),
+            env_config: testnet_env_config,
+            cmd: Command::Cancel {
+                swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
+                force: false,
+            },
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "manual-recovery",
+            "refund",
+            "--swap-id",
+            SWAP_ID,
+        ];
+        let expected_args = Arguments {
+            testnet: true,
+            json: false,
+            config_path: default_testnet_conf_path.clone(),
+            env_config: testnet_env_config,
+            cmd: Command::Refund {
+                swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
+                force: false,
+            },
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "manual-recovery",
+            "punish",
+            "--swap-id",
+            SWAP_ID,
+        ];
+        let expected_args = Arguments {
+            testnet: true,
+            json: false,
+            config_path: default_testnet_conf_path.clone(),
+            env_config: testnet_env_config,
+            cmd: Command::Punish {
+                swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
+                force: false,
+            },
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "manual-recovery",
+            "safely-abort",
+            "--swap-id",
+            SWAP_ID,
+        ];
+        let expected_args = Arguments {
+            testnet: true,
+            json: false,
+            config_path: default_testnet_conf_path,
+            env_config: testnet_env_config,
+            cmd: Command::SafelyAbort {
+                swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
+            },
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn given_user_provides_config_path_then_no_default_config_path_returned() {
+        let cp = PathBuf::from_str("/some/config/path").unwrap();
+
+        let expected = config_path(Some(cp.clone()), true).unwrap();
+        assert_eq!(expected, cp);
+
+        let expected = config_path(Some(cp.clone()), false).unwrap();
+        assert_eq!(expected, cp)
+    }
+
+    #[test]
+    fn given_bitcoin_address_network_mismatch_then_error() {
+        let error =
+            bitcoin_address(Address::from_str(BITCOIN_MAINNET_ADDRESS).unwrap(), true).unwrap_err();
+
+        assert_eq!(
+            error
+                .downcast_ref::<BitcoinAddressNetworkMismatch>()
+                .unwrap(),
+            &BitcoinAddressNetworkMismatch {
+                expected: bitcoin::Network::Testnet,
+                actual: bitcoin::Network::Bitcoin
+            }
+        );
+
+        let error = bitcoin_address(Address::from_str(BITCOIN_TESTNET_ADDRESS).unwrap(), false)
+            .unwrap_err();
+
+        assert_eq!(
+            error
+                .downcast_ref::<BitcoinAddressNetworkMismatch>()
+                .unwrap(),
+            &BitcoinAddressNetworkMismatch {
+                expected: bitcoin::Network::Bitcoin,
+                actual: bitcoin::Network::Testnet
+            }
+        );
+    }
 }
