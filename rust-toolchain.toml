@@ -1,0 +1,4 @@
+[toolchain]
+channel = "1.52"
+components = ["clippy"]
+targets = ["armv7-unknown-linux-gnueabihf"]

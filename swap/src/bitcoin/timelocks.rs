@@ -17,18 +17,6 @@ impl From<BlockHeight> for u32 {
     }
 }
 
-impl BlockHeight {
-    pub const fn new(block_height: u32) -> Self {
-        Self(block_height)
-    }
-    pub const fn checked_sub(self, rhs: Self) -> Option<Self> {
-        match self.0.checked_sub(rhs.0) {
-            Some(result) => Some(BlockHeight(result)),
-            None => None,
-        }
-    }
-}
-
 impl TryFrom<HeaderNotification> for BlockHeight {
     type Error = anyhow::Error;
 

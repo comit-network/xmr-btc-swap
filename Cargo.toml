@@ -1,2 +1,5 @@
 [workspace]
 members = [ "monero-harness", "monero-rpc", "swap", "monero-wallet" ]
+
+[patch.crates-io]
+monero = { git = "https://github.com/comit-network/monero-rs", rev = "818f38b" }

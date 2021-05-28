@@ -314,8 +314,8 @@ impl State2 {
 
         let tx_cancel_sig = self.a.sign(tx_cancel.digest());
         Message3 {
-            tx_refund_encsig,
             tx_cancel_sig,
+            tx_refund_encsig,
         }
     }
 

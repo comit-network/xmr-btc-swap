@@ -17,9 +17,6 @@ jobs:
 
       - uses: Swatinem/rust-cache@v1.2.0
 
-      - name: Check code formatting
-        run: cargo fmt --all -- --check
-
       - name: Check formatting
         uses: dprint/check@v1.4
 
