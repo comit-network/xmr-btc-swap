@@ -265,10 +265,8 @@ pub struct NotThreeWitnesses(usize);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bitcoin::wallet::EstimateFeeRate;
     use crate::env::{GetConfig, Regtest};
     use crate::protocol::{alice, bob};
-    use bdk::FeeRate;
     use rand::rngs::OsRng;
     use uuid::Uuid;
 
@@ -317,21 +315,10 @@ mod tests {
         assert_eq!(expired_timelock, ExpiredTimelocks::Punish)
     }
 
-    struct StaticFeeRate {}
-    impl EstimateFeeRate for StaticFeeRate {
-        fn estimate_feerate(&self, _target_block: usize) -> Result<FeeRate> {
-            Ok(FeeRate::default_min_relay_fee())
-        }
-
-        fn min_relay_fee(&self) -> Result<bitcoin::Amount> {
-            Ok(bitcoin::Amount::from_sat(1_000))
-        }
-    }
-
     #[tokio::test]
     async fn calculate_transaction_weights() {
-        let alice_wallet = Wallet::new_funded(Amount::ONE_BTC.as_sat(), StaticFeeRate {});
-        let bob_wallet = Wallet::new_funded(Amount::ONE_BTC.as_sat(), StaticFeeRate {});
+        let alice_wallet = Wallet::new_funded_default_fees(Amount::ONE_BTC.as_sat());
+        let bob_wallet = Wallet::new_funded_default_fees(Amount::ONE_BTC.as_sat());
         let spending_fee = Amount::from_sat(1_000);
         let btc_amount = Amount::from_sat(500_000);
         let xmr_amount = crate::monero::Amount::from_piconero(10000);

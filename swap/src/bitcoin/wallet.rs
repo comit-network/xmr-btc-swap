@@ -497,12 +497,42 @@ pub trait EstimateFeeRate {
 }
 
 #[cfg(test)]
-impl<EFR> Wallet<(), bdk::database::MemoryDatabase, EFR>
-where
-    EFR: EstimateFeeRate,
-{
+pub struct StaticFeeRate {
+    fee_rate: FeeRate,
+    min_relay_fee: bitcoin::Amount,
+}
+
+#[cfg(test)]
+impl EstimateFeeRate for StaticFeeRate {
+    fn estimate_feerate(&self, _target_block: usize) -> Result<FeeRate> {
+        Ok(self.fee_rate)
+    }
+
+    fn min_relay_fee(&self) -> Result<bitcoin::Amount> {
+        Ok(self.min_relay_fee)
+    }
+}
+
+#[cfg(test)]
+impl Wallet<(), bdk::database::MemoryDatabase, StaticFeeRate> {
+    /// Creates a new, funded wallet with sane default fees.
+    ///
+    /// Unless you are testing things related to fees, this is likely what you
+    /// want.
+    pub fn new_funded_default_fees(amount: u64) -> Self {
+        Self::new_funded(amount, 1.0, 1000)
+    }
+
+    /// Creates a new, funded wallet that doesn't pay any fees.
+    ///
+    /// This will create invalid transactions but can be useful if you want full
+    /// control over the output amounts.
+    pub fn new_funded_zero_fees(amount: u64) -> Self {
+        Self::new_funded(amount, 0.0, 0)
+    }
+
     /// Creates a new, funded wallet to be used within tests.
-    pub fn new_funded(amount: u64, estimate_fee_rate: EFR) -> Self {
+    pub fn new_funded(amount: u64, sats_per_vb: f32, min_relay_fee_sats: u64) -> Self {
         use bdk::database::MemoryDatabase;
         use bdk::{LocalUtxo, TransactionDetails};
         use bitcoin::OutPoint;
@@ -523,7 +553,10 @@ where
             bdk::Wallet::new_offline(&descriptors.0, None, Network::Regtest, database).unwrap();
 
         Self {
-            client: Arc::new(Mutex::new(estimate_fee_rate)),
+            client: Arc::new(Mutex::new(StaticFeeRate {
+                fee_rate: FeeRate::from_sat_per_vb(sats_per_vb),
+                min_relay_fee: bitcoin::Amount::from_sat(min_relay_fee_sats),
+            })),
             wallet: Arc::new(Mutex::new(wallet)),
             finality_confirmations: 1,
             network: Network::Regtest,
@@ -977,23 +1010,9 @@ mod tests {
         }
     }
 
-    struct StaticFeeRate {
-        min_relay_fee: u64,
-    }
-
-    impl EstimateFeeRate for StaticFeeRate {
-        fn estimate_feerate(&self, _target_block: usize) -> Result<FeeRate> {
-            Ok(FeeRate::default_min_relay_fee())
-        }
-
-        fn min_relay_fee(&self) -> Result<bitcoin::Amount> {
-            Ok(bitcoin::Amount::from_sat(self.min_relay_fee))
-        }
-    }
-
     #[tokio::test]
     async fn given_no_balance_returns_amount_0() {
-        let wallet = Wallet::new_funded(0, StaticFeeRate { min_relay_fee: 1 });
+        let wallet = Wallet::new_funded(0, 1.0, 1);
         let amount = wallet.max_giveable(TxLock::script_size()).await.unwrap();
 
         assert_eq!(amount, Amount::ZERO);
@@ -1001,9 +1020,7 @@ mod tests {
 
     #[tokio::test]
     async fn given_balance_below_min_relay_fee_returns_amount_0() {
-        let wallet = Wallet::new_funded(1000, StaticFeeRate {
-            min_relay_fee: 1001,
-        });
+        let wallet = Wallet::new_funded(1000, 1.0, 1001);
         let amount = wallet.max_giveable(TxLock::script_size()).await.unwrap();
 
         assert_eq!(amount, Amount::ZERO);
@@ -1011,9 +1028,7 @@ mod tests {
 
     #[tokio::test]
     async fn given_balance_above_relay_fee_returns_amount_greater_0() {
-        let wallet = Wallet::new_funded(10_000, StaticFeeRate {
-            min_relay_fee: 1000,
-        });
+        let wallet = Wallet::new_funded_default_fees(10_000);
         let amount = wallet.max_giveable(TxLock::script_size()).await.unwrap();
 
         assert!(amount.as_sat() > 0);
@@ -1026,25 +1041,14 @@ mod tests {
     #[tokio::test]
     async fn given_amounts_with_change_outputs_when_signing_tx_then_output_index_0_is_ensured_for_script(
     ) {
-        // We don't care about fees in this test, thus use a zero fee rate
-        struct NoFeeRate();
-        impl EstimateFeeRate for NoFeeRate {
-            fn estimate_feerate(&self, _target_block: usize) -> Result<FeeRate> {
-                Ok(FeeRate::from_sat_per_vb(0.0))
-            }
-
-            fn min_relay_fee(&self) -> Result<bitcoin::Amount> {
-                Ok(bitcoin::Amount::from_sat(0))
-            }
-        }
-
         // This value is somewhat arbitrary but the indexation problem usually occurred
         // on the first or second value (i.e. 547, 548) We keep the test
         // iterations relatively low because these tests are expensive.
         let above_dust = 547;
         let balance = 2000;
 
-        let wallet = Wallet::new_funded(balance, NoFeeRate());
+        // We don't care about fees in this test, thus use a zero fee rate
+        let wallet = Wallet::new_funded_zero_fees(balance);
 
         // sorting is only relevant for amounts that have a change output
         // if the change output is below dust it will be dropped by the BDK
