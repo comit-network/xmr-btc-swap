@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2021-05-28
+
 ### Fixed
 
 - An issue where long-running connections are dead without a connection closure being reported back to the swarm.
@@ -127,7 +129,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[Unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.6.0...HEAD
+[Unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.7.0...HEAD
+[0.7.0]: https://github.com/comit-network/xmr-btc-swap/compare/0.6.0...0.7.0
 [0.6.0]: https://github.com/comit-network/xmr-btc-swap/compare/0.5.0...0.6.0
 [0.5.0]: https://github.com/comit-network/xmr-btc-swap/compare/0.4.0...0.5.0
 [0.4.0]: https://github.com/comit-network/xmr-btc-swap/compare/v0.3...0.4.0
