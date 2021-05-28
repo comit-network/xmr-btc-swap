@@ -20,10 +20,8 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use structopt::clap;
-use structopt::clap::ErrorKind;
 use swap::bitcoin::TxLock;
-use swap::cli::command::{parse_args_and_apply_defaults, Arguments, Command};
+use swap::cli::command::{parse_args_and_apply_defaults, Arguments, Command, ParseResult};
 use swap::database::Database;
 use swap::env::Config;
 use swap::network::quote::BidQuote;
@@ -47,21 +45,11 @@ async fn main() -> Result<()> {
         debug,
         json,
         cmd,
-    } = match parse_args_and_apply_defaults(env::args_os()) {
-        Ok(args) => args,
-        Err(e) => {
-            if let Some(clap_err) = e.downcast_ref::<clap::Error>() {
-                match clap_err.kind {
-                    ErrorKind::HelpDisplayed | ErrorKind::VersionDisplayed => {
-                        println!("{}", clap_err.message);
-                        std::process::exit(0);
-                    }
-                    _ => {
-                        bail!(e);
-                    }
-                }
-            }
-            bail!(e);
+    } = match parse_args_and_apply_defaults(env::args_os())? {
+        ParseResult::Arguments(args) => args,
+        ParseResult::PrintAndExitZero { message } => {
+            println!("{}", message);
+            std::process::exit(0);
         }
     };
 

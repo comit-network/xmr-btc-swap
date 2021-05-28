@@ -7,7 +7,7 @@ use libp2p::PeerId;
 use std::ffi::OsString;
 use std::path::PathBuf;
 use std::str::FromStr;
-use structopt::StructOpt;
+use structopt::{clap, StructOpt};
 use url::Url;
 use uuid::Uuid;
 
@@ -34,20 +34,44 @@ pub struct Arguments {
     pub cmd: Command,
 }
 
-pub fn parse_args_and_apply_defaults<I, T>(raw_args: I) -> Result<Arguments>
+/// Represents the result of parsing the command-line parameters.
+#[derive(Debug, PartialEq)]
+pub enum ParseResult {
+    /// The arguments we were invoked in.
+    Arguments(Arguments),
+    /// A flag or command was given that does not need further processing other
+    /// than printing the provided message.
+    ///
+    /// The caller should exit the program with exit code 0.
+    PrintAndExitZero { message: String },
+}
+
+pub fn parse_args_and_apply_defaults<I, T>(raw_args: I) -> Result<ParseResult>
 where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
 {
-    let matches = RawArguments::clap().get_matches_from_safe(raw_args)?;
-    let args = RawArguments::from_clap(&matches);
+    let args = match RawArguments::clap().get_matches_from_safe(raw_args) {
+        Ok(matches) => RawArguments::from_clap(&matches),
+        Err(clap::Error {
+            message,
+            kind: clap::ErrorKind::HelpDisplayed,
+            ..
+        })
+        | Err(clap::Error {
+            message,
+            kind: clap::ErrorKind::VersionDisplayed,
+            ..
+        }) => return Ok(ParseResult::PrintAndExitZero { message }),
+        Err(e) => anyhow::bail!(e),
+    };
 
     let debug = args.debug;
     let json = args.json;
     let is_testnet = args.testnet;
     let data = args.data;
 
-    match args.cmd {
+    let arguments = match args.cmd {
         RawCommand::BuyXmr {
             seller_peer_id,
             seller_addr: SellerAddr { seller_addr },
@@ -62,7 +86,7 @@ where
                     monero_daemon_address,
                 },
             tor: Tor { tor_socks5_port },
-        } => Ok(Arguments {
+        } => Arguments {
             env_config: env_config_from(is_testnet),
             debug,
             json,
@@ -85,14 +109,14 @@ where
                 ),
                 tor_socks5_port,
             },
-        }),
-        RawCommand::History => Ok(Arguments {
+        },
+        RawCommand::History => Arguments {
             env_config: env_config_from(is_testnet),
             debug,
             json,
             data_dir: data::data_dir_from(data, is_testnet)?,
             cmd: Command::History,
-        }),
+        },
         RawCommand::Resume {
             swap_id: SwapId { swap_id },
             seller_addr: SellerAddr { seller_addr },
@@ -107,7 +131,7 @@ where
                     monero_daemon_address,
                 },
             tor: Tor { tor_socks5_port },
-        } => Ok(Arguments {
+        } => Arguments {
             env_config: env_config_from(is_testnet),
             debug,
             json,
@@ -127,7 +151,7 @@ where
                 ),
                 tor_socks5_port,
             },
-        }),
+        },
         RawCommand::Cancel {
             swap_id: SwapId { swap_id },
             force,
@@ -136,7 +160,7 @@ where
                     bitcoin_electrum_rpc_url,
                     bitcoin_target_block,
                 },
-        } => Ok(Arguments {
+        } => Arguments {
             env_config: env_config_from(is_testnet),
             debug,
             json,
@@ -150,7 +174,7 @@ where
                 )?,
                 bitcoin_target_block: bitcoin_target_block_from(bitcoin_target_block, is_testnet),
             },
-        }),
+        },
         RawCommand::Refund {
             swap_id: SwapId { swap_id },
             force,
@@ -159,7 +183,7 @@ where
                     bitcoin_electrum_rpc_url,
                     bitcoin_target_block,
                 },
-        } => Ok(Arguments {
+        } => Arguments {
             env_config: env_config_from(is_testnet),
             debug,
             json,
@@ -173,8 +197,10 @@ where
                 )?,
                 bitcoin_target_block: bitcoin_target_block_from(bitcoin_target_block, is_testnet),
             },
-        }),
-    }
+        },
+    };
+
+    Ok(ParseResult::Arguments(arguments))
 }
 
 #[derive(Debug, PartialEq)]
@@ -488,8 +514,9 @@ mod tests {
             PEER_ID,
         ];
 
-        let expected_args = Arguments::buy_xmr_mainnet_defaults();
+        let expected_args = ParseResult::Arguments(Arguments::buy_xmr_mainnet_defaults());
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+
         assert_eq!(expected_args, args);
     }
 
@@ -508,7 +535,11 @@ mod tests {
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(args, Arguments::buy_xmr_testnet_defaults());
+
+        assert_eq!(
+            args,
+            ParseResult::Arguments(Arguments::buy_xmr_testnet_defaults())
+        );
     }
 
     #[test]
@@ -574,7 +605,11 @@ mod tests {
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(args, Arguments::resume_mainnet_defaults());
+
+        assert_eq!(
+            args,
+            ParseResult::Arguments(Arguments::resume_mainnet_defaults())
+        );
     }
 
     #[test]
@@ -592,7 +627,11 @@ mod tests {
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(args, Arguments::resume_testnet_defaults());
+
+        assert_eq!(
+            args,
+            ParseResult::Arguments(Arguments::resume_testnet_defaults())
+        );
     }
 
     #[test]
@@ -600,7 +639,11 @@ mod tests {
         let raw_ars = vec![BINARY_NAME, "cancel", "--swap-id", SWAP_ID];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(args, Arguments::cancel_mainnet_defaults());
+
+        assert_eq!(
+            args,
+            ParseResult::Arguments(Arguments::cancel_mainnet_defaults())
+        );
     }
 
     #[test]
@@ -608,7 +651,11 @@ mod tests {
         let raw_ars = vec![BINARY_NAME, "--testnet", "cancel", "--swap-id", SWAP_ID];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(args, Arguments::cancel_testnet_defaults());
+
+        assert_eq!(
+            args,
+            ParseResult::Arguments(Arguments::cancel_testnet_defaults())
+        );
     }
 
     #[test]
@@ -616,7 +663,11 @@ mod tests {
         let raw_ars = vec![BINARY_NAME, "refund", "--swap-id", SWAP_ID];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(args, Arguments::refund_mainnet_defaults());
+
+        assert_eq!(
+            args,
+            ParseResult::Arguments(Arguments::refund_mainnet_defaults())
+        );
     }
 
     #[test]
@@ -624,7 +675,11 @@ mod tests {
         let raw_ars = vec![BINARY_NAME, "--testnet", "refund", "--swap-id", SWAP_ID];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(args, Arguments::refund_testnet_defaults());
+
+        assert_eq!(
+            args,
+            ParseResult::Arguments(Arguments::refund_testnet_defaults())
+        );
     }
 
     #[test]
@@ -645,10 +700,13 @@ mod tests {
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+
         assert_eq!(
             args,
-            Arguments::buy_xmr_mainnet_defaults()
-                .with_data_dir(PathBuf::from_str(data_dir).unwrap())
+            ParseResult::Arguments(
+                Arguments::buy_xmr_mainnet_defaults()
+                    .with_data_dir(PathBuf::from_str(data_dir).unwrap())
+            )
         );
 
         let raw_ars = vec![
@@ -666,10 +724,13 @@ mod tests {
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+
         assert_eq!(
             args,
-            Arguments::buy_xmr_testnet_defaults()
-                .with_data_dir(PathBuf::from_str(data_dir).unwrap())
+            ParseResult::Arguments(
+                Arguments::buy_xmr_testnet_defaults()
+                    .with_data_dir(PathBuf::from_str(data_dir).unwrap())
+            )
         );
 
         let raw_ars = vec![
@@ -686,10 +747,13 @@ mod tests {
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+
         assert_eq!(
             args,
-            Arguments::resume_mainnet_defaults()
-                .with_data_dir(PathBuf::from_str(data_dir).unwrap())
+            ParseResult::Arguments(
+                Arguments::resume_mainnet_defaults()
+                    .with_data_dir(PathBuf::from_str(data_dir).unwrap())
+            )
         );
 
         let raw_ars = vec![
@@ -707,10 +771,13 @@ mod tests {
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+
         assert_eq!(
             args,
-            Arguments::resume_testnet_defaults()
-                .with_data_dir(PathBuf::from_str(data_dir).unwrap())
+            ParseResult::Arguments(
+                Arguments::resume_testnet_defaults()
+                    .with_data_dir(PathBuf::from_str(data_dir).unwrap())
+            )
         );
     }
 
@@ -729,7 +796,10 @@ mod tests {
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(args, Arguments::buy_xmr_mainnet_defaults().with_debug());
+        assert_eq!(
+            args,
+            ParseResult::Arguments(Arguments::buy_xmr_mainnet_defaults().with_debug())
+        );
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -745,7 +815,10 @@ mod tests {
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(args, Arguments::buy_xmr_testnet_defaults().with_debug());
+        assert_eq!(
+            args,
+            ParseResult::Arguments(Arguments::buy_xmr_testnet_defaults().with_debug())
+        );
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -760,7 +833,10 @@ mod tests {
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(args, Arguments::resume_mainnet_defaults().with_debug());
+        assert_eq!(
+            args,
+            ParseResult::Arguments(Arguments::resume_mainnet_defaults().with_debug())
+        );
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -776,7 +852,10 @@ mod tests {
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(args, Arguments::resume_testnet_defaults().with_debug());
+        assert_eq!(
+            args,
+            ParseResult::Arguments(Arguments::resume_testnet_defaults().with_debug())
+        );
     }
 
     #[test]
@@ -794,7 +873,10 @@ mod tests {
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(args, Arguments::buy_xmr_mainnet_defaults().with_json());
+        assert_eq!(
+            args,
+            ParseResult::Arguments(Arguments::buy_xmr_mainnet_defaults().with_json())
+        );
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -810,7 +892,10 @@ mod tests {
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(args, Arguments::buy_xmr_testnet_defaults().with_json());
+        assert_eq!(
+            args,
+            ParseResult::Arguments(Arguments::buy_xmr_testnet_defaults().with_json())
+        );
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -825,7 +910,10 @@ mod tests {
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(args, Arguments::resume_mainnet_defaults().with_json());
+        assert_eq!(
+            args,
+            ParseResult::Arguments(Arguments::resume_mainnet_defaults().with_json())
+        );
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -841,7 +929,10 @@ mod tests {
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(args, Arguments::resume_testnet_defaults().with_json());
+        assert_eq!(
+            args,
+            ParseResult::Arguments(Arguments::resume_testnet_defaults().with_json())
+        );
     }
 
     impl Arguments {
