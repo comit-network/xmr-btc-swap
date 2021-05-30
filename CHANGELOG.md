@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Printing the deposit address to the terminal as a QR code.
+  To not break automated scripts or integrations with other software, this behaviour is disabled if `--json` is passed to the application.
+
 ## [0.7.0] - 2021-05-28
 
 ### Fixed

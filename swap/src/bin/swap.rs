@@ -14,6 +14,8 @@
 
 use anyhow::{bail, Context, Result};
 use prettytable::{row, Table};
+use qrcode::render::unicode;
+use qrcode::QrCode;
 use std::cmp::min;
 use std::env;
 use std::future::Future;
@@ -101,6 +103,7 @@ async fn main() -> Result<()> {
 
             let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
             let (amount, fees) = determine_btc_to_swap(
+                json,
                 event_loop_handle.request_quote(),
                 bitcoin_wallet.new_address(),
                 || bitcoin_wallet.balance(),
@@ -325,7 +328,18 @@ async fn init_monero_wallet(
     Ok((monero_wallet, monero_wallet_rpc_process))
 }
 
+fn qr_code(value: &impl ToString) -> Result<String> {
+    let code = QrCode::new(value.to_string())?;
+    let qr_code = code
+        .render::<unicode::Dense1x2>()
+        .dark_color(unicode::Dense1x2::Light)
+        .light_color(unicode::Dense1x2::Dark)
+        .build();
+    Ok(qr_code)
+}
+
 async fn determine_btc_to_swap<FB, TB, FMG, TMG, FS, TS>(
+    json: bool,
     bid_quote: impl Future<Output = Result<BidQuote>>,
     get_new_address: impl Future<Output = Result<bitcoin::Address>>,
     balance: FB,
@@ -357,6 +371,10 @@ where
         let deposit_address = get_new_address.await?;
         let minimum_amount = bid_quote.min_quantity;
         let maximum_amount = bid_quote.max_quantity;
+
+        if !json {
+            eprintln!("{}", qr_code(&deposit_address)?);
+        }
 
         info!(
             %deposit_address,
@@ -449,6 +467,7 @@ mod tests {
         ])));
 
         let (amount, fees) = determine_btc_to_swap(
+            true,
             async { Ok(quote_with_max(0.01)) },
             get_dummy_address(),
             || async { Ok(Amount::from_btc(0.001)?) },
@@ -475,6 +494,7 @@ mod tests {
         ])));
 
         let (amount, fees) = determine_btc_to_swap(
+            true,
             async { Ok(quote_with_max(0.01)) },
             get_dummy_address(),
             || async { Ok(Amount::from_btc(0.1001)?) },
@@ -502,6 +522,7 @@ mod tests {
         ])));
 
         let (amount, fees) = determine_btc_to_swap(
+            true,
             async { Ok(quote_with_max(0.01)) },
             async { panic!("should not request new address when initial balance  is > 0") },
             || async { Ok(Amount::from_btc(0.005)?) },
@@ -529,6 +550,7 @@ mod tests {
         ])));
 
         let (amount, fees) = determine_btc_to_swap(
+            true,
             async { Ok(quote_with_max(0.01)) },
             async { panic!("should not request new address when initial balance is > 0") },
             || async { Ok(Amount::from_btc(0.1001)?) },
@@ -556,6 +578,7 @@ mod tests {
         ])));
 
         let (amount, fees) = determine_btc_to_swap(
+            true,
             async { Ok(quote_with_min(0.01)) },
             get_dummy_address(),
             || async { Ok(Amount::from_btc(0.0101)?) },
@@ -583,6 +606,7 @@ mod tests {
         ])));
 
         let (amount, fees) = determine_btc_to_swap(
+            true,
             async { Ok(quote_with_min(0.01)) },
             get_dummy_address(),
             || async { Ok(Amount::from_btc(0.0101)?) },
@@ -615,6 +639,7 @@ mod tests {
         let error = tokio::time::timeout(
             Duration::from_secs(1),
             determine_btc_to_swap(
+                true,
                 async { Ok(quote_with_min(0.1)) },
                 get_dummy_address(),
                 || async { Ok(Amount::from_btc(0.0101)?) },
