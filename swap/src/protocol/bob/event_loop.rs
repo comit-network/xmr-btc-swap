@@ -122,6 +122,8 @@ impl EventLoop {
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::TransferProofReceived { msg, channel, peer }) => {
+                            tracing::info!(%msg.swap_id, %peer, "Received transfer proof msg for");
+
                             let swap_id = msg.swap_id;
 
                             if peer != self.alice_peer_id {

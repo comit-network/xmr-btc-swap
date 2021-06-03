@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context, Result};
-use futures::{SinkExt, StreamExt, TryStreamExt};
+use futures::{stream, SinkExt, Stream, StreamExt, TryStreamExt};
 use serde::Deserialize;
+use serde::Serialize;
 use std::convert::{Infallible, TryFrom};
 use std::sync::Arc;
 use std::time::Duration;
@@ -83,9 +84,31 @@ impl PriceUpdates {
     pub fn latest_update(&mut self) -> PriceUpdate {
         self.inner.borrow().clone()
     }
+
+    pub fn into_stream(self) -> impl Stream<Item = Result<PriceUpdate>> {
+        stream::try_unfold(self.inner, |mut receiver| async move {
+            receiver
+                .changed()
+                .await
+                .context("failed to receive latest rate update")?;
+
+            let latest_rate = receiver
+                .borrow()
+                .clone()
+                .map_err(|_e| Error::NotYetAvailable);
+
+            Ok(Some((latest_rate, receiver)))
+        })
+    }
 }
 
-#[derive(Clone, Debug, thiserror::Error)]
+impl From<watch::Receiver<PriceUpdate>> for PriceUpdates {
+    fn from(inner: watch::Receiver<PriceUpdate>) -> Self {
+        Self { inner }
+    }
+}
+
+#[derive(Clone, Debug, thiserror::Error, Serialize)]
 pub enum Error {
     #[error("Rate is not yet available")]
     NotYetAvailable,
@@ -248,9 +271,10 @@ mod wire {
     }
 
     /// Represents an update within the price ticker.
-    #[derive(Clone, Debug, Deserialize)]
+    #[derive(Clone, Debug, Deserialize, Serialize)]
     #[serde(try_from = "TickerUpdate")]
     pub struct PriceUpdate {
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
         pub ask: bitcoin::Amount,
     }
 
