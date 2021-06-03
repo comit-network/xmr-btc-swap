@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use futures::{SinkExt, StreamExt, TryStreamExt};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::convert::{Infallible, TryFrom};
 use std::sync::Arc;
 use std::time::Duration;
@@ -70,7 +70,7 @@ pub fn connect() -> Result<PriceUpdates> {
 
 #[derive(Clone, Debug)]
 pub struct PriceUpdates {
-    inner: watch::Receiver<PriceUpdate>,
+    pub inner: watch::Receiver<PriceUpdate>,
 }
 
 impl PriceUpdates {
@@ -85,7 +85,13 @@ impl PriceUpdates {
     }
 }
 
-#[derive(Clone, Debug, thiserror::Error)]
+impl From<watch::Receiver<PriceUpdate>> for PriceUpdates {
+    fn from(inner: watch::Receiver<PriceUpdate>) -> Self {
+        Self { inner }
+    }
+}
+
+#[derive(Clone, Debug, thiserror::Error, Serialize)]
 pub enum Error {
     #[error("Rate is not yet available")]
     NotYetAvailable,
@@ -248,9 +254,10 @@ mod wire {
     }
 
     /// Represents an update within the price ticker.
-    #[derive(Clone, Debug, Deserialize)]
+    #[derive(Clone, Debug, Deserialize, Serialize)]
     #[serde(try_from = "TickerUpdate")]
     pub struct PriceUpdate {
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
         pub ask: bitcoin::Amount,
     }
 

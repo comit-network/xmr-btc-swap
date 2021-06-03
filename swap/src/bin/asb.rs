@@ -26,6 +26,7 @@ use swap::asb::command::{parse_args, Arguments, Command};
 use swap::asb::config::{
     initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
 };
+use swap::asb::quote_websocket::setup_quote_websocket;
 use swap::database::Database;
 use swap::monero::Amount;
 use swap::network::swarm;
@@ -127,15 +128,30 @@ async fn main() -> Result<()> {
 
             let kraken_price_updates = kraken::connect()?;
 
+            if let Some(quote_websocket_port) = config.maker.quote_websocket_port {
+                setup_quote_websocket(
+                    kraken_price_updates.clone(),
+                    quote_websocket_port,
+                    config.maker.ask_spread,
+                    config.maker.min_buy_btc,
+                    config.maker.max_buy_btc,
+                )
+                .await;
+            }
+
             // setup Tor hidden services
             let tor_client =
                 tor::Client::new(config.tor.socks5_port).with_control_port(config.tor.control_port);
             let _ac = match tor_client.assert_tor_running().await {
                 Ok(_) => {
                     tracing::info!("Tor found. Setting up hidden service");
-                    let ac =
-                        register_tor_services(config.network.clone().listen, tor_client, &seed)
-                            .await?;
+                    let ac = register_tor_services(
+                        config.network.clone().listen,
+                        tor_client,
+                        &seed,
+                        config.maker.quote_websocket_port,
+                    )
+                    .await?;
                     Some(ac)
                 }
                 Err(_) => {
@@ -340,10 +356,11 @@ async fn register_tor_services(
     networks: Vec<Multiaddr>,
     tor_client: tor::Client,
     seed: &Seed,
+    quote_websocket_port: Option<u16>,
 ) -> Result<AuthenticatedClient> {
     let mut ac = tor_client.into_authenticated_client().await?;
 
-    let hidden_services_details = networks
+    let mut hidden_services_details = networks
         .iter()
         .flat_map(|network| {
             network.iter().map(|protocol| match protocol {
@@ -359,6 +376,16 @@ async fn register_tor_services(
         })
         .flatten()
         .collect::<Vec<_>>();
+
+    if let Some(quote_websocket_port) = quote_websocket_port {
+        hidden_services_details.push((
+            quote_websocket_port,
+            SocketAddr::new(
+                IpAddr::from(Ipv4Addr::new(127, 0, 0, 1)),
+                quote_websocket_port,
+            ),
+        ));
+    }
 
     let key = seed.derive_torv3_key();
 
