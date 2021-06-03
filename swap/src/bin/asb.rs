@@ -13,15 +13,13 @@
 #![allow(non_snake_case)]
 
 use anyhow::{bail, Context, Result};
-use futures::{StreamExt, TryStreamExt};
 use libp2p::core::multiaddr::Protocol;
 use libp2p::core::Multiaddr;
 use libp2p::Swarm;
 use prettytable::{row, Table};
-use std::error::Error;
+use std::env;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
-use std::{env, fmt};
 use structopt::clap;
 use structopt::clap::ErrorKind;
 use swap::asb::command::{parse_args, Arguments, Command};
@@ -29,7 +27,7 @@ use swap::asb::config::{
     initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
 };
 use swap::database::Database;
-use swap::kraken::PriceUpdates;
+use swap::kraken::latest_rate;
 use swap::monero::Amount;
 use swap::network::swarm;
 use swap::protocol::alice;
@@ -40,7 +38,7 @@ use swap::tor::AuthenticatedClient;
 use swap::{asb, bitcoin, kraken, monero, tor};
 use tracing::{debug, info, warn};
 use tracing_subscriber::filter::LevelFilter;
-use warp::{Filter, Reply};
+use warp::Filter;
 
 #[macro_use]
 extern crate prettytable;
@@ -134,9 +132,14 @@ async fn main() -> Result<()> {
             let updates = kraken_price_updates.clone();
             let latest_rate = warp::get()
                 .and(warp::path!("api" / "rate" / "btc-xmr"))
-                .map(move || latest_rate(updates.clone()));
+                .and(warp::ws())
+                .map(move |ws: warp::ws::Ws| {
+                    let updates = updates.clone();
+                    info!("New connection received");
+                    ws.on_upgrade(move |socket| latest_rate(socket, updates))
+                });
             tokio::spawn(async move {
-                warp::serve(latest_rate).run(([127, 0, 0, 1], 3030)).await;
+                warp::serve(latest_rate).run(([0, 0, 0, 0], 3030)).await;
             });
 
             // setup Tor hidden services
@@ -387,46 +390,4 @@ async fn register_tor_services(
     });
 
     Ok(ac)
-}
-
-fn latest_rate(subscription: PriceUpdates) -> impl Reply {
-    let stream = subscription
-        .into_stream()
-        .map_ok(|data| {
-            let event = warp::sse::Event::default()
-                .id("rate")
-                .json_data(data)
-                .context("failed to attach json data to sse event")?;
-
-            Ok(event)
-        })
-        .map(|result| match result {
-            Ok(Ok(ok)) => Ok(ok),
-            Ok(Err(e)) => Err(e),
-            Err(e) => Err(e),
-        })
-        .err_into::<RateStreamError>();
-
-    warp::sse::reply(warp::sse::keep_alive().stream(stream))
-}
-
-#[derive(Debug)]
-struct RateStreamError(anyhow::Error);
-
-impl fmt::Display for RateStreamError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:#}", self.0)
-    }
-}
-
-impl Error for RateStreamError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.0.source()
-    }
-}
-
-impl From<anyhow::Error> for RateStreamError {
-    fn from(e: anyhow::Error) -> Self {
-        RateStreamError(e)
-    }
 }
