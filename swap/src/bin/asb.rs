@@ -26,8 +26,9 @@ use swap::asb::command::{parse_args, Arguments, Command};
 use swap::asb::config::{
     initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
 };
+use swap::asb::price_websocket::latest_rate;
 use swap::database::Database;
-use swap::kraken::latest_rate;
+use swap::kraken::PriceUpdates;
 use swap::monero::Amount;
 use swap::network::swarm;
 use swap::protocol::alice;
@@ -129,18 +130,7 @@ async fn main() -> Result<()> {
 
             let kraken_price_updates = kraken::connect()?;
 
-            let updates = kraken_price_updates.clone();
-            let latest_rate = warp::get()
-                .and(warp::path!("api" / "rate" / "btc-xmr"))
-                .and(warp::ws())
-                .map(move |ws: warp::ws::Ws| {
-                    let updates = updates.clone();
-                    info!("New connection received");
-                    ws.on_upgrade(move |socket| latest_rate(socket, updates))
-                });
-            tokio::spawn(async move {
-                warp::serve(latest_rate).run(([0, 0, 0, 0], 3030)).await;
-            });
+            setup_price_websocket(kraken_price_updates.clone()).await;
 
             // setup Tor hidden services
             let tor_client =
@@ -311,6 +301,20 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+async fn setup_price_websocket(price_updates: PriceUpdates) {
+    let latest_rate = warp::get()
+        .and(warp::path!("api" / "price" / "xmr-btc"))
+        .and(warp::ws())
+        .map(move |ws: warp::ws::Ws| {
+            let price_updates = price_updates.clone();
+            info!("New price websocket connection");
+            ws.on_upgrade(move |socket| latest_rate(socket, price_updates))
+        });
+    tokio::spawn(async move {
+        warp::serve(latest_rate).run(([0, 0, 0, 0], 3030)).await;
+    });
+}
+
 async fn init_bitcoin_wallet(
     config: &Config,
     seed: &Seed,
@@ -376,7 +380,10 @@ async fn register_tor_services(
         .collect::<Vec<_>>();
 
     // TODO: Only configure if feature flag is set in config
-    hidden_services_details.push((3030, SocketAddr::new(IpAddr::from(Ipv4Addr::new(127, 0, 0, 1)), 3030)));
+    hidden_services_details.push((
+        3030,
+        SocketAddr::new(IpAddr::from(Ipv4Addr::new(127, 0, 0, 1)), 3030),
+    ));
 
     let key = seed.derive_torv3_key();
 

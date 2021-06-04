@@ -1,12 +1,10 @@
 use anyhow::{anyhow, Context, Result};
-use futures::{stream, SinkExt, Stream, StreamExt, TryStreamExt};
-use serde::Deserialize;
-use serde::Serialize;
+use futures::{SinkExt, StreamExt, TryStreamExt};
+use serde::{Deserialize, Serialize};
 use std::convert::{Infallible, TryFrom};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::watch;
-use warp::ws::{Message, WebSocket};
 
 /// Connect to Kraken websocket API for a constant stream of rate updates.
 ///
@@ -85,30 +83,6 @@ impl PriceUpdates {
     pub fn latest_update(&mut self) -> PriceUpdate {
         self.inner.borrow().clone()
     }
-
-    pub fn into_ws_stream(self) -> impl Stream<Item = Result<Message, warp::Error>> {
-        stream::try_unfold(self.inner, |mut receiver| async move {
-            // todo print error message but don't forward it to the user and don't panic
-            receiver
-                .changed()
-                .await
-                .context("failed to receive latest rate update")
-                .expect("Should not fail :)");
-
-            let latest_rate = receiver
-                .borrow()
-                .clone()
-                .map_err(|_e| Error::NotYetAvailable)
-                .expect("Should work");
-            let msg = Message::text(serde_json::to_string(&latest_rate).expect("to serialize"));
-            Ok(Some((msg, receiver)))
-        })
-    }
-}
-
-pub async fn latest_rate(ws: WebSocket, subscription: PriceUpdates) {
-    let (ws_tx, mut _ws_rx) = ws.split();
-    tokio::task::spawn(subscription.into_ws_stream().forward(ws_tx));
 }
 
 impl From<watch::Receiver<PriceUpdate>> for PriceUpdates {
