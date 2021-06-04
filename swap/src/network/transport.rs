@@ -7,13 +7,11 @@ use libp2p::dns::TokioDnsConfig;
 use libp2p::mplex::MplexConfig;
 use libp2p::noise::{self, NoiseConfig, X25519Spec};
 use libp2p::tcp::TokioTcpConfig;
-use libp2p::websocket::WsConfig;
 use libp2p::{identity, yamux, PeerId, Transport};
 use std::time::Duration;
 
 /// Builds a libp2p transport with the following features:
 /// - TcpConnection
-/// - WebSocketConnection
 /// - DNS name resolution
 /// - authentication via noise
 /// - multiplexing via yamux or mplex
@@ -23,10 +21,8 @@ pub fn build_clear_net(id_keys: &identity::Keypair) -> Result<SwapTransport> {
 
     let tcp = TokioTcpConfig::new().nodelay(true);
     let dns = TokioDnsConfig::system(tcp)?;
-    let websocket = WsConfig::new(dns.clone());
 
-    let transport = websocket
-        .or_transport(dns)
+    let transport = dns
         .upgrade(Version::V1)
         .authenticate(noise)
         .multiplex(SelectUpgrade::new(
@@ -42,7 +38,6 @@ pub fn build_clear_net(id_keys: &identity::Keypair) -> Result<SwapTransport> {
 
 /// Builds a libp2p transport with the following features:
 /// - TorTcpConnection
-/// - WebSocketConnection
 /// - DNS name resolution
 /// - authentication via noise
 /// - multiplexing via yamux or mplex
@@ -53,10 +48,8 @@ pub fn build_tor(id_keys: &identity::Keypair, tor_socks5_port: u16) -> Result<Sw
     let tcp = TokioTcpConfig::new().nodelay(true);
     let tcp = TorTcpConfig::new(tcp, tor_socks5_port);
     let dns = TokioDnsConfig::system(tcp)?;
-    let websocket = WsConfig::new(dns.clone());
 
-    let transport = websocket
-        .or_transport(dns)
+    let transport = dns
         .upgrade(Version::V1)
         .authenticate(noise)
         .multiplex(SelectUpgrade::new(
