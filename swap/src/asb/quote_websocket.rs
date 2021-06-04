@@ -14,6 +14,8 @@ pub async fn setup_quote_websocket(
     min: bitcoin::Amount,
     max: bitcoin::Amount,
 ) {
+    tracing::info!("Setting up Quote Websocket on port {}", port);
+
     let latest_quote = warp::get()
         .and(warp::path!("api" / "quote" / "xmr-btc"))
         .and(warp::ws())
