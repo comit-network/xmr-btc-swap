@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A dedicated quote websockets for the ASB that one can subscribe to for price updates.
+  Instead of exposing websocket connections over libp2p there is a dedicated websocket for bid-quotes.
+  The websocket libp2p transport was removed in favor of the new websocket.
+  The quote websocket can be activated in the `maker` section of the ASB config by specifying the port, e.g.: `quote_websocket_port = 3030`
+  Upon detecting Tor an additional hidden service for the websocket is automatically configured upon startup of the ASB.
+
 ## [0.7.0] - 2021-05-28
 
 ### Fixed
