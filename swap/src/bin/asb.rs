@@ -358,7 +358,7 @@ async fn register_tor_services(
 ) -> Result<AuthenticatedClient> {
     let mut ac = tor_client.into_authenticated_client().await?;
 
-    let hidden_services_details = networks
+    let mut hidden_services_details = networks
         .iter()
         .flat_map(|network| {
             network.iter().map(|protocol| match protocol {
@@ -374,6 +374,9 @@ async fn register_tor_services(
         })
         .flatten()
         .collect::<Vec<_>>();
+
+    // TODO: Only configure if feature flag is set in config
+    hidden_services_details.push((3030, SocketAddr::new(IpAddr::from(Ipv4Addr::new(127, 0, 0, 1)), 3030)));
 
     let key = seed.derive_torv3_key();
 
