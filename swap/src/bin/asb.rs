@@ -26,9 +26,8 @@ use swap::asb::command::{parse_args, Arguments, Command};
 use swap::asb::config::{
     initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
 };
-use swap::asb::price_websocket::latest_rate;
+use swap::asb::quote_websocket::setup_quote_websocket;
 use swap::database::Database;
-use swap::kraken::PriceUpdates;
 use swap::monero::Amount;
 use swap::network::swarm;
 use swap::protocol::alice;
@@ -39,7 +38,6 @@ use swap::tor::AuthenticatedClient;
 use swap::{asb, bitcoin, kraken, monero, tor};
 use tracing::{debug, info, warn};
 use tracing_subscriber::filter::LevelFilter;
-use warp::Filter;
 
 #[macro_use]
 extern crate prettytable;
@@ -130,7 +128,13 @@ async fn main() -> Result<()> {
 
             let kraken_price_updates = kraken::connect()?;
 
-            setup_price_websocket(kraken_price_updates.clone()).await;
+            setup_quote_websocket(
+                kraken_price_updates.clone(),
+                config.maker.ask_spread,
+                config.maker.min_buy_btc,
+                config.maker.max_buy_btc,
+            )
+            .await;
 
             // setup Tor hidden services
             let tor_client =
@@ -299,20 +303,6 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-async fn setup_price_websocket(price_updates: PriceUpdates) {
-    let latest_rate = warp::get()
-        .and(warp::path!("api" / "price" / "xmr-btc"))
-        .and(warp::ws())
-        .map(move |ws: warp::ws::Ws| {
-            let price_updates = price_updates.clone();
-            info!("New price websocket connection");
-            ws.on_upgrade(move |socket| latest_rate(socket, price_updates))
-        });
-    tokio::spawn(async move {
-        warp::serve(latest_rate).run(([0, 0, 0, 0], 3030)).await;
-    });
 }
 
 async fn init_bitcoin_wallet(

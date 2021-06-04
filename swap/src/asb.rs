@@ -1,6 +1,6 @@
 pub mod command;
 pub mod config;
-pub mod price_websocket;
+pub mod quote_websocket;
 mod rate;
 pub mod tracing;
 
