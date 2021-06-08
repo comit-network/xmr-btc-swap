@@ -479,7 +479,7 @@ fn parse_monero_address(s: &str) -> Result<monero::Address> {
 }
 
 #[derive(thiserror::Error, Debug, Clone, Copy, PartialEq)]
-#[error("Invalid monero address provided, expected address on network {expected:?}  but address provided is on {actual:?}")]
+#[error("Invalid monero address provided, expected address on network {expected:?} but address provided is on {actual:?}")]
 pub struct MoneroAddressNetworkMismatch {
     expected: monero::Network,
     actual: monero::Network,
