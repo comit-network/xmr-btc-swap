@@ -1,4 +1,4 @@
-use anyhow::anyhow;
+use anyhow::{anyhow, Result};
 use data_encoding::BASE32;
 use futures::future::Ready;
 use futures::prelude::*;
@@ -76,7 +76,7 @@ impl Transport for TorTcpConfig {
 /// Tor expects an address format of ADDR:PORT.
 /// This helper function tries to convert the provided multi-address into this
 /// format. None is returned if an unsupported protocol was provided.
-fn to_address_string(multi: Multiaddr) -> anyhow::Result<String> {
+fn to_address_string(multi: Multiaddr) -> Result<String> {
     let mut protocols = multi.iter();
     let address_string = match protocols.next() {
         // if it is an Onion address, we have all we need and can return
