@@ -9,7 +9,7 @@ use libp2p::{PeerId, Swarm};
 use std::fmt::Debug;
 
 #[allow(clippy::too_many_arguments)]
-pub fn alice<LR>(
+pub fn asb<LR>(
     seed: &Seed,
     balance: monero::Amount,
     lock_fee: monero::Amount,
@@ -36,7 +36,7 @@ where
     )
 }
 
-pub async fn bob(
+pub async fn cli(
     seed: &Seed,
     alice: PeerId,
     tor_socks5_port: u16,
