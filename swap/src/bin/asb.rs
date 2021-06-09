@@ -163,6 +163,8 @@ async fn main() -> Result<()> {
                     .with_context(|| format!("Failed to listen on network interface {}", listen))?;
             }
 
+            tracing::info!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
+
             let (event_loop, mut swap_receiver) = EventLoop::new(
                 swarm,
                 env_config,
@@ -191,8 +193,6 @@ async fn main() -> Result<()> {
                     });
                 }
             });
-
-            info!(peer_id = %event_loop.peer_id(), "Our peer-id");
 
             event_loop.run().await;
         }

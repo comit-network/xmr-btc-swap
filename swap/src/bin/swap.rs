@@ -90,8 +90,8 @@ async fn main() -> Result<()> {
                 .behaviour_mut()
                 .add_address(seller_peer_id, seller_addr);
 
-            let our_peer_id = swarm.local_peer_id();
-            tracing::debug!(peer_id = %our_peer_id, "Initializing network module");
+            tracing::debug!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
+
             let (event_loop, mut event_loop_handle) = EventLoop::new(
                 swap_id,
                 swarm,
