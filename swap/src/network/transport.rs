@@ -1,4 +1,4 @@
-use crate::network::tor_transport::TorTcpConfig;
+use crate::network::tor_transport::TorDialOnlyTransport;
 use anyhow::Result;
 use libp2p::core::muxing::StreamMuxerBox;
 use libp2p::core::transport::Boxed;
@@ -51,12 +51,13 @@ pub fn build_tor(id_keys: &identity::Keypair, tor_socks5_port: u16) -> Result<Sw
     let noise = NoiseConfig::xx(dh_keys).into_authenticated();
 
     let tcp = TokioTcpConfig::new().nodelay(true);
-    let tcp = TorTcpConfig::new(tcp, tor_socks5_port);
-    let dns = TokioDnsConfig::system(tcp)?;
-    let websocket = WsConfig::new(dns.clone());
+    let tcp_with_dns = TokioDnsConfig::system(tcp)?;
+    let websocket_with_dns = WsConfig::new(tcp_with_dns.clone());
+    let tor_dial_only = TorDialOnlyTransport::new(tor_socks5_port);
 
-    let transport = websocket
-        .or_transport(dns)
+    let transport = tor_dial_only
+        .or_transport(tcp_with_dns)
+        .or_transport(websocket_with_dns)
         .upgrade(Version::V1)
         .authenticate(noise)
         .multiplex(SelectUpgrade::new(
