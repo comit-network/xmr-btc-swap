@@ -7,7 +7,7 @@ use libp2p::core::Transport;
 use libp2p::tcp::tokio::{Tcp, TcpStream};
 use libp2p::tcp::{GenTcpConfig, TcpListenStream, TokioTcpConfig};
 use std::io;
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::Ipv4Addr;
 use tokio_socks::tcp::Socks5Stream;
 
 /// Represents the configuration for a Tor transport for libp2p.
@@ -45,10 +45,12 @@ impl Transport for TorTcpConfig {
             Ok(tor_address_string) => Ok(async move {
                 tracing::trace!("Connecting through Tor proxy to address: {}", addr);
 
-                let sock = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, self.socks_port));
-                let stream = Socks5Stream::connect(sock, tor_address_string)
-                    .await
-                    .map_err(|e| io::Error::new(io::ErrorKind::ConnectionRefused, e))?;
+                let stream = Socks5Stream::connect(
+                    (Ipv4Addr::LOCALHOST, self.socks_port),
+                    tor_address_string,
+                )
+                .await
+                .map_err(|e| io::Error::new(io::ErrorKind::ConnectionRefused, e))?;
 
                 tracing::trace!("Connection through Tor established");
 
