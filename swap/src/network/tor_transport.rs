@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
 use data_encoding::BASE32;
-use futures::future::Ready;
-use futures::prelude::*;
+use futures::future::{BoxFuture, Ready};
 use libp2p::core::multiaddr::{Multiaddr, Protocol};
 use libp2p::core::transport::TransportError;
 use libp2p::core::Transport;
@@ -9,7 +8,6 @@ use libp2p::tcp::tokio::{Tcp, TcpStream};
 use libp2p::tcp::{GenTcpConfig, TcpListenStream, TokioTcpConfig};
 use std::io;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
-use std::pin::Pin;
 use tokio_socks::tcp::Socks5Stream;
 use tokio_socks::IntoTargetAddr;
 
@@ -35,8 +33,7 @@ impl Transport for TorTcpConfig {
     type Error = io::Error;
     type Listener = TcpListenStream<Tcp>;
     type ListenerUpgrade = Ready<Result<Self::Output, Self::Error>>;
-    #[allow(clippy::type_complexity)]
-    type Dial = Pin<Box<dyn Future<Output = Result<Self::Output, Self::Error>> + Send>>;
+    type Dial = BoxFuture<'static, Result<Self::Output, Self::Error>>;
 
     fn listen_on(self, addr: Multiaddr) -> Result<Self::Listener, TransportError<Self::Error>> {
         self.inner.listen_on(addr)
