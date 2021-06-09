@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use data_encoding::BASE32;
-use futures::future::{BoxFuture, Ready};
+use futures::future::{BoxFuture, FutureExt, Ready};
 use libp2p::core::multiaddr::{Multiaddr, Protocol};
 use libp2p::core::transport::TransportError;
 use libp2p::core::Transport;
@@ -9,7 +9,6 @@ use libp2p::tcp::{GenTcpConfig, TcpListenStream, TokioTcpConfig};
 use std::io;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio_socks::tcp::Socks5Stream;
-use tokio_socks::IntoTargetAddr;
 
 /// Represents the configuration for a Tor transport for libp2p.
 #[derive(Clone)]
@@ -42,19 +41,20 @@ impl Transport for TorTcpConfig {
     // dials via Tor's socks5 proxy if configured and if the provided address is an
     // onion address. or it falls back to Tcp dialling
     fn dial(self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {
-        async fn do_tor_dial(socks_port: u16, dest: String) -> Result<TcpStream, io::Error> {
-            tracing::trace!("Connecting through Tor proxy to address: {}", dest);
-            let stream = connect_to_socks_proxy(dest, socks_port)
-                .await
-                .map_err(|e| io::Error::new(io::ErrorKind::ConnectionRefused, e))?;
-            tracing::trace!("Connection through Tor established");
-            Ok(stream)
-        }
-
         match to_address_string(addr.clone()) {
-            Ok(tor_address_string) => {
-                Ok(Box::pin(do_tor_dial(self.socks_port, tor_address_string)))
+            Ok(tor_address_string) => Ok(async move {
+                tracing::trace!("Connecting through Tor proxy to address: {}", addr);
+
+                let sock = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, self.socks_port));
+                let stream = Socks5Stream::connect(sock, tor_address_string)
+                    .await
+                    .map_err(|e| io::Error::new(io::ErrorKind::ConnectionRefused, e))?;
+
+                tracing::trace!("Connection through Tor established");
+
+                Ok(TcpStream(stream.into_inner()))
             }
+            .boxed()),
             Err(error) => {
                 tracing::warn!(
                     address = %addr,
@@ -109,16 +109,6 @@ fn to_address_string(multi: Multiaddr) -> Result<String> {
     } else {
         Ok(address_string)
     }
-}
-
-/// Connect to the SOCKS5 proxy socket.
-async fn connect_to_socks_proxy<'a>(
-    dest: impl IntoTargetAddr<'a>,
-    port: u16,
-) -> Result<TcpStream, tokio_socks::Error> {
-    let sock = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, port));
-    let stream = Socks5Stream::connect(sock, dest).await?;
-    Ok(TcpStream(stream.into_inner()))
 }
 
 #[cfg(test)]
