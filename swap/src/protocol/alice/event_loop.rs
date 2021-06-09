@@ -335,7 +335,7 @@ where
                             }
                         }
                         SwarmEvent::NewListenAddr(address) => {
-                            tracing::info!(%address, "Listening on");
+                            tracing::info!(%address, "New listen address detected");
                         }
                         _ => {}
                     }
