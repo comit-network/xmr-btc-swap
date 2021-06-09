@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Printing the deposit address to the terminal as a QR code.
   To not break automated scripts or integrations with other software, this behaviour is disabled if `--json` is passed to the application.
 
+### Removed
+
+- The websocket transport from the CLI.
+  Websockets were only ever intended to be used for the ASB side to allow websites to retrieve quotes.
+  The CLI can use regular TCP connections and having both - TCP and websockets - causes problems and unnecessary overhead.
+
 ## [0.7.0] - 2021-05-28
 
 ### Fixed
