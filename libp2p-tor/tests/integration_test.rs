@@ -42,7 +42,7 @@ async fn create_ephemeral_service() {
             AuthenticatedConn::with_password(9051, "supersecret")
                 .await
                 .unwrap(),
-            move || onion_key_bytes.into(),
+            onion_key_bytes.into(),
         )
         .await
         .unwrap()
@@ -149,17 +149,16 @@ impl IntoIterator for TorArgs {
         let mut args = Vec::new();
 
         if let Some(port) = self.socks_port {
-            args.push(format!("SocksPort"));
+            args.push("SocksPort".to_string());
             args.push(format!("0.0.0.0:{}", port));
         }
 
         if let Some(port) = self.control_port {
-            args.push(format!("ControlPort"));
+            args.push("ControlPort".to_string());
             args.push(format!("0.0.0.0:{}", port));
-            args.push(format!("HashedControlPassword"));
-            args.push(format!(
-                "16:436B425404AA332A60B4F341C2023146C4B3A80548D757F0BB10DE81B4"
-            ))
+            args.push("HashedControlPassword".to_string());
+            args.push("16:436B425404AA332A60B4F341C2023146C4B3A80548D757F0BB10DE81B4"
+                .to_string())
         }
 
         args.into_iter()
@@ -186,7 +185,7 @@ impl Image for TorImage {
     }
 
     fn args(&self) -> Self::Args {
-        self.args.clone()
+        self.args
     }
 
     fn env_vars(&self) -> Self::EnvVars {
