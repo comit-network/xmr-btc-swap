@@ -83,6 +83,8 @@ impl AuthenticatedConnectionExt for AuthenticatedConn<tokio::net::TcpStream, Asy
         onion_port: u16,
         local_port: u16,
     ) -> Result<(), Error> {
+        println!("Adding ephemeral service, onion port {}, local port {}", onion_port, local_port);
+
         self.add_onion_v3(
             &key,
             false,
