@@ -1,5 +1,5 @@
 use libp2p::core::muxing::StreamMuxerBox;
-use libp2p::core::upgrade::Version;
+use libp2p::core::upgrade::{Version, SelectUpgrade};
 use libp2p::ping::{Ping, PingEvent, PingSuccess};
 use libp2p::swarm::{SwarmBuilder, SwarmEvent};
 use libp2p::{identity, noise, yamux, Swarm, Transport, Multiaddr};
@@ -11,6 +11,7 @@ use std::time::Duration;
 use torut::control::AuthenticatedConn;
 use torut::onion::TorSecretKeyV3;
 use std::str::FromStr;
+use libp2p::mplex::MplexConfig;
 
 #[tokio::main]
 async fn main() {
@@ -83,7 +84,10 @@ async fn new_swarm(key: TorSecretKeyV3) -> Swarm<Ping> {
             )
             .into_authenticated(),
         )
-        .multiplex(yamux::YamuxConfig::default())
+        .multiplex(SelectUpgrade::new(
+            yamux::YamuxConfig::default(),
+            MplexConfig::new(),
+        ))
         .timeout(Duration::from_secs(20))
         .map(|(peer, muxer), _| (peer, StreamMuxerBox::new(muxer)))
         .boxed(),

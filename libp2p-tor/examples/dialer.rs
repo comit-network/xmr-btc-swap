@@ -1,10 +1,11 @@
 use libp2p::core::muxing::StreamMuxerBox;
-use libp2p::core::upgrade::Version;
+use libp2p::core::upgrade::{Version, SelectUpgrade};
 use libp2p::ping::{Ping, PingEvent, PingSuccess};
 use libp2p::swarm::{SwarmBuilder, SwarmEvent};
 use libp2p::{identity, noise, yamux, Multiaddr, Swarm, Transport};
 use libp2p_tor::dial_only;
 use std::time::Duration;
+use libp2p::mplex::MplexConfig;
 
 #[tokio::main]
 async fn main() {
@@ -55,6 +56,9 @@ async fn main() {
 /// Builds a new swarm that is capable of dialling onion address.
 fn new_swarm() -> Swarm<Ping> {
     let identity = identity::Keypair::generate_ed25519();
+    let peer_id = identity.public().into_peer_id();
+
+    println!("peer id upon swarm setup: {}", peer_id);
 
     SwarmBuilder::new(
         dial_only::TorConfig::new(9050)
@@ -67,12 +71,15 @@ fn new_swarm() -> Swarm<Ping> {
                 )
                 .into_authenticated(),
             )
-            .multiplex(yamux::YamuxConfig::default())
+            .multiplex(SelectUpgrade::new(
+                yamux::YamuxConfig::default(),
+                MplexConfig::new(),
+            ))
             .timeout(Duration::from_secs(20))
             .map(|(peer, muxer), _| (peer, StreamMuxerBox::new(muxer)))
             .boxed(),
         Ping::default(),
-        identity.public().into_peer_id(),
+        peer_id,
     )
     .executor(Box::new(|f| {
         tokio::spawn(f);
