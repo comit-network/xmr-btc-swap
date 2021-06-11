@@ -15,13 +15,6 @@ use tokio::sync::Mutex;
 use torut::control::{AsyncEvent, AuthenticatedConn};
 use torut::onion::TorSecretKeyV3;
 
-/// This is the hash of
-/// `/onion3/WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW`.
-const WILDCARD_ONION_ADDR_HASH: [u8; 35] = [
-    181, 173, 107, 90, 214, 181, 173, 107, 90, 214, 181, 173, 107, 90, 214, 181, 173, 107, 90, 214,
-    181, 173, 107, 90, 214, 181, 173, 107, 90, 214, 181, 173, 107, 90, 214,
-];
-
 type TorutAsyncEventHandler =
     fn(
         AsyncEvent<'_>,
@@ -31,32 +24,33 @@ type TorutAsyncEventHandler =
 pub struct TorConfig {
     inner: MapErr<GenTcpConfig<libp2p::tcp::tokio::Tcp>, fn(std::io::Error) -> Error>, /* TODO: Make generic over async-std / tokio */
     tor_client: Arc<Mutex<AuthenticatedConn<tokio::net::TcpStream, TorutAsyncEventHandler>>>,
-    onion_key_generator: Arc<dyn (Fn() -> TorSecretKeyV3) + Send + Sync>,
+    key: TorSecretKeyV3,
     socks_port: u16,
 }
 
 impl TorConfig {
     pub async fn new(
         mut client: AuthenticatedConn<tokio::net::TcpStream, TorutAsyncEventHandler>,
-        onion_key_generator: impl (Fn() -> TorSecretKeyV3) + Send + Sync + 'static,
+        // TODO: change to key directly
+        key: TorSecretKeyV3,
     ) -> Result<Self, Error> {
         let socks_port = client.get_socks_port().await?;
 
         Ok(Self {
             inner: TokioTcpConfig::new().map_err(Error::InnerTransprot),
             tor_client: Arc::new(Mutex::new(client)),
-            onion_key_generator: Arc::new(onion_key_generator),
+            key,
             socks_port,
         })
     }
 
     pub async fn from_control_port(
         control_port: u16,
-        key_generator: impl (Fn() -> TorSecretKeyV3) + Send + Sync + 'static,
+        key: TorSecretKeyV3,
     ) -> Result<Self, Error> {
         let client = AuthenticatedConn::new(control_port).await?;
 
-        Self::new(client, key_generator).await
+        Self::new(client, key).await
     }
 }
 
@@ -80,19 +74,15 @@ impl Transport for TorConfig {
             return Err(TransportError::MultiaddrNotSupported(addr));
         };
 
-        if onion.hash() != &WILDCARD_ONION_ADDR_HASH {
-            return Err(TransportError::Other(Error::OnlyWildcardAllowed));
-        }
+        let key: TorSecretKeyV3 = self.key;
+        let onion_bytes = key.public().get_onion_address().get_raw_bytes();
+        let onion_port = onion.port();
 
         let localhost_tcp_random_port_addr = "/ip4/127.0.0.1/tcp/0"
             .parse()
             .expect("always a valid multiaddr");
 
         let listener = self.inner.listen_on(localhost_tcp_random_port_addr)?;
-
-        let key: TorSecretKeyV3 = (self.onion_key_generator)();
-        let onion_bytes = key.public().get_onion_address().get_raw_bytes();
-        let onion_port = onion.port();
 
         let tor_client = self.tor_client;
 
@@ -115,6 +105,7 @@ impl Transport for TorConfig {
                                     })
                                     .expect("TODO: Error handling");
 
+                                // TODO: Don't fully understand this part, why would we have two different multiaddresses here? the actual onion address and the multiaddress would make more sense...?
                                 tracing::debug!(
                                     "Setting up hidden service at {} to forward to {}",
                                     onion_multiaddress,
@@ -125,6 +116,7 @@ impl Transport for TorConfig {
                                     .clone()
                                     .lock()
                                     .await
+                                    // TODO: Potentially simplify this, in our setup the onion port is always equal to the local port. Otherwise we would have the user provide an additional port for the oion service.
                                     .add_ephemeral_service(&key, onion_port, local_port)
                                     .await
                                 {
@@ -141,7 +133,9 @@ impl Transport for TorConfig {
                                 local_addr,
                                 remote_addr,
                             },
-                            ListenerEvent::AddressExpired(_) => {
+                            // TODO: why was the constructed multiaddr used here?
+                            ListenerEvent::AddressExpired(adr) => {
+                                // TODO: even if so, why would we ignore it? Far more logical to just use it...
                                 // can ignore address because we only ever listened on one and we
                                 // know which one that was
 
@@ -156,7 +150,7 @@ impl Transport for TorConfig {
                                     .del_onion(&onion_address_without_dot_onion)
                                     .await
                                 {
-                                    Ok(()) => ListenerEvent::AddressExpired(onion_multiaddress),
+                                    Ok(()) => ListenerEvent::AddressExpired(adr),
                                     Err(e) => ListenerEvent::Error(Error::Torut(
                                         torut_ext::Error::Connection(e),
                                     )),

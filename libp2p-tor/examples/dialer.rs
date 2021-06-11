@@ -8,15 +8,19 @@ use std::time::Duration;
 
 #[tokio::main]
 async fn main() {
-    let addr_to_dial = std::env::args()
-        .next()
-        .unwrap()
+    let arg = std::env::args()
+        .last()
+        .unwrap();
+
+    let addr_to_dial = arg
         .parse::<Multiaddr>()
         .unwrap();
 
     let mut swarm = new_swarm();
 
     println!("Peer-ID: {}", swarm.local_peer_id());
+
+    println!("Dialing {}", addr_to_dial);
     swarm.dial_addr(addr_to_dial).unwrap();
 
     loop {
@@ -41,7 +45,9 @@ async fn main() {
                     println!("Failed to ping {}: {}", peer, failure)
                 }
             },
-            _ => {}
+            event => {
+                println!("Swarm event: {:?}", event)
+            }
         }
     }
 }

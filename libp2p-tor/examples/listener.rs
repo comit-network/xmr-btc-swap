@@ -2,7 +2,7 @@ use libp2p::core::muxing::StreamMuxerBox;
 use libp2p::core::upgrade::Version;
 use libp2p::ping::{Ping, PingEvent, PingSuccess};
 use libp2p::swarm::{SwarmBuilder, SwarmEvent};
-use libp2p::{identity, noise, yamux, Swarm, Transport};
+use libp2p::{identity, noise, yamux, Swarm, Transport, Multiaddr};
 use libp2p_tor::duplex;
 use libp2p_tor::torut_ext::AuthenticatedConnectionExt;
 use noise::NoiseConfig;
@@ -10,23 +10,27 @@ use rand::Rng;
 use std::time::Duration;
 use torut::control::AuthenticatedConn;
 use torut::onion::TorSecretKeyV3;
+use std::str::FromStr;
 
 #[tokio::main]
 async fn main() {
-    let wildcard_multiaddr =
-        "/onion3/WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW:8080"
-            .parse()
-            .unwrap();
 
-    let mut swarm = new_swarm().await;
+    let key = random_onion_identity();
+    let onion_address = key.public().get_onion_address().get_address_without_dot_onion();
+    let onion_port = 7654;
 
-    println!("Peer-ID: {}", swarm.local_peer_id());
-    swarm.listen_on(wildcard_multiaddr).unwrap();
+    let mut swarm = new_swarm(key).await;
+    let peer_id = *swarm.local_peer_id();
+
+    println!("Peer-ID: {}", peer_id);
+    // TODO: Figure out what to with the port, we could also set it to 0 and then imply it from the assigned port
+    swarm.listen_on(Multiaddr::from_str(format!("/onion3/{}:{}", onion_address, onion_port).as_str()).unwrap()).unwrap();
 
     loop {
         match swarm.next_event().await {
             SwarmEvent::NewListenAddr(addr) => {
                 println!("Listening on {}", addr);
+                println!("Connection string: {}/p2p/{}", addr, peer_id)
             }
             SwarmEvent::ConnectionEstablished {
                 peer_id, endpoint, ..
@@ -48,7 +52,9 @@ async fn main() {
                     println!("Failed to ping {}: {}", peer, failure)
                 }
             },
-            _ => {}
+            event => {
+                println!("Swarm event: {:?}", event)
+            }
         }
     }
 }
@@ -58,13 +64,13 @@ async fn main() {
 ///
 /// In particular, this swarm can create ephemeral hidden services on the
 /// configured Tor node.
-async fn new_swarm() -> Swarm<Ping> {
+async fn new_swarm(key: TorSecretKeyV3) -> Swarm<Ping> {
     let identity = identity::Keypair::generate_ed25519();
 
     SwarmBuilder::new(
         duplex::TorConfig::new(
             AuthenticatedConn::new(9051).await.unwrap(),
-            random_onion_identity,
+            key,
         )
         .await
         .unwrap()
