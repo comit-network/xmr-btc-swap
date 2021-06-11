@@ -19,7 +19,7 @@ torut = { version = "0.1", default-features = false, features = [ "v3", "control
 tracing = "0.1"
 
 [dev-dependencies]
-libp2p = { version = "0.37", default-features = false, features = [ "yamux", "noise", "ping" ] }
+libp2p = { version = "0.37", default-features = false, features = [ "yamux", "noise", "ping", "mplex" ] }
 rand = "0.8"
 tempfile = "3"
 testcontainers = "0.12"
