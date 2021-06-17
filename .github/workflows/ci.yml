@@ -18,7 +18,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1.3.0
 
       - name: Check formatting
-        uses: dprint/check@v1.4
+        uses: dprint/check@v1.5
 
       - name: Run clippy with default features
         run: cargo clippy --workspace --all-targets -- -D warnings
