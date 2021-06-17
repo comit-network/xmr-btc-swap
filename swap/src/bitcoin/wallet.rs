@@ -10,7 +10,7 @@ use bdk::descriptor::Segwitv0;
 use bdk::electrum_client::{ElectrumApi, GetHistoryRes};
 use bdk::keys::DerivableKey;
 use bdk::wallet::AddressIndex;
-use bdk::{FeeRate, KeychainKind};
+use bdk::{FeeRate, KeychainKind, SignOptions};
 use bitcoin::{Network, Script};
 use reqwest::Url;
 use rust_decimal::prelude::*;
@@ -246,14 +246,21 @@ where
     C: EstimateFeeRate,
     D: BatchDatabase,
 {
-    pub async fn sign_and_finalize(&self, psbt: PartiallySignedTransaction) -> Result<Transaction> {
-        let (signed_psbt, finalized) = self.wallet.lock().await.sign(psbt, None)?;
+    pub async fn sign_and_finalize(
+        &self,
+        mut psbt: PartiallySignedTransaction,
+    ) -> Result<Transaction> {
+        let finalized = self
+            .wallet
+            .lock()
+            .await
+            .sign(&mut psbt, SignOptions::default())?;
 
         if !finalized {
             bail!("PSBT is not finalized")
         }
 
-        let tx = signed_psbt.extract_tx();
+        let tx = psbt.extract_tx();
 
         Ok(tx)
     }
