@@ -157,7 +157,7 @@ impl State0 {
         let valid = CROSS_CURVE_PROOF_SYSTEM.verify(
             &msg.dleq_proof_s_a,
             (
-                msg.S_a_bitcoin.clone().into(),
+                msg.S_a_bitcoin.into(),
                 msg.S_a_monero
                     .point
                     .decompress()
