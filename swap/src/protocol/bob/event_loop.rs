@@ -176,17 +176,13 @@ impl EventLoop {
                         SwarmEvent::Dialing(peer_id) if peer_id == self.alice_peer_id => {
                             tracing::debug!("Dialling Alice at {}", peer_id);
                         }
-                        SwarmEvent::ConnectionClosed { peer_id, endpoint, num_established, cause } if peer_id == self.alice_peer_id && num_established == 0 => {
-                            match cause {
-                                Some(error) => {
-                                    tracing::warn!("Lost connection to Alice at {}, cause: {}", endpoint.get_remote_address(), error);
-                                },
-                                None => {
-                                    // no error means the disconnection was requested
-                                    tracing::info!("Successfully closed connection to Alice");
-                                    return;
-                                }
-                            }
+                        SwarmEvent::ConnectionClosed { peer_id, endpoint, num_established, cause: Some(error) } if peer_id == self.alice_peer_id && num_established == 0 => {
+                            tracing::warn!("Lost connection to Alice at {}, cause: {}", endpoint.get_remote_address(), error);
+                        }
+                        SwarmEvent::ConnectionClosed { peer_id, num_established, cause: None, .. } if peer_id == self.alice_peer_id && num_established == 0 => {
+                            // no error means the disconnection was requested
+                            tracing::info!("Successfully closed connection to Alice");
+                            return;
                         }
                         SwarmEvent::UnreachableAddr { peer_id, address, attempts_remaining, error } if peer_id == self.alice_peer_id && attempts_remaining == 0 => {
                             tracing::warn!(%address, "Failed to dial Alice: {}", error);
