@@ -1,9 +1,9 @@
 use crate::monero::TransferProof;
 use crate::protocol::bob;
 use crate::protocol::bob::BobState;
-use ::bitcoin::hashes::core::fmt::Display;
 use monero_rpc::wallet::BlockHeight;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Bob {
@@ -104,8 +104,8 @@ impl From<Bob> for BobState {
     }
 }
 
-impl Display for Bob {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Bob {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Bob::Started { .. } => write!(f, "Started"),
             Bob::ExecutionSetupDone { .. } => f.write_str("Execution setup done"),
