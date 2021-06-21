@@ -231,7 +231,7 @@ async fn start_alice(
     let latest_rate = FixedRate::default();
     let resume_only = false;
 
-    let mut swarm = swarm::alice(
+    let mut swarm = swarm::asb(
         &seed,
         current_balance,
         lock_fee,
@@ -449,7 +449,7 @@ impl BobParams {
     ) -> Result<(bob::EventLoop, bob::EventLoopHandle)> {
         let tor_socks5_port = get_port()
             .expect("We don't care about Tor in the tests so we get a free port to disable it.");
-        let mut swarm = swarm::bob(&self.seed, self.alice_peer_id, tor_socks5_port).await?;
+        let mut swarm = swarm::cli(&self.seed, self.alice_peer_id, tor_socks5_port).await?;
         swarm
             .behaviour_mut()
             .add_address(self.alice_peer_id, self.alice_address.clone());

@@ -147,7 +147,7 @@ async fn main() -> Result<()> {
             let current_balance = monero_wallet.get_balance().await?;
             let lock_fee = monero_wallet.static_tx_fee_estimate();
             let kraken_rate = KrakenRate::new(config.maker.ask_spread, kraken_price_updates);
-            let mut swarm = swarm::alice(
+            let mut swarm = swarm::asb(
                 &seed,
                 current_balance,
                 lock_fee,
@@ -162,6 +162,8 @@ async fn main() -> Result<()> {
                 Swarm::listen_on(&mut swarm, listen.clone())
                     .with_context(|| format!("Failed to listen on network interface {}", listen))?;
             }
+
+            tracing::info!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
 
             let (event_loop, mut swap_receiver) = EventLoop::new(
                 swarm,
@@ -191,8 +193,6 @@ async fn main() -> Result<()> {
                     });
                 }
             });
-
-            info!(peer_id = %event_loop.peer_id(), "Our peer-id");
 
             event_loop.run().await;
         }

@@ -85,13 +85,13 @@ async fn main() -> Result<()> {
                 init_monero_wallet(data_dir, monero_daemon_address, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
-            let mut swarm = swarm::bob(&seed, seller_peer_id, tor_socks5_port).await?;
+            let mut swarm = swarm::cli(&seed, seller_peer_id, tor_socks5_port).await?;
             swarm
                 .behaviour_mut()
                 .add_address(seller_peer_id, seller_addr);
 
-            let our_peer_id = swarm.local_peer_id();
-            tracing::debug!(peer_id = %our_peer_id, "Initializing network module");
+            tracing::debug!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
+
             let (event_loop, mut event_loop_handle) = EventLoop::new(
                 swap_id,
                 swarm,
@@ -185,7 +185,7 @@ async fn main() -> Result<()> {
 
             let seller_peer_id = db.get_peer_id(swap_id)?;
 
-            let mut swarm = swarm::bob(&seed, seller_peer_id, tor_socks5_port).await?;
+            let mut swarm = swarm::cli(&seed, seller_peer_id, tor_socks5_port).await?;
             let our_peer_id = swarm.local_peer_id();
             tracing::debug!(peer_id = %our_peer_id, "Initializing network module");
             swarm

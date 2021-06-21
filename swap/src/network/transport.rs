@@ -1,73 +1,39 @@
-use crate::network::tor_transport::TorTcpConfig;
 use anyhow::Result;
+use futures::{AsyncRead, AsyncWrite};
 use libp2p::core::muxing::StreamMuxerBox;
 use libp2p::core::transport::Boxed;
 use libp2p::core::upgrade::{SelectUpgrade, Version};
-use libp2p::dns::TokioDnsConfig;
 use libp2p::mplex::MplexConfig;
 use libp2p::noise::{self, NoiseConfig, X25519Spec};
-use libp2p::tcp::TokioTcpConfig;
-use libp2p::websocket::WsConfig;
 use libp2p::{identity, yamux, PeerId, Transport};
 use std::time::Duration;
 
-/// Builds a libp2p transport with the following features:
-/// - TcpConnection
-/// - WebSocketConnection
-/// - DNS name resolution
-/// - authentication via noise
-/// - multiplexing via yamux or mplex
-pub fn build_clear_net(id_keys: &identity::Keypair) -> Result<SwapTransport> {
-    let dh_keys = noise::Keypair::<X25519Spec>::new().into_authentic(id_keys)?;
-    let noise = NoiseConfig::xx(dh_keys).into_authenticated();
+/// "Completes" a transport by applying the authentication and multiplexing
+/// upgrades.
+///
+/// Even though the actual transport technology in use might be different, for
+/// two libp2p applications to be compatible, the authentication and
+/// multiplexing upgrades need to be compatible.
+pub fn authenticate_and_multiplex<T>(
+    transport: Boxed<T>,
+    identity: &identity::Keypair,
+) -> Result<Boxed<(PeerId, StreamMuxerBox)>>
+where
+    T: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
+    let auth_upgrade = {
+        let noise_identity = noise::Keypair::<X25519Spec>::new().into_authentic(identity)?;
+        NoiseConfig::xx(noise_identity).into_authenticated()
+    };
+    let multiplex_upgrade = SelectUpgrade::new(yamux::YamuxConfig::default(), MplexConfig::new());
 
-    let tcp = TokioTcpConfig::new().nodelay(true);
-    let dns = TokioDnsConfig::system(tcp)?;
-    let websocket = WsConfig::new(dns.clone());
-
-    let transport = websocket
-        .or_transport(dns)
+    let transport = transport
         .upgrade(Version::V1)
-        .authenticate(noise)
-        .multiplex(SelectUpgrade::new(
-            yamux::YamuxConfig::default(),
-            MplexConfig::new(),
-        ))
+        .authenticate(auth_upgrade)
+        .multiplex(multiplex_upgrade)
         .timeout(Duration::from_secs(20))
         .map(|(peer, muxer), _| (peer, StreamMuxerBox::new(muxer)))
         .boxed();
 
     Ok(transport)
 }
-
-/// Builds a libp2p transport with the following features:
-/// - TorTcpConnection
-/// - WebSocketConnection
-/// - DNS name resolution
-/// - authentication via noise
-/// - multiplexing via yamux or mplex
-pub fn build_tor(id_keys: &identity::Keypair, tor_socks5_port: u16) -> Result<SwapTransport> {
-    let dh_keys = noise::Keypair::<X25519Spec>::new().into_authentic(id_keys)?;
-    let noise = NoiseConfig::xx(dh_keys).into_authenticated();
-
-    let tcp = TokioTcpConfig::new().nodelay(true);
-    let tcp = TorTcpConfig::new(tcp, tor_socks5_port);
-    let dns = TokioDnsConfig::system(tcp)?;
-    let websocket = WsConfig::new(dns.clone());
-
-    let transport = websocket
-        .or_transport(dns)
-        .upgrade(Version::V1)
-        .authenticate(noise)
-        .multiplex(SelectUpgrade::new(
-            yamux::YamuxConfig::default(),
-            MplexConfig::new(),
-        ))
-        .timeout(Duration::from_secs(20))
-        .map(|(peer, muxer), _| (peer, StreamMuxerBox::new(muxer)))
-        .boxed();
-
-    Ok(transport)
-}
-
-pub type SwapTransport = Boxed<(PeerId, StreamMuxerBox)>;
