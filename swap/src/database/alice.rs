@@ -3,9 +3,9 @@ use crate::monero;
 use crate::monero::{monero_private_key, TransferProof};
 use crate::protocol::alice;
 use crate::protocol::alice::AliceState;
-use ::bitcoin::hashes::core::fmt::Display;
 use monero_rpc::wallet::BlockHeight;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 // Large enum variant is fine because this is only used for database
 // and is dropped once written in DB.
@@ -274,8 +274,8 @@ impl From<Alice> for AliceState {
     }
 }
 
-impl Display for Alice {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Alice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Alice::Started { .. } => write!(f, "Started"),
             Alice::BtcLocked { .. } => f.write_str("Bitcoin locked"),
