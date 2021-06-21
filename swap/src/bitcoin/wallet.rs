@@ -282,7 +282,8 @@ where
             .lock()
             .await
             .get_address(AddressIndex::New)
-            .context("Failed to get new Bitcoin address")?;
+            .context("Failed to get new Bitcoin address")?
+            .address;
 
         Ok(address)
     }
