@@ -55,55 +55,53 @@ where
             env_config: env_config(is_testnet),
             cmd: Command::Balance,
         },
-        RawCommand::ManualRecovery(manual_recovery) => match manual_recovery {
-            ManualRecovery::Redeem {
-                redeem_params: RecoverCommandParams { swap_id, force },
+        RawCommand::ManualRecovery(ManualRecovery::Redeem {
+            redeem_params: RecoverCommandParams { swap_id, force },
+            do_not_await_finality,
+        }) => Arguments {
+            testnet: is_testnet,
+            json: is_json,
+            config_path: config_path(config, is_testnet)?,
+            env_config: env_config(is_testnet),
+            cmd: Command::Redeem {
+                swap_id,
+                force,
                 do_not_await_finality,
-            } => Arguments {
-                testnet: is_testnet,
-                json: is_json,
-                config_path: config_path(config, is_testnet)?,
-                env_config: env_config(is_testnet),
-                cmd: Command::Redeem {
-                    swap_id,
-                    force,
-                    do_not_await_finality,
-                },
             },
-            ManualRecovery::Cancel {
-                cancel_params: RecoverCommandParams { swap_id, force },
-            } => Arguments {
-                testnet: is_testnet,
-                json: is_json,
-                config_path: config_path(config, is_testnet)?,
-                env_config: env_config(is_testnet),
-                cmd: Command::Cancel { swap_id, force },
-            },
-            ManualRecovery::Refund {
-                refund_params: RecoverCommandParams { swap_id, force },
-            } => Arguments {
-                testnet: is_testnet,
-                json: is_json,
-                config_path: config_path(config, is_testnet)?,
-                env_config: env_config(is_testnet),
-                cmd: Command::Refund { swap_id, force },
-            },
-            ManualRecovery::Punish {
-                punish_params: RecoverCommandParams { swap_id, force },
-            } => Arguments {
-                testnet: is_testnet,
-                json: is_json,
-                config_path: config_path(config, is_testnet)?,
-                env_config: env_config(is_testnet),
-                cmd: Command::Punish { swap_id, force },
-            },
-            ManualRecovery::SafelyAbort { swap_id } => Arguments {
-                testnet: is_testnet,
-                json: is_json,
-                config_path: config_path(config, is_testnet)?,
-                env_config: env_config(is_testnet),
-                cmd: Command::SafelyAbort { swap_id },
-            },
+        },
+        RawCommand::ManualRecovery(ManualRecovery::Cancel {
+            cancel_params: RecoverCommandParams { swap_id, force },
+        }) => Arguments {
+            testnet: is_testnet,
+            json: is_json,
+            config_path: config_path(config, is_testnet)?,
+            env_config: env_config(is_testnet),
+            cmd: Command::Cancel { swap_id, force },
+        },
+        RawCommand::ManualRecovery(ManualRecovery::Refund {
+            refund_params: RecoverCommandParams { swap_id, force },
+        }) => Arguments {
+            testnet: is_testnet,
+            json: is_json,
+            config_path: config_path(config, is_testnet)?,
+            env_config: env_config(is_testnet),
+            cmd: Command::Refund { swap_id, force },
+        },
+        RawCommand::ManualRecovery(ManualRecovery::Punish {
+            punish_params: RecoverCommandParams { swap_id, force },
+        }) => Arguments {
+            testnet: is_testnet,
+            json: is_json,
+            config_path: config_path(config, is_testnet)?,
+            env_config: env_config(is_testnet),
+            cmd: Command::Punish { swap_id, force },
+        },
+        RawCommand::ManualRecovery(ManualRecovery::SafelyAbort { swap_id }) => Arguments {
+            testnet: is_testnet,
+            json: is_json,
+            config_path: config_path(config, is_testnet)?,
+            env_config: env_config(is_testnet),
+            cmd: Command::SafelyAbort { swap_id },
         },
     };
 
