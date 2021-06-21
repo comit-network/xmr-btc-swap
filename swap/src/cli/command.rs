@@ -55,12 +55,7 @@ where
         Ok(matches) => RawArguments::from_clap(&matches),
         Err(clap::Error {
             message,
-            kind: clap::ErrorKind::HelpDisplayed,
-            ..
-        })
-        | Err(clap::Error {
-            message,
-            kind: clap::ErrorKind::VersionDisplayed,
+            kind: clap::ErrorKind::HelpDisplayed | clap::ErrorKind::VersionDisplayed,
             ..
         }) => return Ok(ParseResult::PrintAndExitZero { message }),
         Err(e) => anyhow::bail!(e),

@@ -77,14 +77,12 @@ fn fmt_as_address_string(multi: Multiaddr) -> Result<String, TransportError<io::
         // Deal with non-onion addresses
         Some(Protocol::Ip4(addr)) => format!("{}", addr),
         Some(Protocol::Ip6(addr)) => format!("{}", addr),
-        Some(Protocol::Dns(addr)) => format!("{}", addr),
-        Some(Protocol::Dns4(addr)) => format!("{}", addr),
+        Some(Protocol::Dns(addr) | Protocol::Dns4(addr)) => format!("{}", addr),
         _ => return Err(TransportError::MultiaddrNotSupported(multi)),
     };
 
     let port = match protocols.next() {
-        Some(Protocol::Tcp(port)) => port,
-        Some(Protocol::Udp(port)) => port,
+        Some(Protocol::Tcp(port) | Protocol::Udp(port)) => port,
         _ => return Err(TransportError::MultiaddrNotSupported(multi)),
     };
 
