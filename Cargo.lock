@@ -237,9 +237,9 @@ checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
 name = "bdk"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d85959e6883d0286e39e89aa7791b2edc2b8712f0f7152fda43b692c4db96c06"
+checksum = "05d7fee1aedf8935ba1e2c9aeee640d1b9754da1b64f30ad47e8b8e2b7904ec0"
 dependencies = [
  "async-trait",
  "bdk-macros",
@@ -943,7 +943,7 @@ version = "0.6.2-alpha.0"
 source = "git+https://github.com/LLFourn/secp256kfun#84134daf34845434d7f38cdae7ffc31730a3b1e9"
 dependencies = [
  "bincode",
- "rand_chacha 0.3.0",
+ "rand_chacha 0.3.1",
  "secp256kfun",
  "serde",
  "sigma_fun",
@@ -2808,7 +2808,7 @@ dependencies = [
  "num-traits",
  "quick-error 2.0.0",
  "rand 0.8.3",
- "rand_chacha 0.3.0",
+ "rand_chacha 0.3.1",
  "rand_xorshift 0.3.0",
  "regex-syntax",
  "rusty-fork",
@@ -2969,7 +2969,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ef9e7e66b4468674bfcb0c81af8b7fa0bb154fa9f28eb840da5c447baeb8d7e"
 dependencies = [
  "libc",
- "rand_chacha 0.3.0",
+ "rand_chacha 0.3.1",
  "rand_core 0.6.2",
  "rand_hc 0.3.0",
 ]
@@ -2996,9 +2996,9 @@ dependencies = [
 
 [[package]]
 name = "rand_chacha"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e12735cf05c9e10bf21534da50a147b924d555dc7a547c42e6bb2d5b6017ae0d"
+checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
 dependencies = [
  "ppv-lite86",
  "rand_core 0.6.2",
@@ -3283,9 +3283,9 @@ dependencies = [
 
 [[package]]
 name = "rust_decimal"
-version = "1.14.2"
+version = "1.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9787e62372fc0c5a0f3af64c392652db72d3ec1cc0cff1becc175d2c11e6fbcc"
+checksum = "01127cb8617e5e21bcf2e19b5eb48317735ca677f1d0a94833c21c331c446582"
 dependencies = [
  "arrayvec",
  "num-traits",
@@ -3958,7 +3958,7 @@ dependencies = [
  "proptest",
  "qrcode",
  "rand 0.8.3",
- "rand_chacha 0.3.0",
+ "rand_chacha 0.3.1",
  "reqwest",
  "rust_decimal",
  "rust_decimal_macros",
