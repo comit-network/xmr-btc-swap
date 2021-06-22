@@ -4,6 +4,7 @@ use crate::protocol::{alice, Message0, Message2, Message4};
 use anyhow::{Context, Error};
 use libp2p::PeerId;
 use libp2p_async_await::BehaviourOutEvent;
+use std::time::Duration;
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -49,8 +50,8 @@ impl Default for Behaviour {
 
 impl Behaviour {
     pub fn run(&mut self, bob: PeerId, state0: State0) {
-        self.inner
-            .do_protocol_listener(bob, move |mut substream| async move {
+        self.inner.do_protocol_listener(bob, move |mut substream| {
+            let protocol = async move {
                 let message0 =
                     serde_cbor::from_slice::<Message0>(&substream.read_message(BUF_SIZE).await?)
                         .context("Failed to deserialize message0")?;
@@ -83,7 +84,10 @@ impl Behaviour {
                 let state3 = state2.receive(message4)?;
 
                 Ok((bob, (swap_id, state3)))
-            })
+            };
+
+            async move { tokio::time::timeout(Duration::from_secs(60), protocol).await? }
+        });
     }
 }
 
