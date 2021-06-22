@@ -1,6 +1,6 @@
 use anyhow::{anyhow, bail, Context, Result};
 use std::future::Future;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio::net::TcpStream;
 use torut::control::{AsyncEvent, AuthenticatedConn, ConnError, UnauthenticatedConn};
 use torut::onion::TorSecretKeyV3;
@@ -111,32 +111,6 @@ pub struct AuthenticatedClient {
 }
 
 impl AuthenticatedClient {
-    /// Add an ephemeral tor service on localhost with the provided key
-    /// `service_port` and `onion_port` can be different but don't have to as
-    /// they are on different networks.
-    pub async fn add_service(
-        &mut self,
-        service_port: u16,
-        onion_port: u16,
-        tor_key: &TorSecretKeyV3,
-    ) -> Result<()> {
-        self.inner
-            .add_onion_v3(
-                tor_key,
-                false,
-                false,
-                false,
-                None,
-                &mut [(
-                    onion_port,
-                    SocketAddr::new(IpAddr::from(Ipv4Addr::new(127, 0, 0, 1)), service_port),
-                )]
-                .iter(),
-            )
-            .await
-            .map_err(|e| anyhow!("Could not add onion service.: {:#?}", e))
-    }
-
     /// Add an ephemeral tor service on localhost with the provided key
     /// `service_port` and `onion_port` can be different but don't have to as
     /// they are on different networks.
