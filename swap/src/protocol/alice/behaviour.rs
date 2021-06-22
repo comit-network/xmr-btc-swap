@@ -1,13 +1,14 @@
-use crate::network::quote::BidQuote;
-use crate::network::{encrypted_signature, quote, transfer_proof};
+use crate::network::{encrypted_signature, transfer_proof};
 use crate::protocol::alice::event_loop::LatestRate;
-use crate::protocol::alice::{execution_setup, spot_price, State3};
+use crate::protocol::alice::{execution_setup, spot_price, State3, quote};
 use crate::{env, monero};
 use anyhow::{anyhow, Error};
 use libp2p::ping::{Ping, PingEvent};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
 use uuid::Uuid;
+use crate::network::quote::BidQuote;
+use crate::protocol::alice;
 
 #[derive(Debug)]
 pub enum OutEvent {
@@ -20,9 +21,13 @@ pub enum OutEvent {
         btc: bitcoin::Amount,
         xmr: monero::Amount,
     },
-    QuoteRequested {
-        channel: ResponseChannel<BidQuote>,
+    QuoteSent {
         peer: PeerId,
+        quote: BidQuote
+    },
+    QuoteError {
+        peer: PeerId,
+        error: alice::quote::Error
     },
     ExecutionSetupDone {
         bob_peer_id: PeerId,
@@ -71,7 +76,7 @@ pub struct Behaviour<LR>
 where
     LR: LatestRate + Send + 'static,
 {
-    pub quote: quote::Behaviour,
+    pub quote: quote::Behaviour<LR>,
     pub spot_price: spot_price::Behaviour<LR>,
     pub execution_setup: execution_setup::Behaviour,
     pub transfer_proof: transfer_proof::Behaviour,
@@ -85,7 +90,7 @@ where
 
 impl<LR> Behaviour<LR>
 where
-    LR: LatestRate + Send + 'static,
+    LR: LatestRate + Clone + Send + 'static,
 {
     pub fn new(
         balance: monero::Amount,
@@ -97,7 +102,7 @@ where
         env_config: env::Config,
     ) -> Self {
         Self {
-            quote: quote::alice(),
+            quote: alice::quote::Behaviour::new(balance, lock_fee, max_buy, latest_rate.clone(), resume_only),
             spot_price: spot_price::Behaviour::new(
                 balance,
                 lock_fee,

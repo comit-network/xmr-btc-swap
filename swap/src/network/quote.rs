@@ -1,6 +1,6 @@
 use crate::bitcoin;
 use crate::network::json_pull_codec::JsonPullCodec;
-use crate::protocol::{alice, bob};
+use crate::protocol::{bob};
 use libp2p::core::ProtocolName;
 use libp2p::request_response::{
     ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
@@ -10,10 +10,10 @@ use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 
 const PROTOCOL: &str = "/comit/xmr/btc/bid-quote/1.0.0";
-type OutEvent = RequestResponseEvent<(), BidQuote>;
-type Message = RequestResponseMessage<(), BidQuote>;
+pub type OutEvent = RequestResponseEvent<(), Response>;
+type Message = RequestResponseMessage<(), Response>;
 
-pub type Behaviour = RequestResponse<JsonPullCodec<BidQuoteProtocol, BidQuote>>;
+pub type Behaviour = RequestResponse<JsonPullCodec<BidQuoteProtocol, Response>>;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct BidQuoteProtocol;
@@ -22,6 +22,12 @@ impl ProtocolName for BidQuoteProtocol {
     fn protocol_name(&self) -> &[u8] {
         PROTOCOL.as_bytes()
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum Response {
+    Quote(BidQuote),
+    Error
 }
 
 /// Represents a quote for buying XMR.
@@ -38,17 +44,6 @@ pub struct BidQuote {
     pub max_quantity: bitcoin::Amount,
 }
 
-/// Constructs a new instance of the `quote` behaviour to be used by Alice.
-///
-/// Alice only supports inbound connections, i.e. handing out quotes.
-pub fn alice() -> Behaviour {
-    Behaviour::new(
-        JsonPullCodec::default(),
-        vec![(BidQuoteProtocol, ProtocolSupport::Inbound)],
-        RequestResponseConfig::default(),
-    )
-}
-
 /// Constructs a new instance of the `quote` behaviour to be used by Bob.
 ///
 /// Bob only supports outbound connections, i.e. requesting quotes.
@@ -60,16 +55,6 @@ pub fn bob() -> Behaviour {
     )
 }
 
-impl From<(PeerId, Message)> for alice::OutEvent {
-    fn from((peer, message): (PeerId, Message)) -> Self {
-        match message {
-            Message::Request { channel, .. } => Self::QuoteRequested { channel, peer },
-            Message::Response { .. } => Self::unexpected_response(peer),
-        }
-    }
-}
-crate::impl_from_rr_event!(OutEvent, alice::OutEvent, PROTOCOL);
-
 impl From<(PeerId, Message)> for bob::OutEvent {
     fn from((peer, message): (PeerId, Message)) -> Self {
         match message {
@@ -77,7 +62,7 @@ impl From<(PeerId, Message)> for bob::OutEvent {
             Message::Response {
                 response,
                 request_id,
-            } => Self::QuoteReceived {
+            } => Self::QuoteResponse {
                 id: request_id,
                 response,
             },

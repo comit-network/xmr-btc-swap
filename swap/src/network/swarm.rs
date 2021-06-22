@@ -19,7 +19,7 @@ pub fn asb<LR>(
     env_config: env::Config,
 ) -> Result<Swarm<alice::Behaviour<LR>>>
 where
-    LR: LatestRate + Send + 'static + Debug,
+    LR: LatestRate + Clone + Send + 'static + Debug,
 {
     let behaviour = alice::Behaviour::new(
         balance,

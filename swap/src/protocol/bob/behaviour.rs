@@ -1,4 +1,3 @@
-use crate::network::quote::BidQuote;
 use crate::network::{encrypted_signature, quote, redial, spot_price, transfer_proof};
 use crate::protocol::bob;
 use crate::protocol::bob::{execution_setup, State2};
@@ -11,9 +10,9 @@ use std::time::Duration;
 
 #[derive(Debug)]
 pub enum OutEvent {
-    QuoteReceived {
+    QuoteResponse {
         id: RequestId,
-        response: BidQuote,
+        response: quote::Response,
     },
     SpotPriceReceived {
         id: RequestId,

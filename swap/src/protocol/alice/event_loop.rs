@@ -1,7 +1,6 @@
 use crate::asb::Rate;
 use crate::database::Database;
 use crate::env::Config;
-use crate::network::quote::BidQuote;
 use crate::network::transfer_proof;
 use crate::protocol::alice::spot_price::Error;
 use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State0, State3, Swap};
@@ -21,6 +20,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use uuid::Uuid;
+use crate::network::quote::BidQuote;
 
 /// A future that resolves to a tuple of `PeerId`, `transfer_proof::Request` and
 /// `Responder`.
@@ -222,29 +222,52 @@ where
                                 }
                             }
                         }
-                        SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer }) => {
-                            // TODO: Move the spot-price update into dedicated update stream to decouple it from quote requests
-                            let current_balance = self.monero_wallet.get_balance().await;
-                            match current_balance {
-                                Ok(balance) => {
-                                    self.swarm.behaviour_mut().spot_price.update_balance(balance);
-                                }
-                                Err(e) => {
-                                    tracing::error!("Failed to fetch Monero balance: {:#}", e);
-                                }
-                            }
+                        SwarmEvent::Behaviour(OutEvent::QuoteSent { peer, quote }) => {
+                            // TODO: Move the balance for quote/spot-price update into dedicated update stream to decouple it from quote requests
 
-                            let quote = match self.make_quote(self.min_buy, self.max_buy).await {
-                                Ok(quote) => quote,
-                                Err(error) => {
-                                    tracing::warn!(%peer, "Failed to make quote. Error {:#}", error);
-                                    continue;
-                                }
-                            };
+                            // TODO: move commented code into quote behaviour
 
-                            if self.swarm.behaviour_mut().quote.send_response(channel, quote).is_err() {
-                                tracing::debug!(%peer, "Failed to respond with quote");
-                            }
+                            // let current_balance = self.monero_wallet.get_balance().await;
+                            // match current_balance {
+                            //     Ok(balance) => {
+                            //         self.swarm.behaviour_mut().spot_price.update_balance(balance);
+                            //     }
+                            //     Err(e) => {
+                            //         tracing::error!("Failed to fetch Monero balance: {:#}", e);
+                            //     }
+                            // }
+                            //
+                            // let rate = match self.latest_rate.latest_rate() {
+                            //     Ok(rate) => rate,
+                            //     Err(e) => {
+                            //         self.decline(peer, channel, Error::LatestRateFetchFailed(Box::new(e)));
+                            //         return;
+                            //     }
+                            // };
+                            // let xmr = match rate.sell_quote(self.max_buy) {
+                            //     Ok(xmr) => xmr,
+                            //     Err(e) => {
+                            //         self.decline(peer, channel, Error::SellQuoteCalculationFailed(e));
+                            //         return;
+                            //     }
+                            // };
+                            //
+                            // // TODO: Lock fee should be taken into account here too...
+                            // if current_balance < xmr {
+                            //
+                            // }
+                            //
+                            // let quote = match self.make_quote(self.min_buy, self.max_buy).await {
+                            //     Ok(quote) => quote,
+                            //     Err(error) => {
+                            //         tracing::warn!(%peer, "Failed to make quote. Error {:#}", error);
+                            //         continue;
+                            //     }
+                            // };
+                            //
+                            // if self.swarm.behaviour_mut().quote.send_response(channel, quote::Response::Quote(quote)).is_err() {
+                            //     tracing::debug!(%peer, "Failed to respond with quote");
+                            // }
                         }
                         SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone{bob_peer_id, swap_id, state3}) => {
                             let _ = self.handle_execution_setup_done(bob_peer_id, swap_id, *state3).await;

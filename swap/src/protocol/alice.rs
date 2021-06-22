@@ -24,6 +24,7 @@ mod recovery;
 mod spot_price;
 pub mod state;
 pub mod swap;
+pub mod quote;
 
 pub struct Swap {
     pub state: AliceState,

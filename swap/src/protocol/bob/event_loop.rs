@@ -1,5 +1,6 @@
 use crate::bitcoin::EncryptedSignature;
 use crate::network::quote::BidQuote;
+use crate::network::quote;
 use crate::network::spot_price::{BlockchainNetwork, Response};
 use crate::network::{encrypted_signature, spot_price};
 use crate::protocol::bob;
@@ -111,9 +112,16 @@ impl EventLoop {
                                 let _ = responder.respond(response);
                             }
                         }
-                        SwarmEvent::Behaviour(OutEvent::QuoteReceived { id, response }) => {
-                            if let Some(responder) = self.inflight_quote_requests.remove(&id) {
-                                let _ = responder.respond(response);
+                        SwarmEvent::Behaviour(OutEvent::QuoteResponse { id, response }) => {
+                            match response {
+                                quote::Response::Quote(bid_quote) => {
+                                    if let Some(responder) = self.inflight_quote_requests.remove(&id) {
+                                        let _ = responder.respond(bid_quote);
+                                    }
+                                }
+                                quote::Response::Error => {
+                                    tracing::warn!("This ASB currently does not accept trades");
+                                }
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone(response)) => {
