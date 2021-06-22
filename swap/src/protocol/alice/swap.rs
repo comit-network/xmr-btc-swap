@@ -72,6 +72,27 @@ where
         AliceState::Started { state3 } => {
             let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
             match timeout(
+                env_config.bitcoin_lock_mempool_timeout,
+                tx_lock_status.wait_until_seen(),
+            )
+            .await
+            {
+                Err(_) => {
+                    info!(
+                        minutes = %env_config.bitcoin_lock_mempool_timeout.as_secs_f64() / 60.0,
+                        "TxLock lock was not seen in mempool in time",
+                    );
+                    AliceState::SafelyAborted
+                }
+                Ok(res) => {
+                    res?;
+                    AliceState::BtcLockTransactionSeen { state3 }
+                }
+            }
+        }
+        AliceState::BtcLockTransactionSeen { state3 } => {
+            let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
+            match timeout(
                 env_config.bitcoin_lock_confirmed_timeout,
                 tx_lock_status.wait_until_final(),
             )

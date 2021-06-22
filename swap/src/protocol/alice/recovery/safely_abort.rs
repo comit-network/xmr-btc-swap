@@ -8,7 +8,9 @@ pub async fn safely_abort(swap_id: Uuid, db: Arc<Database>) -> Result<AliceState
     let state = db.get_state(swap_id)?.try_into_alice()?.into();
 
     match state {
-        AliceState::Started { .. } | AliceState::BtcLocked { .. } => {
+        AliceState::Started { .. }
+        | AliceState::BtcLockTransactionSeen { .. }
+        | AliceState::BtcLocked { .. } => {
             let state = AliceState::SafelyAborted;
 
             let db_state = (&state).into();
