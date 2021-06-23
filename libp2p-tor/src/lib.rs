@@ -11,7 +11,7 @@ pub mod torut_ext;
 
 async fn dial_via_tor(onion_address: String, socks_port: u16) -> anyhow::Result<TcpStream, Error> {
     let sock = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, socks_port));
-    let stream = Socks5Stream::connect(sock, onion_address)
+    let stream = Socks5Stream::connect(sock, dbg!(onion_address))
         .await
         .map_err(Error::UnreachableProxy)?;
     let stream = TcpStream(stream.into_inner());

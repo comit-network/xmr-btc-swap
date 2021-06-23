@@ -6,14 +6,30 @@ use libp2p::{identity, noise, yamux, Multiaddr, Swarm, Transport};
 use libp2p_tor::dial_only;
 use std::time::Duration;
 use libp2p::mplex::MplexConfig;
+use anyhow::{anyhow, bail, Result};
+use tracing_subscriber::util::SubscriberInitExt;
 
 #[tokio::main]
-async fn main() {
-    let arg = std::env::args()
-        .last()
-        .unwrap();
+async fn main() -> Result<()> {
 
-    let addr_to_dial = arg
+    let _guard = tracing_subscriber::fmt()
+        .with_env_filter("debug,libp2p_tor=debug") // add `reqwest::connect::verbose=trace` if you want to logs of the RPC clients
+        .with_test_writer()
+        .set_default();
+
+    let proxy = reqwest::Proxy::all("socks5h://127.0.0.1:9050")
+        .map_err(|_| anyhow!("tor proxy should be there"))?;
+    let client = reqwest::Client::builder().proxy(proxy).build()?;
+
+    let res = client.get("https://check.torproject.org").send().await?;
+    let text = res.text().await?;
+
+    if !text.contains("Congratulations. This browser is configured to use Tor.") {
+        bail!("Tor is currently not running")
+    }
+
+
+    let addr_to_dial = "/onion3/jpclybnowuibjexya3qggzvzkoeruuav4nyjlxpnkrosldsvykfbn6qd:7654/p2p/12D3KooWHKqGyK4hVtf5BQY8GpbY6fSGKDZ8eBXMQ3H2RsdnKVzC"
         .parse::<Multiaddr>()
         .unwrap();
 
