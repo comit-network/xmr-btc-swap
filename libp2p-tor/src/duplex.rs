@@ -144,6 +144,8 @@ impl Transport for TorConfig {
                                     .get_onion_address()
                                     .get_address_without_dot_onion();
 
+                                tracing::debug!("Listening expired, removing onion {}", onion_address_without_dot_onion);
+
                                 match tor_client
                                     .lock()
                                     .await
