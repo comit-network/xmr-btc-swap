@@ -57,11 +57,11 @@ impl EventLoop {
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         env_config: env::Config,
     ) -> Result<(Self, EventLoopHandle)> {
-        let execution_setup = bmrng::channel_with_timeout(1, Duration::from_secs(30));
-        let transfer_proof = bmrng::channel_with_timeout(1, Duration::from_secs(30));
-        let encrypted_signature = bmrng::channel_with_timeout(1, Duration::from_secs(30));
-        let spot_price = bmrng::channel_with_timeout(1, Duration::from_secs(30));
-        let quote = bmrng::channel_with_timeout(1, Duration::from_secs(30));
+        let execution_setup = bmrng::channel_with_timeout(1, Duration::from_secs(60));
+        let transfer_proof = bmrng::channel_with_timeout(1, Duration::from_secs(60));
+        let encrypted_signature = bmrng::channel_with_timeout(1, Duration::from_secs(60));
+        let spot_price = bmrng::channel_with_timeout(1, Duration::from_secs(60));
+        let quote = bmrng::channel_with_timeout(1, Duration::from_secs(60));
 
         let event_loop = EventLoop {
             swap_id,
