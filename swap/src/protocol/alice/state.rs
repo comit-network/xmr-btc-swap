@@ -21,6 +21,9 @@ pub enum AliceState {
     Started {
         state3: Box<State3>,
     },
+    BtcLockTransactionSeen {
+        state3: Box<State3>,
+    },
     BtcLocked {
         state3: Box<State3>,
     },
@@ -79,6 +82,9 @@ impl fmt::Display for AliceState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AliceState::Started { .. } => write!(f, "started"),
+            AliceState::BtcLockTransactionSeen { .. } => {
+                write!(f, "bitcoin lock transaction in mempool")
+            }
             AliceState::BtcLocked { .. } => write!(f, "btc is locked"),
             AliceState::XmrLockTransactionSent { .. } => write!(f, "xmr lock transaction sent"),
             AliceState::XmrLocked { .. } => write!(f, "xmr is locked"),

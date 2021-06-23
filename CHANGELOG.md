@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Printing the deposit address to the terminal as a QR code.
   To not break automated scripts or integrations with other software, this behaviour is disabled if `--json` is passed to the application.
 
+### Fixed
+
+- An issue where the ASB gives long price guarantees when setting up a swap.
+  Now, after sending a spot price the ASB will wait for one minute for the CLI's to trigger the execution setup, and three minutes to see the BTC lock transaction of the CLI in mempool after the swap started.
+  If the first timeout is triggered the execution setup will be aborted, if the second timeout is triggered the swap will be safely aborted.
+
 ### Removed
 
 - The websocket transport from the CLI.

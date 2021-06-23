@@ -15,6 +15,9 @@ pub enum Alice {
     Started {
         state3: alice::State3,
     },
+    BtcLockTransactionSeen {
+        state3: alice::State3,
+    },
     BtcLocked {
         state3: alice::State3,
     },
@@ -79,6 +82,9 @@ impl From<&AliceState> for Alice {
     fn from(alice_state: &AliceState) -> Self {
         match alice_state {
             AliceState::Started { state3 } => Alice::Started {
+                state3: state3.as_ref().clone(),
+            },
+            AliceState::BtcLockTransactionSeen { state3 } => Alice::BtcLockTransactionSeen {
                 state3: state3.as_ref().clone(),
             },
             AliceState::BtcLocked { state3 } => Alice::BtcLocked {
@@ -177,6 +183,9 @@ impl From<Alice> for AliceState {
     fn from(db_state: Alice) -> Self {
         match db_state {
             Alice::Started { state3 } => AliceState::Started {
+                state3: Box::new(state3),
+            },
+            Alice::BtcLockTransactionSeen { state3 } => AliceState::BtcLockTransactionSeen {
                 state3: Box::new(state3),
             },
             Alice::BtcLocked { state3 } => AliceState::BtcLocked {
@@ -278,6 +287,9 @@ impl fmt::Display for Alice {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Alice::Started { .. } => write!(f, "Started"),
+            Alice::BtcLockTransactionSeen { .. } => {
+                write!(f, "Bitcoin lock transaction in mempool")
+            }
             Alice::BtcLocked { .. } => f.write_str("Bitcoin locked"),
             Alice::XmrLockTransactionSent { .. } => f.write_str("Monero lock transaction sent"),
             Alice::XmrLocked { .. } => f.write_str("Monero locked"),

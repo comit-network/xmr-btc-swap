@@ -6,6 +6,7 @@ use time::NumericalStdDurationShort;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Config {
+    pub bitcoin_lock_mempool_timeout: Duration,
     pub bitcoin_lock_confirmed_timeout: Duration,
     pub bitcoin_finality_confirmations: u32,
     pub bitcoin_avg_block_time: Duration,
@@ -43,7 +44,8 @@ pub struct Regtest;
 impl GetConfig for Mainnet {
     fn get_config() -> Config {
         Config {
-            bitcoin_lock_confirmed_timeout: 24.hours(),
+            bitcoin_lock_mempool_timeout: 3.minutes(),
+            bitcoin_lock_confirmed_timeout: 2.hours(),
             bitcoin_finality_confirmations: 2,
             bitcoin_avg_block_time: 10.minutes(),
             bitcoin_cancel_timelock: CancelTimelock::new(72),
@@ -59,7 +61,8 @@ impl GetConfig for Mainnet {
 impl GetConfig for Testnet {
     fn get_config() -> Config {
         Config {
-            bitcoin_lock_confirmed_timeout: 12.hours(),
+            bitcoin_lock_mempool_timeout: 3.minutes(),
+            bitcoin_lock_confirmed_timeout: 1.hours(),
             bitcoin_finality_confirmations: 2,
             bitcoin_avg_block_time: 10.minutes(),
             bitcoin_cancel_timelock: CancelTimelock::new(12),
@@ -75,6 +78,7 @@ impl GetConfig for Testnet {
 impl GetConfig for Regtest {
     fn get_config() -> Config {
         Config {
+            bitcoin_lock_mempool_timeout: 30.seconds(),
             bitcoin_lock_confirmed_timeout: 1.minutes(),
             bitcoin_finality_confirmations: 1,
             bitcoin_avg_block_time: 5.seconds(),

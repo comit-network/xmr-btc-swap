@@ -23,6 +23,7 @@ pub async fn cancel(
 
         // In case no XMR has been locked, move to Safely Aborted
         AliceState::Started { .. }
+        | AliceState::BtcLockTransactionSeen { .. }
         | AliceState::BtcLocked { .. } => bail!("Cannot cancel swap {} because it is in state {} where no XMR was locked.", swap_id, state),
 
         AliceState::XmrLockTransactionSent { monero_wallet_restore_blockheight, transfer_proof, state3,  }

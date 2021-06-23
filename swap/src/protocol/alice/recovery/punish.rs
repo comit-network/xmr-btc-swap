@@ -36,7 +36,8 @@ pub async fn punish(
             AliceState::Started { .. } => bail!(Error::NoBtcLocked(state)),
 
             // Punish potentially possible (no knowledge of cancel transaction)
-            AliceState::BtcLocked { state3, .. }
+            AliceState::BtcLockTransactionSeen { state3 }
+            | AliceState::BtcLocked { state3, .. }
             | AliceState::XmrLockTransactionSent {state3, ..}
             | AliceState::XmrLocked {state3, ..}
             | AliceState::XmrLockTransferProofSent {state3, ..}
