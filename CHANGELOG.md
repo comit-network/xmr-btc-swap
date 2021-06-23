@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Printing the deposit address to the terminal as a QR code.
   To not break automated scripts or integrations with other software, this behaviour is disabled if `--json` is passed to the application.
+- Configuration setting for the websocket URL that the ASB connects to in order to receive price ticker updates. Can be configured manually by editing the config.toml file directly. It is expected that the server behind the url follows the same protocol as the [kraken websocket api](https://docs.kraken.com/websockets/)
 
 ### Fixed
 
