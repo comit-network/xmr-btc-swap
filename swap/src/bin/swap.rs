@@ -343,7 +343,7 @@ async fn determine_btc_to_swap<FB, TB, FMG, TMG, FS, TS>(
     bid_quote: impl Future<Output = Result<BidQuote>>,
     get_new_address: impl Future<Output = Result<bitcoin::Address>>,
     balance: FB,
-    max_giveable: FMG,
+    max_giveable_fn: FMG,
     sync: FS,
 ) -> Result<(bitcoin::Amount, bitcoin::Amount)>
 where
@@ -363,11 +363,9 @@ where
         "Received quote: 1 XMR ~ ",
     );
 
-    let mut current_maximum_giveable = max_giveable().await?;
+    let mut max_giveable = max_giveable_fn().await?;
 
-    let max_giveable = if current_maximum_giveable == bitcoin::Amount::ZERO
-        || current_maximum_giveable < bid_quote.min_quantity
-    {
+    if max_giveable == bitcoin::Amount::ZERO || max_giveable < bid_quote.min_quantity {
         let deposit_address = get_new_address.await?;
         let minimum_amount = bid_quote.min_quantity;
         let maximum_amount = bid_quote.max_quantity;
@@ -378,7 +376,7 @@ where
 
         info!(
             %deposit_address,
-            %current_maximum_giveable,
+            %max_giveable,
             %minimum_amount,
             %maximum_amount,
             "Please deposit BTC you want to swap to",
@@ -387,19 +385,19 @@ where
         loop {
             sync().await?;
 
-            let new_max_givable = max_giveable().await?;
+            let new_max_givable = max_giveable_fn().await?;
 
-            if new_max_givable != current_maximum_giveable {
-                current_maximum_giveable = new_max_givable;
+            if new_max_givable != max_giveable {
+                max_giveable = new_max_givable;
 
                 let new_balance = balance().await?;
                 tracing::info!(
                     %new_balance,
-                    %current_maximum_giveable,
+                    %max_giveable,
                     "Received BTC",
                 );
 
-                if current_maximum_giveable >= bid_quote.min_quantity {
+                if max_giveable >= bid_quote.min_quantity {
                     break;
                 } else {
                     tracing::info!(
@@ -412,10 +410,6 @@ where
 
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
-
-        current_maximum_giveable
-    } else {
-        current_maximum_giveable
     };
 
     let balance = balance().await?;

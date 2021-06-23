@@ -3,7 +3,6 @@ use crate::database::Database;
 use crate::env::Config;
 use crate::network::quote::BidQuote;
 use crate::network::transfer_proof;
-use crate::protocol::alice::spot_price::Error;
 use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State0, State3, Swap};
 use crate::{bitcoin, kraken, monero};
 use anyhow::{Context, Result};
@@ -208,19 +207,7 @@ where
                             self.swarm.behaviour_mut().execution_setup.run(peer, state0);
                         }
                         SwarmEvent::Behaviour(OutEvent::SwapRequestDeclined { peer, error }) => {
-                            match error {
-                                Error::ResumeOnlyMode
-                                | Error::AmountBelowMinimum { .. }
-                                | Error::AmountAboveMaximum { .. }
-                                | Error::BlockchainNetworkMismatch { .. } => {
-                                    tracing::warn!(%peer, "Ignoring spot price request because: {}", error);
-                                }
-                                Error::BalanceTooLow { .. }
-                                | Error::LatestRateFetchFailed(_)
-                                | Error::SellQuoteCalculationFailed(_) => {
-                                    tracing::error!(%peer, "Ignoring spot price request because: {}", error);
-                                }
-                            }
+                            tracing::warn!(%peer, "Ignoring spot price request because: {}", error);
                         }
                         SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer }) => {
                             // TODO: Move the spot-price update into dedicated update stream to decouple it from quote requests
@@ -324,15 +311,11 @@ where
                         SwarmEvent::IncomingConnectionError { send_back_addr: address, error, .. } => {
                             tracing::warn!(%address, "Failed to set up connection with peer. Error {:#}", error);
                         }
-                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause } if num_established == 0 => {
-                            match cause {
-                                Some(error) => {
-                                    tracing::warn!(%peer, address = %endpoint.get_remote_address(), "Lost connection. Error {:#}", error);
-                                },
-                                None => {
-                                    tracing::info!(%peer, address = %endpoint.get_remote_address(), "Successfully closed connection");
-                                }
-                            }
+                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause: Some(error) } if num_established == 0 => {
+                            tracing::warn!(%peer, address = %endpoint.get_remote_address(), "Lost connection. Error {:#}", error);
+                        }
+                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause: None } if num_established == 0 => {
+                            tracing::info!(%peer, address = %endpoint.get_remote_address(), "Successfully closed connection");
                         }
                         SwarmEvent::NewListenAddr(address) => {
                             tracing::info!(%address, "New listen address detected");
