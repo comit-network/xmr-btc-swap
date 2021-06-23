@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::future::Future;
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::num::ParseIntError;
 use std::{io, iter};
 use torut::control::{AsyncEvent, AuthenticatedConn, TorAuthData, UnauthenticatedConn};
@@ -93,7 +93,7 @@ impl AuthenticatedConnectionExt for AuthenticatedConn<tokio::net::TcpStream, Asy
             None,
             &mut iter::once(&(
                 onion_port,
-                SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), local_port)),
+                SocketAddr::new(IpAddr::from(Ipv4Addr::new(127, 0, 0, 1)), local_port),
             )),
         )
         .await
