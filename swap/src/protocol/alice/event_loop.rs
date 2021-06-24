@@ -3,6 +3,7 @@ use crate::database::Database;
 use crate::env::Config;
 use crate::network::quote::BidQuote;
 use crate::network::transfer_proof;
+use crate::protocol::alice::swap_setup::WalletSnapshot;
 use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State0, State3, Swap};
 use crate::{bitcoin, kraken, monero};
 use anyhow::{Context, Result};
@@ -20,7 +21,6 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use uuid::Uuid;
-use crate::protocol::alice::swap_setup::WalletSnapshot;
 
 /// A future that resolves to a tuple of `PeerId`, `transfer_proof::Request` and
 /// `Responder`.
@@ -151,7 +151,7 @@ where
             tokio::select! {
                 swarm_event = self.swarm.next_event() => {
                     match swarm_event {
-                        SwarmEvent::Behaviour(OutEvent::SwapInitiated { send_wallet_snapshot }) => {
+                        SwarmEvent::Behaviour(OutEvent::SwapSetupInitiated { send_wallet_snapshot }) => {
 
                             let wallet_snapshot = match WalletSnapshot::capture(&self.bitcoin_wallet, &self.monero_wallet).await {
                                 Ok(wallet_snapshot) => wallet_snapshot,
@@ -163,28 +163,11 @@ where
                             match send_wallet_snapshot.send().await {
                                 Ok()
                             }
-
-                            // TODO: Move into execution setup as part of swap_setup
-                            // let state0 = match State0::new(
-                            //     btc,
-                            //     xmr,
-                            //     self.env_config,
-                            //     redeem_address,
-                            //     punish_address,
-                            //     tx_redeem_fee,
-                            //     tx_punish_fee,
-                            //     &mut OsRng
-                            // ) {
-                            //     Ok(state) => state,
-                            //     Err(error) => {
-                            //         tracing::warn!(%peer, "Failed to make State0 for execution setup. Error {:#}", error);
-                            //         continue;
-                            //     }
-                            // };
-                            //
-                            // self.swarm.behaviour_mut().execution_setup.run(peer, state0);
                         }
-                        SwarmEvent::Behaviour(OutEvent::SwapRequestDeclined { peer, error }) => {
+                        SwarmEvent::Behaviour(OutEvent::SwapSetupCompleted{peer_id, swap_id, state3}) => {
+                            let _ = self.handle_execution_setup_done(bob_peer_id, swap_id, *state3).await;
+                        }
+                        SwarmEvent::Behaviour(OutEvent::SwapDeclined { peer, error }) => {
                             tracing::warn!(%peer, "Ignoring spot price request because: {}", error);
                         }
                         SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer }) => {
@@ -210,9 +193,6 @@ where
                             if self.swarm.behaviour_mut().quote.send_response(channel, quote).is_err() {
                                 tracing::debug!(%peer, "Failed to respond with quote");
                             }
-                        }
-                        SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone{bob_peer_id, swap_id, state3}) => {
-                            let _ = self.handle_execution_setup_done(bob_peer_id, swap_id, *state3).await;
                         }
                         SwarmEvent::Behaviour(OutEvent::TransferProofAcknowledged { peer, id }) => {
                             tracing::debug!(%peer, "Bob acknowledged transfer proof");

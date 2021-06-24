@@ -91,8 +91,6 @@ where
     LR: LatestRate + Send + 'static,
 {
     pub fn new(
-        balance: monero::Amount,
-        lock_fee: monero::Amount,
         min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,
         env_config: env::Config,
@@ -101,18 +99,12 @@ where
     ) -> Self {
         Self {
             events: Default::default(),
-            balance,
-            lock_fee,
             min_buy,
             max_buy,
             env_config,
             latest_rate,
             resume_only,
         }
-    }
-
-    pub fn update(&mut self, monero_balance: monero::Amount, redeem_address: bitcoin::Address, punish_address: bitcoin::Address) {
-        self.balance = monero_balance;
     }
 }
 

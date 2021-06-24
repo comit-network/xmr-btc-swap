@@ -51,11 +51,7 @@ impl Default for Behaviour {
 impl Behaviour {
     pub fn run(&mut self, bob: PeerId, state0: State0) {
         self.inner.do_protocol_listener(bob, move |mut substream| {
-            let protocol = async move {
-
-
-                Ok((bob, (swap_id, state3)))
-            };
+            let protocol = async move { Ok((bob, (swap_id, state3))) };
 
             async move { tokio::time::timeout(Duration::from_secs(60), protocol).await? }
         });
@@ -69,8 +65,8 @@ impl From<OutEvent> for alice::OutEvent {
                 bob_peer_id,
                 state3,
                 swap_id,
-            } => Self::ExecutionSetupDone {
-                bob_peer_id,
+            } => Self::SwapSetupCompleted {
+                peer_id: bob_peer_id,
                 state3: Box::new(state3),
                 swap_id,
             },
