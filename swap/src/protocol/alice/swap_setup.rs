@@ -1,33 +1,75 @@
-use crate::network::cbor_request_response::CborCodec;
-use crate::network::spot_price;
-use crate::network::spot_price::{BlockchainNetwork, SpotPriceProtocol};
-use crate::protocol::alice;
-use crate::protocol::alice::event_loop::LatestRate;
-use crate::{env, monero};
+use anyhow::{Result, Context};
+use std::collections::VecDeque;
+use std::fmt::Debug;
+use std::future;
+use std::task::{Context, Poll};
+
+use futures::future::{BoxFuture, OptionFuture};
+use libp2p::{Multiaddr, NetworkBehaviour, PeerId};
+use libp2p::core::connection::ConnectionId;
+use libp2p::core::{Endpoint, upgrade};
+use libp2p::core::upgrade::from_fn;
+use libp2p::core::upgrade::FromFnUpgrade;
 use libp2p::request_response::{
     ProtocolSupport, RequestResponseConfig, RequestResponseEvent, RequestResponseMessage,
     ResponseChannel,
 };
-use libp2p::swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters, NetworkBehaviour, IntoProtocolsHandler, ProtocolsHandler, ProtocolsHandlerEvent, ProtocolsHandlerUpgrErr, KeepAlive, SubstreamProtocol, NegotiatedSubstream};
-use libp2p::{NetworkBehaviour, PeerId, Multiaddr};
-use std::collections::VecDeque;
-use std::fmt::Debug;
-use std::task::{Context, Poll};
-use libp2p::core::connection::ConnectionId;
-use libp2p::swarm::protocols_handler::{OutboundUpgradeSend, InboundUpgradeSend};
-use libp2p::core::
+use libp2p::swarm::{IntoProtocolsHandler, KeepAlive, NegotiatedSubstream, NetworkBehaviour, NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters, ProtocolsHandler, ProtocolsHandlerEvent, ProtocolsHandlerUpgrErr, SubstreamProtocol};
+use libp2p::swarm::protocols_handler::{InboundUpgradeSend, OutboundUpgradeSend};
+use uuid::Uuid;
+use void::Void;
+
+use crate::{env, monero};
+use crate::network::cbor_request_response::CborCodec;
+use crate::network::spot_price;
+use crate::network::spot_price::{BlockchainNetwork, SpotPriceProtocol};
+use crate::protocol::{alice, bob, Message0, Message2, Message4};
+use crate::protocol::alice::event_loop::LatestRate;
+use crate::protocol::alice::{State3, State0};
+use futures::FutureExt;
+use tokio::sync::oneshot;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
 pub enum OutEvent {
-    ExecutionSetupParams {
-        peer: PeerId,
-        btc: bitcoin::Amount,
-        xmr: monero::Amount,
+    Initiated {
+        send_wallet_snapshot: oneshot::Sender<WalletSnapshot>
     },
-    Error {
-        peer: PeerId,
-        error: Error,
+    Completed {
+        bob_peer_id: PeerId,
+        swap_id: Uuid,
+        state3: State3,
     },
+    Error, // TODO be more descriptive
+}
+
+pub struct WalletSnapshot {
+    balance: monero::Amount,
+    lock_fee: monero::Amount,
+
+    // TODO: Consider using the same address for punish and redeem (they are mutually exclusive, so effectively the address will only be used once)
+    redeem_address: bitcoin::Address,
+    punish_address: bitcoin::Address,
+
+    redeem_fee: bitcoin::Amount,
+    refund_fee: bitcoin::Amount,
+}
+
+impl WalletSnapshot {
+    pub async fn capture(bitcoin_wallet: &bitcoin::Wallet, monero_wallet: &monero::Wallet) -> Result<Self> {
+        Ok(Self {
+            balance: monero_wallet.get_balance().await?,
+            lock_fee: monero::MONERO_FEE,
+            redeem_address: bitcoin_wallet.new_address().await?,
+            punish_address: bitcoin_wallet.new_address().await?,
+            redeem_fee: bitcoin_wallet
+                .estimate_fee(bitcoin::TxRedeem::weight(), btc)
+                .await,
+            refund_fee: bitcoin_wallet
+                .estimate_fee(bitcoin::TxPunish::weight(), btc)
+                .await
+        })
+    }
 }
 
 #[allow(missing_debug_implementations)]
@@ -36,24 +78,14 @@ where
     LR: LatestRate + Send + 'static,
 {
     events: VecDeque<OutEvent>,
-
-    balance: monero::Amount,
-    lock_fee: monero::Amount,
     min_buy: bitcoin::Amount,
     max_buy: bitcoin::Amount,
     env_config: env::Config,
 
-    unused_addresses: VecDeque<bitcoin::Address>,
-    redeem_fee: bitcoin::Amount,
-    refund_fee: bitcoin::Amount,
     latest_rate: LR,
     resume_only: bool,
 }
 
-/// Behaviour that handles spot prices.
-/// All the logic how to react to a spot price request is contained here, events
-/// reporting the successful handling of a spot price request or a failure are
-/// bubbled up to the parent behaviour.
 impl<LR> Behaviour<LR>
 where
     LR: LatestRate + Send + 'static,
@@ -79,37 +111,17 @@ where
         }
     }
 
-    pub fn update_balance(&mut self, balance: monero::Amount) {
-        self.balance = balance;
-    }
-
-    fn decline(
-        &mut self,
-        peer: PeerId,
-        channel: ResponseChannel<spot_price::Response>,
-        error: Error,
-    ) {
-        if self
-            .behaviour
-            .send_response(
-                channel,
-                spot_price::Response::Error(error.to_error_response()),
-            )
-            .is_err()
-        {
-            tracing::debug!(%peer, "Unable to send error response for spot price request");
-        }
-
-        self.events.push_back(OutEvent::Error { peer, error });
+    pub fn update(&mut self, monero_balance: monero::Amount, redeem_address: bitcoin::Address, punish_address: bitcoin::Address) {
+        self.balance = monero_balance;
     }
 }
 
 impl<LR> NetworkBehaviour for Behaviour<LR> {
-    type ProtocolsHandler = ();
-    type OutEvent = ();
+    type ProtocolsHandler = Handler;
+    type OutEvent = OutEvent;
 
     fn new_handler(&mut self) -> Self::ProtocolsHandler {
-        todo!()
+        Handler::default()
     }
 
     fn addresses_of_peer(&mut self, peer_id: &PeerId) -> Vec<Multiaddr> {
@@ -133,33 +145,189 @@ impl<LR> NetworkBehaviour for Behaviour<LR> {
     }
 }
 
-enum InboundState {
-    PendingBehaviour(NegotiatedSubstream)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SpotPriceRequest {
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    pub btc: bitcoin::Amount,
+    pub blockchain_network: BlockchainNetwork,
 }
 
-struct Handler {
-    inbound_stream: Option<InboundState>
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum SpotPriceError {
+    NoSwapsAccepted,
+    AmountBelowMinimum {
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        min: bitcoin::Amount,
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        buy: bitcoin::Amount,
+    },
+    AmountAboveMaximum {
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        max: bitcoin::Amount,
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        buy: bitcoin::Amount,
+    },
+    BalanceTooLow {
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+        buy: bitcoin::Amount,
+    },
+    BlockchainNetworkMismatch {
+        cli: BlockchainNetwork,
+        asb: BlockchainNetwork,
+    },
+    /// To be used for errors that cannot be explained on the CLI side (e.g.
+    /// rate update problems on the seller side)
+    Other,
 }
+
+// TODO: This is bob only.
+// enum OutboundState {
+//     PendingOpen(
+//         // TODO: put data in here we pass in when we want to kick of swap setup, just bitcoin amount?
+//     ),
+//     PendingNegotiate,
+//     Executing(BoxFuture<'static, anyhow::Result<(Uuid, bob::State3)>>)
+// }
+
+// TODO: Don't just use anyhow::Error
+type InboundStream = BoxFuture<'static, anyhow::Result<(Uuid, alice::State3)>>;
+
+struct Handler {
+    inbound_stream: OptionFuture<InboundStream>,
+    events: VecDeque<HandlerOutEvent>,
+    resume_only: bool
+}
+
+enum HandlerOutEvent {
+    Initiated(oneshot::Sender<WalletSnapshot>),
+    Completed(anyhow::Result<(Uuid, alice::State3)>)
+}
+
+pub const BUF_SIZE: usize = 1024 * 1024;
 
 impl ProtocolsHandler for Handler {
     type InEvent = ();
-    type OutEvent = ();
+    type OutEvent = HandlerOutEvent;
     type Error = ();
-    type InboundProtocol = ();
+    type InboundProtocol = protocol::SwapSetup;
     type OutboundProtocol = ();
     type InboundOpenInfo = ();
     type OutboundOpenInfo = ();
 
     fn listen_protocol(&self) -> SubstreamProtocol<Self::InboundProtocol, Self::InboundOpenInfo> {
-        todo!()
+        SubstreamProtocol::new(protocol::new(), todo!("pass data down to handler"))
     }
 
-    fn inject_fully_negotiated_inbound(&mut self, protocol: NegotiatedSubstream, _: Self::InboundOpenInfo) {
-        self.inbound_stream = Some(InboundState::PendingBehaviour(protocol));
+    fn inject_fully_negotiated_inbound(&mut self, mut protocol: NegotiatedSubstream, _: Self::InboundOpenInfo) {
+        let (sender, receiver) = oneshot::channel();
+        let resume_only = self.resume_only;
+        
+        self.inbound_stream = OptionFuture::from(Some(async move {
+            let request = read_cbor_message::<SpotPriceRequest>(&mut protocol).await?;
+            let wallet_snapshot = receiver.await?; // TODO Put a timeout on this
+
+            async {
+                if resume_only {
+                    return Err(Error::ResumeOnlyMode)
+                };
+
+
+            }
+
+
+            let blockchain_network = BlockchainNetwork {
+                bitcoin: self.env_config.bitcoin_network,
+                monero: self.env_config.monero_network,
+            };
+
+            if request.blockchain_network != blockchain_network {
+                self.decline(peer, channel, Error::BlockchainNetworkMismatch {
+                    cli: request.blockchain_network,
+                    asb: blockchain_network,
+                });
+                return;
+            }
+
+
+
+            let btc = request.btc;
+
+            if btc < self.min_buy {
+                self.decline(peer, channel, Error::AmountBelowMinimum {
+                    min: self.min_buy,
+                    buy: btc,
+                });
+                return;
+            }
+
+            if btc > self.max_buy {
+                self.decline(peer, channel, Error::AmountAboveMaximum {
+                    max: self.max_buy,
+                    buy: btc,
+                });
+                return;
+            }
+
+            let rate = match self.latest_rate.latest_rate() {
+                Ok(rate) => rate,
+                Err(e) => {
+                    self.decline(peer, channel, Error::LatestRateFetchFailed(Box::new(e)));
+                    return;
+                }
+            };
+            let xmr = match rate.sell_quote(btc) {
+                Ok(xmr) => xmr,
+                Err(e) => {
+                    self.decline(peer, channel, Error::SellQuoteCalculationFailed(e));
+                    return;
+                }
+            };
+
+            let xmr_balance = self.balance;
+            let xmr_lock_fees = self.lock_fee;
+
+            if xmr_balance < xmr + xmr_lock_fees {
+                self.decline(peer, channel, Error::BalanceTooLow {
+                    balance: xmr_balance,
+                    buy: btc,
+                });
+                return;
+            }
+
+            if self
+                .behaviour
+                .send_response(channel, spot_price::Response::Xmr(xmr))
+                .is_err()
+            {
+                tracing::error!(%peer, "Failed to send spot price response of {} for {}", xmr, btc)
+            }
+
+            let state0 = State0::new(spot_price_request.btc, todo!(), todo!(), todo!(), todo!(), todo!(), todo!(), todo!())?;
+            
+            let message0 = read_cbor_message::<Message0>(&mut protocol).context("Failed to deserialize message0")?;
+            let (swap_id, state1) = state0.receive(message0)?;
+
+            write_cbor_message(&mut protocol, state1.next_message()).await?;
+
+            let message2 = read_cbor_message::<Message2>(&mut protocol).context("Failed to deserialize message2")?;
+            let state2 = state1
+                .receive(message2)
+                .context("Failed to receive Message2")?;
+
+            write_cbor_message(&mut protocol, state2.next_message()).await?;
+            
+            let message4 = read_cbor_message::<Message4>(&mut protocol).context("Failed to deserialize message4")?;
+            let state3 = state2
+                .receive(message4)
+                .context("Failed to receive Message4")?;
+
+            Ok((swap_id, state3))
+        }.boxed()));
+        self.events.push_back(HandlerOutEvent::Initiated(sender));
     }
 
-    fn inject_fully_negotiated_outbound(&mut self, protocol: _, info: Self::OutboundOpenInfo) {
-        todo!()
+    fn inject_fully_negotiated_outbound(&mut self, protocol: NegotiatedSubstream, info: Self::OutboundOpenInfo) {
+        unreachable!("we don't support outbound")
     }
 
     fn inject_event(&mut self, event: Self::InEvent) {
@@ -175,145 +343,60 @@ impl ProtocolsHandler for Handler {
     }
 
     fn poll(&mut self, cx: &mut Context<'_>) -> Poll<ProtocolsHandlerEvent<Self::OutboundProtocol, Self::OutboundOpenInfo, Self::OutEvent, Self::Error>> {
-        todo!()
+        let event = futures::ready!(self.inbound_stream.poll(cx));
+        
+        Poll::Ready(ProtocolsHandlerEvent::Custom(HandlerOutEvent::Completed(event)))
     }
 }
 
-pub fn new() -> SwapSetup {
-    from_fn(
-        b"/rendezvous/1.0.0",
-        Box::new(|socket, _| future::ready(Ok(socket))),
-    )
+async fn read_cbor_message<T>(substream: &mut NegotiatedSubstream) -> Result<T> where T: Deserialize {
+    let bytes = upgrade::read_one(substream, BUF_SIZE).await?;
+    let mut de = serde_cbor::Deserializer::from_slice(&bytes);
+    let message = T::deserialize(de)?;
+    
+    Ok(message)
 }
 
-pub type SwapSetup = FromFnUpgrade<
-    &'static [u8],
-    Box<
-        dyn Fn(
-            NegotiatedSubstream,
-            Endpoint,
+async fn write_cbor_message<T>(substream: &mut NegotiatedSubstream, message: T) -> Result<()> where T: Serialize {
+    let bytes = serde_cbor::to_vec(&message)?;
+    upgrade::write_one(substream, &bytes).await?;
+    
+    Ok(())
+}
+
+async fn write_error_message(substream: &mut NegotiatedSubstream, message: impl Into<SpotPriceError>) -> Result<()> {
+    let bytes = serde_cbor::to_vec(&message.into())?;
+    upgrade::write_one(substream, &bytes).await?;
+
+    Ok(())
+}
+
+mod protocol {
+    use super::*;
+
+    pub fn new() -> SwapSetup {
+        from_fn(
+            b"/comit/xmr/btc/swap_setup/1.0.0",
+            Box::new(|socket, endpoint| future::ready(match endpoint {
+                Endpoint::Listener => Ok(socket),
+                Endpoint::Dialer => todo!("return error")
+            })),
         )
-            -> future::Ready<Result<NegotiatedSubstream, Void>>
-        + Send
-        + 'static,
-    >,
->;
-
-impl<LR> NetworkBehaviourEventProcess<spot_price::OutEvent> for Behaviour<LR>
-where
-    LR: LatestRate + Send + 'static,
-{
-    fn inject_event(&mut self, event: spot_price::OutEvent) {
-        let (peer, message) = match event {
-            RequestResponseEvent::Message { peer, message } => (peer, message),
-            RequestResponseEvent::OutboundFailure { peer, error, .. } => {
-                tracing::error!(%peer, "Failure sending spot price response: {:#}", error);
-                return;
-            }
-            RequestResponseEvent::InboundFailure { peer, error, .. } => {
-                tracing::warn!(%peer, "Inbound failure when handling spot price request: {:#}", error);
-                return;
-            }
-            RequestResponseEvent::ResponseSent { peer, .. } => {
-                tracing::debug!(%peer, "Spot price response sent");
-                return;
-            }
-        };
-
-        let (request, channel) = match message {
-            RequestResponseMessage::Request {
-                request, channel, ..
-            } => (request, channel),
-            RequestResponseMessage::Response { .. } => {
-                tracing::error!("Unexpected message");
-                return;
-            }
-        };
-
-        let blockchain_network = BlockchainNetwork {
-            bitcoin: self.env_config.bitcoin_network,
-            monero: self.env_config.monero_network,
-        };
-
-        if request.blockchain_network != blockchain_network {
-            self.decline(peer, channel, Error::BlockchainNetworkMismatch {
-                cli: request.blockchain_network,
-                asb: blockchain_network,
-            });
-            return;
-        }
-
-        if self.resume_only {
-            self.decline(peer, channel, Error::ResumeOnlyMode);
-            return;
-        }
-
-        let btc = request.btc;
-
-        if btc < self.min_buy {
-            self.decline(peer, channel, Error::AmountBelowMinimum {
-                min: self.min_buy,
-                buy: btc,
-            });
-            return;
-        }
-
-        if btc > self.max_buy {
-            self.decline(peer, channel, Error::AmountAboveMaximum {
-                max: self.max_buy,
-                buy: btc,
-            });
-            return;
-        }
-
-        let rate = match self.latest_rate.latest_rate() {
-            Ok(rate) => rate,
-            Err(e) => {
-                self.decline(peer, channel, Error::LatestRateFetchFailed(Box::new(e)));
-                return;
-            }
-        };
-        let xmr = match rate.sell_quote(btc) {
-            Ok(xmr) => xmr,
-            Err(e) => {
-                self.decline(peer, channel, Error::SellQuoteCalculationFailed(e));
-                return;
-            }
-        };
-
-        let xmr_balance = self.balance;
-        let xmr_lock_fees = self.lock_fee;
-
-        if xmr_balance < xmr + xmr_lock_fees {
-            self.decline(peer, channel, Error::BalanceTooLow {
-                balance: xmr_balance,
-                buy: btc,
-            });
-            return;
-        }
-
-        if self
-            .behaviour
-            .send_response(channel, spot_price::Response::Xmr(xmr))
-            .is_err()
-        {
-            tracing::error!(%peer, "Failed to send spot price response of {} for {}", xmr, btc)
-        }
-
-        self.events
-            .push_back(OutEvent::ExecutionSetupParams { peer, btc, xmr });
     }
-}
 
-impl From<OutEvent> for alice::OutEvent {
-    fn from(event: OutEvent) -> Self {
-        match event {
-            OutEvent::ExecutionSetupParams { peer, btc, xmr } => {
-                Self::ExecutionSetupStart { peer, btc, xmr }
-            }
-            OutEvent::Error { peer, error } => Self::SwapRequestDeclined { peer, error },
-        }
-    }
+    pub type SwapSetup = FromFnUpgrade<
+        &'static [u8],
+        Box<
+            dyn Fn(
+                NegotiatedSubstream,
+                Endpoint,
+            )
+                -> future::Ready<Result<NegotiatedSubstream, Void>>
+            + Send
+            + 'static,
+        >,
+    >;
+
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -374,15 +457,17 @@ impl Error {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::asb::Rate;
-    use crate::env::GetConfig;
-    use crate::monero;
-    use crate::network::test::{await_events_or_timeout, connect, new_swarm};
-    use crate::protocol::{alice, bob};
     use anyhow::anyhow;
     use libp2p::Swarm;
     use rust_decimal::Decimal;
+
+    use crate::{monero, network};
+    use crate::asb::Rate;
+    use crate::env::GetConfig;
+    use crate::network::test::{await_events_or_timeout, connect, new_swarm};
+    use crate::protocol::{alice, bob};
+
+    use super::*;
 
     impl Default for AliceBehaviourValues {
         fn default() -> Self {

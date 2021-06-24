@@ -20,6 +20,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use uuid::Uuid;
+use crate::protocol::alice::swap_setup::WalletSnapshot;
 
 /// A future that resolves to a tuple of `PeerId`, `transfer_proof::Request` and
 /// `Responder`.
@@ -150,61 +151,38 @@ where
             tokio::select! {
                 swarm_event = self.swarm.next_event() => {
                     match swarm_event {
-                        SwarmEvent::Behaviour(OutEvent::ExecutionSetupStart { peer, btc, xmr }) => {
+                        SwarmEvent::Behaviour(OutEvent::SwapInitiated { send_wallet_snapshot }) => {
 
-                            let tx_redeem_fee = self.bitcoin_wallet
-                                .estimate_fee(bitcoin::TxRedeem::weight(), btc)
-                                .await;
-                            let tx_punish_fee = self.bitcoin_wallet
-                                .estimate_fee(bitcoin::TxPunish::weight(), btc)
-                                .await;
-                            let redeem_address = self.bitcoin_wallet.new_address().await;
-                            let punish_address = self.bitcoin_wallet.new_address().await;
-
-                            let (redeem_address, punish_address) = match (
-                                redeem_address,
-                                punish_address,
-                            ) {
-                                (Ok(redeem_address), Ok(punish_address)) => {
-                                    (redeem_address, punish_address)
-                                }
-                                _ => {
-                                    tracing::error!(%peer, "Failed to get new address during execution setup");
-                                    continue;
-                                }
-                            };
-
-                            let (tx_redeem_fee, tx_punish_fee) = match (
-                                tx_redeem_fee,
-                                tx_punish_fee,
-                            ) {
-                                (Ok(tx_redeem_fee), Ok(tx_punish_fee)) => {
-                                    (tx_redeem_fee, tx_punish_fee)
-                                }
-                                _ => {
-                                    tracing::error!(%peer, "Failed to calculate transaction fees during execution setup");
-                                    continue;
-                                }
-                            };
-
-                            let state0 = match State0::new(
-                                btc,
-                                xmr,
-                                self.env_config,
-                                redeem_address,
-                                punish_address,
-                                tx_redeem_fee,
-                                tx_punish_fee,
-                                &mut OsRng
-                            ) {
-                                Ok(state) => state,
+                            let wallet_snapshot = match WalletSnapshot::capture(&self.bitcoin_wallet, &self.monero_wallet).await {
+                                Ok(wallet_snapshot) => wallet_snapshot,
                                 Err(error) => {
-                                    tracing::warn!(%peer, "Failed to make State0 for execution setup. Error {:#}", error);
-                                    continue;
+                                    tracing::error!("Swap request will be ignored because we were unable to create wallet snapshot for swap: {:#}", error)
                                 }
                             };
 
-                            self.swarm.behaviour_mut().execution_setup.run(peer, state0);
+                            match send_wallet_snapshot.send().await {
+                                Ok()
+                            }
+
+                            // TODO: Move into execution setup as part of swap_setup
+                            // let state0 = match State0::new(
+                            //     btc,
+                            //     xmr,
+                            //     self.env_config,
+                            //     redeem_address,
+                            //     punish_address,
+                            //     tx_redeem_fee,
+                            //     tx_punish_fee,
+                            //     &mut OsRng
+                            // ) {
+                            //     Ok(state) => state,
+                            //     Err(error) => {
+                            //         tracing::warn!(%peer, "Failed to make State0 for execution setup. Error {:#}", error);
+                            //         continue;
+                            //     }
+                            // };
+                            //
+                            // self.swarm.behaviour_mut().execution_setup.run(peer, state0);
                         }
                         SwarmEvent::Behaviour(OutEvent::SwapRequestDeclined { peer, error }) => {
                             tracing::warn!(%peer, "Ignoring spot price request because: {}", error);

@@ -1,13 +1,16 @@
-use crate::network::quote::BidQuote;
-use crate::network::{encrypted_signature, quote, transfer_proof};
-use crate::protocol::alice::event_loop::LatestRate;
-use crate::protocol::alice::{execution_setup, swap_setup, State3};
-use crate::{env, monero};
 use anyhow::{anyhow, Error};
+use libp2p::{NetworkBehaviour, PeerId};
 use libp2p::ping::{Ping, PingEvent};
 use libp2p::request_response::{RequestId, ResponseChannel};
-use libp2p::{NetworkBehaviour, PeerId};
 use uuid::Uuid;
+
+use crate::{env, monero};
+use crate::network::{encrypted_signature, quote, transfer_proof};
+use crate::network::quote::BidQuote;
+use crate::protocol::alice::{execution_setup, State3, swap_setup};
+use crate::protocol::alice::event_loop::LatestRate;
+use crate::protocol::alice::swap_setup::WalletSnapshot;
+use tokio::sync::oneshot;
 
 #[derive(Debug)]
 pub enum OutEvent {
@@ -15,10 +18,8 @@ pub enum OutEvent {
         peer: PeerId,
         error: swap_setup::Error,
     },
-    ExecutionSetupStart {
-        peer: PeerId,
-        btc: bitcoin::Amount,
-        xmr: monero::Amount,
+    SwapInitiated {
+        send_wallet_snapshot: oneshot::Sender<WalletSnapshot>
     },
     QuoteRequested {
         channel: ResponseChannel<BidQuote>,
