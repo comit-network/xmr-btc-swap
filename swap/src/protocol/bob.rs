@@ -14,11 +14,10 @@ pub use self::swap::{run, run_until};
 mod behaviour;
 pub mod cancel;
 pub mod event_loop;
-mod execution_setup;
 pub mod refund;
-pub mod spot_price;
 pub mod state;
 pub mod swap;
+mod swap_setup;
 
 pub struct Swap {
     pub state: BobState,

@@ -85,20 +85,22 @@ async fn main() -> Result<()> {
                 init_monero_wallet(data_dir, monero_daemon_address, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
-            let mut swarm = swarm::cli(&seed, seller_peer_id, tor_socks5_port).await?;
+            let mut swarm = swarm::cli(
+                &seed,
+                seller_peer_id,
+                tor_socks5_port,
+                env_config,
+                bitcoin_wallet.clone(),
+            )
+            .await?;
             swarm
                 .behaviour_mut()
                 .add_address(seller_peer_id, seller_addr);
 
             tracing::debug!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
 
-            let (event_loop, mut event_loop_handle) = EventLoop::new(
-                swap_id,
-                swarm,
-                seller_peer_id,
-                bitcoin_wallet.clone(),
-                env_config,
-            )?;
+            let (event_loop, mut event_loop_handle) =
+                EventLoop::new(swap_id, swarm, seller_peer_id, env_config)?;
             let event_loop = tokio::spawn(event_loop.run());
 
             let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
@@ -185,20 +187,22 @@ async fn main() -> Result<()> {
 
             let seller_peer_id = db.get_peer_id(swap_id)?;
 
-            let mut swarm = swarm::cli(&seed, seller_peer_id, tor_socks5_port).await?;
+            let mut swarm = swarm::cli(
+                &seed,
+                seller_peer_id,
+                tor_socks5_port,
+                env_config,
+                bitcoin_wallet.clone(),
+            )
+            .await?;
             let our_peer_id = swarm.local_peer_id();
             tracing::debug!(peer_id = %our_peer_id, "Initializing network module");
             swarm
                 .behaviour_mut()
                 .add_address(seller_peer_id, seller_addr);
 
-            let (event_loop, event_loop_handle) = EventLoop::new(
-                swap_id,
-                swarm,
-                seller_peer_id,
-                bitcoin_wallet.clone(),
-                env_config,
-            )?;
+            let (event_loop, event_loop_handle) =
+                EventLoop::new(swap_id, swarm, seller_peer_id, env_config)?;
             let handle = tokio::spawn(event_loop.run());
 
             let swap = Swap::from_db(

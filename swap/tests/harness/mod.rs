@@ -224,8 +224,6 @@ async fn start_alice(
 ) -> (AliceApplicationHandle, Receiver<alice::Swap>) {
     let db = Arc::new(Database::open(db_path.as_path()).unwrap());
 
-    let current_balance = monero_wallet.get_balance().await.unwrap();
-    let lock_fee = monero_wallet.static_tx_fee_estimate();
     let min_buy = bitcoin::Amount::from_sat(u64::MIN);
     let max_buy = bitcoin::Amount::from_sat(u64::MAX);
     let latest_rate = FixedRate::default();
@@ -233,8 +231,6 @@ async fn start_alice(
 
     let mut swarm = swarm::asb(
         &seed,
-        current_balance,
-        lock_fee,
         min_buy,
         max_buy,
         latest_rate,
@@ -449,18 +445,19 @@ impl BobParams {
     ) -> Result<(bob::EventLoop, bob::EventLoopHandle)> {
         let tor_socks5_port = get_port()
             .expect("We don't care about Tor in the tests so we get a free port to disable it.");
-        let mut swarm = swarm::cli(&self.seed, self.alice_peer_id, tor_socks5_port).await?;
+        let mut swarm = swarm::cli(
+            &self.seed,
+            self.alice_peer_id,
+            tor_socks5_port,
+            self.env_config,
+            self.bitcoin_wallet.clone(),
+        )
+        .await?;
         swarm
             .behaviour_mut()
             .add_address(self.alice_peer_id, self.alice_address.clone());
 
-        bob::EventLoop::new(
-            swap_id,
-            swarm,
-            self.alice_peer_id,
-            self.bitcoin_wallet.clone(),
-            self.env_config,
-        )
+        bob::EventLoop::new(swap_id, swarm, self.alice_peer_id, self.env_config)
     }
 }
 
