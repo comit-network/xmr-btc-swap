@@ -1,3 +1,4 @@
+use crate::network::swap_setup::protocol;
 use crate::protocol::alice::event_loop::LatestRate;
 use crate::protocol::alice::{State0, State3};
 use crate::protocol::{alice, Message0, Message2, Message4};
@@ -6,8 +7,7 @@ use anyhow::{anyhow, Context as _, Result};
 use futures::future::{BoxFuture, OptionFuture};
 use futures::FutureExt;
 use libp2p::core::connection::ConnectionId;
-use libp2p::core::upgrade::{from_fn, FromFnUpgrade};
-use libp2p::core::{upgrade, Endpoint};
+use libp2p::core::upgrade;
 use libp2p::swarm::{
     KeepAlive, NegotiatedSubstream, NetworkBehaviour, NetworkBehaviourAction, PollParameters,
     ProtocolsHandler, ProtocolsHandlerEvent, ProtocolsHandlerUpgrErr, SubstreamProtocol,
@@ -17,12 +17,10 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::fmt::Debug;
-use std::future;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use uuid::Uuid;
 use void::Void;
-use std::time::Duration;
 
 #[derive(Debug)]
 pub enum OutEvent {
@@ -530,34 +528,6 @@ where
     upgrade::write_one(substream, &bytes).await?;
 
     Ok(())
-}
-
-mod protocol {
-    use super::*;
-
-    pub fn new() -> SwapSetup {
-        from_fn(
-            b"/comit/xmr/btc/swap_setup/1.0.0",
-            Box::new(|socket, endpoint| {
-                future::ready(match endpoint {
-                    Endpoint::Listener => Ok(socket),
-                    Endpoint::Dialer => todo!("return error"),
-                })
-            }),
-        )
-    }
-
-    pub type SwapSetup = FromFnUpgrade<
-        &'static [u8],
-        Box<
-            dyn Fn(
-                    NegotiatedSubstream,
-                    Endpoint,
-                ) -> future::Ready<Result<NegotiatedSubstream, Void>>
-                + Send
-                + 'static,
-        >,
-    >;
 }
 
 // TODO: Differentiate between errors that we send back and shit that happens on
