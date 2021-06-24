@@ -176,24 +176,19 @@ where
             HandlerOutEvent::Initiated(send_wallet_snapshot) => {
                 self.events.push_back(OutEvent::Initiated { send_wallet_snapshot })
             }
-            HandlerOutEvent::Completed(swap_setup_result) => {
-                match swap_setup_result {
-                    Ok((swap_id, state3)) => {
-                        self.events.push_back(OutEvent::Completed {
-                            peer_id,
-                            swap_id,
-                            state3
-                        })
-                    }
-                    Err(error) => {
-                        self.events.push_back(OutEvent::Error {
-                            peer_id,
-                            error
-                        })
-                    }
-                }
-
-            }
+            HandlerOutEvent::Completed(Ok((swap_id, state3))) => {
+                self.events.push_back(OutEvent::Completed {
+                    peer_id,
+                    swap_id,
+                    state3
+                })
+            },
+            HandlerOutEvent::Completed(Err(error)) => {
+                self.events.push_back(OutEvent::Error {
+                    peer_id,
+                    error
+                })
+            },
         }
     }
 
