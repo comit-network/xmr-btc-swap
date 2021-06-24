@@ -445,18 +445,19 @@ impl BobParams {
     ) -> Result<(bob::EventLoop, bob::EventLoopHandle)> {
         let tor_socks5_port = get_port()
             .expect("We don't care about Tor in the tests so we get a free port to disable it.");
-        let mut swarm = swarm::cli(&self.seed, self.alice_peer_id, tor_socks5_port).await?;
+        let mut swarm = swarm::cli(
+            &self.seed,
+            self.alice_peer_id,
+            tor_socks5_port,
+            self.env_config,
+            self.bitcoin_wallet.clone(),
+        )
+        .await?;
         swarm
             .behaviour_mut()
             .add_address(self.alice_peer_id, self.alice_address.clone());
 
-        bob::EventLoop::new(
-            swap_id,
-            swarm,
-            self.alice_peer_id,
-            self.bitcoin_wallet.clone(),
-            self.env_config,
-        )
+        bob::EventLoop::new(swap_id, swarm, self.alice_peer_id, self.env_config)
     }
 }
 

@@ -26,7 +26,7 @@ pub async fn cancel(
         BobState::EncSigSent(state4) => state4.cancel(),
         BobState::CancelTimelockExpired(state6) => state6,
         BobState::Started { .. }
-        | BobState::ExecutionSetupDone(_)
+        | BobState::SwapSetupCompleted(_)
         | BobState::BtcRedeemed(_)
         | BobState::BtcCancelled(_)
         | BobState::BtcRefunded(_)

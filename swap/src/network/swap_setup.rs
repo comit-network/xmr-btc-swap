@@ -1,3 +1,4 @@
+use crate::monero;
 use libp2p::core::upgrade;
 use libp2p::swarm::NegotiatedSubstream;
 use serde::de::DeserializeOwned;
@@ -49,7 +50,7 @@ pub struct SpotPriceRequest {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum SpotPriceResponse {
-    Xmr(crate::monero::Amount),
+    Xmr(monero::Amount),
     Error(SpotPriceError),
 }
 

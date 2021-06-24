@@ -26,7 +26,7 @@ pub enum BobState {
     Started {
         btc_amount: bitcoin::Amount,
     },
-    ExecutionSetupDone(State2),
+    SwapSetupCompleted(State2),
     BtcLocked(State3),
     XmrLockProofReceived {
         state: State3,
@@ -52,7 +52,7 @@ impl fmt::Display for BobState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             BobState::Started { .. } => write!(f, "quote has been requested"),
-            BobState::ExecutionSetupDone(..) => write!(f, "execution setup done"),
+            BobState::SwapSetupCompleted(..) => write!(f, "execution setup done"),
             BobState::BtcLocked(..) => write!(f, "btc is locked"),
             BobState::XmrLockProofReceived { .. } => {
                 write!(f, "XMR lock transaction transfer proof received")
