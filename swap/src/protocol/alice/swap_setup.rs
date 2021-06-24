@@ -197,15 +197,6 @@ where
     }
 }
 
-// TODO: This is bob only.
-// enum OutboundState {
-//     PendingOpen(
-//         // TODO: put data in here we pass in when we want to kick of swap
-// setup, just bitcoin amount?     ),
-//     PendingNegotiate,
-//     Executing(BoxFuture<'static, anyhow::Result<(Uuid, bob::State3)>>)
-// }
-
 type InboundStream = BoxFuture<'static, anyhow::Result<(Uuid, alice::State3), Error>>;
 
 pub struct Handler<LR> {
