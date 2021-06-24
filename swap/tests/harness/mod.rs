@@ -224,8 +224,6 @@ async fn start_alice(
 ) -> (AliceApplicationHandle, Receiver<alice::Swap>) {
     let db = Arc::new(Database::open(db_path.as_path()).unwrap());
 
-    let current_balance = monero_wallet.get_balance().await.unwrap();
-    let lock_fee = monero_wallet.static_tx_fee_estimate();
     let min_buy = bitcoin::Amount::from_sat(u64::MIN);
     let max_buy = bitcoin::Amount::from_sat(u64::MAX);
     let latest_rate = FixedRate::default();
@@ -233,8 +231,6 @@ async fn start_alice(
 
     let mut swarm = swarm::asb(
         &seed,
-        current_balance,
-        lock_fee,
         min_buy,
         max_buy,
         latest_rate,

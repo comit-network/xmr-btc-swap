@@ -4,18 +4,17 @@ use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
 use uuid::Uuid;
 
+use crate::env;
 use crate::network::quote::BidQuote;
 use crate::network::{encrypted_signature, quote, transfer_proof};
 use crate::protocol::alice::event_loop::LatestRate;
 use crate::protocol::alice::swap_setup::WalletSnapshot;
-use crate::protocol::alice::{execution_setup, swap_setup, State3};
-use crate::{env, monero};
-use tokio::sync::oneshot;
+use crate::protocol::alice::{swap_setup, State3};
 
 #[derive(Debug)]
 pub enum OutEvent {
     SwapSetupInitiated {
-        send_wallet_snapshot: oneshot::Sender<WalletSnapshot>,
+        send_wallet_snapshot: bmrng::RequestReceiver<bitcoin::Amount, WalletSnapshot>,
     },
     SwapSetupCompleted {
         peer_id: PeerId,
@@ -73,8 +72,7 @@ where
     LR: LatestRate + Send + 'static,
 {
     pub quote: quote::Behaviour,
-    pub spot_price: swap_setup::Behaviour<LR>,
-    pub execution_setup: execution_setup::Behaviour,
+    pub swap_setup: swap_setup::Behaviour<LR>,
     pub transfer_proof: transfer_proof::Behaviour,
     pub encrypted_signature: encrypted_signature::Behaviour,
 
@@ -89,8 +87,6 @@ where
     LR: LatestRate + Send + 'static,
 {
     pub fn new(
-        balance: monero::Amount,
-        lock_fee: monero::Amount,
         min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,
         latest_rate: LR,
@@ -99,16 +95,13 @@ where
     ) -> Self {
         Self {
             quote: quote::alice(),
-            spot_price: swap_setup::Behaviour::new(
-                balance,
-                lock_fee,
+            swap_setup: swap_setup::Behaviour::new(
                 min_buy,
                 max_buy,
                 env_config,
                 latest_rate,
                 resume_only,
             ),
-            execution_setup: Default::default(),
             transfer_proof: transfer_proof::alice(),
             encrypted_signature: encrypted_signature::alice(),
             ping: Ping::default(),

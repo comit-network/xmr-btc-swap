@@ -1,7 +1,7 @@
 use crate::protocol::alice::event_loop::LatestRate;
 use crate::protocol::{alice, bob};
 use crate::seed::Seed;
-use crate::{asb, cli, env, monero, tor};
+use crate::{asb, cli, env, tor};
 use anyhow::Result;
 use libp2p::swarm::SwarmBuilder;
 use libp2p::{PeerId, Swarm};
@@ -10,8 +10,6 @@ use std::fmt::Debug;
 #[allow(clippy::too_many_arguments)]
 pub fn asb<LR>(
     seed: &Seed,
-    balance: monero::Amount,
-    lock_fee: monero::Amount,
     min_buy: bitcoin::Amount,
     max_buy: bitcoin::Amount,
     latest_rate: LR,
@@ -19,17 +17,9 @@ pub fn asb<LR>(
     env_config: env::Config,
 ) -> Result<Swarm<alice::Behaviour<LR>>>
 where
-    LR: LatestRate + Send + 'static + Debug,
+    LR: LatestRate + Send + 'static + Debug + Clone,
 {
-    let behaviour = alice::Behaviour::new(
-        balance,
-        lock_fee,
-        min_buy,
-        max_buy,
-        latest_rate,
-        resume_only,
-        env_config,
-    );
+    let behaviour = alice::Behaviour::new(min_buy, max_buy, latest_rate, resume_only, env_config);
 
     let identity = seed.derive_libp2p_identity();
     let transport = asb::transport::new(&identity)?;

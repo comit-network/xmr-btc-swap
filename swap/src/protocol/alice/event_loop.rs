@@ -4,7 +4,7 @@ use crate::env::Config;
 use crate::network::quote::BidQuote;
 use crate::network::transfer_proof;
 use crate::protocol::alice::swap_setup::WalletSnapshot;
-use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State0, State3, Swap};
+use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State3, Swap};
 use crate::{bitcoin, kraken, monero};
 use anyhow::{Context, Result};
 use futures::future;
@@ -13,7 +13,6 @@ use futures::stream::{FuturesUnordered, StreamExt};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
-use rand::rngs::OsRng;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -35,7 +34,7 @@ type OutgoingTransferProof =
 #[allow(missing_debug_implementations)]
 pub struct EventLoop<LR>
 where
-    LR: LatestRate + Send + 'static + Debug,
+    LR: LatestRate + Send + 'static + Debug + Clone,
 {
     swarm: libp2p::Swarm<Behaviour<LR>>,
     env_config: Config,
@@ -65,7 +64,7 @@ where
 
 impl<LR> EventLoop<LR>
 where
-    LR: LatestRate + Send + 'static + Debug,
+    LR: LatestRate + Send + 'static + Debug + Clone,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -151,21 +150,23 @@ where
             tokio::select! {
                 swarm_event = self.swarm.next_event() => {
                     match swarm_event {
-                        SwarmEvent::Behaviour(OutEvent::SwapSetupInitiated { send_wallet_snapshot }) => {
+                        SwarmEvent::Behaviour(OutEvent::SwapSetupInitiated { mut send_wallet_snapshot }) => {
 
-                            let wallet_snapshot = match WalletSnapshot::capture(&self.bitcoin_wallet, &self.monero_wallet).await {
+                            let (btc, responder) = send_wallet_snapshot.recv().await.expect("TODO: handle error");
+
+                            let wallet_snapshot = match WalletSnapshot::capture(&self.bitcoin_wallet, &self.monero_wallet, btc).await {
                                 Ok(wallet_snapshot) => wallet_snapshot,
                                 Err(error) => {
-                                    tracing::error!("Swap request will be ignored because we were unable to create wallet snapshot for swap: {:#}", error)
+                                    tracing::error!("Swap request will be ignored because we were unable to create wallet snapshot for swap: {:#}", error);
+                                    continue;
                                 }
                             };
 
-                            match send_wallet_snapshot.send().await {
-                                Ok()
-                            }
+                            // Ignore result, we should never hit this because the receiver will alive as long as the connection is.
+                            let _ = responder.respond(wallet_snapshot);
                         }
                         SwarmEvent::Behaviour(OutEvent::SwapSetupCompleted{peer_id, swap_id, state3}) => {
-                            let _ = self.handle_execution_setup_done(bob_peer_id, swap_id, *state3).await;
+                            let _ = self.handle_execution_setup_done(peer_id, swap_id, *state3).await;
                         }
                         SwarmEvent::Behaviour(OutEvent::SwapDeclined { peer, error }) => {
                             tracing::warn!(%peer, "Ignoring spot price request because: {}", error);
@@ -175,7 +176,8 @@ where
                             let current_balance = self.monero_wallet.get_balance().await;
                             match current_balance {
                                 Ok(balance) => {
-                                    self.swarm.behaviour_mut().spot_price.update_balance(balance);
+
+                                    // FIXME self.swarm.behaviour_mut().spot_price.update_balance(balance);
                                 }
                                 Err(e) => {
                                     tracing::error!("Failed to fetch Monero balance: {:#}", e);

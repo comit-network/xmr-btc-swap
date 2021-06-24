@@ -21,7 +21,6 @@ pub use self::swap::{run, run_until};
 
 mod behaviour;
 pub mod event_loop;
-mod execution_setup;
 mod recovery;
 pub mod state;
 pub mod swap;
