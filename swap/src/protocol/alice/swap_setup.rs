@@ -13,6 +13,10 @@ use libp2p::swarm::{
     ProtocolsHandler, ProtocolsHandlerEvent, ProtocolsHandlerUpgrErr, SubstreamProtocol,
 };
 use libp2p::{Multiaddr, PeerId};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use std::future;
+use std::time::Instant;
 use uuid::Uuid;
 use void::Void;
 
@@ -222,6 +226,7 @@ pub struct Handler<LR> {
     resume_only: bool,
 
     timeout: Duration,
+    keep_alive: KeepAlive,
 }
 
 impl<LR> Handler<LR> {
@@ -241,6 +246,7 @@ impl<LR> Handler<LR> {
             latest_rate,
             resume_only,
             timeout: Duration::from_secs(60),
+            keep_alive: KeepAlive::Until(Instant::now() + Duration::from_secs(5)),
         }
     }
 }
@@ -271,6 +277,8 @@ where
         mut substream: NegotiatedSubstream,
         _: Self::InboundOpenInfo,
     ) {
+        self.keep_alive = KeepAlive::Yes;
+
         let (sender, receiver) = bmrng::channel_with_timeout::<bitcoin::Amount, WalletSnapshot>(
             1,
             Duration::from_secs(5),
@@ -435,7 +443,7 @@ where
     }
 
     fn connection_keep_alive(&self) -> KeepAlive {
-        todo!()
+        self.keep_alive
     }
 
     fn poll(
@@ -450,6 +458,7 @@ where
         >,
     > {
         if let Some(result) = futures::ready!(self.inbound_stream.poll_unpin(cx)) {
+            self.keep_alive = KeepAlive::No;
             return Poll::Ready(ProtocolsHandlerEvent::Custom(HandlerOutEvent::Completed(
                 result,
             )));
