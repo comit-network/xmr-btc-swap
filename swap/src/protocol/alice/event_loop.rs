@@ -172,18 +172,6 @@ where
                             tracing::warn!(%peer, "Ignoring spot price request because: {}", error);
                         }
                         SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer }) => {
-                            // TODO: Move the spot-price update into dedicated update stream to decouple it from quote requests
-                            let current_balance = self.monero_wallet.get_balance().await;
-                            match current_balance {
-                                Ok(balance) => {
-
-                                    // FIXME self.swarm.behaviour_mut().spot_price.update_balance(balance);
-                                }
-                                Err(e) => {
-                                    tracing::error!("Failed to fetch Monero balance: {:#}", e);
-                                }
-                            }
-
                             let quote = match self.make_quote(self.min_buy, self.max_buy).await {
                                 Ok(quote) => quote,
                                 Err(error) => {
