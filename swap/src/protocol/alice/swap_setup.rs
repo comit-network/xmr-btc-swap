@@ -388,7 +388,7 @@ where
                     wallet_snapshot.redeem_fee,
                     wallet_snapshot.punish_fee,
                     &mut rand::thread_rng(),
-                )?;
+                );
 
                 let message0 = read_cbor_message::<Message0>(&mut substream)
                     .await
