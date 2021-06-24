@@ -1,18 +1,16 @@
 use crate::bitcoin::EncryptedSignature;
+use crate::network::encrypted_signature;
 use crate::network::quote::BidQuote;
-use crate::network::spot_price::{BlockchainNetwork, Response};
-use crate::network::{encrypted_signature, spot_price};
-use crate::protocol::bob;
-use crate::protocol::bob::{Behaviour, OutEvent, State0, State2};
-use crate::{bitcoin, env, monero};
-use anyhow::{bail, Context, Result};
+use crate::protocol::bob::swap_setup::NewSwap;
+use crate::protocol::bob::{Behaviour, OutEvent, State2};
+use crate::{env, monero};
+use anyhow::{Context, Result};
 use futures::future::{BoxFuture, OptionFuture};
 use futures::{FutureExt, StreamExt};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;
 
@@ -20,22 +18,19 @@ use uuid::Uuid;
 pub struct EventLoop {
     swap_id: Uuid,
     swarm: libp2p::Swarm<Behaviour>,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
     alice_peer_id: PeerId,
 
     // these streams represents outgoing requests that we have to make
     quote_requests: bmrng::RequestReceiverStream<(), BidQuote>,
-    spot_price_requests: bmrng::RequestReceiverStream<spot_price::Request, spot_price::Response>,
     encrypted_signatures: bmrng::RequestReceiverStream<EncryptedSignature, ()>,
-    execution_setup_requests: bmrng::RequestReceiverStream<State0, Result<State2>>,
+    swap_setup_requests: bmrng::RequestReceiverStream<NewSwap, Result<State2>>,
 
     // these represents requests that are currently in-flight.
     // once we get a response to a matching [`RequestId`], we will use the responder to relay the
     // response.
-    inflight_spot_price_requests: HashMap<RequestId, bmrng::Responder<spot_price::Response>>,
     inflight_quote_requests: HashMap<RequestId, bmrng::Responder<BidQuote>>,
     inflight_encrypted_signature_requests: HashMap<RequestId, bmrng::Responder<()>>,
-    inflight_execution_setup: Option<bmrng::Responder<Result<State2>>>,
+    inflight_swap_setup: Option<bmrng::Responder<Result<State2>>>,
 
     /// The sender we will use to relay incoming transfer proofs.
     transfer_proof: bmrng::RequestSender<monero::TransferProof, ()>,
@@ -54,37 +49,31 @@ impl EventLoop {
         swap_id: Uuid,
         swarm: Swarm<Behaviour>,
         alice_peer_id: PeerId,
-        bitcoin_wallet: Arc<bitcoin::Wallet>,
         env_config: env::Config,
     ) -> Result<(Self, EventLoopHandle)> {
         let execution_setup = bmrng::channel_with_timeout(1, Duration::from_secs(60));
         let transfer_proof = bmrng::channel_with_timeout(1, Duration::from_secs(60));
         let encrypted_signature = bmrng::channel_with_timeout(1, Duration::from_secs(60));
-        let spot_price = bmrng::channel_with_timeout(1, Duration::from_secs(60));
         let quote = bmrng::channel_with_timeout(1, Duration::from_secs(60));
 
         let event_loop = EventLoop {
             swap_id,
             swarm,
             alice_peer_id,
-            bitcoin_wallet,
-            execution_setup_requests: execution_setup.1.into(),
+            swap_setup_requests: execution_setup.1.into(),
             transfer_proof: transfer_proof.0,
             encrypted_signatures: encrypted_signature.1.into(),
-            spot_price_requests: spot_price.1.into(),
             quote_requests: quote.1.into(),
-            inflight_spot_price_requests: HashMap::default(),
             inflight_quote_requests: HashMap::default(),
-            inflight_execution_setup: None,
+            inflight_swap_setup: None,
             inflight_encrypted_signature_requests: HashMap::default(),
             pending_transfer_proof: OptionFuture::from(None),
         };
 
         let handle = EventLoopHandle {
-            execution_setup: execution_setup.0,
+            swap_setup: execution_setup.0,
             transfer_proof: transfer_proof.1,
             encrypted_signature: encrypted_signature.0,
-            spot_price: spot_price.0,
             quote: quote.0,
             env_config,
         };
@@ -106,18 +95,13 @@ impl EventLoop {
             tokio::select! {
                 swarm_event = self.swarm.next_event().fuse() => {
                     match swarm_event {
-                        SwarmEvent::Behaviour(OutEvent::SpotPriceReceived { id, response }) => {
-                            if let Some(responder) = self.inflight_spot_price_requests.remove(&id) {
-                                let _ = responder.respond(response);
-                            }
-                        }
                         SwarmEvent::Behaviour(OutEvent::QuoteReceived { id, response }) => {
                             if let Some(responder) = self.inflight_quote_requests.remove(&id) {
                                 let _ = responder.respond(response);
                             }
                         }
-                        SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone(response)) => {
-                            if let Some(responder) = self.inflight_execution_setup.take() {
+                        SwarmEvent::Behaviour(OutEvent::SwapSetupCompleted(response)) => {
+                            if let Some(responder) = self.inflight_swap_setup.take() {
                                 let _ = responder.respond(*response);
                             }
                         }
@@ -197,17 +181,13 @@ impl EventLoop {
 
                 // Handle to-be-sent requests for all our network protocols.
                 // Use `self.is_connected_to_alice` as a guard to "buffer" requests until we are connected.
-                Some((request, responder)) = self.spot_price_requests.next().fuse(), if self.is_connected_to_alice() => {
-                    let id = self.swarm.behaviour_mut().spot_price.send_request(&self.alice_peer_id, request);
-                    self.inflight_spot_price_requests.insert(id, responder);
-                },
                 Some(((), responder)) = self.quote_requests.next().fuse(), if self.is_connected_to_alice() => {
                     let id = self.swarm.behaviour_mut().quote.send_request(&self.alice_peer_id, ());
                     self.inflight_quote_requests.insert(id, responder);
                 },
-                Some((request, responder)) = self.execution_setup_requests.next().fuse(), if self.is_connected_to_alice() => {
-                    self.swarm.behaviour_mut().execution_setup.run(self.alice_peer_id, request, self.bitcoin_wallet.clone());
-                    self.inflight_execution_setup = Some(responder);
+                Some((swap, responder)) = self.swap_setup_requests.next().fuse(), if self.is_connected_to_alice() => {
+                    self.swarm.behaviour_mut().swap_setup.start(self.alice_peer_id, swap).await;
+                    self.inflight_swap_setup = Some(responder);
                 },
                 Some((tx_redeem_encsig, responder)) = self.encrypted_signatures.next().fuse(), if self.is_connected_to_alice() => {
                     let request = encrypted_signature::Request {
@@ -235,17 +215,16 @@ impl EventLoop {
 
 #[derive(Debug)]
 pub struct EventLoopHandle {
-    execution_setup: bmrng::RequestSender<State0, Result<State2>>,
+    swap_setup: bmrng::RequestSender<NewSwap, Result<State2>>,
     transfer_proof: bmrng::RequestReceiver<monero::TransferProof, ()>,
     encrypted_signature: bmrng::RequestSender<EncryptedSignature, ()>,
-    spot_price: bmrng::RequestSender<spot_price::Request, spot_price::Response>,
     quote: bmrng::RequestSender<(), BidQuote>,
     env_config: env::Config,
 }
 
 impl EventLoopHandle {
-    pub async fn execution_setup(&mut self, state0: State0) -> Result<State2> {
-        self.execution_setup.send_receive(state0).await?
+    pub async fn setup_swap(&mut self, swap: NewSwap) -> Result<State2> {
+        self.swap_setup.send_receive(swap).await?
     }
 
     pub async fn recv_transfer_proof(&mut self) -> Result<monero::TransferProof> {
@@ -259,27 +238,6 @@ impl EventLoopHandle {
             .context("Failed to acknowledge receipt of transfer proof")?;
 
         Ok(transfer_proof)
-    }
-
-    pub async fn request_spot_price(&mut self, btc: bitcoin::Amount) -> Result<monero::Amount> {
-        let response = self
-            .spot_price
-            .send_receive(spot_price::Request {
-                btc,
-                blockchain_network: BlockchainNetwork {
-                    bitcoin: self.env_config.bitcoin_network,
-                    monero: self.env_config.monero_network,
-                },
-            })
-            .await?;
-
-        match response {
-            Response::Xmr(xmr) => Ok(xmr),
-            Response::Error(error) => {
-                let error: bob::spot_price::Error = error.into();
-                bail!(error);
-            }
-        }
     }
 
     pub async fn request_quote(&mut self) -> Result<BidQuote> {

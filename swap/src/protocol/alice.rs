@@ -19,11 +19,10 @@ pub use self::swap::{run, run_until};
 
 mod behaviour;
 pub mod event_loop;
-mod execution_setup;
 mod recovery;
-mod spot_price;
 pub mod state;
 pub mod swap;
+pub mod swap_setup;
 
 pub struct Swap {
     pub state: AliceState,

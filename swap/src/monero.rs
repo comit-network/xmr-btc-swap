@@ -81,6 +81,9 @@ pub struct PublicViewKey(PublicKey);
 #[derive(Debug, Copy, Clone, Deserialize, Serialize, PartialEq, PartialOrd)]
 pub struct Amount(u64);
 
+// Median tx fees on Monero as found here: https://www.monero.how/monero-transaction-fees, XMR 0.000_015 * 2 (to be on the safe side)
+pub const MONERO_FEE: Amount = Amount::from_piconero(30000000);
+
 impl Amount {
     pub const ZERO: Self = Self(0);
     pub const ONE_XMR: Self = Self(PICONERO_OFFSET);
@@ -88,7 +91,7 @@ impl Amount {
     /// piconeros.
     ///
     /// A piconero (a.k.a atomic unit) is equal to 1e-12 XMR.
-    pub fn from_piconero(amount: u64) -> Self {
+    pub const fn from_piconero(amount: u64) -> Self {
         Amount(amount)
     }
 

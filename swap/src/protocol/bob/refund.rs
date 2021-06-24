@@ -26,7 +26,7 @@ pub async fn refund(
             BobState::CancelTimelockExpired(state6) => state6,
             BobState::BtcCancelled(state6) => state6,
             BobState::Started { .. }
-            | BobState::ExecutionSetupDone(_)
+            | BobState::SwapSetupCompleted(_)
             | BobState::BtcRedeemed(_)
             | BobState::BtcRefunded(_)
             | BobState::XmrRedeemed { .. }
