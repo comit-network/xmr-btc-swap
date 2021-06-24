@@ -344,8 +344,7 @@ mod tests {
             tx_redeem_fee,
             tx_punish_fee,
             &mut OsRng,
-        )
-        .unwrap();
+        );
 
         let bob_state0 = bob::State0::new(
             Uuid::new_v4(),
