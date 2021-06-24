@@ -399,7 +399,7 @@ where
                         )
                         .await
                             .map_err(|e| Error::Io(e))?;
-                        return Err(e.into());
+                        return Err(e);
                     }
                 };
 
