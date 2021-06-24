@@ -470,20 +470,20 @@ where
         self.events.push_back(HandlerOutEvent::Initiated(receiver));
     }
 
-    fn inject_fully_negotiated_outbound(&mut self, protocol: Void, info: Self::OutboundOpenInfo) {
-        unreachable!("we don't support outbound")
+    fn inject_fully_negotiated_outbound(&mut self, _: Void, _: Self::OutboundOpenInfo) {
+        unreachable!("Alice does not support outbound in the hanlder")
     }
 
-    fn inject_event(&mut self, event: Self::InEvent) {
-        todo!()
+    fn inject_event(&mut self, _: Self::InEvent) {
+        unreachable!("Alice does not receive events from the Behaviour in the handler")
     }
 
     fn inject_dial_upgrade_error(
         &mut self,
-        info: Self::OutboundOpenInfo,
-        error: ProtocolsHandlerUpgrErr<Void>,
+        _: Self::OutboundOpenInfo,
+        _: ProtocolsHandlerUpgrErr<Void>,
     ) {
-        todo!()
+        unreachable!("Alice does not dial")
     }
 
     fn connection_keep_alive(&self) -> KeepAlive {
