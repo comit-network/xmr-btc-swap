@@ -13,9 +13,6 @@ use libp2p::swarm::{
     ProtocolsHandler, ProtocolsHandlerEvent, ProtocolsHandlerUpgrErr, SubstreamProtocol,
 };
 use libp2p::{Multiaddr, PeerId};
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-use std::future;
 use std::time::Instant;
 use uuid::Uuid;
 use void::Void;
@@ -30,6 +27,7 @@ use crate::protocol::{alice, Message0, Message2, Message4};
 use crate::{bitcoin, env, monero};
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum OutEvent {
     Initiated {
         send_wallet_snapshot: bmrng::RequestReceiver<bitcoin::Amount, WalletSnapshot>,
@@ -158,19 +156,15 @@ where
         )
     }
 
-    fn addresses_of_peer(&mut self, peer_id: &PeerId) -> Vec<Multiaddr> {
-        todo!()
+    fn addresses_of_peer(&mut self, _: &PeerId) -> Vec<Multiaddr> {
+        Vec::new()
     }
 
-    fn inject_connected(&mut self, peer_id: &PeerId) {
-        todo!()
-    }
+    fn inject_connected(&mut self, _: &PeerId) {}
 
-    fn inject_disconnected(&mut self, peer_id: &PeerId) {
-        todo!()
-    }
+    fn inject_disconnected(&mut self, _: &PeerId) {}
 
-    fn inject_event(&mut self, peer_id: PeerId, connection: ConnectionId, event: HandlerOutEvent) {
+    fn inject_event(&mut self, peer_id: PeerId, _: ConnectionId, event: HandlerOutEvent) {
         match event {
             HandlerOutEvent::Initiated(send_wallet_snapshot) => {
                 self.events.push_back(OutEvent::Initiated {
@@ -251,6 +245,7 @@ impl<LR> Handler<LR> {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum HandlerOutEvent {
     Initiated(bmrng::RequestReceiver<bitcoin::Amount, WalletSnapshot>),
     Completed(anyhow::Result<(Uuid, alice::State3), Error>),
@@ -292,7 +287,7 @@ where
         let protocol = tokio::time::timeout(self.timeout, async move {
             let request = swap_setup::read_cbor_message::<SpotPriceRequest>(&mut substream)
                 .await
-                .map_err(|e| Error::Io(e))?;
+                .map_err(Error::Io)?;
             let wallet_snapshot = sender
                 .send_receive(request.btc)
                 .await
@@ -336,7 +331,7 @@ where
                 let rate = latest_rate.map_err(|e| Error::LatestRateFetchFailed(Box::new(e)))?;
                 let xmr = rate
                     .sell_quote(btc)
-                    .map_err(|e| Error::SellQuoteCalculationFailed(e))?;
+                    .map_err(Error::SellQuoteCalculationFailed)?;
 
                 if wallet_snapshot.balance < xmr + wallet_snapshot.lock_fee {
                     return Err(Error::BalanceTooLow {
@@ -352,7 +347,7 @@ where
                 Ok(xmr) => {
                     swap_setup::write_cbor_message(&mut substream, SpotPriceResponse::Xmr(xmr))
                         .await
-                        .map_err(|e| Error::Io(e))?;
+                        .map_err(Error::Io)?;
 
                     xmr
                 }
@@ -362,7 +357,7 @@ where
                         SpotPriceResponse::Error(e.to_error_response()),
                     )
                     .await
-                    .map_err(|e| Error::Io(e))?;
+                    .map_err(Error::Io)?;
                     return Err(e);
                 }
             };
@@ -381,34 +376,34 @@ where
             let message0 = swap_setup::read_cbor_message::<Message0>(&mut substream)
                 .await
                 .context("Failed to deserialize message0")
-                .map_err(|e| Error::Io(e))?;
-            let (swap_id, state1) = state0.receive(message0).map_err(|e| Error::Io(e))?;
+                .map_err(Error::Io)?;
+            let (swap_id, state1) = state0.receive(message0).map_err(Error::Io)?;
 
             swap_setup::write_cbor_message(&mut substream, state1.next_message())
                 .await
-                .map_err(|e| Error::Io(e))?;
+                .map_err(Error::Io)?;
 
             let message2 = swap_setup::read_cbor_message::<Message2>(&mut substream)
                 .await
                 .context("Failed to deserialize message2")
-                .map_err(|e| Error::Io(e))?;
+                .map_err(Error::Io)?;
             let state2 = state1
                 .receive(message2)
                 .context("Failed to receive Message2")
-                .map_err(|e| Error::Io(e))?;
+                .map_err(Error::Io)?;
 
             swap_setup::write_cbor_message(&mut substream, state2.next_message())
                 .await
-                .map_err(|e| Error::Io(e))?;
+                .map_err(Error::Io)?;
 
             let message4 = swap_setup::read_cbor_message::<Message4>(&mut substream)
                 .await
                 .context("Failed to deserialize message4")
-                .map_err(|e| Error::Io(e))?;
+                .map_err(Error::Io)?;
             let state3 = state2
                 .receive(message4)
                 .context("Failed to receive Message4")
-                .map_err(|e| Error::Io(e))?;
+                .map_err(Error::Io)?;
 
             Ok((swap_id, state3))
         });
@@ -446,6 +441,7 @@ where
         self.keep_alive
     }
 
+    #[allow(clippy::type_complexity)]
     fn poll(
         &mut self,
         cx: &mut Context<'_>,
