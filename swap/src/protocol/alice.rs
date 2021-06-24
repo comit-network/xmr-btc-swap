@@ -21,7 +21,7 @@ mod behaviour;
 pub mod event_loop;
 mod execution_setup;
 mod recovery;
-mod spot_price;
+mod swap_setup;
 pub mod state;
 pub mod swap;
 

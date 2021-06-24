@@ -8,11 +8,14 @@ use libp2p::request_response::{
     ProtocolSupport, RequestResponseConfig, RequestResponseEvent, RequestResponseMessage,
     ResponseChannel,
 };
-use libp2p::swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters};
-use libp2p::{NetworkBehaviour, PeerId};
+use libp2p::swarm::{NetworkBehaviourAction, NetworkBehaviourEventProcess, PollParameters, NetworkBehaviour, IntoProtocolsHandler, ProtocolsHandler, ProtocolsHandlerEvent, ProtocolsHandlerUpgrErr, KeepAlive, SubstreamProtocol, NegotiatedSubstream};
+use libp2p::{NetworkBehaviour, PeerId, Multiaddr};
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::task::{Context, Poll};
+use libp2p::core::connection::ConnectionId;
+use libp2p::swarm::protocols_handler::{OutboundUpgradeSend, InboundUpgradeSend};
+use libp2p::core::
 
 #[derive(Debug)]
 pub enum OutEvent {
@@ -27,31 +30,23 @@ pub enum OutEvent {
     },
 }
 
-#[derive(NetworkBehaviour)]
-#[behaviour(out_event = "OutEvent", poll_method = "poll", event_process = true)]
 #[allow(missing_debug_implementations)]
 pub struct Behaviour<LR>
 where
     LR: LatestRate + Send + 'static,
 {
-    behaviour: spot_price::Behaviour,
-
-    #[behaviour(ignore)]
     events: VecDeque<OutEvent>,
 
-    #[behaviour(ignore)]
     balance: monero::Amount,
-    #[behaviour(ignore)]
     lock_fee: monero::Amount,
-    #[behaviour(ignore)]
     min_buy: bitcoin::Amount,
-    #[behaviour(ignore)]
     max_buy: bitcoin::Amount,
-    #[behaviour(ignore)]
     env_config: env::Config,
-    #[behaviour(ignore)]
+
+    unused_addresses: VecDeque<bitcoin::Address>,
+    redeem_fee: bitcoin::Amount,
+    refund_fee: bitcoin::Amount,
     latest_rate: LR,
-    #[behaviour(ignore)]
     resume_only: bool,
 }
 
@@ -73,11 +68,6 @@ where
         resume_only: bool,
     ) -> Self {
         Self {
-            behaviour: spot_price::Behaviour::new(
-                CborCodec::default(),
-                vec![(SpotPriceProtocol, ProtocolSupport::Inbound)],
-                RequestResponseConfig::default(),
-            ),
             events: Default::default(),
             balance,
             lock_fee,
@@ -112,20 +102,102 @@ where
 
         self.events.push_back(OutEvent::Error { peer, error });
     }
+}
 
-    fn poll<BIE>(
-        &mut self,
-        _cx: &mut Context<'_>,
-        _params: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<BIE, OutEvent>> {
-        if let Some(event) = self.events.pop_front() {
-            return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
-        }
+impl<LR> NetworkBehaviour for Behaviour<LR> {
+    type ProtocolsHandler = ();
+    type OutEvent = ();
 
-        // We trust in libp2p to poll us.
-        Poll::Pending
+    fn new_handler(&mut self) -> Self::ProtocolsHandler {
+        todo!()
+    }
+
+    fn addresses_of_peer(&mut self, peer_id: &PeerId) -> Vec<Multiaddr> {
+        todo!()
+    }
+
+    fn inject_connected(&mut self, peer_id: &PeerId) {
+        todo!()
+    }
+
+    fn inject_disconnected(&mut self, peer_id: &PeerId) {
+        todo!()
+    }
+
+    fn inject_event(&mut self, peer_id: PeerId, connection: ConnectionId, event: _) {
+        todo!()
+    }
+
+    fn poll(&mut self, cx: &mut Context<'_>, params: &mut impl PollParameters) -> Poll<NetworkBehaviourAction<_, Self::OutEvent>> {
+        todo!()
     }
 }
+
+enum InboundState {
+    PendingBehaviour(NegotiatedSubstream)
+}
+
+struct Handler {
+    inbound_stream: Option<InboundState>
+}
+
+impl ProtocolsHandler for Handler {
+    type InEvent = ();
+    type OutEvent = ();
+    type Error = ();
+    type InboundProtocol = ();
+    type OutboundProtocol = ();
+    type InboundOpenInfo = ();
+    type OutboundOpenInfo = ();
+
+    fn listen_protocol(&self) -> SubstreamProtocol<Self::InboundProtocol, Self::InboundOpenInfo> {
+        todo!()
+    }
+
+    fn inject_fully_negotiated_inbound(&mut self, protocol: NegotiatedSubstream, _: Self::InboundOpenInfo) {
+        self.inbound_stream = Some(InboundState::PendingBehaviour(protocol));
+    }
+
+    fn inject_fully_negotiated_outbound(&mut self, protocol: _, info: Self::OutboundOpenInfo) {
+        todo!()
+    }
+
+    fn inject_event(&mut self, event: Self::InEvent) {
+        todo!()
+    }
+
+    fn inject_dial_upgrade_error(&mut self, info: Self::OutboundOpenInfo, error: ProtocolsHandlerUpgrErr<_>) {
+        todo!()
+    }
+
+    fn connection_keep_alive(&self) -> KeepAlive {
+        todo!()
+    }
+
+    fn poll(&mut self, cx: &mut Context<'_>) -> Poll<ProtocolsHandlerEvent<Self::OutboundProtocol, Self::OutboundOpenInfo, Self::OutEvent, Self::Error>> {
+        todo!()
+    }
+}
+
+pub fn new() -> SwapSetup {
+    from_fn(
+        b"/rendezvous/1.0.0",
+        Box::new(|socket, _| future::ready(Ok(socket))),
+    )
+}
+
+pub type SwapSetup = FromFnUpgrade<
+    &'static [u8],
+    Box<
+        dyn Fn(
+            NegotiatedSubstream,
+            Endpoint,
+        )
+            -> future::Ready<Result<NegotiatedSubstream, Void>>
+        + Send
+        + 'static,
+    >,
+>;
 
 impl<LR> NetworkBehaviourEventProcess<spot_price::OutEvent> for Behaviour<LR>
 where
@@ -349,7 +421,7 @@ mod tests {
 
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::BalanceTooLow {
+            alice::swap_setup::Error::BalanceTooLow {
                 balance: monero::Amount::ZERO,
                 buy: btc_to_swap,
             },
@@ -375,7 +447,7 @@ mod tests {
 
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::BalanceTooLow {
+            alice::swap_setup::Error::BalanceTooLow {
                 balance: monero::Amount::ZERO,
                 buy: btc_to_swap,
             },
@@ -398,7 +470,7 @@ mod tests {
         let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::BalanceTooLow {
+            alice::swap_setup::Error::BalanceTooLow {
                 balance,
                 buy: btc_to_swap,
             },
@@ -417,7 +489,7 @@ mod tests {
         let btc_to_swap = bitcoin::Amount::from_btc(0.0001).unwrap();
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::AmountBelowMinimum {
+            alice::swap_setup::Error::AmountBelowMinimum {
                 buy: btc_to_swap,
                 min: min_buy,
             },
@@ -440,7 +512,7 @@ mod tests {
 
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::AmountAboveMaximum {
+            alice::swap_setup::Error::AmountAboveMaximum {
                 buy: btc_to_swap,
                 max: max_buy,
             },
@@ -460,7 +532,7 @@ mod tests {
         let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::ResumeOnlyMode,
+            alice::swap_setup::Error::ResumeOnlyMode,
             bob::spot_price::Error::NoSwapsAccepted,
         )
         .await;
@@ -475,7 +547,7 @@ mod tests {
         let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::LatestRateFetchFailed(Box::new(TestRateError {})),
+            alice::swap_setup::Error::LatestRateFetchFailed(Box::new(TestRateError {})),
             bob::spot_price::Error::Other,
         )
         .await;
@@ -492,7 +564,7 @@ mod tests {
 
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::SellQuoteCalculationFailed(anyhow!(
+            alice::swap_setup::Error::SellQuoteCalculationFailed(anyhow!(
                 "Error text irrelevant, won't be checked here"
             )),
             bob::spot_price::Error::Other,
@@ -510,7 +582,7 @@ mod tests {
         let btc_to_swap = bitcoin::Amount::from_btc(0.01).unwrap();
         test.construct_and_send_request(btc_to_swap);
         test.assert_error(
-            alice::spot_price::Error::BlockchainNetworkMismatch {
+            alice::swap_setup::Error::BlockchainNetworkMismatch {
                 cli: BlockchainNetwork {
                     bitcoin: bitcoin::Network::Testnet,
                     monero: monero::Network::Stagenet,
@@ -549,7 +621,7 @@ mod tests {
 
         test.send_request(request);
         test.assert_error(
-            alice::spot_price::Error::BlockchainNetworkMismatch {
+            alice::swap_setup::Error::BlockchainNetworkMismatch {
                 cli: BlockchainNetwork {
                     bitcoin: bitcoin::Network::Bitcoin,
                     monero: monero::Network::Mainnet,
@@ -574,7 +646,7 @@ mod tests {
     }
 
     struct SpotPriceTest {
-        alice_swarm: Swarm<alice::spot_price::Behaviour<TestRate>>,
+        alice_swarm: Swarm<alice::swap_setup::Behaviour<TestRate>>,
         bob_swarm: Swarm<spot_price::Behaviour>,
 
         alice_peer_id: PeerId,
@@ -628,7 +700,7 @@ mod tests {
         ) {
             match await_events_or_timeout(self.alice_swarm.next(), self.bob_swarm.next()).await {
                 (
-                    alice::spot_price::OutEvent::ExecutionSetupParams { btc, xmr, .. },
+                    alice::swap_setup::OutEvent::ExecutionSetupParams { btc, xmr, .. },
                     spot_price::OutEvent::Message { message, .. },
                 ) => {
                     assert_eq!(alice_assert, (btc, xmr));
@@ -654,22 +726,22 @@ mod tests {
 
         async fn assert_error(
             &mut self,
-            alice_assert: alice::spot_price::Error,
+            alice_assert: alice::swap_setup::Error,
             bob_assert: bob::spot_price::Error,
         ) {
             match await_events_or_timeout(self.alice_swarm.next(), self.bob_swarm.next()).await {
                 (
-                    alice::spot_price::OutEvent::Error { error, .. },
+                    alice::swap_setup::OutEvent::Error { error, .. },
                     spot_price::OutEvent::Message { message, .. },
                 ) => {
                     // TODO: Somehow make PartialEq work on Alice's spot_price::Error
                     match (alice_assert, error) {
                         (
-                            alice::spot_price::Error::BalanceTooLow {
+                            alice::swap_setup::Error::BalanceTooLow {
                                 balance: balance1,
                                 buy: buy1,
                             },
-                            alice::spot_price::Error::BalanceTooLow {
+                            alice::swap_setup::Error::BalanceTooLow {
                                 balance: balance2,
                                 buy: buy2,
                             },
@@ -678,11 +750,11 @@ mod tests {
                             assert_eq!(buy1, buy2);
                         }
                         (
-                            alice::spot_price::Error::BlockchainNetworkMismatch {
+                            alice::swap_setup::Error::BlockchainNetworkMismatch {
                                 cli: cli1,
                                 asb: asb1,
                             },
-                            alice::spot_price::Error::BlockchainNetworkMismatch {
+                            alice::swap_setup::Error::BlockchainNetworkMismatch {
                                 cli: cli2,
                                 asb: asb2,
                             },
@@ -691,24 +763,24 @@ mod tests {
                             assert_eq!(asb1, asb2);
                         }
                         (
-                            alice::spot_price::Error::AmountBelowMinimum { .. },
-                            alice::spot_price::Error::AmountBelowMinimum { .. },
+                            alice::swap_setup::Error::AmountBelowMinimum { .. },
+                            alice::swap_setup::Error::AmountBelowMinimum { .. },
                         )
                         | (
-                            alice::spot_price::Error::AmountAboveMaximum { .. },
-                            alice::spot_price::Error::AmountAboveMaximum { .. },
+                            alice::swap_setup::Error::AmountAboveMaximum { .. },
+                            alice::swap_setup::Error::AmountAboveMaximum { .. },
                         )
                         | (
-                            alice::spot_price::Error::LatestRateFetchFailed(_),
-                            alice::spot_price::Error::LatestRateFetchFailed(_),
+                            alice::swap_setup::Error::LatestRateFetchFailed(_),
+                            alice::swap_setup::Error::LatestRateFetchFailed(_),
                         )
                         | (
-                            alice::spot_price::Error::SellQuoteCalculationFailed(_),
-                            alice::spot_price::Error::SellQuoteCalculationFailed(_),
+                            alice::swap_setup::Error::SellQuoteCalculationFailed(_),
+                            alice::swap_setup::Error::SellQuoteCalculationFailed(_),
                         )
                         | (
-                            alice::spot_price::Error::ResumeOnlyMode,
-                            alice::spot_price::Error::ResumeOnlyMode,
+                            alice::swap_setup::Error::ResumeOnlyMode,
+                            alice::swap_setup::Error::ResumeOnlyMode,
                         ) => {}
                         (alice_assert, error) => {
                             panic!("Expected: {:?} Actual: {:?}", alice_assert, error)
