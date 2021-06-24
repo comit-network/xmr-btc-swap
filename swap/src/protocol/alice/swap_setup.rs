@@ -190,7 +190,7 @@ where
         &mut self,
         _cx: &mut Context<'_>,
         _params: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<HandlerInEvent, Self::OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<(), Self::OutEvent>> {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -250,13 +250,11 @@ pub enum HandlerOutEvent {
     Completed(anyhow::Result<(Uuid, alice::State3), Error>),
 }
 
-pub enum HandlerInEvent {}
-
 impl<LR> ProtocolsHandler for Handler<LR>
 where
     LR: LatestRate + Send + 'static,
 {
-    type InEvent = HandlerInEvent;
+    type InEvent = ();
     type OutEvent = HandlerOutEvent;
     type Error = Error;
     type InboundProtocol = protocol::SwapSetup;
