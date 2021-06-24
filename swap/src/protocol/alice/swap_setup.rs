@@ -22,6 +22,7 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 use uuid::Uuid;
 use void::Void;
+use std::time::Duration;
 
 #[derive(Debug)]
 pub enum OutEvent {
@@ -324,7 +325,7 @@ where
     ) {
         let (sender, receiver) = bmrng::channel_with_timeout::<bitcoin::Amount, WalletSnapshot>(
             1,
-            todo!("decide on timeout"),
+            Duration::from_secs(5),
         );
         let resume_only = self.resume_only;
         let min_buy = self.min_buy;
