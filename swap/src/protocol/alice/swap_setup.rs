@@ -311,7 +311,7 @@ where
     type OutboundOpenInfo = ();
 
     fn listen_protocol(&self) -> SubstreamProtocol<Self::InboundProtocol, Self::InboundOpenInfo> {
-        SubstreamProtocol::new(protocol::new(), todo!("pass data down to handler"))
+        SubstreamProtocol::new(protocol::new(), ())
     }
 
     fn inject_fully_negotiated_inbound(
