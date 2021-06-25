@@ -78,7 +78,7 @@ impl Behaviour {
         bitcoin_wallet: Arc<bitcoin::Wallet>,
     ) -> Self {
         Self {
-            quote: quote::bob(),
+            quote: quote::cli(),
             swap_setup: bob::Behaviour::new(env_config, bitcoin_wallet),
             transfer_proof: transfer_proof::bob(),
             encrypted_signature: encrypted_signature::bob(),
