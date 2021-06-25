@@ -14,7 +14,7 @@ pub mod swap;
 
 pub struct Swap {
     pub state: BobState,
-    pub event_loop_handle: cli::event_loop::EventLoopHandle,
+    pub event_loop_handle: cli::EventLoopHandle,
     pub db: Database,
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
@@ -31,7 +31,7 @@ impl Swap {
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
         env_config: env::Config,
-        event_loop_handle: cli::event_loop::EventLoopHandle,
+        event_loop_handle: cli::EventLoopHandle,
         receive_monero_address: monero::Address,
         btc_amount: bitcoin::Amount,
     ) -> Self {
@@ -53,7 +53,7 @@ impl Swap {
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
         env_config: env::Config,
-        event_loop_handle: cli::event_loop::EventLoopHandle,
+        event_loop_handle: cli::EventLoopHandle,
         receive_monero_address: monero::Address,
     ) -> Result<Self> {
         let state = db.get_state(id)?.try_into_bob()?.into();

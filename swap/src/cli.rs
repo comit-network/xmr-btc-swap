@@ -1,7 +1,7 @@
-pub mod behaviour;
+mod behaviour;
 pub mod cancel;
 pub mod command;
-pub mod event_loop;
+mod event_loop;
 pub mod refund;
 pub mod tracing;
 pub mod transport;

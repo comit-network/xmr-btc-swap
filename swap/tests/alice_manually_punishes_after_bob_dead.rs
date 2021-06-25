@@ -4,7 +4,7 @@ use harness::alice_run_until::is_xmr_lock_transaction_sent;
 use harness::bob_run_until::is_btc_locked;
 use harness::FastPunishConfig;
 use swap::asb;
-use swap::asb::event_loop::FixedRate;
+use swap::asb::FixedRate;
 use swap::protocol::alice::AliceState;
 use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};

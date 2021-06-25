@@ -1,5 +1,5 @@
 use crate::bitcoin::{ExpiredTimelocks, TxCancel, TxRefund};
-use crate::cli::event_loop::EventLoopHandle;
+use crate::cli::EventLoopHandle;
 use crate::database::Swap;
 use crate::network::swap_setup::bob::NewSwap;
 use crate::protocol::bob;

@@ -14,7 +14,7 @@ pub mod swap;
 
 pub struct Swap {
     pub state: AliceState,
-    pub event_loop_handle: asb::event_loop::EventLoopHandle,
+    pub event_loop_handle: asb::EventLoopHandle,
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
     pub env_config: Config,

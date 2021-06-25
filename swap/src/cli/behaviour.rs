@@ -1,17 +1,15 @@
-use std::sync::Arc;
-use std::time::Duration;
-
-use anyhow::{anyhow, Error, Result};
-use libp2p::core::Multiaddr;
-use libp2p::ping::{Ping, PingEvent};
-use libp2p::request_response::{RequestId, ResponseChannel};
-use libp2p::{NetworkBehaviour, PeerId};
-
 use crate::network::quote::BidQuote;
 use crate::network::swap_setup::bob;
 use crate::network::{encrypted_signature, quote, redial, transfer_proof};
 use crate::protocol::bob::State2;
 use crate::{bitcoin, env};
+use anyhow::{anyhow, Error, Result};
+use libp2p::core::Multiaddr;
+use libp2p::ping::{Ping, PingEvent};
+use libp2p::request_response::{RequestId, ResponseChannel};
+use libp2p::{NetworkBehaviour, PeerId};
+use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Debug)]
 pub enum OutEvent {

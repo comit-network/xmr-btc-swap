@@ -1,4 +1,4 @@
-use crate::asb::event_loop::LatestRate;
+use crate::asb::LatestRate;
 use crate::seed::Seed;
 use crate::{asb, bitcoin, cli, env, tor};
 use anyhow::Result;

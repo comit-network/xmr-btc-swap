@@ -1,7 +1,4 @@
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::time::Duration;
-
+use crate::cli;
 use backoff::backoff::Backoff;
 use backoff::ExponentialBackoff;
 use futures::future::FutureExt;
@@ -10,10 +7,11 @@ use libp2p::core::Multiaddr;
 use libp2p::swarm::protocols_handler::DummyProtocolsHandler;
 use libp2p::swarm::{DialPeerCondition, NetworkBehaviour, NetworkBehaviourAction, PollParameters};
 use libp2p::PeerId;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::time::Duration;
 use tokio::time::{Instant, Sleep};
 use void::Void;
-
-use crate::cli;
 
 pub enum OutEvent {
     AllAttemptsExhausted { peer: PeerId },
@@ -121,11 +119,11 @@ impl NetworkBehaviour for Behaviour {
     }
 }
 
-impl From<OutEvent> for cli::behaviour::OutEvent {
+impl From<OutEvent> for cli::OutEvent {
     fn from(event: OutEvent) -> Self {
         match event {
             OutEvent::AllAttemptsExhausted { peer } => {
-                cli::behaviour::OutEvent::AllRedialAttemptsExhausted { peer }
+                cli::OutEvent::AllRedialAttemptsExhausted { peer }
             }
         }
     }

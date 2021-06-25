@@ -12,24 +12,19 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
+use anyhow::{bail, Context, Result};
+use prettytable::{row, Table};
+use qrcode::render::unicode;
+use qrcode::QrCode;
 use std::cmp::min;
 use std::env;
 use std::future::Future;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-
-use anyhow::{bail, Context, Result};
-use prettytable::{row, Table};
-use qrcode::render::unicode;
-use qrcode::QrCode;
-use tracing::{debug, error, info, warn};
-use url::Url;
-use uuid::Uuid;
-
 use swap::bitcoin::TxLock;
 use swap::cli::command::{parse_args_and_apply_defaults, Arguments, Command, ParseResult};
-use swap::cli::event_loop::EventLoop;
+use swap::cli::EventLoop;
 use swap::database::Database;
 use swap::env::Config;
 use swap::network::quote::BidQuote;
@@ -38,6 +33,9 @@ use swap::protocol::bob;
 use swap::protocol::bob::Swap;
 use swap::seed::Seed;
 use swap::{bitcoin, cli, monero};
+use tracing::{debug, error, info, warn};
+use url::Url;
+use uuid::Uuid;
 
 #[macro_use]
 extern crate prettytable;

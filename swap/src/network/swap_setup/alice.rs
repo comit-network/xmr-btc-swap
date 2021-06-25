@@ -1,4 +1,4 @@
-use crate::asb::event_loop::LatestRate;
+use crate::asb::LatestRate;
 use crate::network::swap_setup;
 use crate::network::swap_setup::{
     protocol, BlockchainNetwork, SpotPriceError, SpotPriceRequest, SpotPriceResponse,

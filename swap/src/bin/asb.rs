@@ -26,9 +26,7 @@ use swap::asb::command::{parse_args, Arguments, Command};
 use swap::asb::config::{
     initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
 };
-use swap::asb::event_loop::{EventLoop, KrakenRate};
-use swap::asb::recovery::redeem;
-use swap::asb::{cancel, punish, redeem, refund, safely_abort};
+use swap::asb::{cancel, punish, redeem, refund, safely_abort, EventLoop, Finality, KrakenRate};
 use swap::database::Database;
 use swap::monero::Amount;
 use swap::network::swarm;
@@ -282,7 +280,7 @@ async fn main() -> Result<()> {
                 Arc::new(bitcoin_wallet),
                 Arc::new(db),
                 force,
-                redeem::Finality::from_bool(do_not_await_finality),
+                Finality::from_bool(do_not_await_finality),
             )
             .await?;
 
