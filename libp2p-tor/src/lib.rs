@@ -24,7 +24,7 @@ pub enum Error {
     OnlyWildcardAllowed,
     Torut(torut_ext::Error),
     UnreachableProxy(tokio_socks::Error),
-    InnerTransprot(io::Error),
+    InnerTransport(io::Error),
 }
 
 impl std::error::Error for Error {}

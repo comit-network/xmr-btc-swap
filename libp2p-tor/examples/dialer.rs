@@ -1,17 +1,16 @@
+use anyhow::{anyhow, bail, Result};
 use libp2p::core::muxing::StreamMuxerBox;
-use libp2p::core::upgrade::{Version, SelectUpgrade};
+use libp2p::core::upgrade::{SelectUpgrade, Version};
+use libp2p::mplex::MplexConfig;
 use libp2p::ping::{Ping, PingEvent, PingSuccess};
 use libp2p::swarm::{SwarmBuilder, SwarmEvent};
 use libp2p::{identity, noise, yamux, Multiaddr, Swarm, Transport};
 use libp2p_tor::dial_only;
 use std::time::Duration;
-use libp2p::mplex::MplexConfig;
-use anyhow::{anyhow, bail, Result};
 use tracing_subscriber::util::SubscriberInitExt;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
-
     let _guard = tracing_subscriber::fmt()
         .with_env_filter("debug,libp2p_tor=debug") // add `reqwest::connect::verbose=trace` if you want to logs of the RPC clients
         .with_test_writer()
@@ -27,7 +26,6 @@ async fn main() -> Result<()> {
     if !text.contains("Congratulations. This browser is configured to use Tor.") {
         bail!("Tor is currently not running")
     }
-
 
     let addr_to_dial = "/onion3/jpclybnowuibjexya3qggzvzkoeruuav4nyjlxpnkrosldsvykfbn6qd:7654/p2p/12D3KooWHKqGyK4hVtf5BQY8GpbY6fSGKDZ8eBXMQ3H2RsdnKVzC"
         .parse::<Multiaddr>()

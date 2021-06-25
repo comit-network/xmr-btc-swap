@@ -5,7 +5,7 @@ use futures::future::BoxFuture;
 use futures::prelude::*;
 use libp2p::core::multiaddr::{Multiaddr, Protocol};
 use libp2p::core::transport::map_err::MapErr;
-use libp2p::core::transport::{ListenerEvent, TransportError};
+use libp2p::core::transport::{Boxed, ListenerEvent, TransportError};
 use libp2p::core::Transport;
 use libp2p::futures::stream::BoxStream;
 use libp2p::futures::{StreamExt, TryStreamExt};
@@ -37,17 +37,14 @@ impl TorConfig {
         let socks_port = client.get_socks_port().await?;
 
         Ok(Self {
-            inner: TokioTcpConfig::new().map_err(Error::InnerTransprot),
+            inner: TokioTcpConfig::new().map_err(Error::InnerTransport),
             tor_client: Arc::new(Mutex::new(client)),
             key,
             socks_port,
         })
     }
 
-    pub async fn from_control_port(
-        control_port: u16,
-        key: TorSecretKeyV3,
-    ) -> Result<Self, Error> {
+    pub async fn from_control_port(control_port: u16, key: TorSecretKeyV3) -> Result<Self, Error> {
         let client = AuthenticatedConn::new(control_port).await?;
 
         Self::new(client, key).await
@@ -82,7 +79,8 @@ impl Transport for TorConfig {
             return Err(TransportError::MultiaddrNotSupported(addr));
         }
 
-        let localhost_tcp_random_port_addr = format!("/ip4/127.0.0.1/tcp/{}", onion_port).as_str()
+        let localhost_tcp_random_port_addr = format!("/ip4/127.0.0.1/tcp/{}", onion_port)
+            .as_str()
             .parse()
             .expect("always a valid multiaddr");
 
@@ -109,7 +107,9 @@ impl Transport for TorConfig {
                                     })
                                     .expect("TODO: Error handling");
 
-                                // TODO: Don't fully understand this part, why would we have two different multiaddresses here? the actual onion address and the multiaddress would make more sense...?
+                                // TODO: Don't fully understand this part, why would we have two
+                                // different multiaddresses here? the actual onion address and the
+                                // multiaddress would make more sense...?
                                 tracing::debug!(
                                     "Setting up hidden service at {} to forward to {}",
                                     onion_multiaddress,
@@ -120,7 +120,9 @@ impl Transport for TorConfig {
                                     .clone()
                                     .lock()
                                     .await
-                                    // TODO: Potentially simplify this, in our setup the onion port is always equal to the local port. Otherwise we would have the user provide an additional port for the oion service.
+                                    // TODO: Potentially simplify this, in our setup the onion port
+                                    // is always equal to the local port. Otherwise we would have
+                                    // the user provide an additional port for the oion service.
                                     .add_ephemeral_service(&key, onion_port, local_port)
                                     .await
                                 {
@@ -139,8 +141,9 @@ impl Transport for TorConfig {
                             },
                             // TODO: why was the constructed multiaddr used here?
                             ListenerEvent::AddressExpired(adr) => {
-                                // TODO: even if so, why would we ignore it? Far more logical to just use it...
-                                // can ignore address because we only ever listened on one and we
+                                // TODO: even if so, why would we ignore it? Far more logical to
+                                // just use it... can ignore address
+                                // because we only ever listened on one and we
                                 // know which one that was
 
                                 let onion_address_without_dot_onion = key
@@ -148,7 +151,10 @@ impl Transport for TorConfig {
                                     .get_onion_address()
                                     .get_address_without_dot_onion();
 
-                                tracing::debug!("Listening expired, removing onion {}", onion_address_without_dot_onion);
+                                tracing::debug!(
+                                    "Listening expired, removing onion {}",
+                                    onion_address_without_dot_onion
+                                );
 
                                 match tor_client
                                     .lock()
@@ -181,7 +187,7 @@ impl Transport for TorConfig {
         Ok(crate::dial_via_tor(address, self.socks_port).boxed())
     }
 
-    fn address_translation(&self, _: &Multiaddr, _: &Multiaddr) -> Option<Multiaddr> {
-        None // address translation for tor doesn't make any sense :)
+    fn address_translation(&self, listen: &Multiaddr, observed: &Multiaddr) -> Option<Multiaddr> {
+        self.inner.address_translation(listen, observed)
     }
 }

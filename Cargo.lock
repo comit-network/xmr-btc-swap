@@ -1881,6 +1881,7 @@ dependencies = [
  "futures",
  "lazy_static",
  "libp2p-core",
+ "libp2p-mplex",
  "libp2p-noise 0.30.0",
  "libp2p-ping",
  "libp2p-swarm",

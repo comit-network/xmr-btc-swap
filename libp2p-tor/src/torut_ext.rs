@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::future::Future;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::num::ParseIntError;
 use std::{io, iter};
 use torut::control::{AsyncEvent, AuthenticatedConn, TorAuthData, UnauthenticatedConn};
@@ -83,7 +83,10 @@ impl AuthenticatedConnectionExt for AuthenticatedConn<tokio::net::TcpStream, Asy
         onion_port: u16,
         local_port: u16,
     ) -> Result<(), Error> {
-        println!("Adding ephemeral service, onion port {}, local port {}", onion_port, local_port);
+        println!(
+            "Adding ephemeral service, onion port {}, local port {}",
+            onion_port, local_port
+        );
 
         self.add_onion_v3(
             &key,
