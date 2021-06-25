@@ -94,7 +94,7 @@ where
         env_config: env::Config,
     ) -> Self {
         Self {
-            quote: quote::alice(),
+            quote: quote::asb(),
             swap_setup: alice::Behaviour::new(
                 min_buy,
                 max_buy,

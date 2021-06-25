@@ -37,10 +37,11 @@ pub struct BidQuote {
     pub max_quantity: bitcoin::Amount,
 }
 
-/// Constructs a new instance of the `quote` behaviour to be used by Alice.
+/// Constructs a new instance of the `quote` behaviour to be used by the ASB.
 ///
-/// Alice only supports inbound connections, i.e. handing out quotes.
-pub fn alice() -> Behaviour {
+/// The ASB is always listening and only supports inbound connections, i.e.
+/// handing out quotes.
+pub fn asb() -> Behaviour {
     Behaviour::new(
         JsonPullCodec::default(),
         vec![(BidQuoteProtocol, ProtocolSupport::Inbound)],
@@ -48,10 +49,11 @@ pub fn alice() -> Behaviour {
     )
 }
 
-/// Constructs a new instance of the `quote` behaviour to be used by Bob.
+/// Constructs a new instance of the `quote` behaviour to be used by the CLI.
 ///
-/// Bob only supports outbound connections, i.e. requesting quotes.
-pub fn bob() -> Behaviour {
+/// The CLI is always dialing and only supports outbound connections, i.e.
+/// requesting quotes.
+pub fn cli() -> Behaviour {
     Behaviour::new(
         JsonPullCodec::default(),
         vec![(BidQuoteProtocol, ProtocolSupport::Outbound)],
