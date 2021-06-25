@@ -14,6 +14,7 @@ use torut::control::AuthenticatedConn;
 use torut::onion::TorSecretKeyV3;
 use tracing_subscriber::util::SubscriberInitExt;
 use libp2p_tor::duplex::TorutAsyncEventHandler;
+use libp2p::tcp::TokioTcpConfig;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
@@ -44,9 +45,14 @@ async fn main() {
     // imply it from the assigned port swarm.listen_on(Multiaddr::
     // from_str(format!("/onion3/{}:{}", onion_address,
     // onion_port).as_str()).unwrap()).unwrap();
+    // swarm
+    //     .listen_on(
+    //         Multiaddr::from_str(format!("/onion3/{}:{}", onion_address, onion_port).as_str()).unwrap(),
+    //     )
+    //     .unwrap();
     swarm
         .listen_on(
-            Multiaddr::from_str(format!("/onion3/{}:{}", onion_address, onion_port).as_str()).unwrap(),
+            Multiaddr::from_str(format!("/ip4/127.0.0.1/tcp/{}", onion_port).as_str()).unwrap(),
         )
         .unwrap();
 
@@ -92,7 +98,7 @@ async fn new_swarm(client: AuthenticatedConn<tokio::net::TcpStream, TorutAsyncEv
     let identity = fixed_libp2p_identity();
 
     SwarmBuilder::new(
-        duplex::TorConfig::new(client, key).await.unwrap()
+        TokioTcpConfig::new().nodelay(true)
             .boxed()
             .upgrade(Version::V1)
             .authenticate(
