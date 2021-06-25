@@ -1,9 +1,13 @@
-use crate::monero;
 use anyhow::{Context, Result};
 use libp2p::core::upgrade;
 use libp2p::swarm::NegotiatedSubstream;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+
+use crate::monero;
+
+pub mod alice;
+pub mod bob;
 
 pub const BUF_SIZE: usize = 1024 * 1024;
 

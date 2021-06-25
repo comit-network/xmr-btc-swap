@@ -1,10 +1,11 @@
+use crate::asb::behaviour::{Behaviour, OutEvent};
 use crate::asb::Rate;
 use crate::database::Database;
 use crate::env::Config;
 use crate::network::quote::BidQuote;
+use crate::network::swap_setup::alice::WalletSnapshot;
 use crate::network::transfer_proof;
-use crate::protocol::alice::swap_setup::WalletSnapshot;
-use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State3, Swap};
+use crate::protocol::alice::{AliceState, State3, Swap};
 use crate::{bitcoin, kraken, monero};
 use anyhow::{Context, Result};
 use futures::future;
