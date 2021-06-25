@@ -93,19 +93,19 @@ impl EventLoop {
         loop {
             // Note: We are making very elaborate use of `select!` macro's feature here. Make sure to read the documentation thoroughly: https://docs.rs/tokio/1.4.0/tokio/macro.select.html
             tokio::select! {
-                swarm_event = self.swarm.next_event().fuse() => {
-                    match swarm_event {
-                        SwarmEvent::Behaviour(OutEvent::QuoteReceived { id, response }) => {
+                swarm_event = self.swarm.next().fuse() => {
+                    match swarm_event{
+                        Some(SwarmEvent::Behaviour(OutEvent::QuoteReceived { id, response })) => {
                             if let Some(responder) = self.inflight_quote_requests.remove(&id) {
                                 let _ = responder.respond(response);
                             }
                         }
-                        SwarmEvent::Behaviour(OutEvent::SwapSetupCompleted(response)) => {
+                        Some(SwarmEvent::Behaviour(OutEvent::SwapSetupCompleted(response))) => {
                             if let Some(responder) = self.inflight_swap_setup.take() {
                                 let _ = responder.respond(*response);
                             }
                         }
-                        SwarmEvent::Behaviour(OutEvent::TransferProofReceived { msg, channel, peer }) => {
+                        Some(SwarmEvent::Behaviour(OutEvent::TransferProofReceived { msg, channel, peer })) => {
                             let swap_id = msg.swap_id;
 
                             if peer != self.alice_peer_id {
@@ -141,34 +141,34 @@ impl EventLoop {
                                 channel
                             }.boxed()));
                         }
-                        SwarmEvent::Behaviour(OutEvent::EncryptedSignatureAcknowledged { id }) => {
+                        Some(SwarmEvent::Behaviour(OutEvent::EncryptedSignatureAcknowledged { id })) => {
                             if let Some(responder) = self.inflight_encrypted_signature_requests.remove(&id) {
                                 let _ = responder.respond(());
                             }
                         }
-                        SwarmEvent::Behaviour(OutEvent::AllRedialAttemptsExhausted { peer }) if peer == self.alice_peer_id => {
+                        Some(SwarmEvent::Behaviour(OutEvent::AllRedialAttemptsExhausted { peer })) if peer == self.alice_peer_id => {
                             tracing::error!("Exhausted all re-dial attempts to Alice");
                             return;
                         }
-                        SwarmEvent::Behaviour(OutEvent::Failure { peer, error }) => {
+                        Some(SwarmEvent::Behaviour(OutEvent::Failure { peer, error })) => {
                             tracing::warn!(%peer, "Communication error: {:#}", error);
                             return;
                         }
-                        SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } if peer_id == self.alice_peer_id => {
+                        Some(SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. }) if peer_id == self.alice_peer_id => {
                             tracing::info!("Connected to Alice at {}", endpoint.get_remote_address());
                         }
-                        SwarmEvent::Dialing(peer_id) if peer_id == self.alice_peer_id => {
+                        Some(SwarmEvent::Dialing(peer_id)) if peer_id == self.alice_peer_id => {
                             tracing::debug!("Dialling Alice at {}", peer_id);
                         }
-                        SwarmEvent::ConnectionClosed { peer_id, endpoint, num_established, cause: Some(error) } if peer_id == self.alice_peer_id && num_established == 0 => {
+                        Some(SwarmEvent::ConnectionClosed { peer_id, endpoint, num_established, cause: Some(error) }) if peer_id == self.alice_peer_id && num_established == 0 => {
                             tracing::warn!("Lost connection to Alice at {}, cause: {}", endpoint.get_remote_address(), error);
                         }
-                        SwarmEvent::ConnectionClosed { peer_id, num_established, cause: None, .. } if peer_id == self.alice_peer_id && num_established == 0 => {
+                        Some(SwarmEvent::ConnectionClosed { peer_id, num_established, cause: None, .. }) if peer_id == self.alice_peer_id && num_established == 0 => {
                             // no error means the disconnection was requested
                             tracing::info!("Successfully closed connection to Alice");
                             return;
                         }
-                        SwarmEvent::UnreachableAddr { peer_id, address, attempts_remaining, error } if peer_id == self.alice_peer_id && attempts_remaining == 0 => {
+                        Some(SwarmEvent::UnreachableAddr { peer_id, address, attempts_remaining, error }) if peer_id == self.alice_peer_id && attempts_remaining == 0 => {
                             tracing::warn!(%address, "Failed to dial Alice: {}", error);
 
                             if let Some(duration) = self.swarm.behaviour_mut().redial.until_next_redial() {
