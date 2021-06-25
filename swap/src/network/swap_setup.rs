@@ -101,7 +101,7 @@ where
     T: Serialize,
 {
     let bytes = serde_cbor::to_vec(&message)?;
-    upgrade::write_one(substream, &bytes).await?;
+    upgrade::write_with_len_prefix(substream, &bytes).await?;
 
     Ok(())
 }

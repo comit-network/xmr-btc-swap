@@ -444,8 +444,13 @@ where
             Self::Error,
         >,
     > {
+        if let Some(event) = self.events.pop_front() {
+            return Poll::Ready(ProtocolsHandlerEvent::Custom(event));
+        }
+
         if let Some(result) = futures::ready!(self.inbound_stream.poll_unpin(cx)) {
             self.keep_alive = KeepAlive::No;
+            self.inbound_stream = OptionFuture::from(None);
             return Poll::Ready(ProtocolsHandlerEvent::Custom(HandlerOutEvent::Completed(
                 result,
             )));
@@ -478,17 +483,17 @@ pub enum Error {
     },
     #[error("Failed to fetch latest rate")]
     LatestRateFetchFailed(#[source] Box<dyn std::error::Error + Send + Sync + 'static>),
-    #[error("Failed to calculate quote: {0}")]
+    #[error("Failed to calculate quote")]
     SellQuoteCalculationFailed(#[source] anyhow::Error),
     #[error("Blockchain networks did not match, we are on {asb:?}, but request from {cli:?}")]
     BlockchainNetworkMismatch {
         cli: BlockchainNetwork,
         asb: BlockchainNetwork,
     },
-    #[error("Io Error: {0}")]
-    Io(anyhow::Error),
-    #[error("Failed to request wallet snapshot: {0}")]
-    WalletSnapshotFailed(anyhow::Error),
+    #[error("Io Error")]
+    Io(#[source] anyhow::Error),
+    #[error("Failed to request wallet snapshot")]
+    WalletSnapshotFailed(#[source] anyhow::Error),
     #[error("Failed to complete execution setup within {seconds}s")]
     Timeout { seconds: u64 },
 }

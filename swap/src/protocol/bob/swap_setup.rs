@@ -238,6 +238,7 @@ impl ProtocolsHandler for Handler {
 
         if let Some(result) = futures::ready!(self.outbound_stream.poll_unpin(cx)) {
             self.keep_alive = KeepAlive::No;
+            self.outbound_stream = OptionFuture::from(None);
             return Poll::Ready(ProtocolsHandlerEvent::Custom(Completed(result)));
         }
 
