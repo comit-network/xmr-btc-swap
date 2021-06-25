@@ -14,11 +14,9 @@
 
 use anyhow::{bail, Context, Result};
 use libp2p::core::multiaddr::Protocol;
-use libp2p::core::Multiaddr;
 use libp2p::Swarm;
 use prettytable::{row, Table};
 use std::env;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use structopt::clap;
 use structopt::clap::ErrorKind;
@@ -33,8 +31,9 @@ use swap::protocol::alice;
 use swap::protocol::alice::event_loop::KrakenRate;
 use swap::protocol::alice::{redeem, run, EventLoop};
 use swap::seed::Seed;
-use swap::tor::{is_tor_daemon_running_on_port, AuthenticatedClient};
+use swap::torut_ext::AuthenticatedConnectionExt;
 use swap::{asb, bitcoin, kraken, monero, tor};
+use torut::control::AuthenticatedConn;
 use tracing::{debug, info, warn};
 use tracing_subscriber::filter::LevelFilter;
 
@@ -127,19 +126,38 @@ async fn main() -> Result<()> {
 
             let kraken_price_updates = kraken::connect()?;
 
-            // setup Tor hidden services
-            let _ac = match is_tor_daemon_running_on_port(config.tor.socks5_port).await {
-                Ok(_) => {
-                    tracing::info!("Tor found. Setting up hidden service");
-                    let tor_client = tor::Client::new(config.tor.socks5_port)
-                        .with_control_port(config.tor.control_port);
+            let local_listening_tcp_port = config.network.listen.iter().find_map(|address| {
+                address.iter().find_map(|protocol| match protocol {
+                    Protocol::Tcp(port) => Some(port),
+                    _ => None,
+                })
+            });
 
-                    let ac =
-                        register_tor_services(config.network.clone().listen, tor_client, &seed)
-                            .await?;
-                    Some(ac)
+            // setup Tor hidden services
+            let _ac = match (
+                tor::is_daemon_running_on_port(config.tor.socks5_port).await,
+                local_listening_tcp_port,
+            ) {
+                (Ok(_), Some(port)) => {
+                    tracing::info!("Tor found. Setting up hidden service");
+
+                    let mut connection = AuthenticatedConn::new(config.tor.control_port).await?;
+
+                    let tor_secret_key = seed.derive_torv3_key();
+                    connection
+                        .add_ephemeral_service(&tor_secret_key, port, port)
+                        .await?;
+
+                    let onion_address = tor_secret_key.public().get_onion_address();
+                    tracing::info!(%onion_address);
+
+                    Some(connection)
                 }
-                Err(_) => {
+                (Ok(_), None) => {
+                    tracing::warn!("Tor running but no local listening addresses available, unable to set up hidden service");
+                    None
+                }
+                (Err(_), _) => {
                     tracing::warn!("Tor not found. Running on clear net");
                     None
                 }
@@ -333,47 +351,4 @@ async fn init_monero_wallet(
     .await?;
 
     Ok(wallet)
-}
-
-/// Registers a hidden service for each network.
-/// Note: Once ac goes out of scope, the services will be de-registered.
-async fn register_tor_services(
-    networks: Vec<Multiaddr>,
-    tor_client: tor::Client,
-    seed: &Seed,
-) -> Result<AuthenticatedClient> {
-    let mut ac = tor_client.into_authenticated_client().await?;
-
-    let hidden_services_details = networks
-        .iter()
-        .flat_map(|network| {
-            network.iter().map(|protocol| match protocol {
-                Protocol::Tcp(port) => Some((
-                    port,
-                    SocketAddr::new(IpAddr::from(Ipv4Addr::new(127, 0, 0, 1)), port),
-                )),
-                _ => {
-                    // We only care for Tcp for now.
-                    None
-                }
-            })
-        })
-        .flatten()
-        .collect::<Vec<_>>();
-
-    let key = seed.derive_torv3_key();
-
-    ac.add_services(&hidden_services_details, &key).await?;
-
-    let onion_address = key
-        .public()
-        .get_onion_address()
-        .get_address_without_dot_onion();
-
-    hidden_services_details.iter().for_each(|(port, _)| {
-        let onion_address = format!("/onion3/{}:{}", onion_address, port);
-        tracing::info!(%onion_address);
-    });
-
-    Ok(ac)
 }

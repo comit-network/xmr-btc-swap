@@ -28,5 +28,6 @@ pub mod network;
 pub mod protocol;
 pub mod seed;
 pub mod tor;
+pub mod torut_ext;
 
 mod monero_ext;

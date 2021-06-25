@@ -1,8 +1,7 @@
 use crate::protocol::alice::event_loop::LatestRate;
 use crate::protocol::{alice, bob};
 use crate::seed::Seed;
-use crate::tor::is_tor_daemon_running_on_port;
-use crate::{asb, cli, env, monero};
+use crate::{asb, cli, env, monero, tor};
 use anyhow::Result;
 use libp2p::swarm::SwarmBuilder;
 use libp2p::{PeerId, Swarm};
@@ -50,7 +49,7 @@ pub async fn cli(
     alice: PeerId,
     tor_socks5_port: u16,
 ) -> Result<Swarm<bob::Behaviour>> {
-    let maybe_tor_socks5_port = match is_tor_daemon_running_on_port(tor_socks5_port).await {
+    let maybe_tor_socks5_port = match tor::is_daemon_running_on_port(tor_socks5_port).await {
         Ok(()) => Some(tor_socks5_port),
         Err(_) => None,
     };
