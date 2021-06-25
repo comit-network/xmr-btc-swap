@@ -1,11 +1,11 @@
+use crate::asb::LatestRate;
 use crate::network::swap_setup;
 use crate::network::swap_setup::{
     protocol, BlockchainNetwork, SpotPriceError, SpotPriceRequest, SpotPriceResponse,
 };
-use crate::protocol::alice::event_loop::LatestRate;
 use crate::protocol::alice::{State0, State3};
-use crate::protocol::{alice, Message0, Message2, Message4};
-use crate::{bitcoin, env, monero};
+use crate::protocol::{Message0, Message2, Message4};
+use crate::{asb, bitcoin, env, monero};
 use anyhow::{anyhow, Context, Result};
 use futures::future::{BoxFuture, OptionFuture};
 use futures::FutureExt;
@@ -81,24 +81,24 @@ impl WalletSnapshot {
     }
 }
 
-impl From<OutEvent> for alice::OutEvent {
+impl From<OutEvent> for asb::OutEvent {
     fn from(event: OutEvent) -> Self {
         match event {
             OutEvent::Initiated {
                 send_wallet_snapshot,
-            } => alice::OutEvent::SwapSetupInitiated {
+            } => asb::OutEvent::SwapSetupInitiated {
                 send_wallet_snapshot,
             },
             OutEvent::Completed {
                 peer_id: bob_peer_id,
                 swap_id,
                 state3,
-            } => alice::OutEvent::SwapSetupCompleted {
+            } => asb::OutEvent::SwapSetupCompleted {
                 peer_id: bob_peer_id,
                 swap_id,
                 state3: Box::new(state3),
             },
-            OutEvent::Error { peer_id, error } => alice::OutEvent::Failure {
+            OutEvent::Error { peer_id, error } => asb::OutEvent::Failure {
                 peer: peer_id,
                 error: anyhow!(error),
             },
@@ -194,7 +194,7 @@ where
     }
 }
 
-type InboundStream = BoxFuture<'static, Result<(Uuid, alice::State3)>>;
+type InboundStream = BoxFuture<'static, Result<(Uuid, State3)>>;
 
 pub struct Handler<LR> {
     inbound_stream: OptionFuture<InboundStream>,
@@ -236,7 +236,7 @@ impl<LR> Handler<LR> {
 #[allow(clippy::large_enum_variant)]
 pub enum HandlerOutEvent {
     Initiated(bmrng::RequestReceiver<bitcoin::Amount, WalletSnapshot>),
-    Completed(Result<(Uuid, alice::State3)>),
+    Completed(Result<(Uuid, State3)>),
 }
 
 impl<LR> ProtocolsHandler for Handler<LR>

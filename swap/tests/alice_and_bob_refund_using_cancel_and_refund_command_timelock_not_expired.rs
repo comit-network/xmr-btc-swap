@@ -3,10 +3,11 @@ pub mod harness;
 use harness::alice_run_until::is_xmr_lock_transaction_sent;
 use harness::bob_run_until::is_btc_locked;
 use harness::SlowCancelConfig;
-use swap::protocol::alice::event_loop::FixedRate;
+use swap::asb::FixedRate;
 use swap::protocol::alice::AliceState;
 use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
+use swap::{asb, cli};
 
 #[tokio::test]
 async fn given_alice_and_bob_manually_cancel_when_timelock_not_expired_errors() {
@@ -37,12 +38,12 @@ async fn given_alice_and_bob_manually_cancel_when_timelock_not_expired_errors() 
         ));
 
         // Bob tries but fails to manually cancel
-        let result = bob::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false)
+        let result = cli::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false)
             .await?
             .unwrap_err();
         assert!(matches!(
             result,
-            bob::cancel::Error::CancelTimelockNotExpiredYet
+            cli::cancel::Error::CancelTimelockNotExpiredYet
         ));
 
         ctx.restart_alice().await;
@@ -53,7 +54,7 @@ async fn given_alice_and_bob_manually_cancel_when_timelock_not_expired_errors() 
         ));
 
         // Alice tries but fails manual cancel
-        let result = alice::cancel(
+        let result = asb::cancel(
             alice_swap.swap_id,
             alice_swap.bitcoin_wallet,
             alice_swap.db,
@@ -63,7 +64,7 @@ async fn given_alice_and_bob_manually_cancel_when_timelock_not_expired_errors() 
         .unwrap_err();
         assert!(matches!(
             result,
-            alice::cancel::Error::CancelTimelockNotExpiredYet
+            asb::cancel::Error::CancelTimelockNotExpiredYet
         ));
 
         let (bob_swap, bob_join_handle) = ctx
@@ -72,10 +73,10 @@ async fn given_alice_and_bob_manually_cancel_when_timelock_not_expired_errors() 
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));
 
         // Bob tries but fails to manually refund
-        let result = bob::refund(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false)
+        let result = cli::refund(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false)
             .await?
             .unwrap_err();
-        assert!(matches!(result, bob::refund::SwapNotCancelledYet(_)));
+        assert!(matches!(result, cli::refund::SwapNotCancelledYet(_)));
 
         let (bob_swap, _) = ctx
             .stop_and_resume_bob_from_db(bob_join_handle, swap_id)
@@ -90,7 +91,7 @@ async fn given_alice_and_bob_manually_cancel_when_timelock_not_expired_errors() 
         ));
 
         // Alice tries but fails manual cancel
-        let result = alice::refund(
+        let result = asb::refund(
             alice_swap.swap_id,
             alice_swap.bitcoin_wallet,
             alice_swap.monero_wallet,
@@ -99,7 +100,7 @@ async fn given_alice_and_bob_manually_cancel_when_timelock_not_expired_errors() 
         )
         .await?
         .unwrap_err();
-        assert!(matches!(result, alice::refund::Error::SwapNotCancelled));
+        assert!(matches!(result, asb::refund::Error::SwapNotCancelled));
 
         ctx.restart_alice().await;
         let alice_swap = ctx.alice_next_swap().await;

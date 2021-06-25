@@ -3,10 +3,11 @@ pub mod harness;
 use harness::alice_run_until::is_xmr_lock_transaction_sent;
 use harness::bob_run_until::is_btc_locked;
 use harness::FastCancelConfig;
-use swap::protocol::alice::event_loop::FixedRate;
+use swap::asb::FixedRate;
 use swap::protocol::alice::AliceState;
 use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
+use swap::{asb, cli};
 
 #[tokio::test]
 async fn given_alice_and_bob_manually_refund_after_funds_locked_both_refund() {
@@ -50,7 +51,7 @@ async fn given_alice_and_bob_manually_refund_after_funds_locked_both_refund() {
         // Bob manually cancels
         bob_join_handle.abort();
         let (_, state) =
-            bob::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false).await??;
+            cli::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false).await??;
         assert!(matches!(state, BobState::BtcCancelled { .. }));
 
         let (bob_swap, bob_join_handle) = ctx
@@ -61,7 +62,7 @@ async fn given_alice_and_bob_manually_refund_after_funds_locked_both_refund() {
         // Bob manually refunds
         bob_join_handle.abort();
         let bob_state =
-            bob::refund(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false).await??;
+            cli::refund(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false).await??;
 
         ctx.assert_bob_refunded(bob_state).await;
 
@@ -74,7 +75,7 @@ async fn given_alice_and_bob_manually_refund_after_funds_locked_both_refund() {
             AliceState::XmrLockTransactionSent { .. }
         ));
 
-        alice::cancel(
+        asb::cancel(
             alice_swap.swap_id,
             alice_swap.bitcoin_wallet,
             alice_swap.db,
@@ -86,7 +87,7 @@ async fn given_alice_and_bob_manually_refund_after_funds_locked_both_refund() {
         ctx.restart_alice().await;
         let alice_swap = ctx.alice_next_swap().await;
         assert!(matches!(alice_swap.state, AliceState::BtcCancelled { .. }));
-        let alice_state = alice::refund(
+        let alice_state = asb::refund(
             alice_swap.swap_id,
             alice_swap.bitcoin_wallet,
             alice_swap.monero_wallet,

@@ -2,9 +2,9 @@ use crate::network::swap_setup::{
     protocol, read_cbor_message, write_cbor_message, BlockchainNetwork, SpotPriceError,
     SpotPriceRequest, SpotPriceResponse,
 };
-use crate::protocol::bob::State0;
-use crate::protocol::{bob, Message1, Message3};
-use crate::{bitcoin, env, monero};
+use crate::protocol::bob::{State0, State2};
+use crate::protocol::{Message1, Message3};
+use crate::{bitcoin, cli, env, monero};
 use anyhow::Result;
 use futures::future::{BoxFuture, OptionFuture};
 use futures::FutureExt;
@@ -46,9 +46,9 @@ impl Behaviour {
     }
 }
 
-impl From<Completed> for bob::OutEvent {
+impl From<Completed> for cli::OutEvent {
     fn from(completed: Completed) -> Self {
-        bob::OutEvent::SwapSetupCompleted(Box::new(completed.0))
+        cli::OutEvent::SwapSetupCompleted(Box::new(completed.0))
     }
 }
 
@@ -93,7 +93,7 @@ impl NetworkBehaviour for Behaviour {
     }
 }
 
-type OutboundStream = BoxFuture<'static, Result<bob::State2>>;
+type OutboundStream = BoxFuture<'static, Result<State2>>;
 
 pub struct Handler {
     outbound_stream: OptionFuture<OutboundStream>,
@@ -126,7 +126,7 @@ pub struct NewSwap {
     pub bitcoin_refund_address: bitcoin::Address,
 }
 
-pub struct Completed(Result<bob::State2>);
+pub struct Completed(Result<State2>);
 
 impl ProtocolsHandler for Handler {
     type InEvent = NewSwap;

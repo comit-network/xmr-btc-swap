@@ -1,9 +1,9 @@
 use crate::bitcoin::{ExpiredTimelocks, TxCancel, TxRefund};
+use crate::cli::EventLoopHandle;
 use crate::database::Swap;
+use crate::network::swap_setup::bob::NewSwap;
 use crate::protocol::bob;
-use crate::protocol::bob::event_loop::EventLoopHandle;
 use crate::protocol::bob::state::*;
-use crate::protocol::bob::swap_setup::NewSwap;
 use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
 use tokio::select;

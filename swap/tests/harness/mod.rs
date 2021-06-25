@@ -14,16 +14,16 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
+use swap::asb::FixedRate;
 use swap::bitcoin::{CancelTimelock, PunishTimelock, TxCancel, TxPunish, TxRedeem, TxRefund};
 use swap::database::Database;
 use swap::env::{Config, GetConfig};
 use swap::network::swarm;
-use swap::protocol::alice::event_loop::FixedRate;
 use swap::protocol::alice::{AliceState, Swap};
 use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
 use swap::seed::Seed;
-use swap::{bitcoin, env, monero};
+use swap::{asb, bitcoin, cli, env, monero};
 use tempfile::tempdir;
 use testcontainers::clients::Cli;
 use testcontainers::{Container, Docker, RunArgs};
@@ -240,7 +240,7 @@ async fn start_alice(
     .unwrap();
     swarm.listen_on(listen_address).unwrap();
 
-    let (event_loop, swap_handle) = alice::EventLoop::new(
+    let (event_loop, swap_handle) = asb::EventLoop::new(
         swarm,
         env_config,
         bitcoin_wallet,
@@ -399,7 +399,7 @@ struct BobParams {
 }
 
 impl BobParams {
-    pub async fn new_swap_from_db(&self, swap_id: Uuid) -> Result<(bob::Swap, bob::EventLoop)> {
+    pub async fn new_swap_from_db(&self, swap_id: Uuid) -> Result<(bob::Swap, cli::EventLoop)> {
         let (event_loop, handle) = self.new_eventloop(swap_id).await?;
         let db = Database::open(&self.db_path)?;
 
@@ -419,7 +419,7 @@ impl BobParams {
     pub async fn new_swap(
         &self,
         btc_amount: bitcoin::Amount,
-    ) -> Result<(bob::Swap, bob::EventLoop)> {
+    ) -> Result<(bob::Swap, cli::EventLoop)> {
         let swap_id = Uuid::new_v4();
 
         let (event_loop, handle) = self.new_eventloop(swap_id).await?;
@@ -442,7 +442,7 @@ impl BobParams {
     pub async fn new_eventloop(
         &self,
         swap_id: Uuid,
-    ) -> Result<(bob::EventLoop, bob::EventLoopHandle)> {
+    ) -> Result<(cli::EventLoop, cli::EventLoopHandle)> {
         let tor_socks5_port = get_port()
             .expect("We don't care about Tor in the tests so we get a free port to disable it.");
         let mut swarm = swarm::cli(
@@ -457,7 +457,7 @@ impl BobParams {
             .behaviour_mut()
             .add_address(self.alice_peer_id, self.alice_address.clone());
 
-        bob::EventLoop::new(swap_id, swarm, self.alice_peer_id, self.env_config)
+        cli::EventLoop::new(swap_id, swarm, self.alice_peer_id, self.env_config)
     }
 }
 

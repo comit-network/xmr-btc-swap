@@ -3,7 +3,8 @@ pub mod harness;
 use harness::alice_run_until::is_xmr_lock_transaction_sent;
 use harness::bob_run_until::is_btc_locked;
 use harness::FastPunishConfig;
-use swap::protocol::alice::event_loop::FixedRate;
+use swap::asb;
+use swap::asb::FixedRate;
 use swap::protocol::alice::AliceState;
 use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
@@ -47,7 +48,7 @@ async fn alice_manually_punishes_after_bob_dead() {
 
         ctx.restart_alice().await;
         let alice_swap = ctx.alice_next_swap().await;
-        let (_, alice_state) = alice::cancel(
+        let (_, alice_state) = asb::cancel(
             alice_swap.swap_id,
             alice_swap.bitcoin_wallet,
             alice_swap.db,
@@ -70,7 +71,7 @@ async fn alice_manually_punishes_after_bob_dead() {
 
         ctx.restart_alice().await;
         let alice_swap = ctx.alice_next_swap().await;
-        let (_, alice_state) = alice::punish(
+        let (_, alice_state) = asb::punish(
             alice_swap.swap_id,
             alice_swap.bitcoin_wallet,
             alice_swap.db,

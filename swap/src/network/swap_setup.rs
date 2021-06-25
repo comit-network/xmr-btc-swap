@@ -5,6 +5,9 @@ use libp2p::swarm::NegotiatedSubstream;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
+pub mod alice;
+pub mod bob;
+
 pub const BUF_SIZE: usize = 1024 * 1024;
 
 pub mod protocol {

@@ -1,8 +1,9 @@
 use crate::bitcoin::EncryptedSignature;
+use crate::cli::behaviour::{Behaviour, OutEvent};
 use crate::network::encrypted_signature;
 use crate::network::quote::BidQuote;
-use crate::protocol::bob::swap_setup::NewSwap;
-use crate::protocol::bob::{Behaviour, OutEvent, State2};
+use crate::network::swap_setup::bob::NewSwap;
+use crate::protocol::bob::State2;
 use crate::{env, monero};
 use anyhow::{Context, Result};
 use futures::future::{BoxFuture, OptionFuture};

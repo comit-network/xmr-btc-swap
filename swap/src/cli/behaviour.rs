@@ -1,40 +1,32 @@
-use crate::env;
 use crate::network::quote::BidQuote;
-use crate::network::{encrypted_signature, quote, transfer_proof};
-use crate::protocol::alice::event_loop::LatestRate;
-use crate::protocol::alice::swap_setup::WalletSnapshot;
-use crate::protocol::alice::{swap_setup, State3};
-use anyhow::{anyhow, Error};
+use crate::network::swap_setup::bob;
+use crate::network::{encrypted_signature, quote, redial, transfer_proof};
+use crate::protocol::bob::State2;
+use crate::{bitcoin, env};
+use anyhow::{anyhow, Error, Result};
+use libp2p::core::Multiaddr;
 use libp2p::ping::{Ping, PingEvent};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
-use uuid::Uuid;
+use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Debug)]
 pub enum OutEvent {
-    SwapSetupInitiated {
-        send_wallet_snapshot: bmrng::RequestReceiver<bitcoin::Amount, WalletSnapshot>,
+    QuoteReceived {
+        id: RequestId,
+        response: BidQuote,
     },
-    SwapSetupCompleted {
-        peer_id: PeerId,
-        swap_id: Uuid,
-        state3: Box<State3>,
-    },
-    SwapDeclined {
-        peer: PeerId,
-        error: swap_setup::Error,
-    },
-    QuoteRequested {
-        channel: ResponseChannel<BidQuote>,
+    SwapSetupCompleted(Box<Result<State2>>),
+    TransferProofReceived {
+        msg: Box<transfer_proof::Request>,
+        channel: ResponseChannel<()>,
         peer: PeerId,
     },
-    TransferProofAcknowledged {
-        peer: PeerId,
+    EncryptedSignatureAcknowledged {
         id: RequestId,
     },
-    EncryptedSignatureReceived {
-        msg: Box<encrypted_signature::Request>,
-        channel: ResponseChannel<()>,
+    AllRedialAttemptsExhausted {
         peer: PeerId,
     },
     Failure {
@@ -62,18 +54,16 @@ impl OutEvent {
     }
 }
 
-/// A `NetworkBehaviour` that represents an XMR/BTC swap node as Alice.
+/// A `NetworkBehaviour` that represents an XMR/BTC swap node as Bob.
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "OutEvent", event_process = false)]
 #[allow(missing_debug_implementations)]
-pub struct Behaviour<LR>
-where
-    LR: LatestRate + Send + 'static,
-{
+pub struct Behaviour {
     pub quote: quote::Behaviour,
-    pub swap_setup: swap_setup::Behaviour<LR>,
+    pub swap_setup: bob::Behaviour,
     pub transfer_proof: transfer_proof::Behaviour,
     pub encrypted_signature: encrypted_signature::Behaviour,
+    pub redial: redial::Behaviour,
 
     /// Ping behaviour that ensures that the underlying network connection is
     /// still alive. If the ping fails a connection close event will be
@@ -81,30 +71,27 @@ where
     ping: Ping,
 }
 
-impl<LR> Behaviour<LR>
-where
-    LR: LatestRate + Send + 'static,
-{
+impl Behaviour {
     pub fn new(
-        min_buy: bitcoin::Amount,
-        max_buy: bitcoin::Amount,
-        latest_rate: LR,
-        resume_only: bool,
+        alice: PeerId,
         env_config: env::Config,
+        bitcoin_wallet: Arc<bitcoin::Wallet>,
     ) -> Self {
         Self {
-            quote: quote::alice(),
-            swap_setup: swap_setup::Behaviour::new(
-                min_buy,
-                max_buy,
-                env_config,
-                latest_rate,
-                resume_only,
-            ),
-            transfer_proof: transfer_proof::alice(),
-            encrypted_signature: encrypted_signature::alice(),
+            quote: quote::bob(),
+            swap_setup: bob::Behaviour::new(env_config, bitcoin_wallet),
+            transfer_proof: transfer_proof::bob(),
+            encrypted_signature: encrypted_signature::bob(),
+            redial: redial::Behaviour::new(alice, Duration::from_secs(2)),
             ping: Ping::default(),
         }
+    }
+
+    /// Add a known address for the given peer
+    pub fn add_address(&mut self, peer_id: PeerId, address: Multiaddr) {
+        self.quote.add_address(&peer_id, address.clone());
+        self.transfer_proof.add_address(&peer_id, address.clone());
+        self.encrypted_signature.add_address(&peer_id, address);
     }
 }
 

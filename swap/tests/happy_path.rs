@@ -1,7 +1,7 @@
 pub mod harness;
 
 use harness::SlowCancelConfig;
-use swap::protocol::alice::event_loop::FixedRate;
+use swap::asb::FixedRate;
 use swap::protocol::{alice, bob};
 use tokio::join;
 

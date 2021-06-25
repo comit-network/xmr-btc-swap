@@ -1,6 +1,5 @@
-use crate::monero;
 use crate::network::cbor_request_response::CborCodec;
-use crate::protocol::{alice, bob};
+use crate::{asb, cli, monero};
 use libp2p::core::ProtocolName;
 use libp2p::request_response::{
     ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
@@ -47,7 +46,7 @@ pub fn bob() -> Behaviour {
     )
 }
 
-impl From<(PeerId, Message)> for alice::OutEvent {
+impl From<(PeerId, Message)> for asb::OutEvent {
     fn from((peer, message): (PeerId, Message)) -> Self {
         match message {
             Message::Request { .. } => Self::unexpected_request(peer),
@@ -58,9 +57,9 @@ impl From<(PeerId, Message)> for alice::OutEvent {
         }
     }
 }
-crate::impl_from_rr_event!(OutEvent, alice::OutEvent, PROTOCOL);
+crate::impl_from_rr_event!(OutEvent, asb::OutEvent, PROTOCOL);
 
-impl From<(PeerId, Message)> for bob::OutEvent {
+impl From<(PeerId, Message)> for cli::OutEvent {
     fn from((peer, message): (PeerId, Message)) -> Self {
         match message {
             Message::Request {
@@ -74,4 +73,4 @@ impl From<(PeerId, Message)> for bob::OutEvent {
         }
     }
 }
-crate::impl_from_rr_event!(OutEvent, bob::OutEvent, PROTOCOL);
+crate::impl_from_rr_event!(OutEvent, cli::OutEvent, PROTOCOL);
