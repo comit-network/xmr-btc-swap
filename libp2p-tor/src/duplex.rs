@@ -5,7 +5,7 @@ use futures::future::BoxFuture;
 use futures::prelude::*;
 use libp2p::core::multiaddr::{Multiaddr, Protocol};
 use libp2p::core::transport::map_err::MapErr;
-use libp2p::core::transport::{Boxed, ListenerEvent, TransportError};
+use libp2p::core::transport::{ListenerEvent, TransportError};
 use libp2p::core::Transport;
 use libp2p::futures::stream::BoxStream;
 use libp2p::futures::{StreamExt, TryStreamExt};
@@ -15,7 +15,7 @@ use tokio::sync::Mutex;
 use torut::control::{AsyncEvent, AuthenticatedConn};
 use torut::onion::TorSecretKeyV3;
 
-type TorutAsyncEventHandler =
+pub type TorutAsyncEventHandler =
     fn(
         AsyncEvent<'_>,
     ) -> Box<dyn Future<Output = Result<(), torut::control::ConnError>> + Unpin + Send>;
@@ -31,13 +31,12 @@ pub struct TorConfig {
 impl TorConfig {
     pub async fn new(
         mut client: AuthenticatedConn<tokio::net::TcpStream, TorutAsyncEventHandler>,
-        // TODO: change to key directly
         key: TorSecretKeyV3,
     ) -> Result<Self, Error> {
         let socks_port = client.get_socks_port().await?;
 
         Ok(Self {
-            inner: TokioTcpConfig::new().map_err(Error::InnerTransport),
+            inner: TokioTcpConfig::new().nodelay(true).map_err(Error::InnerTransport),
             tor_client: Arc::new(Mutex::new(client)),
             key,
             socks_port,
@@ -86,7 +85,7 @@ impl Transport for TorConfig {
 
         let listener = self.inner.listen_on(localhost_tcp_random_port_addr)?;
 
-        let tor_client = self.tor_client;
+        let tor_client = self.tor_client.clone();
 
         let listener = listener
             .and_then({
@@ -99,36 +98,7 @@ impl Transport for TorConfig {
                     async move {
                         Ok(match event {
                             ListenerEvent::NewAddress(address) => {
-                                let local_port = address
-                                    .iter()
-                                    .find_map(|p| match p {
-                                        Protocol::Tcp(port) => Some(port),
-                                        _ => None,
-                                    })
-                                    .expect("TODO: Error handling");
-
-                                // TODO: Don't fully understand this part, why would we have two
-                                // different multiaddresses here? the actual onion address and the
-                                // multiaddress would make more sense...?
-                                tracing::debug!(
-                                    "Setting up hidden service at {} to forward to {}",
-                                    onion_multiaddress,
-                                    address
-                                );
-
-                                match tor_client
-                                    .clone()
-                                    .lock()
-                                    .await
-                                    // TODO: Potentially simplify this, in our setup the onion port
-                                    // is always equal to the local port. Otherwise we would have
-                                    // the user provide an additional port for the oion service.
-                                    .add_ephemeral_service(&key, onion_port, local_port)
-                                    .await
-                                {
-                                    Ok(()) => ListenerEvent::NewAddress(onion_multiaddress.clone()),
-                                    Err(e) => ListenerEvent::Error(Error::Torut(e)),
-                                }
+                                ListenerEvent::NewAddress(onion_multiaddress.clone())
                             }
                             ListenerEvent::Upgrade {
                                 upgrade,

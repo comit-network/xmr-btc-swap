@@ -13,15 +13,13 @@ use std::time::Duration;
 use torut::control::AuthenticatedConn;
 use torut::onion::TorSecretKeyV3;
 use tracing_subscriber::util::SubscriberInitExt;
+use libp2p_tor::duplex::TorutAsyncEventHandler;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
-    let _guard = tracing_subscriber::fmt()
-        .with_env_filter("debug,libp2p_tor=debug") // add `reqwest::connect::verbose=trace` if you want to logs of the RPC clients
-        .with_test_writer()
-        .set_default();
-
-    tracing::debug!("test");
+    tracing_subscriber::fmt()
+        .with_env_filter("trace") // add `reqwest::connect::verbose=trace` if you want to logs of the RPC clients
+        .init();
 
     let key = fixed_onion_identity();
 
@@ -31,37 +29,37 @@ async fn main() {
         .get_address_without_dot_onion();
     let onion_port = 7654;
 
-    let mut swarm = new_swarm().await;
+    let mut client = AuthenticatedConn::new(9051).await.unwrap();
+
+    client
+        .add_ephemeral_service(&key, onion_port, onion_port)
+        .await
+        .unwrap();
+
+    let mut swarm = new_swarm(client, key).await;
     let peer_id = *swarm.local_peer_id();
 
-    println!("Peer-ID: {}", peer_id);
+    tracing::info!("Peer-ID: {}", peer_id);
     // TODO: Figure out what to with the port, we could also set it to 0 and then
     // imply it from the assigned port swarm.listen_on(Multiaddr::
     // from_str(format!("/onion3/{}:{}", onion_address,
     // onion_port).as_str()).unwrap()).unwrap();
     swarm
         .listen_on(
-            Multiaddr::from_str(format!("/ip4/127.0.0.1/tcp/{}", onion_port).as_str()).unwrap(),
+            Multiaddr::from_str(format!("/onion3/{}:{}", onion_address, onion_port).as_str()).unwrap(),
         )
         .unwrap();
 
     loop {
         match swarm.next_event().await {
             SwarmEvent::NewListenAddr(addr) => {
-                println!("Listening on {}", addr);
-                println!("Connection string: {}/p2p/{}", addr, peer_id);
-
-                AuthenticatedConn::new(9051)
-                    .await
-                    .unwrap()
-                    .add_ephemeral_service(&key, onion_port, onion_port)
-                    .await
-                    .unwrap();
+                tracing::info!("Listening on {}", addr);
+                tracing::info!("Connection string: {}/p2p/{}", addr, peer_id);
             }
             SwarmEvent::ConnectionEstablished {
                 peer_id, endpoint, ..
             } => {
-                println!(
+                tracing::info!(
                     "Connected to {} via {}",
                     peer_id,
                     endpoint.get_remote_address()
@@ -69,17 +67,17 @@ async fn main() {
             }
             SwarmEvent::Behaviour(PingEvent { result, peer }) => match result {
                 Ok(PingSuccess::Pong) => {
-                    println!("Got pong from {}", peer);
+                    tracing::info!("Got pong from {}", peer);
                 }
                 Ok(PingSuccess::Ping { rtt }) => {
-                    println!("Pinged {} with rtt of {}s", peer, rtt.as_secs());
+                    tracing::info!("Pinged {} with rtt of {}s", peer, rtt.as_secs());
                 }
                 Err(failure) => {
-                    println!("Failed to ping {}: {}", peer, failure)
+                    tracing::info!("Failed to ping {}: {}", peer, failure)
                 }
             },
             event => {
-                println!("Swarm event: {:?}", event)
+                tracing::debug!("Swarm event: {:?}", event)
             }
         }
     }
@@ -90,11 +88,11 @@ async fn main() {
 ///
 /// In particular, this swarm can create ephemeral hidden services on the
 /// configured Tor node.
-async fn new_swarm() -> Swarm<Ping> {
+async fn new_swarm(client: AuthenticatedConn<tokio::net::TcpStream, TorutAsyncEventHandler>, key: TorSecretKeyV3) -> Swarm<Ping> {
     let identity = fixed_libp2p_identity();
 
     SwarmBuilder::new(
-        libp2p::tcp::TokioTcpConfig::new()
+        duplex::TorConfig::new(client, key).await.unwrap()
             .boxed()
             .upgrade(Version::V1)
             .authenticate(
