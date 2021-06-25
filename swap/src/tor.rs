@@ -46,23 +46,6 @@ impl Client {
         }
     }
 
-    /// checks if tor is running
-    pub async fn assert_tor_running(&self) -> Result<()> {
-        // Make sure you are running tor and this is your socks port
-        let proxy = reqwest::Proxy::all(format!("socks5h://{}", self.socks5_address).as_str())
-            .map_err(|_| anyhow!("tor proxy should be there"))?;
-        let client = reqwest::Client::builder().proxy(proxy).build()?;
-
-        let res = client.get("https://check.torproject.org").send().await?;
-        let text = res.text().await?;
-
-        if !text.contains("Congratulations. This browser is configured to use Tor.") {
-            bail!("Tor is currently not running")
-        }
-
-        Ok(())
-    }
-
     async fn init_unauthenticated_connection(&self) -> Result<UnauthenticatedConn<TcpStream>> {
         // Connect to local tor service via control port
         let sock = TcpStream::connect(self.control_port_address).await?;
@@ -72,7 +55,7 @@ impl Client {
 
     /// Create a new authenticated connection to your local Tor service
     pub async fn into_authenticated_client(self) -> Result<AuthenticatedClient> {
-        self.assert_tor_running().await?;
+        is_tor_daemon_running_on_port(self.socks5_address.port()).await?;
 
         let mut uc = self
             .init_unauthenticated_connection()
@@ -125,4 +108,21 @@ impl AuthenticatedClient {
             .await
             .map_err(|e| anyhow!("Could not add onion service.: {:#?}", e))
     }
+}
+
+/// checks if tor is running
+pub async fn is_tor_daemon_running_on_port(port: u16) -> Result<()> {
+    // Make sure you are running tor and this is your socks port
+    let proxy = reqwest::Proxy::all(format!("socks5h://127.0.0.1:{}", port).as_str())
+        .map_err(|_| anyhow!("tor proxy should be there"))?;
+    let client = reqwest::Client::builder().proxy(proxy).build()?;
+
+    let res = client.get("https://check.torproject.org").send().await?;
+    let text = res.text().await?;
+
+    if !text.contains("Congratulations. This browser is configured to use Tor.") {
+        bail!("Tor is currently not running")
+    }
+
+    Ok(())
 }

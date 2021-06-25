@@ -33,7 +33,7 @@ use swap::protocol::alice;
 use swap::protocol::alice::event_loop::KrakenRate;
 use swap::protocol::alice::{redeem, run, EventLoop};
 use swap::seed::Seed;
-use swap::tor::AuthenticatedClient;
+use swap::tor::{is_tor_daemon_running_on_port, AuthenticatedClient};
 use swap::{asb, bitcoin, kraken, monero, tor};
 use tracing::{debug, info, warn};
 use tracing_subscriber::filter::LevelFilter;
@@ -128,11 +128,12 @@ async fn main() -> Result<()> {
             let kraken_price_updates = kraken::connect()?;
 
             // setup Tor hidden services
-            let tor_client =
-                tor::Client::new(config.tor.socks5_port).with_control_port(config.tor.control_port);
-            let _ac = match tor_client.assert_tor_running().await {
+            let _ac = match is_tor_daemon_running_on_port(config.tor.socks5_port).await {
                 Ok(_) => {
                     tracing::info!("Tor found. Setting up hidden service");
+                    let tor_client = tor::Client::new(config.tor.socks5_port)
+                        .with_control_port(config.tor.control_port);
+
                     let ac =
                         register_tor_services(config.network.clone().listen, tor_client, &seed)
                             .await?;
