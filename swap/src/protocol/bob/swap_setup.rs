@@ -61,16 +61,12 @@ impl NetworkBehaviour for Behaviour {
     }
 
     fn addresses_of_peer(&mut self, _: &PeerId) -> Vec<Multiaddr> {
-        todo!()
+        Vec::new()
     }
 
-    fn inject_connected(&mut self, _: &PeerId) {
-        todo!()
-    }
+    fn inject_connected(&mut self, _: &PeerId) {}
 
-    fn inject_disconnected(&mut self, _: &PeerId) {
-        todo!()
-    }
+    fn inject_disconnected(&mut self, _: &PeerId) {}
 
     fn inject_event(&mut self, peer: PeerId, _: ConnectionId, completed: Completed) {
         self.completed_swaps.push_back((peer, completed));
@@ -221,6 +217,7 @@ impl ProtocolsHandler for Handler {
         self.keep_alive
     }
 
+    #[allow(clippy::type_complexity)]
     fn poll(
         &mut self,
         cx: &mut Context<'_>,
