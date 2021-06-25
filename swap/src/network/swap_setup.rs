@@ -1,4 +1,5 @@
 use crate::monero;
+use anyhow::{Context, Result};
 use libp2p::core::upgrade;
 use libp2p::swarm::NegotiatedSubstream;
 use serde::de::DeserializeOwned;
@@ -82,26 +83,29 @@ pub enum SpotPriceError {
     Other,
 }
 
-pub async fn read_cbor_message<T>(substream: &mut NegotiatedSubstream) -> anyhow::Result<T>
+pub async fn read_cbor_message<T>(substream: &mut NegotiatedSubstream) -> Result<T>
 where
     T: DeserializeOwned,
 {
-    let bytes = upgrade::read_one(substream, BUF_SIZE).await?;
+    let bytes = upgrade::read_one(substream, BUF_SIZE)
+        .await
+        .context("Failed to read length-prefixed message from stream")?;
     let mut de = serde_cbor::Deserializer::from_slice(&bytes);
-    let message = T::deserialize(&mut de)?;
+    let message =
+        T::deserialize(&mut de).context("Failed to deserialize bytes into message using CBOR")?;
 
     Ok(message)
 }
 
-pub async fn write_cbor_message<T>(
-    substream: &mut NegotiatedSubstream,
-    message: T,
-) -> anyhow::Result<()>
+pub async fn write_cbor_message<T>(substream: &mut NegotiatedSubstream, message: T) -> Result<()>
 where
     T: Serialize,
 {
-    let bytes = serde_cbor::to_vec(&message)?;
-    upgrade::write_with_len_prefix(substream, &bytes).await?;
+    let bytes =
+        serde_cbor::to_vec(&message).context("Failed to serialize message as bytes using CBOR")?;
+    upgrade::write_with_len_prefix(substream, &bytes)
+        .await
+        .context("Failed to write bytes as length-prefixed message")?;
 
     Ok(())
 }

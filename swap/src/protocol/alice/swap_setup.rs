@@ -1,9 +1,12 @@
-use std::collections::VecDeque;
-use std::fmt::Debug;
-use std::task::{Context, Poll};
-use std::time::Duration;
-
-use anyhow::{anyhow, Context as _, Result};
+use crate::network::swap_setup;
+use crate::network::swap_setup::{
+    protocol, BlockchainNetwork, SpotPriceError, SpotPriceRequest, SpotPriceResponse,
+};
+use crate::protocol::alice::event_loop::LatestRate;
+use crate::protocol::alice::{State0, State3};
+use crate::protocol::{alice, Message0, Message2, Message4};
+use crate::{bitcoin, env, monero};
+use anyhow::{anyhow, Context, Result};
 use futures::future::{BoxFuture, OptionFuture};
 use futures::FutureExt;
 use libp2p::core::connection::ConnectionId;
@@ -13,18 +16,12 @@ use libp2p::swarm::{
     ProtocolsHandler, ProtocolsHandlerEvent, ProtocolsHandlerUpgrErr, SubstreamProtocol,
 };
 use libp2p::{Multiaddr, PeerId};
-use std::time::Instant;
+use std::collections::VecDeque;
+use std::fmt::Debug;
+use std::task::Poll;
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 use void::Void;
-
-use crate::network::swap_setup;
-use crate::network::swap_setup::{
-    protocol, BlockchainNetwork, SpotPriceError, SpotPriceRequest, SpotPriceResponse,
-};
-use crate::protocol::alice::event_loop::LatestRate;
-use crate::protocol::alice::{State0, State3};
-use crate::protocol::{alice, Message0, Message2, Message4};
-use crate::{bitcoin, env, monero};
 
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -39,7 +36,7 @@ pub enum OutEvent {
     },
     Error {
         peer_id: PeerId,
-        error: Error,
+        error: anyhow::Error,
     },
 }
 
@@ -186,7 +183,7 @@ where
 
     fn poll(
         &mut self,
-        _cx: &mut Context<'_>,
+        _cx: &mut std::task::Context<'_>,
         _params: &mut impl PollParameters,
     ) -> Poll<NetworkBehaviourAction<(), Self::OutEvent>> {
         if let Some(event) = self.events.pop_front() {
@@ -197,7 +194,7 @@ where
     }
 }
 
-type InboundStream = BoxFuture<'static, anyhow::Result<(Uuid, alice::State3), Error>>;
+type InboundStream = BoxFuture<'static, Result<(Uuid, alice::State3)>>;
 
 pub struct Handler<LR> {
     inbound_stream: OptionFuture<InboundStream>,
@@ -239,7 +236,7 @@ impl<LR> Handler<LR> {
 #[allow(clippy::large_enum_variant)]
 pub enum HandlerOutEvent {
     Initiated(bmrng::RequestReceiver<bitcoin::Amount, WalletSnapshot>),
-    Completed(anyhow::Result<(Uuid, alice::State3), Error>),
+    Completed(Result<(Uuid, alice::State3)>),
 }
 
 impl<LR> ProtocolsHandler for Handler<LR>
@@ -278,11 +275,12 @@ where
         let protocol = tokio::time::timeout(self.timeout, async move {
             let request = swap_setup::read_cbor_message::<SpotPriceRequest>(&mut substream)
                 .await
-                .map_err(Error::Io)?;
+                .context("Failed to read spot price request")?;
+
             let wallet_snapshot = sender
                 .send_receive(request.btc)
                 .await
-                .map_err(|e| Error::WalletSnapshotFailed(anyhow!(e)))?;
+                .context("Failed to receive wallet snapshot")?;
 
             // wrap all of these into another future so we can `return` from all the
             // different blocks
@@ -334,24 +332,16 @@ where
                 Ok(xmr)
             };
 
-            let xmr = match validate.await {
-                Ok(xmr) => {
-                    swap_setup::write_cbor_message(&mut substream, SpotPriceResponse::Xmr(xmr))
-                        .await
-                        .map_err(Error::Io)?;
+            let result = validate.await;
 
-                    xmr
-                }
-                Err(e) => {
-                    swap_setup::write_cbor_message(
-                        &mut substream,
-                        SpotPriceResponse::Error(e.to_error_response()),
-                    )
-                    .await
-                    .map_err(Error::Io)?;
-                    return Err(e);
-                }
-            };
+            swap_setup::write_cbor_message(
+                &mut substream,
+                SpotPriceResponse::from_result_ref(&result),
+            )
+            .await
+            .context("Failed to write spot price response")?;
+
+            let xmr = result?;
 
             let state0 = State0::new(
                 request.btc,
@@ -366,35 +356,32 @@ where
 
             let message0 = swap_setup::read_cbor_message::<Message0>(&mut substream)
                 .await
-                .context("Failed to deserialize message0")
-                .map_err(Error::Io)?;
-            let (swap_id, state1) = state0.receive(message0).map_err(Error::Io)?;
+                .context("Failed to read message0")?;
+            let (swap_id, state1) = state0
+                .receive(message0)
+                .context("Failed to transition state0 -> state1 using message0")?;
 
             swap_setup::write_cbor_message(&mut substream, state1.next_message())
                 .await
-                .map_err(Error::Io)?;
+                .context("Failed to send message1")?;
 
             let message2 = swap_setup::read_cbor_message::<Message2>(&mut substream)
                 .await
-                .context("Failed to deserialize message2")
-                .map_err(Error::Io)?;
+                .context("Failed to read message2")?;
             let state2 = state1
                 .receive(message2)
-                .context("Failed to receive Message2")
-                .map_err(Error::Io)?;
+                .context("Failed to transition state1 -> state2 using message2")?;
 
             swap_setup::write_cbor_message(&mut substream, state2.next_message())
                 .await
-                .map_err(Error::Io)?;
+                .context("Failed to send message3")?;
 
             let message4 = swap_setup::read_cbor_message::<Message4>(&mut substream)
                 .await
-                .context("Failed to deserialize message4")
-                .map_err(Error::Io)?;
+                .context("Failed to read message4")?;
             let state3 = state2
                 .receive(message4)
-                .context("Failed to receive Message4")
-                .map_err(Error::Io)?;
+                .context("Failed to transition state2 -> state3 using message4")?;
 
             Ok((swap_id, state3))
         });
@@ -402,8 +389,8 @@ where
         let max_seconds = self.timeout.as_secs();
         self.inbound_stream = OptionFuture::from(Some(
             async move {
-                protocol.await.map_err(|_| Error::Timeout {
-                    seconds: max_seconds,
+                protocol.await.with_context(|| {
+                    format!("Failed to complete execution setup within {}s", max_seconds)
                 })?
             }
             .boxed(),
@@ -413,7 +400,7 @@ where
     }
 
     fn inject_fully_negotiated_outbound(&mut self, _: Void, _: Self::OutboundOpenInfo) {
-        unreachable!("Alice does not support outbound in the hanlder")
+        unreachable!("Alice does not support outbound in the handler")
     }
 
     fn inject_event(&mut self, _: Self::InEvent) {
@@ -435,7 +422,7 @@ where
     #[allow(clippy::type_complexity)]
     fn poll(
         &mut self,
-        cx: &mut Context<'_>,
+        cx: &mut std::task::Context<'_>,
     ) -> Poll<
         ProtocolsHandlerEvent<
             Self::OutboundProtocol,
@@ -460,8 +447,15 @@ where
     }
 }
 
-// TODO: Differentiate between errors that we send back and shit that happens on
-// our side (IO, timeout)
+impl SpotPriceResponse {
+    pub fn from_result_ref(result: &Result<monero::Amount, Error>) -> Self {
+        match result {
+            Ok(amount) => SpotPriceResponse::Xmr(*amount),
+            Err(error) => SpotPriceResponse::Error(error.to_error_response()),
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("ASB is running in resume-only mode")]
@@ -490,12 +484,6 @@ pub enum Error {
         cli: BlockchainNetwork,
         asb: BlockchainNetwork,
     },
-    #[error("Io Error")]
-    Io(#[source] anyhow::Error),
-    #[error("Failed to request wallet snapshot")]
-    WalletSnapshotFailed(#[source] anyhow::Error),
-    #[error("Failed to complete execution setup within {seconds}s")]
-    Timeout { seconds: u64 },
 }
 
 impl Error {
@@ -517,11 +505,9 @@ impl Error {
                     asb: *asb,
                 }
             }
-            Error::LatestRateFetchFailed(_)
-            | Error::SellQuoteCalculationFailed(_)
-            | Error::WalletSnapshotFailed(_)
-            | Error::Timeout { .. }
-            | Error::Io(_) => SpotPriceError::Other,
+            Error::LatestRateFetchFailed(_) | Error::SellQuoteCalculationFailed(_) => {
+                SpotPriceError::Other
+            }
         }
     }
 }
