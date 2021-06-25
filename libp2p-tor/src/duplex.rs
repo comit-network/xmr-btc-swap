@@ -78,6 +78,10 @@ impl Transport for TorConfig {
         let onion_bytes = key.public().get_onion_address().get_raw_bytes();
         let onion_port = onion.port();
 
+        if onion.hash() != &onion_bytes {
+            return Err(TransportError::MultiaddrNotSupported(addr));
+        }
+
         let localhost_tcp_random_port_addr = format!("/ip4/127.0.0.1/tcp/{}", onion_port).as_str()
             .parse()
             .expect("always a valid multiaddr");
