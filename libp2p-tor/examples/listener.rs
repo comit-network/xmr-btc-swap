@@ -129,13 +129,7 @@ async fn new_swarm(client: AuthenticatedConn<tokio::net::TcpStream, TorutAsyncEv
 }
 
 fn fixed_onion_identity() -> TorSecretKeyV3 {
-    let fixed_onion_bytes = [
-        6, 164, 217, 80, 139, 239, 11, 110, 37, 77, 191, 158, 206, 252, 178, 188, 147, 98, 54, 13,
-        35, 183, 114, 231, 202, 38, 30, 29, 245, 8, 118, 153, 55, 141, 228, 109, 78, 189, 120, 28,
-        172, 131, 198, 55, 113, 47, 10, 135, 139, 117, 182, 195, 46, 34, 234, 169, 85, 96, 203,
-        215, 7, 155, 209, 211,
-    ];
-    fixed_onion_bytes.into()
+    TorSecretKeyV3::generate()
 }
 
 fn fixed_libp2p_identity() -> Keypair {
