@@ -1,12 +1,10 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use std::sync::Arc;
-
-use uuid::Uuid;
-
 use crate::database::Database;
 use crate::env::Config;
 use crate::{bitcoin, monero};
+use std::sync::Arc;
+use uuid::Uuid;
 
 pub use self::behaviour::{Behaviour, OutEvent};
 pub use self::event_loop::{EventLoop, EventLoopHandle};

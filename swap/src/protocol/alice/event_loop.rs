@@ -152,7 +152,13 @@ where
                     match swarm_event {
                         SwarmEvent::Behaviour(OutEvent::SwapSetupInitiated { mut send_wallet_snapshot }) => {
 
-                            let (btc, responder) = send_wallet_snapshot.recv().await.expect("TODO: handle error");
+                            let (btc, responder) = match send_wallet_snapshot.recv().await {
+                                Ok((btc, responder)) => (btc, responder),
+                                Err(error) => {
+                                    tracing::error!("Swap request will be ignored because of a failure when requesting information for the wallet snapshot: {:#}", error);
+                                    continue;
+                                }
+                            };
 
                             let wallet_snapshot = match WalletSnapshot::capture(&self.bitcoin_wallet, &self.monero_wallet, btc).await {
                                 Ok(wallet_snapshot) => wallet_snapshot,

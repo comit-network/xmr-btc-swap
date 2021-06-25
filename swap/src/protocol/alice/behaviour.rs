@@ -1,15 +1,14 @@
-use anyhow::{anyhow, Error};
-use libp2p::ping::{Ping, PingEvent};
-use libp2p::request_response::{RequestId, ResponseChannel};
-use libp2p::{NetworkBehaviour, PeerId};
-use uuid::Uuid;
-
 use crate::env;
 use crate::network::quote::BidQuote;
 use crate::network::{encrypted_signature, quote, transfer_proof};
 use crate::protocol::alice::event_loop::LatestRate;
 use crate::protocol::alice::swap_setup::WalletSnapshot;
 use crate::protocol::alice::{swap_setup, State3};
+use anyhow::{anyhow, Error};
+use libp2p::ping::{Ping, PingEvent};
+use libp2p::request_response::{RequestId, ResponseChannel};
+use libp2p::{NetworkBehaviour, PeerId};
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub enum OutEvent {
