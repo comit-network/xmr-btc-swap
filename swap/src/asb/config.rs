@@ -27,6 +27,7 @@ pub struct Defaults {
     listen_address_ws: Multiaddr,
     electrum_rpc_url: Url,
     monero_wallet_rpc_url: Url,
+    price_ticker_ws_url: Url,
     bitcoin_confirmation_target: usize,
 }
 
@@ -41,6 +42,7 @@ impl GetDefaults for Testnet {
             listen_address_ws: Multiaddr::from_str("/ip4/0.0.0.0/tcp/9940/ws")?,
             electrum_rpc_url: Url::parse("ssl://electrum.blockstream.info:60002")?,
             monero_wallet_rpc_url: Url::parse("http://127.0.0.1:38083/json_rpc")?,
+            price_ticker_ws_url: Url::parse("wss://ws.kraken.com")?,
             bitcoin_confirmation_target: 1,
         };
 
@@ -59,6 +61,7 @@ impl GetDefaults for Mainnet {
             listen_address_ws: Multiaddr::from_str("/ip4/0.0.0.0/tcp/9940/ws")?,
             electrum_rpc_url: Url::parse("ssl://electrum.blockstream.info:50002")?,
             monero_wallet_rpc_url: Url::parse("http://127.0.0.1:18083/json_rpc")?,
+            price_ticker_ws_url: Url::parse("wss://ws.kraken.com")?,
             bitcoin_confirmation_target: 3,
         };
 
@@ -151,6 +154,7 @@ pub struct Maker {
     #[serde(with = "::bitcoin::util::amount::serde::as_btc")]
     pub max_buy_btc: bitcoin::Amount,
     pub ask_spread: Decimal,
+    pub price_ticker_ws_url: Url,
 }
 
 impl Default for TorConf {
@@ -307,6 +311,7 @@ pub fn query_user_for_initial_config(testnet: bool) -> Result<Config> {
             min_buy_btc: min_buy,
             max_buy_btc: max_buy,
             ask_spread,
+            price_ticker_ws_url: defaults.price_ticker_ws_url,
         },
     })
 }
@@ -347,6 +352,7 @@ mod tests {
                 min_buy_btc: bitcoin::Amount::from_btc(DEFAULT_MIN_BUY_AMOUNT).unwrap(),
                 max_buy_btc: bitcoin::Amount::from_btc(DEFAULT_MAX_BUY_AMOUNT).unwrap(),
                 ask_spread: Decimal::from_f64(DEFAULT_SPREAD).unwrap(),
+                price_ticker_ws_url: defaults.price_ticker_ws_url,
             },
         };
 
@@ -387,6 +393,7 @@ mod tests {
                 min_buy_btc: bitcoin::Amount::from_btc(DEFAULT_MIN_BUY_AMOUNT).unwrap(),
                 max_buy_btc: bitcoin::Amount::from_btc(DEFAULT_MAX_BUY_AMOUNT).unwrap(),
                 ask_spread: Decimal::from_f64(DEFAULT_SPREAD).unwrap(),
+                price_ticker_ws_url: defaults.price_ticker_ws_url,
             },
         };
 

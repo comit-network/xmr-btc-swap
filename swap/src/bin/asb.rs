@@ -124,7 +124,7 @@ async fn main() -> Result<()> {
                 info!(%monero_balance, "Initialized Monero wallet");
             }
 
-            let kraken_price_updates = kraken::connect()?;
+            let kraken_price_updates = kraken::connect(config.maker.price_ticker_ws_url)?;
 
             // setup Tor hidden services
             let tor_client =

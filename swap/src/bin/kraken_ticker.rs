@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use url::Url;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -6,7 +7,9 @@ async fn main() -> Result<()> {
         tracing_subscriber::fmt().with_env_filter("debug").finish(),
     )?;
 
-    let mut ticker = swap::kraken::connect().context("Failed to connect to kraken")?;
+    let price_ticker_ws_url = Url::parse("wss://ws.kraken.com")?;
+    let mut ticker =
+        swap::kraken::connect(price_ticker_ws_url).context("Failed to connect to kraken")?;
 
     loop {
         match ticker.wait_for_next_update().await? {
