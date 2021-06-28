@@ -24,7 +24,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use swap::bitcoin::TxLock;
 use swap::cli::command::{parse_args_and_apply_defaults, Arguments, Command, ParseResult};
-use swap::cli::EventLoop;
+use swap::cli::{list_sellers, EventLoop};
 use swap::database::Database;
 use swap::env::Config;
 use swap::network::quote::BidQuote;
@@ -68,7 +68,7 @@ async fn main() -> Result<()> {
         } => {
             let swap_id = Uuid::new_v4();
 
-            cli::tracing::init(debug, json, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -159,7 +159,7 @@ async fn main() -> Result<()> {
             monero_daemon_address,
             tor_socks5_port,
         } => {
-            cli::tracing::init(debug, json, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -221,7 +221,7 @@ async fn main() -> Result<()> {
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
         } => {
-            cli::tracing::init(debug, json, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -253,7 +253,7 @@ async fn main() -> Result<()> {
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
         } => {
-            cli::tracing::init(debug, json, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -269,6 +269,30 @@ async fn main() -> Result<()> {
             .await?;
 
             cli::refund(swap_id, Arc::new(bitcoin_wallet), db, force).await??;
+        }
+        Command::ListSellers {
+            rendezvous_node_peer_id,
+            rendezvous_node_addr,
+            namespace,
+            tor_socks5_port,
+        } => {
+            cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
+            let seed = Seed::from_file_or_generate(data_dir.as_path())
+                .context("Failed to read in seed file")?;
+            let identity = seed.derive_libp2p_identity();
+
+            let makers = list_sellers(
+                rendezvous_node_peer_id,
+                rendezvous_node_addr,
+                namespace,
+                tor_socks5_port,
+                identity,
+            )
+            .await?;
+
+            for maker in makers {
+                tracing::info!(peer_id=%maker.peer_id, multiaddr=%maker.multiaddr, price=%maker.quote.price, max_quantity=%maker.quote.max_quantity, min_quantity=%maker.quote.min_quantity);
+            }
         }
     };
     Ok(())
