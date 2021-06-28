@@ -149,9 +149,9 @@ where
 
         loop {
             tokio::select! {
-                swarm_event = self.swarm.next_event() => {
+                swarm_event = self.swarm.next() => {
                     match swarm_event {
-                        SwarmEvent::Behaviour(OutEvent::SwapSetupInitiated { mut send_wallet_snapshot }) => {
+                        Some(SwarmEvent::Behaviour(OutEvent::SwapSetupInitiated { mut send_wallet_snapshot })) => {
 
                             let (btc, responder) = match send_wallet_snapshot.recv().await {
                                 Ok((btc, responder)) => (btc, responder),
@@ -172,13 +172,13 @@ where
                             // Ignore result, we should never hit this because the receiver will alive as long as the connection is.
                             let _ = responder.respond(wallet_snapshot);
                         }
-                        SwarmEvent::Behaviour(OutEvent::SwapSetupCompleted{peer_id, swap_id, state3}) => {
+                        Some(SwarmEvent::Behaviour(OutEvent::SwapSetupCompleted{peer_id, swap_id, state3})) => {
                             let _ = self.handle_execution_setup_done(peer_id, swap_id, *state3).await;
                         }
-                        SwarmEvent::Behaviour(OutEvent::SwapDeclined { peer, error }) => {
+                        Some(SwarmEvent::Behaviour(OutEvent::SwapDeclined { peer, error })) => {
                             tracing::warn!(%peer, "Ignoring spot price request because: {}", error);
                         }
-                        SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer }) => {
+                        Some(SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer })) => {
                             let quote = match self.make_quote(self.min_buy, self.max_buy).await {
                                 Ok(quote) => quote,
                                 Err(error) => {
@@ -191,13 +191,13 @@ where
                                 tracing::debug!(%peer, "Failed to respond with quote");
                             }
                         }
-                        SwarmEvent::Behaviour(OutEvent::TransferProofAcknowledged { peer, id }) => {
+                        Some(SwarmEvent::Behaviour(OutEvent::TransferProofAcknowledged { peer, id })) => {
                             tracing::debug!(%peer, "Bob acknowledged transfer proof");
                             if let Some(responder) = self.inflight_transfer_proofs.remove(&id) {
                                 let _ = responder.respond(());
                             }
                         }
-                        SwarmEvent::Behaviour(OutEvent::EncryptedSignatureReceived{ msg, channel, peer }) => {
+                        Some(SwarmEvent::Behaviour(OutEvent::EncryptedSignatureReceived{ msg, channel, peer })) => {
                             let swap_id = msg.swap_id;
                             let swap_peer = self.db.get_peer_id(swap_id);
 
@@ -246,12 +246,12 @@ where
                                 channel
                             }.boxed());
                         }
-                        SwarmEvent::Behaviour(OutEvent::Failure {peer, error}) => {
+                        Some(SwarmEvent::Behaviour(OutEvent::Failure {peer, error})) => {
                             tracing::error!(
                                 %peer,
                                 "Communication error. Error {:#}", error);
                         }
-                        SwarmEvent::ConnectionEstablished { peer_id: peer, endpoint, .. } => {
+                        Some(SwarmEvent::ConnectionEstablished { peer_id: peer, endpoint, .. }) => {
                             tracing::debug!(%peer, address = %endpoint.get_remote_address(), "New connection established");
 
                             if let Some(transfer_proofs) = self.buffered_transfer_proofs.remove(&peer) {
@@ -263,16 +263,16 @@ where
                                 }
                             }
                         }
-                        SwarmEvent::IncomingConnectionError { send_back_addr: address, error, .. } => {
+                        Some(SwarmEvent::IncomingConnectionError { send_back_addr: address, error, .. }) => {
                             tracing::warn!(%address, "Failed to set up connection with peer. Error {:#}", error);
                         }
-                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause: Some(error) } if num_established == 0 => {
+                        Some(SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause: Some(error) }) if num_established == 0 => {
                             tracing::warn!(%peer, address = %endpoint.get_remote_address(), "Lost connection. Error {:#}", error);
                         }
-                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause: None } if num_established == 0 => {
+                        Some(SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause: None }) if num_established == 0 => {
                             tracing::info!(%peer, address = %endpoint.get_remote_address(), "Successfully closed connection");
                         }
-                        SwarmEvent::NewListenAddr(address) => {
+                        Some(SwarmEvent::NewListenAddr(address)) => {
                             tracing::info!(%address, "New listen address detected");
                         }
                         _ => {}
