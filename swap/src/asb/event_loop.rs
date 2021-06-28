@@ -148,7 +148,7 @@ where
 
         loop {
             tokio::select! {
-                swarm_event = self.swarm.next_event() => {
+                swarm_event = self.swarm.select_next_some() => {
                     match swarm_event {
                         SwarmEvent::Behaviour(OutEvent::SwapSetupInitiated { mut send_wallet_snapshot }) => {
 

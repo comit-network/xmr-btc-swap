@@ -24,7 +24,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use swap::bitcoin::TxLock;
 use swap::cli::command::{parse_args_and_apply_defaults, Arguments, Command, ParseResult};
-use swap::cli::EventLoop;
+use swap::cli::{list_sellers, EventLoop};
 use swap::database::Database;
 use swap::env::Config;
 use swap::libp2p_ext::MultiAddrExt;
@@ -65,7 +65,7 @@ async fn main() -> Result<()> {
         } => {
             let swap_id = Uuid::new_v4();
 
-            cli::tracing::init(debug, json, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -157,7 +157,7 @@ async fn main() -> Result<()> {
             monero_daemon_address,
             tor_socks5_port,
         } => {
-            cli::tracing::init(debug, json, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -223,7 +223,7 @@ async fn main() -> Result<()> {
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
         } => {
-            cli::tracing::init(debug, json, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -255,7 +255,7 @@ async fn main() -> Result<()> {
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
         } => {
-            cli::tracing::init(debug, json, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -271,6 +271,50 @@ async fn main() -> Result<()> {
             .await?;
 
             cli::refund(swap_id, Arc::new(bitcoin_wallet), db, force).await??;
+        }
+        Command::ListSellers {
+            rendezvous_node_addr,
+            namespace,
+            tor_socks5_port,
+        } => {
+            let rendezvous_node_peer_id = rendezvous_node_addr
+                .extract_peer_id()
+                .context("Rendezvous node address must contain peer ID")?;
+
+            cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
+            let seed = Seed::from_file_or_generate(data_dir.as_path())
+                .context("Failed to read in seed file")?;
+            let identity = seed.derive_libp2p_identity();
+
+            let sellers = list_sellers(
+                rendezvous_node_peer_id,
+                rendezvous_node_addr,
+                namespace,
+                tor_socks5_port,
+                identity,
+            )
+            .await?;
+
+            if json {
+                for seller in sellers {
+                    println!("{}", serde_json::to_string(&seller)?);
+                }
+            } else {
+                let mut table = Table::new();
+
+                table.set_header(vec!["PRICE", "MIN_QUANTITY", "MAX_QUANTITY", "ADDRESS"]);
+
+                for seller in sellers {
+                    table.add_row(vec![
+                        seller.quote.price.to_string(),
+                        seller.quote.min_quantity.to_string(),
+                        seller.quote.max_quantity.to_string(),
+                        seller.multiaddr.to_string(),
+                    ]);
+                }
+
+                println!("{}", table);
+            }
         }
     };
     Ok(())

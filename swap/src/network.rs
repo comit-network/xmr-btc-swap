@@ -7,6 +7,7 @@ pub mod encrypted_signature;
 pub mod json_pull_codec;
 pub mod quote;
 pub mod redial;
+pub mod rendezvous;
 pub mod swap_setup;
 pub mod swarm;
 pub mod tor_transport;
