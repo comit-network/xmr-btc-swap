@@ -228,7 +228,7 @@ impl<LR> Handler<LR> {
             latest_rate,
             resume_only,
             timeout: Duration::from_secs(120),
-            keep_alive: KeepAlive::Until(Instant::now() + Duration::from_secs(5)),
+            keep_alive: KeepAlive::Until(Instant::now() + Duration::from_secs(10)),
         }
     }
 }
@@ -445,7 +445,6 @@ where
         }
 
         if let Some(result) = futures::ready!(self.inbound_stream.poll_unpin(cx)) {
-            self.keep_alive = KeepAlive::No;
             self.inbound_stream = OptionFuture::from(None);
             return Poll::Ready(ProtocolsHandlerEvent::Custom(HandlerOutEvent::Completed(
                 result,

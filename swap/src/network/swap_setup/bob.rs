@@ -19,7 +19,7 @@ use libp2p::{Multiaddr, PeerId};
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use uuid::Uuid;
 use void::Void;
 
@@ -112,7 +112,7 @@ impl Handler {
             timeout: Duration::from_secs(120),
             new_swaps: VecDeque::default(),
             bitcoin_wallet,
-            keep_alive: KeepAlive::Until(Instant::now() + Duration::from_secs(5)),
+            keep_alive: KeepAlive::Yes,
         }
     }
 }
@@ -240,7 +240,6 @@ impl ProtocolsHandler for Handler {
         }
 
         if let Some(result) = futures::ready!(self.outbound_stream.poll_unpin(cx)) {
-            self.keep_alive = KeepAlive::No;
             self.outbound_stream = OptionFuture::from(None);
             return Poll::Ready(ProtocolsHandlerEvent::Custom(Completed(result)));
         }
