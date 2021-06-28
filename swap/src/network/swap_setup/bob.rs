@@ -7,7 +7,7 @@ use crate::protocol::{Message1, Message3};
 use crate::{bitcoin, cli, env, monero};
 use anyhow::Result;
 use futures::future::{BoxFuture, OptionFuture};
-use futures::FutureExt;
+use futures::{AsyncWriteExt, FutureExt};
 use libp2p::core::connection::ConnectionId;
 use libp2p::core::upgrade;
 use libp2p::swarm::{
@@ -187,6 +187,9 @@ impl ProtocolsHandler for Handler {
             let state2 = state1.receive(message3)?;
 
             write_cbor_message(&mut substream, state2.next_message()).await?;
+
+            substream.flush().await?;
+            substream.close().await?;
 
             Ok(state2)
         });

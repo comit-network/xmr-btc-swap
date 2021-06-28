@@ -8,7 +8,7 @@ use crate::protocol::{Message0, Message2, Message4};
 use crate::{asb, bitcoin, env, monero};
 use anyhow::{anyhow, Context, Result};
 use futures::future::{BoxFuture, OptionFuture};
-use futures::FutureExt;
+use futures::{AsyncWriteExt, FutureExt};
 use libp2p::core::connection::ConnectionId;
 use libp2p::core::upgrade;
 use libp2p::swarm::{
@@ -382,6 +382,15 @@ where
             let state3 = state2
                 .receive(message4)
                 .context("Failed to transition state2 -> state3 using message4")?;
+
+            substream
+                .flush()
+                .await
+                .context("Failed to flush substream after all messages were sent")?;
+            substream
+                .close()
+                .await
+                .context("Failed to close substream after all messages were sent")?;
 
             Ok((swap_id, state3))
         });
