@@ -1,3 +1,4 @@
+use crate::cli::list_sellers::XmrBtcNamespace;
 use crate::env::GetConfig;
 use crate::fs::system_data_dir;
 use crate::{env, monero};
@@ -193,6 +194,22 @@ where
                 bitcoin_target_block: bitcoin_target_block_from(bitcoin_target_block, is_testnet),
             },
         },
+        RawCommand::ListSellers {
+            rendezvous_node_peer_id,
+            rendezvous_node_addr,
+            tor: Tor { tor_socks5_port },
+        } => Arguments {
+            env_config: env_config_from(is_testnet),
+            debug,
+            json,
+            data_dir: data::data_dir_from(data, is_testnet)?,
+            cmd: Command::ListSellers {
+                rendezvous_node_peer_id,
+                rendezvous_node_addr,
+                namespace: rendezvous_namespace_from(is_testnet),
+                tor_socks5_port,
+            },
+        },
     };
 
     Ok(ParseResult::Arguments(arguments))
@@ -230,6 +247,12 @@ pub enum Command {
         force: bool,
         bitcoin_electrum_rpc_url: Url,
         bitcoin_target_block: usize,
+    },
+    ListSellers {
+        rendezvous_node_peer_id: PeerId,
+        rendezvous_node_addr: Multiaddr,
+        namespace: XmrBtcNamespace,
+        tor_socks5_port: u16,
     },
 }
 
@@ -324,6 +347,24 @@ pub enum RawCommand {
         #[structopt(flatten)]
         bitcoin: Bitcoin,
     },
+    ListSellers {
+        // TODO: sane default value
+        #[structopt(
+            long,
+            help = "The peer-id of a rendezvous node that sellers register with"
+        )]
+        rendezvous_node_peer_id: PeerId,
+
+        // TODO: sane default value
+        #[structopt(
+            long,
+            help = "The multiaddr of a rendezvous node that sellers register with"
+        )]
+        rendezvous_node_addr: Multiaddr,
+
+        #[structopt(flatten)]
+        tor: Tor,
+    },
 }
 
 #[derive(structopt::StructOpt, Debug)]
@@ -413,6 +454,14 @@ fn bitcoin_electrum_rpc_url_from(url: Option<Url>, testnet: bool) -> Result<Url>
         Ok(Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)?)
     } else {
         Ok(Url::from_str(DEFAULT_ELECTRUM_RPC_URL)?)
+    }
+}
+
+fn rendezvous_namespace_from(is_testnet: bool) -> XmrBtcNamespace {
+    if is_testnet {
+        XmrBtcNamespace::Testnet
+    } else {
+        XmrBtcNamespace::Mainnet
     }
 }
 

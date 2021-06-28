@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::option::Option::Some;
 use std::path::Path;
 use tracing::subscriber::set_global_default;
 use tracing::{Event, Level, Subscriber};
@@ -8,7 +9,7 @@ use tracing_subscriber::layer::{Context, SubscriberExt};
 use tracing_subscriber::{fmt, EnvFilter, FmtSubscriber, Layer, Registry};
 use uuid::Uuid;
 
-pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>, swap_id: Uuid) -> Result<()> {
+pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>, swap_id: Option<Uuid>) -> Result<()> {
     if json {
         let level = if debug { Level::DEBUG } else { Level::INFO };
 
@@ -24,7 +25,7 @@ pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>, swap_id: Uuid) -> Re
             .init();
 
         Ok(())
-    } else {
+    } else if let Some(swap_id) = swap_id {
         let level_filter = EnvFilter::try_new("swap=debug")?;
 
         let registry = Registry::default().with(level_filter);
@@ -44,6 +45,19 @@ pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>, swap_id: Uuid) -> Re
         } else {
             set_global_default(registry.with(file_logger).with(info_terminal_printer()))?;
         }
+
+        Ok(())
+    } else {
+        let level = if debug { Level::DEBUG } else { Level::INFO };
+        let is_terminal = atty::is(atty::Stream::Stderr);
+
+        FmtSubscriber::builder()
+            .with_env_filter(format!("swap={}", level))
+            .with_writer(std::io::stderr)
+            .with_ansi(is_terminal)
+            .with_timer(ChronoLocal::with_format("%F %T".to_owned()))
+            .with_target(false)
+            .init();
 
         Ok(())
     }
