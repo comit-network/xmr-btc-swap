@@ -2,8 +2,8 @@ pub mod harness;
 
 use harness::alice_run_until::is_encsig_learned;
 use harness::SlowCancelConfig;
-use swap::protocol::alice::event_loop::FixedRate;
-use swap::protocol::alice::redeem::Finality;
+use swap::asb;
+use swap::asb::{Finality, FixedRate};
 use swap::protocol::alice::AliceState;
 use swap::protocol::{alice, bob};
 
@@ -28,7 +28,7 @@ async fn alice_manually_redeems_after_enc_sig_learned() {
         // manual redeem
         ctx.restart_alice().await;
         let alice_swap = ctx.alice_next_swap().await;
-        let (_, alice_state) = alice::redeem(
+        let (_, alice_state) = asb::redeem(
             alice_swap.swap_id,
             alice_swap.bitcoin_wallet,
             alice_swap.db,

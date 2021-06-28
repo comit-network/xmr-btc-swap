@@ -1,9 +1,11 @@
+use crate::asb::behaviour::{Behaviour, OutEvent};
 use crate::asb::Rate;
 use crate::database::Database;
 use crate::env::Config;
 use crate::network::quote::BidQuote;
+use crate::network::swap_setup::alice::WalletSnapshot;
 use crate::network::transfer_proof;
-use crate::protocol::alice::{AliceState, Behaviour, OutEvent, State0, State3, Swap};
+use crate::protocol::alice::{AliceState, State3, Swap};
 use crate::{bitcoin, kraken, monero};
 use anyhow::{Context, Result};
 use futures::future;
@@ -12,7 +14,6 @@ use futures::stream::{FuturesUnordered, StreamExt};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
-use rand::rngs::OsRng;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -34,7 +35,7 @@ type OutgoingTransferProof =
 #[allow(missing_debug_implementations)]
 pub struct EventLoop<LR>
 where
-    LR: LatestRate + Send + 'static + Debug,
+    LR: LatestRate + Send + 'static + Debug + Clone,
 {
     swarm: libp2p::Swarm<Behaviour<LR>>,
     env_config: Config,
@@ -64,7 +65,7 @@ where
 
 impl<LR> EventLoop<LR>
 where
-    LR: LatestRate + Send + 'static + Debug,
+    LR: LatestRate + Send + 'static + Debug + Clone,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -150,77 +151,34 @@ where
             tokio::select! {
                 swarm_event = self.swarm.next_event() => {
                     match swarm_event {
-                        SwarmEvent::Behaviour(OutEvent::ExecutionSetupStart { peer, btc, xmr }) => {
+                        SwarmEvent::Behaviour(OutEvent::SwapSetupInitiated { mut send_wallet_snapshot }) => {
 
-                            let tx_redeem_fee = self.bitcoin_wallet
-                                .estimate_fee(bitcoin::TxRedeem::weight(), btc)
-                                .await;
-                            let tx_punish_fee = self.bitcoin_wallet
-                                .estimate_fee(bitcoin::TxPunish::weight(), btc)
-                                .await;
-                            let redeem_address = self.bitcoin_wallet.new_address().await;
-                            let punish_address = self.bitcoin_wallet.new_address().await;
-
-                            let (redeem_address, punish_address) = match (
-                                redeem_address,
-                                punish_address,
-                            ) {
-                                (Ok(redeem_address), Ok(punish_address)) => {
-                                    (redeem_address, punish_address)
-                                }
-                                _ => {
-                                    tracing::error!(%peer, "Failed to get new address during execution setup");
-                                    continue;
-                                }
-                            };
-
-                            let (tx_redeem_fee, tx_punish_fee) = match (
-                                tx_redeem_fee,
-                                tx_punish_fee,
-                            ) {
-                                (Ok(tx_redeem_fee), Ok(tx_punish_fee)) => {
-                                    (tx_redeem_fee, tx_punish_fee)
-                                }
-                                _ => {
-                                    tracing::error!(%peer, "Failed to calculate transaction fees during execution setup");
-                                    continue;
-                                }
-                            };
-
-                            let state0 = match State0::new(
-                                btc,
-                                xmr,
-                                self.env_config,
-                                redeem_address,
-                                punish_address,
-                                tx_redeem_fee,
-                                tx_punish_fee,
-                                &mut OsRng
-                            ) {
-                                Ok(state) => state,
+                            let (btc, responder) = match send_wallet_snapshot.recv().await {
+                                Ok((btc, responder)) => (btc, responder),
                                 Err(error) => {
-                                    tracing::warn!(%peer, "Failed to make State0 for execution setup. Error {:#}", error);
+                                    tracing::error!("Swap request will be ignored because of a failure when requesting information for the wallet snapshot: {:#}", error);
                                     continue;
                                 }
                             };
 
-                            self.swarm.behaviour_mut().execution_setup.run(peer, state0);
+                            let wallet_snapshot = match WalletSnapshot::capture(&self.bitcoin_wallet, &self.monero_wallet, btc).await {
+                                Ok(wallet_snapshot) => wallet_snapshot,
+                                Err(error) => {
+                                    tracing::error!("Swap request will be ignored because we were unable to create wallet snapshot for swap: {:#}", error);
+                                    continue;
+                                }
+                            };
+
+                            // Ignore result, we should never hit this because the receiver will alive as long as the connection is.
+                            let _ = responder.respond(wallet_snapshot);
                         }
-                        SwarmEvent::Behaviour(OutEvent::SwapRequestDeclined { peer, error }) => {
+                        SwarmEvent::Behaviour(OutEvent::SwapSetupCompleted{peer_id, swap_id, state3}) => {
+                            let _ = self.handle_execution_setup_done(peer_id, swap_id, *state3).await;
+                        }
+                        SwarmEvent::Behaviour(OutEvent::SwapDeclined { peer, error }) => {
                             tracing::warn!(%peer, "Ignoring spot price request because: {}", error);
                         }
                         SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer }) => {
-                            // TODO: Move the spot-price update into dedicated update stream to decouple it from quote requests
-                            let current_balance = self.monero_wallet.get_balance().await;
-                            match current_balance {
-                                Ok(balance) => {
-                                    self.swarm.behaviour_mut().spot_price.update_balance(balance);
-                                }
-                                Err(e) => {
-                                    tracing::error!("Failed to fetch Monero balance: {:#}", e);
-                                }
-                            }
-
                             let quote = match self.make_quote(self.min_buy, self.max_buy).await {
                                 Ok(quote) => quote,
                                 Err(error) => {
@@ -232,9 +190,6 @@ where
                             if self.swarm.behaviour_mut().quote.send_response(channel, quote).is_err() {
                                 tracing::debug!(%peer, "Failed to respond with quote");
                             }
-                        }
-                        SwarmEvent::Behaviour(OutEvent::ExecutionSetupDone{bob_peer_id, swap_id, state3}) => {
-                            let _ = self.handle_execution_setup_done(bob_peer_id, swap_id, *state3).await;
                         }
                         SwarmEvent::Behaviour(OutEvent::TransferProofAcknowledged { peer, id }) => {
                             tracing::debug!(%peer, "Bob acknowledged transfer proof");

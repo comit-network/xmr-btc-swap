@@ -1,12 +1,11 @@
 use crate::bitcoin::{ExpiredTimelocks, TxCancel, TxRefund};
+use crate::cli::EventLoopHandle;
 use crate::database::Swap;
-use crate::env::Config;
+use crate::network::swap_setup::bob::NewSwap;
 use crate::protocol::bob;
-use crate::protocol::bob::event_loop::EventLoopHandle;
 use crate::protocol::bob::state::*;
 use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
-use rand::rngs::OsRng;
 use tokio::select;
 use uuid::Uuid;
 
@@ -38,7 +37,6 @@ pub async fn run_until(
             &mut swap.event_loop_handle,
             swap.bitcoin_wallet.as_ref(),
             swap.monero_wallet.as_ref(),
-            &swap.env_config,
             swap.receive_monero_address,
         )
         .await?;
@@ -58,7 +56,6 @@ async fn next_state(
     event_loop_handle: &mut EventLoopHandle,
     bitcoin_wallet: &bitcoin::Wallet,
     monero_wallet: &monero::Wallet,
-    env_config: &Config,
     receive_monero_address: monero::Address,
 ) -> Result<BobState> {
     tracing::trace!(%state, "Advancing state");
@@ -73,20 +70,19 @@ async fn next_state(
                 .estimate_fee(TxCancel::weight(), btc_amount)
                 .await?;
 
-            let state2 = request_price_and_setup(
-                swap_id,
-                btc_amount,
-                event_loop_handle,
-                env_config,
-                bitcoin_refund_address,
-                tx_refund_fee,
-                tx_cancel_fee,
-            )
-            .await?;
+            let state2 = event_loop_handle
+                .setup_swap(NewSwap {
+                    swap_id,
+                    btc: btc_amount,
+                    tx_refund_fee,
+                    tx_cancel_fee,
+                    bitcoin_refund_address,
+                })
+                .await?;
 
-            BobState::ExecutionSetupDone(state2)
+            BobState::SwapSetupCompleted(state2)
         }
-        BobState::ExecutionSetupDone(state2) => {
+        BobState::SwapSetupCompleted(state2) => {
             // Alice and Bob have exchanged info
             let (state3, tx_lock) = state2.lock_btc().await?;
             let signed_tx = bitcoin_wallet
@@ -267,35 +263,4 @@ async fn next_state(
         BobState::SafelyAborted => BobState::SafelyAborted,
         BobState::XmrRedeemed { tx_lock_id } => BobState::XmrRedeemed { tx_lock_id },
     })
-}
-
-pub async fn request_price_and_setup(
-    swap_id: Uuid,
-    btc: bitcoin::Amount,
-    event_loop_handle: &mut EventLoopHandle,
-    env_config: &Config,
-    bitcoin_refund_address: bitcoin::Address,
-    tx_refund_fee: bitcoin::Amount,
-    tx_cancel_fee: bitcoin::Amount,
-) -> Result<bob::state::State2> {
-    let xmr = event_loop_handle.request_spot_price(btc).await?;
-
-    tracing::info!(%btc, %xmr, "Spot price");
-
-    let state0 = State0::new(
-        swap_id,
-        &mut OsRng,
-        btc,
-        xmr,
-        env_config.bitcoin_cancel_timelock,
-        env_config.bitcoin_punish_timelock,
-        bitcoin_refund_address,
-        env_config.monero_finality_confirmations,
-        tx_refund_fee,
-        tx_cancel_fee,
-    );
-
-    let state2 = event_loop_handle.execution_setup(state0).await?;
-
-    Ok(state2)
 }

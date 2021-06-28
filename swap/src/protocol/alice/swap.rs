@@ -1,8 +1,8 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
+use crate::asb::{EventLoopHandle, LatestRate};
 use crate::bitcoin::ExpiredTimelocks;
 use crate::env::Config;
-use crate::protocol::alice::event_loop::{EventLoopHandle, LatestRate};
 use crate::protocol::alice::{AliceState, Swap};
 use crate::{bitcoin, database, monero};
 use anyhow::{bail, Context, Result};

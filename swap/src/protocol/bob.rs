@@ -1,28 +1,20 @@
-use crate::database::Database;
-use crate::{bitcoin, env, monero};
-use anyhow::Result;
 use std::sync::Arc;
+
+use anyhow::Result;
 use uuid::Uuid;
 
-pub use self::behaviour::{Behaviour, OutEvent};
-pub use self::cancel::cancel;
-pub use self::event_loop::{EventLoop, EventLoopHandle};
-pub use self::refund::refund;
+use crate::database::Database;
+use crate::{bitcoin, cli, env, monero};
+
 pub use self::state::*;
 pub use self::swap::{run, run_until};
 
-mod behaviour;
-pub mod cancel;
-pub mod event_loop;
-mod execution_setup;
-pub mod refund;
-pub mod spot_price;
 pub mod state;
 pub mod swap;
 
 pub struct Swap {
     pub state: BobState,
-    pub event_loop_handle: EventLoopHandle,
+    pub event_loop_handle: cli::EventLoopHandle,
     pub db: Database,
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
@@ -39,7 +31,7 @@ impl Swap {
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
         env_config: env::Config,
-        event_loop_handle: EventLoopHandle,
+        event_loop_handle: cli::EventLoopHandle,
         receive_monero_address: monero::Address,
         btc_amount: bitcoin::Amount,
     ) -> Self {
@@ -61,7 +53,7 @@ impl Swap {
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
         env_config: env::Config,
-        event_loop_handle: EventLoopHandle,
+        event_loop_handle: cli::EventLoopHandle,
         receive_monero_address: monero::Address,
     ) -> Result<Self> {
         let state = db.get_state(id)?.try_into_bob()?.into();

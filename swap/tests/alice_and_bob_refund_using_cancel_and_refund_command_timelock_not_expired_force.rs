@@ -3,10 +3,11 @@ pub mod harness;
 use harness::alice_run_until::is_xmr_lock_transaction_sent;
 use harness::bob_run_until::is_btc_locked;
 use harness::SlowCancelConfig;
-use swap::protocol::alice::event_loop::FixedRate;
+use swap::asb::FixedRate;
 use swap::protocol::alice::AliceState;
 use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
+use swap::{asb, cli};
 
 #[tokio::test]
 async fn given_alice_and_bob_manually_force_cancel_when_timelock_not_expired_errors() {
@@ -37,7 +38,7 @@ async fn given_alice_and_bob_manually_force_cancel_when_timelock_not_expired_err
         ));
 
         // Bob tries but fails to manually cancel
-        let result = bob::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, true).await;
+        let result = cli::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, true).await;
         assert!(matches!(result, Err(_)));
 
         ctx.restart_alice().await;
@@ -48,7 +49,7 @@ async fn given_alice_and_bob_manually_force_cancel_when_timelock_not_expired_err
         ));
 
         // Alice tries but fails manual cancel
-        let is_outer_err = alice::cancel(
+        let is_outer_err = asb::cancel(
             alice_swap.swap_id,
             alice_swap.bitcoin_wallet,
             alice_swap.db,
@@ -64,7 +65,7 @@ async fn given_alice_and_bob_manually_force_cancel_when_timelock_not_expired_err
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));
 
         // Bob tries but fails to manually refund
-        let is_outer_err = bob::refund(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, true)
+        let is_outer_err = cli::refund(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, true)
             .await
             .is_err();
         assert!(is_outer_err);
@@ -82,7 +83,7 @@ async fn given_alice_and_bob_manually_force_cancel_when_timelock_not_expired_err
         ));
 
         // Alice tries but fails manual cancel
-        let refund_tx_not_published_yet = alice::refund(
+        let refund_tx_not_published_yet = asb::refund(
             alice_swap.swap_id,
             alice_swap.bitcoin_wallet,
             alice_swap.monero_wallet,
@@ -93,7 +94,7 @@ async fn given_alice_and_bob_manually_force_cancel_when_timelock_not_expired_err
         .unwrap_err();
         assert!(matches!(
             refund_tx_not_published_yet,
-            alice::refund::Error::RefundTransactionNotPublishedYet(..)
+            asb::refund::Error::RefundTransactionNotPublishedYet(..)
         ));
 
         ctx.restart_alice().await;

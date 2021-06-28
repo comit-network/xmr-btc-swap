@@ -136,7 +136,7 @@ impl State0 {
         tx_redeem_fee: bitcoin::Amount,
         tx_punish_fee: bitcoin::Amount,
         rng: &mut R,
-    ) -> Result<Self>
+    ) -> Self
     where
         R: RngCore + CryptoRng,
     {
@@ -146,7 +146,7 @@ impl State0 {
         let s_a = monero::Scalar::random(rng);
         let (dleq_proof_s_a, (S_a_bitcoin, S_a_monero)) = CROSS_CURVE_PROOF_SYSTEM.prove(&s_a, rng);
 
-        Ok(Self {
+        Self {
             a,
             s_a,
             v_a,
@@ -163,7 +163,7 @@ impl State0 {
             punish_timelock: env_config.bitcoin_punish_timelock,
             tx_redeem_fee,
             tx_punish_fee,
-        })
+        }
     }
 
     pub fn receive(self, msg: Message0) -> Result<(Uuid, State1)> {

@@ -1,12 +1,14 @@
 use crate::network::quote::BidQuote;
-use crate::network::{encrypted_signature, quote, redial, spot_price, transfer_proof};
-use crate::protocol::bob;
-use crate::protocol::bob::{execution_setup, State2};
+use crate::network::swap_setup::bob;
+use crate::network::{encrypted_signature, quote, redial, transfer_proof};
+use crate::protocol::bob::State2;
+use crate::{bitcoin, env};
 use anyhow::{anyhow, Error, Result};
 use libp2p::core::Multiaddr;
 use libp2p::ping::{Ping, PingEvent};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -15,11 +17,7 @@ pub enum OutEvent {
         id: RequestId,
         response: BidQuote,
     },
-    SpotPriceReceived {
-        id: RequestId,
-        response: spot_price::Response,
-    },
-    ExecutionSetupDone(Box<Result<State2>>),
+    SwapSetupCompleted(Box<Result<State2>>),
     TransferProofReceived {
         msg: Box<transfer_proof::Request>,
         channel: ResponseChannel<()>,
@@ -62,8 +60,7 @@ impl OutEvent {
 #[allow(missing_debug_implementations)]
 pub struct Behaviour {
     pub quote: quote::Behaviour,
-    pub spot_price: spot_price::Behaviour,
-    pub execution_setup: execution_setup::Behaviour,
+    pub swap_setup: bob::Behaviour,
     pub transfer_proof: transfer_proof::Behaviour,
     pub encrypted_signature: encrypted_signature::Behaviour,
     pub redial: redial::Behaviour,
@@ -75,11 +72,14 @@ pub struct Behaviour {
 }
 
 impl Behaviour {
-    pub fn new(alice: PeerId) -> Self {
+    pub fn new(
+        alice: PeerId,
+        env_config: env::Config,
+        bitcoin_wallet: Arc<bitcoin::Wallet>,
+    ) -> Self {
         Self {
-            quote: quote::bob(),
-            spot_price: bob::spot_price::bob(),
-            execution_setup: Default::default(),
+            quote: quote::cli(),
+            swap_setup: bob::Behaviour::new(env_config, bitcoin_wallet),
             transfer_proof: transfer_proof::bob(),
             encrypted_signature: encrypted_signature::bob(),
             redial: redial::Behaviour::new(alice, Duration::from_secs(2)),
@@ -90,7 +90,6 @@ impl Behaviour {
     /// Add a known address for the given peer
     pub fn add_address(&mut self, peer_id: PeerId, address: Multiaddr) {
         self.quote.add_address(&peer_id, address.clone());
-        self.spot_price.add_address(&peer_id, address.clone());
         self.transfer_proof.add_address(&peer_id, address.clone());
         self.encrypted_signature.add_address(&peer_id, address);
     }

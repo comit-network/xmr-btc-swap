@@ -1,8 +1,10 @@
+use crate::asb::event_loop::LatestRate;
+use crate::env;
 use crate::network::quote::BidQuote;
+use crate::network::swap_setup::alice;
+use crate::network::swap_setup::alice::WalletSnapshot;
 use crate::network::{encrypted_signature, quote, transfer_proof};
-use crate::protocol::alice::event_loop::LatestRate;
-use crate::protocol::alice::{execution_setup, spot_price, State3};
-use crate::{env, monero};
+use crate::protocol::alice::State3;
 use anyhow::{anyhow, Error};
 use libp2p::ping::{Ping, PingEvent};
 use libp2p::request_response::{RequestId, ResponseChannel};
@@ -11,23 +13,21 @@ use uuid::Uuid;
 
 #[derive(Debug)]
 pub enum OutEvent {
-    SwapRequestDeclined {
-        peer: PeerId,
-        error: spot_price::Error,
+    SwapSetupInitiated {
+        send_wallet_snapshot: bmrng::RequestReceiver<bitcoin::Amount, WalletSnapshot>,
     },
-    ExecutionSetupStart {
+    SwapSetupCompleted {
+        peer_id: PeerId,
+        swap_id: Uuid,
+        state3: Box<State3>,
+    },
+    SwapDeclined {
         peer: PeerId,
-        btc: bitcoin::Amount,
-        xmr: monero::Amount,
+        error: alice::Error,
     },
     QuoteRequested {
         channel: ResponseChannel<BidQuote>,
         peer: PeerId,
-    },
-    ExecutionSetupDone {
-        bob_peer_id: PeerId,
-        swap_id: Uuid,
-        state3: Box<State3>,
     },
     TransferProofAcknowledged {
         peer: PeerId,
@@ -72,8 +72,7 @@ where
     LR: LatestRate + Send + 'static,
 {
     pub quote: quote::Behaviour,
-    pub spot_price: spot_price::Behaviour<LR>,
-    pub execution_setup: execution_setup::Behaviour,
+    pub swap_setup: alice::Behaviour<LR>,
     pub transfer_proof: transfer_proof::Behaviour,
     pub encrypted_signature: encrypted_signature::Behaviour,
 
@@ -88,8 +87,6 @@ where
     LR: LatestRate + Send + 'static,
 {
     pub fn new(
-        balance: monero::Amount,
-        lock_fee: monero::Amount,
         min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,
         latest_rate: LR,
@@ -97,17 +94,14 @@ where
         env_config: env::Config,
     ) -> Self {
         Self {
-            quote: quote::alice(),
-            spot_price: spot_price::Behaviour::new(
-                balance,
-                lock_fee,
+            quote: quote::asb(),
+            swap_setup: alice::Behaviour::new(
                 min_buy,
                 max_buy,
                 env_config,
                 latest_rate,
                 resume_only,
             ),
-            execution_setup: Default::default(),
             transfer_proof: transfer_proof::alice(),
             encrypted_signature: encrypted_signature::alice(),
             ping: Ping::default(),

@@ -1,6 +1,5 @@
-use crate::bitcoin;
 use crate::network::json_pull_codec::JsonPullCodec;
-use crate::protocol::{alice, bob};
+use crate::{asb, bitcoin, cli};
 use libp2p::core::ProtocolName;
 use libp2p::request_response::{
     ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
@@ -38,10 +37,11 @@ pub struct BidQuote {
     pub max_quantity: bitcoin::Amount,
 }
 
-/// Constructs a new instance of the `quote` behaviour to be used by Alice.
+/// Constructs a new instance of the `quote` behaviour to be used by the ASB.
 ///
-/// Alice only supports inbound connections, i.e. handing out quotes.
-pub fn alice() -> Behaviour {
+/// The ASB is always listening and only supports inbound connections, i.e.
+/// handing out quotes.
+pub fn asb() -> Behaviour {
     Behaviour::new(
         JsonPullCodec::default(),
         vec![(BidQuoteProtocol, ProtocolSupport::Inbound)],
@@ -49,10 +49,11 @@ pub fn alice() -> Behaviour {
     )
 }
 
-/// Constructs a new instance of the `quote` behaviour to be used by Bob.
+/// Constructs a new instance of the `quote` behaviour to be used by the CLI.
 ///
-/// Bob only supports outbound connections, i.e. requesting quotes.
-pub fn bob() -> Behaviour {
+/// The CLI is always dialing and only supports outbound connections, i.e.
+/// requesting quotes.
+pub fn cli() -> Behaviour {
     Behaviour::new(
         JsonPullCodec::default(),
         vec![(BidQuoteProtocol, ProtocolSupport::Outbound)],
@@ -60,7 +61,7 @@ pub fn bob() -> Behaviour {
     )
 }
 
-impl From<(PeerId, Message)> for alice::OutEvent {
+impl From<(PeerId, Message)> for asb::OutEvent {
     fn from((peer, message): (PeerId, Message)) -> Self {
         match message {
             Message::Request { channel, .. } => Self::QuoteRequested { channel, peer },
@@ -68,9 +69,9 @@ impl From<(PeerId, Message)> for alice::OutEvent {
         }
     }
 }
-crate::impl_from_rr_event!(OutEvent, alice::OutEvent, PROTOCOL);
+crate::impl_from_rr_event!(OutEvent, asb::OutEvent, PROTOCOL);
 
-impl From<(PeerId, Message)> for bob::OutEvent {
+impl From<(PeerId, Message)> for cli::OutEvent {
     fn from((peer, message): (PeerId, Message)) -> Self {
         match message {
             Message::Request { .. } => Self::unexpected_request(peer),
@@ -84,4 +85,4 @@ impl From<(PeerId, Message)> for bob::OutEvent {
         }
     }
 }
-crate::impl_from_rr_event!(OutEvent, bob::OutEvent, PROTOCOL);
+crate::impl_from_rr_event!(OutEvent, cli::OutEvent, PROTOCOL);

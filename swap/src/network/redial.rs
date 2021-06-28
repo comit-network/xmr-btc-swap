@@ -1,4 +1,4 @@
-use crate::protocol::bob;
+use crate::cli;
 use backoff::backoff::Backoff;
 use backoff::ExponentialBackoff;
 use futures::future::FutureExt;
@@ -119,11 +119,11 @@ impl NetworkBehaviour for Behaviour {
     }
 }
 
-impl From<OutEvent> for bob::OutEvent {
+impl From<OutEvent> for cli::OutEvent {
     fn from(event: OutEvent) -> Self {
         match event {
             OutEvent::AllAttemptsExhausted { peer } => {
-                bob::OutEvent::AllRedialAttemptsExhausted { peer }
+                cli::OutEvent::AllRedialAttemptsExhausted { peer }
             }
         }
     }
