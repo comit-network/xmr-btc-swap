@@ -109,7 +109,7 @@ impl Handler {
         Self {
             env_config,
             outbound_stream: OptionFuture::from(None),
-            timeout: Duration::from_secs(60),
+            timeout: Duration::from_secs(120),
             new_swaps: VecDeque::default(),
             bitcoin_wallet,
             keep_alive: KeepAlive::Until(Instant::now() + Duration::from_secs(5)),

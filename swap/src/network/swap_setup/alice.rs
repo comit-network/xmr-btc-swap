@@ -227,7 +227,7 @@ impl<LR> Handler<LR> {
             env_config,
             latest_rate,
             resume_only,
-            timeout: Duration::from_secs(60),
+            timeout: Duration::from_secs(120),
             keep_alive: KeepAlive::Until(Instant::now() + Duration::from_secs(5)),
         }
     }
