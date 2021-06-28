@@ -91,14 +91,9 @@ async fn main() -> Result<()> {
                 .context("Seller address must contain peer ID")?;
             db.insert_address(seller_peer_id, seller.clone()).await?;
 
-            let mut swarm = swarm::cli(
-                &seed,
-                seller_peer_id,
-                tor_socks5_port,
-                env_config,
-                bitcoin_wallet.clone(),
-            )
-            .await?;
+            let behaviour = cli::Behaviour::new(seller_peer_id, env_config, bitcoin_wallet.clone());
+            let mut swarm =
+                swarm::cli(seed.derive_libp2p_identity(), tor_socks5_port, behaviour).await?;
             swarm.behaviour_mut().add_address(seller_peer_id, seller);
 
             tracing::debug!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
@@ -191,14 +186,9 @@ async fn main() -> Result<()> {
             let seller_peer_id = db.get_peer_id(swap_id)?;
             let seller_addresses = db.get_addresses(seller_peer_id)?;
 
-            let mut swarm = swarm::cli(
-                &seed,
-                seller_peer_id,
-                tor_socks5_port,
-                env_config,
-                bitcoin_wallet.clone(),
-            )
-            .await?;
+            let behaviour = cli::Behaviour::new(seller_peer_id, env_config, bitcoin_wallet.clone());
+            let mut swarm =
+                swarm::cli(seed.derive_libp2p_identity(), tor_socks5_port, behaviour).await?;
             let our_peer_id = swarm.local_peer_id();
             tracing::debug!(peer_id = %our_peer_id, "Initializing network module");
 

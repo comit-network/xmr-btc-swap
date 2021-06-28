@@ -445,12 +445,16 @@ impl BobParams {
     ) -> Result<(cli::EventLoop, cli::EventLoopHandle)> {
         let tor_socks5_port = get_port()
             .expect("We don't care about Tor in the tests so we get a free port to disable it.");
-        let mut swarm = swarm::cli(
-            &self.seed,
+
+        let behaviour = cli::Behaviour::new(
             self.alice_peer_id,
-            tor_socks5_port,
             self.env_config,
             self.bitcoin_wallet.clone(),
+        );
+        let mut swarm = swarm::cli(
+            self.seed.derive_libp2p_identity(),
+            tor_socks5_port,
+            behaviour,
         )
         .await?;
         swarm

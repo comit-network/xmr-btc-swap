@@ -2,10 +2,9 @@ use crate::asb::LatestRate;
 use crate::seed::Seed;
 use crate::{asb, bitcoin, cli, env, tor};
 use anyhow::Result;
-use libp2p::swarm::SwarmBuilder;
-use libp2p::{PeerId, Swarm};
+use libp2p::swarm::{NetworkBehaviour, SwarmBuilder};
+use libp2p::{identity, Swarm};
 use std::fmt::Debug;
-use std::sync::Arc;
 
 #[allow(clippy::too_many_arguments)]
 pub fn asb<LR>(
@@ -34,21 +33,19 @@ where
     Ok(swarm)
 }
 
-pub async fn cli(
-    seed: &Seed,
-    alice: PeerId,
+pub async fn cli<T>(
+    identity: identity::Keypair,
     tor_socks5_port: u16,
-    env_config: env::Config,
-    bitcoin_wallet: Arc<bitcoin::Wallet>,
-) -> Result<Swarm<cli::Behaviour>> {
+    behaviour: T,
+) -> Result<Swarm<T>>
+where
+    T: NetworkBehaviour,
+{
     let maybe_tor_socks5_port = match tor::Client::new(tor_socks5_port).assert_tor_running().await {
         Ok(()) => Some(tor_socks5_port),
         Err(_) => None,
     };
 
-    let behaviour = cli::Behaviour::new(alice, env_config, bitcoin_wallet);
-
-    let identity = seed.derive_libp2p_identity();
     let transport = cli::transport::new(&identity, maybe_tor_socks5_port)?;
     let peer_id = identity.public().into_peer_id();
 
