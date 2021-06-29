@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Error};
 use libp2p::ping::{Ping, PingEvent};
 use libp2p::request_response::{RequestId, ResponseChannel};
-use libp2p::{NetworkBehaviour, PeerId};
+use libp2p::{rendezvous, NetworkBehaviour, PeerId};
 use uuid::Uuid;
 
 use crate::env;
@@ -10,6 +10,8 @@ use crate::network::{encrypted_signature, quote, transfer_proof};
 use crate::protocol::alice::event_loop::LatestRate;
 use crate::protocol::alice::swap_setup::WalletSnapshot;
 use crate::protocol::alice::{swap_setup, State3};
+use libp2p::identity::Keypair;
+use libp2p::rendezvous::{Event, RegisterError, Registration};
 
 #[derive(Debug)]
 pub enum OutEvent {
@@ -42,6 +44,13 @@ pub enum OutEvent {
         peer: PeerId,
         error: Error,
     },
+    Registered {
+        rendezvous_node: PeerId,
+        ttl: i64,
+        namespace: String,
+    },
+    RegisterFailed(RegisterError),
+    RegisterExpired(Registration),
     /// "Fallback" variant that allows the event mapping code to swallow certain
     /// events that we don't want the caller to deal with.
     Other,
@@ -71,6 +80,7 @@ pub struct Behaviour<LR>
 where
     LR: LatestRate + Send + 'static,
 {
+    pub rendezvous: rendezvous::Rendezvous,
     pub quote: quote::Behaviour,
     pub swap_setup: swap_setup::Behaviour<LR>,
     pub transfer_proof: transfer_proof::Behaviour,
@@ -92,8 +102,10 @@ where
         latest_rate: LR,
         resume_only: bool,
         env_config: env::Config,
+        keypair: Keypair,
     ) -> Self {
         Self {
+            rendezvous: rendezvous::Rendezvous::new(keypair, rendezvous::Config::default()),
             quote: quote::alice(),
             swap_setup: swap_setup::Behaviour::new(
                 min_buy,
@@ -112,5 +124,30 @@ where
 impl From<PingEvent> for OutEvent {
     fn from(_: PingEvent) -> Self {
         OutEvent::Other
+    }
+}
+
+impl From<rendezvous::Event> for OutEvent {
+    fn from(rendezvous_event: rendezvous::Event) -> Self {
+        match rendezvous_event {
+            Event::Discovered { .. } => OutEvent::Other,
+            Event::DiscoverFailed { .. } => OutEvent::Other,
+            Event::Registered {
+                rendezvous_node,
+                ttl,
+                namespace,
+            } => OutEvent::Registered {
+                rendezvous_node,
+                ttl,
+                namespace,
+            },
+            Event::RegisterFailed(register_error) => OutEvent::RegisterFailed(register_error),
+            Event::DiscoverServed { .. } => OutEvent::Other,
+            Event::DiscoverNotServed { .. } => OutEvent::Other,
+            Event::PeerRegistered { .. } => OutEvent::Other,
+            Event::PeerNotRegistered { .. } => OutEvent::Other,
+            Event::PeerUnregistered { .. } => OutEvent::Other,
+            Event::RegistrationExpired(registration) => OutEvent::RegisterExpired(registration),
+        }
     }
 }

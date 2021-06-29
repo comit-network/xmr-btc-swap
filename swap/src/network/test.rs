@@ -1,4 +1,5 @@
 use futures::future;
+use futures::stream::StreamExt;
 use libp2p::core::muxing::StreamMuxerBox;
 use libp2p::core::transport::memory::MemoryTransport;
 use libp2p::core::upgrade::{SelectUpgrade, Version};
@@ -129,9 +130,9 @@ where
     let mut bob_connected = false;
 
     while !alice_connected && !bob_connected {
-        let (alice_event, bob_event) = future::join(alice.next_event(), bob.next_event()).await;
+        let (alice_event, bob_event) = future::join(alice.next(), bob.next()).await;
 
-        match alice_event {
+        match alice_event.unwrap() {
             SwarmEvent::ConnectionEstablished { .. } => {
                 alice_connected = true;
             }
@@ -146,7 +147,7 @@ where
             }
             _ => {}
         }
-        match bob_event {
+        match bob_event.unwrap() {
             SwarmEvent::ConnectionEstablished { .. } => {
                 bob_connected = true;
             }

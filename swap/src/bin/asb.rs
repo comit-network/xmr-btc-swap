@@ -15,7 +15,7 @@
 use anyhow::{bail, Context, Result};
 use libp2p::core::multiaddr::Protocol;
 use libp2p::core::Multiaddr;
-use libp2p::Swarm;
+use libp2p::{PeerId, Swarm};
 use prettytable::{row, Table};
 use std::env;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -152,6 +152,7 @@ async fn main() -> Result<()> {
                 kraken_rate.clone(),
                 resume_only,
                 env_config,
+                seed.derive_libp2p_identity(),
             )?;
 
             for listen in config.network.listen {
@@ -170,6 +171,7 @@ async fn main() -> Result<()> {
                 kraken_rate.clone(),
                 config.maker.min_buy_btc,
                 config.maker.max_buy_btc,
+                PeerId::random(),
             )
             .unwrap();
 

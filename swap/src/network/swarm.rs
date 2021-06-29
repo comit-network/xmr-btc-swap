@@ -3,6 +3,7 @@ use crate::protocol::{alice, bob};
 use crate::seed::Seed;
 use crate::{asb, bitcoin, cli, env, tor};
 use anyhow::Result;
+use libp2p::identity::Keypair;
 use libp2p::swarm::SwarmBuilder;
 use libp2p::{PeerId, Swarm};
 use std::fmt::Debug;
@@ -16,11 +17,19 @@ pub fn asb<LR>(
     latest_rate: LR,
     resume_only: bool,
     env_config: env::Config,
+    keypair: Keypair,
 ) -> Result<Swarm<alice::Behaviour<LR>>>
 where
     LR: LatestRate + Send + 'static + Debug + Clone,
 {
-    let behaviour = alice::Behaviour::new(min_buy, max_buy, latest_rate, resume_only, env_config);
+    let behaviour = alice::Behaviour::new(
+        min_buy,
+        max_buy,
+        latest_rate,
+        resume_only,
+        env_config,
+        keypair,
+    );
 
     let identity = seed.derive_libp2p_identity();
     let transport = asb::transport::new(&identity)?;

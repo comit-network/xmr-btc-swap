@@ -44,6 +44,7 @@ where
     latest_rate: LR,
     min_buy: bitcoin::Amount,
     max_buy: bitcoin::Amount,
+    rendezvous_node: PeerId,
 
     swap_sender: mpsc::Sender<Swap>,
 
@@ -76,6 +77,7 @@ where
         latest_rate: LR,
         min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,
+        rendezvous_node: PeerId,
     ) -> Result<(Self, mpsc::Receiver<Swap>)> {
         let swap_channel = MpscChannels::default();
 
@@ -89,6 +91,7 @@ where
             swap_sender: swap_channel.sender,
             min_buy,
             max_buy,
+            rendezvous_node,
             recv_encrypted_signature: Default::default(),
             inflight_encrypted_signatures: Default::default(),
             send_transfer_proof: Default::default(),
@@ -103,6 +106,13 @@ where
     }
 
     pub async fn run(mut self) {
+        let _ = self
+            .swarm
+            .behaviour_mut()
+            .rendezvous
+            .register("xmr-btc-swap".to_string(), self.rendezvous_node, None)
+            .unwrap();
+
         // ensure that these streams are NEVER empty, otherwise it will
         // terminate forever.
         self.send_transfer_proof.push(future::pending().boxed());
@@ -267,6 +277,13 @@ where
                         }
                         Some(SwarmEvent::NewListenAddr(address)) => {
                             tracing::info!(%address, "New listen address detected");
+                        }
+                        Some(SwarmEvent::Behaviour(OutEvent::Registered { namespace, ..})) => {
+                            tracing::info!(%namespace, "Registered with rendezvous node");
+                        }
+                        Some(SwarmEvent::Behaviour(OutEvent::RegisterExpired(registration))) => {
+                            tracing::info!("Registration expired: {:?}", &registration);
+                            self.swarm.behaviour_mut().rendezvous.register(registration.namespace, registration.record.peer_id(), Some(registration.ttl)).unwrap();
                         }
                         _ => {}
                     }

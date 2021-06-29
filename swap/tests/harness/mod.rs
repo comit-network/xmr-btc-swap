@@ -156,13 +156,16 @@ async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
             .await
             .unwrap();
 
-    (monero, Containers {
-        bitcoind_url,
-        bitcoind,
-        monerod_container,
-        monero_wallet_rpc_containers,
-        electrs,
-    })
+    (
+        monero,
+        Containers {
+            bitcoind_url,
+            bitcoind,
+            monerod_container,
+            monero_wallet_rpc_containers,
+            electrs,
+        },
+    )
 }
 
 async fn init_bitcoind_container(
@@ -236,6 +239,7 @@ async fn start_alice(
         latest_rate,
         resume_only,
         env_config,
+        seed.derive_libp2p_identity(),
     )
     .unwrap();
     swarm.listen_on(listen_address).unwrap();
@@ -249,6 +253,7 @@ async fn start_alice(
         FixedRate::default(),
         min_buy,
         max_buy,
+        PeerId::random(),
     )
     .unwrap();
 
