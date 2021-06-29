@@ -236,6 +236,7 @@ async fn start_alice(
         latest_rate,
         resume_only,
         env_config,
+        None,
     )
     .unwrap();
     swarm.listen_on(listen_address).unwrap();

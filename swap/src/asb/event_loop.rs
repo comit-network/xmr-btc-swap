@@ -1,11 +1,10 @@
 use crate::asb::{Behaviour, OutEvent, Rate};
 use crate::database::Database;
-use crate::env::Config;
 use crate::network::quote::BidQuote;
 use crate::network::swap_setup::alice::WalletSnapshot;
 use crate::network::transfer_proof;
 use crate::protocol::alice::{AliceState, State3, Swap};
-use crate::{bitcoin, kraken, monero};
+use crate::{bitcoin, env, kraken, monero};
 use anyhow::{Context, Result};
 use futures::future;
 use futures::future::{BoxFuture, FutureExt};
@@ -37,7 +36,7 @@ where
     LR: LatestRate + Send + 'static + Debug + Clone,
 {
     swarm: libp2p::Swarm<Behaviour<LR>>,
-    env_config: Config,
+    env_config: env::Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
     db: Arc<Database>,
@@ -69,7 +68,7 @@ where
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         swarm: Swarm<Behaviour<LR>>,
-        env_config: Config,
+        env_config: env::Config,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
         db: Arc<Database>,
@@ -244,6 +243,12 @@ where
 
                                 channel
                             }.boxed());
+                        }
+                        SwarmEvent::Behaviour(OutEvent::Rendezvous(libp2p::rendezvous::Event::Registered { .. })) => {
+                            tracing::info!("Successfully registered with rendezvous node");
+                        }
+                        SwarmEvent::Behaviour(OutEvent::Rendezvous(libp2p::rendezvous::Event::RegisterFailed(error))) => {
+                            tracing::error!("Registration with rendezvous node failed: {:#}", error);
                         }
                         SwarmEvent::Behaviour(OutEvent::Failure {peer, error}) => {
                             tracing::error!(
