@@ -15,6 +15,7 @@
 use anyhow::{bail, Context, Result};
 use libp2p::core::multiaddr::Protocol;
 use libp2p::core::Multiaddr;
+use libp2p::swarm::AddressScore;
 use libp2p::Swarm;
 use prettytable::{row, Table};
 use std::env;
@@ -31,6 +32,7 @@ use swap::database::Database;
 use swap::monero::Amount;
 use swap::network::swarm;
 use swap::protocol::alice::run;
+use swap::rendezvous::XmrBtcNamespace;
 use swap::seed::Seed;
 use swap::tor::AuthenticatedClient;
 use swap::{asb, bitcoin, kraken, monero, tor};
@@ -153,12 +155,28 @@ async fn main() -> Result<()> {
                 env_config,
             )?;
 
-            for listen in config.network.listen {
+            for listen in config.network.listen.clone() {
                 Swarm::listen_on(&mut swarm, listen.clone())
                     .with_context(|| format!("Failed to listen on network interface {}", listen))?;
+                Swarm::add_external_address(&mut swarm, listen.clone(), AddressScore::Infinite);
             }
 
             tracing::info!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
+
+            Swarm::dial_addr(&mut swarm, config.rendezvous_node.addr.clone()).with_context(
+                || {
+                    format!(
+                        "Failed to dial rendezvous node addr {}",
+                        config.rendezvous_node.addr
+                    )
+                },
+            )?;
+
+            let namespace = if testnet {
+                XmrBtcNamespace::Testnet
+            } else {
+                XmrBtcNamespace::Mainnet
+            };
 
             let (event_loop, mut swap_receiver) = EventLoop::new(
                 swarm,
@@ -169,6 +187,8 @@ async fn main() -> Result<()> {
                 kraken_rate.clone(),
                 config.maker.min_buy_btc,
                 config.maker.max_buy_btc,
+                config.rendezvous_node.peer_id,
+                namespace,
             )
             .unwrap();
 

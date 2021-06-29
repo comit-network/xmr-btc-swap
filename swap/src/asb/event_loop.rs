@@ -1,16 +1,17 @@
 use crate::asb::behaviour::{Behaviour, OutEvent};
 use crate::asb::Rate;
 use crate::database::Database;
-use crate::env::Config;
 use crate::network::quote::BidQuote;
 use crate::network::swap_setup::alice::WalletSnapshot;
 use crate::network::transfer_proof;
 use crate::protocol::alice::{AliceState, State3, Swap};
-use crate::{bitcoin, kraken, monero};
+use crate::rendezvous::XmrBtcNamespace;
+use crate::{bitcoin, env, kraken, monero};
 use anyhow::{Context, Result};
 use futures::future;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::{FuturesUnordered, StreamExt};
+use libp2p::rendezvous::Namespace;
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
@@ -19,6 +20,7 @@ use std::collections::HashMap;
 use std::convert::Infallible;
 use std::fmt::Debug;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
@@ -38,7 +40,7 @@ where
     LR: LatestRate + Send + 'static + Debug + Clone,
 {
     swarm: libp2p::Swarm<Behaviour<LR>>,
-    env_config: Config,
+    env_config: env::Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
     db: Arc<Database>,
@@ -61,6 +63,13 @@ where
     /// Tracks [`transfer_proof::Request`]s which are currently inflight and
     /// awaiting an acknowledgement.
     inflight_transfer_proofs: HashMap<RequestId, bmrng::Responder<()>>,
+
+    // TODO: Potentially group together, potentially the whole rendezvous handling could go into a
+    // separate swarm?  There is no dependency between swap and registration, so we could just
+    // build this completely separate.
+    rendezvous_node_peer_id: PeerId,
+    rendezvous_namespace: XmrBtcNamespace,
+    rendezvous_reregister_timestamp: Option<Instant>,
 }
 
 impl<LR> EventLoop<LR>
@@ -70,13 +79,15 @@ where
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         swarm: Swarm<Behaviour<LR>>,
-        env_config: Config,
+        env_config: env::Config,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
         db: Arc<Database>,
         latest_rate: LR,
         min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,
+        rendezvous_node_peer_id: PeerId,
+        rendezvous_namespace: XmrBtcNamespace,
     ) -> Result<(Self, mpsc::Receiver<Swap>)> {
         let swap_channel = MpscChannels::default();
 
@@ -95,6 +106,9 @@ where
             send_transfer_proof: Default::default(),
             buffered_transfer_proofs: Default::default(),
             inflight_transfer_proofs: Default::default(),
+            rendezvous_node_peer_id,
+            rendezvous_namespace,
+            rendezvous_reregister_timestamp: None,
         };
         Ok((event_loop, swap_channel.receiver))
     }
@@ -246,6 +260,23 @@ where
                                 channel
                             }.boxed());
                         }
+                        Some(SwarmEvent::Behaviour(OutEvent::Registered { rendezvous_node, ttl, namespace })) => {
+
+                            // TODO: this can most likely not happen at all, potentially remove these checks
+                            if rendezvous_node != self.rendezvous_node_peer_id {
+                                tracing::warn!(peer_id=%rendezvous_node, "Ignoring message from unknown rendezvous node");
+                                continue;
+                            }
+
+                            // TODO: Consider implementing From for Namespace and XmrBtcNamespace
+                            if namespace.to_string() != self.rendezvous_namespace.to_string() {
+                                tracing::warn!(peer_id=%rendezvous_node, %namespace, "Ignoring message from rendezvous node for unknown namespace");
+                                continue;
+                            }
+
+                            // record re-registration after half the ttl has expired
+                            self.rendezvous_reregister_timestamp = Some(Instant::now() + Duration::from_secs(ttl) / 2);
+                        }
                         Some(SwarmEvent::Behaviour(OutEvent::Failure {peer, error})) => {
                             tracing::error!(
                                 %peer,
@@ -260,6 +291,19 @@ where
 
                                     let id = self.swarm.behaviour_mut().transfer_proof.send_request(&peer, transfer_proof);
                                     self.inflight_transfer_proofs.insert(id, responder);
+                                }
+                            }
+
+                            if peer == self.rendezvous_node_peer_id {
+                                match self
+                                    .swarm
+                                    .behaviour_mut()
+                                    .rendezvous
+                                    .register(Namespace::new(self.rendezvous_namespace.to_string()).expect("our namespace to be a correct string"), self.rendezvous_node_peer_id, None) {
+                                    Ok(()) => {},
+                                    Err(err) => {
+                                        tracing::error!("Sending registration to rendezvous failed: {:#}", err);
+                                    }
                                 }
                             }
                         }

@@ -10,5 +10,5 @@ pub mod transport;
 pub use behaviour::{Behaviour, OutEvent};
 pub use cancel::cancel;
 pub use event_loop::{EventLoop, EventLoopHandle};
-pub use list_sellers::{list_sellers, XmrBtcNamespace};
+pub use list_sellers::list_sellers;
 pub use refund::refund;

@@ -1,6 +1,6 @@
-use crate::cli::list_sellers::XmrBtcNamespace;
 use crate::env::GetConfig;
 use crate::fs::system_data_dir;
+use crate::rendezvous::XmrBtcNamespace;
 use crate::{env, monero};
 use anyhow::{Context, Result};
 use libp2p::core::Multiaddr;

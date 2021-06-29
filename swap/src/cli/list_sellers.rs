@@ -1,5 +1,6 @@
 use crate::network::quote::BidQuote;
 use crate::network::{quote, swarm};
+use crate::rendezvous::XmrBtcNamespace;
 use anyhow::Result;
 use futures::StreamExt;
 use libp2p::multiaddr::Protocol;
@@ -8,7 +9,6 @@ use libp2p::request_response::{RequestResponseEvent, RequestResponseMessage};
 use libp2p::swarm::SwarmEvent;
 use libp2p::{identity, rendezvous, Multiaddr, PeerId, Swarm};
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
 
 pub async fn list_sellers(
     rendezvous_node_peer_id: PeerId,
@@ -40,21 +40,6 @@ pub struct Seller {
     pub peer_id: PeerId,
     pub multiaddr: Multiaddr,
     pub quote: BidQuote,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum XmrBtcNamespace {
-    Mainnet,
-    Testnet,
-}
-
-impl Display for XmrBtcNamespace {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            XmrBtcNamespace::Mainnet => write!(f, "xmr-btc-swap-mainnet"),
-            XmrBtcNamespace::Testnet => write!(f, "xmr-btc-swap-mainnet"),
-        }
-    }
 }
 
 #[derive(Debug)]

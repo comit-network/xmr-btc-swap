@@ -18,9 +18,17 @@ pub fn asb<LR>(
 where
     LR: LatestRate + Send + 'static + Debug + Clone,
 {
-    let behaviour = asb::Behaviour::new(min_buy, max_buy, latest_rate, resume_only, env_config);
-
     let identity = seed.derive_libp2p_identity();
+
+    let behaviour = asb::Behaviour::new(
+        min_buy,
+        max_buy,
+        latest_rate,
+        resume_only,
+        env_config,
+        identity.clone(),
+    );
+
     let transport = asb::transport::new(&identity)?;
     let peer_id = identity.public().into_peer_id();
 

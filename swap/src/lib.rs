@@ -26,6 +26,7 @@ pub mod kraken;
 pub mod monero;
 pub mod network;
 pub mod protocol;
+pub mod rendezvous;
 pub mod seed;
 pub mod tor;
 

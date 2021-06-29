@@ -6,9 +6,11 @@ use crate::network::swap_setup::alice::WalletSnapshot;
 use crate::network::{encrypted_signature, quote, transfer_proof};
 use crate::protocol::alice::State3;
 use anyhow::{anyhow, Error};
+use libp2p::identity::Keypair;
 use libp2p::ping::{Ping, PingEvent};
+use libp2p::rendezvous::{Event, Namespace, RegisterError};
 use libp2p::request_response::{RequestId, ResponseChannel};
-use libp2p::{NetworkBehaviour, PeerId};
+use libp2p::{rendezvous, NetworkBehaviour, PeerId};
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -42,6 +44,12 @@ pub enum OutEvent {
         peer: PeerId,
         error: Error,
     },
+    Registered {
+        rendezvous_node: PeerId,
+        ttl: u64,
+        namespace: Namespace,
+    },
+    RegisterFailed(RegisterError),
     /// "Fallback" variant that allows the event mapping code to swallow certain
     /// events that we don't want the caller to deal with.
     Other,
@@ -71,6 +79,7 @@ pub struct Behaviour<LR>
 where
     LR: LatestRate + Send + 'static,
 {
+    pub rendezvous: rendezvous::Rendezvous,
     pub quote: quote::Behaviour,
     pub swap_setup: alice::Behaviour<LR>,
     pub transfer_proof: transfer_proof::Behaviour,
@@ -92,8 +101,10 @@ where
         latest_rate: LR,
         resume_only: bool,
         env_config: env::Config,
+        keypair: Keypair,
     ) -> Self {
         Self {
+            rendezvous: rendezvous::Rendezvous::new(keypair, rendezvous::Config::default()),
             quote: quote::asb(),
             swap_setup: alice::Behaviour::new(
                 min_buy,
@@ -112,5 +123,30 @@ where
 impl From<PingEvent> for OutEvent {
     fn from(_: PingEvent) -> Self {
         OutEvent::Other
+    }
+}
+
+impl From<rendezvous::Event> for OutEvent {
+    fn from(event: rendezvous::Event) -> Self {
+        match event {
+            Event::Discovered { .. } => unreachable!("The ASB does not discover other nodes"),
+            Event::DiscoverFailed { .. } => unreachable!("The ASB does not discover other nodes"),
+            Event::Registered {
+                rendezvous_node,
+                ttl,
+                namespace,
+            } => OutEvent::Registered {
+                rendezvous_node,
+                ttl,
+                namespace,
+            },
+            Event::RegisterFailed(error) => OutEvent::RegisterFailed(error),
+            Event::DiscoverServed { .. } => unreachable!("ASB does not act as rendezvous node"),
+            Event::DiscoverNotServed { .. } => unreachable!("ASB does not act as rendezvous node"),
+            Event::PeerRegistered { .. } => unreachable!("ASB does not act as rendezvous node"),
+            Event::PeerNotRegistered { .. } => unreachable!("ASB does not act as rendezvous node"),
+            Event::PeerUnregistered { .. } => unreachable!("ASB does not act as rendezvous node"),
+            Event::RegistrationExpired(_) => unreachable!("ASB does not act as rendezvous node"),
+        }
     }
 }
