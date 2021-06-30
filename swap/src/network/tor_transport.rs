@@ -136,83 +136,76 @@ pub mod test {
 
     #[test]
     fn test_tor_address_string() {
-        let address =
-            "/onion3/oarchy4tamydxcitaki6bc2v4leza6v35iezmu2chg2bap63sv6f2did:1024/p2p/12D3KooWPD4uHN74SHotLN7VCH7Fm8zZgaNVymYcpeF1fpD2guc9"
-            ;
-        let address_string =
-            TorCompatibleAddress::from_multiaddr(Cow::Owned(address.parse().unwrap()))
-                .unwrap()
-                .to_string();
+        let address = tor_compatible_address_from_str("/onion3/oarchy4tamydxcitaki6bc2v4leza6v35iezmu2chg2bap63sv6f2did:1024/p2p/12D3KooWPD4uHN74SHotLN7VCH7Fm8zZgaNVymYcpeF1fpD2guc9");
+
+        assert!(!address.is_certainly_not_reachable_via_tor_daemon());
         assert_eq!(
-            address_string,
+            address.to_string(),
             "oarchy4tamydxcitaki6bc2v4leza6v35iezmu2chg2bap63sv6f2did.onion:1024"
         );
     }
 
     #[test]
     fn tcp_to_address_string_should_be_some() {
-        let address = "/ip4/127.0.0.1/tcp/7777";
-        let address_string =
-            TorCompatibleAddress::from_multiaddr(Cow::Owned(address.parse().unwrap()))
-                .unwrap()
-                .to_string();
-        assert_eq!(address_string, "127.0.0.1:7777");
+        let address = tor_compatible_address_from_str("/ip4/127.0.0.1/tcp/7777");
+
+        assert!(address.is_certainly_not_reachable_via_tor_daemon());
+        assert_eq!(address.to_string(), "127.0.0.1:7777");
     }
 
     #[test]
     fn ip6_to_address_string_should_be_some() {
-        let address = "/ip6/2001:db8:85a3:8d3:1319:8a2e:370:7348/tcp/7777";
-        let address_string =
-            TorCompatibleAddress::from_multiaddr(Cow::Owned(address.parse().unwrap()))
-                .unwrap()
-                .to_string();
-        assert_eq!(address_string, "2001:db8:85a3:8d3:1319:8a2e:370:7348:7777");
+        let address =
+            tor_compatible_address_from_str("/ip6/2001:db8:85a3:8d3:1319:8a2e:370:7348/tcp/7777");
+
+        assert!(!address.is_certainly_not_reachable_via_tor_daemon());
+        assert_eq!(
+            address.to_string(),
+            "2001:db8:85a3:8d3:1319:8a2e:370:7348:7777"
+        );
     }
 
     #[test]
     fn udp_to_address_string_should_be_some() {
-        let address = "/ip4/127.0.0.1/udp/7777";
-        let address_string =
-            TorCompatibleAddress::from_multiaddr(Cow::Owned(address.parse().unwrap()))
-                .unwrap()
-                .to_string();
-        assert_eq!(address_string, "127.0.0.1:7777");
+        let address = tor_compatible_address_from_str("/ip4/127.0.0.1/udp/7777");
+
+        assert!(address.is_certainly_not_reachable_via_tor_daemon());
+        assert_eq!(address.to_string(), "127.0.0.1:7777");
     }
 
     #[test]
     fn ws_to_address_string_should_be_some() {
-        let address = "/ip4/127.0.0.1/tcp/7777/ws";
-        let address_string =
-            TorCompatibleAddress::from_multiaddr(Cow::Owned(address.parse().unwrap()))
-                .unwrap()
-                .to_string();
-        assert_eq!(address_string, "127.0.0.1:7777");
+        let address = tor_compatible_address_from_str("/ip4/127.0.0.1/tcp/7777/ws");
+
+        assert!(address.is_certainly_not_reachable_via_tor_daemon());
+        assert_eq!(address.to_string(), "127.0.0.1:7777");
     }
 
     #[test]
     fn dns4_to_address_string_should_be_some() {
-        let address = "/dns4/randomdomain.com/tcp/7777";
-        let address_string =
-            TorCompatibleAddress::from_multiaddr(Cow::Owned(address.parse().unwrap()))
-                .unwrap()
-                .to_string();
-        assert_eq!(address_string, "randomdomain.com:7777");
+        let address = tor_compatible_address_from_str("/dns4/randomdomain.com/tcp/7777");
+
+        assert!(!address.is_certainly_not_reachable_via_tor_daemon());
+        assert_eq!(address.to_string(), "randomdomain.com:7777");
     }
 
     #[test]
     fn dns_to_address_string_should_be_some() {
-        let address = "/dns/randomdomain.com/tcp/7777";
-        let address_string =
-            TorCompatibleAddress::from_multiaddr(Cow::Owned(address.parse().unwrap()))
-                .unwrap()
-                .to_string();
-        assert_eq!(address_string, "randomdomain.com:7777");
+        let address = tor_compatible_address_from_str("/dns/randomdomain.com/tcp/7777");
+
+        assert!(!address.is_certainly_not_reachable_via_tor_daemon());
+        assert_eq!(address.to_string(), "randomdomain.com:7777");
     }
 
     #[test]
     fn dnsaddr_to_address_string_should_be_error() {
         let address = "/dnsaddr/randomdomain.com";
+
         let _ =
             TorCompatibleAddress::from_multiaddr(Cow::Owned(address.parse().unwrap())).unwrap_err();
+    }
+
+    fn tor_compatible_address_from_str(str: &str) -> TorCompatibleAddress {
+        TorCompatibleAddress::from_multiaddr(Cow::Owned(str.parse().unwrap())).unwrap()
     }
 }
