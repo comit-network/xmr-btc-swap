@@ -299,18 +299,21 @@ where
 
                             // TODO: this can most likely not happen at all, potentially remove these checks
                             if rendezvous_node != self.rendezvous_node_peer_id {
-                                tracing::warn!(peer_id=%rendezvous_node, "Ignoring message from unknown rendezvous node");
+                                tracing::error!(peer_id=%rendezvous_node, "Ignoring message from unknown rendezvous node");
                                 continue;
                             }
 
                             // TODO: Consider implementing From for Namespace and XmrBtcNamespace
                             if namespace.to_string() != self.rendezvous_namespace.to_string() {
-                                tracing::warn!(peer_id=%rendezvous_node, %namespace, "Ignoring message from rendezvous node for unknown namespace");
+                                tracing::error!(peer_id=%rendezvous_node, %namespace, "Ignoring message from rendezvous node for unknown namespace");
                                 continue;
                             }
 
                             // record re-registration after half the ttl has expired
                             self.rendezvous_reregister_timestamp = Some(Instant::now() + Duration::from_secs(ttl) / 2);
+                        }
+                        Some(SwarmEvent::Behaviour(OutEvent::RegisterFailed(error))) => {
+                            tracing::error!(rendezvous_node=%self.rendezvous_node_peer_id, "Registration with rendezvous node failed: {:#}", error);
                         }
                         Some(SwarmEvent::Behaviour(OutEvent::Failure {peer, error})) => {
                             tracing::error!(
