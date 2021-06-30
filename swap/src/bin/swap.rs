@@ -281,7 +281,7 @@ async fn main() -> Result<()> {
                 .context("Failed to read in seed file")?;
             let identity = seed.derive_libp2p_identity();
 
-            let makers = list_sellers(
+            let sellers = list_sellers(
                 rendezvous_node_peer_id,
                 rendezvous_node_addr,
                 namespace,
@@ -290,8 +290,11 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            for maker in makers {
-                tracing::info!(peer_id=%maker.peer_id, multiaddr=%maker.multiaddr, price=%maker.quote.price, max_quantity=%maker.quote.max_quantity, min_quantity=%maker.quote.min_quantity);
+            for seller in sellers {
+                // TODO: Do not use tracing for printing this information
+                // TODO: Print on stdout
+                // TODO: Decide if the json flag should still be honoured
+                tracing::info!(peer_id=%seller.peer_id, multiaddr=%seller.multiaddr, price=%seller.quote.price, max_quantity=%seller.quote.max_quantity, min_quantity=%seller.quote.min_quantity);
             }
         }
     };

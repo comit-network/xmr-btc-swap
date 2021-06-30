@@ -31,9 +31,9 @@ pub async fn list_sellers(
         rendezvous_node_addr,
         namespace,
     );
-    let makers = event_loop.run().await;
+    let sellers = event_loop.run().await;
 
-    Ok(makers)
+    Ok(sellers)
 }
 
 pub struct Seller {
@@ -223,7 +223,7 @@ impl EventLoop {
                 .collect::<Result<Vec<_>, _>>();
 
             match all_quotes_fetched {
-                Ok(makers) => break makers,
+                Ok(sellers) => break sellers,
                 Err(StillPending {}) => continue,
             }
         }
