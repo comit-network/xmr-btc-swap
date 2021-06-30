@@ -35,17 +35,19 @@ impl Transport for TorDialOnlyTransport {
     }
 
     fn dial(self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {
-        let tor_compatible_address = TorCompatibleAddress::from_multiaddr(Cow::Borrowed(&addr))?;
+        let address = TorCompatibleAddress::from_multiaddr(Cow::Borrowed(&addr))?;
+
+        if address.is_certainly_not_reachable_via_tor_daemon() {
+            return Err(TransportError::MultiaddrNotSupported(addr));
+        }
 
         let dial_future = async move {
             tracing::trace!("Connecting through Tor proxy to address: {}", addr);
 
-            let stream = Socks5Stream::connect(
-                (Ipv4Addr::LOCALHOST, self.socks_port),
-                tor_compatible_address.to_string(),
-            )
-            .await
-            .map_err(|e| io::Error::new(io::ErrorKind::ConnectionRefused, e))?;
+            let stream =
+                Socks5Stream::connect((Ipv4Addr::LOCALHOST, self.socks_port), address.to_string())
+                    .await
+                    .map_err(|e| io::Error::new(io::ErrorKind::ConnectionRefused, e))?;
 
             tracing::trace!("Connection through Tor established");
 
@@ -97,6 +99,22 @@ impl TorCompatibleAddress {
                 })
             }
             _ => Err(TransportError::MultiaddrNotSupported(multi.into_owned())),
+        }
+    }
+
+    /// Checks if the address is reachable via the Tor daemon.
+    ///
+    /// The Tor daemon can dial onion addresses, resolve DNS names and dial
+    /// IP4/IP6 addresses reachable via the public Internet.
+    /// We can't guarantee that an address is reachable via the Internet but we
+    /// can say that some addresses are almost certainly not reachable, for
+    /// example, loopback addresses.
+    fn is_certainly_not_reachable_via_tor_daemon(&self) -> bool {
+        match self {
+            TorCompatibleAddress::Onion3 { .. } => false,
+            TorCompatibleAddress::Dns { address, .. } => address == "localhost",
+            TorCompatibleAddress::Ip4 { address, .. } => address.is_loopback(),
+            TorCompatibleAddress::Ip6 { address, .. } => address.is_loopback(),
         }
     }
 }
