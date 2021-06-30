@@ -309,6 +309,7 @@ where
                                 continue;
                             }
 
+                            tracing::info!("Successfully registered with rendezvous node");
                             // record re-registration after half the ttl has expired
                             self.rendezvous_reregister_timestamp = Some(Instant::now() + Duration::from_secs(ttl) / 2);
                         }
