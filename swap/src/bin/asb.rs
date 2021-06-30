@@ -188,6 +188,7 @@ async fn main() -> Result<()> {
                 config.maker.min_buy_btc,
                 config.maker.max_buy_btc,
                 config.rendezvous_node.peer_id,
+                config.rendezvous_node.addr,
                 namespace,
             )
             .unwrap();

@@ -14,7 +14,7 @@ use futures::stream::{FuturesUnordered, StreamExt};
 use libp2p::rendezvous::Namespace;
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::swarm::SwarmEvent;
-use libp2p::{PeerId, Swarm};
+use libp2p::{Multiaddr, PeerId, Swarm};
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -68,6 +68,7 @@ where
     // separate swarm?  There is no dependency between swap and registration, so we could just
     // build this completely separate.
     rendezvous_node_peer_id: PeerId,
+    rendezvous_node_addr: Multiaddr,
     rendezvous_namespace: XmrBtcNamespace,
     rendezvous_reregister_timestamp: Option<Instant>,
 }
@@ -87,6 +88,7 @@ where
         min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,
         rendezvous_node_peer_id: PeerId,
+        rendezvous_node_addr: Multiaddr,
         rendezvous_namespace: XmrBtcNamespace,
     ) -> Result<(Self, mpsc::Receiver<Swap>)> {
         let swap_channel = MpscChannels::default();
@@ -107,6 +109,7 @@ where
             buffered_transfer_proofs: Default::default(),
             inflight_transfer_proofs: Default::default(),
             rendezvous_node_peer_id,
+            rendezvous_node_addr,
             rendezvous_namespace,
             rendezvous_reregister_timestamp: None,
         };
@@ -162,6 +165,38 @@ where
         }
 
         loop {
+            // rendezvous node re-registration
+            if let Some(rendezvous_reregister_timestamp) = self.rendezvous_reregister_timestamp {
+                if Instant::now() > rendezvous_reregister_timestamp {
+                    if self.swarm.is_connected(&self.rendezvous_node_peer_id) {
+                        match self.swarm.behaviour_mut().rendezvous.register(
+                            Namespace::new(self.rendezvous_namespace.to_string())
+                                .expect("our namespace to be a correct string"),
+                            self.rendezvous_node_peer_id,
+                            None,
+                        ) {
+                            Ok(()) => {}
+                            Err(err) => {
+                                tracing::error!(
+                                    "Sending registration to rendezvous failed: {:#}",
+                                    err
+                                );
+                            }
+                        }
+                    } else {
+                        match Swarm::dial_addr(&mut self.swarm, self.rendezvous_node_addr.clone()) {
+                            Ok(()) => {}
+                            Err(error) => {
+                                tracing::error!(
+                                    "Failed to redial rendezvous node for re-registration: {:#}",
+                                    error
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
             tokio::select! {
                 swarm_event = self.swarm.next() => {
                     match swarm_event {

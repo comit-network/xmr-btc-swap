@@ -251,6 +251,7 @@ async fn start_alice(
         min_buy,
         max_buy,
         PeerId::random(),
+        Multiaddr::empty(),
         XmrBtcNamespace::Testnet,
     )
     .unwrap();
