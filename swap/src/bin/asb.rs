@@ -107,7 +107,10 @@ async fn main() -> Result<()> {
         Seed::from_file_or_generate(&config.data.dir).expect("Could not retrieve/initialize seed");
 
     match cmd {
-        Command::Start { resume_only } => {
+        Command::Start {
+            resume_only,
+            external_addr,
+        } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
 
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
@@ -163,14 +166,19 @@ async fn main() -> Result<()> {
 
             tracing::info!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
 
-            Swarm::dial_addr(&mut swarm, config.rendezvous_node.addr.clone()).with_context(
-                || {
-                    format!(
-                        "Failed to dial rendezvous node addr {}",
-                        config.rendezvous_node.addr
-                    )
-                },
-            )?;
+            // todo: Option<Multiaddr> is being used as a rendezvous feature toggle.
+            // The fact that rendezvous is an optional feature could be expressed better.
+            if let Some(addr) = external_addr {
+                let _ = Swarm::add_external_address(&mut swarm, addr, AddressScore::Infinite);
+                Swarm::dial_addr(&mut swarm, config.rendezvous_node.addr.clone()).with_context(
+                    || {
+                        format!(
+                            "Failed to dial rendezvous node addr {}",
+                            config.rendezvous_node.addr
+                        )
+                    },
+                )?;
+            }
 
             let namespace = if testnet {
                 XmrBtcNamespace::Testnet

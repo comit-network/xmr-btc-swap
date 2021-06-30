@@ -4,6 +4,7 @@ use crate::env;
 use crate::env::GetConfig;
 use anyhow::{bail, Result};
 use bitcoin::Address;
+use libp2p::Multiaddr;
 use serde::Serialize;
 use std::ffi::OsString;
 use std::path::PathBuf;
@@ -24,12 +25,18 @@ where
     let command: RawCommand = args.cmd;
 
     let arguments = match command {
-        RawCommand::Start { resume_only } => Arguments {
+        RawCommand::Start {
+            resume_only,
+            external_addr,
+        } => Arguments {
             testnet: is_testnet,
             json: is_json,
             config_path: config_path(config, is_testnet)?,
             env_config: env_config(is_testnet),
-            cmd: Command::Start { resume_only },
+            cmd: Command::Start {
+                resume_only,
+                external_addr,
+            },
         },
         RawCommand::History => Arguments {
             testnet: is_testnet,
@@ -167,6 +174,7 @@ pub struct Arguments {
 pub enum Command {
     Start {
         resume_only: bool,
+        external_addr: Option<Multiaddr>,
     },
     History,
     WithdrawBtc {
@@ -234,6 +242,11 @@ pub enum RawCommand {
             help = "For maintenance only. When set, no new swap requests will be accepted, but existing unfinished swaps will be resumed."
         )]
         resume_only: bool,
+        #[structopt(
+            long = "external-addr",
+            help = "Our external address to be used when registering our service with a rendezvous node"
+        )]
+        external_addr: Option<Multiaddr>,
     },
     #[structopt(about = "Prints swap-id and the state of each swap ever made.")]
     History,
@@ -338,7 +351,10 @@ mod tests {
             json: false,
             config_path: default_mainnet_conf_path.clone(),
             env_config: mainnet_env_config,
-            cmd: Command::Start { resume_only: false },
+            cmd: Command::Start {
+                resume_only: false,
+                external_addr: None,
+            },
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
@@ -475,7 +491,10 @@ mod tests {
             json: false,
             config_path: default_testnet_conf_path.clone(),
             env_config: testnet_env_config,
-            cmd: Command::Start { resume_only: false },
+            cmd: Command::Start {
+                resume_only: false,
+                external_addr: None,
+            },
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
