@@ -25,7 +25,7 @@ pub async fn list_sellers(
         ping: Ping::new(
             PingConfig::new()
                 .with_keep_alive(false)
-                .with_interval(Duration::from_secs(3_154_000_000)),
+                .with_interval(Duration::from_secs(86_400)),
         ),
     };
     let mut swarm = swarm::cli(identity, tor_socks5_port, behaviour).await?;
