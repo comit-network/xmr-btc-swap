@@ -83,6 +83,13 @@ fn default_asb_data_dir() -> Result<PathBuf> {
         .context("Could not generate default config file path")
 }
 
+// TODO: update this to the actual deployed rendezvous server
+//  Currently set to Staging ASB on raspi
+const DEFAULT_RENDEZVOUS_PEER_ID: &str = "12D3KooWPZ69DRp4wbGB3wJsxxsg1XW1EVZ2evtVwcARCF3a1nrx";
+// TODO: update this to the actual deployed rendezvous server
+//  Port still to be opened once running rendezvous node
+const DEFAULT_RENDEZVOUS_ADDR: &str = "/ip4/141.168.172.35/tcp/7654";
+
 const DEFAULT_MIN_BUY_AMOUNT: f64 = 0.002f64;
 const DEFAULT_MAX_BUY_AMOUNT: f64 = 0.02f64;
 const DEFAULT_SPREAD: f64 = 0.02f64;
@@ -297,6 +304,18 @@ pub fn query_user_for_initial_config(testnet: bool) -> Result<Config> {
     }
     let ask_spread = Decimal::from_f64(ask_spread).context("Unable to parse spread")?;
 
+    let rendezvous_peer_id_str = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter the peer id of the rendezvous node you wish to register with")
+        .default(DEFAULT_RENDEZVOUS_PEER_ID.to_string())
+        .interact_text()?;
+    let rendezvous_peer_id = PeerId::from_str(rendezvous_peer_id_str.as_str())?;
+
+    let rendezvous_addr_str = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter the multiaddress of the rendezvous node you wish to register with")
+        .default(DEFAULT_RENDEZVOUS_ADDR.to_string())
+        .interact_text()?;
+    let rendezvous_addr = Multiaddr::from_str(rendezvous_addr_str.as_str())?;
+
     println!();
 
     Ok(Config {
@@ -325,7 +344,10 @@ pub fn query_user_for_initial_config(testnet: bool) -> Result<Config> {
             ask_spread,
             price_ticker_ws_url: defaults.price_ticker_ws_url,
         },
-        rendezvous: None,
+        rendezvous: Some(Rendezvous {
+            addr: rendezvous_addr,
+            peer_id: rendezvous_peer_id,
+        }),
     })
 }
 
@@ -367,7 +389,10 @@ mod tests {
                 ask_spread: Decimal::from_f64(DEFAULT_SPREAD).unwrap(),
                 price_ticker_ws_url: defaults.price_ticker_ws_url,
             },
-            rendezvous: None,
+            rendezvous: Some(Rendezvous {
+                addr: DEFAULT_RENDEZVOUS_ADDR.parse().unwrap(),
+                peer_id: PeerId::from_str(DEFAULT_RENDEZVOUS_PEER_ID).unwrap(),
+            }),
         };
 
         initial_setup(config_path.clone(), expected.clone()).unwrap();
@@ -409,7 +434,10 @@ mod tests {
                 ask_spread: Decimal::from_f64(DEFAULT_SPREAD).unwrap(),
                 price_ticker_ws_url: defaults.price_ticker_ws_url,
             },
-            rendezvous: None,
+            rendezvous: Some(Rendezvous {
+                addr: DEFAULT_RENDEZVOUS_ADDR.parse().unwrap(),
+                peer_id: PeerId::from_str(DEFAULT_RENDEZVOUS_PEER_ID).unwrap(),
+            }),
         };
 
         initial_setup(config_path.clone(), expected.clone()).unwrap();
