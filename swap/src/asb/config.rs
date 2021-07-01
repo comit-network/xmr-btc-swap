@@ -95,6 +95,7 @@ const DEFAULT_MAX_BUY_AMOUNT: f64 = 0.02f64;
 const DEFAULT_SPREAD: f64 = 0.02f64;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     pub data: Data,
     pub network: Network,
