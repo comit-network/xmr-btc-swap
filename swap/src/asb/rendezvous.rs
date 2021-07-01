@@ -54,10 +54,18 @@ impl Behaviour {
                             .expect("our namespace to be a correct string"),
                         self.rendezvous_point_peer_id,
                         None,
-                    )?;
+                    );
                 }
             }
         } else {
+            // TODO: The refresh has to be tied to a refersh time that is tied to us having
+            // gotten a Ttl!  We should not be able to refresh like this,
+            // because it may result in constant retry (with new connections) if there is an
+            // error on the rendezvous side and the connection is closed.
+            //  In such an error scenario the initial dial to the rendezvous node should
+            // just fail and then we get an error on the ASB and don't try again. (pointless
+            // to try again anyway if the rendezvous server is broken / not available)
+
             let p2p_suffix = Protocol::P2p(self.rendezvous_point_peer_id.into());
             let address_with_p2p = if !self
                 .rendezvous_point_addr

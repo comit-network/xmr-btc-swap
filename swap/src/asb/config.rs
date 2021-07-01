@@ -304,6 +304,8 @@ pub fn query_user_for_initial_config(testnet: bool) -> Result<Config> {
     }
     let ask_spread = Decimal::from_f64(ask_spread).context("Unable to parse spread")?;
 
+    // TODO: This is not complete given that the rendezvous section is optional - we
+    // could go for yes/no here first?
     let rendezvous_peer_id_str = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter the peer id of the rendezvous node you wish to register with")
         .default(DEFAULT_RENDEZVOUS_PEER_ID.to_string())
