@@ -32,7 +32,6 @@ use swap::database::Database;
 use swap::monero::Amount;
 use swap::network::swarm;
 use swap::protocol::alice::run;
-use swap::rendezvous::XmrBtcNamespace;
 use swap::seed::Seed;
 use swap::tor::AuthenticatedClient;
 use swap::{asb, bitcoin, kraken, monero, tor};
@@ -156,6 +155,7 @@ async fn main() -> Result<()> {
                 kraken_rate.clone(),
                 resume_only,
                 env_config,
+                config.rendezvous,
             )?;
 
             for listen in config.network.listen.clone() {
@@ -165,25 +165,9 @@ async fn main() -> Result<()> {
 
             tracing::info!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
 
-            // todo: Option<Multiaddr> is being used as a rendezvous feature toggle.
-            // The fact that rendezvous is an optional feature could be expressed better.
             if let Some(addr) = external_addr {
                 let _ = Swarm::add_external_address(&mut swarm, addr, AddressScore::Infinite);
-                Swarm::dial_addr(&mut swarm, config.rendezvous_node.addr.clone()).with_context(
-                    || {
-                        format!(
-                            "Failed to dial rendezvous node addr {}",
-                            config.rendezvous_node.addr
-                        )
-                    },
-                )?;
             }
-
-            let namespace = if testnet {
-                XmrBtcNamespace::Testnet
-            } else {
-                XmrBtcNamespace::Mainnet
-            };
 
             let (event_loop, mut swap_receiver) = EventLoop::new(
                 swarm,
@@ -194,9 +178,6 @@ async fn main() -> Result<()> {
                 kraken_rate.clone(),
                 config.maker.min_buy_btc,
                 config.maker.max_buy_btc,
-                config.rendezvous_node.peer_id,
-                config.rendezvous_node.addr,
-                namespace,
             )
             .unwrap();
 

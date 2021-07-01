@@ -14,6 +14,7 @@ pub fn asb<LR>(
     latest_rate: LR,
     resume_only: bool,
     env_config: env::Config,
+    rendezvous_config: Option<asb::config::Rendezvous>,
 ) -> Result<Swarm<asb::Behaviour<LR>>>
 where
     LR: LatestRate + Send + 'static + Debug + Clone,
@@ -27,6 +28,7 @@ where
         resume_only,
         env_config,
         identity.clone(),
+        rendezvous_config,
     );
 
     let transport = asb::transport::new(&identity)?;

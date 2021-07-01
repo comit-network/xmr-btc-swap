@@ -4,6 +4,7 @@ pub mod config;
 mod event_loop;
 mod rate;
 mod recovery;
+mod rendezvous;
 pub mod tracing;
 pub mod transport;
 

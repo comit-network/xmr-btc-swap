@@ -22,7 +22,6 @@ use swap::network::swarm;
 use swap::protocol::alice::{AliceState, Swap};
 use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
-use swap::rendezvous::XmrBtcNamespace;
 use swap::seed::Seed;
 use swap::{asb, bitcoin, cli, env, monero};
 use tempfile::tempdir;
@@ -157,13 +156,16 @@ async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
             .await
             .unwrap();
 
-    (monero, Containers {
-        bitcoind_url,
-        bitcoind,
-        monerod_container,
-        monero_wallet_rpc_containers,
-        electrs,
-    })
+    (
+        monero,
+        Containers {
+            bitcoind_url,
+            bitcoind,
+            monerod_container,
+            monero_wallet_rpc_containers,
+            electrs,
+        },
+    )
 }
 
 async fn init_bitcoind_container(
@@ -237,6 +239,7 @@ async fn start_alice(
         latest_rate,
         resume_only,
         env_config,
+        None,
     )
     .unwrap();
     swarm.listen_on(listen_address).unwrap();
@@ -250,9 +253,6 @@ async fn start_alice(
         FixedRate::default(),
         min_buy,
         max_buy,
-        PeerId::random(),
-        Multiaddr::empty(),
-        XmrBtcNamespace::Testnet,
     )
     .unwrap();
 
