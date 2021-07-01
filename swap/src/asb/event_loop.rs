@@ -149,9 +149,7 @@ where
         loop {
             // rendezvous node re-registration
             if let Some(rendezvous_behaviour) = self.swarm.behaviour_mut().rendezvous.as_mut() {
-                if let Err(error) = rendezvous_behaviour.refresh_registration() {
-                    tracing::error!("Failed to register with rendezvous point: {:#}", error);
-                }
+                rendezvous_behaviour.refresh();
             }
 
             tokio::select! {
