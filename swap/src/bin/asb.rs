@@ -161,7 +161,6 @@ async fn main() -> Result<()> {
             for listen in config.network.listen.clone() {
                 Swarm::listen_on(&mut swarm, listen.clone())
                     .with_context(|| format!("Failed to listen on network interface {}", listen))?;
-                Swarm::add_external_address(&mut swarm, listen.clone(), AddressScore::Infinite);
             }
 
             tracing::info!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
