@@ -12,7 +12,8 @@ use libp2p::{Multiaddr, PeerId};
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
-/// A `NetworkBehaviour` that handles registration of the xmr-btc swap service with a rendezvous point
+/// A `NetworkBehaviour` that handles registration of the xmr-btc swap service
+/// with a rendezvous point
 pub struct Behaviour {
     rendezvous_behaviour: libp2p::rendezvous::Rendezvous,
     rendezvous_point_peer_id: PeerId,
