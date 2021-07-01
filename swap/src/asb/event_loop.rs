@@ -169,20 +169,12 @@ where
             if let Some(rendezvous_reregister_timestamp) = self.rendezvous_reregister_timestamp {
                 if Instant::now() > rendezvous_reregister_timestamp {
                     if self.swarm.is_connected(&self.rendezvous_node_peer_id) {
-                        match self.swarm.behaviour_mut().rendezvous.register(
+                        self.swarm.behaviour_mut().rendezvous.register(
                             Namespace::new(self.rendezvous_namespace.to_string())
                                 .expect("our namespace to be a correct string"),
                             self.rendezvous_node_peer_id,
                             None,
-                        ) {
-                            Ok(()) => {}
-                            Err(err) => {
-                                tracing::error!(
-                                    "Sending registration to rendezvous failed: {:#}",
-                                    err
-                                );
-                            }
-                        }
+                        );
                     } else {
                         match Swarm::dial_addr(&mut self.swarm, self.rendezvous_node_addr.clone()) {
                             Ok(()) => {}
@@ -334,16 +326,11 @@ where
                             }
 
                             if peer == self.rendezvous_node_peer_id {
-                                match self
+                                self
                                     .swarm
                                     .behaviour_mut()
                                     .rendezvous
-                                    .register(Namespace::new(self.rendezvous_namespace.to_string()).expect("our namespace to be a correct string"), self.rendezvous_node_peer_id, None) {
-                                    Ok(()) => {},
-                                    Err(err) => {
-                                        tracing::error!("Sending registration to rendezvous failed: {:#}", err);
-                                    }
-                                }
+                                    .register(Namespace::new(self.rendezvous_namespace.to_string()).expect("our namespace to be a correct string"), self.rendezvous_node_peer_id, None);
                             }
                         }
                         Some(SwarmEvent::IncomingConnectionError { send_back_addr: address, error, .. }) => {
