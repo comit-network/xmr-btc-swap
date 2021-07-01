@@ -1818,7 +1818,7 @@ checksum = "ba4aede83fc3617411dc6993bc8c70919750c1c257c6ca6a502aed6e0e2394ae"
 [[package]]
 name = "libp2p"
 version = "0.39.0"
-source = "git+https://github.com/comit-network/rust-libp2p?branch=rendezvous#c3cd411cedb12eab72ba26b08c43c2467a8fd8e9"
+source = "git+https://github.com/comit-network/rust-libp2p?rev=2e143a01aebbbf318231e7841884f9f34638c4e2#2e143a01aebbbf318231e7841884f9f34638c4e2"
 dependencies = [
  "atomic",
  "bytes 1.0.1",
@@ -1846,7 +1846,7 @@ dependencies = [
 [[package]]
 name = "libp2p-core"
 version = "0.29.0"
-source = "git+https://github.com/comit-network/rust-libp2p?branch=rendezvous#c3cd411cedb12eab72ba26b08c43c2467a8fd8e9"
+source = "git+https://github.com/comit-network/rust-libp2p?rev=2e143a01aebbbf318231e7841884f9f34638c4e2#2e143a01aebbbf318231e7841884f9f34638c4e2"
 dependencies = [
  "asn1_der",
  "bs58",
@@ -1879,7 +1879,7 @@ dependencies = [
 [[package]]
 name = "libp2p-dns"
 version = "0.29.0"
-source = "git+https://github.com/comit-network/rust-libp2p?branch=rendezvous#c3cd411cedb12eab72ba26b08c43c2467a8fd8e9"
+source = "git+https://github.com/comit-network/rust-libp2p?rev=2e143a01aebbbf318231e7841884f9f34638c4e2#2e143a01aebbbf318231e7841884f9f34638c4e2"
 dependencies = [
  "futures",
  "libp2p-core",
@@ -1891,7 +1891,7 @@ dependencies = [
 [[package]]
 name = "libp2p-mplex"
 version = "0.29.0"
-source = "git+https://github.com/comit-network/rust-libp2p?branch=rendezvous#c3cd411cedb12eab72ba26b08c43c2467a8fd8e9"
+source = "git+https://github.com/comit-network/rust-libp2p?rev=2e143a01aebbbf318231e7841884f9f34638c4e2#2e143a01aebbbf318231e7841884f9f34638c4e2"
 dependencies = [
  "asynchronous-codec",
  "bytes 1.0.1",
@@ -1908,7 +1908,7 @@ dependencies = [
 [[package]]
 name = "libp2p-noise"
 version = "0.32.0"
-source = "git+https://github.com/comit-network/rust-libp2p?branch=rendezvous#c3cd411cedb12eab72ba26b08c43c2467a8fd8e9"
+source = "git+https://github.com/comit-network/rust-libp2p?rev=2e143a01aebbbf318231e7841884f9f34638c4e2#2e143a01aebbbf318231e7841884f9f34638c4e2"
 dependencies = [
  "bytes 1.0.1",
  "curve25519-dalek",
@@ -1929,7 +1929,7 @@ dependencies = [
 [[package]]
 name = "libp2p-ping"
 version = "0.30.0"
-source = "git+https://github.com/comit-network/rust-libp2p?branch=rendezvous#c3cd411cedb12eab72ba26b08c43c2467a8fd8e9"
+source = "git+https://github.com/comit-network/rust-libp2p?rev=2e143a01aebbbf318231e7841884f9f34638c4e2#2e143a01aebbbf318231e7841884f9f34638c4e2"
 dependencies = [
  "futures",
  "libp2p-core",
@@ -1943,7 +1943,7 @@ dependencies = [
 [[package]]
 name = "libp2p-rendezvous"
 version = "0.1.0"
-source = "git+https://github.com/comit-network/rust-libp2p?branch=rendezvous#c3cd411cedb12eab72ba26b08c43c2467a8fd8e9"
+source = "git+https://github.com/comit-network/rust-libp2p?rev=2e143a01aebbbf318231e7841884f9f34638c4e2#2e143a01aebbbf318231e7841884f9f34638c4e2"
 dependencies = [
  "asynchronous-codec",
  "bimap",
@@ -1965,7 +1965,7 @@ dependencies = [
 [[package]]
 name = "libp2p-request-response"
 version = "0.12.0"
-source = "git+https://github.com/comit-network/rust-libp2p?branch=rendezvous#c3cd411cedb12eab72ba26b08c43c2467a8fd8e9"
+source = "git+https://github.com/comit-network/rust-libp2p?rev=2e143a01aebbbf318231e7841884f9f34638c4e2#2e143a01aebbbf318231e7841884f9f34638c4e2"
 dependencies = [
  "async-trait",
  "bytes 1.0.1",
@@ -1984,7 +1984,7 @@ dependencies = [
 [[package]]
 name = "libp2p-swarm"
 version = "0.30.0"
-source = "git+https://github.com/comit-network/rust-libp2p?branch=rendezvous#c3cd411cedb12eab72ba26b08c43c2467a8fd8e9"
+source = "git+https://github.com/comit-network/rust-libp2p?rev=2e143a01aebbbf318231e7841884f9f34638c4e2#2e143a01aebbbf318231e7841884f9f34638c4e2"
 dependencies = [
  "either",
  "futures",
@@ -1999,7 +1999,7 @@ dependencies = [
 [[package]]
 name = "libp2p-swarm-derive"
 version = "0.23.0"
-source = "git+https://github.com/comit-network/rust-libp2p?branch=rendezvous#c3cd411cedb12eab72ba26b08c43c2467a8fd8e9"
+source = "git+https://github.com/comit-network/rust-libp2p?rev=2e143a01aebbbf318231e7841884f9f34638c4e2#2e143a01aebbbf318231e7841884f9f34638c4e2"
 dependencies = [
  "quote 1.0.9",
  "syn 1.0.73",
@@ -2008,7 +2008,7 @@ dependencies = [
 [[package]]
 name = "libp2p-tcp"
 version = "0.29.0"
-source = "git+https://github.com/comit-network/rust-libp2p?branch=rendezvous#c3cd411cedb12eab72ba26b08c43c2467a8fd8e9"
+source = "git+https://github.com/comit-network/rust-libp2p?rev=2e143a01aebbbf318231e7841884f9f34638c4e2#2e143a01aebbbf318231e7841884f9f34638c4e2"
 dependencies = [
  "futures",
  "futures-timer",
@@ -2024,7 +2024,7 @@ dependencies = [
 [[package]]
 name = "libp2p-websocket"
 version = "0.30.0"
-source = "git+https://github.com/comit-network/rust-libp2p?branch=rendezvous#c3cd411cedb12eab72ba26b08c43c2467a8fd8e9"
+source = "git+https://github.com/comit-network/rust-libp2p?rev=2e143a01aebbbf318231e7841884f9f34638c4e2#2e143a01aebbbf318231e7841884f9f34638c4e2"
 dependencies = [
  "either",
  "futures",
@@ -2041,7 +2041,7 @@ dependencies = [
 [[package]]
 name = "libp2p-yamux"
 version = "0.33.0"
-source = "git+https://github.com/comit-network/rust-libp2p?branch=rendezvous#c3cd411cedb12eab72ba26b08c43c2467a8fd8e9"
+source = "git+https://github.com/comit-network/rust-libp2p?rev=2e143a01aebbbf318231e7841884f9f34638c4e2#2e143a01aebbbf318231e7841884f9f34638c4e2"
 dependencies = [
  "futures",
  "libp2p-core",
@@ -2426,7 +2426,7 @@ checksum = "e5ce46fe64a9d73be07dcbe690a38ce1b293be448fd8ce1e6c1b8062c9f72c6a"
 [[package]]
 name = "multistream-select"
 version = "0.10.3"
-source = "git+https://github.com/comit-network/rust-libp2p?branch=rendezvous#c3cd411cedb12eab72ba26b08c43c2467a8fd8e9"
+source = "git+https://github.com/comit-network/rust-libp2p?rev=2e143a01aebbbf318231e7841884f9f34638c4e2#2e143a01aebbbf318231e7841884f9f34638c4e2"
 dependencies = [
  "bytes 1.0.1",
  "futures",
