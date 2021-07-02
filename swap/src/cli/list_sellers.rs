@@ -9,6 +9,8 @@ use libp2p::rendezvous::{Namespace, Rendezvous};
 use libp2p::request_response::{RequestResponseEvent, RequestResponseMessage};
 use libp2p::swarm::SwarmEvent;
 use libp2p::{identity, rendezvous, Multiaddr, PeerId, Swarm};
+use serde::Serialize;
+use serde_with::{serde_as, DisplayFromStr};
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -43,7 +45,10 @@ pub async fn list_sellers(
     Ok(sellers)
 }
 
+#[serde_as]
+#[derive(Debug, Serialize)]
 pub struct Seller {
+    #[serde_as(as = "DisplayFromStr")]
     pub peer_id: PeerId,
     pub multiaddr: Multiaddr,
     pub quote: BidQuote,
