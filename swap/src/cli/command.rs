@@ -69,7 +69,6 @@ where
 
     let arguments = match args.cmd {
         RawCommand::BuyXmr {
-            seller_peer_id,
             seller_addr: SellerAddr { seller_addr },
             bitcoin:
                 Bitcoin {
@@ -88,7 +87,6 @@ where
             json,
             data_dir: data::data_dir_from(data, is_testnet)?,
             cmd: Command::BuyXmr {
-                seller_peer_id,
                 seller_addr,
                 bitcoin_electrum_rpc_url: bitcoin_electrum_rpc_url_from(
                     bitcoin_electrum_rpc_url,
@@ -218,7 +216,6 @@ where
 #[derive(Debug, PartialEq)]
 pub enum Command {
     BuyXmr {
-        seller_peer_id: PeerId,
         seller_addr: Multiaddr,
         bitcoin_electrum_rpc_url: Url,
         bitcoin_target_block: usize,
@@ -291,9 +288,6 @@ pub struct RawArguments {
 pub enum RawCommand {
     /// Start a XMR for BTC swap
     BuyXmr {
-        #[structopt(long = "seller-peer-id", help = "The seller's peer id")]
-        seller_peer_id: PeerId,
-
         #[structopt(flatten)]
         seller_addr: SellerAddr,
 
@@ -415,7 +409,10 @@ pub struct SwapId {
 
 #[derive(structopt::StructOpt, Debug)]
 pub struct SellerAddr {
-    #[structopt(long = "seller-addr", help = "The seller's multiaddress")]
+    #[structopt(
+        long = "seller-addr",
+        help = "The seller's multiaddress including the peer-id"
+    )]
     pub seller_addr: Multiaddr,
 }
 
@@ -987,7 +984,6 @@ mod tests {
                 json: false,
                 data_dir: data_dir_path_cli().join(TESTNET),
                 cmd: Command::BuyXmr {
-                    seller_peer_id: PeerId::from_str(PEER_ID).unwrap(),
                     seller_addr: Multiaddr::from_str(MUTLI_ADDRESS).unwrap(),
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)
                         .unwrap(),
@@ -1007,7 +1003,6 @@ mod tests {
                 json: false,
                 data_dir: data_dir_path_cli().join(MAINNET),
                 cmd: Command::BuyXmr {
-                    seller_peer_id: PeerId::from_str(PEER_ID).unwrap(),
                     seller_addr: Multiaddr::from_str(MUTLI_ADDRESS).unwrap(),
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET,

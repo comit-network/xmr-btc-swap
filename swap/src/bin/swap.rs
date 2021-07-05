@@ -13,6 +13,8 @@
 #![allow(non_snake_case)]
 
 use anyhow::{bail, Context, Result};
+use libp2p::core::multiaddr::Protocol;
+use libp2p::PeerId;
 use prettytable::{row, Table};
 use qrcode::render::unicode;
 use qrcode::QrCode;
@@ -58,7 +60,6 @@ async fn main() -> Result<()> {
 
     match cmd {
         Command::BuyXmr {
-            seller_peer_id,
             seller_addr,
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
@@ -67,6 +68,23 @@ async fn main() -> Result<()> {
             tor_socks5_port,
         } => {
             let swap_id = Uuid::new_v4();
+
+            let seller_peer_id = match seller_addr.iter().last() {
+                None => {
+                    bail!("Invalid multiaddress");
+                }
+                Some(protocol) => {
+                    match protocol {
+                        Protocol::P2p(hash) => {
+                            match PeerId::from_multihash(hash) {
+                                Ok(peer_id) => peer_id,
+                                Err(_) => bail!("Multiaddress contains invalid peer-id")
+                            }
+                        }
+                        _ => bail!("The given multiaddress does not end with the peer-id (i.e. /p2p/{peer-id}), make sure you provide the peer-id of the seller as part of the address.")
+                    }
+                }
+            };
 
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
             let db = Database::open(data_dir.join("database").as_path())
@@ -159,6 +177,10 @@ async fn main() -> Result<()> {
             monero_daemon_address,
             tor_socks5_port,
         } => {
+            // TODO: Save complete seller address into database - the user might not know
+            // the seller that is traded with  We assume that the seller address
+            // does not change.
+
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
