@@ -1,5 +1,4 @@
-use crate::asb::behaviour::{Behaviour, OutEvent};
-use crate::asb::Rate;
+use crate::asb::{Behaviour, OutEvent, Rate};
 use crate::database::Database;
 use crate::env::Config;
 use crate::network::quote::BidQuote;
