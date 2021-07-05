@@ -291,18 +291,7 @@ async fn main() -> Result<()> {
             .await?;
 
             for seller in sellers {
-                if json {
-                    println!("{}", serde_json::to_string(&seller)?);
-                } else {
-                    println!(
-                        "Seller: peer-id={}, addr={}, price={}, min_quantity={}, max_quantity={}",
-                        seller.peer_id,
-                        seller.multiaddr,
-                        seller.quote.price,
-                        seller.quote.min_quantity,
-                        seller.quote.max_quantity
-                    );
-                }
+                println!("{}", serde_json::to_string(&seller)?);
             }
         }
     };
