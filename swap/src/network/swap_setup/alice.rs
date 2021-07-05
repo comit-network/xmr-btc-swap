@@ -96,7 +96,7 @@ impl From<OutEvent> for asb::OutEvent {
             } => asb::OutEvent::SwapSetupCompleted {
                 peer_id: bob_peer_id,
                 swap_id,
-                state3: Box::new(state3),
+                state3,
             },
             OutEvent::Error { peer_id, error } => asb::OutEvent::Failure {
                 peer: peer_id,

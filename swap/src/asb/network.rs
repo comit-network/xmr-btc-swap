@@ -34,6 +34,7 @@ pub mod behaviour {
     use libp2p::{NetworkBehaviour, PeerId};
     use uuid::Uuid;
 
+    #[allow(clippy::large_enum_variant)]
     #[derive(Debug)]
     pub enum OutEvent {
         SwapSetupInitiated {
@@ -42,7 +43,7 @@ pub mod behaviour {
         SwapSetupCompleted {
             peer_id: PeerId,
             swap_id: Uuid,
-            state3: Box<State3>,
+            state3: State3,
         },
         SwapDeclined {
             peer: PeerId,
@@ -57,7 +58,7 @@ pub mod behaviour {
             id: RequestId,
         },
         EncryptedSignatureReceived {
-            msg: Box<encrypted_signature::Request>,
+            msg: encrypted_signature::Request,
             channel: ResponseChannel<()>,
             peer: PeerId,
         },
