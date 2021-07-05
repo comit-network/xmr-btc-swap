@@ -199,7 +199,9 @@ impl EventLoop {
                                 RequestResponseEvent::Message { peer, message } => {
                                     match message {
                                         RequestResponseMessage::Response { response, .. } => {
-                                            if self.asb_quote_status.insert(peer, QuoteStatus::Received(response)).is_none() {
+                                            if self.asb_quote_status.insert(peer, QuoteStatus::Received(response)).is_some() {
+                                                tracing::debug!(%peer, "Received bid quote {:?} from peer {}", response, peer);
+                                            } else {
                                                 tracing::error!(%peer, "Received bid quote from unexpected peer, this record will be removed!");
                                                 self.asb_quote_status.remove(&peer);
                                             }
