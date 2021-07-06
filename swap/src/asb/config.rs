@@ -14,7 +14,6 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use tracing::info;
 use url::Url;
 
 pub trait GetDefaults {
@@ -178,7 +177,7 @@ pub struct ConfigNotInitialized {}
 
 pub fn read_config(config_path: PathBuf) -> Result<Result<Config, ConfigNotInitialized>> {
     if config_path.exists() {
-        info!(
+        tracing::info!(
             path = %config_path.display(),
             "Using config file at",
         );
@@ -198,7 +197,7 @@ pub fn initial_setup(config_path: PathBuf, config: Config) -> Result<()> {
     ensure_directory_exists(config_path.as_path())?;
     fs::write(&config_path, toml)?;
 
-    info!(
+    tracing::info!(
         path = %config_path.as_path().display(),
         "Initial setup complete, config file created",
     );

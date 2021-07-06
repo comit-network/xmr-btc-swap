@@ -36,7 +36,6 @@ use swap::protocol::alice::run;
 use swap::seed::Seed;
 use swap::tor::AuthenticatedClient;
 use swap::{asb, bitcoin, kraken, monero, tor};
-use tracing::{debug, info, warn};
 use tracing_subscriber::filter::LevelFilter;
 
 const DEFAULT_WALLET_NAME: &str = "asb-wallet";
@@ -90,7 +89,7 @@ async fn main() -> Result<()> {
         ));
     }
 
-    info!(
+    tracing::info!(
         db_folder = %config.data.dir.display(),
         "Database and Seed will be stored in",
     );
@@ -110,17 +109,17 @@ async fn main() -> Result<()> {
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
 
             let bitcoin_balance = bitcoin_wallet.balance().await?;
-            info!(%bitcoin_balance, "Initialized Bitcoin wallet");
+            tracing::info!(%bitcoin_balance, "Initialized Bitcoin wallet");
 
             let monero_balance = monero_wallet.get_balance().await?;
             if monero_balance == Amount::ZERO {
                 let monero_address = monero_wallet.get_main_address();
-                warn!(
+                tracing::warn!(
                     %monero_address,
                     "The Monero balance is 0, make sure to deposit funds at",
                 )
             } else {
-                info!(%monero_balance, "Initialized Monero wallet");
+                tracing::info!(%monero_balance, "Initialized Monero wallet");
             }
 
             let kraken_price_updates = kraken::connect(config.maker.price_ticker_ws_url.clone())?;
@@ -314,7 +313,7 @@ async fn init_bitcoin_wallet(
     seed: &Seed,
     env_config: swap::env::Config,
 ) -> Result<bitcoin::Wallet> {
-    debug!("Opening Bitcoin wallet");
+    tracing::debug!("Opening Bitcoin wallet");
     let wallet_dir = config.data.dir.join("wallet");
 
     let wallet = bitcoin::Wallet::new(
@@ -336,7 +335,7 @@ async fn init_monero_wallet(
     config: &Config,
     env_config: swap::env::Config,
 ) -> Result<monero::Wallet> {
-    debug!("Opening Monero wallet");
+    tracing::debug!("Opening Monero wallet");
     let wallet = monero::Wallet::open_or_create(
         config.monero.wallet_rpc_url.clone(),
         DEFAULT_WALLET_NAME.to_string(),

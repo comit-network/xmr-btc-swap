@@ -8,7 +8,6 @@ use crate::{bitcoin, database, monero};
 use anyhow::{bail, Context, Result};
 use tokio::select;
 use tokio::time::timeout;
-use tracing::{error, info, warn};
 use uuid::Uuid;
 
 pub async fn run<LR>(swap: Swap, rate_service: LR) -> Result<AliceState>
@@ -66,7 +65,7 @@ where
         .latest_rate()
         .map_or("NaN".to_string(), |rate| format!("{}", rate));
 
-    info!(%state, %rate, "Advancing state");
+    tracing::info!(%state, %rate, "Advancing state");
 
     Ok(match state {
         AliceState::Started { state3 } => {
@@ -78,7 +77,7 @@ where
             .await
             {
                 Err(_) => {
-                    info!(
+                    tracing::info!(
                         minutes = %env_config.bitcoin_lock_mempool_timeout.as_secs_f64() / 60.0,
                         "TxLock lock was not seen in mempool in time",
                     );
@@ -99,7 +98,7 @@ where
             .await
             {
                 Err(_) => {
-                    info!(
+                    tracing::info!(
                         confirmations_needed = %env_config.bitcoin_finality_confirmations,
                         minutes = %env_config.bitcoin_lock_confirmed_timeout.as_secs_f64() / 60.0,
                         "TxLock lock did not get enough confirmations in time",
@@ -204,7 +203,7 @@ where
                     }
                 }
                 enc_sig = event_loop_handle.recv_encrypted_signature() => {
-                    info!("Received encrypted signature");
+                    tracing::info!("Received encrypted signature");
 
                     AliceState::EncSigLearned {
                         monero_wallet_restore_blockheight,
@@ -232,7 +231,7 @@ where
                             }
                         },
                         Err(error) => {
-                            error!(
+                            tracing::error!(
                                 "Publishing the redeem transaction failed. Error {:#}",
                                 error
                             );
@@ -248,7 +247,7 @@ where
                         }
                     },
                     Err(error) => {
-                        error!(
+                        tracing::error!(
                             "Constructing the redeem transaction failed. Attempting to wait for cancellation now. Error {:#}", error);
                         tx_lock_status
                             .wait_until_confirmed_with(state3.cancel_timelock)
@@ -361,7 +360,7 @@ where
             match punish {
                 Ok(_) => AliceState::BtcPunished,
                 Err(error) => {
-                    warn!(
+                    tracing::warn!(
                         "Falling back to refund because punish transaction failed. Error {:#}",
                         error
                     );
