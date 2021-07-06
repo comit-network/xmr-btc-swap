@@ -13,7 +13,7 @@
 #![allow(non_snake_case)]
 
 use anyhow::{bail, Context, Result};
-use prettytable::{row, Table};
+use comfy_table::Table;
 use qrcode::render::unicode;
 use qrcode::QrCode;
 use std::cmp::min;
@@ -24,7 +24,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use swap::bitcoin::TxLock;
 use swap::cli::command::{parse_args_and_apply_defaults, Arguments, Command, ParseResult};
-use swap::cli::EventLoop;
+use swap::cli::{list_sellers, EventLoop};
 use swap::database::Database;
 use swap::env::Config;
 use swap::libp2p_ext::MultiAddrExt;
@@ -37,9 +37,6 @@ use swap::{bitcoin, cli, monero};
 use tracing::{debug, error, info, warn};
 use url::Url;
 use uuid::Uuid;
-
-#[macro_use]
-extern crate prettytable;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -68,7 +65,7 @@ async fn main() -> Result<()> {
         } => {
             let swap_id = Uuid::new_v4();
 
-            cli::tracing::init(debug, json, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -91,14 +88,9 @@ async fn main() -> Result<()> {
                 .context("Seller address must contain peer ID")?;
             db.insert_address(seller_peer_id, seller.clone()).await?;
 
-            let mut swarm = swarm::cli(
-                &seed,
-                seller_peer_id,
-                tor_socks5_port,
-                env_config,
-                bitcoin_wallet.clone(),
-            )
-            .await?;
+            let behaviour = cli::Behaviour::new(seller_peer_id, env_config, bitcoin_wallet.clone());
+            let mut swarm =
+                swarm::cli(seed.derive_libp2p_identity(), tor_socks5_port, behaviour).await?;
             swarm.behaviour_mut().add_address(seller_peer_id, seller);
 
             tracing::debug!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
@@ -149,14 +141,13 @@ async fn main() -> Result<()> {
 
             let mut table = Table::new();
 
-            table.add_row(row!["SWAP ID", "STATE"]);
+            table.set_header(vec!["SWAP ID", "STATE"]);
 
             for (swap_id, state) in db.all_bob()? {
-                table.add_row(row![swap_id, state]);
+                table.add_row(vec![swap_id.to_string(), state.to_string()]);
             }
 
-            // Print the table to stdout
-            table.printstd();
+            println!("{}", table);
         }
         Command::Resume {
             swap_id,
@@ -166,7 +157,7 @@ async fn main() -> Result<()> {
             monero_daemon_address,
             tor_socks5_port,
         } => {
-            cli::tracing::init(debug, json, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -191,14 +182,9 @@ async fn main() -> Result<()> {
             let seller_peer_id = db.get_peer_id(swap_id)?;
             let seller_addresses = db.get_addresses(seller_peer_id)?;
 
-            let mut swarm = swarm::cli(
-                &seed,
-                seller_peer_id,
-                tor_socks5_port,
-                env_config,
-                bitcoin_wallet.clone(),
-            )
-            .await?;
+            let behaviour = cli::Behaviour::new(seller_peer_id, env_config, bitcoin_wallet.clone());
+            let mut swarm =
+                swarm::cli(seed.derive_libp2p_identity(), tor_socks5_port, behaviour).await?;
             let our_peer_id = swarm.local_peer_id();
             tracing::debug!(peer_id = %our_peer_id, "Initializing network module");
 
@@ -237,7 +223,7 @@ async fn main() -> Result<()> {
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
         } => {
-            cli::tracing::init(debug, json, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -269,7 +255,7 @@ async fn main() -> Result<()> {
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
         } => {
-            cli::tracing::init(debug, json, data_dir.join("logs"), swap_id)?;
+            cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
             let db = Database::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
@@ -285,6 +271,50 @@ async fn main() -> Result<()> {
             .await?;
 
             cli::refund(swap_id, Arc::new(bitcoin_wallet), db, force).await??;
+        }
+        Command::ListSellers {
+            rendezvous_node_addr,
+            namespace,
+            tor_socks5_port,
+        } => {
+            let rendezvous_node_peer_id = rendezvous_node_addr
+                .extract_peer_id()
+                .context("Rendezvous node address must contain peer ID")?;
+
+            cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
+            let seed = Seed::from_file_or_generate(data_dir.as_path())
+                .context("Failed to read in seed file")?;
+            let identity = seed.derive_libp2p_identity();
+
+            let sellers = list_sellers(
+                rendezvous_node_peer_id,
+                rendezvous_node_addr,
+                namespace,
+                tor_socks5_port,
+                identity,
+            )
+            .await?;
+
+            if json {
+                for seller in sellers {
+                    println!("{}", serde_json::to_string(&seller)?);
+                }
+            } else {
+                let mut table = Table::new();
+
+                table.set_header(vec!["PRICE", "MIN_QUANTITY", "MAX_QUANTITY", "ADDRESS"]);
+
+                for seller in sellers {
+                    table.add_row(vec![
+                        seller.quote.price.to_string(),
+                        seller.quote.min_quantity.to_string(),
+                        seller.quote.max_quantity.to_string(),
+                        seller.multiaddr.to_string(),
+                    ]);
+                }
+
+                println!("{}", table);
+            }
         }
     };
     Ok(())

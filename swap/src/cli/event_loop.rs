@@ -94,7 +94,7 @@ impl EventLoop {
         loop {
             // Note: We are making very elaborate use of `select!` macro's feature here. Make sure to read the documentation thoroughly: https://docs.rs/tokio/1.4.0/tokio/macro.select.html
             tokio::select! {
-                swarm_event = self.swarm.next_event().fuse() => {
+                swarm_event = self.swarm.select_next_some() => {
                     match swarm_event {
                         SwarmEvent::Behaviour(OutEvent::QuoteReceived { id, response }) => {
                             if let Some(responder) = self.inflight_quote_requests.remove(&id) {

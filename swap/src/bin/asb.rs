@@ -13,10 +13,11 @@
 #![allow(non_snake_case)]
 
 use anyhow::{bail, Context, Result};
+use comfy_table::Table;
 use libp2p::core::multiaddr::Protocol;
 use libp2p::core::Multiaddr;
+use libp2p::swarm::AddressScore;
 use libp2p::Swarm;
-use prettytable::{row, Table};
 use std::env;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
@@ -29,6 +30,7 @@ use swap::asb::config::{
 use swap::asb::{cancel, punish, redeem, refund, safely_abort, EventLoop, Finality, KrakenRate};
 use swap::database::Database;
 use swap::monero::Amount;
+use swap::network::rendezvous::XmrBtcNamespace;
 use swap::network::swarm;
 use swap::protocol::alice::run;
 use swap::seed::Seed;
@@ -36,9 +38,6 @@ use swap::tor::AuthenticatedClient;
 use swap::{asb, bitcoin, kraken, monero, tor};
 use tracing::{debug, info, warn};
 use tracing_subscriber::filter::LevelFilter;
-
-#[macro_use]
-extern crate prettytable;
 
 const DEFAULT_WALLET_NAME: &str = "asb-wallet";
 
@@ -124,7 +123,7 @@ async fn main() -> Result<()> {
                 info!(%monero_balance, "Initialized Monero wallet");
             }
 
-            let kraken_price_updates = kraken::connect(config.maker.price_ticker_ws_url)?;
+            let kraken_price_updates = kraken::connect(config.maker.price_ticker_ws_url.clone())?;
 
             // setup Tor hidden services
             let tor_client =
@@ -151,14 +150,32 @@ async fn main() -> Result<()> {
                 kraken_rate.clone(),
                 resume_only,
                 env_config,
+                config.network.rendezvous_point.map(|rendezvous_point| {
+                    (
+                        rendezvous_point,
+                        if testnet {
+                            XmrBtcNamespace::Testnet
+                        } else {
+                            XmrBtcNamespace::Mainnet
+                        },
+                    )
+                }),
             )?;
 
-            for listen in config.network.listen {
+            for listen in config.network.listen.clone() {
                 Swarm::listen_on(&mut swarm, listen.clone())
                     .with_context(|| format!("Failed to listen on network interface {}", listen))?;
             }
 
             tracing::info!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
+
+            for external_address in config.network.external_addresses {
+                let _ = Swarm::add_external_address(
+                    &mut swarm,
+                    external_address,
+                    AddressScore::Infinite,
+                );
+            }
 
             let (event_loop, mut swap_receiver) = EventLoop::new(
                 swarm,
@@ -194,14 +211,13 @@ async fn main() -> Result<()> {
         Command::History => {
             let mut table = Table::new();
 
-            table.add_row(row!["SWAP ID", "STATE"]);
+            table.set_header(vec!["SWAP ID", "STATE"]);
 
             for (swap_id, state) in db.all_alice()? {
-                table.add_row(row![swap_id, state]);
+                table.add_row(vec![swap_id.to_string(), state.to_string()]);
             }
 
-            // Print the table to stdout
-            table.printstd();
+            println!("{}", table);
         }
         Command::WithdrawBtc { amount, address } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;

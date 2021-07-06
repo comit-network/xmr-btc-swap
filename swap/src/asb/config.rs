@@ -1,5 +1,6 @@
 use crate::env::{Mainnet, Testnet};
 use crate::fs::{ensure_directory_exists, system_config_dir, system_data_dir};
+use crate::network::rendezvous::DEFAULT_RENDEZVOUS_ADDRESS;
 use crate::tor::{DEFAULT_CONTROL_PORT, DEFAULT_SOCKS5_PORT};
 use anyhow::{bail, Context, Result};
 use config::ConfigError;
@@ -86,6 +87,7 @@ const DEFAULT_MAX_BUY_AMOUNT: f64 = 0.02f64;
 const DEFAULT_SPREAD: f64 = 0.02f64;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     pub data: Data,
     pub network: Network,
@@ -118,6 +120,10 @@ pub struct Data {
 #[serde(deny_unknown_fields)]
 pub struct Network {
     pub listen: Vec<Multiaddr>,
+    #[serde(default)]
+    pub rendezvous_point: Option<Multiaddr>,
+    #[serde(default)]
+    pub external_addresses: Vec<Multiaddr>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -285,12 +291,25 @@ pub fn query_user_for_initial_config(testnet: bool) -> Result<Config> {
     }
     let ask_spread = Decimal::from_f64(ask_spread).context("Unable to parse spread")?;
 
+    let rendezvous_address = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Do you want to advertise your ASB instance with a rendezvous node? Enter an empty string if not.")
+        .default(DEFAULT_RENDEZVOUS_ADDRESS.to_string())
+        .interact_text()?;
+
+    let rendezvous_point = if rendezvous_address.is_empty() {
+        None
+    } else {
+        Some(Multiaddr::from_str(&rendezvous_address)?)
+    };
+
     println!();
 
     Ok(Config {
         data: Data { dir: data_dir },
         network: Network {
             listen: listen_addresses,
+            rendezvous_point,
+            external_addresses: vec![],
         },
         bitcoin: Bitcoin {
             electrum_rpc_url,
@@ -340,6 +359,8 @@ mod tests {
             },
             network: Network {
                 listen: vec![defaults.listen_address_tcp, defaults.listen_address_ws],
+                rendezvous_point: Some(DEFAULT_RENDEZVOUS_ADDRESS.parse().unwrap()),
+                external_addresses: vec![],
             },
 
             monero: Monero {
@@ -381,6 +402,8 @@ mod tests {
             },
             network: Network {
                 listen: vec![defaults.listen_address_tcp, defaults.listen_address_ws],
+                rendezvous_point: Some(DEFAULT_RENDEZVOUS_ADDRESS.parse().unwrap()),
+                external_addresses: vec![],
             },
 
             monero: Monero {

@@ -52,7 +52,7 @@ impl From<(PeerId, Message)> for asb::OutEvent {
             Message::Request {
                 request, channel, ..
             } => Self::EncryptedSignatureReceived {
-                msg: Box::new(request),
+                msg: request,
                 channel,
                 peer,
             },
