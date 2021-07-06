@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use std::future::Future;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio::net::TcpStream;
@@ -50,7 +50,7 @@ impl Client {
     pub async fn assert_tor_running(&self) -> Result<()> {
         // Make sure you are running tor and this is your socks port
         let proxy = reqwest::Proxy::all(format!("socks5h://{}", self.socks5_address).as_str())
-            .map_err(|_| anyhow!("tor proxy should be there"))?;
+            .context("Failed to construct Tor proxy URL")?;
         let client = reqwest::Client::builder().proxy(proxy).build()?;
 
         let res = client.get("https://check.torproject.org").send().await?;
@@ -77,21 +77,21 @@ impl Client {
         let mut uc = self
             .init_unauthenticated_connection()
             .await
-            .map_err(|_| anyhow!("Could not connect to Tor. Tor might not be running or the control port is incorrect."))?;
+            .context("Failed to connect to Tor")?;
 
         let tor_info = uc
             .load_protocol_info()
             .await
-            .map_err(|_| anyhow!("Failed to load protocol info from Tor."))?;
+            .context("Failed to load protocol info from Tor")?;
 
         let tor_auth_data = tor_info
             .make_auth_data()?
-            .context("Failed to make Tor auth data.")?;
+            .context("Failed to make Tor auth data")?;
 
         // Get an authenticated connection to the Tor via the Tor Controller protocol.
         uc.authenticate(&tor_auth_data)
             .await
-            .map_err(|_| anyhow!("Failed to authenticate with Tor"))?;
+            .context("Failed to authenticate with Tor")?;
 
         Ok(AuthenticatedClient {
             inner: uc.into_authenticated().await,
@@ -123,6 +123,6 @@ impl AuthenticatedClient {
         self.inner
             .add_onion_v3(tor_key, false, false, false, None, &mut listeners)
             .await
-            .map_err(|e| anyhow!("Could not add onion service.: {:#?}", e))
+            .context("Failed to add onion service")
     }
 }
