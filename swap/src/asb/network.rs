@@ -170,7 +170,7 @@ pub mod behaviour {
     }
 }
 
-mod rendezous {
+pub mod rendezous {
     use super::*;
     use std::pin::Pin;
 

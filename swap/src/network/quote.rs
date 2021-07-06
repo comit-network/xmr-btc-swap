@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 const PROTOCOL: &str = "/comit/xmr/btc/bid-quote/1.0.0";
 pub type OutEvent = RequestResponseEvent<(), BidQuote>;
-type Message = RequestResponseMessage<(), BidQuote>;
+pub type Message = RequestResponseMessage<(), BidQuote>;
 
 pub type Behaviour = RequestResponse<JsonPullCodec<BidQuoteProtocol, BidQuote>>;
 
@@ -24,7 +24,7 @@ impl ProtocolName for BidQuoteProtocol {
 }
 
 /// Represents a quote for buying XMR.
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct BidQuote {
     /// The price at which the maker is willing to buy at.
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]

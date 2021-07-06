@@ -1,7 +1,7 @@
 use crate::network::quote::BidQuote;
 use crate::network::rendezvous::XmrBtcNamespace;
 use crate::network::{quote, swarm};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use futures::StreamExt;
 use libp2p::multiaddr::Protocol;
 use libp2p::ping::{Ping, PingConfig, PingEvent};
@@ -32,7 +32,13 @@ pub async fn list_sellers(
     };
     let mut swarm = swarm::cli(identity, tor_socks5_port, behaviour).await?;
 
-    let _ = swarm.dial_addr(rendezvous_node_addr.clone());
+    swarm
+        .behaviour_mut()
+        .quote
+        .add_address(&rendezvous_node_peer_id, rendezvous_node_addr.clone());
+    swarm
+        .dial(&rendezvous_node_peer_id)
+        .context("Failed to dial rendezvous node")?;
 
     let event_loop = EventLoop::new(
         swarm,
@@ -46,7 +52,7 @@ pub async fn list_sellers(
 }
 
 #[serde_as]
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq, Eq, Hash)]
 pub struct Seller {
     #[serde_as(as = "DisplayFromStr")]
     pub multiaddr: Multiaddr,
@@ -87,6 +93,7 @@ enum QuoteStatus {
     Received(BidQuote),
 }
 
+#[derive(Debug)]
 enum State {
     WaitForDiscovery,
     WaitForQuoteCompletion,
@@ -264,6 +271,7 @@ impl EventLoop {
     }
 }
 
+#[derive(Debug)]
 struct StillPending {}
 
 impl From<PingEvent> for OutEvent {
