@@ -89,11 +89,6 @@ async fn main() -> Result<()> {
         ));
     }
 
-    tracing::info!(
-        db_folder = %config.data.dir.display(),
-        "Database and Seed will be stored in",
-    );
-
     let db_path = config.data.dir.join("database");
 
     let db = Database::open(config.data.dir.join(db_path).as_path())
@@ -129,7 +124,7 @@ async fn main() -> Result<()> {
                 tor::Client::new(config.tor.socks5_port).with_control_port(config.tor.control_port);
             let _ac = match tor_client.assert_tor_running().await {
                 Ok(_) => {
-                    tracing::info!("Tor found. Setting up hidden service");
+                    tracing::info!("Setting up Tor hidden service");
                     let ac =
                         register_tor_services(config.network.clone().listen, tor_client, &seed)
                             .await?;
@@ -195,10 +190,10 @@ async fn main() -> Result<()> {
                         let swap_id = swap.swap_id;
                         match run(swap, rate).await {
                             Ok(state) => {
-                                tracing::debug!(%swap_id, %state, "Swap finished with state")
+                                tracing::debug!(%swap_id, final_state=%state, "Swap completed")
                             }
                             Err(error) => {
-                                tracing::error!(%swap_id, "Swap failed. Error {:#}", error)
+                                tracing::error!(%swap_id, "Swap failed: {:#}", error)
                             }
                         }
                     });
@@ -383,7 +378,7 @@ async fn register_tor_services(
 
     hidden_services_details.iter().for_each(|(port, _)| {
         let onion_address = format!("/onion3/{}:{}", onion_address, port);
-        tracing::info!(%onion_address);
+        tracing::info!(%onion_address, "Successfully created hidden service");
     });
 
     Ok(ac)

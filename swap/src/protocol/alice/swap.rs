@@ -231,10 +231,7 @@ where
                             }
                         },
                         Err(error) => {
-                            tracing::error!(
-                                "Publishing the redeem transaction failed. Error {:#}",
-                                error
-                            );
+                            tracing::error!("Failed to publish redeem transaction: {:#}", error);
                             tx_lock_status
                                 .wait_until_confirmed_with(state3.cancel_timelock)
                                 .await?;
@@ -247,8 +244,12 @@ where
                         }
                     },
                     Err(error) => {
-                        tracing::error!(
-                            "Constructing the redeem transaction failed. Attempting to wait for cancellation now. Error {:#}", error);
+                        tracing::error!("Failed to construct redeem transaction: {:#}", error);
+                        tracing::info!(
+                            "Waiting for cancellation timelock ({}) to expire",
+                            state3.cancel_timelock
+                        );
+
                         tx_lock_status
                             .wait_until_confirmed_with(state3.cancel_timelock)
                             .await?;
@@ -360,10 +361,7 @@ where
             match punish {
                 Ok(_) => AliceState::BtcPunished,
                 Err(error) => {
-                    tracing::warn!(
-                        "Falling back to refund because punish transaction failed. Error {:#}",
-                        error
-                    );
+                    tracing::warn!("Failed to publish punish transaction: {:#}", error);
 
                     // Upon punish failure we assume that the refund tx was included but we
                     // missed seeing it. In case we fail to fetch the refund tx we fail
@@ -371,6 +369,8 @@ where
                     // to. It does not help to race punish and refund inclusion,
                     // because a punish tx failure is not recoverable (besides re-trying) if the
                     // refund tx was not included.
+
+                    tracing::info!("Falling back to refund");
 
                     let published_refund_tx = bitcoin_wallet
                         .get_raw_transaction(state3.tx_refund().txid())

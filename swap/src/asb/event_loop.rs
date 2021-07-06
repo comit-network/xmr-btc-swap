@@ -174,13 +174,13 @@ where
                             let _ = self.handle_execution_setup_done(peer_id, swap_id, state3).await;
                         }
                         SwarmEvent::Behaviour(OutEvent::SwapDeclined { peer, error }) => {
-                            tracing::warn!(%peer, "Ignoring spot price request because: {}", error);
+                            tracing::warn!(%peer, "Ignoring spot price request: {}", error);
                         }
                         SwarmEvent::Behaviour(OutEvent::QuoteRequested { channel, peer }) => {
                             let quote = match self.make_quote(self.min_buy, self.max_buy).await {
                                 Ok(quote) => quote,
                                 Err(error) => {
-                                    tracing::warn!(%peer, "Failed to make quote. Error {:#}", error);
+                                    tracing::warn!(%peer, "Failed to make quote: {:#}", error);
                                     continue;
                                 }
                             };
@@ -253,7 +253,7 @@ where
                         SwarmEvent::Behaviour(OutEvent::Failure {peer, error}) => {
                             tracing::error!(
                                 %peer,
-                                "Communication error. Error {:#}", error);
+                                "Communication error: {:#}", error);
                         }
                         SwarmEvent::ConnectionEstablished { peer_id: peer, endpoint, .. } => {
                             tracing::debug!(%peer, address = %endpoint.get_remote_address(), "New connection established");
@@ -268,16 +268,16 @@ where
                             }
                         }
                         SwarmEvent::IncomingConnectionError { send_back_addr: address, error, .. } => {
-                            tracing::warn!(%address, "Failed to set up connection with peer. Error {:#}", error);
+                            tracing::warn!(%address, "Failed to set up connection with peer: {:#}", error);
                         }
                         SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause: Some(error) } if num_established == 0 => {
-                            tracing::warn!(%peer, address = %endpoint.get_remote_address(), "Lost connection. Error {:#}", error);
+                            tracing::warn!(%peer, address = %endpoint.get_remote_address(), "Lost connection to peer: {:#}", error);
                         }
                         SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause: None } if num_established == 0 => {
                             tracing::info!(%peer, address = %endpoint.get_remote_address(), "Successfully closed connection");
                         }
                         SwarmEvent::NewListenAddr(address) => {
-                            tracing::info!(%address, "New listen address detected");
+                            tracing::info!(%address, "New listen address reported");
                         }
                         _ => {}
                     }
@@ -295,7 +295,7 @@ where
                             self.inflight_transfer_proofs.insert(id, responder);
                         },
                         Some(Err(error)) => {
-                            tracing::debug!("A swap stopped without sending a transfer proof. Error {:#}", error);
+                            tracing::debug!("A swap stopped without sending a transfer proof: {:#}", error);
                         }
                         None => {
                             unreachable!("stream of transfer proof receivers must never terminate")
@@ -354,11 +354,11 @@ where
         match self.db.insert_peer_id(swap_id, bob_peer_id).await {
             Ok(_) => {
                 if let Err(error) = self.swap_sender.send(swap).await {
-                    tracing::warn!(%swap_id, "Swap cannot be spawned: {}", error);
+                    tracing::warn!(%swap_id, "Failed to start swap: {}", error);
                 }
             }
             Err(error) => {
-                tracing::warn!(%swap_id, "Unable to save peer-id, swap cannot be spawned: {}", error);
+                tracing::warn!(%swap_id, "Unable to save peer-id in database: {}", error);
             }
         }
     }
