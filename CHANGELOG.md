@@ -21,11 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Now, after sending a spot price the ASB will wait for one minute for the CLI's to trigger the execution setup, and three minutes to see the BTC lock transaction of the CLI in mempool after the swap started.
   If the first timeout is triggered the execution setup will be aborted, if the second timeout is triggered the swap will be safely aborted.
 
+### Changed
+
+- The commandline interface of the CLI to combine `--seller-addr` and `--seller-peer-id`.
+  These two parameters have been merged into a parameter `--seller` that accepts a single [multiaddress](https://docs.libp2p.io/concepts/addressing/).
+  The multiaddress must end with a `/p2p` protocol defining the seller's peer ID.
+
 ### Removed
 
 - The websocket transport from the CLI.
   Websockets were only ever intended to be used for the ASB side to allow websites to retrieve quotes.
   The CLI can use regular TCP connections and having both - TCP and websockets - causes problems and unnecessary overhead.
+- The `--seller-addr` parameter from the CLI's `resume` command.
+  This information is now loaded from the database.
 
 ## [0.7.0] - 2021-05-28
 

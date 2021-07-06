@@ -27,6 +27,7 @@ use swap::cli::command::{parse_args_and_apply_defaults, Arguments, Command, Pars
 use swap::cli::EventLoop;
 use swap::database::Database;
 use swap::env::Config;
+use swap::libp2p_ext::MultiAddrExt;
 use swap::network::quote::BidQuote;
 use swap::network::swarm;
 use swap::protocol::bob;
@@ -58,8 +59,7 @@ async fn main() -> Result<()> {
 
     match cmd {
         Command::BuyXmr {
-            seller_peer_id,
-            seller_addr,
+            seller,
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
             monero_receive_address,
@@ -86,6 +86,11 @@ async fn main() -> Result<()> {
                 init_monero_wallet(data_dir, monero_daemon_address, env_config).await?;
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
+            let seller_peer_id = seller
+                .extract_peer_id()
+                .context("Seller address must contain peer ID")?;
+            db.insert_address(seller_peer_id, seller.clone()).await?;
+
             let mut swarm = swarm::cli(
                 &seed,
                 seller_peer_id,
@@ -94,9 +99,7 @@ async fn main() -> Result<()> {
                 bitcoin_wallet.clone(),
             )
             .await?;
-            swarm
-                .behaviour_mut()
-                .add_address(seller_peer_id, seller_addr);
+            swarm.behaviour_mut().add_address(seller_peer_id, seller);
 
             tracing::debug!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
 
@@ -157,7 +160,6 @@ async fn main() -> Result<()> {
         }
         Command::Resume {
             swap_id,
-            seller_addr,
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
             monero_receive_address,
@@ -187,6 +189,7 @@ async fn main() -> Result<()> {
             let bitcoin_wallet = Arc::new(bitcoin_wallet);
 
             let seller_peer_id = db.get_peer_id(swap_id)?;
+            let seller_addresses = db.get_addresses(seller_peer_id)?;
 
             let mut swarm = swarm::cli(
                 &seed,
@@ -198,9 +201,12 @@ async fn main() -> Result<()> {
             .await?;
             let our_peer_id = swarm.local_peer_id();
             tracing::debug!(peer_id = %our_peer_id, "Initializing network module");
-            swarm
-                .behaviour_mut()
-                .add_address(seller_peer_id, seller_addr);
+
+            for seller_address in seller_addresses {
+                swarm
+                    .behaviour_mut()
+                    .add_address(seller_peer_id, seller_address);
+            }
 
             let (event_loop, event_loop_handle) =
                 EventLoop::new(swap_id, swarm, seller_peer_id, env_config)?;

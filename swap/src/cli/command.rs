@@ -3,7 +3,6 @@ use crate::fs::system_data_dir;
 use crate::{env, monero};
 use anyhow::{Context, Result};
 use libp2p::core::Multiaddr;
-use libp2p::PeerId;
 use std::ffi::OsString;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -68,8 +67,7 @@ where
 
     let arguments = match args.cmd {
         RawCommand::BuyXmr {
-            seller_peer_id,
-            seller_addr: SellerAddr { seller_addr },
+            seller: Seller { seller },
             bitcoin:
                 Bitcoin {
                     bitcoin_electrum_rpc_url,
@@ -87,8 +85,7 @@ where
             json,
             data_dir: data::data_dir_from(data, is_testnet)?,
             cmd: Command::BuyXmr {
-                seller_peer_id,
-                seller_addr,
+                seller,
                 bitcoin_electrum_rpc_url: bitcoin_electrum_rpc_url_from(
                     bitcoin_electrum_rpc_url,
                     is_testnet,
@@ -114,7 +111,6 @@ where
         },
         RawCommand::Resume {
             swap_id: SwapId { swap_id },
-            seller_addr: SellerAddr { seller_addr },
             bitcoin:
                 Bitcoin {
                     bitcoin_electrum_rpc_url,
@@ -133,7 +129,6 @@ where
             data_dir: data::data_dir_from(data, is_testnet)?,
             cmd: Command::Resume {
                 swap_id,
-                seller_addr,
                 bitcoin_electrum_rpc_url: bitcoin_electrum_rpc_url_from(
                     bitcoin_electrum_rpc_url,
                     is_testnet,
@@ -201,8 +196,7 @@ where
 #[derive(Debug, PartialEq)]
 pub enum Command {
     BuyXmr {
-        seller_peer_id: PeerId,
-        seller_addr: Multiaddr,
+        seller: Multiaddr,
         bitcoin_electrum_rpc_url: Url,
         bitcoin_target_block: usize,
         monero_receive_address: monero::Address,
@@ -212,7 +206,6 @@ pub enum Command {
     History,
     Resume {
         swap_id: Uuid,
-        seller_addr: Multiaddr,
         bitcoin_electrum_rpc_url: Url,
         bitcoin_target_block: usize,
         monero_receive_address: monero::Address,
@@ -268,11 +261,8 @@ pub struct RawArguments {
 pub enum RawCommand {
     /// Start a XMR for BTC swap
     BuyXmr {
-        #[structopt(long = "seller-peer-id", help = "The seller's peer id")]
-        seller_peer_id: PeerId,
-
         #[structopt(flatten)]
-        seller_addr: SellerAddr,
+        seller: Seller,
 
         #[structopt(flatten)]
         bitcoin: Bitcoin,
@@ -289,9 +279,6 @@ pub enum RawCommand {
     Resume {
         #[structopt(flatten)]
         swap_id: SwapId,
-
-        #[structopt(flatten)]
-        seller_addr: SellerAddr,
 
         #[structopt(flatten)]
         bitcoin: Bitcoin,
@@ -373,9 +360,12 @@ pub struct SwapId {
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct SellerAddr {
-    #[structopt(long = "seller-addr", help = "The seller's multiaddress")]
-    pub seller_addr: Multiaddr,
+pub struct Seller {
+    #[structopt(
+        long,
+        help = "The seller's address. Must include a peer ID part, i.e. `/p2p/`"
+    )]
+    pub seller: Multiaddr,
 }
 
 mod data {
@@ -492,8 +482,8 @@ mod tests {
 
     const MONERO_STAGENET_ADDRESS: &str = "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a";
     const MONERO_MAINNET_ADDRESS: &str = "44Ato7HveWidJYUAVw5QffEcEtSH1DwzSP3FPPkHxNAS4LX9CqgucphTisH978FLHE34YNEx7FcbBfQLQUU8m3NUC4VqsRa";
-    const MUTLI_ADDRESS: &str = "/ip4/127.0.0.1/tcp/9939";
-    const PEER_ID: &str = "12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
+    const MULTI_ADDRESS: &str =
+        "/ip4/127.0.0.1/tcp/9939/p2p/12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
     const SWAP_ID: &str = "ea030832-3be9-454f-bb98-5ea9a788406b";
 
     #[test]
@@ -503,10 +493,8 @@ mod tests {
             "buy-xmr",
             "--receive-address",
             MONERO_MAINNET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
-            "--seller-peer-id",
-            PEER_ID,
+            "--seller",
+            MULTI_ADDRESS,
         ];
 
         let expected_args = ParseResult::Arguments(Arguments::buy_xmr_mainnet_defaults());
@@ -523,10 +511,8 @@ mod tests {
             "buy-xmr",
             "--receive-address",
             MONERO_STAGENET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
-            "--seller-peer-id",
-            PEER_ID,
+            "--seller",
+            MULTI_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -544,10 +530,8 @@ mod tests {
             "buy-xmr",
             "--receive-address",
             MONERO_STAGENET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
-            "--seller-peer-id",
-            PEER_ID,
+            "--seller",
+            MULTI_ADDRESS,
         ];
 
         let err = parse_args_and_apply_defaults(raw_ars).unwrap_err();
@@ -569,10 +553,8 @@ mod tests {
             "buy-xmr",
             "--receive-address",
             MONERO_MAINNET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
-            "--seller-peer-id",
-            PEER_ID,
+            "--seller",
+            MULTI_ADDRESS,
         ];
 
         let err = parse_args_and_apply_defaults(raw_ars).unwrap_err();
@@ -595,8 +577,6 @@ mod tests {
             SWAP_ID,
             "--receive-address",
             MONERO_MAINNET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -617,8 +597,6 @@ mod tests {
             SWAP_ID,
             "--receive-address",
             MONERO_STAGENET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -688,10 +666,8 @@ mod tests {
             "buy-xmr",
             "--receive-address",
             MONERO_MAINNET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
-            "--seller-peer-id",
-            PEER_ID,
+            "--seller",
+            MULTI_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -712,10 +688,8 @@ mod tests {
             "buy-xmr",
             "--receive-address",
             MONERO_STAGENET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
-            "--seller-peer-id",
-            PEER_ID,
+            "--seller",
+            MULTI_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -737,8 +711,6 @@ mod tests {
             SWAP_ID,
             "--receive-address",
             MONERO_MAINNET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -761,8 +733,6 @@ mod tests {
             SWAP_ID,
             "--receive-address",
             MONERO_STAGENET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -784,10 +754,8 @@ mod tests {
             "buy-xmr",
             "--receive-address",
             MONERO_MAINNET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
-            "--seller-peer-id",
-            PEER_ID,
+            "--seller",
+            MULTI_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -803,10 +771,8 @@ mod tests {
             "buy-xmr",
             "--receive-address",
             MONERO_STAGENET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
-            "--seller-peer-id",
-            PEER_ID,
+            "--seller",
+            MULTI_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -823,8 +789,6 @@ mod tests {
             SWAP_ID,
             "--receive-address",
             MONERO_MAINNET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -842,8 +806,6 @@ mod tests {
             SWAP_ID,
             "--receive-address",
             MONERO_STAGENET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -861,10 +823,8 @@ mod tests {
             "buy-xmr",
             "--receive-address",
             MONERO_MAINNET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
-            "--seller-peer-id",
-            PEER_ID,
+            "--seller",
+            MULTI_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -880,10 +840,8 @@ mod tests {
             "buy-xmr",
             "--receive-address",
             MONERO_STAGENET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
-            "--seller-peer-id",
-            PEER_ID,
+            "--seller",
+            MULTI_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -900,8 +858,6 @@ mod tests {
             SWAP_ID,
             "--receive-address",
             MONERO_MAINNET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -919,8 +875,6 @@ mod tests {
             SWAP_ID,
             "--receive-address",
             MONERO_STAGENET_ADDRESS,
-            "--seller-addr",
-            MUTLI_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -938,8 +892,7 @@ mod tests {
                 json: false,
                 data_dir: data_dir_path_cli().join(TESTNET),
                 cmd: Command::BuyXmr {
-                    seller_peer_id: PeerId::from_str(PEER_ID).unwrap(),
-                    seller_addr: Multiaddr::from_str(MUTLI_ADDRESS).unwrap(),
+                    seller: Multiaddr::from_str(MULTI_ADDRESS).unwrap(),
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)
                         .unwrap(),
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET,
@@ -958,8 +911,7 @@ mod tests {
                 json: false,
                 data_dir: data_dir_path_cli().join(MAINNET),
                 cmd: Command::BuyXmr {
-                    seller_peer_id: PeerId::from_str(PEER_ID).unwrap(),
-                    seller_addr: Multiaddr::from_str(MUTLI_ADDRESS).unwrap(),
+                    seller: Multiaddr::from_str(MULTI_ADDRESS).unwrap(),
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET,
                     monero_receive_address: monero::Address::from_str(MONERO_MAINNET_ADDRESS)
@@ -978,7 +930,6 @@ mod tests {
                 data_dir: data_dir_path_cli().join(TESTNET),
                 cmd: Command::Resume {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-                    seller_addr: Multiaddr::from_str(MUTLI_ADDRESS).unwrap(),
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)
                         .unwrap(),
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET,
@@ -998,7 +949,6 @@ mod tests {
                 data_dir: data_dir_path_cli().join(MAINNET),
                 cmd: Command::Resume {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-                    seller_addr: Multiaddr::from_str(MUTLI_ADDRESS).unwrap(),
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET,
                     monero_receive_address: monero::Address::from_str(MONERO_MAINNET_ADDRESS)
