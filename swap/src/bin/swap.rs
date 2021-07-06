@@ -12,7 +12,7 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use comfy_table::Table;
 use qrcode::render::unicode;
 use qrcode::QrCode;
@@ -114,6 +114,8 @@ async fn main() -> Result<()> {
             info!(%amount, %fees, %swap_id,  "Swapping");
 
             db.insert_peer_id(swap_id, seller_peer_id).await?;
+            db.insert_monero_address(swap_id, monero_receive_address)
+                .await?;
 
             let swap = Swap::new(
                 db,
@@ -155,7 +157,6 @@ async fn main() -> Result<()> {
             swap_id,
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
-            monero_receive_address,
             monero_daemon_address,
             tor_socks5_port,
         } => {
@@ -164,10 +165,6 @@ async fn main() -> Result<()> {
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
-
-            if monero_receive_address.network != env_config.monero_network {
-                bail!("The given monero address is on network {:?}, expected address of network {:?}.", monero_receive_address.network, env_config.monero_network)
-            }
 
             let bitcoin_wallet = init_bitcoin_wallet(
                 bitcoin_electrum_rpc_url,
@@ -200,6 +197,7 @@ async fn main() -> Result<()> {
                 EventLoop::new(swap_id, swarm, seller_peer_id, env_config)?;
             let handle = tokio::spawn(event_loop.run());
 
+            let monero_receive_address = db.get_monero_address(swap_id)?;
             let swap = Swap::from_db(
                 db,
                 swap_id,

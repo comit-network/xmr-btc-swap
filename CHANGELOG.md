@@ -42,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The CLI can use regular TCP connections and having both - TCP and websockets - causes problems and unnecessary overhead.
 - The `--seller-addr` parameter from the CLI's `resume` command.
   This information is now loaded from the database.
+- The `--receive-address` parameter from the CLI's `resume` command.
+  This information is now loaded from the database.
 
 ## [0.7.0] - 2021-05-28
 

@@ -75,11 +75,10 @@ where
                     bitcoin_target_block,
                 },
             bitcoin_change_address,
-            monero:
-                Monero {
-                    monero_receive_address,
-                    monero_daemon_address,
-                },
+            monero: Monero {
+                monero_daemon_address,
+            },
+            monero_receive_address,
             tor: Tor { tor_socks5_port },
         } => Arguments {
             env_config: env_config_from(is_testnet),
@@ -119,11 +118,9 @@ where
                     bitcoin_electrum_rpc_url,
                     bitcoin_target_block,
                 },
-            monero:
-                Monero {
-                    monero_receive_address,
-                    monero_daemon_address,
-                },
+            monero: Monero {
+                monero_daemon_address,
+            },
             tor: Tor { tor_socks5_port },
         } => Arguments {
             env_config: env_config_from(is_testnet),
@@ -137,7 +134,6 @@ where
                     is_testnet,
                 )?,
                 bitcoin_target_block: bitcoin_target_block_from(bitcoin_target_block, is_testnet),
-                monero_receive_address,
                 monero_daemon_address: monero_daemon_address_from(
                     monero_daemon_address,
                     is_testnet,
@@ -226,7 +222,6 @@ pub enum Command {
         swap_id: Uuid,
         bitcoin_electrum_rpc_url: Url,
         bitcoin_target_block: usize,
-        monero_receive_address: monero::Address,
         monero_daemon_address: String,
         tor_socks5_port: u16,
     },
@@ -299,6 +294,12 @@ pub enum RawCommand {
         #[structopt(flatten)]
         monero: Monero,
 
+        #[structopt(long = "receive-address",
+            help = "The monero address where you would like to receive monero",
+            parse(try_from_str = parse_monero_address)
+        )]
+        monero_receive_address: monero::Address,
+
         #[structopt(flatten)]
         tor: Tor,
     },
@@ -355,12 +356,6 @@ pub enum RawCommand {
 
 #[derive(structopt::StructOpt, Debug)]
 pub struct Monero {
-    #[structopt(long = "receive-address",
-        help = "The monero address where you would like to receive monero",
-        parse(try_from_str = parse_monero_address)
-    )]
-    pub monero_receive_address: monero::Address,
-
     #[structopt(
         long = "monero-daemon-address",
         help = "Specify to connect to a monero daemon of your choice: <host>:<port>"
@@ -628,14 +623,7 @@ mod tests {
 
     #[test]
     fn given_resume_on_mainnet_then_defaults_to_mainnet() {
-        let raw_ars = vec![
-            BINARY_NAME,
-            "resume",
-            "--swap-id",
-            SWAP_ID,
-            "--receive-address",
-            MONERO_MAINNET_ADDRESS,
-        ];
+        let raw_ars = vec![BINARY_NAME, "resume", "--swap-id", SWAP_ID];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
 
@@ -647,15 +635,7 @@ mod tests {
 
     #[test]
     fn given_resume_on_testnet_then_defaults_to_testnet() {
-        let raw_ars = vec![
-            BINARY_NAME,
-            "--testnet",
-            "resume",
-            "--swap-id",
-            SWAP_ID,
-            "--receive-address",
-            MONERO_STAGENET_ADDRESS,
-        ];
+        let raw_ars = vec![BINARY_NAME, "--testnet", "resume", "--swap-id", SWAP_ID];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
 
@@ -771,8 +751,6 @@ mod tests {
             "resume",
             "--swap-id",
             SWAP_ID,
-            "--receive-address",
-            MONERO_MAINNET_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -793,8 +771,6 @@ mod tests {
             "resume",
             "--swap-id",
             SWAP_ID,
-            "--receive-address",
-            MONERO_STAGENET_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -847,15 +823,7 @@ mod tests {
             ParseResult::Arguments(Arguments::buy_xmr_testnet_defaults().with_debug())
         );
 
-        let raw_ars = vec![
-            BINARY_NAME,
-            "--debug",
-            "resume",
-            "--swap-id",
-            SWAP_ID,
-            "--receive-address",
-            MONERO_MAINNET_ADDRESS,
-        ];
+        let raw_ars = vec![BINARY_NAME, "--debug", "resume", "--swap-id", SWAP_ID];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
         assert_eq!(
@@ -870,8 +838,6 @@ mod tests {
             "resume",
             "--swap-id",
             SWAP_ID,
-            "--receive-address",
-            MONERO_STAGENET_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -920,15 +886,7 @@ mod tests {
             ParseResult::Arguments(Arguments::buy_xmr_testnet_defaults().with_json())
         );
 
-        let raw_ars = vec![
-            BINARY_NAME,
-            "--json",
-            "resume",
-            "--swap-id",
-            SWAP_ID,
-            "--receive-address",
-            MONERO_MAINNET_ADDRESS,
-        ];
+        let raw_ars = vec![BINARY_NAME, "--json", "resume", "--swap-id", SWAP_ID];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
         assert_eq!(
@@ -943,8 +901,6 @@ mod tests {
             "resume",
             "--swap-id",
             SWAP_ID,
-            "--receive-address",
-            MONERO_STAGENET_ADDRESS,
         ];
 
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
@@ -1005,8 +961,6 @@ mod tests {
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)
                         .unwrap(),
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET,
-                    monero_receive_address: monero::Address::from_str(MONERO_STAGENET_ADDRESS)
-                        .unwrap(),
                     monero_daemon_address: DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET.to_string(),
                     tor_socks5_port: DEFAULT_SOCKS5_PORT,
                 },
@@ -1023,8 +977,6 @@ mod tests {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET,
-                    monero_receive_address: monero::Address::from_str(MONERO_MAINNET_ADDRESS)
-                        .unwrap(),
                     monero_daemon_address: DEFAULT_MONERO_DAEMON_ADDRESS.to_string(),
                     tor_socks5_port: DEFAULT_SOCKS5_PORT,
                 },
