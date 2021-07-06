@@ -405,4 +405,24 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn save_and_load_addresses() -> Result<()> {
+        let db_dir = tempfile::tempdir()?;
+        let peer_id = PeerId::random();
+        let home1 = "/ip4/127.0.0.1/tcp/1".parse::<Multiaddr>()?;
+        let home2 = "/ip4/127.0.0.1/tcp/2".parse::<Multiaddr>()?;
+
+        {
+            let db = Database::open(db_dir.path())?;
+            db.insert_address(peer_id, home1.clone()).await?;
+            db.insert_address(peer_id, home2.clone()).await?;
+        }
+
+        let addresses = Database::open(db_dir.path())?.get_addresses(peer_id)?;
+
+        assert_eq!(addresses, vec![home1, home2]);
+
+        Ok(())
+    }
 }
