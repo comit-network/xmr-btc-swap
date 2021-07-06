@@ -20,7 +20,7 @@ pub struct Swap {
     pub monero_wallet: Arc<monero::Wallet>,
     pub env_config: env::Config,
     pub id: Uuid,
-    pub receive_monero_address: monero::Address,
+    pub monero_receive_address: monero::Address,
 }
 
 impl Swap {
@@ -32,7 +32,7 @@ impl Swap {
         monero_wallet: Arc<monero::Wallet>,
         env_config: env::Config,
         event_loop_handle: cli::EventLoopHandle,
-        receive_monero_address: monero::Address,
+        monero_receive_address: monero::Address,
         btc_amount: bitcoin::Amount,
     ) -> Self {
         Self {
@@ -43,7 +43,7 @@ impl Swap {
             monero_wallet,
             env_config,
             id,
-            receive_monero_address,
+            monero_receive_address,
         }
     }
 
@@ -54,7 +54,7 @@ impl Swap {
         monero_wallet: Arc<monero::Wallet>,
         env_config: env::Config,
         event_loop_handle: cli::EventLoopHandle,
-        receive_monero_address: monero::Address,
+        monero_receive_address: monero::Address,
     ) -> Result<Self> {
         let state = db.get_state(id)?.try_into_bob()?.into();
 
@@ -66,7 +66,7 @@ impl Swap {
             monero_wallet,
             env_config,
             id,
-            receive_monero_address,
+            monero_receive_address,
         })
     }
 }
