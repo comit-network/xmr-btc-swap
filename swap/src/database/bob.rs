@@ -3,13 +3,17 @@ use crate::protocol::bob;
 use crate::protocol::bob::BobState;
 use monero_rpc::wallet::BlockHeight;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 use std::fmt;
 
+#[serde_as]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Bob {
     Started {
         #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
         btc_amount: bitcoin::Amount,
+        #[serde_as(as = "DisplayFromStr")]
+        change_address: bitcoin::Address,
     },
     ExecutionSetupDone {
         state2: bob::State2,
@@ -45,7 +49,13 @@ pub enum BobEndState {
 impl From<BobState> for Bob {
     fn from(bob_state: BobState) -> Self {
         match bob_state {
-            BobState::Started { btc_amount } => Bob::Started { btc_amount },
+            BobState::Started {
+                btc_amount,
+                change_address,
+            } => Bob::Started {
+                btc_amount,
+                change_address,
+            },
             BobState::SwapSetupCompleted(state2) => Bob::ExecutionSetupDone { state2 },
             BobState::BtcLocked(state3) => Bob::BtcLocked { state3 },
             BobState::XmrLockProofReceived {
@@ -77,7 +87,13 @@ impl From<BobState> for Bob {
 impl From<Bob> for BobState {
     fn from(db_state: Bob) -> Self {
         match db_state {
-            Bob::Started { btc_amount } => BobState::Started { btc_amount },
+            Bob::Started {
+                btc_amount,
+                change_address,
+            } => BobState::Started {
+                btc_amount,
+                change_address,
+            },
             Bob::ExecutionSetupDone { state2 } => BobState::SwapSetupCompleted(state2),
             Bob::BtcLocked { state3 } => BobState::BtcLocked(state3),
             Bob::XmrLockProofReceived {

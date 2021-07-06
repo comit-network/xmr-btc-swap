@@ -231,7 +231,9 @@ async fn main() -> Result<()> {
                 }
             };
 
-            let psbt = bitcoin_wallet.send_to_address(address, amount).await?;
+            let psbt = bitcoin_wallet
+                .send_to_address(address, amount, None)
+                .await?;
             let signed_tx = bitcoin_wallet.sign_and_finalize(psbt).await?;
 
             bitcoin_wallet.broadcast(signed_tx, "withdraw").await?;
