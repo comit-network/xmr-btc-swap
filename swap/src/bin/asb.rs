@@ -13,10 +13,10 @@
 #![allow(non_snake_case)]
 
 use anyhow::{bail, Context, Result};
+use comfy_table::Table;
 use libp2p::core::multiaddr::Protocol;
 use libp2p::core::Multiaddr;
 use libp2p::Swarm;
-use prettytable::{row, Table};
 use std::env;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
@@ -36,9 +36,6 @@ use swap::tor::AuthenticatedClient;
 use swap::{asb, bitcoin, kraken, monero, tor};
 use tracing::{debug, info, warn};
 use tracing_subscriber::filter::LevelFilter;
-
-#[macro_use]
-extern crate prettytable;
 
 const DEFAULT_WALLET_NAME: &str = "asb-wallet";
 
@@ -194,14 +191,13 @@ async fn main() -> Result<()> {
         Command::History => {
             let mut table = Table::new();
 
-            table.add_row(row!["SWAP ID", "STATE"]);
+            table.set_header(vec!["SWAP ID", "STATE"]);
 
             for (swap_id, state) in db.all_alice()? {
-                table.add_row(row![swap_id, state]);
+                table.add_row(vec![swap_id.to_string(), state.to_string()]);
             }
 
-            // Print the table to stdout
-            table.printstd();
+            println!("{}", table);
         }
         Command::WithdrawBtc { amount, address } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;

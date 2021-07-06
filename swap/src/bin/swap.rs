@@ -13,7 +13,7 @@
 #![allow(non_snake_case)]
 
 use anyhow::{bail, Context, Result};
-use prettytable::{row, Table};
+use comfy_table::Table;
 use qrcode::render::unicode;
 use qrcode::QrCode;
 use std::cmp::min;
@@ -37,9 +37,6 @@ use swap::{bitcoin, cli, monero};
 use tracing::{debug, error, info, warn};
 use url::Url;
 use uuid::Uuid;
-
-#[macro_use]
-extern crate prettytable;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -144,14 +141,13 @@ async fn main() -> Result<()> {
 
             let mut table = Table::new();
 
-            table.add_row(row!["SWAP ID", "STATE"]);
+            table.set_header(vec!["SWAP ID", "STATE"]);
 
             for (swap_id, state) in db.all_bob()? {
-                table.add_row(row![swap_id, state]);
+                table.add_row(vec![swap_id.to_string(), state.to_string()]);
             }
 
-            // Print the table to stdout
-            table.printstd();
+            println!("{}", table);
         }
         Command::Resume {
             swap_id,
