@@ -3,7 +3,7 @@ pub use bob::Bob;
 
 use anyhow::{anyhow, bail, Context, Result};
 use itertools::Itertools;
-use libp2p::PeerId;
+use libp2p::{Multiaddr, PeerId};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
@@ -68,6 +68,7 @@ impl Swap {
 pub struct Database {
     swaps: sled::Tree,
     peers: sled::Tree,
+    addresses: sled::Tree,
 }
 
 impl Database {
@@ -79,8 +80,13 @@ impl Database {
 
         let swaps = db.open_tree("swaps")?;
         let peers = db.open_tree("peers")?;
+        let addresses = db.open_tree("addresses")?;
 
-        Ok(Database { swaps, peers })
+        Ok(Database {
+            swaps,
+            peers,
+            addresses,
+        })
     }
 
     pub async fn insert_peer_id(&self, swap_id: Uuid, peer_id: PeerId) -> Result<()> {
@@ -108,6 +114,46 @@ impl Database {
 
         let peer_id: String = deserialize(&encoded).context("Could not deserialize peer-id")?;
         Ok(PeerId::from_str(peer_id.as_str())?)
+    }
+
+    pub async fn insert_address(&self, peer_id: PeerId, address: Multiaddr) -> Result<()> {
+        let key = peer_id.to_bytes();
+
+        let existing_addresses = self.addresses.get(&key)?;
+
+        let new_addresses = {
+            let existing_addresses = existing_addresses.clone();
+
+            Some(match existing_addresses {
+                Some(encoded) => {
+                    let mut addresses = deserialize::<Vec<Multiaddr>>(&encoded)?;
+                    addresses.push(address);
+
+                    serialize(&addresses)?
+                }
+                None => serialize(&[address])?,
+            })
+        };
+
+        self.addresses
+            .compare_and_swap(key, existing_addresses, new_addresses)??;
+
+        self.addresses
+            .flush_async()
+            .await
+            .map(|_| ())
+            .context("Could not flush db")
+    }
+
+    pub fn get_addresses(&self, peer_id: PeerId) -> Result<Vec<Multiaddr>> {
+        let key = peer_id.to_bytes();
+
+        let addresses = match self.addresses.get(&key)? {
+            Some(encoded) => deserialize(&encoded).context("Failed to deserialize addresses")?,
+            None => vec![],
+        };
+
+        Ok(addresses)
     }
 
     pub async fn insert_latest_state(&self, swap_id: Uuid, state: Swap) -> Result<()> {
