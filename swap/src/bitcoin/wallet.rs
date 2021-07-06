@@ -16,7 +16,6 @@ use reqwest::Url;
 use rust_decimal::prelude::*;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::fmt;
@@ -326,22 +325,20 @@ where
         let (psbt, _details) = tx_builder.finish()?;
         let mut psbt: PartiallySignedTransaction = psbt;
 
-        // When subscribing to transactions we depend on the relevant script being at
-        // output index 0, thus we ensure the relevant output to be at index `0`.
-        psbt.outputs.sort_by(|a, _| {
-            if a.witness_script.as_ref() == Some(&script) {
-                Ordering::Less
-            } else {
-                Ordering::Greater
+        match psbt.global.unsigned_tx.output.as_mut_slice() {
+            // our primary output is the 2nd one? reverse the vectors
+            [_, second_txout] if second_txout.script_pubkey == script => {
+                psbt.outputs.reverse();
+                psbt.global.unsigned_tx.output.reverse();
             }
-        });
-        psbt.global.unsigned_tx.output.sort_by(|a, _| {
-            if a.script_pubkey == script {
-                Ordering::Less
-            } else {
-                Ordering::Greater
+            [first_txout, _] if first_txout.script_pubkey == script => {
+                // no need to do anything
             }
-        });
+            [_] => {
+                // single output, no need do anything
+            }
+            _ => bail!("Unexpected transaction layout"),
+        }
 
         Ok(psbt)
     }
