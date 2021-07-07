@@ -245,7 +245,12 @@ pub enum Command {
 }
 
 #[derive(structopt::StructOpt, Debug)]
-#[structopt(name = "swap", about = "CLI for swapping BTC for XMR", author)]
+#[structopt(
+    name = "swap",
+    about = "CLI for swapping BTC for XMR",
+    author,
+    version = env!("VERGEN_GIT_SEMVER_LIGHTWEIGHT")
+)]
 struct RawArguments {
     // global is necessary to ensure that clap can match against testnet in subcommands
     #[structopt(

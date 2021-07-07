@@ -84,3 +84,7 @@ serde_cbor = "0.11"
 spectral = "0.6"
 tempfile = "3"
 testcontainers = "0.12"
+
+[build-dependencies]
+vergen = { version = "5", default-features = false, features = [ "git", "build" ] }
+anyhow = "1"
