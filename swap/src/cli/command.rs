@@ -246,37 +246,37 @@ pub enum Command {
 
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(name = "swap", about = "CLI for swapping BTC for XMR", author)]
-pub struct RawArguments {
+struct RawArguments {
     // global is necessary to ensure that clap can match against testnet in subcommands
     #[structopt(
         long,
         help = "Swap on testnet and assume testnet defaults for data-dir and the blockchain related parameters",
         global = true
     )]
-    pub testnet: bool,
+    testnet: bool,
 
     #[structopt(
         long = "--data-dir",
         help = "Provide the data directory path to be used to store application data using testnet and mainnet as subfolder"
     )]
-    pub data: Option<PathBuf>,
+    data: Option<PathBuf>,
 
     #[structopt(long, help = "Activate debug logging.")]
-    pub debug: bool,
+    debug: bool,
 
     #[structopt(
         short,
         long = "json",
         help = "Changes the log messages to json vs plain-text. This can be helpful to simplify automated log analyses."
     )]
-    pub json: bool,
+    json: bool,
 
     #[structopt(subcommand)]
-    pub cmd: RawCommand,
+    cmd: RawCommand,
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub enum RawCommand {
+enum RawCommand {
     /// Start a XMR for BTC swap
     BuyXmr {
         #[structopt(flatten)]
@@ -355,52 +355,52 @@ pub enum RawCommand {
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct Monero {
+struct Monero {
     #[structopt(
         long = "monero-daemon-address",
         help = "Specify to connect to a monero daemon of your choice: <host>:<port>"
     )]
-    pub monero_daemon_address: Option<String>,
+    monero_daemon_address: Option<String>,
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct Bitcoin {
+struct Bitcoin {
     #[structopt(long = "electrum-rpc", help = "Provide the Bitcoin Electrum RPC URL")]
-    pub bitcoin_electrum_rpc_url: Option<Url>,
+    bitcoin_electrum_rpc_url: Option<Url>,
 
     #[structopt(
         long = "bitcoin-target-block",
         help = "Use for fee estimation, decides within how many blocks the Bitcoin transactions should be confirmed."
     )]
-    pub bitcoin_target_block: Option<usize>,
+    bitcoin_target_block: Option<usize>,
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct Tor {
+struct Tor {
     #[structopt(
         long = "tor-socks5-port",
         help = "Your local Tor socks5 proxy port",
         default_value = DEFAULT_TOR_SOCKS5_PORT
     )]
-    pub tor_socks5_port: u16,
+    tor_socks5_port: u16,
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct SwapId {
+struct SwapId {
     #[structopt(
         long = "swap-id",
         help = "The swap id can be retrieved using the history subcommand"
     )]
-    pub swap_id: Uuid,
+    swap_id: Uuid,
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct Seller {
+struct Seller {
     #[structopt(
         long,
         help = "The seller's address. Must include a peer ID part, i.e. `/p2p/`"
     )]
-    pub seller: Multiaddr,
+    seller: Multiaddr,
 }
 
 mod data {
