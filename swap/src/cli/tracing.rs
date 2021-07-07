@@ -55,7 +55,8 @@ pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>, swap_id: Option<Uuid
             .with_env_filter(format!("swap={}", level))
             .with_writer(std::io::stderr)
             .with_ansi(is_terminal)
-            .with_timer(ChronoLocal::with_format("%F %T".to_owned()))
+            .with_level(false)
+            .without_time()
             .with_target(false)
             .init();
 
