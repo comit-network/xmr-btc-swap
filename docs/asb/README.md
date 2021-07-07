@@ -15,7 +15,7 @@ This quickstart guide assumes that you are running the software on testnet (i.e.
 Public Monero stagenet nodes for running the Monero Wallet RPC:
 
 - `monero-stagenet.exan.tech:38081`
-- `stagenet.community.xmr.to:38081`
+- `stagenet.melo.tools:38081`
 
 Run `./asb --help` for more information.
 
