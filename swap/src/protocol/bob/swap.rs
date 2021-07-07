@@ -150,8 +150,8 @@ async fn next_state(
                         match received_xmr {
                             Ok(()) => BobState::XmrLocked(state.xmr_locked(monero_wallet_restore_blockheight)),
                             Err(monero::InsufficientFunds { expected, actual }) => {
-                                tracing::warn!("Insufficient Monero have been locked! Expected {} but got {}", expected, actual);
-                                tracing::info!("Waiting for cancel timelock ({}) to expire", state.cancel_timelock);
+                                tracing::warn!(%expected, %actual, "Insufficient Monero have been locked!");
+                                tracing::info!(timelock = %state.cancel_timelock, "Waiting for cancel timelock to expire");
 
                                 tx_lock_status.wait_until_confirmed_with(state.cancel_timelock).await?;
 

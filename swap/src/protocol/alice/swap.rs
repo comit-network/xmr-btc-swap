@@ -246,8 +246,8 @@ where
                     Err(error) => {
                         tracing::error!("Failed to construct redeem transaction: {:#}", error);
                         tracing::info!(
-                            "Waiting for cancellation timelock ({}) to expire",
-                            state3.cancel_timelock
+                            timelock = %state3.cancel_timelock,
+                            "Waiting for cancellation timelock to expire",
                         );
 
                         tx_lock_status
