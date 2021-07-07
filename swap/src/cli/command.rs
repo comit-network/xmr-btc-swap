@@ -188,7 +188,7 @@ where
             },
         },
         RawCommand::ListSellers {
-            rendezvous_node_addr,
+            rendezvous_point,
             tor: Tor { tor_socks5_port },
         } => Arguments {
             env_config: env_config_from(is_testnet),
@@ -196,7 +196,7 @@ where
             json,
             data_dir: data::data_dir_from(data, is_testnet)?,
             cmd: Command::ListSellers {
-                rendezvous_node_addr,
+                rendezvous_point,
                 namespace: rendezvous_namespace_from(is_testnet),
                 tor_socks5_port,
             },
@@ -238,7 +238,7 @@ pub enum Command {
         bitcoin_target_block: usize,
     },
     ListSellers {
-        rendezvous_node_addr: Multiaddr,
+        rendezvous_point: Multiaddr,
         namespace: XmrBtcNamespace,
         tor_socks5_port: u16,
     },
@@ -246,38 +246,38 @@ pub enum Command {
 
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(name = "swap", about = "CLI for swapping BTC for XMR", author)]
-pub struct RawArguments {
+struct RawArguments {
     // global is necessary to ensure that clap can match against testnet in subcommands
     #[structopt(
         long,
         help = "Swap on testnet and assume testnet defaults for data-dir and the blockchain related parameters",
         global = true
     )]
-    pub testnet: bool,
+    testnet: bool,
 
     #[structopt(
-        long = "--data-dir",
-        help = "Provide the data directory path to be used to store application data using testnet and mainnet as subfolder"
+        long = "--data-base-dir",
+        help = "The base data directory to be used for mainnet / testnet specific data like database, wallets etc"
     )]
-    pub data: Option<PathBuf>,
+    data: Option<PathBuf>,
 
-    #[structopt(long, help = "Activate debug logging.")]
-    pub debug: bool,
+    #[structopt(long, help = "Activate debug logging")]
+    debug: bool,
 
     #[structopt(
         short,
         long = "json",
-        help = "Changes the log messages to json vs plain-text. This can be helpful to simplify automated log analyses."
+        help = "Outputs all logs in JSON format instead of plain text"
     )]
-    pub json: bool,
+    json: bool,
 
     #[structopt(subcommand)]
-    pub cmd: RawCommand,
+    cmd: RawCommand,
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub enum RawCommand {
-    /// Start a XMR for BTC swap
+enum RawCommand {
+    /// Start a BTC for XMR swap
     BuyXmr {
         #[structopt(flatten)]
         seller: Seller,
@@ -303,7 +303,7 @@ pub enum RawCommand {
         #[structopt(flatten)]
         tor: Tor,
     },
-    /// Show a list of past ongoing and completed swaps
+    /// Show a list of past, ongoing and completed swaps
     History,
     /// Resume a swap
     Resume {
@@ -330,7 +330,7 @@ pub enum RawCommand {
         #[structopt(flatten)]
         bitcoin: Bitcoin,
     },
-    /// Try to cancel a swap and refund my BTC (expert users only)
+    /// Try to cancel a swap and refund the BTC (expert users only)
     Refund {
         #[structopt(flatten)]
         swap_id: SwapId,
@@ -341,13 +341,14 @@ pub enum RawCommand {
         #[structopt(flatten)]
         bitcoin: Bitcoin,
     },
+    /// Discover and list sellers (i.e. ASB providers)
     ListSellers {
         #[structopt(
             long,
-            help = "The multiaddr (including peer-id) of a rendezvous node that sellers register with",
+            help = "Address of the rendezvous point you want to use to discover ASBs",
             default_value = DEFAULT_RENDEZVOUS_ADDRESS
         )]
-        rendezvous_node_addr: Multiaddr,
+        rendezvous_point: Multiaddr,
 
         #[structopt(flatten)]
         tor: Tor,
@@ -355,75 +356,66 @@ pub enum RawCommand {
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct Monero {
+struct Monero {
     #[structopt(
         long = "monero-daemon-address",
         help = "Specify to connect to a monero daemon of your choice: <host>:<port>"
     )]
-    pub monero_daemon_address: Option<String>,
+    monero_daemon_address: Option<String>,
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct Bitcoin {
+struct Bitcoin {
     #[structopt(long = "electrum-rpc", help = "Provide the Bitcoin Electrum RPC URL")]
-    pub bitcoin_electrum_rpc_url: Option<Url>,
+    bitcoin_electrum_rpc_url: Option<Url>,
 
     #[structopt(
         long = "bitcoin-target-block",
-        help = "Use for fee estimation, decides within how many blocks the Bitcoin transactions should be confirmed."
+        help = "Estimate Bitcoin fees such that transactions are confirmed within the specified number of blocks"
     )]
-    pub bitcoin_target_block: Option<usize>,
+    bitcoin_target_block: Option<usize>,
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct Tor {
+struct Tor {
     #[structopt(
         long = "tor-socks5-port",
         help = "Your local Tor socks5 proxy port",
         default_value = DEFAULT_TOR_SOCKS5_PORT
     )]
-    pub tor_socks5_port: u16,
+    tor_socks5_port: u16,
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct SwapId {
+struct SwapId {
     #[structopt(
         long = "swap-id",
         help = "The swap id can be retrieved using the history subcommand"
     )]
-    pub swap_id: Uuid,
+    swap_id: Uuid,
 }
 
 #[derive(structopt::StructOpt, Debug)]
-pub struct Seller {
+struct Seller {
     #[structopt(
         long,
         help = "The seller's address. Must include a peer ID part, i.e. `/p2p/`"
     )]
-    pub seller: Multiaddr,
+    seller: Multiaddr,
 }
 
 mod data {
     use super::*;
 
     pub fn data_dir_from(arg_dir: Option<PathBuf>, testnet: bool) -> Result<PathBuf> {
-        let dir = if let Some(dir) = arg_dir {
-            dir
-        } else if testnet {
-            testnet_default()?
-        } else {
-            mainnet_default()?
+        let base_dir = match arg_dir {
+            Some(custom_base_dir) => custom_base_dir,
+            None => os_default()?,
         };
 
-        Ok(dir)
-    }
+        let sub_directory = if testnet { "testnet" } else { "mainnet" };
 
-    fn testnet_default() -> Result<PathBuf> {
-        Ok(os_default()?.join("testnet"))
-    }
-
-    fn mainnet_default() -> Result<PathBuf> {
-        Ok(os_default()?.join("mainnet"))
+        Ok(base_dir.join(sub_directory))
     }
 
     fn os_default() -> Result<PathBuf> {
@@ -699,7 +691,7 @@ mod tests {
 
         let raw_ars = vec![
             BINARY_NAME,
-            "--data-dir",
+            "--data-base-dir",
             data_dir,
             "buy-xmr",
             "--change-address",
@@ -716,14 +708,14 @@ mod tests {
             args,
             ParseResult::Arguments(
                 Arguments::buy_xmr_mainnet_defaults()
-                    .with_data_dir(PathBuf::from_str(data_dir).unwrap())
+                    .with_data_dir(PathBuf::from_str(data_dir).unwrap().join("mainnet"))
             )
         );
 
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
-            "--data-dir",
+            "--data-base-dir",
             data_dir,
             "buy-xmr",
             "--change-address",
@@ -740,13 +732,13 @@ mod tests {
             args,
             ParseResult::Arguments(
                 Arguments::buy_xmr_testnet_defaults()
-                    .with_data_dir(PathBuf::from_str(data_dir).unwrap())
+                    .with_data_dir(PathBuf::from_str(data_dir).unwrap().join("testnet"))
             )
         );
 
         let raw_ars = vec![
             BINARY_NAME,
-            "--data-dir",
+            "--data-base-dir",
             data_dir,
             "resume",
             "--swap-id",
@@ -759,14 +751,14 @@ mod tests {
             args,
             ParseResult::Arguments(
                 Arguments::resume_mainnet_defaults()
-                    .with_data_dir(PathBuf::from_str(data_dir).unwrap())
+                    .with_data_dir(PathBuf::from_str(data_dir).unwrap().join("mainnet"))
             )
         );
 
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
-            "--data-dir",
+            "--data-base-dir",
             data_dir,
             "resume",
             "--swap-id",
@@ -779,7 +771,7 @@ mod tests {
             args,
             ParseResult::Arguments(
                 Arguments::resume_testnet_defaults()
-                    .with_data_dir(PathBuf::from_str(data_dir).unwrap())
+                    .with_data_dir(PathBuf::from_str(data_dir).unwrap().join("testnet"))
             )
         );
     }

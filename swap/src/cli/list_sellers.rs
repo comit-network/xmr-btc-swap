@@ -11,6 +11,7 @@ use libp2p::swarm::SwarmEvent;
 use libp2p::{identity, rendezvous, Multiaddr, PeerId, Swarm};
 use serde::Serialize;
 use serde_with::{serde_as, DisplayFromStr};
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -52,11 +53,17 @@ pub async fn list_sellers(
 }
 
 #[serde_as]
-#[derive(Debug, Serialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct Seller {
+    pub status: Status,
     #[serde_as(as = "DisplayFromStr")]
     pub multiaddr: Multiaddr,
-    pub quote: BidQuote,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq, Hash, Copy, Clone, Ord, PartialOrd)]
+pub enum Status {
+    Online(BidQuote),
+    Unreachable,
 }
 
 #[derive(Debug)]
@@ -90,7 +97,7 @@ struct Behaviour {
 #[derive(Debug)]
 enum QuoteStatus {
     Pending,
-    Received(BidQuote),
+    Received(Status),
 }
 
 #[derive(Debug)]
@@ -104,7 +111,8 @@ struct EventLoop {
     rendezvous_peer_id: PeerId,
     rendezvous_addr: Multiaddr,
     namespace: XmrBtcNamespace,
-    asb_address: HashMap<PeerId, Multiaddr>,
+    reachable_asb_address: HashMap<PeerId, Multiaddr>,
+    unreachable_asb_address: HashMap<PeerId, Multiaddr>,
     asb_quote_status: HashMap<PeerId, QuoteStatus>,
     state: State,
 }
@@ -121,7 +129,8 @@ impl EventLoop {
             rendezvous_peer_id,
             rendezvous_addr,
             namespace,
-            asb_address: Default::default(),
+            reachable_asb_address: Default::default(),
+            unreachable_asb_address: Default::default(),
             asb_quote_status: Default::default(),
             state: State::WaitForDiscovery,
         }
@@ -147,7 +156,7 @@ impl EventLoop {
                                 );
                             } else {
                                 let address = endpoint.get_remote_address();
-                                self.asb_address.insert(peer_id, address.clone());
+                                self.reachable_asb_address.insert(peer_id, address.clone());
                             }
                         }
                         SwarmEvent::UnreachableAddr { peer_id, error, address, .. } => {
@@ -166,9 +175,16 @@ impl EventLoop {
                                     address,
                                     error
                                 );
+                                self.unreachable_asb_address.insert(peer_id, address.clone());
 
-                                // if a different peer than the rendezvous node is unreachable (i.e. a seller) we remove that seller from the quote status state
-                                self.asb_quote_status.remove(&peer_id);
+                                match self.asb_quote_status.entry(peer_id) {
+                                    Entry::Occupied(mut entry) => {
+                                        entry.insert(QuoteStatus::Received(Status::Unreachable));
+                                    },
+                                    _ => {
+                                        tracing::debug!(%peer_id, %error, "Connection error with unexpected peer")
+                                    }
+                                }
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::Rendezvous(
@@ -205,7 +221,7 @@ impl EventLoop {
                                 RequestResponseEvent::Message { peer, message } => {
                                     match message {
                                         RequestResponseMessage::Response { response, .. } => {
-                                            if self.asb_quote_status.insert(peer, QuoteStatus::Received(response)).is_none() {
+                                            if self.asb_quote_status.insert(peer, QuoteStatus::Received(Status::Online(response))).is_none() {
                                                 tracing::error!(%peer, "Received bid quote from unexpected peer, this record will be removed!");
                                                 self.asb_quote_status.remove(&peer);
                                             }
@@ -247,15 +263,26 @@ impl EventLoop {
                         .iter()
                         .map(|(peer_id, quote_status)| match quote_status {
                             QuoteStatus::Pending => Err(StillPending {}),
-                            QuoteStatus::Received(quote) => {
+                            QuoteStatus::Received(Status::Online(quote)) => {
                                 let address = self
-                                    .asb_address
+                                    .reachable_asb_address
                                     .get(&peer_id)
                                     .expect("if we got a quote we must have stored an address");
 
                                 Ok(Seller {
                                     multiaddr: address.clone(),
-                                    quote: *quote,
+                                    status: Status::Online(*quote),
+                                })
+                            }
+                            QuoteStatus::Received(Status::Unreachable) => {
+                                let address = self
+                                    .unreachable_asb_address
+                                    .get(&peer_id)
+                                    .expect("if we got a quote we must have stored an address");
+
+                                Ok(Seller {
+                                    multiaddr: address.clone(),
+                                    status: Status::Unreachable,
                                 })
                             }
                         })
@@ -277,5 +304,53 @@ struct StillPending {}
 impl From<PingEvent> for OutEvent {
     fn from(event: PingEvent) -> Self {
         OutEvent::Ping(event)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sellers_sort_with_unreachable_coming_last() {
+        let mut list = vec![
+            Seller {
+                multiaddr: "/ip4/127.0.0.1/tcp/1234".parse().unwrap(),
+                status: Status::Unreachable,
+            },
+            Seller {
+                multiaddr: Multiaddr::empty(),
+                status: Status::Unreachable,
+            },
+            Seller {
+                multiaddr: "/ip4/127.0.0.1/tcp/5678".parse().unwrap(),
+                status: Status::Online(BidQuote {
+                    price: Default::default(),
+                    min_quantity: Default::default(),
+                    max_quantity: Default::default(),
+                }),
+            },
+        ];
+
+        list.sort();
+
+        assert_eq!(list, vec![
+            Seller {
+                multiaddr: "/ip4/127.0.0.1/tcp/5678".parse().unwrap(),
+                status: Status::Online(BidQuote {
+                    price: Default::default(),
+                    min_quantity: Default::default(),
+                    max_quantity: Default::default(),
+                })
+            },
+            Seller {
+                multiaddr: Multiaddr::empty(),
+                status: Status::Unreachable
+            },
+            Seller {
+                multiaddr: "/ip4/127.0.0.1/tcp/1234".parse().unwrap(),
+                status: Status::Unreachable
+            },
+        ])
     }
 }

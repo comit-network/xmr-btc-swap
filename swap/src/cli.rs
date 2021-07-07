@@ -10,14 +10,14 @@ pub mod transport;
 pub use behaviour::{Behaviour, OutEvent};
 pub use cancel::cancel;
 pub use event_loop::{EventLoop, EventLoopHandle};
-pub use list_sellers::list_sellers;
+pub use list_sellers::{list_sellers, Seller, Status as SellerStatus};
 pub use refund::refund;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::asb;
-    use crate::cli::list_sellers::Seller;
+    use crate::cli::list_sellers::{Seller, Status};
     use crate::network::quote;
     use crate::network::quote::BidQuote;
     use crate::network::rendezvous::XmrBtcNamespace;
@@ -122,7 +122,7 @@ mod tests {
 
         Seller {
             multiaddr: asb_address.with(Protocol::P2p(asb_peer_id.into())),
-            quote: static_quote,
+            status: Status::Online(static_quote),
         }
     }
 

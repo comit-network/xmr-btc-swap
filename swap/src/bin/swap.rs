@@ -24,7 +24,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use swap::bitcoin::TxLock;
 use swap::cli::command::{parse_args_and_apply_defaults, Arguments, Command, ParseResult};
-use swap::cli::{list_sellers, EventLoop};
+use swap::cli::{list_sellers, EventLoop, SellerStatus};
 use swap::database::Database;
 use swap::env::Config;
 use swap::libp2p_ext::MultiAddrExt;
@@ -272,11 +272,11 @@ async fn main() -> Result<()> {
             cli::refund(swap_id, Arc::new(bitcoin_wallet), db, force).await??;
         }
         Command::ListSellers {
-            rendezvous_node_addr,
+            rendezvous_point,
             namespace,
             tor_socks5_port,
         } => {
-            let rendezvous_node_peer_id = rendezvous_node_addr
+            let rendezvous_node_peer_id = rendezvous_point
                 .extract_peer_id()
                 .context("Rendezvous node address must contain peer ID")?;
 
@@ -285,14 +285,15 @@ async fn main() -> Result<()> {
                 .context("Failed to read in seed file")?;
             let identity = seed.derive_libp2p_identity();
 
-            let sellers = list_sellers(
+            let mut sellers = list_sellers(
                 rendezvous_node_peer_id,
-                rendezvous_node_addr,
+                rendezvous_point,
                 namespace,
                 tor_socks5_port,
                 identity,
             )
             .await?;
+            sellers.sort();
 
             if json {
                 for seller in sellers {
@@ -301,15 +302,37 @@ async fn main() -> Result<()> {
             } else {
                 let mut table = Table::new();
 
-                table.set_header(vec!["PRICE", "MIN_QUANTITY", "MAX_QUANTITY", "ADDRESS"]);
+                table.set_header(vec![
+                    "PRICE",
+                    "MIN_QUANTITY",
+                    "MAX_QUANTITY",
+                    "STATUS",
+                    "ADDRESS",
+                ]);
 
                 for seller in sellers {
-                    table.add_row(vec![
-                        seller.quote.price.to_string(),
-                        seller.quote.min_quantity.to_string(),
-                        seller.quote.max_quantity.to_string(),
-                        seller.multiaddr.to_string(),
-                    ]);
+                    let row = match seller.status {
+                        SellerStatus::Online(quote) => {
+                            vec![
+                                quote.price.to_string(),
+                                quote.min_quantity.to_string(),
+                                quote.max_quantity.to_string(),
+                                "Online".to_owned(),
+                                seller.multiaddr.to_string(),
+                            ]
+                        }
+                        SellerStatus::Unreachable => {
+                            vec![
+                                "???".to_owned(),
+                                "???".to_owned(),
+                                "???".to_owned(),
+                                "Unreachable".to_owned(),
+                                seller.multiaddr.to_string(),
+                            ]
+                        }
+                    };
+
+                    table.add_row(row);
                 }
 
                 println!("{}", table);

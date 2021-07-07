@@ -24,7 +24,7 @@ impl ProtocolName for BidQuoteProtocol {
 }
 
 /// Represents a quote for buying XMR.
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct BidQuote {
     /// The price at which the maker is willing to buy at.
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
