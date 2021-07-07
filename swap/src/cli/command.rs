@@ -188,7 +188,7 @@ where
             },
         },
         RawCommand::ListSellers {
-            rendezvous_node_addr,
+            rendezvous_point,
             tor: Tor { tor_socks5_port },
         } => Arguments {
             env_config: env_config_from(is_testnet),
@@ -196,7 +196,7 @@ where
             json,
             data_dir: data::data_dir_from(data, is_testnet)?,
             cmd: Command::ListSellers {
-                rendezvous_node_addr,
+                rendezvous_point,
                 namespace: rendezvous_namespace_from(is_testnet),
                 tor_socks5_port,
             },
@@ -238,7 +238,7 @@ pub enum Command {
         bitcoin_target_block: usize,
     },
     ListSellers {
-        rendezvous_node_addr: Multiaddr,
+        rendezvous_point: Multiaddr,
         namespace: XmrBtcNamespace,
         tor_socks5_port: u16,
     },
@@ -261,13 +261,13 @@ struct RawArguments {
     )]
     data: Option<PathBuf>,
 
-    #[structopt(long, help = "Activate debug logging.")]
+    #[structopt(long, help = "Activate debug logging")]
     debug: bool,
 
     #[structopt(
         short,
         long = "json",
-        help = "Changes the log messages to json vs plain-text. This can be helpful to simplify automated log analyses."
+        help = "Outputs all logs in JSON format instead of plain text"
     )]
     json: bool,
 
@@ -277,7 +277,7 @@ struct RawArguments {
 
 #[derive(structopt::StructOpt, Debug)]
 enum RawCommand {
-    /// Start a XMR for BTC swap
+    /// Start a BTC for XMR swap
     BuyXmr {
         #[structopt(flatten)]
         seller: Seller,
@@ -303,7 +303,7 @@ enum RawCommand {
         #[structopt(flatten)]
         tor: Tor,
     },
-    /// Show a list of past ongoing and completed swaps
+    /// Show a list of past, ongoing and completed swaps
     History,
     /// Resume a swap
     Resume {
@@ -330,7 +330,7 @@ enum RawCommand {
         #[structopt(flatten)]
         bitcoin: Bitcoin,
     },
-    /// Try to cancel a swap and refund my BTC (expert users only)
+    /// Try to cancel a swap and refund the BTC (expert users only)
     Refund {
         #[structopt(flatten)]
         swap_id: SwapId,
@@ -341,13 +341,14 @@ enum RawCommand {
         #[structopt(flatten)]
         bitcoin: Bitcoin,
     },
+    /// Discover and list sellers (i.e. ASB providers)
     ListSellers {
         #[structopt(
             long,
-            help = "The multiaddr (including peer-id) of a rendezvous node that sellers register with",
+            help = "Address of the rendezvous point you want to use to discover ASBs",
             default_value = DEFAULT_RENDEZVOUS_ADDRESS
         )]
-        rendezvous_node_addr: Multiaddr,
+        rendezvous_point: Multiaddr,
 
         #[structopt(flatten)]
         tor: Tor,
@@ -370,7 +371,7 @@ struct Bitcoin {
 
     #[structopt(
         long = "bitcoin-target-block",
-        help = "Use for fee estimation, decides within how many blocks the Bitcoin transactions should be confirmed."
+        help = "Estimate Bitcoin fees such that transactions are confirmed within the specified number of blocks"
     )]
     bitcoin_target_block: Option<usize>,
 }

@@ -272,11 +272,11 @@ async fn main() -> Result<()> {
             cli::refund(swap_id, Arc::new(bitcoin_wallet), db, force).await??;
         }
         Command::ListSellers {
-            rendezvous_node_addr,
+            rendezvous_point,
             namespace,
             tor_socks5_port,
         } => {
-            let rendezvous_node_peer_id = rendezvous_node_addr
+            let rendezvous_node_peer_id = rendezvous_point
                 .extract_peer_id()
                 .context("Rendezvous node address must contain peer ID")?;
 
@@ -287,7 +287,7 @@ async fn main() -> Result<()> {
 
             let mut sellers = list_sellers(
                 rendezvous_node_peer_id,
-                rendezvous_node_addr,
+                rendezvous_point,
                 namespace,
                 tor_socks5_port,
                 identity,
