@@ -37,7 +37,7 @@ pub async fn run_until(
             &mut swap.event_loop_handle,
             swap.bitcoin_wallet.as_ref(),
             swap.monero_wallet.as_ref(),
-            swap.receive_monero_address,
+            swap.monero_receive_address,
         )
         .await?;
 
@@ -56,13 +56,15 @@ async fn next_state(
     event_loop_handle: &mut EventLoopHandle,
     bitcoin_wallet: &bitcoin::Wallet,
     monero_wallet: &monero::Wallet,
-    receive_monero_address: monero::Address,
+    monero_receive_address: monero::Address,
 ) -> Result<BobState> {
     tracing::trace!(%state, "Advancing state");
 
     Ok(match state {
-        BobState::Started { btc_amount } => {
-            let bitcoin_refund_address = bitcoin_wallet.new_address().await?;
+        BobState::Started {
+            btc_amount,
+            change_address,
+        } => {
             let tx_refund_fee = bitcoin_wallet
                 .estimate_fee(TxRefund::weight(), btc_amount)
                 .await?;
@@ -76,7 +78,7 @@ async fn next_state(
                     btc: btc_amount,
                     tx_refund_fee,
                     tx_cancel_fee,
-                    bitcoin_refund_address,
+                    bitcoin_refund_address: change_address,
                 })
                 .await?;
 
@@ -224,10 +226,10 @@ async fn next_state(
             // Ensure that the generated wallet is synced so we have a proper balance
             monero_wallet.refresh().await?;
             // Sweep (transfer all funds) to the given address
-            let tx_hashes = monero_wallet.sweep_all(receive_monero_address).await?;
+            let tx_hashes = monero_wallet.sweep_all(monero_receive_address).await?;
 
             for tx_hash in tx_hashes {
-                tracing::info!(%receive_monero_address, txid=%tx_hash.0, "Sent XMR to");
+                tracing::info!(%monero_receive_address, txid=%tx_hash.0, "Sent XMR to");
             }
 
             BobState::XmrRedeemed {

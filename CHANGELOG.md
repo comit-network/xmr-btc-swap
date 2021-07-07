@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The rendezvous node address (`rendezvous_point`), as well as the ASB's external addresses (`external_addresses`) to be registered, is configured in the `network` section of the ASB config file.
   A rendezvous node is provided at `/dnsaddr/rendezvous.coblox.tech/p2p/12D3KooWQUt9DkNZxEn2R5ymJzWj15MpG6mTW84kyd8vDaRZi46o` which is used as default for discovery in the CLI.
   Upon discovery using `list-sellers` CLI users are provided with quote and connection information for each ASB discovered through the rendezvous node.
+- A mandatory `--change-address` parameter to the CLI's `buy-xmr` command.
+  The provided address is used to transfer Bitcoin in case of a refund and in case the user transfers more than the specified amount into the swap.
+  For more information see [#513](https://github.com/comit-network/xmr-btc-swap/issues/513).
 
 ### Fixed
 
@@ -38,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Websockets were only ever intended to be used for the ASB side to allow websites to retrieve quotes.
   The CLI can use regular TCP connections and having both - TCP and websockets - causes problems and unnecessary overhead.
 - The `--seller-addr` parameter from the CLI's `resume` command.
+  This information is now loaded from the database.
+- The `--receive-address` parameter from the CLI's `resume` command.
   This information is now loaded from the database.
 
 ## [0.7.0] - 2021-05-28

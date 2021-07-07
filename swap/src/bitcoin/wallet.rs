@@ -16,7 +16,6 @@ use reqwest::Url;
 use rust_decimal::prelude::*;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::fmt;
@@ -310,9 +309,16 @@ where
         &self,
         address: Address,
         amount: Amount,
+        change_override: Option<Address>,
     ) -> Result<PartiallySignedTransaction> {
         if self.network != address.network {
             bail!("Cannot build PSBT because network of given address is {} but wallet is on network {}", address.network, self.network);
+        }
+
+        if let Some(change) = change_override.as_ref() {
+            if self.network != change.network {
+                bail!("Cannot build PSBT because network of given address is {} but wallet is on network {}", change.network, self.network);
+            }
         }
 
         let wallet = self.wallet.lock().await;
@@ -326,22 +332,31 @@ where
         let (psbt, _details) = tx_builder.finish()?;
         let mut psbt: PartiallySignedTransaction = psbt;
 
-        // When subscribing to transactions we depend on the relevant script being at
-        // output index 0, thus we ensure the relevant output to be at index `0`.
-        psbt.outputs.sort_by(|a, _| {
-            if a.witness_script.as_ref() == Some(&script) {
-                Ordering::Less
-            } else {
-                Ordering::Greater
+        match psbt.global.unsigned_tx.output.as_mut_slice() {
+            // our primary output is the 2nd one? reverse the vectors
+            [_, second_txout] if second_txout.script_pubkey == script => {
+                psbt.outputs.reverse();
+                psbt.global.unsigned_tx.output.reverse();
             }
-        });
-        psbt.global.unsigned_tx.output.sort_by(|a, _| {
-            if a.script_pubkey == script {
-                Ordering::Less
-            } else {
-                Ordering::Greater
+            [first_txout, _] if first_txout.script_pubkey == script => {
+                // no need to do anything
             }
-        });
+            [_] => {
+                // single output, no need do anything
+            }
+            _ => bail!("Unexpected transaction layout"),
+        }
+
+        if let ([_, change], [_, psbt_output], Some(change_override)) = (
+            &mut psbt.global.unsigned_tx.output.as_mut_slice(),
+            &mut psbt.outputs.as_mut_slice(),
+            change_override,
+        ) {
+            change.script_pubkey = change_override.script_pubkey();
+            // Might be populated based on the previously set change address, but for the
+            // overwrite we don't know unless we ask the user for more information.
+            psbt_output.bip32_derivation.clear();
+        }
 
         Ok(psbt)
     }
@@ -1062,7 +1077,8 @@ mod tests {
         // if the change output is below dust it will be dropped by the BDK
         for amount in above_dust..(balance - (above_dust - 1)) {
             let (A, B) = (PublicKey::random(), PublicKey::random());
-            let txlock = TxLock::new(&wallet, bitcoin::Amount::from_sat(amount), A, B)
+            let change = wallet.new_address().await.unwrap();
+            let txlock = TxLock::new(&wallet, bitcoin::Amount::from_sat(amount), A, B, change)
                 .await
                 .unwrap();
             let txlock_output = txlock.script_pubkey();
@@ -1075,6 +1091,32 @@ mod tests {
                 "Output {:?} index mismatch for amount {} and balance {}",
                 tx.output, amount, balance
             );
+        }
+    }
+
+    #[tokio::test]
+    async fn can_override_change_address() {
+        let wallet = Wallet::new_funded_default_fees(50_000);
+        let custom_change = "bcrt1q08pfqpsyrt7acllzyjm8q5qsz5capvyahm49rw"
+            .parse::<Address>()
+            .unwrap();
+
+        let psbt = wallet
+            .send_to_address(
+                wallet.new_address().await.unwrap(),
+                Amount::from_sat(10_000),
+                Some(custom_change.clone()),
+            )
+            .await
+            .unwrap();
+        let transaction = wallet.sign_and_finalize(psbt).await.unwrap();
+
+        match transaction.output.as_slice() {
+            [first, change] => {
+                assert_eq!(first.value, 10_000);
+                assert_eq!(change.script_pubkey, custom_change.script_pubkey());
+            }
+            _ => panic!("expected exactly two outputs"),
         }
     }
 }

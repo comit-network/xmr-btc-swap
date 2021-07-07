@@ -20,7 +20,7 @@ pub struct Swap {
     pub monero_wallet: Arc<monero::Wallet>,
     pub env_config: env::Config,
     pub id: Uuid,
-    pub receive_monero_address: monero::Address,
+    pub monero_receive_address: monero::Address,
 }
 
 impl Swap {
@@ -32,21 +32,26 @@ impl Swap {
         monero_wallet: Arc<monero::Wallet>,
         env_config: env::Config,
         event_loop_handle: cli::EventLoopHandle,
-        receive_monero_address: monero::Address,
+        monero_receive_address: monero::Address,
+        bitcoin_change_address: bitcoin::Address,
         btc_amount: bitcoin::Amount,
     ) -> Self {
         Self {
-            state: BobState::Started { btc_amount },
+            state: BobState::Started {
+                btc_amount,
+                change_address: bitcoin_change_address,
+            },
             event_loop_handle,
             db,
             bitcoin_wallet,
             monero_wallet,
             env_config,
             id,
-            receive_monero_address,
+            monero_receive_address,
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn from_db(
         db: Database,
         id: Uuid,
@@ -54,7 +59,7 @@ impl Swap {
         monero_wallet: Arc<monero::Wallet>,
         env_config: env::Config,
         event_loop_handle: cli::EventLoopHandle,
-        receive_monero_address: monero::Address,
+        monero_receive_address: monero::Address,
     ) -> Result<Self> {
         let state = db.get_state(id)?.try_into_bob()?.into();
 
@@ -66,7 +71,7 @@ impl Swap {
             monero_wallet,
             env_config,
             id,
-            receive_monero_address,
+            monero_receive_address,
         })
     }
 }

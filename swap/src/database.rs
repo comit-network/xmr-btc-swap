@@ -69,6 +69,7 @@ pub struct Database {
     swaps: sled::Tree,
     peers: sled::Tree,
     addresses: sled::Tree,
+    monero_addresses: sled::Tree,
 }
 
 impl Database {
@@ -81,11 +82,13 @@ impl Database {
         let swaps = db.open_tree("swaps")?;
         let peers = db.open_tree("peers")?;
         let addresses = db.open_tree("addresses")?;
+        let monero_addresses = db.open_tree("monero_addresses")?;
 
         Ok(Database {
             swaps,
             peers,
             addresses,
+            monero_addresses,
         })
     }
 
@@ -114,6 +117,39 @@ impl Database {
 
         let peer_id: String = deserialize(&encoded).context("Could not deserialize peer-id")?;
         Ok(PeerId::from_str(peer_id.as_str())?)
+    }
+
+    pub async fn insert_monero_address(
+        &self,
+        swap_id: Uuid,
+        address: monero::Address,
+    ) -> Result<()> {
+        let key = swap_id.as_bytes();
+        let value = serialize(&address)?;
+
+        self.monero_addresses.insert(key, value)?;
+
+        self.monero_addresses
+            .flush_async()
+            .await
+            .map(|_| ())
+            .context("Could not flush db")
+    }
+
+    pub fn get_monero_address(&self, swap_id: Uuid) -> Result<monero::Address> {
+        let encoded = self
+            .monero_addresses
+            .get(swap_id.as_bytes())?
+            .ok_or_else(|| {
+                anyhow!(
+                    "No Monero address found for swap id {} in database",
+                    swap_id
+                )
+            })?;
+
+        let monero_address = deserialize(&encoded)?;
+
+        Ok(monero_address)
     }
 
     pub async fn insert_address(&self, peer_id: PeerId, address: Multiaddr) -> Result<()> {
@@ -422,6 +458,19 @@ mod tests {
         let addresses = Database::open(db_dir.path())?.get_addresses(peer_id)?;
 
         assert_eq!(addresses, vec![home1, home2]);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn save_and_load_monero_address() -> Result<()> {
+        let db_dir = tempfile::tempdir()?;
+        let swap_id = Uuid::new_v4();
+
+        Database::open(db_dir.path())?.insert_monero_address(swap_id, "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a".parse()?).await?;
+        let loaded_monero_address = Database::open(db_dir.path())?.get_monero_address(swap_id)?;
+
+        assert_eq!(loaded_monero_address.to_string(), "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a");
 
         Ok(())
     }
