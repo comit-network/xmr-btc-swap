@@ -256,8 +256,8 @@ struct RawArguments {
     testnet: bool,
 
     #[structopt(
-        long = "--data-dir",
-        help = "Provide the data directory path to be used to store application data using testnet and mainnet as subfolder"
+        long = "--data-base-dir",
+        help = "The base data directory to be used for mainnet / testnet specific data like database, wallets etc"
     )]
     data: Option<PathBuf>,
 
@@ -407,23 +407,14 @@ mod data {
     use super::*;
 
     pub fn data_dir_from(arg_dir: Option<PathBuf>, testnet: bool) -> Result<PathBuf> {
-        let dir = if let Some(dir) = arg_dir {
-            dir
-        } else if testnet {
-            testnet_default()?
-        } else {
-            mainnet_default()?
+        let base_dir = match arg_dir {
+            Some(custom_base_dir) => custom_base_dir,
+            None => os_default()?,
         };
 
-        Ok(dir)
-    }
+        let sub_directory = if testnet { "testnet" } else { "mainnet" };
 
-    fn testnet_default() -> Result<PathBuf> {
-        Ok(os_default()?.join("testnet"))
-    }
-
-    fn mainnet_default() -> Result<PathBuf> {
-        Ok(os_default()?.join("mainnet"))
+        Ok(base_dir.join(sub_directory))
     }
 
     fn os_default() -> Result<PathBuf> {
@@ -699,7 +690,7 @@ mod tests {
 
         let raw_ars = vec![
             BINARY_NAME,
-            "--data-dir",
+            "--data-base-dir",
             data_dir,
             "buy-xmr",
             "--change-address",
@@ -716,14 +707,14 @@ mod tests {
             args,
             ParseResult::Arguments(
                 Arguments::buy_xmr_mainnet_defaults()
-                    .with_data_dir(PathBuf::from_str(data_dir).unwrap())
+                    .with_data_dir(PathBuf::from_str(data_dir).unwrap().join("mainnet"))
             )
         );
 
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
-            "--data-dir",
+            "--data-base-dir",
             data_dir,
             "buy-xmr",
             "--change-address",
@@ -740,13 +731,13 @@ mod tests {
             args,
             ParseResult::Arguments(
                 Arguments::buy_xmr_testnet_defaults()
-                    .with_data_dir(PathBuf::from_str(data_dir).unwrap())
+                    .with_data_dir(PathBuf::from_str(data_dir).unwrap().join("testnet"))
             )
         );
 
         let raw_ars = vec![
             BINARY_NAME,
-            "--data-dir",
+            "--data-base-dir",
             data_dir,
             "resume",
             "--swap-id",
@@ -759,14 +750,14 @@ mod tests {
             args,
             ParseResult::Arguments(
                 Arguments::resume_mainnet_defaults()
-                    .with_data_dir(PathBuf::from_str(data_dir).unwrap())
+                    .with_data_dir(PathBuf::from_str(data_dir).unwrap().join("mainnet"))
             )
         );
 
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
-            "--data-dir",
+            "--data-base-dir",
             data_dir,
             "resume",
             "--swap-id",
@@ -779,7 +770,7 @@ mod tests {
             args,
             ParseResult::Arguments(
                 Arguments::resume_testnet_defaults()
-                    .with_data_dir(PathBuf::from_str(data_dir).unwrap())
+                    .with_data_dir(PathBuf::from_str(data_dir).unwrap().join("testnet"))
             )
         );
     }

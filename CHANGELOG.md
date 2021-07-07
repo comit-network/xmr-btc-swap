@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The commandline interface of the CLI to combine `--seller-addr` and `--seller-peer-id`.
   These two parameters have been merged into a parameter `--seller` that accepts a single [multiaddress](https://docs.libp2p.io/concepts/addressing/).
   The multiaddress must end with a `/p2p` protocol defining the seller's peer ID.
+- The `--data-dir` option to `--data-base-dir`.
+  Previously, this option determined the final data directory, regardless of the `--testnet` flag.
+  With `--data-base-dir`, a subdirectory (either `testnet` or `mainnet`) will be created under the given path.
+  This allows using the same command with or without `--testnet`.
 
 ### Removed
 
