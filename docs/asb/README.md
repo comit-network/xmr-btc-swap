@@ -33,7 +33,7 @@ Public Electrum mainnet nodes can be found [here](https://1209k.com/bitcoin-eye/
 The ASB is a long running daemon that acts as the trading partner to the swap CLI.
 The CLI user is buying XMR (i.e. receives XMR, sends BTC), the ASB service provider is selling XMR (i.e. sends XMR, receives BTC).
 The ASB can handle multiple swaps with different peers concurrently.
-The ASB communicates with the CLI on various [libp2p](https://libp2p.io/)-based network protocols.
+The ASB communicates with the CLI on various [libp2p-based](https://libp2p.io/) network protocols.
 
 Both the ASB and the CLI can be run by anybody.
 The CLI is designed to run one specific swap against an ASB.
