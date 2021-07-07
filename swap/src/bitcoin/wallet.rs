@@ -353,6 +353,8 @@ where
             change_override,
         ) {
             change.script_pubkey = change_override.script_pubkey();
+            // Might be populated based on the previously set change address, but for the
+            // overwrite we don't know unless we ask the user for more information.
             psbt_output.bip32_derivation.clear();
         }
 
