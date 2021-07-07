@@ -144,13 +144,18 @@ impl Wallet {
                         let new_status = match client.lock().await.status_of_script(&tx) {
                             Ok(new_status) => new_status,
                             Err(error) => {
-                                tracing::warn!(%txid, "Failed to get status of script. Error {:#}", error);
+                                tracing::warn!(%txid, "Failed to get status of script: {:#}", error);
                                 return;
                             }
                         };
 
-                        if Some(new_status) != last_status {
-                            tracing::debug!(%txid, status = %new_status, "Transaction");
+                        match (last_status, new_status) {
+                            (None, new_status) => {
+                                tracing::debug!(%txid, status = %new_status, "Found relevant Bitcoin transaction");
+                            },
+                            (Some(old_status), new_status) => {
+                                tracing::debug!(%txid, %new_status, %old_status, "Bitcoin transaction status changed");
+                            }
                         }
 
                         last_status = Some(new_status);
@@ -409,9 +414,7 @@ where
     ) -> Result<bitcoin::Amount> {
         let client = self.client.lock().await;
         let fee_rate = client.estimate_feerate(self.target_block)?;
-
         let min_relay_fee = client.min_relay_fee()?;
-        tracing::debug!("Min relay fee: {}", min_relay_fee);
 
         estimate_fee(weight, transfer_amount, fee_rate, min_relay_fee)
     }
@@ -443,20 +446,21 @@ fn estimate_fee(
 
     let weight = Decimal::from(weight);
     let weight_factor = dec!(4.0);
-    let fee_rate = Decimal::from_f32(fee_rate_svb).context("Could not parse fee_rate.")?;
+    let fee_rate = Decimal::from_f32(fee_rate_svb).context("Failed to parse fee rate")?;
 
     let sats_per_vbyte = weight / weight_factor * fee_rate;
+
     tracing::debug!(
-        "Estimated fee for weight: {} for fee_rate: {:?} is in total: {}",
-        weight,
-        fee_rate,
-        sats_per_vbyte
+        %weight,
+        %fee_rate,
+        %sats_per_vbyte,
+        "Estimated fee for transaction",
     );
 
     let transfer_amount = Decimal::from(transfer_amount.as_sat());
     let max_allowed_fee = transfer_amount * MAX_RELATIVE_TX_FEE;
-
     let min_relay_fee = Decimal::from(min_relay_fee.as_sat());
+
     let recommended_fee = if sats_per_vbyte < min_relay_fee {
         tracing::warn!(
             "Estimated fee of {} is smaller than the min relay fee, defaulting to min relay fee {}",
@@ -482,6 +486,7 @@ fn estimate_fee(
     let amount = recommended_fee
         .map(bitcoin::Amount::from_sat)
         .context("Could not estimate tranasction fee.")?;
+
     Ok(amount)
 }
 

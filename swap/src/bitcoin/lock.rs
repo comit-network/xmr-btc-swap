@@ -151,13 +151,13 @@ impl TxLock {
             witness: Vec::new(),
         };
 
-        let spending_fee = spending_fee.as_sat();
-        tracing::debug!(%spending_fee, "Redeem tx fee");
+        let fee = spending_fee.as_sat();
         let tx_out = TxOut {
-            value: self.inner.clone().extract_tx().output[self.lock_output_vout()].value
-                - spending_fee,
+            value: self.inner.clone().extract_tx().output[self.lock_output_vout()].value - fee,
             script_pubkey: spend_address.script_pubkey(),
         };
+
+        tracing::debug!(%fee, "Constructed Bitcoin spending transaction");
 
         Transaction {
             version: 2,

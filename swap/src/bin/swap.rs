@@ -34,7 +34,6 @@ use swap::protocol::bob;
 use swap::protocol::bob::Swap;
 use swap::seed::Seed;
 use swap::{bitcoin, cli, monero};
-use tracing::{debug, error, info, warn};
 use url::Url;
 use uuid::Uuid;
 
@@ -111,7 +110,7 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            info!(%amount, %fees, %swap_id,  "Swapping");
+            tracing::info!(%amount, %fees, %swap_id,  "Starting new swap");
 
             db.insert_peer_id(swap_id, seller_peer_id).await?;
             db.insert_monero_address(swap_id, monero_receive_address)
@@ -185,7 +184,7 @@ async fn main() -> Result<()> {
             let mut swarm =
                 swarm::cli(seed.derive_libp2p_identity(), tor_socks5_port, behaviour).await?;
             let our_peer_id = swarm.local_peer_id();
-            tracing::debug!(peer_id = %our_peer_id, "Initializing network module");
+            tracing::debug!(peer_id = %our_peer_id, "Network layer initialized");
 
             for seller_address in seller_addresses {
                 swarm
@@ -242,10 +241,10 @@ async fn main() -> Result<()> {
 
             match cancel {
                 Ok((txid, _)) => {
-                    debug!("Cancel transaction successfully published with id {}", txid)
+                    tracing::debug!("Cancel transaction successfully published with id {}", txid)
                 }
-                Err(cli::cancel::Error::CancelTimelockNotExpiredYet) => error!(
-                    "The Cancel Transaction cannot be published yet, because the timelock has not expired. Please try again later"
+                Err(cli::cancel::Error::CancelTimelockNotExpiredYet) => tracing::error!(
+                    "The cancel transaction cannot be published yet, because the timelock has not expired. Please try again later"
                 ),
             }
         }
@@ -395,9 +394,9 @@ where
     TS: Future<Output = Result<()>>,
     FS: Fn() -> TS,
 {
-    debug!("Requesting quote");
+    tracing::debug!("Requesting quote");
     let bid_quote = bid_quote.await?;
-    info!(
+    tracing::info!(
         price = %bid_quote.price,
         minimum_amount = %bid_quote.min_quantity,
         maximum_amount = %bid_quote.max_quantity,
@@ -415,15 +414,15 @@ where
             eprintln!("{}", qr_code(&deposit_address)?);
         }
 
-        info!(
-            %deposit_address,
-            %max_giveable,
-            %minimum_amount,
-            %maximum_amount,
-            "Please deposit BTC you want to swap to",
-        );
-
         loop {
+            tracing::info!(
+                %deposit_address,
+                %max_giveable,
+                %minimum_amount,
+                %maximum_amount,
+                "Waiting for Bitcoin deposit",
+            );
+
             sync().await?;
 
             let new_max_givable = max_giveable_fn().await?;
@@ -435,17 +434,13 @@ where
                 tracing::info!(
                     %new_balance,
                     %max_giveable,
-                    "Received BTC",
+                    "Received Bitcoin",
                 );
 
                 if max_giveable >= bid_quote.min_quantity {
                     break;
                 } else {
-                    tracing::info!(
-                        %minimum_amount,
-                        %deposit_address,
-                        "Please deposit more, not enough BTC to trigger swap with",
-                    );
+                    tracing::info!("Deposited amount is less than `min_quantity`",);
                 }
             }
 

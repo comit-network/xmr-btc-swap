@@ -11,6 +11,7 @@ use miniscript::{Descriptor, DescriptorTrait};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::fmt;
 use std::ops::Add;
 
 /// Represent a timelock, expressed in relative block height as defined in
@@ -44,6 +45,12 @@ impl PartialOrd<CancelTimelock> for u32 {
 impl PartialEq<CancelTimelock> for u32 {
     fn eq(&self, other: &CancelTimelock) -> bool {
         self.eq(&other.0)
+    }
+}
+
+impl fmt::Display for CancelTimelock {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} blocks", self.0)
     }
 }
 

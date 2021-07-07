@@ -157,12 +157,12 @@ impl Wallet {
                 Err(error) => {
                     tracing::warn!(
                         address = %self.main_address,
-                        "Transferring Monero back to default wallet failed. Error {:#}", error
+                        "Failed to transfer Monero to default wallet: {:#}", error
                     );
                 }
             },
             Err(error) => {
-                tracing::warn!("Refreshing the generated wallet failed. Error {:#}", error);
+                tracing::warn!("Failed to refresh generated wallet: {:#}", error);
             }
         }
 
@@ -192,7 +192,7 @@ impl Wallet {
             %amount,
             to = %public_spend_key,
             tx_id = %res.tx_hash,
-            "Sent transfer"
+            "Successfully initiated Monero transfer"
         );
 
         Ok(TransferProof::new(
@@ -202,7 +202,7 @@ impl Wallet {
         ))
     }
 
-    pub async fn watch_for_transfer(&self, request: WatchRequest) -> Result<()> {
+    pub async fn watch_for_transfer(&self, request: WatchRequest) -> Result<(), InsufficientFunds> {
         let WatchRequest {
             conf_target,
             public_view_key,
@@ -314,7 +314,7 @@ where
             Err(error) => {
                 tracing::debug!(
                     %txid,
-                    "Failed to retrieve tx from blockchain. Error {:#}", error
+                    "Failed to retrieve tx from blockchain: {:#}", error
                 );
                 continue; // treating every error as transient and retrying
                           // is obviously wrong but the jsonrpc client is

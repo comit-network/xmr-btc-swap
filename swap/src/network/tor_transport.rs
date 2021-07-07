@@ -42,7 +42,7 @@ impl Transport for TorDialOnlyTransport {
         }
 
         let dial_future = async move {
-            tracing::trace!("Connecting through Tor proxy to address: {}", addr);
+            tracing::trace!(address = %addr, "Establishing connection through Tor proxy");
 
             let stream =
                 Socks5Stream::connect((Ipv4Addr::LOCALHOST, self.socks_port), address.to_string())

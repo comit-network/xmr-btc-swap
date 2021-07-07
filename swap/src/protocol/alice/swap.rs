@@ -8,7 +8,6 @@ use crate::{bitcoin, database, monero};
 use anyhow::{bail, Context, Result};
 use tokio::select;
 use tokio::time::timeout;
-use tracing::{error, info, warn};
 use uuid::Uuid;
 
 pub async fn run<LR>(swap: Swap, rate_service: LR) -> Result<AliceState>
@@ -66,7 +65,7 @@ where
         .latest_rate()
         .map_or("NaN".to_string(), |rate| format!("{}", rate));
 
-    info!(%state, %rate, "Advancing state");
+    tracing::info!(%state, %rate, "Advancing state");
 
     Ok(match state {
         AliceState::Started { state3 } => {
@@ -78,7 +77,7 @@ where
             .await
             {
                 Err(_) => {
-                    info!(
+                    tracing::info!(
                         minutes = %env_config.bitcoin_lock_mempool_timeout.as_secs_f64() / 60.0,
                         "TxLock lock was not seen in mempool in time",
                     );
@@ -99,7 +98,7 @@ where
             .await
             {
                 Err(_) => {
-                    info!(
+                    tracing::info!(
                         confirmations_needed = %env_config.bitcoin_finality_confirmations,
                         minutes = %env_config.bitcoin_lock_confirmed_timeout.as_secs_f64() / 60.0,
                         "TxLock lock did not get enough confirmations in time",
@@ -204,7 +203,7 @@ where
                     }
                 }
                 enc_sig = event_loop_handle.recv_encrypted_signature() => {
-                    info!("Received encrypted signature");
+                    tracing::info!("Received encrypted signature");
 
                     AliceState::EncSigLearned {
                         monero_wallet_restore_blockheight,
@@ -232,10 +231,7 @@ where
                             }
                         },
                         Err(error) => {
-                            error!(
-                                "Publishing the redeem transaction failed. Error {:#}",
-                                error
-                            );
+                            tracing::error!("Failed to publish redeem transaction: {:#}", error);
                             tx_lock_status
                                 .wait_until_confirmed_with(state3.cancel_timelock)
                                 .await?;
@@ -248,8 +244,12 @@ where
                         }
                     },
                     Err(error) => {
-                        error!(
-                            "Constructing the redeem transaction failed. Attempting to wait for cancellation now. Error {:#}", error);
+                        tracing::error!("Failed to construct redeem transaction: {:#}", error);
+                        tracing::info!(
+                            timelock = %state3.cancel_timelock,
+                            "Waiting for cancellation timelock to expire",
+                        );
+
                         tx_lock_status
                             .wait_until_confirmed_with(state3.cancel_timelock)
                             .await?;
@@ -361,10 +361,7 @@ where
             match punish {
                 Ok(_) => AliceState::BtcPunished,
                 Err(error) => {
-                    warn!(
-                        "Falling back to refund because punish transaction failed. Error {:#}",
-                        error
-                    );
+                    tracing::warn!("Failed to publish punish transaction: {:#}", error);
 
                     // Upon punish failure we assume that the refund tx was included but we
                     // missed seeing it. In case we fail to fetch the refund tx we fail
@@ -372,6 +369,8 @@ where
                     // to. It does not help to race punish and refund inclusion,
                     // because a punish tx failure is not recoverable (besides re-trying) if the
                     // refund tx was not included.
+
+                    tracing::info!("Falling back to refund");
 
                     let published_refund_tx = bitcoin_wallet
                         .get_raw_transaction(state3.tx_refund().txid())

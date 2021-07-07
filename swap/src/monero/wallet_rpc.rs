@@ -128,7 +128,7 @@ impl WalletRpc {
 
         tracing::debug!(
             %port,
-            "Starting monero-wallet-rpc on"
+            "Starting monero-wallet-rpc"
         );
 
         let network_flag = match network {

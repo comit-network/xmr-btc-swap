@@ -64,7 +64,7 @@ impl Seed {
             return Self::from_file(&file_path);
         }
 
-        tracing::debug!("No seed file found, creating at: {}", file_path.display());
+        tracing::debug!("No seed file found, creating at {}", file_path.display());
 
         let random_seed = Seed::random()?;
         random_seed.write_to(file_path.to_path_buf())?;

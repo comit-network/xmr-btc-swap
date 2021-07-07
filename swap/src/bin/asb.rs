@@ -36,7 +36,6 @@ use swap::protocol::alice::run;
 use swap::seed::Seed;
 use swap::tor::AuthenticatedClient;
 use swap::{asb, bitcoin, kraken, monero, tor};
-use tracing::{debug, info, warn};
 use tracing_subscriber::filter::LevelFilter;
 
 const DEFAULT_WALLET_NAME: &str = "asb-wallet";
@@ -90,11 +89,6 @@ async fn main() -> Result<()> {
         ));
     }
 
-    info!(
-        db_folder = %config.data.dir.display(),
-        "Database and Seed will be stored in",
-    );
-
     let db_path = config.data.dir.join("database");
 
     let db = Database::open(config.data.dir.join(db_path).as_path())
@@ -110,17 +104,17 @@ async fn main() -> Result<()> {
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
 
             let bitcoin_balance = bitcoin_wallet.balance().await?;
-            info!(%bitcoin_balance, "Initialized Bitcoin wallet");
+            tracing::info!(%bitcoin_balance, "Initialized Bitcoin wallet");
 
             let monero_balance = monero_wallet.get_balance().await?;
             if monero_balance == Amount::ZERO {
                 let monero_address = monero_wallet.get_main_address();
-                warn!(
+                tracing::warn!(
                     %monero_address,
                     "The Monero balance is 0, make sure to deposit funds at",
                 )
             } else {
-                info!(%monero_balance, "Initialized Monero wallet");
+                tracing::info!(%monero_balance, "Initialized Monero wallet");
             }
 
             let kraken_price_updates = kraken::connect(config.maker.price_ticker_ws_url.clone())?;
@@ -130,7 +124,7 @@ async fn main() -> Result<()> {
                 tor::Client::new(config.tor.socks5_port).with_control_port(config.tor.control_port);
             let _ac = match tor_client.assert_tor_running().await {
                 Ok(_) => {
-                    tracing::info!("Tor found. Setting up hidden service");
+                    tracing::info!("Setting up Tor hidden service");
                     let ac =
                         register_tor_services(config.network.clone().listen, tor_client, &seed)
                             .await?;
@@ -196,10 +190,10 @@ async fn main() -> Result<()> {
                         let swap_id = swap.swap_id;
                         match run(swap, rate).await {
                             Ok(state) => {
-                                tracing::debug!(%swap_id, %state, "Swap finished with state")
+                                tracing::debug!(%swap_id, final_state=%state, "Swap completed")
                             }
                             Err(error) => {
-                                tracing::error!(%swap_id, "Swap failed. Error {:#}", error)
+                                tracing::error!(%swap_id, "Swap failed: {:#}", error)
                             }
                         }
                     });
@@ -314,7 +308,7 @@ async fn init_bitcoin_wallet(
     seed: &Seed,
     env_config: swap::env::Config,
 ) -> Result<bitcoin::Wallet> {
-    debug!("Opening Bitcoin wallet");
+    tracing::debug!("Opening Bitcoin wallet");
     let wallet_dir = config.data.dir.join("wallet");
 
     let wallet = bitcoin::Wallet::new(
@@ -336,7 +330,7 @@ async fn init_monero_wallet(
     config: &Config,
     env_config: swap::env::Config,
 ) -> Result<monero::Wallet> {
-    debug!("Opening Monero wallet");
+    tracing::debug!("Opening Monero wallet");
     let wallet = monero::Wallet::open_or_create(
         config.monero.wallet_rpc_url.clone(),
         DEFAULT_WALLET_NAME.to_string(),
@@ -384,7 +378,7 @@ async fn register_tor_services(
 
     hidden_services_details.iter().for_each(|(port, _)| {
         let onion_address = format!("/onion3/{}:{}", onion_address, port);
-        tracing::info!(%onion_address);
+        tracing::info!(%onion_address, "Successfully created hidden service");
     });
 
     Ok(ac)
