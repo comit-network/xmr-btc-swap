@@ -149,16 +149,7 @@ impl Wallet {
                             }
                         };
 
-                        match (last_status, new_status) {
-                            (None, new_status) => {
-                                tracing::debug!(%txid, status = %new_status, "Found relevant Bitcoin transaction");
-                            },
-                            (Some(old_status), new_status) => {
-                                tracing::debug!(%txid, %new_status, %old_status, "Bitcoin transaction status changed");
-                            }
-                        }
-
-                        last_status = Some(new_status);
+                        last_status = Some(print_status_change(txid, last_status, new_status));
 
                         let all_receivers_gone = sender.send(new_status).is_err();
 
@@ -180,6 +171,20 @@ impl Wallet {
 
         sub
     }
+}
+
+fn print_status_change(txid: Txid, old: Option<ScriptStatus>, new: ScriptStatus) -> ScriptStatus {
+    match (old, new) {
+        (None, new_status) => {
+            tracing::debug!(%txid, status = %new_status, "Found relevant Bitcoin transaction");
+        }
+        (Some(old_status), new_status) if old_status != new_status => {
+            tracing::debug!(%txid, %new_status, %old_status, "Bitcoin transaction status changed");
+        }
+        _ => {}
+    }
+
+    new
 }
 
 /// Represents a subscription to the status of a given transaction.
@@ -850,7 +855,9 @@ impl fmt::Display for ScriptStatus {
 mod tests {
     use super::*;
     use crate::bitcoin::{PublicKey, TxLock};
+    use crate::tracing_ext::capture_logs;
     use proptest::prelude::*;
+    use tracing::level_filters::LevelFilter;
 
     #[test]
     fn given_depth_0_should_meet_confirmation_target_one() {
@@ -1123,5 +1130,39 @@ mod tests {
             }
             _ => panic!("expected exactly two outputs"),
         }
+    }
+
+    #[test]
+    fn printing_status_change_doesnt_spam_on_same_status() {
+        let writer = capture_logs(LevelFilter::DEBUG);
+
+        let tx = Txid::default();
+        let mut old = None;
+        old = Some(print_status_change(tx, old, ScriptStatus::Unseen));
+        old = Some(print_status_change(tx, old, ScriptStatus::InMempool));
+        old = Some(print_status_change(tx, old, ScriptStatus::InMempool));
+        old = Some(print_status_change(tx, old, ScriptStatus::InMempool));
+        old = Some(print_status_change(tx, old, ScriptStatus::InMempool));
+        old = Some(print_status_change(tx, old, ScriptStatus::InMempool));
+        old = Some(print_status_change(tx, old, ScriptStatus::InMempool));
+        old = Some(print_status_change(tx, old, confs(1)));
+        old = Some(print_status_change(tx, old, confs(2)));
+        old = Some(print_status_change(tx, old, confs(3)));
+        old = Some(print_status_change(tx, old, confs(3)));
+        print_status_change(tx, old, confs(3));
+
+        assert_eq!(
+            writer.captured(),
+            r"DEBUG swap::bitcoin::wallet: Found relevant Bitcoin transaction txid=0000000000000000000000000000000000000000000000000000000000000000 status=unseen
+DEBUG swap::bitcoin::wallet: Bitcoin transaction status changed txid=0000000000000000000000000000000000000000000000000000000000000000 new_status=in mempool old_status=unseen
+DEBUG swap::bitcoin::wallet: Bitcoin transaction status changed txid=0000000000000000000000000000000000000000000000000000000000000000 new_status=confirmed with 1 blocks old_status=in mempool
+DEBUG swap::bitcoin::wallet: Bitcoin transaction status changed txid=0000000000000000000000000000000000000000000000000000000000000000 new_status=confirmed with 2 blocks old_status=confirmed with 1 blocks
+DEBUG swap::bitcoin::wallet: Bitcoin transaction status changed txid=0000000000000000000000000000000000000000000000000000000000000000 new_status=confirmed with 3 blocks old_status=confirmed with 2 blocks
+"
+        )
+    }
+
+    fn confs(confirmations: u32) -> ScriptStatus {
+        ScriptStatus::from_confirmations(confirmations)
     }
 }
