@@ -285,7 +285,7 @@ async fn main() -> Result<()> {
                 .context("Failed to read in seed file")?;
             let identity = seed.derive_libp2p_identity();
 
-            let mut sellers = list_sellers(
+            let sellers = list_sellers(
                 rendezvous_node_peer_id,
                 rendezvous_point,
                 namespace,
@@ -293,7 +293,6 @@ async fn main() -> Result<()> {
                 identity,
             )
             .await?;
-            sellers.sort();
 
             if json {
                 for seller in sellers {

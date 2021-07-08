@@ -15,6 +15,12 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::time::Duration;
 
+/// Returns sorted list of sellers, with [Online](Status::Online) listed first.
+///
+/// First uses the rendezvous node to discover peers in the given namespace,
+/// then fetches a quote from each peer that was discovered. If fetching a quote
+/// from a discovered peer fails the seller's status will be
+/// [Unreachable](Status::Unreachable).
 pub async fn list_sellers(
     rendezvous_node_peer_id: PeerId,
     rendezvous_node_addr: Multiaddr,
@@ -289,7 +295,10 @@ impl EventLoop {
                         .collect::<Result<Vec<_>, _>>();
 
                     match all_quotes_fetched {
-                        Ok(sellers) => break sellers,
+                        Ok(mut sellers) => {
+                            sellers.sort();
+                            break sellers;
+                        }
                         Err(StillPending {}) => continue,
                     }
                 }
