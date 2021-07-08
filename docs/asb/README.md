@@ -12,10 +12,7 @@ This quickstart guide assumes that you are running the software on testnet (i.e.
 3. Run the ASB in terminal: `./asb --testnet start`
 4. Follow the setup wizard in the terminal
 
-Public Monero stagenet nodes for running the Monero Wallet RPC:
-
-- `monero-stagenet.exan.tech:38081`
-- `stagenet.melo.tools:38081`
+Public Monero nodes for running the Monero Wallet RPC can be found [here](https://melo.tools/nodes.html).
 
 Run `./asb --help` for more information.
 

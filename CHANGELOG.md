@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An issue where the ASB gives long price guarantees when setting up a swap.
   Now, after sending a spot price the ASB will wait for one minute for the CLI's to trigger the execution setup, and three minutes to see the BTC lock transaction of the CLI in mempool after the swap started.
   If the first timeout is triggered the execution setup will be aborted, if the second timeout is triggered the swap will be safely aborted.
+- An issue where the default Monero node connection string would not work, because the public nodes were moved to a different domain.
+  The default monerod nodes were updated to use the [melo tool nodes](https://melo.tools/nodes.html).
 
 ### Changed
 
