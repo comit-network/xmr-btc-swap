@@ -492,28 +492,6 @@ mod tests {
 
     use super::*;
 
-    struct MaxGiveable {
-        amounts: Vec<Amount>,
-        call_counter: usize,
-    }
-
-    impl MaxGiveable {
-        fn new(amounts: Vec<Amount>) -> Self {
-            Self {
-                amounts,
-                call_counter: 0,
-            }
-        }
-        fn give(&mut self) -> Result<Amount> {
-            let amount = self
-                .amounts
-                .get(self.call_counter)
-                .ok_or_else(|| anyhow::anyhow!("No more balances available"))?;
-            self.call_counter += 1;
-            Ok(*amount)
-        }
-    }
-
     #[tokio::test]
     async fn given_no_balance_and_transfers_less_than_max_swaps_max_giveable() {
         let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
@@ -710,6 +688,28 @@ mod tests {
         .unwrap_err();
 
         assert!(matches!(error, tokio::time::error::Elapsed { .. }))
+    }
+
+    struct MaxGiveable {
+        amounts: Vec<Amount>,
+        call_counter: usize,
+    }
+
+    impl MaxGiveable {
+        fn new(amounts: Vec<Amount>) -> Self {
+            Self {
+                amounts,
+                call_counter: 0,
+            }
+        }
+        fn give(&mut self) -> Result<Amount> {
+            let amount = self
+                .amounts
+                .get(self.call_counter)
+                .ok_or_else(|| anyhow::anyhow!("No more balances available"))?;
+            self.call_counter += 1;
+            Ok(*amount)
+        }
     }
 
     fn quote_with_max(btc: f64) -> BidQuote {
