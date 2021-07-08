@@ -423,7 +423,7 @@ where
         price = %bid_quote.price,
         minimum_amount = %bid_quote.min_quantity,
         maximum_amount = %bid_quote.max_quantity,
-        "Received quote: 1 XMR ~ ",
+        "Received quote",
     );
 
     let mut max_giveable = max_giveable_fn().await?;
@@ -517,7 +517,7 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            r" INFO swap: Received quote: 1 XMR ~  price=0.00100000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
+            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
  INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 max_giveable=0.00000000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
  INFO swap: Received Bitcoin new_balance=0.00100000 BTC max_giveable=0.00090000 BTC
 "
@@ -552,7 +552,7 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            r" INFO swap: Received quote: 1 XMR ~  price=0.00100000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
+            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
  INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 max_giveable=0.00000000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
  INFO swap: Received Bitcoin new_balance=0.10010000 BTC max_giveable=0.10000000 BTC
 "
@@ -587,7 +587,7 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            r" INFO swap: Received quote: 1 XMR ~  price=0.00100000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
+            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
 "
         );
     }
@@ -620,7 +620,7 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            r" INFO swap: Received quote: 1 XMR ~  price=0.00100000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
+            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
 "
         );
     }
@@ -653,7 +653,7 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            r" INFO swap: Received quote: 1 XMR ~  price=0.00100000 BTC minimum_amount=0.01000000 BTC maximum_amount=184467440737.09551615 BTC
+            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.01000000 BTC maximum_amount=184467440737.09551615 BTC
  INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 max_giveable=0.00000000 BTC minimum_amount=0.01000000 BTC maximum_amount=184467440737.09551615 BTC
  INFO swap: Received Bitcoin new_balance=0.01010000 BTC max_giveable=0.01000000 BTC
 "
@@ -688,7 +688,7 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            r" INFO swap: Received quote: 1 XMR ~  price=0.00100000 BTC minimum_amount=0.01000000 BTC maximum_amount=184467440737.09551615 BTC
+            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.01000000 BTC maximum_amount=184467440737.09551615 BTC
  INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 max_giveable=0.00010000 BTC minimum_amount=0.01000000 BTC maximum_amount=184467440737.09551615 BTC
  INFO swap: Received Bitcoin new_balance=0.01010000 BTC max_giveable=0.01000000 BTC
 "
@@ -726,7 +726,7 @@ mod tests {
         assert!(matches!(error, tokio::time::error::Elapsed { .. }));
         assert_eq!(
             writer.captured(),
-            r" INFO swap: Received quote: 1 XMR ~  price=0.00100000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
+            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
  INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 max_giveable=0.00000000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
  INFO swap: Received Bitcoin new_balance=0.01010000 BTC max_giveable=0.01000000 BTC
  INFO swap: Deposited amount is less than `min_quantity`
@@ -772,7 +772,7 @@ mod tests {
 
         assert_eq!(
             writer.captured(),
-            r" INFO swap: Received quote: 1 XMR ~  price=0.00100000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
+            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
  INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 max_giveable=0.00000000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
  INFO swap: Received Bitcoin new_balance=0.21000000 BTC max_giveable=0.20000000 BTC
 "
