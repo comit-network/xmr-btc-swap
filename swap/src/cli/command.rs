@@ -3,6 +3,7 @@ use crate::fs::system_data_dir;
 use crate::network::rendezvous::{XmrBtcNamespace, DEFAULT_RENDEZVOUS_ADDRESS};
 use crate::{env, monero};
 use anyhow::{Context, Result};
+use bitcoin::AddressType;
 use libp2p::core::Multiaddr;
 use std::ffi::OsString;
 use std::path::PathBuf;
@@ -80,6 +81,8 @@ where
             let monero_daemon_address = monero.apply_defaults(is_testnet);
             let monero_receive_address =
                 validate_monero_address(monero_receive_address, is_testnet)?;
+            let bitcoin_change_address =
+                validate_bitcoin_address(bitcoin_change_address, is_testnet)?;
 
             Arguments {
                 env_config: env_config_from(is_testnet),
@@ -481,6 +484,28 @@ fn validate_monero_address(
     Ok(address)
 }
 
+fn validate_bitcoin_address(address: bitcoin::Address, testnet: bool) -> Result<bitcoin::Address> {
+    let expected_network = if testnet {
+        bitcoin::Network::Testnet
+    } else {
+        bitcoin::Network::Bitcoin
+    };
+
+    if address.network != expected_network {
+        anyhow::bail!(
+            "Invalid Bitcoin address provided; expected network {} but provided address is for {}",
+            expected_network,
+            address.network
+        );
+    }
+
+    if address.address_type() != Some(AddressType::P2wpkh) {
+        anyhow::bail!("Invalid Bitcoin address provided, only bech32 format is supported!")
+    }
+
+    Ok(address)
+}
+
 fn parse_monero_address(s: &str) -> Result<monero::Address> {
     monero::Address::from_str(s).with_context(|| {
         format!(
@@ -491,7 +516,7 @@ fn parse_monero_address(s: &str) -> Result<monero::Address> {
 }
 
 #[derive(thiserror::Error, Debug, Clone, Copy, PartialEq)]
-#[error("Invalid monero address provided, expected address on network {expected:?}  but address provided is on {actual:?}")]
+#[error("Invalid monero address provided, expected address on network {expected:?} but address provided is on {actual:?}")]
 pub struct MoneroAddressNetworkMismatch {
     expected: monero::Network,
     actual: monero::Network,
@@ -892,6 +917,105 @@ mod tests {
             args,
             ParseResult::Arguments(Arguments::resume_testnet_defaults().with_json())
         );
+    }
+
+    #[test]
+    fn only_bech32_addresses_mainnet_are_allowed() {
+        let raw_ars = vec![
+            BINARY_NAME,
+            "buy-xmr",
+            "--change-address",
+            "1A5btpLKZjgYm8R22rJAhdbTFVXgSRA2Mp",
+            "--receive-address",
+            MONERO_MAINNET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars);
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Invalid Bitcoin address provided, only bech32 format is supported!"
+        );
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "buy-xmr",
+            "--change-address",
+            "36vn4mFhmTXn7YcNwELFPxTXhjorw2ppu2",
+            "--receive-address",
+            MONERO_MAINNET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars);
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Invalid Bitcoin address provided, only bech32 format is supported!"
+        );
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "buy-xmr",
+            "--change-address",
+            "bc1qh4zjxrqe3trzg7s6m7y67q2jzrw3ru5mx3z7j3",
+            "--receive-address",
+            MONERO_MAINNET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars).unwrap();
+        assert!(matches!(result, ParseResult::Arguments(_)));
+    }
+
+    #[test]
+    fn only_bech32_addresses_testnet_are_allowed() {
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "buy-xmr",
+            "--change-address",
+            "n2czxyeFCQp9e8WRyGpy4oL4YfQAeKkkUH",
+            "--receive-address",
+            MONERO_STAGENET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars);
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Invalid Bitcoin address provided, only bech32 format is supported!"
+        );
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "buy-xmr",
+            "--change-address",
+            "2ND9a4xmQG89qEWG3ETRuytjKpLmGrW7Jvf",
+            "--receive-address",
+            MONERO_STAGENET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars);
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Invalid Bitcoin address provided, only bech32 format is supported!"
+        );
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "buy-xmr",
+            "--change-address",
+            "tb1q958vfh3wkdp232pktq8zzvmttyxeqnj80zkz3v",
+            "--receive-address",
+            MONERO_STAGENET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars).unwrap();
+        assert!(matches!(result, ParseResult::Arguments(_)));
     }
 
     impl Arguments {
