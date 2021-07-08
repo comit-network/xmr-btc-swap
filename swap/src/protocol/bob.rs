@@ -33,14 +33,10 @@ impl Swap {
         env_config: env::Config,
         event_loop_handle: cli::EventLoopHandle,
         monero_receive_address: monero::Address,
-        bitcoin_change_address: bitcoin::Address,
         btc_amount: bitcoin::Amount,
     ) -> Self {
         Self {
-            state: BobState::Started {
-                btc_amount,
-                change_address: bitcoin_change_address,
-            },
+            state: BobState::Started { btc_amount },
             event_loop_handle,
             db,
             bitcoin_wallet,
@@ -51,7 +47,6 @@ impl Swap {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn from_db(
         db: Database,
         id: Uuid,

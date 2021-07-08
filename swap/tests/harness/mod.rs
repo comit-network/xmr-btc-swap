@@ -434,7 +434,6 @@ impl BobParams {
             self.env_config,
             handle,
             self.monero_wallet.get_main_address(),
-            self.bitcoin_wallet.new_address().await?,
             btc_amount,
         );
 

@@ -74,7 +74,6 @@ where
                     bitcoin_electrum_rpc_url,
                     bitcoin_target_block,
                 },
-            bitcoin_change_address,
             monero: Monero {
                 monero_daemon_address,
             },
@@ -92,7 +91,6 @@ where
                     is_testnet,
                 )?,
                 bitcoin_target_block: bitcoin_target_block_from(bitcoin_target_block, is_testnet),
-                bitcoin_change_address,
                 monero_receive_address: validate_monero_address(
                     monero_receive_address,
                     is_testnet,
@@ -212,7 +210,6 @@ pub enum Command {
         seller: Multiaddr,
         bitcoin_electrum_rpc_url: Url,
         bitcoin_target_block: usize,
-        bitcoin_change_address: bitcoin::Address,
         monero_receive_address: monero::Address,
         monero_daemon_address: String,
         tor_socks5_port: u16,
@@ -290,12 +287,6 @@ enum RawCommand {
         #[structopt(flatten)]
         bitcoin: Bitcoin,
 
-        #[structopt(
-            long = "change-address",
-            help = "The bitcoin address where any form of change or excess funds should be sent to"
-        )]
-        bitcoin_change_address: bitcoin::Address,
-
         #[structopt(flatten)]
         monero: Monero,
 
@@ -361,7 +352,7 @@ enum RawCommand {
 }
 
 #[derive(structopt::StructOpt, Debug)]
-struct Monero {
+pub struct Monero {
     #[structopt(
         long = "monero-daemon-address",
         help = "Specify to connect to a monero daemon of your choice: <host>:<port>"
@@ -521,9 +512,7 @@ mod tests {
     const MAINNET: &str = "mainnet";
 
     const MONERO_STAGENET_ADDRESS: &str = "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a";
-    const BITCOIN_TESTNET_ADDRESS: &str = "tb1qr3em6k3gfnyl8r7q0v7t4tlnyxzgxma3lressv";
     const MONERO_MAINNET_ADDRESS: &str = "44Ato7HveWidJYUAVw5QffEcEtSH1DwzSP3FPPkHxNAS4LX9CqgucphTisH978FLHE34YNEx7FcbBfQLQUU8m3NUC4VqsRa";
-    const BITCOIN_MAINNET_ADDRESS: &str = "bc1qe4epnfklcaa0mun26yz5g8k24em5u9f92hy325";
     const MULTI_ADDRESS: &str =
         "/ip4/127.0.0.1/tcp/9939/p2p/12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
     const SWAP_ID: &str = "ea030832-3be9-454f-bb98-5ea9a788406b";
@@ -535,8 +524,6 @@ mod tests {
             "buy-xmr",
             "--receive-address",
             MONERO_MAINNET_ADDRESS,
-            "--change-address",
-            BITCOIN_MAINNET_ADDRESS,
             "--seller",
             MULTI_ADDRESS,
         ];
@@ -555,8 +542,6 @@ mod tests {
             "buy-xmr",
             "--receive-address",
             MONERO_STAGENET_ADDRESS,
-            "--change-address",
-            BITCOIN_TESTNET_ADDRESS,
             "--seller",
             MULTI_ADDRESS,
         ];
@@ -576,8 +561,6 @@ mod tests {
             "buy-xmr",
             "--receive-address",
             MONERO_STAGENET_ADDRESS,
-            "--change-address",
-            BITCOIN_TESTNET_ADDRESS,
             "--seller",
             MULTI_ADDRESS,
         ];
@@ -601,8 +584,6 @@ mod tests {
             "buy-xmr",
             "--receive-address",
             MONERO_MAINNET_ADDRESS,
-            "--change-address",
-            BITCOIN_MAINNET_ADDRESS,
             "--seller",
             MULTI_ADDRESS,
         ];
@@ -699,8 +680,6 @@ mod tests {
             "--data-base-dir",
             data_dir,
             "buy-xmr",
-            "--change-address",
-            BITCOIN_MAINNET_ADDRESS,
             "--receive-address",
             MONERO_MAINNET_ADDRESS,
             "--seller",
@@ -723,8 +702,6 @@ mod tests {
             "--data-base-dir",
             data_dir,
             "buy-xmr",
-            "--change-address",
-            BITCOIN_TESTNET_ADDRESS,
             "--receive-address",
             MONERO_STAGENET_ADDRESS,
             "--seller",
@@ -787,8 +764,6 @@ mod tests {
             BINARY_NAME,
             "--debug",
             "buy-xmr",
-            "--change-address",
-            BITCOIN_MAINNET_ADDRESS,
             "--receive-address",
             MONERO_MAINNET_ADDRESS,
             "--seller",
@@ -806,8 +781,6 @@ mod tests {
             "--testnet",
             "--debug",
             "buy-xmr",
-            "--change-address",
-            BITCOIN_TESTNET_ADDRESS,
             "--receive-address",
             MONERO_STAGENET_ADDRESS,
             "--seller",
@@ -850,8 +823,6 @@ mod tests {
             BINARY_NAME,
             "--json",
             "buy-xmr",
-            "--change-address",
-            BITCOIN_MAINNET_ADDRESS,
             "--receive-address",
             MONERO_MAINNET_ADDRESS,
             "--seller",
@@ -869,8 +840,6 @@ mod tests {
             "--testnet",
             "--json",
             "buy-xmr",
-            "--change-address",
-            BITCOIN_TESTNET_ADDRESS,
             "--receive-address",
             MONERO_STAGENET_ADDRESS,
             "--seller",
@@ -919,7 +888,6 @@ mod tests {
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)
                         .unwrap(),
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET,
-                    bitcoin_change_address: BITCOIN_TESTNET_ADDRESS.parse().unwrap(),
                     monero_receive_address: monero::Address::from_str(MONERO_STAGENET_ADDRESS)
                         .unwrap(),
                     monero_daemon_address: DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET.to_string(),
@@ -938,7 +906,6 @@ mod tests {
                     seller: Multiaddr::from_str(MULTI_ADDRESS).unwrap(),
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET,
-                    bitcoin_change_address: BITCOIN_MAINNET_ADDRESS.parse().unwrap(),
                     monero_receive_address: monero::Address::from_str(MONERO_MAINNET_ADDRESS)
                         .unwrap(),
                     monero_daemon_address: DEFAULT_MONERO_DAEMON_ADDRESS.to_string(),

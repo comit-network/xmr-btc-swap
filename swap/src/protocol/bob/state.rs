@@ -25,7 +25,6 @@ use uuid::Uuid;
 pub enum BobState {
     Started {
         btc_amount: bitcoin::Amount,
-        change_address: bitcoin::Address,
     },
     SwapSetupCompleted(State2),
     BtcLocked(State3),
@@ -170,14 +169,7 @@ impl State0 {
             bail!("Alice's dleq proof doesn't verify")
         }
 
-        let tx_lock = bitcoin::TxLock::new(
-            wallet,
-            self.btc,
-            msg.A,
-            self.b.public(),
-            self.refund_address.clone(),
-        )
-        .await?;
+        let tx_lock = bitcoin::TxLock::new(wallet, self.btc, msg.A, self.b.public()).await?;
         let v = msg.v_a + self.v_b;
 
         Ok(State1 {

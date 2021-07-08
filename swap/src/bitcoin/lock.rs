@@ -24,7 +24,6 @@ impl TxLock {
         amount: Amount,
         A: PublicKey,
         B: PublicKey,
-        change: bitcoin::Address,
     ) -> Result<Self>
     where
         C: EstimateFeeRate,
@@ -35,9 +34,7 @@ impl TxLock {
             .address(wallet.get_network())
             .expect("can derive address from descriptor");
 
-        let psbt = wallet
-            .send_to_address(address, amount, Some(change))
-            .await?;
+        let psbt = wallet.send_to_address(address, amount).await?;
 
         Ok(Self {
             inner: psbt,
@@ -254,11 +251,7 @@ mod tests {
         wallet: &Wallet<(), bdk::database::MemoryDatabase, StaticFeeRate>,
         amount: Amount,
     ) -> PartiallySignedTransaction {
-        let change = wallet.new_address().await.unwrap();
-        TxLock::new(&wallet, amount, A, B, change)
-            .await
-            .unwrap()
-            .into()
+        TxLock::new(&wallet, amount, A, B).await.unwrap().into()
     }
 
     fn alice_and_bob() -> (PublicKey, PublicKey) {

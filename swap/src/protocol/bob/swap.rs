@@ -61,10 +61,8 @@ async fn next_state(
     tracing::trace!(%state, "Advancing state");
 
     Ok(match state {
-        BobState::Started {
-            btc_amount,
-            change_address,
-        } => {
+        BobState::Started { btc_amount } => {
+            let bitcoin_refund_address = bitcoin_wallet.new_address().await?;
             let tx_refund_fee = bitcoin_wallet
                 .estimate_fee(TxRefund::weight(), btc_amount)
                 .await?;
@@ -78,7 +76,7 @@ async fn next_state(
                     btc: btc_amount,
                     tx_refund_fee,
                     tx_cancel_fee,
-                    bitcoin_refund_address: change_address,
+                    bitcoin_refund_address,
                 })
                 .await?;
 

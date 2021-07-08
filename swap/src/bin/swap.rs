@@ -58,7 +58,6 @@ async fn main() -> Result<()> {
             seller,
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
-            bitcoin_change_address,
             monero_receive_address,
             monero_daemon_address,
             tor_socks5_port,
@@ -124,7 +123,6 @@ async fn main() -> Result<()> {
                 env_config,
                 event_loop_handle,
                 monero_receive_address,
-                bitcoin_change_address,
                 amount,
             );
 
