@@ -446,28 +446,26 @@ where
                 "Waiting for Bitcoin deposit",
             );
 
-            sync().await?;
+            max_giveable = loop {
+                sync().await?;
+                let new_max_givable = max_giveable_fn().await?;
 
-            let new_max_givable = max_giveable_fn().await?;
-
-            if new_max_givable != max_giveable {
-                max_giveable = new_max_givable;
-
-                let new_balance = balance().await?;
-                tracing::info!(
-                    %new_balance,
-                    %max_giveable,
-                    "Received Bitcoin",
-                );
-
-                if max_giveable >= bid_quote.min_quantity {
-                    break;
-                } else {
-                    tracing::info!("Deposited amount is less than `min_quantity`",);
+                if new_max_givable > max_giveable {
+                    break new_max_givable;
                 }
+
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            };
+
+            let new_balance = balance().await?;
+            tracing::info!(%new_balance, %max_giveable, "Received Bitcoin");
+
+            if max_giveable < bid_quote.min_quantity {
+                tracing::info!("Deposited amount is less than `min_quantity`");
+                continue;
             }
 
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            break;
         }
     };
 
