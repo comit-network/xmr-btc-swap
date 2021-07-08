@@ -13,8 +13,8 @@ use url::Url;
 use uuid::Uuid;
 
 // See: https://moneroworld.com/
-pub const DEFAULT_MONERO_DAEMON_ADDRESS: &str = "node.xmr.to:18081";
-pub const DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET: &str = "monero-stagenet.exan.tech:38081";
+pub const DEFAULT_MONERO_DAEMON_ADDRESS: &str = "node.melo.tools:18081";
+pub const DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET: &str = "stagenet.melo.tools:38081";
 
 // See: https://1209k.com/bitcoin-eye/ele.php?chain=btc
 const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://electrum.blockstream.info:50002";
