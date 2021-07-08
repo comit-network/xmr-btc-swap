@@ -2,7 +2,6 @@
 
 CLI_PATH=$1
 YOUR_MONERO_ADDR=$2
-YOUR_BITCOIN_ADDR=$3
 
 CLI_LIST_SELLERS="$CLI_PATH --testnet --json --debug list-sellers"
 echo "Requesting sellers with command: $CLI_LIST_SELLERS"
@@ -21,7 +20,7 @@ echo "  max_quantity: $MAX sat"
 
 echo
 
-CLI_SWAP="$CLI_PATH --testnet --debug buy-xmr --receive-address $YOUR_MONERO_ADDR --change-address $YOUR_BITCOIN_ADDR --seller $ADDR"
+CLI_SWAP="$CLI_PATH --testnet --debug buy-xmr --receive-address $YOUR_MONERO_ADDR --seller $ADDR"
 
 echo "Starting swap with best seller using command $CLI_SWAP"
 echo
