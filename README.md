@@ -15,7 +15,7 @@ You can read [this blogpost](https://comit.network/blog/2021/07/02/transaction-p
 2. Find a seller to swap with:
 
 ```shell
-./swap --testnet --list-sellers
+./swap --testnet list-sellers
 ```
 
 3. Swap with a seller:
