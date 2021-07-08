@@ -3,6 +3,7 @@ use crate::fs::system_data_dir;
 use crate::network::rendezvous::{XmrBtcNamespace, DEFAULT_RENDEZVOUS_ADDRESS};
 use crate::{env, monero};
 use anyhow::{Context, Result};
+use bitcoin::AddressType;
 use libp2p::core::Multiaddr;
 use std::ffi::OsString;
 use std::path::PathBuf;
@@ -69,41 +70,36 @@ where
     let arguments = match args.cmd {
         RawCommand::BuyXmr {
             seller: Seller { seller },
-            bitcoin:
-                Bitcoin {
-                    bitcoin_electrum_rpc_url,
-                    bitcoin_target_block,
-                },
+            bitcoin,
             bitcoin_change_address,
-            monero: Monero {
-                monero_daemon_address,
-            },
+            monero,
             monero_receive_address,
             tor: Tor { tor_socks5_port },
-        } => Arguments {
-            env_config: env_config_from(is_testnet),
-            debug,
-            json,
-            data_dir: data::data_dir_from(data, is_testnet)?,
-            cmd: Command::BuyXmr {
-                seller,
-                bitcoin_electrum_rpc_url: bitcoin_electrum_rpc_url_from(
+        } => {
+            let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
+                bitcoin.apply_defaults(is_testnet)?;
+            let monero_daemon_address = monero.apply_defaults(is_testnet);
+            let monero_receive_address =
+                validate_monero_address(monero_receive_address, is_testnet)?;
+            let bitcoin_change_address =
+                validate_bitcoin_address(bitcoin_change_address, is_testnet)?;
+
+            Arguments {
+                env_config: env_config_from(is_testnet),
+                debug,
+                json,
+                data_dir: data::data_dir_from(data, is_testnet)?,
+                cmd: Command::BuyXmr {
+                    seller,
                     bitcoin_electrum_rpc_url,
-                    is_testnet,
-                )?,
-                bitcoin_target_block: bitcoin_target_block_from(bitcoin_target_block, is_testnet),
-                bitcoin_change_address,
-                monero_receive_address: validate_monero_address(
+                    bitcoin_target_block,
+                    bitcoin_change_address,
                     monero_receive_address,
-                    is_testnet,
-                )?,
-                monero_daemon_address: monero_daemon_address_from(
                     monero_daemon_address,
-                    is_testnet,
-                ),
-                tor_socks5_port,
-            },
-        },
+                    tor_socks5_port,
+                },
+            }
+        }
         RawCommand::History => Arguments {
             env_config: env_config_from(is_testnet),
             debug,
@@ -113,80 +109,70 @@ where
         },
         RawCommand::Resume {
             swap_id: SwapId { swap_id },
-            bitcoin:
-                Bitcoin {
+            bitcoin,
+            monero,
+            tor: Tor { tor_socks5_port },
+        } => {
+            let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
+                bitcoin.apply_defaults(is_testnet)?;
+            let monero_daemon_address = monero.apply_defaults(is_testnet);
+
+            Arguments {
+                env_config: env_config_from(is_testnet),
+                debug,
+                json,
+                data_dir: data::data_dir_from(data, is_testnet)?,
+                cmd: Command::Resume {
+                    swap_id,
                     bitcoin_electrum_rpc_url,
                     bitcoin_target_block,
-                },
-            monero: Monero {
-                monero_daemon_address,
-            },
-            tor: Tor { tor_socks5_port },
-        } => Arguments {
-            env_config: env_config_from(is_testnet),
-            debug,
-            json,
-            data_dir: data::data_dir_from(data, is_testnet)?,
-            cmd: Command::Resume {
-                swap_id,
-                bitcoin_electrum_rpc_url: bitcoin_electrum_rpc_url_from(
-                    bitcoin_electrum_rpc_url,
-                    is_testnet,
-                )?,
-                bitcoin_target_block: bitcoin_target_block_from(bitcoin_target_block, is_testnet),
-                monero_daemon_address: monero_daemon_address_from(
                     monero_daemon_address,
-                    is_testnet,
-                ),
-                tor_socks5_port,
-            },
-        },
+                    tor_socks5_port,
+                },
+            }
+        }
         RawCommand::Cancel {
             swap_id: SwapId { swap_id },
             force,
-            bitcoin:
-                Bitcoin {
+            bitcoin,
+        } => {
+            let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
+                bitcoin.apply_defaults(is_testnet)?;
+
+            Arguments {
+                env_config: env_config_from(is_testnet),
+                debug,
+                json,
+                data_dir: data::data_dir_from(data, is_testnet)?,
+                cmd: Command::Cancel {
+                    swap_id,
+                    force,
                     bitcoin_electrum_rpc_url,
                     bitcoin_target_block,
                 },
-        } => Arguments {
-            env_config: env_config_from(is_testnet),
-            debug,
-            json,
-            data_dir: data::data_dir_from(data, is_testnet)?,
-            cmd: Command::Cancel {
-                swap_id,
-                force,
-                bitcoin_electrum_rpc_url: bitcoin_electrum_rpc_url_from(
-                    bitcoin_electrum_rpc_url,
-                    is_testnet,
-                )?,
-                bitcoin_target_block: bitcoin_target_block_from(bitcoin_target_block, is_testnet),
-            },
-        },
+            }
+        }
         RawCommand::Refund {
             swap_id: SwapId { swap_id },
             force,
-            bitcoin:
-                Bitcoin {
+            bitcoin,
+        } => {
+            let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
+                bitcoin.apply_defaults(is_testnet)?;
+
+            Arguments {
+                env_config: env_config_from(is_testnet),
+                debug,
+                json,
+                data_dir: data::data_dir_from(data, is_testnet)?,
+                cmd: Command::Refund {
+                    swap_id,
+                    force,
                     bitcoin_electrum_rpc_url,
                     bitcoin_target_block,
                 },
-        } => Arguments {
-            env_config: env_config_from(is_testnet),
-            debug,
-            json,
-            data_dir: data::data_dir_from(data, is_testnet)?,
-            cmd: Command::Refund {
-                swap_id,
-                force,
-                bitcoin_electrum_rpc_url: bitcoin_electrum_rpc_url_from(
-                    bitcoin_electrum_rpc_url,
-                    is_testnet,
-                )?,
-                bitcoin_target_block: bitcoin_target_block_from(bitcoin_target_block, is_testnet),
-            },
-        },
+            }
+        }
         RawCommand::ListSellers {
             rendezvous_point,
             tor: Tor { tor_socks5_port },
@@ -369,6 +355,18 @@ struct Monero {
     monero_daemon_address: Option<String>,
 }
 
+impl Monero {
+    fn apply_defaults(self, testnet: bool) -> String {
+        if let Some(address) = self.monero_daemon_address {
+            address
+        } else if testnet {
+            DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET.to_string()
+        } else {
+            DEFAULT_MONERO_DAEMON_ADDRESS.to_string()
+        }
+    }
+}
+
 #[derive(structopt::StructOpt, Debug)]
 struct Bitcoin {
     #[structopt(long = "electrum-rpc", help = "Provide the Bitcoin Electrum RPC URL")]
@@ -379,6 +377,28 @@ struct Bitcoin {
         help = "Estimate Bitcoin fees such that transactions are confirmed within the specified number of blocks"
     )]
     bitcoin_target_block: Option<usize>,
+}
+
+impl Bitcoin {
+    fn apply_defaults(self, testnet: bool) -> Result<(Url, usize)> {
+        let bitcoin_electrum_rpc_url = if let Some(url) = self.bitcoin_electrum_rpc_url {
+            url
+        } else if testnet {
+            Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)?
+        } else {
+            Url::from_str(DEFAULT_ELECTRUM_RPC_URL)?
+        };
+
+        let bitcoin_target_block = if let Some(target_block) = self.bitcoin_target_block {
+            target_block
+        } else if testnet {
+            DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET
+        } else {
+            DEFAULT_BITCOIN_CONFIRMATION_TARGET
+        };
+
+        Ok((bitcoin_electrum_rpc_url, bitcoin_target_block))
+    }
 }
 
 #[derive(structopt::StructOpt, Debug)]
@@ -428,41 +448,11 @@ mod data {
     }
 }
 
-fn bitcoin_electrum_rpc_url_from(url: Option<Url>, testnet: bool) -> Result<Url> {
-    if let Some(url) = url {
-        Ok(url)
-    } else if testnet {
-        Ok(Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)?)
-    } else {
-        Ok(Url::from_str(DEFAULT_ELECTRUM_RPC_URL)?)
-    }
-}
-
 fn rendezvous_namespace_from(is_testnet: bool) -> XmrBtcNamespace {
     if is_testnet {
         XmrBtcNamespace::Testnet
     } else {
         XmrBtcNamespace::Mainnet
-    }
-}
-
-fn bitcoin_target_block_from(target_block: Option<usize>, testnet: bool) -> usize {
-    if let Some(target_block) = target_block {
-        target_block
-    } else if testnet {
-        DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET
-    } else {
-        DEFAULT_BITCOIN_CONFIRMATION_TARGET
-    }
-}
-
-fn monero_daemon_address_from(address: Option<String>, testnet: bool) -> String {
-    if let Some(address) = address {
-        address
-    } else if testnet {
-        DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET.to_string()
-    } else {
-        DEFAULT_MONERO_DAEMON_ADDRESS.to_string()
     }
 }
 
@@ -494,6 +484,28 @@ fn validate_monero_address(
     Ok(address)
 }
 
+fn validate_bitcoin_address(address: bitcoin::Address, testnet: bool) -> Result<bitcoin::Address> {
+    let expected_network = if testnet {
+        bitcoin::Network::Testnet
+    } else {
+        bitcoin::Network::Bitcoin
+    };
+
+    if address.network != expected_network {
+        anyhow::bail!(
+            "Invalid Bitcoin address provided; expected network {} but provided address is for {}",
+            expected_network,
+            address.network
+        );
+    }
+
+    if address.address_type() != Some(AddressType::P2wpkh) {
+        anyhow::bail!("Invalid Bitcoin address provided, only bech32 format is supported!")
+    }
+
+    Ok(address)
+}
+
 fn parse_monero_address(s: &str) -> Result<monero::Address> {
     monero::Address::from_str(s).with_context(|| {
         format!(
@@ -504,7 +516,7 @@ fn parse_monero_address(s: &str) -> Result<monero::Address> {
 }
 
 #[derive(thiserror::Error, Debug, Clone, Copy, PartialEq)]
-#[error("Invalid monero address provided, expected address on network {expected:?}  but address provided is on {actual:?}")]
+#[error("Invalid monero address provided, expected address on network {expected:?} but address provided is on {actual:?}")]
 pub struct MoneroAddressNetworkMismatch {
     expected: monero::Network,
     actual: monero::Network,
@@ -905,6 +917,105 @@ mod tests {
             args,
             ParseResult::Arguments(Arguments::resume_testnet_defaults().with_json())
         );
+    }
+
+    #[test]
+    fn only_bech32_addresses_mainnet_are_allowed() {
+        let raw_ars = vec![
+            BINARY_NAME,
+            "buy-xmr",
+            "--change-address",
+            "1A5btpLKZjgYm8R22rJAhdbTFVXgSRA2Mp",
+            "--receive-address",
+            MONERO_MAINNET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars);
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Invalid Bitcoin address provided, only bech32 format is supported!"
+        );
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "buy-xmr",
+            "--change-address",
+            "36vn4mFhmTXn7YcNwELFPxTXhjorw2ppu2",
+            "--receive-address",
+            MONERO_MAINNET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars);
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Invalid Bitcoin address provided, only bech32 format is supported!"
+        );
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "buy-xmr",
+            "--change-address",
+            "bc1qh4zjxrqe3trzg7s6m7y67q2jzrw3ru5mx3z7j3",
+            "--receive-address",
+            MONERO_MAINNET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars).unwrap();
+        assert!(matches!(result, ParseResult::Arguments(_)));
+    }
+
+    #[test]
+    fn only_bech32_addresses_testnet_are_allowed() {
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "buy-xmr",
+            "--change-address",
+            "n2czxyeFCQp9e8WRyGpy4oL4YfQAeKkkUH",
+            "--receive-address",
+            MONERO_STAGENET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars);
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Invalid Bitcoin address provided, only bech32 format is supported!"
+        );
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "buy-xmr",
+            "--change-address",
+            "2ND9a4xmQG89qEWG3ETRuytjKpLmGrW7Jvf",
+            "--receive-address",
+            MONERO_STAGENET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars);
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Invalid Bitcoin address provided, only bech32 format is supported!"
+        );
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "buy-xmr",
+            "--change-address",
+            "tb1q958vfh3wkdp232pktq8zzvmttyxeqnj80zkz3v",
+            "--receive-address",
+            MONERO_STAGENET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars).unwrap();
+        assert!(matches!(result, ParseResult::Arguments(_)));
     }
 
     impl Arguments {
