@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- An issue where the default Monero node connection string would not work, because the public nodes were moved to a different domain.
+  The default monerod nodes were updated to use the [melo tool nodes](https://melo.tools/nodes.html).
+
 ## [0.8.0] - 2021-07-07
 
 ### Added
