@@ -737,6 +737,50 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn given_longer_delay_until_deposit_should_not_spam_user() {
+        let writer = capture_logs();
+        let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
+            Amount::ZERO,
+            Amount::ZERO,
+            Amount::ZERO,
+            Amount::ZERO,
+            Amount::ZERO,
+            Amount::ZERO,
+            Amount::ZERO,
+            Amount::ZERO,
+            Amount::ZERO,
+            Amount::from_btc(0.2).unwrap(),
+        ])));
+
+        tokio::time::timeout(
+            Duration::from_secs(10),
+            determine_btc_to_swap(
+                true,
+                async { Ok(quote_with_min(0.1)) },
+                get_dummy_address(),
+                || async { Ok(Amount::from_btc(0.21)?) },
+                || async {
+                    let mut result = givable.lock().unwrap();
+
+                    result.give()
+                },
+                || async { Ok(()) },
+            ),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            writer.captured(),
+            r" INFO swap: Received quote: 1 XMR ~  price=0.00100000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 max_giveable=0.00000000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap: Received Bitcoin new_balance=0.21000000 BTC max_giveable=0.20000000 BTC
+"
+        );
+    }
+
     /// Setup tracing with a capturing writer, allowing assertions on the log
     /// messages.
     ///
