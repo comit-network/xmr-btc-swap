@@ -149,16 +149,7 @@ impl Wallet {
                             }
                         };
 
-                        match (last_status, new_status) {
-                            (None, new_status) => {
-                                tracing::debug!(%txid, status = %new_status, "Found relevant Bitcoin transaction");
-                            },
-                            (Some(old_status), new_status) => {
-                                tracing::debug!(%txid, %new_status, %old_status, "Bitcoin transaction status changed");
-                            }
-                        }
-
-                        last_status = Some(new_status);
+                        last_status = Some(print_status_change(txid, last_status, new_status));
 
                         let all_receivers_gone = sender.send(new_status).is_err();
 
@@ -180,6 +171,19 @@ impl Wallet {
 
         sub
     }
+}
+
+fn print_status_change(txid: Txid, old: Option<ScriptStatus>, new: ScriptStatus) -> ScriptStatus {
+    match (old, new) {
+        (None, new_status) => {
+            tracing::debug!(%txid, status = %new_status, "Found relevant Bitcoin transaction");
+        }
+        (Some(old_status), new_status) => {
+            tracing::debug!(%txid, %new_status, %old_status, "Bitcoin transaction status changed");
+        }
+    }
+
+    new
 }
 
 /// Represents a subscription to the status of a given transaction.
