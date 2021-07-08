@@ -422,7 +422,7 @@ where
         price = %bid_quote.price,
         minimum_amount = %bid_quote.min_quantity,
         maximum_amount = %bid_quote.max_quantity,
-        "Received quote: 1 XMR ~ ",
+        "Received quote",
     );
 
     let mut max_giveable = max_giveable_fn().await?;
@@ -445,28 +445,26 @@ where
                 "Waiting for Bitcoin deposit",
             );
 
-            sync().await?;
+            max_giveable = loop {
+                sync().await?;
+                let new_max_givable = max_giveable_fn().await?;
 
-            let new_max_givable = max_giveable_fn().await?;
-
-            if new_max_givable != max_giveable {
-                max_giveable = new_max_givable;
-
-                let new_balance = balance().await?;
-                tracing::info!(
-                    %new_balance,
-                    %max_giveable,
-                    "Received Bitcoin",
-                );
-
-                if max_giveable >= bid_quote.min_quantity {
-                    break;
-                } else {
-                    tracing::info!("Deposited amount is less than `min_quantity`",);
+                if new_max_givable > max_giveable {
+                    break new_max_givable;
                 }
+
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            };
+
+            let new_balance = balance().await?;
+            tracing::info!(%new_balance, %max_giveable, "Received Bitcoin");
+
+            if max_giveable < bid_quote.min_quantity {
+                tracing::info!("Deposited amount is less than `min_quantity`");
+                continue;
             }
 
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            break;
         }
     };
 
@@ -482,40 +480,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
-
-    use ::bitcoin::Amount;
-    use tracing::subscriber;
-
-    use crate::determine_btc_to_swap;
-
     use super::*;
-
-    struct MaxGiveable {
-        amounts: Vec<Amount>,
-        call_counter: usize,
-    }
-
-    impl MaxGiveable {
-        fn new(amounts: Vec<Amount>) -> Self {
-            Self {
-                amounts,
-                call_counter: 0,
-            }
-        }
-        fn give(&mut self) -> Result<Amount> {
-            let amount = self
-                .amounts
-                .get(self.call_counter)
-                .ok_or_else(|| anyhow::anyhow!("No more balances available"))?;
-            self.call_counter += 1;
-            Ok(*amount)
-        }
-    }
+    use crate::determine_btc_to_swap;
+    use ::bitcoin::Amount;
+    use std::io;
+    use std::sync::Mutex;
+    use tracing::subscriber;
+    use tracing_subscriber::fmt::MakeWriter;
 
     #[tokio::test]
     async fn given_no_balance_and_transfers_less_than_max_swaps_max_giveable() {
-        let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+        let writer = capture_logs();
         let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
             Amount::ZERO,
             Amount::from_btc(0.0009).unwrap(),
@@ -538,11 +513,19 @@ mod tests {
         let expected_amount = Amount::from_btc(0.0009).unwrap();
         let expected_fees = Amount::from_btc(0.0001).unwrap();
 
-        assert_eq!((amount, fees), (expected_amount, expected_fees))
+        assert_eq!((amount, fees), (expected_amount, expected_fees));
+        assert_eq!(
+            writer.captured(),
+            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
+ INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 max_giveable=0.00000000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
+ INFO swap: Received Bitcoin new_balance=0.00100000 BTC max_giveable=0.00090000 BTC
+"
+        );
     }
+
     #[tokio::test]
     async fn given_no_balance_and_transfers_more_then_swaps_max_quantity_from_quote() {
-        let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+        let writer = capture_logs();
         let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
             Amount::ZERO,
             Amount::from_btc(0.1).unwrap(),
@@ -565,12 +548,19 @@ mod tests {
         let expected_amount = Amount::from_btc(0.01).unwrap();
         let expected_fees = Amount::from_btc(0.0001).unwrap();
 
-        assert_eq!((amount, fees), (expected_amount, expected_fees))
+        assert_eq!((amount, fees), (expected_amount, expected_fees));
+        assert_eq!(
+            writer.captured(),
+            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
+ INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 max_giveable=0.00000000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
+ INFO swap: Received Bitcoin new_balance=0.10010000 BTC max_giveable=0.10000000 BTC
+"
+        );
     }
 
     #[tokio::test]
     async fn given_initial_balance_below_max_quantity_swaps_max_givable() {
-        let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+        let writer = capture_logs();
         let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
             Amount::from_btc(0.0049).unwrap(),
             Amount::from_btc(99.9).unwrap(),
@@ -593,12 +583,17 @@ mod tests {
         let expected_amount = Amount::from_btc(0.0049).unwrap();
         let expected_fees = Amount::from_btc(0.0001).unwrap();
 
-        assert_eq!((amount, fees), (expected_amount, expected_fees))
+        assert_eq!((amount, fees), (expected_amount, expected_fees));
+        assert_eq!(
+            writer.captured(),
+            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
+"
+        );
     }
 
     #[tokio::test]
     async fn given_initial_balance_above_max_quantity_swaps_max_quantity() {
-        let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+        let writer = capture_logs();
         let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
             Amount::from_btc(0.1).unwrap(),
             Amount::from_btc(99.9).unwrap(),
@@ -621,12 +616,17 @@ mod tests {
         let expected_amount = Amount::from_btc(0.01).unwrap();
         let expected_fees = Amount::from_btc(0.0001).unwrap();
 
-        assert_eq!((amount, fees), (expected_amount, expected_fees))
+        assert_eq!((amount, fees), (expected_amount, expected_fees));
+        assert_eq!(
+            writer.captured(),
+            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
+"
+        );
     }
 
     #[tokio::test]
     async fn given_no_initial_balance_then_min_wait_for_sufficient_deposit() {
-        let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+        let writer = capture_logs();
         let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
             Amount::ZERO,
             Amount::from_btc(0.01).unwrap(),
@@ -649,12 +649,19 @@ mod tests {
         let expected_amount = Amount::from_btc(0.01).unwrap();
         let expected_fees = Amount::from_btc(0.0001).unwrap();
 
-        assert_eq!((amount, fees), (expected_amount, expected_fees))
+        assert_eq!((amount, fees), (expected_amount, expected_fees));
+        assert_eq!(
+            writer.captured(),
+            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.01000000 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 max_giveable=0.00000000 BTC minimum_amount=0.01000000 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap: Received Bitcoin new_balance=0.01010000 BTC max_giveable=0.01000000 BTC
+"
+        );
     }
 
     #[tokio::test]
     async fn given_balance_less_then_min_wait_for_sufficient_deposit() {
-        let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+        let writer = capture_logs();
         let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
             Amount::from_btc(0.0001).unwrap(),
             Amount::from_btc(0.01).unwrap(),
@@ -677,12 +684,19 @@ mod tests {
         let expected_amount = Amount::from_btc(0.01).unwrap();
         let expected_fees = Amount::from_btc(0.0001).unwrap();
 
-        assert_eq!((amount, fees), (expected_amount, expected_fees))
+        assert_eq!((amount, fees), (expected_amount, expected_fees));
+        assert_eq!(
+            writer.captured(),
+            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.01000000 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 max_giveable=0.00010000 BTC minimum_amount=0.01000000 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap: Received Bitcoin new_balance=0.01010000 BTC max_giveable=0.01000000 BTC
+"
+        );
     }
 
     #[tokio::test]
     async fn given_no_initial_balance_and_transfers_less_than_min_keep_waiting() {
-        let _guard = subscriber::set_default(tracing_subscriber::fmt().with_test_writer().finish());
+        let writer = capture_logs();
         let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
             Amount::ZERO,
             Amount::from_btc(0.01).unwrap(),
@@ -708,7 +722,139 @@ mod tests {
         .await
         .unwrap_err();
 
-        assert!(matches!(error, tokio::time::error::Elapsed { .. }))
+        assert!(matches!(error, tokio::time::error::Elapsed { .. }));
+        assert_eq!(
+            writer.captured(),
+            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 max_giveable=0.00000000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap: Received Bitcoin new_balance=0.01010000 BTC max_giveable=0.01000000 BTC
+ INFO swap: Deposited amount is less than `min_quantity`
+ INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 max_giveable=0.01000000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
+"
+        );
+    }
+
+    #[tokio::test]
+    async fn given_longer_delay_until_deposit_should_not_spam_user() {
+        let writer = capture_logs();
+        let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
+            Amount::ZERO,
+            Amount::ZERO,
+            Amount::ZERO,
+            Amount::ZERO,
+            Amount::ZERO,
+            Amount::ZERO,
+            Amount::ZERO,
+            Amount::ZERO,
+            Amount::ZERO,
+            Amount::from_btc(0.2).unwrap(),
+        ])));
+
+        tokio::time::timeout(
+            Duration::from_secs(10),
+            determine_btc_to_swap(
+                true,
+                async { Ok(quote_with_min(0.1)) },
+                get_dummy_address(),
+                || async { Ok(Amount::from_btc(0.21)?) },
+                || async {
+                    let mut result = givable.lock().unwrap();
+
+                    result.give()
+                },
+                || async { Ok(()) },
+            ),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            writer.captured(),
+            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 max_giveable=0.00000000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap: Received Bitcoin new_balance=0.21000000 BTC max_giveable=0.20000000 BTC
+"
+        );
+    }
+
+    /// Setup tracing with a capturing writer, allowing assertions on the log
+    /// messages.
+    ///
+    /// Time and ANSI are disabled to make the output more predictable and
+    /// readable.
+    fn capture_logs() -> MakeCapturingWriter {
+        let make_writer = MakeCapturingWriter::default();
+
+        let guard = subscriber::set_default(
+            tracing_subscriber::fmt()
+                .with_ansi(false)
+                .without_time()
+                .with_writer(make_writer.clone())
+                .finish(),
+        );
+        // don't clean up guard we stay initialized
+        std::mem::forget(guard);
+
+        make_writer
+    }
+
+    #[derive(Default, Clone)]
+    struct MakeCapturingWriter {
+        writer: CapturingWriter,
+    }
+
+    impl MakeCapturingWriter {
+        fn captured(&self) -> String {
+            let captured = &self.writer.captured;
+            let cursor = captured.lock().unwrap();
+            String::from_utf8(cursor.clone().into_inner()).unwrap()
+        }
+    }
+
+    impl MakeWriter for MakeCapturingWriter {
+        type Writer = CapturingWriter;
+
+        fn make_writer(&self) -> Self::Writer {
+            self.writer.clone()
+        }
+    }
+
+    #[derive(Default, Clone)]
+    struct CapturingWriter {
+        captured: Arc<Mutex<io::Cursor<Vec<u8>>>>,
+    }
+
+    impl io::Write for CapturingWriter {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            self.captured.lock().unwrap().write(buf)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    struct MaxGiveable {
+        amounts: Vec<Amount>,
+        call_counter: usize,
+    }
+
+    impl MaxGiveable {
+        fn new(amounts: Vec<Amount>) -> Self {
+            Self {
+                amounts,
+                call_counter: 0,
+            }
+        }
+        fn give(&mut self) -> Result<Amount> {
+            let amount = self
+                .amounts
+                .get(self.call_counter)
+                .ok_or_else(|| anyhow::anyhow!("No more balances available"))?;
+            self.call_counter += 1;
+            Ok(*amount)
+        }
     }
 
     fn quote_with_max(btc: f64) -> BidQuote {
