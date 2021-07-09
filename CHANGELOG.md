@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2021-07-09
+
 ### Added
 
 - Printing the deposit address to the terminal as a QR code.
@@ -173,7 +175,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[Unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.7.0...HEAD
+[Unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.8.0...HEAD
+[0.8.0]: https://github.com/comit-network/xmr-btc-swap/compare/0.7.0...0.8.0
 [0.7.0]: https://github.com/comit-network/xmr-btc-swap/compare/0.6.0...0.7.0
 [0.6.0]: https://github.com/comit-network/xmr-btc-swap/compare/0.5.0...0.6.0
 [0.5.0]: https://github.com/comit-network/xmr-btc-swap/compare/0.4.0...0.5.0
