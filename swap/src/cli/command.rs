@@ -1,6 +1,6 @@
 use crate::env::GetConfig;
 use crate::fs::system_data_dir;
-use crate::network::rendezvous::{XmrBtcNamespace, DEFAULT_RENDEZVOUS_ADDRESS};
+use crate::network::rendezvous::XmrBtcNamespace;
 use crate::{env, monero};
 use anyhow::{Context, Result};
 use bitcoin::AddressType;
@@ -336,8 +336,7 @@ enum RawCommand {
     ListSellers {
         #[structopt(
             long,
-            help = "Address of the rendezvous point you want to use to discover ASBs",
-            default_value = DEFAULT_RENDEZVOUS_ADDRESS
+            help = "Address of the rendezvous point you want to use to discover ASBs"
         )]
         rendezvous_point: Multiaddr,
 

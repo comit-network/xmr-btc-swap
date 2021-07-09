@@ -1,9 +1,6 @@
 use libp2p::rendezvous::Namespace;
 use std::fmt;
 
-pub const DEFAULT_RENDEZVOUS_ADDRESS: &str =
-    "/dnsaddr/rendezvous.coblox.tech/p2p/12D3KooWQUt9DkNZxEn2R5ymJzWj15MpG6mTW84kyd8vDaRZi46o";
-
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum XmrBtcNamespace {
     Mainnet,

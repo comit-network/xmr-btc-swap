@@ -94,13 +94,11 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-        --rendezvous-point <rendezvous-point>       Address of the rendezvous point you want to use to discover ASBs [default: /dnsaddr/rendezvous.coblox.tech/p2p/12D3KooWQUt9DkNZxEn2R5ymJzWj15MpG6mTW84kyd8vDaRZi46o]
+        --rendezvous-point <rendezvous-point>       Address of the rendezvous point you want to use to discover ASBs
         --tor-socks5-port <tor-socks5-port>         Your local Tor socks5 proxy port [default: 9050]
 ```
 
-This command only takes optional parameters and can be run as-is:
-
-Running `swap --testnet list-sellers` will give you something like:
+Running `swap --testnet list-sellers --rendezvous-point /dnsaddr/rendezvous.coblox.tech/p2p/12D3KooWQUt9DkNZxEn2R5ymJzWj15MpG6mTW84kyd8vDaRZi46o` will give you something like:
 
 ```
 Connected to rendezvous point, discovering nodes in 'xmr-btc-swap-testnet' namespace ...
