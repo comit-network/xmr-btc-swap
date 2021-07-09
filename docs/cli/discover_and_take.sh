@@ -1,10 +1,21 @@
 #!/bin/bash
 
-CLI_PATH=$1
-YOUR_MONERO_ADDR=$2
-YOUR_BITCOIN_ADDR=$3
+# This is a utility script to showcase how the swap CLI can discover sellers and then trigger a swap using the discovered sellers
+#
+# 1st param: Path to the "swap" binary (aka the swap CLI)
+# 2nd param: Multiaddress of the rendezvous node to be used for discovery
+# 3rd param: Your Monero stagenet address where the XMR will be received
+# 4th param: Your bech32 Bitcoin testnet address that will be used for any change output (e.g. refund scenario or when swapping an amount smaller than the transferred BTC)
+#
+# Example usage:
+# discover_and_take.sh "PATH/TO/swap" "/dnsaddr/rendezvous.coblox.tech/p2p/12D3KooWQUt9DkNZxEn2R5ymJzWj15MpG6mTW84kyd8vDaRZi46o" "YOUR_XMR_STAGENET_ADDRESS" "YOUR_BECH32_BITCOIN_TESTNET_ADDRESS"
 
-CLI_LIST_SELLERS="$CLI_PATH --testnet --json --debug list-sellers"
+CLI_PATH=$1
+RENDEZVOUS_POINT=$2
+YOUR_MONERO_ADDR=$3
+YOUR_BITCOIN_ADDR=$4
+
+CLI_LIST_SELLERS="$CLI_PATH --testnet --json --debug list-sellers --rendezvous-point $RENDEZVOUS_POINT"
 echo "Requesting sellers with command: $CLI_LIST_SELLERS"
 echo
 
