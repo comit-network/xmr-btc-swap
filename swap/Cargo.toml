@@ -55,7 +55,7 @@ thiserror = "1"
 time = "0.2"
 tokio = { version = "1", features = [ "rt-multi-thread", "time", "macros", "sync", "process", "fs", "net" ] }
 tokio-socks = "0.5"
-tokio-tungstenite = { version = "0.14", features = [ "rustls-tls" ] }
+tokio-tungstenite = { version = "0.15", features = [ "rustls-tls" ] }
 tokio-util = { version = "0.6", features = [ "io" ] }
 toml = "0.5"
 torut = { version = "0.1", default-features = false, features = [ "v3", "control" ] }
