@@ -33,6 +33,12 @@ Swapping of course needs two parties - and the CLI is only one of them: The take
 If you are interested in becoming a market maker you will want to run the second binary provided in this repository: `asb` - the Automated Swap Backend.
 Detailed documentation for the `asb` can be found [in this README](./docs/asb/README.md).
 
+## Safety
+
+This software is using cryptography that has not been formally audited.
+While we do our best to make it safe, it is up to the user to evaluate whether or not it is safe to use for their purposes.
+Please also see section 15 and 16 of the [license](./LICENSE).
+
 ## Contact
 
 Feel free to reach out to us in the [COMIT-Monero Matrix channel](https://matrix.to/#/#comit-monero:matrix.org).
