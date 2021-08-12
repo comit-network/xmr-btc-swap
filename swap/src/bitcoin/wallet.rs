@@ -306,7 +306,8 @@ where
             .iter()
             .find(|tx| tx.txid == txid)
             .context("Could not find tx in bdk wallet when trying to determine fees")?
-            .fees;
+            .fee
+            .expect("fees are always present with Electrum backend");
 
         Ok(Amount::from_sat(fees))
     }
@@ -394,14 +395,16 @@ where
         let mut tx_builder = wallet.build_tx();
 
         let dummy_script = Script::from(vec![0u8; locking_script_size]);
-        tx_builder.set_single_recipient(dummy_script);
-        tx_builder.drain_wallet();
+        tx_builder.drain_to(dummy_script);
         tx_builder.fee_rate(fee_rate);
 
         let response = tx_builder.finish();
         match response {
             Ok((_, details)) => {
-                let max_giveable = details.sent - details.fees;
+                let max_giveable = details.sent
+                    - details
+                        .fee
+                        .expect("fees are always present with Electrum backend");
                 Ok(Amount::from_sat(max_giveable))
             }
             Err(bdk::Error::InsufficientFunds { .. }) => Ok(Amount::ZERO),
@@ -600,7 +603,7 @@ impl WalletBuilder {
 
     pub fn build(self) -> Wallet<(), bdk::database::MemoryDatabase, StaticFeeRate> {
         use bdk::database::MemoryDatabase;
-        use bdk::{LocalUtxo, TransactionDetails};
+        use bdk::{ConfirmationTime, LocalUtxo, TransactionDetails};
         use bitcoin::OutPoint;
         use testutils::testutils;
 
