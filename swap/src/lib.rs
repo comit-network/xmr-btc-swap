@@ -32,3 +32,6 @@ pub mod tor;
 pub mod tracing_ext;
 
 mod monero_ext;
+
+#[cfg(test)]
+mod proptest;

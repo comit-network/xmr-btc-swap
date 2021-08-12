@@ -7,10 +7,10 @@ use ::bitcoin::{OutPoint, TxIn, TxOut, Txid};
 use anyhow::{bail, Result};
 use bdk::database::BatchDatabase;
 use bitcoin::Script;
-use ecdsa_fun::fun::Point;
 use miniscript::{Descriptor, DescriptorTrait};
-use rand::thread_rng;
 use serde::{Deserialize, Serialize};
+
+const SCRIPT_SIZE: usize = 34;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TxLock {
@@ -112,12 +112,7 @@ impl TxLock {
 
     /// Calculate the size of the script used by this transaction.
     pub fn script_size() -> usize {
-        build_shared_output_descriptor(
-            Point::random(&mut thread_rng()),
-            Point::random(&mut thread_rng()),
-        )
-        .script_pubkey()
-        .len()
+        SCRIPT_SIZE
     }
 
     pub fn script_pubkey(&self) -> Script {
@@ -243,6 +238,17 @@ mod tests {
         let result = TxLock::from_psbt(psbt, A, B, agreed_amount);
 
         result.expect_err("PSBT to be invalid");
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn estimated_tx_lock_script_size_never_changes(a in crate::proptest::ecdsa_fun::point(), b in crate::proptest::ecdsa_fun::point()) {
+            proptest::prop_assume!(a != b);
+
+            let computed_size = build_shared_output_descriptor(a, b).script_pubkey().len();
+
+            assert_eq!(computed_size, SCRIPT_SIZE);
+        }
     }
 
     /// Helper function that represents Bob's action of constructing the PSBT.
