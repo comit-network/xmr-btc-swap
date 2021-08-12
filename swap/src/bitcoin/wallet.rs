@@ -547,48 +547,84 @@ impl EstimateFeeRate for StaticFeeRate {
 }
 
 #[cfg(test)]
-impl Wallet<(), bdk::database::MemoryDatabase, StaticFeeRate> {
+pub struct WalletBuilder {
+    utxo_amount: u64,
+    sats_per_vb: f32,
+    min_relay_fee_sats: u64,
+    key: bitcoin::util::bip32::ExtendedPrivKey,
+    num_utxos: u8,
+}
+
+#[cfg(test)]
+impl WalletBuilder {
     /// Creates a new, funded wallet with sane default fees.
     ///
     /// Unless you are testing things related to fees, this is likely what you
     /// want.
-    pub fn new_funded_default_fees(amount: u64) -> Self {
-        Self::new_funded(amount, 1.0, 1000)
+    pub fn new(amount: u64) -> Self {
+        WalletBuilder {
+            utxo_amount: amount,
+            sats_per_vb: 1.0,
+            min_relay_fee_sats: 1000,
+            key: "tprv8ZgxMBicQKsPeZRHk4rTG6orPS2CRNFX3njhUXx5vj9qGog5ZMH4uGReDWN5kCkY3jmWEtWause41CDvBRXD1shKknAMKxT99o9qUTRVC6m".parse().unwrap(),
+            num_utxos: 1,
+        }
     }
 
-    /// Creates a new, funded wallet that doesn't pay any fees.
-    ///
-    /// This will create invalid transactions but can be useful if you want full
-    /// control over the output amounts.
-    pub fn new_funded_zero_fees(amount: u64) -> Self {
-        Self::new_funded(amount, 0.0, 0)
+    pub fn with_zero_fees(self) -> Self {
+        Self {
+            sats_per_vb: 0.0,
+            min_relay_fee_sats: 0,
+            ..self
+        }
     }
 
-    /// Creates a new, funded wallet to be used within tests.
-    pub fn new_funded(amount: u64, sats_per_vb: f32, min_relay_fee_sats: u64) -> Self {
+    pub fn with_fees(self, sats_per_vb: f32, min_relay_fee_sats: u64) -> Self {
+        Self {
+            sats_per_vb,
+            min_relay_fee_sats,
+            ..self
+        }
+    }
+
+    pub fn with_key(self, key: bitcoin::util::bip32::ExtendedPrivKey) -> Self {
+        Self { key, ..self }
+    }
+
+    pub fn with_num_utxos(self, number: u8) -> Self {
+        Self {
+            num_utxos: number,
+            ..self
+        }
+    }
+
+    pub fn build(self) -> Wallet<(), bdk::database::MemoryDatabase, StaticFeeRate> {
         use bdk::database::MemoryDatabase;
         use bdk::{LocalUtxo, TransactionDetails};
         use bitcoin::OutPoint;
         use testutils::testutils;
 
-        let descriptors = testutils!(@descriptors ("wpkh(tprv8ZgxMBicQKsPeZRHk4rTG6orPS2CRNFX3njhUXx5vj9qGog5ZMH4uGReDWN5kCkY3jmWEtWause41CDvBRXD1shKknAMKxT99o9qUTRVC6m/*)"));
+        let descriptors = testutils!(@descriptors (&format!("wpkh({}/*)", self.key)));
 
         let mut database = MemoryDatabase::new();
-        bdk::populate_test_db!(
-            &mut database,
-            testutils! {
-                @tx ( (@external descriptors, 0) => amount ) (@confirmations 1)
-            },
-            Some(100)
-        );
+
+        for index in 0..self.num_utxos {
+            bdk::populate_test_db!(
+                &mut database,
+                testutils! {
+                    @tx ( (@external descriptors, index as u32) => self.utxo_amount ) (@confirmations 1)
+                },
+                Some(100)
+            );
+        }
 
         let wallet =
             bdk::Wallet::new_offline(&descriptors.0, None, Network::Regtest, database).unwrap();
 
-        Self {
+        Wallet {
             client: Arc::new(Mutex::new(StaticFeeRate {
-                fee_rate: FeeRate::from_sat_per_vb(sats_per_vb),
-                min_relay_fee: bitcoin::Amount::from_sat(min_relay_fee_sats),
+                fee_rate: FeeRate::from_sat_per_vb(self.sats_per_vb),
+                min_relay_fee: bitcoin::Amount::from_sat(self.min_relay_fee_sats),
             })),
             wallet: Arc::new(Mutex::new(wallet)),
             finality_confirmations: 1,
@@ -1047,7 +1083,7 @@ mod tests {
 
     #[tokio::test]
     async fn given_no_balance_returns_amount_0() {
-        let wallet = Wallet::new_funded(0, 1.0, 1);
+        let wallet = WalletBuilder::new(0).with_fees(1.0, 1).build();
         let amount = wallet.max_giveable(TxLock::script_size()).await.unwrap();
 
         assert_eq!(amount, Amount::ZERO);
@@ -1055,7 +1091,7 @@ mod tests {
 
     #[tokio::test]
     async fn given_balance_below_min_relay_fee_returns_amount_0() {
-        let wallet = Wallet::new_funded(1000, 1.0, 1001);
+        let wallet = WalletBuilder::new(1000).with_fees(1.0, 1001).build();
         let amount = wallet.max_giveable(TxLock::script_size()).await.unwrap();
 
         assert_eq!(amount, Amount::ZERO);
@@ -1063,7 +1099,7 @@ mod tests {
 
     #[tokio::test]
     async fn given_balance_above_relay_fee_returns_amount_greater_0() {
-        let wallet = Wallet::new_funded_default_fees(10_000);
+        let wallet = WalletBuilder::new(10_000).build();
         let amount = wallet.max_giveable(TxLock::script_size()).await.unwrap();
 
         assert!(amount.as_sat() > 0);
@@ -1083,7 +1119,7 @@ mod tests {
         let balance = 2000;
 
         // We don't care about fees in this test, thus use a zero fee rate
-        let wallet = Wallet::new_funded_zero_fees(balance);
+        let wallet = WalletBuilder::new(balance).with_zero_fees().build();
 
         // sorting is only relevant for amounts that have a change output
         // if the change output is below dust it will be dropped by the BDK
@@ -1108,7 +1144,7 @@ mod tests {
 
     #[tokio::test]
     async fn can_override_change_address() {
-        let wallet = Wallet::new_funded_default_fees(50_000);
+        let wallet = WalletBuilder::new(50_000).build();
         let custom_change = "bcrt1q08pfqpsyrt7acllzyjm8q5qsz5capvyahm49rw"
             .parse::<Address>()
             .unwrap();
