@@ -15,3 +15,15 @@ pub mod ecdsa_fun {
         })
     }
 }
+
+pub mod bitcoin {
+    use super::*;
+    use ::bitcoin::util::bip32::ExtendedPrivKey;
+    use ::bitcoin::Network;
+
+    pub fn extended_priv_key() -> impl Strategy<Value = ExtendedPrivKey> {
+        prop::array::uniform8(0..255u8).prop_filter_map("invalid secret key generated", |bytes| {
+            ExtendedPrivKey::new_master(Network::Regtest, &bytes).ok()
+        })
+    }
+}

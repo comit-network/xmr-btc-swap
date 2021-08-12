@@ -1201,4 +1201,21 @@ DEBUG swap::bitcoin::wallet: Bitcoin transaction status changed txid=00000000000
     fn confs(confirmations: u32) -> ScriptStatus {
         ScriptStatus::from_confirmations(confirmations)
     }
+
+    proptest::proptest! {
+        #[test]
+        fn funding_never_fails_with_insufficient_funds(funding_amount in 3000u32.., num_utxos in 1..5u8, sats_per_vb in 1.0..500.0f32, key in crate::proptest::bitcoin::extended_priv_key(), alice in crate::proptest::ecdsa_fun::point(), bob in crate::proptest::ecdsa_fun::point()) {
+            proptest::prop_assume!(alice != bob);
+
+            tokio::runtime::Runtime::new().unwrap().block_on(async move {
+                let wallet = WalletBuilder::new(funding_amount as u64).with_key(key).with_num_utxos(num_utxos).with_fees(sats_per_vb, 1000).build();
+
+                let amount = wallet.max_giveable(TxLock::script_size()).await.unwrap();
+                let psbt: PartiallySignedTransaction = TxLock::new(&wallet, amount, PublicKey::from(alice), PublicKey::from(bob), wallet.new_address().await.unwrap()).await.unwrap().into();
+                let result = wallet.sign_and_finalize(psbt).await;
+
+                result.expect("transaction to be signed");
+            });
+        }
+    }
 }

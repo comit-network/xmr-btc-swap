@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 849f8b01f49fc9a913100203698a9151d8de8a37564e1d3b1e3b4169e192f58a # shrinks to funding_amount = 290250686, num_utxos = 3, sats_per_vb = 75.35638, key = ExtendedPrivKey { network: Regtest, depth: 0, parent_fingerprint: 00000000, child_number: Normal { index: 0 }, private_key: [private key data], chain_code: 0b7a29ca6990bbc9b9187c1d1a07e2cf68e32f5ce55d2df01edf8a4ac2ee2a4b }, alice = Point<Normal,Public,NonZero>(0299a8c6a662e2e9e8ee7c6889b75a51c432812b4bf70c1d76eace63abc1bdfb1b), bob = Point<Normal,Public,NonZero>(027165b1f9924030c90d38c511da0f4397766078687997ed34d6ef2743d2a7bbed)
