@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- An occasional error where users couldn't start a swap because of `InsufficientFunds` that were off by exactly 1 satoshi.
+
 ## [0.8.0] - 2021-07-09
 
 ### Added

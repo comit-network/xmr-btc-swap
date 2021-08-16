@@ -15,7 +15,7 @@ async-trait = "0.1"
 atty = "0.2"
 backoff = { version = "0.3", features = [ "tokio" ] }
 base64 = "0.13"
-bdk = "0.8"
+bdk = "0.10"
 big-bytes = "1"
 bitcoin = { version = "0.26", features = [ "rand", "use-serde" ] }
 bmrng = "0.5"
@@ -80,6 +80,7 @@ get-port = "3"
 hyper = "0.14"
 monero-harness = { path = "../monero-harness" }
 port_check = "0.1"
+proptest = "1"
 serde_cbor = "0.11"
 spectral = "0.6"
 tempfile = "3"

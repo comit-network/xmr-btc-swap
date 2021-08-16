@@ -236,10 +236,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
-name = "bdk"
-version = "0.8.0"
+name = "base64-compat"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05d7fee1aedf8935ba1e2c9aeee640d1b9754da1b64f30ad47e8b8e2b7904ec0"
+checksum = "5a8d4d2746f89841e49230dd26917df1876050f95abafafbe34f47cb534b88d7"
+dependencies = [
+ "byteorder",
+]
+
+[[package]]
+name = "bdk"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f4da304c23a06c21807598a7fe3223566e84c76c6bba2cab2504370dd6f4938"
 dependencies = [
  "async-trait",
  "bdk-macros",
@@ -252,14 +261,13 @@ dependencies = [
  "serde",
  "serde_json",
  "sled",
- "tokio",
 ]
 
 [[package]]
 name = "bdk-macros"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b45570b78250774145859a8f85bfdb6e310663fc82640d7e159a44b1386074a2"
+checksum = "c3f510015e946c5995cc169f7ed4c92ba032bbce795c0956ee0d98d82f7aff78"
 dependencies = [
  "proc-macro2 1.0.27",
  "quote 1.0.9",
@@ -331,6 +339,7 @@ version = "0.26.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6742ec672d3f12506f4ac5c0d853926ff1f94e675f60ffd3224039972bf663f1"
 dependencies = [
+ "base64-compat",
  "bech32",
  "bitcoin_hashes",
  "secp256k1",

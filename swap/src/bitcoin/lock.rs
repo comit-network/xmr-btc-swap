@@ -7,10 +7,10 @@ use ::bitcoin::{OutPoint, TxIn, TxOut, Txid};
 use anyhow::{bail, Result};
 use bdk::database::BatchDatabase;
 use bitcoin::Script;
-use ecdsa_fun::fun::Point;
 use miniscript::{Descriptor, DescriptorTrait};
-use rand::thread_rng;
 use serde::{Deserialize, Serialize};
+
+const SCRIPT_SIZE: usize = 34;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TxLock {
@@ -112,12 +112,7 @@ impl TxLock {
 
     /// Calculate the size of the script used by this transaction.
     pub fn script_size() -> usize {
-        build_shared_output_descriptor(
-            Point::random(&mut thread_rng()),
-            Point::random(&mut thread_rng()),
-        )
-        .script_pubkey()
-        .len()
+        SCRIPT_SIZE
     }
 
     pub fn script_pubkey(&self) -> Script {
@@ -188,11 +183,12 @@ impl Watchable for TxLock {
 mod tests {
     use super::*;
     use crate::bitcoin::wallet::StaticFeeRate;
+    use crate::bitcoin::WalletBuilder;
 
     #[tokio::test]
     async fn given_bob_sends_good_psbt_when_reconstructing_then_succeeeds() {
         let (A, B) = alice_and_bob();
-        let wallet = Wallet::new_funded_default_fees(50000);
+        let wallet = WalletBuilder::new(50_000).build();
         let agreed_amount = Amount::from_sat(10000);
 
         let psbt = bob_make_psbt(A, B, &wallet, agreed_amount).await;
@@ -206,7 +202,7 @@ mod tests {
         let (A, B) = alice_and_bob();
         let fees = 610;
         let agreed_amount = Amount::from_sat(10000);
-        let wallet = Wallet::new_funded_default_fees(agreed_amount.as_sat() + fees);
+        let wallet = WalletBuilder::new(agreed_amount.as_sat() + fees).build();
 
         let psbt = bob_make_psbt(A, B, &wallet, agreed_amount).await;
         assert_eq!(
@@ -222,7 +218,7 @@ mod tests {
     #[tokio::test]
     async fn given_bob_is_sending_less_than_agreed_when_reconstructing_txlock_then_fails() {
         let (A, B) = alice_and_bob();
-        let wallet = Wallet::new_funded_default_fees(50000);
+        let wallet = WalletBuilder::new(50_000).build();
         let agreed_amount = Amount::from_sat(10000);
 
         let bad_amount = Amount::from_sat(5000);
@@ -235,7 +231,7 @@ mod tests {
     #[tokio::test]
     async fn given_bob_is_sending_to_a_bad_output_reconstructing_txlock_then_fails() {
         let (A, B) = alice_and_bob();
-        let wallet = Wallet::new_funded_default_fees(50000);
+        let wallet = WalletBuilder::new(50_000).build();
         let agreed_amount = Amount::from_sat(10000);
 
         let E = eve();
@@ -243,6 +239,17 @@ mod tests {
         let result = TxLock::from_psbt(psbt, A, B, agreed_amount);
 
         result.expect_err("PSBT to be invalid");
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn estimated_tx_lock_script_size_never_changes(a in crate::proptest::ecdsa_fun::point(), b in crate::proptest::ecdsa_fun::point()) {
+            proptest::prop_assume!(a != b);
+
+            let computed_size = build_shared_output_descriptor(a, b).script_pubkey().len();
+
+            assert_eq!(computed_size, SCRIPT_SIZE);
+        }
     }
 
     /// Helper function that represents Bob's action of constructing the PSBT.
