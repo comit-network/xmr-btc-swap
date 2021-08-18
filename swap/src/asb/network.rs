@@ -13,7 +13,7 @@ use libp2p::core::connection::ConnectionId;
 use libp2p::core::muxing::StreamMuxerBox;
 use libp2p::core::transport::Boxed;
 use libp2p::dns::TokioDnsConfig;
-use libp2p::ping::{Ping, PingEvent};
+use libp2p::ping::{Ping, PingConfig, PingEvent};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::swarm::{
     DialPeerCondition, IntoProtocolsHandler, NetworkBehaviour, NetworkBehaviourAction,
@@ -152,7 +152,7 @@ pub mod behaviour {
                 ),
                 transfer_proof: transfer_proof::alice(),
                 encrypted_signature: encrypted_signature::alice(),
-                ping: Ping::default(),
+                ping: Ping::new(PingConfig::new().with_keep_alive(true)),
             }
         }
     }
