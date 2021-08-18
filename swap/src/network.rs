@@ -1,7 +1,5 @@
 mod impl_from_rr_event;
 
-pub mod alice;
-pub mod bob;
 pub mod cbor_request_response;
 pub mod encrypted_signature;
 pub mod json_pull_codec;

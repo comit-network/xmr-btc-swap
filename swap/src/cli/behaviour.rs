@@ -5,7 +5,7 @@ use crate::protocol::bob::State2;
 use crate::{bitcoin, env};
 use anyhow::{anyhow, Error, Result};
 use libp2p::core::Multiaddr;
-use libp2p::ping::{Ping, PingEvent};
+use libp2p::ping::{Ping, PingConfig, PingEvent};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::{NetworkBehaviour, PeerId};
 use std::sync::Arc;
@@ -83,7 +83,7 @@ impl Behaviour {
             transfer_proof: transfer_proof::bob(),
             encrypted_signature: encrypted_signature::bob(),
             redial: redial::Behaviour::new(alice, Duration::from_secs(2)),
-            ping: Ping::default(),
+            ping: Ping::new(PingConfig::new().with_keep_alive(true)),
         }
     }
 

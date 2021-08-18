@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- An issue where the connection between ASB and CLI would get closed prematurely.
+  The CLI expects to be connected to the ASB throughout the entire swap and hence reconnects as soon as the connection is closed.
+  This resulted in a loop of connections being established but instantly closed again because the ASB deemed the connection to not be necessary.
+  See issue https://github.com/comit-network/xmr-btc-swap/issues/648.
+
 ## [0.8.1] - 2021-08-16
 
 ### Fixed
