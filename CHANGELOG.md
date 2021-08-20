@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The CLI expects to be connected to the ASB throughout the entire swap and hence reconnects as soon as the connection is closed.
   This resulted in a loop of connections being established but instantly closed again because the ASB deemed the connection to not be necessary.
   See issue https://github.com/comit-network/xmr-btc-swap/issues/648.
+- An issue where the ASB was unable to use the Monero wallet in case `monero-wallet-rpc` has been restarted.
+  In case no wallet is loaded when we try to interact with the `monero-wallet-rpc` daemon, we now load the correct wallet on-demand.
+  See issue https://github.com/comit-network/xmr-btc-swap/issues/652.
 
 ## [0.8.1] - 2021-08-16
 
