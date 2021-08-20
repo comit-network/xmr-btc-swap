@@ -629,13 +629,14 @@ checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 
 [[package]]
 name = "comfy-table"
-version = "4.0.1"
+version = "4.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92e0356b571da8e3d6ff2fe5de9be56e379c6bf22d91ffc86c2fcab35e54701f"
+checksum = "11e95a3e867422fd8d04049041f5671f94d53c32a9dcd82e2be268714942f3f3"
 dependencies = [
  "crossterm",
  "strum",
  "strum_macros",
+ "unicode-width",
 ]
 
 [[package]]
