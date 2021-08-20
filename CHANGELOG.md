@@ -157,11 +157,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - 2021-04-06
 
-### Changed
-
-- The `resume` command of the `swap` CLI no longer require the `--seller-peer-id` parameter.
-  This information is now saved in the database.
-
 ### Added
 
 - A changelog file.
@@ -177,6 +172,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Throughout the public demo phase of this project, the CLI traded with us by default if the peer id and multiaddress of the seller were not specified.
   Having the defaults made it easy for us to give something to the community that can easily be tested, however it is not aligned with our long-term vision of a decentralised network of sellers.
   We have removed these defaults forcing the user to specify the seller they wish to trade with.
+- The `resume` command of the `swap` CLI no longer require the `--seller-peer-id` parameter.
+  This information is now saved in the database.
 
 ### Fixed
 
