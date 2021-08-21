@@ -8,7 +8,7 @@ edition = "2018"
 anyhow = "1"
 curve25519-dalek = "3.1"
 hex = "0.4"
-jsonrpc_client = { version = "0.6", features = [ "reqwest" ] }
+jsonrpc_client = { version = "0.7", features = [ "reqwest" ] }
 monero = "0.12"
 monero-epee-bin-serde = "1"
 rand = "0.7"
