@@ -1786,9 +1786,9 @@ dependencies = [
 
 [[package]]
 name = "jsonrpc_client"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a85cf2c5ce158eabf30b2ac4f535463d7b09ce7905502e11238b7d6048ef7d02"
+checksum = "2f2e6b724d546ba449f65c42d02f97d437742962fe4a5735733a5132b3453208"
 dependencies = [
  "async-trait",
  "jsonrpc_client_macro 0.3.0",
@@ -2408,7 +2408,7 @@ dependencies = [
  "curve25519-dalek",
  "hex 0.4.3",
  "hex-literal",
- "jsonrpc_client 0.6.0",
+ "jsonrpc_client 0.7.0",
  "monero",
  "monero-epee-bin-serde",
  "rand 0.7.3",
@@ -3374,9 +3374,9 @@ dependencies = [
 
 [[package]]
 name = "rust_decimal"
-version = "1.14.3"
+version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01127cb8617e5e21bcf2e19b5eb48317735ca677f1d0a94833c21c331c446582"
+checksum = "c5446d1cf2dfe2d6367c8b27f2082bdf011e60e76fa1fcd140047f535156d6e7"
 dependencies = [
  "arrayvec",
  "num-traits",
