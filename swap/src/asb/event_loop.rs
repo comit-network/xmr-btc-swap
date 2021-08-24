@@ -271,7 +271,7 @@ where
                             tracing::warn!(%address, "Failed to set up connection with peer: {:#}", error);
                         }
                         SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause: Some(error) } if num_established == 0 => {
-                            tracing::warn!(%peer, address = %endpoint.get_remote_address(), "Lost connection to peer: {:#}", error);
+                            tracing::debug!(%peer, address = %endpoint.get_remote_address(), "Lost connection to peer: {:#}", error);
                         }
                         SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause: None } if num_established == 0 => {
                             tracing::info!(%peer, address = %endpoint.get_remote_address(), "Successfully closed connection");
