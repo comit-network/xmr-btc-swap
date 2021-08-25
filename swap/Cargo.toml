@@ -17,7 +17,7 @@ backoff = { version = "0.3", features = [ "tokio" ] }
 base64 = "0.13"
 bdk = "0.10"
 big-bytes = "1"
-bitcoin = { version = "0.26", features = [ "rand", "use-serde" ] }
+bitcoin = { version = "0.27", features = [ "rand", "use-serde" ] }
 bmrng = "0.5"
 comfy-table = "4.1.1"
 config = { version = "0.11", default-features = false, features = [ "toml" ] }
