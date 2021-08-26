@@ -2,7 +2,7 @@ use crate::asb;
 use crate::bitcoin::{CancelTimelock, PunishTimelock};
 use std::cmp::max;
 use std::time::Duration;
-use time::NumericalStdDurationShort;
+use time::ext::NumericalStdDuration;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Config {
@@ -44,14 +44,14 @@ pub struct Regtest;
 impl GetConfig for Mainnet {
     fn get_config() -> Config {
         Config {
-            bitcoin_lock_mempool_timeout: 3.minutes(),
-            bitcoin_lock_confirmed_timeout: 2.hours(),
+            bitcoin_lock_mempool_timeout: 3.std_minutes(),
+            bitcoin_lock_confirmed_timeout: 2.std_hours(),
             bitcoin_finality_confirmations: 2,
-            bitcoin_avg_block_time: 10.minutes(),
+            bitcoin_avg_block_time: 10.std_minutes(),
             bitcoin_cancel_timelock: CancelTimelock::new(72),
             bitcoin_punish_timelock: PunishTimelock::new(72),
             bitcoin_network: bitcoin::Network::Bitcoin,
-            monero_avg_block_time: 2.minutes(),
+            monero_avg_block_time: 2.std_minutes(),
             monero_finality_confirmations: 10,
             monero_network: monero::Network::Mainnet,
         }
@@ -61,14 +61,14 @@ impl GetConfig for Mainnet {
 impl GetConfig for Testnet {
     fn get_config() -> Config {
         Config {
-            bitcoin_lock_mempool_timeout: 3.minutes(),
-            bitcoin_lock_confirmed_timeout: 1.hours(),
+            bitcoin_lock_mempool_timeout: 3.std_minutes(),
+            bitcoin_lock_confirmed_timeout: 1.std_hours(),
             bitcoin_finality_confirmations: 2,
-            bitcoin_avg_block_time: 10.minutes(),
+            bitcoin_avg_block_time: 10.std_minutes(),
             bitcoin_cancel_timelock: CancelTimelock::new(12),
             bitcoin_punish_timelock: PunishTimelock::new(6),
             bitcoin_network: bitcoin::Network::Testnet,
-            monero_avg_block_time: 2.minutes(),
+            monero_avg_block_time: 2.std_minutes(),
             monero_finality_confirmations: 10,
             monero_network: monero::Network::Stagenet,
         }
@@ -78,14 +78,14 @@ impl GetConfig for Testnet {
 impl GetConfig for Regtest {
     fn get_config() -> Config {
         Config {
-            bitcoin_lock_mempool_timeout: 30.seconds(),
-            bitcoin_lock_confirmed_timeout: 1.minutes(),
+            bitcoin_lock_mempool_timeout: 30.std_seconds(),
+            bitcoin_lock_confirmed_timeout: 1.std_minutes(),
             bitcoin_finality_confirmations: 1,
-            bitcoin_avg_block_time: 5.seconds(),
+            bitcoin_avg_block_time: 5.std_seconds(),
             bitcoin_cancel_timelock: CancelTimelock::new(100),
             bitcoin_punish_timelock: PunishTimelock::new(50),
             bitcoin_network: bitcoin::Network::Regtest,
-            monero_avg_block_time: 1.seconds(),
+            monero_avg_block_time: 1.std_seconds(),
             monero_finality_confirmations: 10,
             monero_network: monero::Network::Mainnet, // yes this is strange
         }
