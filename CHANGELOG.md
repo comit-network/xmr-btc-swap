@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The CLI expects to be connected to the ASB throughout the entire swap and hence reconnects as soon as the connection is closed.
   This resulted in a loop of connections being established but instantly closed again because the ASB deemed the connection to not be necessary.
   See issue https://github.com/comit-network/xmr-btc-swap/issues/648.
+- An issue where the ASB was unable to use the Monero wallet in case `monero-wallet-rpc` has been restarted.
+  In case no wallet is loaded when we try to interact with the `monero-wallet-rpc` daemon, we now load the correct wallet on-demand.
+  See issue https://github.com/comit-network/xmr-btc-swap/issues/652.
 
 ## [0.8.1] - 2021-08-16
 
@@ -157,11 +160,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - 2021-04-06
 
-### Changed
-
-- The `resume` command of the `swap` CLI no longer require the `--seller-peer-id` parameter.
-  This information is now saved in the database.
-
 ### Added
 
 - A changelog file.
@@ -177,6 +175,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Throughout the public demo phase of this project, the CLI traded with us by default if the peer id and multiaddress of the seller were not specified.
   Having the defaults made it easy for us to give something to the community that can easily be tested, however it is not aligned with our long-term vision of a decentralised network of sellers.
   We have removed these defaults forcing the user to specify the seller they wish to trade with.
+- The `resume` command of the `swap` CLI no longer require the `--seller-peer-id` parameter.
+  This information is now saved in the database.
 
 ### Fixed
 
