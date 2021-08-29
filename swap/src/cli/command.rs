@@ -1,9 +1,11 @@
 use crate::env::GetConfig;
 use crate::fs::system_data_dir;
 use crate::network::rendezvous::XmrBtcNamespace;
+use crate::bitcoin::Amount;
 use crate::{env, monero};
-use anyhow::{Context, Result};
-use bitcoin::AddressType;
+use anyhow::{Context, Result, bail};
+use bitcoin::{AddressType, Address};
+use serde::Serialize;
 use libp2p::core::Multiaddr;
 use std::ffi::OsString;
 use std::path::PathBuf;
@@ -107,6 +109,44 @@ where
             data_dir: data::data_dir_from(data, is_testnet)?,
             cmd: Command::History,
         },
+        RawCommand::Balance{
+            bitcoin,
+        } =>{
+            let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
+            bitcoin.apply_defaults(is_testnet)?;
+
+            Arguments {
+                env_config: env_config_from(is_testnet),
+                debug,
+                json,
+                data_dir: data::data_dir_from(data, is_testnet)?,
+                cmd: Command::Balance{
+                    bitcoin_electrum_rpc_url,
+                    bitcoin_target_block
+                },
+            }
+        },
+        RawCommand::WithdrawBtc { 
+            bitcoin,
+            amount, 
+            address 
+        } => {
+            let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
+            bitcoin.apply_defaults(is_testnet)?;
+
+            Arguments {
+                env_config: env_config_from(is_testnet),
+                debug,
+                json,
+                data_dir: data::data_dir_from(data, is_testnet)?,
+                cmd: Command::WithdrawBtc {
+                    bitcoin_electrum_rpc_url,
+                    bitcoin_target_block,
+                    amount,
+                    address: bitcoin_address(address, is_testnet)?,
+                },
+            }
+        },
         RawCommand::Resume {
             swap_id: SwapId { swap_id },
             bitcoin,
@@ -204,6 +244,16 @@ pub enum Command {
         tor_socks5_port: u16,
     },
     History,
+    WithdrawBtc {
+        bitcoin_electrum_rpc_url: Url,
+        bitcoin_target_block: usize,
+        amount: Option<Amount>,
+        address: Address,
+    },
+    Balance {
+        bitcoin_electrum_rpc_url: Url,
+        bitcoin_target_block: usize
+    },
     Resume {
         swap_id: Uuid,
         bitcoin_electrum_rpc_url: Url,
@@ -296,6 +346,26 @@ enum RawCommand {
     },
     /// Show a list of past, ongoing and completed swaps
     History,
+    #[structopt(about = "Allows withdrawing BTC from the internal Bitcoin wallet.")]
+    WithdrawBtc {
+        #[structopt(flatten)]
+        bitcoin: Bitcoin,
+
+        #[structopt(
+            long = "amount",
+            help = "Optionally specify the amount of Bitcoin to be withdrawn. If not specified the wallet will be drained."
+        )]
+        amount: Option<Amount>,
+        #[structopt(long = "address", help = "The address to receive the Bitcoin.")]
+        address: Address,
+    },
+    #[structopt(
+        about = "Prints the Bitcoin balance."
+    )]
+    Balance{
+        #[structopt(flatten)]
+        bitcoin: Bitcoin,
+    },
     /// Resume a swap
     Resume {
         #[structopt(flatten)]
@@ -463,6 +533,23 @@ fn env_config_from(testnet: bool) -> env::Config {
     }
 }
 
+fn bitcoin_address(address: Address, is_testnet: bool) -> Result<Address> {
+    let network = if is_testnet {
+        bitcoin::Network::Testnet
+    } else {
+        bitcoin::Network::Bitcoin
+    };
+
+    if address.network != network {
+        bail!(BitcoinAddressNetworkMismatch {
+            expected: network,
+            actual: address.network
+        });
+    }
+
+    Ok(address)
+}
+
 fn validate_monero_address(
     address: monero::Address,
     testnet: bool,
@@ -519,6 +606,15 @@ fn parse_monero_address(s: &str) -> Result<monero::Address> {
 pub struct MoneroAddressNetworkMismatch {
     expected: monero::Network,
     actual: monero::Network,
+}
+
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Serialize)]
+#[error("Invalid Bitcoin address provided, expected address on network {expected:?}  but address provided is on {actual:?}")]
+pub struct BitcoinAddressNetworkMismatch {
+    #[serde(with = "crate::bitcoin::network")]
+    expected: bitcoin::Network,
+    #[serde(with = "crate::bitcoin::network")]
+    actual: bitcoin::Network,
 }
 
 #[cfg(test)]
