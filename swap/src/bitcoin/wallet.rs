@@ -400,6 +400,7 @@ where
         let dummy_script = Script::from(vec![0u8; locking_script_size]);
         tx_builder.drain_to(dummy_script);
         tx_builder.fee_rate(fee_rate);
+        tx_builder.drain_wallet();
 
         let response = tx_builder.finish();
         match response {

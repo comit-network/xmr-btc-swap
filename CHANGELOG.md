@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   See issues: https://github.com/comit-network/xmr-btc-swap/issues/709 https://github.com/comit-network/xmr-btc-swap/issues/688, https://github.com/comit-network/xmr-btc-swap/issues/701.
 - Add the ability to view the swap-cli bitcoin balance and withdraw
   See issue https://github.com/comit-network/xmr-btc-swap/issues/694
+- An issue where the ASB withdraw one bitcoin UTXO at a time instead of the whole balance.
+  See issue https://github.com/comit-network/xmr-btc-swap/issues/662
 
 ## [0.8.1] - 2021-08-16
 
