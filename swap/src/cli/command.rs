@@ -3,7 +3,7 @@ use crate::env::GetConfig;
 use crate::fs::system_data_dir;
 use crate::network::rendezvous::XmrBtcNamespace;
 use crate::{env, monero};
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use bitcoin::{Address, AddressType};
 use libp2p::core::Multiaddr;
 use serde::Serialize;
@@ -141,7 +141,7 @@ where
                     bitcoin_electrum_rpc_url,
                     bitcoin_target_block,
                     amount,
-                    address: validate_bitcoin_address(address, is_testnet)?,
+                    address: bitcoin_address(address, is_testnet)?,
                 },
             }
         }
@@ -527,6 +527,23 @@ fn env_config_from(testnet: bool) -> env::Config {
     } else {
         env::Mainnet::get_config()
     }
+}
+
+fn bitcoin_address(address: Address, is_testnet: bool) -> Result<Address> {
+    let network = if is_testnet {
+        bitcoin::Network::Testnet
+    } else {
+        bitcoin::Network::Bitcoin
+    };
+
+    if address.network != network {
+        bail!(BitcoinAddressNetworkMismatch {
+            expected: network,
+            actual: address.network
+        });
+    }
+
+    Ok(address)
 }
 
 fn validate_monero_address(
