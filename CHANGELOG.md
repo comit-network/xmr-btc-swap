@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add the ability to view the swap-cli bitcoin balance and withdraw
+  See issue https://github.com/comit-network/xmr-btc-swap/issues/694
+
 ### Fixed
 
 - An issue where the connection between ASB and CLI would get closed prematurely.
