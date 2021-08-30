@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   See issue https://github.com/comit-network/xmr-btc-swap/issues/652.
 - An issue where swap protocol was getting stuck trying to submit the cancel transaction.
   We were not handling the error when TxCancel submission fails.
-  See issues: https://github.com/comit-network/xmr-btc-swap/issues/709, https://github.com/comit-network/xmr-btc-swap/issues/688, https://github.com/comit-network/xmr-btc-swap/issues/701.
+  We also configured the electrum client to retry 5 times in order to help with this problem.
+  See issues: https://github.com/comit-network/xmr-btc-swap/issues/709 https://github.com/comit-network/xmr-btc-swap/issues/688, https://github.com/comit-network/xmr-btc-swap/issues/701.
 
 ## [0.8.1] - 2021-08-16
 
