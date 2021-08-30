@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An issue where the ASB was unable to use the Monero wallet in case `monero-wallet-rpc` has been restarted.
   In case no wallet is loaded when we try to interact with the `monero-wallet-rpc` daemon, we now load the correct wallet on-demand.
   See issue https://github.com/comit-network/xmr-btc-swap/issues/652.
+- An issue where swap protocol was getting stuck trying to submit the cancel transaction.
+  We were not handling the error when TxCancel submission fails.
+  See issues: https://github.com/comit-network/xmr-btc-swap/issues/709, https://github.com/comit-network/xmr-btc-swap/issues/688, https://github.com/comit-network/xmr-btc-swap/issues/701.
 
 ## [0.8.1] - 2021-08-16
 
