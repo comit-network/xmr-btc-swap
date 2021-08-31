@@ -39,6 +39,11 @@ This software is using cryptography that has not been formally audited.
 While we do our best to make it safe, it is up to the user to evaluate whether or not it is safe to use for their purposes.
 Please also see section 15 and 16 of the [license](./LICENSE).
 
+## Contributing
+
+We are encourage community contributions whether it be a bug fix or an improvement to the documentation.
+Please have a look at the [contribution guidelines](./CONTRIBUTING.md).
+
 ## Contact
 
 Feel free to reach out to us in the [COMIT-Monero Matrix channel](https://matrix.to/#/#comit-monero:matrix.org).
