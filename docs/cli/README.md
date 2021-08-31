@@ -7,6 +7,7 @@ To do that, pass the `--testnet` flag with the actual command:
 ```shell
 swap --testnet <SUBCOMMAND>
 ```
+
 Take note that applying `--testnet` results in transacting on Bitcoin testnet and on Monero stagenet, not on Monero testnet.
 
 The two main commands of the CLI are:
