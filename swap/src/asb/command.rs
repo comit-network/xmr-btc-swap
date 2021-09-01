@@ -56,7 +56,7 @@ where
             cmd: Command::Balance,
         },
         RawCommand::ManualRecovery(ManualRecovery::Redeem {
-            redeem_params: RecoverCommandParams { swap_id, force },
+            redeem_params: RecoverCommandParams { swap_id },
             do_not_await_finality,
         }) => Arguments {
             testnet: is_testnet,
@@ -65,36 +65,36 @@ where
             env_config: env_config(is_testnet),
             cmd: Command::Redeem {
                 swap_id,
-                force,
+
                 do_not_await_finality,
             },
         },
         RawCommand::ManualRecovery(ManualRecovery::Cancel {
-            cancel_params: RecoverCommandParams { swap_id, force },
+            cancel_params: RecoverCommandParams { swap_id },
         }) => Arguments {
             testnet: is_testnet,
             json: is_json,
             config_path: config_path(config, is_testnet)?,
             env_config: env_config(is_testnet),
-            cmd: Command::Cancel { swap_id, force },
+            cmd: Command::Cancel { swap_id },
         },
         RawCommand::ManualRecovery(ManualRecovery::Refund {
-            refund_params: RecoverCommandParams { swap_id, force },
+            refund_params: RecoverCommandParams { swap_id },
         }) => Arguments {
             testnet: is_testnet,
             json: is_json,
             config_path: config_path(config, is_testnet)?,
             env_config: env_config(is_testnet),
-            cmd: Command::Refund { swap_id, force },
+            cmd: Command::Refund { swap_id },
         },
         RawCommand::ManualRecovery(ManualRecovery::Punish {
-            punish_params: RecoverCommandParams { swap_id, force },
+            punish_params: RecoverCommandParams { swap_id },
         }) => Arguments {
             testnet: is_testnet,
             json: is_json,
             config_path: config_path(config, is_testnet)?,
             env_config: env_config(is_testnet),
-            cmd: Command::Punish { swap_id, force },
+            cmd: Command::Punish { swap_id },
         },
         RawCommand::ManualRecovery(ManualRecovery::SafelyAbort { swap_id }) => Arguments {
             testnet: is_testnet,
@@ -176,20 +176,16 @@ pub enum Command {
     Balance,
     Redeem {
         swap_id: Uuid,
-        force: bool,
         do_not_await_finality: bool,
     },
     Cancel {
         swap_id: Uuid,
-        force: bool,
     },
     Refund {
         swap_id: Uuid,
-        force: bool,
     },
     Punish {
         swap_id: Uuid,
-        force: bool,
     },
     SafelyAbort {
         swap_id: Uuid,
@@ -309,13 +305,6 @@ pub struct RecoverCommandParams {
         help = "The swap id can be retrieved using the history subcommand"
     )]
     pub swap_id: Uuid,
-
-    #[structopt(
-        short,
-        long,
-        help = "Circumvents certain checks when recovering. It is recommended to run a recovery command without --force first to see what is returned."
-    )]
-    pub force: bool,
 }
 
 #[cfg(test)]
@@ -399,7 +388,6 @@ mod tests {
             env_config: mainnet_env_config,
             cmd: Command::Cancel {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
-                force: false,
             },
         };
         let args = parse_args(raw_ars).unwrap();
@@ -419,7 +407,6 @@ mod tests {
             env_config: mainnet_env_config,
             cmd: Command::Refund {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
-                force: false,
             },
         };
         let args = parse_args(raw_ars).unwrap();
@@ -439,7 +426,6 @@ mod tests {
             env_config: mainnet_env_config,
             cmd: Command::Punish {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
-                force: false,
             },
         };
         let args = parse_args(raw_ars).unwrap();
@@ -538,7 +524,6 @@ mod tests {
             env_config: testnet_env_config,
             cmd: Command::Cancel {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
-                force: false,
             },
         };
         let args = parse_args(raw_ars).unwrap();
@@ -559,7 +544,6 @@ mod tests {
             env_config: testnet_env_config,
             cmd: Command::Refund {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
-                force: false,
             },
         };
         let args = parse_args(raw_ars).unwrap();
@@ -580,7 +564,6 @@ mod tests {
             env_config: testnet_env_config,
             cmd: Command::Punish {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
-                force: false,
             },
         };
         let args = parse_args(raw_ars).unwrap();

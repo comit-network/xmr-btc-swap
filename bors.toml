@@ -12,7 +12,6 @@ status = [
     "docker_tests (happy_path_restart_bob_before_xmr_locked)",
     "docker_tests (alice_and_bob_refund_using_cancel_and_refund_command)",
     "docker_tests (alice_and_bob_refund_using_cancel_and_refund_command_timelock_not_expired)",
-    "docker_tests (alice_and_bob_refund_using_cancel_and_refund_command_timelock_not_expired_force)",
     "docker_tests (punish)",
     "docker_tests (alice_punishes_after_restart_bob_dead)",
     "docker_tests (alice_manually_punishes_after_bob_dead)",

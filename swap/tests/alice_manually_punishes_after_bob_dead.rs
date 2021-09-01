@@ -48,13 +48,8 @@ async fn alice_manually_punishes_after_bob_dead() {
 
         ctx.restart_alice().await;
         let alice_swap = ctx.alice_next_swap().await;
-        let (_, alice_state) = asb::cancel(
-            alice_swap.swap_id,
-            alice_swap.bitcoin_wallet,
-            alice_swap.db,
-            false,
-        )
-        .await??;
+        let (_, alice_state) =
+            asb::cancel(alice_swap.swap_id, alice_swap.bitcoin_wallet, alice_swap.db).await?;
 
         // Ensure punish timelock is expired
         if let AliceState::BtcCancelled { state3, .. } = alice_state {
@@ -71,13 +66,8 @@ async fn alice_manually_punishes_after_bob_dead() {
 
         ctx.restart_alice().await;
         let alice_swap = ctx.alice_next_swap().await;
-        let (_, alice_state) = asb::punish(
-            alice_swap.swap_id,
-            alice_swap.bitcoin_wallet,
-            alice_swap.db,
-            false,
-        )
-        .await??;
+        let (_, alice_state) =
+            asb::punish(alice_swap.swap_id, alice_swap.bitcoin_wallet, alice_swap.db).await?;
         ctx.assert_alice_punished(alice_state).await;
 
         // Restart Bob after Alice punished to ensure Bob transitions to

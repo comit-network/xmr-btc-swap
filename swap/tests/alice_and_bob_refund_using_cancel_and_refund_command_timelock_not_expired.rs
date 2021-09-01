@@ -38,13 +38,13 @@ async fn given_alice_and_bob_manually_cancel_when_timelock_not_expired_errors() 
         ));
 
         // Bob tries but fails to manually cancel
-        let result = cli::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false)
-            .await?
+        let error = cli::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db)
+            .await
             .unwrap_err();
-        assert!(matches!(
-            result,
-            cli::cancel::Error::CancelTimelockNotExpiredYet
-        ));
+        match error.downcast::<bdk::Error>().unwrap() {
+            bdk::Error::Electrum(bdk::electrum_client::Error::Protocol(..)) => (),
+            unexpected => panic!("Failed to cancel due to unexpected error: {}", unexpected),
+        }
 
         ctx.restart_alice().await;
         let alice_swap = ctx.alice_next_swap().await;
@@ -54,18 +54,9 @@ async fn given_alice_and_bob_manually_cancel_when_timelock_not_expired_errors() 
         ));
 
         // Alice tries but fails manual cancel
-        let result = asb::cancel(
-            alice_swap.swap_id,
-            alice_swap.bitcoin_wallet,
-            alice_swap.db,
-            false,
-        )
-        .await?
-        .unwrap_err();
-        assert!(matches!(
-            result,
-            asb::cancel::Error::CancelTimelockNotExpiredYet
-        ));
+        let result =
+            asb::cancel(alice_swap.swap_id, alice_swap.bitcoin_wallet, alice_swap.db).await;
+        assert!(result.is_err());
 
         let (bob_swap, bob_join_handle) = ctx
             .stop_and_resume_bob_from_db(bob_join_handle, swap_id)
@@ -73,10 +64,13 @@ async fn given_alice_and_bob_manually_cancel_when_timelock_not_expired_errors() 
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));
 
         // Bob tries but fails to manually refund
-        let result = cli::refund(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false)
-            .await?
+        let error = cli::refund(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db)
+            .await
             .unwrap_err();
-        assert!(matches!(result, cli::refund::SwapNotCancelledYet(_)));
+        match error.downcast::<bdk::Error>().unwrap() {
+            bdk::Error::Electrum(bdk::electrum_client::Error::Protocol(..)) => (),
+            unexpected => panic!("Failed to refund due to unexpected error: {}", unexpected),
+        }
 
         let (bob_swap, _) = ctx
             .stop_and_resume_bob_from_db(bob_join_handle, swap_id)
@@ -96,11 +90,9 @@ async fn given_alice_and_bob_manually_cancel_when_timelock_not_expired_errors() 
             alice_swap.bitcoin_wallet,
             alice_swap.monero_wallet,
             alice_swap.db,
-            false,
         )
-        .await?
-        .unwrap_err();
-        assert!(matches!(result, asb::refund::Error::SwapNotCancelled));
+        .await;
+        assert!(result.is_err());
 
         ctx.restart_alice().await;
         let alice_swap = ctx.alice_next_swap().await;

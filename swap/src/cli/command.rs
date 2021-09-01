@@ -171,7 +171,6 @@ where
         }
         RawCommand::Cancel {
             swap_id: SwapId { swap_id },
-            force,
             bitcoin,
         } => {
             let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
@@ -184,7 +183,6 @@ where
                 data_dir: data::data_dir_from(data, is_testnet)?,
                 cmd: Command::Cancel {
                     swap_id,
-                    force,
                     bitcoin_electrum_rpc_url,
                     bitcoin_target_block,
                 },
@@ -192,7 +190,6 @@ where
         }
         RawCommand::Refund {
             swap_id: SwapId { swap_id },
-            force,
             bitcoin,
         } => {
             let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
@@ -205,7 +202,6 @@ where
                 data_dir: data::data_dir_from(data, is_testnet)?,
                 cmd: Command::Refund {
                     swap_id,
-                    force,
                     bitcoin_electrum_rpc_url,
                     bitcoin_target_block,
                 },
@@ -261,13 +257,11 @@ pub enum Command {
     },
     Cancel {
         swap_id: Uuid,
-        force: bool,
         bitcoin_electrum_rpc_url: Url,
         bitcoin_target_block: usize,
     },
     Refund {
         swap_id: Uuid,
-        force: bool,
         bitcoin_electrum_rpc_url: Url,
         bitcoin_target_block: usize,
     },
@@ -376,24 +370,20 @@ enum RawCommand {
         #[structopt(flatten)]
         tor: Tor,
     },
-    /// Try to cancel an ongoing swap (expert users only)
+    /// Force submission of the cancel transaction overriding the protocol state
+    /// machine and blockheight checks (expert users only)
     Cancel {
         #[structopt(flatten)]
         swap_id: SwapId,
 
-        #[structopt(short, long)]
-        force: bool,
-
         #[structopt(flatten)]
         bitcoin: Bitcoin,
     },
-    /// Try to cancel a swap and refund the BTC (expert users only)
+    /// Force submission of the refund transaction overriding the protocol state
+    /// machine and blockheight checks (expert users only)
     Refund {
         #[structopt(flatten)]
         swap_id: SwapId,
-
-        #[structopt(short, long)]
-        force: bool,
 
         #[structopt(flatten)]
         bitcoin: Bitcoin,
@@ -1190,7 +1180,6 @@ mod tests {
                 data_dir: data_dir_path_cli().join(TESTNET),
                 cmd: Command::Cancel {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-                    force: false,
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)
                         .unwrap(),
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET,
@@ -1206,7 +1195,6 @@ mod tests {
                 data_dir: data_dir_path_cli().join(MAINNET),
                 cmd: Command::Cancel {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-                    force: false,
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET,
                 },
@@ -1221,7 +1209,6 @@ mod tests {
                 data_dir: data_dir_path_cli().join(TESTNET),
                 cmd: Command::Refund {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-                    force: false,
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)
                         .unwrap(),
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET,
@@ -1237,7 +1224,6 @@ mod tests {
                 data_dir: data_dir_path_cli().join(MAINNET),
                 cmd: Command::Refund {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-                    force: false,
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET,
                 },

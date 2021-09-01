@@ -99,7 +99,6 @@ jobs:
             happy_path_restart_alice_after_xmr_locked,
             alice_and_bob_refund_using_cancel_and_refund_command,
             alice_and_bob_refund_using_cancel_and_refund_command_timelock_not_expired,
-            alice_and_bob_refund_using_cancel_and_refund_command_timelock_not_expired_force,
             punish,
             alice_punishes_after_restart_bob_dead,
             alice_manually_punishes_after_bob_dead,

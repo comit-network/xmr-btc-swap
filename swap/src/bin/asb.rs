@@ -244,15 +244,14 @@ async fn main() -> Result<()> {
                 %monero_balance,
                 "Current balance");
         }
-        Command::Cancel { swap_id, force } => {
+        Command::Cancel { swap_id } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
 
-            let (txid, _) =
-                cancel(swap_id, Arc::new(bitcoin_wallet), Arc::new(db), force).await??;
+            let (txid, _) = cancel(swap_id, Arc::new(bitcoin_wallet), Arc::new(db)).await?;
 
             tracing::info!("Cancel transaction successfully published with id {}", txid);
         }
-        Command::Refund { swap_id, force } => {
+        Command::Refund { swap_id } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
 
@@ -261,17 +260,15 @@ async fn main() -> Result<()> {
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
                 Arc::new(db),
-                force,
             )
-            .await??;
+            .await?;
 
             tracing::info!("Monero successfully refunded");
         }
-        Command::Punish { swap_id, force } => {
+        Command::Punish { swap_id } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
 
-            let (txid, _) =
-                punish(swap_id, Arc::new(bitcoin_wallet), Arc::new(db), force).await??;
+            let (txid, _) = punish(swap_id, Arc::new(bitcoin_wallet), Arc::new(db)).await?;
 
             tracing::info!("Punish transaction successfully published with id {}", txid);
         }
@@ -282,7 +279,6 @@ async fn main() -> Result<()> {
         }
         Command::Redeem {
             swap_id,
-            force,
             do_not_await_finality,
         } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
@@ -291,7 +287,6 @@ async fn main() -> Result<()> {
                 swap_id,
                 Arc::new(bitcoin_wallet),
                 Arc::new(db),
-                force,
                 Finality::from_bool(do_not_await_finality),
             )
             .await?;

@@ -50,8 +50,7 @@ async fn given_alice_and_bob_manually_refund_after_funds_locked_both_refund() {
 
         // Bob manually cancels
         bob_join_handle.abort();
-        let (_, state) =
-            cli::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false).await??;
+        let (_, state) = cli::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db).await?;
         assert!(matches!(state, BobState::BtcCancelled { .. }));
 
         let (bob_swap, bob_join_handle) = ctx
@@ -61,40 +60,20 @@ async fn given_alice_and_bob_manually_refund_after_funds_locked_both_refund() {
 
         // Bob manually refunds
         bob_join_handle.abort();
-        let bob_state =
-            cli::refund(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db, false).await??;
+        let bob_state = cli::refund(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db).await?;
 
         ctx.assert_bob_refunded(bob_state).await;
-
-        // manually cancel ALice's swap (effectively just notice that Bob already
-        // cancelled and record that)
-        ctx.restart_alice().await;
-        let alice_swap = ctx.alice_next_swap().await;
-        assert!(matches!(
-            alice_swap.state,
-            AliceState::XmrLockTransactionSent { .. }
-        ));
-
-        asb::cancel(
-            alice_swap.swap_id,
-            alice_swap.bitcoin_wallet,
-            alice_swap.db,
-            false,
-        )
-        .await??;
 
         // manually refund ALice's swap
         ctx.restart_alice().await;
         let alice_swap = ctx.alice_next_swap().await;
-        assert!(matches!(alice_swap.state, AliceState::BtcCancelled { .. }));
         let alice_state = asb::refund(
             alice_swap.swap_id,
             alice_swap.bitcoin_wallet,
             alice_swap.monero_wallet,
             alice_swap.db,
-            false,
         )
-        .await??;
+        .await?;
 
         ctx.assert_alice_refunded(alice_state).await;
 
