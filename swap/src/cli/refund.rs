@@ -13,11 +13,11 @@ pub async fn refund(
     swap_id: Uuid,
     bitcoin_wallet: Arc<Wallet>,
     db: Database,
-    force: bool,
+    graceful: bool,
 ) -> Result<Result<BobState, SwapNotCancelledYet>> {
     let state = db.get_state(swap_id)?.try_into_bob()?.into();
 
-    let state6 = if force {
+    let state6 = if !graceful {
         match state {
             BobState::BtcLocked(state3) => state3.cancel(),
             BobState::XmrLockProofReceived { state, .. } => state.cancel(),

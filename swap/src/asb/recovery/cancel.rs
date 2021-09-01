@@ -15,7 +15,7 @@ pub async fn cancel(
     swap_id: Uuid,
     bitcoin_wallet: Arc<Wallet>,
     db: Arc<Database>,
-    force: bool,
+    graceful: bool,
 ) -> Result<Result<(Txid, AliceState), Error>> {
     let state = db.get_state(swap_id)?.try_into_alice()?.into();
 
@@ -52,7 +52,7 @@ pub async fn cancel(
 
     tracing::info!(%swap_id, "Trying to manually cancel swap");
 
-    if !force {
+    if graceful {
         tracing::debug!(%swap_id, "Checking if cancel timelock is expired");
 
         if let ExpiredTimelocks::None = state3.expired_timelocks(bitcoin_wallet.as_ref()).await? {

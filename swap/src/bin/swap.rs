@@ -273,7 +273,7 @@ async fn main() -> Result<()> {
         }
         Command::Cancel {
             swap_id,
-            force,
+            graceful,
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
         } => {
@@ -292,7 +292,7 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            let cancel = cli::cancel(swap_id, Arc::new(bitcoin_wallet), db, force).await?;
+            let cancel = cli::cancel(swap_id, Arc::new(bitcoin_wallet), db, graceful).await?;
 
             match cancel {
                 Ok((txid, _)) => {
@@ -305,7 +305,7 @@ async fn main() -> Result<()> {
         }
         Command::Refund {
             swap_id,
-            force,
+            graceful: force,
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
         } => {
