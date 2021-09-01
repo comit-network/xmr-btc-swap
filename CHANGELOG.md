@@ -7,28 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] - 2021-09-01
+
 ### Added
 
 - Add the ability to view the swap-cli bitcoin balance and withdraw
-  See issue https://github.com/comit-network/xmr-btc-swap/issues/694
+  See issue <https://github.com/comit-network/xmr-btc-swap/issues/694>
 
 ### Fixed
 
 - An issue where the connection between ASB and CLI would get closed prematurely.
   The CLI expects to be connected to the ASB throughout the entire swap and hence reconnects as soon as the connection is closed.
   This resulted in a loop of connections being established but instantly closed again because the ASB deemed the connection to not be necessary.
-  See issue https://github.com/comit-network/xmr-btc-swap/issues/648.
+  See issue <https://github.com/comit-network/xmr-btc-swap/issues/648>.
 - An issue where the ASB was unable to use the Monero wallet in case `monero-wallet-rpc` has been restarted.
   In case no wallet is loaded when we try to interact with the `monero-wallet-rpc` daemon, we now load the correct wallet on-demand.
-  See issue https://github.com/comit-network/xmr-btc-swap/issues/652.
+  See issue <https://github.com/comit-network/xmr-btc-swap/issues/652>.
 - An issue where swap protocol was getting stuck trying to submit the cancel transaction.
   We were not handling the error when TxCancel submission fails.
   We also configured the electrum client to retry 5 times in order to help with this problem.
-  See issues: https://github.com/comit-network/xmr-btc-swap/issues/709 https://github.com/comit-network/xmr-btc-swap/issues/688, https://github.com/comit-network/xmr-btc-swap/issues/701.
+  See issues: <https://github.com/comit-network/xmr-btc-swap/issues/709> <https://github.com/comit-network/xmr-btc-swap/issues/688>, <https://github.com/comit-network/xmr-btc-swap/issues/701>.
 - Add the ability to view the swap-cli bitcoin balance and withdraw
-  See issue https://github.com/comit-network/xmr-btc-swap/issues/694
+  See issue <https://github.com/comit-network/xmr-btc-swap/issues/694>
 - An issue where the ASB withdraw one bitcoin UTXO at a time instead of the whole balance.
-  See issue https://github.com/comit-network/xmr-btc-swap/issues/662
+  See issue <https://github.com/comit-network/xmr-btc-swap/issues/662>
 
 ## [0.8.1] - 2021-08-16
 
@@ -201,7 +203,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[Unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.8.1...HEAD
+[Unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.8.2...HEAD
+[0.8.2]: https://github.com/comit-network/xmr-btc-swap/compare/0.8.1...0.8.2
 [0.8.1]: https://github.com/comit-network/xmr-btc-swap/compare/0.8.0...0.8.1
 [0.8.0]: https://github.com/comit-network/xmr-btc-swap/compare/0.7.0...0.8.0
 [0.7.0]: https://github.com/comit-network/xmr-btc-swap/compare/0.6.0...0.7.0
