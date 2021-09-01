@@ -152,6 +152,61 @@ async fn main() -> Result<()> {
 
             println!("{}", table);
         }
+
+        Command::WithdrawBtc {
+            bitcoin_electrum_rpc_url,
+            bitcoin_target_block,
+            amount,
+            address,
+        } => {
+            cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
+            let seed = Seed::from_file_or_generate(data_dir.as_path())
+                .context("Failed to read in seed file")?;
+            let bitcoin_wallet = init_bitcoin_wallet(
+                bitcoin_electrum_rpc_url,
+                &seed,
+                data_dir.clone(),
+                env_config,
+                bitcoin_target_block,
+            )
+            .await?;
+
+            let amount = match amount {
+                Some(amount) => amount,
+                None => {
+                    bitcoin_wallet
+                        .max_giveable(address.script_pubkey().len())
+                        .await?
+                }
+            };
+
+            let psbt = bitcoin_wallet
+                .send_to_address(address, amount, None)
+                .await?;
+            let signed_tx = bitcoin_wallet.sign_and_finalize(psbt).await?;
+
+            bitcoin_wallet.broadcast(signed_tx, "withdraw").await?;
+        }
+
+        Command::Balance {
+            bitcoin_electrum_rpc_url,
+            bitcoin_target_block,
+        } => {
+            cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
+            let seed = Seed::from_file_or_generate(data_dir.as_path())
+                .context("Failed to read in seed file")?;
+            let bitcoin_wallet = init_bitcoin_wallet(
+                bitcoin_electrum_rpc_url,
+                &seed,
+                data_dir.clone(),
+                env_config,
+                bitcoin_target_block,
+            )
+            .await?;
+
+            let bitcoin_balance = bitcoin_wallet.balance().await?;
+            println!("Bitcoin balance is {}", bitcoin_balance);
+        }
         Command::Resume {
             swap_id,
             bitcoin_electrum_rpc_url,
