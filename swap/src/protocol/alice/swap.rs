@@ -195,7 +195,8 @@ where
             select! {
                 biased; // make sure the cancel timelock expiry future is polled first
 
-                _ = tx_lock_status.wait_until_confirmed_with(state3.cancel_timelock) => {
+                result = tx_lock_status.wait_until_confirmed_with(state3.cancel_timelock) => {
+                    let _ = result?;
                     AliceState::CancelTimelockExpired {
                         monero_wallet_restore_blockheight,
                         transfer_proof,

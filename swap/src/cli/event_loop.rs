@@ -54,7 +54,7 @@ impl EventLoop {
     ) -> Result<(Self, EventLoopHandle)> {
         let execution_setup = bmrng::channel_with_timeout(1, Duration::from_secs(60));
         let transfer_proof = bmrng::channel_with_timeout(1, Duration::from_secs(60));
-        let encrypted_signature = bmrng::channel_with_timeout(1, Duration::from_secs(60));
+        let encrypted_signature = bmrng::channel(1);
         let quote = bmrng::channel_with_timeout(1, Duration::from_secs(60));
 
         let event_loop = EventLoop {
@@ -248,7 +248,7 @@ impl EventLoopHandle {
     pub async fn send_encrypted_signature(
         &mut self,
         tx_redeem_encsig: EncryptedSignature,
-    ) -> Result<()> {
+    ) -> Result<(), bmrng::error::RequestError<EncryptedSignature>> {
         Ok(self
             .encrypted_signature
             .send_receive(tx_redeem_encsig)

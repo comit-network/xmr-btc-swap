@@ -128,7 +128,7 @@ async fn next_state(
 
                         let state4 = state3.cancel();
                         BobState::CancelTimelockExpired(state4)
-                    }
+                    },
                 }
             } else {
                 let state4 = state3.cancel();
@@ -159,7 +159,8 @@ async fn next_state(
                             },
                         }
                     }
-                    _ = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
+                    result = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
+                        let _ = result?;
                         BobState::CancelTimelockExpired(state.cancel())
                     }
                 }
@@ -175,10 +176,15 @@ async fn next_state(
                 // Bob sends Alice his key
 
                 select! {
-                    _ = event_loop_handle.send_encrypted_signature(state.tx_redeem_encsig()) => {
-                        BobState::EncSigSent(state)
+                    result = event_loop_handle.send_encrypted_signature(state.tx_redeem_encsig()) => {
+                        match result {
+                            Ok(_) => BobState::EncSigSent(state),
+                            Err(bmrng::error::RequestError::RecvError | bmrng::error::RequestError::SendError(_)) => bail!("Failed to communicate encrypted signature through event loop channel"),
+                            Err(bmrng::error::RequestError::RecvTimeoutError) => unreachable!("We construct the channel with no timeout"),
+                        }
                     },
-                    _ = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
+                    result = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
+                        let _ = result?;
                         BobState::CancelTimelockExpired(state.cancel())
                     }
                 }
@@ -194,7 +200,8 @@ async fn next_state(
                     state5 = state.watch_for_redeem_btc(bitcoin_wallet) => {
                         BobState::BtcRedeemed(state5?)
                     },
-                    _ = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
+                    result = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
+                        let _ = result?;
                         BobState::CancelTimelockExpired(state.cancel())
                     }
                 }

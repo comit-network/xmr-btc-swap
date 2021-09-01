@@ -48,7 +48,10 @@ impl Wallet {
         env_config: env::Config,
         target_block: usize,
     ) -> Result<Self> {
-        let client = bdk::electrum_client::Client::new(electrum_rpc_url.as_str())
+        let config = bdk::electrum_client::ConfigBuilder::default()
+            .retry(5)
+            .build();
+        let client = bdk::electrum_client::Client::from_config(electrum_rpc_url.as_str(), config)
             .context("Failed to initialize Electrum RPC client")?;
 
         let db = bdk::sled::open(wallet_dir)?.open_tree(SLED_TREE_NAME)?;
