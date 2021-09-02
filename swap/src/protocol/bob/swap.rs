@@ -123,7 +123,8 @@ async fn next_state(
                             monero_wallet_restore_blockheight
                         }
                     },
-                    _ = cancel_timelock_expires => {
+                    result = cancel_timelock_expires => {
+                        let _ = result?;
                         tracing::info!("Alice took too long to lock Monero, cancelling the swap");
 
                         let state4 = state3.cancel();
