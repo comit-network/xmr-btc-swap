@@ -9,8 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.3] - 2021-09-02
 
-## [0.8.3] - 2021-09-02
-
 ### Fixed
 
 - A bug where the ASB erroneously transitioned into a punishable state upon a bitcoin transaction monitoring error.
@@ -213,7 +211,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
 [Unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.8.3...HEAD
-[0.8.3]: https://github.com/comit-network/xmr-btc-swap/compare/0.8.3...0.8.3
 [0.8.3]: https://github.com/comit-network/xmr-btc-swap/compare/0.8.2...0.8.3
 [0.8.2]: https://github.com/comit-network/xmr-btc-swap/compare/0.8.1...0.8.2
 [0.8.1]: https://github.com/comit-network/xmr-btc-swap/compare/0.8.0...0.8.1
