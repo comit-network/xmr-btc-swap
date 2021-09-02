@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A bug where the ASB erroneously transitioned into a punishable state upon a bitcoin transaction monitoring error.
+  This could lead to a scenario where the ASB was neither able to punish, nor able to refund, so the XMR could stay locked up forever while the CLI refunded the BTC.
+- A bug where the CLI erroneously transitioned into a cancel-timelock-expired state upon a bitcoin transaction monitoring error.
+  This could lead to a scenario where the CLI is forced to wait for cancel, even though the cancel timelock is not yet expired and the swap could still be redeemed.
+
 ## [0.8.2] - 2021-09-01
 
 ### Added
