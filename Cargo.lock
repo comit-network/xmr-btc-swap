@@ -25,7 +25,7 @@ checksum = "bbda1ffd586ec58bdbc3290f9243c1d05bec1abf49ec15e4bc3d60070b7d9d11"
 dependencies = [
  "cfg-if 1.0.0",
  "cipher",
- "cpufeatures",
+ "cpufeatures 0.1.4",
  "opaque-debug 0.3.0",
 ]
 
@@ -552,7 +552,7 @@ checksum = "fee7ad89dc1128635074c268ee661f90c3f7e83d9fd12910608c36b47d6c3412"
 dependencies = [
  "cfg-if 1.0.0",
  "cipher",
- "cpufeatures",
+ "cpufeatures 0.1.4",
  "zeroize",
 ]
 
@@ -708,6 +708,15 @@ name = "cpufeatures"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed00c67cb5d0a7d64a44f6ad2668db7e7530311dd53ea79bcd4fb022c64911c8"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "cpufeatures"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95059428f66df56b63431fdb4e1947ed2190586af5c5a8a8b71122bdf5a7f469"
 dependencies = [
  "libc",
 ]
@@ -1012,7 +1021,7 @@ dependencies = [
  "ed25519",
  "rand 0.7.3",
  "serde",
- "sha2 0.9.5",
+ "sha2 0.9.6",
  "zeroize",
 ]
 
@@ -1861,9 +1870,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.98"
+version = "0.2.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "320cfe77175da3a483efed4bc0adc1968ca050b098ce4f2f1c13a56626128790"
+checksum = "3cb00336871be5ed2c8ed44b60ae9959dc5b9f08539422ed43f09e34ecaeba21"
 
 [[package]]
 name = "libgit2-sys"
@@ -1930,7 +1939,7 @@ dependencies = [
  "rand 0.7.3",
  "ring",
  "rw-stream-sink",
- "sha2 0.9.5",
+ "sha2 0.9.6",
  "smallvec",
  "thiserror",
  "unsigned-varint 0.7.0",
@@ -1981,7 +1990,7 @@ dependencies = [
  "prost",
  "prost-build",
  "rand 0.8.3",
- "sha2 0.9.5",
+ "sha2 0.9.6",
  "snow",
  "static_assertions",
  "x25519-dalek",
@@ -2016,7 +2025,7 @@ dependencies = [
  "prost",
  "prost-build",
  "rand 0.8.3",
- "sha2 0.9.5",
+ "sha2 0.9.6",
  "thiserror",
  "unsigned-varint 0.7.0",
  "uuid",
@@ -2127,7 +2136,7 @@ dependencies = [
  "libsecp256k1-gen-genmult",
  "rand 0.7.3",
  "serde",
- "sha2 0.9.5",
+ "sha2 0.9.6",
  "typenum",
 ]
 
@@ -2461,7 +2470,7 @@ dependencies = [
  "digest 0.9.0",
  "generic-array 0.14.4",
  "multihash-derive",
- "sha2 0.9.5",
+ "sha2 0.9.6",
  "unsigned-varint 0.5.1",
 ]
 
@@ -2808,7 +2817,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fe800695325da85083cd23b56826fccb2e2dc29b218e7811a6f33bc93f414be"
 dependencies = [
- "cpufeatures",
+ "cpufeatures 0.1.4",
  "opaque-debug 0.3.0",
  "universal-hash",
 ]
@@ -2819,7 +2828,7 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "864231b0b86ce05168a8e6da0fea2e67275dacf25f75b00a62cfd341aab904a9"
 dependencies = [
- "cpufeatures",
+ "cpufeatures 0.1.4",
  "opaque-debug 0.3.0",
  "universal-hash",
 ]
@@ -3653,9 +3662,9 @@ dependencies = [
 
 [[package]]
 name = "serde_cbor"
-version = "0.11.1"
+version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e18acfa2f90e8b735b2836ab8d538de304cbb6729a7360729ea5a895d15a622"
+checksum = "2bef2ebfde456fb76bbcf9f59315333decc4fda0b2b44b420243c11e0f5ec1f5"
 dependencies = [
  "half",
  "serde",
@@ -3773,13 +3782,13 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.9.5"
+version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b362ae5752fd2137731f9fa25fd4d9058af34666ca1966fb969119cc35719f12"
+checksum = "9204c41a1597a8c5af23c82d1c921cb01ec0a4c59e07a9c7306062829a3903f3"
 dependencies = [
  "block-buffer 0.9.0",
  "cfg-if 1.0.0",
- "cpufeatures",
+ "cpufeatures 0.2.1",
  "digest 0.9.0",
  "opaque-debug 0.3.0",
 ]
@@ -3896,7 +3905,7 @@ dependencies = [
  "rand_core 0.6.2",
  "ring",
  "rustc_version 0.3.3",
- "sha2 0.9.5",
+ "sha2 0.9.6",
  "subtle 2.4.0",
  "x25519-dalek",
 ]
@@ -4151,7 +4160,7 @@ dependencies = [
  "serde_cbor",
  "serde_json",
  "serde_with",
- "sha2 0.9.5",
+ "sha2 0.9.6",
  "sigma_fun",
  "sled",
  "spectral",
@@ -4250,7 +4259,7 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "serde_json",
- "sha2 0.9.5",
+ "sha2 0.9.6",
 ]
 
 [[package]]
@@ -4265,7 +4274,7 @@ dependencies = [
  "rand 0.8.3",
  "serde",
  "serde_json",
- "sha2 0.9.5",
+ "sha2 0.9.6",
 ]
 
 [[package]]
