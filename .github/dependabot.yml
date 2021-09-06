@@ -11,6 +11,9 @@ updates:
       interval: "daily"
     rebase-strategy: "disabled"
     open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "bitcoin" # Needs to be updated together with bdk to be in sync.
+      - dependency-name: "miniscript" # Needs to be updated together with bdk to be in sync.
 
   - package-ecosystem: "github-actions"
     directory: "/"
