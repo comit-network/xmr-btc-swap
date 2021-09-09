@@ -19,6 +19,7 @@ where
     let args = RawArguments::from_clap(&matches);
 
     let json = args.json;
+    let timestamp = args.timestamp;
     let testnet = args.testnet;
     let config = args.config;
     let command: RawCommand = args.cmd;
@@ -27,6 +28,7 @@ where
         RawCommand::Start { resume_only } => Arguments {
             testnet,
             json,
+            timestamp,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Start { resume_only },
@@ -34,6 +36,7 @@ where
         RawCommand::History => Arguments {
             testnet,
             json,
+            timestamp,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::History,
@@ -41,6 +44,7 @@ where
         RawCommand::WithdrawBtc { amount, address } => Arguments {
             testnet,
             json,
+            timestamp,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::WithdrawBtc {
@@ -51,6 +55,7 @@ where
         RawCommand::Balance => Arguments {
             testnet,
             json,
+            timestamp,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Balance,
@@ -61,6 +66,7 @@ where
         }) => Arguments {
             testnet,
             json,
+            timestamp,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Redeem {
@@ -74,6 +80,7 @@ where
         }) => Arguments {
             testnet,
             json,
+            timestamp,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Cancel { swap_id },
@@ -83,6 +90,7 @@ where
         }) => Arguments {
             testnet,
             json,
+            timestamp,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Refund { swap_id },
@@ -92,6 +100,7 @@ where
         }) => Arguments {
             testnet,
             json,
+            timestamp,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Punish { swap_id },
@@ -99,6 +108,7 @@ where
         RawCommand::ManualRecovery(ManualRecovery::SafelyAbort { swap_id }) => Arguments {
             testnet,
             json,
+            timestamp,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::SafelyAbort { swap_id },
@@ -158,6 +168,7 @@ pub struct BitcoinAddressNetworkMismatch {
 pub struct Arguments {
     pub testnet: bool,
     pub json: bool,
+    pub timestamp: bool,
     pub config_path: PathBuf,
     pub env_config: env::Config,
     pub cmd: Command,
@@ -209,6 +220,13 @@ pub struct RawArguments {
         help = "Changes the log messages to json vs plain-text. If you run ASB as a service, it is recommended to set this to true to simplify log analyses."
     )]
     pub json: bool,
+
+    #[structopt(
+        short,
+        long = "timestamp",
+        help = "Adds a timestamp to the log messages"
+    )]
+    pub timestamp: bool,
 
     #[structopt(
         long = "config",
@@ -326,6 +344,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            timestamp: false,
             config_path: default_mainnet_conf_path.clone(),
             env_config: mainnet_env_config,
             cmd: Command::Start { resume_only: false },
@@ -337,6 +356,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            timestamp: false,
             config_path: default_mainnet_conf_path.clone(),
             env_config: mainnet_env_config,
             cmd: Command::History,
@@ -348,6 +368,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            timestamp: false,
             config_path: default_mainnet_conf_path.clone(),
             env_config: mainnet_env_config,
             cmd: Command::Balance,
@@ -364,6 +385,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            timestamp: false,
             config_path: default_mainnet_conf_path.clone(),
             env_config: mainnet_env_config,
             cmd: Command::WithdrawBtc {
@@ -384,6 +406,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            timestamp: false,
             config_path: default_mainnet_conf_path.clone(),
             env_config: mainnet_env_config,
             cmd: Command::Cancel {
@@ -403,6 +426,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            timestamp: false,
             config_path: default_mainnet_conf_path.clone(),
             env_config: mainnet_env_config,
             cmd: Command::Refund {
@@ -422,6 +446,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            timestamp: false,
             config_path: default_mainnet_conf_path.clone(),
             env_config: mainnet_env_config,
             cmd: Command::Punish {
@@ -441,6 +466,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            timestamp: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::SafelyAbort {
@@ -460,6 +486,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            timestamp: false,
             config_path: default_testnet_conf_path.clone(),
             env_config: testnet_env_config,
             cmd: Command::Start { resume_only: false },
@@ -471,6 +498,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            timestamp: false,
             config_path: default_testnet_conf_path.clone(),
             env_config: testnet_env_config,
             cmd: Command::History,
@@ -482,6 +510,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            timestamp: false,
             config_path: default_testnet_conf_path.clone(),
             env_config: testnet_env_config,
             cmd: Command::Balance,
@@ -499,6 +528,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            timestamp: false,
             config_path: default_testnet_conf_path.clone(),
             env_config: testnet_env_config,
             cmd: Command::WithdrawBtc {
@@ -520,6 +550,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            timestamp: false,
             config_path: default_testnet_conf_path.clone(),
             env_config: testnet_env_config,
             cmd: Command::Cancel {
@@ -540,6 +571,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            timestamp: false,
             config_path: default_testnet_conf_path.clone(),
             env_config: testnet_env_config,
             cmd: Command::Refund {
@@ -560,6 +592,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            timestamp: false,
             config_path: default_testnet_conf_path.clone(),
             env_config: testnet_env_config,
             cmd: Command::Punish {
@@ -580,6 +613,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            timestamp: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::SafelyAbort {
