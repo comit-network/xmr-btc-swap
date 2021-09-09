@@ -1,22 +1,15 @@
-use crate::bitcoin::{ExpiredTimelocks, Txid, Wallet};
+use crate::bitcoin::{parse_rpc_error_code, RpcErrorCode, Txid, Wallet};
 use crate::database::{Database, Swap};
 use crate::protocol::bob::BobState;
 use anyhow::{bail, Result};
 use std::sync::Arc;
 use uuid::Uuid;
 
-#[derive(Debug, thiserror::Error, Clone, Copy)]
-pub enum Error {
-    #[error("The cancel timelock has not expired yet.")]
-    CancelTimelockNotExpiredYet,
-}
-
 pub async fn cancel(
     swap_id: Uuid,
     bitcoin_wallet: Arc<Wallet>,
     db: Database,
-    force: bool,
-) -> Result<Result<(Txid, BobState), Error>> {
+) -> Result<(Txid, BobState)> {
     let state = db.get_state(swap_id)?.try_into_bob()?.into();
 
     let state6 = match state {
@@ -25,11 +18,12 @@ pub async fn cancel(
         BobState::XmrLocked(state4) => state4.cancel(),
         BobState::EncSigSent(state4) => state4.cancel(),
         BobState::CancelTimelockExpired(state6) => state6,
+        BobState::BtcRefunded(state6) => state6,
+        BobState::BtcCancelled(state6) => state6,
+
         BobState::Started { .. }
         | BobState::SwapSetupCompleted(_)
         | BobState::BtcRedeemed(_)
-        | BobState::BtcCancelled(_)
-        | BobState::BtcRefunded(_)
         | BobState::XmrRedeemed { .. }
         | BobState::BtcPunished { .. }
         | BobState::SafelyAborted => bail!(
@@ -41,25 +35,21 @@ pub async fn cancel(
 
     tracing::info!(%swap_id, "Manually cancelling swap");
 
-    if !force {
-        tracing::debug!(%swap_id, "Checking if cancel timelock is expired");
-
-        if let ExpiredTimelocks::None = state6.expired_timelock(bitcoin_wallet.as_ref()).await? {
-            return Ok(Err(Error::CancelTimelockNotExpiredYet));
+    let txid = match state6.submit_tx_cancel(bitcoin_wallet.as_ref()).await {
+        Ok(txid) => txid,
+        Err(err) => {
+            if let Ok(code) = parse_rpc_error_code(&err) {
+                if code == i64::from(RpcErrorCode::RpcVerifyAlreadyInChain) {
+                    tracing::info!("Cancel transaction has already been confirmed on chain")
+                }
+            }
+            bail!(err);
         }
-    }
-
-    let txid = if let Ok(tx) = state6.check_for_tx_cancel(bitcoin_wallet.as_ref()).await {
-        tracing::debug!(%swap_id, "Cancel transaction has already been published");
-
-        tx.txid()
-    } else {
-        state6.submit_tx_cancel(bitcoin_wallet.as_ref()).await?
     };
 
     let state = BobState::BtcCancelled(state6);
     let db_state = state.clone().into();
     db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
 
-    Ok(Ok((txid, state)))
+    Ok((txid, state))
 }

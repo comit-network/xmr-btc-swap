@@ -32,7 +32,6 @@ async fn alice_manually_redeems_after_enc_sig_learned() {
             alice_swap.swap_id,
             alice_swap.bitcoin_wallet,
             alice_swap.db,
-            false,
             Finality::Await,
         )
         .await?;

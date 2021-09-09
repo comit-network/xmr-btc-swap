@@ -249,6 +249,58 @@ pub fn current_epoch(
     ExpiredTimelocks::None
 }
 
+/// Bitcoin error codes: https://github.com/bitcoin/bitcoin/blob/97d3500601c1d28642347d014a6de1e38f53ae4e/src/rpc/protocol.h#L23
+pub enum RpcErrorCode {
+    /// Transaction or block was rejected by network rules. Error code -26.
+    RpcVerifyRejected,
+    /// Transaction or block was rejected by network rules. Error code -27.
+    RpcVerifyAlreadyInChain,
+    /// General error during transaction or block submission
+    RpcVerifyError,
+}
+
+impl From<RpcErrorCode> for i64 {
+    fn from(code: RpcErrorCode) -> Self {
+        match code {
+            RpcErrorCode::RpcVerifyError => -25,
+            RpcErrorCode::RpcVerifyRejected => -26,
+            RpcErrorCode::RpcVerifyAlreadyInChain => -27,
+        }
+    }
+}
+
+pub fn parse_rpc_error_code(error: &anyhow::Error) -> anyhow::Result<i64> {
+    let string = match error.downcast_ref::<bdk::Error>() {
+        Some(bdk::Error::Electrum(bdk::electrum_client::Error::Protocol(
+            serde_json::Value::String(string),
+        ))) => string,
+        _ => bail!("Error is of incorrect variant:{}", error),
+    };
+
+    let json = serde_json::from_str(&string.replace("sendrawtransaction RPC error:", ""))?;
+
+    let json_map = match json {
+        serde_json::Value::Object(map) => map,
+        _ => bail!("Json error is not json object "),
+    };
+
+    let error_code_value = match json_map.get("code") {
+        Some(val) => val,
+        None => bail!("No error code field"),
+    };
+
+    let error_code_number = match error_code_value {
+        serde_json::Value::Number(num) => num,
+        _ => bail!("Error code is not a number"),
+    };
+
+    if let Some(int) = error_code_number.as_i64() {
+        Ok(int)
+    } else {
+        bail!("Error code is not an unsigned integer")
+    }
+}
+
 #[derive(Clone, Copy, thiserror::Error, Debug)]
 #[error("transaction does not spend anything")]
 pub struct NoInputs;

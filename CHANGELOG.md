@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The `cancel`, `refund` and `punish` subcommands in ASB and CLI are run with the `--force` by default and the `--force` option has been removed.
+  The force flag was used to ignore blockheight and protocol state checks.
+  Users can still restart a swap with these checks using the `resume` subcommand.
+
 ## [0.8.3] - 2021-09-03
 
 ### Fixed

@@ -273,7 +273,6 @@ async fn main() -> Result<()> {
         }
         Command::Cancel {
             swap_id,
-            force,
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
         } => {
@@ -292,20 +291,11 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            let cancel = cli::cancel(swap_id, Arc::new(bitcoin_wallet), db, force).await?;
-
-            match cancel {
-                Ok((txid, _)) => {
-                    tracing::debug!("Cancel transaction successfully published with id {}", txid)
-                }
-                Err(cli::cancel::Error::CancelTimelockNotExpiredYet) => tracing::error!(
-                    "The cancel transaction cannot be published yet, because the timelock has not expired. Please try again later"
-                ),
-            }
+            let (txid, _) = cli::cancel(swap_id, Arc::new(bitcoin_wallet), db).await?;
+            tracing::debug!("Cancel transaction successfully published with id {}", txid);
         }
         Command::Refund {
             swap_id,
-            force,
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
         } => {
@@ -324,7 +314,7 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            cli::refund(swap_id, Arc::new(bitcoin_wallet), db, force).await??;
+            cli::refund(swap_id, Arc::new(bitcoin_wallet), db).await?;
         }
         Command::ListSellers {
             rendezvous_point,
