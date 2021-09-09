@@ -1,4 +1,4 @@
-use crate::bitcoin::{Txid, Wallet};
+use crate::bitcoin::{parse_rpc_error_code, RpcErrorCode, Txid, Wallet};
 use crate::database::{Database, Swap};
 use crate::protocol::alice::AliceState;
 use anyhow::{bail, Result};
@@ -44,9 +44,11 @@ pub async fn cancel(
     let txid = match state3.submit_tx_cancel(bitcoin_wallet.as_ref()).await {
         Ok(txid) => txid,
         Err(err) => {
-            if let Some(bdk::Error::TransactionConfirmed) = err.downcast_ref::<bdk::Error>() {
-                tracing::info!("Cancel transaction has already been published and confirmed")
-            };
+            if let Ok(code) = parse_rpc_error_code(&err) {
+                if code == i64::from(RpcErrorCode::RpcVerifyAlreadyInChain) {
+                    tracing::info!("Cancel transaction has already been confirmed on chain")
+                }
+            }
             bail!(err);
         }
     };
