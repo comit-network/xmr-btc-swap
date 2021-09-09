@@ -18,51 +18,51 @@ where
     let matches = RawArguments::clap().get_matches_from_safe(raw_args)?;
     let args = RawArguments::from_clap(&matches);
 
-    let is_json = args.json;
-    let is_testnet = args.testnet;
+    let json = args.json;
+    let testnet = args.testnet;
     let config = args.config;
     let command: RawCommand = args.cmd;
 
     let arguments = match command {
         RawCommand::Start { resume_only } => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::Start { resume_only },
         },
         RawCommand::History => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::History,
         },
         RawCommand::WithdrawBtc { amount, address } => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::WithdrawBtc {
                 amount,
-                address: bitcoin_address(address, is_testnet)?,
+                address: bitcoin_address(address, testnet)?,
             },
         },
         RawCommand::Balance => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::Balance,
         },
         RawCommand::ManualRecovery(ManualRecovery::Redeem {
             redeem_params: RecoverCommandParams { swap_id },
             do_not_await_finality,
         }) => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::Redeem {
                 swap_id,
 
@@ -72,35 +72,35 @@ where
         RawCommand::ManualRecovery(ManualRecovery::Cancel {
             cancel_params: RecoverCommandParams { swap_id },
         }) => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::Cancel { swap_id },
         },
         RawCommand::ManualRecovery(ManualRecovery::Refund {
             refund_params: RecoverCommandParams { swap_id },
         }) => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::Refund { swap_id },
         },
         RawCommand::ManualRecovery(ManualRecovery::Punish {
             punish_params: RecoverCommandParams { swap_id },
         }) => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::Punish { swap_id },
         },
         RawCommand::ManualRecovery(ManualRecovery::SafelyAbort { swap_id }) => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::SafelyAbort { swap_id },
         },
     };
