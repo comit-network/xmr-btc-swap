@@ -82,6 +82,8 @@ async fn next_state(
                 })
                 .await?;
 
+            tracing::info!(%swap_id, "Starting new swap");
+
             BobState::SwapSetupCompleted(state2)
         }
         BobState::SwapSetupCompleted(state2) => {
