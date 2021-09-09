@@ -110,7 +110,7 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            tracing::info!(%amount, %fees, %swap_id,  "Starting new swap");
+            tracing::info!(%amount, %fees,  "Determined swap amount");
 
             db.insert_peer_id(swap_id, seller_peer_id).await?;
             db.insert_monero_address(swap_id, monero_receive_address)
