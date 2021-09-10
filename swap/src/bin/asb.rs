@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
     let Arguments {
         testnet,
         json,
-        timestamp,
+        disable_timestamp,
         config_path,
         env_config,
         cmd,
@@ -67,7 +67,7 @@ async fn main() -> Result<()> {
         }
     };
 
-    asb::tracing::init(LevelFilter::DEBUG, json, timestamp).expect("initialize tracing");
+    asb::tracing::init(LevelFilter::DEBUG, json, !disable_timestamp).expect("initialize tracing");
 
     let config = match read_config(config_path.clone())? {
         Ok(config) => config,
