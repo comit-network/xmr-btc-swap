@@ -336,7 +336,7 @@ mod tests {
     const SWAP_ID: &str = "ea030832-3be9-454f-bb98-5ea9a788406b";
 
     #[test]
-    fn ensure_command_mapping_for_mainnet() {
+    fn ensure_start_command_mapping_mainnet() {
         let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
         let mainnet_env_config = env::Mainnet::get_config();
 
@@ -345,37 +345,54 @@ mod tests {
             testnet: false,
             json: false,
             timestamp: false,
-            config_path: default_mainnet_conf_path.clone(),
+            config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::Start { resume_only: false },
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_history_command_mapping_mainnet() {
+        let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
+        let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![BINARY_NAME, "history"];
         let expected_args = Arguments {
             testnet: false,
             json: false,
             timestamp: false,
-            config_path: default_mainnet_conf_path.clone(),
+            config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::History,
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_balance_command_mapping_mainnet() {
+        let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
+        let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![BINARY_NAME, "balance"];
         let expected_args = Arguments {
             testnet: false,
             json: false,
             timestamp: false,
-            config_path: default_mainnet_conf_path.clone(),
+            config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::Balance,
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
 
+    #[test]
+    fn ensure_withdraw_command_mapping_mainnet() {
+        let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
+        let mainnet_env_config = env::Mainnet::get_config();
         let raw_ars = vec![
             BINARY_NAME,
             "withdraw-btc",
@@ -386,7 +403,7 @@ mod tests {
             testnet: false,
             json: false,
             timestamp: false,
-            config_path: default_mainnet_conf_path.clone(),
+            config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::WithdrawBtc {
                 amount: None,
@@ -395,6 +412,12 @@ mod tests {
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_cancel_command_mapping_mainnet() {
+        let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
+        let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -407,7 +430,7 @@ mod tests {
             testnet: false,
             json: false,
             timestamp: false,
-            config_path: default_mainnet_conf_path.clone(),
+            config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::Cancel {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
@@ -415,6 +438,12 @@ mod tests {
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_refund_command_mappin_mainnet() {
+        let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
+        let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -427,7 +456,7 @@ mod tests {
             testnet: false,
             json: false,
             timestamp: false,
-            config_path: default_mainnet_conf_path.clone(),
+            config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::Refund {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
@@ -435,6 +464,12 @@ mod tests {
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_punish_command_mapping_mainnet() {
+        let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
+        let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -447,7 +482,7 @@ mod tests {
             testnet: false,
             json: false,
             timestamp: false,
-            config_path: default_mainnet_conf_path.clone(),
+            config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::Punish {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
@@ -455,6 +490,12 @@ mod tests {
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_safely_abort_command_mapping_mainnet() {
+        let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
+        let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -478,7 +519,7 @@ mod tests {
     }
 
     #[test]
-    fn ensure_command_mapping_for_testnet() {
+    fn ensure_start_command_mapping_for_testnet() {
         let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
         let testnet_env_config = env::Testnet::get_config();
 
@@ -487,36 +528,54 @@ mod tests {
             testnet: true,
             json: false,
             timestamp: false,
-            config_path: default_testnet_conf_path.clone(),
+            config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::Start { resume_only: false },
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_history_command_mapping_testnet() {
+        let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
+        let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![BINARY_NAME, "--testnet", "history"];
         let expected_args = Arguments {
             testnet: true,
             json: false,
             timestamp: false,
-            config_path: default_testnet_conf_path.clone(),
+            config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::History,
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_balance_command_mapping_testnet() {
+        let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
+        let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![BINARY_NAME, "--testnet", "balance"];
         let expected_args = Arguments {
             testnet: true,
             json: false,
             timestamp: false,
-            config_path: default_testnet_conf_path.clone(),
+            config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::Balance,
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_withdraw_command_mapping_testnet() {
+        let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
+        let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -529,7 +588,7 @@ mod tests {
             testnet: true,
             json: false,
             timestamp: false,
-            config_path: default_testnet_conf_path.clone(),
+            config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::WithdrawBtc {
                 amount: None,
@@ -538,6 +597,11 @@ mod tests {
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+    #[test]
+    fn ensure_cancel_command_mapping_testnet() {
+        let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
+        let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -551,7 +615,7 @@ mod tests {
             testnet: true,
             json: false,
             timestamp: false,
-            config_path: default_testnet_conf_path.clone(),
+            config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::Cancel {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
@@ -559,6 +623,12 @@ mod tests {
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_refund_command_mapping_testnet() {
+        let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
+        let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -572,7 +642,7 @@ mod tests {
             testnet: true,
             json: false,
             timestamp: false,
-            config_path: default_testnet_conf_path.clone(),
+            config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::Refund {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
@@ -580,6 +650,12 @@ mod tests {
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_punish_command_mapping_testnet() {
+        let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
+        let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -593,7 +669,7 @@ mod tests {
             testnet: true,
             json: false,
             timestamp: false,
-            config_path: default_testnet_conf_path.clone(),
+            config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::Punish {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
@@ -601,6 +677,12 @@ mod tests {
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_safely_abort_command_mapping_testnet() {
+        let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
+        let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
