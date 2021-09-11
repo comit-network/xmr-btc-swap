@@ -58,7 +58,7 @@ async fn next_state(
     monero_wallet: &monero::Wallet,
     monero_receive_address: monero::Address,
 ) -> Result<BobState> {
-    tracing::trace!(%state, "Advancing state");
+    tracing::debug!(%state, "Advancing state");
 
     Ok(match state {
         BobState::Started {

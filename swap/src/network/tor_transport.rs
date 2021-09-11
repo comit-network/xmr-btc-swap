@@ -42,14 +42,14 @@ impl Transport for TorDialOnlyTransport {
         }
 
         let dial_future = async move {
-            tracing::trace!(address = %addr, "Establishing connection through Tor proxy");
+            tracing::debug!(address = %addr, "Establishing connection through Tor proxy");
 
             let stream =
                 Socks5Stream::connect((Ipv4Addr::LOCALHOST, self.socks_port), address.to_string())
                     .await
                     .map_err(|e| io::Error::new(io::ErrorKind::ConnectionRefused, e))?;
 
-            tracing::trace!("Connection through Tor established");
+            tracing::debug!("Connection through Tor established");
 
             Ok(TcpStream(stream.into_inner()))
         };
