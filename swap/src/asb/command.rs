@@ -18,51 +18,57 @@ where
     let matches = RawArguments::clap().get_matches_from_safe(raw_args)?;
     let args = RawArguments::from_clap(&matches);
 
-    let is_json = args.json;
-    let is_testnet = args.testnet;
+    let json = args.json;
+    let disable_timestamp = args.disable_timestamp;
+    let testnet = args.testnet;
     let config = args.config;
     let command: RawCommand = args.cmd;
 
     let arguments = match command {
         RawCommand::Start { resume_only } => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            disable_timestamp,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::Start { resume_only },
         },
         RawCommand::History => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            disable_timestamp,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::History,
         },
         RawCommand::WithdrawBtc { amount, address } => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            disable_timestamp,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::WithdrawBtc {
                 amount,
-                address: bitcoin_address(address, is_testnet)?,
+                address: bitcoin_address(address, testnet)?,
             },
         },
         RawCommand::Balance => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            disable_timestamp,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::Balance,
         },
         RawCommand::ManualRecovery(ManualRecovery::Redeem {
             redeem_params: RecoverCommandParams { swap_id },
             do_not_await_finality,
         }) => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            disable_timestamp,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::Redeem {
                 swap_id,
 
@@ -72,35 +78,39 @@ where
         RawCommand::ManualRecovery(ManualRecovery::Cancel {
             cancel_params: RecoverCommandParams { swap_id },
         }) => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            disable_timestamp,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::Cancel { swap_id },
         },
         RawCommand::ManualRecovery(ManualRecovery::Refund {
             refund_params: RecoverCommandParams { swap_id },
         }) => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            disable_timestamp,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::Refund { swap_id },
         },
         RawCommand::ManualRecovery(ManualRecovery::Punish {
             punish_params: RecoverCommandParams { swap_id },
         }) => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            disable_timestamp,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::Punish { swap_id },
         },
         RawCommand::ManualRecovery(ManualRecovery::SafelyAbort { swap_id }) => Arguments {
-            testnet: is_testnet,
-            json: is_json,
-            config_path: config_path(config, is_testnet)?,
-            env_config: env_config(is_testnet),
+            testnet,
+            json,
+            disable_timestamp,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
             cmd: Command::SafelyAbort { swap_id },
         },
     };
@@ -158,6 +168,7 @@ pub struct BitcoinAddressNetworkMismatch {
 pub struct Arguments {
     pub testnet: bool,
     pub json: bool,
+    pub disable_timestamp: bool,
     pub config_path: PathBuf,
     pub env_config: env::Config,
     pub cmd: Command,
@@ -209,6 +220,13 @@ pub struct RawArguments {
         help = "Changes the log messages to json vs plain-text. If you run ASB as a service, it is recommended to set this to true to simplify log analyses."
     )]
     pub json: bool,
+
+    #[structopt(
+        short,
+        long = "disable-timestamp",
+        help = "Disable timestamping of log messages"
+    )]
+    pub disable_timestamp: bool,
 
     #[structopt(
         long = "config",
@@ -318,7 +336,7 @@ mod tests {
     const SWAP_ID: &str = "ea030832-3be9-454f-bb98-5ea9a788406b";
 
     #[test]
-    fn ensure_command_mapping_for_mainnet() {
+    fn ensure_start_command_mapping_mainnet() {
         let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
         let mainnet_env_config = env::Mainnet::get_config();
 
@@ -326,35 +344,55 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
-            config_path: default_mainnet_conf_path.clone(),
+            disable_timestamp: false,
+            config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::Start { resume_only: false },
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_history_command_mapping_mainnet() {
+        let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
+        let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![BINARY_NAME, "history"];
         let expected_args = Arguments {
             testnet: false,
             json: false,
-            config_path: default_mainnet_conf_path.clone(),
+            disable_timestamp: false,
+            config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::History,
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_balance_command_mapping_mainnet() {
+        let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
+        let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![BINARY_NAME, "balance"];
         let expected_args = Arguments {
             testnet: false,
             json: false,
-            config_path: default_mainnet_conf_path.clone(),
+            disable_timestamp: false,
+            config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::Balance,
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
 
+    #[test]
+    fn ensure_withdraw_command_mapping_mainnet() {
+        let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
+        let mainnet_env_config = env::Mainnet::get_config();
         let raw_ars = vec![
             BINARY_NAME,
             "withdraw-btc",
@@ -364,7 +402,8 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
-            config_path: default_mainnet_conf_path.clone(),
+            disable_timestamp: false,
+            config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::WithdrawBtc {
                 amount: None,
@@ -373,6 +412,12 @@ mod tests {
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_cancel_command_mapping_mainnet() {
+        let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
+        let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -384,7 +429,8 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
-            config_path: default_mainnet_conf_path.clone(),
+            disable_timestamp: false,
+            config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::Cancel {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
@@ -392,6 +438,12 @@ mod tests {
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_refund_command_mappin_mainnet() {
+        let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
+        let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -403,7 +455,8 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
-            config_path: default_mainnet_conf_path.clone(),
+            disable_timestamp: false,
+            config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::Refund {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
@@ -411,6 +464,12 @@ mod tests {
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_punish_command_mapping_mainnet() {
+        let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
+        let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -422,7 +481,8 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
-            config_path: default_mainnet_conf_path.clone(),
+            disable_timestamp: false,
+            config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::Punish {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
@@ -430,6 +490,12 @@ mod tests {
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_safely_abort_command_mapping_mainnet() {
+        let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
+        let mainnet_env_config = env::Mainnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -441,6 +507,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            disable_timestamp: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
             cmd: Command::SafelyAbort {
@@ -452,7 +519,7 @@ mod tests {
     }
 
     #[test]
-    fn ensure_command_mapping_for_testnet() {
+    fn ensure_start_command_mapping_for_testnet() {
         let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
         let testnet_env_config = env::Testnet::get_config();
 
@@ -460,34 +527,55 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
-            config_path: default_testnet_conf_path.clone(),
+            disable_timestamp: false,
+            config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::Start { resume_only: false },
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_history_command_mapping_testnet() {
+        let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
+        let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![BINARY_NAME, "--testnet", "history"];
         let expected_args = Arguments {
             testnet: true,
             json: false,
-            config_path: default_testnet_conf_path.clone(),
+            disable_timestamp: false,
+            config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::History,
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_balance_command_mapping_testnet() {
+        let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
+        let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![BINARY_NAME, "--testnet", "balance"];
         let expected_args = Arguments {
             testnet: true,
             json: false,
-            config_path: default_testnet_conf_path.clone(),
+            disable_timestamp: false,
+            config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::Balance,
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_withdraw_command_mapping_testnet() {
+        let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
+        let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -499,7 +587,8 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
-            config_path: default_testnet_conf_path.clone(),
+            disable_timestamp: false,
+            config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::WithdrawBtc {
                 amount: None,
@@ -508,6 +597,11 @@ mod tests {
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+    #[test]
+    fn ensure_cancel_command_mapping_testnet() {
+        let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
+        let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -520,7 +614,8 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
-            config_path: default_testnet_conf_path.clone(),
+            disable_timestamp: false,
+            config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::Cancel {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
@@ -528,6 +623,12 @@ mod tests {
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_refund_command_mapping_testnet() {
+        let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
+        let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -540,7 +641,8 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
-            config_path: default_testnet_conf_path.clone(),
+            disable_timestamp: false,
+            config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::Refund {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
@@ -548,6 +650,12 @@ mod tests {
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_punish_command_mapping_testnet() {
+        let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
+        let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -560,7 +668,8 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
-            config_path: default_testnet_conf_path.clone(),
+            disable_timestamp: false,
+            config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::Punish {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
@@ -568,6 +677,12 @@ mod tests {
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_safely_abort_command_mapping_testnet() {
+        let default_testnet_conf_path = env::Testnet::getConfigFileDefaults().unwrap().config_path;
+        let testnet_env_config = env::Testnet::get_config();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -580,11 +695,30 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            disable_timestamp: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
             cmd: Command::SafelyAbort {
                 swap_id: Uuid::parse_str(SWAP_ID).unwrap(),
             },
+        };
+        let args = parse_args(raw_ars).unwrap();
+        assert_eq!(expected_args, args);
+    }
+
+    #[test]
+    fn ensure_disable_timestamp_mapping() {
+        let default_mainnet_conf_path = env::Mainnet::getConfigFileDefaults().unwrap().config_path;
+        let mainnet_env_config = env::Mainnet::get_config();
+
+        let raw_ars = vec![BINARY_NAME, "--disable-timestamp", "start"];
+        let expected_args = Arguments {
+            testnet: false,
+            json: false,
+            disable_timestamp: true,
+            config_path: default_mainnet_conf_path,
+            env_config: mainnet_env_config,
+            cmd: Command::Start { resume_only: false },
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);

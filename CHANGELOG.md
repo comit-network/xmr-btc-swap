@@ -9,9 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Timestamping is now enabled by default even when the ASB is not run inside an interactive terminal.
 - The `cancel`, `refund` and `punish` subcommands in ASB and CLI are run with the `--force` by default and the `--force` option has been removed.
   The force flag was used to ignore blockheight and protocol state checks.
   Users can still restart a swap with these checks using the `resume` subcommand.
+
+### Added
+
+- Added a `disable-timestamp` flag to the ASB that disables timestamps from logs.
 
 ## [0.8.3] - 2021-09-03
 
