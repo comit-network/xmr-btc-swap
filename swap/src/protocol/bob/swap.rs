@@ -1,8 +1,7 @@
 use crate::bitcoin::{ExpiredTimelocks, TxCancel, TxRefund};
 use crate::cli::EventLoopHandle;
-use crate::database::Swap;
 use crate::network::swap_setup::bob::NewSwap;
-use crate::protocol::bob;
+use crate::protocol::{bob, Database};
 use crate::protocol::bob::state::*;
 use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
@@ -20,12 +19,12 @@ pub fn is_complete(state: &BobState) -> bool {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn run(swap: bob::Swap) -> Result<BobState> {
+pub async fn run<D: Database>(swap: bob::Swap<D>) -> Result<BobState> {
     run_until(swap, is_complete).await
 }
 
-pub async fn run_until(
-    mut swap: bob::Swap,
+pub async fn run_until<D: Database>(
+    mut swap: bob::Swap<D>,
     is_target_state: fn(&BobState) -> bool,
 ) -> Result<BobState> {
     let mut current_state = swap.state;
@@ -33,7 +32,7 @@ pub async fn run_until(
     while !is_target_state(&current_state) {
         current_state = next_state(
             swap.id,
-            current_state,
+            current_state.clone(),
             &mut swap.event_loop_handle,
             swap.bitcoin_wallet.as_ref(),
             swap.monero_wallet.as_ref(),
@@ -41,9 +40,8 @@ pub async fn run_until(
         )
         .await?;
 
-        let db_state = current_state.clone().into();
         swap.db
-            .insert_latest_state(swap.id, Swap::Bob(db_state))
+            .insert_latest_state(swap.id, current_state.clone().into())
             .await?;
     }
 

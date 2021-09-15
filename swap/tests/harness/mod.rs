@@ -16,12 +16,12 @@ use std::sync::Arc;
 use std::time::Duration;
 use swap::asb::FixedRate;
 use swap::bitcoin::{CancelTimelock, PunishTimelock, TxCancel, TxPunish, TxRedeem, TxRefund};
-use swap::database::Database;
+use swap::database::SledDatabase;
 use swap::env::{Config, GetConfig};
 use swap::network::swarm;
 use swap::protocol::alice::{AliceState, Swap};
 use swap::protocol::bob::BobState;
-use swap::protocol::{alice, bob};
+use swap::protocol::{alice, bob, Database};
 use swap::seed::Seed;
 use swap::{asb, bitcoin, cli, env, monero};
 use tempfile::tempdir;
@@ -221,8 +221,8 @@ async fn start_alice(
     env_config: Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
-) -> (AliceApplicationHandle, Receiver<alice::Swap>) {
-    let db = Arc::new(Database::open(db_path.as_path()).unwrap());
+) -> (AliceApplicationHandle, Receiver<alice::Swap<SledDatabase>>) {
+    let db = SledDatabase::open(db_path.as_path()).await.unwrap();
 
     let min_buy = bitcoin::Amount::from_sat(u64::MIN);
     let max_buy = bitcoin::Amount::from_sat(u64::MAX);
@@ -400,9 +400,9 @@ struct BobParams {
 }
 
 impl BobParams {
-    pub async fn new_swap_from_db(&self, swap_id: Uuid) -> Result<(bob::Swap, cli::EventLoop)> {
+    pub async fn new_swap_from_db(&self, swap_id: Uuid) -> Result<(bob::Swap<SledDatabase>, cli::EventLoop)> {
         let (event_loop, handle) = self.new_eventloop(swap_id).await?;
-        let db = Database::open(&self.db_path)?;
+        let db = SledDatabase::open(&self.db_path).await?;
 
         let swap = bob::Swap::from_db(
             db,
@@ -412,7 +412,7 @@ impl BobParams {
             self.env_config,
             handle,
             self.monero_wallet.get_main_address(),
-        )?;
+        ).await?;
 
         Ok((swap, event_loop))
     }
@@ -420,11 +420,11 @@ impl BobParams {
     pub async fn new_swap(
         &self,
         btc_amount: bitcoin::Amount,
-    ) -> Result<(bob::Swap, cli::EventLoop)> {
+    ) -> Result<(bob::Swap<SledDatabase>, cli::EventLoop)> {
         let swap_id = Uuid::new_v4();
 
         let (event_loop, handle) = self.new_eventloop(swap_id).await?;
-        let db = Database::open(&self.db_path)?;
+        let db = SledDatabase::open(&self.db_path).await?;
 
         let swap = bob::Swap::new(
             db,
@@ -499,7 +499,7 @@ pub struct TestContext {
     alice_starting_balances: StartingBalances,
     alice_bitcoin_wallet: Arc<bitcoin::Wallet>,
     alice_monero_wallet: Arc<monero::Wallet>,
-    alice_swap_handle: mpsc::Receiver<Swap>,
+    alice_swap_handle: mpsc::Receiver<Swap<SledDatabase>>,
     alice_handle: AliceApplicationHandle,
 
     bob_params: BobParams,
@@ -526,14 +526,14 @@ impl TestContext {
         self.alice_swap_handle = alice_swap_handle;
     }
 
-    pub async fn alice_next_swap(&mut self) -> alice::Swap {
+    pub async fn alice_next_swap(&mut self) -> alice::Swap<SledDatabase> {
         timeout(Duration::from_secs(20), self.alice_swap_handle.recv())
             .await
             .expect("No Alice swap within 20 seconds, aborting because this test is likely waiting for a swap forever...")
             .unwrap()
     }
 
-    pub async fn bob_swap(&mut self) -> (bob::Swap, BobApplicationHandle) {
+    pub async fn bob_swap(&mut self) -> (bob::Swap<SledDatabase>, BobApplicationHandle) {
         let (swap, event_loop) = self.bob_params.new_swap(self.btc_amount).await.unwrap();
 
         // ensure the wallet is up to date for concurrent swap tests
@@ -548,7 +548,7 @@ impl TestContext {
         &mut self,
         join_handle: BobApplicationHandle,
         swap_id: Uuid,
-    ) -> (bob::Swap, BobApplicationHandle) {
+    ) -> (bob::Swap<SledDatabase>, BobApplicationHandle) {
         join_handle.abort();
 
         let (swap, event_loop) = self.bob_params.new_swap_from_db(swap_id).await.unwrap();

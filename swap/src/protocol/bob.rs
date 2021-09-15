@@ -3,19 +3,20 @@ use std::sync::Arc;
 use anyhow::Result;
 use uuid::Uuid;
 
-use crate::database::Database;
+use crate::protocol::Database;
 use crate::{bitcoin, cli, env, monero};
 
 pub use self::state::*;
 pub use self::swap::{run, run_until};
+use std::convert::TryInto;
 
 pub mod state;
 pub mod swap;
 
-pub struct Swap {
+pub struct Swap<D: Database> {
     pub state: BobState,
     pub event_loop_handle: cli::EventLoopHandle,
-    pub db: Database,
+    pub db: D,
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
     pub env_config: env::Config,
@@ -23,10 +24,10 @@ pub struct Swap {
     pub monero_receive_address: monero::Address,
 }
 
-impl Swap {
+impl<D: Database> Swap<D> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        db: Database,
+        db: D,
         id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
@@ -52,8 +53,8 @@ impl Swap {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn from_db(
-        db: Database,
+    pub async fn from_db(
+        db: D,
         id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
@@ -61,7 +62,7 @@ impl Swap {
         event_loop_handle: cli::EventLoopHandle,
         monero_receive_address: monero::Address,
     ) -> Result<Self> {
-        let state = db.get_state(id)?.try_into_bob()?.into();
+        let state = db.get_state(id).await?.try_into()?;
 
         Ok(Self {
             state,

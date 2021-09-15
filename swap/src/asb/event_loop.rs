@@ -1,5 +1,5 @@
 use crate::asb::{Behaviour, OutEvent, Rate};
-use crate::database::Database;
+use crate::protocol::{Database};
 use crate::network::quote::BidQuote;
 use crate::network::swap_setup::alice::WalletSnapshot;
 use crate::network::transfer_proof;
@@ -14,7 +14,7 @@ use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
 use rust_decimal::Decimal;
 use std::collections::HashMap;
-use std::convert::Infallible;
+use std::convert::{Infallible, TryInto};
 use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -31,20 +31,21 @@ type OutgoingTransferProof =
     BoxFuture<'static, Result<(PeerId, transfer_proof::Request, bmrng::Responder<()>)>>;
 
 #[allow(missing_debug_implementations)]
-pub struct EventLoop<LR>
+pub struct EventLoop<LR, D>
 where
     LR: LatestRate + Send + 'static + Debug + Clone,
+    D: Database + Send + 'static
 {
     swarm: libp2p::Swarm<Behaviour<LR>>,
     env_config: env::Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
-    db: Arc<Database>,
+    db: D,
     latest_rate: LR,
     min_buy: bitcoin::Amount,
     max_buy: bitcoin::Amount,
 
-    swap_sender: mpsc::Sender<Swap>,
+    swap_sender: mpsc::Sender<Swap<D>>,
 
     /// Stores incoming [`EncryptedSignature`]s per swap.
     recv_encrypted_signature: HashMap<Uuid, bmrng::RequestSender<bitcoin::EncryptedSignature, ()>>,
@@ -61,9 +62,10 @@ where
     inflight_transfer_proofs: HashMap<RequestId, bmrng::Responder<()>>,
 }
 
-impl<LR> EventLoop<LR>
+impl<LR, D> EventLoop<LR, D>
 where
     LR: LatestRate + Send + 'static + Debug + Clone,
+    D: Database + Send + Clone + 'static
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -71,11 +73,11 @@ where
         env_config: env::Config,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
-        db: Arc<Database>,
+        db: D,
         latest_rate: LR,
         min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,
-    ) -> Result<(Self, mpsc::Receiver<Swap>)> {
+    ) -> Result<(Self, mpsc::Receiver<Swap<D>>)> {
         let swap_channel = MpscChannels::default();
 
         let event_loop = EventLoop {
@@ -108,7 +110,8 @@ where
         self.inflight_encrypted_signatures
             .push(future::pending().boxed());
 
-        let unfinished_swaps = match self.db.unfinished_alice() {
+
+        let unfinished_swaps = match self.db.unfinished(|state | !state.swap_finished()).await {
             Ok(unfinished_swaps) => unfinished_swaps,
             Err(_) => {
                 tracing::error!("Failed to load unfinished swaps");
@@ -117,7 +120,7 @@ where
         };
 
         for (swap_id, state) in unfinished_swaps {
-            let peer_id = match self.db.get_peer_id(swap_id) {
+            let peer_id = match self.db.get_peer_id(swap_id).await {
                 Ok(peer_id) => peer_id,
                 Err(_) => {
                     tracing::warn!(%swap_id, "Resuming swap skipped because no peer-id found for swap in database");
@@ -133,7 +136,7 @@ where
                 monero_wallet: self.monero_wallet.clone(),
                 env_config: self.env_config,
                 db: self.db.clone(),
-                state: state.into(),
+                state: state.try_into().expect("Alice state loaded from db"),
                 swap_id,
             };
 
@@ -197,7 +200,7 @@ where
                         }
                         SwarmEvent::Behaviour(OutEvent::EncryptedSignatureReceived{ msg, channel, peer }) => {
                             let swap_id = msg.swap_id;
-                            let swap_peer = self.db.get_peer_id(swap_id);
+                            let swap_peer = self.db.get_peer_id(swap_id).await;
 
                             // Ensure that an incoming encrypted signature is sent by the peer-id associated with the swap
                             let swap_peer = match swap_peer {

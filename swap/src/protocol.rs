@@ -1,3 +1,5 @@
+use anyhow::Result;
+use async_trait::async_trait;
 use crate::{bitcoin, monero};
 use conquer_once::Lazy;
 use ecdsa_fun::fun::marker::Mark;
@@ -6,6 +8,13 @@ use sha2::Sha256;
 use sigma_fun::ext::dl_secp256k1_ed25519_eq::{CrossCurveDLEQ, CrossCurveDLEQProof};
 use sigma_fun::HashTranscript;
 use uuid::Uuid;
+use crate::protocol::alice::AliceState;
+use crate::protocol::bob::BobState;
+use std::path::Path;
+use libp2p::{PeerId, Multiaddr};
+use std::convert::TryInto;
+use crate::protocol::bob::swap::is_complete as bob_is_complete;
+use crate::protocol::alice::swap::is_complete as alice_is_complete;
 
 pub mod alice;
 pub mod bob;
@@ -64,4 +73,82 @@ pub struct Message3 {
 pub struct Message4 {
     tx_punish_sig: bitcoin::Signature,
     tx_cancel_sig: bitcoin::Signature,
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug, PartialEq)]
+pub enum State {
+    Alice(AliceState),
+    Bob(BobState),
+}
+
+impl State {
+    pub fn swap_finished(&self) -> bool {
+        match self {
+            State::Alice(state) =>  {
+                alice_is_complete(state)
+            },
+            State::Bob(state) => {
+                bob_is_complete(state)
+            },
+        }
+
+    }
+}
+
+impl From<AliceState> for State {
+    fn from(alice: AliceState) -> Self {
+        Self::Alice(alice)
+    }
+}
+
+impl From<BobState> for State {
+    fn from(bob: BobState) -> Self {
+        Self::Bob(bob)
+    }
+}
+
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq)]
+#[error("Not in the role of Alice")]
+pub struct NotAlice;
+
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq)]
+#[error("Not in the role of Bob")]
+pub struct NotBob;
+
+impl TryInto<BobState> for State {
+    type Error = NotBob;
+
+    fn try_into(self) -> std::result::Result<BobState, Self::Error> {
+        match self  {
+            State::Alice(_) => Err(NotBob),
+            State::Bob(state) => Ok(state),
+        }
+    }
+}
+
+impl TryInto<AliceState> for State {
+    type Error = NotAlice;
+
+    fn try_into(self) -> std::result::Result<AliceState, Self::Error> {
+        match self  {
+            State::Alice(state) => Ok(state),
+            State::Bob(_) => Err(NotAlice),
+        }
+    }
+}
+
+#[async_trait]
+pub trait Database {
+    async fn open(path: &Path) -> Result<Self> where Self: std::marker::Sized;
+    async fn insert_peer_id(&self, swap_id: Uuid, peer_id: PeerId) -> Result<()>;
+    async fn get_peer_id(&self, swap_id: Uuid) -> Result<PeerId>;
+    async fn insert_monero_address(&self, swap_id: Uuid, address: monero::Address) -> Result<()>;
+    async fn get_monero_address(&self, swap_id: Uuid) -> Result<monero::Address>;
+    async fn insert_address(&self, peer_id: PeerId, address: Multiaddr) -> Result<()>;
+    async fn get_addresses(&self, peer_id: PeerId) -> Result<Vec<Multiaddr>>;
+    async fn insert_latest_state(&self, swap_id: Uuid, state: State) -> Result<()>;
+    async fn get_state(&self, swap_id: Uuid) -> Result<State>;
+    async fn all(&self) -> Result<Vec<(Uuid, State)>>;
+    async fn unfinished(&self, unfinished: fn(State) -> bool) -> Result<Vec<(Uuid, State)>>;
 }
