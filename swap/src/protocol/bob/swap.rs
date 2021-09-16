@@ -215,6 +215,8 @@ async fn next_state(
         BobState::BtcRedeemed(state) => {
             let (spend_key, view_key) = state.xmr_keys();
 
+            tracing::info!("Private view key: {}", serde_json::to_string(&view_key)?);
+
             let wallet_file_name = swap_id.to_string();
             if let Err(e) = monero_wallet
                 .create_from_and_load(
