@@ -8,7 +8,7 @@ use libp2p::{Multiaddr, PeerId};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Debug};
-use std::path::Path;
+use std::path::PathBuf;
 use std::str::FromStr;
 use uuid::Uuid;
 use crate::protocol::alice::AliceState;
@@ -86,11 +86,11 @@ pub struct SledDatabase  {
 
 #[async_trait]
 impl Database for SledDatabase {
-    async fn open(path: &Path) -> Result<Self> {
-        tracing::debug!("Opening database at {}", path.display());
+    async fn open(path: PathBuf) -> Result<Self> {
+        tracing::debug!("Opening database at {:?}", &path);
 
         let db =
-            sled::open(path).with_context(|| format!("Could not open the DB at {:?}", path))?;
+            sled::open(path.clone()).with_context(|| format!("Could not open the DB at {}", &path.display()))?;
 
         let swaps = db.open_tree("swaps")?;
         let peers = db.open_tree("peers")?;
@@ -287,7 +287,7 @@ mod tests {
     #[tokio::test]
     async fn can_write_and_read_to_multiple_keys() {
         let db_dir = tempfile::tempdir().unwrap();
-        let db = SledDatabase::open(db_dir.path()).await.unwrap();
+        let db = SledDatabase::open(db_dir.into_path()).await.unwrap();
 
         let state_1 = State::from(AliceState::BtcRedeemed);
         let swap_id_1 = Uuid::new_v4();
@@ -318,7 +318,7 @@ mod tests {
     #[tokio::test]
     async fn can_write_twice_to_one_key() {
         let db_dir = tempfile::tempdir().unwrap();
-        let db = SledDatabase::open(db_dir.path()).await.unwrap();
+        let db = SledDatabase::open(db_dir.into_path()).await.unwrap();
 
         let state = State::from(AliceState::SafelyAborted);
 
@@ -347,7 +347,7 @@ mod tests {
     #[tokio::test]
     async fn can_save_swap_state_and_peer_id_with_same_swap_id() -> Result<()> {
         let db_dir = tempfile::tempdir().unwrap();
-        let db = SledDatabase::open(db_dir.path()).await.unwrap();
+        let db = SledDatabase::open(db_dir.into_path()).await.unwrap();
 
         let alice_id = Uuid::new_v4();
         let alice_state = State::from(AliceState::BtcPunished);
@@ -367,19 +367,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_reopen_db() -> Result<()> {
-        let db_dir = tempfile::tempdir().unwrap();
         let alice_id = Uuid::new_v4();
         let alice_state = State::from(AliceState::BtcPunished);
 
         let peer_id = PeerId::random();
 
+        let db_dir = tempfile::tempdir().unwrap();
         {
-            let db = SledDatabase::open(db_dir.path()).await.unwrap();
+            let db = SledDatabase::open(db_dir.path().to_path_buf()).await.unwrap();
             db.insert_latest_state(alice_id,alice_state.clone()).await?;
             db.insert_peer_id(alice_id, peer_id).await?;
         }
 
-        let db = SledDatabase::open(db_dir.path()).await.unwrap();
+        let db = SledDatabase::open(db_dir.into_path()).await.unwrap();
 
         let loaded_swap = db.get_state(alice_id).await?;
         let loaded_peer_id = db.get_peer_id(alice_id).await?;
@@ -392,18 +392,18 @@ mod tests {
 
     #[tokio::test]
     async fn save_and_load_addresses() -> Result<()> {
-        let db_dir = tempfile::tempdir()?;
         let peer_id = PeerId::random();
         let home1 = "/ip4/127.0.0.1/tcp/1".parse::<Multiaddr>()?;
         let home2 = "/ip4/127.0.0.1/tcp/2".parse::<Multiaddr>()?;
 
+        let db_dir = tempfile::tempdir()?;
         {
-            let db = SledDatabase::open(db_dir.path()).await?;
+            let db = SledDatabase::open(db_dir.path().to_path_buf()).await?;
             db.insert_address(peer_id, home1.clone()).await?;
             db.insert_address(peer_id, home2.clone()).await?;
         }
 
-        let addresses = SledDatabase::open(db_dir.path()).await?.get_addresses(peer_id).await?;
+        let addresses = SledDatabase::open(db_dir.into_path()).await?.get_addresses(peer_id).await?;
 
         assert_eq!(addresses, vec![home1, home2]);
 
@@ -415,8 +415,8 @@ mod tests {
         let db_dir = tempfile::tempdir()?;
         let swap_id = Uuid::new_v4();
 
-        SledDatabase::open(db_dir.path()).await?.insert_monero_address(swap_id, "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a".parse()?).await?;
-        let loaded_monero_address = SledDatabase::open(db_dir.path()).await?.get_monero_address(swap_id).await?;
+        SledDatabase::open(db_dir.path().to_path_buf()).await?.insert_monero_address(swap_id, "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a".parse()?).await?;
+        let loaded_monero_address = SledDatabase::open(db_dir.into_path()).await?.get_monero_address(swap_id).await?;
 
         assert_eq!(loaded_monero_address.to_string(), "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a");
 

@@ -20,6 +20,7 @@ pub mod asb;
 pub mod bitcoin;
 pub mod cli;
 pub mod database;
+pub mod sqlite;
 pub mod env;
 pub mod fs;
 pub mod kraken;

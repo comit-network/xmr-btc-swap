@@ -93,7 +93,7 @@ async fn main() -> Result<()> {
 
     let db_path = config.data.dir.join("database");
 
-    let db = SledDatabase::open(config.data.dir.join(db_path).as_path()).await
+    let db = SledDatabase::open(config.data.dir.join(db_path)).await
         .context("Could not open database")?;
 
     let seed =

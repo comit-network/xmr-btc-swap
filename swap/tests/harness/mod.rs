@@ -222,7 +222,7 @@ async fn start_alice(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
 ) -> (AliceApplicationHandle, Receiver<alice::Swap<SledDatabase>>) {
-    let db = SledDatabase::open(db_path.as_path()).await.unwrap();
+    let db = SledDatabase::open(db_path).await.unwrap();
 
     let min_buy = bitcoin::Amount::from_sat(u64::MIN);
     let max_buy = bitcoin::Amount::from_sat(u64::MAX);
@@ -402,7 +402,7 @@ struct BobParams {
 impl BobParams {
     pub async fn new_swap_from_db(&self, swap_id: Uuid) -> Result<(bob::Swap<SledDatabase>, cli::EventLoop)> {
         let (event_loop, handle) = self.new_eventloop(swap_id).await?;
-        let db = SledDatabase::open(&self.db_path).await?;
+        let db = SledDatabase::open(self.db_path.clone()).await?;
 
         let swap = bob::Swap::from_db(
             db,
@@ -424,7 +424,7 @@ impl BobParams {
         let swap_id = Uuid::new_v4();
 
         let (event_loop, handle) = self.new_eventloop(swap_id).await?;
-        let db = SledDatabase::open(&self.db_path).await?;
+        let db = SledDatabase::open(self.db_path.clone()).await?;
 
         let swap = bob::Swap::new(
             db,

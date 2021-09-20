@@ -10,7 +10,7 @@ use sigma_fun::HashTranscript;
 use uuid::Uuid;
 use crate::protocol::alice::AliceState;
 use crate::protocol::bob::BobState;
-use std::path::Path;
+use std::path::PathBuf;
 use libp2p::{PeerId, Multiaddr};
 use std::convert::TryInto;
 use crate::protocol::bob::swap::is_complete as bob_is_complete;
@@ -140,7 +140,7 @@ impl TryInto<AliceState> for State {
 
 #[async_trait]
 pub trait Database {
-    async fn open(path: &Path) -> Result<Self> where Self: std::marker::Sized;
+    async fn open(path: PathBuf) -> Result<Self> where Self: std::marker::Sized;
     async fn insert_peer_id(&self, swap_id: Uuid, peer_id: PeerId) -> Result<()>;
     async fn get_peer_id(&self, swap_id: Uuid) -> Result<PeerId>;
     async fn insert_monero_address(&self, swap_id: Uuid, address: monero::Address) -> Result<()>;
@@ -150,5 +150,6 @@ pub trait Database {
     async fn insert_latest_state(&self, swap_id: Uuid, state: State) -> Result<()>;
     async fn get_state(&self, swap_id: Uuid) -> Result<State>;
     async fn all(&self) -> Result<Vec<(Uuid, State)>>;
+    // todo: return a hashmap here
     async fn unfinished(&self, unfinished: fn(State) -> bool) -> Result<Vec<(Uuid, State)>>;
 }
