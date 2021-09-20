@@ -19,6 +19,7 @@ bdk = "0.10"
 big-bytes = "1"
 bitcoin = { version = "0.26", features = [ "rand", "use-serde" ] }
 bmrng = "0.5"
+chrono = "0.4"
 comfy-table = "4.1.1"
 config = { version = "0.11", default-features = false, features = [ "toml" ] }
 conquer-once = "0.3"
@@ -49,6 +50,7 @@ serde_with = { version = "1", features = [ "macros" ] }
 sha2 = "0.9"
 sigma_fun = { git = "https://github.com/LLFourn/secp256kfun", default-features = false, features = [ "ed25519", "serde" ] }
 sled = "0.34"
+sqlx = { version = "0.5", features = [ "sqlite", "runtime-tokio-rustls", "offline" ] }
 structopt = "0.3"
 strum = { version = "0.21", features = [ "derive" ] }
 thiserror = "1"

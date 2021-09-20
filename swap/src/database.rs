@@ -1,6 +1,7 @@
 pub use self::sled::SledDatabase;
 pub use alice::Alice;
 pub use bob::Bob;
+pub use sqlite::SqliteDatabase;
 
 use crate::protocol::State;
 use anyhow::{bail, Result};
@@ -10,6 +11,7 @@ use std::fmt::Display;
 mod alice;
 mod bob;
 mod sled;
+mod sqlite;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum Swap {
