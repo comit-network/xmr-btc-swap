@@ -217,6 +217,9 @@ async fn next_state(
 
             tracing::info!("Private view key: {}", serde_json::to_string(&view_key)?);
 
+            let address = monero::Address::subaddress(monero::Network::Mainnet, monero::PublicKey::from_private_key(&spend_key), monero::PublicKey::from(view_key.public()));
+            tracing::info!("Address: {}", address.to_string());
+
             let wallet_file_name = swap_id.to_string();
             if let Err(e) = monero_wallet
                 .create_from_and_load(
