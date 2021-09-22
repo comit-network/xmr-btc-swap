@@ -1,10 +1,10 @@
-use crate::database::{Database, Swap};
+use crate::database::{SledDatabase, Swap};
 use crate::protocol::alice::AliceState;
 use anyhow::{bail, Result};
 use std::sync::Arc;
 use uuid::Uuid;
 
-pub async fn safely_abort(swap_id: Uuid, db: Arc<Database>) -> Result<AliceState> {
+pub async fn safely_abort(swap_id: Uuid, db: Arc<SledDatabase>) -> Result<AliceState> {
     let state = db.get_state(swap_id)?.try_into_alice()?.into();
 
     match state {

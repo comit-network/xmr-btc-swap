@@ -1,5 +1,5 @@
 use crate::asb::{Behaviour, OutEvent, Rate};
-use crate::database::Database;
+use crate::database::SledDatabase;
 use crate::network::quote::BidQuote;
 use crate::network::swap_setup::alice::WalletSnapshot;
 use crate::network::transfer_proof;
@@ -39,7 +39,7 @@ where
     env_config: env::Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
-    db: Arc<Database>,
+    db: Arc<SledDatabase>,
     latest_rate: LR,
     min_buy: bitcoin::Amount,
     max_buy: bitcoin::Amount,
@@ -71,7 +71,7 @@ where
         env_config: env::Config,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
-        db: Arc<Database>,
+        db: Arc<SledDatabase>,
         latest_rate: LR,
         min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,

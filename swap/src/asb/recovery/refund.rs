@@ -1,5 +1,5 @@
 use crate::bitcoin::{self};
-use crate::database::{Database, Swap};
+use crate::database::{SledDatabase, Swap};
 use crate::monero;
 use crate::protocol::alice::AliceState;
 use anyhow::{bail, Result};
@@ -26,7 +26,7 @@ pub async fn refund(
     swap_id: Uuid,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
-    db: Arc<Database>,
+    db: Arc<SledDatabase>,
 ) -> Result<AliceState> {
     let state = db.get_state(swap_id)?.try_into_alice()?.into();
 

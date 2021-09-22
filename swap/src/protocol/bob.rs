@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use uuid::Uuid;
 
-use crate::database::Database;
+use crate::database::SledDatabase;
 use crate::{bitcoin, cli, env, monero};
 
 pub use self::state::*;
@@ -15,7 +15,7 @@ pub mod swap;
 pub struct Swap {
     pub state: BobState,
     pub event_loop_handle: cli::EventLoopHandle,
-    pub db: Database,
+    pub db: SledDatabase,
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
     pub env_config: env::Config,
@@ -26,7 +26,7 @@ pub struct Swap {
 impl Swap {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        db: Database,
+        db: SledDatabase,
         id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
@@ -53,7 +53,7 @@ impl Swap {
 
     #[allow(clippy::too_many_arguments)]
     pub fn from_db(
-        db: Database,
+        db: SledDatabase,
         id: Uuid,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,

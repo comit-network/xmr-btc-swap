@@ -25,7 +25,7 @@ use std::time::Duration;
 use swap::bitcoin::TxLock;
 use swap::cli::command::{parse_args_and_apply_defaults, Arguments, Command, ParseResult};
 use swap::cli::{list_sellers, EventLoop, SellerStatus};
-use swap::database::Database;
+use swap::database::SledDatabase;
 use swap::env::Config;
 use swap::libp2p_ext::MultiAddrExt;
 use swap::network::quote::BidQuote;
@@ -66,7 +66,7 @@ async fn main() -> Result<()> {
             let swap_id = Uuid::new_v4();
 
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
-            let db = Database::open(data_dir.join("database").as_path())
+            let db = SledDatabase::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
@@ -139,7 +139,7 @@ async fn main() -> Result<()> {
             }
         }
         Command::History => {
-            let db = Database::open(data_dir.join("database").as_path())
+            let db = SledDatabase::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
 
             let mut table = Table::new();
@@ -215,7 +215,7 @@ async fn main() -> Result<()> {
             tor_socks5_port,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
-            let db = Database::open(data_dir.join("database").as_path())
+            let db = SledDatabase::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
@@ -277,7 +277,7 @@ async fn main() -> Result<()> {
             bitcoin_target_block,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
-            let db = Database::open(data_dir.join("database").as_path())
+            let db = SledDatabase::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
@@ -300,7 +300,7 @@ async fn main() -> Result<()> {
             bitcoin_target_block,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
-            let db = Database::open(data_dir.join("database").as_path())
+            let db = SledDatabase::open(data_dir.join("database").as_path())
                 .context("Failed to open database")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;

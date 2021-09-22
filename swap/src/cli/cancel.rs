@@ -1,5 +1,5 @@
 use crate::bitcoin::{parse_rpc_error_code, RpcErrorCode, Txid, Wallet};
-use crate::database::{Database, Swap};
+use crate::database::{SledDatabase, Swap};
 use crate::protocol::bob::BobState;
 use anyhow::{bail, Result};
 use std::sync::Arc;
@@ -8,7 +8,7 @@ use uuid::Uuid;
 pub async fn cancel(
     swap_id: Uuid,
     bitcoin_wallet: Arc<Wallet>,
-    db: Database,
+    db: SledDatabase,
 ) -> Result<(Txid, BobState)> {
     let state = db.get_state(swap_id)?.try_into_bob()?.into();
 

@@ -28,7 +28,7 @@ use swap::asb::config::{
     initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
 };
 use swap::asb::{cancel, punish, redeem, refund, safely_abort, EventLoop, Finality, KrakenRate};
-use swap::database::Database;
+use swap::database::SledDatabase;
 use swap::monero::Amount;
 use swap::network::rendezvous::XmrBtcNamespace;
 use swap::network::swarm;
@@ -92,7 +92,7 @@ async fn main() -> Result<()> {
 
     let db_path = config.data.dir.join("database");
 
-    let db = Database::open(config.data.dir.join(db_path).as_path())
+    let db = SledDatabase::open(config.data.dir.join(db_path).as_path())
         .context("Could not open database")?;
 
     let seed =

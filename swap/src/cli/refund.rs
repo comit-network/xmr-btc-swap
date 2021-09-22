@@ -1,11 +1,15 @@
 use crate::bitcoin::Wallet;
-use crate::database::{Database, Swap};
+use crate::database::{SledDatabase, Swap};
 use crate::protocol::bob::BobState;
 use anyhow::{bail, Result};
 use std::sync::Arc;
 use uuid::Uuid;
 
-pub async fn refund(swap_id: Uuid, bitcoin_wallet: Arc<Wallet>, db: Database) -> Result<BobState> {
+pub async fn refund(
+    swap_id: Uuid,
+    bitcoin_wallet: Arc<Wallet>,
+    db: SledDatabase,
+) -> Result<BobState> {
     let state = db.get_state(swap_id)?.try_into_bob()?.into();
 
     let state6 = match state {
