@@ -54,6 +54,12 @@ async fn main() -> Result<()> {
         }
     };
 
+    let db = Arc::new(
+        SledDatabase::open(data_dir.join("database").as_path())
+            .await
+            .context("Failed to open database")?,
+    );
+
     match cmd {
         Command::BuyXmr {
             seller,
@@ -67,11 +73,6 @@ async fn main() -> Result<()> {
             let swap_id = Uuid::new_v4();
 
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
-            let db = Arc::new(
-                SledDatabase::open(data_dir.join("database").as_path())
-                    .await
-                    .context("Failed to open database")?,
-            );
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
 
@@ -143,10 +144,6 @@ async fn main() -> Result<()> {
             }
         }
         Command::History => {
-            let db = SledDatabase::open(data_dir.join("database").as_path())
-                .await
-                .context("Failed to open database")?;
-
             let mut table = Table::new();
 
             table.set_header(vec!["SWAP ID", "STATE"]);
@@ -221,11 +218,6 @@ async fn main() -> Result<()> {
             tor_socks5_port,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
-            let db = Arc::new(
-                SledDatabase::open(data_dir.join("database").as_path())
-                    .await
-                    .context("Failed to open database")?,
-            );
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
 
@@ -287,11 +279,6 @@ async fn main() -> Result<()> {
             bitcoin_target_block,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
-            let db = Arc::new(
-                SledDatabase::open(data_dir.join("database").as_path())
-                    .await
-                    .context("Failed to open database")?,
-            );
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
 
@@ -313,11 +300,6 @@ async fn main() -> Result<()> {
             bitcoin_target_block,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
-            let db = Arc::new(
-                SledDatabase::open(data_dir.join("database").as_path())
-                    .await
-                    .context("Failed to open database")?,
-            );
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
 
