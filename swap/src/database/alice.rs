@@ -7,7 +7,7 @@ use monero_rpc::wallet::BlockHeight;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-// Large enum variant is fine because this is only used for database
+// Large enum variant is fine because this is only used for sled
 // and is dropped once written in DB.
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]

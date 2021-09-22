@@ -290,7 +290,7 @@ struct RawArguments {
 
     #[structopt(
         long = "--data-base-dir",
-        help = "The base data directory to be used for mainnet / testnet specific data like database, wallets etc"
+        help = "The base data directory to be used for mainnet / testnet specific data like sled, wallets etc"
     )]
     data: Option<PathBuf>,
 

@@ -23,7 +23,6 @@ impl SqliteDatabase {
     }
 }
 
-
 #[async_trait]
 impl Database for SqliteDatabase {
     async fn open(path: PathBuf) -> Result<Self> where Self: std::marker::Sized  {
@@ -187,7 +186,7 @@ impl Database for SqliteDatabase {
             swap_id
         ).fetch_all(&mut conn).await?;
 
-        let row = row.first().context(format!("No state in database for swap: {}", swap_id))?;
+        let row = row.first().context(format!("No state in sled for swap: {}", swap_id))?;
         let swap: Swap = serde_json::from_str(&row.state)?;
 
         Ok(swap.into())

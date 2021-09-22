@@ -123,7 +123,7 @@ where
             let peer_id = match self.db.get_peer_id(swap_id).await {
                 Ok(peer_id) => peer_id,
                 Err(_) => {
-                    tracing::warn!(%swap_id, "Resuming swap skipped because no peer-id found for swap in database");
+                    tracing::warn!(%swap_id, "Resuming swap skipped because no peer-id found for swap in sled");
                     continue;
                 }
             };
@@ -361,7 +361,7 @@ where
                 }
             }
             Err(error) => {
-                tracing::warn!(%swap_id, "Unable to save peer-id in database: {}", error);
+                tracing::warn!(%swap_id, "Unable to save peer-id in sled: {}", error);
             }
         }
     }

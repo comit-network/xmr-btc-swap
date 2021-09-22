@@ -28,7 +28,7 @@ use swap::asb::config::{
     initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
 };
 use swap::asb::{cancel, punish, redeem, refund, safely_abort, EventLoop, Finality, KrakenRate};
-use swap::database::SledDatabase;
+use swap::database::sled::SledDatabase;
 use swap::monero::Amount;
 use swap::network::rendezvous::XmrBtcNamespace;
 use swap::network::swarm;
@@ -91,10 +91,10 @@ async fn main() -> Result<()> {
         ));
     }
 
-    let db_path = config.data.dir.join("database");
+    let db_path = config.data.dir.join("sled");
 
     let db = SledDatabase::open(config.data.dir.join(db_path)).await
-        .context("Could not open database")?;
+        .context("Could not open sled")?;
 
     let seed =
         Seed::from_file_or_generate(&config.data.dir).expect("Could not retrieve/initialize seed");

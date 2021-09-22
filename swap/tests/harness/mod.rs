@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use swap::asb::FixedRate;
 use swap::bitcoin::{CancelTimelock, PunishTimelock, TxCancel, TxPunish, TxRedeem, TxRefund};
-use swap::database::SledDatabase;
+use swap::database::sled::SledDatabase;
 use swap::env::{Config, GetConfig};
 use swap::network::swarm;
 use swap::protocol::alice::{AliceState, Swap};

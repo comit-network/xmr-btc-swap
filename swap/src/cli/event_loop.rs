@@ -120,7 +120,7 @@ impl EventLoop {
 
                             if swap_id != self.swap_id {
 
-                                // TODO: Save unexpected transfer proofs in the database and check for messages in the database when handling swaps
+                                // TODO: Save unexpected transfer proofs in the sled and check for messages in the sled when handling swaps
                                 tracing::warn!("Received unexpected transfer proof for swap {} while running swap {}. This transfer proof will be ignored", swap_id, self.swap_id);
 
                                 // When receiving a transfer proof that is unexpected we still have to acknowledge that it was received
