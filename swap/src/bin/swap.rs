@@ -55,6 +55,9 @@ async fn main() -> Result<()> {
         }
     };
 
+    let db = SledDatabase::open(data_dir.join("sled")).await
+        .context("Failed to open sled")?;
+
     match cmd {
         Command::BuyXmr {
             seller,
@@ -68,8 +71,6 @@ async fn main() -> Result<()> {
             let swap_id = Uuid::new_v4();
 
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
-            let db = SledDatabase::open(data_dir.join("sled")).await
-                .context("Failed to open sled")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
 
@@ -141,9 +142,6 @@ async fn main() -> Result<()> {
             }
         }
         Command::History => {
-            let db = SledDatabase::open(data_dir.join("sled")).await
-                .context("Failed to open sled")?;
-
             let mut table = Table::new();
 
             table.set_header(vec!["SWAP ID", "STATE"]);
@@ -218,8 +216,6 @@ async fn main() -> Result<()> {
             tor_socks5_port,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
-            let db = SledDatabase::open(data_dir.join("sled")).await
-                .context("Failed to open sled")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
 
@@ -280,8 +276,6 @@ async fn main() -> Result<()> {
             bitcoin_target_block,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
-            let db = SledDatabase::open(data_dir.join("sled")).await
-                .context("Failed to open sled")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
 
@@ -303,8 +297,6 @@ async fn main() -> Result<()> {
             bitcoin_target_block,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
-            let db = SledDatabase::open(data_dir.join("sled")).await
-                .context("Failed to open sled")?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
 
