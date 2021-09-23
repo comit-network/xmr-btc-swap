@@ -4,31 +4,28 @@ use crate::asb::{EventLoopHandle, LatestRate};
 use crate::bitcoin::ExpiredTimelocks;
 use crate::env::Config;
 use crate::protocol::alice::{AliceState, Swap};
-use crate::protocol::{Database};
 use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
 use tokio::select;
 use tokio::time::timeout;
 use uuid::Uuid;
 
-pub async fn run<LR, D>(swap: Swap<D>, rate_service: LR) -> Result<AliceState>
+pub async fn run<LR>(swap: Swap, rate_service: LR) -> Result<AliceState>
 where
     LR: LatestRate + Clone,
-    D: Database
 {
 
     run_until(swap, |_| false, rate_service).await
 }
 
 #[tracing::instrument(name = "swap", skip(swap,exit_early,rate_service), fields(id = %swap.swap_id), err)]
-pub async fn run_until<LR, D>(
-    mut swap: Swap<D>,
+pub async fn run_until<LR>(
+    mut swap: Swap,
     exit_early: fn(&AliceState) -> bool,
     rate_service: LR,
 ) -> Result<AliceState>
 where
     LR: LatestRate + Clone,
-    D: Database
 {
     let mut current_state = swap.state;
 

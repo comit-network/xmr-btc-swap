@@ -12,12 +12,12 @@ use crate::protocol::Database;
 pub mod state;
 pub mod swap;
 
-pub struct Swap<D: Database> {
+pub struct Swap {
     pub state: AliceState,
     pub event_loop_handle: asb::EventLoopHandle,
     pub bitcoin_wallet: Arc<bitcoin::Wallet>,
     pub monero_wallet: Arc<monero::Wallet>,
     pub env_config: Config,
     pub swap_id: Uuid,
-    pub db: D,
+    pub db: Arc<dyn Database + Send + Sync>,
 }

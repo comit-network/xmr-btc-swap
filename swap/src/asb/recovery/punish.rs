@@ -15,7 +15,7 @@ pub enum Error {
 pub async fn punish(
     swap_id: Uuid,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
-    db: impl Database,
+    db: Arc<dyn Database + Send>,
 ) -> Result<(Txid, AliceState)> {
     let state = db.get_state(swap_id).await?.try_into()?;
 

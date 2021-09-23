@@ -28,7 +28,6 @@ use swap::asb::config::{
     initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
 };
 use swap::asb::{cancel, punish, redeem, refund, safely_abort, EventLoop, Finality, KrakenRate};
-use swap::database::sled::SledDatabase;
 use swap::monero::Amount;
 use swap::network::rendezvous::XmrBtcNamespace;
 use swap::network::swarm;
@@ -37,8 +36,8 @@ use swap::seed::Seed;
 use swap::tor::AuthenticatedClient;
 use swap::{asb, bitcoin, kraken, monero, tor};
 use tracing_subscriber::filter::LevelFilter;
-use swap::protocol::Database;
 use std::convert::TryInto;
+use swap::database::open_db;
 
 const DEFAULT_WALLET_NAME: &str = "asb-wallet";
 
@@ -91,10 +90,8 @@ async fn main() -> Result<()> {
         ));
     }
 
-    let db_path = config.data.dir.join("sled");
-
-    let db = SledDatabase::open(config.data.dir.join(db_path)).await
-        .context("Could not open sled")?;
+    let sled = false;
+    let db = open_db(config.data.dir.clone(), sled).await?;
 
     let seed =
         Seed::from_file_or_generate(&config.data.dir).expect("Could not retrieve/initialize seed");

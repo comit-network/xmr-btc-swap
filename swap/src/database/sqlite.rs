@@ -11,6 +11,7 @@ use async_trait::async_trait;
 use crate::database::Swap;
 use std::str::FromStr;
 use anyhow::Context;
+use sqlx::migrate::MigrateDatabase;
 
 pub struct SqliteDatabase {
     pool: Pool<Sqlite>
@@ -27,6 +28,7 @@ impl SqliteDatabase {
 impl Database for SqliteDatabase {
     async fn open(path: PathBuf) -> Result<Self> where Self: std::marker::Sized  {
         let path_str = format!("sqlite:{}", path.as_path().display());
+        Sqlite::create_database(&path_str).await?;
         let pool = SqlitePool::connect(&path_str)
             .await?;
       Ok(Self { pool })

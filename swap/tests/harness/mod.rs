@@ -221,8 +221,8 @@ async fn start_alice(
     env_config: Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
-) -> (AliceApplicationHandle, Receiver<alice::Swap<SledDatabase>>) {
-    let db = SledDatabase::open(db_path).await.unwrap();
+) -> (AliceApplicationHandle, Receiver<alice::Swap>) {
+    let db = Arc::new(SledDatabase::open(db_path).await.unwrap());
 
     let min_buy = bitcoin::Amount::from_sat(u64::MIN);
     let max_buy = bitcoin::Amount::from_sat(u64::MAX);
@@ -400,12 +400,12 @@ struct BobParams {
 }
 
 impl BobParams {
-    pub async fn new_swap_from_db(&self, swap_id: Uuid) -> Result<(bob::Swap<SledDatabase>, cli::EventLoop)> {
+    pub async fn new_swap_from_db(&self, swap_id: Uuid) -> Result<(bob::Swap, cli::EventLoop)> {
         let (event_loop, handle) = self.new_eventloop(swap_id).await?;
         let db = SledDatabase::open(self.db_path.clone()).await?;
 
         let swap = bob::Swap::from_db(
-            db,
+            Arc::new(db),
             swap_id,
             self.bitcoin_wallet.clone(),
             self.monero_wallet.clone(),
@@ -420,14 +420,14 @@ impl BobParams {
     pub async fn new_swap(
         &self,
         btc_amount: bitcoin::Amount,
-    ) -> Result<(bob::Swap<SledDatabase>, cli::EventLoop)> {
+    ) -> Result<(bob::Swap, cli::EventLoop)> {
         let swap_id = Uuid::new_v4();
 
         let (event_loop, handle) = self.new_eventloop(swap_id).await?;
         let db = SledDatabase::open(self.db_path.clone()).await?;
 
         let swap = bob::Swap::new(
-            db,
+            Arc::new(db),
             swap_id,
             self.bitcoin_wallet.clone(),
             self.monero_wallet.clone(),
@@ -499,7 +499,7 @@ pub struct TestContext {
     alice_starting_balances: StartingBalances,
     alice_bitcoin_wallet: Arc<bitcoin::Wallet>,
     alice_monero_wallet: Arc<monero::Wallet>,
-    alice_swap_handle: mpsc::Receiver<Swap<SledDatabase>>,
+    alice_swap_handle: mpsc::Receiver<Swap>,
     alice_handle: AliceApplicationHandle,
 
     bob_params: BobParams,
@@ -526,14 +526,14 @@ impl TestContext {
         self.alice_swap_handle = alice_swap_handle;
     }
 
-    pub async fn alice_next_swap(&mut self) -> alice::Swap<SledDatabase> {
+    pub async fn alice_next_swap(&mut self) -> alice::Swap {
         timeout(Duration::from_secs(20), self.alice_swap_handle.recv())
             .await
             .expect("No Alice swap within 20 seconds, aborting because this test is likely waiting for a swap forever...")
             .unwrap()
     }
 
-    pub async fn bob_swap(&mut self) -> (bob::Swap<SledDatabase>, BobApplicationHandle) {
+    pub async fn bob_swap(&mut self) -> (bob::Swap, BobApplicationHandle) {
         let (swap, event_loop) = self.bob_params.new_swap(self.btc_amount).await.unwrap();
 
         // ensure the wallet is up to date for concurrent swap tests
@@ -548,7 +548,7 @@ impl TestContext {
         &mut self,
         join_handle: BobApplicationHandle,
         swap_id: Uuid,
-    ) -> (bob::Swap<SledDatabase>, BobApplicationHandle) {
+    ) -> (bob::Swap, BobApplicationHandle) {
         join_handle.abort();
 
         let (swap, event_loop) = self.bob_params.new_swap_from_db(swap_id).await.unwrap();

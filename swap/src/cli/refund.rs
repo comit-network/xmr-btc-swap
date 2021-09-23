@@ -6,7 +6,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 use std::convert::TryInto;
 
-pub async fn refund(swap_id: Uuid, bitcoin_wallet: Arc<Wallet>, db: impl Database) -> Result<BobState> {
+pub async fn refund(swap_id: Uuid, bitcoin_wallet: Arc<Wallet>, db: Arc<dyn Database>) -> Result<BobState> {
     let state = db.get_state(swap_id).await?.try_into()?;
 
     let state6 = match state {

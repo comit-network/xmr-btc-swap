@@ -9,7 +9,7 @@ use std::convert::TryInto;
 pub async fn cancel(
     swap_id: Uuid,
     bitcoin_wallet: Arc<Wallet>,
-    db: impl Database,
+    db: Arc<dyn Database + Send>,
 ) -> Result<(Txid, AliceState)> {
     let state = db.get_state(swap_id).await?.try_into()?;
 

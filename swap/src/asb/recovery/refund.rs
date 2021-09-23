@@ -27,7 +27,7 @@ pub async fn refund(
     swap_id: Uuid,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
-    db: impl Database,
+    db: Arc<dyn Database + Send>,
 ) -> Result<AliceState> {
     let state = db.get_state(swap_id).await?.try_into()?;
 

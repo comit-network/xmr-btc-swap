@@ -24,7 +24,7 @@ impl Finality {
 pub async fn redeem(
     swap_id: Uuid,
     bitcoin_wallet: Arc<Wallet>,
-    db: impl Database,
+    db: Arc<dyn Database + Send>,
     finality: Finality,
 ) -> Result<(Txid, AliceState)> {
     let state = db.get_state(swap_id).await?.try_into()?;

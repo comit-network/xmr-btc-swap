@@ -31,21 +31,20 @@ type OutgoingTransferProof =
     BoxFuture<'static, Result<(PeerId, transfer_proof::Request, bmrng::Responder<()>)>>;
 
 #[allow(missing_debug_implementations)]
-pub struct EventLoop<LR, D>
+pub struct EventLoop<LR>
 where
     LR: LatestRate + Send + 'static + Debug + Clone,
-    D: Database + Send + 'static
 {
     swarm: libp2p::Swarm<Behaviour<LR>>,
     env_config: env::Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
-    db: D,
+    db: Arc<dyn Database + Send + Sync>,
     latest_rate: LR,
     min_buy: bitcoin::Amount,
     max_buy: bitcoin::Amount,
 
-    swap_sender: mpsc::Sender<Swap<D>>,
+    swap_sender: mpsc::Sender<Swap>,
 
     /// Stores incoming [`EncryptedSignature`]s per swap.
     recv_encrypted_signature: HashMap<Uuid, bmrng::RequestSender<bitcoin::EncryptedSignature, ()>>,
@@ -62,10 +61,9 @@ where
     inflight_transfer_proofs: HashMap<RequestId, bmrng::Responder<()>>,
 }
 
-impl<LR, D> EventLoop<LR, D>
+impl<LR> EventLoop<LR>
 where
     LR: LatestRate + Send + 'static + Debug + Clone,
-    D: Database + Send + Clone + 'static
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -73,11 +71,11 @@ where
         env_config: env::Config,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
         monero_wallet: Arc<monero::Wallet>,
-        db: D,
+        db: Arc<dyn Database + Send + Sync>,
         latest_rate: LR,
         min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,
-    ) -> Result<(Self, mpsc::Receiver<Swap<D>>)> {
+    ) -> Result<(Self, mpsc::Receiver<Swap>)> {
         let swap_channel = MpscChannels::default();
 
         let event_loop = EventLoop {

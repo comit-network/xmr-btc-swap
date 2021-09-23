@@ -3,8 +3,9 @@ use crate::protocol::alice::AliceState;
 use anyhow::{bail, Result};
 use uuid::Uuid;
 use std::convert::TryInto;
+use std::sync::Arc;
 
-pub async fn safely_abort(swap_id: Uuid, db: impl Database) -> Result<AliceState> {
+pub async fn safely_abort(swap_id: Uuid, db: Arc<dyn Database + Send>,) -> Result<AliceState> {
     let state = db.get_state(swap_id).await?.try_into()?;
 
     match state {
