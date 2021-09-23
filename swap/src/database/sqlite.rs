@@ -22,10 +22,12 @@ impl SqliteDatabase {
     {
         let path_str = format!("sqlite:{}", path.as_ref().display());
         let pool = SqlitePool::connect(&path_str).await?;
-        Ok(Self { pool })
+        let mut sqlite = Self { pool };
+        sqlite.run_migrations().await?;
+        Ok(sqlite)
     }
 
-    pub async fn run_migrations(&mut self) -> anyhow::Result<()> {
+    async fn run_migrations(&mut self) -> anyhow::Result<()> {
         sqlx::migrate!("./migrations").run(&self.pool).await?;
         Ok(())
     }
@@ -374,9 +376,7 @@ mod tests {
         // file has to exist in order to connect with sqlite
         File::create(temp_db.clone()).unwrap();
 
-        let mut db = SqliteDatabase::open(temp_db).await?;
-
-        db.run_migrations().await.unwrap();
+        let db = SqliteDatabase::open(temp_db).await?;
 
         Ok(db)
     }

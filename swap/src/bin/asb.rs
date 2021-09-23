@@ -29,12 +29,11 @@ use swap::asb::config::{
     initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
 };
 use swap::asb::{cancel, punish, redeem, refund, safely_abort, EventLoop, Finality, KrakenRate};
-use swap::database::SledDatabase;
+use swap::database::open_db;
 use swap::monero::Amount;
 use swap::network::rendezvous::XmrBtcNamespace;
 use swap::network::swarm;
 use swap::protocol::alice::{run, AliceState};
-use swap::protocol::Database;
 use swap::seed::Seed;
 use swap::tor::AuthenticatedClient;
 use swap::{asb, bitcoin, kraken, monero, tor};
@@ -93,10 +92,9 @@ async fn main() -> Result<()> {
     }
 
     let db_path = config.data.dir.join("database");
+    let sled_path = config.data.dir.join(db_path);
 
-    let db = SledDatabase::open(config.data.dir.join(db_path).as_path())
-        .await
-        .context("Could not open database")?;
+    let db = open_db(sled_path, config.data.dir.join("sqlite"), true).await?;
 
     let seed =
         Seed::from_file_or_generate(&config.data.dir).expect("Could not retrieve/initialize seed");
@@ -180,7 +178,7 @@ async fn main() -> Result<()> {
                 env_config,
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
-                Arc::new(db),
+                db,
                 kraken_rate.clone(),
                 config.maker.min_buy_btc,
                 config.maker.max_buy_btc,
@@ -252,7 +250,7 @@ async fn main() -> Result<()> {
         Command::Cancel { swap_id } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
 
-            let (txid, _) = cancel(swap_id, Arc::new(bitcoin_wallet), Arc::new(db)).await?;
+            let (txid, _) = cancel(swap_id, Arc::new(bitcoin_wallet), db).await?;
 
             tracing::info!("Cancel transaction successfully published with id {}", txid);
         }
@@ -264,7 +262,7 @@ async fn main() -> Result<()> {
                 swap_id,
                 Arc::new(bitcoin_wallet),
                 Arc::new(monero_wallet),
-                Arc::new(db),
+                db,
             )
             .await?;
 
@@ -273,12 +271,12 @@ async fn main() -> Result<()> {
         Command::Punish { swap_id } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
 
-            let (txid, _) = punish(swap_id, Arc::new(bitcoin_wallet), Arc::new(db)).await?;
+            let (txid, _) = punish(swap_id, Arc::new(bitcoin_wallet), db).await?;
 
             tracing::info!("Punish transaction successfully published with id {}", txid);
         }
         Command::SafelyAbort { swap_id } => {
-            safely_abort(swap_id, Arc::new(db)).await?;
+            safely_abort(swap_id, db).await?;
 
             tracing::info!("Swap safely aborted");
         }
@@ -291,7 +289,7 @@ async fn main() -> Result<()> {
             let (txid, _) = redeem(
                 swap_id,
                 Arc::new(bitcoin_wallet),
-                Arc::new(db),
+                db,
                 Finality::from_bool(do_not_await_finality),
             )
             .await?;
