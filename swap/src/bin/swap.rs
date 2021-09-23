@@ -25,18 +25,18 @@ use std::time::Duration;
 use swap::bitcoin::TxLock;
 use swap::cli::command::{parse_args_and_apply_defaults, Arguments, Command, ParseResult};
 use swap::cli::{list_sellers, EventLoop, SellerStatus};
-use swap::database::SledDatabase;
 use swap::env::Config;
 use swap::libp2p_ext::MultiAddrExt;
 use swap::network::quote::BidQuote;
 use swap::network::swarm;
-use swap::protocol::{bob, Database};
+use swap::protocol::bob;
 use swap::protocol::bob::{Swap, BobState};
 use swap::seed::Seed;
 use swap::{bitcoin, cli, monero};
 use url::Url;
 use uuid::Uuid;
 use std::convert::TryInto;
+use swap::database::open_db;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -54,8 +54,7 @@ async fn main() -> Result<()> {
         }
     };
 
-    let db = SledDatabase::open(data_dir.join("database").as_path())
-        .context("Failed to open database")?;
+    let db = open_db(data_dir.join("database"), data_dir.join("sqlite"), true).await?;
 
     match cmd {
         Command::BuyXmr {

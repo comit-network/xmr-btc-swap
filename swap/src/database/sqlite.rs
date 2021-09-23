@@ -3,7 +3,7 @@ use sqlx::sqlite::Sqlite;
 use anyhow::Result;
 use chrono::Utc;
 use crate::protocol::{State, Database};
-use std::path::PathBuf;
+use std::path::Path;
 use libp2p::{PeerId, Multiaddr};
 use crate::monero::Address;
 use sqlx::{SqlitePool, Pool};
@@ -18,8 +18,8 @@ pub struct SqliteDatabase {
 }
 
 impl SqliteDatabase {
-    pub async fn open(path: PathBuf) -> Result<Self> where Self: std::marker::Sized  {
-        let path_str = format!("sqlite:{}", path.as_path().display());
+    pub async fn open(path: impl AsRef<Path>) -> Result<Self> where Self: std::marker::Sized  {
+        let path_str = format!("sqlite:{}", path.as_ref().display());
         let pool = SqlitePool::connect(&path_str)
             .await?;
         Ok(Self { pool })
