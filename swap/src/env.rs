@@ -3,8 +3,9 @@ use crate::bitcoin::{CancelTimelock, PunishTimelock};
 use std::cmp::max;
 use std::time::Duration;
 use time::ext::NumericalStdDuration;
+use serde::Serialize;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize)]
 pub struct Config {
     pub bitcoin_lock_mempool_timeout: Duration,
     pub bitcoin_lock_confirmed_timeout: Duration,
@@ -15,6 +16,7 @@ pub struct Config {
     pub bitcoin_network: bitcoin::Network,
     pub monero_avg_block_time: Duration,
     pub monero_finality_confirmations: u64,
+    #[serde(with = "monero_network")]
     pub monero_network: monero::Network,
 }
 
@@ -120,6 +122,23 @@ pub fn new(is_testnet: bool, asb_config: &asb::config::Config) -> Config {
         }
     } else {
         env_config
+    }
+}
+
+mod monero_network {
+    use serde::Serializer;
+    use crate::monero::Network;
+
+    pub fn serialize<S>(x: &monero::Network, s: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+    {
+        let str = match x {
+            Network::Mainnet => "mainnet",
+            Network::Stagenet => "stagenet",
+            Network::Testnet => "testnet"
+        };
+        s.serialize_str(&str)
     }
 }
 
