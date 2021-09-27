@@ -12,6 +12,7 @@ use crate::database::Swap;
 use std::str::FromStr;
 use anyhow::Context;
 use tokio::fs::File;
+use std::collections::HashMap;
 
 pub struct SqliteDatabase {
     pool: Pool<Sqlite>

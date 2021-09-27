@@ -13,6 +13,7 @@ pub use crate::database::alice::Alice;
 pub use crate::database::bob::Bob;
 use crate::database::Swap;
 use crate::protocol::{Database, State};
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct SledDatabase  {
@@ -181,7 +182,7 @@ impl Database for SledDatabase {
         self.all_iter().collect()
     }
 
-    async fn unfinished(&self, unfinished: fn(State) -> bool) -> Result<Vec<(Uuid, State)>> {
+    async fn unfinished(&self, unfinished: fn(State) -> bool) -> Result<HashMap<Uuid, State>> {
         self.all_iter().into_iter()
             .filter_ok(|(_swap_id, state)| unfinished(state.clone()))
             .collect()

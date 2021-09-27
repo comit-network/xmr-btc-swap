@@ -15,6 +15,7 @@ use libp2p::{PeerId, Multiaddr};
 use std::convert::TryInto;
 use crate::protocol::bob::swap::is_complete as bob_is_complete;
 use crate::protocol::alice::swap::is_complete as alice_is_complete;
+use std::collections::HashMap;
 
 pub mod alice;
 pub mod bob;
@@ -150,6 +151,5 @@ pub trait Database {
     async fn insert_latest_state(&self, swap_id: Uuid, state: State) -> Result<()>;
     async fn get_state(&self, swap_id: Uuid) -> Result<State>;
     async fn all(&self) -> Result<Vec<(Uuid, State)>>;
-    // todo: return a hashmap here
-    async fn unfinished(&self, unfinished: fn(State) -> bool) -> Result<Vec<(Uuid, State)>>;
+    async fn unfinished(&self, unfinished: fn(State) -> bool) -> Result<HashMap<Uuid, State>>;
 }
