@@ -45,6 +45,7 @@ async fn main() -> Result<()> {
         data_dir,
         debug,
         json,
+        sled,
         cmd,
     } = match parse_args_and_apply_defaults(env::args_os())? {
         ParseResult::Arguments(args) => args,
@@ -54,7 +55,7 @@ async fn main() -> Result<()> {
         }
     };
 
-    let db = open_db(data_dir.join("database"), data_dir.join("sqlite"), true).await?;
+    let db = open_db(data_dir.join("database"), data_dir.join("sqlite"), sled).await?;
 
     match cmd {
         Command::BuyXmr {
