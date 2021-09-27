@@ -46,6 +46,7 @@ async fn main() -> Result<()> {
     let Arguments {
         testnet,
         json,
+        sled,
         config_path,
         env_config,
         cmd,
@@ -90,7 +91,6 @@ async fn main() -> Result<()> {
         ));
     }
 
-    let sled = false;
     let db = open_db(config.data.dir.clone(), sled).await?;
 
     let seed =

@@ -45,6 +45,7 @@ async fn main() -> Result<()> {
         data_dir,
         debug,
         json,
+        sled,
         cmd,
     } = match parse_args_and_apply_defaults(env::args_os())? {
         ParseResult::Arguments(args) => args,
@@ -54,7 +55,6 @@ async fn main() -> Result<()> {
         }
     };
 
-    let sled = false;
     let db = open_db(data_dir.clone(), sled).await?;
 
     match cmd {
