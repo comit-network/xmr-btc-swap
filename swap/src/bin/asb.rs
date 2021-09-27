@@ -217,6 +217,10 @@ async fn main() -> Result<()> {
 
             println!("{}", table);
         }
+        Command::Config => {
+            let config_json = serde_json::to_string_pretty(&config)?;
+            println!("{}", config_json);
+        }
         Command::WithdrawBtc { amount, address } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
 

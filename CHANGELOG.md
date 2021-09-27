@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This makes it easier to build applications on top of xmr-btc-swap by enabling developers to read swap information directly from the database.
   This resolved an issue where users where unable to run concurrent processes, for example, users could not print the swap history if another ASB or CLI process was running.
   The sqlite database filed is named `sqlite` and is found in the data directory.
+  You can print the data directory using the `config` subcommand.
   The schema can be found here [here](swap/migrations/20210903050345_create_swaps_table.sql).
 
 #### Database migration guide
@@ -47,6 +48,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 ### Added
 
 - Added a `disable-timestamp` flag to the ASB that disables timestamps from logs.
+- A `config` subcommand that prints the current configuration including the data directory location.
+  This feature should alleviate difficulties users were having when finding where xmr-btc-swap was storing data.
 
 ## [0.8.3] - 2021-09-03
 

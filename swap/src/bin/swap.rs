@@ -152,7 +152,37 @@ async fn main() -> Result<()> {
 
             println!("{}", table);
         }
-
+        Command::Config => {
+            println!("Data directory: {}", data_dir.display());
+            println!(
+                "Log files locations: {}",
+                format!("{}/wallet", data_dir.display())
+            );
+            println!(
+                "Sled folder location: {}",
+                format!("{}/database", data_dir.display())
+            );
+            println!(
+                "Sqlite file location: {}",
+                format!("{}/sqlite", data_dir.display())
+            );
+            println!(
+                "Seed file location: {}",
+                format!("{}/seed.pem", data_dir.display())
+            );
+            println!(
+                "Monero-wallet-rpc location: {}",
+                format!("{}/monero", data_dir.display())
+            );
+            println!(
+                "Internal bitcoin wallet location: {}",
+                format!("{}/wallet", data_dir.display())
+            );
+            println!(
+                "Internal bitcoin wallet location: {}",
+                format!("{}/wallet", data_dir.display())
+            );
+        }
         Command::WithdrawBtc {
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,

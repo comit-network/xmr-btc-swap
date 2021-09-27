@@ -113,6 +113,14 @@ where
             data_dir: data::data_dir_from(data, is_testnet)?,
             cmd: Command::History,
         },
+        RawCommand::Config => Arguments {
+            env_config: env_config_from(is_testnet),
+            debug,
+            json,
+            sled,
+            data_dir: data::data_dir_from(data, is_testnet)?,
+            cmd: Command::Config,
+        },
         RawCommand::Balance { bitcoin } => {
             let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
                 bitcoin.apply_defaults(is_testnet)?;
@@ -248,6 +256,7 @@ pub enum Command {
         tor_socks5_port: u16,
     },
     History,
+    Config,
     WithdrawBtc {
         bitcoin_electrum_rpc_url: Url,
         bitcoin_target_block: usize,
@@ -355,6 +364,8 @@ enum RawCommand {
     },
     /// Show a list of past, ongoing and completed swaps
     History,
+    #[structopt(about = "Prints the current config")]
+    Config,
     #[structopt(about = "Allows withdrawing BTC from the internal Bitcoin wallet.")]
     WithdrawBtc {
         #[structopt(flatten)]
