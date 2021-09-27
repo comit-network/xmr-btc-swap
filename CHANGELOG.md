@@ -7,19 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A `config` subcommand that prints the current configuration including the data directory location.
+  This feature should alleviate difficulties users were having when finding where xmr-btc-swap was storing data.
+
 ### Changed
 
 - ASB and CLI can migrate their data to sqlite to store swaps and related data.
   This makes it easier to build applications on top of xmr-btc-swap by enabling developers to read swap information directly from the database.
   This resolved an issue where users where unable to run concurrent processes, for example, users could not print the swap history if another ASB or CLI process was running.
   The sqlite database filed is named `sqlite` and  is found in the data directory.
+  You can print the data directory using the `config` subcommand.
   The schema can be found here [here](swap/migrations/20210903050345_create_swaps_table.sql).
 
 #### Migration guide
 
 ##### Delete old data 
 The simplest way to migrate is to accept the loss of data and delete the old database.
-1. Find the location of the old database using the `todo(datadir)` subcommand.
+1. Find the location of the old database using the `config` subcommand.
 2. Delete the database
 3. Run xmr-btc-swap
 xmr-btc swap will create a new sqlite database and use that from now on.

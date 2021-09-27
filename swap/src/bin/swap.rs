@@ -152,7 +152,11 @@ async fn main() -> Result<()> {
 
             println!("{}", table);
         }
-
+        Command::Config => {
+            println!("Data Directory: {}", data_dir.display());
+            let config_json = serde_json::to_string_pretty(&env_config)?;
+            println!("Config: {}", config_json);
+        }
         Command::WithdrawBtc {
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,

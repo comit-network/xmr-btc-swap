@@ -60,6 +60,14 @@ where
             env_config: env_config(is_testnet),
             cmd: Command::Balance,
         },
+        RawCommand::Config => Arguments {
+            testnet: is_testnet,
+            json: is_json,
+            sled: is_sled,
+            config_path: config_path(config, is_testnet)?,
+            env_config: env_config(is_testnet),
+            cmd: Command::Config,
+        },
         RawCommand::ManualRecovery(ManualRecovery::Redeem {
             redeem_params: RecoverCommandParams { swap_id },
             do_not_await_finality,
@@ -180,6 +188,7 @@ pub enum Command {
         resume_only: bool,
     },
     History,
+    Config,
     WithdrawBtc {
         amount: Option<Amount>,
         address: Address,
@@ -252,6 +261,8 @@ pub enum RawCommand {
     },
     #[structopt(about = "Prints swap-id and the state of each swap ever made.")]
     History,
+    #[structopt(about = "Prints the current config")]
+    Config,
     #[structopt(about = "Allows withdrawing BTC from the internal Bitcoin wallet.")]
     WithdrawBtc {
         #[structopt(

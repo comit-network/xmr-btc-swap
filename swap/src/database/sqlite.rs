@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use crate::database::Swap;
 use std::str::FromStr;
 use anyhow::Context;
-use sqlx::migrate::MigrateDatabase;
+use tokio::fs::File;
 
 pub struct SqliteDatabase {
     pool: Pool<Sqlite>
@@ -27,11 +27,16 @@ impl SqliteDatabase {
 #[async_trait]
 impl Database for SqliteDatabase {
     async fn open(path: PathBuf) -> Result<Self> where Self: std::marker::Sized  {
+        if let Some(prefix) = path.parent() {
+            tokio::fs::create_dir_all(prefix).await?;
+        }
+        File::create(&path).await?;
         let path_str = format!("sqlite:{}", path.as_path().display());
-        Sqlite::create_database(&path_str).await?;
         let pool = SqlitePool::connect(&path_str)
             .await?;
-      Ok(Self { pool })
+        let mut db = Self { pool };
+        db.run_migrations().await?;
+      Ok(db)
     }
 
     async fn insert_peer_id(&self, swap_id: Uuid, peer_id: PeerId) -> Result<()> {
