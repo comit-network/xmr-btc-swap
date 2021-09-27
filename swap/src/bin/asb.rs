@@ -47,6 +47,7 @@ async fn main() -> Result<()> {
         testnet,
         json,
         disable_timestamp,
+        sled,
         config_path,
         env_config,
         cmd,
@@ -94,7 +95,7 @@ async fn main() -> Result<()> {
     let db_path = config.data.dir.join("database");
     let sled_path = config.data.dir.join(db_path);
 
-    let db = open_db(sled_path, config.data.dir.join("sqlite"), true).await?;
+    let db = open_db(sled_path, config.data.dir.join("sqlite"), sled).await?;
 
     let seed =
         Seed::from_file_or_generate(&config.data.dir).expect("Could not retrieve/initialize seed");

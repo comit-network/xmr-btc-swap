@@ -14,6 +14,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The force flag was used to ignore blockheight and protocol state checks.
   Users can still restart a swap with these checks using the `resume` subcommand.
 - Changed log level of the "Advancing state", "Establishing Connection through Tor proxy" and "Connection through Tor established" log message from tracing to debug in the CLI.
+- ASB and CLI can migrate their data to sqlite to store swaps and related data.
+  This makes it easier to build applications on top of xmr-btc-swap by enabling developers to read swap information directly from the database.
+  This resolved an issue where users where unable to run concurrent processes, for example, users could not print the swap history if another ASB or CLI process was running.
+  The sqlite database filed is named `sqlite` and is found in the data directory.
+  The schema can be found here [here](swap/migrations/20210903050345_create_swaps_table.sql).
+
+#### Database migration guide
+
+##### Delete old data
+
+The simplest way to migrate is to accept the loss of data and delete the old database.
+
+1. Find the location of the old database using the `config` subcommand.
+2. Delete the database
+3. Run xmr-btc-swap
+   xmr-btc swap will create a new sqlite database and use that from now on.
+
+##### Preserve old data
+
+It is possible to migrate critical data from the old db to the sqlite but there are many pitfalls.
+
+1. Run xmr-btc-swap as you would normally
+   xmr-btc-swap will try and automatically migrate your existing data to the new database.
+   If the existing database contains swaps for very early releases, the migration will fail due to an incompatible schema.
+2. Print out the swap history using the `history` subcommand.
+3. Print out the swap history stored in the old database by also passing the `--sled` flag.
+   eg. `swap-cli --sled history`
+4. Compare the old and new history to see if you are happy with migration.
+5. If you are unhappy with the new history you can continue to use the old database by passing the `--sled flag`
 
 ### Added
 

@@ -21,6 +21,7 @@ where
     let json = args.json;
     let disable_timestamp = args.disable_timestamp;
     let testnet = args.testnet;
+    let sled = args.sled;
     let config = args.config;
     let command: RawCommand = args.cmd;
 
@@ -29,6 +30,7 @@ where
             testnet,
             json,
             disable_timestamp,
+            sled,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Start { resume_only },
@@ -37,6 +39,7 @@ where
             testnet,
             json,
             disable_timestamp,
+            sled,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::History,
@@ -45,6 +48,7 @@ where
             testnet,
             json,
             disable_timestamp,
+            sled,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::WithdrawBtc {
@@ -56,6 +60,7 @@ where
             testnet,
             json,
             disable_timestamp,
+            sled,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Balance,
@@ -67,6 +72,7 @@ where
             testnet,
             json,
             disable_timestamp,
+            sled,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Redeem {
@@ -81,6 +87,7 @@ where
             testnet,
             json,
             disable_timestamp,
+            sled,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Cancel { swap_id },
@@ -91,6 +98,7 @@ where
             testnet,
             json,
             disable_timestamp,
+            sled,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Refund { swap_id },
@@ -101,6 +109,7 @@ where
             testnet,
             json,
             disable_timestamp,
+            sled,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::Punish { swap_id },
@@ -109,6 +118,7 @@ where
             testnet,
             json,
             disable_timestamp,
+            sled,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
             cmd: Command::SafelyAbort { swap_id },
@@ -168,6 +178,7 @@ pub struct BitcoinAddressNetworkMismatch {
 pub struct Arguments {
     pub testnet: bool,
     pub json: bool,
+    pub sled: bool,
     pub disable_timestamp: bool,
     pub config_path: PathBuf,
     pub env_config: env::Config,
@@ -227,6 +238,13 @@ pub struct RawArguments {
         help = "Disable timestamping of log messages"
     )]
     pub disable_timestamp: bool,
+
+    #[structopt(
+        short,
+        long = "sled",
+        help = "Forces the asb to use the deprecated sled db if it is available"
+    )]
+    pub sled: bool,
 
     #[structopt(
         long = "config",
@@ -344,6 +362,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            sled: false,
             disable_timestamp: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
@@ -362,6 +381,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            sled: false,
             disable_timestamp: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
@@ -380,6 +400,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            sled: false,
             disable_timestamp: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
@@ -402,6 +423,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            sled: false,
             disable_timestamp: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
@@ -429,6 +451,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            sled: false,
             disable_timestamp: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
@@ -455,6 +478,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            sled: false,
             disable_timestamp: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
@@ -481,6 +505,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            sled: false,
             disable_timestamp: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
@@ -507,6 +532,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            sled: false,
             disable_timestamp: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
@@ -527,6 +553,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            sled: false,
             disable_timestamp: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
@@ -545,6 +572,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            sled: false,
             disable_timestamp: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
@@ -563,6 +591,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            sled: false,
             disable_timestamp: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
@@ -587,6 +616,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            sled: false,
             disable_timestamp: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
@@ -614,6 +644,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            sled: false,
             disable_timestamp: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
@@ -641,6 +672,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            sled: false,
             disable_timestamp: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
@@ -668,6 +700,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            sled: false,
             disable_timestamp: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
@@ -695,6 +728,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: true,
             json: false,
+            sled: false,
             disable_timestamp: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
@@ -715,6 +749,7 @@ mod tests {
         let expected_args = Arguments {
             testnet: false,
             json: false,
+            sled: false,
             disable_timestamp: true,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
