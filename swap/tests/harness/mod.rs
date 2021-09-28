@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use swap::asb::FixedRate;
 use swap::bitcoin::{CancelTimelock, PunishTimelock, TxCancel, TxPunish, TxRedeem, TxRefund};
-use swap::database::Database;
+use swap::database::SledDatabase;
 use swap::env::{Config, GetConfig};
 use swap::network::swarm;
 use swap::protocol::alice::{AliceState, Swap};
@@ -222,7 +222,7 @@ async fn start_alice(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
 ) -> (AliceApplicationHandle, Receiver<alice::Swap>) {
-    let db = Arc::new(Database::open(db_path.as_path()).unwrap());
+    let db = Arc::new(SledDatabase::open(db_path.as_path()).await.unwrap());
 
     let min_buy = bitcoin::Amount::from_sat(u64::MIN);
     let max_buy = bitcoin::Amount::from_sat(u64::MAX);
@@ -402,7 +402,7 @@ struct BobParams {
 impl BobParams {
     pub async fn new_swap_from_db(&self, swap_id: Uuid) -> Result<(bob::Swap, cli::EventLoop)> {
         let (event_loop, handle) = self.new_eventloop(swap_id).await?;
-        let db = Database::open(&self.db_path)?;
+        let db = Arc::new(SledDatabase::open(&self.db_path).await?);
 
         let swap = bob::Swap::from_db(
             db,
@@ -412,7 +412,7 @@ impl BobParams {
             self.env_config,
             handle,
             self.monero_wallet.get_main_address(),
-        )?;
+        ).await?;
 
         Ok((swap, event_loop))
     }
@@ -424,7 +424,7 @@ impl BobParams {
         let swap_id = Uuid::new_v4();
 
         let (event_loop, handle) = self.new_eventloop(swap_id).await?;
-        let db = Database::open(&self.db_path)?;
+        let db = Arc::new(SledDatabase::open(&self.db_path).await?);
 
         let swap = bob::Swap::new(
             db,

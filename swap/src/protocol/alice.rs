@@ -1,6 +1,5 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
-use crate::database::Database;
 use crate::env::Config;
 use crate::{asb, bitcoin, monero};
 use std::sync::Arc;
@@ -8,6 +7,7 @@ use uuid::Uuid;
 
 pub use self::state::*;
 pub use self::swap::{run, run_until};
+use crate::protocol::Database;
 
 pub mod state;
 pub mod swap;
@@ -19,5 +19,5 @@ pub struct Swap {
     pub monero_wallet: Arc<monero::Wallet>,
     pub env_config: Config,
     pub swap_id: Uuid,
-    pub db: Arc<Database>,
+    pub db: Arc<dyn Database + Send + Sync>,
 }
