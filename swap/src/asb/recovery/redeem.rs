@@ -1,7 +1,8 @@
 use crate::bitcoin::{Txid, Wallet};
-use crate::database::{SledDatabase, Swap};
 use crate::protocol::alice::AliceState;
+use crate::protocol::Database;
 use anyhow::{bail, Result};
+use std::convert::TryInto;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -23,10 +24,10 @@ impl Finality {
 pub async fn redeem(
     swap_id: Uuid,
     bitcoin_wallet: Arc<Wallet>,
-    db: Arc<SledDatabase>,
+    db: Arc<dyn Database>,
     finality: Finality,
 ) -> Result<(Txid, AliceState)> {
-    let state = db.get_state(swap_id)?.try_into_alice()?.into();
+    let state = db.get_state(swap_id).await?.try_into()?;
 
     match state {
         AliceState::EncSigLearned {
@@ -42,17 +43,14 @@ pub async fn redeem(
             subscription.wait_until_seen().await?;
 
             let state = AliceState::BtcRedeemTransactionPublished { state3 };
-            let db_state = (&state).into();
-            db.insert_latest_state(swap_id, Swap::Alice(db_state))
-                .await?;
+            db.insert_latest_state(swap_id, state.into()).await?;
 
             if let Finality::Await = finality {
                 subscription.wait_until_final().await?;
             }
 
             let state = AliceState::BtcRedeemed;
-            let db_state = (&state).into();
-            db.insert_latest_state(swap_id, Swap::Alice(db_state))
+            db.insert_latest_state(swap_id, state.clone().into())
                 .await?;
 
             Ok((txid, state))
@@ -64,8 +62,7 @@ pub async fn redeem(
             }
 
             let state = AliceState::BtcRedeemed;
-            let db_state = (&state).into();
-            db.insert_latest_state(swap_id, Swap::Alice(db_state))
+            db.insert_latest_state(swap_id, state.clone().into())
                 .await?;
 
             let txid = state3.tx_redeem().txid();

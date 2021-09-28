@@ -18,6 +18,7 @@ use libp2p::core::multiaddr::Protocol;
 use libp2p::core::Multiaddr;
 use libp2p::swarm::AddressScore;
 use libp2p::Swarm;
+use std::convert::TryInto;
 use std::env;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
@@ -32,7 +33,8 @@ use swap::database::SledDatabase;
 use swap::monero::Amount;
 use swap::network::rendezvous::XmrBtcNamespace;
 use swap::network::swarm;
-use swap::protocol::alice::run;
+use swap::protocol::alice::{run, AliceState};
+use swap::protocol::Database;
 use swap::seed::Seed;
 use swap::tor::AuthenticatedClient;
 use swap::{asb, bitcoin, kraken, monero, tor};
@@ -93,6 +95,7 @@ async fn main() -> Result<()> {
     let db_path = config.data.dir.join("database");
 
     let db = SledDatabase::open(config.data.dir.join(db_path).as_path())
+        .await
         .context("Could not open database")?;
 
     let seed =
@@ -208,7 +211,8 @@ async fn main() -> Result<()> {
 
             table.set_header(vec!["SWAP ID", "STATE"]);
 
-            for (swap_id, state) in db.all_alice()? {
+            for (swap_id, state) in db.all().await? {
+                let state: AliceState = state.try_into()?;
                 table.add_row(vec![swap_id.to_string(), state.to_string()]);
             }
 

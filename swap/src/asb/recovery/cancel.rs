@@ -1,16 +1,17 @@
 use crate::bitcoin::{parse_rpc_error_code, RpcErrorCode, Txid, Wallet};
-use crate::database::{SledDatabase, Swap};
 use crate::protocol::alice::AliceState;
+use crate::protocol::Database;
 use anyhow::{bail, Result};
+use std::convert::TryInto;
 use std::sync::Arc;
 use uuid::Uuid;
 
 pub async fn cancel(
     swap_id: Uuid,
     bitcoin_wallet: Arc<Wallet>,
-    db: Arc<SledDatabase>,
+    db: Arc<dyn Database>,
 ) -> Result<(Txid, AliceState)> {
-    let state = db.get_state(swap_id)?.try_into_alice()?.into();
+    let state = db.get_state(swap_id).await?.try_into()?;
 
     let (monero_wallet_restore_blockheight, transfer_proof, state3) = match state {
 
@@ -58,8 +59,7 @@ pub async fn cancel(
         transfer_proof,
         state3,
     };
-    let db_state = (&state).into();
-    db.insert_latest_state(swap_id, Swap::Alice(db_state))
+    db.insert_latest_state(swap_id, state.clone().into())
         .await?;
 
     Ok((txid, state))

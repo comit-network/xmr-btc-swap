@@ -1,7 +1,8 @@
 use crate::bitcoin::{self, Txid};
-use crate::database::{SledDatabase, Swap};
 use crate::protocol::alice::AliceState;
+use crate::protocol::Database;
 use anyhow::{bail, Result};
+use std::convert::TryInto;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -14,9 +15,9 @@ pub enum Error {
 pub async fn punish(
     swap_id: Uuid,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
-    db: Arc<SledDatabase>,
+    db: Arc<dyn Database>,
 ) -> Result<(Txid, AliceState)> {
-    let state = db.get_state(swap_id)?.try_into_alice()?.into();
+    let state = db.get_state(swap_id).await?.try_into()?;
 
     let state3 = match state {
         // Punish potentially possible (no knowledge of cancel transaction)
@@ -46,8 +47,7 @@ pub async fn punish(
     let txid = state3.punish_btc(&bitcoin_wallet).await?;
 
     let state = AliceState::BtcPunished;
-    let db_state = (&state).into();
-    db.insert_latest_state(swap_id, Swap::Alice(db_state))
+    db.insert_latest_state(swap_id, state.clone().into())
         .await?;
 
     Ok((txid, state))

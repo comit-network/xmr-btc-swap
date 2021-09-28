@@ -2,6 +2,7 @@ pub use self::sled::SledDatabase;
 pub use alice::Alice;
 pub use bob::Bob;
 
+use crate::protocol::State;
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
@@ -14,6 +15,24 @@ mod sled;
 pub enum Swap {
     Alice(Alice),
     Bob(Bob),
+}
+
+impl From<State> for Swap {
+    fn from(state: State) -> Self {
+        match state {
+            State::Alice(state) => Swap::Alice(state.into()),
+            State::Bob(state) => Swap::Bob(state.into()),
+        }
+    }
+}
+
+impl From<Swap> for State {
+    fn from(value: Swap) -> Self {
+        match value {
+            Swap::Alice(alice) => State::Alice(alice.into()),
+            Swap::Bob(bob) => State::Bob(bob.into()),
+        }
+    }
 }
 
 impl From<Alice> for Swap {

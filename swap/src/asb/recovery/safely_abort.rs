@@ -1,11 +1,12 @@
-use crate::database::{SledDatabase, Swap};
 use crate::protocol::alice::AliceState;
+use crate::protocol::Database;
 use anyhow::{bail, Result};
+use std::convert::TryInto;
 use std::sync::Arc;
 use uuid::Uuid;
 
-pub async fn safely_abort(swap_id: Uuid, db: Arc<SledDatabase>) -> Result<AliceState> {
-    let state = db.get_state(swap_id)?.try_into_alice()?.into();
+pub async fn safely_abort(swap_id: Uuid, db: Arc<dyn Database>) -> Result<AliceState> {
+    let state = db.get_state(swap_id).await?.try_into()?;
 
     match state {
         AliceState::Started { .. }
@@ -13,8 +14,7 @@ pub async fn safely_abort(swap_id: Uuid, db: Arc<SledDatabase>) -> Result<AliceS
         | AliceState::BtcLocked { .. } => {
             let state = AliceState::SafelyAborted;
 
-            let db_state = (&state).into();
-            db.insert_latest_state(swap_id, Swap::Alice(db_state))
+            db.insert_latest_state(swap_id, state.clone().into())
                 .await?;
 
             Ok(state)
