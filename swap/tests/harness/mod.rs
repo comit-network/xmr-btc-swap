@@ -21,7 +21,7 @@ use swap::env::{Config, GetConfig};
 use swap::network::swarm;
 use swap::protocol::alice::{AliceState, Swap};
 use swap::protocol::bob::BobState;
-use swap::protocol::{alice, bob, Database};
+use swap::protocol::{alice, bob};
 use swap::seed::Seed;
 use swap::{asb, bitcoin, cli, env, monero};
 use tempfile::tempdir;

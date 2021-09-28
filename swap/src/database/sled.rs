@@ -25,25 +25,6 @@ pub struct SledDatabase  {
 
 #[async_trait]
 impl Database for SledDatabase {
-    async fn open(path: PathBuf) -> Result<Self> {
-        tracing::debug!("Opening sled at {:?}", &path);
-
-        let db =
-            sled::open(path.clone()).with_context(|| format!("Could not open the DB at {}", &path.display()))?;
-
-        let swaps = db.open_tree("swaps")?;
-        let peers = db.open_tree("peers")?;
-        let addresses = db.open_tree("addresses")?;
-        let monero_addresses = db.open_tree("monero_addresses")?;
-
-        Ok(SledDatabase {
-            swaps,
-            peers,
-            addresses,
-            monero_addresses,
-        })
-    }
-
     async fn insert_peer_id(&self, swap_id: Uuid, peer_id: PeerId) -> Result<()> {
         let peer_id_str = peer_id.to_string();
 
@@ -190,6 +171,25 @@ impl Database for SledDatabase {
 }
 
 impl SledDatabase {
+    pub async fn open(path: PathBuf) -> Result<Self> {
+        tracing::debug!("Opening sled at {:?}", &path);
+
+        let db =
+            sled::open(path.clone()).with_context(|| format!("Could not open the DB at {}", &path.display()))?;
+
+        let swaps = db.open_tree("swaps")?;
+        let peers = db.open_tree("peers")?;
+        let addresses = db.open_tree("addresses")?;
+        let monero_addresses = db.open_tree("monero_addresses")?;
+
+        Ok(SledDatabase {
+            swaps,
+            peers,
+            addresses,
+            monero_addresses,
+        })
+    }
+
     fn all_iter(&self) -> impl Iterator<Item = Result<(Uuid, State)>> {
         self.swaps.iter().map(|item| {
             let (key, value) = item.context("Failed to retrieve swap from DB")?;

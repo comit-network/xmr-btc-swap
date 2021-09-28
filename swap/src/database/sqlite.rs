@@ -19,15 +19,7 @@ pub struct SqliteDatabase {
 }
 
 impl SqliteDatabase {
-    pub async fn run_migrations(&mut self) -> anyhow::Result<()> {
-        sqlx::migrate!("./migrations").run(&self.pool).await?;
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl Database for SqliteDatabase {
-    async fn open(path: PathBuf) -> Result<Self> where Self: std::marker::Sized  {
+    pub async fn open(path: PathBuf) -> Result<Self> where Self: std::marker::Sized  {
         if let Some(prefix) = path.parent() {
             tokio::fs::create_dir_all(prefix).await?;
         }
@@ -37,9 +29,17 @@ impl Database for SqliteDatabase {
             .await?;
         let mut db = Self { pool };
         db.run_migrations().await?;
-      Ok(db)
+        Ok(db)
     }
 
+    pub async fn run_migrations(&mut self) -> anyhow::Result<()> {
+        sqlx::migrate!("./migrations").run(&self.pool).await?;
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Database for SqliteDatabase {
     async fn insert_peer_id(&self, swap_id: Uuid, peer_id: PeerId) -> Result<()> {
         let mut conn = self.pool.acquire().await?;
 
