@@ -231,28 +231,29 @@ dependencies = [
 
 [[package]]
 name = "bdk"
-version = "0.10.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f4da304c23a06c21807598a7fe3223566e84c76c6bba2cab2504370dd6f4938"
+checksum = "ecf7e997526ceefbab7dd99fc0da6834ed8853bd051f53523415ed1dc82b870d"
 dependencies = [
  "async-trait",
  "bdk-macros",
- "bitcoin",
- "electrum-client 0.7.0",
+ "bitcoin 0.27.1",
+ "electrum-client 0.8.0",
  "js-sys",
  "log 0.4.14",
- "miniscript",
+ "miniscript 6.0.1",
  "rand 0.7.3",
  "serde",
  "serde_json",
  "sled",
+ "tokio",
 ]
 
 [[package]]
 name = "bdk-macros"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3f510015e946c5995cc169f7ed4c92ba032bbce795c0956ee0d98d82f7aff78"
+checksum = "81c1980e50ae23bb6efa9283ae8679d6ea2c6fa6a99fe62533f65f4a25a1a56c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -265,11 +266,11 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6687d59c3f65c5b318356154f00699e28dc75487abab31c09391c4febea51bbf"
 dependencies = [
- "bitcoin",
+ "bitcoin 0.26.2",
  "bitcoincore-rpc",
  "electrum-client 0.6.0",
  "log 0.4.14",
- "miniscript",
+ "miniscript 5.1.0",
  "serde",
  "serde_json",
  "serial_test",
@@ -280,6 +281,12 @@ name = "bech32"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2dabbe35f96fb9507f7330793dc490461b2962659ac5d427181e451a623751d1"
+
+[[package]]
+name = "bech32"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf9ff0bbfd639f15c74af777d81383cf53efb7c93613f6cab67c6c11e05bbf8b"
 
 [[package]]
 name = "big-bytes"
@@ -324,9 +331,21 @@ version = "0.26.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6742ec672d3f12506f4ac5c0d853926ff1f94e675f60ffd3224039972bf663f1"
 dependencies = [
+ "bech32 0.7.3",
+ "bitcoin_hashes 0.9.7",
+ "secp256k1",
+ "serde",
+]
+
+[[package]]
+name = "bitcoin"
+version = "0.27.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a41df6ad9642c5c15ae312dd3d074de38fd3eb7cc87ad4ce10f90292a83fe4d"
+dependencies = [
  "base64-compat",
- "bech32",
- "bitcoin_hashes",
+ "bech32 0.8.1",
+ "bitcoin_hashes 0.10.0",
  "secp256k1",
  "serde",
 ]
@@ -338,7 +357,7 @@ source = "git+https://github.com/coblox/bitcoin-harness-rs#5a31e889618d2cdef613b
 dependencies = [
  "async-trait",
  "base64 0.12.3",
- "bitcoin",
+ "bitcoin 0.26.2",
  "bitcoincore-rpc-json",
  "futures",
  "hex 0.4.3",
@@ -363,6 +382,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bitcoin_hashes"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "006cc91e1a1d99819bc5b8214be3555c1f0611b169f527a1fdc54ed1f2b745b0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "bitcoincore-rpc"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -381,7 +409,7 @@ version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "977e55a945ab1e3c446dea93267876703c15e07c7d6eeb1dfa1766b3190c560f"
 dependencies = [
- "bitcoin",
+ "bitcoin 0.26.2",
  "hex 0.3.2",
  "serde",
  "serde_json",
@@ -984,7 +1012,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "21453800c95bb1aaa57490458c42d60c6277cb8a3e386030ec2381d5c2d4fa77"
 dependencies = [
- "bitcoin",
+ "bitcoin 0.26.2",
  "log 0.4.14",
  "rustls 0.16.0",
  "serde",
@@ -996,11 +1024,11 @@ dependencies = [
 
 [[package]]
 name = "electrum-client"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cab4d90cc575a7daab4cfed9e315912a88071bc47462e6be57516a2f01ccc89"
+checksum = "edd12f125852d77980725243b2a8b3bea73cd4c7a22c33bc52b08b664c561dc7"
 dependencies = [
- "bitcoin",
+ "bitcoin 0.27.1",
  "log 0.4.14",
  "rustls 0.16.0",
  "serde",
@@ -2237,7 +2265,17 @@ version = "5.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71f455be59a359d50370c4f587afbc5739c862e684c5afecae80ab93e7474b4e"
 dependencies = [
- "bitcoin",
+ "bitcoin 0.26.2",
+ "serde",
+]
+
+[[package]]
+name = "miniscript"
+version = "6.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d69450033bf162edf854d4aacaff82ca5ef34fa81f6cf69e1c81a103f0834997"
+dependencies = [
+ "bitcoin 0.27.1",
  "serde",
 ]
 
@@ -3892,7 +3930,7 @@ dependencies = [
  "bdk",
  "bdk-testutils",
  "big-bytes",
- "bitcoin",
+ "bitcoin 0.26.2",
  "bitcoin-harness",
  "bmrng",
  "comfy-table",
@@ -3909,7 +3947,7 @@ dependencies = [
  "hyper 0.14.12",
  "itertools 0.10.1",
  "libp2p",
- "miniscript",
+ "miniscript 5.1.0",
  "monero",
  "monero-harness",
  "monero-rpc",
