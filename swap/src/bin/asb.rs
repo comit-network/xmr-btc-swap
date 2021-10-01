@@ -301,6 +301,11 @@ async fn main() -> Result<()> {
 
             tracing::info!("Redeem transaction successfully published with id {}", txid);
         }
+        Command::ExportBitcoinWallet => {
+            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+            let wallet_export = bitcoin_wallet.wallet_export("asb").await?;
+            println!("{}", wallet_export.to_string())
+        }
     }
 
     Ok(())

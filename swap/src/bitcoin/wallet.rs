@@ -9,6 +9,7 @@ use bdk::database::BatchDatabase;
 use bdk::descriptor::Segwitv0;
 use bdk::electrum_client::{ElectrumApi, GetHistoryRes};
 use bdk::keys::DerivableKey;
+use bdk::wallet::export::WalletExport;
 use bdk::wallet::AddressIndex;
 use bdk::{FeeRate, KeychainKind, SignOptions};
 use bitcoin::{Network, Script};
@@ -173,6 +174,18 @@ impl Wallet {
             .clone();
 
         sub
+    }
+
+    pub async fn wallet_export(&self, role: &str) -> Result<WalletExport> {
+        let wallet = self.wallet.lock().await;
+        match bdk::wallet::export::WalletExport::export_wallet(
+            &wallet,
+            &format!("{}-{}", role, self.network),
+            true,
+        ) {
+            Ok(wallet_export) => Ok(wallet_export),
+            Err(err_msg) => Err(anyhow::Error::msg(err_msg)),
+        }
     }
 }
 
