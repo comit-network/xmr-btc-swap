@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The force flag was used to ignore blockheight and protocol state checks.
   Users can still restart a swap with these checks using the `resume` subcommand.
 - Changed log level of the "Advancing state", "Establishing Connection through Tor proxy" and "Connection through Tor established" log message from tracing to debug in the CLI.
+- Changed the bitcoin finality confirmation requirement from 2 to 1 block on mainnet.
 
 ### Added
 
