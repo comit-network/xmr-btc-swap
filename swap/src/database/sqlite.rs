@@ -3,12 +3,12 @@ use crate::monero::Address;
 use crate::protocol::{Database, State};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use chrono::Utc;
 use libp2p::{Multiaddr, PeerId};
 use sqlx::sqlite::Sqlite;
 use sqlx::{Pool, SqlitePool};
 use std::path::Path;
 use std::str::FromStr;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 pub struct SqliteDatabase {
@@ -171,7 +171,7 @@ impl Database for SqliteDatabase {
 
     async fn insert_latest_state(&self, swap_id: Uuid, state: State) -> Result<()> {
         let mut conn = self.pool.acquire().await?;
-        let entered_at = Utc::now();
+        let entered_at = OffsetDateTime::now_utc();
 
         let swap_id = swap_id.to_string();
         let swap = serde_json::to_string(&Swap::from(state))?;

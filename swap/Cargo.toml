@@ -19,7 +19,6 @@ bdk = "0.10"
 big-bytes = "1"
 bitcoin = { version = "0.26", features = [ "rand", "use-serde" ] }
 bmrng = "0.5"
-chrono = "0.4"
 comfy-table = "4.1.1"
 config = { version = "0.11", default-features = false, features = [ "toml" ] }
 conquer-once = "0.3"

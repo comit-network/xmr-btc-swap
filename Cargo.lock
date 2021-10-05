@@ -4117,7 +4117,6 @@ dependencies = [
  "bitcoin",
  "bitcoin-harness",
  "bmrng",
- "chrono",
  "comfy-table",
  "config",
  "conquer-once",
