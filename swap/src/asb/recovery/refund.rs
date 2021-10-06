@@ -1,9 +1,10 @@
 use crate::bitcoin::{self};
-use crate::database::{Database, Swap};
 use crate::monero;
 use crate::protocol::alice::AliceState;
+use crate::protocol::Database;
 use anyhow::{bail, Result};
 use libp2p::PeerId;
+use std::convert::TryInto;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -26,9 +27,9 @@ pub async fn refund(
     swap_id: Uuid,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
-    db: Arc<Database>,
+    db: Arc<dyn Database>,
 ) -> Result<AliceState> {
-    let state = db.get_state(swap_id)?.try_into_alice()?.into();
+    let state = db.get_state(swap_id).await?.try_into()?;
 
     let (monero_wallet_restore_blockheight, transfer_proof, state3) = match state {
         // In case no XMR has been locked, move to Safely Aborted
@@ -66,7 +67,7 @@ pub async fn refund(
         tracing::debug!(%swap_id, "Bitcoin refund transaction found, extracting key to refund Monero");
         state3.extract_monero_private_key(published_refund_tx)?
     } else {
-        let bob_peer_id = db.get_peer_id(swap_id)?;
+        let bob_peer_id = db.get_peer_id(swap_id).await?;
         bail!(Error::RefundTransactionNotPublishedYet(bob_peer_id),);
     };
 
@@ -81,8 +82,7 @@ pub async fn refund(
         .await?;
 
     let state = AliceState::XmrRefunded;
-    let db_state = (&state).into();
-    db.insert_latest_state(swap_id, Swap::Alice(db_state))
+    db.insert_latest_state(swap_id, state.clone().into())
         .await?;
 
     Ok(state)

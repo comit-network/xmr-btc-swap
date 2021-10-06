@@ -104,7 +104,6 @@ jobs:
             alice_manually_punishes_after_bob_dead,
             alice_refunds_after_restart_bob_refunded,
             ensure_same_swap_id,
-            concurrent_bobs_after_xmr_lock_proof_sent,
             concurrent_bobs_before_xmr_lock_proof_sent,
             alice_manually_redeems_after_enc_sig_learned
         ]

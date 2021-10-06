@@ -234,6 +234,15 @@ pub mod monero_private_key {
             let mut s = s;
             PrivateKey::consensus_decode(&mut s).map_err(|err| E::custom(format!("{:?}", err)))
         }
+
+        fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            let bytes = hex::decode(s).map_err(|err| E::custom(format!("{:?}", err)))?;
+            PrivateKey::consensus_decode(&mut bytes.as_slice())
+                .map_err(|err| E::custom(format!("{:?}", err)))
+        }
     }
 
     pub fn serialize<S>(x: &PrivateKey, s: S) -> Result<S::Ok, S::Error>
@@ -243,7 +252,11 @@ pub mod monero_private_key {
         let mut bytes = Cursor::new(vec![]);
         x.consensus_encode(&mut bytes)
             .map_err(|err| S::Error::custom(format!("{:?}", err)))?;
-        s.serialize_bytes(bytes.into_inner().as_ref())
+        if s.is_human_readable() {
+            s.serialize_str(&hex::encode(bytes.into_inner()))
+        } else {
+            s.serialize_bytes(bytes.into_inner().as_ref())
+        }
     }
 
     pub fn deserialize<'de, D>(
@@ -252,7 +265,13 @@ pub mod monero_private_key {
     where
         D: Deserializer<'de>,
     {
-        let key = deserializer.deserialize_bytes(BytesVisitor)?;
+        let key = {
+            if deserializer.is_human_readable() {
+                deserializer.deserialize_string(BytesVisitor)?
+            } else {
+                deserializer.deserialize_bytes(BytesVisitor)?
+            }
+        };
         Ok(key)
     }
 }
@@ -351,7 +370,17 @@ mod tests {
     pub struct MoneroAmount(#[serde(with = "monero_amount")] crate::monero::Amount);
 
     #[test]
-    fn serde_monero_private_key() {
+    fn serde_monero_private_key_json() {
+        let key = MoneroPrivateKey(monero::PrivateKey::from_scalar(
+            crate::monero::Scalar::random(&mut OsRng),
+        ));
+        let encoded = serde_json::to_vec(&key).unwrap();
+        let decoded: MoneroPrivateKey = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(key, decoded);
+    }
+
+    #[test]
+    fn serde_monero_private_key_cbor() {
         let key = MoneroPrivateKey(monero::PrivateKey::from_scalar(
             crate::monero::Scalar::random(&mut OsRng),
         ));

@@ -33,6 +33,7 @@ pub struct Arguments {
     pub env_config: env::Config,
     pub debug: bool,
     pub json: bool,
+    pub sled: bool,
     pub data_dir: PathBuf,
     pub cmd: Command,
 }
@@ -66,6 +67,7 @@ where
 
     let debug = args.debug;
     let json = args.json;
+    let sled = args.sled;
     let is_testnet = args.testnet;
     let data = args.data;
 
@@ -90,6 +92,7 @@ where
                 env_config: env_config_from(is_testnet),
                 debug,
                 json,
+                sled,
                 data_dir: data::data_dir_from(data, is_testnet)?,
                 cmd: Command::BuyXmr {
                     seller,
@@ -106,8 +109,17 @@ where
             env_config: env_config_from(is_testnet),
             debug,
             json,
+            sled,
             data_dir: data::data_dir_from(data, is_testnet)?,
             cmd: Command::History,
+        },
+        RawCommand::Config => Arguments {
+            env_config: env_config_from(is_testnet),
+            debug,
+            json,
+            sled,
+            data_dir: data::data_dir_from(data, is_testnet)?,
+            cmd: Command::Config,
         },
         RawCommand::Balance { bitcoin } => {
             let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
@@ -117,6 +129,7 @@ where
                 env_config: env_config_from(is_testnet),
                 debug,
                 json,
+                sled,
                 data_dir: data::data_dir_from(data, is_testnet)?,
                 cmd: Command::Balance {
                     bitcoin_electrum_rpc_url,
@@ -136,6 +149,7 @@ where
                 env_config: env_config_from(is_testnet),
                 debug,
                 json,
+                sled,
                 data_dir: data::data_dir_from(data, is_testnet)?,
                 cmd: Command::WithdrawBtc {
                     bitcoin_electrum_rpc_url,
@@ -159,6 +173,7 @@ where
                 env_config: env_config_from(is_testnet),
                 debug,
                 json,
+                sled,
                 data_dir: data::data_dir_from(data, is_testnet)?,
                 cmd: Command::Resume {
                     swap_id,
@@ -180,6 +195,7 @@ where
                 env_config: env_config_from(is_testnet),
                 debug,
                 json,
+                sled,
                 data_dir: data::data_dir_from(data, is_testnet)?,
                 cmd: Command::Cancel {
                     swap_id,
@@ -199,6 +215,7 @@ where
                 env_config: env_config_from(is_testnet),
                 debug,
                 json,
+                sled,
                 data_dir: data::data_dir_from(data, is_testnet)?,
                 cmd: Command::Refund {
                     swap_id,
@@ -214,6 +231,7 @@ where
             env_config: env_config_from(is_testnet),
             debug,
             json,
+            sled,
             data_dir: data::data_dir_from(data, is_testnet)?,
             cmd: Command::ListSellers {
                 rendezvous_point,
@@ -238,6 +256,7 @@ pub enum Command {
         tor_socks5_port: u16,
     },
     History,
+    Config,
     WithdrawBtc {
         bitcoin_electrum_rpc_url: Url,
         bitcoin_target_block: usize,
@@ -304,6 +323,13 @@ struct RawArguments {
     )]
     json: bool,
 
+    #[structopt(
+        short,
+        long = "sled",
+        help = "Forces the swap-cli to use the deprecated sled db if it is available"
+    )]
+    sled: bool,
+
     #[structopt(subcommand)]
     cmd: RawCommand,
 }
@@ -338,6 +364,8 @@ enum RawCommand {
     },
     /// Show a list of past, ongoing and completed swaps
     History,
+    #[structopt(about = "Prints the current config")]
+    Config,
     #[structopt(about = "Allows withdrawing BTC from the internal Bitcoin wallet.")]
     WithdrawBtc {
         #[structopt(flatten)]
@@ -1105,6 +1133,7 @@ mod tests {
                 env_config: env::Testnet::get_config(),
                 debug: false,
                 json: false,
+                sled: false,
                 data_dir: data_dir_path_cli().join(TESTNET),
                 cmd: Command::BuyXmr {
                     seller: Multiaddr::from_str(MULTI_ADDRESS).unwrap(),
@@ -1125,6 +1154,7 @@ mod tests {
                 env_config: env::Mainnet::get_config(),
                 debug: false,
                 json: false,
+                sled: false,
                 data_dir: data_dir_path_cli().join(MAINNET),
                 cmd: Command::BuyXmr {
                     seller: Multiaddr::from_str(MULTI_ADDRESS).unwrap(),
@@ -1144,6 +1174,7 @@ mod tests {
                 env_config: env::Testnet::get_config(),
                 debug: false,
                 json: false,
+                sled: false,
                 data_dir: data_dir_path_cli().join(TESTNET),
                 cmd: Command::Resume {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
@@ -1161,6 +1192,7 @@ mod tests {
                 env_config: env::Mainnet::get_config(),
                 debug: false,
                 json: false,
+                sled: false,
                 data_dir: data_dir_path_cli().join(MAINNET),
                 cmd: Command::Resume {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
@@ -1177,6 +1209,7 @@ mod tests {
                 env_config: env::Testnet::get_config(),
                 debug: false,
                 json: false,
+                sled: false,
                 data_dir: data_dir_path_cli().join(TESTNET),
                 cmd: Command::Cancel {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
@@ -1192,6 +1225,7 @@ mod tests {
                 env_config: env::Mainnet::get_config(),
                 debug: false,
                 json: false,
+                sled: false,
                 data_dir: data_dir_path_cli().join(MAINNET),
                 cmd: Command::Cancel {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
@@ -1206,6 +1240,7 @@ mod tests {
                 env_config: env::Testnet::get_config(),
                 debug: false,
                 json: false,
+                sled: false,
                 data_dir: data_dir_path_cli().join(TESTNET),
                 cmd: Command::Refund {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
@@ -1221,6 +1256,7 @@ mod tests {
                 env_config: env::Mainnet::get_config(),
                 debug: false,
                 json: false,
+                sled: false,
                 data_dir: data_dir_path_cli().join(MAINNET),
                 cmd: Command::Refund {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),

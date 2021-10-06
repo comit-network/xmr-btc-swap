@@ -1,16 +1,17 @@
 use crate::bitcoin::{parse_rpc_error_code, RpcErrorCode, Txid, Wallet};
-use crate::database::{Database, Swap};
 use crate::protocol::bob::BobState;
+use crate::protocol::Database;
 use anyhow::{bail, Result};
+use std::convert::TryInto;
 use std::sync::Arc;
 use uuid::Uuid;
 
 pub async fn cancel(
     swap_id: Uuid,
     bitcoin_wallet: Arc<Wallet>,
-    db: Database,
+    db: Arc<dyn Database>,
 ) -> Result<(Txid, BobState)> {
-    let state = db.get_state(swap_id)?.try_into_bob()?.into();
+    let state = db.get_state(swap_id).await?.try_into()?;
 
     let state6 = match state {
         BobState::BtcLocked(state3) => state3.cancel(),
@@ -48,8 +49,8 @@ pub async fn cancel(
     };
 
     let state = BobState::BtcCancelled(state6);
-    let db_state = state.clone().into();
-    db.insert_latest_state(swap_id, Swap::Bob(db_state)).await?;
+    db.insert_latest_state(swap_id, state.clone().into())
+        .await?;
 
     Ok((txid, state))
 }
