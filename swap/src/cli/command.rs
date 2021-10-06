@@ -64,10 +64,7 @@ where
         Err(e) => anyhow::bail!(e),
     };
 
-    let debug = args.debug;
-    let json = args.json;
-    let is_testnet = args.testnet;
-    let data = args.data;
+    let (debug, json, is_testnet, data) = (args.debug, args.json, args.testnet, args.data);
 
     let arguments = match args.cmd {
         RawCommand::BuyXmr {

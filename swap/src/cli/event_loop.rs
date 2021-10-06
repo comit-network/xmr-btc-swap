@@ -18,7 +18,7 @@ use uuid::Uuid;
 #[allow(missing_debug_implementations)]
 pub struct EventLoop {
     swap_id: Uuid,
-    swarm: libp2p::Swarm<Behaviour>,
+    swarm: Swarm<Behaviour>,
     alice_peer_id: PeerId,
 
     // these streams represents outgoing requests that we have to make
