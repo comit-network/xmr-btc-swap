@@ -4128,6 +4128,7 @@ dependencies = [
  "ed25519-dalek",
  "futures",
  "get-port",
+ "hex 0.4.3",
  "hyper 0.14.12",
  "itertools 0.10.1",
  "libp2p",

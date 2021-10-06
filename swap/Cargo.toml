@@ -29,6 +29,7 @@ directories-next = "2"
 ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", default-features = false, features = [ "libsecp_compat", "serde" ] }
 ed25519-dalek = "1"
 futures = { version = "0.3", default-features = false }
+hex = "0.4"
 itertools = "0.10"
 libp2p = { git = "https://github.com/comit-network/rust-libp2p", branch = "rendezvous", default-features = false, features = [ "tcp-tokio", "yamux", "mplex", "dns-tokio", "noise", "request-response", "websocket", "ping", "rendezvous" ] }
 miniscript = { version = "5", features = [ "serde" ] }

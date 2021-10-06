@@ -18,6 +18,7 @@ use swap::asb::FixedRate;
 use swap::bitcoin::{CancelTimelock, PunishTimelock, TxCancel, TxPunish, TxRedeem, TxRefund};
 use swap::database::SledDatabase;
 use swap::env::{Config, GetConfig};
+use swap::fs::ensure_directory_exists;
 use swap::network::swarm;
 use swap::protocol::alice::{AliceState, Swap};
 use swap::protocol::bob::BobState;
@@ -156,13 +157,16 @@ async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
             .await
             .unwrap();
 
-    (monero, Containers {
-        bitcoind_url,
-        bitcoind,
-        monerod_container,
-        monero_wallet_rpc_containers,
-        electrs,
-    })
+    (
+        monero,
+        Containers {
+            bitcoind_url,
+            bitcoind,
+            monerod_container,
+            monero_wallet_rpc_containers,
+            electrs,
+        },
+    )
 }
 
 async fn init_bitcoind_container(
