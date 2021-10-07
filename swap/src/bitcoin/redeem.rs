@@ -6,12 +6,12 @@ use crate::bitcoin::{
 use ::bitcoin::util::bip143::SigHashCache;
 use ::bitcoin::{SigHash, SigHashType, Txid};
 use anyhow::{bail, Context, Result};
+use bdk::miniscript::{Descriptor, DescriptorTrait};
 use bitcoin::Script;
 use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
 use ecdsa_fun::fun::Scalar;
 use ecdsa_fun::nonce::Deterministic;
 use ecdsa_fun::Signature;
-use miniscript::{Descriptor, DescriptorTrait};
 use sha2::Sha256;
 use std::collections::HashMap;
 

@@ -29,12 +29,12 @@ use ::bitcoin::hashes::hex::ToHex;
 use ::bitcoin::hashes::Hash;
 use ::bitcoin::{secp256k1, SigHash};
 use anyhow::{bail, Context, Result};
+use bdk::miniscript::descriptor::Wsh;
+use bdk::miniscript::{Descriptor, Segwitv0};
 use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
 use ecdsa_fun::fun::Point;
 use ecdsa_fun::nonce::Deterministic;
 use ecdsa_fun::ECDSA;
-use miniscript::descriptor::Wsh;
-use miniscript::{Descriptor, Segwitv0};
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
@@ -215,8 +215,9 @@ pub fn build_shared_output_descriptor(A: Point, B: Point) -> Descriptor<bitcoin:
 
     let miniscript = MINISCRIPT_TEMPLATE.replace("A", &A).replace("B", &B);
 
-    let miniscript = miniscript::Miniscript::<bitcoin::PublicKey, Segwitv0>::from_str(&miniscript)
-        .expect("a valid miniscript");
+    let miniscript =
+        bdk::miniscript::Miniscript::<bitcoin::PublicKey, Segwitv0>::from_str(&miniscript)
+            .expect("a valid miniscript");
 
     Descriptor::Wsh(Wsh::new(miniscript).expect("a valid descriptor"))
 }

@@ -15,9 +15,9 @@ async-trait = "0.1"
 atty = "0.2"
 backoff = { version = "0.3", features = [ "tokio" ] }
 base64 = "0.13"
-bdk = "0.10"
+bdk = "0.12"
 big-bytes = "1"
-bitcoin = { version = "0.26", features = [ "rand", "use-serde" ] }
+bitcoin = { version = "0.27", features = [ "rand", "use-serde" ] }
 bmrng = "0.5"
 comfy-table = "4.1.1"
 config = { version = "0.11", default-features = false, features = [ "toml" ] }
@@ -32,7 +32,6 @@ futures = { version = "0.3", default-features = false }
 hex = "0.4"
 itertools = "0.10"
 libp2p = { git = "https://github.com/comit-network/rust-libp2p", branch = "rendezvous", default-features = false, features = [ "tcp-tokio", "yamux", "mplex", "dns-tokio", "noise", "request-response", "websocket", "ping", "rendezvous" ] }
-miniscript = { version = "5", features = [ "serde" ] }
 monero = { version = "0.12", features = [ "serde_support" ] }
 monero-rpc = { path = "../monero-rpc" }
 pem = "0.8"
@@ -76,7 +75,6 @@ tokio-tar = "0.3"
 zip = "0.5"
 
 [dev-dependencies]
-bdk-testutils = { version = "0.4" }
 bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs" }
 get-port = "3"
 hyper = "0.14"

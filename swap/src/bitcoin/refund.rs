@@ -7,8 +7,8 @@ use crate::{bitcoin, monero};
 use ::bitcoin::util::bip143::SigHashCache;
 use ::bitcoin::{Script, SigHash, SigHashType, Txid};
 use anyhow::{bail, Context, Result};
+use bdk::miniscript::{Descriptor, DescriptorTrait};
 use ecdsa_fun::Signature;
-use miniscript::{Descriptor, DescriptorTrait};
 use std::collections::HashMap;
 
 #[derive(Debug)]
