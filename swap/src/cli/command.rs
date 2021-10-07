@@ -121,7 +121,13 @@ where
             data_dir: data::data_dir_from(data, is_testnet)?,
             cmd: Command::Config,
         },
-        RawCommand::Balance { bitcoin } => {
+        RawCommand::Balance {
+            bitcoin_electrum_rpc_url,
+        } => {
+            let bitcoin = Bitcoin {
+                bitcoin_electrum_rpc_url,
+                bitcoin_target_block: None,
+            };
             let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
                 bitcoin.apply_defaults(is_testnet)?;
 
@@ -381,8 +387,8 @@ enum RawCommand {
     },
     #[structopt(about = "Prints the Bitcoin balance.")]
     Balance {
-        #[structopt(flatten)]
-        bitcoin: Bitcoin,
+        #[structopt(long = "electrum-rpc", help = "Provide the Bitcoin Electrum RPC URL")]
+        bitcoin_electrum_rpc_url: Option<Url>,
     },
     /// Resume a swap
     Resume {
