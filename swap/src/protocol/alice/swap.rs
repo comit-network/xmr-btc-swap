@@ -4,7 +4,7 @@ use crate::asb::{EventLoopHandle, LatestRate};
 use crate::bitcoin::ExpiredTimelocks;
 use crate::env::Config;
 use crate::protocol::alice::{AliceState, Swap};
-use crate::{bitcoin, database, monero};
+use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
 use tokio::select;
 use tokio::time::timeout;
@@ -40,9 +40,8 @@ where
         )
         .await?;
 
-        let db_state = (&current_state).into();
         swap.db
-            .insert_latest_state(swap.swap_id, database::Swap::Alice(db_state))
+            .insert_latest_state(swap.swap_id, current_state.clone().into())
             .await?;
     }
 
@@ -398,7 +397,7 @@ where
     })
 }
 
-fn is_complete(state: &AliceState) -> bool {
+pub(crate) fn is_complete(state: &AliceState) -> bool {
     matches!(
         state,
         AliceState::XmrRefunded

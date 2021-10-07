@@ -16,15 +16,16 @@ use std::sync::Arc;
 use std::time::Duration;
 use swap::asb::FixedRate;
 use swap::bitcoin::{CancelTimelock, PunishTimelock, TxCancel, TxPunish, TxRedeem, TxRefund};
-use swap::database::Database;
+use swap::database::SqliteDatabase;
 use swap::env::{Config, GetConfig};
+use swap::fs::ensure_directory_exists;
 use swap::network::swarm;
 use swap::protocol::alice::{AliceState, Swap};
 use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
 use swap::seed::Seed;
 use swap::{asb, bitcoin, cli, env, monero};
-use tempfile::tempdir;
+use tempfile::{tempdir, NamedTempFile};
 use testcontainers::clients::Cli;
 use testcontainers::{Container, Docker, RunArgs};
 use tokio::sync::mpsc;
@@ -82,7 +83,7 @@ where
         .parse()
         .expect("failed to parse Alice's address");
 
-    let alice_db_path = tempdir().unwrap().into_path();
+    let alice_db_path = NamedTempFile::new().unwrap().path().to_path_buf();
     let (alice_handle, alice_swap_handle) = start_alice(
         &alice_seed,
         alice_db_path.clone(),
@@ -110,7 +111,7 @@ where
 
     let bob_params = BobParams {
         seed: Seed::random().unwrap(),
-        db_path: tempdir().unwrap().path().to_path_buf(),
+        db_path: NamedTempFile::new().unwrap().path().to_path_buf(),
         bitcoin_wallet: bob_bitcoin_wallet.clone(),
         monero_wallet: bob_monero_wallet.clone(),
         alice_address: alice_listen_address.clone(),
@@ -222,7 +223,13 @@ async fn start_alice(
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
 ) -> (AliceApplicationHandle, Receiver<alice::Swap>) {
-    let db = Arc::new(Database::open(db_path.as_path()).unwrap());
+    if let Some(parent_dir) = db_path.parent() {
+        ensure_directory_exists(parent_dir).unwrap();
+    }
+    if !&db_path.exists() {
+        tokio::fs::File::create(&db_path).await.unwrap();
+    }
+    let db = Arc::new(SqliteDatabase::open(db_path.as_path()).await.unwrap());
 
     let min_buy = bitcoin::Amount::from_sat(u64::MIN);
     let max_buy = bitcoin::Amount::from_sat(u64::MAX);
@@ -402,7 +409,14 @@ struct BobParams {
 impl BobParams {
     pub async fn new_swap_from_db(&self, swap_id: Uuid) -> Result<(bob::Swap, cli::EventLoop)> {
         let (event_loop, handle) = self.new_eventloop(swap_id).await?;
-        let db = Database::open(&self.db_path)?;
+
+        if let Some(parent_dir) = self.db_path.parent() {
+            ensure_directory_exists(parent_dir)?;
+        }
+        if !self.db_path.exists() {
+            tokio::fs::File::create(&self.db_path).await?;
+        }
+        let db = Arc::new(SqliteDatabase::open(&self.db_path).await?);
 
         let swap = bob::Swap::from_db(
             db,
@@ -412,7 +426,8 @@ impl BobParams {
             self.env_config,
             handle,
             self.monero_wallet.get_main_address(),
-        )?;
+        )
+        .await?;
 
         Ok((swap, event_loop))
     }
@@ -424,7 +439,14 @@ impl BobParams {
         let swap_id = Uuid::new_v4();
 
         let (event_loop, handle) = self.new_eventloop(swap_id).await?;
-        let db = Database::open(&self.db_path)?;
+
+        if let Some(parent_dir) = self.db_path.parent() {
+            ensure_directory_exists(parent_dir)?;
+        }
+        if !self.db_path.exists() {
+            tokio::fs::File::create(&self.db_path).await?;
+        }
+        let db = Arc::new(SqliteDatabase::open(&self.db_path).await?);
 
         let swap = bob::Swap::new(
             db,
