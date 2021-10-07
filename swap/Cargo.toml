@@ -34,7 +34,7 @@ itertools = "0.10"
 libp2p = { git = "https://github.com/comit-network/rust-libp2p", branch = "rendezvous", default-features = false, features = [ "tcp-tokio", "yamux", "mplex", "dns-tokio", "noise", "request-response", "websocket", "ping", "rendezvous" ] }
 monero = { version = "0.12", features = [ "serde_support" ] }
 monero-rpc = { path = "../monero-rpc" }
-pem = "0.8"
+pem = "1.0"
 proptest = "1"
 qrcode = "0.12"
 rand = "0.8"
