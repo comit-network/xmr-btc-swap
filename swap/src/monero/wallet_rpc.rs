@@ -18,17 +18,17 @@ use tokio_util::io::StreamReader;
 compile_error!("unsupported operating system");
 
 #[cfg(target_os = "macos")]
-const DOWNLOAD_URL: &str = "http://downloads.getmonero.org/cli/monero-mac-x64-v0.17.2.0.tar.bz2";
+const DOWNLOAD_URL: &str = "http://downloads.getmonero.org/cli/monero-mac-x64-v0.17.2.3.tar.bz2";
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-linux-x64-v0.17.2.0.tar.bz2";
+const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-linux-x64-v0.17.2.3.tar.bz2";
 
 #[cfg(all(target_os = "linux", target_arch = "arm"))]
 const DOWNLOAD_URL: &str =
-    "https://downloads.getmonero.org/cli/monero-linux-armv7-v0.17.2.0.tar.bz2";
+    "https://downloads.getmonero.org/cli/monero-linux-armv7-v0.17.2.3.tar.bz2";
 
 #[cfg(target_os = "windows")]
-const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-win-x64-v0.17.2.0.zip";
+const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-win-x64-v0.17.2.3.zip";
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 const PACKED_FILE: &str = "monero-wallet-rpc";
@@ -70,6 +70,23 @@ impl WalletRpc {
 
         if monero_wallet_rpc.archive_path().exists() {
             remove_file(monero_wallet_rpc.archive_path()).await?;
+        }
+
+        // If the monero-wallet-rpc exists, identify it's version and delete it if the
+        // version is not the v0.17.2.3-release. Unfortunately monero does no
+        // provide per file checksums which would of been a better solution.
+        if monero_wallet_rpc.exec_path().exists() {
+            let output = Command::new(monero_wallet_rpc.exec_path())
+                .env("LANG", "en_AU.UTF-8")
+                .stdout(Stdio::piped())
+                .kill_on_drop(true)
+                .arg("--version")
+                .output()
+                .await?;
+            let version_string = String::from_utf8_lossy(&output.stdout);
+            if !version_string.contains("v0.17.2.3-release") {
+                remove_file(monero_wallet_rpc.exec_path()).await?;
+            }
         }
 
         if !monero_wallet_rpc.exec_path().exists() {

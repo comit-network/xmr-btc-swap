@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The sqlite database filed is named `sqlite` and is found in the data directory.
   You can print the data directory using the `config` subcommand.
   The schema can be found here [here](swap/migrations/20210903050345_create_swaps_table.sql).
+- Upgraded monero-wallet-rpc to use version v0.17.2.3.
+  This resolved a bug for a user where the redeemed monero transaction was not being accepted by the v0.17.2.0.
 
 #### Database migration guide
 
