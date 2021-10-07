@@ -53,6 +53,11 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Added `export-bitcoin-wallet` subcommand to the CLI and ASB, to print the internal bitcoin wallet descriptor.
   This will allow users to transact and monitor using external wallets.
 
+### Removed
+
+- The `bitcoin-target-block` argument from the `balance` subcommand on the CLI.
+  This argument did not affect how the balance was calculated and was pointless.
+
 ## [0.8.3] - 2021-09-03
 
 ### Fixed
