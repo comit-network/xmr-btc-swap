@@ -4,7 +4,7 @@ use ::bitcoin::util::bip143::SigHashCache;
 use ::bitcoin::{SigHash, SigHashType};
 use anyhow::{Context, Result};
 use bdk::bitcoin::Script;
-use miniscript::{Descriptor, DescriptorTrait};
+use bdk::miniscript::{Descriptor, DescriptorTrait};
 use std::collections::HashMap;
 
 #[derive(Debug)]

@@ -607,9 +607,7 @@ impl WalletBuilder {
 
     pub fn build(self) -> Wallet<(), bdk::database::MemoryDatabase, StaticFeeRate> {
         use bdk::database::MemoryDatabase;
-        use bdk::{ConfirmationTime, LocalUtxo, TransactionDetails};
-        use bitcoin::OutPoint;
-        use testutils::testutils;
+        use bdk::testutils;
 
         let descriptors = testutils!(@descriptors (&format!("wpkh({}/*)", self.key)));
 

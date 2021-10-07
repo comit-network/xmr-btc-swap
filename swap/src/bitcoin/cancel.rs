@@ -6,8 +6,8 @@ use crate::bitcoin::{
 use ::bitcoin::util::bip143::SigHashCache;
 use ::bitcoin::{OutPoint, Script, SigHash, SigHashType, TxIn, TxOut, Txid};
 use anyhow::Result;
+use bdk::miniscript::{Descriptor, DescriptorTrait};
 use ecdsa_fun::Signature;
-use miniscript::{Descriptor, DescriptorTrait};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;

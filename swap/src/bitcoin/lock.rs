@@ -6,8 +6,8 @@ use ::bitcoin::util::psbt::PartiallySignedTransaction;
 use ::bitcoin::{OutPoint, TxIn, TxOut, Txid};
 use anyhow::{bail, Result};
 use bdk::database::BatchDatabase;
+use bdk::miniscript::{Descriptor, DescriptorTrait};
 use bitcoin::Script;
-use miniscript::{Descriptor, DescriptorTrait};
 use serde::{Deserialize, Serialize};
 
 const SCRIPT_SIZE: usize = 34;
