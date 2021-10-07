@@ -50,6 +50,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Added a `disable-timestamp` flag to the ASB that disables timestamps from logs.
 - A `config` subcommand that prints the current configuration including the data directory location.
   This feature should alleviate difficulties users were having when finding where xmr-btc-swap was storing data.
+- Added `export-bitcoin-wallet` subcommand to the CLI and ASB, to print the internal bitcoin wallet descriptor.
+  This will allow users to transact and monitor using external wallets.
 
 ## [0.8.3] - 2021-09-03
 

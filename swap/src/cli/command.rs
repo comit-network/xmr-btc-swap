@@ -239,6 +239,22 @@ where
                 tor_socks5_port,
             },
         },
+        RawCommand::ExportBitcoinWallet { bitcoin } => {
+            let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
+                bitcoin.apply_defaults(is_testnet)?;
+
+            Arguments {
+                env_config: env_config_from(is_testnet),
+                debug,
+                json,
+                sled,
+                data_dir: data::data_dir_from(data, is_testnet)?,
+                cmd: Command::ExportBitcoinWallet {
+                    bitcoin_electrum_rpc_url,
+                    bitcoin_target_block,
+                },
+            }
+        }
     };
 
     Ok(ParseResult::Arguments(arguments))
@@ -288,6 +304,10 @@ pub enum Command {
         rendezvous_point: Multiaddr,
         namespace: XmrBtcNamespace,
         tor_socks5_port: u16,
+    },
+    ExportBitcoinWallet {
+        bitcoin_electrum_rpc_url: Url,
+        bitcoin_target_block: usize,
     },
 }
 
@@ -426,6 +446,11 @@ enum RawCommand {
 
         #[structopt(flatten)]
         tor: Tor,
+    },
+    /// Print the internal bitcoin wallet descriptor
+    ExportBitcoinWallet {
+        #[structopt(flatten)]
+        bitcoin: Bitcoin,
     },
 }
 

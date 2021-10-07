@@ -409,6 +409,23 @@ async fn main() -> Result<()> {
                 println!("{}", table);
             }
         }
+        Command::ExportBitcoinWallet {
+            bitcoin_electrum_rpc_url,
+            bitcoin_target_block,
+        } => {
+            let seed = Seed::from_file_or_generate(data_dir.as_path())
+                .context("Failed to read in seed file")?;
+            let bitcoin_wallet = init_bitcoin_wallet(
+                bitcoin_electrum_rpc_url,
+                &seed,
+                data_dir.clone(),
+                env_config,
+                bitcoin_target_block,
+            )
+            .await?;
+            let wallet_export = bitcoin_wallet.wallet_export("cli").await?;
+            println!("{}", wallet_export.to_string())
+        }
     };
     Ok(())
 }
