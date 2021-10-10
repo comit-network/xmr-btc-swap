@@ -177,10 +177,6 @@ async fn main() -> Result<()> {
                 "Internal bitcoin wallet location: {}",
                 format!("{}/wallet", data_dir.display())
             );
-            println!(
-                "Internal bitcoin wallet location: {}",
-                format!("{}/wallet", data_dir.display())
-            );
         }
         Command::WithdrawBtc {
             bitcoin_electrum_rpc_url,
