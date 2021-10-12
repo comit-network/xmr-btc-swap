@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Support for the old sled database.
+  The ASB and CLI only support the new sqlite database.
+  If you haven't already, you can migrate your old data using the 0.9.0 release.
+
 ### Changed
 
 - The ASB to no longer work as a rendezvous server.
