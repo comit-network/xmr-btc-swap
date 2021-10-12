@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use futures::prelude::*;
 use libp2p::core::upgrade;
-use libp2p::core::upgrade::ReadOneError;
 use libp2p::request_response::{ProtocolName, RequestResponseCodec};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -40,10 +39,7 @@ where
     where
         T: AsyncRead + Unpin + Send,
     {
-        let message = upgrade::read_one(io, BUF_SIZE).await.map_err(|e| match e {
-            ReadOneError::Io(err) => err,
-            e => io::Error::new(io::ErrorKind::Other, e),
-        })?;
+        let message = upgrade::read_length_prefixed(io, BUF_SIZE).await?;
         let mut de = serde_cbor::Deserializer::from_slice(&message);
         let msg = Req::deserialize(&mut de)
             .map_err(|error| io::Error::new(io::ErrorKind::Other, error))?;
@@ -59,9 +55,7 @@ where
     where
         T: AsyncRead + Unpin + Send,
     {
-        let message = upgrade::read_one(io, BUF_SIZE)
-            .await
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let message = upgrade::read_length_prefixed(io, BUF_SIZE).await?;
         let mut de = serde_cbor::Deserializer::from_slice(&message);
         let msg = Res::deserialize(&mut de)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
@@ -81,7 +75,7 @@ where
         let bytes =
             serde_cbor::to_vec(&req).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        upgrade::write_one(io, &bytes).await?;
+        upgrade::write_length_prefixed(io, &bytes).await?;
 
         Ok(())
     }
@@ -97,7 +91,7 @@ where
     {
         let bytes = serde_cbor::to_vec(&res)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-        upgrade::write_one(io, &bytes).await?;
+        upgrade::write_length_prefixed(io, &bytes).await?;
 
         Ok(())
     }

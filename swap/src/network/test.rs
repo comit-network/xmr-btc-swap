@@ -203,7 +203,7 @@ where
 {
     loop {
         match swarm.select_next_some().await {
-            SwarmEvent::NewListenAddr(addr) if &addr == multiaddr => {
+            SwarmEvent::NewListenAddr { address, .. } if &address == multiaddr => {
                 break;
             }
             other => {

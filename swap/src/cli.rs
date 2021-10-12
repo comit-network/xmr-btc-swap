@@ -26,7 +26,7 @@ mod tests {
     use libp2p::multiaddr::Protocol;
     use libp2p::request_response::RequestResponseEvent;
     use libp2p::swarm::{AddressScore, NetworkBehaviourEventProcess};
-    use libp2p::{identity, Multiaddr, PeerId};
+    use libp2p::{identity, rendezvous, Multiaddr, PeerId};
     use std::collections::HashSet;
     use std::iter::FromIterator;
     use std::time::Duration;
@@ -59,11 +59,8 @@ mod tests {
     }
 
     async fn setup_rendezvous_point() -> (Multiaddr, PeerId) {
-        let mut rendezvous_node = new_swarm(|_, identity| RendezvousPointBehaviour {
-            rendezvous: libp2p::rendezvous::Rendezvous::new(
-                identity,
-                libp2p::rendezvous::Config::default(),
-            ),
+        let mut rendezvous_node = new_swarm(|_, _| RendezvousPointBehaviour {
+            rendezvous: rendezvous::server::Behaviour::new(rendezvous::server::Config::default()),
             ping: Default::default(),
         });
         let rendezvous_address = rendezvous_node.listen_on_tcp_localhost().await;
@@ -127,6 +124,7 @@ mod tests {
     }
 
     #[derive(libp2p::NetworkBehaviour)]
+    #[behaviour(event_process = true)]
     struct StaticQuoteAsbBehaviour {
         rendezvous: asb::rendezous::Behaviour,
         // Support `Ping` as a workaround until https://github.com/libp2p/rust-libp2p/issues/2109 is fixed.
@@ -138,14 +136,14 @@ mod tests {
         #[behaviour(ignore)]
         registered: bool,
     }
-
-    impl NetworkBehaviourEventProcess<libp2p::rendezvous::Event> for StaticQuoteAsbBehaviour {
-        fn inject_event(&mut self, event: libp2p::rendezvous::Event) {
-            if let libp2p::rendezvous::Event::Registered { .. } = event {
+    impl NetworkBehaviourEventProcess<rendezvous::client::Event> for StaticQuoteAsbBehaviour {
+        fn inject_event(&mut self, event: rendezvous::client::Event) {
+            if let rendezvous::client::Event::Registered { .. } = event {
                 self.registered = true;
             }
         }
     }
+
     impl NetworkBehaviourEventProcess<libp2p::ping::PingEvent> for StaticQuoteAsbBehaviour {
         fn inject_event(&mut self, _: libp2p::ping::PingEvent) {}
     }
@@ -164,14 +162,15 @@ mod tests {
     }
 
     #[derive(libp2p::NetworkBehaviour)]
+    #[behaviour(event_process = true)]
     struct RendezvousPointBehaviour {
-        rendezvous: libp2p::rendezvous::Rendezvous,
+        rendezvous: rendezvous::server::Behaviour,
         // Support `Ping` as a workaround until https://github.com/libp2p/rust-libp2p/issues/2109 is fixed.
         ping: libp2p::ping::Ping,
     }
 
-    impl NetworkBehaviourEventProcess<libp2p::rendezvous::Event> for RendezvousPointBehaviour {
-        fn inject_event(&mut self, _: libp2p::rendezvous::Event) {}
+    impl NetworkBehaviourEventProcess<rendezvous::server::Event> for RendezvousPointBehaviour {
+        fn inject_event(&mut self, _: rendezvous::server::Event) {}
     }
     impl NetworkBehaviourEventProcess<libp2p::ping::PingEvent> for RendezvousPointBehaviour {
         fn inject_event(&mut self, _: libp2p::ping::PingEvent) {}

@@ -76,7 +76,7 @@ impl NetworkBehaviour for Behaviour {
         &mut self,
         _cx: &mut Context<'_>,
         _params: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<NewSwap, Self::OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<Self::OutEvent, Self::ProtocolsHandler>> {
         if let Some((_, event)) = self.completed_swaps.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -126,6 +126,7 @@ pub struct NewSwap {
     pub bitcoin_refund_address: bitcoin::Address,
 }
 
+#[derive(Debug)]
 pub struct Completed(Result<State2>);
 
 impl ProtocolsHandler for Handler {

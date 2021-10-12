@@ -55,7 +55,7 @@ where
     where
         T: AsyncRead + Unpin + Send,
     {
-        let message = upgrade::read_one(io, BUF_SIZE)
+        let message = upgrade::read_length_prefixed(io, BUF_SIZE)
             .await
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         let mut de = serde_json::Deserializer::from_slice(&message);
@@ -88,7 +88,7 @@ where
     {
         let bytes = serde_json::to_vec(&res)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-        upgrade::write_one(io, &bytes).await?;
+        upgrade::write_length_prefixed(io, &bytes).await?;
 
         Ok(())
     }

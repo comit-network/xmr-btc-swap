@@ -249,11 +249,11 @@ where
                                 channel
                             }.boxed());
                         }
-                        SwarmEvent::Behaviour(OutEvent::Rendezvous(libp2p::rendezvous::Event::Registered { .. })) => {
+                        SwarmEvent::Behaviour(OutEvent::Rendezvous(libp2p::rendezvous::client::Event::Registered { .. })) => {
                             tracing::info!("Successfully registered with rendezvous node");
                         }
-                        SwarmEvent::Behaviour(OutEvent::Rendezvous(libp2p::rendezvous::Event::RegisterFailed(error))) => {
-                            tracing::error!("Registration with rendezvous node failed: {:#}", error);
+                        SwarmEvent::Behaviour(OutEvent::Rendezvous(libp2p::rendezvous::client::Event::RegisterFailed(error))) => {
+                            tracing::error!("Registration with rendezvous node failed: {:?}", error);
                         }
                         SwarmEvent::Behaviour(OutEvent::Failure {peer, error}) => {
                             tracing::error!(
@@ -281,7 +281,7 @@ where
                         SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause: None } if num_established == 0 => {
                             tracing::info!(%peer, address = %endpoint.get_remote_address(), "Successfully closed connection");
                         }
-                        SwarmEvent::NewListenAddr(address) => {
+                        SwarmEvent::NewListenAddr{address, ..} => {
                             tracing::info!(%address, "New listen address reported");
                         }
                         _ => {}

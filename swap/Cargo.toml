@@ -31,7 +31,7 @@ ed25519-dalek = "1"
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
 itertools = "0.10"
-libp2p = { git = "https://github.com/comit-network/rust-libp2p", branch = "rendezvous", default-features = false, features = [ "tcp-tokio", "yamux", "mplex", "dns-tokio", "noise", "request-response", "websocket", "ping", "rendezvous" ] }
+libp2p = { git = "https://github.com/libp2p/rust-libp2p.git", default-features = false, features = [ "tcp-tokio", "yamux", "mplex", "dns-tokio", "noise", "request-response", "websocket", "ping", "rendezvous" ] }
 monero = { version = "0.12", features = [ "serde_support" ] }
 monero-rpc = { path = "../monero-rpc" }
 pem = "1.0"
