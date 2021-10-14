@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The ASB to no longer work as a rendezvous server.
+  The ASB can still register with rendezvous server as usual.
+
 ## [0.9.0] - 2021-10-07
 
 ### Changed

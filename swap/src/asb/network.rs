@@ -72,7 +72,7 @@ pub mod behaviour {
             channel: ResponseChannel<()>,
             peer: PeerId,
         },
-        Rendezvous(libp2p::rendezvous::Event),
+        Rendezvous(libp2p::rendezvous::client::Event),
         Failure {
             peer: PeerId,
             error: Error,
@@ -163,8 +163,8 @@ pub mod behaviour {
         }
     }
 
-    impl From<libp2p::rendezvous::Event> for OutEvent {
-        fn from(event: libp2p::rendezvous::Event) -> Self {
+    impl From<libp2p::rendezvous::client::Event> for OutEvent {
+        fn from(event: libp2p::rendezvous::client::Event) -> Self {
             OutEvent::Rendezvous(event)
         }
     }
@@ -172,6 +172,7 @@ pub mod behaviour {
 
 pub mod rendezous {
     use super::*;
+    use libp2p::swarm::DialError;
     use std::pin::Pin;
 
     #[derive(PartialEq)]
@@ -190,7 +191,7 @@ pub mod rendezous {
     }
 
     pub struct Behaviour {
-        inner: libp2p::rendezvous::Rendezvous,
+        inner: libp2p::rendezvous::client::Behaviour,
         rendezvous_point: Multiaddr,
         rendezvous_peer_id: PeerId,
         namespace: XmrBtcNamespace,
@@ -208,10 +209,7 @@ pub mod rendezous {
             registration_ttl: Option<u64>,
         ) -> Self {
             Self {
-                inner: libp2p::rendezvous::Rendezvous::new(
-                    identity,
-                    libp2p::rendezvous::Config::default(),
-                ),
+                inner: libp2p::rendezvous::client::Behaviour::new(identity),
                 rendezvous_point: rendezvous_address,
                 rendezvous_peer_id,
                 namespace,
@@ -232,8 +230,8 @@ pub mod rendezous {
 
     impl NetworkBehaviour for Behaviour {
         type ProtocolsHandler =
-            <libp2p::rendezvous::Rendezvous as NetworkBehaviour>::ProtocolsHandler;
-        type OutEvent = libp2p::rendezvous::Event;
+            <libp2p::rendezvous::client::Behaviour as NetworkBehaviour>::ProtocolsHandler;
+        type OutEvent = libp2p::rendezvous::client::Event;
 
         fn new_handler(&mut self) -> Self::ProtocolsHandler {
             self.inner.new_handler()
@@ -277,14 +275,23 @@ pub mod rendezous {
             self.inner.inject_event(peer_id, connection, event)
         }
 
-        fn inject_dial_failure(&mut self, peer_id: &PeerId) {
+        fn inject_dial_failure(
+            &mut self,
+            peer_id: &PeerId,
+            _handler: Self::ProtocolsHandler,
+            _error: DialError,
+        ) {
             if peer_id == &self.rendezvous_peer_id {
                 self.connection_status = ConnectionStatus::Disconnected;
             }
         }
 
         #[allow(clippy::type_complexity)]
-        fn poll(&mut self, cx: &mut std::task::Context<'_>, params: &mut impl PollParameters) -> Poll<NetworkBehaviourAction<<<Self::ProtocolsHandler as IntoProtocolsHandler>::Handler as ProtocolsHandler>::InEvent, Self::OutEvent>>{
+        fn poll(
+            &mut self,
+            cx: &mut std::task::Context<'_>,
+            params: &mut impl PollParameters,
+        ) -> Poll<NetworkBehaviourAction<Self::OutEvent, Self::ProtocolsHandler>> {
             match &mut self.registration_status {
                 RegistrationStatus::RegisterOnNextConnection => match self.connection_status {
                     ConnectionStatus::Disconnected => {
@@ -293,6 +300,7 @@ pub mod rendezous {
                         return Poll::Ready(NetworkBehaviourAction::DialPeer {
                             peer_id: self.rendezvous_peer_id,
                             condition: DialPeerCondition::Disconnected,
+                            handler: Self::ProtocolsHandler::new(Duration::from_secs(30)),
                         });
                     }
                     ConnectionStatus::Dialling => {}
@@ -315,6 +323,7 @@ pub mod rendezous {
                                 return Poll::Ready(NetworkBehaviourAction::DialPeer {
                                     peer_id: self.rendezvous_peer_id,
                                     condition: DialPeerCondition::Disconnected,
+                                    handler: Self::ProtocolsHandler::new(Duration::from_secs(30)),
                                 });
                             }
                             ConnectionStatus::Dialling => {}
@@ -328,7 +337,7 @@ pub mod rendezous {
 
             // reset the timer if we successfully registered
             if let Poll::Ready(NetworkBehaviourAction::GenerateEvent(
-                libp2p::rendezvous::Event::Registered { ttl, .. },
+                libp2p::rendezvous::client::Event::Registered { ttl, .. },
             )) = &inner_poll
             {
                 let half_of_ttl = Duration::from_secs(*ttl) / 2;
@@ -347,13 +356,14 @@ pub mod rendezous {
         use super::*;
         use crate::network::test::{new_swarm, SwarmExt};
         use futures::StreamExt;
+        use libp2p::rendezvous;
         use libp2p::swarm::SwarmEvent;
 
         #[tokio::test]
         async fn given_no_initial_connection_when_constructed_asb_connects_and_registers_with_rendezvous_node(
         ) {
-            let mut rendezvous_node = new_swarm(|_, identity| {
-                libp2p::rendezvous::Rendezvous::new(identity, libp2p::rendezvous::Config::default())
+            let mut rendezvous_node = new_swarm(|_, _| {
+                rendezvous::server::Behaviour::new(rendezvous::server::Config::default())
             });
             let rendezvous_address = rendezvous_node.listen_on_random_memory_address().await;
 
@@ -375,7 +385,7 @@ pub mod rendezous {
             });
             let asb_registered = tokio::spawn(async move {
                 loop {
-                    if let SwarmEvent::Behaviour(libp2p::rendezvous::Event::Registered { .. }) =
+                    if let SwarmEvent::Behaviour(rendezvous::client::Event::Registered { .. }) =
                         asb.select_next_some().await
                     {
                         break;
@@ -391,11 +401,9 @@ pub mod rendezous {
 
         #[tokio::test]
         async fn asb_automatically_re_registers() {
-            let min_ttl = 5;
-            let mut rendezvous_node = new_swarm(|_, identity| {
-                libp2p::rendezvous::Rendezvous::new(
-                    identity,
-                    libp2p::rendezvous::Config::default().with_min_ttl(min_ttl),
+            let mut rendezvous_node = new_swarm(|_, _| {
+                rendezvous::server::Behaviour::new(
+                    rendezvous::server::Config::default().with_min_ttl(2),
                 )
             });
             let rendezvous_address = rendezvous_node.listen_on_random_memory_address().await;
@@ -420,7 +428,7 @@ pub mod rendezous {
                 let mut number_of_registrations = 0;
 
                 loop {
-                    if let SwarmEvent::Behaviour(libp2p::rendezvous::Event::Registered { .. }) =
+                    if let SwarmEvent::Behaviour(rendezvous::client::Event::Registered { .. }) =
                         asb.select_next_some().await
                     {
                         number_of_registrations += 1

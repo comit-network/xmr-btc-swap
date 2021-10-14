@@ -43,7 +43,7 @@ where
     );
 
     let transport = asb::transport::new(&identity)?;
-    let peer_id = identity.public().into_peer_id();
+    let peer_id = identity.public().into();
 
     let swarm = SwarmBuilder::new(transport, behaviour, peer_id)
         .executor(Box::new(|f| {
@@ -68,7 +68,7 @@ where
     };
 
     let transport = cli::transport::new(&identity, maybe_tor_socks5_port)?;
-    let peer_id = identity.public().into_peer_id();
+    let peer_id = identity.public().into();
 
     let swarm = SwarmBuilder::new(transport, behaviour, peer_id)
         .executor(Box::new(|f| {

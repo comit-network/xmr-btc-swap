@@ -185,7 +185,7 @@ where
         &mut self,
         _cx: &mut std::task::Context<'_>,
         _params: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<(), Self::OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<Self::OutEvent, Self::ProtocolsHandler>> {
         if let Some(event) = self.events.pop_front() {
             return Poll::Ready(NetworkBehaviourAction::GenerateEvent(event));
         }
@@ -234,6 +234,7 @@ impl<LR> Handler<LR> {
 }
 
 #[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
 pub enum HandlerOutEvent {
     Initiated(bmrng::RequestReceiver<bitcoin::Amount, WalletSnapshot>),
     Completed(Result<(Uuid, State3)>),

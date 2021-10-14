@@ -5,7 +5,6 @@ use anyhow::{Context, Result};
 use futures::StreamExt;
 use libp2p::multiaddr::Protocol;
 use libp2p::ping::{Ping, PingConfig, PingEvent};
-use libp2p::rendezvous::{Namespace, Rendezvous};
 use libp2p::request_response::{RequestResponseEvent, RequestResponseMessage};
 use libp2p::swarm::SwarmEvent;
 use libp2p::{identity, rendezvous, Multiaddr, PeerId, Swarm};
@@ -29,7 +28,7 @@ pub async fn list_sellers(
     identity: identity::Keypair,
 ) -> Result<Vec<Seller>> {
     let behaviour = Behaviour {
-        rendezvous: Rendezvous::new(identity.clone(), rendezvous::Config::default()),
+        rendezvous: rendezvous::client::Behaviour::new(identity.clone()),
         quote: quote::cli(),
         ping: Ping::new(
             PingConfig::new()
@@ -74,13 +73,13 @@ pub enum Status {
 
 #[derive(Debug)]
 enum OutEvent {
-    Rendezvous(rendezvous::Event),
+    Rendezvous(rendezvous::client::Event),
     Quote(quote::OutEvent),
     Ping(PingEvent),
 }
 
-impl From<rendezvous::Event> for OutEvent {
-    fn from(event: rendezvous::Event) -> Self {
+impl From<rendezvous::client::Event> for OutEvent {
+    fn from(event: rendezvous::client::Event) -> Self {
         OutEvent::Rendezvous(event)
     }
 }
@@ -95,7 +94,7 @@ impl From<quote::OutEvent> for OutEvent {
 #[behaviour(event_process = false)]
 #[behaviour(out_event = "OutEvent")]
 struct Behaviour {
-    rendezvous: Rendezvous,
+    rendezvous: rendezvous::client::Behaviour,
     quote: quote::Behaviour,
     ping: Ping,
 }
@@ -155,7 +154,7 @@ impl EventLoop {
                                 );
 
                                 self.swarm.behaviour_mut().rendezvous.discover(
-                                    Some(Namespace::new(self.namespace.to_string()).expect("our namespace to be a correct string")),
+                                    Some(rendezvous::Namespace::new(self.namespace.to_string()).expect("our namespace to be a correct string")),
                                     None,
                                     None,
                                     self.rendezvous_peer_id,
@@ -194,7 +193,7 @@ impl EventLoop {
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::Rendezvous(
-                                                  rendezvous::Event::Discovered { registrations, .. },
+                                                  libp2p::rendezvous::client::Event::Discovered { registrations, .. },
                                               )) => {
                             self.state = State::WaitForQuoteCompletion;
 

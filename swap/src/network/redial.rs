@@ -93,7 +93,7 @@ impl NetworkBehaviour for Behaviour {
         &mut self,
         cx: &mut Context<'_>,
         _: &mut impl PollParameters,
-    ) -> Poll<NetworkBehaviourAction<Void, Self::OutEvent>> {
+    ) -> Poll<NetworkBehaviourAction<Self::OutEvent, Self::ProtocolsHandler>> {
         let sleep = match self.sleep.as_mut() {
             None => return Poll::Pending, // early exit if we shouldn't be re-dialling
             Some(future) => future,
@@ -115,6 +115,7 @@ impl NetworkBehaviour for Behaviour {
         Poll::Ready(NetworkBehaviourAction::DialPeer {
             peer_id: self.peer,
             condition: DialPeerCondition::Disconnected,
+            handler: Self::ProtocolsHandler::default(),
         })
     }
 }

@@ -90,7 +90,7 @@ pub async fn read_cbor_message<T>(substream: &mut NegotiatedSubstream) -> Result
 where
     T: DeserializeOwned,
 {
-    let bytes = upgrade::read_one(substream, BUF_SIZE)
+    let bytes = upgrade::read_length_prefixed(substream, BUF_SIZE)
         .await
         .context("Failed to read length-prefixed message from stream")?;
     let mut de = serde_cbor::Deserializer::from_slice(&bytes);
@@ -106,7 +106,7 @@ where
 {
     let bytes =
         serde_cbor::to_vec(&message).context("Failed to serialize message as bytes using CBOR")?;
-    upgrade::write_with_len_prefix(substream, &bytes)
+    upgrade::write_length_prefixed(substream, &bytes)
         .await
         .context("Failed to write bytes as length-prefixed message")?;
 
