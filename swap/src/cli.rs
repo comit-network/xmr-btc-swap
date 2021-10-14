@@ -59,10 +59,7 @@ mod tests {
     }
 
     async fn setup_rendezvous_point() -> (Multiaddr, PeerId) {
-        let mut rendezvous_node = new_swarm(|_, _| RendezvousPointBehaviour {
-            rendezvous: rendezvous::server::Behaviour::new(rendezvous::server::Config::default()),
-            ping: Default::default(),
-        });
+        let mut rendezvous_node = new_swarm(|_, _| RendezvousPointBehaviour::default());
         let rendezvous_address = rendezvous_node.listen_on_tcp_localhost().await;
         let rendezvous_peer_id = *rendezvous_node.local_peer_id();
 
@@ -174,5 +171,16 @@ mod tests {
     }
     impl NetworkBehaviourEventProcess<libp2p::ping::PingEvent> for RendezvousPointBehaviour {
         fn inject_event(&mut self, _: libp2p::ping::PingEvent) {}
+    }
+
+    impl Default for RendezvousPointBehaviour {
+        fn default() -> Self {
+            RendezvousPointBehaviour {
+                rendezvous: rendezvous::server::Behaviour::new(
+                    rendezvous::server::Config::default(),
+                ),
+                ping: Default::default(),
+            }
+        }
     }
 }
