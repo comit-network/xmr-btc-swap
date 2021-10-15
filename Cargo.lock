@@ -3952,7 +3952,6 @@ dependencies = [
  "serde_with",
  "sha2",
  "sigma_fun",
- "sled",
  "spectral",
  "sqlx",
  "structopt",
