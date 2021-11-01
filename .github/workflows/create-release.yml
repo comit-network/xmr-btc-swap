@@ -9,7 +9,7 @@ jobs:
   create_release:
     name: Create from merged release branch
     if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2.3.4
 

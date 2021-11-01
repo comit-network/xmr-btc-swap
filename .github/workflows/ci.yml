@@ -10,7 +10,7 @@ on:
 
 jobs:
   static_analysis:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2.3.4
@@ -31,9 +31,9 @@ jobs:
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-18.04
           - target: armv7-unknown-linux-gnueabihf
-            os: ubuntu-latest
+            os: ubuntu-18.04
           - target: x86_64-apple-darwin
             os: macos-latest
           - target: x86_64-pc-windows-msvc
@@ -71,7 +71,7 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os: [ ubuntu-18.04, macos-latest ]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
@@ -83,7 +83,7 @@ jobs:
         run: cargo build --tests --workspace --all-features
 
       - name: Run monero-harness tests
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-18.04'
         run: cargo test --package monero-harness --all-features
 
       - name: Run library tests for swap
@@ -107,7 +107,7 @@ jobs:
             concurrent_bobs_before_xmr_lock_proof_sent,
             alice_manually_redeems_after_enc_sig_learned
         ]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
 
       - name: Checkout sources

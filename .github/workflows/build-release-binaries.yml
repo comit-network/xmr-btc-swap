@@ -12,11 +12,11 @@ jobs:
         include:
           - bin: swap
             target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-18.04
             archive_ext: tar
           - bin: swap
             target: armv7-unknown-linux-gnueabihf
-            os: ubuntu-latest
+            os: ubuntu-18.04
             archive_ext: tar
           - bin: swap
             target: x86_64-apple-darwin
@@ -28,11 +28,11 @@ jobs:
             archive_ext: zip
           - bin: asb
             target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-18.04
             archive_ext: tar
           - bin: asb
             target: armv7-unknown-linux-gnueabihf
-            os: ubuntu-latest
+            os: ubuntu-18.04
             archive_ext: tar
           - bin: asb
             target: x86_64-apple-darwin
@@ -92,7 +92,7 @@ jobs:
         run: gtar -C ./target/${{ matrix.target }}/release --create --file=${{ steps.create-archive-name.outputs.archive }} ${{ matrix.bin }}
 
       - name: Pack linux archive
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-18.04'
         shell: bash
         run: tar -C ./target/${{ matrix.target }}/release --create --file=${{ steps.create-archive-name.outputs.archive }} ${{ matrix.bin }}
 
