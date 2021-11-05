@@ -39,6 +39,9 @@ This software is using cryptography that has not been formally audited.
 While we do our best to make it safe, it is up to the user to evaluate whether or not it is safe to use for their purposes.
 Please also see section 15 and 16 of the [license](./LICENSE).
 
+Keep in mind that swaps are complex protocols, it is recommended to _not_ do anything fancy when moving coins in and out.
+It is not recommended to bump fees when swapping because it can have unpredictable side effects.
+
 ## Contributing
 
 We are encourage community contributions whether it be a bug fix or an improvement to the documentation.
