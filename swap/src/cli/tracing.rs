@@ -38,7 +38,8 @@ pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>, swap_id: Option<Uuid
         let file_logger = fmt::layer()
             .with_ansi(false)
             .with_target(false)
-            .with_writer(appender);
+            .with_writer(appender)
+            .json();
 
         if debug {
             set_global_default(registry.with(file_logger).with(debug_terminal_printer()))?;
