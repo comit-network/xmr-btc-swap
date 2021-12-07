@@ -138,40 +138,38 @@ async fn main() -> Result<()> {
             }
         }
         Command::History => {
+            cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
+
             let db = open_db(data_dir.join("sqlite")).await?;
-            let mut table = Table::new();
+            let swaps = db.all().await?;
 
-            table.set_header(vec!["SWAP ID", "STATE"]);
+            if json {
+                for (swap_id, state) in swaps {
+                    let state: BobState = state.try_into()?;
+                    tracing::info!(swap_id=%swap_id.to_string(), state=%state.to_string(), "Read swap state from database");
+                }
+            } else {
+                let mut table = Table::new();
 
-            for (swap_id, state) in db.all().await? {
-                let state: BobState = state.try_into()?;
-                table.add_row(vec![swap_id.to_string(), state.to_string()]);
+                table.set_header(vec!["SWAP ID", "STATE"]);
+
+                for (swap_id, state) in swaps {
+                    let state: BobState = state.try_into()?;
+                    table.add_row(vec![swap_id.to_string(), state.to_string()]);
+                }
+
+                println!("{}", table);
             }
-
-            println!("{}", table);
         }
         Command::Config => {
-            println!("Data directory: {}", data_dir.display());
-            println!(
-                "Log files locations: {}",
-                format!("{}/wallet", data_dir.display())
-            );
-            println!(
-                "Sqlite file location: {}",
-                format!("{}/sqlite", data_dir.display())
-            );
-            println!(
-                "Seed file location: {}",
-                format!("{}/seed.pem", data_dir.display())
-            );
-            println!(
-                "Monero-wallet-rpc location: {}",
-                format!("{}/monero", data_dir.display())
-            );
-            println!(
-                "Internal bitcoin wallet location: {}",
-                format!("{}/wallet", data_dir.display())
-            );
+            cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
+
+            tracing::info!(path=%data_dir.display(), "Data directory");
+            tracing::info!(path=%format!("{}/logs", data_dir.display()), "Log files directory");
+            tracing::info!(path=%format!("{}/sqlite", data_dir.display()), "Sqlite file location");
+            tracing::info!(path=%format!("{}/seed.pem", data_dir.display()), "Seed file location");
+            tracing::info!(path=%format!("{}/monero", data_dir.display()), "Monero-wallet-rpc directory");
+            tracing::info!(path=%format!("{}/wallet", data_dir.display()), "Internal bitcoin wallet directory");
         }
         Command::WithdrawBtc {
             bitcoin_electrum_rpc_url,
@@ -225,7 +223,10 @@ async fn main() -> Result<()> {
             .await?;
 
             let bitcoin_balance = bitcoin_wallet.balance().await?;
-            println!("Bitcoin balance is {}", bitcoin_balance);
+            tracing::info!(
+                balance = %bitcoin_balance,
+                "Checked Bitcoin balance",
+            );
         }
         Command::Resume {
             swap_id,
@@ -359,7 +360,25 @@ async fn main() -> Result<()> {
 
             if json {
                 for seller in sellers {
-                    println!("{}", serde_json::to_string(&seller)?);
+                    match seller.status {
+                        SellerStatus::Online(quote) => {
+                            tracing::info!(
+                                price = %quote.price.to_string(),
+                                min_quantity = %quote.min_quantity.to_string(),
+                                max_quantity = %quote.max_quantity.to_string(),
+                                status = "Online",
+                                address = %seller.multiaddr.to_string(),
+                                "Fetched peer status"
+                            );
+                        }
+                        SellerStatus::Unreachable => {
+                            tracing::info!(
+                                status = "Unreachable",
+                                address = %seller.multiaddr.to_string(),
+                                "Fetched peer status"
+                            );
+                        }
+                    }
                 }
             } else {
                 let mut table = Table::new();
@@ -404,6 +423,8 @@ async fn main() -> Result<()> {
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
         } => {
+            cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
+
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
             let bitcoin_wallet = init_bitcoin_wallet(
@@ -415,7 +436,7 @@ async fn main() -> Result<()> {
             )
             .await?;
             let wallet_export = bitcoin_wallet.wallet_export("cli").await?;
-            println!("{}", wallet_export.to_string())
+            tracing::info!(descriptor=%wallet_export.to_string(), "Exported bitcoin wallet");
         }
     };
     Ok(())

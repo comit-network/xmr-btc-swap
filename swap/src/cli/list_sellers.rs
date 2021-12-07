@@ -200,7 +200,7 @@ impl EventLoop {
                             for registration in registrations {
                                 let peer = registration.record.peer_id();
                                 for address in registration.record.addresses() {
-                                    tracing::info!("Discovered peer {} at {}", peer, address);
+                                    tracing::info!(peer_id=%peer, address=%address, "Discovered peer");
 
                                     let p2p_suffix = Protocol::P2p(*peer.as_ref());
                                     let _address_with_p2p = if !address
