@@ -54,7 +54,7 @@ jobs:
         run: git push origin release/${{ github.event.inputs.version }} --force
 
       - name: Create pull request
-        uses: thomaseizinger/create-pull-request@1.2.1
+        uses: thomaseizinger/create-pull-request@1.2.2
         with:
           GITHUB_TOKEN: ${{ secrets.BOTTY_GITHUB_TOKEN }}
           head: release/${{ github.event.inputs.version }}
