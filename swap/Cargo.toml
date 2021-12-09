@@ -86,5 +86,5 @@ tempfile = "3"
 testcontainers = "0.12"
 
 [build-dependencies]
-vergen = { version = "5", default-features = false, features = [ "git", "build" ] }
+vergen = { version = "6", default-features = false, features = [ "git", "build" ] }
 anyhow = "1"
