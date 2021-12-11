@@ -58,7 +58,7 @@ impl GetDefaults for Mainnet {
             data_dir: default_asb_data_dir()?.join("mainnet"),
             listen_address_tcp: Multiaddr::from_str("/ip4/0.0.0.0/tcp/9939")?,
             listen_address_ws: Multiaddr::from_str("/ip4/0.0.0.0/tcp/9940/ws")?,
-            electrum_rpc_url: Url::parse("ssl://electrum.blockstream.info:50002")?,
+            electrum_rpc_url: Url::parse("ssl://blockstream.info:700")?,
             monero_wallet_rpc_url: Url::parse("http://127.0.0.1:18083/json_rpc")?,
             price_ticker_ws_url: Url::parse("wss://ws.kraken.com")?,
             bitcoin_confirmation_target: 3,
