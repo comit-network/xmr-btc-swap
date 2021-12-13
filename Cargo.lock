@@ -74,9 +74,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.44"
+version = "1.0.51"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61604a8f862e1d5c3229fdd78f8b02c68dcf73a4c4b05fd636d12240aaa242c1"
+checksum = "8b26702f315f53b6071259e15dd9d64528213b44d61de1ec926eca7715d62203"
 
 [[package]]
 name = "arrayref"
@@ -235,9 +235,9 @@ dependencies = [
 
 [[package]]
 name = "bdk"
-version = "0.12.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecf7e997526ceefbab7dd99fc0da6834ed8853bd051f53523415ed1dc82b870d"
+checksum = "a6ec4da3dbaa41bb6d6cffe40b113ea8651566da7f96beebe9c0e87fc92b9094"
 dependencies = [
  "async-trait",
  "bdk-macros",
