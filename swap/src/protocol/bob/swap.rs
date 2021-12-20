@@ -85,6 +85,17 @@ async fn next_state(
             BobState::SwapSetupCompleted(state2)
         }
         BobState::SwapSetupCompleted(state2) => {
+            // Record the current monero wallet block height so we don't have to scan from
+            // block 0 once we create the redeem wallet.
+            // This has to be done **before** the Bitcoin is locked in order to ensure that
+            // if Bob goes offline the recorded wallet-height is correct.
+            // If we only record this later, it can happen that Bob publishes the Bitcoin
+            // transaction, goes offline, while offline Alice publishes Monero.
+            // If the Monero transaction gets confirmed before Bob comes online again then
+            // Bob would record a wallet-height that is past the lock transaction height,
+            // which can lead to the wallet not detect the transaction.
+            let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
+
             // Alice and Bob have exchanged info
             let (state3, tx_lock) = state2.lock_btc().await?;
             let signed_tx = bitcoin_wallet
@@ -93,21 +104,23 @@ async fn next_state(
                 .context("Failed to sign Bitcoin lock transaction")?;
             let (..) = bitcoin_wallet.broadcast(signed_tx, "lock").await?;
 
-            BobState::BtcLocked(state3)
+            BobState::BtcLocked {
+                state3,
+                monero_wallet_restore_blockheight,
+            }
         }
         // Bob has locked Btc
         // Watch for Alice to Lock Xmr or for cancel timelock to elapse
-        BobState::BtcLocked(state3) => {
+        BobState::BtcLocked {
+            state3,
+            monero_wallet_restore_blockheight,
+        } => {
             let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
 
             if let ExpiredTimelocks::None = state3.current_epoch(bitcoin_wallet).await? {
                 let transfer_proof_watcher = event_loop_handle.recv_transfer_proof();
                 let cancel_timelock_expires =
                     tx_lock_status.wait_until_confirmed_with(state3.cancel_timelock);
-
-                // Record the current monero wallet block height so we don't have to scan from
-                // block 0 once we create the redeem wallet.
-                let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
 
                 tracing::info!("Waiting for Alice to lock Monero");
 

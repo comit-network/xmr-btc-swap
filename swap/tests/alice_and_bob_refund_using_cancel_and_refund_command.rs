@@ -37,7 +37,7 @@ async fn given_alice_and_bob_manually_refund_after_funds_locked_both_refund() {
             .await;
 
         // Ensure cancel timelock is expired
-        if let BobState::BtcLocked(state3) = bob_swap.state.clone() {
+        if let BobState::BtcLocked { state3, .. } = bob_swap.state.clone() {
             bob_swap
                 .bitcoin_wallet
                 .subscribe_to(state3.tx_lock)

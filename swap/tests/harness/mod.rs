@@ -974,7 +974,7 @@ pub mod bob_run_until {
     use swap::protocol::bob::BobState;
 
     pub fn is_btc_locked(state: &BobState) -> bool {
-        matches!(state, BobState::BtcLocked(..))
+        matches!(state, BobState::BtcLocked { .. })
     }
 
     pub fn is_lock_proof_received(state: &BobState) -> bool {

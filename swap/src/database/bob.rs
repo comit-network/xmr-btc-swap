@@ -20,6 +20,7 @@ pub enum Bob {
     },
     BtcLocked {
         state3: bob::State3,
+        monero_wallet_restore_blockheight: BlockHeight,
     },
     XmrLockProofReceived {
         state: bob::State3,
@@ -57,7 +58,13 @@ impl From<BobState> for Bob {
                 change_address,
             },
             BobState::SwapSetupCompleted(state2) => Bob::ExecutionSetupDone { state2 },
-            BobState::BtcLocked(state3) => Bob::BtcLocked { state3 },
+            BobState::BtcLocked {
+                state3,
+                monero_wallet_restore_blockheight,
+            } => Bob::BtcLocked {
+                state3,
+                monero_wallet_restore_blockheight,
+            },
             BobState::XmrLockProofReceived {
                 state,
                 lock_transfer_proof,
@@ -95,7 +102,13 @@ impl From<Bob> for BobState {
                 change_address,
             },
             Bob::ExecutionSetupDone { state2 } => BobState::SwapSetupCompleted(state2),
-            Bob::BtcLocked { state3 } => BobState::BtcLocked(state3),
+            Bob::BtcLocked {
+                state3,
+                monero_wallet_restore_blockheight,
+            } => BobState::BtcLocked {
+                state3,
+                monero_wallet_restore_blockheight,
+            },
             Bob::XmrLockProofReceived {
                 state,
                 lock_transfer_proof,

@@ -14,7 +14,7 @@ pub async fn cancel(
     let state = db.get_state(swap_id).await?.try_into()?;
 
     let state6 = match state {
-        BobState::BtcLocked(state3) => state3.cancel(),
+        BobState::BtcLocked { state3, .. } => state3.cancel(),
         BobState::XmrLockProofReceived { state, .. } => state.cancel(),
         BobState::XmrLocked(state4) => state4.cancel(),
         BobState::EncSigSent(state4) => state4.cancel(),
