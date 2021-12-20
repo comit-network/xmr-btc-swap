@@ -12,7 +12,7 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use comfy_table::Table;
 use qrcode::render::unicode;
 use qrcode::QrCode;
@@ -416,6 +416,43 @@ async fn main() -> Result<()> {
             .await?;
             let wallet_export = bitcoin_wallet.wallet_export("cli").await?;
             println!("{}", wallet_export.to_string())
+        }
+        Command::MoneroRecovery { swap_id } => {
+            let db = open_db(data_dir.join("sqlite")).await?;
+
+            let swap_state: BobState = db.get_state(swap_id).await?.try_into()?;
+
+            match swap_state {
+                BobState::Started { .. }
+                | BobState::SwapSetupCompleted(_)
+                | BobState::BtcLocked(_)
+                | BobState::XmrLockProofReceived { .. }
+                | BobState::XmrLocked(_)
+                | BobState::EncSigSent(_)
+                | BobState::CancelTimelockExpired(_)
+                | BobState::BtcCancelled(_)
+                | BobState::BtcRefunded(_)
+                | BobState::BtcPunished { .. }
+                | BobState::SafelyAborted
+                | BobState::XmrRedeemed { .. } => {
+                    bail!("Cannot print monero recovery information in state {}, only possible for BtcRedeemed", swap_state)
+                }
+                BobState::BtcRedeemed(state5) => {
+                    let (spend_key, view_key) = state5.xmr_keys();
+
+                    let address = monero::Address::standard(
+                        env_config.monero_network,
+                        monero::PublicKey::from_private_key(&spend_key),
+                        monero::PublicKey::from(view_key.public()),
+                    );
+                    tracing::info!("Wallet address: {}", address.to_string());
+
+                    let view_key = serde_json::to_string(&view_key)?;
+                    println!("View key: {}", view_key);
+
+                    println!("Spend key: {}", spend_key);
+                }
+            }
         }
     };
     Ok(())

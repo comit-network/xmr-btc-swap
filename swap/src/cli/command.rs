@@ -249,6 +249,15 @@ where
                 },
             }
         }
+        RawCommand::MoneroRecovery { swap_id } => Arguments {
+            env_config: env_config_from(is_testnet),
+            debug,
+            json,
+            data_dir: data::data_dir_from(data, is_testnet)?,
+            cmd: Command::MoneroRecovery {
+                swap_id: swap_id.swap_id,
+            },
+        },
     };
 
     Ok(ParseResult::Arguments(arguments))
@@ -302,6 +311,9 @@ pub enum Command {
     ExportBitcoinWallet {
         bitcoin_electrum_rpc_url: Url,
         bitcoin_target_block: usize,
+    },
+    MoneroRecovery {
+        swap_id: Uuid,
     },
 }
 
@@ -438,6 +450,13 @@ enum RawCommand {
     ExportBitcoinWallet {
         #[structopt(flatten)]
         bitcoin: Bitcoin,
+    },
+    /// Prints Monero information related to the swap in case the generated
+    /// wallet fails to detect the funds. This can only be used for swaps
+    /// that are in a `btc is redeemed` state.
+    MoneroRecovery {
+        #[structopt(flatten)]
+        swap_id: SwapId,
     },
 }
 
