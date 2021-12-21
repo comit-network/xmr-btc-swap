@@ -149,18 +149,21 @@ impl Wallet {
                             Ok(new_status) => new_status,
                             Err(error) => {
                                 tracing::warn!(%txid, "Failed to get status of script: {:#}", error);
-                                return;
+                                ScriptStatus::Retrying
                             }
                         };
+                        
+                        if new_status != ScriptStatus::Retrying
+                        {
+                            last_status = Some(print_status_change(txid, last_status, new_status));
 
-                        last_status = Some(print_status_change(txid, last_status, new_status));
-
-                        let all_receivers_gone = sender.send(new_status).is_err();
-
-                        if all_receivers_gone {
-                            tracing::debug!(%txid, "All receivers gone, removing subscription");
-                            client.lock().await.subscriptions.remove(&(txid, script));
-                            return;
+                            let all_receivers_gone = sender.send(new_status).is_err();
+    
+                            if all_receivers_gone {
+                                tracing::debug!(%txid, "All receivers gone, removing subscription");
+                                client.lock().await.subscriptions.remove(&(txid, script));
+                                return;
+                            }
                         }
                     }
                 });
@@ -823,6 +826,7 @@ pub enum ScriptStatus {
     Unseen,
     InMempool,
     Confirmed(Confirmed),
+    Retrying,
 }
 
 impl ScriptStatus {
@@ -898,6 +902,7 @@ impl fmt::Display for ScriptStatus {
         match self {
             ScriptStatus::Unseen => write!(f, "unseen"),
             ScriptStatus::InMempool => write!(f, "in mempool"),
+            ScriptStatus::Retrying => write!(f, "retrying"),
             ScriptStatus::Confirmed(inner) => {
                 write!(f, "confirmed with {} blocks", inner.confirmations())
             }
