@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `monero-recovery` command that can be used to print the monero address, private spend and view key so one can manually recover instances where the `monero-wallet-rpc` does not pick up the Monero funds locked up by the ASB.
+  Related issue: https://github.com/comit-network/xmr-btc-swap/issues/537
+  The command takes the swap-id as parameter.
+  The swap has to be in a `BtcRedeemed` state.
+  Use `--help` for more details.
+
 ## [0.10.0] - 2021-10-15
 
 ### Removed
