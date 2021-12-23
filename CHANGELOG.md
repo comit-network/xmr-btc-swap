@@ -7,10 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2021-12-23
+
 ### Added
 
 - `monero-recovery` command that can be used to print the monero address, private spend and view key so one can manually recover instances where the `monero-wallet-rpc` does not pick up the Monero funds locked up by the ASB.
-  Related issue: https://github.com/comit-network/xmr-btc-swap/issues/537
+  Related issue: <https://github.com/comit-network/xmr-btc-swap/issues/537>
   The command takes the swap-id as parameter.
   The swap has to be in a `BtcRedeemed` state.
   Use `--help` for more details.
@@ -288,7 +290,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[Unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.10.0...HEAD
+[Unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.10.1...HEAD
+[0.10.1]: https://github.com/comit-network/xmr-btc-swap/compare/0.10.0...0.10.1
 [0.10.0]: https://github.com/comit-network/xmr-btc-swap/compare/0.9.0...0.10.0
 [0.9.0]: https://github.com/comit-network/xmr-btc-swap/compare/0.8.3...0.9.0
 [0.8.3]: https://github.com/comit-network/xmr-btc-swap/compare/0.8.2...0.8.3
