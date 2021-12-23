@@ -3,29 +3,14 @@ use std::option::Option::Some;
 use std::path::Path;
 use tracing::subscriber::set_global_default;
 use tracing::{Event, Level, Subscriber};
-use tracing_subscriber::fmt::format::{DefaultFields, Format};
+use tracing_subscriber::fmt::format::{DefaultFields, Format, JsonFields};
 use tracing_subscriber::fmt::time::ChronoLocal;
 use tracing_subscriber::layer::{Context, SubscriberExt};
 use tracing_subscriber::{fmt, EnvFilter, FmtSubscriber, Layer, Registry};
 use uuid::Uuid;
 
 pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>, swap_id: Option<Uuid>) -> Result<()> {
-    if json {
-        let level = if debug { Level::DEBUG } else { Level::INFO };
-
-        let is_terminal = atty::is(atty::Stream::Stderr);
-
-        FmtSubscriber::builder()
-            .with_env_filter(format!("swap={}", level))
-            .with_writer(std::io::stderr)
-            .with_ansi(is_terminal)
-            .with_timer(ChronoLocal::with_format("%F %T".to_owned()))
-            .with_target(false)
-            .json()
-            .init();
-
-        Ok(())
-    } else if let Some(swap_id) = swap_id {
+    if let Some(swap_id) = swap_id {
         let level_filter = EnvFilter::try_new("swap=debug")?;
 
         let registry = Registry::default().with(level_filter);
@@ -40,7 +25,19 @@ pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>, swap_id: Option<Uuid
             .with_target(false)
             .with_writer(appender);
 
-        if debug {
+        if json && debug {
+            set_global_default(
+                registry
+                    .with(file_logger.json())
+                    .with(debug_json_terminal_printer()),
+            )?;
+        } else if json && !debug {
+            set_global_default(
+                registry
+                    .with(file_logger.json())
+                    .with(info_json_terminal_printer()),
+            )?;
+        } else if !json && debug {
             set_global_default(registry.with(file_logger).with(debug_terminal_printer()))?;
         } else {
             set_global_default(registry.with(file_logger).with(info_terminal_printer()))?;
@@ -51,14 +48,18 @@ pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>, swap_id: Option<Uuid
         let level = if debug { Level::DEBUG } else { Level::INFO };
         let is_terminal = atty::is(atty::Stream::Stderr);
 
-        FmtSubscriber::builder()
+        let builder = FmtSubscriber::builder()
             .with_env_filter(format!("swap={}", level))
             .with_writer(std::io::stderr)
             .with_ansi(is_terminal)
-            .with_level(false)
-            .without_time()
-            .with_target(false)
-            .init();
+            .with_timer(ChronoLocal::with_format("%F %T".to_owned()))
+            .with_target(false);
+
+        if json {
+            builder.json().init();
+        } else {
+            builder.init();
+        }
 
         Ok(())
     }
@@ -76,6 +77,13 @@ type StdErrLayer<S, T> = tracing_subscriber::fmt::Layer<
     fn() -> std::io::Stderr,
 >;
 
+type StdErrJsonLayer<S, T> = tracing_subscriber::fmt::Layer<
+    S,
+    JsonFields,
+    Format<tracing_subscriber::fmt::format::Json, T>,
+    fn() -> std::io::Stderr,
+>;
+
 fn debug_terminal_printer<S>() -> StdErrPrinter<StdErrLayer<S, ChronoLocal>> {
     let is_terminal = atty::is(atty::Stream::Stderr);
     StdErrPrinter {
@@ -83,6 +91,19 @@ fn debug_terminal_printer<S>() -> StdErrPrinter<StdErrLayer<S, ChronoLocal>> {
             .with_ansi(is_terminal)
             .with_target(false)
             .with_timer(ChronoLocal::with_format("%F %T".to_owned()))
+            .with_writer(std::io::stderr),
+        level: Level::DEBUG,
+    }
+}
+
+fn debug_json_terminal_printer<S>() -> StdErrPrinter<StdErrJsonLayer<S, ChronoLocal>> {
+    let is_terminal = atty::is(atty::Stream::Stderr);
+    StdErrPrinter {
+        inner: fmt::layer()
+            .with_ansi(is_terminal)
+            .with_target(false)
+            .with_timer(ChronoLocal::with_format("%F %T".to_owned()))
+            .json()
             .with_writer(std::io::stderr),
         level: Level::DEBUG,
     }
@@ -96,6 +117,20 @@ fn info_terminal_printer<S>() -> StdErrPrinter<StdErrLayer<S, ()>> {
             .with_target(false)
             .with_level(false)
             .without_time()
+            .with_writer(std::io::stderr),
+        level: Level::INFO,
+    }
+}
+
+fn info_json_terminal_printer<S>() -> StdErrPrinter<StdErrJsonLayer<S, ()>> {
+    let is_terminal = atty::is(atty::Stream::Stderr);
+    StdErrPrinter {
+        inner: fmt::layer()
+            .with_ansi(is_terminal)
+            .with_target(false)
+            .with_level(false)
+            .without_time()
+            .json()
             .with_writer(std::io::stderr),
         level: Level::INFO,
     }
