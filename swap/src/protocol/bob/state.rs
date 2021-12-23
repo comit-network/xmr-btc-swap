@@ -28,7 +28,10 @@ pub enum BobState {
         change_address: bitcoin::Address,
     },
     SwapSetupCompleted(State2),
-    BtcLocked(State3),
+    BtcLocked {
+        state3: State3,
+        monero_wallet_restore_blockheight: BlockHeight,
+    },
     XmrLockProofReceived {
         state: State3,
         lock_transfer_proof: TransferProof,
@@ -54,7 +57,7 @@ impl fmt::Display for BobState {
         match self {
             BobState::Started { .. } => write!(f, "quote has been requested"),
             BobState::SwapSetupCompleted(..) => write!(f, "execution setup done"),
-            BobState::BtcLocked(..) => write!(f, "btc is locked"),
+            BobState::BtcLocked { .. } => write!(f, "btc is locked"),
             BobState::XmrLockProofReceived { .. } => {
                 write!(f, "XMR lock transaction transfer proof received")
             }

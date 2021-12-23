@@ -446,7 +446,7 @@ async fn main() -> Result<()> {
             match swap_state {
                 BobState::Started { .. }
                 | BobState::SwapSetupCompleted(_)
-                | BobState::BtcLocked(_)
+                | BobState::BtcLocked { .. }
                 | BobState::XmrLockProofReceived { .. }
                 | BobState::XmrLocked(_)
                 | BobState::EncSigSent(_)

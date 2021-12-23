@@ -20,7 +20,7 @@ async fn concurrent_bobs_before_xmr_lock_proof_sent() {
         let alice_swap_1 = tokio::spawn(alice::run(alice_swap_1, FixedRate::default()));
 
         let bob_state_1 = bob_swap_1.await??;
-        assert!(matches!(bob_state_1, BobState::BtcLocked(_)));
+        assert!(matches!(bob_state_1, BobState::BtcLocked { .. }));
 
         // make sure bob_swap_1's event loop is gone
         bob_join_handle_1.abort();
@@ -44,7 +44,7 @@ async fn concurrent_bobs_before_xmr_lock_proof_sent() {
         let (bob_swap_1, _) = ctx
             .stop_and_resume_bob_from_db(bob_join_handle_2, swap_id)
             .await;
-        assert!(matches!(bob_state_1, BobState::BtcLocked(_)));
+        assert!(matches!(bob_state_1, BobState::BtcLocked { .. }));
 
         // The 1st (paused) swap is expected to refund, because the transfer
         // proof is delivered to the wrong swap, and we currently don't store it in the
