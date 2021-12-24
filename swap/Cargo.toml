@@ -46,7 +46,7 @@ serde = { version = "1", features = [ "derive" ] }
 serde_cbor = "0.11"
 serde_json = "1"
 serde_with = { version = "1", features = [ "macros" ] }
-sha2 = "0.9"
+sha2 = "0.10"
 sigma_fun = { git = "https://github.com/LLFourn/secp256kfun", default-features = false, features = [ "ed25519", "serde" ] }
 sqlx = { version = "0.5", features = [ "sqlite", "runtime-tokio-rustls", "offline" ] }
 structopt = "0.3"
