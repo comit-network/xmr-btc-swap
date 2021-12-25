@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Record monero wallet restore blockheight in state `SwapSetupCompleted` already.
+  This solves issues where the CLI went offline after sending the BTC transaction, and the monero wallet restore blockheight being recorded after Alice locked the Monero, resulting in the generated XMR redeem wallet not detecting the transaction and reporting `No unlocked balance in the specified account`.
+  This is a breaking database change!
+  Swaps that were saved prior to this change may fail to load if they are in state `SwapSetupCompleted` of `BtcLocked`.
+  Make sure to finish your swaps before upgrading.
 - logs to use rfc3339 local time formatting.
 
 ## [0.10.1] - 2021-12-23
@@ -20,14 +25,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The command takes the swap-id as parameter.
   The swap has to be in a `BtcRedeemed` state.
   Use `--help` for more details.
-
-### Changed
-
-- Record monero wallet restore blockheight in state `SwapSetupCompleted` already.
-  This solves issues where the CLI went offline after sending the BTC transaction, and the monero wallet restore blockheight being recorded after Alice locked the Monero, resulting in the generated XMR redeem wallet not detecting the transaction and reporting `No unlocked balance in the specified account`.
-  This is a breaking database change!
-  Swaps that were saved prior to this change may fail to load if they are in state `SwapSetupCompleted` of `BtcLocked`.
-  Make sure to finish your swaps before upgrading.
 
 ## [0.10.0] - 2021-10-15
 
