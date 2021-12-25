@@ -1,10 +1,11 @@
 use anyhow::Result;
 use std::option::Option::Some;
 use std::path::Path;
+use time::format_description::well_known::Rfc3339;
 use tracing::subscriber::set_global_default;
 use tracing::{Event, Level, Subscriber};
 use tracing_subscriber::fmt::format::{DefaultFields, Format, JsonFields};
-use tracing_subscriber::fmt::time::ChronoLocal;
+use tracing_subscriber::fmt::time::LocalTime;
 use tracing_subscriber::layer::{Context, SubscriberExt};
 use tracing_subscriber::{fmt, EnvFilter, FmtSubscriber, Layer, Registry};
 use uuid::Uuid;
@@ -52,7 +53,7 @@ pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>, swap_id: Option<Uuid
             .with_env_filter(format!("swap={}", level))
             .with_writer(std::io::stderr)
             .with_ansi(is_terminal)
-            .with_timer(ChronoLocal::with_format("%F %T".to_owned()))
+            .with_timer(LocalTime::new(Rfc3339))
             .with_target(false);
 
         if json {
@@ -84,25 +85,25 @@ type StdErrJsonLayer<S, T> = tracing_subscriber::fmt::Layer<
     fn() -> std::io::Stderr,
 >;
 
-fn debug_terminal_printer<S>() -> StdErrPrinter<StdErrLayer<S, ChronoLocal>> {
+fn debug_terminal_printer<S>() -> StdErrPrinter<StdErrLayer<S, LocalTime<Rfc3339>>> {
     let is_terminal = atty::is(atty::Stream::Stderr);
     StdErrPrinter {
         inner: fmt::layer()
             .with_ansi(is_terminal)
             .with_target(false)
-            .with_timer(ChronoLocal::with_format("%F %T".to_owned()))
+            .with_timer(LocalTime::new(Rfc3339))
             .with_writer(std::io::stderr),
         level: Level::DEBUG,
     }
 }
 
-fn debug_json_terminal_printer<S>() -> StdErrPrinter<StdErrJsonLayer<S, ChronoLocal>> {
+fn debug_json_terminal_printer<S>() -> StdErrPrinter<StdErrJsonLayer<S, LocalTime<Rfc3339>>> {
     let is_terminal = atty::is(atty::Stream::Stderr);
     StdErrPrinter {
         inner: fmt::layer()
             .with_ansi(is_terminal)
             .with_target(false)
-            .with_timer(ChronoLocal::with_format("%F %T".to_owned()))
+            .with_timer(LocalTime::new(Rfc3339))
             .json()
             .with_writer(std::io::stderr),
         level: Level::DEBUG,

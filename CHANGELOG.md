@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- logs to use rfc3339 local time formatting.
+
 ## [0.10.1] - 2021-12-23
 
 ### Added
