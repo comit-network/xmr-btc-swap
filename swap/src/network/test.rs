@@ -129,8 +129,9 @@ where
         <T as NetworkBehaviour>::OutEvent: Debug,
     {
         let addr_to_dial = other.external_addresses().next().unwrap().addr.clone();
+        let local_peer_id = *other.local_peer_id();
 
-        self.dial_addr(addr_to_dial.clone()).unwrap();
+        self.dial(addr_to_dial).unwrap();
 
         let mut dialer_done = false;
         let mut listener_done = false;
@@ -144,8 +145,8 @@ where
                         SwarmEvent::ConnectionEstablished { .. } => {
                             dialer_done = true;
                         }
-                        SwarmEvent::UnknownPeerUnreachableAddr { address, error } if address == addr_to_dial => {
-                            panic!("Failed to dial address {}: {}", addr_to_dial, error)
+                        SwarmEvent::OutgoingConnectionError { peer_id, error } if matches!(peer_id, Some(alice_peer_id) if alice_peer_id == local_peer_id) => {
+                                panic!("Failed to dial address {}: {}", peer_id.unwrap(), error)
                         }
                         other => {
                             tracing::debug!("Ignoring {:?}", other);

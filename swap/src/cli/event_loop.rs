@@ -1,14 +1,15 @@
 use crate::bitcoin::EncryptedSignature;
 use crate::cli::behaviour::{Behaviour, OutEvent};
+use crate::monero;
 use crate::network::encrypted_signature;
 use crate::network::quote::BidQuote;
 use crate::network::swap_setup::bob::NewSwap;
 use crate::protocol::bob::State2;
-use crate::{env, monero};
 use anyhow::{Context, Result};
 use futures::future::{BoxFuture, OptionFuture};
 use futures::{FutureExt, StreamExt};
 use libp2p::request_response::{RequestId, ResponseChannel};
+use libp2p::swarm::dial_opts::DialOpts;
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
 use std::collections::HashMap;
@@ -50,7 +51,6 @@ impl EventLoop {
         swap_id: Uuid,
         swarm: Swarm<Behaviour>,
         alice_peer_id: PeerId,
-        env_config: env::Config,
     ) -> Result<(Self, EventLoopHandle)> {
         let execution_setup = bmrng::channel_with_timeout(1, Duration::from_secs(60));
         let transfer_proof = bmrng::channel_with_timeout(1, Duration::from_secs(60));
@@ -76,14 +76,13 @@ impl EventLoop {
             transfer_proof: transfer_proof.1,
             encrypted_signature: encrypted_signature.0,
             quote: quote.0,
-            env_config,
         };
 
         Ok((event_loop, handle))
     }
 
     pub async fn run(mut self) {
-        match self.swarm.dial(&self.alice_peer_id) {
+        match self.swarm.dial(DialOpts::from(self.alice_peer_id)) {
             Ok(()) => {}
             Err(e) => {
                 tracing::error!("Failed to initiate dial to Alice: {}", e);
@@ -169,12 +168,9 @@ impl EventLoop {
                             tracing::info!("Successfully closed connection to Alice");
                             return;
                         }
-                        SwarmEvent::UnreachableAddr { peer_id, address, attempts_remaining, error } if peer_id == self.alice_peer_id && attempts_remaining == 0 => {
-                            tracing::warn!(%address, "Failed to dial Alice: {}", error);
+                        SwarmEvent::OutgoingConnectionError { peer_id,  error } if matches!(peer_id, Some(alice_peer_id) if alice_peer_id == self.alice_peer_id) => {
+                            tracing::warn!( "Failed to dial Alice: {}", error);
 
-                            if let Some(duration) = self.swarm.behaviour_mut().redial.until_next_redial() {
-                                tracing::info!("Next redial attempt in {}s", duration.as_secs());
-                            }
                         }
                         _ => {}
                     }
@@ -220,7 +216,6 @@ pub struct EventLoopHandle {
     transfer_proof: bmrng::RequestReceiver<monero::TransferProof, ()>,
     encrypted_signature: bmrng::RequestSender<EncryptedSignature, ()>,
     quote: bmrng::RequestSender<(), BidQuote>,
-    env_config: env::Config,
 }
 
 impl EventLoopHandle {

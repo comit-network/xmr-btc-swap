@@ -102,7 +102,7 @@ impl Wallet {
         self.wallet
             .lock()
             .await
-            .broadcast(transaction)
+            .broadcast(&transaction)
             .with_context(|| {
                 format!("Failed to broadcast Bitcoin {} transaction {}", kind, txid)
             })?;
@@ -152,13 +152,13 @@ impl Wallet {
                                 ScriptStatus::Retrying
                             }
                         };
-                        
+
                         if new_status != ScriptStatus::Retrying
                         {
                             last_status = Some(print_status_change(txid, last_status, new_status));
 
                             let all_receivers_gone = sender.send(new_status).is_err();
-    
+
                             if all_receivers_gone {
                                 tracing::debug!(%txid, "All receivers gone, removing subscription");
                                 client.lock().await.subscriptions.remove(&(txid, script));
