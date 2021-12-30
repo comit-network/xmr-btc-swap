@@ -1,7 +1,6 @@
 use anyhow::Result;
-use time::format_description::well_known::Rfc3339;
 use tracing_subscriber::filter::LevelFilter;
-use tracing_subscriber::fmt::time::LocalTime;
+use tracing_subscriber::fmt::time::ChronoLocal;
 use tracing_subscriber::FmtSubscriber;
 
 pub fn init(level: LevelFilter, json_format: bool, timestamp: bool) -> Result<()> {
@@ -15,7 +14,7 @@ pub fn init(level: LevelFilter, json_format: bool, timestamp: bool) -> Result<()
         .with_env_filter(format!("asb={},swap={}", level, level))
         .with_writer(std::io::stderr)
         .with_ansi(is_terminal)
-        .with_timer(LocalTime::new(Rfc3339))
+        .with_timer(ChronoLocal::with_format("%F %T".to_owned()))
         .with_target(false);
 
     match (json_format, timestamp) {
