@@ -1,6 +1,7 @@
 name: "Build swap and asb release binaries"
 
 on:
+  workflow_dispatch:
   release:
     types: [created]
 
