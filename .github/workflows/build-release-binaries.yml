@@ -2,6 +2,13 @@ name: "Build swap and asb release binaries"
 
 on:
   workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'     
+        required: true
+        default: 'warning'
+      tags:
+        description: 'Test scenario tags'  
   release:
     types: [created]
 
