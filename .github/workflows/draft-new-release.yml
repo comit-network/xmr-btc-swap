@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.4.0
         with:
-          token: ${{ secrets.BOTTY_GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create release branch
         run: git checkout -b release/${{ github.event.inputs.version }}
@@ -56,7 +56,7 @@ jobs:
       - name: Create pull request
         uses: thomaseizinger/create-pull-request@1.2.2
         with:
-          GITHUB_TOKEN: ${{ secrets.BOTTY_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           head: release/${{ github.event.inputs.version }}
           base: master
           title: Release version ${{ github.event.inputs.version }}
