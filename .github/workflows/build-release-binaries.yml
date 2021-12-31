@@ -48,7 +48,7 @@ jobs:
         uses: actions/checkout@v2.4.0
         with:
           ref: ${{ github.event.release.target_commitish }}
-          token: ${{ secrets.BOTTY_GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: Swatinem/rust-cache@v1.3.0
 
@@ -106,7 +106,7 @@ jobs:
       - name: Upload archive
         uses: actions/upload-release-asset@v1.0.2
         env:
-          GITHUB_TOKEN: ${{ secrets.BOTTY_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
           asset_path: ./${{ steps.create-archive-name.outputs.archive }}
