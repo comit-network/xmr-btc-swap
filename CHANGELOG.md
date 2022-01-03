@@ -16,7 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This is a breaking database change!
   Swaps that were saved prior to this change may fail to load if they are in state `SwapSetupCompleted` of `BtcLocked`.
   Make sure to finish your swaps before upgrading.
-- logs to use rfc3339 local time formatting.
 
 ## [0.10.1] - 2021-12-23
 
