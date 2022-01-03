@@ -146,14 +146,14 @@ async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
     let prefix = random_prefix();
     let bitcoind_name = format!("{}_{}", prefix, "bitcoind");
     let (bitcoind, bitcoind_url) =
-        init_bitcoind_container(&cli, prefix.clone(), bitcoind_name.clone(), prefix.clone())
+        init_bitcoind_container(cli, prefix.clone(), bitcoind_name.clone(), prefix.clone())
             .await
             .expect("could not init bitcoind");
-    let electrs = init_electrs_container(&cli, prefix.clone(), bitcoind_name, prefix)
+    let electrs = init_electrs_container(cli, prefix.clone(), bitcoind_name, prefix)
         .await
         .expect("could not init electrs");
     let (monero, monerod_container, monero_wallet_rpc_containers) =
-        Monero::new(&cli, vec![MONERO_WALLET_NAME_ALICE, MONERO_WALLET_NAME_BOB])
+        Monero::new(cli, vec![MONERO_WALLET_NAME_ALICE, MONERO_WALLET_NAME_BOB])
             .await
             .unwrap();
 
@@ -237,7 +237,7 @@ async fn start_alice(
     let resume_only = false;
 
     let mut swarm = swarm::asb(
-        &seed,
+        seed,
         min_buy,
         max_buy,
         latest_rate,
@@ -485,7 +485,7 @@ impl BobParams {
             .behaviour_mut()
             .add_address(self.alice_peer_id, self.alice_address.clone());
 
-        cli::EventLoop::new(swap_id, swarm, self.alice_peer_id, self.env_config)
+        cli::EventLoop::new(swap_id, swarm, self.alice_peer_id)
     }
 }
 

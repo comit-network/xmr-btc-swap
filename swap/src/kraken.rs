@@ -45,7 +45,7 @@ pub fn connect(price_ticker_ws_url: Url) -> Result<PriceUpdates> {
                         }
                     }
 
-                    Err(backoff::Error::Transient(anyhow!("stream ended")))
+                    Err(backoff::Error::transient(anyhow!("stream ended")))
                 }
             },
             |error, next: Duration| {
@@ -108,8 +108,8 @@ fn to_backoff(e: connection::Error) -> backoff::Error<anyhow::Error> {
 
     match e {
         // Connection closures and websocket errors will be retried
-        connection::Error::ConnectionClosed => Transient(anyhow::Error::from(e)),
-        connection::Error::WebSocket(_) => Transient(anyhow::Error::from(e)),
+        connection::Error::ConnectionClosed => backoff::Error::transient(anyhow::Error::from(e)),
+        connection::Error::WebSocket(_) => backoff::Error::transient(anyhow::Error::from(e)),
 
         // Failures while parsing a message are permanent because they most likely present a
         // programmer error
@@ -275,8 +275,6 @@ mod wire {
     pub struct TickerData {
         #[serde(rename = "a")]
         ask: Vec<RateElement>,
-        #[serde(rename = "b")]
-        bid: Vec<RateElement>,
     }
 
     #[derive(Debug, Deserialize)]

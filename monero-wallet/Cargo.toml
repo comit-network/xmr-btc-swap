@@ -2,7 +2,7 @@
 name = "monero-wallet"
 version = "0.1.0"
 authors = [ "CoBloX Team <team@coblox.tech>" ]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 anyhow = "1"
