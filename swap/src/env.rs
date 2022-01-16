@@ -48,7 +48,7 @@ impl GetConfig for Mainnet {
         Config {
             bitcoin_lock_mempool_timeout: 3.std_minutes(),
             bitcoin_lock_confirmed_timeout: 2.std_hours(),
-            bitcoin_finality_confirmations: 2,
+            bitcoin_finality_confirmations: 1,
             bitcoin_avg_block_time: 10.std_minutes(),
             bitcoin_cancel_timelock: CancelTimelock::new(72),
             bitcoin_punish_timelock: PunishTimelock::new(72),
@@ -65,7 +65,7 @@ impl GetConfig for Testnet {
         Config {
             bitcoin_lock_mempool_timeout: 3.std_minutes(),
             bitcoin_lock_confirmed_timeout: 1.std_hours(),
-            bitcoin_finality_confirmations: 2,
+            bitcoin_finality_confirmations: 1,
             bitcoin_avg_block_time: 10.std_minutes(),
             bitcoin_cancel_timelock: CancelTimelock::new(12),
             bitcoin_punish_timelock: PunishTimelock::new(6),
