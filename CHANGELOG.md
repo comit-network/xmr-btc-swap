@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Revert logs to use rfc3339 local time formatting.
+- Update from monero v17.2.0 to monero v17.3.0
 
 ## [0.10.2] - 2021-12-25
 
