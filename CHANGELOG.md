@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Revert logs to use rfc3339 local time formatting.
+- Increase time window for Bob to refund from 12 hours to 72 hours. This is a breaking change that is not backward compatible. Both the CLI and ASB must have applied this change to be able to initiate a swap.
 
 ## [0.10.2] - 2021-12-25
 

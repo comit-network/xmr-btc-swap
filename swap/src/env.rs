@@ -51,7 +51,7 @@ impl GetConfig for Mainnet {
             bitcoin_finality_confirmations: 2,
             bitcoin_avg_block_time: 10.std_minutes(),
             bitcoin_cancel_timelock: CancelTimelock::new(72),
-            bitcoin_punish_timelock: PunishTimelock::new(72),
+            bitcoin_punish_timelock: PunishTimelock::new(432),
             bitcoin_network: bitcoin::Network::Bitcoin,
             monero_avg_block_time: 2.std_minutes(),
             monero_finality_confirmations: 10,
