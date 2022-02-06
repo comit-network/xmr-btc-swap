@@ -262,7 +262,7 @@ mod tests {
         amount: Amount,
     ) -> PartiallySignedTransaction {
         let change = wallet.new_address().await.unwrap();
-        TxLock::new(&wallet, amount, A, B, change)
+        TxLock::new(wallet, amount, A, B, change)
             .await
             .unwrap()
             .into()

@@ -171,7 +171,7 @@ pub fn verify_sig(
 ) -> Result<()> {
     let ecdsa = ECDSA::verify_only();
 
-    if ecdsa.verify(&verification_key.0, &transaction_sighash.into_inner(), &sig) {
+    if ecdsa.verify(&verification_key.0, &transaction_sighash.into_inner(), sig) {
         Ok(())
     } else {
         bail!(InvalidSignature)
@@ -194,7 +194,7 @@ pub fn verify_encsig(
         &verification_key.0,
         &encryption_key.0,
         &digest.into_inner(),
-        &encsig,
+        encsig,
     ) {
         Ok(())
     } else {

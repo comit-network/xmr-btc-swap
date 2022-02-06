@@ -138,7 +138,7 @@ mod monero_network {
             Network::Stagenet => "stagenet",
             Network::Testnet => "testnet",
         };
-        s.serialize_str(&str)
+        s.serialize_str(str)
     }
 }
 

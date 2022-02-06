@@ -95,7 +95,7 @@ async fn main() -> Result<()> {
             tracing::debug!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
 
             let (event_loop, mut event_loop_handle) =
-                EventLoop::new(swap_id, swarm, seller_peer_id, env_config)?;
+                EventLoop::new(swap_id, swarm, seller_peer_id)?;
             let event_loop = tokio::spawn(event_loop.run());
 
             let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
@@ -268,7 +268,7 @@ async fn main() -> Result<()> {
             }
 
             let (event_loop, event_loop_handle) =
-                EventLoop::new(swap_id, swarm, seller_peer_id, env_config)?;
+                EventLoop::new(swap_id, swarm, seller_peer_id)?;
             let handle = tokio::spawn(event_loop.run());
 
             let monero_receive_address = db.get_monero_address(swap_id).await?;

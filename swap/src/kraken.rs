@@ -274,9 +274,7 @@ mod wire {
     #[derive(Debug, Deserialize)]
     pub struct TickerData {
         #[serde(rename = "a")]
-        ask: Vec<RateElement>,
-        #[serde(rename = "b")]
-        bid: Vec<RateElement>,
+        ask: Vec<RateElement>
     }
 
     #[derive(Debug, Deserialize)]

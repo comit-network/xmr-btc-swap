@@ -38,6 +38,7 @@ pub struct Arguments {
 }
 
 /// Represents the result of parsing the command-line parameters.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq)]
 pub enum ParseResult {
     /// The arguments we were invoked in.
