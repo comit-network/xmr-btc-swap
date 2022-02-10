@@ -25,7 +25,7 @@ impl Image for Monerod {
     type EntryPoint = str;
 
     fn descriptor(&self) -> String {
-        "xmrto/monero:v0.17.2.0".to_owned()
+        "melotools/monero:v0.17.2.0".to_owned()
     }
 
     fn wait_until_ready<D: Docker>(&self, container: &Container<'_, D, Self>) {
@@ -78,7 +78,7 @@ impl Image for MoneroWalletRpc {
     type EntryPoint = str;
 
     fn descriptor(&self) -> String {
-        "xmrto/monero:v0.17.2.0".to_owned()
+        "melotools/monero:v0.17.2.0".to_owned()
     }
 
     fn wait_until_ready<D: Docker>(&self, container: &Container<'_, D, Self>) {
