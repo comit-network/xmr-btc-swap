@@ -4326,9 +4326,9 @@ dependencies = [
 
 [[package]]
 name = "torut"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecb506186a6ad032c4b50bd92c35307a32f95146e7d07ee28b93cc1410dfc384"
+checksum = "99febc413f26cf855b3a309c5872edff5c31e0ffe9c2fce5681868761df36f69"
 dependencies = [
  "base32",
  "base64 0.13.0",
