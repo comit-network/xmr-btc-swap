@@ -13,7 +13,7 @@ anyhow = "1"
 async-compression = { version = "0.3", features = [ "bzip2", "tokio" ] }
 async-trait = "0.1"
 atty = "0.2"
-backoff = { version = "0.3", features = [ "tokio" ] }
+backoff = { version = "0.4", features = [ "tokio" ] }
 base64 = "0.13"
 bdk = "0.12"
 big-bytes = "1"

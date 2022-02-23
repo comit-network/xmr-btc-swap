@@ -105,7 +105,7 @@ dependencies = [
  "bzip2",
  "futures-core",
  "memchr",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.8",
  "tokio",
 ]
 
@@ -130,7 +130,7 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "memchr",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.8",
 ]
 
 [[package]]
@@ -176,14 +176,14 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
 name = "backoff"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fe17f59a06fe8b87a6fc8bf53bb70b3aba76d7685f432487a68cd5552853625"
+checksum = "b62ddb9cb1ec0a098ad4bbf9344d0713fa193ae1a80af55febcff2627b6a00c1"
 dependencies = [
  "futures-core",
  "getrandom 0.2.2",
  "instant",
- "pin-project 1.0.5",
+ "pin-project-lite 0.2.8",
  "rand 0.8.3",
  "tokio",
 ]
@@ -1241,7 +1241,7 @@ dependencies = [
  "futures-sink",
  "futures-task",
  "memchr",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.8",
  "pin-utils",
  "proc-macro-hack",
  "proc-macro-nested",
@@ -1507,7 +1507,7 @@ dependencies = [
  "httparse",
  "httpdate",
  "itoa 0.4.7",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.8",
  "socket2 0.4.0",
  "tokio",
  "tower-service",
@@ -2639,9 +2639,9 @@ checksum = "257b64915a082f7811703966789728173279bdebb956b143dbcd23f6f970a777"
 
 [[package]]
 name = "pin-project-lite"
-version = "0.2.6"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc0e1f259c92177c30a4c9d177246edd0a3568b25756a977d0632cf8fa37e905"
+checksum = "e280fbe77cc62c91527259e9442153f4688736748d24660126286329742b4c6c"
 
 [[package]]
 name = "pin-utils"
@@ -3159,7 +3159,7 @@ dependencies = [
  "log",
  "mime",
  "percent-encoding",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.8",
  "rustls 0.20.2",
  "rustls-pemfile",
  "serde",
@@ -4207,7 +4207,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "parking_lot",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.8",
  "signal-hook-registry",
  "tokio-macros",
  "winapi 0.3.9",
@@ -4265,7 +4265,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c535f53c0cfa1acace62995a8994fc9cc1f12d202420da96ff306ee24d576469"
 dependencies = [
  "futures-core",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.8",
  "tokio",
 ]
 
@@ -4311,7 +4311,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "log",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.8",
  "tokio",
 ]
 
@@ -4355,7 +4355,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "375a639232caf30edfc78e8d89b2d4c375515393e7af7e16f01cd96917fb2105"
 dependencies = [
  "cfg-if 1.0.0",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.8",
  "tracing-attributes",
  "tracing-core",
 ]
