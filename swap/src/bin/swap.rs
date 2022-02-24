@@ -29,7 +29,7 @@ use swap::cli::{list_sellers, EventLoop, SellerStatus};
 use swap::database::open_db;
 use swap::env::Config;
 use swap::libp2p_ext::MultiAddrExt;
-use swap::network::quote::BidQuote;
+use swap::network::quote::{BidQuote, ZeroQuoteReceived};
 use swap::network::swarm;
 use swap::protocol::bob;
 use swap::protocol::bob::{BobState, Swap};
@@ -99,7 +99,7 @@ async fn main() -> Result<()> {
             let event_loop = tokio::spawn(event_loop.run());
 
             let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
-            let (amount, fees) = determine_btc_to_swap(
+            let (amount, fees) = match determine_btc_to_swap(
                 json,
                 event_loop_handle.request_quote(),
                 bitcoin_wallet.new_address(),
@@ -107,7 +107,16 @@ async fn main() -> Result<()> {
                 max_givable,
                 || bitcoin_wallet.sync(),
             )
-            .await?;
+            .await
+            {
+                Ok(val) => val,
+                Err(error) => match error.downcast::<ZeroQuoteReceived>() {
+                    Ok(_) => {
+                        bail!("Seller's XMR balance is currently too low to initiate a swap, please try again later")
+                    }
+                    Err(other) => bail!(other),
+                },
+            };
 
             tracing::info!(%amount, %fees,  "Determined swap amount");
 
@@ -556,6 +565,11 @@ where
 {
     tracing::debug!("Requesting quote");
     let bid_quote = bid_quote.await?;
+
+    if bid_quote.max_quantity == bitcoin::Amount::ZERO {
+        bail!(ZeroQuoteReceived)
+    }
+
     tracing::info!(
         price = %bid_quote.price,
         minimum_amount = %bid_quote.min_quantity,
@@ -913,6 +927,32 @@ mod tests {
  INFO swap: Received Bitcoin new_balance=0.21000000 BTC max_giveable=0.20000000 BTC
 "
         );
+    }
+
+    #[tokio::test]
+    async fn given_bid_quote_max_amount_0_return_errorq() {
+        let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
+            Amount::from_btc(0.0001).unwrap(),
+            Amount::from_btc(0.01).unwrap(),
+        ])));
+
+        let determination_error = determine_btc_to_swap(
+            true,
+            async { Ok(quote_with_max(0.00)) },
+            get_dummy_address(),
+            || async { Ok(Amount::from_btc(0.0101)?) },
+            || async {
+                let mut result = givable.lock().unwrap();
+                result.give()
+            },
+            || async { Ok(()) },
+        )
+        .await
+        .err()
+        .unwrap()
+        .to_string();
+
+        assert_eq!("Received quote of 0", determination_error);
     }
 
     struct MaxGiveable {

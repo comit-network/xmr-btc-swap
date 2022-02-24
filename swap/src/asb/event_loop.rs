@@ -319,13 +319,46 @@ where
         min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,
     ) -> Result<BidQuote> {
-        let rate = self
+        let ask_price = self
             .latest_rate
             .latest_rate()
-            .context("Failed to get latest rate")?;
+            .context("Failed to get latest rate")?
+            .ask()
+            .context("Failed to compute asking price")?;
+
+        let max_bitcoin_for_monero = self
+            .monero_wallet
+            .get_balance()
+            .await?
+            .max_bitcoin_for_price(ask_price);
+
+        if min_buy > max_bitcoin_for_monero {
+            tracing::warn!(
+                        "Your Monero balance is too low to initiate a swap, as your minimum swap amount is {}. You could at most swap {}",
+                        min_buy, max_bitcoin_for_monero
+                    );
+
+            return Ok(BidQuote {
+                price: ask_price,
+                min_quantity: bitcoin::Amount::ZERO,
+                max_quantity: bitcoin::Amount::ZERO,
+            });
+        }
+
+        if max_buy > max_bitcoin_for_monero {
+            tracing::warn!(
+                    "Your Monero balance is too low to initiate a swap with the maximum swap amount {} that you have specified in your config. You can at most swap {}",
+                    max_buy, max_bitcoin_for_monero
+                );
+            return Ok(BidQuote {
+                price: ask_price,
+                min_quantity: min_buy,
+                max_quantity: max_bitcoin_for_monero,
+            });
+        }
 
         Ok(BidQuote {
-            price: rate.ask().context("Failed to compute asking price")?,
+            price: ask_price,
             min_quantity: min_buy,
             max_quantity: max_buy,
         })
