@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Change Monero nodes to [Rino tool nodes](https://community.rino.io/nodes.html)
 - Revert logs to use rfc3339 local time formatting.
 - Always write logs as JSON to files
 
@@ -305,7 +306,7 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[Unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.10.2...HEAD
+[unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.10.2...HEAD
 [0.10.2]: https://github.com/comit-network/xmr-btc-swap/compare/0.10.1...0.10.2
 [0.10.1]: https://github.com/comit-network/xmr-btc-swap/compare/0.10.0...0.10.1
 [0.10.0]: https://github.com/comit-network/xmr-btc-swap/compare/0.9.0...0.10.0
