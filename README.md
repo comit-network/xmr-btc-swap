@@ -47,6 +47,11 @@ It is not recommended to bump fees when swapping because it can have unpredictab
 We are encourage community contributions whether it be a bug fix or an improvement to the documentation.
 Please have a look at the [contribution guidelines](./CONTRIBUTING.md).
 
+## Rust Version Support
+
+Please note that only the latest stable Rust toolchain is supported.
+All stable toolchains since 1.58 _should_ work.
+
 ## Contact
 
 Feel free to reach out to us in the [COMIT-Monero Matrix channel](https://matrix.to/#/#comit-monero:matrix.org).

@@ -6,7 +6,7 @@ pub mod ecdsa_fun {
     use ::ecdsa_fun::fun::{Point, Scalar, G};
 
     pub fn point() -> impl Strategy<Value = Point> {
-        scalar().prop_map(|mut scalar| Point::from_scalar_mul(&G, &mut scalar).mark::<Normal>())
+        scalar().prop_map(|mut scalar| Point::from_scalar_mul(G, &mut scalar).mark::<Normal>())
     }
 
     pub fn scalar() -> impl Strategy<Value = Scalar> {
