@@ -184,12 +184,7 @@ pub struct Refreshed {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SweepAll {
-    amount_list: Vec<u64>,
-    fee_list: Vec<u64>,
-    multisig_txset: String,
     pub tx_hash_list: Vec<String>,
-    unsigned_txset: String,
-    weight_list: Vec<u32>,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize)]
@@ -244,7 +239,7 @@ mod tests {
           }
         }"#;
 
-        let _: Response<SweepAll> = serde_json::from_str(&response).unwrap();
+        let _: Response<SweepAll> = serde_json::from_str(response).unwrap();
     }
 
     #[test]
@@ -256,6 +251,6 @@ mod tests {
           }
         }"#;
 
-        let _: Response<WalletCreated> = serde_json::from_str(&response).unwrap();
+        let _: Response<WalletCreated> = serde_json::from_str(response).unwrap();
     }
 }

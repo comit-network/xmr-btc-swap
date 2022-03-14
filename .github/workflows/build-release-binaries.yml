@@ -67,9 +67,9 @@ jobs:
         run: target/${{ matrix.target }}/release/${{ matrix.bin }} --help
 
       # Remove once python 3 is the default
-      - uses: actions/setup-python@v2.3.2
+      - uses: actions/setup-python@v3
         with:
-          python-version: '3.x'
+          python-version: "3.x"
 
       - id: create-archive-name
         shell: python # Use python to have a prettier name for the archive on Windows.
