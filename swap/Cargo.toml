@@ -60,7 +60,7 @@ tokio-util = { version = "0.7", features = [ "io", "codec" ] }
 toml = "0.5"
 torut = { version = "0.2", default-features = false, features = [ "v3", "control" ] }
 tracing = { version = "0.1", features = [ "attributes" ] }
-tracing-appender = "0.1"
+tracing-appender = "0.2"
 tracing-futures = { version = "0.2", features = [ "std-future", "futures-03" ] }
 tracing-subscriber = { version = "0.2", default-features = false, features = [ "fmt", "ansi", "env-filter", "chrono", "tracing-log", "json" ] }
 url = { version = "2", features = [ "serde" ] }
