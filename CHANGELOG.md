@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Change Monero nodes to [Rino tool nodes](https://community.rino.io/nodes.html)
 - Revert logs to use rfc3339 local time formatting.
 - Always write logs as JSON to files
 
