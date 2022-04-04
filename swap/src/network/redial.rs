@@ -4,8 +4,9 @@ use backoff::ExponentialBackoff;
 use futures::future::FutureExt;
 use libp2p::core::connection::ConnectionId;
 use libp2p::core::Multiaddr;
+use libp2p::swarm::dial_opts::{DialOpts, PeerCondition};
 use libp2p::swarm::protocols_handler::DummyProtocolsHandler;
-use libp2p::swarm::{DialPeerCondition, NetworkBehaviour, NetworkBehaviourAction, PollParameters};
+use libp2p::swarm::{NetworkBehaviour, NetworkBehaviourAction, PollParameters};
 use libp2p::PeerId;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -112,9 +113,10 @@ impl NetworkBehaviour for Behaviour {
 
         self.sleep = Some(Box::pin(tokio::time::sleep(next_dial_in)));
 
-        Poll::Ready(NetworkBehaviourAction::DialPeer {
-            peer_id: self.peer,
-            condition: DialPeerCondition::Disconnected,
+        Poll::Ready(NetworkBehaviourAction::Dial {
+            opts: DialOpts::peer_id(self.peer)
+                .condition(PeerCondition::Disconnected)
+                .build(),
             handler: Self::ProtocolsHandler::default(),
         })
     }
