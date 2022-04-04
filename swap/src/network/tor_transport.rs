@@ -60,6 +60,28 @@ impl Transport for TorDialOnlyTransport {
     fn address_translation(&self, _: &Multiaddr, _: &Multiaddr) -> Option<Multiaddr> {
         None
     }
+    fn dial_as_listener(self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {
+        let address = TorCompatibleAddress::from_multiaddr(Cow::Borrowed(&addr))?;
+
+        if address.is_certainly_not_reachable_via_tor_daemon() {
+            return Err(TransportError::MultiaddrNotSupported(addr));
+        }
+
+        let dial_future = async move {
+            tracing::debug!(address = %addr, "Establishing connection through Tor proxy");
+
+            let stream =
+                Socks5Stream::connect((Ipv4Addr::LOCALHOST, self.socks_port), address.to_string())
+                    .await
+                    .map_err(|e| io::Error::new(io::ErrorKind::ConnectionRefused, e))?;
+
+            tracing::debug!("Connection through Tor established");
+
+            Ok(TcpStream(stream.into_inner()))
+        };
+
+        Ok(dial_future.boxed())
+    }
 }
 
 /// Represents an address that is _compatible_ with Tor, i.e. can be resolved by
