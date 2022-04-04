@@ -1,13 +1,15 @@
 use crate::network::quote::BidQuote;
+use crate::network::rendezvous::XmrBtcNamespace;
 use crate::network::swap_setup::bob;
 use crate::network::{encrypted_signature, quote, redial, transfer_proof};
 use crate::protocol::bob::State2;
 use crate::{bitcoin, env};
 use anyhow::{anyhow, Error, Result};
 use libp2p::core::Multiaddr;
+use libp2p::identify::{Identify, IdentifyConfig, IdentifyEvent};
 use libp2p::ping::{Ping, PingConfig, PingEvent};
 use libp2p::request_response::{RequestId, ResponseChannel};
-use libp2p::{NetworkBehaviour, PeerId};
+use libp2p::{identity, NetworkBehaviour, PeerId};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -64,6 +66,7 @@ pub struct Behaviour {
     pub transfer_proof: transfer_proof::Behaviour,
     pub encrypted_signature: encrypted_signature::Behaviour,
     pub redial: redial::Behaviour,
+    pub identify: Identify,
 
     /// Ping behaviour that ensures that the underlying network connection is
     /// still alive. If the ping fails a connection close event will be
@@ -76,7 +79,13 @@ impl Behaviour {
         alice: PeerId,
         env_config: env::Config,
         bitcoin_wallet: Arc<bitcoin::Wallet>,
+        identify_params: (identity::Keypair, XmrBtcNamespace),
     ) -> Self {
+        let agentVersion = format!("cli/{} ({})", env!("CARGO_PKG_VERSION"), identify_params.1);
+        let protocolVersion = "/comit/xmr/btc/1.0.0".to_string();
+        let identifyConfig = IdentifyConfig::new(protocolVersion, identify_params.0.public())
+            .with_agent_version(agentVersion);
+
         Self {
             quote: quote::cli(),
             swap_setup: bob::Behaviour::new(env_config, bitcoin_wallet),
@@ -84,6 +93,7 @@ impl Behaviour {
             encrypted_signature: encrypted_signature::bob(),
             redial: redial::Behaviour::new(alice, Duration::from_secs(2)),
             ping: Ping::new(PingConfig::new().with_keep_alive(true)),
+            identify: Identify::new(identifyConfig),
         }
     }
 
@@ -97,6 +107,12 @@ impl Behaviour {
 
 impl From<PingEvent> for OutEvent {
     fn from(_: PingEvent) -> Self {
+        OutEvent::Other
+    }
+}
+
+impl From<IdentifyEvent> for OutEvent {
+    fn from(_: IdentifyEvent) -> Self {
         OutEvent::Other
     }
 }

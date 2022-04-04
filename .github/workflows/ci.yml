@@ -4,18 +4,18 @@ on:
   pull_request: # Need to run on pull-requests, otherwise PRs from forks don't run
   push:
     branches:
-      - 'staging' # Bors uses this branch
-      - 'trying' # Bors uses this branch
-      - 'master' # Always build head of master for the badge in the README
+      - "staging" # Bors uses this branch
+      - "trying" # Bors uses this branch
+      - "master" # Always build head of master for the badge in the README
 
 jobs:
   static_analysis:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v3.0.1
 
-      - uses: Swatinem/rust-cache@v1.3.0
+      - uses: Swatinem/rust-cache@v1.4.0
 
       - name: Check formatting
         uses: dprint/check@v2.0
@@ -40,11 +40,10 @@ jobs:
             os: windows-latest
     runs-on: ${{ matrix.os }}
     steps:
-
       - name: Checkout sources
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v3.0.1
 
-      - uses: Swatinem/rust-cache@v1.3.0
+      - uses: Swatinem/rust-cache@v1.4.0
 
       - name: Install compiler for armhf arch
         if: matrix.target == 'armv7-unknown-linux-gnueabihf'
@@ -71,13 +70,13 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v3.0.1
 
-      - uses: Swatinem/rust-cache@v1.3.0
+      - uses: Swatinem/rust-cache@v1.4.0
 
       - name: Build tests
         run: cargo build --tests --workspace --all-features
@@ -92,7 +91,8 @@ jobs:
   docker_tests:
     strategy:
       matrix:
-        test_name: [
+        test_name:
+          [
             happy_path,
             happy_path_restart_bob_after_xmr_locked,
             happy_path_restart_bob_before_xmr_locked,
@@ -105,15 +105,14 @@ jobs:
             alice_refunds_after_restart_bob_refunded,
             ensure_same_swap_id,
             concurrent_bobs_before_xmr_lock_proof_sent,
-            alice_manually_redeems_after_enc_sig_learned
-        ]
+            alice_manually_redeems_after_enc_sig_learned,
+          ]
     runs-on: ubuntu-latest
     steps:
-
       - name: Checkout sources
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v3.0.1
 
-      - uses: Swatinem/rust-cache@v1.3.0
+      - uses: Swatinem/rust-cache@v1.4.0
 
       - name: Run test ${{ matrix.test_name }}
         run: cargo test --package swap --all-features --test ${{ matrix.test_name }} -- --nocapture

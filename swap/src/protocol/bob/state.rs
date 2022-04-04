@@ -659,8 +659,7 @@ impl State6 {
 
     pub async fn publish_refund_btc(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<()> {
         let signed_tx_refund = self.signed_refund_transaction()?;
-        let (_, subscription) = bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
-        subscription.wait_until_final().await?;
+        bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
 
         Ok(())
     }

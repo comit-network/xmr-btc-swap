@@ -6,6 +6,7 @@ use futures::StreamExt;
 use libp2p::multiaddr::Protocol;
 use libp2p::ping::{Ping, PingConfig, PingEvent};
 use libp2p::request_response::{RequestResponseEvent, RequestResponseMessage};
+use libp2p::swarm::dial_opts::DialOpts;
 use libp2p::swarm::SwarmEvent;
 use libp2p::{identity, rendezvous, Multiaddr, PeerId, Swarm};
 use serde::Serialize;
@@ -43,7 +44,7 @@ pub async fn list_sellers(
         .quote
         .add_address(&rendezvous_node_peer_id, rendezvous_node_addr.clone());
     swarm
-        .dial(&rendezvous_node_peer_id)
+        .dial(DialOpts::from(rendezvous_node_peer_id))
         .context("Failed to dial rendezvous node")?;
 
     let event_loop = EventLoop::new(
@@ -164,30 +165,42 @@ impl EventLoop {
                                 self.reachable_asb_address.insert(peer_id, address.clone());
                             }
                         }
-                        SwarmEvent::UnreachableAddr { peer_id, error, address, .. } => {
-                            if address == self.rendezvous_addr {
+                        SwarmEvent::OutgoingConnectionError { peer_id, error } => {
+                            if let Some(peer_id_from_error) = peer_id {
+
+                                if &peer_id_from_error == &self.rendezvous_peer_id {
                                 tracing::error!(
                                     "Failed to connect to rendezvous point at {}: {}",
-                                    address,
+                                    &self.rendezvous_addr,
                                     error
                                 );
 
                                 // if the rendezvous node is unreachable we just stop
                                 return Vec::new();
                             } else {
-                                tracing::debug!(
-                                    "Failed to connect to peer at {}: {}",
-                                    address,
+                                tracing::error!(
+                                    "You connected to the wrong Peer: {} Error: {}",
+                                    &peer_id_from_error,
                                     error
                                 );
-                                self.unreachable_asb_address.insert(peer_id, address.clone());
+                                     // if for some reason the peer is not the same it will return empty too.
+                                     // this is just for the CLI to not get stuck
+                                     return Vec::new();
+                            }
+                            } else {
+                                tracing::debug!(
+                                    "Failed to connect to peer at {}: {}",
+                                    &self.rendezvous_addr,
+                                    error
+                                );
+                                self.unreachable_asb_address.insert(self.rendezvous_peer_id, self.rendezvous_addr.clone());
 
-                                match self.asb_quote_status.entry(peer_id) {
+                                match self.asb_quote_status.entry(self.rendezvous_peer_id) {
                                     Entry::Occupied(mut entry) => {
                                         entry.insert(QuoteStatus::Received(Status::Unreachable));
                                     },
                                     _ => {
-                                        tracing::debug!(%peer_id, %error, "Connection error with unexpected peer")
+                                        tracing::debug!(%self.rendezvous_peer_id, %error, "Connection error with unexpected peer")
                                     }
                                 }
                             }

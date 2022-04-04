@@ -31,7 +31,7 @@ ed25519-dalek = "1"
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
 itertools = "0.10"
-libp2p = { git = "https://github.com/libp2p/rust-libp2p.git", default-features = false, features = [ "tcp-tokio", "yamux", "mplex", "dns-tokio", "noise", "request-response", "websocket", "ping", "rendezvous" ] }
+libp2p = { version = "0.42.2", default-features = false, features = [ "tcp-tokio", "yamux", "mplex", "dns-tokio", "noise", "request-response", "websocket", "ping", "rendezvous", "identify" ] }
 monero = { version = "0.12", features = [ "serde_support" ] }
 monero-rpc = { path = "../monero-rpc" }
 pem = "1.0"
@@ -50,7 +50,7 @@ sha2 = "0.9"
 sigma_fun = { git = "https://github.com/LLFourn/secp256kfun", default-features = false, features = [ "ed25519", "serde" ] }
 sqlx = { version = "0.5", features = [ "sqlite", "runtime-tokio-rustls", "offline" ] }
 structopt = "0.3"
-strum = { version = "0.23", features = [ "derive" ] }
+strum = { version = "0.24", features = [ "derive" ] }
 thiserror = "1"
 time = "0.3"
 tokio = { version = "1", features = [ "rt-multi-thread", "time", "macros", "sync", "process", "fs", "net" ] }
@@ -64,7 +64,7 @@ tracing-appender = "0.1"
 tracing-futures = { version = "0.2", features = [ "std-future", "futures-03" ] }
 tracing-subscriber = { version = "0.2", default-features = false, features = [ "fmt", "ansi", "env-filter", "chrono", "tracing-log", "json" ] }
 url = { version = "2", features = [ "serde" ] }
-uuid = { version = "0.8", features = [ "serde", "v4" ] }
+uuid = { version = "1.0", features = [ "serde", "v4" ] }
 void = "1"
 
 [target.'cfg(not(windows))'.dependencies]
@@ -86,5 +86,5 @@ tempfile = "3"
 testcontainers = "0.12"
 
 [build-dependencies]
-vergen = { version = "6", default-features = false, features = [ "git", "build" ] }
+vergen = { version = "7", default-features = false, features = [ "git", "build" ] }
 anyhow = "1"
