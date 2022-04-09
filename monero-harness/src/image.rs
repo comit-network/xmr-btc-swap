@@ -13,7 +13,7 @@ pub const MONEROD_DEFAULT_NETWORK: &str = "monero_network";
 /// this doesn't matter.
 pub const RPC_PORT: u16 = 18081;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Monerod {
     args: MonerodArgs,
 }
@@ -25,7 +25,7 @@ impl Image for Monerod {
     type EntryPoint = str;
 
     fn descriptor(&self) -> String {
-        "melotools/monero:v0.17.2.0".to_owned()
+        "rinocommunity/monero:v0.17.2.0".to_owned()
     }
 
     fn wait_until_ready<D: Docker>(&self, container: &Container<'_, D, Self>) {
@@ -58,15 +58,7 @@ impl Image for Monerod {
     }
 }
 
-impl Default for Monerod {
-    fn default() -> Self {
-        Self {
-            args: MonerodArgs::default(),
-        }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct MoneroWalletRpc {
     args: MoneroWalletRpcArgs,
 }
@@ -78,7 +70,7 @@ impl Image for MoneroWalletRpc {
     type EntryPoint = str;
 
     fn descriptor(&self) -> String {
-        "melotools/monero:v0.17.2.0".to_owned()
+        "rinocommunity/monero:v0.17.2.0".to_owned()
     }
 
     fn wait_until_ready<D: Docker>(&self, container: &Container<'_, D, Self>) {
@@ -108,14 +100,6 @@ impl Image for MoneroWalletRpc {
     fn entrypoint(&self) -> Option<String> {
         Some("".to_owned()) // an empty entrypoint disables the entrypoint
                             // script and gives us full control
-    }
-}
-
-impl Default for MoneroWalletRpc {
-    fn default() -> Self {
-        Self {
-            args: MoneroWalletRpcArgs::default(),
-        }
     }
 }
 

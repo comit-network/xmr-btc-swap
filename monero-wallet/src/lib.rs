@@ -77,8 +77,8 @@ mod tests {
         let result = rpc_client
             .get_outs(
                 key_offsets
-                    .to_vec()
-                    .into_iter()
+                    .iter()
+                    .cloned()
                     .map(|varint| GetOutputsOut {
                         amount: 0,
                         index: varint.0,

@@ -29,7 +29,7 @@ impl Image for Bitcoind {
         container
             .logs()
             .stdout
-            .wait_for_message(&"init message: Done loading")
+            .wait_for_message("init message: Done loading")
             .unwrap();
     }
 
