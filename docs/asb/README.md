@@ -12,7 +12,7 @@ This quickstart guide assumes that you are running the software on testnet (i.e.
 3. Run the ASB in terminal: `./asb --testnet start`
 4. Follow the setup wizard in the terminal
 
-Public Monero nodes for running the Monero Wallet RPC can be found [here](https://melo.tools/nodes.html).
+Public Monero nodes for running the Monero Wallet RPC can be found [here](https://community.rino.io/nodes.html).
 
 Run `./asb --help` for more information.
 

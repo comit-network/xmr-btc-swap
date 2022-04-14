@@ -14,7 +14,6 @@ pub struct Electrs {
     entrypoint: Option<String>,
     wait_for_message: String,
     volume: String,
-    bitcoind_container_name: String,
 }
 
 impl Image for Electrs {
@@ -73,7 +72,6 @@ impl Default for Electrs {
             entrypoint: Some("/build/electrs".into()),
             wait_for_message: "Running accept thread".to_string(),
             volume: uuid::Uuid::new_v4().to_string(),
-            bitcoind_container_name: uuid::Uuid::new_v4().to_string(),
         }
     }
 }

@@ -200,9 +200,10 @@ mod tests {
     #[tokio::test]
     async fn bob_can_fund_without_a_change_output() {
         let (A, B) = alice_and_bob();
-        let fees = 610;
+        let fees = 300;
         let agreed_amount = Amount::from_sat(10000);
-        let wallet = WalletBuilder::new(agreed_amount.as_sat() + fees).build();
+        let amount = agreed_amount.as_sat() + fees;
+        let wallet = WalletBuilder::new(amount).build();
 
         let psbt = bob_make_psbt(A, B, &wallet, agreed_amount).await;
         assert_eq!(
@@ -262,7 +263,7 @@ mod tests {
         amount: Amount,
     ) -> PartiallySignedTransaction {
         let change = wallet.new_address().await.unwrap();
-        TxLock::new(&wallet, amount, A, B, change)
+        TxLock::new(wallet, amount, A, B, change)
             .await
             .unwrap()
             .into()

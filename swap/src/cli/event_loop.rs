@@ -1,10 +1,10 @@
 use crate::bitcoin::EncryptedSignature;
 use crate::cli::behaviour::{Behaviour, OutEvent};
+use crate::monero;
 use crate::network::encrypted_signature;
 use crate::network::quote::BidQuote;
 use crate::network::swap_setup::bob::NewSwap;
 use crate::protocol::bob::State2;
-use crate::{env, monero};
 use anyhow::{Context, Result};
 use futures::future::{BoxFuture, OptionFuture};
 use futures::{FutureExt, StreamExt};
@@ -50,7 +50,6 @@ impl EventLoop {
         swap_id: Uuid,
         swarm: Swarm<Behaviour>,
         alice_peer_id: PeerId,
-        env_config: env::Config,
     ) -> Result<(Self, EventLoopHandle)> {
         let execution_setup = bmrng::channel_with_timeout(1, Duration::from_secs(60));
         let transfer_proof = bmrng::channel_with_timeout(1, Duration::from_secs(60));
@@ -76,7 +75,6 @@ impl EventLoop {
             transfer_proof: transfer_proof.1,
             encrypted_signature: encrypted_signature.0,
             quote: quote.0,
-            env_config,
         };
 
         Ok((event_loop, handle))
@@ -220,7 +218,6 @@ pub struct EventLoopHandle {
     transfer_proof: bmrng::RequestReceiver<monero::TransferProof, ()>,
     encrypted_signature: bmrng::RequestSender<EncryptedSignature, ()>,
     quote: bmrng::RequestSender<(), BidQuote>,
-    env_config: env::Config,
 }
 
 impl EventLoopHandle {

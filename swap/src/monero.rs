@@ -99,6 +99,20 @@ impl Amount {
         self.0
     }
 
+    pub fn max_bitcoin_for_price(&self, ask_price: bitcoin::Amount) -> bitcoin::Amount {
+        let piconero_minus_fee = self.as_piconero().saturating_sub(MONERO_FEE.as_piconero());
+
+        if piconero_minus_fee == 0 {
+            return bitcoin::Amount::ZERO;
+        }
+
+        // There needs to be an offset for difference in zeroes beetween Piconeros and
+        // Satoshis
+        let piconero_calc = (piconero_minus_fee * ask_price.as_sat()) / PICONERO_OFFSET;
+
+        bitcoin::Amount::from_sat(piconero_calc)
+    }
+
     pub fn from_monero(amount: f64) -> Result<Self> {
         let decimal = Decimal::try_from(amount)?;
         Self::from_decimal(decimal)
@@ -358,6 +372,30 @@ mod tests {
             error.downcast_ref::<OverflowError>().unwrap(),
             &OverflowError(overflow_pics.to_owned())
         );
+    }
+
+    #[test]
+    fn geting_max_bitcoin_to_trade() {
+        let amount = Amount::parse_monero("10").unwrap();
+        let bitcoin_price_sats = bitcoin::Amount::from_sat(382_900);
+
+        let monero_max_from_bitcoin = amount.max_bitcoin_for_price(bitcoin_price_sats);
+
+        assert_eq!(
+            bitcoin::Amount::from_sat(3_828_988),
+            monero_max_from_bitcoin
+        );
+    }
+
+    #[test]
+    fn geting_max_bitcoin_to_trade_with_balance_smaller_than_locking_fee() {
+        let monero = "0.00001";
+        let amount = Amount::parse_monero(monero).unwrap();
+        let bitcoin_price_sats = bitcoin::Amount::from_sat(382_900);
+
+        let monero_max_from_bitcoin = amount.max_bitcoin_for_price(bitcoin_price_sats);
+
+        assert_eq!(bitcoin::Amount::ZERO, monero_max_from_bitcoin);
     }
 
     use rand::rngs::OsRng;

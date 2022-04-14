@@ -271,7 +271,7 @@ impl EventLoop {
                             QuoteStatus::Received(Status::Online(quote)) => {
                                 let address = self
                                     .reachable_asb_address
-                                    .get(&peer_id)
+                                    .get(peer_id)
                                     .expect("if we got a quote we must have stored an address");
 
                                 Ok(Seller {
@@ -282,7 +282,7 @@ impl EventLoop {
                             QuoteStatus::Received(Status::Unreachable) => {
                                 let address = self
                                     .unreachable_asb_address
-                                    .get(&peer_id)
+                                    .get(peer_id)
                                     .expect("if we got a quote we must have stored an address");
 
                                 Ok(Seller {

@@ -29,7 +29,7 @@ use swap::cli::{list_sellers, EventLoop, SellerStatus};
 use swap::database::open_db;
 use swap::env::Config;
 use swap::libp2p_ext::MultiAddrExt;
-use swap::network::quote::BidQuote;
+use swap::network::quote::{BidQuote, ZeroQuoteReceived};
 use swap::network::swarm;
 use swap::protocol::bob;
 use swap::protocol::bob::{BobState, Swap};
@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
         json,
         cmd,
     } = match parse_args_and_apply_defaults(env::args_os())? {
-        ParseResult::Arguments(args) => args,
+        ParseResult::Arguments(args) => *args,
         ParseResult::PrintAndExitZero { message } => {
             println!("{}", message);
             std::process::exit(0);
@@ -67,6 +67,12 @@ async fn main() -> Result<()> {
             let swap_id = Uuid::new_v4();
 
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
+
+            match check_latest_version().await {
+                Ok(()) => (),
+                Err(error) => tracing::error!("{}", error),
+            };
+
             let db = open_db(data_dir.join("sqlite")).await?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
@@ -95,11 +101,11 @@ async fn main() -> Result<()> {
             tracing::debug!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
 
             let (event_loop, mut event_loop_handle) =
-                EventLoop::new(swap_id, swarm, seller_peer_id, env_config)?;
+                EventLoop::new(swap_id, swarm, seller_peer_id)?;
             let event_loop = tokio::spawn(event_loop.run());
 
             let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
-            let (amount, fees) = determine_btc_to_swap(
+            let (amount, fees) = match determine_btc_to_swap(
                 json,
                 event_loop_handle.request_quote(),
                 bitcoin_wallet.new_address(),
@@ -107,7 +113,16 @@ async fn main() -> Result<()> {
                 max_givable,
                 || bitcoin_wallet.sync(),
             )
-            .await?;
+            .await
+            {
+                Ok(val) => val,
+                Err(error) => match error.downcast::<ZeroQuoteReceived>() {
+                    Ok(_) => {
+                        bail!("Seller's XMR balance is currently too low to initiate a swap, please try again later")
+                    }
+                    Err(other) => bail!(other),
+                },
+            };
 
             tracing::info!(%amount, %fees,  "Determined swap amount");
 
@@ -140,6 +155,11 @@ async fn main() -> Result<()> {
         Command::History => {
             cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
 
+            match check_latest_version().await {
+                Ok(()) => (),
+                Err(error) => tracing::error!("{}", error),
+            };
+
             let db = open_db(data_dir.join("sqlite")).await?;
             let swaps = db.all().await?;
 
@@ -164,6 +184,11 @@ async fn main() -> Result<()> {
         Command::Config => {
             cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
 
+            match check_latest_version().await {
+                Ok(()) => (),
+                Err(error) => tracing::error!("{}", error),
+            };
+
             tracing::info!(path=%data_dir.display(), "Data directory");
             tracing::info!(path=%format!("{}/logs", data_dir.display()), "Log files directory");
             tracing::info!(path=%format!("{}/sqlite", data_dir.display()), "Sqlite file location");
@@ -178,6 +203,12 @@ async fn main() -> Result<()> {
             address,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
+
+            match check_latest_version().await {
+                Ok(()) => (),
+                Err(error) => tracing::error!("{}", error),
+            };
+
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
             let bitcoin_wallet = init_bitcoin_wallet(
@@ -211,6 +242,12 @@ async fn main() -> Result<()> {
             bitcoin_target_block,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
+
+            match check_latest_version().await {
+                Ok(()) => (),
+                Err(error) => tracing::error!("{}", error),
+            };
+
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
             let bitcoin_wallet = init_bitcoin_wallet(
@@ -236,6 +273,12 @@ async fn main() -> Result<()> {
             tor_socks5_port,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
+
+            match check_latest_version().await {
+                Ok(()) => (),
+                Err(error) => tracing::error!("{}", error),
+            };
+
             let db = open_db(data_dir.join("sqlite")).await?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
@@ -267,8 +310,7 @@ async fn main() -> Result<()> {
                     .add_address(seller_peer_id, seller_address);
             }
 
-            let (event_loop, event_loop_handle) =
-                EventLoop::new(swap_id, swarm, seller_peer_id, env_config)?;
+            let (event_loop, event_loop_handle) = EventLoop::new(swap_id, swarm, seller_peer_id)?;
             let handle = tokio::spawn(event_loop.run());
 
             let monero_receive_address = db.get_monero_address(swap_id).await?;
@@ -298,6 +340,12 @@ async fn main() -> Result<()> {
             bitcoin_target_block,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
+
+            match check_latest_version().await {
+                Ok(()) => (),
+                Err(error) => tracing::error!("{}", error),
+            };
+
             let db = open_db(data_dir.join("sqlite")).await?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
@@ -320,6 +368,12 @@ async fn main() -> Result<()> {
             bitcoin_target_block,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
+
+            match check_latest_version().await {
+                Ok(()) => (),
+                Err(error) => tracing::error!("{}", error),
+            };
+
             let db = open_db(data_dir.join("sqlite")).await?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
@@ -345,6 +399,11 @@ async fn main() -> Result<()> {
                 .context("Rendezvous node address must contain peer ID")?;
 
             cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
+            match check_latest_version().await {
+                Ok(()) => (),
+                Err(error) => tracing::error!("{}", error),
+            };
+
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
             let identity = seed.derive_libp2p_identity();
@@ -425,6 +484,11 @@ async fn main() -> Result<()> {
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
 
+            match check_latest_version().await {
+                Ok(()) => (),
+                Err(error) => tracing::error!("{}", error),
+            };
+
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
             let bitcoin_wallet = init_bitcoin_wallet(
@@ -439,6 +503,13 @@ async fn main() -> Result<()> {
             tracing::info!(descriptor=%wallet_export.to_string(), "Exported bitcoin wallet");
         }
         Command::MoneroRecovery { swap_id } => {
+            cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
+
+            match check_latest_version().await {
+                Ok(()) => (),
+                Err(error) => tracing::error!("{}", error),
+            };
+
             let db = open_db(data_dir.join("sqlite")).await?;
 
             let swap_state: BobState = db.get_state(swap_id).await?.try_into()?;
@@ -556,6 +627,11 @@ where
 {
     tracing::debug!("Requesting quote");
     let bid_quote = bid_quote.await?;
+
+    if bid_quote.max_quantity == bitcoin::Amount::ZERO {
+        bail!(ZeroQuoteReceived)
+    }
+
     tracing::info!(
         price = %bid_quote.price,
         minimum_amount = %bid_quote.min_quantity,
@@ -616,10 +692,43 @@ where
     Ok((btc_swap_amount, fees))
 }
 
+pub async fn check_latest_version() -> Result<()> {
+    const GITHUB_LATEST_VERSION_URL: &str =
+        "https://github.com/comit-network/xmr-btc-swap/releases/latest";
+
+    let response = match reqwest::get(GITHUB_LATEST_VERSION_URL).await {
+        Ok(res) => res,
+        Err(_) => bail!(
+            "could not request the website {}",
+            GITHUB_LATEST_VERSION_URL
+        ),
+    };
+
+    let last_version_from_url: &str = match response.url().path_segments() {
+        Some(split_segments) => match split_segments.last() {
+            Some(seg) => seg,
+            None => bail!("could not check the latest version"),
+        },
+        None => bail!("could not check the latest version"),
+    };
+
+    let version_from_binary: &str = env!("CARGO_PKG_VERSION");
+
+    if last_version_from_url != version_from_binary {
+        tracing::warn!(
+            "You are not on the lastest version {}, it's available on Github: {}",
+            last_version_from_url,
+            GITHUB_LATEST_VERSION_URL
+        );
+    };
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::determine_btc_to_swap;
+    use crate::{check_latest_version, determine_btc_to_swap};
     use ::bitcoin::Amount;
     use std::sync::Mutex;
     use swap::tracing_ext::capture_logs;
@@ -915,6 +1024,32 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn given_bid_quote_max_amount_0_return_errorq() {
+        let givable = Arc::new(Mutex::new(MaxGiveable::new(vec![
+            Amount::from_btc(0.0001).unwrap(),
+            Amount::from_btc(0.01).unwrap(),
+        ])));
+
+        let determination_error = determine_btc_to_swap(
+            true,
+            async { Ok(quote_with_max(0.00)) },
+            get_dummy_address(),
+            || async { Ok(Amount::from_btc(0.0101)?) },
+            || async {
+                let mut result = givable.lock().unwrap();
+                result.give()
+            },
+            || async { Ok(()) },
+        )
+        .await
+        .err()
+        .unwrap()
+        .to_string();
+
+        assert_eq!("Received quote of 0", determination_error);
+    }
+
     struct MaxGiveable {
         amounts: Vec<Amount>,
         call_counter: usize,
@@ -955,5 +1090,14 @@ mod tests {
 
     async fn get_dummy_address() -> Result<bitcoin::Address> {
         Ok("1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6".parse()?)
+    }
+
+    #[tokio::test]
+    async fn check_correct_latest_version() {
+        let writer = capture_logs(LevelFilter::INFO);
+
+        check_latest_version().await.unwrap();
+
+        assert_eq!(writer.captured(), r"");
     }
 }
