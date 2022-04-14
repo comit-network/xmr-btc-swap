@@ -58,7 +58,7 @@ jobs:
           ref: ${{ github.event.release.target_commitish }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: Swatinem/rust-cache@v1.3.0
+      - uses: Swatinem/rust-cache@v1.4.0
 
       - name: Install compiler for armhf arch
         if: matrix.target == 'armv7-unknown-linux-gnueabihf'
