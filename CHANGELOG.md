@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Adjust quote based on Bitcoin balance.
   If the max_buy_btc in the ASB config is higher than the available balance to trade it will return the max available balance discounting the locking fees for monero, in the case the balance is lower than the min_buy_btc config it will return 0 to the CLI. If the ASB returns a quote of 0 the CLI will not allow you continue with a trade.
+- Reduce required confirmations for Bitcoin transactions from 2 to 1
 
 ## [0.10.2] - 2021-12-25
 
