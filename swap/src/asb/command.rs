@@ -276,7 +276,7 @@ pub enum RawCommand {
     WithdrawBtc {
         #[structopt(
             long = "amount",
-            help = "Optionally specify the amount of Bitcoin to be withdrawn. If not specified the wallet will be drained."
+            help = "Optionally specify the amount of Bitcoin to be withdrawn. If not specified the wallet will be drained. Amount must be specified in quotes with denomination, e.g `--amount '0.1 BTC'`"
         )]
         amount: Option<Amount>,
         #[structopt(long = "address", help = "The address to receive the Bitcoin.")]
