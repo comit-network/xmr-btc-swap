@@ -171,7 +171,7 @@ pub fn verify_sig(
 ) -> Result<()> {
     let ecdsa = ECDSA::verify_only();
 
-    if ecdsa.verify(&verification_key.0, &transaction_sighash.into_inner(), &sig) {
+    if ecdsa.verify(&verification_key.0, &transaction_sighash.into_inner(), sig) {
         Ok(())
     } else {
         bail!(InvalidSignature)
@@ -194,7 +194,7 @@ pub fn verify_encsig(
         &verification_key.0,
         &encryption_key.0,
         &digest.into_inner(),
-        &encsig,
+        encsig,
     ) {
         Ok(())
     } else {
@@ -213,7 +213,7 @@ pub fn build_shared_output_descriptor(A: Point, B: Point) -> Descriptor<bitcoin:
     let A = ToHex::to_hex(&secp256k1::PublicKey::from(A));
     let B = ToHex::to_hex(&secp256k1::PublicKey::from(B));
 
-    let miniscript = MINISCRIPT_TEMPLATE.replace("A", &A).replace("B", &B);
+    let miniscript = MINISCRIPT_TEMPLATE.replace('A', &A).replace('B', &B);
 
     let miniscript =
         bdk::miniscript::Miniscript::<bitcoin::PublicKey, Segwitv0>::from_str(&miniscript)

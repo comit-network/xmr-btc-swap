@@ -20,27 +20,22 @@ pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>, swap_id: Option<Uuid
 
         std::mem::forget(guard);
 
-        let file_logger = fmt::layer()
-            .with_ansi(false)
-            .with_target(false)
-            .with_writer(appender);
+        let file_logger = registry.with(
+            fmt::layer()
+                .with_ansi(false)
+                .with_target(false)
+                .json()
+                .with_writer(appender),
+        );
 
         if json && debug {
-            set_global_default(
-                registry
-                    .with(file_logger.json())
-                    .with(debug_json_terminal_printer()),
-            )?;
+            set_global_default(file_logger.with(debug_json_terminal_printer()))?;
         } else if json && !debug {
-            set_global_default(
-                registry
-                    .with(file_logger.json())
-                    .with(info_json_terminal_printer()),
-            )?;
+            set_global_default(file_logger.with(info_json_terminal_printer()))?;
         } else if !json && debug {
-            set_global_default(registry.with(file_logger).with(debug_terminal_printer()))?;
+            set_global_default(file_logger.with(debug_terminal_printer()))?;
         } else {
-            set_global_default(registry.with(file_logger).with(info_terminal_printer()))?;
+            set_global_default(file_logger.with(info_terminal_printer()))?;
         }
 
         Ok(())

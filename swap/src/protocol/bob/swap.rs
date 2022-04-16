@@ -278,9 +278,12 @@ async fn next_state(
                     state.publish_refund_btc(bitcoin_wallet).await?;
                     BobState::BtcRefunded(state)
                 }
-                ExpiredTimelocks::Punish => BobState::BtcPunished {
-                    tx_lock_id: state.tx_lock_id(),
-                },
+                ExpiredTimelocks::Punish => {
+                    tracing::info!("You have been punished for not refunding in time");
+                    BobState::BtcPunished {
+                        tx_lock_id: state.tx_lock_id(),
+                    }
+                }
             }
         }
         BobState::BtcRefunded(state4) => BobState::BtcRefunded(state4),

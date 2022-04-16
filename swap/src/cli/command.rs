@@ -15,8 +15,8 @@ use url::Url;
 use uuid::Uuid;
 
 // See: https://moneroworld.com/
-pub const DEFAULT_MONERO_DAEMON_ADDRESS: &str = "node.melo.tools:18081";
-pub const DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET: &str = "stagenet.melo.tools:38081";
+pub const DEFAULT_MONERO_DAEMON_ADDRESS: &str = "node.community.rino.io:18081";
+pub const DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET: &str = "stagenet.community.rino.io:38081";
 
 // See: https://1209k.com/bitcoin-eye/ele.php?chain=btc
 const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://blockstream.info:700";
@@ -41,7 +41,7 @@ pub struct Arguments {
 #[derive(Debug, PartialEq)]
 pub enum ParseResult {
     /// The arguments we were invoked in.
-    Arguments(Arguments),
+    Arguments(Box<Arguments>),
     /// A flag or command was given that does not need further processing other
     /// than printing the provided message.
     ///
@@ -260,7 +260,7 @@ where
         },
     };
 
-    Ok(ParseResult::Arguments(arguments))
+    Ok(ParseResult::Arguments(Box::new(arguments)))
 }
 
 #[derive(Debug, PartialEq)]
@@ -693,7 +693,8 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let expected_args = ParseResult::Arguments(Arguments::buy_xmr_mainnet_defaults());
+        let expected_args =
+            ParseResult::Arguments(Arguments::buy_xmr_mainnet_defaults().into_boxed());
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
 
         assert_eq!(expected_args, args);
@@ -717,7 +718,7 @@ mod tests {
 
         assert_eq!(
             args,
-            ParseResult::Arguments(Arguments::buy_xmr_testnet_defaults())
+            ParseResult::Arguments(Arguments::buy_xmr_testnet_defaults().into_boxed())
         );
     }
 
@@ -778,7 +779,7 @@ mod tests {
 
         assert_eq!(
             args,
-            ParseResult::Arguments(Arguments::resume_mainnet_defaults())
+            ParseResult::Arguments(Arguments::resume_mainnet_defaults().into_boxed())
         );
     }
 
@@ -790,7 +791,7 @@ mod tests {
 
         assert_eq!(
             args,
-            ParseResult::Arguments(Arguments::resume_testnet_defaults())
+            ParseResult::Arguments(Arguments::resume_testnet_defaults().into_boxed())
         );
     }
 
@@ -802,7 +803,7 @@ mod tests {
 
         assert_eq!(
             args,
-            ParseResult::Arguments(Arguments::cancel_mainnet_defaults())
+            ParseResult::Arguments(Arguments::cancel_mainnet_defaults().into_boxed())
         );
     }
 
@@ -814,7 +815,7 @@ mod tests {
 
         assert_eq!(
             args,
-            ParseResult::Arguments(Arguments::cancel_testnet_defaults())
+            ParseResult::Arguments(Arguments::cancel_testnet_defaults().into_boxed())
         );
     }
 
@@ -826,7 +827,7 @@ mod tests {
 
         assert_eq!(
             args,
-            ParseResult::Arguments(Arguments::refund_mainnet_defaults())
+            ParseResult::Arguments(Arguments::refund_mainnet_defaults().into_boxed())
         );
     }
 
@@ -838,7 +839,7 @@ mod tests {
 
         assert_eq!(
             args,
-            ParseResult::Arguments(Arguments::refund_testnet_defaults())
+            ParseResult::Arguments(Arguments::refund_testnet_defaults().into_boxed())
         );
     }
 
@@ -866,6 +867,7 @@ mod tests {
             ParseResult::Arguments(
                 Arguments::buy_xmr_mainnet_defaults()
                     .with_data_dir(PathBuf::from_str(data_dir).unwrap().join("mainnet"))
+                    .into_boxed()
             )
         );
 
@@ -890,6 +892,7 @@ mod tests {
             ParseResult::Arguments(
                 Arguments::buy_xmr_testnet_defaults()
                     .with_data_dir(PathBuf::from_str(data_dir).unwrap().join("testnet"))
+                    .into_boxed()
             )
         );
 
@@ -909,6 +912,7 @@ mod tests {
             ParseResult::Arguments(
                 Arguments::resume_mainnet_defaults()
                     .with_data_dir(PathBuf::from_str(data_dir).unwrap().join("mainnet"))
+                    .into_boxed()
             )
         );
 
@@ -929,6 +933,7 @@ mod tests {
             ParseResult::Arguments(
                 Arguments::resume_testnet_defaults()
                     .with_data_dir(PathBuf::from_str(data_dir).unwrap().join("testnet"))
+                    .into_boxed()
             )
         );
     }
@@ -950,7 +955,11 @@ mod tests {
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
         assert_eq!(
             args,
-            ParseResult::Arguments(Arguments::buy_xmr_mainnet_defaults().with_debug())
+            ParseResult::Arguments(
+                Arguments::buy_xmr_mainnet_defaults()
+                    .with_debug()
+                    .into_boxed()
+            )
         );
 
         let raw_ars = vec![
@@ -969,7 +978,11 @@ mod tests {
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
         assert_eq!(
             args,
-            ParseResult::Arguments(Arguments::buy_xmr_testnet_defaults().with_debug())
+            ParseResult::Arguments(
+                Arguments::buy_xmr_testnet_defaults()
+                    .with_debug()
+                    .into_boxed()
+            )
         );
 
         let raw_ars = vec![BINARY_NAME, "--debug", "resume", "--swap-id", SWAP_ID];
@@ -977,7 +990,11 @@ mod tests {
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
         assert_eq!(
             args,
-            ParseResult::Arguments(Arguments::resume_mainnet_defaults().with_debug())
+            ParseResult::Arguments(
+                Arguments::resume_mainnet_defaults()
+                    .with_debug()
+                    .into_boxed()
+            )
         );
 
         let raw_ars = vec![
@@ -992,7 +1009,11 @@ mod tests {
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
         assert_eq!(
             args,
-            ParseResult::Arguments(Arguments::resume_testnet_defaults().with_debug())
+            ParseResult::Arguments(
+                Arguments::resume_testnet_defaults()
+                    .with_debug()
+                    .into_boxed()
+            )
         );
     }
 
@@ -1013,7 +1034,11 @@ mod tests {
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
         assert_eq!(
             args,
-            ParseResult::Arguments(Arguments::buy_xmr_mainnet_defaults().with_json())
+            ParseResult::Arguments(
+                Arguments::buy_xmr_mainnet_defaults()
+                    .with_json()
+                    .into_boxed()
+            )
         );
 
         let raw_ars = vec![
@@ -1032,7 +1057,11 @@ mod tests {
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
         assert_eq!(
             args,
-            ParseResult::Arguments(Arguments::buy_xmr_testnet_defaults().with_json())
+            ParseResult::Arguments(
+                Arguments::buy_xmr_testnet_defaults()
+                    .with_json()
+                    .into_boxed()
+            )
         );
 
         let raw_ars = vec![BINARY_NAME, "--json", "resume", "--swap-id", SWAP_ID];
@@ -1040,7 +1069,11 @@ mod tests {
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
         assert_eq!(
             args,
-            ParseResult::Arguments(Arguments::resume_mainnet_defaults().with_json())
+            ParseResult::Arguments(
+                Arguments::resume_mainnet_defaults()
+                    .with_json()
+                    .into_boxed()
+            )
         );
 
         let raw_ars = vec![
@@ -1055,7 +1088,11 @@ mod tests {
         let args = parse_args_and_apply_defaults(raw_ars).unwrap();
         assert_eq!(
             args,
-            ParseResult::Arguments(Arguments::resume_testnet_defaults().with_json())
+            ParseResult::Arguments(
+                Arguments::resume_testnet_defaults()
+                    .with_json()
+                    .into_boxed()
+            )
         );
     }
 
@@ -1302,6 +1339,10 @@ mod tests {
         pub fn with_json(mut self) -> Self {
             self.json = true;
             self
+        }
+
+        pub fn into_boxed(self) -> Box<Self> {
+            Box::new(self)
         }
     }
 
