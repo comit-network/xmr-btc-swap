@@ -13,6 +13,7 @@ use libp2p::core::connection::ConnectionId;
 use libp2p::core::muxing::StreamMuxerBox;
 use libp2p::core::transport::Boxed;
 use libp2p::dns::TokioDnsConfig;
+use libp2p::identify::{Identify, IdentifyConfig, IdentifyEvent};
 use libp2p::ping::{Ping, PingConfig, PingEvent};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p::swarm::{
@@ -111,6 +112,7 @@ pub mod behaviour {
         pub swap_setup: alice::Behaviour<LR>,
         pub transfer_proof: transfer_proof::Behaviour,
         pub encrypted_signature: encrypted_signature::Behaviour,
+        pub identify: Identify,
 
         /// Ping behaviour that ensures that the underlying network connection
         /// is still alive. If the ping fails a connection close event
@@ -128,8 +130,14 @@ pub mod behaviour {
             latest_rate: LR,
             resume_only: bool,
             env_config: env::Config,
+            identify_params: (identity::Keypair, XmrBtcNamespace),
             rendezvous_params: Option<(identity::Keypair, PeerId, Multiaddr, XmrBtcNamespace)>,
         ) -> Self {
+            let agentVersion = format!("asb/{} ({})", env!("CARGO_PKG_VERSION"), identify_params.1);
+            let protocolVersion = "/comit/xmr/btc/1.0.0".to_string();
+            let identifyConfig = IdentifyConfig::new(protocolVersion, identify_params.0.public())
+                .with_agent_version(agentVersion);
+
             Self {
                 rendezvous: libp2p::swarm::toggle::Toggle::from(rendezvous_params.map(
                     |(identity, rendezvous_peer_id, rendezvous_address, namespace)| {
@@ -153,12 +161,19 @@ pub mod behaviour {
                 transfer_proof: transfer_proof::alice(),
                 encrypted_signature: encrypted_signature::alice(),
                 ping: Ping::new(PingConfig::new().with_keep_alive(true)),
+                identify: Identify::new(identifyConfig),
             }
         }
     }
 
     impl From<PingEvent> for OutEvent {
         fn from(_: PingEvent) -> Self {
+            OutEvent::Other
+        }
+    }
+
+    impl From<IdentifyEvent> for OutEvent {
+        fn from(_: IdentifyEvent) -> Self {
             OutEvent::Other
         }
     }

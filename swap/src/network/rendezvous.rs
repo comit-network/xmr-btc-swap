@@ -27,3 +27,13 @@ impl From<XmrBtcNamespace> for Namespace {
         }
     }
 }
+
+impl XmrBtcNamespace {
+    pub fn from_is_testnet(testnet: bool) -> XmrBtcNamespace {
+        if testnet {
+            XmrBtcNamespace::Testnet
+        } else {
+            XmrBtcNamespace::Mainnet
+        }
+    }
+}
