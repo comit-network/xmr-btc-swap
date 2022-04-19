@@ -83,7 +83,7 @@ proptest = "1"
 serde_cbor = "0.11"
 spectral = "0.6"
 tempfile = "3"
-testcontainers = "0.12"
+testcontainers = "0.13"
 
 [build-dependencies]
 vergen = { version = "7", default-features = false, features = [ "git", "build" ] }
