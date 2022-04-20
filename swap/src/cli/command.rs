@@ -99,6 +99,7 @@ where
                     monero_receive_address,
                     monero_daemon_address,
                     tor_socks5_port,
+                    namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
                 },
             }
         }
@@ -179,6 +180,7 @@ where
                     bitcoin_target_block,
                     monero_daemon_address,
                     tor_socks5_port,
+                    namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
                 },
             }
         }
@@ -230,8 +232,8 @@ where
             data_dir: data::data_dir_from(data, is_testnet)?,
             cmd: Command::ListSellers {
                 rendezvous_point,
-                namespace: rendezvous_namespace_from(is_testnet),
                 tor_socks5_port,
+                namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
             },
         },
         RawCommand::ExportBitcoinWallet { bitcoin } => {
@@ -273,6 +275,7 @@ pub enum Command {
         monero_receive_address: monero::Address,
         monero_daemon_address: String,
         tor_socks5_port: u16,
+        namespace: XmrBtcNamespace,
     },
     History,
     Config,
@@ -292,6 +295,7 @@ pub enum Command {
         bitcoin_target_block: usize,
         monero_daemon_address: String,
         tor_socks5_port: u16,
+        namespace: XmrBtcNamespace,
     },
     Cancel {
         swap_id: Uuid,
@@ -559,14 +563,6 @@ mod data {
 
     fn os_default() -> Result<PathBuf> {
         Ok(system_data_dir()?.join("cli"))
-    }
-}
-
-fn rendezvous_namespace_from(is_testnet: bool) -> XmrBtcNamespace {
-    if is_testnet {
-        XmrBtcNamespace::Testnet
-    } else {
-        XmrBtcNamespace::Mainnet
     }
 }
 
@@ -1212,6 +1208,7 @@ mod tests {
                         .unwrap(),
                     monero_daemon_address: DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET.to_string(),
                     tor_socks5_port: DEFAULT_SOCKS5_PORT,
+                    namespace: XmrBtcNamespace::Testnet,
                 },
             }
         }
@@ -1231,6 +1228,7 @@ mod tests {
                         .unwrap(),
                     monero_daemon_address: DEFAULT_MONERO_DAEMON_ADDRESS.to_string(),
                     tor_socks5_port: DEFAULT_SOCKS5_PORT,
+                    namespace: XmrBtcNamespace::Mainnet,
                 },
             }
         }
@@ -1248,6 +1246,7 @@ mod tests {
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET,
                     monero_daemon_address: DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET.to_string(),
                     tor_socks5_port: DEFAULT_SOCKS5_PORT,
+                    namespace: XmrBtcNamespace::Testnet,
                 },
             }
         }
@@ -1264,6 +1263,7 @@ mod tests {
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET,
                     monero_daemon_address: DEFAULT_MONERO_DAEMON_ADDRESS.to_string(),
                     tor_socks5_port: DEFAULT_SOCKS5_PORT,
+                    namespace: XmrBtcNamespace::Mainnet,
                 },
             }
         }

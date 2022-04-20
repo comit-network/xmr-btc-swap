@@ -63,6 +63,7 @@ async fn main() -> Result<()> {
             monero_receive_address,
             monero_daemon_address,
             tor_socks5_port,
+            namespace,
         } => {
             let swap_id = Uuid::new_v4();
 
@@ -87,7 +88,12 @@ async fn main() -> Result<()> {
                 .context("Seller address must contain peer ID")?;
             db.insert_address(seller_peer_id, seller.clone()).await?;
 
-            let behaviour = cli::Behaviour::new(seller_peer_id, env_config, bitcoin_wallet.clone());
+            let behaviour = cli::Behaviour::new(
+                seller_peer_id,
+                env_config,
+                bitcoin_wallet.clone(),
+                (seed.derive_libp2p_identity(), namespace),
+            );
             let mut swarm =
                 swarm::cli(seed.derive_libp2p_identity(), tor_socks5_port, behaviour).await?;
             swarm.behaviour_mut().add_address(seller_peer_id, seller);
@@ -243,6 +249,7 @@ async fn main() -> Result<()> {
             bitcoin_target_block,
             monero_daemon_address,
             tor_socks5_port,
+            namespace,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
             let db = open_db(data_dir.join("sqlite")).await?;
@@ -264,7 +271,12 @@ async fn main() -> Result<()> {
             let seller_peer_id = db.get_peer_id(swap_id).await?;
             let seller_addresses = db.get_addresses(seller_peer_id).await?;
 
-            let behaviour = cli::Behaviour::new(seller_peer_id, env_config, bitcoin_wallet.clone());
+            let behaviour = cli::Behaviour::new(
+                seller_peer_id,
+                env_config,
+                bitcoin_wallet.clone(),
+                (seed.derive_libp2p_identity(), namespace),
+            );
             let mut swarm =
                 swarm::cli(seed.derive_libp2p_identity(), tor_socks5_port, behaviour).await?;
             let our_peer_id = swarm.local_peer_id();

@@ -1783,6 +1783,7 @@ dependencies = [
  "lazy_static",
  "libp2p-core",
  "libp2p-dns",
+ "libp2p-identify",
  "libp2p-metrics",
  "libp2p-mplex",
  "libp2p-noise",
@@ -1847,11 +1848,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "libp2p-identify"
+version = "0.31.0"
+source = "git+https://github.com/libp2p/rust-libp2p.git#6d3ab8a3debe8d69dcd004173999732f12d0da96"
+dependencies = [
+ "futures",
+ "libp2p-core",
+ "libp2p-swarm",
+ "log",
+ "lru 0.6.6",
+ "prost",
+ "prost-build",
+ "smallvec",
+ "wasm-timer",
+]
+
+[[package]]
 name = "libp2p-metrics"
 version = "0.1.0"
 source = "git+https://github.com/libp2p/rust-libp2p.git#6d3ab8a3debe8d69dcd004173999732f12d0da96"
 dependencies = [
  "libp2p-core",
+ "libp2p-identify",
  "libp2p-ping",
  "libp2p-swarm",
  "open-metrics-client",
@@ -1941,7 +1959,7 @@ dependencies = [
  "libp2p-core",
  "libp2p-swarm",
  "log",
- "lru",
+ "lru 0.7.0",
  "rand 0.7.3",
  "smallvec",
  "unsigned-varint",
@@ -2110,6 +2128,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51b9bbe6c47d51fc3e1a9b945965946b4c44142ab8792c50835a980d362c2710"
 dependencies = [
  "cfg-if 1.0.0",
+]
+
+[[package]]
+name = "lru"
+version = "0.6.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ea2d928b485416e8908cff2d97d621db22b27f7b3b6729e438bcf42c671ba91"
+dependencies = [
+ "hashbrown",
 ]
 
 [[package]]

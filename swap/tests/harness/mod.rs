@@ -19,6 +19,7 @@ use swap::bitcoin::{CancelTimelock, PunishTimelock, TxCancel, TxPunish, TxRedeem
 use swap::database::SqliteDatabase;
 use swap::env::{Config, GetConfig};
 use swap::fs::ensure_directory_exists;
+use swap::network::rendezvous::XmrBtcNamespace;
 use swap::network::swarm;
 use swap::protocol::alice::{AliceState, Swap};
 use swap::protocol::bob::BobState;
@@ -243,6 +244,7 @@ async fn start_alice(
         latest_rate,
         resume_only,
         env_config,
+        XmrBtcNamespace::Testnet,
         None,
     )
     .unwrap();
@@ -469,18 +471,15 @@ impl BobParams {
     ) -> Result<(cli::EventLoop, cli::EventLoopHandle)> {
         let tor_socks5_port = get_port()
             .expect("We don't care about Tor in the tests so we get a free port to disable it.");
+        let identity = self.seed.derive_libp2p_identity();
 
         let behaviour = cli::Behaviour::new(
             self.alice_peer_id,
             self.env_config,
             self.bitcoin_wallet.clone(),
+            (identity.clone(), XmrBtcNamespace::Testnet),
         );
-        let mut swarm = swarm::cli(
-            self.seed.derive_libp2p_identity(),
-            tor_socks5_port,
-            behaviour,
-        )
-        .await?;
+        let mut swarm = swarm::cli(identity.clone(), tor_socks5_port, behaviour).await?;
         swarm
             .behaviour_mut()
             .add_address(self.alice_peer_id, self.alice_address.clone());

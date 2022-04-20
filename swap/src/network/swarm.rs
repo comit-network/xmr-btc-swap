@@ -16,14 +16,15 @@ pub fn asb<LR>(
     latest_rate: LR,
     resume_only: bool,
     env_config: env::Config,
-    rendezvous_params: Option<(Multiaddr, XmrBtcNamespace)>,
+    namespace: XmrBtcNamespace,
+    rendezvous_point: Option<Multiaddr>,
 ) -> Result<Swarm<asb::Behaviour<LR>>>
 where
     LR: LatestRate + Send + 'static + Debug + Clone,
 {
     let identity = seed.derive_libp2p_identity();
 
-    let rendezvous_params = if let Some((address, namespace)) = rendezvous_params {
+    let rendezvous_params = if let Some(address) = rendezvous_point {
         let peer_id = address
             .extract_peer_id()
             .context("Rendezvous node address must contain peer ID")?;
@@ -39,6 +40,7 @@ where
         latest_rate,
         resume_only,
         env_config,
+        (identity.clone(), namespace),
         rendezvous_params,
     );
 
