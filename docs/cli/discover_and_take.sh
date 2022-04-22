@@ -8,7 +8,7 @@
 # 4th param: Your bech32 Bitcoin testnet address that will be used for any change output (e.g. refund scenario or when swapping an amount smaller than the transferred BTC)
 #
 # Example usage:
-# discover_and_take.sh "PATH/TO/swap" "/dnsaddr/rendezvous.coblox.tech/p2p/12D3KooWQUt9DkNZxEn2R5ymJzWj15MpG6mTW84kyd8vDaRZi46o" "YOUR_XMR_STAGENET_ADDRESS" "YOUR_BECH32_BITCOIN_TESTNET_ADDRESS"
+# discover_and_take.sh "PATH/TO/swap" "/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE" "YOUR_XMR_STAGENET_ADDRESS" "YOUR_BECH32_BITCOIN_TESTNET_ADDRESS"
 
 CLI_PATH=$1
 RENDEZVOUS_POINT=$2
