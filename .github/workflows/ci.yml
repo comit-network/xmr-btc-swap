@@ -13,7 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.0.1
+        uses: actions/checkout@v3.0.2
+
 
       - uses: Swatinem/rust-cache@v1.4.0
 
@@ -41,7 +42,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.0.1
+        uses: actions/checkout@v3.0.2
 
       - uses: Swatinem/rust-cache@v1.4.0
 
@@ -74,7 +75,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.0.1
+        uses: actions/checkout@v3.0.2
 
       - uses: Swatinem/rust-cache@v1.4.0
 
@@ -110,7 +111,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.0.1
+        uses: actions/checkout@v3.0.2
 
       - uses: Swatinem/rust-cache@v1.4.0
 
