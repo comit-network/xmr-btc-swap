@@ -100,7 +100,7 @@ OPTIONS:
         --tor-socks5-port <tor-socks5-port>         Your local Tor socks5 proxy port [default: 9050]
 ```
 
-Running `swap --testnet list-sellers --rendezvous-point /dnsaddr/rendezvous.coblox.tech/p2p/12D3KooWQUt9DkNZxEn2R5ymJzWj15MpG6mTW84kyd8vDaRZi46o` will give you something like:
+Running `swap --testnet list-sellers --rendezvous-point /dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE` will give you something like:
 
 ```
 Connected to rendezvous point, discovering nodes in 'xmr-btc-swap-testnet' namespace ...
