@@ -168,7 +168,7 @@ impl EventLoop {
                         SwarmEvent::OutgoingConnectionError { peer_id, error } => {
                             if let Some(peer_id_from_error) = peer_id {
 
-                                if &peer_id_from_error == &self.rendezvous_peer_id {
+                                if peer_id_from_error == self.rendezvous_peer_id {
                                 tracing::error!(
                                     "Failed to connect to rendezvous point at {}: {}",
                                     &self.rendezvous_addr,
