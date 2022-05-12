@@ -14,6 +14,7 @@ pub async fn refund(
     let state = db.get_state(swap_id).await?.try_into()?;
 
     let state6 = match state {
+        BobState::SwapSetupCompleted(state2) => state2.cancel(),
         BobState::BtcLocked { state3, .. } => state3.cancel(),
         BobState::XmrLockProofReceived { state, .. } => state.cancel(),
         BobState::XmrLocked(state4) => state4.cancel(),
@@ -21,7 +22,6 @@ pub async fn refund(
         BobState::CancelTimelockExpired(state6) => state6,
         BobState::BtcCancelled(state6) => state6,
         BobState::Started { .. }
-        | BobState::SwapSetupCompleted(_)
         | BobState::BtcRedeemed(_)
         | BobState::BtcRefunded(_)
         | BobState::XmrRedeemed { .. }

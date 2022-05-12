@@ -331,6 +331,22 @@ impl State2 {
         }
     }
 
+    pub fn cancel(&self) -> State6 {
+        State6 {
+            A: self.A,
+            b: self.b.clone(),
+            s_b: self.s_b,
+            cancel_timelock: self.cancel_timelock,
+            punish_timelock: self.punish_timelock,
+            refund_address: self.refund_address.clone(),
+            tx_lock: self.tx_lock.clone(),
+            tx_cancel_sig_a: self.tx_cancel_sig_a.clone(),
+            tx_refund_encsig: self.tx_refund_encsig.clone(),
+            tx_refund_fee: self.tx_refund_fee,
+            tx_cancel_fee: self.tx_cancel_fee,
+        }
+    }
+
     pub async fn lock_btc(self) -> Result<(State3, TxLock)> {
         Ok((
             State3 {
