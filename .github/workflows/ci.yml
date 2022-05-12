@@ -56,17 +56,11 @@ jobs:
         run: |
           cargo build -p swap --target ${{ matrix.target }}
 
-      - name: Upload swap binary
+      - name: Upload swap binaries
         uses: actions/upload-artifact@v2-preview
         with:
           name: swap-${{ matrix.target }}
-          path: target/${{ matrix.target }}/debug/swap
-
-      - name: Upload asb binary
-        uses: actions/upload-artifact@v2-preview
-        with:
-          name: asb-${{ matrix.target }}
-          path: target/${{ matrix.target }}/debug/asb
+          path: target/*/**
 
   test:
     strategy:
