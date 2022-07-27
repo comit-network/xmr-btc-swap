@@ -10,9 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Change Monero nodes to [Rino tool nodes](https://community.rino.io/nodes.html)
-- Revert logs to use rfc3339 local time formatting.
 - Update from monero v17.2.0 to monero v17.3.0
 - Always write logs as JSON to files
+- Change to UTC time for log messages, due to a bug causing no logging at all to be printed (linux/macos), and an [unsoundness issue](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/fmt/time/struct.LocalTime.html) with local time in [the time crate](https://github.com/time-rs/time/issues/293#issuecomment-748151025)
 
 ### Added
 
