@@ -3985,9 +3985,9 @@ checksum = "cae14b91c7d11c9a851d3fbc80a963198998c2a64eec840477fa92d8ce9b70bb"
 
 [[package]]
 name = "strum"
-version = "0.24.0"
+version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e96acfc1b70604b8b2f1ffa4c57e59176c7dbb05d556c71ecd2f5498a1dee7f8"
+checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
 dependencies = [
  "strum_macros 0.24.0",
 ]
@@ -4081,7 +4081,7 @@ dependencies = [
  "spectral",
  "sqlx",
  "structopt",
- "strum 0.24.0",
+ "strum 0.24.1",
  "tempfile",
  "testcontainers 0.12.0",
  "thiserror",
