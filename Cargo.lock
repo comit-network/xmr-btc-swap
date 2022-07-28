@@ -3237,7 +3237,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.23.1",
  "tokio-socks",
- "tokio-util 0.7.1",
+ "tokio-util 0.7.2",
  "tower-service",
  "url",
  "wasm-bindgen",
@@ -3593,11 +3593,10 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "1.13.0"
+version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b827f2113224f3f19a665136f006709194bdfdcb1fdc1e4b2b5cbac8e0cced54"
+checksum = "678b5a069e50bf00ecd22d0cd8ddf7c236f68581b03db652061ed5eb13a312ff"
 dependencies = [
- "rustversion",
  "serde",
  "serde_with_macros",
 ]
@@ -4091,7 +4090,7 @@ dependencies = [
  "tokio-socks",
  "tokio-tar",
  "tokio-tungstenite",
- "tokio-util 0.7.1",
+ "tokio-util 0.7.2",
  "toml",
  "torut",
  "tracing",
@@ -4390,9 +4389,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0edfdeb067411dba2044da6d1cb2df793dd35add7888d73c16e3381ded401764"
+checksum = "f988a1a1adc2fb21f9c12aa96441da33a1728193ae0b95d2be22dbd17fcb4e5c"
 dependencies = [
  "bytes",
  "futures-core",
