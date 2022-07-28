@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update from monero v17.2.0 to monero v17.3.0
 - Always write logs as JSON to files
 - Change to UTC time for log messages, due to a bug causing no logging at all to be printed (linux/macos), and an [unsoundness issue](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/fmt/time/struct.LocalTime.html) with local time in [the time crate](https://github.com/time-rs/time/issues/293#issuecomment-748151025)
+- Fix potential integer overflow in ASB when calculating maximum Bitcoin amount for Monero balance
+- Reduce Monero locking transaction fee amount from 0.000030 to 0.000016 XMR, which is still double the current median fee as reported at [monero.how](https://www.monero.how/monero-transaction-fees)
 
 ### Added
 
