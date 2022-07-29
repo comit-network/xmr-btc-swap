@@ -32,15 +32,18 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
+            ext: ""
           - target: armv7-unknown-linux-gnueabihf
             os: ubuntu-latest
+            ext: ""
           - target: x86_64-apple-darwin
             os: macos-latest
+            ext: ""
           - target: x86_64-pc-windows-msvc
             os: windows-latest
+            ext: ".exe"
     runs-on: ${{ matrix.os }}
     steps:
-
       - name: Checkout sources
         uses: actions/checkout@v3.0.2
 
@@ -57,21 +60,23 @@ jobs:
           cargo build -p swap --target ${{ matrix.target }}
 
       - name: Upload swap binary
-        uses: actions/upload-artifact@v2-preview
+        uses: actions/upload-artifact@v3
         with:
-          name: swap-${{ matrix.target }}
-          path: target/${{ matrix.target }}/debug/swap
+          name: swap-${{ matrix.target }}${{ matrix.ext }}
+          path: target/${{ matrix.target }}/debug/swap${{ matrix.ext }}
+          if-no-files-found: error
 
       - name: Upload asb binary
-        uses: actions/upload-artifact@v2-preview
+        uses: actions/upload-artifact@v3
         with:
-          name: asb-${{ matrix.target }}
-          path: target/${{ matrix.target }}/debug/asb
+          name: asb-${{ matrix.target }}${{ matrix.ext }}
+          path: target/${{ matrix.target }}/debug/asb${{ matrix.ext }}
+          if-no-files-found: error
 
   test:
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
@@ -92,7 +97,8 @@ jobs:
   docker_tests:
     strategy:
       matrix:
-        test_name: [
+        test_name:
+          [
             happy_path,
             happy_path_restart_bob_after_xmr_locked,
             happy_path_restart_bob_before_xmr_locked,
@@ -105,11 +111,10 @@ jobs:
             alice_refunds_after_restart_bob_refunded,
             ensure_same_swap_id,
             concurrent_bobs_before_xmr_lock_proof_sent,
-            alice_manually_redeems_after_enc_sig_learned
-        ]
+            alice_manually_redeems_after_enc_sig_learned,
+          ]
     runs-on: ubuntu-latest
     steps:
-
       - name: Checkout sources
         uses: actions/checkout@v3.0.2
 
