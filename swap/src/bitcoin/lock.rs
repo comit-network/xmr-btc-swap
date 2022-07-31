@@ -11,6 +11,7 @@ use bitcoin::Script;
 use serde::{Deserialize, Serialize};
 
 const SCRIPT_SIZE: usize = 34;
+const TX_LOCK_WEIGHT: usize = 485;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TxLock {
@@ -160,6 +161,10 @@ impl TxLock {
             input: vec![tx_in],
             output: vec![tx_out],
         }
+    }
+
+    pub fn weight() -> usize {
+        TX_LOCK_WEIGHT
     }
 }
 

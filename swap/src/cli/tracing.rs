@@ -16,7 +16,8 @@ pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>, swap_id: Option<Uuid
 
         let registry = Registry::default().with(level_filter);
 
-        let appender = tracing_appender::rolling::never(dir, format!("swap-{}.log", swap_id));
+        let appender =
+            tracing_appender::rolling::never(dir.as_ref(), format!("swap-{}.log", swap_id));
         let (appender, guard) = tracing_appender::non_blocking(appender);
 
         std::mem::forget(guard);
@@ -38,8 +39,6 @@ pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>, swap_id: Option<Uuid
         } else {
             set_global_default(file_logger.with(info_terminal_printer()))?;
         }
-
-        Ok(())
     } else {
         let level = if debug { Level::DEBUG } else { Level::INFO };
         let is_terminal = atty::is(atty::Stream::Stderr);
@@ -56,9 +55,10 @@ pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>, swap_id: Option<Uuid
         } else {
             builder.init();
         }
+    };
 
-        Ok(())
-    }
+    tracing::info!("Logging initialized to {}", dir.as_ref().display());
+    Ok(())
 }
 
 pub struct StdErrPrinter<L> {

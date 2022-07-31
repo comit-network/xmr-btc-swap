@@ -19,9 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Adjust quote based on Bitcoin balance.
-  If the max_buy_btc in the ASB config is higher than the available balance to trade it will return the max available balance discounting the locking fees for monero, in the case the balance is lower than the min_buy_btc config it will return 0 to the CLI. If the ASB returns a quote of 0 the CLI will not allow you continue with a trade.
+  If the max_buy_btc in the ASB config is higher than the available balance to trade, it will return the max available balance discounting the Monero locking fees. In the case the balance is lower than the min_buy_btc config it will return 0 to the CLI. If the ASB returns a quote of 0 the CLI will not allow you continue with a trade.
 - Reduce required confirmations for Bitcoin transactions from 2 to 1
 - Both the ASB and CLI now support the [Identify](https://github.com/libp2p/specs/blob/master/identify/README.md) protocol. This makes its version and network (testnet/mainnet) avaliable to others
+- Display minimum BTC deposit required to cover the minimum quantity plus fee in the Swap CLI
 
 ## [0.10.2] - 2021-12-25
 
