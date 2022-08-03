@@ -81,8 +81,8 @@ pub struct PublicViewKey(PublicKey);
 #[derive(Debug, Copy, Clone, Deserialize, Serialize, PartialEq, PartialOrd)]
 pub struct Amount(u64);
 
-// Median tx fees on Monero as found here: https://www.monero.how/monero-transaction-fees, XMR 0.000_015 * 2 (to be on the safe side)
-pub const MONERO_FEE: Amount = Amount::from_piconero(30000000);
+// Median tx fees on Monero as found here: https://www.monero.how/monero-transaction-fees, XMR 0.000_008 * 2 (to be on the safe side)
+pub const MONERO_FEE: Amount = Amount::from_piconero(16_000_000);
 
 impl Amount {
     pub const ZERO: Self = Self(0);
@@ -95,22 +95,30 @@ impl Amount {
         Amount(amount)
     }
 
+    /// Return Monero Amount as Piconero.
     pub fn as_piconero(&self) -> u64 {
         self.0
     }
 
-    pub fn max_bitcoin_for_price(&self, ask_price: bitcoin::Amount) -> bitcoin::Amount {
-        let piconero_minus_fee = self.as_piconero().saturating_sub(MONERO_FEE.as_piconero());
+    /// Calculate the maximum amount of Bitcoin that can be bought at a given
+    /// asking price for this amount of Monero including the median fee.
+    pub fn max_bitcoin_for_price(&self, ask_price: bitcoin::Amount) -> Option<bitcoin::Amount> {
+        let pico_minus_fee = self.as_piconero().saturating_sub(MONERO_FEE.as_piconero());
 
-        if piconero_minus_fee == 0 {
-            return bitcoin::Amount::ZERO;
+        if pico_minus_fee == 0 {
+            return Some(bitcoin::Amount::ZERO);
         }
 
-        // There needs to be an offset for difference in zeroes beetween Piconeros and
-        // Satoshis
-        let piconero_calc = (piconero_minus_fee * ask_price.as_sat()) / PICONERO_OFFSET;
+        // safely convert the BTC/XMR rate to sat/pico
+        let ask_sats = Decimal::from(ask_price.as_sat());
+        let pico_per_xmr = Decimal::from(PICONERO_OFFSET);
+        let ask_sats_per_pico = ask_sats / pico_per_xmr;
 
-        bitcoin::Amount::from_sat(piconero_calc)
+        let pico = Decimal::from(pico_minus_fee);
+        let max_sats = pico.checked_mul(ask_sats_per_pico)?;
+        let satoshi = max_sats.to_u64()?;
+
+        Some(bitcoin::Amount::from_sat(satoshi))
     }
 
     pub fn from_monero(amount: f64) -> Result<Self> {
@@ -375,27 +383,88 @@ mod tests {
     }
 
     #[test]
-    fn geting_max_bitcoin_to_trade() {
-        let amount = Amount::parse_monero("10").unwrap();
-        let bitcoin_price_sats = bitcoin::Amount::from_sat(382_900);
+    fn max_bitcoin_to_trade() {
+        // sanity check: if the asking price is 1 BTC / 1 XMR
+        // and we have μ XMR + fee
+        // then max BTC we can buy is μ
+        let ask = bitcoin::Amount::from_btc(1.0).unwrap();
 
-        let monero_max_from_bitcoin = amount.max_bitcoin_for_price(bitcoin_price_sats);
+        let xmr = Amount::parse_monero("1.0").unwrap() + MONERO_FEE;
+        let btc = xmr.max_bitcoin_for_price(ask).unwrap();
 
-        assert_eq!(
-            bitcoin::Amount::from_sat(3_828_988),
-            monero_max_from_bitcoin
-        );
+        assert_eq!(btc, bitcoin::Amount::from_btc(1.0).unwrap());
+
+        let xmr = Amount::parse_monero("0.5").unwrap() + MONERO_FEE;
+        let btc = xmr.max_bitcoin_for_price(ask).unwrap();
+
+        assert_eq!(btc, bitcoin::Amount::from_btc(0.5).unwrap());
+
+        let xmr = Amount::parse_monero("2.5").unwrap() + MONERO_FEE;
+        let btc = xmr.max_bitcoin_for_price(ask).unwrap();
+
+        assert_eq!(btc, bitcoin::Amount::from_btc(2.5).unwrap());
+
+        let xmr = Amount::parse_monero("420").unwrap() + MONERO_FEE;
+        let btc = xmr.max_bitcoin_for_price(ask).unwrap();
+
+        assert_eq!(btc, bitcoin::Amount::from_btc(420.0).unwrap());
+
+        let xmr = Amount::parse_monero("0.00001").unwrap() + MONERO_FEE;
+        let btc = xmr.max_bitcoin_for_price(ask).unwrap();
+
+        assert_eq!(btc, bitcoin::Amount::from_btc(0.00001).unwrap());
+
+        // other ask prices
+
+        let ask = bitcoin::Amount::from_btc(0.5).unwrap();
+        let xmr = Amount::parse_monero("2").unwrap() + MONERO_FEE;
+        let btc = xmr.max_bitcoin_for_price(ask).unwrap();
+
+        assert_eq!(btc, bitcoin::Amount::from_btc(1.0).unwrap());
+
+        let ask = bitcoin::Amount::from_btc(2.0).unwrap();
+        let xmr = Amount::parse_monero("1").unwrap() + MONERO_FEE;
+        let btc = xmr.max_bitcoin_for_price(ask).unwrap();
+
+        assert_eq!(btc, bitcoin::Amount::from_btc(2.0).unwrap());
+
+        let ask = bitcoin::Amount::from_sat(382_900);
+        let xmr = Amount::parse_monero("10").unwrap();
+        let btc = xmr.max_bitcoin_for_price(ask).unwrap();
+
+        assert_eq!(btc, bitcoin::Amount::from_sat(3_828_993));
+
+        // example from https://github.com/comit-network/xmr-btc-swap/issues/1084
+        // with rate from kraken at that time
+        let ask = bitcoin::Amount::from_sat(685_800);
+        let xmr = Amount::parse_monero("0.826286435921").unwrap();
+        let btc = xmr.max_bitcoin_for_price(ask).unwrap();
+
+        assert_eq!(btc, bitcoin::Amount::from_sat(566_656));
+    }
+
+    #[test]
+    fn max_bitcoin_to_trade_overflow() {
+        let xmr = Amount::from_monero(30.0).unwrap();
+        let ask = bitcoin::Amount::from_sat(728_688);
+        let btc = xmr.max_bitcoin_for_price(ask).unwrap();
+
+        assert_eq!(bitcoin::Amount::from_sat(21_860_628), btc);
+
+        let xmr = Amount::from_piconero(u64::MAX);
+        let ask = bitcoin::Amount::from_sat(u64::MAX);
+        let btc = xmr.max_bitcoin_for_price(ask);
+
+        assert!(btc.is_none());
     }
 
     #[test]
     fn geting_max_bitcoin_to_trade_with_balance_smaller_than_locking_fee() {
-        let monero = "0.00001";
-        let amount = Amount::parse_monero(monero).unwrap();
-        let bitcoin_price_sats = bitcoin::Amount::from_sat(382_900);
+        let ask = bitcoin::Amount::from_sat(382_900);
+        let xmr = Amount::parse_monero("0.00001").unwrap();
+        let btc = xmr.max_bitcoin_for_price(ask).unwrap();
 
-        let monero_max_from_bitcoin = amount.max_bitcoin_for_price(bitcoin_price_sats);
-
-        assert_eq!(bitcoin::Amount::ZERO, monero_max_from_bitcoin);
+        assert_eq!(bitcoin::Amount::ZERO, btc);
     }
 
     use rand::rngs::OsRng;

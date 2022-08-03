@@ -50,7 +50,7 @@ jobs:
           ref: ${{ github.event.release.target_commitish }}
           token: ${{ secrets.BOTTY_GITHUB_TOKEN }}
 
-      - uses: Swatinem/rust-cache@v1.4.0
+      - uses: Swatinem/rust-cache@v2.0.0
 
       - name: Install compiler for armhf arch
         if: matrix.target == 'armv7-unknown-linux-gnueabihf'
@@ -67,7 +67,7 @@ jobs:
         run: target/${{ matrix.target }}/release/${{ matrix.bin }} --help
 
       # Remove once python 3 is the default
-      - uses: actions/setup-python@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.x"
 
