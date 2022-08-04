@@ -148,7 +148,7 @@ impl EventLoop {
                 swarm_event = self.swarm.select_next_some() => {
                     match swarm_event {
                         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
-                            if peer_id == self.rendezvous_peer_id{
+                            if peer_id == self.rendezvous_peer_id {
                                 tracing::info!(
                                     "Connected to rendezvous point, discovering nodes in '{}' namespace ...",
                                     self.namespace
@@ -167,26 +167,25 @@ impl EventLoop {
                         }
                         SwarmEvent::OutgoingConnectionError { peer_id, error } => {
                             if let Some(peer_id_from_error) = peer_id {
-
                                 if peer_id_from_error == self.rendezvous_peer_id {
-                                tracing::error!(
-                                    "Failed to connect to rendezvous point at {}: {}",
-                                    &self.rendezvous_addr,
-                                    error
-                                );
+                                    tracing::error!(
+                                        "Failed to connect to rendezvous point at {}: {}",
+                                        &self.rendezvous_addr,
+                                        error
+                                    );
 
-                                // if the rendezvous node is unreachable we just stop
-                                return Vec::new();
-                            } else {
-                                tracing::error!(
-                                    "You connected to the wrong Peer: {} Error: {}",
-                                    &peer_id_from_error,
-                                    error
-                                );
-                                     // if for some reason the peer is not the same it will return empty too.
-                                     // this is just for the CLI to not get stuck
-                                     return Vec::new();
-                            }
+                                    // if the rendezvous node is unreachable we just stop
+                                    return Vec::new();
+                                } else {
+                                    tracing::error!(
+                                        "You connected to the wrong Peer: {} Error: {}",
+                                        &peer_id_from_error,
+                                        error
+                                    );
+                                    // if for some reason the peer is not the same it will return empty too.
+                                    // this is just for the CLI to not get stuck
+                                    return Vec::new();
+                                }
                             } else {
                                 tracing::debug!(
                                     "Failed to connect to peer at {}: {}",
