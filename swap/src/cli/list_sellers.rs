@@ -43,6 +43,7 @@ pub async fn list_sellers(
         .behaviour_mut()
         .quote
         .add_address(&rendezvous_node_peer_id, rendezvous_node_addr.clone());
+
     swarm
         .dial(DialOpts::from(rendezvous_node_peer_id))
         .context("Failed to dial rendezvous node")?;
@@ -162,15 +163,17 @@ impl EventLoop {
                                 );
                             } else {
                                 let address = endpoint.get_remote_address();
+                                tracing::debug!(%peer_id, %address, "Connection established to peer");
                                 self.reachable_asb_address.insert(peer_id, address.clone());
                             }
                         }
                         SwarmEvent::OutgoingConnectionError { peer_id, error } => {
-                            if let Some(peer_id_from_error) = peer_id {
-                                if peer_id_from_error == self.rendezvous_peer_id {
+                            if let Some(peer_id) = peer_id {
+                                if peer_id == self.rendezvous_peer_id {
                                     tracing::error!(
-                                        "Failed to connect to rendezvous point at {}: {}",
-                                        &self.rendezvous_addr,
+                                        %peer_id,
+                                        %self.rendezvous_addr,
+                                        "Failed to connect to rendezvous point: {}",
                                         error
                                     );
 
@@ -178,30 +181,23 @@ impl EventLoop {
                                     return Vec::new();
                                 } else {
                                     tracing::error!(
-                                        "You connected to the wrong Peer: {} Error: {}",
-                                        &peer_id_from_error,
+                                        %peer_id,
+                                        "Failed to connect to peer: {}",
                                         error
                                     );
-                                    // if for some reason the peer is not the same it will return empty too.
-                                    // this is just for the CLI to not get stuck
-                                    return Vec::new();
-                                }
-                            } else {
-                                tracing::debug!(
-                                    "Failed to connect to peer at {}: {}",
-                                    &self.rendezvous_addr,
-                                    error
-                                );
-                                self.unreachable_asb_address.insert(self.rendezvous_peer_id, self.rendezvous_addr.clone());
+                                    self.unreachable_asb_address.insert(peer_id, Multiaddr::empty());
 
-                                match self.asb_quote_status.entry(self.rendezvous_peer_id) {
-                                    Entry::Occupied(mut entry) => {
-                                        entry.insert(QuoteStatus::Received(Status::Unreachable));
-                                    },
-                                    _ => {
-                                        tracing::debug!(%self.rendezvous_peer_id, %error, "Connection error with unexpected peer")
+                                    match self.asb_quote_status.entry(peer_id) {
+                                        Entry::Occupied(mut entry) => {
+                                            entry.insert(QuoteStatus::Received(Status::Unreachable));
+                                        },
+                                        _ => {
+                                            tracing::debug!(%peer_id, %error, "Connection error with unexpected peer");
+                                        }
                                     }
                                 }
+                            } else {
+                                tracing::debug!("Failed to connect (no peer id): {}", error);
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::Rendezvous(
