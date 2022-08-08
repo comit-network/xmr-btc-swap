@@ -29,6 +29,7 @@ use swap::asb::config::{
     initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
 };
 use swap::asb::{cancel, punish, redeem, refund, safely_abort, EventLoop, Finality, KrakenRate};
+use swap::common::check_latest_version;
 use swap::database::open_db;
 use swap::monero::Amount;
 use swap::network::rendezvous::XmrBtcNamespace;
@@ -67,6 +68,10 @@ async fn main() -> Result<()> {
             bail!(e);
         }
     };
+
+    if let Err(e) = check_latest_version(env!("CARGO_PKG_VERSION")).await {
+        eprintln!("{}", e);
+    }
 
     asb::tracing::init(LevelFilter::DEBUG, json, !disable_timestamp).expect("initialize tracing");
 
