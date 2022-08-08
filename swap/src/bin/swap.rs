@@ -26,6 +26,7 @@ use std::time::Duration;
 use swap::bitcoin::TxLock;
 use swap::cli::command::{parse_args_and_apply_defaults, Arguments, Command, ParseResult};
 use swap::cli::{list_sellers, EventLoop, SellerStatus};
+use swap::common::check_latest_version;
 use swap::database::open_db;
 use swap::env::Config;
 use swap::libp2p_ext::MultiAddrExt;
@@ -54,6 +55,10 @@ async fn main() -> Result<()> {
         }
     };
 
+    if let Err(e) = check_latest_version(env!("CARGO_PKG_VERSION")).await {
+        eprintln!("{}", e);
+    }
+
     match cmd {
         Command::BuyXmr {
             seller,
@@ -68,6 +73,7 @@ async fn main() -> Result<()> {
             let swap_id = Uuid::new_v4();
 
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
+
             let db = open_db(data_dir.join("sqlite")).await?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
@@ -196,6 +202,7 @@ async fn main() -> Result<()> {
             address,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
+
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
             let bitcoin_wallet = init_bitcoin_wallet(
@@ -229,6 +236,7 @@ async fn main() -> Result<()> {
             bitcoin_target_block,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
+
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
             let bitcoin_wallet = init_bitcoin_wallet(
@@ -255,6 +263,7 @@ async fn main() -> Result<()> {
             namespace,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
+
             let db = open_db(data_dir.join("sqlite")).await?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
@@ -321,6 +330,7 @@ async fn main() -> Result<()> {
             bitcoin_target_block,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
+
             let db = open_db(data_dir.join("sqlite")).await?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
@@ -343,6 +353,7 @@ async fn main() -> Result<()> {
             bitcoin_target_block,
         } => {
             cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
+
             let db = open_db(data_dir.join("sqlite")).await?;
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
@@ -368,6 +379,7 @@ async fn main() -> Result<()> {
                 .context("Rendezvous node address must contain peer ID")?;
 
             cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
+
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read in seed file")?;
             let identity = seed.derive_libp2p_identity();
@@ -462,6 +474,8 @@ async fn main() -> Result<()> {
             tracing::info!(descriptor=%wallet_export.to_string(), "Exported bitcoin wallet");
         }
         Command::MoneroRecovery { swap_id } => {
+            cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
+
             let db = open_db(data_dir.join("sqlite")).await?;
 
             let swap_state: BobState = db.get_state(swap_id).await?.try_into()?;
