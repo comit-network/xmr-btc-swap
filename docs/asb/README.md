@@ -48,7 +48,7 @@ For example:
 
 ```toml
 [network]
-rendezvous_point = "/dnsaddr/rendezvous.coblox.tech/p2p/12D3KooWQUt9DkNZxEn2R5ymJzWj15MpG6mTW84kyd8vDaRZi46o"
+rendezvous_point = "/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE"
 external_addresses = ["/dns4/example.com/tcp/9939"]
 ```
 
