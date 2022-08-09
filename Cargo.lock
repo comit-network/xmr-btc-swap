@@ -74,9 +74,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.59"
+version = "1.0.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c91f1f46651137be86f3a2b9a8359f9ab421d04d941c62b5982e1ca21113adf9"
+checksum = "c794e162a5eff65c72ef524dfe393eb923c354e350bb78b9c7383df13f3bc142"
 
 [[package]]
 name = "arrayref"
@@ -4085,7 +4085,7 @@ dependencies = [
  "tempfile",
  "testcontainers 0.12.0",
  "thiserror",
- "time 0.3.11",
+ "time 0.3.13",
  "tokio",
  "tokio-socks",
  "tokio-tar",
@@ -4232,9 +4232,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.11"
+version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72c91f41dcb2f096c05f0873d667dceec1087ce5bcf984ec8ffb19acddbb3217"
+checksum = "db76ff9fa4b1458b3c7f077f3ff9887394058460d21e634355b273aaf11eea45"
 dependencies = [
  "itoa 1.0.1",
  "libc",
@@ -4453,7 +4453,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09d48f71a791638519505cefafe162606f706c25592e4bde4d97600c0195312e"
 dependencies = [
  "crossbeam-channel",
- "time 0.3.11",
+ "time 0.3.13",
  "tracing-subscriber 0.3.15",
 ]
 
@@ -4543,7 +4543,7 @@ dependencies = [
  "serde_json",
  "sharded-slab",
  "thread_local",
- "time 0.3.11",
+ "time 0.3.13",
  "tracing",
  "tracing-core",
  "tracing-log",
@@ -4783,7 +4783,7 @@ dependencies = [
  "git2",
  "rustversion",
  "thiserror",
- "time 0.3.11",
+ "time 0.3.13",
 ]
 
 [[package]]
