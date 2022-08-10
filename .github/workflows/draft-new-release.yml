@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'The new version in X.Y.Z format.'
+        description: "The new version in X.Y.Z format."
         required: true
 
 jobs:

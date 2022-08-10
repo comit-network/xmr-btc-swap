@@ -16,9 +16,10 @@ use libp2p::dns::TokioDnsConfig;
 use libp2p::identify::{Identify, IdentifyConfig, IdentifyEvent};
 use libp2p::ping::{Ping, PingConfig, PingEvent};
 use libp2p::request_response::{RequestId, ResponseChannel};
+use libp2p::swarm::dial_opts::PeerCondition;
 use libp2p::swarm::{
-    DialPeerCondition, IntoProtocolsHandler, NetworkBehaviour, NetworkBehaviourAction,
-    PollParameters, ProtocolsHandler,
+    IntoProtocolsHandler, NetworkBehaviour, NetworkBehaviourAction, PollParameters,
+    ProtocolsHandler,
 };
 use libp2p::tcp::TokioTcpConfig;
 use libp2p::websocket::WsConfig;
@@ -107,7 +108,7 @@ pub mod behaviour {
     where
         LR: LatestRate + Send + 'static,
     {
-        pub rendezvous: libp2p::swarm::toggle::Toggle<rendezous::Behaviour>,
+        pub rendezvous: libp2p::swarm::behaviour::toggle::Toggle<rendezous::Behaviour>,
         pub quote: quote::Behaviour,
         pub swap_setup: alice::Behaviour<LR>,
         pub transfer_proof: transfer_proof::Behaviour,
@@ -139,7 +140,7 @@ pub mod behaviour {
                 .with_agent_version(agentVersion);
 
             Self {
-                rendezvous: libp2p::swarm::toggle::Toggle::from(rendezvous_params.map(
+                rendezvous: libp2p::swarm::behaviour::toggle::Toggle::from(rendezvous_params.map(
                     |(identity, rendezvous_peer_id, rendezvous_address, namespace)| {
                         rendezous::Behaviour::new(
                             identity,
@@ -187,6 +188,7 @@ pub mod behaviour {
 
 pub mod rendezous {
     use super::*;
+    use libp2p::swarm::dial_opts::DialOpts;
     use libp2p::swarm::DialError;
     use std::pin::Pin;
 
@@ -292,12 +294,14 @@ pub mod rendezous {
 
         fn inject_dial_failure(
             &mut self,
-            peer_id: &PeerId,
+            peer_id: Option<PeerId>,
             _handler: Self::ProtocolsHandler,
-            _error: DialError,
+            _error: &DialError,
         ) {
-            if peer_id == &self.rendezvous_peer_id {
-                self.connection_status = ConnectionStatus::Disconnected;
+            if let Some(id) = peer_id {
+                if id == self.rendezvous_peer_id {
+                    self.connection_status = ConnectionStatus::Disconnected;
+                }
             }
         }
 
@@ -312,9 +316,11 @@ pub mod rendezous {
                     ConnectionStatus::Disconnected => {
                         self.connection_status = ConnectionStatus::Dialling;
 
-                        return Poll::Ready(NetworkBehaviourAction::DialPeer {
-                            peer_id: self.rendezvous_peer_id,
-                            condition: DialPeerCondition::Disconnected,
+                        return Poll::Ready(NetworkBehaviourAction::Dial {
+                            opts: DialOpts::peer_id(self.rendezvous_peer_id)
+                                .condition(PeerCondition::Disconnected)
+                                .build(),
+
                             handler: Self::ProtocolsHandler::new(Duration::from_secs(30)),
                         });
                     }
@@ -335,9 +341,10 @@ pub mod rendezous {
                                 self.registration_status =
                                     RegistrationStatus::RegisterOnNextConnection;
 
-                                return Poll::Ready(NetworkBehaviourAction::DialPeer {
-                                    peer_id: self.rendezvous_peer_id,
-                                    condition: DialPeerCondition::Disconnected,
+                                return Poll::Ready(NetworkBehaviourAction::Dial {
+                                    opts: DialOpts::peer_id(self.rendezvous_peer_id)
+                                        .condition(PeerCondition::Disconnected)
+                                        .build(),
                                     handler: Self::ProtocolsHandler::new(Duration::from_secs(30)),
                                 });
                             }

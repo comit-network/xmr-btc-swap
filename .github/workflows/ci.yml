@@ -4,9 +4,9 @@ on:
   pull_request: # Need to run on pull-requests, otherwise PRs from forks don't run
   push:
     branches:
-      - 'staging' # Bors uses this branch
-      - 'trying' # Bors uses this branch
-      - 'master' # Always build head of master for the badge in the README
+      - "staging" # Bors uses this branch
+      - "trying" # Bors uses this branch
+      - "master" # Always build head of master for the badge in the README
 
 jobs:
   static_analysis:
@@ -40,7 +40,6 @@ jobs:
             os: windows-latest
     runs-on: ${{ matrix.os }}
     steps:
-
       - name: Checkout sources
         uses: actions/checkout@v3.0.2
 
@@ -71,7 +70,7 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
@@ -92,7 +91,8 @@ jobs:
   docker_tests:
     strategy:
       matrix:
-        test_name: [
+        test_name:
+          [
             happy_path,
             happy_path_restart_bob_after_xmr_locked,
             happy_path_restart_bob_before_xmr_locked,
@@ -105,11 +105,10 @@ jobs:
             alice_refunds_after_restart_bob_refunded,
             ensure_same_swap_id,
             concurrent_bobs_before_xmr_lock_proof_sent,
-            alice_manually_redeems_after_enc_sig_learned
-        ]
+            alice_manually_redeems_after_enc_sig_learned,
+          ]
     runs-on: ubuntu-latest
     steps:
-
       - name: Checkout sources
         uses: actions/checkout@v3.0.2
 
