@@ -79,7 +79,7 @@ impl WalletRpc {
 
         // check the monero-wallet-rpc version
         let exec_path = monero_wallet_rpc.exec_path();
-        tracing::debug!("exec path: {}", exec_path.display());
+        tracing::debug!("RPC exec path: {}", exec_path.display());
 
         if exec_path.exists() {
             let output = Command::new(&exec_path).arg("--version").output().await?;
