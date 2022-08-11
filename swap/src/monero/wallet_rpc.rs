@@ -17,24 +17,29 @@ use tokio_util::io::StreamReader;
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
 compile_error!("unsupported operating system");
 
-#[cfg(target_os = "macos")]
-const DOWNLOAD_URL: &str = "http://downloads.getmonero.org/cli/monero-mac-x64-v0.17.3.0.tar.bz2";
+#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+const DOWNLOAD_URL: &str = "http://downloads.getmonero.org/cli/monero-mac-x64-v0.18.0.0.tar.bz2";
+
+#[cfg(all(target_os = "macos", target_arch = "arm"))]
+const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-mac-armv8-v0.18.0.0.tar.bz2";
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-linux-x64-v0.17.3.0.tar.bz2";
+const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-linux-x64-v0.18.0.0.tar.bz2";
 
 #[cfg(all(target_os = "linux", target_arch = "arm"))]
 const DOWNLOAD_URL: &str =
-    "https://downloads.getmonero.org/cli/monero-linux-armv7-v0.17.3.0.tar.bz2";
+    "https://downloads.getmonero.org/cli/monero-linux-armv7-v0.18.0.0.tar.bz2";
 
 #[cfg(target_os = "windows")]
-const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-win-x64-v0.17.3.0.zip";
+const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-win-x64-v0.18.0.0.zip";
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 const PACKED_FILE: &str = "monero-wallet-rpc";
 
 #[cfg(target_os = "windows")]
 const PACKED_FILE: &str = "monero-wallet-rpc.exe";
+
+const CODENAME: &str = "Fluorine Fermi";
 
 #[derive(Debug, Clone, Copy, thiserror::Error)]
 #[error("monero wallet rpc executable not found in downloaded archive")]
@@ -72,6 +77,22 @@ impl WalletRpc {
             remove_file(monero_wallet_rpc.archive_path()).await?;
         }
 
+        // check the monero-wallet-rpc version
+        let exec_path = monero_wallet_rpc.exec_path();
+        tracing::debug!("RPC exec path: {}", exec_path.display());
+
+        if exec_path.exists() {
+            let output = Command::new(&exec_path).arg("--version").output().await?;
+            let version = String::from_utf8_lossy(&output.stdout);
+            tracing::debug!("RPC version output: {}", version);
+
+            if !version.contains(CODENAME) {
+                tracing::info!("Removing old version of monero-wallet-rpc");
+                tokio::fs::remove_file(exec_path).await?;
+            }
+        }
+
+        // if monero-wallet-rpc doesn't exist then download it
         if !monero_wallet_rpc.exec_path().exists() {
             let mut options = OpenOptions::new();
             let mut file = options
@@ -109,12 +130,24 @@ impl WalletRpc {
             let mut stream = FramedRead::new(StreamReader::new(byte_stream), BytesCodec::new())
                 .map_ok(|bytes| bytes.freeze());
 
+            let (mut received, mut notified) = (0, 0);
             while let Some(chunk) = stream.next().await {
-                file.write(&chunk?).await?;
+                let bytes = chunk?;
+                received += bytes.len();
+                // the stream is decompressed as it is downloaded
+                // file is compressed approx 3:1 in bz format
+                let total = 3 * content_length;
+                let percent = 100 * received as u64 / total;
+                if percent != notified && percent % 10 == 0 {
+                    tracing::debug!("{}%", percent);
+                    notified = percent;
+                }
+                file.write(&bytes).await?;
             }
 
             file.flush().await?;
 
+            tracing::debug!("Extracting archive");
             Self::extract_archive(&monero_wallet_rpc).await?;
         }
         Ok(monero_wallet_rpc)

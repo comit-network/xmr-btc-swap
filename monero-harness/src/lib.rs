@@ -117,11 +117,12 @@ impl<'c> Monero {
         let miner_wallet = self.wallet("miner")?;
         let miner_address = miner_wallet.address().await?.address;
 
-        // generate the first 70 as bulk
+        // generate the first 120 as bulk
+        let amount_of_blocks = 120;
         let monerod = &self.monerod;
         let res = monerod
             .client()
-            .generateblocks(70, miner_address.clone())
+            .generateblocks(amount_of_blocks, miner_address.clone())
             .await?;
         tracing::info!("Generated {:?} blocks", res.blocks.len());
         miner_wallet.refresh().await?;
