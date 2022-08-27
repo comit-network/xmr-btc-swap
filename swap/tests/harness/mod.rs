@@ -902,7 +902,7 @@ async fn mine(bitcoind_client: Client, reward_address: bitcoin::Address) -> Resu
     loop {
         tokio::time::sleep(Duration::from_secs(1)).await;
         bitcoind_client
-            .generatetoaddress(1, reward_address.clone(), None)
+            .generatetoaddress(1, reward_address.clone())
             .await?;
     }
 }
@@ -920,7 +920,7 @@ async fn init_bitcoind(node_url: Url, spendable_quantity: u32) -> Result<Client>
         .await?;
 
     bitcoind_client
-        .generatetoaddress(101 + spendable_quantity, reward_address.clone(), None)
+        .generatetoaddress(101 + spendable_quantity, reward_address.clone())
         .await?;
     let _ = tokio::spawn(mine(bitcoind_client.clone(), reward_address));
     Ok(bitcoind_client)
@@ -940,9 +940,7 @@ pub async fn mint(node_url: Url, address: bitcoin::Address, amount: bitcoin::Amo
         .with_wallet(BITCOIN_TEST_WALLET_NAME)?
         .getnewaddress(None, None)
         .await?;
-    bitcoind_client
-        .generatetoaddress(1, reward_address, None)
-        .await?;
+    bitcoind_client.generatetoaddress(1, reward_address).await?;
 
     Ok(())
 }

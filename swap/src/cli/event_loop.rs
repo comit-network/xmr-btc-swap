@@ -248,9 +248,8 @@ impl EventLoopHandle {
         &mut self,
         tx_redeem_encsig: EncryptedSignature,
     ) -> Result<(), bmrng::error::RequestError<EncryptedSignature>> {
-        Ok(self
-            .encrypted_signature
+        self.encrypted_signature
             .send_receive(tx_redeem_encsig)
-            .await?)
+            .await
     }
 }

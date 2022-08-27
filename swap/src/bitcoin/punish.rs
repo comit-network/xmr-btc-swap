@@ -1,7 +1,7 @@
 use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{self, Address, Amount, PunishTimelock, Transaction, TxCancel, Txid};
-use ::bitcoin::util::bip143::SigHashCache;
-use ::bitcoin::{SigHash, SigHashType};
+use ::bitcoin::util::sighash::SighashCache;
+use ::bitcoin::{EcdsaSighashType, Sighash};
 use anyhow::{Context, Result};
 use bdk::bitcoin::Script;
 use bdk::miniscript::{Descriptor, DescriptorTrait};
@@ -10,7 +10,7 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub struct TxPunish {
     inner: Transaction,
-    digest: SigHash,
+    digest: Sighash,
     cancel_output_descriptor: Descriptor<::bitcoin::PublicKey>,
     watch_script: Script,
 }
@@ -25,12 +25,17 @@ impl TxPunish {
         let tx_punish =
             tx_cancel.build_spend_transaction(punish_address, Some(punish_timelock), spending_fee);
 
-        let digest = SigHashCache::new(&tx_punish).signature_hash(
-            0, // Only one input: cancel transaction
-            &tx_cancel.output_descriptor.script_code(),
-            tx_cancel.amount().as_sat(),
-            SigHashType::All,
-        );
+        let digest = SighashCache::new(&tx_punish)
+            .segwit_signature_hash(
+                0, // Only one input: cancel transaction
+                &tx_cancel
+                    .output_descriptor
+                    .script_code()
+                    .expect("scriptcode"),
+                tx_cancel.amount().as_sat(),
+                EcdsaSighashType::All,
+            )
+            .expect("sighash");
 
         Self {
             inner: tx_punish,
@@ -40,7 +45,7 @@ impl TxPunish {
         }
     }
 
-    pub fn digest(&self) -> SigHash {
+    pub fn digest(&self) -> Sighash {
         self.digest
     }
 
@@ -56,12 +61,18 @@ impl TxPunish {
         let satisfier = {
             let mut satisfier = HashMap::with_capacity(2);
 
-            let A = a.public().into();
-            let B = B.into();
+            let A = a.public().try_into()?;
+            let B = B.try_into()?;
 
             // The order in which these are inserted doesn't matter
-            satisfier.insert(A, (sig_a.into(), ::bitcoin::SigHashType::All));
-            satisfier.insert(B, (sig_b.into(), ::bitcoin::SigHashType::All));
+            satisfier.insert(A, ::bitcoin::EcdsaSig {
+                sig: sig_a.into(),
+                hash_ty: EcdsaSighashType::All,
+            });
+            satisfier.insert(B, ::bitcoin::EcdsaSig {
+                sig: sig_b.into(),
+                hash_ty: EcdsaSighashType::All,
+            });
 
             satisfier
         };

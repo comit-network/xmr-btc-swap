@@ -3,11 +3,12 @@ use crate::bitcoin::{
     verify_encsig, verify_sig, Address, Amount, EmptyWitnessStack, EncryptedSignature, NoInputs,
     NotThreeWitnesses, PublicKey, SecretKey, TooManyInputs, Transaction, TxLock,
 };
-use ::bitcoin::util::bip143::SigHashCache;
-use ::bitcoin::{SigHash, SigHashType, Txid};
+use ::bitcoin::{Sighash, Txid};
 use anyhow::{bail, Context, Result};
 use bdk::miniscript::{Descriptor, DescriptorTrait};
-use bitcoin::Script;
+use bitcoin::secp256k1::ecdsa;
+use bitcoin::util::sighash::SighashCache;
+use bitcoin::{EcdsaSighashType, Script};
 use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
 use ecdsa_fun::fun::Scalar;
 use ecdsa_fun::nonce::Deterministic;
@@ -18,7 +19,7 @@ use std::collections::HashMap;
 #[derive(Clone, Debug)]
 pub struct TxRedeem {
     inner: Transaction,
-    digest: SigHash,
+    digest: Sighash,
     lock_output_descriptor: Descriptor<::bitcoin::PublicKey>,
     watch_script: Script,
 }
@@ -29,12 +30,14 @@ impl TxRedeem {
         // redeem transaction
         let tx_redeem = tx_lock.build_spend_transaction(redeem_address, None, spending_fee);
 
-        let digest = SigHashCache::new(&tx_redeem).signature_hash(
-            0, // Only one input: lock_input (lock transaction)
-            &tx_lock.output_descriptor.script_code(),
-            tx_lock.lock_amount().as_sat(),
-            SigHashType::All,
-        );
+        let digest = SighashCache::new(&tx_redeem)
+            .segwit_signature_hash(
+                0, // Only one input: lock_input (lock transaction)
+                &tx_lock.output_descriptor.script_code().expect("scriptcode"),
+                tx_lock.lock_amount().as_sat(),
+                EcdsaSighashType::All,
+            )
+            .expect("sighash");
 
         Self {
             inner: tx_redeem,
@@ -48,7 +51,7 @@ impl TxRedeem {
         self.inner.txid()
     }
 
-    pub fn digest(&self) -> SigHash {
+    pub fn digest(&self) -> Sighash {
         self.digest
     }
 
@@ -76,16 +79,22 @@ impl TxRedeem {
 
             let A = ::bitcoin::PublicKey {
                 compressed: true,
-                key: a.public.into(),
+                inner: a.public.into(),
             };
             let B = ::bitcoin::PublicKey {
                 compressed: true,
-                key: B.0.into(),
+                inner: B.0.into(),
             };
 
             // The order in which these are inserted doesn't matter
-            satisfier.insert(A, (sig_a.into(), ::bitcoin::SigHashType::All));
-            satisfier.insert(B, (sig_b.into(), ::bitcoin::SigHashType::All));
+            satisfier.insert(A, ::bitcoin::EcdsaSig {
+                sig: sig_a.into(),
+                hash_ty: EcdsaSighashType::All,
+            });
+            satisfier.insert(B, ::bitcoin::EcdsaSig {
+                sig: sig_b.into(),
+                hash_ty: EcdsaSighashType::All,
+            });
 
             satisfier
         };
@@ -108,19 +117,10 @@ impl TxRedeem {
             [inputs @ ..] => bail!(TooManyInputs(inputs.len())),
         };
 
-        let sigs = match input
-            .witness
-            .iter()
-            .map(|vec| vec.as_slice())
-            .collect::<Vec<_>>()
-            .as_slice()
-        {
+        let sigs = match input.witness.iter().collect::<Vec<_>>().as_slice() {
             [sig_1, sig_2, _script] => [sig_1, sig_2]
                 .iter()
-                .map(|sig| {
-                    bitcoin::secp256k1::Signature::from_der(&sig[..sig.len() - 1])
-                        .map(Signature::from)
-                })
+                .map(|sig| ecdsa::Signature::from_der(&sig[..sig.len() - 1]).map(Signature::from))
                 .collect::<std::result::Result<Vec<_>, _>>(),
             [] => bail!(EmptyWitnessStack),
             [witnesses @ ..] => bail!(NotThreeWitnesses(witnesses.len())),

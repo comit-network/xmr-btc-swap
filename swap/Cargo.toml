@@ -15,9 +15,9 @@ async-trait = "0.1"
 atty = "0.2"
 backoff = { version = "0.4", features = [ "tokio" ] }
 base64 = "0.13"
-bdk = "0.16"
+bdk = "0.22"
 big-bytes = "1"
-bitcoin = { version = "0.27", features = [ "rand", "use-serde" ] }
+bitcoin = { version = "0.28", features = [ "rand", "use-serde" ] }
 bmrng = "0.5"
 comfy-table = "5.0"
 config = { version = "0.11", default-features = false, features = [ "toml" ] }
@@ -26,7 +26,7 @@ curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
 data-encoding = "2.3"
 dialoguer = "0.10"
 directories-next = "2"
-ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", default-features = false, features = [ "libsecp_compat", "serde" ] }
+ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", default-features = false, features = [ "libsecp_compat", "serde", "adaptor" ] }
 ed25519-dalek = "1"
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
@@ -46,8 +46,8 @@ serde = { version = "1", features = [ "derive" ] }
 serde_cbor = "0.11"
 serde_json = "1"
 serde_with = { version = "1", features = [ "macros" ] }
-sha2 = "0.9"
-sigma_fun = { git = "https://github.com/LLFourn/secp256kfun", default-features = false, features = [ "ed25519", "serde" ] }
+sha2 = "0.10"
+sigma_fun = { git = "https://github.com/LLFourn/secp256kfun", default-features = false, features = [ "ed25519", "serde", "secp256k1", "alloc" ] }
 sqlx = { version = "0.5", features = [ "sqlite", "runtime-tokio-rustls", "offline" ] }
 structopt = "0.3"
 strum = { version = "0.24", features = [ "derive" ] }
@@ -74,7 +74,7 @@ tokio-tar = "0.3"
 zip = "0.5"
 
 [dev-dependencies]
-bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs" }
+bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "bff9a64b5cd75dec2ce807cbfade7b98c2e1e0d4" } # waiting on crates.io release
 get-port = "3"
 hyper = "0.14"
 monero-harness = { path = "../monero-harness" }
