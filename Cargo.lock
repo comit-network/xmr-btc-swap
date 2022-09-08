@@ -298,16 +298,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "50ae17cabbc8a38a1e3e4c1a6a664e9a09672dc14d0896fa8d865d3a5a446b07"
 
 [[package]]
-name = "bincode"
-version = "1.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f30d3a39baa26f9651f17b375061f3233dde33424a8b72b0dbe93a68a0bc896d"
-dependencies = [
- "byteorder",
- "serde",
-]
-
-[[package]]
 name = "bit-set"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -331,7 +321,7 @@ dependencies = [
  "base64-compat",
  "bech32",
  "bitcoin_hashes",
- "secp256k1",
+ "secp256k1 0.20.3",
  "serde",
 ]
 
@@ -987,14 +977,11 @@ checksum = "5caaa75cbd2b960ff1e5392d2cfb1f44717fffe12fc1f32b7b5d1267f99732a6"
 
 [[package]]
 name = "ecdsa_fun"
-version = "0.6.2-alpha.0"
-source = "git+https://github.com/LLFourn/secp256kfun#84134daf34845434d7f38cdae7ffc31730a3b1e9"
+version = "0.7.1"
+source = "git+https://github.com/LLFourn/secp256kfun#e28cd44f8a7c8d203f6b2606d5c2cf21389ae948"
 dependencies = [
- "bincode",
- "rand_chacha 0.3.1",
  "secp256kfun",
  "serde",
- "sigma_fun",
 ]
 
 [[package]]
@@ -3435,8 +3422,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97d03ceae636d0fed5bae6a7f4f664354c5f4fcedf6eef053fef17e49f837d0a"
 dependencies = [
  "rand 0.6.5",
- "secp256k1-sys",
+ "secp256k1-sys 0.4.0",
  "serde",
+]
+
+[[package]]
+name = "secp256k1"
+version = "0.22.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26947345339603ae8395f68e2f3d85a6b0a8ddfe6315818e80b8504415099db0"
+dependencies = [
+ "secp256k1-sys 0.5.2",
 ]
 
 [[package]]
@@ -3449,24 +3445,35 @@ dependencies = [
 ]
 
 [[package]]
-name = "secp256kfun"
-version = "0.6.2-alpha.0"
-source = "git+https://github.com/LLFourn/secp256kfun#84134daf34845434d7f38cdae7ffc31730a3b1e9"
+name = "secp256k1-sys"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "152e20a0fd0519390fc43ab404663af8a0b794273d2a91d60ad4a39f13ffe110"
 dependencies = [
- "digest 0.9.0",
+ "cc",
+]
+
+[[package]]
+name = "secp256kfun"
+version = "0.7.1"
+source = "git+https://github.com/LLFourn/secp256kfun#e28cd44f8a7c8d203f6b2606d5c2cf21389ae948"
+dependencies = [
+ "digest 0.10.3",
  "rand_core 0.6.2",
- "secp256k1",
- "secp256kfun_parity_backend",
+ "secp256k1 0.22.1",
+ "secp256kfun_k256_backend",
  "serde",
  "subtle-ng",
 ]
 
 [[package]]
-name = "secp256kfun_parity_backend"
-version = "0.1.6-alpha.0"
-source = "git+https://github.com/LLFourn/secp256kfun#84134daf34845434d7f38cdae7ffc31730a3b1e9"
+name = "secp256kfun_k256_backend"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "007b33ee2c671688cc9a6b400428440aac4af0d6bc517c4f71477f783fcee18d"
 dependencies = [
- "crunchy",
+ "cfg-if 1.0.0",
+ "generic-array",
  "subtle-ng",
 ]
 
@@ -3657,11 +3664,11 @@ dependencies = [
 
 [[package]]
 name = "sigma_fun"
-version = "0.3.2-alpha.0"
-source = "git+https://github.com/LLFourn/secp256kfun#84134daf34845434d7f38cdae7ffc31730a3b1e9"
+version = "0.4.1"
+source = "git+https://github.com/LLFourn/secp256kfun#e28cd44f8a7c8d203f6b2606d5c2cf21389ae948"
 dependencies = [
  "curve25519-dalek-ng",
- "digest 0.9.0",
+ "digest 0.10.3",
  "generic-array",
  "rand_core 0.6.2",
  "secp256kfun",
