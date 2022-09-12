@@ -1847,7 +1847,7 @@ dependencies = [
  "rand 0.8.3",
  "ring",
  "rw-stream-sink",
- "sha2 0.10.2",
+ "sha2 0.10.5",
  "smallvec",
  "thiserror",
  "unsigned-varint",
@@ -1931,7 +1931,7 @@ dependencies = [
  "prost",
  "prost-build",
  "rand 0.8.3",
- "sha2 0.10.2",
+ "sha2 0.10.5",
  "snow",
  "static_assertions",
  "x25519-dalek",
@@ -1971,7 +1971,7 @@ dependencies = [
  "prost",
  "prost-build",
  "rand 0.8.3",
- "sha2 0.10.2",
+ "sha2 0.10.5",
  "thiserror",
  "unsigned-varint",
  "void",
@@ -3625,9 +3625,9 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.10.2"
+version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55deaec60f81eefe3cce0dc50bda92d6d8e88f2a27df7c5033b42afeb1ed2676"
+checksum = "cf9db03534dff993187064c4e0c05a5708d2a9728ace9a8959b77bedf415dac5"
 dependencies = [
  "cfg-if 1.0.0",
  "cpufeatures 0.2.1",
