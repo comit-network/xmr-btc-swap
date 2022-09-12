@@ -149,9 +149,9 @@ impl State0 {
         }
     }
 
-    pub async fn receive<B, D, C>(
+    pub async fn receive<D, C>(
         self,
-        wallet: &bitcoin::Wallet<B, D, C>,
+        wallet: &bitcoin::Wallet<D, C>,
         msg: Message1,
     ) -> Result<State1>
     where

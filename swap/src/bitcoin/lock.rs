@@ -20,8 +20,8 @@ pub struct TxLock {
 }
 
 impl TxLock {
-    pub async fn new<B, D, C>(
-        wallet: &Wallet<B, D, C>,
+    pub async fn new<D, C>(
+        wallet: &Wallet<D, C>,
         amount: Amount,
         A: PublicKey,
         B: PublicKey,
@@ -57,7 +57,7 @@ impl TxLock {
         B: PublicKey,
         btc: Amount,
     ) -> Result<Self> {
-        let shared_output_candidate = match psbt.global.unsigned_tx.output.as_slice() {
+        let shared_output_candidate = match psbt.unsigned_tx.output.as_slice() {
             [shared_output_candidate, _] if shared_output_candidate.value == btc.as_sat() => {
                 shared_output_candidate
             }
@@ -144,7 +144,7 @@ impl TxLock {
             previous_output,
             script_sig: Default::default(),
             sequence: sequence.unwrap_or(0xFFFF_FFFF),
-            witness: Vec::new(),
+            witness: Default::default(),
         };
 
         let fee = spending_fee.as_sat();
@@ -212,7 +212,7 @@ mod tests {
 
         let psbt = bob_make_psbt(A, B, &wallet, agreed_amount).await;
         assert_eq!(
-            psbt.global.unsigned_tx.output.len(),
+            psbt.unsigned_tx.output.len(),
             1,
             "psbt should only have a single output"
         );
@@ -264,7 +264,7 @@ mod tests {
     async fn bob_make_psbt(
         A: PublicKey,
         B: PublicKey,
-        wallet: &Wallet<(), bdk::database::MemoryDatabase, StaticFeeRate>,
+        wallet: &Wallet<bdk::database::MemoryDatabase, StaticFeeRate>,
         amount: Amount,
     ) -> PartiallySignedTransaction {
         let change = wallet.new_address().await.unwrap();

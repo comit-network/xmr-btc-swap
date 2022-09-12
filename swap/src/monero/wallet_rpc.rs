@@ -18,7 +18,7 @@ use tokio_util::io::StreamReader;
 compile_error!("unsupported operating system");
 
 #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-const DOWNLOAD_URL: &str = "http://downloads.getmonero.org/cli/monero-mac-x64-v0.18.0.0.tar.bz2";
+const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-mac-x64-v0.18.0.0.tar.bz2";
 
 #[cfg(all(target_os = "macos", target_arch = "arm"))]
 const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-mac-armv8-v0.18.0.0.tar.bz2";
@@ -142,7 +142,7 @@ impl WalletRpc {
                     tracing::debug!("{}%", percent);
                     notified = percent;
                 }
-                file.write(&bytes).await?;
+                file.write_all(&bytes).await?;
             }
 
             file.flush().await?;

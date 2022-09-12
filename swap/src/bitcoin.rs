@@ -27,7 +27,7 @@ pub use wallet::WalletBuilder;
 use crate::bitcoin::wallet::ScriptStatus;
 use ::bitcoin::hashes::hex::ToHex;
 use ::bitcoin::hashes::Hash;
-use ::bitcoin::{secp256k1, SigHash};
+use ::bitcoin::{secp256k1, Sighash};
 use anyhow::{bail, Context, Result};
 use bdk::miniscript::descriptor::Wsh;
 use bdk::miniscript::{Descriptor, Segwitv0};
@@ -78,7 +78,7 @@ impl SecretKey {
         self.inner.to_bytes()
     }
 
-    pub fn sign(&self, digest: SigHash) -> Signature {
+    pub fn sign(&self, digest: Sighash) -> Signature {
         let ecdsa = ECDSA::<Deterministic<Sha256>>::default();
 
         ecdsa.sign(&self.inner, &digest.into_inner())
@@ -98,7 +98,7 @@ impl SecretKey {
     // alice now has s_a and s_b and can refund monero
 
     // self = a, Y = S_b, digest = tx_refund
-    pub fn encsign(&self, Y: PublicKey, digest: SigHash) -> EncryptedSignature {
+    pub fn encsign(&self, Y: PublicKey, digest: Sighash) -> EncryptedSignature {
         let adaptor = Adaptor::<
             HashTranscript<Sha256, rand_chacha::ChaCha20Rng>,
             Deterministic<Sha256>,
@@ -124,12 +124,12 @@ impl From<PublicKey> for Point {
     }
 }
 
-impl From<PublicKey> for ::bitcoin::PublicKey {
-    fn from(from: PublicKey) -> Self {
-        ::bitcoin::PublicKey {
-            compressed: true,
-            key: from.0.into(),
-        }
+impl TryFrom<PublicKey> for bitcoin::PublicKey {
+    type Error = bitcoin::util::key::Error;
+
+    fn try_from(pubkey: PublicKey) -> Result<Self, Self::Error> {
+        let bytes = pubkey.0.to_bytes();
+        bitcoin::PublicKey::from_slice(&bytes)
     }
 }
 
@@ -166,7 +166,7 @@ impl From<Scalar> for PublicKey {
 
 pub fn verify_sig(
     verification_key: &PublicKey,
-    transaction_sighash: &SigHash,
+    transaction_sighash: &Sighash,
     sig: &Signature,
 ) -> Result<()> {
     let ecdsa = ECDSA::verify_only();
@@ -185,7 +185,7 @@ pub struct InvalidSignature;
 pub fn verify_encsig(
     verification_key: PublicKey,
     encryption_key: PublicKey,
-    digest: &SigHash,
+    digest: &Sighash,
     encsig: &EncryptedSignature,
 ) -> Result<()> {
     let adaptor = Adaptor::<HashTranscript<Sha256>, Deterministic<Sha256>>::default();
@@ -457,7 +457,7 @@ mod tests {
     // transactions have 2 signatures the weight can be up to 8 bytes less than
     // the static weight (4 bytes per signature).
     fn assert_weight(transaction: Transaction, expected_weight: usize, tx_name: &str) {
-        let is_weight = transaction.get_weight();
+        let is_weight = transaction.weight();
 
         assert!(
             expected_weight - is_weight <= 8,
