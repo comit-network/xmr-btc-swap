@@ -6,7 +6,6 @@ use crate::{bitcoin, monero};
 use anyhow::Result;
 use async_trait::async_trait;
 use conquer_once::Lazy;
-use ecdsa_fun::fun::marker::Mark;
 use libp2p::{Multiaddr, PeerId};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
@@ -22,7 +21,7 @@ pub static CROSS_CURVE_PROOF_SYSTEM: Lazy<
     CrossCurveDLEQ<HashTranscript<Sha256, rand_chacha::ChaCha20Rng>>,
 > = Lazy::new(|| {
     CrossCurveDLEQ::<HashTranscript<Sha256, rand_chacha::ChaCha20Rng>>::new(
-        (*ecdsa_fun::fun::G).mark::<ecdsa_fun::fun::marker::Normal>(),
+        (*ecdsa_fun::fun::G).normalize(),
         curve25519_dalek::constants::ED25519_BASEPOINT_POINT,
     )
 });
