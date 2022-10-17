@@ -15,7 +15,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v3.1.0
 
-      - uses: Swatinem/rust-cache@v2.0.0
+      - uses: Swatinem/rust-cache@v2.0.1
 
       - name: Check formatting
         uses: dprint/check@v2.1
@@ -45,7 +45,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v3.1.0
 
-      - uses: Swatinem/rust-cache@v2.0.0
+      - uses: Swatinem/rust-cache@v2.0.1
 
       - name: Install compiler for armhf arch
         if: matrix.target == 'armv7-unknown-linux-gnueabihf'
@@ -78,7 +78,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v3.1.0
 
-      - uses: Swatinem/rust-cache@v2.0.0
+      - uses: Swatinem/rust-cache@v2.0.1
 
       - name: Build tests
         run: cargo build --tests --workspace --all-features
@@ -114,7 +114,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v3.1.0
 
-      - uses: Swatinem/rust-cache@v2.0.0
+      - uses: Swatinem/rust-cache@v2.0.1
 
       - name: Run test ${{ matrix.test_name }}
         run: cargo test --package swap --all-features --test ${{ matrix.test_name }} -- --nocapture
