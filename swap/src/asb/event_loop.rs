@@ -176,7 +176,7 @@ where
                             let _ = responder.respond(wallet_snapshot);
                         }
                         SwarmEvent::Behaviour(OutEvent::SwapSetupCompleted{peer_id, swap_id, state3}) => {
-                            let _ = self.handle_execution_setup_done(peer_id, swap_id, state3).await;
+                            self.handle_execution_setup_done(peer_id, swap_id, state3).await;
                         }
                         SwarmEvent::Behaviour(OutEvent::SwapDeclined { peer, error }) => {
                             tracing::warn!(%peer, "Ignoring spot price request: {}", error);
