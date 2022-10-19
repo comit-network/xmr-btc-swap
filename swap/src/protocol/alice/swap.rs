@@ -176,7 +176,7 @@ where
                    }
                 },
                 result = tx_lock_status.wait_until_confirmed_with(state3.cancel_timelock) => {
-                    let _ = result?;
+                    result?;
                     AliceState::CancelTimelockExpired {
                         monero_wallet_restore_blockheight,
                         transfer_proof,
@@ -196,7 +196,7 @@ where
                 biased; // make sure the cancel timelock expiry future is polled first
 
                 result = tx_lock_status.wait_until_confirmed_with(state3.cancel_timelock) => {
-                    let _ = result?;
+                    result?;
                     AliceState::CancelTimelockExpired {
                         monero_wallet_restore_blockheight,
                         transfer_proof,
@@ -326,7 +326,7 @@ where
                     }
                 }
                 result = tx_cancel_status.wait_until_confirmed_with(state3.punish_timelock) => {
-                    let _ = result?;
+                    result?;
 
                     AliceState::BtcPunishable {
                         monero_wallet_restore_blockheight,

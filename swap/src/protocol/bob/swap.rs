@@ -137,7 +137,7 @@ async fn next_state(
                         }
                     },
                     result = cancel_timelock_expires => {
-                        let _ = result?;
+                        result?;
                         tracing::info!("Alice took too long to lock Monero, cancelling the swap");
 
                         let state4 = state3.cancel();
@@ -174,7 +174,7 @@ async fn next_state(
                         }
                     }
                     result = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
-                        let _ = result?;
+                        result?;
                         BobState::CancelTimelockExpired(state.cancel())
                     }
                 }
@@ -198,7 +198,7 @@ async fn next_state(
                         }
                     },
                     result = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
-                        let _ = result?;
+                        result?;
                         BobState::CancelTimelockExpired(state.cancel())
                     }
                 }
@@ -215,7 +215,7 @@ async fn next_state(
                         BobState::BtcRedeemed(state5?)
                     },
                     result = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
-                        let _ = result?;
+                        result?;
                         BobState::CancelTimelockExpired(state.cancel())
                     }
                 }
