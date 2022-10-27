@@ -7,6 +7,7 @@ on:
       - "staging" # Bors uses this branch
       - "trying" # Bors uses this branch
       - "master" # Always build head of master for the badge in the README
+      - "0.11.x"
 
 jobs:
   static_analysis:
