@@ -296,7 +296,7 @@ impl<'c> MoneroWalletRpc {
 
     /// Sends amount to address
     pub async fn transfer(&self, address: &str, amount: u64) -> Result<Transfer> {
-        Ok(self.client().transfer_single(0, amount, address).await?)
+        self.client().transfer_single(0, amount, address).await
     }
 
     pub async fn address(&self) -> Result<GetAddress> {

@@ -142,7 +142,7 @@ impl WalletRpc {
                     tracing::debug!("{}%", percent);
                     notified = percent;
                 }
-                file.write(&bytes).await?;
+                file.write_all(&bytes).await?;
             }
 
             file.flush().await?;
