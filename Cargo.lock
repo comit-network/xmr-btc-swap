@@ -4162,7 +4162,7 @@ checksum = "734676eb262c623cec13c3155096e08d1f8f29adce39ba17948b18dad1e54142"
 
 [[package]]
 name = "swap"
-version = "0.11.0"
+version = "0.11.1"
 dependencies = [
  "anyhow",
  "async-compression",
