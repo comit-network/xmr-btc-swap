@@ -1076,7 +1076,7 @@ mod tests {
     proptest! {
         #[test]
         fn given_fee_above_max_should_always_errors(
-            sat_per_vb in 100_000_000.0f32..,
+            sat_per_vb in 100_000_000.0f32..f32::MAX,
         ) {
             let weight = 400;
             let amount = bitcoin::Amount::from_sat(547u64);
