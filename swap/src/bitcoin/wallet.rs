@@ -131,8 +131,6 @@ impl Wallet {
                     let mut last_status = None;
 
                     loop {
-                        tokio::time::sleep(Duration::from_secs(5)).await;
-
                         let new_status = match client.lock().await.status_of_script(&tx) {
                             Ok(new_status) => new_status,
                             Err(error) => {
@@ -153,6 +151,8 @@ impl Wallet {
                                 return;
                             }
                         }
+
+                        tokio::time::sleep(Duration::from_secs(5)).await;
                     }
                 });
 
@@ -705,7 +705,7 @@ impl Client {
             electrum,
             blockchain,
             latest_block_height: BlockHeight::try_from(latest_block)?,
-            last_sync: Instant::now(),
+            last_sync: Instant::now() - interval,
             sync_interval: interval,
             script_history: Default::default(),
             subscriptions: Default::default(),
