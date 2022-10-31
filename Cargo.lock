@@ -980,7 +980,7 @@ checksum = "5caaa75cbd2b960ff1e5392d2cfb1f44717fffe12fc1f32b7b5d1267f99732a6"
 [[package]]
 name = "ecdsa_fun"
 version = "0.7.1"
-source = "git+https://github.com/LLFourn/secp256kfun#b511ab5f83aa0ae21f10460ada56f535ad3a6d57"
+source = "git+https://github.com/LLFourn/secp256kfun#7f1ae3db3933e215ae59f115f20c2a4eea23fb29"
 dependencies = [
  "bincode",
  "rand_chacha 0.3.1",
@@ -3428,7 +3428,7 @@ dependencies = [
 [[package]]
 name = "secp256kfun"
 version = "0.7.1"
-source = "git+https://github.com/LLFourn/secp256kfun#b511ab5f83aa0ae21f10460ada56f535ad3a6d57"
+source = "git+https://github.com/LLFourn/secp256kfun#7f1ae3db3933e215ae59f115f20c2a4eea23fb29"
 dependencies = [
  "digest 0.10.5",
  "rand_core 0.6.2",
@@ -3625,7 +3625,7 @@ dependencies = [
 [[package]]
 name = "sigma_fun"
 version = "0.4.1"
-source = "git+https://github.com/LLFourn/secp256kfun#b511ab5f83aa0ae21f10460ada56f535ad3a6d57"
+source = "git+https://github.com/LLFourn/secp256kfun#7f1ae3db3933e215ae59f115f20c2a4eea23fb29"
 dependencies = [
  "curve25519-dalek-ng",
  "digest 0.10.5",
