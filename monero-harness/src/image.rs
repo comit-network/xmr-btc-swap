@@ -25,7 +25,7 @@ impl Image for Monerod {
     type EntryPoint = str;
 
     fn descriptor(&self) -> String {
-        "rinocommunity/monero:v0.18.0.0".to_owned()
+        "rinocommunity/monero:v0.18.1.2".to_owned()
     }
 
     fn wait_until_ready<D: Docker>(&self, container: &Container<'_, D, Self>) {
@@ -70,7 +70,7 @@ impl Image for MoneroWalletRpc {
     type EntryPoint = str;
 
     fn descriptor(&self) -> String {
-        "rinocommunity/monero:v0.18.0.0".to_owned()
+        "rinocommunity/monero:v0.18.1.2".to_owned()
     }
 
     fn wait_until_ready<D: Docker>(&self, container: &Container<'_, D, Self>) {
@@ -229,6 +229,7 @@ impl IntoIterator for MoneroWalletRpcArgs {
             format!("--daemon-address={}", self.daemon_address),
             format!("--rpc-bind-port={}", RPC_PORT),
             "--log-level=4".to_string(),
+            "--allow-mismatched-daemon-version".to_string(), /* https://github.com/monero-project/monero/issues/8600 */
         ];
 
         if self.disable_rpc_login {
