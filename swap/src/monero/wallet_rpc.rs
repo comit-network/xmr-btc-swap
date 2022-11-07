@@ -18,20 +18,20 @@ use tokio_util::io::StreamReader;
 compile_error!("unsupported operating system");
 
 #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-const DOWNLOAD_URL: &str = "http://downloads.getmonero.org/cli/monero-mac-x64-v0.18.0.0.tar.bz2";
+const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-mac-x64-v0.18.0.0.tar.bz2";
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-mac-armv8-v0.18.0.0.tar.bz2";
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-linux-x64-v0.18.0.0.tar.bz2";
+const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-linux-x64-v0.18.1.2.tar.bz2";
 
 #[cfg(all(target_os = "linux", target_arch = "arm"))]
 const DOWNLOAD_URL: &str =
-    "https://downloads.getmonero.org/cli/monero-linux-armv7-v0.18.0.0.tar.bz2";
+    "https://downloads.getmonero.org/cli/monero-linux-armv7-v0.18.1.2.tar.bz2";
 
 #[cfg(target_os = "windows")]
-const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-win-x64-v0.18.0.0.zip";
+const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-win-x64-v0.18.1.2.zip";
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 const PACKED_FILE: &str = "monero-wallet-rpc";
@@ -39,7 +39,7 @@ const PACKED_FILE: &str = "monero-wallet-rpc";
 #[cfg(target_os = "windows")]
 const PACKED_FILE: &str = "monero-wallet-rpc.exe";
 
-const CODENAME: &str = "Fluorine Fermi";
+const WALLET_RPC_VERSION: &str = "v0.18.1.2";
 
 #[derive(Debug, Clone, Copy, thiserror::Error)]
 #[error("monero wallet rpc executable not found in downloaded archive")]
@@ -86,7 +86,7 @@ impl WalletRpc {
             let version = String::from_utf8_lossy(&output.stdout);
             tracing::debug!("RPC version output: {}", version);
 
-            if !version.contains(CODENAME) {
+            if !version.contains(WALLET_RPC_VERSION) {
                 tracing::info!("Removing old version of monero-wallet-rpc");
                 tokio::fs::remove_file(exec_path).await?;
             }

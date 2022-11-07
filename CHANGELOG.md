@@ -7,22 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-<<<<<<< HEAD
+### Changed
+
+- Changed ASB to quote on Monero unlocked balance instead of total balance
 
 ## [0.11.1] - 2022-10-28
 
 ### Changed
 
 - Immediately fetch transaction status upon subscription
-- # Dependency updates
-
-### Changed
-
-- Changed ASB to quote on Monero unlocked balance instead of total balance
-
-### Added
-
-> > > > > > > f224c495 (fix(asb): use unlocked monero balance for quotes)
+- Dependency updates
 
 ## [0.11.0] - 2022-08-11
 
