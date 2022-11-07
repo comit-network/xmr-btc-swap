@@ -138,15 +138,30 @@ impl<'c> Monero {
         let wallet = self.wallet(name)?;
         let address = wallet.address().await?.address;
 
+        let mut expected_total = 0;
+        let mut expected_unlocked = 0;
+        let mut unlocked = 0;
         for amount in amount_in_outputs {
             if amount > 0 {
                 miner_wallet.transfer(&address, amount).await?;
+                expected_total += amount;
                 tracing::info!("Funded {} wallet with {}", wallet.name, amount);
+
+                // sanity checks for total/unlocked balance
+                let total = wallet.balance().await?;
+                assert_eq!(total, expected_total);
+                assert_eq!(unlocked, expected_unlocked);
+
                 monerod
                     .client()
                     .generateblocks(10, miner_address.clone())
                     .await?;
                 wallet.refresh().await?;
+                expected_unlocked += amount;
+
+                unlocked = wallet.unlocked_balance().await?;
+                assert_eq!(unlocked, expected_unlocked);
+                assert_eq!(total, expected_total);
             }
         }
 
@@ -310,10 +325,18 @@ impl<'c> MoneroWalletRpc {
         Ok(balance)
     }
 
+    pub async fn unlocked_balance(&self) -> Result<u64> {
+        self.client().refresh().await?;
+        let balance = self.client().get_balance(0).await?.unlocked_balance;
+
+        Ok(balance)
+    }
+
     pub async fn refresh(&self) -> Result<Refreshed> {
         Ok(self.client().refresh().await?)
     }
 }
+
 /// Mine a block ever BLOCK_TIME_SECS seconds.
 async fn mine(monerod: monerod::Client, reward_address: String) -> Result<()> {
     loop {

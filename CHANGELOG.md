@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Changed ASB to quote on Monero unlocked balance instead of total balance
+
+### Added
+
 ## [0.11.0] - 2022-08-11
 
 ### Changed
@@ -320,7 +326,7 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[Unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.11.0...HEAD
+[unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.11.0...HEAD
 [0.11.0]: https://github.com/comit-network/xmr-btc-swap/compare/0.10.2...0.11.0
 [0.10.2]: https://github.com/comit-network/xmr-btc-swap/compare/0.10.1...0.10.2
 [0.10.1]: https://github.com/comit-network/xmr-btc-swap/compare/0.10.0...0.10.1
