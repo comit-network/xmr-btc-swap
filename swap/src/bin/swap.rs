@@ -14,6 +14,7 @@
 
 use anyhow::{bail, Context, Result};
 use comfy_table::Table;
+use jsonrpsee::http_server::{HttpServerHandle};
 use qrcode::render::unicode;
 use qrcode::QrCode;
 use std::cmp::min;
@@ -23,6 +24,7 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use std::net::SocketAddr;
 use swap::bitcoin::TxLock;
 use swap::cli::command::{parse_args_and_apply_defaults, Arguments, Command, ParseResult};
 use swap::cli::{list_sellers, EventLoop, SellerStatus};
@@ -35,6 +37,7 @@ use swap::network::swarm;
 use swap::protocol::bob;
 use swap::protocol::bob::{BobState, Swap};
 use swap::seed::Seed;
+use swap::rpc;
 use swap::{bitcoin, cli, monero};
 use url::Url;
 use uuid::Uuid;
@@ -254,6 +257,15 @@ async fn main() -> Result<()> {
                 "Checked Bitcoin balance",
             );
         }
+        Command::StartDaemon {
+            server_address,
+        } => {
+              let handle = rpc::run_server(server_address).await?;
+              loop {
+
+              }
+
+        },
         Command::Resume {
             swap_id,
             bitcoin_electrum_rpc_url,
@@ -515,6 +527,7 @@ async fn main() -> Result<()> {
     };
     Ok(())
 }
+
 
 async fn init_bitcoin_wallet(
     electrum_rpc_url: Url,

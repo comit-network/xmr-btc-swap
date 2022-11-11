@@ -13,6 +13,7 @@ use std::str::FromStr;
 use structopt::{clap, StructOpt};
 use url::Url;
 use uuid::Uuid;
+use std::net::SocketAddr;
 
 // See: https://moneroworld.com/
 pub const DEFAULT_MONERO_DAEMON_ADDRESS: &str = "node.community.rino.io:18081";
@@ -138,6 +139,21 @@ where
                 },
             }
         }
+        RawCommand::StartDaemon {
+            server_address,
+        } => {
+            let server_address = "127.0.0.1:1234".parse()?;
+            Arguments {
+                env_config: env_config_from(is_testnet),
+                debug,
+                json,
+                data_dir: data::data_dir_from(data, is_testnet)?,
+                cmd: Command::StartDaemon {
+                    server_address,
+                },
+            }
+
+        }
         RawCommand::WithdrawBtc {
             bitcoin,
             amount,
@@ -250,7 +266,7 @@ where
                     bitcoin_target_block,
                 },
             }
-        }
+        },
         RawCommand::MoneroRecovery { swap_id } => Arguments {
             env_config: env_config_from(is_testnet),
             debug,
@@ -288,6 +304,10 @@ pub enum Command {
     Balance {
         bitcoin_electrum_rpc_url: Url,
         bitcoin_target_block: usize,
+    },
+    StartDaemon {
+        server_address: SocketAddr,
+
     },
     Resume {
         swap_id: Uuid,
@@ -407,6 +427,10 @@ enum RawCommand {
     Balance {
         #[structopt(long = "electrum-rpc", help = "Provide the Bitcoin Electrum RPC URL")]
         bitcoin_electrum_rpc_url: Option<Url>,
+    },
+    #[structopt(about="Starts a JSON-RPC server")]
+    StartDaemon {
+        server_address: Option<SocketAddr>,
     },
     /// Resume a swap
     Resume {

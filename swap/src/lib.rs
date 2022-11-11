@@ -28,6 +28,7 @@ pub mod libp2p_ext;
 pub mod monero;
 pub mod network;
 pub mod protocol;
+pub mod rpc;
 pub mod seed;
 pub mod tor;
 pub mod tracing_ext;
