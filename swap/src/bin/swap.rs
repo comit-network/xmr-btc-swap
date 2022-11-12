@@ -12,38 +12,25 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
-use anyhow::{bail, Context, Result};
-use comfy_table::Table;
-use jsonrpsee::http_server::{HttpServerHandle};
-use qrcode::render::unicode;
-use qrcode::QrCode;
-use std::cmp::min;
-use std::convert::TryInto;
+use anyhow::Result;
 use std::env;
-use std::future::Future;
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::Duration;
-use std::net::SocketAddr;
-use swap::bitcoin::TxLock;
-use swap::cli::command::{parse_args_and_apply_defaults, Options, Command, ParseResult};
-use swap::cli::{list_sellers, EventLoop, SellerStatus};
+use swap::cli::command::{parse_args_and_apply_defaults, ParseResult};
 use swap::common::check_latest_version;
-use swap::database::open_db;
-use swap::env::Config;
-use swap::libp2p_ext::MultiAddrExt;
-use swap::network::quote::{BidQuote, ZeroQuoteReceived};
-use swap::network::swarm;
-use swap::protocol::bob;
-use swap::protocol::bob::{BobState, Swap};
-use swap::seed::Seed;
-use swap::rpc;
-use swap::{bitcoin, cli, monero};
-use url::Url;
-use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let api = match parse_args_and_apply_defaults(env::args_os())? {
+        ParseResult::InternalApi(api) => *api,
+        ParseResult::PrintAndExitZero { message } => {
+            println!("{}", message);
+            std::process::exit(0);
+        }
+    };
+
+    if let Err(e) = check_latest_version(env!("CARGO_PKG_VERSION")).await {
+        eprintln!("{}", e);
+    }
+    api.call().await?;
     Ok(())
 }
 

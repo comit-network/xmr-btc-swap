@@ -4146,6 +4146,7 @@ dependencies = [
  "hyper",
  "itertools",
  "jsonrpsee",
+ "jsonrpsee-core",
  "libp2p",
  "monero",
  "monero-harness",

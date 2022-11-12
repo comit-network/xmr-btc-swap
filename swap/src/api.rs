@@ -56,7 +56,68 @@ pub struct Params {
 }
 
 impl InternalApi {
-    pub async fn call() -> Result<()> {
+    pub async fn call(self) -> Result<()> {
+        let opts = &self.opts;
+        let params = self.params;
+        match self.cmd {
+            Command::BuyXmr => { }
+            Command::History => {
+                cli::tracing::init(opts.debug, opts.json, opts.data_dir.join("logs"), None)?;
+
+                let db = open_db(opts.data_dir.join("sqlite")).await?;
+                let swaps = db.all().await?;
+
+                if opts.json {
+                    for (swap_id, state) in swaps {
+                        let state: BobState = state.try_into()?;
+                        tracing::info!(swap_id=%swap_id.to_string(), state=%state.to_string(), "Read swap state from database");
+                    }
+                } else {
+                    let mut table = Table::new();
+
+                    table.set_header(vec!["SWAP ID", "STATE"]);
+
+                    for (swap_id, state) in swaps {
+                        let state: BobState = state.try_into()?;
+                        table.add_row(vec![swap_id.to_string(), state.to_string()]);
+                    }
+
+                    println!("{}", table);
+                }
+            }
+            Command::Config => { }
+            Command::WithdrawBtc => { }
+            Command::StartDaemon => {
+                let handle = rpc::run_server(params.server_address.unwrap()).await?;
+                loop {}
+            }
+            Command::Balance => {
+                cli::tracing::init(opts.debug, opts.json, opts.data_dir.join("logs"), None)?;
+
+                let seed = Seed::from_file_or_generate(opts.data_dir.as_path())
+                    .context("Failed to read in seed file")?;
+                let bitcoin_wallet = init_bitcoin_wallet(
+                    params.bitcoin_electrum_rpc_url.unwrap(),
+                    &seed,
+                    opts.data_dir.clone(),
+                    opts.env_config,
+                    params.bitcoin_target_block.unwrap(),
+                )
+                .await?;
+
+                let bitcoin_balance = bitcoin_wallet.balance().await?;
+                tracing::info!(
+                    balance = %bitcoin_balance,
+                    "Checked Bitcoin balance",
+                );
+            }
+            Command::Resume => { }
+            Command::Cancel => { }
+            Command::Refund => { }
+            Command::ListSellers => { }
+            Command::ExportBitcoinWallet => { }
+            Command::MoneroRecovery => { }
+        }
         Ok(())
     }
 }
