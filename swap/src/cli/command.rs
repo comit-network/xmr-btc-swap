@@ -3,6 +3,7 @@ use crate::env::GetConfig;
 use crate::fs::system_data_dir;
 use crate::network::rendezvous::XmrBtcNamespace;
 use crate::{env, monero};
+use crate::api::{InternalApi, Params};
 use anyhow::{bail, Context, Result};
 use bitcoin::{Address, AddressType};
 use libp2p::core::Multiaddr;
@@ -30,19 +31,18 @@ const DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET: usize = 1;
 const DEFAULT_TOR_SOCKS5_PORT: &str = "9050";
 
 #[derive(Debug, PartialEq)]
-pub struct Arguments {
+pub struct Options {
     pub env_config: env::Config,
     pub debug: bool,
     pub json: bool,
     pub data_dir: PathBuf,
-    pub cmd: Command,
 }
 
 /// Represents the result of parsing the command-line parameters.
 #[derive(Debug, PartialEq)]
 pub enum ParseResult {
     /// The arguments we were invoked in.
-    Arguments(Box<Arguments>),
+    InternalApi(Box<InternalApi>),
     /// A flag or command was given that does not need further processing other
     /// than printing the provided message.
     ///
@@ -70,7 +70,7 @@ where
     let is_testnet = args.testnet;
     let data = args.data;
 
-    let arguments = match args.cmd {
+    let api = match args.cmd {
         RawCommand::BuyXmr {
             seller: Seller { seller },
             bitcoin,
@@ -87,35 +87,49 @@ where
             let bitcoin_change_address =
                 validate_bitcoin_address(bitcoin_change_address, is_testnet)?;
 
-            Arguments {
+            InternalApi {
+                opts: Options {
+                    env_config: env_config_from(is_testnet),
+                    debug,
+                    json,
+                    data_dir: data::data_dir_from(data, is_testnet)?,
+                },
+                params: Params {
+                    seller: Some(seller),
+                    bitcoin_electrum_rpc_url: Some(bitcoin_electrum_rpc_url),
+                    bitcoin_target_block: Some(bitcoin_target_block),
+                    bitcoin_change_address: Some(bitcoin_change_address),
+                    monero_receive_address: Some(monero_receive_address),
+                    monero_daemon_address: Some(monero_daemon_address),
+                    tor_socks5_port: Some(tor_socks5_port),
+                    namespace: Some(XmrBtcNamespace::from_is_testnet(is_testnet)),
+                    ..Default::default()
+                },
+                cmd: Command::BuyXmr,
+            }
+        }
+        RawCommand::History => InternalApi {
+            opts: Options {
                 env_config: env_config_from(is_testnet),
                 debug,
                 json,
                 data_dir: data::data_dir_from(data, is_testnet)?,
-                cmd: Command::BuyXmr {
-                    seller,
-                    bitcoin_electrum_rpc_url,
-                    bitcoin_target_block,
-                    bitcoin_change_address,
-                    monero_receive_address,
-                    monero_daemon_address,
-                    tor_socks5_port,
-                    namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
-                },
-            }
-        }
-        RawCommand::History => Arguments {
-            env_config: env_config_from(is_testnet),
-            debug,
-            json,
-            data_dir: data::data_dir_from(data, is_testnet)?,
+            },
+            params: Params {
+                ..Default::default()
+            },
             cmd: Command::History,
         },
-        RawCommand::Config => Arguments {
-            env_config: env_config_from(is_testnet),
-            debug,
-            json,
-            data_dir: data::data_dir_from(data, is_testnet)?,
+        RawCommand::Config => InternalApi {
+            opts: Options {
+                env_config: env_config_from(is_testnet),
+                debug,
+                json,
+                data_dir: data::data_dir_from(data, is_testnet)?,
+            },
+            params: Params {
+                ..Default::default()
+            },
             cmd: Command::Config,
         },
         RawCommand::Balance {
@@ -128,31 +142,39 @@ where
             let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
                 bitcoin.apply_defaults(is_testnet)?;
 
-            Arguments {
-                env_config: env_config_from(is_testnet),
-                debug,
-                json,
-                data_dir: data::data_dir_from(data, is_testnet)?,
-                cmd: Command::Balance {
-                    bitcoin_electrum_rpc_url,
-                    bitcoin_target_block,
+            InternalApi {
+                opts: Options {
+                    env_config: env_config_from(is_testnet),
+                    debug,
+                    json,
+                    data_dir: data::data_dir_from(data, is_testnet)?,
                 },
+                params: Params {
+                    bitcoin_electrum_rpc_url: Some(bitcoin_electrum_rpc_url),
+                    bitcoin_target_block: Some(bitcoin_target_block),
+                    ..Default::default()
+                },
+                cmd: Command::Balance,
             }
         }
         RawCommand::StartDaemon {
             server_address,
         } => {
             let server_address = "127.0.0.1:1234".parse()?;
-            Arguments {
-                env_config: env_config_from(is_testnet),
-                debug,
-                json,
-                data_dir: data::data_dir_from(data, is_testnet)?,
-                cmd: Command::StartDaemon {
-                    server_address,
-                },
-            }
+            InternalApi {
+                opts: Options {
+                    env_config: env_config_from(is_testnet),
+                    debug,
+                    json,
+                    data_dir: data::data_dir_from(data, is_testnet)?,
 
+                },
+                params: Params {
+                    server_address: Some(server_address),
+                    ..Default::default()
+                },
+                cmd: Command::StartDaemon,
+            }
         }
         RawCommand::WithdrawBtc {
             bitcoin,
@@ -162,17 +184,21 @@ where
             let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
                 bitcoin.apply_defaults(is_testnet)?;
 
-            Arguments {
-                env_config: env_config_from(is_testnet),
-                debug,
-                json,
-                data_dir: data::data_dir_from(data, is_testnet)?,
-                cmd: Command::WithdrawBtc {
-                    bitcoin_electrum_rpc_url,
-                    bitcoin_target_block,
-                    amount,
-                    address: bitcoin_address(address, is_testnet)?,
+            InternalApi {
+                opts: Options {
+                    env_config: env_config_from(is_testnet),
+                    debug,
+                    json,
+                    data_dir: data::data_dir_from(data, is_testnet)?,
                 },
+                params: Params {
+                    bitcoin_electrum_rpc_url: Some(bitcoin_electrum_rpc_url),
+                    bitcoin_target_block: Some(bitcoin_target_block),
+                    amount,
+                    address: Some(bitcoin_address(address, is_testnet)?),
+                    ..Default::default()
+                },
+                cmd: Command::WithdrawBtc,
             }
         }
         RawCommand::Resume {
@@ -185,19 +211,24 @@ where
                 bitcoin.apply_defaults(is_testnet)?;
             let monero_daemon_address = monero.apply_defaults(is_testnet);
 
-            Arguments {
-                env_config: env_config_from(is_testnet),
-                debug,
-                json,
-                data_dir: data::data_dir_from(data, is_testnet)?,
-                cmd: Command::Resume {
-                    swap_id,
-                    bitcoin_electrum_rpc_url,
-                    bitcoin_target_block,
-                    monero_daemon_address,
-                    tor_socks5_port,
-                    namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
+            InternalApi {
+                opts: Options {
+                    env_config: env_config_from(is_testnet),
+                    debug,
+                    json,
+                    data_dir: data::data_dir_from(data, is_testnet)?,
+
                 },
+                params: Params {
+                    swap_id: Some(swap_id),
+                    bitcoin_electrum_rpc_url: Some(bitcoin_electrum_rpc_url),
+                    bitcoin_target_block: Some(bitcoin_target_block),
+                    monero_daemon_address: Some(monero_daemon_address),
+                    tor_socks5_port: Some(tor_socks5_port),
+                    namespace: Some(XmrBtcNamespace::from_is_testnet(is_testnet)),
+                    ..Default::default()
+                },
+                cmd: Command::Resume,
             }
         }
         RawCommand::Cancel {
@@ -207,16 +238,20 @@ where
             let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
                 bitcoin.apply_defaults(is_testnet)?;
 
-            Arguments {
-                env_config: env_config_from(is_testnet),
-                debug,
-                json,
-                data_dir: data::data_dir_from(data, is_testnet)?,
-                cmd: Command::Cancel {
-                    swap_id,
-                    bitcoin_electrum_rpc_url,
-                    bitcoin_target_block,
+            InternalApi {
+                opts: Options {
+                    env_config: env_config_from(is_testnet),
+                    debug,
+                    json,
+                    data_dir: data::data_dir_from(data, is_testnet)?,
                 },
+                params: Params {
+                    swap_id: Some(swap_id),
+                    bitcoin_electrum_rpc_url: Some(bitcoin_electrum_rpc_url),
+                    bitcoin_target_block: Some(bitcoin_target_block),
+                    ..Default::default()
+                },
+                cmd: Command::Cancel,
             }
         }
         RawCommand::Refund {
@@ -226,120 +261,93 @@ where
             let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
                 bitcoin.apply_defaults(is_testnet)?;
 
-            Arguments {
-                env_config: env_config_from(is_testnet),
-                debug,
-                json,
-                data_dir: data::data_dir_from(data, is_testnet)?,
-                cmd: Command::Refund {
-                    swap_id,
-                    bitcoin_electrum_rpc_url,
-                    bitcoin_target_block,
+            InternalApi {
+                opts: Options {
+                    env_config: env_config_from(is_testnet),
+                    debug,
+                    json,
+                    data_dir: data::data_dir_from(data, is_testnet)?,
                 },
+                params: Params {
+                    swap_id: Some(swap_id),
+                    bitcoin_electrum_rpc_url: Some(bitcoin_electrum_rpc_url),
+                    bitcoin_target_block: Some(bitcoin_target_block),
+                    ..Default::default()
+                },
+                cmd: Command::Refund,
+
             }
         }
         RawCommand::ListSellers {
             rendezvous_point,
             tor: Tor { tor_socks5_port },
-        } => Arguments {
-            env_config: env_config_from(is_testnet),
-            debug,
-            json,
-            data_dir: data::data_dir_from(data, is_testnet)?,
-            cmd: Command::ListSellers {
-                rendezvous_point,
-                tor_socks5_port,
-                namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
+        } => InternalApi {
+            opts: Options {
+                env_config: env_config_from(is_testnet),
+                debug,
+                json,
+                data_dir: data::data_dir_from(data, is_testnet)?,
             },
+            params: Params {
+                rendezvous_point: Some(rendezvous_point),
+                tor_socks5_port: Some(tor_socks5_port),
+                namespace: Some(XmrBtcNamespace::from_is_testnet(is_testnet)),
+                ..Default::default()
+            },
+            cmd: Command::ListSellers,
         },
         RawCommand::ExportBitcoinWallet { bitcoin } => {
             let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
                 bitcoin.apply_defaults(is_testnet)?;
 
-            Arguments {
+            InternalApi {
+                opts: Options {
+                    env_config: env_config_from(is_testnet),
+                    debug,
+                    json,
+                    data_dir: data::data_dir_from(data, is_testnet)?,
+                },
+                params: Params {
+                    bitcoin_target_block: Some(bitcoin_target_block),
+                    bitcoin_electrum_rpc_url: Some(bitcoin_electrum_rpc_url),
+                    ..Default::default()
+                },
+                cmd: Command::ExportBitcoinWallet,
+            }
+        },
+        RawCommand::MoneroRecovery { swap_id } => InternalApi {
+            opts: Options {
                 env_config: env_config_from(is_testnet),
                 debug,
                 json,
                 data_dir: data::data_dir_from(data, is_testnet)?,
-                cmd: Command::ExportBitcoinWallet {
-                    bitcoin_electrum_rpc_url,
-                    bitcoin_target_block,
-                },
-            }
-        },
-        RawCommand::MoneroRecovery { swap_id } => Arguments {
-            env_config: env_config_from(is_testnet),
-            debug,
-            json,
-            data_dir: data::data_dir_from(data, is_testnet)?,
-            cmd: Command::MoneroRecovery {
-                swap_id: swap_id.swap_id,
             },
+            params: Params {
+                swap_id: Some(swap_id.swap_id),
+                ..Default::default()
+            },
+            cmd: Command::MoneroRecovery,
         },
     };
 
-    Ok(ParseResult::Arguments(Box::new(arguments)))
+    Ok(ParseResult::InternalApi(Box::new(api)))
 }
-
 #[derive(Debug, PartialEq)]
 pub enum Command {
-    BuyXmr {
-        seller: Multiaddr,
-        bitcoin_electrum_rpc_url: Url,
-        bitcoin_target_block: usize,
-        bitcoin_change_address: bitcoin::Address,
-        monero_receive_address: monero::Address,
-        monero_daemon_address: String,
-        tor_socks5_port: u16,
-        namespace: XmrBtcNamespace,
-    },
+    BuyXmr,
     History,
     Config,
-    WithdrawBtc {
-        bitcoin_electrum_rpc_url: Url,
-        bitcoin_target_block: usize,
-        amount: Option<Amount>,
-        address: Address,
-    },
-    Balance {
-        bitcoin_electrum_rpc_url: Url,
-        bitcoin_target_block: usize,
-    },
-    StartDaemon {
-        server_address: SocketAddr,
-
-    },
-    Resume {
-        swap_id: Uuid,
-        bitcoin_electrum_rpc_url: Url,
-        bitcoin_target_block: usize,
-        monero_daemon_address: String,
-        tor_socks5_port: u16,
-        namespace: XmrBtcNamespace,
-    },
-    Cancel {
-        swap_id: Uuid,
-        bitcoin_electrum_rpc_url: Url,
-        bitcoin_target_block: usize,
-    },
-    Refund {
-        swap_id: Uuid,
-        bitcoin_electrum_rpc_url: Url,
-        bitcoin_target_block: usize,
-    },
-    ListSellers {
-        rendezvous_point: Multiaddr,
-        namespace: XmrBtcNamespace,
-        tor_socks5_port: u16,
-    },
-    ExportBitcoinWallet {
-        bitcoin_electrum_rpc_url: Url,
-        bitcoin_target_block: usize,
-    },
-    MoneroRecovery {
-        swap_id: Uuid,
-    },
+    WithdrawBtc,
+    Balance,
+    Resume,
+    Cancel,
+    Refund,
+    ListSellers,
+    ExportBitcoinWallet,
+    MoneroRecovery,
+    StartDaemon,
 }
+
 
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(
