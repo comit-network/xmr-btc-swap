@@ -1,5 +1,5 @@
 use jsonrpsee::http_server::{RpcModule};
-use crate::api::{InternalApi, Params};
+use crate::api::{Request, Params};
 use crate::env::{Config, GetConfig, Testnet};
 use crate::fs::system_data_dir;
 use url::Url;
@@ -21,22 +21,22 @@ pub fn register_modules() -> RpcModule<()> {
 }
 
 async fn get_bitcoin_balance() -> anyhow::Result<(), Error> {
-    let api = InternalApi {
-        opts: Options {
-            env_config: Testnet::get_config(),
-            debug: false,
-            json: true,
-            data_dir: system_data_dir().unwrap().join("cli")
-
-        },
-        params: Params {
-            bitcoin_electrum_rpc_url: Some(Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET).unwrap()),
-            bitcoin_target_block: Some(DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET),
-            ..Default::default()
-        },
-        cmd: Command::Balance,
-    };
-    api.call().await;
+//    let api = InternalApi {
+//        opts: Options {
+//            env_config: Testnet::get_config(),
+//            debug: false,
+//            json: true,
+//            data_dir: system_data_dir().unwrap().join("cli")
+//
+//        },
+//        params: Params {
+//            bitcoin_electrum_rpc_url: Some(Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET).unwrap()),
+//            bitcoin_target_block: Some(DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET),
+//            ..Default::default()
+//        },
+//        cmd: Command::Balance,
+//    };
+//    api.call().await;
     Ok(())
 
 }

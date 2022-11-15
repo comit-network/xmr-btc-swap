@@ -3,6 +3,7 @@ use comfy_table::Table;
 use jsonrpsee::http_server::{HttpServerHandle};
 use qrcode::render::unicode;
 use qrcode::QrCode;
+use crate::env::GetConfig;
 use std::cmp::min;
 use crate::network::rendezvous::XmrBtcNamespace;
 use std::net::SocketAddr;
@@ -15,11 +16,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use crate::bitcoin::TxLock;
-use crate::cli::command::{parse_args_and_apply_defaults, Command, ParseResult, Options};
+use crate::cli::command::{parse_args_and_apply_defaults, Command, ParseResult, Options, Bitcoin, Monero, Tor};
 use crate::cli::{list_sellers, EventLoop, SellerStatus};
 use crate::common::check_latest_version;
 use crate::database::open_db;
-use crate::env::Config;
 use crate::libp2p_ext::MultiAddrExt;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
 use crate::network::swarm;
@@ -30,86 +30,49 @@ use crate::rpc;
 use crate::{bitcoin, cli, monero};
 use url::Url;
 use uuid::Uuid;
+use crate::protocol::Database;
+use crate::env::{Config, Mainnet, Testnet};
+use crate::fs::system_data_dir;
 
-#[derive(Debug, PartialEq)]
-pub struct InternalApi {
-    pub opts: Options,
+pub struct Request {
     pub params: Params,
     pub cmd: Command,
 }
 
-#[derive(Debug, PartialEq, Default)]
+#[derive(Default)]
 pub struct Params {
-    pub bitcoin_electrum_rpc_url: Option<Url>,
-    pub bitcoin_target_block: Option<usize>,
     pub seller: Option<Multiaddr>,
     pub bitcoin_change_address: Option<bitcoin::Address>,
     pub monero_receive_address: Option<monero::Address>,
-    pub monero_daemon_address: Option<String>,
-    pub tor_socks5_port: Option<u16>,
-    pub namespace: Option<XmrBtcNamespace>,
     pub rendezvous_point: Option<Multiaddr>,
     pub swap_id: Option<Uuid>,
-    pub server_address: Option<SocketAddr>,
     pub amount: Option<Amount>,
     pub address: Option<bitcoin::Address>,
 }
 
-impl InternalApi {
-    pub async fn call(self) -> Result<()> {
-        let opts = &self.opts;
-        let params = self.params;
+pub struct Init {
+    db: Arc<dyn Database + Send + Sync>,
+    bitcoin_wallet: Option<bitcoin::Wallet>,
+    monero_wallet: Option<(monero::Wallet, monero::WalletRpcProcess)>,
+    tor_socks5_port: Option<u16>,
+    namespace: XmrBtcNamespace,
+    server_handle: Option<HttpServerHandle>,
+    debug: bool,
+    json: bool,
+    is_testnet: bool,
+}
+
+impl Request {
+    pub async fn call(&self, api_init: &Init) -> Result<()> {
         match self.cmd {
             Command::BuyXmr => { }
             Command::History => {
-                cli::tracing::init(opts.debug, opts.json, opts.data_dir.join("logs"), None)?;
-
-                let db = open_db(opts.data_dir.join("sqlite")).await?;
-                let swaps = db.all().await?;
-
-                if opts.json {
-                    for (swap_id, state) in swaps {
-                        let state: BobState = state.try_into()?;
-                        tracing::info!(swap_id=%swap_id.to_string(), state=%state.to_string(), "Read swap state from database");
-                    }
-                } else {
-                    let mut table = Table::new();
-
-                    table.set_header(vec!["SWAP ID", "STATE"]);
-
-                    for (swap_id, state) in swaps {
-                        let state: BobState = state.try_into()?;
-                        table.add_row(vec![swap_id.to_string(), state.to_string()]);
-                    }
-
-                    println!("{}", table);
-                }
             }
             Command::Config => { }
             Command::WithdrawBtc => { }
             Command::StartDaemon => {
-                let handle = rpc::run_server(params.server_address.unwrap()).await?;
-                loop {}
             }
             Command::Balance => {
-                cli::tracing::init(opts.debug, opts.json, opts.data_dir.join("logs"), None)?;
-
-                let seed = Seed::from_file_or_generate(opts.data_dir.as_path())
-                    .context("Failed to read in seed file")?;
-                let bitcoin_wallet = init_bitcoin_wallet(
-                    params.bitcoin_electrum_rpc_url.unwrap(),
-                    &seed,
-                    opts.data_dir.clone(),
-                    opts.env_config,
-                    params.bitcoin_target_block.unwrap(),
-                )
-                .await?;
-
-                let bitcoin_balance = bitcoin_wallet.balance().await?;
-                tracing::info!(
-                    balance = %bitcoin_balance,
-                    "Checked Bitcoin balance",
-                );
             }
             Command::Resume => { }
             Command::Cancel => { }
@@ -120,6 +83,155 @@ impl InternalApi {
         }
         Ok(())
     }
+}
+impl Init {
+    //pub async fn build_server(bitcoin_electrum_rpc_url: Url, bitcoin_target_block: usize, monero_daemon_address: String, tor_socks5_port: u16, namespace: XmrBtcNamespace, server_address: SocketAddr, data_dir: PathBuf, env_config: Config) -> Result<Init> {
+    pub async fn build(
+        bitcoin: Bitcoin,
+        monero: Monero, 
+        tor: Option<Tor>, 
+        data: Option<PathBuf>, 
+        is_testnet: bool,
+        debug: bool,
+        json: bool,
+        server_address: Option<SocketAddr>,
+        ) -> Result<Init> {
+            let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
+                bitcoin.apply_defaults(is_testnet)?;
+
+            let monero_daemon_address = monero.apply_defaults(is_testnet);
+
+
+            let data_dir = data::data_dir_from(data, is_testnet)?;
+            let env_config = env_config_from(is_testnet);
+
+            let seed = Seed::from_file_or_generate(data_dir.as_path())
+                .context("Failed to read seed in file")?;
+
+            let server_handle = {
+                if let Some(addr) = server_address {
+                    let (_addr, handle) = rpc::run_server(addr).await?;
+                    Some(handle)
+                } else {
+                    None
+                }
+            };
+
+            let tor_socks5_port = {
+                if let Some(tor) = tor {
+                    Some(tor.tor_socks5_port)
+                } else {
+                    None
+                }
+            };
+
+            let init = Init {
+                bitcoin_wallet: Some(init_bitcoin_wallet(
+                    bitcoin_electrum_rpc_url,
+                    &seed,
+                    data_dir.clone(),
+                    env_config,
+                    bitcoin_target_block,
+                )
+                .await?),
+
+                monero_wallet: Some(init_monero_wallet(
+                    data_dir.clone(),
+                    monero_daemon_address,
+                    env_config,
+                )
+                .await?),
+                tor_socks5_port: tor_socks5_port,
+                namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
+                db: open_db(data_dir.join("sqlite")).await?,
+                debug,
+                json,
+                is_testnet,
+                server_handle,
+            };
+            
+
+            Ok(init)
+        }
+
+    pub async fn build_walletless(
+        tor: Option<Tor>,
+        data: Option<PathBuf>,
+        is_testnet: bool,
+        debug: bool,
+        json: bool,
+        ) -> Result<Init> {
+            let data_dir = data::data_dir_from(data, is_testnet)?;
+            let env_config = env_config_from(is_testnet);
+
+            let tor_socks5_port = {
+                if let Some(tor) = tor {
+                    Some(tor.tor_socks5_port)
+                } else {
+                    None
+                }
+            };
+
+            let init = Init {
+                bitcoin_wallet: None,
+                monero_wallet: None,
+                tor_socks5_port, 
+                namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
+                db: open_db(data_dir.join("sqlite")).await?,
+                debug,
+                json,
+                is_testnet,
+                server_handle: None,
+            };
+            Ok(init)
+    }
+
+    pub async fn build_with_btc(
+        bitcoin: Bitcoin,
+        tor: Option<Tor>,
+        data: Option<PathBuf>,
+        is_testnet: bool,
+        debug: bool,
+        json: bool,
+        ) -> Result<Init> {
+            let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
+                bitcoin.apply_defaults(is_testnet)?;
+
+            let data_dir = data::data_dir_from(data, is_testnet)?;
+            let env_config = env_config_from(is_testnet);
+
+            let seed = Seed::from_file_or_generate(data_dir.as_path())
+                .context("Failed to read seed in file")?;
+
+            let tor_socks5_port = {
+                if let Some(tor) = tor {
+                    Some(tor.tor_socks5_port)
+                } else {
+                    None
+                }
+            };
+
+            let init = Init {
+                bitcoin_wallet: Some(init_bitcoin_wallet(
+                    bitcoin_electrum_rpc_url,
+                    &seed,
+                    data_dir.clone(),
+                    env_config,
+                    bitcoin_target_block,
+                )
+                .await?),
+                monero_wallet: None,
+                tor_socks5_port, 
+                namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
+                db: open_db(data_dir.join("sqlite")).await?,
+                debug,
+                json,
+                is_testnet,
+                server_handle: None,
+            };
+            Ok(init)
+    }
+
 }
 
 async fn init_bitcoin_wallet(
@@ -271,4 +383,31 @@ async fn init_monero_wallet(
     .await?;
 
     Ok((monero_wallet, monero_wallet_rpc_process))
+}
+
+mod data {
+    use super::*;
+
+    pub fn data_dir_from(arg_dir: Option<PathBuf>, testnet: bool) -> Result<PathBuf> {
+        let base_dir = match arg_dir {
+            Some(custom_base_dir) => custom_base_dir,
+            None => os_default()?,
+        };
+
+        let sub_directory = if testnet { "testnet" } else { "mainnet" };
+
+        Ok(base_dir.join(sub_directory))
+    }
+
+    fn os_default() -> Result<PathBuf> {
+        Ok(system_data_dir()?.join("cli"))
+    }
+}
+
+fn env_config_from(testnet: bool) -> Config {
+    if testnet {
+        Testnet::get_config()
+    } else {
+        Mainnet::get_config()
+    }
 }
