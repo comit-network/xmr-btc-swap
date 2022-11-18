@@ -45,15 +45,27 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.2.0
 
-      - name: Install compiler for armhf arch
-        if: matrix.target == 'armv7-unknown-linux-gnueabihf'
-        run: |
-          sudo apt-get update
-          sudo apt-get install gcc-arm-linux-gnueabihf
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          target: armv7-unknown-linux-gnueabihf
+          override: true
 
       - name: Build binary
-        run: |
-          cargo build -p swap --target ${{ matrix.target }}
+        if: matrix.target != 'armv7-unknown-linux-gnueabihf'
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: -p swap --target ${{ matrix.target }}
+
+      - name: Build binary (armv7)
+        if: matrix.target == 'armv7-unknown-linux-gnueabihf'
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: -p swap --target ${{ matrix.target }}
+          use-cross: true
 
       - name: Upload swap binary
         uses: actions/upload-artifact@v2-preview
