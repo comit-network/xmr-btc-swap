@@ -19,18 +19,19 @@ use swap::common::check_latest_version;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-//    let api = match parse_args_and_apply_defaults(env::args_os()).await? {
-//        ParseResult::InternalApi(api) => *api,
-//        ParseResult::PrintAndExitZero { message } => {
-//            println!("{}", message);
-//            std::process::exit(0);
-//        }
-//    };
+    let (api_init, request) = match parse_args_and_apply_defaults(env::args_os()).await? {
+        ParseResult::Init(api_init, request) => (api_init, request),
+        ParseResult::PrintAndExitZero { message } => {
+            println!("{}", message);
+            std::process::exit(0);
+        }
+    };
 
     if let Err(e) = check_latest_version(env!("CARGO_PKG_VERSION")).await {
         eprintln!("{}", e);
     }
-    //api.call().await?;
+    let result = request.call(&api_init).await?;
+    println!("{}", result);
     Ok(())
 }
 

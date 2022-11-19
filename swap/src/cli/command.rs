@@ -143,7 +143,7 @@ where
             ).await?;
             let request = Request {
                 params: Params::default(),
-                cmd: Command::Config,
+                cmd: Command::Balance,
             };
             (init, request)
         }

@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use jsonrpsee::http_server::{RpcModule, HttpServerBuilder, HttpServerHandle};
 use thiserror::Error;
+use crate::api::{Init};
 
 pub mod methods;
 
@@ -10,11 +11,11 @@ pub enum Error {
     ExampleError,
 }
 
-pub async fn run_server(server_address: SocketAddr) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
+pub async fn run_server(server_address: SocketAddr, api_init: &Init) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
 	let server = HttpServerBuilder::default().build(server_address).await?;
     let mut modules = RpcModule::new(());
     {
-        modules.merge(methods::register_modules())
+        modules.merge(methods::register_modules(&api_init))
             .unwrap()
     }
 

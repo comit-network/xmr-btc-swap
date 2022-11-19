@@ -33,6 +33,10 @@ use uuid::Uuid;
 use crate::protocol::Database;
 use crate::env::{Config, Mainnet, Testnet};
 use crate::fs::system_data_dir;
+use serde_json::json;
+use std::str::FromStr;
+use tokio::task;
+
 
 pub struct Request {
     pub params: Params,
@@ -52,36 +56,128 @@ pub struct Params {
 
 pub struct Init {
     db: Arc<dyn Database + Send + Sync>,
-    bitcoin_wallet: Option<bitcoin::Wallet>,
-    monero_wallet: Option<(monero::Wallet, monero::WalletRpcProcess)>,
+    pub bitcoin_wallet: Option<bitcoin::Wallet>,
+    monero_wallet: Option<monero::Wallet>,
     tor_socks5_port: Option<u16>,
     namespace: XmrBtcNamespace,
-    server_handle: Option<HttpServerHandle>,
-    debug: bool,
-    json: bool,
-    is_testnet: bool,
+    //server_handle: Option<task::JoinHandle<()>>,
+    server_address: Option<SocketAddr>,
+    pub seed: Option<Seed>,
+    pub debug: bool,
+    pub json: bool,
+    pub is_testnet: bool,
 }
 
 impl Request {
-    pub async fn call(&self, api_init: &Init) -> Result<()> {
-        match self.cmd {
-            Command::BuyXmr => { }
-            Command::History => {
+    pub async fn call(&self, api_init: &Init) -> Result<serde_json::Value> {
+        let result = match self.cmd {
+            Command::BuyXmr => {
+                json!({
+                    "empty": "true"
+                })
             }
-            Command::Config => { }
-            Command::WithdrawBtc => { }
+            Command::History => {
+                let swaps = api_init.db.all().await?;
+                let mut vec: Vec<(Uuid, String)> = Vec::new();
+                for (swap_id, state) in swaps {
+                    let state: BobState = state.try_into()?;
+                    vec.push((swap_id, state.to_string()));
+                }
+                json!({
+                    "swaps": vec
+                })
+
+            }
+            Command::Config => {
+                json!({
+                    "empty": "true"
+                })
+            }
+            Command::WithdrawBtc => {
+                json!({
+                    "empty": "true"
+                })
+            }
             Command::StartDaemon => {
+                let addr2 = "127.0.0.1:1234".parse()?;
+
+                let server_handle = {
+                    if let Some(addr) = api_init.server_address {
+                        let (_addr, handle) = rpc::run_server(addr, api_init).await?;
+                        Some(handle)
+                    } else {
+                        let (_addr, handle) = rpc::run_server(addr2, api_init).await?;
+                        Some(handle)
+                    }
+                };
+                json!({
+                    "empty": "true"
+                })
             }
             Command::Balance => {
+                let debug = api_init.debug;
+                let json = api_init.json;
+                let is_testnet = api_init.is_testnet;
+
+                let bitcoin_balance = api_init.bitcoin_wallet
+                    .as_ref().unwrap().balance().await?;
+                tracing::info!(
+                    balance = %bitcoin_balance,
+                    "Checked Bitcoin balance",
+                );
+                json!({
+                    "balance": bitcoin_balance.as_sat()
+                })
             }
-            Command::Resume => { }
-            Command::Cancel => { }
-            Command::Refund => { }
-            Command::ListSellers => { }
-            Command::ExportBitcoinWallet => { }
-            Command::MoneroRecovery => { }
-        }
-        Ok(())
+            Command::Resume => {
+                json!({
+                    "empty": "true"
+                })
+            }
+            Command::Cancel => {
+                json!({
+                    "empty": "true"
+                })
+            }
+            Command::Refund => {
+                json!({
+                    "empty": "true"
+                })
+            }
+            Command::ListSellers => {
+                let rendezvous_point = self.params.rendezvous_point.clone().unwrap();
+                let rendezvous_node_peer_id = rendezvous_point
+                    .extract_peer_id()
+                    .context("Rendezvous node address must contain peer ID")?;
+
+                let identity = api_init.seed.as_ref().unwrap().derive_libp2p_identity();
+
+                let sellers = list_sellers(
+                    rendezvous_node_peer_id,
+                    rendezvous_point,
+                    api_init.namespace,
+                    api_init.tor_socks5_port.unwrap(),
+                    identity,
+                )
+                .await?;
+
+
+                json!({
+                    "empty": "true"
+                })
+            }
+            Command::ExportBitcoinWallet => {
+                json!({
+                    "empty": "true"
+                })
+            }
+            Command::MoneroRecovery => {
+                json!({
+                    "empty": "true"
+                })
+            }
+        };
+        Ok(result)
     }
 }
 impl Init {
@@ -108,14 +204,7 @@ impl Init {
             let seed = Seed::from_file_or_generate(data_dir.as_path())
                 .context("Failed to read seed in file")?;
 
-            let server_handle = {
-                if let Some(addr) = server_address {
-                    let (_addr, handle) = rpc::run_server(addr).await?;
-                    Some(handle)
-                } else {
-                    None
-                }
-            };
+
 
             let tor_socks5_port = {
                 if let Some(tor) = tor {
@@ -124,6 +213,8 @@ impl Init {
                     None
                 }
             };
+
+            cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
 
             let init = Init {
                 bitcoin_wallet: Some(init_bitcoin_wallet(
@@ -140,14 +231,15 @@ impl Init {
                     monero_daemon_address,
                     env_config,
                 )
-                .await?),
+                .await?.0),
                 tor_socks5_port: tor_socks5_port,
                 namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
                 db: open_db(data_dir.join("sqlite")).await?,
+                seed: Some(seed),
                 debug,
                 json,
                 is_testnet,
-                server_handle,
+                server_address,
             };
             
 
@@ -171,6 +263,7 @@ impl Init {
                     None
                 }
             };
+            cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
 
             let init = Init {
                 bitcoin_wallet: None,
@@ -178,10 +271,11 @@ impl Init {
                 tor_socks5_port, 
                 namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
                 db: open_db(data_dir.join("sqlite")).await?,
+                seed: None,
                 debug,
                 json,
                 is_testnet,
-                server_handle: None,
+                server_address: None,
             };
             Ok(init)
     }
@@ -211,6 +305,8 @@ impl Init {
                 }
             };
 
+            cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
+
             let init = Init {
                 bitcoin_wallet: Some(init_bitcoin_wallet(
                     bitcoin_electrum_rpc_url,
@@ -224,13 +320,15 @@ impl Init {
                 tor_socks5_port, 
                 namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
                 db: open_db(data_dir.join("sqlite")).await?,
+                seed: Some(seed),
                 debug,
                 json,
                 is_testnet,
-                server_handle: None,
+                server_address: None,
             };
             Ok(init)
     }
+
 
 }
 
