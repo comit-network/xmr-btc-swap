@@ -15,9 +15,9 @@ async-trait = "0.1"
 atty = "0.2"
 backoff = { version = "0.4", features = [ "tokio" ] }
 base64 = "0.13"
-bdk = "0.23"
+bdk = "0.24"
 big-bytes = "1"
-bitcoin = { version = "0.28", features = [ "rand", "use-serde" ] }
+bitcoin = { version = "0.29", features = [ "rand", "serde" ] }
 bmrng = "0.5"
 comfy-table = "6.1"
 config = { version = "0.11", default-features = false, features = [ "toml" ] }
@@ -74,7 +74,7 @@ tokio-tar = "0.3"
 zip = "0.5"
 
 [dev-dependencies]
-bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "bff9a64b5cd75dec2ce807cbfade7b98c2e1e0d4" } # waiting on crates.io release
+bitcoin-harness = "0.2.2"
 get-port = "3"
 hyper = "0.14"
 monero-harness = { path = "../monero-harness" }

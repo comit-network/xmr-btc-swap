@@ -26,6 +26,20 @@ jobs:
       - name: Run clippy with all features enabled
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
+  bdk_test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3.1.0
+
+      - uses: Swatinem/rust-cache@v2.0.2
+
+      - name: Build swap
+        run: cargo build --bin swap
+
+      - name: Run BDK regression script
+        run: ./swap/tests/bdk.sh
+
   build:
     strategy:
       matrix:
@@ -56,13 +70,13 @@ jobs:
           cargo build -p swap --target ${{ matrix.target }}
 
       - name: Upload swap binary
-        uses: actions/upload-artifact@v2-preview
+        uses: actions/upload-artifact@v3
         with:
           name: swap-${{ matrix.target }}
           path: target/${{ matrix.target }}/debug/swap
 
       - name: Upload asb binary
-        uses: actions/upload-artifact@v2-preview
+        uses: actions/upload-artifact@v3
         with:
           name: asb-${{ matrix.target }}
           path: target/${{ matrix.target }}/debug/asb

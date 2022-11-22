@@ -56,7 +56,7 @@ where
     monero.init_miner().await.unwrap();
 
     let btc_amount = bitcoin::Amount::from_sat(1_000_000);
-    let xmr_amount = monero::Amount::from_monero(btc_amount.as_btc() / FixedRate::RATE).unwrap();
+    let xmr_amount = monero::Amount::from_monero(btc_amount.to_btc() / FixedRate::RATE).unwrap();
 
     let alice_starting_balances =
         StartingBalances::new(bitcoin::Amount::ZERO, xmr_amount, Some(10));

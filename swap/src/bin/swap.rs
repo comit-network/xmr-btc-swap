@@ -523,12 +523,12 @@ async fn init_bitcoin_wallet(
     env_config: Config,
     bitcoin_target_block: usize,
 ) -> Result<bitcoin::Wallet> {
-    let wallet_dir = data_dir.join("wallet");
+    let xprivkey = seed.derive_extended_private_key(env_config.bitcoin_network)?;
 
     let wallet = bitcoin::Wallet::new(
         electrum_rpc_url.clone(),
-        &wallet_dir,
-        seed.derive_extended_private_key(env_config.bitcoin_network)?,
+        data_dir,
+        xprivkey,
         env_config,
         bitcoin_target_block,
     )
