@@ -16,6 +16,7 @@ use anyhow::Result;
 use std::env;
 use swap::cli::command::{parse_args_and_apply_defaults, ParseResult};
 use swap::common::check_latest_version;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -30,7 +31,7 @@ async fn main() -> Result<()> {
     if let Err(e) = check_latest_version(env!("CARGO_PKG_VERSION")).await {
         eprintln!("{}", e);
     }
-    let result = request.call(&api_init).await?;
+    let result = request.call(Arc::clone(&api_init)).await?;
     println!("{}", result);
     Ok(())
 }

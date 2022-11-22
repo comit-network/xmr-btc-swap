@@ -36,6 +36,7 @@ use crate::fs::system_data_dir;
 use serde_json::json;
 use std::str::FromStr;
 use tokio::task;
+use serde::ser::{Serialize, Serializer, SerializeStruct};
 
 
 pub struct Request {
@@ -56,8 +57,8 @@ pub struct Params {
 
 pub struct Init {
     db: Arc<dyn Database + Send + Sync>,
-    pub bitcoin_wallet: Option<bitcoin::Wallet>,
-    monero_wallet: Option<monero::Wallet>,
+    pub bitcoin_wallet: Option<Arc<bitcoin::Wallet>>,
+    monero_wallet: Option<Arc<monero::Wallet>>,
     tor_socks5_port: Option<u16>,
     namespace: XmrBtcNamespace,
     //server_handle: Option<task::JoinHandle<()>>,
@@ -69,9 +70,91 @@ pub struct Init {
 }
 
 impl Request {
-    pub async fn call(&self, api_init: &Init) -> Result<serde_json::Value> {
+    pub async fn call(&self, api_init: Arc<Init>) -> Result<serde_json::Value> {
         let result = match self.cmd {
             Command::BuyXmr => {
+                let swap_id = Uuid::new_v4();
+
+                let seed = api_init.seed.as_ref().unwrap();
+                let env_config = env_config_from(api_init.is_testnet);
+                let btc = api_init.bitcoin_wallet.as_ref().unwrap();
+                let seller = self.params.seller.clone().unwrap();
+                let monero_receive_address = self.params.monero_receive_address.unwrap();
+                let bitcoin_change_address = self.params.bitcoin_change_address.clone().unwrap();
+
+                let bitcoin_wallet = btc;
+                let seller_peer_id = self.params.seller.as_ref().unwrap()
+                    .extract_peer_id()
+                    .context("Seller address must contain peer ID")?;
+                api_init.db.insert_address(seller_peer_id, seller.clone()).await?;
+
+                let behaviour = cli::Behaviour::new(
+                    seller_peer_id,
+                    env_config_from(api_init.is_testnet),
+                    bitcoin_wallet.clone(),
+                    (seed.derive_libp2p_identity(), api_init.namespace),
+                );
+                let mut swarm =
+                    swarm::cli(seed.derive_libp2p_identity(), api_init.tor_socks5_port.unwrap(), behaviour).await?;
+                swarm.behaviour_mut().add_address(seller_peer_id, seller);
+
+                tracing::debug!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
+
+                let (event_loop, mut event_loop_handle) =
+                    EventLoop::new(swap_id, swarm, seller_peer_id)?;
+                let event_loop = tokio::spawn(event_loop.run());
+
+                let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
+                let estimate_fee = |amount| bitcoin_wallet.estimate_fee(TxLock::weight(), amount);
+
+                let (amount, fees) = match determine_btc_to_swap(
+                    api_init.json,
+                    event_loop_handle.request_quote(),
+                    bitcoin_wallet.new_address(),
+                    || bitcoin_wallet.balance(),
+                    max_givable,
+                    || bitcoin_wallet.sync(),
+                    estimate_fee,
+                )
+                .await
+                {
+                    Ok(val) => val,
+                    Err(error) => match error.downcast::<ZeroQuoteReceived>() {
+                        Ok(_) => {
+                            bail!("Seller's XMR balance is currently too low to initiate a swap, please try again later")
+                        }
+                        Err(other) => bail!(other),
+                    },
+                };
+
+                tracing::info!(%amount, %fees,  "Determined swap amount");
+
+                api_init.db.insert_peer_id(swap_id, seller_peer_id).await?;
+                api_init.db.insert_monero_address(swap_id, monero_receive_address)
+                    .await?;
+                let monero_wallet = api_init.monero_wallet.as_ref().unwrap();
+
+                let swap = Swap::new(
+                    Arc::clone(&api_init.db),
+                    swap_id,
+                    Arc::clone(&bitcoin_wallet),
+                    Arc::clone(&monero_wallet),
+                    env_config,
+                    event_loop_handle,
+                    monero_receive_address,
+                    bitcoin_change_address,
+                    amount,
+                );
+
+                tokio::select! {
+                    result = event_loop => {
+                        result
+                            .context("EventLoop panicked")?;
+                    },
+                    result = bob::run(swap) => {
+                        result.context("Failed to complete swap")?;
+                    }
+                }
                 json!({
                     "empty": "true"
                 })
@@ -110,6 +193,9 @@ impl Request {
                         Some(handle)
                     }
                 };
+                loop {
+
+                }
                 json!({
                     "empty": "true"
                 })
@@ -217,21 +303,21 @@ impl Init {
             cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
 
             let init = Init {
-                bitcoin_wallet: Some(init_bitcoin_wallet(
+                bitcoin_wallet: Some(Arc::new(init_bitcoin_wallet(
                     bitcoin_electrum_rpc_url,
                     &seed,
                     data_dir.clone(),
                     env_config,
                     bitcoin_target_block,
                 )
-                .await?),
+                .await?)),
 
-                monero_wallet: Some(init_monero_wallet(
+                monero_wallet: Some(Arc::new(init_monero_wallet(
                     data_dir.clone(),
                     monero_daemon_address,
                     env_config,
                 )
-                .await?.0),
+                .await?.0)),
                 tor_socks5_port: tor_socks5_port,
                 namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
                 db: open_db(data_dir.join("sqlite")).await?,
@@ -308,14 +394,14 @@ impl Init {
             cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
 
             let init = Init {
-                bitcoin_wallet: Some(init_bitcoin_wallet(
+                bitcoin_wallet: Some(Arc::new(init_bitcoin_wallet(
                     bitcoin_electrum_rpc_url,
                     &seed,
                     data_dir.clone(),
                     env_config,
                     bitcoin_target_block,
                 )
-                .await?),
+                .await?)),
                 monero_wallet: None,
                 tor_socks5_port, 
                 namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
@@ -328,8 +414,19 @@ impl Init {
             };
             Ok(init)
     }
+}
 
-
+impl Serialize for Init {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // 3 is the number of fields in the struct.
+        let mut state = serializer.serialize_struct("Init", 3)?;
+        state.serialize_field("debug", &self.debug)?;
+        state.serialize_field("json", &self.json)?;
+        state.end()
+    }
 }
 
 async fn init_bitcoin_wallet(
