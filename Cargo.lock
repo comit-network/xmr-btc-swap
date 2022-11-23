@@ -321,7 +321,7 @@ dependencies = [
  "base64-compat",
  "bech32",
  "bitcoin_hashes",
- "secp256k1",
+ "secp256k1 0.22.1",
  "serde",
 ]
 
@@ -980,7 +980,7 @@ checksum = "5caaa75cbd2b960ff1e5392d2cfb1f44717fffe12fc1f32b7b5d1267f99732a6"
 [[package]]
 name = "ecdsa_fun"
 version = "0.7.1"
-source = "git+https://github.com/LLFourn/secp256kfun#7f1ae3db3933e215ae59f115f20c2a4eea23fb29"
+source = "git+https://github.com/LLFourn/secp256kfun#e041ac08117e30170ac418047ecb734652e6b62c"
 dependencies = [
  "bincode",
  "rand_chacha 0.3.1",
@@ -3371,8 +3371,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26947345339603ae8395f68e2f3d85a6b0a8ddfe6315818e80b8504415099db0"
 dependencies = [
  "rand 0.6.5",
- "secp256k1-sys",
+ "secp256k1-sys 0.5.2",
  "serde",
+]
+
+[[package]]
+name = "secp256k1"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff55dc09d460954e9ef2fa8a7ced735a964be9981fd50e870b2b3b0705e14964"
+dependencies = [
+ "secp256k1-sys 0.6.1",
 ]
 
 [[package]]
@@ -3385,13 +3394,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "secp256k1-sys"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83080e2c2fc1006e625be82e5d1eb6a43b7fd9578b617fcc55814daf286bba4b"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "secp256kfun"
 version = "0.7.1"
-source = "git+https://github.com/LLFourn/secp256kfun#7f1ae3db3933e215ae59f115f20c2a4eea23fb29"
+source = "git+https://github.com/LLFourn/secp256kfun#e041ac08117e30170ac418047ecb734652e6b62c"
 dependencies = [
  "digest 0.10.5",
  "rand_core 0.6.2",
- "secp256k1",
+ "secp256k1 0.24.1",
  "serde",
  "subtle-ng",
 ]
@@ -3584,7 +3602,7 @@ dependencies = [
 [[package]]
 name = "sigma_fun"
 version = "0.4.1"
-source = "git+https://github.com/LLFourn/secp256kfun#7f1ae3db3933e215ae59f115f20c2a4eea23fb29"
+source = "git+https://github.com/LLFourn/secp256kfun#e041ac08117e30170ac418047ecb734652e6b62c"
 dependencies = [
  "curve25519-dalek-ng",
  "digest 0.10.5",
