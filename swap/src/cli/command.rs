@@ -1,10 +1,7 @@
 use crate::bitcoin::Amount;
-use crate::env::GetConfig;
-use crate::fs::system_data_dir;
-use crate::network::rendezvous::XmrBtcNamespace;
 use crate::{env, monero};
-use crate::api::{Request, Params, Init};
-use anyhow::{bail, Context, Result};
+use crate::api::{Request, Params, Context};
+use anyhow::{bail, Context as AnyContext, Result};
 use bitcoin::{Address, AddressType};
 use libp2p::core::Multiaddr;
 use serde::Serialize;
@@ -42,7 +39,7 @@ pub struct Options {
 /// Represents the result of parsing the command-line parameters.
 pub enum ParseResult {
     /// The arguments we were invoked in.
-    Init(Arc<Init>, Box<Request>),
+    Context(Arc<Context>, Box<Request>),
     /// A flag or command was given that does not need further processing other
     /// than printing the provided message.
     ///
@@ -70,7 +67,7 @@ where
     let is_testnet = args.testnet;
     let data = args.data;
 
-    let (init, request) = match args.cmd {
+    let (context, request) = match args.cmd {
         RawCommand::BuyXmr {
             seller: Seller { seller },
             bitcoin,
@@ -79,9 +76,9 @@ where
             monero_receive_address,
             tor,
         } => {
-            let init = Init::build(
-                bitcoin,
-                monero,
+            let context = Context::build(
+                Some(bitcoin),
+                Some(monero),
                 Some(tor),
                 data,
                 is_testnet,
@@ -98,54 +95,62 @@ where
                 },
                 cmd: Command::BuyXmr,
             };
-            (init, request)
+            (context, request)
         }
         RawCommand::History => {
-            let init = Init::build_walletless(
+            let context = Context::build(
+                None,
+                None,
                 None,
                 data,
                 is_testnet,
                 debug,
-                json
+                json,
+                None
             ).await?;
 
             let request = Request {
                 params: Params::default(),
                 cmd: Command::History,
             };
-            (init, request)
+            (context, request)
         },
         RawCommand::Config => {
-            let init = Init::build_walletless(
+            let context = Context::build(
+                None,
+                None,
                 None,
                 data,
                 is_testnet,
                 debug,
-                json
+                json,
+                None
             ).await?;
 
             let request = Request {
                 params: Params::default(),
                 cmd: Command::Config,
             };
-            (init, request)
+            (context, request)
         },
         RawCommand::Balance {
             bitcoin,
         } => {
-            let init = Init::build_with_btc(
-                bitcoin,
+            let context = Context::build(
+                Some(bitcoin),
+                None,
                 None,
                 data,
                 is_testnet,
                 debug,
-                json
+                json,
+                None
             ).await?;
             let request = Request {
                 params: Params::default(),
                 cmd: Command::Balance,
             };
-            (init, request)
+            (context, request)
         }
         RawCommand::StartDaemon {
             server_address,
@@ -153,9 +158,9 @@ where
             monero,
             tor,
         } => {
-            let init = Init::build(
-                bitcoin,
-                monero,
+            let context = Context::build(
+                Some(bitcoin),
+                Some(monero),
                 Some(tor),
                 data,
                 is_testnet,
@@ -167,20 +172,22 @@ where
                 params: Params::default(),
                 cmd: Command::StartDaemon,
             };
-            (init, request)
+            (context, request)
         }
         RawCommand::WithdrawBtc {
             bitcoin,
             amount,
             address,
         } => {
-            let init = Init::build_with_btc(
-                bitcoin,
+            let context = Context::build(
+                Some(bitcoin),
+                None,
                 None,
                 data,
                 is_testnet,
                 debug,
-                json
+                json,
+                None
             ).await?;
             let request = Request {
                 params: Params {
@@ -190,7 +197,7 @@ where
                 },
                 cmd: Command::WithdrawBtc,
             };
-            (init, request)
+            (context, request)
         }
         RawCommand::Resume {
             swap_id: SwapId { swap_id },
@@ -198,9 +205,9 @@ where
             monero,
             tor,
         } => {
-            let init = Init::build(
-                bitcoin,
-                monero,
+            let context = Context::build(
+                Some(bitcoin),
+                Some(monero),
                 Some(tor),
                 data,
                 is_testnet,
@@ -215,19 +222,21 @@ where
                 },
                 cmd: Command::Resume,
             };
-            (init, request)
+            (context, request)
         }
         RawCommand::Cancel {
             swap_id: SwapId { swap_id },
             bitcoin,
         } => {
-            let init = Init::build_with_btc(
-                bitcoin,
+            let context = Context::build(
+                Some(bitcoin),
+                None,
                 None,
                 data,
                 is_testnet,
                 debug,
-                json
+                json,
+                None
             ).await?;
             let request = Request {
                 params: Params {
@@ -236,19 +245,21 @@ where
                 },
                 cmd: Command::Cancel,
             };
-            (init, request)
+            (context, request)
         }
         RawCommand::Refund {
             swap_id: SwapId { swap_id },
             bitcoin,
         } => {
-            let init = Init::build_with_btc(
-                bitcoin,
+            let context = Context::build(
+                Some(bitcoin),
+                None,
                 None,
                 data,
                 is_testnet,
                 debug,
-                json
+                json,
+                None
             ).await?;
             let request = Request {
                 params: Params {
@@ -257,18 +268,21 @@ where
                 },
                 cmd: Command::Refund,
             };
-            (init, request)
+            (context, request)
         }
         RawCommand::ListSellers {
             rendezvous_point,
             tor,
         } => {
-            let init = Init::build_walletless(
+            let context = Context::build(
+                None,
+                None,
                 Some(tor),
                 data,
                 is_testnet,
                 debug,
-                json
+                json,
+                None
             ).await?;
 
             let request = Request {
@@ -278,30 +292,35 @@ where
                 },
                 cmd: Command::ListSellers,
             };
-            (init, request)
+            (context, request)
         }
         RawCommand::ExportBitcoinWallet { bitcoin } => {
-            let init = Init::build_with_btc(
-                bitcoin,
+            let context = Context::build(
+                Some(bitcoin),
+                None,
                 None,
                 data,
                 is_testnet,
                 debug,
-                json
+                json,
+                None
             ).await?;
             let request = Request {
                 params: Params::default(),
                 cmd: Command::ExportBitcoinWallet,
             };
-            (init, request)
+            (context, request)
         },
         RawCommand::MoneroRecovery { swap_id } => {
-            let init = Init::build_walletless(
+            let context = Context::build(
+                None,
+                None,
                 None,
                 data,
                 is_testnet,
                 debug,
-                json
+                json,
+                None
             ).await?;
 
             let request = Request {
@@ -311,11 +330,11 @@ where
                 },
                 cmd: Command::MoneroRecovery,
             };
-            (init, request)
+            (context, request)
         },
     };
 
-    Ok(ParseResult::Init(Arc::new(init), Box::new(request)))
+    Ok(ParseResult::Context(Arc::new(context), Box::new(request)))
 }
 #[derive(Debug, PartialEq)]
 pub enum Command {
@@ -497,7 +516,7 @@ pub struct Monero {
         long = "monero-daemon-address",
         help = "Specify to connect to a monero daemon of your choice: <host>:<port>"
     )]
-    monero_daemon_address: Option<String>,
+    pub monero_daemon_address: Option<String>,
 }
 
 impl Monero {
@@ -1192,28 +1211,7 @@ mod tests {
         assert!(matches!(result, ParseResult::Arguments(_)));
     }
 
-    impl Arguments {
-        pub fn buy_xmr_testnet_defaults() -> Self {
-            Self {
-                env_config: env::Testnet::get_config(),
-                debug: false,
-                json: false,
-                data_dir: data_dir_path_cli().join(TESTNET),
-                cmd: Command::BuyXmr {
-                    seller: Multiaddr::from_str(MULTI_ADDRESS).unwrap(),
-                    bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)
-                        .unwrap(),
-                    bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET,
-                    bitcoin_change_address: BITCOIN_TESTNET_ADDRESS.parse().unwrap(),
-                    monero_receive_address: monero::Address::from_str(MONERO_STAGENET_ADDRESS)
-                        .unwrap(),
-                    monero_daemon_address: DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET.to_string(),
-                    tor_socks5_port: DEFAULT_SOCKS5_PORT,
-                    namespace: XmrBtcNamespace::Testnet,
-                },
-            }
-        }
-
+    impl Context {
         pub fn buy_xmr_mainnet_defaults() -> Self {
             Self {
                 env_config: env::Mainnet::get_config(),

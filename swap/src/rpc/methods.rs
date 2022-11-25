@@ -1,20 +1,15 @@
 use jsonrpsee::http_server::{RpcModule};
-use crate::api::{Request, Init, Params};
-use crate::env::{Config, GetConfig, Testnet};
-use crate::fs::system_data_dir;
-use url::Url;
-use crate::cli::command::{Command, Options};
+use crate::api::{Request, Context, Params};
+use crate::cli::command::{Command};
 use std::str::FromStr;
-use crate::cli::command::{DEFAULT_ELECTRUM_RPC_URL_TESTNET, DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET};
 use crate::rpc::Error;
-use crate::{bitcoin, cli, monero};
+use crate::{bitcoin, monero};
 use std::sync::Arc;
-use serde_json::json;
 use uuid::Uuid;
 use std::collections::HashMap;
 use libp2p::core::Multiaddr;
 
-pub fn register_modules(context: Arc<Init>) -> RpcModule<Arc<Init>> {
+pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
     let mut module = RpcModule::new(context);
     module
         .register_async_method("get_bitcoin_balance", |_, context| async move {
@@ -40,7 +35,7 @@ pub fn register_modules(context: Arc<Init>) -> RpcModule<Arc<Init>> {
         .register_async_method("withdraw_btc", |params, context| async move {
             let map_params: HashMap<String, String> = params.parse()?;
             let amount = if let Some(amount_str) = map_params.get("amount") {
-                Some(::bitcoin::Amount::from_str_in(amount_str, ::bitcoin::Denomination::Bitcoin).map_err(|err| jsonrpsee_core::Error::Custom("Unable to parse amount".to_string()))?)
+                Some(::bitcoin::Amount::from_str_in(amount_str, ::bitcoin::Denomination::Bitcoin).map_err(|_| jsonrpsee_core::Error::Custom("Unable to parse amount".to_string()))?)
             } else {
                 None
             };
@@ -70,7 +65,7 @@ pub fn register_modules(context: Arc<Init>) -> RpcModule<Arc<Init>> {
     module
 }
 
-async fn get_bitcoin_balance(context: &Arc<Arc<Init>>) -> anyhow::Result<serde_json::Value, Error> {
+async fn get_bitcoin_balance(context: &Arc<Context>) -> anyhow::Result<serde_json::Value, Error> {
     let request = Request {
         params: Params::default(),
         cmd: Command::Balance,
@@ -79,7 +74,7 @@ async fn get_bitcoin_balance(context: &Arc<Arc<Init>>) -> anyhow::Result<serde_j
     Ok(balance)
 }
 
-async fn get_history(context: &Arc<Arc<Init>>) -> anyhow::Result<serde_json::Value, Error> {
+async fn get_history(context: &Arc<Context>) -> anyhow::Result<serde_json::Value, Error> {
     let request = Request {
         params: Params::default(),
         cmd: Command::History,
@@ -88,7 +83,7 @@ async fn get_history(context: &Arc<Arc<Init>>) -> anyhow::Result<serde_json::Val
     Ok(history)
 }
 
-async fn resume_swap(swap_id: Uuid, context: &Arc<Arc<Init>>) -> anyhow::Result<serde_json::Value, Error> {
+async fn resume_swap(swap_id: Uuid, context: &Arc<Context>) -> anyhow::Result<serde_json::Value, Error> {
     let request = Request {
         params: Params {
             swap_id: Some(swap_id),
@@ -100,7 +95,7 @@ async fn resume_swap(swap_id: Uuid, context: &Arc<Arc<Init>>) -> anyhow::Result<
     let result = request.call(Arc::clone(context)).await.unwrap();
     Ok(result)
 }
-async fn withdraw_btc(withdraw_address: bitcoin::Address, amount: Option<bitcoin::Amount>, context: &Arc<Arc<Init>>) -> anyhow::Result<serde_json::Value, Error> {
+async fn withdraw_btc(withdraw_address: bitcoin::Address, amount: Option<bitcoin::Amount>, context: &Arc<Context>) -> anyhow::Result<serde_json::Value, Error> {
     let request = Request {
         params: Params {
             amount: amount,
@@ -113,7 +108,7 @@ async fn withdraw_btc(withdraw_address: bitcoin::Address, amount: Option<bitcoin
     Ok(result)
 }
 
-async fn buy_xmr(bitcoin_change_address: bitcoin::Address, monero_receive_address: monero::Address, seller: Multiaddr, context: &Arc<Arc<Init>>) -> anyhow::Result<serde_json::Value, Error> {
+async fn buy_xmr(bitcoin_change_address: bitcoin::Address, monero_receive_address: monero::Address, seller: Multiaddr, context: &Arc<Context>) -> anyhow::Result<serde_json::Value, Error> {
     let request = Request {
         params: Params {
             bitcoin_change_address: Some(bitcoin_change_address),
@@ -127,7 +122,7 @@ async fn buy_xmr(bitcoin_change_address: bitcoin::Address, monero_receive_addres
     Ok(swap)
 }
 
-async fn list_sellers(rendezvous_point: Multiaddr, context: &Arc<Arc<Init>>) -> anyhow::Result<serde_json::Value, Error> {
+async fn list_sellers(rendezvous_point: Multiaddr, context: &Arc<Context>) -> anyhow::Result<serde_json::Value, Error> {
     let request = Request {
         params: Params {
             rendezvous_point: Some(rendezvous_point),

@@ -20,8 +20,8 @@ use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let (api_init, request) = match parse_args_and_apply_defaults(env::args_os()).await? {
-        ParseResult::Init(api_init, request) => (api_init, request),
+    let (context, request) = match parse_args_and_apply_defaults(env::args_os()).await? {
+        ParseResult::Context(context, request) => (context, request),
         ParseResult::PrintAndExitZero { message } => {
             println!("{}", message);
             std::process::exit(0);
@@ -31,7 +31,7 @@ async fn main() -> Result<()> {
     if let Err(e) = check_latest_version(env!("CARGO_PKG_VERSION")).await {
         eprintln!("{}", e);
     }
-    let result = request.call(Arc::clone(&api_init)).await?;
+    let result = request.call(Arc::clone(&context)).await?;
     println!("{}", result);
     Ok(())
 }

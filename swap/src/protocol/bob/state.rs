@@ -21,9 +21,10 @@ use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQProof;
 use std::fmt;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum BobState {
     Started {
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
         btc_amount: bitcoin::Amount,
         change_address: bitcoin::Address,
     },

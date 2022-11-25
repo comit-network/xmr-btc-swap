@@ -9,7 +9,7 @@ use uuid::Uuid;
 pub async fn cancel(
     swap_id: Uuid,
     bitcoin_wallet: Arc<Wallet>,
-    db: Arc<dyn Database>,
+    db: Arc<dyn Database + Send + Sync>,
 ) -> Result<(Txid, BobState)> {
     let state = db.get_state(swap_id).await?.try_into()?;
 
