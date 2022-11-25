@@ -6,12 +6,12 @@ use ::bitcoin::Txid;
 use anyhow::{bail, Context, Result};
 use bdk::blockchain::{Blockchain, ElectrumBlockchain, GetTx};
 use bdk::database::BatchDatabase;
-use bdk::descriptor::Segwitv0;
 use bdk::electrum_client::{ElectrumApi, GetHistoryRes};
-use bdk::keys::DerivableKey;
+use bdk::sled::Tree;
 use bdk::wallet::export::FullyNodedExport;
 use bdk::wallet::AddressIndex;
 use bdk::{FeeRate, KeychainKind, SignOptions, SyncOptions};
+use bitcoin::util::bip32::ExtendedPrivKey;
 use bitcoin::{Network, Script};
 use reqwest::Url;
 use rust_decimal::prelude::*;
@@ -33,7 +33,10 @@ const MAX_RELATIVE_TX_FEE: Decimal = dec!(0.03);
 const MAX_ABSOLUTE_TX_FEE: Decimal = dec!(100_000);
 const DUST_AMOUNT: u64 = 546;
 
-pub struct Wallet<D = bdk::sled::Tree, C = Client> {
+const WALLET: &str = "wallet";
+const WALLET_OLD: &str = "wallet-old";
+
+pub struct Wallet<D = Tree, C = Client> {
     client: Arc<Mutex<C>>,
     wallet: Arc<Mutex<bdk::Wallet<D>>>,
     finality_confirmations: u32,
@@ -44,19 +47,28 @@ pub struct Wallet<D = bdk::sled::Tree, C = Client> {
 impl Wallet {
     pub async fn new(
         electrum_rpc_url: Url,
-        wallet_dir: &Path,
-        key: impl DerivableKey<Segwitv0> + Clone,
+        data_dir: impl AsRef<Path>,
+        xprivkey: ExtendedPrivKey,
         env_config: env::Config,
         target_block: usize,
     ) -> Result<Self> {
-        let db = bdk::sled::open(wallet_dir)?.open_tree(SLED_TREE_NAME)?;
+        let data_dir = data_dir.as_ref();
+        let wallet_dir = data_dir.join(WALLET);
+        let database = bdk::sled::open(&wallet_dir)?.open_tree(SLED_TREE_NAME)?;
+        let network = env_config.bitcoin_network;
 
-        let wallet = bdk::Wallet::new(
-            bdk::template::Bip84(key.clone(), KeychainKind::External),
-            Some(bdk::template::Bip84(key, KeychainKind::Internal)),
-            env_config.bitcoin_network,
-            db,
-        )?;
+        let wallet = match bdk::Wallet::new(
+            bdk::template::Bip84(xprivkey, KeychainKind::External),
+            Some(bdk::template::Bip84(xprivkey, KeychainKind::Internal)),
+            network,
+            database,
+        ) {
+            Ok(w) => w,
+            Err(e) if matches!(e, bdk::Error::ChecksumMismatch) => {
+                Self::migrate(data_dir, xprivkey, network)?
+            }
+            err => err?,
+        };
 
         let client = Client::new(electrum_rpc_url, env_config.bitcoin_sync_interval())?;
 
@@ -69,6 +81,32 @@ impl Wallet {
             network,
             target_block,
         })
+    }
+
+    /// Create a new database for the wallet and rename the old one.
+    /// This is necessary when getting a ChecksumMismatch from a wallet
+    /// created with an older version of BDK. Only affected Testnet wallets.
+    // https://github.com/comit-network/xmr-btc-swap/issues/1182
+    fn migrate(
+        data_dir: &Path,
+        xprivkey: ExtendedPrivKey,
+        network: bitcoin::Network,
+    ) -> Result<bdk::Wallet<Tree>> {
+        let from = data_dir.join(WALLET);
+        let to = data_dir.join(WALLET_OLD);
+        std::fs::rename(from, to)?;
+
+        let wallet_dir = data_dir.join(WALLET);
+        let database = bdk::sled::open(&wallet_dir)?.open_tree(SLED_TREE_NAME)?;
+
+        let wallet = bdk::Wallet::new(
+            bdk::template::Bip84(xprivkey, KeychainKind::External),
+            Some(bdk::template::Bip84(xprivkey, KeychainKind::Internal)),
+            network,
+            database,
+        )?;
+
+        Ok(wallet)
     }
 
     /// Broadcast the given transaction to the network and emit a log statement
@@ -346,7 +384,7 @@ where
         let script = address.script_pubkey();
 
         let mut tx_builder = wallet.build_tx();
-        tx_builder.add_recipient(script.clone(), amount.as_sat());
+        tx_builder.add_recipient(script.clone(), amount.to_sat());
         tx_builder.fee_rate(fee_rate);
         let (psbt, _details) = tx_builder.finish()?;
         let mut psbt: PartiallySignedTransaction = psbt;
@@ -392,7 +430,7 @@ where
             return Ok(Amount::ZERO);
         }
         let client = self.client.lock().await;
-        let min_relay_fee = client.min_relay_fee()?.as_sat();
+        let min_relay_fee = client.min_relay_fee()?.to_sat();
 
         if balance.get_total() < min_relay_fee {
             return Ok(Amount::ZERO);
@@ -443,18 +481,18 @@ fn estimate_fee(
     fee_rate: FeeRate,
     min_relay_fee: Amount,
 ) -> Result<Amount> {
-    if transfer_amount.as_sat() <= 546 {
+    if transfer_amount.to_sat() <= 546 {
         bail!("Amounts needs to be greater than Bitcoin dust amount.")
     }
     let fee_rate_svb = fee_rate.as_sat_per_vb();
     if fee_rate_svb <= 0.0 {
         bail!("Fee rate needs to be > 0")
     }
-    if fee_rate_svb > 100_000_000.0 || min_relay_fee.as_sat() > 100_000_000 {
+    if fee_rate_svb > 100_000_000.0 || min_relay_fee.to_sat() > 100_000_000 {
         bail!("A fee_rate or min_relay_fee of > 1BTC does not make sense")
     }
 
-    let min_relay_fee = if min_relay_fee.as_sat() == 0 {
+    let min_relay_fee = if min_relay_fee.to_sat() == 0 {
         // if min_relay_fee is 0 we don't fail, we just set it to 1 satoshi;
         Amount::ONE_SAT
     } else {
@@ -474,9 +512,9 @@ fn estimate_fee(
         "Estimated fee for transaction",
     );
 
-    let transfer_amount = Decimal::from(transfer_amount.as_sat());
+    let transfer_amount = Decimal::from(transfer_amount.to_sat());
     let max_allowed_fee = transfer_amount * MAX_RELATIVE_TX_FEE;
-    let min_relay_fee = Decimal::from(min_relay_fee.as_sat());
+    let min_relay_fee = Decimal::from(min_relay_fee.to_sat());
 
     let recommended_fee = if sats_per_vbyte < min_relay_fee {
         tracing::warn!(
@@ -932,6 +970,7 @@ mod tests {
     use super::*;
     use crate::bitcoin::{PublicKey, TxLock};
     use crate::tracing_ext::capture_logs;
+    use bitcoin::hashes::Hash;
     use proptest::prelude::*;
     use tracing::level_filters::LevelFilter;
 
@@ -1031,7 +1070,7 @@ mod tests {
 
         // weight / 4.0 *  sat_per_vb would be greater than 3% hence we take total
         // max allowed fee.
-        assert_eq!(is_fee.as_sat(), MAX_ABSOLUTE_TX_FEE.to_u64().unwrap());
+        assert_eq!(is_fee.to_sat(), MAX_ABSOLUTE_TX_FEE.to_u64().unwrap());
     }
 
     proptest! {
@@ -1067,7 +1106,7 @@ mod tests {
             let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
 
             // weight / 4 * 1_000 is always lower than MAX_ABSOLUTE_TX_FEE
-            assert!(is_fee.as_sat() < MAX_ABSOLUTE_TX_FEE.to_u64().unwrap());
+            assert!(is_fee.to_sat() < MAX_ABSOLUTE_TX_FEE.to_u64().unwrap());
         }
     }
 
@@ -1086,7 +1125,7 @@ mod tests {
             let is_fee = estimate_fee(weight, amount, fee_rate, relay_fee).unwrap();
 
             // weight / 4 * 1_000  is always higher than MAX_ABSOLUTE_TX_FEE
-            assert!(is_fee.as_sat() >= MAX_ABSOLUTE_TX_FEE.to_u64().unwrap());
+            assert!(is_fee.to_sat() >= MAX_ABSOLUTE_TX_FEE.to_u64().unwrap());
         }
     }
 
@@ -1142,7 +1181,7 @@ mod tests {
         let wallet = WalletBuilder::new(10_000).build();
         let amount = wallet.max_giveable(TxLock::script_size()).await.unwrap();
 
-        assert!(amount.as_sat() > 0);
+        assert!(amount.to_sat() > 0);
     }
 
     /// This test ensures that the relevant script output of the transaction
@@ -1212,7 +1251,8 @@ mod tests {
     fn printing_status_change_doesnt_spam_on_same_status() {
         let writer = capture_logs(LevelFilter::DEBUG);
 
-        let tx = Txid::default();
+        let inner = bitcoin::hashes::sha256d::Hash::all_zeros();
+        let tx = Txid::from_hash(inner);
         let mut old = None;
         old = Some(print_status_change(tx, old, ScriptStatus::Unseen));
         old = Some(print_status_change(tx, old, ScriptStatus::InMempool));

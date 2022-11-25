@@ -312,11 +312,10 @@ async fn init_bitcoin_wallet(
     env_config: swap::env::Config,
 ) -> Result<bitcoin::Wallet> {
     tracing::debug!("Opening Bitcoin wallet");
-    let wallet_dir = config.data.dir.join("wallet");
-
+    let data_dir = &config.data.dir;
     let wallet = bitcoin::Wallet::new(
         config.bitcoin.electrum_rpc_url.clone(),
-        &wallet_dir,
+        data_dir,
         seed.derive_extended_private_key(env_config.bitcoin_network)?,
         env_config,
         config.bitcoin.target_block,

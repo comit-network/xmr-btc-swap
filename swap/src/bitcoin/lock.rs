@@ -6,8 +6,8 @@ use ::bitcoin::util::psbt::PartiallySignedTransaction;
 use ::bitcoin::{OutPoint, TxIn, TxOut, Txid};
 use anyhow::{bail, Result};
 use bdk::database::BatchDatabase;
-use bdk::miniscript::{Descriptor, DescriptorTrait};
-use bitcoin::Script;
+use bdk::miniscript::Descriptor;
+use bitcoin::{PackedLockTime, Script, Sequence};
 use serde::{Deserialize, Serialize};
 
 const SCRIPT_SIZE: usize = 34;
@@ -58,14 +58,14 @@ impl TxLock {
         btc: Amount,
     ) -> Result<Self> {
         let shared_output_candidate = match psbt.unsigned_tx.output.as_slice() {
-            [shared_output_candidate, _] if shared_output_candidate.value == btc.as_sat() => {
+            [shared_output_candidate, _] if shared_output_candidate.value == btc.to_sat() => {
                 shared_output_candidate
             }
-            [_, shared_output_candidate] if shared_output_candidate.value == btc.as_sat() => {
+            [_, shared_output_candidate] if shared_output_candidate.value == btc.to_sat() => {
                 shared_output_candidate
             }
             // A single output is possible if Bob funds without any change necessary
-            [shared_output_candidate] if shared_output_candidate.value == btc.as_sat() => {
+            [shared_output_candidate] if shared_output_candidate.value == btc.to_sat() => {
                 shared_output_candidate
             }
             [_, _] => {
@@ -140,14 +140,15 @@ impl TxLock {
     ) -> Transaction {
         let previous_output = self.as_outpoint();
 
+        let sequence = Sequence(sequence.unwrap_or(0xFFFF_FFFF));
         let tx_in = TxIn {
             previous_output,
             script_sig: Default::default(),
-            sequence: sequence.unwrap_or(0xFFFF_FFFF),
+            sequence,
             witness: Default::default(),
         };
 
-        let fee = spending_fee.as_sat();
+        let fee = spending_fee.to_sat();
         let tx_out = TxOut {
             value: self.inner.clone().extract_tx().output[self.lock_output_vout()].value - fee,
             script_pubkey: spend_address.script_pubkey(),
@@ -157,7 +158,7 @@ impl TxLock {
 
         Transaction {
             version: 2,
-            lock_time: 0,
+            lock_time: PackedLockTime(0),
             input: vec![tx_in],
             output: vec![tx_out],
         }
@@ -207,7 +208,7 @@ mod tests {
         let (A, B) = alice_and_bob();
         let fees = 300;
         let agreed_amount = Amount::from_sat(10000);
-        let amount = agreed_amount.as_sat() + fees;
+        let amount = agreed_amount.to_sat() + fees;
         let wallet = WalletBuilder::new(amount).build();
 
         let psbt = bob_make_psbt(A, B, &wallet, agreed_amount).await;

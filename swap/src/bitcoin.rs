@@ -373,8 +373,8 @@ mod tests {
 
     #[tokio::test]
     async fn calculate_transaction_weights() {
-        let alice_wallet = WalletBuilder::new(Amount::ONE_BTC.as_sat()).build();
-        let bob_wallet = WalletBuilder::new(Amount::ONE_BTC.as_sat()).build();
+        let alice_wallet = WalletBuilder::new(Amount::ONE_BTC.to_sat()).build();
+        let bob_wallet = WalletBuilder::new(Amount::ONE_BTC.to_sat()).build();
         let spending_fee = Amount::from_sat(1_000);
         let btc_amount = Amount::from_sat(500_000);
         let xmr_amount = crate::monero::Amount::from_piconero(10000);

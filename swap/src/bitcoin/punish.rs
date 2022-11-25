@@ -4,7 +4,7 @@ use ::bitcoin::util::sighash::SighashCache;
 use ::bitcoin::{EcdsaSighashType, Sighash};
 use anyhow::{Context, Result};
 use bdk::bitcoin::Script;
-use bdk::miniscript::{Descriptor, DescriptorTrait};
+use bdk::miniscript::Descriptor;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -32,7 +32,7 @@ impl TxPunish {
                     .output_descriptor
                     .script_code()
                     .expect("scriptcode"),
-                tx_cancel.amount().as_sat(),
+                tx_cancel.amount().to_sat(),
                 EcdsaSighashType::All,
             )
             .expect("sighash");

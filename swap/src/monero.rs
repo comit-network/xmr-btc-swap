@@ -110,7 +110,7 @@ impl Amount {
         }
 
         // safely convert the BTC/XMR rate to sat/pico
-        let ask_sats = Decimal::from(ask_price.as_sat());
+        let ask_sats = Decimal::from(ask_price.to_sat());
         let pico_per_xmr = Decimal::from(PICONERO_OFFSET);
         let ask_sats_per_pico = ask_sats / pico_per_xmr;
 
