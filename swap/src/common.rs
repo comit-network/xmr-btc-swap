@@ -9,19 +9,18 @@ pub enum Version {
 }
 
 /// Check the latest release from GitHub API.
-pub async fn check_latest_version(current: &str) -> anyhow::Result<Version> {
+pub async fn check_latest_version(current_version: &str) -> anyhow::Result<Version> {
     let response = reqwest::get(LATEST_RELEASE_URL).await?;
     let e = "Failed to get latest release.";
-    let url = response.url();
-    let segments = url.path_segments().ok_or_else(|| anyhow!(e))?;
-    let latest = segments.last().ok_or_else(|| anyhow!(e))?;
+    let download_url = response.url();
+    let segments = download_url.path_segments().ok_or_else(|| anyhow!(e))?;
+    let latest_version = segments.last().ok_or_else(|| anyhow!(e))?;
 
-    let result = if is_latest_version(current, latest) {
+    let result = if is_latest_version(current_version, latest_version) {
         Version::Current
     } else {
-        println!(
-            "You are not on the latest version: {} is available. \n{}",
-            latest, url
+        tracing::warn!(%current_version, %latest_version, %download_url,
+            "You are not on the latest version",
         );
         Version::Available
     };
