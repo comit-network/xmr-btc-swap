@@ -41,11 +41,13 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::determine_btc_to_swap;
+    use swap::api::determine_btc_to_swap;
     use ::bitcoin::Amount;
     use std::sync::Mutex;
     use swap::tracing_ext::capture_logs;
     use tracing::level_filters::LevelFilter;
+    use swap::network::quote::BidQuote;
+    use std::time::Duration;
 
     #[tokio::test]
     async fn given_no_balance_and_transfers_less_than_max_swaps_max_giveable() {
