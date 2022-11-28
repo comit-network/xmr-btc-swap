@@ -205,6 +205,7 @@ impl Request {
                 json!({
                     "signed_tx": signed_tx,
                     "amount": amount.as_sat(),
+                    "txid": signed_tx.txid(),
                 })
             }
             Command::StartDaemon => {
