@@ -253,6 +253,7 @@ async fn main() -> Result<()> {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
             let bitcoin_balance = bitcoin_wallet.balance().await?;
             tracing::info!(%bitcoin_balance);
+            tracing::info!(%bitcoin_balance, %monero_balance, "Current balance");
         }
         Command::Cancel { swap_id } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
