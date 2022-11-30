@@ -40,6 +40,22 @@ jobs:
       - name: Run BDK regression script
         run: ./swap/tests/bdk.sh
 
+  sqlx_test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3.1.0
+
+      - uses: Swatinem/rust-cache@v2.0.2
+
+      - name: Install sqlx-cli
+        run: cargo install sqlx-cli
+
+      - name: Run sqlite_dev_setup.sh script
+        run: |
+          cd swap
+          ./sqlite_dev_setup.sh
+
   build:
     strategy:
       matrix:
