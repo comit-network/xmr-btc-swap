@@ -14,9 +14,9 @@
 
 use anyhow::Result;
 use std::env;
+use std::sync::Arc;
 use swap::cli::command::{parse_args_and_apply_defaults, ParseResult};
 use swap::common::check_latest_version;
-use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -36,18 +36,16 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use swap::api::determine_btc_to_swap;
     use ::bitcoin::Amount;
     use std::sync::Mutex;
+    use std::time::Duration;
+    use swap::api::determine_btc_to_swap;
+    use swap::network::quote::BidQuote;
     use swap::tracing_ext::capture_logs;
     use tracing::level_filters::LevelFilter;
-    use swap::network::quote::BidQuote;
-    use std::time::Duration;
 
     #[tokio::test]
     async fn given_no_balance_and_transfers_less_than_max_swaps_max_giveable() {

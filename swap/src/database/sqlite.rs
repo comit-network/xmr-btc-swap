@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use libp2p::{Multiaddr, PeerId};
 use sqlx::sqlite::Sqlite;
 use sqlx::{Pool, SqlitePool};
+use std::collections::HashMap;
 use std::path::Path;
 use std::str::FromStr;
 use time::OffsetDateTime;
@@ -149,7 +150,7 @@ impl Database for SqliteDatabase {
 
         let rows = sqlx::query!(
             r#"
-        SELECT address
+        SELECT DISTINCT address
         FROM peer_addresses
         WHERE peer_id = ?
         "#,
@@ -167,6 +168,24 @@ impl Database for SqliteDatabase {
             .collect::<Result<Vec<Multiaddr>>>();
 
         addresses
+    }
+
+    async fn get_swap_start_date(&self, swap_id: Uuid) -> Result<String> {
+        let mut conn = self.pool.acquire().await?;
+        let swap_id = swap_id.to_string();
+
+        let row = sqlx::query!(
+            r#"
+                SELECT min(entered_at) as start_date
+                FROM swap_states
+                WHERE swap_id = ?
+                "#,
+            swap_id
+        )
+        .fetch_one(&mut conn)
+        .await?;
+
+        return Ok(row.start_date.unwrap());
     }
 
     async fn insert_latest_state(&self, swap_id: Uuid, state: State) -> Result<()> {
@@ -248,6 +267,33 @@ impl Database for SqliteDatabase {
             .collect::<Result<Vec<(Uuid, State)>>>();
 
         result
+    }
+
+    async fn raw_all(&self) -> Result<HashMap<Uuid, Vec<serde_json::Value>>> {
+        let mut conn = self.pool.acquire().await?;
+        let rows = sqlx::query!(
+            r#"
+                SELECT swap_id, state
+                FROM swap_states
+                "#
+        )
+        .fetch_all(&mut conn)
+        .await?;
+
+        let mut swaps: HashMap<Uuid, Vec<serde_json::Value>> = HashMap::new();
+
+        for row in &rows {
+            let swap_id = Uuid::from_str(&row.swap_id).unwrap();
+            let state = serde_json::from_str(&row.state).unwrap();
+
+            if swaps.contains_key(&swap_id) {
+                swaps.get_mut(&swap_id).unwrap().push(state);
+            } else {
+                swaps.insert(swap_id, vec![state]);
+            }
+        }
+
+        Ok(swaps)
     }
 }
 

@@ -1,39 +1,34 @@
+use crate::bitcoin::{Amount, TxLock};
+use crate::cli::command::{Bitcoin, Command, Monero, Tor};
+use crate::cli::{list_sellers, EventLoop, SellerStatus};
+use crate::database::open_db;
+use crate::env::{Config, GetConfig, Mainnet, Testnet};
+use crate::fs::system_data_dir;
+use crate::libp2p_ext::MultiAddrExt;
+use crate::network::quote::{BidQuote, ZeroQuoteReceived};
+use crate::network::rendezvous::XmrBtcNamespace;
+use crate::network::swarm;
+use crate::protocol::bob::{BobState, Swap};
+use crate::protocol::{bob, Database};
+use crate::seed::Seed;
+use crate::{bitcoin, cli, monero, rpc};
 use anyhow::{bail, Context as AnyContext, Result};
 use comfy_table::Table;
+use libp2p::core::Multiaddr;
 use qrcode::render::unicode;
 use qrcode::QrCode;
-use crate::env::GetConfig;
+use serde::ser::{Serialize, SerializeStruct, Serializer};
+use serde_json::json;
 use std::cmp::min;
-use crate::network::rendezvous::XmrBtcNamespace;
-use std::net::SocketAddr;
-use libp2p::core::Multiaddr;
 use std::convert::TryInto;
-use crate::bitcoin::Amount;
+use std::fmt;
 use std::future::Future;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use crate::bitcoin::TxLock;
-use crate::cli::command::{Command, Bitcoin, Monero, Tor};
-use crate::cli::{list_sellers, EventLoop, SellerStatus};
-use crate::database::open_db;
-use crate::libp2p_ext::MultiAddrExt;
-use crate::network::quote::{BidQuote, ZeroQuoteReceived};
-use crate::network::swarm;
-use crate::protocol::bob;
-use crate::protocol::bob::{BobState, Swap};
-use crate::seed::Seed;
-use crate::rpc;
-use crate::{bitcoin, cli, monero};
 use url::Url;
 use uuid::Uuid;
-use crate::protocol::Database;
-use crate::env::{Config, Mainnet, Testnet};
-use crate::fs::system_data_dir;
-use serde_json::json;
-use serde::ser::{Serialize, Serializer, SerializeStruct};
-use std::fmt;
-
 
 #[derive(PartialEq, Debug)]
 pub struct Request {
@@ -53,7 +48,7 @@ pub struct Params {
 }
 
 pub struct Context {
-    db: Arc<dyn Database + Send + Sync>,
+    pub db: Arc<dyn Database + Send + Sync>,
     bitcoin_wallet: Option<Arc<bitcoin::Wallet>>,
     monero_wallet: Option<Arc<monero::Wallet>>,
     monero_rpc_process: Option<monero::WalletRpcProcess>,
@@ -81,10 +76,17 @@ impl Request {
                 let bitcoin_change_address = self.params.bitcoin_change_address.clone().unwrap();
 
                 let bitcoin_wallet = btc;
-                let seller_peer_id = self.params.seller.as_ref().unwrap()
+                let seller_peer_id = self
+                    .params
+                    .seller
+                    .as_ref()
+                    .unwrap()
                     .extract_peer_id()
                     .context("Seller address must contain peer ID")?;
-                context.db.insert_address(seller_peer_id, seller.clone()).await?;
+                context
+                    .db
+                    .insert_address(seller_peer_id, seller.clone())
+                    .await?;
 
                 let behaviour = cli::Behaviour::new(
                     seller_peer_id,
@@ -92,8 +94,12 @@ impl Request {
                     bitcoin_wallet.clone(),
                     (seed.derive_libp2p_identity(), context.namespace),
                 );
-                let mut swarm =
-                    swarm::cli(seed.derive_libp2p_identity(), context.tor_socks5_port.unwrap(), behaviour).await?;
+                let mut swarm = swarm::cli(
+                    seed.derive_libp2p_identity(),
+                    context.tor_socks5_port.unwrap(),
+                    behaviour,
+                )
+                .await?;
                 swarm.behaviour_mut().add_address(seller_peer_id, seller);
 
                 tracing::debug!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
@@ -128,7 +134,9 @@ impl Request {
                 tracing::info!(%amount, %fees,  "Determined swap amount");
 
                 context.db.insert_peer_id(swap_id, seller_peer_id).await?;
-                context.db.insert_monero_address(swap_id, monero_receive_address)
+                context
+                    .db
+                    .insert_monero_address(swap_id, monero_receive_address)
                     .await?;
                 let monero_wallet = context.monero_wallet.as_ref().unwrap();
 
@@ -165,18 +173,20 @@ impl Request {
                     let state: BobState = state.try_into()?;
                     vec.push((swap_id, state.to_string()));
                 }
-                json!({
-                    "swaps": vec
-                })
-
+                json!({ "swaps": vec })
             }
             Command::Config => {
-//                tracing::info!(path=%data_dir.display(), "Data directory");
-//                tracing::info!(path=%format!("{}/logs", data_dir.display()), "Log files directory");
-//                tracing::info!(path=%format!("{}/sqlite", data_dir.display()), "Sqlite file location");
-//                tracing::info!(path=%format!("{}/seed.pem", data_dir.display()), "Seed file location");
-//                tracing::info!(path=%format!("{}/monero", data_dir.display()), "Monero-wallet-rpc directory");
-//                tracing::info!(path=%format!("{}/wallet", data_dir.display()), "Internal bitcoin wallet directory");
+                //                tracing::info!(path=%data_dir.display(), "Data directory");
+                //                tracing::info!(path=%format!("{}/logs", data_dir.display()),
+                // "Log files directory");
+                // tracing::info!(path=%format!("{}/sqlite", data_dir.display()), "Sqlite file
+                // location");
+                // tracing::info!(path=%format!("{}/seed.pem", data_dir.display()), "Seed file
+                // location");
+                // tracing::info!(path=%format!("{}/monero", data_dir.display()),
+                // "Monero-wallet-rpc directory");
+                // tracing::info!(path=%format!("{}/wallet", data_dir.display()), "Internal
+                // bitcoin wallet directory");
 
                 json!({
                     "result": []
@@ -200,7 +210,9 @@ impl Request {
                     .await?;
                 let signed_tx = bitcoin_wallet.sign_and_finalize(psbt).await?;
 
-                bitcoin_wallet.broadcast(signed_tx.clone(), "withdraw").await?;
+                bitcoin_wallet
+                    .broadcast(signed_tx.clone(), "withdraw")
+                    .await?;
 
                 json!({
                     "signed_tx": signed_tx,
@@ -220,9 +232,7 @@ impl Request {
                         Some(handle)
                     }
                 };
-                loop {
-
-                }
+                loop {}
                 json!({
                     "result": []
                 })
@@ -255,8 +265,12 @@ impl Request {
                     Arc::clone(context.bitcoin_wallet.as_ref().unwrap()),
                     (seed.clone(), context.namespace),
                 );
-                let mut swarm =
-                    swarm::cli(seed.clone(), context.tor_socks5_port.clone().unwrap(), behaviour).await?;
+                let mut swarm = swarm::cli(
+                    seed.clone(),
+                    context.tor_socks5_port.clone().unwrap(),
+                    behaviour,
+                )
+                .await?;
                 let our_peer_id = swarm.local_peer_id();
 
                 tracing::debug!(peer_id = %our_peer_id, "Network layer initialized");
@@ -267,7 +281,8 @@ impl Request {
                         .add_address(seller_peer_id, seller_address);
                 }
 
-                let (event_loop, event_loop_handle) = EventLoop::new(swap_id, swarm, seller_peer_id)?;
+                let (event_loop, event_loop_handle) =
+                    EventLoop::new(swap_id, swarm, seller_peer_id)?;
                 let handle = tokio::spawn(event_loop.run());
 
                 let monero_receive_address = context.db.get_monero_address(swap_id).await?;
@@ -297,8 +312,13 @@ impl Request {
             Command::Cancel => {
                 let bitcoin_wallet = context.bitcoin_wallet.as_ref().unwrap();
 
-                let (txid, _) = cli::cancel(self.params.swap_id.unwrap(), Arc::clone(bitcoin_wallet), Arc::clone(&context.db)).await?;
-                
+                let (txid, _) = cli::cancel(
+                    self.params.swap_id.unwrap(),
+                    Arc::clone(bitcoin_wallet),
+                    Arc::clone(&context.db),
+                )
+                .await?;
+
                 tracing::debug!("Cancel transaction successfully published with id {}", txid);
 
                 json!({
@@ -308,11 +328,14 @@ impl Request {
             Command::Refund => {
                 let bitcoin_wallet = context.bitcoin_wallet.as_ref().unwrap();
 
-                let state = cli::refund(self.params.swap_id.unwrap(), Arc::clone(bitcoin_wallet), Arc::clone(&context.db)).await?;
+                let state = cli::refund(
+                    self.params.swap_id.unwrap(),
+                    Arc::clone(bitcoin_wallet),
+                    Arc::clone(&context.db),
+                )
+                .await?;
 
-                json!({
-                    "result": state
-                })
+                json!({ "result": state })
             }
             Command::ListSellers => {
                 let rendezvous_point = self.params.rendezvous_point.clone().unwrap();
@@ -328,7 +351,8 @@ impl Request {
                     context.namespace,
                     context.tor_socks5_port.unwrap(),
                     identity,
-                ).await?;
+                )
+                .await?;
 
                 for seller in &sellers {
                     match seller.status {
@@ -352,9 +376,7 @@ impl Request {
                     }
                 }
 
-                json!({
-                    "sellers": sellers
-                })
+                json!({ "sellers": sellers })
             }
             Command::ExportBitcoinWallet => {
                 let bitcoin_wallet = context.bitcoin_wallet.as_ref().unwrap();
@@ -366,7 +388,11 @@ impl Request {
                 })
             }
             Command::MoneroRecovery => {
-                let swap_state: BobState = context.db.get_state(self.params.swap_id.clone().unwrap()).await?.try_into()?;
+                let swap_state: BobState = context
+                    .db
+                    .get_state(self.params.swap_id.clone().unwrap())
+                    .await?
+                    .try_into()?;
 
                 match swap_state {
                     BobState::Started { .. }
@@ -411,81 +437,77 @@ impl Request {
 impl Context {
     pub async fn build(
         bitcoin: Option<Bitcoin>,
-        monero: Option<Monero>, 
-        tor: Option<Tor>, 
-        data: Option<PathBuf>, 
+        monero: Option<Monero>,
+        tor: Option<Tor>,
+        data: Option<PathBuf>,
         is_testnet: bool,
         debug: bool,
         json: bool,
         server_address: Option<SocketAddr>,
-        ) -> Result<Context> {
-            let data_dir = data::data_dir_from(data, is_testnet)?;
-            let env_config = env_config_from(is_testnet);
+    ) -> Result<Context> {
+        let data_dir = data::data_dir_from(data, is_testnet)?;
+        let env_config = env_config_from(is_testnet);
 
-            let seed = Seed::from_file_or_generate(data_dir.as_path())
-                .context("Failed to read seed in file")?;
+        let seed = Seed::from_file_or_generate(data_dir.as_path())
+            .context("Failed to read seed in file")?;
 
-            let bitcoin_wallet = {
-                if let Some(bitcoin) = bitcoin {
-                    let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
-                        bitcoin.apply_defaults(is_testnet)?;
-                    Some(Arc::new(init_bitcoin_wallet(
+        let bitcoin_wallet = {
+            if let Some(bitcoin) = bitcoin {
+                let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
+                    bitcoin.apply_defaults(is_testnet)?;
+                Some(Arc::new(
+                    init_bitcoin_wallet(
                         bitcoin_electrum_rpc_url,
                         &seed,
                         data_dir.clone(),
                         env_config,
                         bitcoin_target_block,
-                        )
-                        .await?))
-                } else {
-                    None
-                }
-            };
+                    )
+                    .await?,
+                ))
+            } else {
+                None
+            }
+        };
 
-            let (monero_wallet, monero_rpc_process) = {
-                if let Some(monero) = monero {
-                    let monero_daemon_address = monero.apply_defaults(is_testnet);
-                    let (wlt, prc) = init_monero_wallet(
-                        data_dir.clone(),
-                        monero_daemon_address,
-                        env_config,
-                        ).await?;
-                    (Some(Arc::new(wlt)), Some(prc))
-                } else {
-                    (None, None)
-                }
-            };
+        let (monero_wallet, monero_rpc_process) = {
+            if let Some(monero) = monero {
+                let monero_daemon_address = monero.apply_defaults(is_testnet);
+                let (wlt, prc) =
+                    init_monero_wallet(data_dir.clone(), monero_daemon_address, env_config).await?;
+                (Some(Arc::new(wlt)), Some(prc))
+            } else {
+                (None, None)
+            }
+        };
 
+        let tor_socks5_port = {
+            if let Some(tor) = tor {
+                Some(tor.tor_socks5_port)
+            } else {
+                None
+            }
+        };
 
-            let tor_socks5_port = {
-                if let Some(tor) = tor {
-                    Some(tor.tor_socks5_port)
-                } else {
-                    None
-                }
-            };
+        cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
 
-            cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
+        let init = Context {
+            bitcoin_wallet,
+            monero_wallet,
+            monero_rpc_process,
+            tor_socks5_port,
+            namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
+            db: open_db(data_dir.join("sqlite")).await?,
+            env_config,
+            seed: Some(seed),
+            debug,
+            json,
+            is_testnet,
+            server_address,
+        };
 
-            let init = Context {
-                bitcoin_wallet,
-                monero_wallet,
-                monero_rpc_process,
-                tor_socks5_port: tor_socks5_port,
-                namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
-                db: open_db(data_dir.join("sqlite")).await?,
-                env_config,
-                seed: Some(seed),
-                debug,
-                json,
-                is_testnet,
-                server_address,
-            };
-            
-
-            Ok(init)
+        Ok(init)
     }
-
 }
 
 impl Serialize for Context {
@@ -503,17 +525,17 @@ impl Serialize for Context {
 
 impl PartialEq for Context {
     fn eq(&self, other: &Self) -> bool {
-        self.tor_socks5_port == other.tor_socks5_port &&
-        self.namespace == other.namespace &&
-        self.debug == other.debug &&
-        self.json == other.json &&
-        self.server_address == other.server_address
+        self.tor_socks5_port == other.tor_socks5_port
+            && self.namespace == other.namespace
+            && self.debug == other.debug
+            && self.json == other.json
+            && self.server_address == other.server_address
     }
 }
 
 impl fmt::Debug for Context {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-          write!(f, "Testing {}", true)
+        write!(f, "Testing {}", true)
     }
 }
 
@@ -709,26 +731,34 @@ pub mod api_test {
     pub const SWAP_ID: &str = "ea030832-3be9-454f-bb98-5ea9a788406b";
 
     impl Context {
-
-        pub async fn default(is_testnet: bool, data_dir: PathBuf, json: bool, debug: bool) -> Result<Context> {
-
+        pub async fn default(
+            is_testnet: bool,
+            data_dir: PathBuf,
+            json: bool,
+            debug: bool,
+        ) -> Result<Context> {
             Ok(Context::build(
-                Some(Bitcoin { bitcoin_electrum_rpc_url: None, bitcoin_target_block: None}),
-                Some(Monero { monero_daemon_address: None }),
-                Some(Tor { tor_socks5_port: DEFAULT_SOCKS5_PORT }),
+                Some(Bitcoin {
+                    bitcoin_electrum_rpc_url: None,
+                    bitcoin_target_block: None,
+                }),
+                Some(Monero {
+                    monero_daemon_address: None,
+                }),
+                Some(Tor {
+                    tor_socks5_port: DEFAULT_SOCKS5_PORT,
+                }),
                 Some(data_dir),
                 is_testnet,
                 debug,
                 json,
-                None
-            ).await?)
+                None,
+            )
+            .await?)
         }
-
     }
     impl Request {
-
         pub fn buy_xmr(is_testnet: bool) -> Request {
-
             let seller = Multiaddr::from_str(MULTI_ADDRESS).unwrap();
             let bitcoin_change_address = {
                 if is_testnet {
@@ -752,9 +782,8 @@ pub mod api_test {
                     bitcoin_change_address: Some(bitcoin_change_address),
                     monero_receive_address: Some(monero_receive_address),
                     ..Default::default()
-
                 },
-                cmd: Command::BuyXmr
+                cmd: Command::BuyXmr,
             }
         }
 
@@ -763,9 +792,8 @@ pub mod api_test {
                 params: Params {
                     swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
                     ..Default::default()
-
                 },
-                cmd: Command::Resume
+                cmd: Command::Resume,
             }
         }
 
@@ -774,9 +802,8 @@ pub mod api_test {
                 params: Params {
                     swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
                     ..Default::default()
-
                 },
-                cmd: Command::Cancel
+                cmd: Command::Cancel,
             }
         }
 
@@ -785,9 +812,8 @@ pub mod api_test {
                 params: Params {
                     swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
                     ..Default::default()
-
                 },
-                cmd: Command::Refund
+                cmd: Command::Refund,
             }
         }
     }

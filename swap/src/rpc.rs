@@ -1,8 +1,8 @@
+use crate::api::Context;
+use jsonrpsee::http_server::{HttpServerBuilder, HttpServerHandle, RpcModule};
 use std::net::SocketAddr;
-use jsonrpsee::http_server::{RpcModule, HttpServerBuilder, HttpServerHandle};
-use thiserror::Error;
-use crate::api::{Context};
 use std::sync::Arc;
+use thiserror::Error;
 
 pub mod methods;
 
@@ -12,18 +12,21 @@ pub enum Error {
     ExampleError,
 }
 
-pub async fn run_server(server_address: SocketAddr, context: Arc<Context>) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
-	let server = HttpServerBuilder::default().build(server_address).await?;
+pub async fn run_server(
+    server_address: SocketAddr,
+    context: Arc<Context>,
+) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
+    let server = HttpServerBuilder::default().build(server_address).await?;
     let mut modules = RpcModule::new(());
     {
-        modules.merge(methods::register_modules(Arc::clone(&context)))
+        modules
+            .merge(methods::register_modules(Arc::clone(&context)))
             .unwrap()
     }
 
-	let addr = server.local_addr()?;
-	let server_handle = server.start(modules)?;
+    let addr = server.local_addr()?;
+    let server_handle = server.start(modules)?;
     tracing::info!(%addr, "Started RPC server");
-    
-	Ok((addr, server_handle))
-}
 
+    Ok((addr, server_handle))
+}

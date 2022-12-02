@@ -16,6 +16,7 @@
     missing_copy_implementations
 )]
 
+pub mod api;
 pub mod asb;
 pub mod bitcoin;
 pub mod cli;
@@ -24,7 +25,6 @@ pub mod database;
 pub mod env;
 pub mod fs;
 pub mod kraken;
-pub mod api;
 pub mod libp2p_ext;
 pub mod monero;
 pub mod network;

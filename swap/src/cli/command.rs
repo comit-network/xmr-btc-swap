@@ -1,19 +1,19 @@
+use crate::api::{Context, Params, Request};
 use crate::bitcoin::Amount;
+use crate::fs::system_data_dir;
 use crate::{env, monero};
-use crate::api::{Request, Params, Context};
 use anyhow::{bail, Context as AnyContext, Result};
 use bitcoin::{Address, AddressType};
 use libp2p::core::Multiaddr;
 use serde::Serialize;
 use std::ffi::OsString;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::Arc;
 use structopt::{clap, StructOpt};
 use url::Url;
 use uuid::Uuid;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use crate::fs::system_data_dir;
 
 // See: https://moneroworld.com/
 pub const DEFAULT_MONERO_DAEMON_ADDRESS: &str = "node.community.rino.io:18081";
@@ -79,8 +79,9 @@ where
                 is_testnet,
                 debug,
                 json,
-                None
-            ).await?;
+                None,
+            )
+            .await?;
             let request = Request {
                 params: Params {
                     bitcoin_change_address: Some(bitcoin_change_address),
@@ -93,44 +94,26 @@ where
             (context, request)
         }
         RawCommand::History => {
-            let context = Context::build(
-                None,
-                None,
-                None,
-                data,
-                is_testnet,
-                debug,
-                json,
-                None
-            ).await?;
+            let context =
+                Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
 
             let request = Request {
                 params: Params::default(),
                 cmd: Command::History,
             };
             (context, request)
-        },
+        }
         RawCommand::Config => {
-            let context = Context::build(
-                None,
-                None,
-                None,
-                data,
-                is_testnet,
-                debug,
-                json,
-                None
-            ).await?;
+            let context =
+                Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
 
             let request = Request {
                 params: Params::default(),
                 cmd: Command::Config,
             };
             (context, request)
-        },
-        RawCommand::Balance {
-            bitcoin,
-        } => {
+        }
+        RawCommand::Balance { bitcoin } => {
             let context = Context::build(
                 Some(bitcoin),
                 None,
@@ -139,8 +122,9 @@ where
                 is_testnet,
                 debug,
                 json,
-                None
-            ).await?;
+                None,
+            )
+            .await?;
             let request = Request {
                 params: Params::default(),
                 cmd: Command::Balance,
@@ -162,7 +146,8 @@ where
                 debug,
                 json,
                 server_address,
-            ).await?;
+            )
+            .await?;
             let request = Request {
                 params: Params::default(),
                 cmd: Command::StartDaemon,
@@ -182,11 +167,12 @@ where
                 is_testnet,
                 debug,
                 json,
-                None
-            ).await?;
+                None,
+            )
+            .await?;
             let request = Request {
                 params: Params {
-                    amount: amount,
+                    amount,
                     address: Some(address),
                     ..Default::default()
                 },
@@ -209,7 +195,8 @@ where
                 debug,
                 json,
                 None,
-            ).await?;
+            )
+            .await?;
             let request = Request {
                 params: Params {
                     swap_id: Some(swap_id),
@@ -231,8 +218,9 @@ where
                 is_testnet,
                 debug,
                 json,
-                None
-            ).await?;
+                None,
+            )
+            .await?;
             let request = Request {
                 params: Params {
                     swap_id: Some(swap_id),
@@ -254,8 +242,9 @@ where
                 is_testnet,
                 debug,
                 json,
-                None
-            ).await?;
+                None,
+            )
+            .await?;
             let request = Request {
                 params: Params {
                     swap_id: Some(swap_id),
@@ -269,16 +258,8 @@ where
             rendezvous_point,
             tor,
         } => {
-            let context = Context::build(
-                None,
-                None,
-                Some(tor),
-                data,
-                is_testnet,
-                debug,
-                json,
-                None
-            ).await?;
+            let context =
+                Context::build(None, None, Some(tor), data, is_testnet, debug, json, None).await?;
 
             let request = Request {
                 params: Params {
@@ -298,25 +279,18 @@ where
                 is_testnet,
                 debug,
                 json,
-                None
-            ).await?;
+                None,
+            )
+            .await?;
             let request = Request {
                 params: Params::default(),
                 cmd: Command::ExportBitcoinWallet,
             };
             (context, request)
-        },
+        }
         RawCommand::MoneroRecovery { swap_id } => {
-            let context = Context::build(
-                None,
-                None,
-                None,
-                data,
-                is_testnet,
-                debug,
-                json,
-                None
-            ).await?;
+            let context =
+                Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
 
             let request = Request {
                 params: Params {
@@ -326,7 +300,7 @@ where
                 cmd: Command::MoneroRecovery,
             };
             (context, request)
-        },
+        }
     };
 
     Ok(ParseResult::Context(Arc::new(context), Box::new(request)))
@@ -346,7 +320,6 @@ pub enum Command {
     MoneroRecovery,
     StartDaemon,
 }
-
 
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(
@@ -435,15 +408,18 @@ enum RawCommand {
         #[structopt(flatten)]
         bitcoin: Bitcoin,
     },
-    #[structopt(about="Starts a JSON-RPC server")]
+    #[structopt(about = "Starts a JSON-RPC server")]
     StartDaemon {
         #[structopt(flatten)]
         bitcoin: Bitcoin,
 
         #[structopt(flatten)]
         monero: Monero,
-        
-        #[structopt(long="server-address", help = "The socket address the server should use")]
+
+        #[structopt(
+            long = "server-address",
+            help = "The socket address the server should use"
+        )]
         server_address: Option<SocketAddr>,
         #[structopt(flatten)]
         tor: Tor,
@@ -588,7 +564,6 @@ struct Seller {
     seller: Multiaddr,
 }
 
-
 fn bitcoin_address(address: Address, is_testnet: bool) -> Result<Address> {
     let network = if is_testnet {
         bitcoin::Network::Testnet
@@ -699,12 +674,16 @@ mod tests {
         let (is_testnet, debug, json) = (false, false, false);
         let data_dir = data_dir_path_cli(is_testnet);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir, debug, json).await.unwrap(), Request::buy_xmr(is_testnet));
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir, debug, json)
+                .await
+                .unwrap(),
+            Request::buy_xmr(is_testnet),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -729,12 +708,16 @@ mod tests {
         let (is_testnet, debug, json) = (true, false, false);
         let data_dir = data_dir_path_cli(is_testnet);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir, debug, json).await.unwrap(), Request::buy_xmr(is_testnet));
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir, debug, json)
+                .await
+                .unwrap(),
+            Request::buy_xmr(is_testnet),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -798,12 +781,16 @@ mod tests {
         let (is_testnet, debug, json) = (false, false, false);
         let data_dir = data_dir_path_cli(is_testnet);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir, debug, json).await.unwrap(), Request::resume());
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir, debug, json)
+                .await
+                .unwrap(),
+            Request::resume(),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -818,12 +805,16 @@ mod tests {
         let (is_testnet, debug, json) = (true, false, false);
         let data_dir = data_dir_path_cli(is_testnet);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir, debug, json).await.unwrap(), Request::resume());
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir, debug, json)
+                .await
+                .unwrap(),
+            Request::resume(),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -839,12 +830,16 @@ mod tests {
         let (is_testnet, debug, json) = (false, false, false);
         let data_dir = data_dir_path_cli(is_testnet);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir, debug, json).await.unwrap(), Request::cancel());
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir, debug, json)
+                .await
+                .unwrap(),
+            Request::cancel(),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -859,12 +854,16 @@ mod tests {
         let (is_testnet, debug, json) = (true, false, false);
         let data_dir = data_dir_path_cli(is_testnet);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir, debug, json).await.unwrap(), Request::cancel());
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir, debug, json)
+                .await
+                .unwrap(),
+            Request::cancel(),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -879,12 +878,16 @@ mod tests {
         let (is_testnet, debug, json) = (false, false, false);
         let data_dir = data_dir_path_cli(is_testnet);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir, debug, json).await.unwrap(), Request::refund());
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir, debug, json)
+                .await
+                .unwrap(),
+            Request::refund(),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -899,12 +902,16 @@ mod tests {
         let (is_testnet, debug, json) = (true, false, false);
         let data_dir = data_dir_path_cli(is_testnet);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir, debug, json).await.unwrap(), Request::refund());
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir, debug, json)
+                .await
+                .unwrap(),
+            Request::refund(),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -932,12 +939,16 @@ mod tests {
         let (is_testnet, debug, json) = (false, false, false);
         let data_dir = PathBuf::from_str(args_data_dir).unwrap();
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir.clone(), debug, json).await.unwrap(), Request::buy_xmr(is_testnet));
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir.clone(), debug, json)
+                .await
+                .unwrap(),
+            Request::buy_xmr(is_testnet),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -960,12 +971,16 @@ mod tests {
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir.clone(), debug, json).await.unwrap(), Request::buy_xmr(is_testnet));
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir.clone(), debug, json)
+                .await
+                .unwrap(),
+            Request::buy_xmr(is_testnet),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -983,12 +998,16 @@ mod tests {
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, false);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir.clone(), debug, json).await.unwrap(), Request::resume());
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir.clone(), debug, json)
+                .await
+                .unwrap(),
+            Request::resume(),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -1003,18 +1022,20 @@ mod tests {
             "--swap-id",
             SWAP_ID,
         ];
-        
-
 
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir.clone(), debug, json).await.unwrap(), Request::resume());
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir.clone(), debug, json)
+                .await
+                .unwrap(),
+            Request::resume(),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -1039,12 +1060,16 @@ mod tests {
         let (is_testnet, debug, json) = (false, true, false);
         let data_dir = data_dir_path_cli(is_testnet);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir, debug, json).await.unwrap(), Request::buy_xmr(is_testnet));
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir, debug, json)
+                .await
+                .unwrap(),
+            Request::buy_xmr(is_testnet),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -1067,12 +1092,16 @@ mod tests {
         let (is_testnet, debug, json) = (true, true, false);
         let data_dir = data_dir_path_cli(is_testnet);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir, debug, json).await.unwrap(), Request::buy_xmr(is_testnet));
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir, debug, json)
+                .await
+                .unwrap(),
+            Request::buy_xmr(is_testnet),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -1084,12 +1113,16 @@ mod tests {
         let (is_testnet, debug, json) = (false, true, false);
         let data_dir = data_dir_path_cli(is_testnet);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir, debug, json).await.unwrap(), Request::resume());
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir, debug, json)
+                .await
+                .unwrap(),
+            Request::resume(),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -1108,12 +1141,16 @@ mod tests {
         let (is_testnet, debug, json) = (true, true, false);
         let data_dir = data_dir_path_cli(is_testnet);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir, debug, json).await.unwrap(), Request::resume());
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir, debug, json)
+                .await
+                .unwrap(),
+            Request::resume(),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -1138,12 +1175,16 @@ mod tests {
         let (is_testnet, debug, json) = (false, false, true);
         let data_dir = data_dir_path_cli(is_testnet);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir, debug, json).await.unwrap(), Request::buy_xmr(is_testnet));
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir, debug, json)
+                .await
+                .unwrap(),
+            Request::buy_xmr(is_testnet),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -1166,12 +1207,16 @@ mod tests {
         let (is_testnet, debug, json) = (true, false, true);
         let data_dir = data_dir_path_cli(is_testnet);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir, debug, json).await.unwrap(), Request::buy_xmr(is_testnet));
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir, debug, json)
+                .await
+                .unwrap(),
+            Request::buy_xmr(is_testnet),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -1182,12 +1227,16 @@ mod tests {
         let (is_testnet, debug, json) = (false, false, true);
         let data_dir = data_dir_path_cli(is_testnet);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir, debug, json).await.unwrap(), Request::resume());
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir, debug, json)
+                .await
+                .unwrap(),
+            Request::resume(),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -1206,12 +1255,16 @@ mod tests {
         let (is_testnet, debug, json) = (true, false, true);
         let data_dir = data_dir_path_cli(is_testnet);
 
-        let (expected_context, expected_request) =
-            (Context::default(is_testnet, data_dir, debug, json).await.unwrap(), Request::resume());
+        let (expected_context, expected_request) = (
+            Context::default(is_testnet, data_dir, debug, json)
+                .await
+                .unwrap(),
+            Request::resume(),
+        );
 
         let (actual_context, actual_request) = match args {
             ParseResult::Context(context, request) => (context, request),
-            _ => panic!("Couldn't parse result")
+            _ => panic!("Couldn't parse result"),
         };
 
         assert_eq!(actual_context, Arc::new(expected_context));
@@ -1266,7 +1319,7 @@ mod tests {
             MULTI_ADDRESS,
         ];
         let result = parse_args_and_apply_defaults(raw_ars).await.unwrap();
-        //assert!(matches!(result, ParseResult::Arguments(_)));
+        // assert!(matches!(result, ParseResult::Arguments(_)));
         assert!(true);
     }
 
@@ -1318,7 +1371,7 @@ mod tests {
             MULTI_ADDRESS,
         ];
         let result = parse_args_and_apply_defaults(raw_ars).await.unwrap();
-        //assert!(matches!(result, ParseResult::Arguments(_)));
+        // assert!(matches!(result, ParseResult::Arguments(_)));
         assert!(true);
     }
 
