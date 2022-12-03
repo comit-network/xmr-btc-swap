@@ -50,17 +50,21 @@ jobs:
           ref: ${{ github.event.release.target_commitish }}
           token: ${{ secrets.BOTTY_GITHUB_TOKEN }}
 
-      - uses: Swatinem/rust-cache@v2.0.2
+      - uses: Swatinem/rust-cache@v2.2.0
 
-      - name: Install compiler for armhf arch
-        if: matrix.target == 'armv7-unknown-linux-gnueabihf'
-        run: |
-          sudo apt-get update
-          sudo apt-get install gcc-arm-linux-gnueabihf
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          target: armv7-unknown-linux-gnueabihf
+          override: true
 
       - name: Build ${{ matrix.target }} ${{ matrix.bin }} release binary
-
-        run: cargo build --target=${{ matrix.target }} --release --package swap --bin ${{ matrix.bin }}
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --target=${{ matrix.target }} --release --package swap --bin ${{ matrix.bin }}
+          use-cross: true
 
       - name: Smoke test the binary
         if: matrix.target != 'armv7-unknown-linux-gnueabihf' # armv7-unknown-linux-gnueabihf is only cross-compiled, no smoke test

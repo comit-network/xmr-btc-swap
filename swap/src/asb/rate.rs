@@ -29,7 +29,7 @@ impl Rate {
     ///
     /// This applies the spread to the market asking price.
     pub fn ask(&self) -> Result<bitcoin::Amount> {
-        let sats = self.ask.as_sat();
+        let sats = self.ask.to_sat();
         let sats = Decimal::from(sats);
 
         let additional_sats = sats * self.ask_spread;
@@ -51,13 +51,13 @@ impl Rate {
         // quote (btc) = rate * base (xmr)
         // base = quote / rate
 
-        let quote_in_sats = quote.as_sat();
+        let quote_in_sats = quote.to_sat();
         let quote_in_btc = Decimal::from(quote_in_sats)
-            .checked_div(Decimal::from(bitcoin::Amount::ONE_BTC.as_sat()))
+            .checked_div(Decimal::from(bitcoin::Amount::ONE_BTC.to_sat()))
             .context("Division overflow")?;
 
-        let rate_in_btc = Decimal::from(rate.as_sat())
-            .checked_div(Decimal::from(bitcoin::Amount::ONE_BTC.as_sat()))
+        let rate_in_btc = Decimal::from(rate.to_sat())
+            .checked_div(Decimal::from(bitcoin::Amount::ONE_BTC.to_sat()))
             .context("Division overflow")?;
 
         let base_in_xmr = quote_in_btc
@@ -105,7 +105,7 @@ mod tests {
 
         let amount = rate.ask().unwrap();
 
-        assert_eq!(amount.as_sat(), 102);
+        assert_eq!(amount.to_sat(), 102);
     }
 
     #[test]

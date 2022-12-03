@@ -15,9 +15,9 @@ async-trait = "0.1"
 atty = "0.2"
 backoff = { version = "0.4", features = [ "tokio" ] }
 base64 = "0.13"
-bdk = "0.23"
+bdk = "0.24"
 big-bytes = "1"
-bitcoin = { version = "0.28", features = [ "rand", "use-serde" ] }
+bitcoin = { version = "0.29", features = [ "rand", "serde" ] }
 bmrng = "0.5"
 comfy-table = "6.1"
 config = { version = "0.11", default-features = false, features = [ "toml" ] }
@@ -48,7 +48,7 @@ serde_json = "1"
 serde_with = { version = "1", features = [ "macros" ] }
 sha2 = "0.10"
 sigma_fun = { git = "https://github.com/LLFourn/secp256kfun", default-features = false, features = [ "ed25519", "serde", "secp256k1", "alloc" ] }
-sqlx = { version = "0.5", features = [ "sqlite", "runtime-tokio-rustls", "offline" ] }
+sqlx = { version = "0.6", features = [ "sqlite", "runtime-tokio-rustls", "offline" ] }
 structopt = "0.3"
 strum = { version = "0.24", features = [ "derive" ] }
 thiserror = "1"
@@ -74,7 +74,7 @@ tokio-tar = "0.3"
 zip = "0.5"
 
 [dev-dependencies]
-bitcoin-harness = { git = "https://github.com/coblox/bitcoin-harness-rs", rev = "bff9a64b5cd75dec2ce807cbfade7b98c2e1e0d4" } # waiting on crates.io release
+bitcoin-harness = "0.2.2"
 get-port = "3"
 hyper = "0.14"
 monero-harness = { path = "../monero-harness" }

@@ -8,7 +8,7 @@ use ::bitcoin::secp256k1::ecdsa;
 use ::bitcoin::util::sighash::SighashCache;
 use ::bitcoin::{EcdsaSighashType, Script, Sighash, Txid};
 use anyhow::{bail, Context, Result};
-use bdk::miniscript::{Descriptor, DescriptorTrait};
+use bdk::miniscript::Descriptor;
 use ecdsa_fun::Signature;
 use std::collections::HashMap;
 
@@ -31,7 +31,7 @@ impl TxRefund {
                     .output_descriptor
                     .script_code()
                     .expect("scriptcode"),
-                tx_cancel.amount().as_sat(),
+                tx_cancel.amount().to_sat(),
                 EcdsaSighashType::All,
             )
             .expect("sighash");

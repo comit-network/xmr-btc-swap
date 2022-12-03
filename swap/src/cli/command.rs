@@ -338,6 +338,7 @@ struct RawArguments {
     testnet: bool,
 
     #[structopt(
+        short,
         long = "--data-base-dir",
         help = "The base data directory to be used for mainnet / testnet specific data like database, wallets etc"
     )]

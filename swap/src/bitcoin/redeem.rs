@@ -5,7 +5,7 @@ use crate::bitcoin::{
 };
 use ::bitcoin::{Sighash, Txid};
 use anyhow::{bail, Context, Result};
-use bdk::miniscript::{Descriptor, DescriptorTrait};
+use bdk::miniscript::Descriptor;
 use bitcoin::secp256k1::ecdsa;
 use bitcoin::util::sighash::SighashCache;
 use bitcoin::{EcdsaSighashType, Script};
@@ -34,7 +34,7 @@ impl TxRedeem {
             .segwit_signature_hash(
                 0, // Only one input: lock_input (lock transaction)
                 &tx_lock.output_descriptor.script_code().expect("scriptcode"),
-                tx_lock.lock_amount().as_sat(),
+                tx_lock.lock_amount().to_sat(),
                 EcdsaSighashType::All,
             )
             .expect("sighash");
