@@ -15,7 +15,7 @@ pub use crate::bitcoin::refund::TxRefund;
 pub use crate::bitcoin::timelocks::{BlockHeight, ExpiredTimelocks};
 pub use ::bitcoin::util::amount::Amount;
 pub use ::bitcoin::util::psbt::PartiallySignedTransaction;
-pub use ::bitcoin::{Address, Network, Transaction, Txid};
+pub use ::bitcoin::{Address, AddressType, Network, Transaction, Txid};
 pub use ecdsa_fun::adaptor::EncryptedSignature;
 pub use ecdsa_fun::fun::Scalar;
 pub use ecdsa_fun::Signature;
@@ -248,6 +248,48 @@ pub fn current_epoch(
     }
 
     ExpiredTimelocks::None
+}
+
+pub mod bitcoin_address {
+    use anyhow::{bail, Result};
+    use serde::Serialize;
+    use std::str::FromStr;
+
+    #[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Serialize)]
+    #[error("Invalid Bitcoin address provided, expected address on network {expected:?}  but address provided is on {actual:?}")]
+    pub struct BitcoinAddressNetworkMismatch {
+        #[serde(with = "crate::bitcoin::network")]
+        expected: bitcoin::Network,
+        #[serde(with = "crate::bitcoin::network")]
+        actual: bitcoin::Network,
+    }
+
+    pub fn parse(addr_str: &str) -> Result<bitcoin::Address> {
+        let address = bitcoin::Address::from_str(addr_str)?;
+
+        if address.address_type() != Some(bitcoin::AddressType::P2wpkh) {
+            anyhow::bail!("Invalid Bitcoin address provided, only bech32 format is supported!")
+        }
+
+        Ok(address)
+    }
+
+    pub fn validate(address: bitcoin::Address, is_testnet: bool) -> Result<bitcoin::Address> {
+        let expected_network = if is_testnet {
+            bitcoin::Network::Testnet
+        } else {
+            bitcoin::Network::Bitcoin
+        };
+
+        if address.network != expected_network {
+            bail!(BitcoinAddressNetworkMismatch {
+                expected: expected_network,
+                actual: address.network
+            });
+        }
+
+        Ok(address)
+    }
 }
 
 /// Bitcoin error codes: https://github.com/bitcoin/bitcoin/blob/97d3500601c1d28642347d014a6de1e38f53ae4e/src/rpc/protocol.h#L23

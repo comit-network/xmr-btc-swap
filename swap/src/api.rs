@@ -2,7 +2,7 @@ use crate::bitcoin::{Amount, TxLock};
 use crate::cli::command::{Bitcoin, Command, Monero, Tor};
 use crate::cli::{list_sellers, EventLoop, SellerStatus};
 use crate::database::open_db;
-use crate::env::{Config, GetConfig, Mainnet, Testnet};
+use crate::env::{Config as EnvConfig, GetConfig, Mainnet, Testnet};
 use crate::fs::system_data_dir;
 use crate::libp2p_ext::MultiAddrExt;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
@@ -28,7 +28,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
+use std::sync::Once;
 use uuid::Uuid;
+
+static START: Once = Once::new();
 
 #[derive(PartialEq, Debug)]
 pub struct Request {
@@ -47,19 +50,24 @@ pub struct Params {
     pub address: Option<bitcoin::Address>,
 }
 
+#[derive(Clone, PartialEq, Debug)]
+pub struct Config {
+    tor_socks5_port: Option<u16>,
+    namespace: XmrBtcNamespace,
+    server_address: Option<SocketAddr>,
+    env_config: EnvConfig,
+    seed: Option<Seed>,
+    debug: bool,
+    json: bool,
+    is_testnet: bool,
+}
+
 pub struct Context {
     pub db: Arc<dyn Database + Send + Sync>,
     bitcoin_wallet: Option<Arc<bitcoin::Wallet>>,
     monero_wallet: Option<Arc<monero::Wallet>>,
     monero_rpc_process: Option<monero::WalletRpcProcess>,
-    tor_socks5_port: Option<u16>,
-    namespace: XmrBtcNamespace,
-    server_address: Option<SocketAddr>,
-    env_config: Config,
-    seed: Option<Seed>,
-    debug: bool,
-    json: bool,
-    is_testnet: bool,
+    pub config: Config,
 }
 
 impl Request {
@@ -68,8 +76,8 @@ impl Request {
             Command::BuyXmr => {
                 let swap_id = Uuid::new_v4();
 
-                let seed = context.seed.as_ref().unwrap();
-                let env_config = context.env_config;
+                let seed = context.config.seed.as_ref().unwrap();
+                let env_config = context.config.env_config;
                 let btc = context.bitcoin_wallet.as_ref().unwrap();
                 let seller = self.params.seller.clone().unwrap();
                 let monero_receive_address = self.params.monero_receive_address.unwrap();
@@ -92,11 +100,11 @@ impl Request {
                     seller_peer_id,
                     env_config,
                     bitcoin_wallet.clone(),
-                    (seed.derive_libp2p_identity(), context.namespace),
+                    (seed.derive_libp2p_identity(), context.config.namespace),
                 );
                 let mut swarm = swarm::cli(
                     seed.derive_libp2p_identity(),
-                    context.tor_socks5_port.unwrap(),
+                    context.config.tor_socks5_port.unwrap(),
                     behaviour,
                 )
                 .await?;
@@ -112,7 +120,7 @@ impl Request {
                 let estimate_fee = |amount| bitcoin_wallet.estimate_fee(TxLock::weight(), amount);
 
                 let (amount, fees) = match determine_btc_to_swap(
-                    context.json,
+                    context.config.json,
                     event_loop_handle.request_quote(),
                     bitcoin_wallet.new_address(),
                     || bitcoin_wallet.balance(),
@@ -224,7 +232,7 @@ impl Request {
                 let addr2 = "127.0.0.1:1234".parse()?;
 
                 let server_handle = {
-                    if let Some(addr) = context.server_address {
+                    if let Some(addr) = context.config.server_address {
                         let (_addr, handle) = rpc::run_server(addr, context).await?;
                         Some(handle)
                     } else {
@@ -257,17 +265,17 @@ impl Request {
                 let seller_peer_id = context.db.get_peer_id(swap_id).await?;
                 let seller_addresses = context.db.get_addresses(seller_peer_id).await?;
 
-                let seed = context.seed.as_ref().unwrap().derive_libp2p_identity();
+                let seed = context.config.seed.as_ref().unwrap().derive_libp2p_identity();
 
                 let behaviour = cli::Behaviour::new(
                     seller_peer_id,
-                    context.env_config,
+                    context.config.env_config,
                     Arc::clone(context.bitcoin_wallet.as_ref().unwrap()),
-                    (seed.clone(), context.namespace),
+                    (seed.clone(), context.config.namespace),
                 );
                 let mut swarm = swarm::cli(
                     seed.clone(),
-                    context.tor_socks5_port.clone().unwrap(),
+                    context.config.tor_socks5_port.clone().unwrap(),
                     behaviour,
                 )
                 .await?;
@@ -291,7 +299,7 @@ impl Request {
                     swap_id,
                     Arc::clone(context.bitcoin_wallet.as_ref().unwrap()),
                     Arc::clone(context.monero_wallet.as_ref().unwrap()),
-                    context.env_config,
+                    context.config.env_config,
                     event_loop_handle,
                     monero_receive_address,
                 )
@@ -343,13 +351,13 @@ impl Request {
                     .extract_peer_id()
                     .context("Rendezvous node address must contain peer ID")?;
 
-                let identity = context.seed.as_ref().unwrap().derive_libp2p_identity();
+                let identity = context.config.seed.as_ref().unwrap().derive_libp2p_identity();
 
                 let sellers = list_sellers(
                     rendezvous_node_peer_id,
                     rendezvous_point,
-                    context.namespace,
-                    context.tor_socks5_port.unwrap(),
+                    context.config.namespace,
+                    context.config.tor_socks5_port.unwrap(),
                     identity,
                 )
                 .await?;
@@ -413,7 +421,7 @@ impl Request {
                         let (spend_key, view_key) = state5.xmr_keys();
 
                         let address = monero::Address::standard(
-                            context.env_config.monero_network,
+                            context.config.env_config.monero_network,
                             monero::PublicKey::from_private_key(&spend_key),
                             monero::PublicKey::from(view_key.public()),
                         );
@@ -489,21 +497,26 @@ impl Context {
             }
         };
 
-        cli::tracing::init(debug, json, data_dir.join("logs"), None)?;
+        START.call_once(|| {
+            let _ = cli::tracing::init(debug, json, data_dir.join("logs"), None);
+        });
+
 
         let init = Context {
+            db: open_db(data_dir.join("sqlite")).await?,
             bitcoin_wallet,
             monero_wallet,
             monero_rpc_process,
-            tor_socks5_port,
-            namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
-            db: open_db(data_dir.join("sqlite")).await?,
-            env_config,
-            seed: Some(seed),
-            debug,
-            json,
-            is_testnet,
-            server_address,
+            config: Config {
+                tor_socks5_port,
+                namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
+                env_config,
+                seed: Some(seed),
+                server_address,
+                debug,
+                json,
+                is_testnet,
+            },
         };
 
         Ok(init)
@@ -517,19 +530,9 @@ impl Serialize for Context {
     {
         // 3 is the number of fields in the struct.
         let mut state = serializer.serialize_struct("Context", 3)?;
-        state.serialize_field("debug", &self.debug)?;
-        state.serialize_field("json", &self.json)?;
+        state.serialize_field("debug", &self.config.debug)?;
+        state.serialize_field("json", &self.config.json)?;
         state.end()
-    }
-}
-
-impl PartialEq for Context {
-    fn eq(&self, other: &Self) -> bool {
-        self.tor_socks5_port == other.tor_socks5_port
-            && self.namespace == other.namespace
-            && self.debug == other.debug
-            && self.json == other.json
-            && self.server_address == other.server_address
     }
 }
 
@@ -543,7 +546,7 @@ async fn init_bitcoin_wallet(
     electrum_rpc_url: Url,
     seed: &Seed,
     data_dir: PathBuf,
-    env_config: Config,
+    env_config: EnvConfig,
     bitcoin_target_block: usize,
 ) -> Result<bitcoin::Wallet> {
     let wallet_dir = data_dir.join("wallet");
@@ -668,7 +671,7 @@ where
 async fn init_monero_wallet(
     data_dir: PathBuf,
     monero_daemon_address: String,
-    env_config: Config,
+    env_config: EnvConfig,
 ) -> Result<(monero::Wallet, monero::WalletRpcProcess)> {
     let network = env_config.monero_network;
 
@@ -709,7 +712,7 @@ mod data {
     }
 }
 
-fn env_config_from(testnet: bool) -> Config {
+fn env_config_from(testnet: bool) -> EnvConfig {
     if testnet {
         Testnet::get_config()
     } else {
@@ -730,32 +733,30 @@ pub mod api_test {
     pub const BITCOIN_MAINNET_ADDRESS: &str = "bc1qe4epnfklcaa0mun26yz5g8k24em5u9f92hy325";
     pub const SWAP_ID: &str = "ea030832-3be9-454f-bb98-5ea9a788406b";
 
-    impl Context {
-        pub async fn default(
+    impl Config {
+        pub fn default(
             is_testnet: bool,
-            data_dir: PathBuf,
+            data_dir: Option<PathBuf>,
             json: bool,
             debug: bool,
-        ) -> Result<Context> {
-            Ok(Context::build(
-                Some(Bitcoin {
-                    bitcoin_electrum_rpc_url: None,
-                    bitcoin_target_block: None,
-                }),
-                Some(Monero {
-                    monero_daemon_address: None,
-                }),
-                Some(Tor {
-                    tor_socks5_port: DEFAULT_SOCKS5_PORT,
-                }),
-                Some(data_dir),
-                is_testnet,
+        ) -> Self {
+            let data_dir = data::data_dir_from(data_dir, is_testnet).unwrap();
+
+            let seed = Seed::from_file_or_generate(data_dir.as_path()).unwrap();
+
+            let env_config = env_config_from(is_testnet);
+            Self {
+                tor_socks5_port: Some(9050),
+                namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
+                server_address: None,
+                env_config,
+                seed: Some(seed),
                 debug,
                 json,
-                None,
-            )
-            .await?)
+                is_testnet
+            }
         }
+
     }
     impl Request {
         pub fn buy_xmr(is_testnet: bool) -> Request {

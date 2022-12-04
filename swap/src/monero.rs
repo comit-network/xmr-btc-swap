@@ -320,6 +320,43 @@ pub mod monero_amount {
     }
 }
 
+pub mod monero_address {
+    use anyhow::{bail, Result, Context};
+    use std::str::FromStr;
+
+    #[derive(thiserror::Error, Debug, Clone, Copy, PartialEq)]
+    #[error("Invalid monero address provided, expected address on network {expected:?} but address provided is on {actual:?}")]
+    pub struct MoneroAddressNetworkMismatch {
+        pub expected: monero::Network,
+        pub actual: monero::Network,
+    }
+
+    pub fn parse(s: &str) -> Result<monero::Address> {
+        monero::Address::from_str(s).with_context(|| {
+            format!(
+                "Failed to parse {} as a monero address, please make sure it is a valid address",
+                s
+            )
+        })
+    }
+
+    pub fn validate(address: monero::Address, is_testnet: bool) -> Result<monero::Address> {
+        let expected_network = if is_testnet {
+            monero::Network::Stagenet
+        } else {
+            monero::Network::Mainnet
+        };
+
+        if address.network != expected_network {
+            bail!(MoneroAddressNetworkMismatch {
+                expected: expected_network,
+                actual: address.network,
+            });
+        }
+        Ok(address)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
