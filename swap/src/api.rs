@@ -737,8 +737,8 @@ pub mod api_test {
         pub fn default(
             is_testnet: bool,
             data_dir: Option<PathBuf>,
-            json: bool,
             debug: bool,
+            json: bool,
         ) -> Self {
             let data_dir = data::data_dir_from(data_dir, is_testnet).unwrap();
 

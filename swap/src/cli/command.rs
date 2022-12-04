@@ -977,339 +977,327 @@ mod tests {
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
     }
-//
-//    #[tokio::test]
-//    async fn given_with_debug_then_debug_set() {
-//        let raw_ars = vec![
-//            BINARY_NAME,
-//            "--debug",
-//            "buy-xmr",
-//            "--change-address",
-//            BITCOIN_MAINNET_ADDRESS,
-//            "--receive-address",
-//            MONERO_MAINNET_ADDRESS,
-//            "--seller",
-//            MULTI_ADDRESS,
-//        ];
-//
-//        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
-//        let (is_testnet, debug, json) = (false, true, false);
-//        let data_dir = data_dir_path_cli(is_testnet);
-//
-//        let (expected_context, expected_request) = (
-//            Context::default(is_testnet, data_dir, debug, json)
-//                .await
-//                .unwrap(),
-//            Request::buy_xmr(is_testnet),
-//        );
-//
-//        let (actual_context, actual_request) = match args {
-//            ParseResult::Context(context, request) => (context, request),
-//            _ => panic!("Couldn't parse result"),
-//        };
-//
-//        assert_eq!(actual_context, Arc::new(expected_context));
-//        assert_eq!(actual_request, Box::new(expected_request));
-//
-//        let raw_ars = vec![
-//            BINARY_NAME,
-//            "--testnet",
-//            "--debug",
-//            "buy-xmr",
-//            "--change-address",
-//            BITCOIN_TESTNET_ADDRESS,
-//            "--receive-address",
-//            MONERO_STAGENET_ADDRESS,
-//            "--seller",
-//            MULTI_ADDRESS,
-//        ];
-//
-//        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
-//        let (is_testnet, debug, json) = (true, true, false);
-//        let data_dir = data_dir_path_cli(is_testnet);
-//
-//        let (expected_context, expected_request) = (
-//            Context::default(is_testnet, data_dir, debug, json)
-//                .await
-//                .unwrap(),
-//            Request::buy_xmr(is_testnet),
-//        );
-//
-//        let (actual_context, actual_request) = match args {
-//            ParseResult::Context(context, request) => (context, request),
-//            _ => panic!("Couldn't parse result"),
-//        };
-//
-//        assert_eq!(actual_context, Arc::new(expected_context));
-//        assert_eq!(actual_request, Box::new(expected_request));
-//
-//        let raw_ars = vec![BINARY_NAME, "--debug", "resume", "--swap-id", SWAP_ID];
-//
-//        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
-//        let (is_testnet, debug, json) = (false, true, false);
-//        let data_dir = data_dir_path_cli(is_testnet);
-//
-//        let (expected_context, expected_request) = (
-//            Context::default(is_testnet, data_dir, debug, json)
-//                .await
-//                .unwrap(),
-//            Request::resume(),
-//        );
-//
-//        let (actual_context, actual_request) = match args {
-//            ParseResult::Context(context, request) => (context, request),
-//            _ => panic!("Couldn't parse result"),
-//        };
-//
-//        assert_eq!(actual_context, Arc::new(expected_context));
-//        assert_eq!(actual_request, Box::new(expected_request));
-//
-//        let raw_ars = vec![
-//            BINARY_NAME,
-//            "--testnet",
-//            "--debug",
-//            "resume",
-//            "--swap-id",
-//            SWAP_ID,
-//        ];
-//
-//        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
-//        let (is_testnet, debug, json) = (true, true, false);
-//        let data_dir = data_dir_path_cli(is_testnet);
-//
-//        let (expected_context, expected_request) = (
-//            Context::default(is_testnet, data_dir, debug, json)
-//                .await
-//                .unwrap(),
-//            Request::resume(),
-//        );
-//
-//        let (actual_context, actual_request) = match args {
-//            ParseResult::Context(context, request) => (context, request),
-//            _ => panic!("Couldn't parse result"),
-//        };
-//
-//        assert_eq!(actual_context, Arc::new(expected_context));
-//        assert_eq!(actual_request, Box::new(expected_request));
-//    }
-//
-//    #[tokio::test]
-//    async fn given_with_json_then_json_set() {
-//        let raw_ars = vec![
-//            BINARY_NAME,
-//            "--json",
-//            "buy-xmr",
-//            "--change-address",
-//            BITCOIN_MAINNET_ADDRESS,
-//            "--receive-address",
-//            MONERO_MAINNET_ADDRESS,
-//            "--seller",
-//            MULTI_ADDRESS,
-//        ];
-//
-//        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
-//        let (is_testnet, debug, json) = (false, false, true);
-//        let data_dir = data_dir_path_cli(is_testnet);
-//
-//        let (expected_context, expected_request) = (
-//            Context::default(is_testnet, data_dir, debug, json)
-//                .await
-//                .unwrap(),
-//            Request::buy_xmr(is_testnet),
-//        );
-//
-//        let (actual_context, actual_request) = match args {
-//            ParseResult::Context(context, request) => (context, request),
-//            _ => panic!("Couldn't parse result"),
-//        };
-//
-//        assert_eq!(actual_context, Arc::new(expected_context));
-//        assert_eq!(actual_request, Box::new(expected_request));
-//
-//        let raw_ars = vec![
-//            BINARY_NAME,
-//            "--testnet",
-//            "--json",
-//            "buy-xmr",
-//            "--change-address",
-//            BITCOIN_TESTNET_ADDRESS,
-//            "--receive-address",
-//            MONERO_STAGENET_ADDRESS,
-//            "--seller",
-//            MULTI_ADDRESS,
-//        ];
-//
-//        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
-//        let (is_testnet, debug, json) = (true, false, true);
-//        let data_dir = data_dir_path_cli(is_testnet);
-//
-//        let (expected_context, expected_request) = (
-//            Context::default(is_testnet, data_dir, debug, json)
-//                .await
-//                .unwrap(),
-//            Request::buy_xmr(is_testnet),
-//        );
-//
-//        let (actual_context, actual_request) = match args {
-//            ParseResult::Context(context, request) => (context, request),
-//            _ => panic!("Couldn't parse result"),
-//        };
-//
-//        assert_eq!(actual_context, Arc::new(expected_context));
-//        assert_eq!(actual_request, Box::new(expected_request));
-//
-//        let raw_ars = vec![BINARY_NAME, "--json", "resume", "--swap-id", SWAP_ID];
-//        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
-//        let (is_testnet, debug, json) = (false, false, true);
-//        let data_dir = data_dir_path_cli(is_testnet);
-//
-//        let (expected_context, expected_request) = (
-//            Context::default(is_testnet, data_dir, debug, json)
-//                .await
-//                .unwrap(),
-//            Request::resume(),
-//        );
-//
-//        let (actual_context, actual_request) = match args {
-//            ParseResult::Context(context, request) => (context, request),
-//            _ => panic!("Couldn't parse result"),
-//        };
-//
-//        assert_eq!(actual_context, Arc::new(expected_context));
-//        assert_eq!(actual_request, Box::new(expected_request));
-//
-//        let raw_ars = vec![
-//            BINARY_NAME,
-//            "--testnet",
-//            "--json",
-//            "resume",
-//            "--swap-id",
-//            SWAP_ID,
-//        ];
-//
-//        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
-//        let (is_testnet, debug, json) = (true, false, true);
-//        let data_dir = data_dir_path_cli(is_testnet);
-//
-//        let (expected_context, expected_request) = (
-//            Context::default(is_testnet, data_dir, debug, json)
-//                .await
-//                .unwrap(),
-//            Request::resume(),
-//        );
-//
-//        let (actual_context, actual_request) = match args {
-//            ParseResult::Context(context, request) => (context, request),
-//            _ => panic!("Couldn't parse result"),
-//        };
-//
-//        assert_eq!(actual_context, Arc::new(expected_context));
-//        assert_eq!(actual_request, Box::new(expected_request));
-//    }
-//
-//    #[tokio::test]
-//    async fn only_bech32_addresses_mainnet_are_allowed() {
-//        let raw_ars = vec![
-//            BINARY_NAME,
-//            "buy-xmr",
-//            "--change-address",
-//            "1A5btpLKZjgYm8R22rJAhdbTFVXgSRA2Mp",
-//            "--receive-address",
-//            MONERO_MAINNET_ADDRESS,
-//            "--seller",
-//            MULTI_ADDRESS,
-//        ];
-//        let args = parse_args_and_apply_defaults(raw_ars).await;
-//        let (is_testnet, debug, json) = (false, false, false);
-//        let data_dir = data_dir_path_cli(is_testnet);
-//
-//        assert_eq!(
-//            args.unwrap_err().to_string(),
-//            "Invalid Bitcoin address provided, only bech32 format is supported!"
-//        );
-//
-//        let raw_ars = vec![
-//            BINARY_NAME,
-//            "buy-xmr",
-//            "--change-address",
-//            "36vn4mFhmTXn7YcNwELFPxTXhjorw2ppu2",
-//            "--receive-address",
-//            MONERO_MAINNET_ADDRESS,
-//            "--seller",
-//            MULTI_ADDRESS,
-//        ];
-//        let result = parse_args_and_apply_defaults(raw_ars);
-//        assert_eq!(
-//            result.await.unwrap_err().to_string(),
-//            "Invalid Bitcoin address provided, only bech32 format is supported!"
-//        );
-//
-//        let raw_ars = vec![
-//            BINARY_NAME,
-//            "buy-xmr",
-//            "--change-address",
-//            "bc1qh4zjxrqe3trzg7s6m7y67q2jzrw3ru5mx3z7j3",
-//            "--receive-address",
-//            MONERO_MAINNET_ADDRESS,
-//            "--seller",
-//            MULTI_ADDRESS,
-//        ];
-//        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap();
-//        // assert!(matches!(result, ParseResult::Arguments(_)));
-//        assert!(true);
-//    }
-//
-//    #[tokio::test]
-//    async fn only_bech32_addresses_testnet_are_allowed() {
-//        let raw_ars = vec![
-//            BINARY_NAME,
-//            "--testnet",
-//            "buy-xmr",
-//            "--change-address",
-//            "n2czxyeFCQp9e8WRyGpy4oL4YfQAeKkkUH",
-//            "--receive-address",
-//            MONERO_STAGENET_ADDRESS,
-//            "--seller",
-//            MULTI_ADDRESS,
-//        ];
-//        let result = parse_args_and_apply_defaults(raw_ars);
-//        assert_eq!(
-//            result.await.unwrap_err().to_string(),
-//            "Invalid Bitcoin address provided, only bech32 format is supported!"
-//        );
-//
-//        let raw_ars = vec![
-//            BINARY_NAME,
-//            "--testnet",
-//            "buy-xmr",
-//            "--change-address",
-//            "2ND9a4xmQG89qEWG3ETRuytjKpLmGrW7Jvf",
-//            "--receive-address",
-//            MONERO_STAGENET_ADDRESS,
-//            "--seller",
-//            MULTI_ADDRESS,
-//        ];
-//        let result = parse_args_and_apply_defaults(raw_ars);
-//        assert_eq!(
-//            result.await.unwrap_err().to_string(),
-//            "Invalid Bitcoin address provided, only bech32 format is supported!"
-//        );
-//
-//        let raw_ars = vec![
-//            BINARY_NAME,
-//            "--testnet",
-//            "buy-xmr",
-//            "--change-address",
-//            "tb1q958vfh3wkdp232pktq8zzvmttyxeqnj80zkz3v",
-//            "--receive-address",
-//            MONERO_STAGENET_ADDRESS,
-//            "--seller",
-//            MULTI_ADDRESS,
-//        ];
-//        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap();
-//        // assert!(matches!(result, ParseResult::Arguments(_)));
-//        assert!(true);
-//    }
+
+    #[tokio::test]
+    #[sequential]
+    async fn given_buy_xmr_on_mainnet_with_debug_then_debug_set() {
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--debug",
+            "buy-xmr",
+            "--change-address",
+            BITCOIN_MAINNET_ADDRESS,
+            "--receive-address",
+            MONERO_MAINNET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (false, true, false);
+
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::buy_xmr(is_testnet),
+        );
+
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+    }
+
+    #[tokio::test]
+    #[sequential]
+    async fn given_buy_xmr_on_testnet_with_debug_then_debug_set() {
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "--debug",
+            "buy-xmr",
+            "--change-address",
+            BITCOIN_TESTNET_ADDRESS,
+            "--receive-address",
+            MONERO_STAGENET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (true, true, false);
+
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::buy_xmr(is_testnet),
+        );
+
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+    }
+
+    #[tokio::test]
+    #[sequential]
+    async fn given_resume_on_mainnet_with_debug_then_debug_set() {
+
+        let raw_ars = vec![BINARY_NAME, "--debug", "resume", "--swap-id", SWAP_ID];
+
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (false, true, false);
+
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::resume(),
+        );
+
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+    }
+
+
+    #[tokio::test]
+    #[sequential]
+    async fn given_resume_on_testnet_with_debug_then_debug_set() {
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "--debug",
+            "resume",
+            "--swap-id",
+            SWAP_ID,
+        ];
+
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (true, true, false);
+
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::resume(),
+        );
+
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+    }
+
+    #[tokio::test]
+    #[sequential]
+    async fn given_buy_xmr_on_mainnet_with_json_then_json_set() {
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--json",
+            "buy-xmr",
+            "--change-address",
+            BITCOIN_MAINNET_ADDRESS,
+            "--receive-address",
+            MONERO_MAINNET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (false, false, true);
+        let data_dir = data_dir_path_cli(is_testnet);
+
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::buy_xmr(is_testnet),
+        );
+
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+    }
+
+    #[tokio::test]
+    #[sequential]
+    async fn given_buy_xmr_on_testnet_with_json_then_json_set() {
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "--json",
+            "buy-xmr",
+            "--change-address",
+            BITCOIN_TESTNET_ADDRESS,
+            "--receive-address",
+            MONERO_STAGENET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (true, false, true);
+
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::buy_xmr(is_testnet),
+        );
+
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+    }
+
+    #[tokio::test]
+    #[sequential]
+    async fn given_resume_on_mainnet_with_json_then_json_set() {
+
+        let raw_ars = vec![BINARY_NAME, "--json", "resume", "--swap-id", SWAP_ID];
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (false, false, true);
+
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::resume(),
+        );
+
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+    }
+
+    #[tokio::test]
+    #[sequential]
+    async fn given_resume_on_testnet_with_json_then_json_set() {
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "--json",
+            "resume",
+            "--swap-id",
+            SWAP_ID,
+        ];
+
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (true, false, true);
+
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::resume(),
+        );
+
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+    }
+
+    #[tokio::test]
+    #[sequential]
+    async fn only_bech32_addresses_mainnet_are_allowed() {
+        let raw_ars = vec![
+            BINARY_NAME,
+            "buy-xmr",
+            "--change-address",
+            "1A5btpLKZjgYm8R22rJAhdbTFVXgSRA2Mp",
+            "--receive-address",
+            MONERO_MAINNET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "buy-xmr",
+            "--change-address",
+            "36vn4mFhmTXn7YcNwELFPxTXhjorw2ppu2",
+            "--receive-address",
+            MONERO_MAINNET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "buy-xmr",
+            "--change-address",
+            "bc1qh4zjxrqe3trzg7s6m7y67q2jzrw3ru5mx3z7j3",
+            "--receive-address",
+            MONERO_MAINNET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        assert!(matches!(result, ParseResult::Context(_, _)));
+    }
+
+    #[tokio::test]
+    #[sequential]
+    async fn only_bech32_addresses_testnet_are_allowed() {
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "buy-xmr",
+            "--change-address",
+            "n2czxyeFCQp9e8WRyGpy4oL4YfQAeKkkUH",
+            "--receive-address",
+            MONERO_STAGENET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "buy-xmr",
+            "--change-address",
+            "2ND9a4xmQG89qEWG3ETRuytjKpLmGrW7Jvf",
+            "--receive-address",
+            MONERO_STAGENET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
+
+        let raw_ars = vec![
+            BINARY_NAME,
+            "--testnet",
+            "buy-xmr",
+            "--change-address",
+            "tb1q958vfh3wkdp232pktq8zzvmttyxeqnj80zkz3v",
+            "--receive-address",
+            MONERO_STAGENET_ADDRESS,
+            "--seller",
+            MULTI_ADDRESS,
+        ];
+        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        assert!(matches!(result, ParseResult::Context(_, _)));
+    }
 
     fn data_dir_path_cli(is_testnet: bool) -> PathBuf {
         if is_testnet {
