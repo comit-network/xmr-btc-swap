@@ -1,4 +1,5 @@
-use crate::api::{Context, Params, Request, Config};
+use crate::api::{Context, Config};
+use crate::api::request::{Request, Params, Method};
 use crate::bitcoin::{Amount, bitcoin_address};
 use crate::monero::monero_address;
 use crate::fs::system_data_dir;
@@ -48,8 +49,8 @@ where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
 {
-    let args = match RawArguments::clap().get_matches_from_safe(raw_args) {
-        Ok(matches) => RawArguments::from_clap(&matches),
+    let args = match Arguments::clap().get_matches_from_safe(raw_args) {
+        Ok(matches) => Arguments::from_clap(&matches),
         Err(clap::Error {
             message,
             kind: clap::ErrorKind::HelpDisplayed | clap::ErrorKind::VersionDisplayed,
@@ -64,7 +65,7 @@ where
     let data = args.data;
 
     let (context, request) = match args.cmd {
-        RawCommand::BuyXmr {
+        CliCommand::BuyXmr {
             seller: Seller { seller },
             bitcoin,
             bitcoin_change_address,
@@ -94,31 +95,31 @@ where
                     seller: Some(seller),
                     ..Default::default()
                 },
-                cmd: Command::BuyXmr,
+                cmd: Method::BuyXmr,
             };
             (context, request)
         }
-        RawCommand::History => {
+        CliCommand::History => {
             let context =
                 Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
 
             let request = Request {
                 params: Params::default(),
-                cmd: Command::History,
+                cmd: Method::History,
             };
             (context, request)
         }
-        RawCommand::Config => {
+        CliCommand::Config => {
             let context =
                 Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
 
             let request = Request {
                 params: Params::default(),
-                cmd: Command::Config,
+                cmd: Method::Config,
             };
             (context, request)
         }
-        RawCommand::Balance { bitcoin } => {
+        CliCommand::Balance { bitcoin } => {
             let context = Context::build(
                 Some(bitcoin),
                 None,
@@ -132,11 +133,11 @@ where
             .await?;
             let request = Request {
                 params: Params::default(),
-                cmd: Command::Balance,
+                cmd: Method::Balance,
             };
             (context, request)
         }
-        RawCommand::StartDaemon {
+        CliCommand::StartDaemon {
             server_address,
             bitcoin,
             monero,
@@ -155,11 +156,11 @@ where
             .await?;
             let request = Request {
                 params: Params::default(),
-                cmd: Command::StartDaemon,
+                cmd: Method::StartDaemon,
             };
             (context, request)
         }
-        RawCommand::WithdrawBtc {
+        CliCommand::WithdrawBtc {
             bitcoin,
             amount,
             address,
@@ -184,11 +185,11 @@ where
                     address: Some(address),
                     ..Default::default()
                 },
-                cmd: Command::WithdrawBtc,
+                cmd: Method::WithdrawBtc,
             };
             (context, request)
         }
-        RawCommand::Resume {
+        CliCommand::Resume {
             swap_id: SwapId { swap_id },
             bitcoin,
             monero,
@@ -210,11 +211,11 @@ where
                     swap_id: Some(swap_id),
                     ..Default::default()
                 },
-                cmd: Command::Resume,
+                cmd: Method::Resume,
             };
             (context, request)
         }
-        RawCommand::Cancel {
+        CliCommand::Cancel {
             swap_id: SwapId { swap_id },
             bitcoin,
             tor,
@@ -235,11 +236,11 @@ where
                     swap_id: Some(swap_id),
                     ..Default::default()
                 },
-                cmd: Command::Cancel,
+                cmd: Method::Cancel,
             };
             (context, request)
         }
-        RawCommand::Refund {
+        CliCommand::Refund {
             swap_id: SwapId { swap_id },
             bitcoin,
             tor,
@@ -260,11 +261,11 @@ where
                     swap_id: Some(swap_id),
                     ..Default::default()
                 },
-                cmd: Command::Refund,
+                cmd: Method::Refund,
             };
             (context, request)
         }
-        RawCommand::ListSellers {
+        CliCommand::ListSellers {
             rendezvous_point,
             tor,
         } => {
@@ -276,11 +277,11 @@ where
                     rendezvous_point: Some(rendezvous_point),
                     ..Default::default()
                 },
-                cmd: Command::ListSellers,
+                cmd: Method::ListSellers,
             };
             (context, request)
         }
-        RawCommand::ExportBitcoinWallet { bitcoin } => {
+        CliCommand::ExportBitcoinWallet { bitcoin } => {
             let context = Context::build(
                 Some(bitcoin),
                 None,
@@ -294,11 +295,11 @@ where
             .await?;
             let request = Request {
                 params: Params::default(),
-                cmd: Command::ExportBitcoinWallet,
+                cmd: Method::ExportBitcoinWallet,
             };
             (context, request)
         }
-        RawCommand::MoneroRecovery { swap_id } => {
+        CliCommand::MoneroRecovery { swap_id } => {
             let context =
                 Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
 
@@ -307,28 +308,13 @@ where
                     swap_id: Some(swap_id.swap_id),
                     ..Default::default()
                 },
-                cmd: Command::MoneroRecovery,
+                cmd: Method::MoneroRecovery,
             };
             (context, request)
         }
     };
 
     Ok(ParseResult::Context(Arc::new(context), Box::new(request)))
-}
-#[derive(Debug, PartialEq)]
-pub enum Command {
-    BuyXmr,
-    History,
-    Config,
-    WithdrawBtc,
-    Balance,
-    Resume,
-    Cancel,
-    Refund,
-    ListSellers,
-    ExportBitcoinWallet,
-    MoneroRecovery,
-    StartDaemon,
 }
 
 #[derive(structopt::StructOpt, Debug)]
@@ -338,7 +324,7 @@ pub enum Command {
     author,
     version = env!("VERGEN_GIT_SEMVER_LIGHTWEIGHT")
 )]
-struct RawArguments {
+struct Arguments {
     // global is necessary to ensure that clap can match against testnet in subcommands
     #[structopt(
         long,
@@ -365,11 +351,11 @@ struct RawArguments {
     json: bool,
 
     #[structopt(subcommand)]
-    cmd: RawCommand,
+    cmd: CliCommand,
 }
 
 #[derive(structopt::StructOpt, Debug)]
-enum RawCommand {
+enum CliCommand {
     /// Start a BTC for XMR swap
     BuyXmr {
         #[structopt(flatten)]

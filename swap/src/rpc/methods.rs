@@ -1,6 +1,7 @@
-use crate::api::{Context, Params, Request};
-use crate::cli::command::Command;
-use crate::rpc::Error;
+use crate::api::{Context};
+use crate::api::request::{Params, Request, Method};
+//use crate::rpc::Error;
+use anyhow::{Error, Result};
 use crate::{bitcoin, monero};
 use jsonrpsee::http_server::RpcModule;
 use libp2p::core::Multiaddr;
@@ -14,16 +15,12 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
     let mut module = RpcModule::new(context);
     module
         .register_async_method("get_bitcoin_balance", |_, context| async move {
-            get_bitcoin_balance(&context)
-                .await
-                .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))
+            get_bitcoin_balance(&context).await
         })
         .unwrap();
     module
         .register_async_method("get_history", |_, context| async move {
-            get_history(&context)
-                .await
-                .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))
+            get_history(&context).await
         })
         .unwrap();
     module
@@ -38,22 +35,24 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
     module
         .register_async_method("get_seller", |params, context| async move {
             let params: HashMap<String, String> = params.parse()?;
+
             let swap_id = Uuid::from_str(params.get("swap_id").ok_or_else(|| {
                 jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string())
             })?)
-            .unwrap();
+            .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
+
             let peerId = context
                 .db
                 .get_peer_id(swap_id)
                 .await
-                .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))
-                .unwrap();
+                .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
+
             let addresses = context
                 .db
                 .get_addresses(peerId)
                 .await
-                .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))
-                .unwrap();
+                .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
+
             Ok(json!({
                 "peerId": peerId.to_base58(),
                 "addresses": addresses
@@ -63,16 +62,17 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
     module
         .register_async_method("get_swap_start_date", |params, context| async move {
             let params: HashMap<String, String> = params.parse()?;
+
             let swap_id = Uuid::from_str(params.get("swap_id").ok_or_else(|| {
                 jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string())
             })?)
-            .unwrap();
+            .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
+
             let start_date = context
                 .db
                 .get_swap_start_date(swap_id)
                 .await
-                .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))
-                .unwrap();
+                .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
 
             Ok(json!({
                 "start_date": start_date,
@@ -82,18 +82,19 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
     module
         .register_async_method("resume_swap", |params, context| async move {
             let params: HashMap<String, String> = params.parse()?;
+
             let swap_id = Uuid::from_str(params.get("swap_id").ok_or_else(|| {
                 jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string())
             })?)
-            .unwrap();
-            resume_swap(swap_id, &context)
-                .await
-                .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))
+            .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
+
+            resume_swap(swap_id, &context).await
         })
         .unwrap();
     module
         .register_async_method("withdraw_btc", |params, context| async move {
             let params: HashMap<String, String> = params.parse()?;
+
             let amount = if let Some(amount_str) = params.get("amount") {
                 Some(
                     ::bitcoin::Amount::from_str_in(amount_str, ::bitcoin::Denomination::Bitcoin)
@@ -104,19 +105,20 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
             } else {
                 None
             };
+
             let withdraw_address =
                 bitcoin::Address::from_str(params.get("address").ok_or_else(|| {
                     jsonrpsee_core::Error::Custom("Does not contain address".to_string())
                 })?)
-                .unwrap();
-            withdraw_btc(withdraw_address, amount, &context)
-                .await
-                .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))
+                .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
+
+            withdraw_btc(withdraw_address, amount, &context).await
         })
         .unwrap();
     module
         .register_async_method("buy_xmr", |params, context| async move {
             let params: HashMap<String, String> = params.parse()?;
+
             let bitcoin_change_address = bitcoin::Address::from_str(
                 params.get("bitcoin_change_address").ok_or_else(|| {
                     jsonrpsee_core::Error::Custom(
@@ -124,7 +126,8 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
                     )
                 })?,
             )
-            .unwrap();
+            .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
+
             let monero_receive_address = monero::Address::from_str(
                 params.get("monero_receive_address").ok_or_else(|| {
                     jsonrpsee_core::Error::Custom(
@@ -132,19 +135,19 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
                     )
                 })?,
             )
-            .unwrap();
+            .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
+
             let seller = Multiaddr::from_str(params.get("seller").ok_or_else(|| {
                 jsonrpsee_core::Error::Custom("Does not contain seller".to_string())
             })?)
-            .unwrap();
+            .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
+
             buy_xmr(
                 bitcoin_change_address,
                 monero_receive_address,
                 seller,
                 &context,
-            )
-            .await
-            .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))
+            ).await
         })
         .unwrap();
     module
@@ -154,62 +157,71 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
                 Multiaddr::from_str(params.get("rendezvous_point").ok_or_else(|| {
                     jsonrpsee_core::Error::Custom("Does not contain rendezvous_point".to_string())
                 })?)
-                .unwrap();
-            list_sellers(rendezvous_point, &context)
-                .await
-                .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))
+                .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
+
+            list_sellers(rendezvous_point, &context).await
         })
         .unwrap();
     module
 }
 
-async fn get_bitcoin_balance(context: &Arc<Context>) -> anyhow::Result<serde_json::Value, Error> {
+async fn get_bitcoin_balance(context: &Arc<Context>) -> Result<serde_json::Value, jsonrpsee_core::Error> {
     let request = Request {
         params: Params::default(),
-        cmd: Command::Balance,
+        cmd: Method::Balance,
     };
-    let balance = request.call(Arc::clone(context)).await.unwrap();
+    let balance = request.call(Arc::clone(context))
+        .await
+        .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
+
     Ok(balance)
 }
 
-async fn get_history(context: &Arc<Context>) -> anyhow::Result<serde_json::Value, Error> {
+async fn get_history(context: &Arc<Context>) -> Result<serde_json::Value, jsonrpsee_core::Error> {
     let request = Request {
         params: Params::default(),
-        cmd: Command::History,
+        cmd: Method::History,
     };
-    let history = request.call(Arc::clone(context)).await.unwrap();
+    let history = request.call(Arc::clone(context))
+        .await
+        .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
+
     Ok(history)
 }
 
 async fn resume_swap(
     swap_id: Uuid,
     context: &Arc<Context>,
-) -> anyhow::Result<serde_json::Value, Error> {
+) -> Result<serde_json::Value, jsonrpsee_core::Error> {
     let request = Request {
         params: Params {
             swap_id: Some(swap_id),
             ..Default::default()
         },
-        cmd: Command::Resume,
+        cmd: Method::Resume,
     };
 
-    let result = request.call(Arc::clone(context)).await.unwrap();
+    let result = request.call(Arc::clone(context))
+        .await
+        .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
     Ok(result)
 }
 async fn withdraw_btc(
     withdraw_address: bitcoin::Address,
     amount: Option<bitcoin::Amount>,
     context: &Arc<Context>,
-) -> anyhow::Result<serde_json::Value, Error> {
+) -> Result<serde_json::Value, jsonrpsee_core::Error> {
     let request = Request {
         params: Params {
             amount,
             address: Some(withdraw_address),
             ..Default::default()
         },
-        cmd: Command::WithdrawBtc,
+        cmd: Method::WithdrawBtc,
     };
-    let result = request.call(Arc::clone(context)).await.unwrap();
+    let result = request.call(Arc::clone(context))
+        .await
+        .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
     Ok(result)
 }
 
@@ -218,7 +230,7 @@ async fn buy_xmr(
     monero_receive_address: monero::Address,
     seller: Multiaddr,
     context: &Arc<Context>,
-) -> anyhow::Result<serde_json::Value, Error> {
+) -> Result<serde_json::Value, jsonrpsee_core::Error> {
     let request = Request {
         params: Params {
             bitcoin_change_address: Some(bitcoin_change_address),
@@ -226,23 +238,27 @@ async fn buy_xmr(
             seller: Some(seller),
             ..Default::default()
         },
-        cmd: Command::BuyXmr,
+        cmd: Method::BuyXmr,
     };
-    let swap = request.call(Arc::clone(context)).await.unwrap();
+    let swap = request.call(Arc::clone(context))
+        .await
+        .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
     Ok(swap)
 }
 
 async fn list_sellers(
     rendezvous_point: Multiaddr,
     context: &Arc<Context>,
-) -> anyhow::Result<serde_json::Value, Error> {
+) -> Result<serde_json::Value, jsonrpsee_core::Error> {
     let request = Request {
         params: Params {
             rendezvous_point: Some(rendezvous_point),
             ..Default::default()
         },
-        cmd: Command::ListSellers,
+        cmd: Method::ListSellers,
     };
-    let result = request.call(Arc::clone(context)).await.unwrap();
+    let result = request.call(Arc::clone(context))
+        .await
+        .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
     Ok(result)
 }
