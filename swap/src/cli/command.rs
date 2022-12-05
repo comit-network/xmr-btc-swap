@@ -1,13 +1,10 @@
-use crate::api::{Context, Config};
+use crate::api::Context;
 use crate::api::request::{Request, Params, Method};
 use crate::bitcoin::{Amount, bitcoin_address};
 use crate::monero::monero_address;
-use crate::fs::system_data_dir;
-use crate::{env, monero};
-use anyhow::{bail, Context as AnyContext, Result};
-use bitcoin::{Address, AddressType};
+use crate::monero;
+use anyhow::Result;
 use libp2p::core::Multiaddr;
-use serde::Serialize;
 use std::ffi::OsString;
 use std::net::SocketAddr;
 use std::path::PathBuf;

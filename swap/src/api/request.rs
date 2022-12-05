@@ -1,35 +1,23 @@
 use crate::bitcoin::{Amount, TxLock};
-use crate::cli::command::{Bitcoin, Monero, Tor};
 use crate::cli::{list_sellers, EventLoop, SellerStatus};
-use crate::database::open_db;
-use crate::env::{Config as EnvConfig, GetConfig, Mainnet, Testnet};
-use crate::fs::system_data_dir;
 use crate::libp2p_ext::MultiAddrExt;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
-use crate::network::rendezvous::XmrBtcNamespace;
 use crate::network::swarm;
 use crate::protocol::bob::{BobState, Swap};
-use crate::protocol::{bob, Database};
-use crate::seed::Seed;
+use crate::protocol::bob;
 use crate::{bitcoin, cli, monero, rpc};
 use anyhow::{bail, Context as AnyContext, Result};
-use comfy_table::Table;
 use libp2p::core::Multiaddr;
 use qrcode::render::unicode;
 use qrcode::QrCode;
-use serde::ser::{Serialize, SerializeStruct, Serializer};
 use serde_json::json;
 use std::cmp::min;
 use std::convert::TryInto;
-use std::fmt;
 use std::future::Future;
-use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use url::Url;
 use uuid::Uuid;
-use crate::api::{Config, Context};
+use crate::api::Context;
 
 
 #[derive(PartialEq, Debug)]
@@ -53,9 +41,12 @@ pub struct Params {
 pub enum Method {
     BuyXmr,
     History,
+    RawHistory,
     Config,
     WithdrawBtc,
     Balance,
+    GetSeller,
+    SwapStartDate,
     Resume,
     Cancel,
     Refund,
@@ -137,6 +128,7 @@ impl Request {
                 tracing::info!(%amount, %fees,  "Determined swap amount");
 
                 context.db.insert_peer_id(swap_id, seller_peer_id).await?;
+
                 context
                     .db
                     .insert_monero_address(swap_id, monero_receive_address)
@@ -177,6 +169,35 @@ impl Request {
                     vec.push((swap_id, state.to_string()));
                 }
                 json!({ "swaps": vec })
+            }
+            Method::RawHistory => {
+                let raw_history = context.db.raw_all().await?;
+                json!({
+                    "raw_history": raw_history
+                })
+            }
+            Method::GetSeller => {
+                let swap_id = self.params.swap_id.unwrap();
+                let peerId = context.db.get_peer_id(swap_id).await?;
+
+                let addresses = context.db.get_addresses(peerId).await?;
+
+                json!({
+                    "peerId": peerId.to_base58(),
+                    "addresses": addresses
+                })
+            }
+            Method::SwapStartDate => {
+                let swap_id = self.params.swap_id.unwrap();
+
+                let start_date = context
+                    .db
+                    .get_swap_start_date(swap_id)
+                    .await?;
+
+                json!({
+                    "start_date": start_date,
+                })
             }
             Method::Config => {
                 //                tracing::info!(path=%data_dir.display(), "Data directory");

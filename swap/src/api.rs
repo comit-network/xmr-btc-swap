@@ -1,36 +1,19 @@
 pub mod request;
-use crate::bitcoin::{Amount, TxLock};
 use crate::cli::command::{Bitcoin, Monero, Tor};
-use crate::cli::{list_sellers, EventLoop, SellerStatus};
 use crate::database::open_db;
 use crate::env::{Config as EnvConfig, GetConfig, Mainnet, Testnet};
 use crate::fs::system_data_dir;
-use crate::libp2p_ext::MultiAddrExt;
-use crate::network::quote::{BidQuote, ZeroQuoteReceived};
 use crate::network::rendezvous::XmrBtcNamespace;
-use crate::network::swarm;
-use crate::protocol::bob::{BobState, Swap};
-use crate::protocol::{bob, Database};
+use crate::protocol::Database;
 use crate::seed::Seed;
-use crate::{bitcoin, cli, monero, rpc};
-use anyhow::{bail, Context as AnyContext, Result};
-use comfy_table::Table;
-use libp2p::core::Multiaddr;
-use qrcode::render::unicode;
-use qrcode::QrCode;
-use serde::ser::{Serialize, SerializeStruct, Serializer};
-use serde_json::json;
-use std::cmp::min;
-use std::convert::TryInto;
+use crate::{bitcoin, cli, monero};
+use anyhow::{Context as AnyContext, Result};
 use std::fmt;
-use std::future::Future;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 use url::Url;
 use std::sync::Once;
-use uuid::Uuid;
 
 static START: Once = Once::new();
 
@@ -43,7 +26,7 @@ pub struct Config {
     seed: Option<Seed>,
     debug: bool,
     json: bool,
-    is_testnet: bool,
+    pub is_testnet: bool,
 }
 
 pub struct Context {
@@ -134,6 +117,7 @@ impl Context {
 
         Ok(init)
     }
+
 }
 
 impl fmt::Debug for Context {
