@@ -18,12 +18,56 @@ use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;
 use crate::api::Context;
+use tokio::sync::broadcast;
 
 
 #[derive(PartialEq, Debug)]
 pub struct Request {
     pub params: Params,
     pub cmd: Method,
+    pub shutdown: Shutdown,
+}
+
+impl Shutdown {
+    pub fn new(notify: broadcast::Receiver<()>) -> Shutdown {
+        Shutdown {
+            shutdown: false,
+            notify,
+        }
+    }
+
+    /// Returns `true` if the shutdown signal has been received.
+    pub fn is_shutdown(&self) -> bool {
+        self.shutdown
+    }
+
+    /// Receive the shutdown notice, waiting if necessary.
+    pub async fn recv(&mut self) {
+        // If the shutdown signal has already been received, then return
+        // immediately.
+        if self.shutdown {
+            return;
+        }
+
+        // Cannot receive a "lag error" as only one value is ever sent.
+        let _ = self.notify.recv().await;
+
+        self.shutdown = true;
+
+        // Remember that the signal has been received.
+    }
+}
+
+#[derive(Debug)]
+pub struct Shutdown {
+    shutdown: bool,
+    notify:  broadcast::Receiver<()>
+}
+
+impl PartialEq for Shutdown {
+     fn eq(&self, other: &Shutdown) -> bool {
+        self.shutdown == other.shutdown
+    }
 }
 
 #[derive(Default, PartialEq, Debug)]
@@ -36,6 +80,7 @@ pub struct Params {
     pub amount: Option<Amount>,
     pub address: Option<bitcoin::Address>,
 }
+
 
 #[derive(Debug, PartialEq)]
 pub enum Method {
@@ -57,7 +102,7 @@ pub enum Method {
 }
 
 impl Request {
-    pub async fn call(&self, context: Arc<Context>) -> Result<serde_json::Value> {
+    pub async fn call(&mut self, context: Arc<Context>) -> Result<serde_json::Value> {
         let result = match self.cmd {
             Method::BuyXmr => {
                 let swap_id = Uuid::new_v4();
@@ -247,19 +292,18 @@ impl Request {
             Method::StartDaemon => {
                 let addr2 = "127.0.0.1:1234".parse()?;
 
-                let server_handle = {
-                    if let Some(addr) = context.config.server_address {
-                        let (_addr, handle) = rpc::run_server(addr, context).await?;
-                        Some(handle)
-                    } else {
-                        let (_addr, handle) = rpc::run_server(addr2, context).await?;
-                        Some(handle)
+                let (_, server_handle) = rpc::run_server(addr2, Arc::clone(&context)).await?;
+
+                loop {
+                    tokio::select! {
+                        _ = self.shutdown.recv() => {
+                            server_handle.stop();
+                            return Ok(json!({
+                                "result": []
+                            }))
+                        }
                     }
-                };
-                loop {}
-                json!({
-                    "result": []
-                })
+                }
             }
             Method::Balance => {
                 let bitcoin_wallet = context.bitcoin_wallet.as_ref().unwrap();
@@ -457,6 +501,7 @@ impl Request {
         Ok(result)
     }
 }
+
 
 fn qr_code(value: &impl ToString) -> Result<String> {
     let code = QrCode::new(value.to_string())?;

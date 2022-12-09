@@ -1,5 +1,5 @@
 use crate::api::Context;
-use jsonrpsee::http_server::{HttpServerBuilder, HttpServerHandle, RpcModule};
+use jsonrpsee::server::{ServerBuilder, ServerHandle, RpcModule};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use thiserror::Error;
@@ -15,8 +15,8 @@ pub enum Error {
 pub async fn run_server(
     server_address: SocketAddr,
     context: Arc<Context>,
-) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
-    let server = HttpServerBuilder::default().build(server_address).await?;
+) -> anyhow::Result<(SocketAddr, ServerHandle)> {
+    let server = ServerBuilder::default().build(server_address).await?;
     let mut modules = RpcModule::new(());
     {
         modules

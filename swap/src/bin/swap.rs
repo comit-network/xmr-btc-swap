@@ -17,10 +17,12 @@ use std::env;
 use std::sync::Arc;
 use swap::cli::command::{parse_args_and_apply_defaults, ParseResult};
 use swap::common::check_latest_version;
+use tokio::sync::broadcast;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let (context, request) = match parse_args_and_apply_defaults(env::args_os()).await? {
+    let (tx, mut rx1) = broadcast::channel(1);
+    let (context, mut request) = match parse_args_and_apply_defaults(env::args_os(), tx).await? {
         ParseResult::Context(context, request) => (context, request),
         ParseResult::PrintAndExitZero { message } => {
             println!("{}", message);
@@ -42,7 +44,7 @@ mod tests {
     use ::bitcoin::Amount;
     use std::sync::Mutex;
     use std::time::Duration;
-    use swap::api::determine_btc_to_swap;
+    use swap::api::request::determine_btc_to_swap;
     use swap::network::quote::BidQuote;
     use swap::tracing_ext::capture_logs;
     use tracing::level_filters::LevelFilter;

@@ -1,10 +1,10 @@
 use crate::api::{Context};
-use crate::api::request::{Params, Request, Method};
+use crate::api::request::{Params, Request, Method, Shutdown};
 //use crate::rpc::Error;
 use anyhow::Result;
 use crate::{bitcoin, monero};
 use crate::{bitcoin::bitcoin_address, monero::monero_address};
-use jsonrpsee::http_server::RpcModule;
+use jsonrpsee::server::RpcModule;
 use libp2p::core::Multiaddr;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -144,9 +144,10 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
 }
 
 async fn get_bitcoin_balance(context: &Arc<Context>) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let request = Request {
+    let mut request = Request {
         params: Params::default(),
         cmd: Method::Balance,
+        shutdown: Shutdown::new(context.shutdown.subscribe()),
     };
     let balance = request.call(Arc::clone(context))
         .await
@@ -156,9 +157,10 @@ async fn get_bitcoin_balance(context: &Arc<Context>) -> Result<serde_json::Value
 }
 
 async fn get_history(context: &Arc<Context>) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let request = Request {
+    let mut request = Request {
         params: Params::default(),
         cmd: Method::History,
+        shutdown: Shutdown::new(context.shutdown.subscribe()),
     };
     let history = request.call(Arc::clone(context))
         .await
@@ -167,9 +169,10 @@ async fn get_history(context: &Arc<Context>) -> Result<serde_json::Value, jsonrp
     Ok(history)
 }
 async fn get_raw_history(context: &Arc<Context>) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let request = Request {
+    let mut request = Request {
         params: Params::default(),
         cmd: Method::RawHistory,
+        shutdown: Shutdown::new(context.shutdown.subscribe()),
     };
     let history = request.call(Arc::clone(context))
         .await
@@ -182,12 +185,13 @@ async fn get_seller(
     swap_id: Uuid,
     context: &Arc<Context>
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let request = Request {
+    let mut request = Request {
         params: Params {
             swap_id: Some(swap_id),
             ..Default::default()
         },
         cmd: Method::GetSeller,
+        shutdown: Shutdown::new(context.shutdown.subscribe()),
     };
     let result = request.call(Arc::clone(context))
         .await
@@ -200,12 +204,13 @@ async fn get_swap_start_date(
     swap_id: Uuid,
     context: &Arc<Context>
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let request = Request {
+    let mut request = Request {
         params: Params {
             swap_id: Some(swap_id),
             ..Default::default()
         },
         cmd: Method::SwapStartDate,
+        shutdown: Shutdown::new(context.shutdown.subscribe()),
     };
     let result = request.call(Arc::clone(context))
         .await
@@ -218,12 +223,13 @@ async fn resume_swap(
     swap_id: Uuid,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let request = Request {
+    let mut request = Request {
         params: Params {
             swap_id: Some(swap_id),
             ..Default::default()
         },
         cmd: Method::Resume,
+        shutdown: Shutdown::new(context.shutdown.subscribe()),
     };
 
     let result = request.call(Arc::clone(context))
@@ -236,13 +242,14 @@ async fn withdraw_btc(
     amount: Option<bitcoin::Amount>,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let request = Request {
+    let mut request = Request {
         params: Params {
             amount,
             address: Some(withdraw_address),
             ..Default::default()
         },
         cmd: Method::WithdrawBtc,
+        shutdown: Shutdown::new(context.shutdown.subscribe()),
     };
     let result = request.call(Arc::clone(context))
         .await
@@ -256,7 +263,7 @@ async fn buy_xmr(
     seller: Multiaddr,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let request = Request {
+    let mut request = Request {
         params: Params {
             bitcoin_change_address: Some(bitcoin_change_address),
             monero_receive_address: Some(monero_receive_address),
@@ -264,6 +271,7 @@ async fn buy_xmr(
             ..Default::default()
         },
         cmd: Method::BuyXmr,
+        shutdown: Shutdown::new(context.shutdown.subscribe()),
     };
     let swap = request.call(Arc::clone(context))
         .await
@@ -275,12 +283,13 @@ async fn list_sellers(
     rendezvous_point: Multiaddr,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let request = Request {
+    let mut request = Request {
         params: Params {
             rendezvous_point: Some(rendezvous_point),
             ..Default::default()
         },
         cmd: Method::ListSellers,
+        shutdown: Shutdown::new(context.shutdown.subscribe()),
     };
     let result = request.call(Arc::clone(context))
         .await

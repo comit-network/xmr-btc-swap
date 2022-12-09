@@ -11,9 +11,10 @@ use anyhow::{Context as AnyContext, Result};
 use std::fmt;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use url::Url;
 use std::sync::Once;
+use tokio::sync::broadcast;
 
 static START: Once = Once::new();
 
@@ -35,6 +36,7 @@ pub struct Context {
     monero_wallet: Option<Arc<monero::Wallet>>,
     monero_rpc_process: Option<monero::WalletRpcProcess>,
     pub config: Config,
+    pub shutdown: Arc<broadcast::Sender<()>>,
 }
 
 
@@ -48,6 +50,7 @@ impl Context {
         debug: bool,
         json: bool,
         server_address: Option<SocketAddr>,
+        shutdown: broadcast::Sender<()>,
     ) -> Result<Context> {
         let data_dir = data::data_dir_from(data, is_testnet)?;
         let env_config = env_config_from(is_testnet);
@@ -113,6 +116,7 @@ impl Context {
                 json,
                 is_testnet,
             },
+            shutdown: Arc::new(shutdown),
         };
 
         Ok(init)
@@ -125,6 +129,7 @@ impl fmt::Debug for Context {
         write!(f, "Testing {}", true)
     }
 }
+
 
 async fn init_bitcoin_wallet(
     electrum_rpc_url: Url,
@@ -207,6 +212,10 @@ pub mod api_test {
     use super::*;
     use crate::tor::DEFAULT_SOCKS5_PORT;
     use std::str::FromStr;
+    use uuid::Uuid;
+    use crate::api::request::{Request, Params, Method, Shutdown};
+    use libp2p::Multiaddr;
+    use tokio::sync::broadcast;
 
     pub const MULTI_ADDRESS: &str =
         "/ip4/127.0.0.1/tcp/9939/p2p/12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
@@ -236,13 +245,13 @@ pub mod api_test {
                 seed: Some(seed),
                 debug,
                 json,
-                is_testnet
+                is_testnet,
             }
         }
 
     }
     impl Request {
-        pub fn buy_xmr(is_testnet: bool) -> Request {
+        pub fn buy_xmr(is_testnet: bool, tx: broadcast::Sender<()>) -> Request {
             let seller = Multiaddr::from_str(MULTI_ADDRESS).unwrap();
             let bitcoin_change_address = {
                 if is_testnet {
@@ -268,36 +277,40 @@ pub mod api_test {
                     ..Default::default()
                 },
                 cmd: Method::BuyXmr,
+                shutdown: Shutdown::new(tx.subscribe()),
             }
         }
 
-        pub fn resume() -> Request {
+        pub fn resume(tx: broadcast::Sender<()>) -> Request {
             Request {
                 params: Params {
                     swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
                     ..Default::default()
                 },
                 cmd: Method::Resume,
+                shutdown: Shutdown::new(tx.subscribe()),
             }
         }
 
-        pub fn cancel() -> Request {
+        pub fn cancel(tx: broadcast::Sender<()>) -> Request {
             Request {
                 params: Params {
                     swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
                     ..Default::default()
                 },
                 cmd: Method::Cancel,
+                shutdown: Shutdown::new(tx.subscribe()),
             }
         }
 
-        pub fn refund() -> Request {
+        pub fn refund(tx: broadcast::Sender<()>) -> Request {
             Request {
                 params: Params {
                     swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
                     ..Default::default()
                 },
                 cmd: Method::Refund,
+                shutdown: Shutdown::new(tx.subscribe()),
             }
         }
     }

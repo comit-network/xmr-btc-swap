@@ -31,8 +31,8 @@ ed25519-dalek = "1"
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
 itertools = "0.10"
-jsonrpsee = { version = "0.15.1", features = [ "server" ] }
-jsonrpsee-core = "0.15.1"
+jsonrpsee = { version = "0.16.2", features = [ "server" ] }
+jsonrpsee-core = "0.16.2"
 libp2p = { version = "0.42.2", default-features = false, features = [ "tcp-tokio", "yamux", "mplex", "dns-tokio", "noise", "request-response", "websocket", "ping", "rendezvous", "identify" ] }
 monero = { version = "0.12", features = [ "serde_support" ] }
 monero-rpc = { path = "../monero-rpc" }
@@ -81,6 +81,7 @@ get-port = "3"
 hyper = "0.14"
 monero-harness = { path = "../monero-harness" }
 port_check = "0.1"
+jsonrpsee-http-client = "0.15.1"
 proptest = "1"
 serde_cbor = "0.11"
 spectral = "0.6"
