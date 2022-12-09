@@ -45,7 +45,7 @@ pub async fn start_server() {
     let (ctx, mut request) = initialize_context().await;
     let move_ctx = Arc::clone(&ctx);
     tokio::spawn(async move {
-        request.call(Arc::clone(move_ctx)).await;
+        request.call(Arc::clone(&move_ctx)).await;
     });
     tokio::time::sleep(Duration::from_secs(3)).await;
     ctx.shutdown.send(());
