@@ -102,9 +102,24 @@ impl Config {
     {
         let config_file = Path::new(&config_file);
 
-        let mut config = config::Config::new();
-        config.merge(config::File::from(config_file))?;
+        let config = config::Config::builder()
+            .add_source(config::File::from(config_file))
+            .add_source(
+                config::Environment::with_prefix("ASB")
+                    .separator("__")
+                    .list_separator(","),
+            )
+            .build()?;
+
         config.try_into()
+    }
+}
+
+impl TryFrom<config::Config> for Config {
+    type Error = config::ConfigError;
+
+    fn try_from(value: config::Config) -> Result<Self, Self::Error> {
+        value.try_deserialize()
     }
 }
 
@@ -117,11 +132,53 @@ pub struct Data {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Network {
+    #[serde(deserialize_with = "addr_list::deserialize")]
     pub listen: Vec<Multiaddr>,
     #[serde(default)]
     pub rendezvous_point: Option<Multiaddr>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "addr_list::deserialize")]
     pub external_addresses: Vec<Multiaddr>,
+}
+
+mod addr_list {
+    use libp2p::Multiaddr;
+    use serde::de::Unexpected;
+    use serde::{de, Deserialize, Deserializer};
+    use serde_json::Value;
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Multiaddr>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = Value::deserialize(deserializer)?;
+        return match s {
+            Value::String(s) => {
+                let list: Result<Vec<_>, _> = s
+                    .split(',')
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.parse().map_err(de::Error::custom))
+                    .collect();
+                Ok(list?)
+            }
+            Value::Array(a) => {
+                let list: Result<Vec<_>, _> = a
+                    .iter()
+                    .map(|v| {
+                        if let Value::String(s) = v {
+                            s.parse().map_err(de::Error::custom)
+                        } else {
+                            Err(de::Error::custom("expected a string"))
+                        }
+                    })
+                    .collect();
+                Ok(list?)
+            }
+            value => Err(de::Error::invalid_type(
+                Unexpected::Other(&value.to_string()),
+                &"a string or array",
+            )),
+        };
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -172,7 +229,7 @@ impl Default for TorConf {
 
 #[derive(thiserror::Error, Debug, Clone, Copy)]
 #[error("config not initialized")]
-pub struct ConfigNotInitialized {}
+pub struct ConfigNotInitialized;
 
 pub fn read_config(config_path: PathBuf) -> Result<Result<Config, ConfigNotInitialized>> {
     if config_path.exists() {
@@ -334,9 +391,12 @@ pub fn query_user_for_initial_config(testnet: bool) -> Result<Config> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use tempfile::tempdir;
 
+    // these tests are run serially since env vars affect the whole process
     #[test]
+    #[serial]
     fn config_roundtrip_testnet() {
         let temp_dir = tempdir().unwrap().path().to_path_buf();
         let config_path = Path::join(&temp_dir, "config.toml");
@@ -358,7 +418,6 @@ mod tests {
                 rendezvous_point: None,
                 external_addresses: vec![],
             },
-
             monero: Monero {
                 wallet_rpc_url: defaults.monero_wallet_rpc_url,
                 finality_confirmations: None,
@@ -380,6 +439,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn config_roundtrip_mainnet() {
         let temp_dir = tempdir().unwrap().path().to_path_buf();
         let config_path = Path::join(&temp_dir, "config.toml");
@@ -401,7 +461,6 @@ mod tests {
                 rendezvous_point: None,
                 external_addresses: vec![],
             },
-
             monero: Monero {
                 wallet_rpc_url: defaults.monero_wallet_rpc_url,
                 finality_confirmations: None,
@@ -420,5 +479,61 @@ mod tests {
         let actual = read_config(config_path).unwrap().unwrap();
 
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    #[serial]
+    fn env_override() {
+        let temp_dir = tempfile::tempdir().unwrap().path().to_path_buf();
+        let config_path = Path::join(&temp_dir, "config.toml");
+
+        let defaults = Mainnet::getConfigFileDefaults().unwrap();
+
+        let dir = PathBuf::from("/tmp/dir");
+        std::env::set_var("ASB__DATA__DIR", dir.clone());
+        let addr1 = "/dns4/example.com/tcp/9939";
+        let addr2 = "/ip4/1.2.3.4/tcp/9940";
+        let external_addresses = vec![addr1.parse().unwrap(), addr2.parse().unwrap()];
+        let listen = external_addresses.clone();
+        std::env::set_var(
+            "ASB__NETWORK__EXTERNAL_ADDRESSES",
+            format!("{},{}", addr1, addr2),
+        );
+        std::env::set_var("ASB__NETWORK__LISTEN", format!("{},{}", addr1, addr2));
+
+        let expected = Config {
+            data: Data { dir },
+            bitcoin: Bitcoin {
+                electrum_rpc_url: defaults.electrum_rpc_url,
+                target_block: defaults.bitcoin_confirmation_target,
+                finality_confirmations: None,
+                network: bitcoin::Network::Bitcoin,
+            },
+            network: Network {
+                listen,
+                rendezvous_point: None,
+                external_addresses,
+            },
+            monero: Monero {
+                wallet_rpc_url: defaults.monero_wallet_rpc_url,
+                finality_confirmations: None,
+                network: monero::Network::Mainnet,
+            },
+            tor: Default::default(),
+            maker: Maker {
+                min_buy_btc: bitcoin::Amount::from_btc(DEFAULT_MIN_BUY_AMOUNT).unwrap(),
+                max_buy_btc: bitcoin::Amount::from_btc(DEFAULT_MAX_BUY_AMOUNT).unwrap(),
+                ask_spread: Decimal::from_f64(DEFAULT_SPREAD).unwrap(),
+                price_ticker_ws_url: defaults.price_ticker_ws_url,
+            },
+        };
+
+        initial_setup(config_path.clone(), expected.clone()).unwrap();
+        let actual = read_config(config_path).unwrap().unwrap();
+
+        assert_eq!(expected, actual);
+        std::env::remove_var("ASB__DATA__DIR");
+        std::env::remove_var("ASB__NETWORK__EXTERNAL_ADDRESSES");
+        std::env::remove_var("ASB__NETWORK__LISTEN");
     }
 }
