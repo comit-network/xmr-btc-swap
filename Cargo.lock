@@ -219,6 +219,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
+name = "base64"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ea22880d78093b0cbe17c89f64a7d457941e65759157ec6cb31a31d652b05e5"
+
+[[package]]
 name = "bdk"
 version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1031,7 +1037,7 @@ checksum = "5caaa75cbd2b960ff1e5392d2cfb1f44717fffe12fc1f32b7b5d1267f99732a6"
 [[package]]
 name = "ecdsa_fun"
 version = "0.7.1"
-source = "git+https://github.com/LLFourn/secp256kfun#da6ffd2ef4d58c84d508428356c92d92d5f11ac4"
+source = "git+https://github.com/LLFourn/secp256kfun#9657d8c12fd26df5e57254a0063eaf41082a38ca"
 dependencies = [
  "bincode",
  "rand_chacha 0.3.1",
@@ -3439,7 +3445,7 @@ dependencies = [
 [[package]]
 name = "secp256kfun"
 version = "0.7.1"
-source = "git+https://github.com/LLFourn/secp256kfun#da6ffd2ef4d58c84d508428356c92d92d5f11ac4"
+source = "git+https://github.com/LLFourn/secp256kfun#9657d8c12fd26df5e57254a0063eaf41082a38ca"
 dependencies = [
  "digest 0.10.5",
  "rand_core 0.6.2",
@@ -3661,7 +3667,7 @@ dependencies = [
 [[package]]
 name = "sigma_fun"
 version = "0.4.1"
-source = "git+https://github.com/LLFourn/secp256kfun#da6ffd2ef4d58c84d508428356c92d92d5f11ac4"
+source = "git+https://github.com/LLFourn/secp256kfun#9657d8c12fd26df5e57254a0063eaf41082a38ca"
 dependencies = [
  "curve25519-dalek-ng",
  "digest 0.10.5",
@@ -4016,7 +4022,7 @@ dependencies = [
  "async-trait",
  "atty",
  "backoff",
- "base64 0.13.1",
+ "base64 0.20.0",
  "bdk",
  "big-bytes",
  "bitcoin",
