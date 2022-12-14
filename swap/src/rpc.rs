@@ -8,8 +8,8 @@ pub mod methods;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("example")]
-    ExampleError,
+    #[error("Could not parse key value from params")]
+    ParseError,
 }
 
 pub async fn run_server(

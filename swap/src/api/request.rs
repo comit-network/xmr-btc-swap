@@ -222,10 +222,10 @@ impl Request {
                 })
             }
             Method::GetSeller => {
-                let swap_id = self.params.swap_id.unwrap();
-                let peerId = context.db.get_peer_id(swap_id).await?;
+                let swap_id = self.params.swap_id.with_context(|| "A swap_id is needed")?;
+                let peerId = context.db.get_peer_id(swap_id).await.with_context(|| "Could not get PeerID")?;
 
-                let addresses = context.db.get_addresses(peerId).await?;
+                let addresses = context.db.get_addresses(peerId).await.with_context(|| "Could not get addressess")?;
 
                 json!({
                     "peerId": peerId.to_base58(),
@@ -233,7 +233,7 @@ impl Request {
                 })
             }
             Method::SwapStartDate => {
-                let swap_id = self.params.swap_id.unwrap();
+                let swap_id = self.params.swap_id.with_context(|| "A swap_id is needed")?;
 
                 let start_date = context
                     .db

@@ -1,6 +1,5 @@
 use crate::api::{Context};
 use crate::api::request::{Params, Request, Method, Shutdown};
-//use crate::rpc::Error;
 use anyhow::Result;
 use crate::{bitcoin, monero};
 use crate::{bitcoin::bitcoin_address, monero::monero_address};
@@ -10,6 +9,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
+use crate::rpc::Error;
 
 pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
     let mut module = RpcModule::new(context);
@@ -30,38 +30,35 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
         .unwrap();
     module
         .register_async_method("get_seller", |params, context| async move {
-            let params: HashMap<String, String> = params.parse()?;
+            let params: HashMap<String, Uuid> = params.parse()?;
 
-            let swap_id = Uuid::from_str(params.get("swap_id").ok_or_else(|| {
+            let swap_id = params.get("swap_id").ok_or_else(|| {
                 jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string())
-            })?)
-            .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
+            })?;
 
-            get_seller(swap_id, &context).await
+            get_seller(*swap_id, &context).await
         })
         .unwrap();
     module
         .register_async_method("get_swap_start_date", |params, context| async move {
-            let params: HashMap<String, String> = params.parse()?;
+            let params: HashMap<String, Uuid> = params.parse()?;
 
-            let swap_id = Uuid::from_str(params.get("swap_id").ok_or_else(|| {
+            let swap_id = params.get("swap_id").ok_or_else(|| {
                 jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string())
-            })?)
-            .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
+            })?;
 
-            get_swap_start_date(swap_id, &context).await
+            get_swap_start_date(*swap_id, &context).await
         })
         .unwrap();
     module
         .register_async_method("resume_swap", |params, context| async move {
-            let params: HashMap<String, String> = params.parse()?;
+            let params: HashMap<String, Uuid> = params.parse()?;
 
-            let swap_id = Uuid::from_str(params.get("swap_id").ok_or_else(|| {
+            let swap_id = params.get("swap_id").ok_or_else(|| {
                 jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string())
-            })?)
-            .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
+            })?;
 
-            resume_swap(swap_id, &context).await
+            resume_swap(*swap_id, &context).await
         })
         .unwrap();
     module
@@ -130,14 +127,12 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
         .unwrap();
     module
         .register_async_method("list_sellers", |params, context| async move {
-            let params: HashMap<String, String> = params.parse()?;
-            let rendezvous_point =
-                Multiaddr::from_str(params.get("rendezvous_point").ok_or_else(|| {
+            let params: HashMap<String, Multiaddr> = params.parse()?;
+            let rendezvous_point = params.get("rendezvous_point").ok_or_else(|| {
                     jsonrpsee_core::Error::Custom("Does not contain rendezvous_point".to_string())
-                })?)
-                .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
+                })?;
 
-            list_sellers(rendezvous_point, &context).await
+            list_sellers(rendezvous_point.clone(), &context).await
         })
         .unwrap();
     module

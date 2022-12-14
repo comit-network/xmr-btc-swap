@@ -80,8 +80,9 @@ bitcoin-harness = "0.2.2"
 get-port = "3"
 hyper = "0.14"
 monero-harness = { path = "../monero-harness" }
+jsonrpsee = { version = "0.16.2", features = [ "ws-client" ] }
+jsonrpsee-types = { version = "0.16.2" }
 port_check = "0.1"
-jsonrpsee-http-client = "0.15.1"
 proptest = "1"
 serde_cbor = "0.11"
 spectral = "0.6"
