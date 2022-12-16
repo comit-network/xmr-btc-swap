@@ -307,7 +307,7 @@ dependencies = [
  "base64 0.13.1",
  "bech32",
  "bitcoin_hashes",
- "secp256k1",
+ "secp256k1 0.24.1",
  "serde",
 ]
 
@@ -1036,8 +1036,8 @@ checksum = "5caaa75cbd2b960ff1e5392d2cfb1f44717fffe12fc1f32b7b5d1267f99732a6"
 
 [[package]]
 name = "ecdsa_fun"
-version = "0.7.1"
-source = "git+https://github.com/LLFourn/secp256kfun#9657d8c12fd26df5e57254a0063eaf41082a38ca"
+version = "0.8.1"
+source = "git+https://github.com/LLFourn/secp256kfun#29d467f62fe974b70f9ac81b6d968183d6e5e48d"
 dependencies = [
  "bincode",
  "rand_chacha 0.3.1",
@@ -3429,7 +3429,17 @@ checksum = "ff55dc09d460954e9ef2fa8a7ced735a964be9981fd50e870b2b3b0705e14964"
 dependencies = [
  "bitcoin_hashes",
  "rand 0.8.3",
- "secp256k1-sys",
+ "secp256k1-sys 0.6.1",
+ "serde",
+]
+
+[[package]]
+name = "secp256k1"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "550fc3b723a478be77bf74718947cdcdd75144d508aaa70f0a320036905df2a8"
+dependencies = [
+ "secp256k1-sys 0.7.0",
  "serde",
 ]
 
@@ -3443,13 +3453,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "secp256k1-sys"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8058e28ae464daf5ac14c5c0f78110b58616e796c4e4e28cfcca38fdb13d8f22"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "secp256kfun"
-version = "0.7.1"
-source = "git+https://github.com/LLFourn/secp256kfun#9657d8c12fd26df5e57254a0063eaf41082a38ca"
+version = "0.8.2"
+source = "git+https://github.com/LLFourn/secp256kfun#29d467f62fe974b70f9ac81b6d968183d6e5e48d"
 dependencies = [
  "digest 0.10.5",
  "rand_core 0.6.2",
- "secp256k1",
+ "secp256k1 0.25.0",
  "serde",
  "subtle-ng",
 ]
@@ -3666,8 +3685,8 @@ dependencies = [
 
 [[package]]
 name = "sigma_fun"
-version = "0.4.1"
-source = "git+https://github.com/LLFourn/secp256kfun#9657d8c12fd26df5e57254a0063eaf41082a38ca"
+version = "0.5.1"
+source = "git+https://github.com/LLFourn/secp256kfun#29d467f62fe974b70f9ac81b6d968183d6e5e48d"
 dependencies = [
  "curve25519-dalek-ng",
  "digest 0.10.5",
