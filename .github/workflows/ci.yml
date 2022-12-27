@@ -75,27 +75,21 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.2.0
 
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          profile: minimal
-          target: armv7-unknown-linux-gnueabihf
-          override: true
+          targets: armv7-unknown-linux-gnueabihf
 
       - name: Build binary
         if: matrix.target != 'armv7-unknown-linux-gnueabihf'
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: -p swap --target ${{ matrix.target }}
+        run: cargo build -p swap --target ${{ matrix.target }}
+
+      - name: Install cross (armv7)
+        if: matrix.target == 'armv7-unknown-linux-gnueabihf'
+        run: cargo install cross --locked
 
       - name: Build binary (armv7)
         if: matrix.target == 'armv7-unknown-linux-gnueabihf'
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: -p swap --target ${{ matrix.target }}
-          use-cross: true
+        run: cross build -p swap --target ${{ matrix.target }}
 
       - name: Upload swap binary
         uses: actions/upload-artifact@v3
