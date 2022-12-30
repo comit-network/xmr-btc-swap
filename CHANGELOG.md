@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Update `bdk` library to latest version. This introduces an incompatability with previous versions due to different formats being used to exchange Bitcoin transactions
+- Allow asb config overrides using environment variables. See [1231](https://github.com/comit-network/xmr-btc-swap/pull/1231)
+
 ## [0.11.0] - 2022-08-11
 
 ### Changed
