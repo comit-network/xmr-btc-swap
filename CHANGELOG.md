@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Changed ASB to quote on Monero unlocked balance instead of total balance
+- Allow `asb` to set a bitcoin address that is controlled by the asb itself to redeem/punish bitcoin to
 
 ### Added
 

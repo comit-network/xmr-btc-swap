@@ -259,6 +259,7 @@ async fn start_alice(
         FixedRate::default(),
         min_buy,
         max_buy,
+        None,
     )
     .unwrap();
 

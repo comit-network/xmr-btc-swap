@@ -59,11 +59,17 @@ impl WalletSnapshot {
     pub async fn capture(
         bitcoin_wallet: &bitcoin::Wallet,
         monero_wallet: &monero::Wallet,
+        external_redeem_address: &Option<bitcoin::Address>,
         transfer_amount: bitcoin::Amount,
     ) -> Result<Self> {
         let balance = monero_wallet.get_balance().await?;
-        let redeem_address = bitcoin_wallet.new_address().await?;
-        let punish_address = bitcoin_wallet.new_address().await?;
+        let redeem_address = external_redeem_address
+            .clone()
+            .unwrap_or(bitcoin_wallet.new_address().await?);
+        let punish_address = external_redeem_address
+            .clone()
+            .unwrap_or(bitcoin_wallet.new_address().await?);
+
         let redeem_fee = bitcoin_wallet
             .estimate_fee(bitcoin::TxRedeem::weight(), transfer_amount)
             .await?;
