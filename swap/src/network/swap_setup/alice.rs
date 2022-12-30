@@ -1,4 +1,5 @@
 use crate::asb::LatestRate;
+use crate::monero::Amount;
 use crate::network::swap_setup;
 use crate::network::swap_setup::{
     protocol, BlockchainNetwork, SpotPriceError, SpotPriceRequest, SpotPriceResponse,
@@ -42,7 +43,7 @@ pub enum OutEvent {
 
 #[derive(Debug)]
 pub struct WalletSnapshot {
-    balance: monero::Amount,
+    balance: monero_rpc::wallet::GetBalance,
     lock_fee: monero::Amount,
 
     // TODO: Consider using the same address for punish and redeem (they are mutually exclusive, so
@@ -323,7 +324,8 @@ where
                     .sell_quote(btc)
                     .map_err(Error::SellQuoteCalculationFailed)?;
 
-                if wallet_snapshot.balance < xmr + wallet_snapshot.lock_fee {
+                let unlocked = Amount::from_piconero(wallet_snapshot.balance.unlocked_balance);
+                if unlocked < xmr + wallet_snapshot.lock_fee {
                     return Err(Error::BalanceTooLow {
                         balance: wallet_snapshot.balance,
                         buy: btc,
@@ -479,9 +481,9 @@ pub enum Error {
         max: bitcoin::Amount,
         buy: bitcoin::Amount,
     },
-    #[error("Balance {balance} too low to fulfill swapping {buy}")]
+    #[error("Unlocked balance ({balance}) too low to fulfill swapping {buy}")]
     BalanceTooLow {
-        balance: monero::Amount,
+        balance: monero_rpc::wallet::GetBalance,
         buy: bitcoin::Amount,
     },
     #[error("Failed to fetch latest rate")]

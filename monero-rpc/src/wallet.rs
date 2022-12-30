@@ -1,4 +1,7 @@
+use std::fmt;
+
 use anyhow::{Context, Result};
+use rust_decimal::Decimal;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -86,10 +89,30 @@ pub struct GetAddress {
 #[derive(Deserialize, Debug, Clone, Copy)]
 pub struct GetBalance {
     pub balance: u64,
-    pub blocks_to_unlock: u32,
-    pub multisig_import_needed: bool,
-    pub time_to_unlock: u32,
     pub unlocked_balance: u64,
+    pub multisig_import_needed: bool,
+    pub blocks_to_unlock: u32,
+    pub time_to_unlock: u32,
+}
+
+impl fmt::Display for GetBalance {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut total = Decimal::from(self.balance);
+        total
+            .set_scale(12)
+            .expect("12 is smaller than max precision of 28");
+
+        let mut unlocked = Decimal::from(self.unlocked_balance);
+        unlocked
+            .set_scale(12)
+            .expect("12 is smaller than max precision of 28");
+
+        write!(
+            f,
+            "total balance: {}, unlocked balance: {}",
+            total, unlocked
+        )
+    }
 }
 
 #[derive(Deserialize, Debug, Clone)]
