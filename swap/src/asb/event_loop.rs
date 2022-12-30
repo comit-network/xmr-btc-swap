@@ -1,4 +1,5 @@
 use crate::asb::{Behaviour, OutEvent, Rate};
+use crate::monero::Amount;
 use crate::network::quote::BidQuote;
 use crate::network::swap_setup::alice::WalletSnapshot;
 use crate::network::transfer_proof;
@@ -326,7 +327,10 @@ where
             .ask()
             .context("Failed to compute asking price")?;
 
-        let xmr = self.monero_wallet.get_balance().await?;
+        let balance = self.monero_wallet.get_balance().await?;
+
+        // use unlocked monero balance for quote
+        let xmr = Amount::from_piconero(balance.unlocked_balance);
 
         let max_bitcoin_for_monero = xmr.max_bitcoin_for_price(ask_price).ok_or_else(|| {
             anyhow::anyhow!("Bitcoin price ({}) x Monero ({}) overflow", ask_price, xmr)

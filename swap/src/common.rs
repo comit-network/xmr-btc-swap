@@ -47,10 +47,10 @@ mod test {
     #[tokio::test]
     #[ignore = "For local testing, makes http requests to github."]
     async fn it_compares_with_github() {
-        let result = check_latest_version("0.10.1").await.unwrap();
+        let result = check_latest_version("0.11.0").await.unwrap();
         assert_eq!(result, Version::Available);
 
-        let result = check_latest_version("0.10.2").await.unwrap();
+        let result = check_latest_version("0.11.1").await.unwrap();
         assert_eq!(result, Version::Current);
     }
 }

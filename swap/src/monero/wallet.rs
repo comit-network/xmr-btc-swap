@@ -253,10 +253,8 @@ impl Wallet {
     }
 
     /// Get the balance of the primary account.
-    pub async fn get_balance(&self) -> Result<Amount> {
-        let amount = self.inner.lock().await.get_balance(0).await?.balance;
-
-        Ok(Amount::from_piconero(amount))
+    pub async fn get_balance(&self) -> Result<wallet::GetBalance> {
+        Ok(self.inner.lock().await.get_balance(0).await?)
     }
 
     pub async fn block_height(&self) -> Result<BlockHeight> {

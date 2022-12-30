@@ -2326,6 +2326,7 @@ dependencies = [
  "monero-epee-bin-serde",
  "rand 0.7.3",
  "reqwest",
+ "rust_decimal",
  "serde",
  "serde_json",
  "tokio",
