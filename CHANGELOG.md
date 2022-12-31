@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Update `bdk` library to latest version. This introduces an incompatability with previous versions due to different formats being used to exchange Bitcoin transactions
 - Changed ASB to quote on Monero unlocked balance instead of total balance
 
 ### Added
+
+- Allow asb config overrides using environment variables. See [1231](https://github.com/comit-network/xmr-btc-swap/pull/1231)
 
 ## [0.11.0] - 2022-08-11
 
