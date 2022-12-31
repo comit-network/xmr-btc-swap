@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update `bdk` library to latest version. This introduces an incompatability with previous versions due to different formats being used to exchange Bitcoin transactions
 - Changed ASB to quote on Monero unlocked balance instead of total balance
+- Allow `asb` to set a bitcoin address that is controlled by the asb itself to redeem/punish bitcoin to
 
 ### Added
 

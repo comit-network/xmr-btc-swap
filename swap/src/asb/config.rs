@@ -216,6 +216,7 @@ pub struct Maker {
     pub max_buy_btc: bitcoin::Amount,
     pub ask_spread: Decimal,
     pub price_ticker_ws_url: Url,
+    pub external_bitcoin_redeem_address: Option<bitcoin::Address>,
 }
 
 impl Default for TorConf {
@@ -384,6 +385,7 @@ pub fn query_user_for_initial_config(testnet: bool) -> Result<Config> {
             max_buy_btc: max_buy,
             ask_spread,
             price_ticker_ws_url: defaults.price_ticker_ws_url,
+            external_bitcoin_redeem_address: None,
         },
     })
 }
@@ -429,6 +431,7 @@ mod tests {
                 max_buy_btc: bitcoin::Amount::from_btc(DEFAULT_MAX_BUY_AMOUNT).unwrap(),
                 ask_spread: Decimal::from_f64(DEFAULT_SPREAD).unwrap(),
                 price_ticker_ws_url: defaults.price_ticker_ws_url,
+                external_bitcoin_redeem_address: None,
             },
         };
 
@@ -472,6 +475,7 @@ mod tests {
                 max_buy_btc: bitcoin::Amount::from_btc(DEFAULT_MAX_BUY_AMOUNT).unwrap(),
                 ask_spread: Decimal::from_f64(DEFAULT_SPREAD).unwrap(),
                 price_ticker_ws_url: defaults.price_ticker_ws_url,
+                external_bitcoin_redeem_address: None,
             },
         };
 
@@ -525,6 +529,7 @@ mod tests {
                 max_buy_btc: bitcoin::Amount::from_btc(DEFAULT_MAX_BUY_AMOUNT).unwrap(),
                 ask_spread: Decimal::from_f64(DEFAULT_SPREAD).unwrap(),
                 price_ticker_ws_url: defaults.price_ticker_ws_url,
+                external_bitcoin_redeem_address: None,
             },
         };
 

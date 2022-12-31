@@ -188,6 +188,7 @@ async fn main() -> Result<()> {
                 kraken_rate.clone(),
                 config.maker.min_buy_btc,
                 config.maker.max_buy_btc,
+                config.maker.external_bitcoin_redeem_address,
             )
             .unwrap();
 
