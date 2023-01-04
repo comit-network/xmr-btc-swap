@@ -10,7 +10,7 @@ use swap::protocol::{alice, bob};
 use swap::{asb, cli};
 
 #[tokio::test]
-async fn given_alice_and_bob_manually_refund_after_funds_locked_both_refund() {
+async fn given_alice_and_bob_manually_cancel_and_refund_after_funds_locked_both_refund() {
     harness::setup_test(FastCancelConfig, |mut ctx| async move {
         let (bob_swap, bob_join_handle) = ctx.bob_swap().await;
         let bob_swap_id = bob_swap.id;
@@ -48,19 +48,10 @@ async fn given_alice_and_bob_manually_refund_after_funds_locked_both_refund() {
             panic!("Bob in unexpected state {}", bob_swap.state);
         }
 
-        // Bob manually cancels
+        // Bob manually cancels and refunds
         bob_join_handle.abort();
-        let (_, _, state) = cli::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db).await?;
-        assert!(matches!(state, BobState::BtcCancelled { .. }));
-
-        let (bob_swap, bob_join_handle) = ctx
-            .stop_and_resume_bob_from_db(bob_join_handle, bob_swap_id)
-            .await;
-        assert!(matches!(bob_swap.state, BobState::BtcCancelled { .. }));
-
-        // Bob manually refunds
-        bob_join_handle.abort();
-        let bob_state = cli::refund(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db).await?;
+        let bob_state =
+            cli::cancel_and_refund(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db).await?;
 
         ctx.assert_bob_refunded(bob_state).await;
 
