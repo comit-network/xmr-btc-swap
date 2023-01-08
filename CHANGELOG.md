@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Swap: merge separate cancel/refund commands into one `cancel-and-refund` command for stuck swaps
+
 ## [0.12.0] - 2022-12-31
 
 ### Changed

@@ -184,7 +184,7 @@ where
                 },
             }
         }
-        RawCommand::Cancel {
+        RawCommand::CancelAndRefund {
             swap_id: SwapId { swap_id },
             bitcoin,
         } => {
@@ -196,26 +196,7 @@ where
                 debug,
                 json,
                 data_dir: data::data_dir_from(data, is_testnet)?,
-                cmd: Command::Cancel {
-                    swap_id,
-                    bitcoin_electrum_rpc_url,
-                    bitcoin_target_block,
-                },
-            }
-        }
-        RawCommand::Refund {
-            swap_id: SwapId { swap_id },
-            bitcoin,
-        } => {
-            let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
-                bitcoin.apply_defaults(is_testnet)?;
-
-            Arguments {
-                env_config: env_config_from(is_testnet),
-                debug,
-                json,
-                data_dir: data::data_dir_from(data, is_testnet)?,
-                cmd: Command::Refund {
+                cmd: Command::CancelAndRefund {
                     swap_id,
                     bitcoin_electrum_rpc_url,
                     bitcoin_target_block,
@@ -297,12 +278,7 @@ pub enum Command {
         tor_socks5_port: u16,
         namespace: XmrBtcNamespace,
     },
-    Cancel {
-        swap_id: Uuid,
-        bitcoin_electrum_rpc_url: Url,
-        bitcoin_target_block: usize,
-    },
-    Refund {
+    CancelAndRefund {
         swap_id: Uuid,
         bitcoin_electrum_rpc_url: Url,
         bitcoin_target_block: usize,
@@ -422,18 +398,9 @@ enum RawCommand {
         #[structopt(flatten)]
         tor: Tor,
     },
-    /// Force submission of the cancel transaction overriding the protocol state
-    /// machine and blockheight checks (expert users only)
-    Cancel {
-        #[structopt(flatten)]
-        swap_id: SwapId,
-
-        #[structopt(flatten)]
-        bitcoin: Bitcoin,
-    },
-    /// Force submission of the refund transaction overriding the protocol state
-    /// machine and blockheight checks (expert users only)
-    Refund {
+    /// Force the submission of the cancel and refund transactions of a swap
+    #[structopt(aliases = &["cancel", "refund"])]
+    CancelAndRefund {
         #[structopt(flatten)]
         swap_id: SwapId,
 
@@ -1275,7 +1242,7 @@ mod tests {
                 debug: false,
                 json: false,
                 data_dir: data_dir_path_cli().join(TESTNET),
-                cmd: Command::Cancel {
+                cmd: Command::CancelAndRefund {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)
                         .unwrap(),
@@ -1290,7 +1257,7 @@ mod tests {
                 debug: false,
                 json: false,
                 data_dir: data_dir_path_cli().join(MAINNET),
-                cmd: Command::Cancel {
+                cmd: Command::CancelAndRefund {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET,
@@ -1304,7 +1271,7 @@ mod tests {
                 debug: false,
                 json: false,
                 data_dir: data_dir_path_cli().join(TESTNET),
-                cmd: Command::Refund {
+                cmd: Command::CancelAndRefund {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)
                         .unwrap(),
@@ -1319,7 +1286,7 @@ mod tests {
                 debug: false,
                 json: false,
                 data_dir: data_dir_path_cli().join(MAINNET),
-                cmd: Command::Refund {
+                cmd: Command::CancelAndRefund {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET,

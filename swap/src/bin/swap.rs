@@ -324,7 +324,7 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        Command::Cancel {
+        Command::CancelAndRefund {
             swap_id,
             bitcoin_electrum_rpc_url,
             bitcoin_target_block,
@@ -344,30 +344,7 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            let (txid, _) = cli::cancel(swap_id, Arc::new(bitcoin_wallet), db).await?;
-            tracing::debug!("Cancel transaction successfully published with id {}", txid);
-        }
-        Command::Refund {
-            swap_id,
-            bitcoin_electrum_rpc_url,
-            bitcoin_target_block,
-        } => {
-            cli::tracing::init(debug, json, data_dir.join("logs"), Some(swap_id))?;
-
-            let db = open_db(data_dir.join("sqlite")).await?;
-            let seed = Seed::from_file_or_generate(data_dir.as_path())
-                .context("Failed to read in seed file")?;
-
-            let bitcoin_wallet = init_bitcoin_wallet(
-                bitcoin_electrum_rpc_url,
-                &seed,
-                data_dir,
-                env_config,
-                bitcoin_target_block,
-            )
-            .await?;
-
-            cli::refund(swap_id, Arc::new(bitcoin_wallet), db).await?;
+            cli::cancel_and_refund(swap_id, Arc::new(bitcoin_wallet), db).await?;
         }
         Command::ListSellers {
             rendezvous_point,
@@ -523,6 +500,7 @@ async fn init_bitcoin_wallet(
     env_config: Config,
     bitcoin_target_block: usize,
 ) -> Result<bitcoin::Wallet> {
+    tracing::debug!("Initializing bitcoin wallet");
     let xprivkey = seed.derive_extended_private_key(env_config.bitcoin_network)?;
 
     let wallet = bitcoin::Wallet::new(
@@ -535,6 +513,7 @@ async fn init_bitcoin_wallet(
     .await
     .context("Failed to initialize Bitcoin wallet")?;
 
+    tracing::debug!("Syncing bitcoin wallet");
     wallet.sync().await?;
 
     Ok(wallet)
