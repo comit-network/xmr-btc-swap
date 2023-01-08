@@ -45,19 +45,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout tagged commit
-        uses: actions/checkout@v3.1.0
+        uses: actions/checkout@v3.3.0
         with:
           ref: ${{ github.event.release.target_commitish }}
           token: ${{ secrets.BOTTY_GITHUB_TOKEN }}
 
       - uses: Swatinem/rust-cache@v2.2.0
 
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          profile: minimal
-          target: armv7-unknown-linux-gnueabihf
-          override: true
+          targets: armv7-unknown-linux-gnueabihf
 
       - name: Build ${{ matrix.target }} ${{ matrix.bin }} release binary
         uses: actions-rs/cargo@v1

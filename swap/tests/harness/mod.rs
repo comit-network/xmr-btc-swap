@@ -259,6 +259,7 @@ async fn start_alice(
         FixedRate::default(),
         min_buy,
         max_buy,
+        None,
     )
     .unwrap();
 
@@ -867,7 +868,9 @@ impl Wallet for monero::Wallet {
     }
 
     async fn get_balance(&self) -> Result<Self::Amount> {
-        self.get_balance().await
+        let total = self.get_balance().await?;
+        let balance = Self::Amount::from_piconero(total.balance);
+        Ok(balance)
     }
 }
 

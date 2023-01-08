@@ -1,4 +1,5 @@
 use crate::asb::{Behaviour, OutEvent, Rate};
+use crate::monero::Amount;
 use crate::network::quote::BidQuote;
 use crate::network::swap_setup::alice::WalletSnapshot;
 use crate::network::transfer_proof;
@@ -43,6 +44,7 @@ where
     latest_rate: LR,
     min_buy: bitcoin::Amount,
     max_buy: bitcoin::Amount,
+    external_redeem_address: Option<bitcoin::Address>,
 
     swap_sender: mpsc::Sender<Swap>,
 
@@ -75,6 +77,7 @@ where
         latest_rate: LR,
         min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,
+        external_redeem_address: Option<bitcoin::Address>,
     ) -> Result<(Self, mpsc::Receiver<Swap>)> {
         let swap_channel = MpscChannels::default();
 
@@ -88,6 +91,7 @@ where
             swap_sender: swap_channel.sender,
             min_buy,
             max_buy,
+            external_redeem_address,
             recv_encrypted_signature: Default::default(),
             inflight_encrypted_signatures: Default::default(),
             send_transfer_proof: Default::default(),
@@ -164,7 +168,7 @@ where
                                 }
                             };
 
-                            let wallet_snapshot = match WalletSnapshot::capture(&self.bitcoin_wallet, &self.monero_wallet, btc).await {
+                            let wallet_snapshot = match WalletSnapshot::capture(&self.bitcoin_wallet, &self.monero_wallet, &self.external_redeem_address, btc).await {
                                 Ok(wallet_snapshot) => wallet_snapshot,
                                 Err(error) => {
                                     tracing::error!("Swap request will be ignored because we were unable to create wallet snapshot for swap: {:#}", error);
@@ -326,7 +330,10 @@ where
             .ask()
             .context("Failed to compute asking price")?;
 
-        let xmr = self.monero_wallet.get_balance().await?;
+        let balance = self.monero_wallet.get_balance().await?;
+
+        // use unlocked monero balance for quote
+        let xmr = Amount::from_piconero(balance.unlocked_balance);
 
         let max_bitcoin_for_monero = xmr.max_bitcoin_for_price(ask_price).ok_or_else(|| {
             anyhow::anyhow!("Bitcoin price ({}) x Monero ({}) overflow", ask_price, xmr)

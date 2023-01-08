@@ -31,7 +31,6 @@ use swap::asb::config::{
 use swap::asb::{cancel, punish, redeem, refund, safely_abort, EventLoop, Finality, KrakenRate};
 use swap::common::check_latest_version;
 use swap::database::open_db;
-use swap::monero::Amount;
 use swap::network::rendezvous::XmrBtcNamespace;
 use swap::network::swarm;
 use swap::protocol::alice::{run, AliceState};
@@ -103,23 +102,34 @@ async fn main() -> Result<()> {
 
     match cmd {
         Command::Start { resume_only } => {
-            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
-
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
-
-            let bitcoin_balance = bitcoin_wallet.balance().await?;
-            tracing::info!(%bitcoin_balance, "Initialized Bitcoin wallet");
-
-            let monero_balance = monero_wallet.get_balance().await?;
-            if monero_balance == Amount::ZERO {
-                let monero_address = monero_wallet.get_main_address();
-                tracing::warn!(
-                    %monero_address,
-                    "The Monero balance is 0, make sure to deposit funds at",
-                )
-            } else {
-                tracing::info!(%monero_balance, "Initialized Monero wallet");
+            let monero_address = monero_wallet.get_main_address();
+            tracing::info!(%monero_address, "Monero wallet address");
+            let monero = monero_wallet.get_balance().await?;
+            match (monero.balance, monero.unlocked_balance) {
+                (0, _) => {
+                    tracing::warn!(
+                        %monero_address,
+                        "The Monero balance is 0, make sure to deposit funds at",
+                    )
+                }
+                (total, 0) => {
+                    let total = monero::Amount::from_piconero(total);
+                    tracing::warn!(
+                        %total,
+                        "Unlocked Monero balance is 0, total balance is",
+                    )
+                }
+                (total, unlocked) => {
+                    let total = monero::Amount::from_piconero(total);
+                    let unlocked = monero::Amount::from_piconero(unlocked);
+                    tracing::info!(%total, %unlocked, "Monero wallet balance");
+                }
             }
+
+            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+            let bitcoin_balance = bitcoin_wallet.balance().await?;
+            tracing::info!(%bitcoin_balance, "Bitcoin wallet balance");
 
             let kraken_price_updates = kraken::connect(config.maker.price_ticker_ws_url.clone())?;
 
@@ -178,6 +188,7 @@ async fn main() -> Result<()> {
                 kraken_rate.clone(),
                 config.maker.min_buy_btc,
                 config.maker.max_buy_btc,
+                config.maker.external_bitcoin_redeem_address,
             )
             .unwrap();
 
@@ -236,16 +247,14 @@ async fn main() -> Result<()> {
             bitcoin_wallet.broadcast(signed_tx, "withdraw").await?;
         }
         Command::Balance => {
-            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
-
-            let bitcoin_balance = bitcoin_wallet.balance().await?;
             let monero_balance = monero_wallet.get_balance().await?;
+            tracing::info!(%monero_balance);
 
-            tracing::info!(
-                %bitcoin_balance,
-                %monero_balance,
-                "Current balance");
+            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
+            let bitcoin_balance = bitcoin_wallet.balance().await?;
+            tracing::info!(%bitcoin_balance);
+            tracing::info!(%bitcoin_balance, %monero_balance, "Current balance");
         }
         Command::Cancel { swap_id } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
