@@ -560,7 +560,7 @@ impl State4 {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct State5 {
     #[serde(with = "monero_private_key")]
     s_a: monero::PrivateKey,

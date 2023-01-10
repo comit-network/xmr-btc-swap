@@ -39,7 +39,7 @@ pub fn private_key_from_secp256k1_scalar(scalar: bitcoin::Scalar) -> PrivateKey 
     PrivateKey::from_scalar(Scalar::from_bytes_mod_order(bytes))
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PrivateViewKey(#[serde(with = "monero_private_key")] PrivateKey);
 
 impl PrivateViewKey {
@@ -78,7 +78,7 @@ impl From<PublicViewKey> for PublicKey {
 #[derive(Clone, Copy, Debug)]
 pub struct PublicViewKey(PublicKey);
 
-#[derive(Debug, Copy, Clone, Deserialize, Serialize, PartialEq, PartialOrd)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd)]
 pub struct Amount(u64);
 
 // Median tx fees on Monero as found here: https://www.monero.how/monero-transaction-fees, XMR 0.000_008 * 2 (to be on the safe side)
@@ -185,7 +185,7 @@ impl fmt::Display for Amount {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TransferProof {
     tx_hash: TxHash,
     #[serde(with = "monero_private_key")]
@@ -205,7 +205,7 @@ impl TransferProof {
 }
 
 // TODO: add constructor/ change String to fixed length byte array
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TxHash(pub String);
 
 impl From<TxHash> for String {
@@ -227,7 +227,7 @@ pub struct InsufficientFunds {
     pub actual: Amount,
 }
 
-#[derive(thiserror::Error, Debug, Clone, PartialEq)]
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 #[error("Overflow, cannot convert {0} to u64")]
 pub struct OverflowError(pub String);
 
@@ -470,10 +470,10 @@ mod tests {
     use rand::rngs::OsRng;
     use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
     pub struct MoneroPrivateKey(#[serde(with = "monero_private_key")] crate::monero::PrivateKey);
 
-    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
     pub struct MoneroAmount(#[serde(with = "monero_amount")] crate::monero::Amount);
 
     #[test]

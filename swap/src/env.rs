@@ -5,7 +5,7 @@ use std::cmp::max;
 use std::time::Duration;
 use time::ext::NumericalStdDuration;
 
-#[derive(Debug, Copy, Clone, PartialEq, Serialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize)]
 pub struct Config {
     pub bitcoin_lock_mempool_timeout: Duration,
     pub bitcoin_lock_confirmed_timeout: Duration,
