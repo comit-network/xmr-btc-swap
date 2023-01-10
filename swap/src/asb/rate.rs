@@ -5,7 +5,7 @@ use rust_decimal::Decimal;
 use std::fmt::{Debug, Display, Formatter};
 
 /// Represents the rate at which we are willing to trade 1 XMR.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rate {
     /// Represents the asking price from the market.
     ask: bitcoin::Amount,

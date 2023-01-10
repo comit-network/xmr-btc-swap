@@ -157,7 +157,7 @@ pub struct Transfer {
     pub unsigned_txset: String,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct BlockHeight {
     pub height: u32,
 }

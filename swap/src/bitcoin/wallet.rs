@@ -876,7 +876,7 @@ impl EstimateFeeRate for Client {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ScriptStatus {
     Unseen,
     InMempool,
@@ -893,7 +893,7 @@ impl ScriptStatus {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Confirmed {
     /// The depth of this transaction within the blockchain.
     ///

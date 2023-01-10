@@ -75,8 +75,9 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.2.0
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: 1.63
           targets: armv7-unknown-linux-gnueabihf
 
       - name: Build binary

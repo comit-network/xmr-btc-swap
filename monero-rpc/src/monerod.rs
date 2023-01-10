@@ -157,7 +157,7 @@ pub struct OutKey {
     pub unlocked: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct BaseResponse {
     pub credits: u64,
     pub status: Status,
@@ -165,7 +165,7 @@ pub struct BaseResponse {
     pub untrusted: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct GetOIndexesResponse {
     #[serde(flatten)]
     pub base: BaseResponse,
@@ -173,7 +173,7 @@ pub struct GetOIndexesResponse {
     pub o_indexes: Vec<u64>,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 pub enum Status {
     #[serde(rename = "OK")]
     Ok,

@@ -2,7 +2,7 @@ use anyhow::anyhow;
 
 const LATEST_RELEASE_URL: &str = "https://github.com/comit-network/xmr-btc-swap/releases/latest";
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Version {
     Current,
     Available,
