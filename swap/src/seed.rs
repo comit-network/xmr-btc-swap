@@ -61,7 +61,7 @@ impl Seed {
         let file_path = Path::new(&file_path_buf);
 
         if file_path.exists() {
-            return Self::from_file(&file_path);
+            return Self::from_file(file_path);
         }
 
         tracing::debug!("No seed file found, creating at {}", file_path.display());

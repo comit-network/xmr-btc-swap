@@ -1,10 +1,11 @@
+use crate::api::Context;
 use crate::bitcoin::{Amount, TxLock};
 use crate::cli::{list_sellers, EventLoop, SellerStatus};
 use crate::libp2p_ext::MultiAddrExt;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
 use crate::network::swarm;
-use crate::protocol::bob::{BobState, Swap};
 use crate::protocol::bob;
+use crate::protocol::bob::{BobState, Swap};
 use crate::{bitcoin, cli, monero, rpc};
 use anyhow::{bail, Context as AnyContext, Result};
 use libp2p::core::Multiaddr;
@@ -16,10 +17,8 @@ use std::convert::TryInto;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
-use uuid::Uuid;
-use crate::api::Context;
 use tokio::sync::broadcast;
-
+use uuid::Uuid;
 
 #[derive(PartialEq, Debug)]
 pub struct Request {
@@ -61,11 +60,11 @@ impl Shutdown {
 #[derive(Debug)]
 pub struct Shutdown {
     shutdown: bool,
-    notify:  broadcast::Receiver<()>
+    notify: broadcast::Receiver<()>,
 }
 
 impl PartialEq for Shutdown {
-     fn eq(&self, other: &Shutdown) -> bool {
+    fn eq(&self, other: &Shutdown) -> bool {
         self.shutdown == other.shutdown
     }
 }
@@ -81,7 +80,6 @@ pub struct Params {
     pub address: Option<bitcoin::Address>,
 }
 
-
 #[derive(Debug, PartialEq)]
 pub enum Method {
     BuyXmr,
@@ -93,8 +91,7 @@ pub enum Method {
     GetSeller,
     SwapStartDate,
     Resume,
-    Cancel,
-    Refund,
+    CancelAndRefund,
     ListSellers,
     ExportBitcoinWallet,
     MoneroRecovery,
@@ -107,19 +104,29 @@ impl Request {
             Method::BuyXmr => {
                 let swap_id = Uuid::new_v4();
 
-                let seed = context.config.seed.as_ref().unwrap();
+                let seed = context.config.seed.as_ref().context("Could not get seed")?;
                 let env_config = context.config.env_config;
-                let btc = context.bitcoin_wallet.as_ref().unwrap();
-                let seller = self.params.seller.clone().unwrap();
-                let monero_receive_address = self.params.monero_receive_address.unwrap();
-                let bitcoin_change_address = self.params.bitcoin_change_address.clone().unwrap();
-
-                let bitcoin_wallet = btc;
-                let seller_peer_id = self
+                let btc = context
+                    .bitcoin_wallet
+                    .as_ref()
+                    .context("Could not get Bitcoin wallet")?;
+                let seller = self
                     .params
                     .seller
-                    .as_ref()
-                    .unwrap()
+                    .clone()
+                    .context("Parameter seller is missing")?;
+                let monero_receive_address = self
+                    .params
+                    .monero_receive_address
+                    .context("Parameter monero_receive_address is missing")?;
+                let bitcoin_change_address = self
+                    .params
+                    .bitcoin_change_address
+                    .clone()
+                    .context("Parameter bitcoin_change_address is missing")?;
+
+                let bitcoin_wallet = btc;
+                let seller_peer_id = seller
                     .extract_peer_id()
                     .context("Seller address must contain peer ID")?;
                 context
@@ -135,7 +142,10 @@ impl Request {
                 );
                 let mut swarm = swarm::cli(
                     seed.derive_libp2p_identity(),
-                    context.config.tor_socks5_port.unwrap(),
+                    context
+                        .config
+                        .tor_socks5_port
+                        .context("Could not get Tor SOCKS5 port")?,
                     behaviour,
                 )
                 .await?;
@@ -178,13 +188,16 @@ impl Request {
                     .db
                     .insert_monero_address(swap_id, monero_receive_address)
                     .await?;
-                let monero_wallet = context.monero_wallet.as_ref().unwrap();
+                let monero_wallet = context
+                    .monero_wallet
+                    .as_ref()
+                    .context("Could not get Monero wallet")?;
 
                 let swap = Swap::new(
                     Arc::clone(&context.db),
                     swap_id,
-                    Arc::clone(&bitcoin_wallet),
-                    Arc::clone(&monero_wallet),
+                    Arc::clone(bitcoin_wallet),
+                    Arc::clone(monero_wallet),
                     env_config,
                     event_loop_handle,
                     monero_receive_address,
@@ -217,15 +230,21 @@ impl Request {
             }
             Method::RawHistory => {
                 let raw_history = context.db.raw_all().await?;
-                json!({
-                    "raw_history": raw_history
-                })
+                json!({ "raw_history": raw_history })
             }
             Method::GetSeller => {
-                let swap_id = self.params.swap_id.with_context(|| "A swap_id is needed")?;
-                let peerId = context.db.get_peer_id(swap_id).await.with_context(|| "Could not get PeerID")?;
+                let swap_id = self.params.swap_id.context("Parameter swap_id is needed")?;
+                let peerId = context
+                    .db
+                    .get_peer_id(swap_id)
+                    .await
+                    .with_context(|| "Could not get PeerID")?;
 
-                let addresses = context.db.get_addresses(peerId).await.with_context(|| "Could not get addressess")?;
+                let addresses = context
+                    .db
+                    .get_addresses(peerId)
+                    .await
+                    .with_context(|| "Could not get addressess")?;
 
                 json!({
                     "peerId": peerId.to_base58(),
@@ -233,12 +252,12 @@ impl Request {
                 })
             }
             Method::SwapStartDate => {
-                let swap_id = self.params.swap_id.with_context(|| "A swap_id is needed")?;
+                let swap_id = self
+                    .params
+                    .swap_id
+                    .context("Parameter swap_id is missing")?;
 
-                let start_date = context
-                    .db
-                    .get_swap_start_date(swap_id)
-                    .await?;
+                let start_date = context.db.get_swap_start_date(swap_id).await?;
 
                 json!({
                     "start_date": start_date,
@@ -262,9 +281,16 @@ impl Request {
                 })
             }
             Method::WithdrawBtc => {
-                let bitcoin_wallet = context.bitcoin_wallet.as_ref().unwrap();
+                let bitcoin_wallet = context
+                    .bitcoin_wallet
+                    .as_ref()
+                    .context("Could not get Bitcoin wallet")?;
 
-                let address = self.params.address.clone().unwrap();
+                let address = self
+                    .params
+                    .address
+                    .clone()
+                    .context("Parameter address is missing")?;
 
                 let amount = match self.params.amount {
                     Some(amount) => amount,
@@ -306,7 +332,10 @@ impl Request {
                 }
             }
             Method::Balance => {
-                let bitcoin_wallet = context.bitcoin_wallet.as_ref().unwrap();
+                let bitcoin_wallet = context
+                    .bitcoin_wallet
+                    .as_ref()
+                    .context("Could not get Bitcoin wallet")?;
 
                 bitcoin_wallet.sync().await?;
                 let bitcoin_balance = bitcoin_wallet.balance().await?;
@@ -320,22 +349,38 @@ impl Request {
                 })
             }
             Method::Resume => {
-                let swap_id = self.params.swap_id.unwrap();
+                let swap_id = self
+                    .params
+                    .swap_id
+                    .context("Parameter swap_id is missing")?;
 
                 let seller_peer_id = context.db.get_peer_id(swap_id).await?;
                 let seller_addresses = context.db.get_addresses(seller_peer_id).await?;
 
-                let seed = context.config.seed.as_ref().unwrap().derive_libp2p_identity();
+                let seed = context
+                    .config
+                    .seed
+                    .as_ref()
+                    .context("Could not get seed")?
+                    .derive_libp2p_identity();
 
                 let behaviour = cli::Behaviour::new(
                     seller_peer_id,
                     context.config.env_config,
-                    Arc::clone(context.bitcoin_wallet.as_ref().unwrap()),
+                    Arc::clone(
+                        context
+                            .bitcoin_wallet
+                            .as_ref()
+                            .context("Could not get Bitcoin wallet")?,
+                    ),
                     (seed.clone(), context.config.namespace),
                 );
                 let mut swarm = swarm::cli(
                     seed.clone(),
-                    context.config.tor_socks5_port.clone().unwrap(),
+                    context
+                        .config
+                        .tor_socks5_port
+                        .context("Could not get Tor SOCKS5 port")?,
                     behaviour,
                 )
                 .await?;
@@ -357,8 +402,18 @@ impl Request {
                 let swap = Swap::from_db(
                     Arc::clone(&context.db),
                     swap_id,
-                    Arc::clone(context.bitcoin_wallet.as_ref().unwrap()),
-                    Arc::clone(context.monero_wallet.as_ref().unwrap()),
+                    Arc::clone(
+                        context
+                            .bitcoin_wallet
+                            .as_ref()
+                            .context("Could not get Bitcoin wallet")?,
+                    ),
+                    Arc::clone(
+                        context
+                            .monero_wallet
+                            .as_ref()
+                            .context("Could not get Monero wallet")?,
+                    ),
                     context.config.env_config,
                     event_loop_handle,
                     monero_receive_address,
@@ -378,39 +433,49 @@ impl Request {
                 })
             }
             Method::CancelAndRefund => {
-                let bitcoin_wallet = context.bitcoin_wallet.as_ref().unwrap();
+                let bitcoin_wallet = context
+                    .bitcoin_wallet
+                    .as_ref()
+                    .context("Could not get Bitcoin wallet")?;
 
-                let (txid, _) = cli::cancel_and_refund(swap_id, Arc::clone(bitcoin_wallet), Arc::clone(&context.db).await?;
-
-                json!({
-                    "txid": txid,
-                })
-            }
-            Method::Refund => {
-                let bitcoin_wallet = context.bitcoin_wallet.as_ref().unwrap();
-
-                let state = cli::refund(
-                    self.params.swap_id.unwrap(),
+                let state = cli::cancel_and_refund(
+                    self.params
+                        .swap_id
+                        .context("Parameter swap_id is missing")?,
                     Arc::clone(bitcoin_wallet),
                     Arc::clone(&context.db),
                 )
                 .await?;
 
-                json!({ "result": state })
+                json!({
+                    "result": state,
+                })
             }
             Method::ListSellers => {
-                let rendezvous_point = self.params.rendezvous_point.clone().unwrap();
+                let rendezvous_point = self
+                    .params
+                    .rendezvous_point
+                    .clone()
+                    .context("Parameter rendezvous_point is missing")?;
                 let rendezvous_node_peer_id = rendezvous_point
                     .extract_peer_id()
                     .context("Rendezvous node address must contain peer ID")?;
 
-                let identity = context.config.seed.as_ref().unwrap().derive_libp2p_identity();
+                let identity = context
+                    .config
+                    .seed
+                    .as_ref()
+                    .context("Cannot extract seed")?
+                    .derive_libp2p_identity();
 
                 let sellers = list_sellers(
                     rendezvous_node_peer_id,
                     rendezvous_point,
                     context.config.namespace,
-                    context.config.tor_socks5_port.unwrap(),
+                    context
+                        .config
+                        .tor_socks5_port
+                        .context("Could not get Tor SOCKS5 port")?,
                     identity,
                 )
                 .await?;
@@ -440,7 +505,10 @@ impl Request {
                 json!({ "sellers": sellers })
             }
             Method::ExportBitcoinWallet => {
-                let bitcoin_wallet = context.bitcoin_wallet.as_ref().unwrap();
+                let bitcoin_wallet = context
+                    .bitcoin_wallet
+                    .as_ref()
+                    .context("Could not get Bitcoin wallet")?;
 
                 let wallet_export = bitcoin_wallet.wallet_export("cli").await?;
                 tracing::info!(descriptor=%wallet_export.to_string(), "Exported bitcoin wallet");
@@ -451,7 +519,11 @@ impl Request {
             Method::MoneroRecovery => {
                 let swap_state: BobState = context
                     .db
-                    .get_state(self.params.swap_id.clone().unwrap())
+                    .get_state(
+                        self.params
+                            .swap_id
+                            .context("Parameter swap_id is missing")?,
+                    )
                     .await?
                     .try_into()?;
 
@@ -494,7 +566,6 @@ impl Request {
         Ok(result)
     }
 }
-
 
 fn qr_code(value: &impl ToString) -> Result<String> {
     let code = QrCode::new(value.to_string())?;

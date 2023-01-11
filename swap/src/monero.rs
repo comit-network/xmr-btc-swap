@@ -321,7 +321,7 @@ pub mod monero_amount {
 }
 
 pub mod monero_address {
-    use anyhow::{bail, Result, Context};
+    use anyhow::{bail, Context, Result};
     use std::str::FromStr;
 
     #[derive(thiserror::Error, Debug, Clone, Copy, PartialEq)]

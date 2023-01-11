@@ -11,10 +11,9 @@ use anyhow::{Context as AnyContext, Result};
 use std::fmt;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::{Arc};
-use url::Url;
-use std::sync::Once;
+use std::sync::{Arc, Once};
 use tokio::sync::{broadcast, Mutex};
+use url::Url;
 
 static START: Once = Once::new();
 
@@ -41,7 +40,6 @@ pub struct Context {
     pub config: Config,
     pub shutdown: Arc<broadcast::Sender<()>>,
 }
-
 
 impl Context {
     pub async fn build(
@@ -91,18 +89,11 @@ impl Context {
             }
         };
 
-        let tor_socks5_port = {
-            if let Some(tor) = tor {
-                Some(tor.tor_socks5_port)
-            } else {
-                None
-            }
-        };
+        let tor_socks5_port = tor.map(|tor| tor.tor_socks5_port);
 
         START.call_once(|| {
             let _ = cli::tracing::init(debug, json, data_dir.join("logs"), None);
         });
-
 
         let init = Context {
             db: open_db(data_dir.join("sqlite")).await?,
@@ -125,15 +116,13 @@ impl Context {
 
         Ok(init)
     }
-
 }
 
 impl fmt::Debug for Context {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Testing {}", true)
+        write!(f, "")
     }
 }
-
 
 async fn init_bitcoin_wallet(
     electrum_rpc_url: Url,
@@ -158,7 +147,6 @@ async fn init_bitcoin_wallet(
 
     Ok(wallet)
 }
-
 
 async fn init_monero_wallet(
     data_dir: PathBuf,
@@ -213,12 +201,12 @@ fn env_config_from(testnet: bool) -> EnvConfig {
 }
 #[cfg(test)]
 pub mod api_test {
+    use crate::api::request::{Method, Params, Request, Shutdown};
     use crate::tor::DEFAULT_SOCKS5_PORT;
-    use std::str::FromStr;
-    use uuid::Uuid;
-    use crate::api::request::{Request, Params, Method, Shutdown};
     use libp2p::Multiaddr;
+    use std::str::FromStr;
     use tokio::sync::broadcast;
+    use uuid::Uuid;
 
     pub const MULTI_ADDRESS: &str =
         "/ip4/127.0.0.1/tcp/9939/p2p/12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
@@ -251,7 +239,6 @@ pub mod api_test {
                 is_testnet,
             }
         }
-
     }
     impl Request {
         pub fn buy_xmr(is_testnet: bool, tx: broadcast::Sender<()>) -> Request {

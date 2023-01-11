@@ -1,8 +1,8 @@
+use crate::api::request::{Method, Params, Request, Shutdown};
 use crate::api::Context;
-use crate::api::request::{Request, Params, Method, Shutdown};
-use crate::bitcoin::{Amount, bitcoin_address};
-use crate::monero::monero_address;
+use crate::bitcoin::{bitcoin_address, Amount};
 use crate::monero;
+use crate::monero::monero_address;
 use anyhow::Result;
 use libp2p::core::Multiaddr;
 use std::ffi::OsString;
@@ -11,9 +11,9 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use structopt::{clap, StructOpt};
+use tokio::sync::broadcast;
 use url::Url;
 use uuid::Uuid;
-use tokio::sync::broadcast;
 
 // See: https://moneroworld.com/
 pub const DEFAULT_MONERO_DAEMON_ADDRESS: &str = "node.community.rino.io:18081";
@@ -42,7 +42,10 @@ pub enum ParseResult {
     PrintAndExitZero { message: String },
 }
 
-pub async fn parse_args_and_apply_defaults<I, T>(raw_args: I, rx: broadcast::Sender<()>) -> Result<ParseResult>
+pub async fn parse_args_and_apply_defaults<I, T>(
+    raw_args: I,
+    rx: broadcast::Sender<()>,
+) -> Result<ParseResult>
 where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
@@ -70,8 +73,10 @@ where
             monero_receive_address,
             tor,
         } => {
-            let monero_receive_address = monero_address::validate(monero_receive_address, is_testnet)?;
-            let bitcoin_change_address = bitcoin_address::validate(bitcoin_change_address, is_testnet)?;
+            let monero_receive_address =
+                monero_address::validate(monero_receive_address, is_testnet)?;
+            let bitcoin_change_address =
+                bitcoin_address::validate(bitcoin_change_address, is_testnet)?;
 
             let request = Request {
                 params: Params {
@@ -268,8 +273,18 @@ where
                 shutdown: Shutdown::new(rx.subscribe()),
             };
 
-            let context =
-                Context::build(None, None, Some(tor), data, is_testnet, debug, json, None, rx).await?;
+            let context = Context::build(
+                None,
+                None,
+                Some(tor),
+                data,
+                is_testnet,
+                debug,
+                json,
+                None,
+                rx,
+            )
+            .await?;
 
             (context, request)
         }
@@ -563,10 +578,10 @@ mod tests {
     use crate::tor::DEFAULT_SOCKS5_PORT;
 
     use crate::api::api_test::*;
-    use sequential_test::sequential;
-    use crate::monero::monero_address::MoneroAddressNetworkMismatch;
     use crate::api::Config;
     use crate::fs::system_data_dir;
+    use crate::monero::monero_address::MoneroAddressNetworkMismatch;
+    use sequential_test::sequential;
 
     const BINARY_NAME: &str = "swap";
     const ARGS_DATA_DIR: &str = "/tmp/dir/";
@@ -586,7 +601,9 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (false, false, false);
 
         let (expected_config, expected_request) = (
@@ -619,7 +636,9 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
         let (expected_config, expected_request) = (
@@ -651,7 +670,9 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let err = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap_err();
+        let err = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap_err();
 
         assert_eq!(
             err.downcast_ref::<MoneroAddressNetworkMismatch>().unwrap(),
@@ -678,7 +699,9 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let err = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap_err();
+        let err = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap_err();
 
         assert_eq!(
             err.downcast_ref::<MoneroAddressNetworkMismatch>().unwrap(),
@@ -695,7 +718,9 @@ mod tests {
         let raw_ars = vec![BINARY_NAME, "resume", "--swap-id", SWAP_ID];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (false, false, false);
 
         let (expected_config, expected_request) = (
@@ -718,7 +743,9 @@ mod tests {
         let raw_ars = vec![BINARY_NAME, "--testnet", "resume", "--swap-id", SWAP_ID];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
         let (expected_config, expected_request) = (
@@ -741,7 +768,9 @@ mod tests {
         let raw_ars = vec![BINARY_NAME, "cancel", "--swap-id", SWAP_ID];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
 
         let (is_testnet, debug, json) = (false, false, false);
 
@@ -765,7 +794,9 @@ mod tests {
         let raw_ars = vec![BINARY_NAME, "--testnet", "cancel", "--swap-id", SWAP_ID];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
         let (expected_config, expected_request) = (
@@ -788,7 +819,9 @@ mod tests {
         let raw_ars = vec![BINARY_NAME, "refund", "--swap-id", SWAP_ID];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (false, false, false);
 
         let (expected_config, expected_request) = (
@@ -811,7 +844,9 @@ mod tests {
         let raw_ars = vec![BINARY_NAME, "--testnet", "refund", "--swap-id", SWAP_ID];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
         let (expected_config, expected_request) = (
@@ -845,7 +880,9 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (false, false, false);
         let data_dir = PathBuf::from_str(ARGS_DATA_DIR).unwrap();
 
@@ -862,7 +899,6 @@ mod tests {
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
     }
-
 
     #[tokio::test]
     #[sequential]
@@ -883,7 +919,9 @@ mod tests {
 
         let (tx, _) = broadcast::channel(1);
         let data_dir = PathBuf::from_str(ARGS_DATA_DIR).unwrap();
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
         let (expected_config, expected_request) = (
@@ -903,7 +941,6 @@ mod tests {
     #[tokio::test]
     #[sequential]
     async fn given_resume_on_mainnet_with_data_dir_then_data_dir_set() {
-
         let raw_ars = vec![
             BINARY_NAME,
             "--data-base-dir",
@@ -915,7 +952,9 @@ mod tests {
 
         let (tx, _) = broadcast::channel(1);
         let data_dir = PathBuf::from_str(ARGS_DATA_DIR).unwrap();
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (false, false, false);
 
         let (expected_config, expected_request) = (
@@ -935,7 +974,6 @@ mod tests {
     #[tokio::test]
     #[sequential]
     async fn given_resume_on_testnet_with_data_dir_then_data_dir_set() {
-
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -948,7 +986,9 @@ mod tests {
 
         let (tx, _) = broadcast::channel(1);
         let data_dir = PathBuf::from_str(ARGS_DATA_DIR).unwrap();
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
         let (expected_config, expected_request) = (
@@ -981,7 +1021,9 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (false, true, false);
 
         let (expected_config, expected_request) = (
@@ -1015,7 +1057,9 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (true, true, false);
 
         let (expected_config, expected_request) = (
@@ -1035,11 +1079,12 @@ mod tests {
     #[tokio::test]
     #[sequential]
     async fn given_resume_on_mainnet_with_debug_then_debug_set() {
-
         let raw_ars = vec![BINARY_NAME, "--debug", "resume", "--swap-id", SWAP_ID];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (false, true, false);
 
         let (expected_config, expected_request) = (
@@ -1056,7 +1101,6 @@ mod tests {
         assert_eq!(actual_request, Box::new(expected_request));
     }
 
-
     #[tokio::test]
     #[sequential]
     async fn given_resume_on_testnet_with_debug_then_debug_set() {
@@ -1070,7 +1114,9 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (true, true, false);
 
         let (expected_config, expected_request) = (
@@ -1103,7 +1149,9 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (false, false, true);
         let data_dir = data_dir_path_cli(is_testnet);
 
@@ -1138,7 +1186,9 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (true, false, true);
 
         let (expected_config, expected_request) = (
@@ -1158,10 +1208,11 @@ mod tests {
     #[tokio::test]
     #[sequential]
     async fn given_resume_on_mainnet_with_json_then_json_set() {
-
         let (tx, _) = broadcast::channel(1);
         let raw_ars = vec![BINARY_NAME, "--json", "resume", "--swap-id", SWAP_ID];
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (false, false, true);
 
         let (expected_config, expected_request) = (
@@ -1181,7 +1232,6 @@ mod tests {
     #[tokio::test]
     #[sequential]
     async fn given_resume_on_testnet_with_json_then_json_set() {
-
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -1192,7 +1242,9 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         let (is_testnet, debug, json) = (true, false, true);
 
         let (expected_config, expected_request) = (
@@ -1223,7 +1275,9 @@ mod tests {
             MULTI_ADDRESS,
         ];
         let (tx, _) = broadcast::channel(1);
-        let result = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap_err();
+        let result = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap_err();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -1235,7 +1289,9 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap_err();
+        let result = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap_err();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -1247,7 +1303,9 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let result = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         assert!(matches!(result, ParseResult::Context(_, _)));
     }
 
@@ -1266,7 +1324,9 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap_err();
+        let result = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap_err();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -1279,7 +1339,9 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap_err();
+        let result = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap_err();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -1292,7 +1354,9 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars, tx.clone()).await.unwrap();
+        let result = parse_args_and_apply_defaults(raw_ars, tx.clone())
+            .await
+            .unwrap();
         assert!(matches!(result, ParseResult::Context(_, _)));
     }
 

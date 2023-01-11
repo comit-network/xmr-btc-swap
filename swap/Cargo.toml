@@ -79,17 +79,17 @@ zip = "0.5"
 bitcoin-harness = "0.2.2"
 get-port = "3"
 hyper = "0.14"
-monero-harness = { path = "../monero-harness" }
 jsonrpsee = { version = "0.16.2", features = [ "ws-client" ] }
 jsonrpsee-types = { version = "0.16.2" }
+monero-harness = { path = "../monero-harness" }
 port_check = "0.1"
 proptest = "1"
+sequential-test = "0.2.4"
 serde_cbor = "0.11"
 serial_test = "0.10"
 spectral = "0.6"
 tempfile = "3"
 testcontainers = "0.12"
-sequential-test = "0.2.4"
 
 [build-dependencies]
 anyhow = "1"

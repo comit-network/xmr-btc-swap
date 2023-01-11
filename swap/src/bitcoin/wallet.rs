@@ -54,7 +54,7 @@ impl Wallet {
     ) -> Result<Self> {
         let data_dir = data_dir.as_ref();
         let wallet_dir = data_dir.join(WALLET);
-        let database = bdk::sled::open(&wallet_dir)?.open_tree(SLED_TREE_NAME)?;
+        let database = bdk::sled::open(wallet_dir)?.open_tree(SLED_TREE_NAME)?;
         let network = env_config.bitcoin_network;
 
         let wallet = match bdk::Wallet::new(
@@ -97,7 +97,7 @@ impl Wallet {
         std::fs::rename(from, to)?;
 
         let wallet_dir = data_dir.join(WALLET);
-        let database = bdk::sled::open(&wallet_dir)?.open_tree(SLED_TREE_NAME)?;
+        let database = bdk::sled::open(wallet_dir)?.open_tree(SLED_TREE_NAME)?;
 
         let wallet = bdk::Wallet::new(
             bdk::template::Bip84(xprivkey, KeychainKind::External),

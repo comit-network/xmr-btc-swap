@@ -1,7 +1,7 @@
 use crate::database::Swap;
 use crate::monero::Address;
 use crate::protocol::{Database, State};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use libp2p::{Multiaddr, PeerId};
 use sqlx::sqlite::Sqlite;
@@ -185,7 +185,8 @@ impl Database for SqliteDatabase {
         .fetch_one(&mut conn)
         .await?;
 
-        return Ok(row.start_date.unwrap());
+        row.start_date
+            .ok_or_else(|| anyhow!("Could not get swap start date"))
     }
 
     async fn insert_latest_state(&self, swap_id: Uuid, state: State) -> Result<()> {
@@ -283,13 +284,16 @@ impl Database for SqliteDatabase {
         let mut swaps: HashMap<Uuid, Vec<serde_json::Value>> = HashMap::new();
 
         for row in &rows {
-            let swap_id = Uuid::from_str(&row.swap_id).unwrap();
-            let state = serde_json::from_str(&row.state).unwrap();
+            let swap_id = Uuid::from_str(&row.swap_id)?;
+            let state = serde_json::from_str(&row.state)?;
 
-            if swaps.contains_key(&swap_id) {
-                swaps.get_mut(&swap_id).unwrap().push(state);
+            if let std::collections::hash_map::Entry::Vacant(e) = swaps.entry(swap_id) {
+                e.insert(vec![state]);
             } else {
-                swaps.insert(swap_id, vec![state]);
+                swaps
+                    .get_mut(&swap_id)
+                    .ok_or_else(|| anyhow!("Error while retrieving the swap"))?
+                    .push(state);
             }
         }
 

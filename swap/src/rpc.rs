@@ -1,5 +1,5 @@
 use crate::api::Context;
-use jsonrpsee::server::{ServerBuilder, ServerHandle, RpcModule};
+use jsonrpsee::server::{RpcModule, ServerBuilder, ServerHandle};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use thiserror::Error;
@@ -21,7 +21,7 @@ pub async fn run_server(
     {
         modules
             .merge(methods::register_modules(Arc::clone(&context)))
-            .unwrap()
+            .expect("Could not register RPC modules")
     }
 
     let addr = server.local_addr()?;

@@ -28,7 +28,7 @@ pub async fn cancel_and_refund(
 pub async fn cancel(
     swap_id: Uuid,
     bitcoin_wallet: Arc<Wallet>,
-    db: Arc<dyn Database>,
+    db: Arc<dyn Database + Send + Sync>,
 ) -> Result<(Txid, Subscription, BobState)> {
     let state = db.get_state(swap_id).await?.try_into()?;
 
@@ -80,7 +80,7 @@ pub async fn cancel(
 pub async fn refund(
     swap_id: Uuid,
     bitcoin_wallet: Arc<Wallet>,
-    db: Arc<dyn Database>,
+    db: Arc<dyn Database + Send + Sync>,
 ) -> Result<BobState> {
     let state = db.get_state(swap_id).await?.try_into()?;
 
