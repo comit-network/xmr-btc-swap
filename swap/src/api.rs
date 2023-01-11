@@ -11,10 +11,10 @@ use anyhow::{Context as AnyContext, Result};
 use std::fmt;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use url::Url;
 use std::sync::Once;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, Mutex};
 
 static START: Once = Once::new();
 
@@ -30,11 +30,14 @@ pub struct Config {
     pub is_testnet: bool,
 }
 
+// workaround for warning over monero_rpc_process which we must own but not read
+#[allow(dead_code)]
 pub struct Context {
     pub db: Arc<dyn Database + Send + Sync>,
     bitcoin_wallet: Option<Arc<bitcoin::Wallet>>,
     monero_wallet: Option<Arc<monero::Wallet>>,
     monero_rpc_process: Option<monero::WalletRpcProcess>,
+    running_swap: Arc<Mutex<bool>>,
     pub config: Config,
     pub shutdown: Arc<broadcast::Sender<()>>,
 }
@@ -117,6 +120,7 @@ impl Context {
                 is_testnet,
             },
             shutdown: Arc::new(shutdown),
+            running_swap: Arc::new(Mutex::new(false)),
         };
 
         Ok(init)
@@ -209,7 +213,6 @@ fn env_config_from(testnet: bool) -> EnvConfig {
 }
 #[cfg(test)]
 pub mod api_test {
-    use super::*;
     use crate::tor::DEFAULT_SOCKS5_PORT;
     use std::str::FromStr;
     use uuid::Uuid;
@@ -314,7 +317,4 @@ pub mod api_test {
             }
         }
     }
-}
-mod tests {
-    use super::*;
 }

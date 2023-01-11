@@ -9,7 +9,6 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::rpc::Error;
 
 pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
     let mut module = RpcModule::new(context);

@@ -24,10 +24,10 @@ use sequential_test::sequential;
 // to be replaced with actual "real" testing values
 // need to create some kind of swap database and bitcoin environment with some funds
 const SERVER_ADDRESS: &str = "127.0.0.1:1234";
-const BITCOIN_ADDR: &str = "valid_address";
-const MONERO_ADDR: &str = "valid_address";
-const SELLER: &str = "some_seller";
-const SWAP_ID: &str = "valid_swap_id";
+const BITCOIN_ADDR: &str = "tb1qr3em6k3gfnyl8r7q0v7t4tlnyxzgxma3lressv";
+const MONERO_ADDR: &str = "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a";
+const SELLER: &str = "/ip4/127.0.0.1/tcp/9939/p2p/12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
+const SWAP_ID: &str = "ea030832-3be9-454f-bb98-5ea9a788406b";
 
 pub async fn initialize_context() -> (Arc<Context>, Request) {
     let (is_testnet, debug, json) = (true, false, false);

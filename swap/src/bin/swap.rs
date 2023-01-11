@@ -21,7 +21,7 @@ use tokio::sync::broadcast;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let (tx, mut rx1) = broadcast::channel(1);
+    let (tx, _) = broadcast::channel(1);
     let (context, mut request) = match parse_args_and_apply_defaults(env::args_os(), tx).await? {
         ParseResult::Context(context, request) => (context, request),
         ParseResult::PrintAndExitZero { message } => {

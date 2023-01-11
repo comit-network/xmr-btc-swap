@@ -285,7 +285,7 @@ impl Request {
 
                 json!({
                     "signed_tx": signed_tx,
-                    "amount": amount.as_sat(),
+                    "amount": amount.to_sat(),
                     "txid": signed_tx.txid(),
                 })
             }
@@ -297,7 +297,7 @@ impl Request {
                 loop {
                     tokio::select! {
                         _ = self.shutdown.recv() => {
-                            server_handle.stop();
+                            server_handle.stop()?;
                             return Ok(json!({
                                 "result": []
                             }))
@@ -316,7 +316,7 @@ impl Request {
                 );
 
                 json!({
-                    "balance": bitcoin_balance.as_sat()
+                    "balance": bitcoin_balance.to_sat()
                 })
             }
             Method::Resume => {
