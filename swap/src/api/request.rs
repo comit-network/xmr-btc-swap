@@ -264,8 +264,8 @@ impl Request {
                 })
             }
             Method::Config => {
-                //                tracing::info!(path=%data_dir.display(), "Data directory");
-                //                tracing::info!(path=%format!("{}/logs", data_dir.display()),
+                //  tracing::info!(path=%data_dir.display(), "Data directory");
+                //  tracing::info!(path=%format!("{}/logs", data_dir.display()),
                 // "Log files directory");
                 // tracing::info!(path=%format!("{}/sqlite", data_dir.display()), "Sqlite file
                 // location");

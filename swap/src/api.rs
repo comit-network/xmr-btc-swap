@@ -207,6 +207,7 @@ pub mod api_test {
     use std::str::FromStr;
     use tokio::sync::broadcast;
     use uuid::Uuid;
+    use super::*;
 
     pub const MULTI_ADDRESS: &str =
         "/ip4/127.0.0.1/tcp/9939/p2p/12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
