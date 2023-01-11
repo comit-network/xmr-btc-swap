@@ -26,15 +26,16 @@ impl Wallet {
     pub async fn open_or_create(url: Url, name: String, env_config: Config) -> Result<Self> {
         let client = wallet::Client::new(url)?;
 
-        let open_wallet_response = client.open_wallet(name.clone()).await;
-        if open_wallet_response.is_err() {
-            client.create_wallet(name.clone(), "English".to_owned()).await.context(
-                "Unable to create Monero wallet, please ensure that the monero-wallet-rpc is available",
-            )?;
+        match client.open_wallet(name.clone()).await {
+            Err(error) => {
+                tracing::debug!(%error, "Open wallet response error");
+                client.create_wallet(name.clone(), "English".to_owned()).await.context(
+                    "Unable to create Monero wallet, please ensure that the monero-wallet-rpc is available",
+                )?;
 
-            tracing::debug!(monero_wallet_name = %name, "Created Monero wallet");
-        } else {
-            tracing::debug!(monero_wallet_name = %name, "Opened Monero wallet");
+                tracing::debug!(monero_wallet_name = %name, "Created Monero wallet");
+            }
+            Ok(_) => tracing::debug!(monero_wallet_name = %name, "Opened Monero wallet"),
         }
 
         Self::connect(client, name, env_config).await

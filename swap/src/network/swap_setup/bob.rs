@@ -258,7 +258,7 @@ impl From<SpotPriceResponse> for Result<monero::Amount, Error> {
     }
 }
 
-#[derive(Clone, Debug, thiserror::Error, PartialEq)]
+#[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
 pub enum Error {
     #[error("Seller currently does not accept incoming swap requests, please try again later")]
     NoSwapsAccepted,

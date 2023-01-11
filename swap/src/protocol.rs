@@ -102,11 +102,11 @@ impl From<BobState> for State {
     }
 }
 
-#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq)]
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq)]
 #[error("Not in the role of Alice")]
 pub struct NotAlice;
 
-#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq)]
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq)]
 #[error("Not in the role of Bob")]
 pub struct NotBob;
 

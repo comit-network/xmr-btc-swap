@@ -84,7 +84,7 @@ const DEFAULT_MIN_BUY_AMOUNT: f64 = 0.002f64;
 const DEFAULT_MAX_BUY_AMOUNT: f64 = 0.02f64;
 const DEFAULT_SPREAD: f64 = 0.02f64;
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
     pub data: Data,
@@ -123,13 +123,13 @@ impl TryFrom<config::Config> for Config {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Data {
     pub dir: PathBuf,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Network {
     #[serde(deserialize_with = "addr_list::deserialize")]
@@ -181,7 +181,7 @@ mod addr_list {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Bitcoin {
     pub electrum_rpc_url: Url,
@@ -191,7 +191,7 @@ pub struct Bitcoin {
     pub network: bitcoin::Network,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Monero {
     pub wallet_rpc_url: Url,
@@ -200,14 +200,14 @@ pub struct Monero {
     pub network: monero::Network,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TorConf {
     pub control_port: u16,
     pub socks5_port: u16,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Maker {
     #[serde(with = "::bitcoin::util::amount::serde::as_btc")]

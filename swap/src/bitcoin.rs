@@ -108,7 +108,7 @@ impl SecretKey {
     }
 }
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PublicKey(Point);
 
 impl PublicKey {

@@ -1,4 +1,4 @@
-use crate::bitcoin::wallet::EstimateFeeRate;
+use crate::bitcoin::wallet::{EstimateFeeRate, Subscription};
 use crate::bitcoin::{
     self, current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, Transaction, TxCancel,
     TxLock, Txid,
@@ -561,7 +561,7 @@ impl State4 {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct State5 {
     #[serde(with = "monero_private_key")]
     s_a: monero::PrivateKey,
@@ -642,7 +642,10 @@ impl State6 {
         Ok(tx)
     }
 
-    pub async fn submit_tx_cancel(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<Txid> {
+    pub async fn submit_tx_cancel(
+        &self,
+        bitcoin_wallet: &bitcoin::Wallet,
+    ) -> Result<(Txid, Subscription)> {
         let transaction = bitcoin::TxCancel::new(
             &self.tx_lock,
             self.cancel_timelock,
@@ -653,9 +656,9 @@ impl State6 {
         .complete_as_bob(self.A, self.b.clone(), self.tx_cancel_sig_a.clone())
         .context("Failed to complete Bitcoin cancel transaction")?;
 
-        let (tx_id, _) = bitcoin_wallet.broadcast(transaction, "cancel").await?;
+        let (tx_id, subscription) = bitcoin_wallet.broadcast(transaction, "cancel").await?;
 
-        Ok(tx_id)
+        Ok((tx_id, subscription))
     }
 
     pub async fn publish_refund_btc(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<()> {

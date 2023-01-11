@@ -1,17 +1,15 @@
 mod behaviour;
-pub mod cancel;
+pub mod cancel_and_refund;
 pub mod command;
 mod event_loop;
 mod list_sellers;
-pub mod refund;
 pub mod tracing;
 pub mod transport;
 
 pub use behaviour::{Behaviour, OutEvent};
-pub use cancel::cancel;
+pub use cancel_and_refund::{cancel, cancel_and_refund, refund};
 pub use event_loop::{EventLoop, EventLoopHandle};
 pub use list_sellers::{list_sellers, Seller, Status as SellerStatus};
-pub use refund::refund;
 
 #[cfg(test)]
 mod tests {

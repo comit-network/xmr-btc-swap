@@ -377,17 +377,10 @@ impl Request {
                     "result": []
                 })
             }
-            Method::Cancel => {
+            Method::CancelAndRefund => {
                 let bitcoin_wallet = context.bitcoin_wallet.as_ref().unwrap();
 
-                let (txid, _) = cli::cancel(
-                    self.params.swap_id.unwrap(),
-                    Arc::clone(bitcoin_wallet),
-                    Arc::clone(&context.db),
-                )
-                .await?;
-
-                tracing::debug!("Cancel transaction successfully published with id {}", txid);
+                let (txid, _) = cli::cancel_and_refund(swap_id, Arc::clone(bitcoin_wallet), Arc::clone(&context.db).await?;
 
                 json!({
                     "txid": txid,

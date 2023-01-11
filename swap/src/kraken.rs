@@ -230,7 +230,7 @@ mod wire {
     use bitcoin::util::amount::ParseAmountError;
     use serde_json::Value;
 
-    #[derive(Debug, Deserialize, PartialEq)]
+    #[derive(Debug, Deserialize, PartialEq, Eq)]
     #[serde(tag = "event")]
     pub enum Event {
         #[serde(rename = "systemStatus")]

@@ -301,7 +301,7 @@ pub mod api_test {
                     swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
                     ..Default::default()
                 },
-                cmd: Method::Cancel,
+                cmd: Method::CancelAndRefund,
                 shutdown: Shutdown::new(tx.subscribe()),
             }
         }
@@ -312,7 +312,7 @@ pub mod api_test {
                     swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
                     ..Default::default()
                 },
-                cmd: Method::Refund,
+                cmd: Method::CancelAndRefund,
                 shutdown: Shutdown::new(tx.subscribe()),
             }
         }

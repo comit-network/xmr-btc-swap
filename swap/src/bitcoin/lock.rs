@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 const SCRIPT_SIZE: usize = 34;
 const TX_LOCK_WEIGHT: usize = 485;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TxLock {
     inner: PartiallySignedTransaction,
     pub(in crate::bitcoin) output_descriptor: Descriptor<::bitcoin::PublicKey>,

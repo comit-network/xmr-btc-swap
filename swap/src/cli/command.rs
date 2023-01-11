@@ -227,7 +227,7 @@ where
             .await?;
             (context, request)
         }
-        CliCommand::Cancel {
+        CliCommand::CancelAndRefund {
             swap_id: SwapId { swap_id },
             bitcoin,
             tor,
@@ -237,35 +237,7 @@ where
                     swap_id: Some(swap_id),
                     ..Default::default()
                 },
-                cmd: Method::Cancel,
-                shutdown: Shutdown::new(rx.subscribe()),
-            };
-
-            let context = Context::build(
-                Some(bitcoin),
-                None,
-                Some(tor),
-                data,
-                is_testnet,
-                debug,
-                json,
-                None,
-                rx,
-            )
-            .await?;
-            (context, request)
-        }
-        CliCommand::Refund {
-            swap_id: SwapId { swap_id },
-            bitcoin,
-            tor,
-        } => {
-            let request = Request {
-                params: Params {
-                    swap_id: Some(swap_id),
-                    ..Default::default()
-                },
-                cmd: Method::Refund,
+                cmd: Method::CancelAndRefund,
                 shutdown: Shutdown::new(rx.subscribe()),
             };
 
@@ -465,21 +437,9 @@ enum CliCommand {
         #[structopt(flatten)]
         tor: Tor,
     },
-    /// Force submission of the cancel transaction overriding the protocol state
-    /// machine and blockheight checks (expert users only)
-    Cancel {
-        #[structopt(flatten)]
-        swap_id: SwapId,
-
-        #[structopt(flatten)]
-        bitcoin: Bitcoin,
-
-        #[structopt(flatten)]
-        tor: Tor,
-    },
-    /// Force submission of the refund transaction overriding the protocol state
-    /// machine and blockheight checks (expert users only)
-    Refund {
+    /// Force the submission of the cancel and refund transactions of a swap
+    #[structopt(aliases = &["cancel", "refund"])]
+    CancelAndRefund {
         #[structopt(flatten)]
         swap_id: SwapId,
 
