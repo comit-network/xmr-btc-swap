@@ -1,7 +1,7 @@
 use libp2p::rendezvous::Namespace;
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum XmrBtcNamespace {
     Mainnet,
     Testnet,

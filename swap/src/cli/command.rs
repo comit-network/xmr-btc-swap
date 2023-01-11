@@ -28,7 +28,7 @@ const DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET: usize = 1;
 
 const DEFAULT_TOR_SOCKS5_PORT: &str = "9050";
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Arguments {
     pub env_config: env::Config,
     pub debug: bool,
@@ -38,7 +38,7 @@ pub struct Arguments {
 }
 
 /// Represents the result of parsing the command-line parameters.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ParseResult {
     /// The arguments we were invoked in.
     Arguments(Box<Arguments>),
@@ -246,7 +246,7 @@ where
     Ok(ParseResult::Arguments(Box::new(arguments)))
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Command {
     BuyXmr {
         seller: Multiaddr,
@@ -610,14 +610,14 @@ fn parse_monero_address(s: &str) -> Result<monero::Address> {
     })
 }
 
-#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq)]
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq)]
 #[error("Invalid monero address provided, expected address on network {expected:?} but address provided is on {actual:?}")]
 pub struct MoneroAddressNetworkMismatch {
     expected: monero::Network,
     actual: monero::Network,
 }
 
-#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Serialize)]
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[error("Invalid Bitcoin address provided, expected address on network {expected:?}  but address provided is on {actual:?}")]
 pub struct BitcoinAddressNetworkMismatch {
     #[serde(with = "crate::bitcoin::network")]
