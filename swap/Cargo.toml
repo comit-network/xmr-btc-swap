@@ -14,8 +14,8 @@ async-compression = { version = "0.3", features = [ "bzip2", "tokio" ] }
 async-trait = "0.1"
 atty = "0.2"
 backoff = { version = "0.4", features = [ "tokio" ] }
-base64 = "0.20"
-bdk = "0.25"
+base64 = "0.21"
+bdk = "0.26"
 big-bytes = "1"
 bitcoin = { version = "0.29", features = [ "rand", "serde" ] }
 bmrng = "0.5"
@@ -88,4 +88,4 @@ testcontainers = "0.12"
 
 [build-dependencies]
 anyhow = "1"
-vergen = { version = "7", default-features = false, features = [ "git", "build" ] }
+vergen = { version = "7.5", default-features = false, features = [ "git", "build" ] }
