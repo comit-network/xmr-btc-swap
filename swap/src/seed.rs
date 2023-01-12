@@ -187,6 +187,9 @@ mod tests {
 
     #[test]
     fn seed_from_pem_works() {
+        use base64::engine::general_purpose;
+        use base64::Engine;
+
         let payload: &str = "syl9wSYaruvgxg9P5Q1qkZaq5YkM6GvXkxe+VYrL/XM=";
 
         // 32 bytes base64 encoded.
@@ -195,7 +198,7 @@ syl9wSYaruvgxg9P5Q1qkZaq5YkM6GvXkxe+VYrL/XM=
 -----END SEED-----
 ";
 
-        let want = base64::decode(payload).unwrap();
+        let want = general_purpose::STANDARD.decode(payload).unwrap();
         let pem = pem::parse(pem_string).unwrap();
         let got = Seed::from_pem(pem).unwrap();
 
