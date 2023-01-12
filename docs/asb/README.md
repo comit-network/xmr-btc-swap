@@ -164,7 +164,6 @@ May 01 01:32:07.476  INFO /onion3/z4findrdwtfbpoq64ayjtmxvr52vvxnsynerlenlfkmm52
 
 ### Exporting the Bitcoin wallet descriptor
 
-
 First use `swap` or `asb` with the `export-bitcoin-wallet` subcommand.
 
 Output example:
@@ -187,7 +186,6 @@ Sparrow wallet import works as follows:
 
     * Enter the `xprv...` or `tprv...` part of the descriptor (example above is `tprv8Zgredacted...`:
 
-
 ![image](https://user-images.githubusercontent.com/351403/212085114-450725b3-3ff4-4010-a142-b7d39b3200d3.png)
 
     * Click "Import"
@@ -196,7 +194,6 @@ Sparrow wallet import works as follows:
 
     * Click "Apply" and then supply password
 
-
 ![image](https://user-images.githubusercontent.com/351403/212085483-47ab7cc8-8d65-454a-877b-10b309d71bc6.png)
 
     * Click Transactions tab
@@ -204,6 +201,5 @@ Sparrow wallet import works as follows:
     * ???
 
     * Profit!
-
 
 ![image](https://user-images.githubusercontent.com/351403/212085966-d318011d-79bf-4e72-aced-4026499591c5.png)
