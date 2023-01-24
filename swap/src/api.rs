@@ -26,6 +26,7 @@ pub struct Config {
     seed: Option<Seed>,
     debug: bool,
     json: bool,
+    data_dir: PathBuf,
     pub is_testnet: bool,
 }
 
@@ -109,6 +110,7 @@ impl Context {
                 debug,
                 json,
                 is_testnet,
+                data_dir,
             },
             shutdown: Arc::new(shutdown),
             running_swap: Arc::new(Mutex::new(false)),
@@ -238,6 +240,7 @@ pub mod api_test {
                 debug,
                 json,
                 is_testnet,
+                data_dir
             }
         }
     }

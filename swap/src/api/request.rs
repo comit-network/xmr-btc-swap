@@ -226,6 +226,7 @@ impl Request {
                     let state: BobState = state.try_into()?;
                     vec.push((swap_id, state.to_string()));
                 }
+
                 json!({ "swaps": vec })
             }
             Method::RawHistory => {
@@ -264,17 +265,13 @@ impl Request {
                 })
             }
             Method::Config => {
-                //  tracing::info!(path=%data_dir.display(), "Data directory");
-                //  tracing::info!(path=%format!("{}/logs", data_dir.display()),
-                // "Log files directory");
-                // tracing::info!(path=%format!("{}/sqlite", data_dir.display()), "Sqlite file
-                // location");
-                // tracing::info!(path=%format!("{}/seed.pem", data_dir.display()), "Seed file
-                // location");
-                // tracing::info!(path=%format!("{}/monero", data_dir.display()),
-                // "Monero-wallet-rpc directory");
-                // tracing::info!(path=%format!("{}/wallet", data_dir.display()), "Internal
-                // bitcoin wallet directory");
+                let data_dir_display = context.config.data_dir.display();
+                tracing::info!(path=%data_dir_display, "Data directory");
+                tracing::info!(path=%format!("{}/logs", data_dir_display), "Log files directory");
+                tracing::info!(path=%format!("{}/sqlite", data_dir_display), "Sqlite file location");
+                tracing::info!(path=%format!("{}/seed.pem", data_dir_display), "Seed file location");
+                tracing::info!(path=%format!("{}/monero", data_dir_display), "Monero-wallet-rpc directory");
+                tracing::info!(path=%format!("{}/wallet", data_dir_display), "Internal bitcoin wallet directory");
 
                 json!({
                     "result": []

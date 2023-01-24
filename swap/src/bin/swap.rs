@@ -34,7 +34,6 @@ async fn main() -> Result<()> {
         eprintln!("{}", e);
     }
     let result = request.call(Arc::clone(&context)).await?;
-    println!("{}", result);
     Ok(())
 }
 
