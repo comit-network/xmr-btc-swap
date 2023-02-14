@@ -226,9 +226,9 @@ checksum = "a4a4ddaa51a5bc52a6948f74c06d20aaaddb71924eab79b8c97a8c556e942d6a"
 
 [[package]]
 name = "bdk"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b238a07736baee43ba9663933e44b1c6c27b43ef871b9486e175902335d83880"
+checksum = "f8761f371822c53afda671a6217aa89438646af05f05aef0ecd4c647b66ee1d3"
 dependencies = [
  "async-trait",
  "bdk-macros",
@@ -2250,9 +2250,9 @@ checksum = "0c835948974f68e0bd58636fc6c5b1fbff7b297e3046f11b3b3c18bbac012c6d"
 
 [[package]]
 name = "miniscript"
-version = "8.0.0"
+version = "9.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f4975078076f0b7b914a3044ad7432d2a7fcec38edb855afdc672e24ca35b69"
+checksum = "123a10aae81d0712ecc09b780f6f0ae0b0f506a5c4c912974725760d59ba073e"
 dependencies = [
  "bitcoin",
  "serde",
