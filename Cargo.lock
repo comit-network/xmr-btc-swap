@@ -226,9 +226,9 @@ checksum = "a4a4ddaa51a5bc52a6948f74c06d20aaaddb71924eab79b8c97a8c556e942d6a"
 
 [[package]]
 name = "bdk"
-version = "0.27.0"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8761f371822c53afda671a6217aa89438646af05f05aef0ecd4c647b66ee1d3"
+checksum = "51c878ac60a45c41523ff790df555ccb1fbfd634a667220104dcae3e64d7ed9f"
 dependencies = [
  "async-trait",
  "bdk-macros",
