@@ -44,7 +44,7 @@ It is not recommended to bump fees when swapping because it can have unpredictab
 
 ## Contributing
 
-We are encourage community contributions whether it be a bug fix or an improvement to the documentation.
+We encourage community contributions whether it be a bug fix or an improvement to the documentation.
 Please have a look at the [contribution guidelines](./CONTRIBUTING.md).
 
 ## Rust Version Support
