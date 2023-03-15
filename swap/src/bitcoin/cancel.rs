@@ -210,14 +210,20 @@ impl TxCancel {
             };
 
             // The order in which these are inserted doesn't matter
-            satisfier.insert(A, ::bitcoin::EcdsaSig {
-                sig: sig_a.into(),
-                hash_ty: EcdsaSighashType::All,
-            });
-            satisfier.insert(B, ::bitcoin::EcdsaSig {
-                sig: sig_b.into(),
-                hash_ty: EcdsaSighashType::All,
-            });
+            satisfier.insert(
+                A,
+                ::bitcoin::EcdsaSig {
+                    sig: sig_a.into(),
+                    hash_ty: EcdsaSighashType::All,
+                },
+            );
+            satisfier.insert(
+                B,
+                ::bitcoin::EcdsaSig {
+                    sig: sig_b.into(),
+                    hash_ty: EcdsaSighashType::All,
+                },
+            );
 
             satisfier
         };
