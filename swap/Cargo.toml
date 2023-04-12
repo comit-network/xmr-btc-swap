@@ -15,7 +15,7 @@ async-trait = "0.1"
 atty = "0.2"
 backoff = { version = "0.4", features = [ "tokio" ] }
 base64 = "0.21"
-bdk = "0.27"
+bdk = "0.28"
 big-bytes = "1"
 bitcoin = { version = "0.29", features = [ "rand", "serde" ] }
 bmrng = "0.5"
