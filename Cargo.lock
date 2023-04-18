@@ -1564,6 +1564,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ebdb29d2ea9ed0083cd8cece49bbd968021bd99b0849edb4a9a7ee0fdf6a4e0"
 
 [[package]]
+name = "hex-literal"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fe2267d4ed49bc07b63801559be28c718ea06c4738b7a03c94df7386d2cde46"
+
+[[package]]
 name = "hmac"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2332,7 +2338,7 @@ dependencies = [
  "curve25519-dalek-ng",
  "fixed-hash",
  "hex",
- "hex-literal",
+ "hex-literal 0.3.4",
  "keccak-hash",
  "serde",
  "serde-big-array",
@@ -2371,7 +2377,7 @@ dependencies = [
  "anyhow",
  "curve25519-dalek",
  "hex",
- "hex-literal",
+ "hex-literal 0.4.1",
  "jsonrpc_client",
  "monero",
  "monero-epee-bin-serde",
