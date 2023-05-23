@@ -20,7 +20,7 @@ jobs:
           toolchain: 1.63
           components: clippy,rustfmt
 
-      - uses: Swatinem/rust-cache@v2.3.0
+      - uses: Swatinem/rust-cache@v2.4.0
 
       - name: Check formatting
         uses: dprint/check@v2.2
@@ -37,7 +37,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v3.5.2
 
-      - uses: Swatinem/rust-cache@v2.3.0
+      - uses: Swatinem/rust-cache@v2.4.0
 
       - name: Build swap
         run: cargo build --bin swap
@@ -51,7 +51,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v3.5.2
 
-      - uses: Swatinem/rust-cache@v2.3.0
+      - uses: Swatinem/rust-cache@v2.4.0
 
       - name: Install sqlx-cli
         run: cargo install sqlx-cli
@@ -78,7 +78,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v3.5.2
 
-      - uses: Swatinem/rust-cache@v2.3.0
+      - uses: Swatinem/rust-cache@v2.4.0
 
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -118,7 +118,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v3.5.2
 
-      - uses: Swatinem/rust-cache@v2.3.0
+      - uses: Swatinem/rust-cache@v2.4.0
 
       - name: Build tests
         run: cargo build --tests --workspace --all-features
@@ -155,7 +155,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v3.5.2
 
-      - uses: Swatinem/rust-cache@v2.3.0
+      - uses: Swatinem/rust-cache@v2.4.0
 
       - name: Run test ${{ matrix.test_name }}
         run: cargo test --package swap --all-features --test ${{ matrix.test_name }} -- --nocapture
