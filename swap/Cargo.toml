@@ -19,7 +19,7 @@ bdk = "0.28"
 big-bytes = "1"
 bitcoin = { version = "0.29", features = [ "rand", "serde" ] }
 bmrng = "0.5"
-comfy-table = "6.1"
+comfy-table = "7.0"
 config = { version = "0.13", default-features = false, features = [ "toml" ] }
 conquer-once = "0.4"
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
