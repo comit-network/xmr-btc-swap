@@ -54,7 +54,7 @@ impl Wallet {
     ) -> Result<Self> {
         let data_dir = data_dir.as_ref();
         let wallet_dir = data_dir.join(WALLET);
-        let database = bdk::sled::open(&wallet_dir)?.open_tree(SLED_TREE_NAME)?;
+        let database = bdk::sled::open(wallet_dir)?.open_tree(SLED_TREE_NAME)?;
         let network = env_config.bitcoin_network;
 
         let wallet = match bdk::Wallet::new(
@@ -97,7 +97,7 @@ impl Wallet {
         std::fs::rename(from, to)?;
 
         let wallet_dir = data_dir.join(WALLET);
-        let database = bdk::sled::open(&wallet_dir)?.open_tree(SLED_TREE_NAME)?;
+        let database = bdk::sled::open(wallet_dir)?.open_tree(SLED_TREE_NAME)?;
 
         let wallet = bdk::Wallet::new(
             bdk::template::Bip84(xprivkey, KeychainKind::External),
@@ -738,12 +738,15 @@ impl Client {
         let client = bdk::electrum_client::Client::new(electrum_rpc_url.as_str())
             .context("Failed to initialize Electrum RPC client")?;
         let blockchain = ElectrumBlockchain::from(client);
+        let last_sync = Instant::now()
+            .checked_sub(interval)
+            .expect("no underflow since block time is only 600 secs");
 
         Ok(Self {
             electrum,
             blockchain,
             latest_block_height: BlockHeight::try_from(latest_block)?,
-            last_sync: Instant::now() - interval,
+            last_sync,
             sync_interval: interval,
             script_history: Default::default(),
             subscriptions: Default::default(),

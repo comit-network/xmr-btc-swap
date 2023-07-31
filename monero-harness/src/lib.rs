@@ -249,7 +249,7 @@ impl<'c> Monerod {
     /// address
     pub async fn start_miner(&self, miner_wallet_address: &str) -> Result<()> {
         let monerod = self.client().clone();
-        let _ = tokio::spawn(mine(monerod, miner_wallet_address.to_string()));
+        tokio::spawn(mine(monerod, miner_wallet_address.to_string()));
         Ok(())
     }
 }
