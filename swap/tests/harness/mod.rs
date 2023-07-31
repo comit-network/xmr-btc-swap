@@ -928,7 +928,7 @@ async fn init_bitcoind(node_url: Url, spendable_quantity: u32) -> Result<Client>
     bitcoind_client
         .generatetoaddress(101 + spendable_quantity, reward_address.clone())
         .await?;
-    let _ = tokio::spawn(mine(bitcoind_client.clone(), reward_address));
+    tokio::spawn(mine(bitcoind_client.clone(), reward_address));
     Ok(bitcoind_client)
 }
 
