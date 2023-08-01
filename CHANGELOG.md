@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Minimum Supported Rust Version (MSRV) bumped to 1.63
+- Minimum Supported Rust Version (MSRV) bumped to 1.67
+- ASB can now register with multiple rendezvous nodes. The `rendezvous_point` option in `config.toml` can be a string with comma separated addresses, or a toml array of address strings.
 
 ## [0.12.1] - 2023-01-09
 

@@ -15,6 +15,7 @@ pub use list_sellers::{list_sellers, Seller, Status as SellerStatus};
 mod tests {
     use super::*;
     use crate::asb;
+    use crate::asb::rendezvous::RendezvousNode;
     use crate::cli::list_sellers::{Seller, Status};
     use crate::network::quote;
     use crate::network::quote::BidQuote;
@@ -33,10 +34,8 @@ mod tests {
     async fn list_sellers_should_report_all_registered_asbs_with_a_quote() {
         let namespace = XmrBtcNamespace::Mainnet;
         let (rendezvous_address, rendezvous_peer_id) = setup_rendezvous_point().await;
-        let expected_seller_1 =
-            setup_asb(rendezvous_peer_id, rendezvous_address.clone(), namespace).await;
-        let expected_seller_2 =
-            setup_asb(rendezvous_peer_id, rendezvous_address.clone(), namespace).await;
+        let expected_seller_1 = setup_asb(rendezvous_peer_id, &rendezvous_address, namespace).await;
+        let expected_seller_2 = setup_asb(rendezvous_peer_id, &rendezvous_address, namespace).await;
 
         let list_sellers = list_sellers(
             rendezvous_peer_id,
@@ -72,7 +71,7 @@ mod tests {
 
     async fn setup_asb(
         rendezvous_peer_id: PeerId,
-        rendezvous_address: Multiaddr,
+        rendezvous_address: &Multiaddr,
         namespace: XmrBtcNamespace,
     ) -> Seller {
         let static_quote = BidQuote {
@@ -81,18 +80,18 @@ mod tests {
             max_quantity: bitcoin::Amount::from_sat(9001),
         };
 
-        let mut asb = new_swarm(|_, identity| StaticQuoteAsbBehaviour {
-            rendezvous: asb::rendezous::Behaviour::new(
-                identity,
-                rendezvous_peer_id,
-                rendezvous_address,
-                namespace,
-                None,
-            ),
-            ping: Default::default(),
-            quote: quote::asb(),
-            static_quote,
-            registered: false,
+        let mut asb = new_swarm(|_, identity| {
+            let rendezvous_node =
+                RendezvousNode::new(rendezvous_address, rendezvous_peer_id, namespace, None);
+            let rendezvous = asb::rendezvous::Behaviour::new(identity, vec![rendezvous_node]);
+
+            StaticQuoteAsbBehaviour {
+                rendezvous,
+                ping: Default::default(),
+                quote: quote::asb(),
+                static_quote,
+                registered: false,
+            }
         });
 
         let asb_address = asb.listen_on_tcp_localhost().await;
@@ -121,7 +120,7 @@ mod tests {
     #[derive(libp2p::NetworkBehaviour)]
     #[behaviour(event_process = true)]
     struct StaticQuoteAsbBehaviour {
-        rendezvous: asb::rendezous::Behaviour,
+        rendezvous: asb::rendezvous::Behaviour,
         // Support `Ping` as a workaround until https://github.com/libp2p/rust-libp2p/issues/2109 is fixed.
         ping: libp2p::ping::Ping,
         quote: quote::Behaviour,
