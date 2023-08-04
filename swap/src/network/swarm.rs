@@ -9,7 +9,7 @@ use libp2p::{identity, Multiaddr, Swarm};
 use std::fmt::Debug;
 
 #[allow(clippy::too_many_arguments)]
-pub fn asb<LR>(
+pub async fn asb<LR>(
     seed: &Seed,
     min_buy: bitcoin::Amount,
     max_buy: bitcoin::Amount,
@@ -18,10 +18,16 @@ pub fn asb<LR>(
     env_config: env::Config,
     namespace: XmrBtcNamespace,
     rendezvous_addrs: &[Multiaddr],
+    tor_socks5_port: u16
 ) -> Result<Swarm<asb::Behaviour<LR>>>
 where
     LR: LatestRate + Send + 'static + Debug + Clone,
 {
+    let maybe_tor_socks5_port = match tor::Client::new(tor_socks5_port).assert_tor_running().await {
+        Ok(()) => Some(tor_socks5_port),
+        Err(_) => None,
+    };
+
     let identity = seed.derive_libp2p_identity();
 
     let rendezvous_nodes = rendezvous_addrs
@@ -45,7 +51,7 @@ where
         rendezvous_nodes,
     );
 
-    let transport = asb::transport::new(&identity)?;
+    let transport = asb::transport::new(&identity, maybe_tor_socks5_port)?;
     let peer_id = identity.public().into();
 
     let swarm = SwarmBuilder::new(transport, behaviour, peer_id)

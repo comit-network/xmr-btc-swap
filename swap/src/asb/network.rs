@@ -29,15 +29,25 @@ use std::time::Duration;
 use uuid::Uuid;
 
 pub mod transport {
+    use libp2p::core::transport::OptionalTransport;
+    use crate::network::tor_transport::TorDialOnlyTransport;
     use super::*;
 
     /// Creates the libp2p transport for the ASB.
-    pub fn new(identity: &identity::Keypair) -> Result<Boxed<(PeerId, StreamMuxerBox)>> {
+    pub fn new(
+        identity: &identity::Keypair,
+        maybe_tor_socks5_port: Option<u16>,
+    ) -> Result<Boxed<(PeerId, StreamMuxerBox)>> {
         let tcp = TokioTcpConfig::new().nodelay(true);
         let tcp_with_dns = TokioDnsConfig::system(tcp)?;
         let websocket_with_dns = WsConfig::new(tcp_with_dns.clone());
 
-        let transport = tcp_with_dns.or_transport(websocket_with_dns).boxed();
+        let maybe_tor_transport = match maybe_tor_socks5_port {
+            Some(port) => OptionalTransport::some(TorDialOnlyTransport::new(port)),
+            None => OptionalTransport::none(),
+        };
+
+        let transport = maybe_tor_transport.or_transport(tcp_with_dns).or_transport(websocket_with_dns).boxed();
 
         authenticate_and_multiplex(transport, identity)
     }
