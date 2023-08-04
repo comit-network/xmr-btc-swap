@@ -248,7 +248,7 @@ async fn start_alice(
         resume_only,
         env_config,
         XmrBtcNamespace::Testnet,
-        None,
+        &[],
     )
     .unwrap();
     swarm.listen_on(listen_address).unwrap();

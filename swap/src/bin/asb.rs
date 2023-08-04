@@ -102,6 +102,19 @@ async fn main() -> Result<()> {
 
     match cmd {
         Command::Start { resume_only } => {
+            // check and warn for duplicate rendezvous points
+            let mut rendezvous_addrs = config.network.rendezvous_point.clone();
+            let prev_len = rendezvous_addrs.len();
+            rendezvous_addrs.sort();
+            rendezvous_addrs.dedup();
+            let new_len = rendezvous_addrs.len();
+            if new_len < prev_len {
+                tracing::warn!(
+                    "`rendezvous_point` config has {} duplicate entries, they are being ignored.",
+                    prev_len - new_len
+                );
+            }
+
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
             let monero_address = monero_wallet.get_main_address();
             tracing::info!(%monero_address, "Monero wallet address");
@@ -161,7 +174,7 @@ async fn main() -> Result<()> {
                 resume_only,
                 env_config,
                 namespace,
-                config.network.rendezvous_point,
+                &rendezvous_addrs,
             )?;
 
             for listen in config.network.listen.clone() {
