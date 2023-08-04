@@ -42,7 +42,7 @@ Since the ASB is a long running task we specify the person running an ASB as ser
 The ASB daemon supports the libp2p [rendezvous-protocol](https://github.com/libp2p/specs/tree/master/rendezvous).
 Usage of the rendezvous functionality is entirely optional.
 
-You can configure one or more rendezvous point in the `[network]` section of your config file.
+You can configure one or more rendezvous points in the `[network]` section of your config file.
 For the registration to be successful, you also need to configure the externally reachable addresses within the `[network]` section.
 For example:
 
