@@ -17,6 +17,7 @@ use std::convert::TryInto;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
+use std::net::SocketAddr;
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
@@ -77,6 +78,7 @@ pub struct Params {
     pub rendezvous_point: Option<Multiaddr>,
     pub swap_id: Option<Uuid>,
     pub amount: Option<Amount>,
+    pub server_address: Option<SocketAddr>,
     pub address: Option<bitcoin::Address>,
 }
 
@@ -274,7 +276,11 @@ impl Request {
                 tracing::info!(path=%format!("{}/wallet", data_dir_display), "Internal bitcoin wallet directory");
 
                 json!({
-                    "result": []
+                    "log_files": format!("{}/logs", data_dir_display),
+                    "sqlite": format!("{}/sqlite", data_dir_display),
+                    "seed": format!("{}/seed.pem", data_dir_display),
+                    "monero-wallet-rpc": format!("{}/monero", data_dir_display),
+                    "bitcoin_wallet": format!("{}/wallet", data_dir_display),
                 })
             }
             Method::WithdrawBtc => {
@@ -313,9 +319,15 @@ impl Request {
                 })
             }
             Method::StartDaemon => {
-                let addr2 = "127.0.0.1:1234".parse()?;
+                let server_address = match self.params.server_address {
+                    Some(address) => address,
+                    None => {
+                        "127.0.0.1:3456".parse()?
+                    }
+                };
 
-                let (_, server_handle) = rpc::run_server(addr2, Arc::clone(&context)).await?;
+
+                let (_, server_handle) = rpc::run_server(server_address, Arc::clone(&context)).await?;
 
                 loop {
                     tokio::select! {

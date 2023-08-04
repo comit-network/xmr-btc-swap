@@ -96,7 +96,7 @@ impl Context {
             let _ = cli::tracing::init(debug, json, data_dir.join("logs"), None);
         });
 
-        let init = Context {
+        let context = Context {
             db: open_db(data_dir.join("sqlite")).await?,
             bitcoin_wallet,
             monero_wallet,
@@ -116,7 +116,7 @@ impl Context {
             running_swap: Arc::new(Mutex::new(false)),
         };
 
-        Ok(init)
+        Ok(context)
     }
 }
 
