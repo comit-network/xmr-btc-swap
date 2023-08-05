@@ -505,6 +505,7 @@ async fn init_bitcoin_wallet(
 
     let wallet = bitcoin::Wallet::new(
         electrum_rpc_url.clone(),
+        "",
         data_dir,
         xprivkey,
         env_config,
