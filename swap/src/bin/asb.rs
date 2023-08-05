@@ -101,9 +101,7 @@ async fn main() -> Result<()> {
         Seed::from_file_or_generate(&config.data.dir).expect("Could not retrieve/initialize seed");
 
     match cmd {
-        Command::Start {
-            resume_only
-        } => {
+        Command::Start { resume_only } => {
             // check and warn for duplicate rendezvous points
             let mut rendezvous_addrs = config.network.rendezvous_point.clone();
             let prev_len = rendezvous_addrs.len();

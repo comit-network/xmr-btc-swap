@@ -25,9 +25,7 @@ where
     let command: RawCommand = args.cmd;
 
     let arguments = match command {
-        RawCommand::Start {
-            resume_only
-        } => Arguments {
+        RawCommand::Start { resume_only } => Arguments {
             testnet,
             json,
             disable_timestamp,
