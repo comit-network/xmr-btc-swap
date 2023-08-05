@@ -102,10 +102,8 @@ async fn main() -> Result<()> {
 
     match cmd {
         Command::Start {
-            resume_only,
-            tor_socks5_port
+            resume_only
         } => {
-            tracing::info!(%tor_socks5_port, "Tor info");
             // check and warn for duplicate rendezvous points
             let mut rendezvous_addrs = config.network.rendezvous_point.clone();
             let prev_len = rendezvous_addrs.len();
@@ -167,6 +165,9 @@ async fn main() -> Result<()> {
                 }
             };
 
+            let proxy_port = if _ac.is_some() { config.tor.socks5_port } else { 0u16 };
+            tracing::info!(%proxy_port, "SOCKS5");
+
             let kraken_rate = KrakenRate::new(config.maker.ask_spread, kraken_price_updates);
             let namespace = XmrBtcNamespace::from_is_testnet(testnet);
 
@@ -179,7 +180,7 @@ async fn main() -> Result<()> {
                 env_config,
                 namespace,
                 &rendezvous_addrs,
-                tor_socks5_port
+                proxy_port
             ).await?;
 
             for listen in config.network.listen.clone() {

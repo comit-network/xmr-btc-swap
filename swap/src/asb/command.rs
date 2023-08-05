@@ -10,8 +10,6 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 use uuid::Uuid;
 
-const DEFAULT_TOR_SOCKS5_PORT: &str = "9050";
-
 pub fn parse_args<I, T>(raw_args: I) -> Result<Arguments>
 where
     I: IntoIterator<Item = T>,
@@ -28,15 +26,14 @@ where
 
     let arguments = match command {
         RawCommand::Start {
-            resume_only,
-            tor: Tor { tor_socks5_port },
+            resume_only
         } => Arguments {
             testnet,
             json,
             disable_timestamp,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
-            cmd: Command::Start { resume_only, tor_socks5_port },
+            cmd: Command::Start { resume_only },
         },
         RawCommand::History => Arguments {
             testnet,
@@ -198,8 +195,7 @@ pub struct Arguments {
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
     Start {
-        resume_only: bool,
-        tor_socks5_port: u16,
+        resume_only: bool
     },
     History,
     Config,
@@ -272,9 +268,7 @@ pub enum RawCommand {
             long = "resume-only",
             help = "For maintenance only. When set, no new swap requests will be accepted, but existing unfinished swaps will be resumed."
         )]
-        resume_only: bool,
-        #[structopt(flatten)]
-        tor: Tor,
+        resume_only: bool
     },
     #[structopt(about = "Prints swap-id and the state of each swap ever made.")]
     History,
@@ -355,16 +349,6 @@ pub struct RecoverCommandParams {
     pub swap_id: Uuid,
 }
 
-#[derive(structopt::StructOpt, Debug)]
-pub struct Tor {
-    #[structopt(
-    long = "tor-socks5-port",
-    help = "Your local Tor socks5 proxy port",
-    default_value = DEFAULT_TOR_SOCKS5_PORT
-    )]
-    tor_socks5_port: u16,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -387,7 +371,7 @@ mod tests {
             disable_timestamp: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
-            cmd: Command::Start { resume_only: false, tor_socks5_port: 0u16 },
+            cmd: Command::Start { resume_only: false },
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
@@ -570,7 +554,7 @@ mod tests {
             disable_timestamp: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
-            cmd: Command::Start { resume_only: false, tor_socks5_port: 0u16 },
+            cmd: Command::Start { resume_only: false },
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
@@ -758,7 +742,7 @@ mod tests {
             disable_timestamp: true,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
-            cmd: Command::Start { resume_only: false, tor_socks5_port: 0u16 },
+            cmd: Command::Start { resume_only: false },
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
