@@ -117,7 +117,8 @@ async fn main() -> Result<()> {
     };
     let tor_port = if _ac.is_some() { config.tor.socks5_port } else { 0u16 };
     let proxy_string = if tor_port != 0u16 { format!("127.0.0.1:{}", tor_port) } else { "".to_string() };
-    tracing::info!(%proxy_string, "SOCKS5");
+    let info_message = if proxy_string.is_empty() { "Not using SOCKS5 proxy" } else { "Using SOCKS5 proxy at" };
+    tracing::info!(%proxy_string, info_message);
 
     match cmd {
         Command::Start { resume_only } => {
