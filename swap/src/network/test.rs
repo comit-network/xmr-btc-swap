@@ -21,7 +21,7 @@ struct GlobalSpawnTokioExecutor;
 
 impl Executor for GlobalSpawnTokioExecutor {
     fn exec(&self, future: Pin<Box<dyn Future<Output = ()> + Send>>) {
-        let _ = tokio::spawn(future);
+        tokio::spawn(future);
     }
 }
 

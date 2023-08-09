@@ -184,29 +184,32 @@ impl State0 {
 
         let v = self.v_a + msg.v_b;
 
-        Ok((msg.swap_id, State1 {
-            a: self.a,
-            B: msg.B,
-            s_a: self.s_a,
-            S_a_monero: self.S_a_monero,
-            S_a_bitcoin: self.S_a_bitcoin,
-            S_b_monero: msg.S_b_monero,
-            S_b_bitcoin: msg.S_b_bitcoin,
-            v,
-            v_a: self.v_a,
-            dleq_proof_s_a: self.dleq_proof_s_a,
-            btc: self.btc,
-            xmr: self.xmr,
-            cancel_timelock: self.cancel_timelock,
-            punish_timelock: self.punish_timelock,
-            refund_address: msg.refund_address,
-            redeem_address: self.redeem_address,
-            punish_address: self.punish_address,
-            tx_redeem_fee: self.tx_redeem_fee,
-            tx_punish_fee: self.tx_punish_fee,
-            tx_refund_fee: msg.tx_refund_fee,
-            tx_cancel_fee: msg.tx_cancel_fee,
-        }))
+        Ok((
+            msg.swap_id,
+            State1 {
+                a: self.a,
+                B: msg.B,
+                s_a: self.s_a,
+                S_a_monero: self.S_a_monero,
+                S_a_bitcoin: self.S_a_bitcoin,
+                S_b_monero: msg.S_b_monero,
+                S_b_bitcoin: msg.S_b_bitcoin,
+                v,
+                v_a: self.v_a,
+                dleq_proof_s_a: self.dleq_proof_s_a,
+                btc: self.btc,
+                xmr: self.xmr,
+                cancel_timelock: self.cancel_timelock,
+                punish_timelock: self.punish_timelock,
+                refund_address: msg.refund_address,
+                redeem_address: self.redeem_address,
+                punish_address: self.punish_address,
+                tx_redeem_fee: self.tx_redeem_fee,
+                tx_punish_fee: self.tx_punish_fee,
+                tx_refund_fee: msg.tx_refund_fee,
+                tx_cancel_fee: msg.tx_cancel_fee,
+            },
+        ))
     }
 }
 

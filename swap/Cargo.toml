@@ -1,6 +1,6 @@
 [package]
 name = "swap"
-version = "0.12.1"
+version = "0.12.2"
 authors = [ "The COMIT guys <hello@comit.network>" ]
 edition = "2021"
 description = "XMR/BTC trustless atomic swaps."
@@ -14,16 +14,16 @@ async-compression = { version = "0.3", features = [ "bzip2", "tokio" ] }
 async-trait = "0.1"
 atty = "0.2"
 backoff = { version = "0.4", features = [ "tokio" ] }
-base64 = "0.20"
-bdk = "0.25"
+base64 = "0.21"
+bdk = "0.28"
 big-bytes = "1"
 bitcoin = { version = "0.29", features = [ "rand", "serde" ] }
 bmrng = "0.5"
 comfy-table = "6.1"
 config = { version = "0.13", default-features = false, features = [ "toml" ] }
-conquer-once = "0.3"
+conquer-once = "0.4"
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
-data-encoding = "2.3"
+data-encoding = "2.4"
 dialoguer = "0.10"
 directories-next = "2"
 ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", default-features = false, features = [ "libsecp_compat", "serde", "adaptor" ] }
@@ -66,7 +66,7 @@ tracing-appender = "0.2"
 tracing-futures = { version = "0.2", features = [ "std-future", "futures-03" ] }
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "fmt", "ansi", "env-filter", "time", "tracing-log", "json" ] }
 url = { version = "2", features = [ "serde" ] }
-uuid = { version = "1.2", features = [ "serde", "v4" ] }
+uuid = { version = "1.4", features = [ "serde", "v4" ] }
 void = "1"
 
 [target.'cfg(not(windows))'.dependencies]
@@ -86,11 +86,11 @@ port_check = "0.1"
 proptest = "1"
 sequential-test = "0.2.4"
 serde_cbor = "0.11"
-serial_test = "0.10"
+serial_test = "2.0"
 spectral = "0.6"
 tempfile = "3"
 testcontainers = "0.12"
 
 [build-dependencies]
 anyhow = "1"
-vergen = { version = "7", default-features = false, features = [ "git", "build" ] }
+vergen = { version = "7.5", default-features = false, features = [ "git", "build" ] }

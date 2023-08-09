@@ -13,12 +13,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.3.0
+        uses: actions/checkout@v3.5.3
 
-      - uses: Swatinem/rust-cache@v2.2.0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.67
+          components: clippy,rustfmt
+
+      - uses: Swatinem/rust-cache@v2.6.0
 
       - name: Check formatting
-        uses: dprint/check@v2.1
+        uses: dprint/check@v2.2
+        with:
+          dprint-version: 0.39.1
 
       - name: Run clippy with default features
         run: cargo clippy --workspace --all-targets -- -D warnings
@@ -30,9 +37,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.3.0
+        uses: actions/checkout@v3.5.3
 
-      - uses: Swatinem/rust-cache@v2.0.2
+      - uses: Swatinem/rust-cache@v2.6.0
 
       - name: Build swap
         run: cargo build --bin swap
@@ -44,9 +51,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.3.0
+        uses: actions/checkout@v3.5.3
 
-      - uses: Swatinem/rust-cache@v2.0.2
+      - uses: Swatinem/rust-cache@v2.6.0
 
       - name: Install sqlx-cli
         run: cargo install sqlx-cli
@@ -71,13 +78,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.3.0
+        uses: actions/checkout@v3.5.3
 
-      - uses: Swatinem/rust-cache@v2.2.0
+      - uses: Swatinem/rust-cache@v2.6.0
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.63
+          toolchain: 1.67
           targets: armv7-unknown-linux-gnueabihf
 
       - name: Build binary
@@ -111,9 +118,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.3.0
+        uses: actions/checkout@v3.5.3
 
-      - uses: Swatinem/rust-cache@v2.2.0
+      - uses: Swatinem/rust-cache@v2.6.0
 
       - name: Build tests
         run: cargo build --tests --workspace --all-features
@@ -148,9 +155,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.3.0
+        uses: actions/checkout@v3.5.3
 
-      - uses: Swatinem/rust-cache@v2.2.0
+      - uses: Swatinem/rust-cache@v2.6.0
 
       - name: Run test ${{ matrix.test_name }}
         run: cargo test --package swap --all-features --test ${{ matrix.test_name }} -- --nocapture

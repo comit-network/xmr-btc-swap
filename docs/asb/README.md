@@ -42,13 +42,16 @@ Since the ASB is a long running task we specify the person running an ASB as ser
 The ASB daemon supports the libp2p [rendezvous-protocol](https://github.com/libp2p/specs/tree/master/rendezvous).
 Usage of the rendezvous functionality is entirely optional.
 
-You can configure a rendezvous point in the `[network]` section of your config file.
+You can configure one or more rendezvous points in the `[network]` section of your config file.
 For the registration to be successful, you also need to configure the externally reachable addresses within the `[network]` section.
 For example:
 
 ```toml
 [network]
-rendezvous_point = "/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE"
+rendezvous_point = [
+   "/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE",
+   "/dns4/eratosthen.es/tcp/7798/p2p/12D3KooWAh7EXXa2ZyegzLGdjvj1W4G3EXrTGrf6trraoT1MEobs",
+]
 external_addresses = ["/dns4/example.com/tcp/9939"]
 ```
 

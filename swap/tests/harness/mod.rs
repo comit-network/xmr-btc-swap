@@ -158,13 +158,16 @@ async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
             .await
             .unwrap();
 
-    (monero, Containers {
-        bitcoind_url,
-        bitcoind,
-        monerod_container,
-        monero_wallet_rpc_containers,
-        electrs,
-    })
+    (
+        monero,
+        Containers {
+            bitcoind_url,
+            bitcoind,
+            monerod_container,
+            monero_wallet_rpc_containers,
+            electrs,
+        },
+    )
 }
 
 async fn init_bitcoind_container(
@@ -245,7 +248,7 @@ async fn start_alice(
         resume_only,
         env_config,
         XmrBtcNamespace::Testnet,
-        None,
+        &[],
     )
     .unwrap();
     swarm.listen_on(listen_address).unwrap();
@@ -925,7 +928,7 @@ async fn init_bitcoind(node_url: Url, spendable_quantity: u32) -> Result<Client>
     bitcoind_client
         .generatetoaddress(101 + spendable_quantity, reward_address.clone())
         .await?;
-    let _ = tokio::spawn(mine(bitcoind_client.clone(), reward_address));
+    tokio::spawn(mine(bitcoind_client.clone(), reward_address));
     Ok(bitcoind_client)
 }
 

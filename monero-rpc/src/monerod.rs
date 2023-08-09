@@ -47,9 +47,10 @@ impl Client {
     }
 
     pub async fn get_o_indexes(&self, txid: Hash) -> Result<GetOIndexesResponse> {
-        self.binary_request(self.get_o_indexes_bin_url.clone(), GetOIndexesPayload {
-            txid,
-        })
+        self.binary_request(
+            self.get_o_indexes_bin_url.clone(),
+            GetOIndexesPayload { txid },
+        )
         .await
     }
 
