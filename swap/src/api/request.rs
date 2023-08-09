@@ -331,10 +331,8 @@ impl Request {
                 }))
             }
             Method::StartDaemon => {
-                let server_address = match self.params.server_address {
-                    Some(address) => address,
-                    None => "127.0.0.1:3456".parse()?,
-                };
+                // Default to 127.0.0.1:1234
+                let server_address = self.params.server_address.unwrap_or("127.0.0.1:1234".parse().unwrap());
 
                 let (_, server_handle) =
                     rpc::run_server(server_address, Arc::clone(&context)).await?;

@@ -136,7 +136,10 @@ where
             monero,
             tor,
         } => {
-            let request = Request::new(rx.subscribe(), Method::StartDaemon, Params::default());
+            let request = Request::new(rx.subscribe(), Method::StartDaemon, Params {
+                server_address,
+                ..Default::default()
+            });
 
             let context = Context::build(
                 Some(bitcoin),
