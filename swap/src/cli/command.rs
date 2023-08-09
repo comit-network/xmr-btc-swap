@@ -78,12 +78,16 @@ where
             let bitcoin_change_address =
                 bitcoin_address::validate(bitcoin_change_address, is_testnet)?;
 
-            let request = Request::new(rx.subscribe(), Method::BuyXmr, Params {
-                bitcoin_change_address: Some(bitcoin_change_address),
-                monero_receive_address: Some(monero_receive_address),
-                seller: Some(seller),
-                ..Default::default()
-            });
+            let request = Request::new(
+                rx.subscribe(),
+                Method::BuyXmr,
+                Params {
+                    bitcoin_change_address: Some(bitcoin_change_address),
+                    monero_receive_address: Some(monero_receive_address),
+                    seller: Some(seller),
+                    ..Default::default()
+                },
+            );
 
             let context = Context::build(
                 Some(bitcoin),
@@ -136,10 +140,14 @@ where
             monero,
             tor,
         } => {
-            let request = Request::new(rx.subscribe(), Method::StartDaemon, Params {
-                server_address,
-                ..Default::default()
-            });
+            let request = Request::new(
+                rx.subscribe(),
+                Method::StartDaemon,
+                Params {
+                    server_address,
+                    ..Default::default()
+                },
+            );
 
             let context = Context::build(
                 Some(bitcoin),
@@ -162,11 +170,15 @@ where
         } => {
             let address = bitcoin_address::validate(address, is_testnet)?;
 
-            let request = Request::new(rx.subscribe(), Method::WithdrawBtc, Params {
-                amount,
-                address: Some(address),
-                ..Default::default()
-            });
+            let request = Request::new(
+                rx.subscribe(),
+                Method::WithdrawBtc,
+                Params {
+                    amount,
+                    address: Some(address),
+                    ..Default::default()
+                },
+            );
 
             let context = Context::build(
                 Some(bitcoin),
@@ -188,10 +200,14 @@ where
             monero,
             tor,
         } => {
-            let request = Request::new(rx.subscribe(), Method::Resume, Params {
-                swap_id: Some(swap_id),
-                ..Default::default()
-            });
+            let request = Request::new(
+                rx.subscribe(),
+                Method::Resume,
+                Params {
+                    swap_id: Some(swap_id),
+                    ..Default::default()
+                },
+            );
 
             let context = Context::build(
                 Some(bitcoin),
@@ -212,10 +228,14 @@ where
             bitcoin,
             tor,
         } => {
-            let request = Request::new(rx.subscribe(), Method::CancelAndRefund, Params {
-                swap_id: Some(swap_id),
-                ..Default::default()
-            });
+            let request = Request::new(
+                rx.subscribe(),
+                Method::CancelAndRefund,
+                Params {
+                    swap_id: Some(swap_id),
+                    ..Default::default()
+                },
+            );
 
             let context = Context::build(
                 Some(bitcoin),
@@ -235,10 +255,14 @@ where
             rendezvous_point,
             tor,
         } => {
-            let request = Request::new(rx.subscribe(), Method::ListSellers, Params {
-                rendezvous_point: Some(rendezvous_point),
-                ..Default::default()
-            });
+            let request = Request::new(
+                rx.subscribe(),
+                Method::ListSellers,
+                Params {
+                    rendezvous_point: Some(rendezvous_point),
+                    ..Default::default()
+                },
+            );
 
             let context = Context::build(
                 None,
@@ -279,10 +303,14 @@ where
         CliCommand::MoneroRecovery {
             swap_id: SwapId { swap_id },
         } => {
-            let request = Request::new(rx.subscribe(), Method::MoneroRecovery, Params {
-                swap_id: Some(swap_id),
-                ..Default::default()
-            });
+            let request = Request::new(
+                rx.subscribe(),
+                Method::MoneroRecovery,
+                Params {
+                    swap_id: Some(swap_id),
+                    ..Default::default()
+                },
+            );
 
             let context =
                 Context::build(None, None, None, data, is_testnet, debug, json, None, rx).await?;
@@ -540,7 +568,6 @@ struct Seller {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     use crate::api::api_test::*;
     use crate::api::Config;

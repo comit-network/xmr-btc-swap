@@ -1,7 +1,7 @@
-use anyhow::{Result};
+use anyhow::Result;
 
+use jsonrpsee::rpc_params;
 use jsonrpsee::ws_client::WsClientBuilder;
-use jsonrpsee::{rpc_params};
 use jsonrpsee_core::client::ClientT;
 use jsonrpsee_core::params::ObjectParams;
 
@@ -11,9 +11,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use swap::api::request::{Method, Params, Request, Shutdown};
-use swap::api::{Context};
+use swap::api::Context;
 use swap::cli::command::{Bitcoin, Monero};
-
 
 use tokio::sync::broadcast;
 

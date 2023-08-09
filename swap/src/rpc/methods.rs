@@ -13,21 +13,25 @@ use uuid::Uuid;
 
 pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
     let mut module = RpcModule::new(context);
+
     module
         .register_async_method("get_bitcoin_balance", |_, context| async move {
             get_bitcoin_balance(&context).await
         })
         .expect("Could not register RPC method get_bitcoin_balance");
+
     module
         .register_async_method("get_history", |_, context| async move {
             get_history(&context).await
         })
         .expect("Could not register RPC method get_history");
+
     module
         .register_async_method("get_raw_history", |_, context| async move {
             get_raw_history(&context).await
         })
         .expect("Could not register RPC method get_history");
+
     module
         .register_async_method("get_seller", |params, context| async move {
             let params: HashMap<String, Uuid> = params.parse()?;
@@ -39,6 +43,7 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
             get_seller(*swap_id, &context).await
         })
         .expect("Could not register RPC method get_seller");
+
     module
         .register_async_method("get_swap_start_date", |params, context| async move {
             let params: HashMap<String, Uuid> = params.parse()?;
@@ -50,6 +55,7 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
             get_swap_start_date(*swap_id, &context).await
         })
         .expect("Could not register RPC method get_swap_start_date");
+
     module
         .register_async_method("resume_swap", |params, context| async move {
             let params: HashMap<String, Uuid> = params.parse()?;

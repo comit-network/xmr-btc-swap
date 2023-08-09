@@ -18,8 +18,8 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::broadcast;
 use tokio::sync::broadcast::Receiver;
+use tokio::sync::Mutex;
 use tracing::{debug_span, Instrument};
 use uuid::Uuid;
 
@@ -63,7 +63,7 @@ impl Shutdown {
 #[derive(Debug)]
 pub struct Shutdown {
     shutdown: bool,
-    notify: broadcast::Receiver<()>,
+    notify: Receiver<()>,
 }
 
 impl PartialEq for Shutdown {
@@ -332,7 +332,10 @@ impl Request {
             }
             Method::StartDaemon => {
                 // Default to 127.0.0.1:1234
-                let server_address = self.params.server_address.unwrap_or("127.0.0.1:1234".parse().unwrap());
+                let server_address = self
+                    .params
+                    .server_address
+                    .unwrap_or("127.0.0.1:1234".parse().unwrap());
 
                 let (_, server_handle) =
                     rpc::run_server(server_address, Arc::clone(&context)).await?;

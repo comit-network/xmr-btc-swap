@@ -205,7 +205,7 @@ fn env_config_from(testnet: bool) -> EnvConfig {
 pub mod api_test {
     use super::*;
     use crate::api::request::{Method, Params, Request};
-    
+
     use libp2p::Multiaddr;
     use std::str::FromStr;
     use tokio::sync::broadcast;
@@ -264,34 +264,50 @@ pub mod api_test {
                 }
             };
 
-            Request::new(tx.subscribe(), Method::BuyXmr, Params {
-                seller: Some(seller),
-                bitcoin_change_address: Some(bitcoin_change_address),
-                monero_receive_address: Some(monero_receive_address),
-                swap_id: Some(Uuid::new_v4()),
-                ..Default::default()
-            })
+            Request::new(
+                tx.subscribe(),
+                Method::BuyXmr,
+                Params {
+                    seller: Some(seller),
+                    bitcoin_change_address: Some(bitcoin_change_address),
+                    monero_receive_address: Some(monero_receive_address),
+                    swap_id: Some(Uuid::new_v4()),
+                    ..Default::default()
+                },
+            )
         }
 
         pub fn resume(tx: broadcast::Sender<()>) -> Request {
-            Request::new(tx.subscribe(), Method::Resume, Params {
-                swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
-                ..Default::default()
-            })
+            Request::new(
+                tx.subscribe(),
+                Method::Resume,
+                Params {
+                    swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
+                    ..Default::default()
+                },
+            )
         }
 
         pub fn cancel(tx: broadcast::Sender<()>) -> Request {
-            Request::new(tx.subscribe(), Method::CancelAndRefund, Params {
-                swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
-                ..Default::default()
-            })
+            Request::new(
+                tx.subscribe(),
+                Method::CancelAndRefund,
+                Params {
+                    swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
+                    ..Default::default()
+                },
+            )
         }
 
         pub fn refund(tx: broadcast::Sender<()>) -> Request {
-            Request::new(tx.subscribe(), Method::CancelAndRefund, Params {
-                swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
-                ..Default::default()
-            })
+            Request::new(
+                tx.subscribe(),
+                Method::CancelAndRefund,
+                Params {
+                    swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
+                    ..Default::default()
+                },
+            )
         }
     }
 }
