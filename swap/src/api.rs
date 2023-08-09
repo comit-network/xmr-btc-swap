@@ -203,13 +203,13 @@ fn env_config_from(testnet: bool) -> EnvConfig {
 }
 #[cfg(test)]
 pub mod api_test {
-    use crate::api::request::{Method, Params, Request, Shutdown};
-    use crate::tor::DEFAULT_SOCKS5_PORT;
+    use super::*;
+    use crate::api::request::{Method, Params, Request};
+    
     use libp2p::Multiaddr;
     use std::str::FromStr;
     use tokio::sync::broadcast;
     use uuid::Uuid;
-    use super::*;
 
     pub const MULTI_ADDRESS: &str =
         "/ip4/127.0.0.1/tcp/9939/p2p/12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
@@ -240,10 +240,11 @@ pub mod api_test {
                 debug,
                 json,
                 is_testnet,
-                data_dir
+                data_dir,
             }
         }
     }
+
     impl Request {
         pub fn buy_xmr(is_testnet: bool, tx: broadcast::Sender<()>) -> Request {
             let seller = Multiaddr::from_str(MULTI_ADDRESS).unwrap();
@@ -263,49 +264,34 @@ pub mod api_test {
                 }
             };
 
-            Request {
-                params: Params {
-                    seller: Some(seller),
-                    bitcoin_change_address: Some(bitcoin_change_address),
-                    monero_receive_address: Some(monero_receive_address),
-                    ..Default::default()
-                },
-                cmd: Method::BuyXmr,
-                shutdown: Shutdown::new(tx.subscribe()),
-            }
+            Request::new(tx.subscribe(), Method::BuyXmr, Params {
+                seller: Some(seller),
+                bitcoin_change_address: Some(bitcoin_change_address),
+                monero_receive_address: Some(monero_receive_address),
+                swap_id: Some(Uuid::new_v4()),
+                ..Default::default()
+            })
         }
 
         pub fn resume(tx: broadcast::Sender<()>) -> Request {
-            Request {
-                params: Params {
-                    swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
-                    ..Default::default()
-                },
-                cmd: Method::Resume,
-                shutdown: Shutdown::new(tx.subscribe()),
-            }
+            Request::new(tx.subscribe(), Method::Resume, Params {
+                swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
+                ..Default::default()
+            })
         }
 
         pub fn cancel(tx: broadcast::Sender<()>) -> Request {
-            Request {
-                params: Params {
-                    swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
-                    ..Default::default()
-                },
-                cmd: Method::CancelAndRefund,
-                shutdown: Shutdown::new(tx.subscribe()),
-            }
+            Request::new(tx.subscribe(), Method::CancelAndRefund, Params {
+                swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
+                ..Default::default()
+            })
         }
 
         pub fn refund(tx: broadcast::Sender<()>) -> Request {
-            Request {
-                params: Params {
-                    swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
-                    ..Default::default()
-                },
-                cmd: Method::CancelAndRefund,
-                shutdown: Shutdown::new(tx.subscribe()),
-            }
+            Request::new(tx.subscribe(), Method::CancelAndRefund, Params {
+                swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
+                ..Default::default()
+            })
         }
     }
 }

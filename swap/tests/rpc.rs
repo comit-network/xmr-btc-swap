@@ -1,22 +1,22 @@
-use anyhow::{bail, Context as AnyContext, Result};
-use futures::Future;
+use anyhow::{Result};
+
 use jsonrpsee::ws_client::WsClientBuilder;
-use jsonrpsee::{rpc_params, RpcModule};
+use jsonrpsee::{rpc_params};
 use jsonrpsee_core::client::ClientT;
 use jsonrpsee_core::params::ObjectParams;
-use jsonrpsee_types::error::CallError;
+
 use sequential_test::sequential;
-use serde_json::{json, Value};
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use swap::api::request::{Method, Params, Request, Shutdown};
-use swap::api::{Config, Context};
+use swap::api::{Context};
 use swap::cli::command::{Bitcoin, Monero};
-use testcontainers::clients::Cli;
-use testcontainers::{Container, Docker, RunArgs};
+
+
 use tokio::sync::broadcast;
-use tokio::time::{interval, timeout};
+
 use uuid::Uuid;
 
 #[cfg(test)]
@@ -42,15 +42,11 @@ pub async fn initialize_context() -> (Arc<Context>, Request) {
         bitcoin_target_block: None,
     };
 
-    let monero = Monero {
+    let _monero = Monero {
         monero_daemon_address: None,
     };
 
-    let mut request = Request {
-        params: Params::default(),
-        cmd: Method::StartDaemon,
-        shutdown: Shutdown::new(tx.subscribe()),
-    };
+    let request = Request::new(tx.subscribe(), Method::StartDaemon, Params::default());
 
     let context = Context::build(
         Some(bitcoin),

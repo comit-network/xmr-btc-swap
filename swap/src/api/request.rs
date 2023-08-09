@@ -15,10 +15,12 @@ use serde_json::json;
 use std::cmp::min;
 use std::convert::TryInto;
 use std::future::Future;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use std::net::SocketAddr;
 use tokio::sync::broadcast;
+use tokio::sync::broadcast::Receiver;
+use tracing::{debug_span, Instrument};
 use uuid::Uuid;
 
 #[derive(PartialEq, Debug)]
@@ -29,7 +31,7 @@ pub struct Request {
 }
 
 impl Shutdown {
-    pub fn new(notify: broadcast::Receiver<()>) -> Shutdown {
+    pub fn new(notify: Receiver<()>) -> Shutdown {
         Shutdown {
             shutdown: false,
             notify,
@@ -101,11 +103,21 @@ pub enum Method {
 }
 
 impl Request {
-    pub async fn call(&mut self, context: Arc<Context>) -> Result<serde_json::Value> {
-        let result = match self.cmd {
-            Method::BuyXmr => {
-                let swap_id = Uuid::new_v4();
+    pub fn new(shutdownReceiver: Receiver<()>, cmd: Method, params: Params) -> Request {
+        Request {
+            params,
+            cmd,
+            shutdown: Shutdown::new(shutdownReceiver),
+        }
+    }
 
+    async fn handle_cmd(&mut self, context: Arc<Context>) -> Result<serde_json::Value> {
+        match self.cmd {
+            Method::BuyXmr => {
+                let swap_id = self
+                    .params
+                    .swap_id
+                    .context("Parameter swap_id is missing")?;
                 let seed = context.config.seed.as_ref().context("Could not get seed")?;
                 let env_config = context.config.env_config;
                 let btc = context
@@ -217,9 +229,9 @@ impl Request {
                             .context("Failed to complete swap")?;
                     }
                 }
-                json!({
+                Ok(json!({
                     "empty": "true"
-                })
+                }))
             }
             Method::History => {
                 let swaps = context.db.all().await?;
@@ -229,11 +241,11 @@ impl Request {
                     vec.push((swap_id, state.to_string()));
                 }
 
-                json!({ "swaps": vec })
+                Ok(json!({ "swaps": vec }))
             }
             Method::RawHistory => {
                 let raw_history = context.db.raw_all().await?;
-                json!({ "raw_history": raw_history })
+                Ok(json!({ "raw_history": raw_history }))
             }
             Method::GetSeller => {
                 let swap_id = self.params.swap_id.context("Parameter swap_id is needed")?;
@@ -249,10 +261,10 @@ impl Request {
                     .await
                     .with_context(|| "Could not get addressess")?;
 
-                json!({
+                Ok(json!({
                     "peerId": peerId.to_base58(),
                     "addresses": addresses
-                })
+                }))
             }
             Method::SwapStartDate => {
                 let swap_id = self
@@ -262,9 +274,9 @@ impl Request {
 
                 let start_date = context.db.get_swap_start_date(swap_id).await?;
 
-                json!({
+                Ok(json!({
                     "start_date": start_date,
-                })
+                }))
             }
             Method::Config => {
                 let data_dir_display = context.config.data_dir.display();
@@ -275,13 +287,13 @@ impl Request {
                 tracing::info!(path=%format!("{}/monero", data_dir_display), "Monero-wallet-rpc directory");
                 tracing::info!(path=%format!("{}/wallet", data_dir_display), "Internal bitcoin wallet directory");
 
-                json!({
+                Ok(json!({
                     "log_files": format!("{}/logs", data_dir_display),
                     "sqlite": format!("{}/sqlite", data_dir_display),
                     "seed": format!("{}/seed.pem", data_dir_display),
                     "monero-wallet-rpc": format!("{}/monero", data_dir_display),
                     "bitcoin_wallet": format!("{}/wallet", data_dir_display),
-                })
+                }))
             }
             Method::WithdrawBtc => {
                 let bitcoin_wallet = context
@@ -312,22 +324,20 @@ impl Request {
                     .broadcast(signed_tx.clone(), "withdraw")
                     .await?;
 
-                json!({
+                Ok(json!({
                     "signed_tx": signed_tx,
                     "amount": amount.to_sat(),
                     "txid": signed_tx.txid(),
-                })
+                }))
             }
             Method::StartDaemon => {
                 let server_address = match self.params.server_address {
                     Some(address) => address,
-                    None => {
-                        "127.0.0.1:3456".parse()?
-                    }
+                    None => "127.0.0.1:3456".parse()?,
                 };
 
-
-                let (_, server_handle) = rpc::run_server(server_address, Arc::clone(&context)).await?;
+                let (_, server_handle) =
+                    rpc::run_server(server_address, Arc::clone(&context)).await?;
 
                 loop {
                     tokio::select! {
@@ -353,9 +363,9 @@ impl Request {
                     "Checked Bitcoin balance",
                 );
 
-                json!({
+                Ok(json!({
                     "balance": bitcoin_balance.to_sat()
-                })
+                }))
             }
             Method::Resume => {
                 let swap_id = self
@@ -437,9 +447,9 @@ impl Request {
                         swap_result?;
                     }
                 }
-                json!({
+                Ok(json!({
                     "result": []
-                })
+                }))
             }
             Method::CancelAndRefund => {
                 let bitcoin_wallet = context
@@ -456,9 +466,9 @@ impl Request {
                 )
                 .await?;
 
-                json!({
+                Ok(json!({
                     "result": state,
-                })
+                }))
             }
             Method::ListSellers => {
                 let rendezvous_point = self
@@ -511,7 +521,7 @@ impl Request {
                     }
                 }
 
-                json!({ "sellers": sellers })
+                Ok(json!({ "sellers": sellers }))
             }
             Method::ExportBitcoinWallet => {
                 let bitcoin_wallet = context
@@ -521,9 +531,9 @@ impl Request {
 
                 let wallet_export = bitcoin_wallet.wallet_export("cli").await?;
                 tracing::info!(descriptor=%wallet_export.to_string(), "Exported bitcoin wallet");
-                json!({
+                Ok(json!({
                     "result": []
-                })
+                }))
             }
             Method::MoneroRecovery => {
                 let swap_state: BobState = context
@@ -567,12 +577,32 @@ impl Request {
                         println!("Spend key: {}", spend_key);
                     }
                 }
-                json!({
+                Ok(json!({
                     "result": []
-                })
+                }))
             }
-        };
-        Ok(result)
+        }
+    }
+
+    pub async fn call(&mut self, context: Arc<Context>) -> Result<serde_json::Value> {
+        // If the swap ID is set, we add it to the span
+        let call_span = self.params.swap_id.map_or_else(
+            || {
+                debug_span!(
+                    "call",
+                    method = ?self.cmd,
+                )
+            },
+            |swap_id| {
+                debug_span!(
+                    "call",
+                    method = ?self.cmd,
+                    swap_id = swap_id.to_string(),
+                )
+            },
+        );
+
+        self.handle_cmd(context).instrument(call_span).await
     }
 }
 
