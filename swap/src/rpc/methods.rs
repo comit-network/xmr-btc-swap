@@ -30,7 +30,7 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
         .register_async_method("get_raw_history", |_, context| async move {
             get_raw_history(&context).await
         })
-        .expect("Could not register RPC method get_history");
+        .expect("Could not register RPC method get_raw_history");
 
     module
         .register_async_method("get_seller", |params, context| async move {
@@ -67,6 +67,17 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
             resume_swap(*swap_id, &context).await
         })
         .expect("Could not register RPC method resume_swap");
+    module
+        .register_async_method("cancel_refund_swap", |params, context| async move {
+            let params: HashMap<String, Uuid> = params.parse()?;
+
+            let swap_id = params.get("swap_id").ok_or_else(|| {
+                jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string())
+            })?;
+
+            cancel_and_refund_swap(*swap_id, &context).await
+        })
+        .expect("Could not register RPC method cancel_refund_swap");
     module
         .register_async_method("withdraw_btc", |params, context| async move {
             let params: HashMap<String, String> = params.parse()?;
@@ -207,6 +218,17 @@ async fn resume_swap(
         ..Default::default()
     };
     execute_request(Method::Resume, params, context).await
+}
+
+async fn cancel_and_refund_swap(
+    swap_id: Uuid,
+    context: &Arc<Context>,
+) -> Result<serde_json::Value, jsonrpsee_core::Error> {
+    let params = Params {
+        swap_id: Some(swap_id),
+        ..Default::default()
+    };
+    execute_request(Method::CancelAndRefund, params, context).await
 }
 
 async fn withdraw_btc(
