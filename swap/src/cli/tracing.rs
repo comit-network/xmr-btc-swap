@@ -13,6 +13,49 @@ use tracing_subscriber::layer::{Context, SubscriberExt};
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, FmtSubscriber, Layer, Registry};
 use tracing_subscriber::fmt::{format, FormatEvent, MakeWriter};
+use serde_json::{json, Value};
+use serde::Serialize;
+
+#[derive(Debug, Serialize)]
+struct LogEvent<'a> {
+    message: String,
+    level: &'a str,
+    target: &'a str,
+    module: &'a str,
+    file: Option<&'a str>,
+    line: Option<u32>,
+    fields: Value,
+}
+
+/// Transforms a `tracing::Event` into a JSON-formatted string.
+fn format_event_as_json<'a, S>(
+    _: &Context<'a, S>,
+    event: &'a tracing::Event<'a>,
+) -> serde_json::Result<String> {
+    // Extracting fields from the event into a serde_json::Value
+    let mut fields = json!({});
+    let mut message = String::new();  // For capturing the main message
+
+    event.record(&mut |field: &Field, value: &dyn Debug| {
+        if field.name() == "message" {
+            message = format!("{:?}", value);
+        } else {
+            fields[field.name()] = json!(format!("{:?}", value));
+        }
+    });
+
+    let log = LogEvent {
+        message, // Use the captured message here
+        level: event.metadata().level().as_str(),
+        target: event.metadata().target(),
+        module: event.metadata().module_path().unwrap_or_default(),
+        file: event.metadata().file(),
+        line: event.metadata().line(),
+        fields,
+    };
+
+    serde_json::to_string(&log)
+}
 
 struct SwapIdVisitor {
     swap_id: Option<String>,
@@ -56,14 +99,16 @@ impl<S> Layer<S> for FileLayer
         }
     }
 
-    fn on_event(&self, event: &tracing::Event<'_>, ctx: tracing_subscriber::layer::Context<'_, S>) {
+    fn on_event(&self, event: &tracing::Event<'_>, ctx: Context<'_, S>) {
         if let Some(current_span_id) = ctx.current_span().id() {
             if let Some(span) = ctx.span(current_span_id) {
                 if let Some(swap_id) = span.extensions().get::<String>() {
-                    println!("swap_id: {}", swap_id);
+                    // TODO: This is a hack, I need to figure out how to get the JSON formatter to work
 
-                    // Here I need to figure out how to format the event in JSON just like the internal JSON formatter does
-                    self.append_to_file(swap_id, &format!("{}\n", event.metadata().fields())).expect("Failed to write to file");
+                    if let Ok(json_log) = format_event_as_json(&ctx, event) {
+                        self.append_to_file(swap_id, &format!("{}\n", json_log))
+                            .expect("Failed to write to file");
+                    }
                 }
             }
         }
