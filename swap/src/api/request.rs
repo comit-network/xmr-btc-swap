@@ -22,6 +22,11 @@ use structopt::lazy_static::lazy_static;
 use tokio::sync::broadcast::Receiver;
 use tracing::{debug_span, Instrument};
 use uuid::Uuid;
+use tokio::sync::Mutex;
+
+lazy_static! {
+    static ref SWAP_MUTEX: Mutex<Option<Uuid>> = Mutex::new(None);
+}
 
 #[derive(PartialEq, Debug)]
 pub struct Request {
@@ -161,7 +166,7 @@ impl Request {
                         .context("Could not get Tor SOCKS5 port")?,
                     behaviour,
                 )
-                .await?;
+                    .await?;
                 swarm.behaviour_mut().add_address(seller_peer_id, seller);
 
                 tracing::debug!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
@@ -182,7 +187,7 @@ impl Request {
                     || bitcoin_wallet.sync(),
                     estimate_fee,
                 )
-                .await
+                    .await
                 {
                     Ok(val) => val,
                     Err(error) => match error.downcast::<ZeroQuoteReceived>() {
@@ -382,7 +387,7 @@ impl Request {
                         .context("Could not get Tor SOCKS5 port")?,
                     behaviour,
                 )
-                .await?;
+                    .await?;
                 let our_peer_id = swarm.local_peer_id();
 
                 tracing::debug!(peer_id = %our_peer_id, "Network layer initialized");
@@ -417,7 +422,7 @@ impl Request {
                     event_loop_handle,
                     monero_receive_address,
                 )
-                .await?;
+                    .await?;
 
                 tokio::select! {
                     event_loop_result = handle => {
@@ -442,7 +447,7 @@ impl Request {
                     Arc::clone(bitcoin_wallet),
                     Arc::clone(&context.db),
                 )
-                .await?;
+                    .await?;
 
                 Ok(json!({
                     "result": state,
@@ -470,7 +475,7 @@ impl Request {
                         .context("Could not get Tor SOCKS5 port")?,
                     identity,
                 )
-                .await?;
+                    .await?;
 
                 for seller in &sellers {
                     match seller.status {
@@ -558,10 +563,26 @@ impl Request {
     pub async fn call(self, context: Arc<Context>) -> Result<serde_json::Value> {
         // If the swap ID is set, we add it to the span
         let call_span = debug_span!(
-            "call",
+            "cmd",
             method = ?self.cmd,
         );
 
+        if let Some(swap_id) = self.has_lockable_swap_id() {
+            println!("taking lock for swap_id: {}", swap_id);
+            let mut guard = SWAP_MUTEX.try_lock().context("Another swap is already running")?;
+            if guard.is_some() {
+                bail!("Another swap is already running");
+            }
+
+            let _ = guard.insert(swap_id.clone());
+
+            let result = self.handle_cmd(context).instrument(call_span).await;
+            guard.take();
+
+            println!("releasing lock for swap_id: {}", swap_id);
+
+            return result;
+        }
         self.handle_cmd(context).instrument(call_span).await
     }
 }
@@ -584,15 +605,15 @@ pub async fn determine_btc_to_swap<FB, TB, FMG, TMG, FS, TS, FFE, TFE>(
     sync: FS,
     estimate_fee: FFE,
 ) -> Result<(bitcoin::Amount, bitcoin::Amount)>
-where
-    TB: Future<Output = Result<bitcoin::Amount>>,
-    FB: Fn() -> TB,
-    TMG: Future<Output = Result<bitcoin::Amount>>,
-    FMG: Fn() -> TMG,
-    TS: Future<Output = Result<()>>,
-    FS: Fn() -> TS,
-    FFE: Fn(bitcoin::Amount) -> TFE,
-    TFE: Future<Output = Result<bitcoin::Amount>>,
+    where
+        TB: Future<Output = Result<bitcoin::Amount>>,
+        FB: Fn() -> TB,
+        TMG: Future<Output = Result<bitcoin::Amount>>,
+        FMG: Fn() -> TMG,
+        TS: Future<Output = Result<()>>,
+        FS: Fn() -> TS,
+        FFE: Fn(bitcoin::Amount) -> TFE,
+        TFE: Future<Output = Result<bitcoin::Amount>>,
 {
     tracing::debug!("Requesting quote");
     let bid_quote = bid_quote.await?;
@@ -667,3 +688,4 @@ where
 
     Ok((btc_swap_amount, fees))
 }
+
