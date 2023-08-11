@@ -511,7 +511,7 @@ impl Request {
                 let wallet_export = bitcoin_wallet.wallet_export("cli").await?;
                 tracing::info!(descriptor=%wallet_export.to_string(), "Exported bitcoin wallet");
                 Ok(json!({
-                    "result": []
+                    "descriptor": wallet_export.to_string(),
                 }))
             }
             Method::MoneroRecovery {swap_id} => {
