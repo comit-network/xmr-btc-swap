@@ -1,4 +1,4 @@
-use crate::api::request::{Method, Params, Request};
+use crate::api::request::{Method, Request};
 use crate::api::Context;
 use crate::bitcoin::bitcoin_address;
 use crate::monero::monero_address;
@@ -161,10 +161,9 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
 
 async fn execute_request(
     cmd: Method,
-    params: Params,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let mut request = Request::new(context.shutdown.subscribe(), cmd, params);
+    let request = Request::new(context.shutdown.subscribe(), cmd);
     request
         .call(Arc::clone(context))
         .await
@@ -174,74 +173,64 @@ async fn execute_request(
 async fn get_bitcoin_balance(
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    execute_request(Method::Balance, Params::default(), context).await
+    execute_request(Method::Balance, context).await
 }
 
 async fn get_history(context: &Arc<Context>) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    execute_request(Method::History, Params::default(), context).await
+    execute_request(Method::History, context).await
 }
 
 async fn get_raw_history(
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    execute_request(Method::RawHistory, Params::default(), context).await
+    execute_request(Method::RawHistory, context).await
 }
 
 async fn get_seller(
     swap_id: Uuid,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let params = Params {
-        swap_id: Some(swap_id),
-        ..Default::default()
-    };
-    execute_request(Method::GetSeller, params, context).await
+    execute_request(Method::GetSeller {
+        swap_id
+    }, context).await
 }
 
 async fn get_swap_start_date(
     swap_id: Uuid,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let params = Params {
-        swap_id: Some(swap_id),
-        ..Default::default()
-    };
-    execute_request(Method::SwapStartDate, params, context).await
+    execute_request(Method::SwapStartDate {
+        swap_id
+    }, context).await
 }
 
 async fn resume_swap(
     swap_id: Uuid,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let params = Params {
-        swap_id: Some(swap_id),
-        ..Default::default()
-    };
-    execute_request(Method::Resume, params, context).await
+    execute_request(Method::Resume {
+        swap_id
+    }, context).await
 }
 
 async fn cancel_and_refund_swap(
     swap_id: Uuid,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let params = Params {
-        swap_id: Some(swap_id),
-        ..Default::default()
-    };
-    execute_request(Method::CancelAndRefund, params, context).await
+    execute_request(Method::CancelAndRefund {
+        swap_id
+    }, context).await
 }
 
 async fn withdraw_btc(
-    withdraw_address: bitcoin::Address,
+    address: bitcoin::Address,
     amount: Option<bitcoin::Amount>,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let params = Params {
+    execute_request(Method::WithdrawBtc {
         amount,
-        address: Some(withdraw_address),
-        ..Default::default()
-    };
-    execute_request(Method::WithdrawBtc, params, context).await
+        address,
+    }, context).await
 }
 
 async fn buy_xmr(
@@ -250,24 +239,19 @@ async fn buy_xmr(
     seller: Multiaddr,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let params = Params {
-        bitcoin_change_address: Some(bitcoin_change_address),
-        monero_receive_address: Some(monero_receive_address),
-        seller: Some(seller),
-        swap_id: Some(Uuid::new_v4()),
-        ..Default::default()
-    };
-
-    execute_request(Method::BuyXmr, params, context).await
+    execute_request(Method::BuyXmr {
+        seller,
+        swap_id: Uuid::new_v4(),
+        bitcoin_change_address,
+        monero_receive_address
+    }, context).await
 }
 
 async fn list_sellers(
     rendezvous_point: Multiaddr,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let params = Params {
-        rendezvous_point: Some(rendezvous_point),
-        ..Default::default()
-    };
-    execute_request(Method::ListSellers, params, context).await
+    execute_request(Method::ListSellers {
+        rendezvous_point
+    }, context).await
 }
