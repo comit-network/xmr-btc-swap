@@ -156,6 +156,9 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
             list_sellers(rendezvous_point.clone(), &context).await
         })
         .expect("Could not register RPC method list_sellers");
+    module.register_async_method("get_current_swap", |_, context| async move {
+        get_current_swap(&context).await
+    }).expect("Could not register RPC method get_current_swap");
     module
 }
 
@@ -168,6 +171,10 @@ async fn execute_request(
         .call(Arc::clone(context))
         .await
         .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))
+}
+
+async fn get_current_swap(context: &Arc<Context>) -> Result<serde_json::Value, jsonrpsee_core::Error> {
+    execute_request(Method::GetCurrentSwap, context).await
 }
 
 async fn get_bitcoin_balance(

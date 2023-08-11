@@ -16,16 +16,16 @@ use std::cmp::min;
 use std::convert::TryInto;
 use std::future::Future;
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{Arc};
 use std::time::Duration;
 use structopt::lazy_static::lazy_static;
 use tokio::sync::broadcast::Receiver;
 use tracing::{debug_span, Instrument};
 use uuid::Uuid;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 lazy_static! {
-    static ref SWAP_MUTEX: Mutex<Option<Uuid>> = Mutex::new(None);
+    static ref SWAP_LOCK: RwLock<Option<Uuid>> = RwLock::new(None);
 }
 
 #[derive(PartialEq, Debug)]
@@ -113,7 +113,8 @@ pub enum Method {
     },
     StartDaemon {
         server_address: Option<SocketAddr>,
-    }
+    },
+    GetCurrentSwap,
 }
 
 impl Request {
@@ -556,7 +557,12 @@ impl Request {
                 Ok(json!({
                     "result": []
                 }))
-            }
+            },
+            Method::GetCurrentSwap => {
+                Ok(json!({
+                    "swap_id": SWAP_LOCK.read().await.clone()
+                }))
+            },
         }
     }
 
@@ -569,15 +575,16 @@ impl Request {
 
         if let Some(swap_id) = self.has_lockable_swap_id() {
             println!("taking lock for swap_id: {}", swap_id);
-            let mut guard = SWAP_MUTEX.try_lock().context("Another swap is already running")?;
-            if guard.is_some() {
-                bail!("Another swap is already running");
+            let mut guard = SWAP_LOCK.write().await;
+            if let Some(running_swap_id) = guard.as_ref() {
+                bail!("Another swap is already running: {}", running_swap_id);
             }
-
             let _ = guard.insert(swap_id.clone());
+            drop(guard);
 
             let result = self.handle_cmd(context).instrument(call_span).await;
-            guard.take();
+
+            SWAP_LOCK.write().await.take();
 
             println!("releasing lock for swap_id: {}", swap_id);
 
