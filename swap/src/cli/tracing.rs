@@ -1,74 +1,31 @@
 use anyhow::Result;
 use std::fmt::Debug;
 use std::fs::OpenOptions;
+use std::io;
 use std::io::Write;
 use std::option::Option::Some;
 use std::path::{Path, PathBuf};
-use tracing::field::Field;
-use tracing::span::Attributes;
-use tracing::{Id, Level, Subscriber};
-use tracing_subscriber::fmt::format::{Format, Json, JsonFields};
+use tracing::{Event, Level, Subscriber};
+use tracing_subscriber::fmt::format::{DefaultFields, Format, Json, JsonFields};
 use tracing_subscriber::fmt::time::UtcTime;
 use tracing_subscriber::layer::{Context, SubscriberExt};
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::{EnvFilter, FmtSubscriber, Layer, Registry};
-use tracing_subscriber::fmt::{format, FormatEvent, MakeWriter};
+use tracing_subscriber::{EnvFilter, fmt, FmtSubscriber, Layer, Registry, registry};
+use tracing_subscriber::fmt::{FormatEvent, MakeWriter};
 use serde_json::{json, Value};
-use serde::Serialize;
+use tracing::subscriber::set_global_default;
 
-#[derive(Debug, Serialize)]
-struct LogEvent<'a> {
-    message: String,
-    level: &'a str,
-    target: &'a str,
-    module: &'a str,
-    file: Option<&'a str>,
-    line: Option<u32>,
-    fields: Value,
-}
 
-/// Transforms a `tracing::Event` into a JSON-formatted string.
-fn format_event_as_json<'a, S>(
-    _: &Context<'a, S>,
-    event: &'a tracing::Event<'a>,
-) -> serde_json::Result<String> {
-    // Extracting fields from the event into a serde_json::Value
-    let mut fields = json!({});
-    let mut message = String::new();  // For capturing the main message
-
-    event.record(&mut |field: &Field, value: &dyn Debug| {
-        if field.name() == "message" {
-            message = format!("{:?}", value);
-        } else {
-            fields[field.name()] = json!(format!("{:?}", value));
-        }
-    });
-
-    let log = LogEvent {
-        message, // Use the captured message here
-        level: event.metadata().level().as_str(),
-        target: event.metadata().target(),
-        module: event.metadata().module_path().unwrap_or_default(),
-        file: event.metadata().file(),
-        line: event.metadata().line(),
-        fields,
-    };
-
-    serde_json::to_string(&log)
-}
-
-struct SwapIdVisitor {
-    swap_id: Option<String>,
-}
-
-pub struct FileLayer {
+pub struct MyMakeWriter {
     dir: PathBuf,
+    // other members like stdout and stderr if needed
 }
 
-impl FileLayer {
+impl MyMakeWriter {
     pub fn new(dir: impl AsRef<Path>) -> Self {
         Self {
             dir: dir.as_ref().to_path_buf(),
+            // initialize other members
         }
     }
 
@@ -76,69 +33,80 @@ impl FileLayer {
         self.dir.join(format!("swap-{}.log", swap_id))
     }
 
-    fn append_to_file(&self, swap_id: &str, message: &str) -> std::io::Result<()> {
-        let path = self.get_log_path(swap_id);
-        let mut file = OpenOptions::new().append(true).create(true).open(path)?;
-        file.write_all(message.as_bytes())
+    fn get_file_writer(&self, swap_id: &str) -> io::Result<impl Write> {
+        OpenOptions::new().append(true).create(true).open(self.get_log_path(swap_id))
     }
 }
 
+impl<'a> MakeWriter<'a> for MyMakeWriter {
+    type Writer = Box<dyn Write + 'a>;
 
-impl<S> Layer<S> for FileLayer
-    where
-        S: Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
-{
-    fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
-        let mut visitor = SwapIdVisitor { swap_id: None };
-        attrs.record(&mut visitor);
-
-        if let Some(swap_id) = visitor.swap_id {
-            if let Some(span) = ctx.span(id) {
-                span.extensions_mut().insert(swap_id);
-            }
-        }
+    fn make_writer(&'a self) -> Self::Writer {
+        unreachable!();
     }
 
-    fn on_event(&self, event: &tracing::Event<'_>, ctx: Context<'_, S>) {
-        if let Some(current_span_id) = ctx.current_span().id() {
-            if let Some(span) = ctx.span(current_span_id) {
-                if let Some(swap_id) = span.extensions().get::<String>() {
-                    // TODO: This is a hack, I need to figure out how to get the JSON formatter to work
+    fn make_writer_for(&'a self, meta: &tracing::Metadata<'_>) -> Self::Writer {
+        // Print all attributes of the event
+        println!("Event attributes: {:?}", meta);
+        let swap_id = "dummy-swap-id";
 
-                    if let Ok(json_log) = format_event_as_json(&ctx, event) {
-                        self.append_to_file(swap_id, &format!("{}\n", json_log))
-                            .expect("Failed to write to file");
-                    }
-                }
-            }
-        }
+        Box::new(self.get_file_writer(swap_id).expect("Failed to open log file"))
     }
 }
 
-impl tracing::field::Visit for SwapIdVisitor {
-    fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
-        if field.name() == "swap_id" {
-            self.swap_id = Some(format!("{:?}", value));
-        }
-    }
-}
 
 pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>) -> Result<()> {
-    let level = if debug { Level::DEBUG } else { Level::INFO };
-    let is_terminal = atty::is(atty::Stream::Stderr);
+    let level_filter = EnvFilter::try_new("swap=debug")?;
+    let registry = Registry::default().with(level_filter);
 
-    let file_layer = FileLayer::new(dir.as_ref());
 
-    FmtSubscriber::builder()
-        .with_env_filter(format!("swap={}", level))
-        .with_writer(std::io::stderr)
-        .with_ansi(is_terminal)
-        .with_timer(UtcTime::rfc_3339())
-        .with_target(false)
-        .finish()
-        .with(file_layer)
-        .init();
+    let file_logger = registry.with(
+        fmt::layer()
+            .with_ansi(false)
+            .with_target(false)
+            .json()
+            .with_writer(MyMakeWriter::new(dir))
+    );
 
-    tracing::info!("Logging initialized to {}", dir.as_ref().display());
+    set_global_default(file_logger.with(info_terminal_printer()))?;
+
+    //tracing::info!("Logging initialized to {}", dir.as_ref().display());
     Ok(())
+}
+
+pub struct StdErrPrinter<L> {
+    inner: L,
+    level: Level,
+}
+
+type StdErrLayer<S, T> = fmt::Layer<
+    S,
+    DefaultFields,
+    Format<fmt::format::Full, T>,
+    fn() -> io::Stderr,
+>;
+
+fn info_terminal_printer<S>() -> StdErrPrinter<StdErrLayer<S, ()>> {
+    let is_terminal = atty::is(atty::Stream::Stderr);
+    StdErrPrinter {
+        inner: fmt::layer()
+            .with_ansi(is_terminal)
+            .with_target(false)
+            .with_level(false)
+            .without_time()
+            .with_writer(std::io::stderr),
+        level: Level::INFO,
+    }
+}
+
+impl<L, S> Layer<S> for StdErrPrinter<L>
+    where
+        L: 'static + Layer<S>,
+        S: Subscriber + for<'a> registry::LookupSpan<'a>,
+{
+    fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
+        if self.level.ge(event.metadata().level()) {
+            self.inner.on_event(event, ctx);
+        }
+    }
 }
