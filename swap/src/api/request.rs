@@ -598,7 +598,7 @@ impl Request {
                 debug_span!(
                     "call",
                     method = ?self.cmd,
-                    swap_id = swap_id.to_string(),
+                    swap_id = %swap_id,
                 )
             },
         );
