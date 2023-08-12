@@ -93,7 +93,7 @@ impl Context {
         let tor_socks5_port = tor.map(|tor| tor.tor_socks5_port);
 
         START.call_once(|| {
-            let _ = cli::tracing::init(debug, json, data_dir.join("logs"), None);
+            let _ = cli::tracing::init(debug, json, data_dir.join("logs"));
         });
 
         let context = Context {
