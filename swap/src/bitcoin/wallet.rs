@@ -274,7 +274,7 @@ impl Subscription {
 
     pub async fn wait_until_confirmed_with<T>(&self, target: T) -> Result<()>
     where
-        u32: PartialOrd<T>,
+        T: Into<u32>,
         T: Copy,
     {
         self.wait_until(|status| status.is_confirmed_with(target))
@@ -926,10 +926,19 @@ impl Confirmed {
     }
 
     pub fn meets_target<T>(&self, target: T) -> bool
-    where
-        u32: PartialOrd<T>,
+    where T: Into<u32>
     {
-        self.confirmations() >= target
+        self.confirmations() >= target.into()
+    }
+
+    pub fn blocks_left_until<T>(&self, target: T) -> u32
+    where T: Into<u32>, T: Copy
+    {
+        if self.meets_target(target) {
+            0
+        } else {
+            target.into() - self.confirmations()
+        }
     }
 }
 
@@ -941,12 +950,23 @@ impl ScriptStatus {
 
     /// Check if the script has met the given confirmation target.
     pub fn is_confirmed_with<T>(&self, target: T) -> bool
-    where
-        u32: PartialOrd<T>,
+    where T: Into<u32>
     {
         match self {
             ScriptStatus::Confirmed(inner) => inner.meets_target(target),
             _ => false,
+        }
+    }
+
+    // Calculate the number of blocks left until the target is met.
+    pub fn blocks_left_until<T>(&self, target: T) -> u32
+    where T: Into<u32>, T: Copy
+    {
+        match self {
+            ScriptStatus::Confirmed(inner) => {
+                inner.blocks_left_until(target)
+            }
+            _ => target.into(),
         }
     }
 
@@ -1003,6 +1023,33 @@ mod tests {
         let confirmed = Confirmed::from_inclusion_and_latest_block(included_in, latest_block);
 
         assert_eq!(confirmed.depth, 0)
+    }
+
+    #[test]
+    fn given_depth_0_should_return_0_blocks_left_until_1() {
+        let script = ScriptStatus::Confirmed(Confirmed { depth: 0 });
+
+        let blocks_left = script.blocks_left_until(1);
+
+        assert_eq!(blocks_left, 0)
+    }
+
+    #[test]
+    fn given_depth_1_should_return_0_blocks_left_until_1() {
+        let script = ScriptStatus::Confirmed(Confirmed { depth: 1 });
+
+        let blocks_left = script.blocks_left_until(1);
+
+        assert_eq!(blocks_left, 0)
+    }
+
+    #[test]
+    fn given_depth_0_should_return_1_blocks_left_until_2() {
+        let script = ScriptStatus::Confirmed(Confirmed { depth: 0 });
+
+        let blocks_left = script.blocks_left_until(2);
+
+        assert_eq!(blocks_left, 1)
     }
 
     #[test]

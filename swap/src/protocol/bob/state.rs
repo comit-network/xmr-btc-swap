@@ -440,7 +440,7 @@ impl State3 {
         self.tx_lock.txid()
     }
 
-    pub async fn current_epoch(
+    pub async fn expired_timelock(
         &self,
         bitcoin_wallet: &bitcoin::Wallet,
     ) -> Result<ExpiredTimelocks> {

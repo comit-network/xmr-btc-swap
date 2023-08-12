@@ -24,6 +24,12 @@ use std::ops::Add;
 #[serde(transparent)]
 pub struct CancelTimelock(u32);
 
+impl From<CancelTimelock> for u32 {
+    fn from(cancel_timelock: CancelTimelock) -> Self {
+        cancel_timelock.0
+    }
+}
+
 impl CancelTimelock {
     pub const fn new(number_of_blocks: u32) -> Self {
         Self(number_of_blocks)
@@ -63,6 +69,12 @@ impl fmt::Display for CancelTimelock {
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(transparent)]
 pub struct PunishTimelock(u32);
+
+impl From<PunishTimelock> for u32 {
+    fn from(punish_timelock: PunishTimelock) -> Self {
+        punish_timelock.0
+    }
+}
 
 impl PunishTimelock {
     pub const fn new(number_of_blocks: u32) -> Self {

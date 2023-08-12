@@ -1,5 +1,5 @@
 use crate::api::Context;
-use crate::bitcoin::{Amount, TxLock};
+use crate::bitcoin::{Amount, ExpiredTimelocks, TxLock};
 use crate::cli::{list_sellers, EventLoop, SellerStatus};
 use crate::libp2p_ext::MultiAddrExt;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
@@ -115,6 +115,9 @@ pub enum Method {
         server_address: Option<SocketAddr>,
     },
     GetCurrentSwap,
+    GetSwapExpiredTimelock {
+        swap_id: Uuid,
+    },
 }
 
 impl Request {
@@ -561,6 +564,38 @@ impl Request {
             Method::GetCurrentSwap => {
                 Ok(json!({
                     "swap_id": SWAP_LOCK.read().await.clone()
+                }))
+            },
+            Method::GetSwapExpiredTimelock { swap_id } => {
+                let swap_state: BobState = context
+                    .db
+                    .get_state(
+                        swap_id,
+                    )
+                    .await?
+                    .try_into()?;
+
+                let bitcoin_wallet = context.bitcoin_wallet.as_ref().context("Could not get Bitcoin wallet")?;
+
+                let timelock = match swap_state {
+                    BobState::Started { .. }
+                    | BobState::SafelyAborted
+                    | BobState::SwapSetupCompleted(_) => bail!("Bitcoin lock transaction has not been published yet"),
+                    BobState::BtcLocked { state3: state, .. }
+                    | BobState::XmrLockProofReceived { state, .. } => state.expired_timelock(bitcoin_wallet).await,
+                    BobState::XmrLocked(state)
+                    | BobState::EncSigSent(state) => state.expired_timelock(bitcoin_wallet).await,
+                    BobState::CancelTimelockExpired(state)
+                    | BobState::BtcCancelled(state) => state.expired_timelock(bitcoin_wallet).await,
+                    BobState::BtcPunished { .. } => Ok(ExpiredTimelocks::Punish),
+                    // swap is already finished
+                    BobState::BtcRefunded(_)
+                    | BobState::BtcRedeemed(_)
+                    | BobState::XmrRedeemed { .. } => bail!("Bitcoin have already been redeemed or refunded")
+                }?;
+
+                Ok(json!({
+                    "timelock": timelock,
                 }))
             },
         }

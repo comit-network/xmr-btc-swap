@@ -18,19 +18,19 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
         .register_async_method("get_bitcoin_balance", |_, context| async move {
             get_bitcoin_balance(&context).await
         })
-        .expect("Could not register RPC method get_bitcoin_balance");
+        .unwrap();
 
     module
         .register_async_method("get_history", |_, context| async move {
             get_history(&context).await
         })
-        .expect("Could not register RPC method get_history");
+        .unwrap();
 
     module
         .register_async_method("get_raw_history", |_, context| async move {
             get_raw_history(&context).await
         })
-        .expect("Could not register RPC method get_raw_history");
+        .unwrap();
 
     module
         .register_async_method("get_seller", |params, context| async move {
@@ -42,7 +42,7 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
 
             get_seller(*swap_id, &context).await
         })
-        .expect("Could not register RPC method get_seller");
+        .unwrap();
 
     module
         .register_async_method("get_swap_start_date", |params, context| async move {
@@ -54,7 +54,7 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
 
             get_swap_start_date(*swap_id, &context).await
         })
-        .expect("Could not register RPC method get_swap_start_date");
+        .unwrap();
 
     module
         .register_async_method("resume_swap", |params, context| async move {
@@ -66,7 +66,18 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
 
             resume_swap(*swap_id, &context).await
         })
-        .expect("Could not register RPC method resume_swap");
+        .unwrap();
+
+    module.register_async_method("get_swap_expired_timelock", |params, context| async move {
+        let params: HashMap<String, Uuid> = params.parse()?;
+
+        let swap_id = params.get("swap_id").ok_or_else(|| {
+            jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string())
+        })?;
+
+        get_swap_timelock(*swap_id, &context).await
+    }).unwrap();
+
     module
         .register_async_method("cancel_refund_swap", |params, context| async move {
             let params: HashMap<String, Uuid> = params.parse()?;
@@ -77,7 +88,7 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
 
             cancel_and_refund_swap(*swap_id, &context).await
         })
-        .expect("Could not register RPC method cancel_refund_swap");
+        .unwrap();
     module
         .register_async_method("withdraw_btc", |params, context| async move {
             let params: HashMap<String, String> = params.parse()?;
@@ -145,7 +156,7 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
             )
             .await
         })
-        .expect("Could not register RPC method buy_xmr");
+        .unwrap();
     module
         .register_async_method("list_sellers", |params, context| async move {
             let params: HashMap<String, Multiaddr> = params.parse()?;
@@ -155,10 +166,11 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
 
             list_sellers(rendezvous_point.clone(), &context).await
         })
-        .expect("Could not register RPC method list_sellers");
+        .unwrap();
     module.register_async_method("get_current_swap", |_, context| async move {
         get_current_swap(&context).await
-    }).expect("Could not register RPC method get_current_swap");
+    }).unwrap();
+
     module
 }
 
@@ -216,6 +228,15 @@ async fn resume_swap(
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
     execute_request(Method::Resume {
+        swap_id
+    }, context).await
+}
+
+async fn get_swap_timelock(
+    swap_id: Uuid,
+    context: &Arc<Context>,
+) -> Result<serde_json::Value, jsonrpsee_core::Error> {
+    execute_request(Method::GetSwapExpiredTimelock {
         swap_id
     }, context).await
 }

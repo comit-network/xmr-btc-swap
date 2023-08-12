@@ -112,7 +112,7 @@ where
         }
         AliceState::BtcLocked { state3 } => {
             match state3.expired_timelocks(bitcoin_wallet).await? {
-                ExpiredTimelocks::None => {
+                ExpiredTimelocks::None {..} => {
                     // Record the current monero wallet block height so we don't have to scan from
                     // block 0 for scenarios where we create a refund wallet.
                     let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
@@ -135,7 +135,7 @@ where
             transfer_proof,
             state3,
         } => match state3.expired_timelocks(bitcoin_wallet).await? {
-            ExpiredTimelocks::None => {
+            ExpiredTimelocks::None {..} => {
                 monero_wallet
                     .watch_for_transfer(state3.lock_xmr_watch_request(transfer_proof.clone(), 1))
                     .await
@@ -221,7 +221,7 @@ where
             encrypted_signature,
             state3,
         } => match state3.expired_timelocks(bitcoin_wallet).await? {
-            ExpiredTimelocks::None => {
+            ExpiredTimelocks::None {..} => {
                 let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
                 match state3.signed_redeem_transaction(*encrypted_signature) {
                     Ok(tx) => match bitcoin_wallet.broadcast(tx, "redeem").await {
