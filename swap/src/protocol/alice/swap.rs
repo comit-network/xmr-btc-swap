@@ -45,6 +45,8 @@ where
             .await?;
     }
 
+    swap.monero_wallet.store().await?;
+
     Ok(current_state)
 }
 
