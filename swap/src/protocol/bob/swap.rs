@@ -185,7 +185,9 @@ async fn next_state(
         BobState::XmrLocked(state) => {
             let tx_lock_status = bitcoin_wallet.subscribe_to(state.tx_lock.clone()).await;
 
-            if let ExpiredTimelocks::None { .. } = state.expired_timelock(bitcoin_wallet).await? {
+            if let Ok(state5) = state.check_for_tx_redeem(bitcoin_wallet).await {
+                BobState::BtcRedeemed(state5)
+            } else if let ExpiredTimelocks::None { .. } = state.expired_timelock(bitcoin_wallet).await? {
                 // Alice has locked Xmr
                 // Bob sends Alice his key
 
