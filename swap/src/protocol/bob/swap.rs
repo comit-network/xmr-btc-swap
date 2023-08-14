@@ -186,17 +186,13 @@ async fn next_state(
             let tx_lock_status = bitcoin_wallet.subscribe_to(state.tx_lock.clone()).await;
 
             if let Ok(state5) = state.check_for_tx_redeem(bitcoin_wallet).await {
+                // this is in case we send the encrypted signature to alice, but we don't get confirmation that she received it. alice would be able to redeem the btc, but we would be stuck in xmrlocked, never being able to redeem the xmr.
                 BobState::BtcRedeemed(state5)
             } else if let ExpiredTimelocks::None { .. } = state.expired_timelock(bitcoin_wallet).await? {
                 // Alice has locked Xmr
                 // Bob sends Alice his key
 
                 select! {
-                    state5 = state.watch_for_redeem_btc(bitcoin_wallet) => {
-                        // there seems to be a weird edge case where you can send the encrypted signature, alice can redeem the btc, but your database doesn't update to encsigsent or btcredeemed, so here we will watch for redemption too, so we have a chance to unlock xmr.
-                        // this seemed to have happened when a surge of blocks came in on stagenet within a short time frame
-                        BobState::BtcRedeemed(state5?)
-                    },
                     result = event_loop_handle.send_encrypted_signature(state.tx_redeem_encsig()) => {
                         match result {
                             Ok(_) => BobState::EncSigSent(state),
