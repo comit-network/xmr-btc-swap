@@ -79,7 +79,6 @@ where
                 bitcoin_address::validate(bitcoin_change_address, is_testnet)?;
 
             let request = Request::new(
-                rx.subscribe(),
                 Method::BuyXmr,
                 Params {
                     bitcoin_change_address: Some(bitcoin_change_address),
@@ -104,21 +103,21 @@ where
             (context, request)
         }
         CliCommand::History => {
-            let request = Request::new(rx.subscribe(), Method::History, Params::default());
+            let request = Request::new(Method::History, Params::default());
 
             let context =
                 Context::build(None, None, None, data, is_testnet, debug, json, None, rx).await?;
             (context, request)
         }
         CliCommand::Config => {
-            let request = Request::new(rx.subscribe(), Method::Config, Params::default());
+            let request = Request::new(Method::Config, Params::default());
 
             let context =
                 Context::build(None, None, None, data, is_testnet, debug, json, None, rx).await?;
             (context, request)
         }
         CliCommand::Balance { bitcoin } => {
-            let request = Request::new(rx.subscribe(), Method::Balance, Params::default());
+            let request = Request::new(Method::Balance, Params::default());
 
             let context = Context::build(
                 Some(bitcoin),
@@ -141,7 +140,6 @@ where
             tor,
         } => {
             let request = Request::new(
-                rx.subscribe(),
                 Method::StartDaemon,
                 Params {
                     server_address,
@@ -171,7 +169,6 @@ where
             let address = bitcoin_address::validate(address, is_testnet)?;
 
             let request = Request::new(
-                rx.subscribe(),
                 Method::WithdrawBtc,
                 Params {
                     amount,
@@ -201,7 +198,6 @@ where
             tor,
         } => {
             let request = Request::new(
-                rx.subscribe(),
                 Method::Resume,
                 Params {
                     swap_id: Some(swap_id),
@@ -229,7 +225,6 @@ where
             tor,
         } => {
             let request = Request::new(
-                rx.subscribe(),
                 Method::CancelAndRefund,
                 Params {
                     swap_id: Some(swap_id),
@@ -256,7 +251,6 @@ where
             tor,
         } => {
             let request = Request::new(
-                rx.subscribe(),
                 Method::ListSellers,
                 Params {
                     rendezvous_point: Some(rendezvous_point),
@@ -281,7 +275,6 @@ where
         }
         CliCommand::ExportBitcoinWallet { bitcoin } => {
             let request = Request::new(
-                rx.subscribe(),
                 Method::ExportBitcoinWallet,
                 Params::default(),
             );
@@ -304,7 +297,6 @@ where
             swap_id: SwapId { swap_id },
         } => {
             let request = Request::new(
-                rx.subscribe(),
                 Method::MoneroRecovery,
                 Params {
                     swap_id: Some(swap_id),

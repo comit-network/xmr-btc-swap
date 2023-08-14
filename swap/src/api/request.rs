@@ -18,59 +18,15 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::broadcast::Receiver;
-use tokio::sync::Mutex;
 use tracing::{debug_span, Instrument};
 use uuid::Uuid;
 
 #[derive(PartialEq, Debug)]
 pub struct Request {
     pub params: Params,
-    pub cmd: Method,
-    pub shutdown: Shutdown,
+    pub cmd: Method
 }
 
-impl Shutdown {
-    pub fn new(notify: Receiver<()>) -> Shutdown {
-        Shutdown {
-            shutdown: false,
-            notify,
-        }
-    }
-
-    /// Returns `true` if the shutdown signal has been received.
-    pub fn is_shutdown(&self) -> bool {
-        self.shutdown
-    }
-
-    /// Receive the shutdown notice, waiting if necessary.
-    pub async fn recv(&mut self) {
-        // If the shutdown signal has already been received, then return
-        // immediately.
-        if self.shutdown {
-            return;
-        }
-
-        // Cannot receive a "lag error" as only one value is ever sent.
-        let _ = self.notify.recv().await;
-
-        self.shutdown = true;
-
-        // Remember that the signal has been received.
-    }
-}
-
-#[derive(Debug)]
-pub struct Shutdown {
-    shutdown: bool,
-    notify: Receiver<()>,
-}
-
-impl PartialEq for Shutdown {
-    fn eq(&self, other: &Shutdown) -> bool {
-        self.shutdown == other.shutdown
-    }
-}
 
 #[derive(Default, PartialEq, Debug)]
 pub struct Params {
@@ -103,11 +59,10 @@ pub enum Method {
 }
 
 impl Request {
-    pub fn new(shutdownReceiver: Receiver<()>, cmd: Method, params: Params) -> Request {
+    pub fn new(cmd: Method, params: Params) -> Request {
         Request {
             params,
-            cmd,
-            shutdown: Shutdown::new(shutdownReceiver),
+            cmd
         }
     }
 
@@ -218,17 +173,37 @@ impl Request {
                     bitcoin_change_address,
                     amount,
                 );
+                let mut halt = context.shutdown.notify.subscribe();
 
-                tokio::select! {
-                    result = event_loop => {
-                        result
-                            .context("EventLoop panicked")?;
-                    },
-                    result = bob::run(swap) => {
-                        result
-                            .context("Failed to complete swap")?;
+                // execution will halt if the server daemon is stopped or a cancel running swap
+                // request is sent
+                tokio::spawn(async move {
+                    tokio::select! {
+                        result = event_loop => {
+                            match result {
+                                Ok(_) => {
+                                    tracing::debug!(%swap_id, "EventLoop completed")
+                                }
+                                Err(error) => {
+                                    tracing::error!(%swap_id, "EventLoop failed: {:#}", error)
+                                }
+                            }
+                        },
+                        result = bob::run(swap) => {
+                            match result {
+                                Ok(state) => {
+                                    tracing::debug!(%swap_id, state=%state, "Swap completed")
+                                }
+                                Err(error) => {
+                                    tracing::error!(%swap_id, "Failed to complete swap: {:#}", error)
+                                }
+                            }
+                        }
+                        _ = halt.recv() => {
+                            tracing::debug!(%swap_id, "Swap cancel signal received while running swap")
+                        }
                     }
-                }
+                });
                 Ok(json!({
                     "empty": "true"
                 }))
@@ -240,11 +215,13 @@ impl Request {
                     let state: BobState = state.try_into()?;
                     vec.push((swap_id, state.to_string()));
                 }
+                context.shutdown.notify.send(())?;
 
                 Ok(json!({ "swaps": vec }))
             }
             Method::RawHistory => {
                 let raw_history = context.db.raw_all().await?;
+
                 Ok(json!({ "raw_history": raw_history }))
             }
             Method::GetSeller => {
@@ -341,9 +318,11 @@ impl Request {
                     rpc::run_server(server_address, Arc::clone(&context)).await?;
 
                 loop {
+                    let shutdown = Arc::clone(&context.shutdown);
                     tokio::select! {
-                        _ = self.shutdown.recv() => {
+                        _ = shutdown.recv() => {
                             server_handle.stop()?;
+                            context.shutdown.notify.send(())?;
                             return Ok(json!({
                                 "result": []
                             }))

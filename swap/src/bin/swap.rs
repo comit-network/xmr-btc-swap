@@ -22,7 +22,7 @@ use tokio::sync::broadcast;
 #[tokio::main]
 async fn main() -> Result<()> {
     let (tx, _) = broadcast::channel(1);
-    let (context, mut request) = match parse_args_and_apply_defaults(env::args_os(), tx).await? {
+    let (context, mut request) = match parse_args_and_apply_defaults(env::args_os(), tx.clone()).await? {
         ParseResult::Context(context, request) => (context, request),
         ParseResult::PrintAndExitZero { message } => {
             println!("{}", message);
@@ -34,6 +34,7 @@ async fn main() -> Result<()> {
         eprintln!("{}", e);
     }
     let _result = request.call(Arc::clone(&context)).await?;
+    tx.send(())?;
     Ok(())
 }
 
