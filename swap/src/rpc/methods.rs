@@ -15,6 +15,18 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
     let mut module = RpcModule::new(context);
 
     module
+        .register_async_method("get_swap_info", |params, context| async move {
+            let params: HashMap<String, Uuid> = params.parse()?;
+
+            let swap_id = params.get("swap_id").ok_or_else(|| {
+                jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string())
+            })?;
+
+            get_swap_info(*swap_id, &context).await
+        })
+        .unwrap();
+
+    module
         .register_async_method("get_bitcoin_balance", |_, context| async move {
             get_bitcoin_balance(&context).await
         })
@@ -33,30 +45,6 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
         .unwrap();
 
     module
-        .register_async_method("get_seller", |params, context| async move {
-            let params: HashMap<String, Uuid> = params.parse()?;
-
-            let swap_id = params.get("swap_id").ok_or_else(|| {
-                jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string())
-            })?;
-
-            get_seller(*swap_id, &context).await
-        })
-        .unwrap();
-
-    module
-        .register_async_method("get_swap_start_date", |params, context| async move {
-            let params: HashMap<String, Uuid> = params.parse()?;
-
-            let swap_id = params.get("swap_id").ok_or_else(|| {
-                jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string())
-            })?;
-
-            get_swap_start_date(*swap_id, &context).await
-        })
-        .unwrap();
-
-    module
         .register_async_method("resume_swap", |params, context| async move {
             let params: HashMap<String, Uuid> = params.parse()?;
 
@@ -67,16 +55,6 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
             resume_swap(*swap_id, &context).await
         })
         .unwrap();
-
-    module.register_async_method("get_swap_expired_timelock", |params, context| async move {
-        let params: HashMap<String, Uuid> = params.parse()?;
-
-        let swap_id = params.get("swap_id").ok_or_else(|| {
-            jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string())
-        })?;
-
-        get_swap_timelock(*swap_id, &context).await
-    }).unwrap();
 
     module
         .register_async_method("cancel_refund_swap", |params, context| async move {
@@ -167,9 +145,12 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
             list_sellers(rendezvous_point.clone(), &context).await
         })
         .unwrap();
-    module.register_async_method("get_current_swap", |_, context| async move {
-        get_current_swap(&context).await
-    }).unwrap();
+
+    module
+        .register_async_method("get_current_swap", |_, context| async move {
+            get_current_swap(&context).await
+        })
+        .unwrap();
 
     module
 }
@@ -185,7 +166,9 @@ async fn execute_request(
         .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))
 }
 
-async fn get_current_swap(context: &Arc<Context>) -> Result<serde_json::Value, jsonrpsee_core::Error> {
+async fn get_current_swap(
+    context: &Arc<Context>,
+) -> Result<serde_json::Value, jsonrpsee_core::Error> {
     execute_request(Method::GetCurrentSwap, context).await
 }
 
@@ -205,49 +188,25 @@ async fn get_raw_history(
     execute_request(Method::RawHistory, context).await
 }
 
-async fn get_seller(
+async fn get_swap_info(
     swap_id: Uuid,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    execute_request(Method::GetSeller {
-        swap_id
-    }, context).await
-}
-
-async fn get_swap_start_date(
-    swap_id: Uuid,
-    context: &Arc<Context>,
-) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    execute_request(Method::SwapStartDate {
-        swap_id
-    }, context).await
+    execute_request(Method::GetSwapInfo { swap_id }, context).await
 }
 
 async fn resume_swap(
     swap_id: Uuid,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    execute_request(Method::Resume {
-        swap_id
-    }, context).await
-}
-
-async fn get_swap_timelock(
-    swap_id: Uuid,
-    context: &Arc<Context>,
-) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    execute_request(Method::GetSwapExpiredTimelock {
-        swap_id
-    }, context).await
+    execute_request(Method::Resume { swap_id }, context).await
 }
 
 async fn cancel_and_refund_swap(
     swap_id: Uuid,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    execute_request(Method::CancelAndRefund {
-        swap_id
-    }, context).await
+    execute_request(Method::CancelAndRefund { swap_id }, context).await
 }
 
 async fn withdraw_btc(
@@ -255,10 +214,7 @@ async fn withdraw_btc(
     amount: Option<bitcoin::Amount>,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    execute_request(Method::WithdrawBtc {
-        amount,
-        address,
-    }, context).await
+    execute_request(Method::WithdrawBtc { amount, address }, context).await
 }
 
 async fn buy_xmr(
@@ -267,19 +223,21 @@ async fn buy_xmr(
     seller: Multiaddr,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    execute_request(Method::BuyXmr {
-        seller,
-        swap_id: Uuid::new_v4(),
-        bitcoin_change_address,
-        monero_receive_address
-    }, context).await
+    execute_request(
+        Method::BuyXmr {
+            seller,
+            swap_id: Uuid::new_v4(),
+            bitcoin_change_address,
+            monero_receive_address,
+        },
+        context,
+    )
+    .await
 }
 
 async fn list_sellers(
     rendezvous_point: Multiaddr,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    execute_request(Method::ListSellers {
-        rendezvous_point
-    }, context).await
+    execute_request(Method::ListSellers { rendezvous_point }, context).await
 }
