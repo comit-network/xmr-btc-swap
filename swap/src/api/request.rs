@@ -1,5 +1,5 @@
 use crate::api::Context;
-use crate::bitcoin::{Amount, TxLock};
+use crate::bitcoin::{Amount, ExpiredTimelocks, TxLock};
 use crate::cli::{list_sellers, EventLoop, SellerStatus};
 use crate::libp2p_ext::MultiAddrExt;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
@@ -18,81 +18,90 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
+use structopt::lazy_static::lazy_static;
 use tracing::{debug_span, Instrument};
 use uuid::Uuid;
+use tokio::sync::RwLock;
+
+lazy_static! {
+    static ref SWAP_LOCK: RwLock<Option<Uuid>> = RwLock::new(None);
+}
 
 #[derive(PartialEq, Debug)]
 pub struct Request {
-    pub params: Params,
     pub cmd: Method
 }
 
 
-#[derive(Default, PartialEq, Debug)]
-pub struct Params {
-    pub seller: Option<Multiaddr>,
-    pub bitcoin_change_address: Option<bitcoin::Address>,
-    pub monero_receive_address: Option<monero::Address>,
-    pub rendezvous_point: Option<Multiaddr>,
-    pub swap_id: Option<Uuid>,
-    pub amount: Option<Amount>,
-    pub server_address: Option<SocketAddr>,
-    pub address: Option<bitcoin::Address>,
-}
-
 #[derive(Debug, PartialEq)]
 pub enum Method {
-    BuyXmr,
+    BuyXmr {
+        seller: Multiaddr,
+        bitcoin_change_address: bitcoin::Address,
+        monero_receive_address: monero::Address,
+        swap_id: Uuid,
+    },
     History,
     RawHistory,
     Config,
-    WithdrawBtc,
+    WithdrawBtc {
+        amount: Option<Amount>,
+        address: bitcoin::Address,
+    },
     Balance,
-    GetSeller,
-    SwapStartDate,
-    Resume,
-    CancelAndRefund,
-    ListSellers,
+    GetSeller {
+        swap_id: Uuid,
+    },
+    SwapStartDate {
+        swap_id: Uuid,
+    },
+    Resume {
+        swap_id: Uuid,
+    },
+    CancelAndRefund {
+        swap_id: Uuid,
+    },
+    ListSellers {
+        rendezvous_point: Multiaddr,
+    },
     ExportBitcoinWallet,
-    MoneroRecovery,
-    StartDaemon,
+    MoneroRecovery {
+        swap_id: Uuid,
+    },
+    StartDaemon {
+        server_address: Option<SocketAddr>,
+    },
+    GetCurrentSwap,
+    GetSwapExpiredTimelock {
+        swap_id: Uuid,
+    },
 }
 
 impl Request {
-    pub fn new(cmd: Method, params: Params) -> Request {
+    pub fn new(cmd: Method) -> Request {
         Request {
-            params,
             cmd
         }
     }
 
-    async fn handle_cmd(&mut self, context: Arc<Context>) -> Result<serde_json::Value> {
+    fn has_lockable_swap_id(&self) -> Option<Uuid> {
         match self.cmd {
-            Method::BuyXmr => {
-                let swap_id = self
-                    .params
-                    .swap_id
-                    .context("Parameter swap_id is missing")?;
+            Method::BuyXmr { swap_id, .. }
+            | Method::Resume { swap_id }
+            | Method::CancelAndRefund { swap_id } => Some(swap_id),
+            _ => None,
+        }
+    }
+
+    async fn handle_cmd(self, context: Arc<Context>) -> Result<serde_json::Value> {
+        match self.cmd {
+            Method::BuyXmr { seller, bitcoin_change_address, monero_receive_address, swap_id } => {
                 let seed = context.config.seed.as_ref().context("Could not get seed")?;
                 let env_config = context.config.env_config;
                 let btc = context
                     .bitcoin_wallet
                     .as_ref()
                     .context("Could not get Bitcoin wallet")?;
-                let seller = self
-                    .params
-                    .seller
-                    .clone()
-                    .context("Parameter seller is missing")?;
-                let monero_receive_address = self
-                    .params
-                    .monero_receive_address
-                    .context("Parameter monero_receive_address is missing")?;
-                let bitcoin_change_address = self
-                    .params
-                    .bitcoin_change_address
-                    .clone()
-                    .context("Parameter bitcoin_change_address is missing")?;
 
                 let bitcoin_wallet = btc;
                 let seller_peer_id = seller
@@ -117,7 +126,7 @@ impl Request {
                         .context("Could not get Tor SOCKS5 port")?,
                     behaviour,
                 )
-                .await?;
+                    .await?;
                 swarm.behaviour_mut().add_address(seller_peer_id, seller);
 
                 tracing::debug!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
@@ -138,7 +147,7 @@ impl Request {
                     || bitcoin_wallet.sync(),
                     estimate_fee,
                 )
-                .await
+                    .await
                 {
                     Ok(val) => val,
                     Err(error) => match error.downcast::<ZeroQuoteReceived>() {
@@ -224,8 +233,7 @@ impl Request {
 
                 Ok(json!({ "raw_history": raw_history }))
             }
-            Method::GetSeller => {
-                let swap_id = self.params.swap_id.context("Parameter swap_id is needed")?;
+            Method::GetSeller { swap_id }  => {
                 let peerId = context
                     .db
                     .get_peer_id(swap_id)
@@ -243,12 +251,7 @@ impl Request {
                     "addresses": addresses
                 }))
             }
-            Method::SwapStartDate => {
-                let swap_id = self
-                    .params
-                    .swap_id
-                    .context("Parameter swap_id is missing")?;
-
+            Method::SwapStartDate { swap_id } => {
                 let start_date = context.db.get_swap_start_date(swap_id).await?;
 
                 Ok(json!({
@@ -272,19 +275,13 @@ impl Request {
                     "bitcoin_wallet": format!("{}/wallet", data_dir_display),
                 }))
             }
-            Method::WithdrawBtc => {
+            Method::WithdrawBtc {address, amount} => {
                 let bitcoin_wallet = context
                     .bitcoin_wallet
                     .as_ref()
                     .context("Could not get Bitcoin wallet")?;
 
-                let address = self
-                    .params
-                    .address
-                    .clone()
-                    .context("Parameter address is missing")?;
-
-                let amount = match self.params.amount {
+                let amount = match amount {
                     Some(amount) => amount,
                     None => {
                         bitcoin_wallet
@@ -307,12 +304,9 @@ impl Request {
                     "txid": signed_tx.txid(),
                 }))
             }
-            Method::StartDaemon => {
+            Method::StartDaemon {server_address} => {
                 // Default to 127.0.0.1:1234
-                let server_address = self
-                    .params
-                    .server_address
-                    .unwrap_or("127.0.0.1:1234".parse().unwrap());
+                let server_address = server_address.unwrap_or("127.0.0.1:1234".parse().unwrap());
 
                 let (_, server_handle) =
                     rpc::run_server(server_address, Arc::clone(&context)).await?;
@@ -347,12 +341,7 @@ impl Request {
                     "balance": bitcoin_balance.to_sat()
                 }))
             }
-            Method::Resume => {
-                let swap_id = self
-                    .params
-                    .swap_id
-                    .context("Parameter swap_id is missing")?;
-
+            Method::Resume {swap_id} => {
                 let seller_peer_id = context.db.get_peer_id(swap_id).await?;
                 let seller_addresses = context.db.get_addresses(seller_peer_id).await?;
 
@@ -382,7 +371,7 @@ impl Request {
                         .context("Could not get Tor SOCKS5 port")?,
                     behaviour,
                 )
-                .await?;
+                    .await?;
                 let our_peer_id = swarm.local_peer_id();
 
                 tracing::debug!(peer_id = %our_peer_id, "Network layer initialized");
@@ -417,7 +406,7 @@ impl Request {
                     event_loop_handle,
                     monero_receive_address,
                 )
-                .await?;
+                    .await?;
 
                 tokio::select! {
                     event_loop_result = handle => {
@@ -431,31 +420,24 @@ impl Request {
                     "result": []
                 }))
             }
-            Method::CancelAndRefund => {
+            Method::CancelAndRefund {swap_id} => {
                 let bitcoin_wallet = context
                     .bitcoin_wallet
                     .as_ref()
                     .context("Could not get Bitcoin wallet")?;
 
                 let state = cli::cancel_and_refund(
-                    self.params
-                        .swap_id
-                        .context("Parameter swap_id is missing")?,
+                    swap_id,
                     Arc::clone(bitcoin_wallet),
                     Arc::clone(&context.db),
                 )
-                .await?;
+                    .await?;
 
                 Ok(json!({
                     "result": state,
                 }))
             }
-            Method::ListSellers => {
-                let rendezvous_point = self
-                    .params
-                    .rendezvous_point
-                    .clone()
-                    .context("Parameter rendezvous_point is missing")?;
+            Method::ListSellers {rendezvous_point} => {
                 let rendezvous_node_peer_id = rendezvous_point
                     .extract_peer_id()
                     .context("Rendezvous node address must contain peer ID")?;
@@ -477,7 +459,7 @@ impl Request {
                         .context("Could not get Tor SOCKS5 port")?,
                     identity,
                 )
-                .await?;
+                    .await?;
 
                 for seller in &sellers {
                     match seller.status {
@@ -512,16 +494,14 @@ impl Request {
                 let wallet_export = bitcoin_wallet.wallet_export("cli").await?;
                 tracing::info!(descriptor=%wallet_export.to_string(), "Exported bitcoin wallet");
                 Ok(json!({
-                    "result": []
+                    "descriptor": wallet_export.to_string(),
                 }))
             }
-            Method::MoneroRecovery => {
+            Method::MoneroRecovery {swap_id} => {
                 let swap_state: BobState = context
                     .db
                     .get_state(
-                        self.params
-                            .swap_id
-                            .context("Parameter swap_id is missing")?,
+                        swap_id,
                     )
                     .await?
                     .try_into()?;
@@ -560,28 +540,71 @@ impl Request {
                 Ok(json!({
                     "result": []
                 }))
-            }
+            },
+            Method::GetCurrentSwap => {
+                Ok(json!({
+                    "swap_id": SWAP_LOCK.read().await.clone()
+                }))
+            },
+            Method::GetSwapExpiredTimelock { swap_id } => {
+                let swap_state: BobState = context
+                    .db
+                    .get_state(
+                        swap_id,
+                    )
+                    .await?
+                    .try_into()?;
+
+                let bitcoin_wallet = context.bitcoin_wallet.as_ref().context("Could not get Bitcoin wallet")?;
+
+                let timelock = match swap_state {
+                    BobState::Started { .. }
+                    | BobState::SafelyAborted
+                    | BobState::SwapSetupCompleted(_) => bail!("Bitcoin lock transaction has not been published yet"),
+                    BobState::BtcLocked { state3: state, .. }
+                    | BobState::XmrLockProofReceived { state, .. } => state.expired_timelock(bitcoin_wallet).await,
+                    BobState::XmrLocked(state)
+                    | BobState::EncSigSent(state) => state.expired_timelock(bitcoin_wallet).await,
+                    BobState::CancelTimelockExpired(state)
+                    | BobState::BtcCancelled(state) => state.expired_timelock(bitcoin_wallet).await,
+                    BobState::BtcPunished { .. } => Ok(ExpiredTimelocks::Punish),
+                    // swap is already finished
+                    BobState::BtcRefunded(_)
+                    | BobState::BtcRedeemed(_)
+                    | BobState::XmrRedeemed { .. } => bail!("Bitcoin have already been redeemed or refunded")
+                }?;
+
+                Ok(json!({
+                    "timelock": timelock,
+                }))
+            },
         }
     }
 
-    pub async fn call(&mut self, context: Arc<Context>) -> Result<serde_json::Value> {
+    pub async fn call(self, context: Arc<Context>) -> Result<serde_json::Value> {
         // If the swap ID is set, we add it to the span
-        let call_span = self.params.swap_id.map_or_else(
-            || {
-                debug_span!(
-                    "call",
-                    method = ?self.cmd,
-                )
-            },
-            |swap_id| {
-                debug_span!(
-                    "call",
-                    method = ?self.cmd,
-                    swap_id = swap_id.to_string(),
-                )
-            },
+        let call_span = debug_span!(
+            "cmd",
+            method = ?self.cmd,
         );
 
+        if let Some(swap_id) = self.has_lockable_swap_id() {
+            println!("taking lock for swap_id: {}", swap_id);
+            let mut guard = SWAP_LOCK.write().await;
+            if let Some(running_swap_id) = guard.as_ref() {
+                bail!("Another swap is already running: {}", running_swap_id);
+            }
+            let _ = guard.insert(swap_id.clone());
+            drop(guard);
+
+            let result = self.handle_cmd(context).instrument(call_span).await;
+
+            SWAP_LOCK.write().await.take();
+
+            println!("releasing lock for swap_id: {}", swap_id);
+
+            return result;
+        }
         self.handle_cmd(context).instrument(call_span).await
     }
 }
@@ -604,15 +627,15 @@ pub async fn determine_btc_to_swap<FB, TB, FMG, TMG, FS, TS, FFE, TFE>(
     sync: FS,
     estimate_fee: FFE,
 ) -> Result<(bitcoin::Amount, bitcoin::Amount)>
-where
-    TB: Future<Output = Result<bitcoin::Amount>>,
-    FB: Fn() -> TB,
-    TMG: Future<Output = Result<bitcoin::Amount>>,
-    FMG: Fn() -> TMG,
-    TS: Future<Output = Result<()>>,
-    FS: Fn() -> TS,
-    FFE: Fn(bitcoin::Amount) -> TFE,
-    TFE: Future<Output = Result<bitcoin::Amount>>,
+    where
+        TB: Future<Output = Result<bitcoin::Amount>>,
+        FB: Fn() -> TB,
+        TMG: Future<Output = Result<bitcoin::Amount>>,
+        FMG: Fn() -> TMG,
+        TS: Future<Output = Result<()>>,
+        FS: Fn() -> TS,
+        FFE: Fn(bitcoin::Amount) -> TFE,
+        TFE: Future<Output = Result<bitcoin::Amount>>,
 {
     tracing::debug!("Requesting quote");
     let bid_quote = bid_quote.await?;
@@ -687,3 +710,4 @@ where
 
     Ok((btc_swap_amount, fees))
 }
+

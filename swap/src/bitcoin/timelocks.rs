@@ -37,9 +37,13 @@ impl Add<u32> for BlockHeight {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExpiredTimelocks {
-    None,
-    Cancel,
+    None {
+        blocks_left: u32,
+    },
+    Cancel {
+        blocks_left: u32,
+    },
     Punish,
 }

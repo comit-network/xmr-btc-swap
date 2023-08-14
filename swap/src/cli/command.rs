@@ -1,4 +1,4 @@
-use crate::api::request::{Method, Params, Request};
+use crate::api::request::{Method, Request};
 use crate::api::Context;
 use crate::bitcoin::{bitcoin_address, Amount};
 use crate::monero;
@@ -79,13 +79,12 @@ where
                 bitcoin_address::validate(bitcoin_change_address, is_testnet)?;
 
             let request = Request::new(
-                Method::BuyXmr,
-                Params {
-                    bitcoin_change_address: Some(bitcoin_change_address),
-                    monero_receive_address: Some(monero_receive_address),
-                    seller: Some(seller),
-                    ..Default::default()
-                },
+                Method::BuyXmr {
+                    seller,
+                    bitcoin_change_address,
+                    monero_receive_address,
+                    swap_id: Uuid::new_v4(),
+                }
             );
 
             let context = Context::build(
@@ -103,21 +102,21 @@ where
             (context, request)
         }
         CliCommand::History => {
-            let request = Request::new(Method::History, Params::default());
+            let request = Request::new(Method::History);
 
             let context =
                 Context::build(None, None, None, data, is_testnet, debug, json, None, rx).await?;
             (context, request)
         }
         CliCommand::Config => {
-            let request = Request::new(Method::Config, Params::default());
+            let request = Request::new(Method::Config);
 
             let context =
                 Context::build(None, None, None, data, is_testnet, debug, json, None, rx).await?;
             (context, request)
         }
         CliCommand::Balance { bitcoin } => {
-            let request = Request::new(Method::Balance, Params::default());
+            let request = Request::new(Method::Balance);
 
             let context = Context::build(
                 Some(bitcoin),
@@ -140,11 +139,9 @@ where
             tor,
         } => {
             let request = Request::new(
-                Method::StartDaemon,
-                Params {
-                    server_address,
-                    ..Default::default()
-                },
+                Method::StartDaemon {
+                    server_address
+                }
             );
 
             let context = Context::build(
@@ -169,11 +166,9 @@ where
             let address = bitcoin_address::validate(address, is_testnet)?;
 
             let request = Request::new(
-                Method::WithdrawBtc,
-                Params {
+                Method::WithdrawBtc {
                     amount,
-                    address: Some(address),
-                    ..Default::default()
+                    address,
                 },
             );
 
@@ -198,11 +193,9 @@ where
             tor,
         } => {
             let request = Request::new(
-                Method::Resume,
-                Params {
-                    swap_id: Some(swap_id),
-                    ..Default::default()
-                },
+                Method::Resume {
+                    swap_id
+                }
             );
 
             let context = Context::build(
@@ -225,11 +218,9 @@ where
             tor,
         } => {
             let request = Request::new(
-                Method::CancelAndRefund,
-                Params {
-                    swap_id: Some(swap_id),
-                    ..Default::default()
-                },
+                Method::CancelAndRefund {
+                    swap_id
+                }
             );
 
             let context = Context::build(
@@ -251,11 +242,9 @@ where
             tor,
         } => {
             let request = Request::new(
-                Method::ListSellers,
-                Params {
-                    rendezvous_point: Some(rendezvous_point),
-                    ..Default::default()
-                },
+                Method::ListSellers {
+                    rendezvous_point
+                }
             );
 
             let context = Context::build(
@@ -276,7 +265,6 @@ where
         CliCommand::ExportBitcoinWallet { bitcoin } => {
             let request = Request::new(
                 Method::ExportBitcoinWallet,
-                Params::default(),
             );
 
             let context = Context::build(
@@ -297,11 +285,9 @@ where
             swap_id: SwapId { swap_id },
         } => {
             let request = Request::new(
-                Method::MoneroRecovery,
-                Params {
-                    swap_id: Some(swap_id),
-                    ..Default::default()
-                },
+                Method::MoneroRecovery {
+                    swap_id
+                }
             );
 
             let context =
