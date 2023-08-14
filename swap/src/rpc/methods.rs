@@ -159,7 +159,7 @@ async fn execute_request(
     cmd: Method,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let request = Request::new(context.shutdown.subscribe(), cmd);
+    let request = Request::new(cmd);
     request
         .call(Arc::clone(context))
         .await

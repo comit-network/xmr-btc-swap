@@ -12,7 +12,7 @@ use std::fmt;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Once};
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::{broadcast, Mutex, broadcast::Receiver, broadcast::Sender};
 use url::Url;
 
 static START: Once = Once::new();
@@ -30,6 +30,43 @@ pub struct Config {
     pub is_testnet: bool,
 }
 
+impl Shutdown {
+    pub fn new(listen: Receiver<()>) -> Shutdown {
+        let (notify, _) = broadcast::channel(16);
+        Shutdown {
+            shutdown: Mutex::new(false),
+            listen: Mutex::new(listen),
+            notify
+        }
+    }
+
+    /// Receive the shutdown notice, waiting if necessary.
+    pub async fn recv(&self) {
+        // If the shutdown signal has already been received, then return
+        // immediately.
+        let mut guard_shutdown = self.shutdown.lock().await;
+        if *guard_shutdown {
+            return;
+        }
+
+        let _ = self.listen.lock().await.recv().await;
+
+        // Remember that the signal has been received.
+        *guard_shutdown = true;
+
+        // Send shutdown request to child tasks
+
+    }
+}
+
+#[derive(Debug)]
+pub struct Shutdown {
+    shutdown: Mutex<bool>,
+    listen: Mutex<Receiver<()>>,
+    notify: Sender<()>,
+}
+
+
 // workaround for warning over monero_rpc_process which we must own but not read
 #[allow(dead_code)]
 pub struct Context {
@@ -37,9 +74,8 @@ pub struct Context {
     bitcoin_wallet: Option<Arc<bitcoin::Wallet>>,
     monero_wallet: Option<Arc<monero::Wallet>>,
     monero_rpc_process: Option<monero::WalletRpcProcess>,
-    running_swap: Arc<Mutex<bool>>,
     pub config: Config,
-    pub shutdown: Arc<broadcast::Sender<()>>,
+    pub shutdown: Arc<Shutdown>,
 }
 
 impl Context {
@@ -52,7 +88,7 @@ impl Context {
         debug: bool,
         json: bool,
         server_address: Option<SocketAddr>,
-        shutdown: broadcast::Sender<()>,
+        sender: broadcast::Sender<()>,
     ) -> Result<Context> {
         let data_dir = data::data_dir_from(data, is_testnet)?;
         let env_config = env_config_from(is_testnet);
@@ -112,8 +148,7 @@ impl Context {
                 is_testnet,
                 data_dir,
             },
-            shutdown: Arc::new(shutdown),
-            running_swap: Arc::new(Mutex::new(false)),
+            shutdown: Arc::new(Shutdown::new(sender.subscribe())),
         };
 
         Ok(context)
@@ -265,7 +300,6 @@ pub mod api_test {
             };
 
             Request::new(
-                tx.subscribe(),
                 Method::BuyXmr,
                 Params {
                     seller: Some(seller),
@@ -277,9 +311,8 @@ pub mod api_test {
             )
         }
 
-        pub fn resume(tx: broadcast::Sender<()>) -> Request {
+        pub fn resume() -> Request {
             Request::new(
-                tx.subscribe(),
                 Method::Resume,
                 Params {
                     swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
@@ -288,9 +321,8 @@ pub mod api_test {
             )
         }
 
-        pub fn cancel(tx: broadcast::Sender<()>) -> Request {
+        pub fn cancel() -> Request {
             Request::new(
-                tx.subscribe(),
                 Method::CancelAndRefund,
                 Params {
                     swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
@@ -299,9 +331,8 @@ pub mod api_test {
             )
         }
 
-        pub fn refund(tx: broadcast::Sender<()>) -> Request {
+        pub fn refund() -> Request {
             Request::new(
-                tx.subscribe(),
                 Method::CancelAndRefund,
                 Params {
                     swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),

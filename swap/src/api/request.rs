@@ -20,10 +20,9 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use structopt::lazy_static::lazy_static;
-use tokio::sync::broadcast::Receiver;
-use tokio::sync::RwLock;
 use tracing::{debug_span, Instrument};
 use uuid::Uuid;
+use tokio::sync::RwLock;
 
 lazy_static! {
     static ref SWAP_LOCK: RwLock<Option<Uuid>> = RwLock::new(None);
@@ -31,51 +30,9 @@ lazy_static! {
 
 #[derive(PartialEq, Debug)]
 pub struct Request {
-    pub cmd: Method,
-    pub shutdown: Shutdown,
+    pub cmd: Method
 }
 
-impl Shutdown {
-    pub fn new(notify: Receiver<()>) -> Shutdown {
-        Shutdown {
-            shutdown: false,
-            notify,
-        }
-    }
-
-    /// Returns `true` if the shutdown signal has been received.
-    pub fn is_shutdown(&self) -> bool {
-        self.shutdown
-    }
-
-    /// Receive the shutdown notice, waiting if necessary.
-    pub async fn recv(&mut self) {
-        // If the shutdown signal has already been received, then return
-        // immediately.
-        if self.shutdown {
-            return;
-        }
-
-        // Cannot receive a "lag error" as only one value is ever sent.
-        let _ = self.notify.recv().await;
-
-        self.shutdown = true;
-
-        // Remember that the signal has been received.
-    }
-}
-
-#[derive(Debug)]
-pub struct Shutdown {
-    shutdown: bool,
-    notify: Receiver<()>,
-}
-
-impl PartialEq for Shutdown {
-    fn eq(&self, other: &Shutdown) -> bool {
-        self.shutdown == other.shutdown
-    }
-}
 
 #[derive(Debug, PartialEq)]
 pub enum Method {
@@ -116,10 +73,9 @@ pub enum Method {
 }
 
 impl Request {
-    pub fn new(shutdownReceiver: Receiver<()>, cmd: Method) -> Request {
+    pub fn new(cmd: Method) -> Request {
         Request {
-            cmd,
-            shutdown: Shutdown::new(shutdownReceiver),
+            cmd
         }
     }
 
@@ -132,7 +88,7 @@ impl Request {
         }
     }
 
-    async fn handle_cmd(mut self, context: Arc<Context>) -> Result<serde_json::Value> {
+    async fn handle_cmd(self, context: Arc<Context>) -> Result<serde_json::Value> {
         match self.cmd {
             Method::GetSwapInfo { swap_id } => {
                 let bitcoin_wallet = context
@@ -287,17 +243,37 @@ impl Request {
                     bitcoin_change_address,
                     amount,
                 );
+                let mut halt = context.shutdown.notify.subscribe();
 
-                tokio::select! {
-                    result = event_loop => {
-                        result
-                            .context("EventLoop panicked")?;
-                    },
-                    result = bob::run(swap) => {
-                        result
-                            .context("Failed to complete swap")?;
+                // execution will halt if the server daemon is stopped or a cancel running swap
+                // request is sent
+                tokio::spawn(async move {
+                    tokio::select! {
+                        result = event_loop => {
+                            match result {
+                                Ok(_) => {
+                                    tracing::debug!(%swap_id, "EventLoop completed")
+                                }
+                                Err(error) => {
+                                    tracing::error!(%swap_id, "EventLoop failed: {:#}", error)
+                                }
+                            }
+                        },
+                        result = bob::run(swap) => {
+                            match result {
+                                Ok(state) => {
+                                    tracing::debug!(%swap_id, state=%state, "Swap completed")
+                                }
+                                Err(error) => {
+                                    tracing::error!(%swap_id, "Failed to complete swap: {:#}", error)
+                                }
+                            }
+                        }
+                        _ = halt.recv() => {
+                            tracing::debug!(%swap_id, "Swap cancel signal received while running swap")
+                        }
                     }
-                }
+                });
                 Ok(json!({
                     "empty": "true"
                 }))
@@ -314,6 +290,7 @@ impl Request {
             }
             Method::RawHistory => {
                 let raw_history = context.db.raw_all().await?;
+
                 Ok(json!({ "raw_history": raw_history }))
             }
             Method::Config => {
@@ -370,9 +347,11 @@ impl Request {
                     rpc::run_server(server_address, Arc::clone(&context)).await?;
 
                 loop {
+                    let shutdown = Arc::clone(&context.shutdown);
                     tokio::select! {
-                        _ = self.shutdown.recv() => {
+                        _ = shutdown.recv() => {
                             server_handle.stop()?;
+                            context.shutdown.notify.send(())?;
                             return Ok(json!({
                                 "result": []
                             }))
@@ -397,7 +376,7 @@ impl Request {
                     "balance": bitcoin_balance.to_sat()
                 }))
             }
-            Method::Resume { swap_id } => {
+            Method::Resume {swap_id} => {
                 let seller_peer_id = context.db.get_peer_id(swap_id).await?;
                 let seller_addresses = context.db.get_addresses(seller_peer_id).await?;
 
@@ -427,7 +406,7 @@ impl Request {
                         .context("Could not get Tor SOCKS5 port")?,
                     behaviour,
                 )
-                .await?;
+                    .await?;
                 let our_peer_id = swarm.local_peer_id();
 
                 tracing::debug!(peer_id = %our_peer_id, "Network layer initialized");
@@ -462,7 +441,7 @@ impl Request {
                     event_loop_handle,
                     monero_receive_address,
                 )
-                .await?;
+                    .await?;
 
                 tokio::select! {
                     event_loop_result = handle => {
@@ -476,7 +455,7 @@ impl Request {
                     "result": []
                 }))
             }
-            Method::CancelAndRefund { swap_id } => {
+            Method::CancelAndRefund {swap_id} => {
                 let bitcoin_wallet = context
                     .bitcoin_wallet
                     .as_ref()
@@ -487,7 +466,7 @@ impl Request {
                     Arc::clone(bitcoin_wallet),
                     Arc::clone(&context.db),
                 )
-                .await?;
+                    .await?;
 
                 Ok(json!({
                     "result": state,
@@ -515,7 +494,7 @@ impl Request {
                         .context("Could not get Tor SOCKS5 port")?,
                     identity,
                 )
-                .await?;
+                    .await?;
 
                 for seller in &sellers {
                     match seller.status {
