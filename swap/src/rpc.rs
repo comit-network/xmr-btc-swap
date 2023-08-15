@@ -26,7 +26,6 @@ pub async fn run_server(
 
     let addr = server.local_addr()?;
     let server_handle = server.start(modules)?;
-    tracing::info!(%addr, "Started RPC server");
 
     Ok((addr, server_handle))
 }

@@ -15,6 +15,12 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
     let mut module = RpcModule::new(context);
 
     module
+        .register_async_method("suspend_current_swap", |_, context| async move {
+            execute_request(Method::SuspendCurrentSwap, &context).await
+        })
+        .unwrap();
+
+    module
         .register_async_method("get_swap_info", |params, context| async move {
             let params: HashMap<String, Uuid> = params.parse()?;
 

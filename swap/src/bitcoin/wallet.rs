@@ -926,13 +926,16 @@ impl Confirmed {
     }
 
     pub fn meets_target<T>(&self, target: T) -> bool
-    where T: Into<u32>
+    where
+        T: Into<u32>,
     {
         self.confirmations() >= target.into()
     }
 
     pub fn blocks_left_until<T>(&self, target: T) -> u32
-    where T: Into<u32>, T: Copy
+    where
+        T: Into<u32>,
+        T: Copy,
     {
         if self.meets_target(target) {
             0
@@ -950,7 +953,8 @@ impl ScriptStatus {
 
     /// Check if the script has met the given confirmation target.
     pub fn is_confirmed_with<T>(&self, target: T) -> bool
-    where T: Into<u32>
+    where
+        T: Into<u32>,
     {
         match self {
             ScriptStatus::Confirmed(inner) => inner.meets_target(target),
@@ -960,12 +964,12 @@ impl ScriptStatus {
 
     // Calculate the number of blocks left until the target is met.
     pub fn blocks_left_until<T>(&self, target: T) -> u32
-    where T: Into<u32>, T: Copy
+    where
+        T: Into<u32>,
+        T: Copy,
     {
         match self {
-            ScriptStatus::Confirmed(inner) => {
-                inner.blocks_left_until(target)
-            }
+            ScriptStatus::Confirmed(inner) => inner.blocks_left_until(target),
             _ => target.into(),
         }
     }

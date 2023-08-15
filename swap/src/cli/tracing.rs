@@ -13,8 +13,7 @@ pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>) -> Result<()> {
     let level_filter = EnvFilter::try_new("swap=debug")?;
     let registry = Registry::default().with(level_filter);
 
-    let appender =
-        tracing_appender::rolling::never(dir.as_ref(), "swap-all.log");
+    let appender = tracing_appender::rolling::never(dir.as_ref(), "swap-all.log");
     let (appender, guard) = tracing_appender::non_blocking(appender);
 
     std::mem::forget(guard);
@@ -47,19 +46,11 @@ pub struct StdErrPrinter<L> {
     level: Level,
 }
 
-type StdErrLayer<S, T> = fmt::Layer<
-    S,
-    DefaultFields,
-    Format<fmt::format::Full, T>,
-    fn() -> std::io::Stderr,
->;
+type StdErrLayer<S, T> =
+    fmt::Layer<S, DefaultFields, Format<fmt::format::Full, T>, fn() -> std::io::Stderr>;
 
-type StdErrJsonLayer<S, T> = fmt::Layer<
-    S,
-    JsonFields,
-    Format<fmt::format::Json, T>,
-    fn() -> std::io::Stderr,
->;
+type StdErrJsonLayer<S, T> =
+    fmt::Layer<S, JsonFields, Format<fmt::format::Json, T>, fn() -> std::io::Stderr>;
 
 fn debug_terminal_printer<S>() -> StdErrPrinter<StdErrLayer<S, UtcTime<Rfc3339>>> {
     let is_terminal = atty::is(atty::Stream::Stderr);

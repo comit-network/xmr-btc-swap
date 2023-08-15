@@ -11,7 +11,6 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use structopt::{clap, StructOpt};
-use tokio::sync::broadcast;
 use url::Url;
 use uuid::Uuid;
 
@@ -42,10 +41,7 @@ pub enum ParseResult {
     PrintAndExitZero { message: String },
 }
 
-pub async fn parse_args_and_apply_defaults<I, T>(
-    raw_args: I,
-    rx: broadcast::Sender<()>,
-) -> Result<ParseResult>
+pub async fn parse_args_and_apply_defaults<I, T>(raw_args: I) -> Result<ParseResult>
 where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
@@ -78,14 +74,12 @@ where
             let bitcoin_change_address =
                 bitcoin_address::validate(bitcoin_change_address, is_testnet)?;
 
-            let request = Request::new(
-                Method::BuyXmr {
-                    seller,
-                    bitcoin_change_address,
-                    monero_receive_address,
-                    swap_id: Uuid::new_v4(),
-                }
-            );
+            let request = Request::new(Method::BuyXmr {
+                seller,
+                bitcoin_change_address,
+                monero_receive_address,
+                swap_id: Uuid::new_v4(),
+            });
 
             let context = Context::build(
                 Some(bitcoin),
@@ -96,7 +90,6 @@ where
                 debug,
                 json,
                 None,
-                rx,
             )
             .await?;
             (context, request)
@@ -105,14 +98,14 @@ where
             let request = Request::new(Method::History);
 
             let context =
-                Context::build(None, None, None, data, is_testnet, debug, json, None, rx).await?;
+                Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
             (context, request)
         }
         CliCommand::Config => {
             let request = Request::new(Method::Config);
 
             let context =
-                Context::build(None, None, None, data, is_testnet, debug, json, None, rx).await?;
+                Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
             (context, request)
         }
         CliCommand::Balance { bitcoin } => {
@@ -127,7 +120,6 @@ where
                 debug,
                 json,
                 None,
-                rx,
             )
             .await?;
             (context, request)
@@ -138,11 +130,7 @@ where
             monero,
             tor,
         } => {
-            let request = Request::new(
-                Method::StartDaemon {
-                    server_address
-                }
-            );
+            let request = Request::new(Method::StartDaemon { server_address });
 
             let context = Context::build(
                 Some(bitcoin),
@@ -153,7 +141,6 @@ where
                 debug,
                 json,
                 server_address,
-                rx,
             )
             .await?;
             (context, request)
@@ -165,12 +152,7 @@ where
         } => {
             let address = bitcoin_address::validate(address, is_testnet)?;
 
-            let request = Request::new(
-                Method::WithdrawBtc {
-                    amount,
-                    address,
-                },
-            );
+            let request = Request::new(Method::WithdrawBtc { amount, address });
 
             let context = Context::build(
                 Some(bitcoin),
@@ -181,7 +163,6 @@ where
                 debug,
                 json,
                 None,
-                rx,
             )
             .await?;
             (context, request)
@@ -192,11 +173,7 @@ where
             monero,
             tor,
         } => {
-            let request = Request::new(
-                Method::Resume {
-                    swap_id
-                }
-            );
+            let request = Request::new(Method::Resume { swap_id });
 
             let context = Context::build(
                 Some(bitcoin),
@@ -207,7 +184,6 @@ where
                 debug,
                 json,
                 None,
-                rx,
             )
             .await?;
             (context, request)
@@ -217,11 +193,7 @@ where
             bitcoin,
             tor,
         } => {
-            let request = Request::new(
-                Method::CancelAndRefund {
-                    swap_id
-                }
-            );
+            let request = Request::new(Method::CancelAndRefund { swap_id });
 
             let context = Context::build(
                 Some(bitcoin),
@@ -232,7 +204,6 @@ where
                 debug,
                 json,
                 None,
-                rx,
             )
             .await?;
             (context, request)
@@ -241,31 +212,15 @@ where
             rendezvous_point,
             tor,
         } => {
-            let request = Request::new(
-                Method::ListSellers {
-                    rendezvous_point
-                }
-            );
+            let request = Request::new(Method::ListSellers { rendezvous_point });
 
-            let context = Context::build(
-                None,
-                None,
-                Some(tor),
-                data,
-                is_testnet,
-                debug,
-                json,
-                None,
-                rx,
-            )
-            .await?;
+            let context =
+                Context::build(None, None, Some(tor), data, is_testnet, debug, json, None).await?;
 
             (context, request)
         }
         CliCommand::ExportBitcoinWallet { bitcoin } => {
-            let request = Request::new(
-                Method::ExportBitcoinWallet,
-            );
+            let request = Request::new(Method::ExportBitcoinWallet);
 
             let context = Context::build(
                 Some(bitcoin),
@@ -276,7 +231,6 @@ where
                 debug,
                 json,
                 None,
-                rx,
             )
             .await?;
             (context, request)
@@ -284,14 +238,10 @@ where
         CliCommand::MoneroRecovery {
             swap_id: SwapId { swap_id },
         } => {
-            let request = Request::new(
-                Method::MoneroRecovery {
-                    swap_id
-                }
-            );
+            let request = Request::new(Method::MoneroRecovery { swap_id });
 
             let context =
-                Context::build(None, None, None, data, is_testnet, debug, json, None, rx).await?;
+                Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
 
             (context, request)
         }
@@ -570,15 +520,12 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, false);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, None, debug, json),
-            Request::buy_xmr(is_testnet, tx.clone()),
+            Request::buy_xmr(is_testnet),
         );
 
         let (actual_config, actual_request) = match args {
@@ -605,15 +552,12 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, None, debug, json),
-            Request::buy_xmr(is_testnet, tx.clone()),
+            Request::buy_xmr(is_testnet),
         );
 
         let (actual_config, actual_request) = match args {
@@ -639,10 +583,7 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let (tx, _) = broadcast::channel(1);
-        let err = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap_err();
+        let err = parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
 
         assert_eq!(
             err.downcast_ref::<MoneroAddressNetworkMismatch>().unwrap(),
@@ -668,10 +609,7 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let (tx, _) = broadcast::channel(1);
-        let err = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap_err();
+        let err = parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
 
         assert_eq!(
             err.downcast_ref::<MoneroAddressNetworkMismatch>().unwrap(),
@@ -687,15 +625,12 @@ mod tests {
     async fn given_resume_on_mainnet_then_defaults_to_mainnet() {
         let raw_ars = vec![BINARY_NAME, "resume", "--swap-id", SWAP_ID];
 
-        let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, false);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, None, debug, json),
-            Request::resume(tx.clone()),
+            Request::resume(),
         );
 
         let (actual_config, actual_request) = match args {
@@ -713,14 +648,12 @@ mod tests {
         let raw_ars = vec![BINARY_NAME, "--testnet", "resume", "--swap-id", SWAP_ID];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, None, debug, json),
-            Request::resume(tx.clone()),
+            Request::resume(),
         );
 
         let (actual_config, actual_request) = match args {
@@ -738,15 +671,13 @@ mod tests {
         let raw_ars = vec![BINARY_NAME, "cancel", "--swap-id", SWAP_ID];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
 
         let (is_testnet, debug, json) = (false, false, false);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, None, debug, json),
-            Request::cancel(tx.clone()),
+            Request::cancel(),
         );
 
         let (actual_config, actual_request) = match args {
@@ -764,14 +695,12 @@ mod tests {
         let raw_ars = vec![BINARY_NAME, "--testnet", "cancel", "--swap-id", SWAP_ID];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, None, debug, json),
-            Request::cancel(tx.clone()),
+            Request::cancel(),
         );
 
         let (actual_config, actual_request) = match args {
@@ -789,14 +718,12 @@ mod tests {
         let raw_ars = vec![BINARY_NAME, "refund", "--swap-id", SWAP_ID];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, false);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, None, debug, json),
-            Request::refund(tx.clone()),
+            Request::refund(),
         );
 
         let (actual_config, actual_request) = match args {
@@ -814,14 +741,12 @@ mod tests {
         let raw_ars = vec![BINARY_NAME, "--testnet", "refund", "--swap-id", SWAP_ID];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, None, debug, json),
-            Request::refund(tx.clone()),
+            Request::refund(),
         );
 
         let (actual_config, actual_request) = match args {
@@ -850,15 +775,13 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, false);
         let data_dir = PathBuf::from_str(ARGS_DATA_DIR).unwrap();
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, Some(data_dir.clone()), debug, json),
-            Request::buy_xmr(is_testnet, tx.clone()),
+            Request::buy_xmr(is_testnet),
         );
 
         let (actual_config, actual_request) = match args {
@@ -889,14 +812,12 @@ mod tests {
 
         let (tx, _) = broadcast::channel(1);
         let data_dir = PathBuf::from_str(ARGS_DATA_DIR).unwrap();
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, Some(data_dir.clone()), debug, json),
-            Request::buy_xmr(is_testnet, tx.clone()),
+            Request::buy_xmr(is_testnet),
         );
 
         let (actual_config, actual_request) = match args {
@@ -922,14 +843,12 @@ mod tests {
 
         let (tx, _) = broadcast::channel(1);
         let data_dir = PathBuf::from_str(ARGS_DATA_DIR).unwrap();
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, false);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, Some(data_dir.clone()), debug, json),
-            Request::resume(tx.clone()),
+            Request::resume(),
         );
 
         let (actual_config, actual_request) = match args {
@@ -956,14 +875,12 @@ mod tests {
 
         let (tx, _) = broadcast::channel(1);
         let data_dir = PathBuf::from_str(ARGS_DATA_DIR).unwrap();
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, Some(data_dir.clone()), debug, json),
-            Request::resume(tx.clone()),
+            Request::resume(),
         );
 
         let (actual_config, actual_request) = match args {
@@ -991,14 +908,12 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, true, false);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, None, debug, json),
-            Request::buy_xmr(is_testnet, tx.clone()),
+            Request::buy_xmr(is_testnet),
         );
 
         let (actual_config, actual_request) = match args {
@@ -1027,14 +942,12 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, true, false);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, None, debug, json),
-            Request::buy_xmr(is_testnet, tx.clone()),
+            Request::buy_xmr(is_testnet),
         );
 
         let (actual_config, actual_request) = match args {
@@ -1052,14 +965,12 @@ mod tests {
         let raw_ars = vec![BINARY_NAME, "--debug", "resume", "--swap-id", SWAP_ID];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, true, false);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, None, debug, json),
-            Request::resume(tx.clone()),
+            Request::resume(),
         );
 
         let (actual_config, actual_request) = match args {
@@ -1084,14 +995,12 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, true, false);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, None, debug, json),
-            Request::resume(tx.clone()),
+            Request::resume(),
         );
 
         let (actual_config, actual_request) = match args {
@@ -1119,15 +1028,13 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, true);
         let data_dir = data_dir_path_cli(is_testnet);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, None, debug, json),
-            Request::buy_xmr(is_testnet, tx.clone()),
+            Request::buy_xmr(is_testnet),
         );
 
         let (actual_config, actual_request) = match args {
@@ -1156,14 +1063,12 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, true);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, None, debug, json),
-            Request::buy_xmr(is_testnet, tx.clone()),
+            Request::buy_xmr(is_testnet),
         );
 
         let (actual_config, actual_request) = match args {
@@ -1180,14 +1085,12 @@ mod tests {
     async fn given_resume_on_mainnet_with_json_then_json_set() {
         let (tx, _) = broadcast::channel(1);
         let raw_ars = vec![BINARY_NAME, "--json", "resume", "--swap-id", SWAP_ID];
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, true);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, None, debug, json),
-            Request::resume(tx.clone()),
+            Request::resume(),
         );
 
         let (actual_config, actual_request) = match args {
@@ -1212,14 +1115,12 @@ mod tests {
         ];
 
         let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, true);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, None, debug, json),
-            Request::resume(tx.clone()),
+            Request::resume(),
         );
 
         let (actual_config, actual_request) = match args {
@@ -1245,9 +1146,7 @@ mod tests {
             MULTI_ADDRESS,
         ];
         let (tx, _) = broadcast::channel(1);
-        let result = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap_err();
+        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -1259,9 +1158,7 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap_err();
+        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -1273,9 +1170,7 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         assert!(matches!(result, ParseResult::Context(_, _)));
     }
 
@@ -1294,9 +1189,7 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap_err();
+        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -1309,9 +1202,7 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap_err();
+        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -1324,9 +1215,7 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars, tx.clone())
-            .await
-            .unwrap();
+        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         assert!(matches!(result, ParseResult::Context(_, _)));
     }
 
