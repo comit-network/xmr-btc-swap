@@ -22,6 +22,7 @@ use std::time::Duration;
 use tracing::{debug_span, Instrument, Span, field};
 use uuid::Uuid;
 
+//TODO: Request and Method can be combined into a single enum
 #[derive(PartialEq, Debug)]
 pub struct Request {
     pub cmd: Method,
