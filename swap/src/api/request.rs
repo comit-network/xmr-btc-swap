@@ -160,7 +160,6 @@ impl Request {
 
                 let state_name = format!("{:?}", swap_state);
 
-                // variable timelock: Option<Result<ExpiredTimelocks>>
                 let timelock = match swap_state {
                     BobState::Started { .. }
                     | BobState::SafelyAborted
@@ -182,7 +181,7 @@ impl Request {
                     | BobState::XmrRedeemed { .. } => None,
                 };
 
-                // Add txids
+                // TODO: Add relevant txids
                 Ok(json!({
                     "seller": {
                         "peerId": peerId.to_string(),
