@@ -22,7 +22,6 @@ pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>) -> Result<()> {
         fmt::layer()
             .with_ansi(false)
             .with_target(false)
-            .with_span_events(fmt::format::FmtSpan::FULL)
             .json()
             .with_writer(appender),
     );
