@@ -19,7 +19,7 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug_span, Instrument, Span, field};
+use tracing::{debug_span, field, Instrument, Span};
 use uuid::Uuid;
 
 //TODO: Request and Method can be combined into a single enum
@@ -71,7 +71,9 @@ pub enum Method {
 impl Method {
     fn get_tracing_span(&self, log_reference_id: Option<String>) -> Span {
         let span = match self {
-            Method::Balance => debug_span!("method", name = "Balance", log_reference_id=field::Empty),
+            Method::Balance => {
+                debug_span!("method", name = "Balance", log_reference_id = field::Empty)
+            }
             Method::BuyXmr { swap_id, .. } => {
                 debug_span!("method", name="BuyXmr", swap_id=%swap_id, log_reference_id=field::Empty)
             }
@@ -81,32 +83,72 @@ impl Method {
             Method::Resume { swap_id } => {
                 debug_span!("method", name="Resume", swap_id=%swap_id, log_reference_id=field::Empty)
             }
-            Method::Config => debug_span!("method", name = "Config", log_reference_id=field::Empty),
+            Method::Config => {
+                debug_span!("method", name = "Config", log_reference_id = field::Empty)
+            }
             Method::ExportBitcoinWallet => {
-                debug_span!("method", name = "ExportBitcoinWallet", log_reference_id=field::Empty)
+                debug_span!(
+                    "method",
+                    name = "ExportBitcoinWallet",
+                    log_reference_id = field::Empty
+                )
             }
             Method::GetCurrentSwap => {
-                debug_span!("method", name = "GetCurrentSwap", log_reference_id=field::Empty)
+                debug_span!(
+                    "method",
+                    name = "GetCurrentSwap",
+                    log_reference_id = field::Empty
+                )
             }
             Method::GetSwapInfo { .. } => {
-                debug_span!("method", name = "GetSwapInfo", log_reference_id=field::Empty)
+                debug_span!(
+                    "method",
+                    name = "GetSwapInfo",
+                    log_reference_id = field::Empty
+                )
             }
-            Method::History => debug_span!("method", name = "History", log_reference_id=field::Empty),
+            Method::History => {
+                debug_span!("method", name = "History", log_reference_id = field::Empty)
+            }
             Method::ListSellers { .. } => {
-                debug_span!("method", name = "ListSellers", log_reference_id=field::Empty)
+                debug_span!(
+                    "method",
+                    name = "ListSellers",
+                    log_reference_id = field::Empty
+                )
             }
             Method::MoneroRecovery { .. } => {
-                debug_span!("method", name = "MoneroRecovery", log_reference_id=field::Empty)
+                debug_span!(
+                    "method",
+                    name = "MoneroRecovery",
+                    log_reference_id = field::Empty
+                )
             }
-            Method::RawHistory => debug_span!("method", name = "RawHistory", log_reference_id=field::Empty),
+            Method::RawHistory => debug_span!(
+                "method",
+                name = "RawHistory",
+                log_reference_id = field::Empty
+            ),
             Method::StartDaemon { .. } => {
-                debug_span!("method", name = "StartDaemon", log_reference_id=field::Empty)
+                debug_span!(
+                    "method",
+                    name = "StartDaemon",
+                    log_reference_id = field::Empty
+                )
             }
             Method::SuspendCurrentSwap => {
-                debug_span!("method", name = "SuspendCurrentSwap", log_reference_id=field::Empty)
+                debug_span!(
+                    "method",
+                    name = "SuspendCurrentSwap",
+                    log_reference_id = field::Empty
+                )
             }
             Method::WithdrawBtc { .. } => {
-                debug_span!("method", name = "WithdrawBtc", log_reference_id=field::Empty)
+                debug_span!(
+                    "method",
+                    name = "WithdrawBtc",
+                    log_reference_id = field::Empty
+                )
             }
         };
         if let Some(log_reference_id) = log_reference_id {
@@ -118,11 +160,17 @@ impl Method {
 
 impl Request {
     pub fn new(cmd: Method) -> Request {
-        Request { cmd, log_reference: None }
+        Request {
+            cmd,
+            log_reference: None,
+        }
     }
 
     pub fn with_id(cmd: Method, id: Option<String>) -> Request {
-        Request { cmd, log_reference: id }
+        Request {
+            cmd,
+            log_reference: id,
+        }
     }
 
     // We pass the outer tracing span down to this function such that it can be passed down to other spawned tokio tasks
@@ -699,21 +747,21 @@ pub async fn determine_btc_to_swap<FB, TB, FMG, TMG, FS, TS, FFE, TFE>(
     max_giveable_fn: FMG,
     sync: FS,
     estimate_fee: FFE,
-) -> Result<(bitcoin::Amount, bitcoin::Amount)>
+) -> Result<(Amount, Amount)>
 where
-    TB: Future<Output = Result<bitcoin::Amount>>,
+    TB: Future<Output = Result<Amount>>,
     FB: Fn() -> TB,
-    TMG: Future<Output = Result<bitcoin::Amount>>,
+    TMG: Future<Output = Result<Amount>>,
     FMG: Fn() -> TMG,
     TS: Future<Output = Result<()>>,
     FS: Fn() -> TS,
-    FFE: Fn(bitcoin::Amount) -> TFE,
-    TFE: Future<Output = Result<bitcoin::Amount>>,
+    FFE: Fn(Amount) -> TFE,
+    TFE: Future<Output = Result<Amount>>,
 {
     tracing::debug!("Requesting quote");
     let bid_quote = bid_quote.await?;
 
-    if bid_quote.max_quantity == bitcoin::Amount::ZERO {
+    if bid_quote.max_quantity == Amount::ZERO {
         bail!(ZeroQuoteReceived)
     }
 
@@ -724,9 +772,10 @@ where
         "Received quote",
     );
 
+    sync().await?;
     let mut max_giveable = max_giveable_fn().await?;
 
-    if max_giveable == bitcoin::Amount::ZERO || max_giveable < bid_quote.min_quantity {
+    if max_giveable == Amount::ZERO || max_giveable < bid_quote.min_quantity {
         let deposit_address = get_new_address.await?;
         let minimum_amount = bid_quote.min_quantity;
         let maximum_amount = bid_quote.max_quantity;
