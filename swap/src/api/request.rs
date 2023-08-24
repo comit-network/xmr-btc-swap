@@ -177,7 +177,6 @@ impl Request {
     async fn handle_cmd(
         self,
         context: Arc<Context>,
-        tracing_span: Span,
     ) -> Result<serde_json::Value> {
         match self.cmd {
             Method::SuspendCurrentSwap => {
@@ -263,8 +262,6 @@ impl Request {
             } => {
                 context.swap_lock.acquire_swap_lock(swap_id).await?;
 
-                let tracing_span_clone = tracing_span.clone();
-
                 tokio::spawn(async move {
                     tokio::select! {
                         biased;
@@ -309,7 +306,7 @@ impl Request {
 
                             let (event_loop, mut event_loop_handle) =
                                 EventLoop::new(swap_id, swarm, seller_peer_id)?;
-                            let event_loop = tokio::spawn(event_loop.run().instrument(tracing_span_clone.clone()));
+                            let event_loop = tokio::spawn(event_loop.run().instrument(Span::current()));
 
                             let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
                             let estimate_fee = |amount| bitcoin_wallet.estimate_fee(TxLock::weight(), amount);
@@ -392,7 +389,7 @@ impl Request {
                         .release_swap_lock()
                         .await
                         .expect("Could not release swap lock");
-                }.instrument(tracing_span));
+                }.instrument(Span::current()));
 
                 Ok(json!({
                     "swapId": swap_id.to_string(),
@@ -400,7 +397,6 @@ impl Request {
             }
             Method::Resume { swap_id } => {
                 context.swap_lock.acquire_swap_lock(swap_id).await?;
-                let tracing_span_clone = tracing_span.clone();
 
                 tokio::spawn(async move {
                     tokio::select! {
@@ -447,7 +443,7 @@ impl Request {
 
                              let (event_loop, event_loop_handle) =
                                  EventLoop::new(swap_id, swarm, seller_peer_id)?;
-                             let handle = tokio::spawn(event_loop.run().instrument(tracing_span_clone));
+                             let handle = tokio::spawn(event_loop.run().instrument(Span::current()));
 
                              let monero_receive_address = context.db.get_monero_address(swap_id).await?;
                              let swap = Swap::from_db(
@@ -493,7 +489,7 @@ impl Request {
                         .release_swap_lock()
                         .await
                         .expect("Could not release swap lock");
-                }.instrument(tracing_span));
+                }.instrument(Span::current()));
                 Ok(json!({
                     "result": "ok",
                 }))
@@ -723,9 +719,9 @@ impl Request {
     }
 
     pub async fn call(self, context: Arc<Context>) -> Result<serde_json::Value> {
-        let method_span = self.cmd.get_tracing_span(self.log_reference.clone());
+        let method_span = self.cmd.get_tracing_span(self.log_reference.clone()).clone();
 
-        self.handle_cmd(context, method_span.clone())
+        self.handle_cmd(context)
             .instrument(method_span)
             .await
     }

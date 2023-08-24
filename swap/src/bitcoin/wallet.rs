@@ -24,6 +24,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{watch, Mutex};
+use tracing::{Instrument, Span};
 
 const SLED_TREE_NAME: &str = "default_tree";
 
@@ -192,7 +193,7 @@ impl Wallet {
 
                         tokio::time::sleep(Duration::from_secs(5)).await;
                     }
-                });
+                }.instrument(Span::current()));
 
                 Subscription {
                     receiver,
