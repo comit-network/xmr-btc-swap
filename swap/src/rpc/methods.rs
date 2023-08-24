@@ -5,11 +5,11 @@ use crate::monero::monero_address;
 use crate::{bitcoin, monero};
 use anyhow::Result;
 use jsonrpsee::server::RpcModule;
+use jsonrpsee::types::Params;
 use libp2p::core::Multiaddr;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
-use jsonrpsee::types::Params;
 use uuid::Uuid;
 
 pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
@@ -31,11 +31,10 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
 
             execute_request(
                 params_raw,
-                Method::GetSwapInfo {
-                    swap_id: *swap_id,
-                },
+                Method::GetSwapInfo { swap_id: *swap_id },
                 &context,
-            ).await
+            )
+            .await
         })
         .unwrap();
 
@@ -65,13 +64,7 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
                 jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string())
             })?;
 
-            execute_request(
-                params_raw,
-                Method::Resume {
-                    swap_id: *swap_id,
-                },
-                &context,
-            ).await
+            execute_request(params_raw, Method::Resume { swap_id: *swap_id }, &context).await
         })
         .unwrap();
 
@@ -85,11 +78,10 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
 
             execute_request(
                 params_raw,
-                Method::CancelAndRefund {
-                    swap_id: *swap_id,
-                },
+                Method::CancelAndRefund { swap_id: *swap_id },
                 &context,
-            ).await
+            )
+            .await
         })
         .unwrap();
 
@@ -123,7 +115,8 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
                     address: withdraw_address,
                 },
                 &context,
-            ).await
+            )
+            .await
         })
         .expect("Could not register RPC method withdraw_btc");
     module
@@ -168,7 +161,8 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
                     swap_id: Uuid::new_v4(),
                 },
                 &context,
-            ).await
+            )
+            .await
         })
         .unwrap();
     module
@@ -184,7 +178,8 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
                     rendezvous_point: rendezvous_point.clone(),
                 },
                 &context,
-            ).await
+            )
+            .await
         })
         .unwrap();
 
@@ -202,11 +197,11 @@ async fn execute_request(
     cmd: Method,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let params_parsed = params.parse::<HashMap<String, String>>()
+    let params_parsed = params
+        .parse::<HashMap<String, String>>()
         .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
 
-    let reference_id = params_parsed
-        .get("log_reference_id");
+    let reference_id = params_parsed.get("log_reference_id");
 
     let request = Request::with_id(cmd, reference_id.map(|s| s.clone()));
     request
