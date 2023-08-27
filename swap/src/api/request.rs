@@ -173,12 +173,7 @@ impl Request {
         }
     }
 
-    // We pass the outer tracing span down to this function such that it can be passed down to other spawned tokio tasks
-    // This ensures that tasks like the event_loop are all part of the same tracing span
-    async fn handle_cmd(
-        self,
-        context: Arc<Context>,
-    ) -> Result<serde_json::Value> {
+    async fn handle_cmd(self, context: Arc<Context>) -> Result<serde_json::Value> {
         match self.cmd {
             Method::SuspendCurrentSwap => {
                 let swap_id = context.swap_lock.get_current_swap_id().await;
@@ -679,40 +674,28 @@ impl Request {
             Method::MoneroRecovery { swap_id } => {
                 let swap_state: BobState = context.db.get_state(swap_id).await?.try_into()?;
 
-                match swap_state {
-                    BobState::Started { .. }
-                    | BobState::SwapSetupCompleted(_)
-                    | BobState::BtcLocked { .. }
-                    | BobState::XmrLockProofReceived { .. }
-                    | BobState::XmrLocked(_)
-                    | BobState::EncSigSent(_)
-                    | BobState::CancelTimelockExpired(_)
-                    | BobState::BtcCancelled(_)
-                    | BobState::BtcRefunded(_)
-                    | BobState::BtcPunished { .. }
-                    | BobState::SafelyAborted
-                    | BobState::XmrRedeemed { .. } => {
-                        bail!("Cannot print monero recovery information in state {}, only possible for BtcRedeemed", swap_state)
-                    }
-                    BobState::BtcRedeemed(state5) => {
-                        let (spend_key, view_key) = state5.xmr_keys();
+                if let BobState::BtcRedeemed(state5) = swap_state {
+                    let (spend_key, view_key) = state5.xmr_keys();
 
-                        let address = monero::Address::standard(
-                            context.config.env_config.monero_network,
-                            monero::PublicKey::from_private_key(&spend_key),
-                            monero::PublicKey::from(view_key.public()),
-                        );
-                        tracing::info!("Wallet address: {}", address.to_string());
+                    let address = monero::Address::standard(
+                        context.config.env_config.monero_network,
+                        monero::PublicKey::from_private_key(&spend_key),
+                        monero::PublicKey::from(view_key.public()),
+                    );
 
-                        let view_key = serde_json::to_string(&view_key)?;
-                        println!("View key: {}", view_key);
+                    tracing::info!(address=%address, spend_key=%spend_key, view_key=%view_key, "Monero recovery information");
 
-                        println!("Spend key: {}", spend_key);
-                    }
+                    return Ok(json!({
+                        "address": address,
+                        "spend_key": spend_key.to_string(),
+                        "view_key": view_key.to_string(),
+                    }));
+                } else {
+                    bail!(
+                        "Cannot print monero recovery information in state {}, only possible for BtcRedeemed",
+                        swap_state
+                    )
                 }
-                Ok(json!({
-                    "result": []
-                }))
             }
             Method::GetCurrentSwap => Ok(json!({
                 "swap_id": context.swap_lock.get_current_swap_id().await
@@ -721,11 +704,12 @@ impl Request {
     }
 
     pub async fn call(self, context: Arc<Context>) -> Result<serde_json::Value> {
-        let method_span = self.cmd.get_tracing_span(self.log_reference.clone()).clone();
+        let method_span = self
+            .cmd
+            .get_tracing_span(self.log_reference.clone())
+            .clone();
 
-        self.handle_cmd(context)
-            .instrument(method_span)
-            .await
+        self.handle_cmd(context).instrument(method_span).await
     }
 }
 
