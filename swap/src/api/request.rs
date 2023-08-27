@@ -36,27 +36,27 @@ pub enum Method {
         monero_receive_address: monero::Address,
         swap_id: Uuid,
     },
-    History,
-    RawHistory,
-    Config,
-    WithdrawBtc {
-        amount: Option<Amount>,
-        address: bitcoin::Address,
-    },
-    Balance,
     Resume {
         swap_id: Uuid,
     },
     CancelAndRefund {
         swap_id: Uuid,
     },
+    MoneroRecovery {
+        swap_id: Uuid,
+    },
+    History,
+    Config,
+    WithdrawBtc {
+        amount: Option<Amount>,
+        address: bitcoin::Address,
+    },
+    Balance,
     ListSellers {
         rendezvous_point: Multiaddr,
     },
     ExportBitcoinWallet,
-    MoneroRecovery {
-        swap_id: Uuid,
-    },
+    SuspendCurrentSwap,
     StartDaemon {
         server_address: Option<SocketAddr>,
     },
@@ -64,7 +64,7 @@ pub enum Method {
     GetSwapInfo {
         swap_id: Uuid,
     },
-    SuspendCurrentSwap,
+    GetRawStates,
 }
 
 impl Method {
@@ -123,7 +123,7 @@ impl Method {
                     log_reference_id = field::Empty
                 )
             }
-            Method::RawHistory => debug_span!(
+            Method::GetRawStates => debug_span!(
                 "method",
                 name = "RawHistory",
                 log_reference_id = field::Empty
@@ -526,7 +526,7 @@ impl Request {
 
                 Ok(json!({ "swaps": vec }))
             }
-            Method::RawHistory => {
+            Method::GetRawStates => {
                 let raw_history = context.db.raw_all().await?;
 
                 Ok(json!({ "raw_history": raw_history }))
