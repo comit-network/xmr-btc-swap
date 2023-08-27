@@ -86,6 +86,26 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
         .unwrap();
 
     module
+        .register_async_method(
+            "get_monero_recovery_info",
+            |params_raw, context| async move {
+                let params: HashMap<String, Uuid> = params_raw.parse()?;
+
+                let swap_id = params.get("swap_id").ok_or_else(|| {
+                    jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string())
+                })?;
+
+                execute_request(
+                    params_raw,
+                    Method::MoneroRecovery { swap_id: *swap_id },
+                    &context,
+                )
+                .await
+            },
+        )
+        .unwrap();
+
+    module
         .register_async_method("withdraw_btc", |params_raw, context| async move {
             let params: HashMap<String, String> = params_raw.parse()?;
 
@@ -118,7 +138,8 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
             )
             .await
         })
-        .expect("Could not register RPC method withdraw_btc");
+        .unwrap();
+
     module
         .register_async_method("buy_xmr", |params_raw, context| async move {
             let params: HashMap<String, String> = params_raw.parse()?;
@@ -165,6 +186,7 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
             .await
         })
         .unwrap();
+
     module
         .register_async_method("list_sellers", |params_raw, context| async move {
             let params: HashMap<String, Multiaddr> = params_raw.parse()?;
