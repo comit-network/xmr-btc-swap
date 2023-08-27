@@ -17,11 +17,9 @@ use std::env;
 use std::sync::Arc;
 use swap::cli::command::{parse_args_and_apply_defaults, ParseResult};
 use swap::common::check_latest_version;
-use tokio::sync::broadcast;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let (tx, _) = broadcast::channel(1);
     let (context, request) = match parse_args_and_apply_defaults(env::args_os()).await? {
         ParseResult::Context(context, request) => (context, request),
         ParseResult::PrintAndExitZero { message } => {
@@ -34,7 +32,6 @@ async fn main() -> Result<()> {
         eprintln!("{}", e);
     }
     let _result = request.call(Arc::clone(&context)).await?;
-    tx.send(())?;
     Ok(())
 }
 
