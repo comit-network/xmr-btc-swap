@@ -143,6 +143,7 @@ pub trait Database {
     async fn get_swap_start_date(&self, swap_id: Uuid) -> Result<String>;
     async fn insert_latest_state(&self, swap_id: Uuid, state: State) -> Result<()>;
     async fn get_state(&self, swap_id: Uuid) -> Result<State>;
+    async fn get_states(&self, swap_id: Uuid) -> Result<Vec<State>>;
     async fn all(&self) -> Result<Vec<(Uuid, State)>>;
     async fn raw_all(&self) -> Result<HashMap<Uuid, Vec<serde_json::Value>>>;
 }

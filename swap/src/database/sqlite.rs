@@ -5,7 +5,7 @@ use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use libp2p::{Multiaddr, PeerId};
 use sqlx::sqlite::Sqlite;
-use sqlx::{Pool, SqlitePool};
+use sqlx::{Pool, Row, SqlitePool};
 use std::collections::HashMap;
 use std::path::Path;
 use std::str::FromStr;
@@ -266,6 +266,39 @@ impl Database for SqliteDatabase {
                 Ok((swap_id, state))
             })
             .collect::<Result<Vec<(Uuid, State)>>>();
+
+        result
+    }
+
+    async fn get_states(&self, swap_id: Uuid) -> Result<Vec<State>> {
+        let mut conn = self.pool.acquire().await?;
+        let swap_id = swap_id.to_string();
+
+        // TODO: We should use query! instead of query here to allow for at-compile-time validation
+        // I didn't manage to generate the mappings for the query! macro because of problems with sqlx-cli
+        let rows = sqlx::query(
+            r#"
+           SELECT state
+           FROM swap_states
+           WHERE swap_id = ?
+        "#,
+        )
+        .bind(swap_id)
+        .fetch_all(&mut conn)
+        .await?;
+
+        let result = rows
+            .iter()
+            .map(|row| {
+                let state_str: &str = row.try_get("state")?;
+
+                let state = match serde_json::from_str::<Swap>(state_str) {
+                    Ok(a) => Ok(State::from(a)),
+                    Err(e) => Err(e),
+                }?;
+                Ok(state)
+            })
+            .collect::<Result<Vec<State>>>();
 
         result
     }
