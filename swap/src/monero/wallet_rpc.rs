@@ -8,9 +8,11 @@ use reqwest::Url;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::sync::Arc;
 use tokio::fs::{remove_file, OpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
+use tokio::sync::Mutex;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tokio_util::io::StreamReader;
 
@@ -46,8 +48,8 @@ const WALLET_RPC_VERSION: &str = "v0.18.1.2";
 pub struct ExecutableNotFoundInArchive;
 
 pub struct WalletRpcProcess {
-    _child: Child,
     port: u16,
+    _child: Arc<Mutex<Child>>,
 }
 
 impl WalletRpcProcess {
@@ -176,24 +178,78 @@ impl WalletRpc {
             }
         };
 
-        let mut child = Command::new(self.exec_path())
-            .env("LANG", "en_AU.UTF-8")
-            .stdout(Stdio::piped())
-            .kill_on_drop(true)
-            .args(network_flag)
-            .arg("--daemon-address")
-            .arg(daemon_address)
-            .arg("--rpc-bind-port")
-            .arg(format!("{}", port))
-            .arg("--disable-rpc-login")
-            .arg("--wallet-dir")
-            .arg(self.working_dir.join("monero-data"))
-            .spawn()?;
+        let child = Arc::new(Mutex::new(
+            Command::new(self.exec_path())
+                .env("LANG", "en_AU.UTF-8")
+                .stdout(Stdio::piped())
+                .kill_on_drop(true)
+                .args(network_flag)
+                .arg("--daemon-address")
+                .arg(daemon_address)
+                .arg("--rpc-bind-port")
+                .arg(format!("{}", port))
+                .arg("--disable-rpc-login")
+                .arg("--wallet-dir")
+                .arg(self.working_dir.join("monero-data"))
+                .spawn()?,
+        ));
 
         let stdout = child
+            .lock()
+            .await
             .stdout
             .take()
             .expect("monero wallet rpc stdout was not piped parent process");
+
+        /*
+        When the CLI is terminated via a signal, the child process monero-wallet-rpc is not automatically terminated. This discrepancy arises from the behavior of terminal-initiated interrupts (e.g., STRG-C), which send the termination signal to all processes in the process group, effectively killing the child process.
+
+        To address this, we implement a signal handler that explicitly terminates the monero-wallet-rpc child process upon receiving a termination signal for the parent process. This ensures that the child process does not continue running in the background, detached from the parent. Failing to terminate the child process would lock the wallet, preventing future instances of the CLI from starting.
+        */
+        let child_clone = child.clone(); // Clone the Arc for the signal handler
+
+        tokio::spawn(async move {
+            #[cfg(not(windows))]
+            let (sig_stream_1, sig_stream_2, sig_stream_3) = (
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt()),
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()),
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup()),
+            );
+
+            #[cfg(windows)]
+            let (sig_stream_1, sig_stream_2, sig_stream_3) = (
+                tokio::signal::windows::ctrl_c(),
+                tokio::signal::windows::ctrl_close(),
+                tokio::signal::windows::ctrl_break(),
+            );
+
+            match (sig_stream_1, sig_stream_2, sig_stream_3) {
+                (Ok(mut sig_stream_1), Ok(mut sig_stream_2), Ok(mut sig_stream_3)) => {
+                    tokio::select! {
+                        _ = sig_stream_1.recv() => {},
+                        _ = sig_stream_2.recv() => {},
+                        _ = sig_stream_3.recv() => {},
+                    }
+                    match child_clone.lock().await.kill().await {
+                        Ok(_) => {
+                            tracing::debug!("Successfully terminated monero-wallet-rpc process");
+                        }
+                        Err(err) => {
+                            tracing::warn!(
+                                "Failed to terminate monero-wallet-rpc process: {}",
+                                err
+                            );
+                        }
+                    }
+                }
+                (Err(err), _, _) | (_, Err(err), _) | (_, _, Err(err)) => {
+                    tracing::warn!(
+                        "Failed to create kill signal listener for monero-wallet-rpc process: {}.",
+                        err
+                    );
+                }
+            }
+        });
 
         let mut reader = BufReader::new(stdout).lines();
 
