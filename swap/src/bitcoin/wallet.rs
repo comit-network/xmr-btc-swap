@@ -762,9 +762,10 @@ impl Client {
         self.blockchain.get_tx(txid)
     }
 
-    fn update_state(&mut self) -> Result<()> {
+    fn update_state(&mut self, force_sync: bool) -> Result<()> {
         let now = Instant::now();
-        if now < self.last_sync + self.sync_interval {
+
+        if !force_sync && now < self.last_sync + self.sync_interval {
             return Ok(());
         }
 
@@ -784,10 +785,11 @@ impl Client {
 
         if !self.script_history.contains_key(&script) {
             self.script_history.insert(script.clone(), vec![]);
+            self.update_state(true)?;
+        }else {
+            self.update_state(false)?;
         }
-
-        self.update_state()?;
-
+        
         let history = self.script_history.entry(script).or_default();
 
         let history_of_tx = history
