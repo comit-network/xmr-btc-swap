@@ -5,16 +5,14 @@ use jsonrpsee::ws_client::WsClientBuilder;
 use jsonrpsee_core::client::ClientT;
 use jsonrpsee_core::params::ObjectParams;
 
-use sequential_test::sequential;
+use serial_test::serial;
 
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use swap::api::request::{Method, Params, Request, Shutdown};
+use swap::api::request::{Method, Request };
 use swap::api::Context;
 use swap::cli::command::{Bitcoin, Monero};
-
-use tokio::sync::broadcast;
 
 use uuid::Uuid;
 
@@ -34,7 +32,6 @@ pub async fn initialize_context() -> (Arc<Context>, Request) {
     let (is_testnet, debug, json) = (true, false, false);
     // let data_dir = data::data_dir_from(None, is_testnet).unwrap();
     let server_address = None;
-    let (tx, _) = broadcast::channel(1);
 
     let bitcoin = Bitcoin {
         bitcoin_electrum_rpc_url: None,
@@ -45,7 +42,7 @@ pub async fn initialize_context() -> (Arc<Context>, Request) {
         monero_daemon_address: None,
     };
 
-    let request = Request::new(tx.subscribe(), Method::StartDaemon, Params::default());
+    let request = Request::new(Method::StartDaemon { server_address: None });
 
     let context = Context::build(
         Some(bitcoin),
@@ -56,7 +53,6 @@ pub async fn initialize_context() -> (Arc<Context>, Request) {
         debug,
         json,
         server_address,
-        tx,
     )
     .await
     .unwrap();
@@ -65,7 +61,7 @@ pub async fn initialize_context() -> (Arc<Context>, Request) {
 }
 
 #[tokio::test]
-#[sequential]
+#[serial]
 pub async fn can_start_server() {
     let (ctx, mut request) = initialize_context().await;
     let move_ctx = Arc::clone(&ctx);
@@ -73,12 +69,11 @@ pub async fn can_start_server() {
         request.call(Arc::clone(&move_ctx)).await;
     });
     tokio::time::sleep(Duration::from_secs(3)).await;
-    ctx.shutdown.send(());
     assert!(true);
 }
 
 #[tokio::test]
-#[sequential]
+#[serial]
 pub async fn get_bitcoin_balance() {
     let (ctx, mut request) = initialize_context().await;
     let move_ctx = Arc::clone(&ctx);
@@ -96,11 +91,10 @@ pub async fn get_bitcoin_balance() {
         .unwrap();
 
     assert_eq!(response, HashMap::from([("balance".to_string(), 0)]));
-    ctx.shutdown.send(());
 }
 
 #[tokio::test]
-#[sequential]
+#[serial]
 pub async fn get_history() {
     let (ctx, mut request) = initialize_context().await;
     let move_ctx = Arc::clone(&ctx);
@@ -119,11 +113,10 @@ pub async fn get_history() {
     let swaps: Vec<(Uuid, String)> = Vec::new();
 
     assert_eq!(response, HashMap::from([("swaps".to_string(), swaps)]));
-    ctx.shutdown.send(());
 }
 
 #[tokio::test]
-#[sequential]
+#[serial]
 pub async fn get_raw_history() {
     let (ctx, mut request) = initialize_context().await;
     let move_ctx = Arc::clone(&ctx);
@@ -145,11 +138,10 @@ pub async fn get_raw_history() {
         response,
         HashMap::from([("raw_history".to_string(), raw_history)])
     );
-    ctx.shutdown.send(());
 }
 
 #[tokio::test]
-#[sequential]
+#[serial]
 pub async fn get_seller() {
     let (ctx, mut request) = initialize_context().await;
     let move_ctx = Arc::clone(&ctx);
@@ -197,11 +189,10 @@ pub async fn get_seller() {
             e
         ),
     }
-    ctx.shutdown.send(());
 }
 
 #[tokio::test]
-#[sequential]
+#[serial]
 pub async fn get_swap_start_date() {
     let (ctx, mut request) = initialize_context().await;
     let move_ctx = Arc::clone(&ctx);
@@ -244,11 +235,10 @@ pub async fn get_swap_start_date() {
         Ok(hash) => (),
         Err(e) => panic!("Expected a HashMap, got an error: {}", e),
     }
-    ctx.shutdown.send(());
 }
 
 #[tokio::test]
-#[sequential]
+#[serial]
 pub async fn resume_swap() {
     let (ctx, mut request) = initialize_context().await;
     let move_ctx = Arc::clone(&ctx);
@@ -291,11 +281,10 @@ pub async fn resume_swap() {
         Ok(hash) => (),
         Err(e) => panic!("Expected a HashMap, got an error: {}", e),
     }
-    ctx.shutdown.send(());
 }
 
 #[tokio::test]
-#[sequential]
+#[serial]
 pub async fn withdraw_btc() {
     let (ctx, mut request) = initialize_context().await;
     let move_ctx = Arc::clone(&ctx);
@@ -348,11 +337,10 @@ pub async fn withdraw_btc() {
         Err(e) => panic!("Expected a HashMap, got an error: {}", e),
     }
 
-    ctx.shutdown.send(());
 }
 
 #[tokio::test]
-#[sequential]
+#[serial]
 pub async fn buy_xmr() {
     let (ctx, mut request) = initialize_context().await;
     let move_ctx = Arc::clone(&ctx);
@@ -454,5 +442,4 @@ pub async fn buy_xmr() {
         Err(e) => panic!("Expected a HashMap, got an error: {}", e),
     }
 
-    ctx.shutdown.send(());
 }

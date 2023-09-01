@@ -371,6 +371,7 @@ mod tests {
     use crate::protocol::{alice, bob};
     use rand::rngs::OsRng;
     use uuid::Uuid;
+    use std::matches;
 
     #[test]
     fn lock_confirmations_le_to_cancel_timelock_no_timelock_expired() {
@@ -384,7 +385,7 @@ mod tests {
             tx_cancel_status,
         );
 
-        assert_eq!(expired_timelock, ExpiredTimelocks::None)
+        assert!(matches!(expired_timelock, ExpiredTimelocks::None { .. }));
     }
 
     #[test]
@@ -399,7 +400,7 @@ mod tests {
             tx_cancel_status,
         );
 
-        assert_eq!(expired_timelock, ExpiredTimelocks::Cancel)
+        assert!(matches!(expired_timelock, ExpiredTimelocks::Cancel {..}));
     }
 
     #[test]

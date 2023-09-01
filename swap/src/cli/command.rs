@@ -1054,6 +1054,7 @@ mod tests {
             Config::default(is_testnet, None, debug, json),
             Request::buy_xmr(is_testnet),
         );
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
 
         let (actual_config, actual_request) = match args {
             ParseResult::Context(context, request) => (context.config.clone(), request),
