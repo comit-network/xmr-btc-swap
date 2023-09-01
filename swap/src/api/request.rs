@@ -22,6 +22,7 @@ use std::time::Duration;
 use tracing::{debug_span, field, Instrument, Span};
 use uuid::Uuid;
 
+//TODO: Request and Method can be combined into a single enum
 #[derive(PartialEq, Debug)]
 pub struct Request {
     pub cmd: Method,
@@ -235,6 +236,7 @@ impl Request {
                     | BobState::XmrRedeemed { .. } => None,
                 };
 
+                // TODO: Add relevant txids
                 Ok(json!({
                     "swapId": swap_id,
                     "seller": {

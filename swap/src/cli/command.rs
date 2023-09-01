@@ -501,13 +501,13 @@ mod tests {
     use crate::api::Config;
     use crate::fs::system_data_dir;
     use crate::monero::monero_address::MoneroAddressNetworkMismatch;
-    use sequential_test::sequential;
+    use serial_test::serial;
 
     const BINARY_NAME: &str = "swap";
     const ARGS_DATA_DIR: &str = "/tmp/dir/";
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_buy_xmr_on_mainnet_then_defaults_to_mainnet() {
         let raw_ars = vec![
             BINARY_NAME,
@@ -538,7 +538,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_buy_xmr_on_testnet_then_defaults_to_testnet() {
         let raw_ars = vec![
             BINARY_NAME,
@@ -570,7 +570,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_buy_xmr_on_mainnet_with_testnet_address_then_fails() {
         let raw_ars = vec![
             BINARY_NAME,
@@ -595,7 +595,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_buy_xmr_on_testnet_with_mainnet_address_then_fails() {
         let raw_ars = vec![
             BINARY_NAME,
@@ -621,7 +621,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_resume_on_mainnet_then_defaults_to_mainnet() {
         let raw_ars = vec![BINARY_NAME, "resume", "--swap-id", SWAP_ID];
 
@@ -643,11 +643,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_resume_on_testnet_then_defaults_to_testnet() {
         let raw_ars = vec![BINARY_NAME, "--testnet", "resume", "--swap-id", SWAP_ID];
 
-        let (tx, _) = broadcast::channel(1);
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
@@ -666,11 +665,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_cancel_on_mainnet_then_defaults_to_mainnet() {
         let raw_ars = vec![BINARY_NAME, "cancel", "--swap-id", SWAP_ID];
 
-        let (tx, _) = broadcast::channel(1);
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
 
         let (is_testnet, debug, json) = (false, false, false);
@@ -690,11 +688,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_cancel_on_testnet_then_defaults_to_testnet() {
         let raw_ars = vec![BINARY_NAME, "--testnet", "cancel", "--swap-id", SWAP_ID];
 
-        let (tx, _) = broadcast::channel(1);
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
@@ -713,11 +710,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_refund_on_mainnet_then_defaults_to_mainnet() {
         let raw_ars = vec![BINARY_NAME, "refund", "--swap-id", SWAP_ID];
 
-        let (tx, _) = broadcast::channel(1);
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, false);
 
@@ -736,11 +732,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_refund_on_testnet_then_defaults_to_testnet() {
         let raw_ars = vec![BINARY_NAME, "--testnet", "refund", "--swap-id", SWAP_ID];
 
-        let (tx, _) = broadcast::channel(1);
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
@@ -759,7 +754,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_buy_xmr_on_mainnet_with_data_dir_then_data_dir_set() {
         let raw_ars = vec![
             BINARY_NAME,
@@ -774,7 +769,6 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let (tx, _) = broadcast::channel(1);
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, false);
         let data_dir = PathBuf::from_str(ARGS_DATA_DIR).unwrap();
@@ -794,7 +788,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_buy_xmr_on_testnet_with_data_dir_then_data_dir_set() {
         let raw_ars = vec![
             BINARY_NAME,
@@ -810,7 +804,6 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let (tx, _) = broadcast::channel(1);
         let data_dir = PathBuf::from_str(ARGS_DATA_DIR).unwrap();
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, false);
@@ -830,7 +823,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_resume_on_mainnet_with_data_dir_then_data_dir_set() {
         let raw_ars = vec![
             BINARY_NAME,
@@ -841,7 +834,6 @@ mod tests {
             SWAP_ID,
         ];
 
-        let (tx, _) = broadcast::channel(1);
         let data_dir = PathBuf::from_str(ARGS_DATA_DIR).unwrap();
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, false);
@@ -861,7 +853,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_resume_on_testnet_with_data_dir_then_data_dir_set() {
         let raw_ars = vec![
             BINARY_NAME,
@@ -873,7 +865,6 @@ mod tests {
             SWAP_ID,
         ];
 
-        let (tx, _) = broadcast::channel(1);
         let data_dir = PathBuf::from_str(ARGS_DATA_DIR).unwrap();
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, false);
@@ -893,7 +884,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_buy_xmr_on_mainnet_with_debug_then_debug_set() {
         let raw_ars = vec![
             BINARY_NAME,
@@ -907,7 +898,6 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let (tx, _) = broadcast::channel(1);
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, true, false);
 
@@ -926,7 +916,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_buy_xmr_on_testnet_with_debug_then_debug_set() {
         let raw_ars = vec![
             BINARY_NAME,
@@ -941,7 +931,6 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let (tx, _) = broadcast::channel(1);
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, true, false);
 
@@ -960,11 +949,10 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_resume_on_mainnet_with_debug_then_debug_set() {
         let raw_ars = vec![BINARY_NAME, "--debug", "resume", "--swap-id", SWAP_ID];
 
-        let (tx, _) = broadcast::channel(1);
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, true, false);
 
@@ -983,7 +971,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_resume_on_testnet_with_debug_then_debug_set() {
         let raw_ars = vec![
             BINARY_NAME,
@@ -994,7 +982,6 @@ mod tests {
             SWAP_ID,
         ];
 
-        let (tx, _) = broadcast::channel(1);
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, true, false);
 
@@ -1013,7 +1000,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_buy_xmr_on_mainnet_with_json_then_json_set() {
         let raw_ars = vec![
             BINARY_NAME,
@@ -1027,7 +1014,6 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let (tx, _) = broadcast::channel(1);
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, true);
         let data_dir = data_dir_path_cli(is_testnet);
@@ -1047,7 +1033,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_buy_xmr_on_testnet_with_json_then_json_set() {
         let raw_ars = vec![
             BINARY_NAME,
@@ -1062,8 +1048,6 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let (tx, _) = broadcast::channel(1);
-        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, true);
 
         let (expected_config, expected_request) = (
@@ -1081,9 +1065,8 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_resume_on_mainnet_with_json_then_json_set() {
-        let (tx, _) = broadcast::channel(1);
         let raw_ars = vec![BINARY_NAME, "--json", "resume", "--swap-id", SWAP_ID];
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, true);
@@ -1103,7 +1086,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn given_resume_on_testnet_with_json_then_json_set() {
         let raw_ars = vec![
             BINARY_NAME,
@@ -1114,7 +1097,6 @@ mod tests {
             SWAP_ID,
         ];
 
-        let (tx, _) = broadcast::channel(1);
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, true);
 
@@ -1133,7 +1115,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn only_bech32_addresses_mainnet_are_allowed() {
         let raw_ars = vec![
             BINARY_NAME,
@@ -1145,7 +1127,6 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let (tx, _) = broadcast::channel(1);
         let result = parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
 
         let raw_ars = vec![
@@ -1175,9 +1156,8 @@ mod tests {
     }
 
     #[tokio::test]
-    #[sequential]
+    #[serial]
     async fn only_bech32_addresses_testnet_are_allowed() {
-        let (tx, _) = broadcast::channel(1);
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
