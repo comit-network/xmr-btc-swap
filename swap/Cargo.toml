@@ -53,7 +53,7 @@ structopt = "0.3"
 strum = { version = "0.24", features = [ "derive" ] }
 thiserror = "1"
 time = "0.3"
-tokio = { version = "1", features = [ "rt-multi-thread", "time", "macros", "sync", "process", "fs", "net", "signal" ] }
+tokio = { version = "1.32.0", features = [ "rt-multi-thread", "time", "macros", "sync", "process", "fs", "net", "signal" ] }
 tokio-socks = "0.5"
 tokio-tungstenite = { version = "0.15", features = [ "rustls-tls" ] }
 tokio-util = { version = "0.7", features = [ "io", "codec" ] }
