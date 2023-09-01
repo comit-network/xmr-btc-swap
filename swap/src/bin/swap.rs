@@ -541,11 +541,6 @@ async fn init_monero_wallet(
     )
     .await?;
 
-    monero_wallet
-        .refresh()
-        .await
-        .context("Failed to connect to monero daemon")?;
-
     Ok((monero_wallet, monero_wallet_rpc_process))
 }
 
