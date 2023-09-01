@@ -507,7 +507,6 @@ mod tests {
     const ARGS_DATA_DIR: &str = "/tmp/dir/";
 
     #[tokio::test]
-    #[serial]
     async fn given_buy_xmr_on_mainnet_then_defaults_to_mainnet() {
         let raw_ars = vec![
             BINARY_NAME,
@@ -538,7 +537,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     async fn given_buy_xmr_on_testnet_then_defaults_to_testnet() {
         let raw_ars = vec![
             BINARY_NAME,
@@ -1016,7 +1014,6 @@ mod tests {
 
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, true);
-        let data_dir = data_dir_path_cli(is_testnet);
 
         let (expected_config, expected_request) = (
             Config::default(is_testnet, None, debug, json),
