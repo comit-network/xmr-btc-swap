@@ -77,6 +77,7 @@ zip = "0.5"
 bitcoin-harness = "0.2.2"
 get-port = "3"
 hyper = "0.14"
+mockito = "1.1.0"
 monero-harness = { path = "../monero-harness" }
 port_check = "0.1"
 proptest = "1"
