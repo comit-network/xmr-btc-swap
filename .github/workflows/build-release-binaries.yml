@@ -54,7 +54,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.63
+          toolchain: 1.67
           targets: armv7-unknown-linux-gnueabihf
 
       - name: Build ${{ matrix.target }} ${{ matrix.bin }} release binary
