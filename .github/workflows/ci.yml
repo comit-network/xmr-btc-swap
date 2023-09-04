@@ -103,13 +103,13 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: swap-${{ matrix.target }}
-          path: target/${{ matrix.target }}/debug/swap
+          path: target/${{ matrix.target }}/debug/swap*
 
       - name: Upload asb binary
         uses: actions/upload-artifact@v3
         with:
           name: asb-${{ matrix.target }}
-          path: target/${{ matrix.target }}/debug/asb
+          path: target/${{ matrix.target }}/debug/asb*
 
   test:
     strategy:
