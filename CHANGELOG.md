@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Swap: If no Monero daemon is manually specified, we will automatically choose one from a list of public daemons by connecting to each and checking their availability.
+
 ## [0.12.2] - 2023-08-08
 
 ### Changed
