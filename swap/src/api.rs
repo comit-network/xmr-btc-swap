@@ -295,7 +295,6 @@ pub mod api_test {
 
     use libp2p::Multiaddr;
     use std::str::FromStr;
-    use tokio::sync::broadcast;
     use uuid::Uuid;
 
     pub const MULTI_ADDRESS: &str =
@@ -333,7 +332,7 @@ pub mod api_test {
     }
 
     impl Request {
-        pub fn buy_xmr(is_testnet: bool, tx: broadcast::Sender<()>) -> Request {
+        pub fn buy_xmr(is_testnet: bool) -> Request {
             let seller = Multiaddr::from_str(MULTI_ADDRESS).unwrap();
             let bitcoin_change_address = {
                 if is_testnet {
@@ -352,43 +351,35 @@ pub mod api_test {
             };
 
             Request::new(
-                Method::BuyXmr,
-                Params {
-                    seller: Some(seller),
-                    bitcoin_change_address: Some(bitcoin_change_address),
-                    monero_receive_address: Some(monero_receive_address),
-                    swap_id: Some(Uuid::new_v4()),
-                    ..Default::default()
+                Method::BuyXmr { 
+                    seller,
+                    bitcoin_change_address,
+                    monero_receive_address,
+                    swap_id: Uuid::new_v4(),
                 },
             )
         }
 
         pub fn resume() -> Request {
             Request::new(
-                Method::Resume,
-                Params {
-                    swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
-                    ..Default::default()
+                Method::Resume {
+                    swap_id: Uuid::from_str(SWAP_ID).unwrap(),
                 },
             )
         }
 
         pub fn cancel() -> Request {
             Request::new(
-                Method::CancelAndRefund,
-                Params {
-                    swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
-                    ..Default::default()
+                Method::CancelAndRefund {
+                    swap_id: Uuid::from_str(SWAP_ID).unwrap(),
                 },
             )
         }
 
         pub fn refund() -> Request {
             Request::new(
-                Method::CancelAndRefund,
-                Params {
-                    swap_id: Some(Uuid::from_str(SWAP_ID).unwrap()),
-                    ..Default::default()
+                Method::CancelAndRefund {
+                    swap_id: Uuid::from_str(SWAP_ID).unwrap(),
                 },
             )
         }
