@@ -51,7 +51,7 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
         .unwrap();
 
     module
-        .register_async_method("get_raw_history", |params, context| async move {
+        .register_async_method("get_raw_states", |params, context| async move {
             execute_request(params, Method::GetRawStates, &context).await
         })
         .unwrap();
