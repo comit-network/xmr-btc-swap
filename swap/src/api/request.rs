@@ -181,7 +181,6 @@ impl Request {
                     context.swap_lock.send_suspend_signal().await?;
 
                     Ok(json!({
-                        "success": true,
                         "swapId": swap_id.unwrap()
                     }))
                 } else {
