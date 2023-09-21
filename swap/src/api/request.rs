@@ -273,7 +273,6 @@ impl Request {
                     | BobState::XmrRedeemed { .. } => None,
                 };
 
-                // TODO: Add relevant txids
                 Ok(json!({
                     "swapId": swap_id,
                     "seller": {
@@ -635,7 +634,7 @@ impl Request {
 
                 server_handle.stopped().await;
 
-                tracing::info!("Server RPC server");
+                tracing::info!("Stopped RPC server");
 
                 Ok(json!({}))
             }
