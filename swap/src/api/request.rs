@@ -4,9 +4,8 @@ use crate::cli::{list_sellers, EventLoop, SellerStatus};
 use crate::libp2p_ext::MultiAddrExt;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
 use crate::network::swarm;
-use crate::protocol::bob;
-use crate::protocol::bob::swap::is_complete;
 use crate::protocol::bob::{BobState, Swap};
+use crate::protocol::{bob, State};
 use crate::{bitcoin, cli, monero, rpc};
 use anyhow::{bail, Context as AnyContext, Result};
 use libp2p::core::Multiaddr;
@@ -195,8 +194,6 @@ impl Request {
                     .as_ref()
                     .context("Could not get Bitcoin wallet")?;
 
-                let swap_state: BobState = context.db.get_state(swap_id).await?.try_into()?;
-
                 let peerId = context
                     .db
                     .get_peer_id(swap_id)
@@ -209,11 +206,52 @@ impl Request {
                     .await
                     .with_context(|| "Could not get addressess")?;
 
-                let is_completed = is_complete(&swap_state);
+                let state = context.db.get_state(swap_id).await?;
+                let is_completed = state.swap_finished();
 
                 let start_date = context.db.get_swap_start_date(swap_id).await?;
 
+                let swap_state: BobState = state.try_into()?;
                 let state_name = format!("{}", swap_state);
+
+                let (
+                    xmr_amount,
+                    btc_amount,
+                    tx_lock_id,
+                    tx_cancel_fee,
+                    tx_refund_fee,
+                    btc_refund_address,
+                    cancel_timelock,
+                    punish_timelock,
+                ) = context
+                    .db
+                    .get_states(swap_id)
+                    .await?
+                    .iter()
+                    .find_map(|state| {
+                        if let State::Bob(BobState::SwapSetupCompleted(state2)) = state {
+                            let xmr_amount = state2.xmr;
+                            let btc_amount = state2.tx_lock.lock_amount().to_sat();
+                            let tx_cancel_fee = state2.tx_cancel_fee.to_sat();
+                            let tx_refund_fee = state2.tx_refund_fee.to_sat();
+                            let tx_lock_id = state2.tx_lock.txid();
+                            let btc_refund_address = state2.refund_address.to_string();
+
+                            return Some((
+                                xmr_amount,
+                                btc_amount,
+                                tx_lock_id,
+                                tx_cancel_fee,
+                                tx_refund_fee,
+                                btc_refund_address,
+                                state2.cancel_timelock,
+                                state2.punish_timelock,
+                            ));
+                        } else {
+                            None
+                        }
+                    })
+                    .with_context(|| "Did not find SwapSetupCompleted state for swap")?;
 
                 let timelock = match swap_state {
                     BobState::Started { .. }
@@ -230,7 +268,6 @@ impl Request {
                         Some(state.expired_timelock(bitcoin_wallet).await)
                     }
                     BobState::BtcPunished { .. } => Some(Ok(ExpiredTimelocks::Punish)),
-                    // swap is already finished
                     BobState::BtcRefunded(_)
                     | BobState::BtcRedeemed(_)
                     | BobState::XmrRedeemed { .. } => None,
@@ -245,10 +282,18 @@ impl Request {
                     },
                     "completed": is_completed,
                     "startDate": start_date,
-                    // If none return null, if some unwrap and return as json
-                    "timelock": timelock.map(|tl| tl.map(|tl| json!(tl)).unwrap_or(json!(null))).unwrap_or(json!(null)),
-                    // Use display to get the string representation of the state
                     "stateName": state_name,
+                    "xmrAmount": xmr_amount,
+                    "btcAmount": btc_amount,
+                    "txLockId": tx_lock_id,
+                    "txCancelFee": tx_cancel_fee,
+                    "txRefundFee": tx_refund_fee,
+                    "btcRefundAddress": btc_refund_address.to_string(),
+                    "cancelTimelock": cancel_timelock,
+                    "punishTimelock": punish_timelock,
+                    // If the timelock is None, it means that the swap is in a state where the timelock is not accessible to us.
+                    // If that is the case, we return null. Otherwise, we return the timelock.
+                    "timelock": timelock.map(|tl| tl.map(|tl| json!(tl)).unwrap_or(json!(null))).unwrap_or(json!(null)),
                 }))
             }
             Method::BuyXmr {
@@ -263,7 +308,7 @@ impl Request {
                     tokio::select! {
                         biased;
                         _ = context.swap_lock.listen_for_swap_force_suspension() => {
-                            tracing::info!("Shutdown signal received, exiting");
+                            tracing::debug!("Shutdown signal received, exiting");
                             ()
                         },
                         _ = async {
@@ -477,7 +522,7 @@ impl Request {
                             ()
                         },
                         _ = context.swap_lock.listen_for_swap_force_suspension() => {
-                             tracing::info!("Shutdown signal received, exiting");
+                             tracing::debug!("Shutdown signal received, exiting");
                              ()
                          }
                     }
