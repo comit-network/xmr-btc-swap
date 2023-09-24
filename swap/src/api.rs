@@ -123,7 +123,7 @@ impl SwapLock {
 // workaround for warning over monero_rpc_process which we must own but not read
 #[allow(dead_code)]
 pub struct Context {
-    pub db: Arc<dyn Database + Send + Sync>,
+    db: Arc<dyn Database + Send + Sync>,
     bitcoin_wallet: Option<Arc<bitcoin::Wallet>>,
     monero_wallet: Option<Arc<monero::Wallet>>,
     monero_rpc_process: Option<monero::WalletRpcProcess>,
@@ -204,6 +204,36 @@ impl Context {
         };
 
         Ok(context)
+    }
+
+    pub fn new(
+        db: Arc<dyn Database + Send + Sync>,
+        bitcoin_wallet: Option<Arc<bitcoin::Wallet>>,
+        monero_wallet: Option<Arc<monero::Wallet>>,
+        monero_rpc_process: Option<monero::WalletRpcProcess>,
+        config: Config,
+    ) -> Self {
+        Self {
+            db,
+            bitcoin_wallet,
+            monero_wallet,
+            monero_rpc_process,
+            swap_lock: Arc::new(SwapLock::new()),
+            config,
+        }
+    }
+
+    pub async fn for_harness(seed: Seed, env_config: EnvConfig, db_path: PathBuf, bob_bitcoin_wallet: Arc<bitcoin::Wallet>, bob_monero_wallet: Arc<monero::Wallet>) -> Self {
+        let config = Config::for_harness(seed, env_config);
+
+        Self {
+            bitcoin_wallet: Some(bob_bitcoin_wallet),
+            monero_wallet: Some(bob_monero_wallet),
+            config,
+            db: open_db(db_path).await.unwrap(),
+            monero_rpc_process: None,
+            swap_lock: Arc::new(SwapLock::new()),
+        }
     }
 }
 
@@ -288,6 +318,27 @@ fn env_config_from(testnet: bool) -> EnvConfig {
         Mainnet::get_config()
     }
 }
+
+impl Config {
+    pub fn for_harness(seed: Seed, env_config: EnvConfig) -> Self {
+        let data_dir = data::data_dir_from(None, false).unwrap();
+
+        Self {
+            tor_socks5_port: None,
+            namespace: XmrBtcNamespace::from_is_testnet(false),
+            server_address: None,
+            env_config,
+            seed: Some(seed),
+            debug: false,
+            json: false,
+            is_testnet: false,
+            data_dir,
+        }
+    }
+}
+
+
+
 #[cfg(test)]
 pub mod api_test {
     use super::*;
@@ -350,38 +401,30 @@ pub mod api_test {
                 }
             };
 
-            Request::new(
-                Method::BuyXmr { 
-                    seller,
-                    bitcoin_change_address,
-                    monero_receive_address,
-                    swap_id: Uuid::new_v4(),
-                },
-            )
+            Request::new(Method::BuyXmr {
+                seller,
+                bitcoin_change_address,
+                monero_receive_address,
+                swap_id: Uuid::new_v4(),
+            })
         }
 
         pub fn resume() -> Request {
-            Request::new(
-                Method::Resume {
-                    swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-                },
-            )
+            Request::new(Method::Resume {
+                swap_id: Uuid::from_str(SWAP_ID).unwrap(),
+            })
         }
 
         pub fn cancel() -> Request {
-            Request::new(
-                Method::CancelAndRefund {
-                    swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-                },
-            )
+            Request::new(Method::CancelAndRefund {
+                swap_id: Uuid::from_str(SWAP_ID).unwrap(),
+            })
         }
 
         pub fn refund() -> Request {
-            Request::new(
-                Method::CancelAndRefund {
-                    swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-                },
-            )
+            Request::new(Method::CancelAndRefund {
+                swap_id: Uuid::from_str(SWAP_ID).unwrap(),
+            })
         }
     }
 }

@@ -219,11 +219,13 @@ async fn execute_request(
     cmd: Method,
     context: &Arc<Context>,
 ) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    let params_parsed = params
+    // If we fail to parse the params as a String HashMap, it's most likely because its an empty object
+    // In that case, we want to make sure not to fail the request, so we set the log_reference_id to None
+    // and swallow the error
+    let reference_id = params
         .parse::<HashMap<String, String>>()
-        .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
-
-    let reference_id = params_parsed.get("log_reference_id");
+        .ok()
+        .and_then(|params_parsed| params_parsed.get("log_reference_id").cloned());
 
     let request = Request::with_id(cmd, reference_id.map(|s| s.clone()));
     request
