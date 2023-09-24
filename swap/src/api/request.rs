@@ -193,6 +193,9 @@ impl Request {
                     .as_ref()
                     .context("Could not get Bitcoin wallet")?;
 
+                let state = context.db.get_state(swap_id).await?;
+                let is_completed = state.swap_finished();
+
                 let peerId = context
                     .db
                     .get_peer_id(swap_id)
@@ -204,9 +207,6 @@ impl Request {
                     .get_addresses(peerId)
                     .await
                     .with_context(|| "Could not get addressess")?;
-
-                let state = context.db.get_state(swap_id).await?;
-                let is_completed = state.swap_finished();
 
                 let start_date = context.db.get_swap_start_date(swap_id).await?;
 
@@ -346,7 +346,7 @@ impl Request {
 
                             let (event_loop, mut event_loop_handle) =
                                 EventLoop::new(swap_id, swarm, seller_peer_id)?;
-                            let event_loop = tokio::spawn(event_loop.run().instrument(Span::current()));
+                            let event_loop = tokio::spawn(event_loop.run().instrument(Span::none()));
 
                             let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
                             let estimate_fee = |amount| bitcoin_wallet.estimate_fee(TxLock::weight(), amount);
@@ -429,7 +429,7 @@ impl Request {
                         .release_swap_lock()
                         .await
                         .expect("Could not release swap lock");
-                }.instrument(Span::current()));
+                }.instrument(Span::none()));
 
                 Ok(json!({
                     "swapId": swap_id.to_string(),
@@ -483,7 +483,7 @@ impl Request {
 
                              let (event_loop, event_loop_handle) =
                                  EventLoop::new(swap_id, swarm, seller_peer_id)?;
-                             let handle = tokio::spawn(event_loop.run().instrument(Span::current()));
+                             let handle = tokio::spawn(event_loop.run().instrument(Span::none()));
 
                              let monero_receive_address = context.db.get_monero_address(swap_id).await?;
                              let swap = Swap::from_db(
@@ -529,7 +529,7 @@ impl Request {
                         .release_swap_lock()
                         .await
                         .expect("Could not release swap lock");
-                }.instrument(Span::current()));
+                }.instrument(Span::none()));
                 Ok(json!({
                     "result": "ok",
                 }))
@@ -574,7 +574,7 @@ impl Request {
             Method::GetRawStates => {
                 let raw_history = context.db.raw_all().await?;
 
-                Ok(json!({ "raw_history": raw_history }))
+                Ok(json!({ "raw_states": raw_history }))
             }
             Method::Config => {
                 let data_dir_display = context.config.data_dir.display();

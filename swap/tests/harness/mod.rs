@@ -23,9 +23,9 @@ use swap::network::rendezvous::XmrBtcNamespace;
 use swap::network::swarm;
 use swap::protocol::alice::{AliceState, Swap};
 use swap::protocol::bob::BobState;
-use swap::protocol::{alice, bob};
+use swap::protocol::{alice, bob, Database};
 use swap::seed::Seed;
-use swap::{asb, bitcoin, cli, env, monero};
+use swap::{api, asb, bitcoin, cli, env, monero};
 use tempfile::{tempdir, NamedTempFile};
 use testcontainers::clients::Cli;
 use testcontainers::{Container, Docker, RunArgs};
@@ -454,6 +454,8 @@ impl BobParams {
         }
         let db = Arc::new(SqliteDatabase::open(&self.db_path).await?);
 
+        db.insert_peer_id(swap_id, self.alice_peer_id).await?;
+
         let swap = bob::Swap::new(
             db,
             swap_id,
@@ -534,6 +536,17 @@ pub struct TestContext {
 }
 
 impl TestContext {
+    pub async fn get_bob_context(self) -> api::Context {
+        api::Context::for_harness(
+            self.bob_params.seed,
+            self.env_config,
+            self.bob_params.db_path,
+            self.bob_bitcoin_wallet,
+            self.bob_monero_wallet,
+        )
+        .await
+    }
+
     pub async fn restart_alice(&mut self) {
         self.alice_handle.abort();
 

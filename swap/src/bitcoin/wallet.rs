@@ -194,6 +194,7 @@ impl Wallet {
                         tokio::time::sleep(Duration::from_secs(5)).await;
                     }
                 }.instrument(Span::current()));
+                }.instrument(Span::none()));
 
                 Subscription {
                     receiver,

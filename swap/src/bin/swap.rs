@@ -75,10 +75,10 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
- INFO swap: Deposit at least 0.00001000 BTC to cover the min quantity with fee!
- INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.00001000 BTC max_giveable=0.00000000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
- INFO swap: Received Bitcoin new_balance=0.00100000 BTC max_giveable=0.00090000 BTC
+            r" INFO swap::api::request: Received quote price=0.001 BTC minimum_amount=0 BTC maximum_amount=0.01 BTC
+ INFO swap::api::request: Deposit at least 0.00001 BTC to cover the min quantity with fee!
+ INFO swap::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.00001 BTC max_giveable=0 BTC minimum_amount=0 BTC maximum_amount=0.01 BTC
+ INFO swap::api::request: Received Bitcoin new_balance=0.001 BTC max_giveable=0.0009 BTC
 "
         );
     }
@@ -112,10 +112,10 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
- INFO swap: Deposit at least 0.00001000 BTC to cover the min quantity with fee!
- INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.00001000 BTC max_giveable=0.00000000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC
- INFO swap: Received Bitcoin new_balance=0.10010000 BTC max_giveable=0.10000000 BTC
+            r" INFO swap::api::request: Received quote price=0.001 BTC minimum_amount=0 BTC maximum_amount=0.01 BTC
+ INFO swap::api::request: Deposit at least 0.00001 BTC to cover the min quantity with fee!
+ INFO swap::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.00001 BTC max_giveable=0 BTC minimum_amount=0 BTC maximum_amount=0.01 BTC
+ INFO swap::api::request: Received Bitcoin new_balance=0.1001 BTC max_giveable=0.1 BTC
 "
         );
     }
@@ -149,7 +149,7 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            " INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC\n"
+            " INFO swap::api::request: Received quote price=0.001 BTC minimum_amount=0 BTC maximum_amount=0.01 BTC\n"
         );
     }
 
@@ -182,7 +182,7 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            " INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.00000000 BTC maximum_amount=0.01000000 BTC\n"
+            " INFO swap::api::request: Received quote price=0.001 BTC minimum_amount=0 BTC maximum_amount=0.01 BTC\n"
         );
     }
 
@@ -215,10 +215,10 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.01000000 BTC maximum_amount=184467440737.09551615 BTC
- INFO swap: Deposit at least 0.01001000 BTC to cover the min quantity with fee!
- INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.01001000 BTC max_giveable=0.00000000 BTC minimum_amount=0.01000000 BTC maximum_amount=184467440737.09551615 BTC
- INFO swap: Received Bitcoin new_balance=0.01010000 BTC max_giveable=0.01000000 BTC
+            r" INFO swap::api::request: Received quote price=0.001 BTC minimum_amount=0.01 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap::api::request: Deposit at least 0.01001 BTC to cover the min quantity with fee!
+ INFO swap::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.01001 BTC max_giveable=0 BTC minimum_amount=0.01 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap::api::request: Received Bitcoin new_balance=0.0101 BTC max_giveable=0.01 BTC
 "
         );
     }
@@ -252,10 +252,10 @@ mod tests {
         assert_eq!((amount, fees), (expected_amount, expected_fees));
         assert_eq!(
             writer.captured(),
-            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.01000000 BTC maximum_amount=184467440737.09551615 BTC
- INFO swap: Deposit at least 0.00991000 BTC to cover the min quantity with fee!
- INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.00991000 BTC max_giveable=0.00010000 BTC minimum_amount=0.01000000 BTC maximum_amount=184467440737.09551615 BTC
- INFO swap: Received Bitcoin new_balance=0.01010000 BTC max_giveable=0.01000000 BTC
+            r" INFO swap::api::request: Received quote price=0.001 BTC minimum_amount=0.01 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap::api::request: Deposit at least 0.00991 BTC to cover the min quantity with fee!
+ INFO swap::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.00991 BTC max_giveable=0.0001 BTC minimum_amount=0.01 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap::api::request: Received Bitcoin new_balance=0.0101 BTC max_giveable=0.01 BTC
 "
         );
     }
@@ -292,13 +292,13 @@ mod tests {
         assert!(matches!(error, tokio::time::error::Elapsed { .. }));
         assert_eq!(
             writer.captured(),
-            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
- INFO swap: Deposit at least 0.10001000 BTC to cover the min quantity with fee!
- INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.10001000 BTC max_giveable=0.00000000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
- INFO swap: Received Bitcoin new_balance=0.01010000 BTC max_giveable=0.01000000 BTC
- INFO swap: Deposited amount is less than `min_quantity`
- INFO swap: Deposit at least 0.09001000 BTC to cover the min quantity with fee!
- INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.09001000 BTC max_giveable=0.01000000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
+            r" INFO swap::api::request: Received quote price=0.001 BTC minimum_amount=0.1 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap::api::request: Deposit at least 0.10001 BTC to cover the min quantity with fee!
+ INFO swap::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.10001 BTC max_giveable=0 BTC minimum_amount=0.1 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap::api::request: Received Bitcoin new_balance=0.0101 BTC max_giveable=0.01 BTC
+ INFO swap::api::request: Deposited amount is less than `min_quantity`
+ INFO swap::api::request: Deposit at least 0.09001 BTC to cover the min quantity with fee!
+ INFO swap::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.09001 BTC max_giveable=0.01 BTC minimum_amount=0.1 BTC maximum_amount=184467440737.09551615 BTC
 "
         );
     }
@@ -341,10 +341,10 @@ mod tests {
 
         assert_eq!(
             writer.captured(),
-            r" INFO swap: Received quote price=0.00100000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
- INFO swap: Deposit at least 0.10001000 BTC to cover the min quantity with fee!
- INFO swap: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.10001000 BTC max_giveable=0.00000000 BTC minimum_amount=0.10000000 BTC maximum_amount=184467440737.09551615 BTC
- INFO swap: Received Bitcoin new_balance=0.21000000 BTC max_giveable=0.20000000 BTC
+            r" INFO swap::api::request: Received quote price=0.001 BTC minimum_amount=0.1 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap::api::request: Deposit at least 0.10001 BTC to cover the min quantity with fee!
+ INFO swap::api::request: Waiting for Bitcoin deposit deposit_address=1PdfytjS7C8wwd9Lq5o4x9aXA2YRqaCpH6 min_deposit=0.10001 BTC max_giveable=0 BTC minimum_amount=0.1 BTC maximum_amount=184467440737.09551615 BTC
+ INFO swap::api::request: Received Bitcoin new_balance=0.21 BTC max_giveable=0.2 BTC
 "
         );
     }

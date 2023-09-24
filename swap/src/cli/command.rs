@@ -499,16 +499,20 @@ mod tests {
 
     use crate::api::api_test::*;
     use crate::api::Config;
-    use crate::fs::system_data_dir;
     use crate::monero::monero_address::MoneroAddressNetworkMismatch;
-    use serial_test::serial;
 
     const BINARY_NAME: &str = "swap";
     const ARGS_DATA_DIR: &str = "/tmp/dir/";
 
     #[tokio::test]
-    #[serial]
-    async fn given_buy_xmr_on_mainnet_then_defaults_to_mainnet() {
+
+    // this test is very long, however it just checks that various CLI arguments sets the
+    // internal Context and Request properly. It is unlikely to fail and splitting it in various
+    // tests would require to run the tests sequantially which is very slow (due to the context
+    // need to access files like the Bitcoin wallet).
+    async fn test_cli_arguments() {
+        // given_buy_xmr_on_mainnet_then_defaults_to_mainnet
+
         let raw_ars = vec![
             BINARY_NAME,
             "buy-xmr",
@@ -523,23 +527,31 @@ mod tests {
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, false);
 
-        let (expected_config, expected_request) = (
-            Config::default(is_testnet, None, debug, json),
-            Request::buy_xmr(is_testnet),
-        );
-
         let (actual_config, actual_request) = match args {
             ParseResult::Context(context, request) => (context.config.clone(), request),
             _ => panic!("Couldn't parse result"),
         };
 
+        let (expected_config, mut expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::buy_xmr(is_testnet),
+        );
+
+        // since Uuid is random, copy before comparing requests
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_buy_xmr_on_testnet_then_defaults_to_testnet() {
+        // given_buy_xmr_on_testnet_then_defaults_to_testnet
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -555,7 +567,7 @@ mod tests {
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
-        let (expected_config, expected_request) = (
+        let (expected_config, mut expected_request) = (
             Config::default(is_testnet, None, debug, json),
             Request::buy_xmr(is_testnet),
         );
@@ -565,13 +577,20 @@ mod tests {
             _ => panic!("Couldn't parse result"),
         };
 
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_buy_xmr_on_mainnet_with_testnet_address_then_fails() {
+        // given_buy_xmr_on_mainnet_with_testnet_address_then_fails
         let raw_ars = vec![
             BINARY_NAME,
             "buy-xmr",
@@ -592,11 +611,8 @@ mod tests {
                 actual: monero::Network::Stagenet
             }
         );
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_buy_xmr_on_testnet_with_mainnet_address_then_fails() {
+        // given_buy_xmr_on_testnet_with_mainnet_address_then_fails
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -618,11 +634,8 @@ mod tests {
                 actual: monero::Network::Mainnet
             }
         );
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_resume_on_mainnet_then_defaults_to_mainnet() {
+        // given_resume_on_mainnet_then_defaults_to_mainnet
         let raw_ars = vec![BINARY_NAME, "resume", "--swap-id", SWAP_ID];
 
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
@@ -640,11 +653,8 @@ mod tests {
 
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_resume_on_testnet_then_defaults_to_testnet() {
+        // given_resume_on_testnet_then_defaults_to_testnet
         let raw_ars = vec![BINARY_NAME, "--testnet", "resume", "--swap-id", SWAP_ID];
 
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
@@ -662,11 +672,8 @@ mod tests {
 
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_cancel_on_mainnet_then_defaults_to_mainnet() {
+        // given_cancel_on_mainnet_then_defaults_to_mainnet
         let raw_ars = vec![BINARY_NAME, "cancel", "--swap-id", SWAP_ID];
 
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
@@ -685,11 +692,8 @@ mod tests {
 
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_cancel_on_testnet_then_defaults_to_testnet() {
+        // given_cancel_on_testnet_then_defaults_to_testnet
         let raw_ars = vec![BINARY_NAME, "--testnet", "cancel", "--swap-id", SWAP_ID];
 
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
@@ -707,11 +711,7 @@ mod tests {
 
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_refund_on_mainnet_then_defaults_to_mainnet() {
         let raw_ars = vec![BINARY_NAME, "refund", "--swap-id", SWAP_ID];
 
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
@@ -729,11 +729,8 @@ mod tests {
 
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_refund_on_testnet_then_defaults_to_testnet() {
+        // given_refund_on_testnet_then_defaults_to_testnet
         let raw_ars = vec![BINARY_NAME, "--testnet", "refund", "--swap-id", SWAP_ID];
 
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
@@ -751,11 +748,8 @@ mod tests {
 
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_buy_xmr_on_mainnet_with_data_dir_then_data_dir_set() {
+        // given_buy_xmr_on_mainnet_with_data_dir_then_data_dir_set
         let raw_ars = vec![
             BINARY_NAME,
             "--data-base-dir",
@@ -773,7 +767,7 @@ mod tests {
         let (is_testnet, debug, json) = (false, false, false);
         let data_dir = PathBuf::from_str(ARGS_DATA_DIR).unwrap();
 
-        let (expected_config, expected_request) = (
+        let (expected_config, mut expected_request) = (
             Config::default(is_testnet, Some(data_dir.clone()), debug, json),
             Request::buy_xmr(is_testnet),
         );
@@ -783,13 +777,20 @@ mod tests {
             _ => panic!("Couldn't parse result"),
         };
 
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_buy_xmr_on_testnet_with_data_dir_then_data_dir_set() {
+        // given_buy_xmr_on_testnet_with_data_dir_then_data_dir_set
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -808,7 +809,7 @@ mod tests {
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, false, false);
 
-        let (expected_config, expected_request) = (
+        let (expected_config, mut expected_request) = (
             Config::default(is_testnet, Some(data_dir.clone()), debug, json),
             Request::buy_xmr(is_testnet),
         );
@@ -818,13 +819,20 @@ mod tests {
             _ => panic!("Couldn't parse result"),
         };
 
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_resume_on_mainnet_with_data_dir_then_data_dir_set() {
+        // given_resume_on_mainnet_with_data_dir_then_data_dir_set
         let raw_ars = vec![
             BINARY_NAME,
             "--data-base-dir",
@@ -838,10 +846,20 @@ mod tests {
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, false);
 
-        let (expected_config, expected_request) = (
+        let (expected_config, mut expected_request) = (
             Config::default(is_testnet, Some(data_dir.clone()), debug, json),
             Request::resume(),
         );
+
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
 
         let (actual_config, actual_request) = match args {
             ParseResult::Context(context, request) => (context.config.clone(), request),
@@ -850,11 +868,8 @@ mod tests {
 
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_resume_on_testnet_with_data_dir_then_data_dir_set() {
+        // given_resume_on_testnet_with_data_dir_then_data_dir_set
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -881,11 +896,8 @@ mod tests {
 
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_buy_xmr_on_mainnet_with_debug_then_debug_set() {
+        // given_buy_xmr_on_mainnet_with_debug_then_debug_set
         let raw_ars = vec![
             BINARY_NAME,
             "--debug",
@@ -901,7 +913,7 @@ mod tests {
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, true, false);
 
-        let (expected_config, expected_request) = (
+        let (expected_config, mut expected_request) = (
             Config::default(is_testnet, None, debug, json),
             Request::buy_xmr(is_testnet),
         );
@@ -911,13 +923,20 @@ mod tests {
             _ => panic!("Couldn't parse result"),
         };
 
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_buy_xmr_on_testnet_with_debug_then_debug_set() {
+        // given_buy_xmr_on_testnet_with_debug_then_debug_set
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -934,7 +953,7 @@ mod tests {
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (true, true, false);
 
-        let (expected_config, expected_request) = (
+        let (expected_config, mut expected_request) = (
             Config::default(is_testnet, None, debug, json),
             Request::buy_xmr(is_testnet),
         );
@@ -944,19 +963,26 @@ mod tests {
             _ => panic!("Couldn't parse result"),
         };
 
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_resume_on_mainnet_with_debug_then_debug_set() {
+        // given_resume_on_mainnet_with_debug_then_debug_set
         let raw_ars = vec![BINARY_NAME, "--debug", "resume", "--swap-id", SWAP_ID];
 
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, true, false);
 
-        let (expected_config, expected_request) = (
+        let (expected_config, mut expected_request) = (
             Config::default(is_testnet, None, debug, json),
             Request::resume(),
         );
@@ -966,13 +992,20 @@ mod tests {
             _ => panic!("Couldn't parse result"),
         };
 
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_resume_on_testnet_with_debug_then_debug_set() {
+        // given_resume_on_testnet_with_debug_then_debug_set
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -997,11 +1030,8 @@ mod tests {
 
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_buy_xmr_on_mainnet_with_json_then_json_set() {
+        // given_buy_xmr_on_mainnet_with_json_then_json_set
         let raw_ars = vec![
             BINARY_NAME,
             "--json",
@@ -1016,9 +1046,8 @@ mod tests {
 
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, true);
-        let data_dir = data_dir_path_cli(is_testnet);
 
-        let (expected_config, expected_request) = (
+        let (expected_config, mut expected_request) = (
             Config::default(is_testnet, None, debug, json),
             Request::buy_xmr(is_testnet),
         );
@@ -1028,13 +1057,20 @@ mod tests {
             _ => panic!("Couldn't parse result"),
         };
 
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_buy_xmr_on_testnet_with_json_then_json_set() {
+        // given_buy_xmr_on_testnet_with_json_then_json_set
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -1050,7 +1086,7 @@ mod tests {
 
         let (is_testnet, debug, json) = (true, false, true);
 
-        let (expected_config, expected_request) = (
+        let (expected_config, mut expected_request) = (
             Config::default(is_testnet, None, debug, json),
             Request::buy_xmr(is_testnet),
         );
@@ -1061,13 +1097,20 @@ mod tests {
             _ => panic!("Couldn't parse result"),
         };
 
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_resume_on_mainnet_with_json_then_json_set() {
+        // given_resume_on_mainnet_with_json_then_json_set
         let raw_ars = vec![BINARY_NAME, "--json", "resume", "--swap-id", SWAP_ID];
         let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         let (is_testnet, debug, json) = (false, false, true);
@@ -1084,11 +1127,8 @@ mod tests {
 
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn given_resume_on_testnet_with_json_then_json_set() {
+        // given_resume_on_testnet_with_json_then_json_set
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -1113,11 +1153,8 @@ mod tests {
 
         assert_eq!(actual_config, expected_config);
         assert_eq!(actual_request, Box::new(expected_request));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn only_bech32_addresses_mainnet_are_allowed() {
+        // only_bech32_addresses_mainnet_are_allowed
         let raw_ars = vec![
             BINARY_NAME,
             "buy-xmr",
@@ -1128,7 +1165,7 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
+        parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -1140,7 +1177,7 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
+        parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -1154,11 +1191,8 @@ mod tests {
         ];
         let result = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         assert!(matches!(result, ParseResult::Context(_, _)));
-    }
 
-    #[tokio::test]
-    #[serial]
-    async fn only_bech32_addresses_testnet_are_allowed() {
+        // only_bech32_addresses_testnet_are_allowed
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -1170,7 +1204,7 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
+        parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -1183,7 +1217,7 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
+        parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -1198,13 +1232,5 @@ mod tests {
         ];
         let result = parse_args_and_apply_defaults(raw_ars).await.unwrap();
         assert!(matches!(result, ParseResult::Context(_, _)));
-    }
-
-    fn data_dir_path_cli(is_testnet: bool) -> PathBuf {
-        if is_testnet {
-            system_data_dir().unwrap().join("cli").join("testnet")
-        } else {
-            system_data_dir().unwrap().join("cli").join("mainnet")
-        }
     }
 }
