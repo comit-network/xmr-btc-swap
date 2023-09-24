@@ -123,7 +123,7 @@ impl SwapLock {
 // workaround for warning over monero_rpc_process which we must own but not read
 #[allow(dead_code)]
 pub struct Context {
-    db: Arc<dyn Database + Send + Sync>,
+    pub db: Arc<dyn Database + Send + Sync>,
     bitcoin_wallet: Option<Arc<bitcoin::Wallet>>,
     monero_wallet: Option<Arc<monero::Wallet>>,
     monero_rpc_process: Option<monero::WalletRpcProcess>,
