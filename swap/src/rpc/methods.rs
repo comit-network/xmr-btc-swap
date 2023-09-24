@@ -125,8 +125,10 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
                     jsonrpsee_core::Error::Custom("Does not contain address".to_string())
                 })?)
                 .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
-            let withdraw_address =
-                bitcoin_address::validate(withdraw_address, context.config.is_testnet)?;
+            let withdraw_address = bitcoin_address::validate(
+                withdraw_address,
+                context.config.env_config.bitcoin_network,
+            )?;
 
             execute_request(
                 params_raw,
@@ -153,8 +155,10 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
             )
             .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
 
-            let bitcoin_change_address =
-                bitcoin_address::validate(bitcoin_change_address, context.config.is_testnet)?;
+            let bitcoin_change_address = bitcoin_address::validate(
+                bitcoin_change_address,
+                context.config.env_config.bitcoin_network,
+            )?;
 
             let monero_receive_address = monero::Address::from_str(
                 params.get("monero_receive_address").ok_or_else(|| {
@@ -165,8 +169,10 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
             )
             .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
 
-            let monero_receive_address =
-                monero_address::validate(monero_receive_address, context.config.is_testnet)?;
+            let monero_receive_address = monero_address::validate(
+                monero_receive_address,
+                context.config.env_config.monero_network,
+            )?;
 
             let seller = Multiaddr::from_str(params.get("seller").ok_or_else(|| {
                 jsonrpsee_core::Error::Custom("Does not contain seller".to_string())

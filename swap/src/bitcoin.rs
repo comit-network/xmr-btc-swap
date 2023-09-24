@@ -278,13 +278,10 @@ pub mod bitcoin_address {
         Ok(address)
     }
 
-    pub fn validate(address: bitcoin::Address, is_testnet: bool) -> Result<bitcoin::Address> {
-        let expected_network = if is_testnet {
-            bitcoin::Network::Testnet
-        } else {
-            bitcoin::Network::Bitcoin
-        };
-
+    pub fn validate(
+        address: bitcoin::Address,
+        expected_network: bitcoin::Network,
+    ) -> Result<bitcoin::Address> {
         if address.network != expected_network {
             bail!(BitcoinAddressNetworkMismatch {
                 expected: expected_network,
@@ -293,6 +290,18 @@ pub mod bitcoin_address {
         }
 
         Ok(address)
+    }
+
+    pub fn validate_is_testnet(
+        address: bitcoin::Address,
+        is_testnet: bool,
+    ) -> Result<bitcoin::Address> {
+        let expected_network = if is_testnet {
+            bitcoin::Network::Testnet
+        } else {
+            bitcoin::Network::Bitcoin
+        };
+        return validate(address, expected_network);
     }
 }
 

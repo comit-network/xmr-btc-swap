@@ -193,7 +193,6 @@ impl Wallet {
 
                         tokio::time::sleep(Duration::from_secs(5)).await;
                     }
-                }.instrument(Span::current()));
                 }.instrument(Span::none()));
 
                 Subscription {
@@ -787,10 +786,10 @@ impl Client {
         if !self.script_history.contains_key(&script) {
             self.script_history.insert(script.clone(), vec![]);
             self.update_state(true)?;
-        }else {
+        } else {
             self.update_state(false)?;
         }
-        
+
         let history = self.script_history.entry(script).or_default();
 
         let history_of_tx = history
@@ -1007,7 +1006,6 @@ mod tests {
 
     #[test]
     fn given_depth_0_should_meet_confirmation_target_one() {
-
         let script = ScriptStatus::Confirmed(Confirmed { depth: 0 });
 
         let confirmed = script.is_confirmed_with(1 as u32);

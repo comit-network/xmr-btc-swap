@@ -22,12 +22,12 @@ pub struct Config {
     tor_socks5_port: Option<u16>,
     namespace: XmrBtcNamespace,
     server_address: Option<SocketAddr>,
-    env_config: EnvConfig,
+    pub env_config: EnvConfig,
     seed: Option<Seed>,
     debug: bool,
     json: bool,
     data_dir: PathBuf,
-    pub is_testnet: bool,
+    is_testnet: bool,
 }
 
 use uuid::Uuid;
@@ -127,7 +127,7 @@ pub struct Context {
     bitcoin_wallet: Option<Arc<bitcoin::Wallet>>,
     monero_wallet: Option<Arc<monero::Wallet>>,
     monero_rpc_process: Option<monero::WalletRpcProcess>,
-    swap_lock: Arc<SwapLock>,
+    pub swap_lock: Arc<SwapLock>,
     pub config: Config,
 }
 

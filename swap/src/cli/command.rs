@@ -70,9 +70,9 @@ where
             tor,
         } => {
             let monero_receive_address =
-                monero_address::validate(monero_receive_address, is_testnet)?;
+                monero_address::validate_is_testnet(monero_receive_address, is_testnet)?;
             let bitcoin_change_address =
-                bitcoin_address::validate(bitcoin_change_address, is_testnet)?;
+                bitcoin_address::validate_is_testnet(bitcoin_change_address, is_testnet)?;
 
             let request = Request::new(Method::BuyXmr {
                 seller,
@@ -150,8 +150,7 @@ where
             amount,
             address,
         } => {
-            let address = bitcoin_address::validate(address, is_testnet)?;
-
+            let address = bitcoin_address::validate_is_testnet(address, is_testnet)?;
             let request = Request::new(Method::WithdrawBtc { amount, address });
 
             let context = Context::build(
@@ -538,10 +537,13 @@ mod tests {
         );
 
         // since Uuid is random, copy before comparing requests
-        if let Method::BuyXmr { ref mut swap_id, .. } = expected_request.cmd {
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
             *swap_id = match actual_request.cmd {
-                Method::BuyXmr { swap_id, .. } => { swap_id },
-                _ => panic!("Not the Method we expected")
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
             }
         };
 
@@ -574,10 +576,13 @@ mod tests {
             _ => panic!("Couldn't parse result"),
         };
 
-        if let Method::BuyXmr { ref mut swap_id, .. } = expected_request.cmd {
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
             *swap_id = match actual_request.cmd {
-                Method::BuyXmr { swap_id, .. } => { swap_id },
-                _ => panic!("Not the Method we expected")
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
             }
         };
 
@@ -771,10 +776,13 @@ mod tests {
             _ => panic!("Couldn't parse result"),
         };
 
-        if let Method::BuyXmr { ref mut swap_id, .. } = expected_request.cmd {
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
             *swap_id = match actual_request.cmd {
-                Method::BuyXmr { swap_id, .. } => { swap_id },
-                _ => panic!("Not the Method we expected")
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
             }
         };
 
@@ -810,10 +818,13 @@ mod tests {
             _ => panic!("Couldn't parse result"),
         };
 
-        if let Method::BuyXmr { ref mut swap_id, .. } = expected_request.cmd {
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
             *swap_id = match actual_request.cmd {
-                Method::BuyXmr { swap_id, .. } => { swap_id },
-                _ => panic!("Not the Method we expected")
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
             }
         };
 
@@ -839,10 +850,13 @@ mod tests {
             Request::resume(),
         );
 
-        if let Method::BuyXmr { ref mut swap_id, .. } = expected_request.cmd {
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
             *swap_id = match actual_request.cmd {
-                Method::BuyXmr { swap_id, .. } => { swap_id },
-                _ => panic!("Not the Method we expected")
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
             }
         };
 
@@ -908,10 +922,13 @@ mod tests {
             _ => panic!("Couldn't parse result"),
         };
 
-        if let Method::BuyXmr { ref mut swap_id, .. } = expected_request.cmd {
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
             *swap_id = match actual_request.cmd {
-                Method::BuyXmr { swap_id, .. } => { swap_id },
-                _ => panic!("Not the Method we expected")
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
             }
         };
 
@@ -945,10 +962,13 @@ mod tests {
             _ => panic!("Couldn't parse result"),
         };
 
-        if let Method::BuyXmr { ref mut swap_id, .. } = expected_request.cmd {
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
             *swap_id = match actual_request.cmd {
-                Method::BuyXmr { swap_id, .. } => { swap_id },
-                _ => panic!("Not the Method we expected")
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
             }
         };
 
@@ -971,10 +991,13 @@ mod tests {
             _ => panic!("Couldn't parse result"),
         };
 
-        if let Method::BuyXmr { ref mut swap_id, .. } = expected_request.cmd {
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
             *swap_id = match actual_request.cmd {
-                Method::BuyXmr { swap_id, .. } => { swap_id },
-                _ => panic!("Not the Method we expected")
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
             }
         };
 
@@ -1033,10 +1056,13 @@ mod tests {
             _ => panic!("Couldn't parse result"),
         };
 
-        if let Method::BuyXmr { ref mut swap_id, .. } = expected_request.cmd {
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
             *swap_id = match actual_request.cmd {
-                Method::BuyXmr { swap_id, .. } => { swap_id },
-                _ => panic!("Not the Method we expected")
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
             }
         };
 
@@ -1070,10 +1096,13 @@ mod tests {
             _ => panic!("Couldn't parse result"),
         };
 
-        if let Method::BuyXmr { ref mut swap_id, .. } = expected_request.cmd {
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
             *swap_id = match actual_request.cmd {
-                Method::BuyXmr { swap_id, .. } => { swap_id },
-                _ => panic!("Not the Method we expected")
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
             }
         };
 

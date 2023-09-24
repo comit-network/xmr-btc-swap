@@ -402,7 +402,7 @@ impl StartingBalances {
     }
 }
 
-struct BobParams {
+pub struct BobParams {
     seed: Seed,
     db_path: PathBuf,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
@@ -413,6 +413,21 @@ struct BobParams {
 }
 
 impl BobParams {
+    pub fn get_concentenated_alice_address(&self) -> String {
+        format!(
+            "{}/p2p/{}",
+            self.alice_address.clone().to_string(),
+            self.alice_peer_id.clone().to_base58()
+        )
+    }
+
+    pub async fn get_change_receive_addresses(&self) -> (bitcoin::Address, monero::Address) {
+        (
+            self.bitcoin_wallet.new_address().await.unwrap(),
+            self.monero_wallet.get_main_address(),
+        )
+    }
+
     pub async fn new_swap_from_db(&self, swap_id: Uuid) -> Result<(bob::Swap, cli::EventLoop)> {
         let (event_loop, handle) = self.new_eventloop(swap_id).await?;
 
@@ -529,7 +544,7 @@ pub struct TestContext {
     alice_swap_handle: mpsc::Receiver<Swap>,
     alice_handle: AliceApplicationHandle,
 
-    bob_params: BobParams,
+    pub bob_params: BobParams,
     bob_starting_balances: StartingBalances,
     bob_bitcoin_wallet: Arc<bitcoin::Wallet>,
     bob_monero_wallet: Arc<monero::Wallet>,

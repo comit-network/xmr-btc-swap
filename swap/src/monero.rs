@@ -347,13 +347,10 @@ pub mod monero_address {
         })
     }
 
-    pub fn validate(address: monero::Address, is_testnet: bool) -> Result<monero::Address> {
-        let expected_network = if is_testnet {
-            monero::Network::Stagenet
-        } else {
-            monero::Network::Mainnet
-        };
-
+    pub fn validate(
+        address: monero::Address,
+        expected_network: monero::Network,
+    ) -> Result<monero::Address> {
         if address.network != expected_network {
             bail!(MoneroAddressNetworkMismatch {
                 expected: expected_network,
@@ -361,6 +358,18 @@ pub mod monero_address {
             });
         }
         Ok(address)
+    }
+
+    pub fn validate_is_testnet(
+        address: monero::Address,
+        is_testnet: bool,
+    ) -> Result<monero::Address> {
+        let expected_network = if is_testnet {
+            monero::Network::Testnet
+        } else {
+            monero::Network::Mainnet
+        };
+        validate(address, expected_network)
     }
 }
 
