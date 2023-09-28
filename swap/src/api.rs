@@ -90,7 +90,7 @@ impl SwapLock {
     /// # Notes
     /// The 50ms polling interval is considered negligible overhead compared to the typical time required to suspend ongoing swap processes.
     pub async fn send_suspend_signal(&self) -> Result<(), Error> {
-        const TIMEOUT: u32 = 10_000;
+        const TIMEOUT: u64 = 10_000;
         const INTERVAL: u64 = 50;
 
         let _ = self.suspension_trigger.send(())?;
