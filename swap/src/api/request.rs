@@ -22,7 +22,6 @@ use std::time::Duration;
 use tracing::{debug_span, field, Instrument, Span};
 use uuid::Uuid;
 
-//TODO: Request and Method can be combined into a single enum
 #[derive(PartialEq, Debug)]
 pub struct Request {
     pub cmd: Method,
@@ -261,7 +260,6 @@ impl Request {
 
                 tokio::spawn(async move {
                     tokio::select! {
-                        biased;
                         _ = context.swap_lock.listen_for_swap_force_suspension() => {
                             tracing::info!("Shutdown signal received, exiting");
                             ()
