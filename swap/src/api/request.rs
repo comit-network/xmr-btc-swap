@@ -574,7 +574,6 @@ impl Request {
                     .await?;
 
                 Ok(json!({
-                    "signed_tx": signed_tx,
                     "amount": amount.to_sat(),
                     "txid": signed_tx.txid(),
                 }))
