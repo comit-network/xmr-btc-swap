@@ -12,7 +12,7 @@ use std::fmt;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Once};
-use tokio::sync::{broadcast, broadcast::Receiver, broadcast::Sender, RwLock};
+use tokio::sync::{broadcast, broadcast::Sender, RwLock};
 use url::Url;
 
 static START: Once = Once::new();
