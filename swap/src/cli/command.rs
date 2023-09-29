@@ -14,10 +14,6 @@ use structopt::{clap, StructOpt};
 use url::Url;
 use uuid::Uuid;
 
-// See: https://moneroworld.com/
-pub const DEFAULT_MONERO_DAEMON_ADDRESS: &str = "node.community.rino.io:18081";
-pub const DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET: &str = "stagenet.community.rino.io:38081";
-
 // See: https://1209k.com/bitcoin-eye/ele.php?chain=btc
 const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://blockstream.info:700";
 // See: https://1209k.com/bitcoin-eye/ele.php?chain=tbtc
@@ -80,11 +76,11 @@ where
         } => {
             let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
                 bitcoin.apply_defaults(is_testnet)?;
-            let monero_daemon_address = monero.apply_defaults(is_testnet);
             let monero_receive_address =
                 validate_monero_address(monero_receive_address, is_testnet)?;
             let bitcoin_change_address =
                 validate_bitcoin_address(bitcoin_change_address, is_testnet)?;
+            let monero_daemon_address = monero.monero_daemon_address;
 
             Arguments {
                 env_config: env_config_from(is_testnet),
@@ -167,7 +163,7 @@ where
         } => {
             let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
                 bitcoin.apply_defaults(is_testnet)?;
-            let monero_daemon_address = monero.apply_defaults(is_testnet);
+            let monero_daemon_address = monero.monero_daemon_address;
 
             Arguments {
                 env_config: env_config_from(is_testnet),
@@ -254,7 +250,7 @@ pub enum Command {
         bitcoin_target_block: usize,
         bitcoin_change_address: bitcoin::Address,
         monero_receive_address: monero::Address,
-        monero_daemon_address: String,
+        monero_daemon_address: Option<String>,
         tor_socks5_port: u16,
         namespace: XmrBtcNamespace,
     },
@@ -274,7 +270,7 @@ pub enum Command {
         swap_id: Uuid,
         bitcoin_electrum_rpc_url: Url,
         bitcoin_target_block: usize,
-        monero_daemon_address: String,
+        monero_daemon_address: Option<String>,
         tor_socks5_port: u16,
         namespace: XmrBtcNamespace,
     },
@@ -436,21 +432,9 @@ enum RawCommand {
 struct Monero {
     #[structopt(
         long = "monero-daemon-address",
-        help = "Specify to connect to a monero daemon of your choice: <host>:<port>"
+        help = "Specify to connect to a monero daemon of your choice: <host>:<port>. If none is specified, we will connect to a public node."
     )]
     monero_daemon_address: Option<String>,
-}
-
-impl Monero {
-    fn apply_defaults(self, testnet: bool) -> String {
-        if let Some(address) = self.monero_daemon_address {
-            address
-        } else if testnet {
-            DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET.to_string()
-        } else {
-            DEFAULT_MONERO_DAEMON_ADDRESS.to_string()
-        }
-    }
 }
 
 #[derive(structopt::StructOpt, Debug)]
@@ -1174,7 +1158,7 @@ mod tests {
                     bitcoin_change_address: BITCOIN_TESTNET_ADDRESS.parse().unwrap(),
                     monero_receive_address: monero::Address::from_str(MONERO_STAGENET_ADDRESS)
                         .unwrap(),
-                    monero_daemon_address: DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET.to_string(),
+                    monero_daemon_address: None,
                     tor_socks5_port: DEFAULT_SOCKS5_PORT,
                     namespace: XmrBtcNamespace::Testnet,
                 },
@@ -1194,7 +1178,7 @@ mod tests {
                     bitcoin_change_address: BITCOIN_MAINNET_ADDRESS.parse().unwrap(),
                     monero_receive_address: monero::Address::from_str(MONERO_MAINNET_ADDRESS)
                         .unwrap(),
-                    monero_daemon_address: DEFAULT_MONERO_DAEMON_ADDRESS.to_string(),
+                    monero_daemon_address: None,
                     tor_socks5_port: DEFAULT_SOCKS5_PORT,
                     namespace: XmrBtcNamespace::Mainnet,
                 },
@@ -1212,7 +1196,7 @@ mod tests {
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)
                         .unwrap(),
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET,
-                    monero_daemon_address: DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET.to_string(),
+                    monero_daemon_address: None,
                     tor_socks5_port: DEFAULT_SOCKS5_PORT,
                     namespace: XmrBtcNamespace::Testnet,
                 },
@@ -1229,7 +1213,7 @@ mod tests {
                     swap_id: Uuid::from_str(SWAP_ID).unwrap(),
                     bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
                     bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET,
-                    monero_daemon_address: DEFAULT_MONERO_DAEMON_ADDRESS.to_string(),
+                    monero_daemon_address: None,
                     tor_socks5_port: DEFAULT_SOCKS5_PORT,
                     namespace: XmrBtcNamespace::Mainnet,
                 },
