@@ -45,8 +45,6 @@ where
             .await?;
     }
 
-    swap.monero_wallet.store().await?;
-
     Ok(current_state)
 }
 
@@ -147,6 +145,8 @@ where
                             transfer_proof.tx_hash()
                         )
                     })?;
+
+                monero_wallet.store().await?;
 
                 AliceState::XmrLocked {
                     monero_wallet_restore_blockheight,
@@ -353,6 +353,8 @@ where
                     transfer_proof,
                 )
                 .await?;
+
+            monero_wallet.store().await?;
 
             AliceState::XmrRefunded
         }
