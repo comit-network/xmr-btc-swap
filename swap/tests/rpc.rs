@@ -84,8 +84,8 @@ fn assert_has_keys_hashmap(map: &HashMap<String, Value>, keys: &[&str]) {
 #[serial]
 pub async fn can_start_server() {
     setup_test(SlowCancelConfig, |harness_ctx| async move {
-        let (_, _, _) = setup_daemon(harness_ctx).await;
-        assert!(true);
+        let (client, _, _) = setup_daemon(harness_ctx).await;
+        assert!(client.is_connected());
         Ok(())
     })
     .await;
