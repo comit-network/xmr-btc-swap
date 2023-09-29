@@ -284,7 +284,7 @@ pub async fn get_swap_info_valid_swap_id() {
 #[tokio::test]
 #[serial]
 pub async fn swap_endpoints_invalid_or_missing_swap_id() {
-    setup_test(SlowCancelConfig, |mut harness_ctx| async move {
+    setup_test(SlowCancelConfig, |harness_ctx| async move {
         let (client, _, _) = setup_daemon(harness_ctx).await;
 
         for method in ["get_swap_info", "resume_swap", "cancel_refund_swap"].iter() {
@@ -412,7 +412,10 @@ pub async fn withdraw_btc_valid_params() {
             .expect("Expected a valid response");
 
         assert_has_keys_hashmap(&response, &["signed_tx", "amount", "txid"]);
-        assert!(response.get("amount").unwrap().as_f64().unwrap(), 1_000_000);
+        assert_eq!(
+            response.get("amount").unwrap().as_f64().unwrap(),
+            1_000_000.0
+        );
 
         Ok(())
     })
@@ -496,7 +499,7 @@ pub async fn buy_xmr_missing_bitcoin_address() {
 #[serial]
 pub async fn buy_xmr_malformed_bitcoin_address() {
     setup_test(SlowCancelConfig, |harness_ctx| async move {
-        let (client, writer, _) = setup_daemon(harness_ctx).await;
+        let (client, _writer, _) = setup_daemon(harness_ctx).await;
 
         let mut params = ObjectParams::new();
         params
@@ -630,7 +633,7 @@ pub async fn suspend_current_swap_timeout() {
 #[tokio::test]
 #[serial]
 pub async fn buy_xmr_valid_params() {
-    setup_test(SlowCancelConfig, |mut harness_ctx| async move {
+    setup_test(SlowCancelConfig, |harness_ctx| async move {
         let alice_addr = harness_ctx.bob_params.get_concentenated_alice_address();
         let (change_address, receive_address) =
             harness_ctx.bob_params.get_change_receive_addresses().await;
