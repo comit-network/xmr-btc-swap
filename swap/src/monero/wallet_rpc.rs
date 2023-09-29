@@ -1,18 +1,44 @@
 use ::monero::Network;
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Error, Result};
 use big_bytes::BigByte;
 use futures::{StreamExt, TryStreamExt};
 use monero_rpc::wallet::{Client, MoneroWalletRpc as _};
 use reqwest::header::CONTENT_LENGTH;
 use reqwest::Url;
+use serde::Deserialize;
+use std::fmt;
+use std::fmt::{Debug, Display, Formatter};
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::time::Duration;
 use tokio::fs::{remove_file, OpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tokio_util::io::StreamReader;
+
+// See: https://www.moneroworld.com/#nodes, https://monero.fail
+// We don't need any testnet nodes because we don't support testnet at all
+const MONERO_DAEMONS: [MoneroDaemon; 17] = [
+    MoneroDaemon::new("xmr-node.cakewallet.com", 18081, Network::Mainnet),
+    MoneroDaemon::new("nodex.monerujo.io", 18081, Network::Mainnet),
+    MoneroDaemon::new("node.moneroworld.com", 18089, Network::Mainnet),
+    MoneroDaemon::new("nodes.hashvault.pro", 18081, Network::Mainnet),
+    MoneroDaemon::new("p2pmd.xmrvsbeast.com", 18081, Network::Mainnet),
+    MoneroDaemon::new("node.monerodevs.org", 18089, Network::Mainnet),
+    MoneroDaemon::new("xmr-node-usa-east.cakewallet.com", 18081, Network::Mainnet),
+    MoneroDaemon::new("xmr-node-uk.cakewallet.com", 18081, Network::Mainnet),
+    MoneroDaemon::new("node.community.rino.io", 18081, Network::Mainnet),
+    MoneroDaemon::new("testingjohnross.com", 20031, Network::Mainnet),
+    MoneroDaemon::new("xmr.litepay.ch", 18081, Network::Mainnet),
+    MoneroDaemon::new("node.trocador.app", 18089, Network::Mainnet),
+    MoneroDaemon::new("stagenet.xmr-tw.org", 38081, Network::Stagenet),
+    MoneroDaemon::new("node.monerodevs.org", 38089, Network::Stagenet),
+    MoneroDaemon::new("singapore.node.xmr.pm", 38081, Network::Stagenet),
+    MoneroDaemon::new("xmr-lux.boldsuck.org", 38081, Network::Stagenet),
+    MoneroDaemon::new("stagenet.community.rino.io", 38081, Network::Stagenet),
+];
 
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
 compile_error!("unsupported operating system");
@@ -48,6 +74,91 @@ pub struct ExecutableNotFoundInArchive;
 pub struct WalletRpcProcess {
     _child: Child,
     port: u16,
+}
+
+struct MoneroDaemon {
+    address: &'static str,
+    port: u16,
+    network: Network,
+}
+
+impl MoneroDaemon {
+    const fn new(address: &'static str, port: u16, network: Network) -> Self {
+        Self {
+            address,
+            port,
+            network,
+        }
+    }
+
+    /// Checks if the Monero daemon is available by sending a request to its `get_info` endpoint.
+    async fn is_available(&self, client: &reqwest::Client) -> Result<bool, Error> {
+        let url = format!("http://{}:{}/get_info", self.address, self.port);
+        let res = client
+            .get(url)
+            .send()
+            .await
+            .context("Failed to send request to get_info endpoint")?;
+
+        let json: MoneroDaemonGetInfoResponse = res
+            .json()
+            .await
+            .context("Failed to deserialize daemon get_info response")?;
+
+        let is_status_ok = json.status == "OK";
+        let is_synchronized = json.synchronized;
+        let is_correct_network = match self.network {
+            Network::Mainnet => json.mainnet,
+            Network::Stagenet => json.stagenet,
+            Network::Testnet => json.testnet,
+        };
+
+        Ok(is_status_ok && is_synchronized && is_correct_network)
+    }
+}
+
+impl Display for MoneroDaemon {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.address, self.port)
+    }
+}
+
+#[derive(Deserialize)]
+struct MoneroDaemonGetInfoResponse {
+    status: String,
+    synchronized: bool,
+    mainnet: bool,
+    stagenet: bool,
+    testnet: bool,
+}
+
+/// Chooses an available Monero daemon based on the specified network.
+async fn choose_monero_daemon(network: Network) -> Result<&'static MoneroDaemon, Error> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .https_only(false)
+        .build()?;
+
+    // We only want to check for daemons that match the specified network
+    let network_matching_daemons = MONERO_DAEMONS
+        .iter()
+        .filter(|daemon| daemon.network == network);
+
+    for daemon in network_matching_daemons {
+        match daemon.is_available(&client).await {
+            Ok(true) => {
+                tracing::debug!(%daemon, "Found available Monero daemon");
+                return Ok(daemon);
+            }
+            Err(err) => {
+                tracing::debug!(%err, %daemon, "Failed to connect to Monero daemon");
+                continue;
+            }
+            Ok(false) => continue,
+        }
+    }
+
+    bail!("No Monero daemon could be found. Please specify one manually or try again later.")
 }
 
 impl WalletRpcProcess {
@@ -153,13 +264,23 @@ impl WalletRpc {
         Ok(monero_wallet_rpc)
     }
 
-    pub async fn run(&self, network: Network, daemon_address: &str) -> Result<WalletRpcProcess> {
+    pub async fn run(
+        &self,
+        network: Network,
+        daemon_address: Option<String>,
+    ) -> Result<WalletRpcProcess> {
         let port = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await?
             .local_addr()?
             .port();
 
+        let daemon_address = match daemon_address {
+            Some(daemon_address) => daemon_address,
+            None => choose_monero_daemon(network).await?.to_string(),
+        };
+
         tracing::debug!(
+            %daemon_address,
             %port,
             "Starting monero-wallet-rpc"
         );
@@ -232,7 +353,6 @@ impl WalletRpc {
 
     #[cfg(not(target_os = "windows"))]
     async fn extract_archive(monero_wallet_rpc: &Self) -> Result<()> {
-        use anyhow::bail;
         use tokio_tar::Archive;
 
         let mut options = OpenOptions::new();
@@ -295,5 +415,125 @@ impl WalletRpc {
         remove_file(monero_wallet_rpc.archive_path()).await?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn extract_host_and_port(address: String) -> (&'static str, u16) {
+        let parts: Vec<&str> = address.split(':').collect();
+
+        if parts.len() == 2 {
+            let host = parts[0].to_string();
+            let port = parts[1].parse::<u16>().unwrap();
+            let static_str_host: &'static str = Box::leak(host.into_boxed_str());
+            return (static_str_host, port);
+        }
+        panic!("Could not extract host and port from address: {}", address)
+    }
+
+    #[tokio::test]
+    async fn test_is_daemon_available_success() {
+        let mut server = mockito::Server::new();
+
+        let _ = server
+            .mock("GET", "/get_info")
+            .with_status(200)
+            .with_body(
+                r#"
+                {
+                    "status": "OK",
+                    "synchronized": true,
+                    "mainnet": true,
+                    "stagenet": false,
+                    "testnet": false
+                }
+                "#,
+            )
+            .create();
+
+        let (host, port) = extract_host_and_port(server.host_with_port());
+
+        let client = reqwest::Client::new();
+        let result = MoneroDaemon::new(host, port, Network::Mainnet)
+            .is_available(&client)
+            .await;
+
+        assert!(result.is_ok());
+        assert!(result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_is_daemon_available_wrong_network_failure() {
+        let mut server = mockito::Server::new();
+
+        let _ = server
+            .mock("GET", "/get_info")
+            .with_status(200)
+            .with_body(
+                r#"
+                {
+                    "status": "OK",
+                    "synchronized": true,
+                    "mainnet": true,
+                    "stagenet": false,
+                    "testnet": false
+                }
+                "#,
+            )
+            .create();
+
+        let (host, port) = extract_host_and_port(server.host_with_port());
+
+        let client = reqwest::Client::new();
+        let result = MoneroDaemon::new(host, port, Network::Stagenet)
+            .is_available(&client)
+            .await;
+
+        assert!(result.is_ok());
+        assert!(!result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_is_daemon_available_not_synced_failure() {
+        let mut server = mockito::Server::new();
+
+        let _ = server
+            .mock("GET", "/get_info")
+            .with_status(200)
+            .with_body(
+                r#"
+                {
+                    "status": "OK",
+                    "synchronized": false,
+                    "mainnet": true,
+                    "stagenet": false,
+                    "testnet": false
+                }
+                "#,
+            )
+            .create();
+
+        let (host, port) = extract_host_and_port(server.host_with_port());
+
+        let client = reqwest::Client::new();
+        let result = MoneroDaemon::new(host, port, Network::Mainnet)
+            .is_available(&client)
+            .await;
+
+        assert!(result.is_ok());
+        assert!(!result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_is_daemon_available_network_error_failure() {
+        let client = reqwest::Client::new();
+        let result = MoneroDaemon::new("does.not.exist.com", 18081, Network::Mainnet)
+            .is_available(&client)
+            .await;
+
+        assert!(result.is_err());
     }
 }
