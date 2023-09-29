@@ -416,7 +416,7 @@ impl BobParams {
     pub fn get_concentenated_alice_address(&self) -> String {
         format!(
             "{}/p2p/{}",
-            self.alice_address.clone().to_string(),
+            self.alice_address.clone(),
             self.alice_peer_id.clone().to_base58()
         )
     }

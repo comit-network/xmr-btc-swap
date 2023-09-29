@@ -70,7 +70,7 @@ impl SwapLock {
     }
 
     pub async fn get_current_swap_id(&self) -> Option<Uuid> {
-        let current_swap = self.current_swap.read().await.clone();
+        let current_swap = *self.current_swap.read().await;
         current_swap
     }
 
@@ -110,7 +110,7 @@ impl SwapLock {
         if let Some(swap_id) = current_swap.as_ref() {
             tracing::debug!(swap_id = %swap_id, "Releasing swap lock");
 
-            let prev_swap_id = swap_id.clone();
+            let prev_swap_id = *swap_id;
             *current_swap = None;
             drop(current_swap);
             Ok(prev_swap_id)

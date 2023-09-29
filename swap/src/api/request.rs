@@ -151,7 +151,7 @@ impl Method {
             }
         };
         if let Some(log_reference_id) = log_reference_id {
-            span.record("log_reference_id", &log_reference_id.as_str());
+            span.record("log_reference_id", log_reference_id.as_str());
         }
         span
     }
@@ -236,7 +236,7 @@ impl Request {
                             let tx_lock_id = state2.tx_lock.txid();
                             let btc_refund_address = state2.refund_address.to_string();
 
-                            return Some((
+                            Some((
                                 xmr_amount,
                                 btc_amount,
                                 tx_lock_id,
@@ -245,7 +245,7 @@ impl Request {
                                 btc_refund_address,
                                 state2.cancel_timelock,
                                 state2.punish_timelock,
-                            ));
+                            ))
                         } else {
                             None
                         }
@@ -307,7 +307,7 @@ impl Request {
                         biased;
                         _ = context.swap_lock.listen_for_swap_force_suspension() => {
                             tracing::debug!("Shutdown signal received, exiting");
-                            ()
+                            
                         },
                         _ = async {
                             let seed = context.config.seed.as_ref().context("Could not get seed")?;
@@ -421,7 +421,7 @@ impl Request {
                             tracing::debug!(%swap_id, "Swap completed");
                             Ok(())
                         } => {
-                            ()
+                            
                         }
                     };
                     context
@@ -517,11 +517,11 @@ impl Request {
                              };
                              Ok::<(), anyhow::Error>(())
                         } => {
-                            ()
+                            
                         },
                         _ = context.swap_lock.listen_for_swap_force_suspension() => {
                              tracing::debug!("Shutdown signal received, exiting");
-                             ()
+                             
                          }
                     }
                     context
@@ -728,11 +728,11 @@ impl Request {
 
                     tracing::info!(address=%address, spend_key=%spend_key, view_key=%view_key, "Monero recovery information");
 
-                    return Ok(json!({
+                    Ok(json!({
                         "address": address,
                         "spend_key": spend_key.to_string(),
                         "view_key": view_key.to_string(),
-                    }));
+                    }))
                 } else {
                     bail!(
                         "Cannot print monero recovery information in state {}, only possible for BtcRedeemed",
@@ -750,7 +750,7 @@ impl Request {
         let method_span = self
             .cmd
             .get_tracing_span(self.log_reference.clone())
-            .clone();
+            ;
 
         self.handle_cmd(context).instrument(method_span).await
     }

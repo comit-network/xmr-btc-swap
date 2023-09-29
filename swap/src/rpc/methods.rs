@@ -233,7 +233,7 @@ async fn execute_request(
         .ok()
         .and_then(|params_parsed| params_parsed.get("log_reference_id").cloned());
 
-    let request = Request::with_id(cmd, reference_id.map(|s| s.clone()));
+    let request = Request::with_id(cmd, reference_id);
     request
         .call(Arc::clone(context))
         .await

@@ -1008,7 +1008,7 @@ mod tests {
     fn given_depth_0_should_meet_confirmation_target_one() {
         let script = ScriptStatus::Confirmed(Confirmed { depth: 0 });
 
-        let confirmed = script.is_confirmed_with(1 as u32);
+        let confirmed = script.is_confirmed_with(1_u32);
 
         assert!(confirmed)
     }
@@ -1017,7 +1017,7 @@ mod tests {
     fn given_confirmations_1_should_meet_confirmation_target_one() {
         let script = ScriptStatus::from_confirmations(1);
 
-        let confirmed = script.is_confirmed_with(1 as u32);
+        let confirmed = script.is_confirmed_with(1_u32);
 
         assert!(confirmed)
     }
@@ -1036,7 +1036,7 @@ mod tests {
     fn given_depth_0_should_return_0_blocks_left_until_1() {
         let script = ScriptStatus::Confirmed(Confirmed { depth: 0 });
 
-        let blocks_left = script.blocks_left_until(1 as u32);
+        let blocks_left = script.blocks_left_until(1_u32);
 
         assert_eq!(blocks_left, 0)
     }
@@ -1045,7 +1045,7 @@ mod tests {
     fn given_depth_1_should_return_0_blocks_left_until_1() {
         let script = ScriptStatus::Confirmed(Confirmed { depth: 1 });
 
-        let blocks_left = script.blocks_left_until(1 as u32);
+        let blocks_left = script.blocks_left_until(1_u32);
 
         assert_eq!(blocks_left, 0)
     }
@@ -1054,7 +1054,7 @@ mod tests {
     fn given_depth_0_should_return_1_blocks_left_until_2() {
         let script = ScriptStatus::Confirmed(Confirmed { depth: 0 });
 
-        let blocks_left = script.blocks_left_until(2 as u32);
+        let blocks_left = script.blocks_left_until(2_u32);
 
         assert_eq!(blocks_left, 1)
     }

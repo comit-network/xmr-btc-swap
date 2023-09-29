@@ -301,7 +301,7 @@ pub mod bitcoin_address {
         } else {
             bitcoin::Network::Bitcoin
         };
-        return validate(address, expected_network);
+        validate(address, expected_network)
     }
 }
 
