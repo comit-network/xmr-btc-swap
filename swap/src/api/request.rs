@@ -438,75 +438,75 @@ impl Request {
             Method::Resume { swap_id } => {
                 context.swap_lock.acquire_swap_lock(swap_id).await?;
 
+                let seller_peer_id = context.db.get_peer_id(swap_id).await?;
+                let seller_addresses = context.db.get_addresses(seller_peer_id).await?;
+
+                let seed = context
+                    .config
+                    .seed
+                    .as_ref()
+                    .context("Could not get seed")?
+                    .derive_libp2p_identity();
+
+                let behaviour = cli::Behaviour::new(
+                    seller_peer_id,
+                    context.config.env_config,
+                    Arc::clone(
+                        context
+                            .bitcoin_wallet
+                            .as_ref()
+                            .context("Could not get Bitcoin wallet")?,
+                    ),
+                    (seed.clone(), context.config.namespace),
+                );
+                let mut swarm = swarm::cli(
+                    seed.clone(),
+                    context
+                        .config
+                        .tor_socks5_port
+                        .context("Could not get Tor SOCKS5 port")?,
+                    behaviour,
+                )
+                    .await?;
+                let our_peer_id = swarm.local_peer_id();
+
+                tracing::debug!(peer_id = %our_peer_id, "Network layer initialized");
+
+                for seller_address in seller_addresses {
+                    swarm
+                        .behaviour_mut()
+                        .add_address(seller_peer_id, seller_address);
+                }
+
+                let (event_loop, event_loop_handle) =
+                    EventLoop::new(swap_id, swarm, seller_peer_id)?;
+                let monero_receive_address = context.db.get_monero_address(swap_id).await?;
+                let swap = Swap::from_db(
+                    Arc::clone(&context.db),
+                    swap_id,
+                    Arc::clone(
+                        context
+                            .bitcoin_wallet
+                            .as_ref()
+                            .context("Could not get Bitcoin wallet")?,
+                    ),
+                    Arc::clone(
+                        context
+                            .monero_wallet
+                            .as_ref()
+                            .context("Could not get Monero wallet")?,
+                    ),
+                    context.config.env_config,
+                    event_loop_handle,
+                    monero_receive_address,
+                ).await?;
+
                 tokio::spawn(async move {
                     tokio::select! {
                         _ = async {
-                            let seller_peer_id = context.db.get_peer_id(swap_id).await?;
-                            let seller_addresses = context.db.get_addresses(seller_peer_id).await?;
-
-                             let seed = context
-                                 .config
-                                 .seed
-                                 .as_ref()
-                                 .context("Could not get seed")?
-                                 .derive_libp2p_identity();
-
-                             let behaviour = cli::Behaviour::new(
-                                 seller_peer_id,
-                                 context.config.env_config,
-                                 Arc::clone(
-                                     context
-                                         .bitcoin_wallet
-                                         .as_ref()
-                                         .context("Could not get Bitcoin wallet")?,
-                                 ),
-                                 (seed.clone(), context.config.namespace),
-                             );
-                             let mut swarm = swarm::cli(
-                                 seed.clone(),
-                                 context
-                                     .config
-                                     .tor_socks5_port
-                                     .context("Could not get Tor SOCKS5 port")?,
-                                 behaviour,
-                             )
-                                 .await?;
-                             let our_peer_id = swarm.local_peer_id();
-
-                             tracing::debug!(peer_id = %our_peer_id, "Network layer initialized");
-
-                             for seller_address in seller_addresses {
-                                 swarm
-                                     .behaviour_mut()
-                                     .add_address(seller_peer_id, seller_address);
-                             }
-
-                             let (event_loop, event_loop_handle) =
-                                 EventLoop::new(swap_id, swarm, seller_peer_id)?;
                              let handle = tokio::spawn(event_loop.run().instrument(Span::none()));
 
-                             let monero_receive_address = context.db.get_monero_address(swap_id).await?;
-                             let swap = Swap::from_db(
-                                 Arc::clone(&context.db),
-                                 swap_id,
-                                 Arc::clone(
-                                     context
-                                         .bitcoin_wallet
-                                         .as_ref()
-                                         .context("Could not get Bitcoin wallet")?,
-                                 ),
-                                 Arc::clone(
-                                     context
-                                         .monero_wallet
-                                         .as_ref()
-                                         .context("Could not get Monero wallet")?,
-                                 ),
-                                 context.config.env_config,
-                                 event_loop_handle,
-                                 monero_receive_address,
-                             )
-                                 .await?;
-
+                             
                              tokio::select! {
                                  event_loop_result = handle => {
                                      event_loop_result?;
