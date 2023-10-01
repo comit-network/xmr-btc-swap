@@ -12,14 +12,13 @@ use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
 
-pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
+pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>> {
     let mut module = RpcModule::new(context);
 
     module
         .register_async_method("suspend_current_swap", |params, context| async move {
             execute_request(params, Method::SuspendCurrentSwap, &context).await
-        })
-        .unwrap();
+        })?;
 
     module
         .register_async_method("get_swap_info", |params_raw, context| async move {
@@ -35,26 +34,22 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
                 &context,
             )
             .await
-        })
-        .unwrap();
+        })?;
 
     module
         .register_async_method("get_bitcoin_balance", |params, context| async move {
             execute_request(params, Method::Balance, &context).await
-        })
-        .unwrap();
+        })?;
 
     module
         .register_async_method("get_history", |params, context| async move {
             execute_request(params, Method::History, &context).await
-        })
-        .unwrap();
+        })?;
 
     module
         .register_async_method("get_raw_states", |params, context| async move {
             execute_request(params, Method::GetRawStates, &context).await
-        })
-        .unwrap();
+        })?;
 
     module
         .register_async_method("resume_swap", |params_raw, context| async move {
@@ -65,8 +60,7 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
             })?;
 
             execute_request(params_raw, Method::Resume { swap_id: *swap_id }, &context).await
-        })
-        .unwrap();
+        })?;
 
     module
         .register_async_method("cancel_refund_swap", |params_raw, context| async move {
@@ -82,8 +76,7 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
                 &context,
             )
             .await
-        })
-        .unwrap();
+        })?;
 
     module
         .register_async_method(
@@ -101,9 +94,7 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
                     &context,
                 )
                 .await
-            },
-        )
-        .unwrap();
+            })?;
 
     module
         .register_async_method("withdraw_btc", |params_raw, context| async move {
@@ -139,8 +130,7 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
                 &context,
             )
             .await
-        })
-        .unwrap();
+        })?;
 
     module
         .register_async_method("buy_xmr", |params_raw, context| async move {
@@ -190,8 +180,7 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
                 &context,
             )
             .await
-        })
-        .unwrap();
+        })?;
 
     module
         .register_async_method("list_sellers", |params_raw, context| async move {
@@ -208,16 +197,14 @@ pub fn register_modules(context: Arc<Context>) -> RpcModule<Arc<Context>> {
                 &context,
             )
             .await
-        })
-        .unwrap();
+        })?;
 
     module
         .register_async_method("get_current_swap", |params, context| async move {
             execute_request(params, Method::GetCurrentSwap, &context).await
-        })
-        .unwrap();
+        })?;
 
-    module
+    Ok(module)
 }
 
 async fn execute_request(

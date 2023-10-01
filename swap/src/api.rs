@@ -120,6 +120,12 @@ impl SwapLock {
     }
 }
 
+impl Default for SwapLock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // workaround for warning over monero_rpc_process which we must own but not read
 #[allow(dead_code)]
 pub struct Context {
@@ -131,6 +137,7 @@ pub struct Context {
     pub config: Config,
 }
 
+#[allow(clippy::too_many_arguments)]
 impl Context {
     pub async fn build(
         bitcoin: Option<Bitcoin>,
@@ -219,7 +226,7 @@ impl Context {
             bitcoin_wallet: Some(bob_bitcoin_wallet),
             monero_wallet: Some(bob_monero_wallet),
             config,
-            db: open_db(db_path).await.unwrap(),
+            db: open_db(db_path).await.expect("Could not open sqlite database"),
             monero_rpc_process: None,
             swap_lock: Arc::new(SwapLock::new()),
         }
@@ -310,7 +317,7 @@ fn env_config_from(testnet: bool) -> EnvConfig {
 
 impl Config {
     pub fn for_harness(seed: Seed, env_config: EnvConfig) -> Self {
-        let data_dir = data::data_dir_from(None, false).unwrap();
+        let data_dir = data::data_dir_from(None, false).expect("Could not find data directory");
 
         Self {
             tor_socks5_port: None,

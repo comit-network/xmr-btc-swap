@@ -20,7 +20,7 @@ pub async fn run_server(
     let mut modules = RpcModule::new(());
     {
         modules
-            .merge(methods::register_modules(Arc::clone(&context)))
+            .merge(methods::register_modules(Arc::clone(&context))?)
             .expect("Could not register RPC modules")
     }
 
