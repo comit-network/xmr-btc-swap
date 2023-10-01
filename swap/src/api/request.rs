@@ -177,11 +177,11 @@ impl Request {
             Method::SuspendCurrentSwap => {
                 let swap_id = context.swap_lock.get_current_swap_id().await;
 
-                if swap_id.is_some() {
+                if let Some(id_value) = swap_id {
                     context.swap_lock.send_suspend_signal().await?;
 
                     Ok(json!({
-                        "swapId": swap_id.unwrap()
+                        "swapId": id_value
                     }))
                 } else {
                     bail!("No swap is currently running")
@@ -624,7 +624,7 @@ impl Request {
             }
             Method::StartDaemon { server_address } => {
                 // Default to 127.0.0.1:1234
-                let server_address = server_address.unwrap_or("127.0.0.1:1234".parse().unwrap());
+                let server_address = server_address.unwrap_or("127.0.0.1:1234".parse()?);
 
                 let (addr, server_handle) =
                     rpc::run_server(server_address, Arc::clone(&context)).await?;

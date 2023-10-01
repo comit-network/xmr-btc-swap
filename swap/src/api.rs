@@ -268,7 +268,7 @@ async fn init_monero_wallet(
     let monero_wallet_rpc = monero::WalletRpc::new(data_dir.join("monero")).await?;
 
     let monero_wallet_rpc_process = monero_wallet_rpc
-        .run(network, monero_daemon_address.as_str())
+        .run(network, Some(monero_daemon_address))
         .await?;
 
     let monero_wallet = monero::Wallet::open_or_create(

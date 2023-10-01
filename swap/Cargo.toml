@@ -1,6 +1,6 @@
 [package]
 name = "swap"
-version = "0.12.2"
+version = "0.12.3"
 authors = [ "The COMIT guys <hello@comit.network>" ]
 edition = "2021"
 description = "XMR/BTC trustless atomic swaps."
@@ -80,7 +80,7 @@ bitcoin-harness = "0.2.2"
 get-port = "3"
 hyper = "0.14"
 jsonrpsee = { version = "0.16.2", features = [ "ws-client" ] }
-jsonrpsee-types = { version = "0.16.2" }
+mockito = "1.1.0"
 monero-harness = { path = "../monero-harness" }
 port_check = "0.1"
 proptest = "1"

@@ -13,14 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.0.0
 
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.67
           components: clippy,rustfmt
 
-      - uses: Swatinem/rust-cache@v2.6.0
+      - uses: Swatinem/rust-cache@v2.6.2
 
       - name: Check formatting
         uses: dprint/check@v2.2
@@ -37,9 +37,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.0.0
 
-      - uses: Swatinem/rust-cache@v2.6.0
+      - uses: Swatinem/rust-cache@v2.6.2
 
       - name: Build swap
         run: cargo build --bin swap
@@ -51,12 +51,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.0.0
 
-      - uses: Swatinem/rust-cache@v2.6.0
+      - uses: Swatinem/rust-cache@v2.6.2
 
       - name: Install sqlx-cli
-        run: cargo install sqlx-cli
+        run: cargo install sqlx-cli --locked
 
       - name: Run sqlite_dev_setup.sh script
         run: |
@@ -78,9 +78,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.0.0
 
-      - uses: Swatinem/rust-cache@v2.6.0
+      - uses: Swatinem/rust-cache@v2.6.2
 
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -118,9 +118,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.0.0
 
-      - uses: Swatinem/rust-cache@v2.6.0
+      - uses: Swatinem/rust-cache@v2.6.2
 
       - name: Build tests
         run: cargo build --tests --workspace --all-features
@@ -155,9 +155,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.0.0
 
-      - uses: Swatinem/rust-cache@v2.6.0
+      - uses: Swatinem/rust-cache@v2.6.2
 
       - name: Run test ${{ matrix.test_name }}
         run: cargo test --package swap --all-features --test ${{ matrix.test_name }} -- --nocapture

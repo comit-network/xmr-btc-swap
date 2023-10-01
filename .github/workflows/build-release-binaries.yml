@@ -45,16 +45,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout tagged commit
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.0.0
         with:
           ref: ${{ github.event.release.target_commitish }}
           token: ${{ secrets.BOTTY_GITHUB_TOKEN }}
 
-      - uses: Swatinem/rust-cache@v2.6.0
+      - uses: Swatinem/rust-cache@v2.6.2
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.63
+          toolchain: 1.67
           targets: armv7-unknown-linux-gnueabihf
 
       - name: Build ${{ matrix.target }} ${{ matrix.bin }} release binary

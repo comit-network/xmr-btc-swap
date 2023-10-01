@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.3] - 2023-09-20
+
+- Swap: If no Monero daemon is manually specified, we will automatically choose one from a list of public daemons by connecting to each and checking their availability.
+
 ## [0.12.2] - 2023-08-08
 
 ### Changed
@@ -345,7 +349,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[Unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.12.2...HEAD
+[Unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.12.3...HEAD
+[0.12.3]: https://github.com/comit-network/xmr-btc-swap/compare/0.12.2...0.12.3
 [0.12.2]: https://github.com/comit-network/xmr-btc-swap/compare/0.12.1...0.12.2
 [0.12.1]: https://github.com/comit-network/xmr-btc-swap/compare/0.12.0...0.12.1
 [0.12.0]: https://github.com/comit-network/xmr-btc-swap/compare/0.11.0...0.12.0
