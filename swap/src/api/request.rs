@@ -71,81 +71,81 @@ impl Method {
     fn get_tracing_span(&self, log_reference_id: Option<String>) -> Span {
         let span = match self {
             Method::Balance => {
-                debug_span!("method", name = "Balance", log_reference_id = field::Empty)
+                debug_span!("method", method_name = "Balance", log_reference_id = field::Empty)
             }
             Method::BuyXmr { swap_id, .. } => {
-                debug_span!("method", name="BuyXmr", swap_id=%swap_id, log_reference_id=field::Empty)
+                debug_span!("method", method_name="BuyXmr", swap_id=%swap_id, log_reference_id=field::Empty)
             }
             Method::CancelAndRefund { swap_id } => {
-                debug_span!("method", name="CancelAndRefund", swap_id=%swap_id, log_reference_id=field::Empty)
+                debug_span!("method", method_name="CancelAndRefund", swap_id=%swap_id, log_reference_id=field::Empty)
             }
             Method::Resume { swap_id } => {
-                debug_span!("method", name="Resume", swap_id=%swap_id, log_reference_id=field::Empty)
+                debug_span!("method", method_name="Resume", swap_id=%swap_id, log_reference_id=field::Empty)
             }
             Method::Config => {
-                debug_span!("method", name = "Config", log_reference_id = field::Empty)
+                debug_span!("method", method_name = "Config", log_reference_id = field::Empty)
             }
             Method::ExportBitcoinWallet => {
                 debug_span!(
                     "method",
-                    name = "ExportBitcoinWallet",
+                    method_name = "ExportBitcoinWallet",
                     log_reference_id = field::Empty
                 )
             }
             Method::GetCurrentSwap => {
                 debug_span!(
                     "method",
-                    name = "GetCurrentSwap",
+                    method_name = "GetCurrentSwap",
                     log_reference_id = field::Empty
                 )
             }
             Method::GetSwapInfo { .. } => {
                 debug_span!(
                     "method",
-                    name = "GetSwapInfo",
+                    method_name = "GetSwapInfo",
                     log_reference_id = field::Empty
                 )
             }
             Method::History => {
-                debug_span!("method", name = "History", log_reference_id = field::Empty)
+                debug_span!("method", method_name = "History", log_reference_id = field::Empty)
             }
             Method::ListSellers { .. } => {
                 debug_span!(
                     "method",
-                    name = "ListSellers",
+                    method_name = "ListSellers",
                     log_reference_id = field::Empty
                 )
             }
             Method::MoneroRecovery { .. } => {
                 debug_span!(
                     "method",
-                    name = "MoneroRecovery",
+                    method_name = "MoneroRecovery",
                     log_reference_id = field::Empty
                 )
             }
             Method::GetRawStates => debug_span!(
                 "method",
-                name = "RawHistory",
+                method_name = "RawHistory",
                 log_reference_id = field::Empty
             ),
             Method::StartDaemon { .. } => {
                 debug_span!(
                     "method",
-                    name = "StartDaemon",
+                    method_name = "StartDaemon",
                     log_reference_id = field::Empty
                 )
             }
             Method::SuspendCurrentSwap => {
                 debug_span!(
                     "method",
-                    name = "SuspendCurrentSwap",
+                    method_name = "SuspendCurrentSwap",
                     log_reference_id = field::Empty
                 )
             }
             Method::WithdrawBtc { .. } => {
                 debug_span!(
                     "method",
-                    name = "WithdrawBtc",
+                    method_name = "WithdrawBtc",
                     log_reference_id = field::Empty
                 )
             }
@@ -346,7 +346,7 @@ impl Request {
 
                             let (event_loop, mut event_loop_handle) =
                                 EventLoop::new(swap_id, swarm, seller_peer_id)?;
-                            let event_loop = tokio::spawn(event_loop.run().instrument(Span::none()));
+                            let event_loop = tokio::spawn(event_loop.run().in_current_span());
 
                             let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
                             let estimate_fee = |amount| bitcoin_wallet.estimate_fee(TxLock::weight(), amount);
@@ -429,7 +429,7 @@ impl Request {
                         .release_swap_lock()
                         .await
                         .expect("Could not release swap lock");
-                }.instrument(Span::none()));
+                }.in_current_span());
 
                 Ok(json!({
                     "swapId": swap_id.to_string(),
@@ -504,9 +504,8 @@ impl Request {
                 tokio::spawn(async move {
                     tokio::select! {
                         _ = async {
-                             let handle = tokio::spawn(event_loop.run().instrument(Span::none()));
+                             let handle = tokio::spawn(event_loop.run().in_current_span());
 
-                             
                              tokio::select! {
                                  event_loop_result = handle => {
                                      event_loop_result?;
@@ -529,7 +528,7 @@ impl Request {
                         .release_swap_lock()
                         .await
                         .expect("Could not release swap lock");
-                }.instrument(Span::none()));
+                }.in_current_span());
                 Ok(json!({
                     "result": "ok",
                 }))
