@@ -365,7 +365,7 @@ pub mod monero_address {
         is_testnet: bool,
     ) -> Result<monero::Address> {
         let expected_network = if is_testnet {
-            monero::Network::Testnet
+            monero::Network::Stagenet
         } else {
             monero::Network::Mainnet
         };
