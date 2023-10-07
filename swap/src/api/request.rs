@@ -70,7 +70,11 @@ impl Method {
     fn get_tracing_span(&self, log_reference_id: Option<String>) -> Span {
         let span = match self {
             Method::Balance => {
-                debug_span!("method", method_name = "Balance", log_reference_id = field::Empty)
+                debug_span!(
+                    "method",
+                    method_name = "Balance",
+                    log_reference_id = field::Empty
+                )
             }
             Method::BuyXmr { swap_id, .. } => {
                 debug_span!("method", method_name="BuyXmr", swap_id=%swap_id, log_reference_id=field::Empty)
@@ -82,7 +86,11 @@ impl Method {
                 debug_span!("method", method_name="Resume", swap_id=%swap_id, log_reference_id=field::Empty)
             }
             Method::Config => {
-                debug_span!("method", method_name = "Config", log_reference_id = field::Empty)
+                debug_span!(
+                    "method",
+                    method_name = "Config",
+                    log_reference_id = field::Empty
+                )
             }
             Method::ExportBitcoinWallet => {
                 debug_span!(
@@ -106,7 +114,11 @@ impl Method {
                 )
             }
             Method::History => {
-                debug_span!("method", method_name = "History", log_reference_id = field::Empty)
+                debug_span!(
+                    "method",
+                    method_name = "History",
+                    log_reference_id = field::Empty
+                )
             }
             Method::ListSellers { .. } => {
                 debug_span!(
@@ -179,9 +191,7 @@ impl Request {
                 if let Some(id_value) = swap_id {
                     context.swap_lock.send_suspend_signal().await?;
 
-                    Ok(json!({
-                        "swapId": id_value
-                    }))
+                    Ok(json!({ "swapId": id_value }))
                 } else {
                     bail!("No swap is currently running")
                 }
@@ -301,7 +311,12 @@ impl Request {
             } => {
                 context.swap_lock.acquire_swap_lock(swap_id).await?;
 
-                let bitcoin_wallet = Arc::clone(&context.bitcoin_wallet.as_ref().expect("Could not find Bitcoin wallet"));
+                let bitcoin_wallet = Arc::clone(
+                    &context
+                        .bitcoin_wallet
+                        .as_ref()
+                        .expect("Could not find Bitcoin wallet"),
+                );
                 let env_config = context.config.env_config;
                 let seed = context.config.seed.clone().context("Could not get seed")?;
 
@@ -415,9 +430,7 @@ impl Request {
                             }
                             tracing::debug!(%swap_id, "Swap completed");
                             Ok::<_, anyhow::Error>(())
-                        } => {
-                            
-                        }
+                        } => { }
                     };
                     context
                         .swap_lock
@@ -462,7 +475,7 @@ impl Request {
                         .context("Could not get Tor SOCKS5 port")?,
                     behaviour,
                 )
-                    .await?;
+                .await?;
                 let our_peer_id = swarm.local_peer_id();
 
                 tracing::debug!(peer_id = %our_peer_id, "Network layer initialized");
@@ -494,36 +507,40 @@ impl Request {
                     context.config.env_config,
                     event_loop_handle,
                     monero_receive_address,
-                ).await?;
+                )
+                .await?;
 
-                tokio::spawn(async move {
-                    tokio::select! {
-                        _ = async {
-                             let handle = tokio::spawn(event_loop.run().in_current_span());
+                tokio::spawn(
+                    async move {
+                        tokio::select! {
+                            _ = async {
+                                 let handle = tokio::spawn(event_loop.run().in_current_span());
 
-                             tokio::select! {
-                                 event_loop_result = handle => {
-                                     event_loop_result?;
-                                 },
-                                 swap_result = bob::run(swap) => {
-                                     swap_result?;
-                                 }
-                             };
-                             Ok::<(), anyhow::Error>(())
-                        } => {
-                            
-                        },
-                        _ = context.swap_lock.listen_for_swap_force_suspension() => {
-                             tracing::debug!("Shutdown signal received, exiting");
-                             
-                         }
+                                 tokio::select! {
+                                     event_loop_result = handle => {
+                                         event_loop_result?;
+                                     },
+                                     swap_result = bob::run(swap) => {
+                                         swap_result?;
+                                     }
+                                 };
+                                 Ok::<(), anyhow::Error>(())
+                            } => {
+
+                            },
+                            _ = context.swap_lock.listen_for_swap_force_suspension() => {
+                                 tracing::debug!("Shutdown signal received, exiting");
+
+                             }
+                        }
+                        context
+                            .swap_lock
+                            .release_swap_lock()
+                            .await
+                            .expect("Could not release swap lock");
                     }
-                    context
-                        .swap_lock
-                        .release_swap_lock()
-                        .await
-                        .expect("Could not release swap lock");
-                }.in_current_span());
+                    .in_current_span(),
+                );
                 Ok(json!({
                     "result": "ok",
                 }))
@@ -741,10 +758,7 @@ impl Request {
     }
 
     pub async fn call(self, context: Arc<Context>) -> Result<serde_json::Value> {
-        let method_span = self
-            .cmd
-            .get_tracing_span(self.log_reference.clone())
-            ;
+        let method_span = self.cmd.get_tracing_span(self.log_reference.clone());
 
         self.handle_cmd(context).instrument(method_span).await
     }

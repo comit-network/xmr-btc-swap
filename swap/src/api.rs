@@ -226,7 +226,9 @@ impl Context {
             bitcoin_wallet: Some(bob_bitcoin_wallet),
             monero_wallet: Some(bob_monero_wallet),
             config,
-            db: open_db(db_path).await.expect("Could not open sqlite database"),
+            db: open_db(db_path)
+                .await
+                .expect("Could not open sqlite database"),
             monero_rpc_process: None,
             swap_lock: Arc::new(SwapLock::new()),
         }

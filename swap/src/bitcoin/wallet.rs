@@ -785,7 +785,7 @@ impl Client {
 
         if !self.script_history.contains_key(&script) {
             self.script_history.insert(script.clone(), vec![]);
-     
+
             // When we first subscribe to a script we want to immediately fetch its status
             // Otherwise we would have to wait for the next sync interval, which can take a minute
             // This would result in potentially inaccurate status updates until that next sync interval is hit
