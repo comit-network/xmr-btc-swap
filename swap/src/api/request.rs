@@ -311,92 +311,124 @@ impl Request {
             } => {
                 context.swap_lock.acquire_swap_lock(swap_id).await?;
 
-                let bitcoin_wallet = Arc::clone(
-                    &context
-                        .bitcoin_wallet
-                        .as_ref()
-                        .expect("Could not find Bitcoin wallet"),
-                );
-                let env_config = context.config.env_config;
-                let seed = context.config.seed.clone().context("Could not get seed")?;
-
-                let seller_peer_id = seller
-                    .extract_peer_id()
-                    .context("Seller address must contain peer ID")?;
-                context
-                    .db
-                    .insert_address(seller_peer_id, seller.clone())
-                    .await?;
-
-                let behaviour = cli::Behaviour::new(
-                    seller_peer_id,
-                    env_config,
-                    bitcoin_wallet.clone(),
-                    (seed.derive_libp2p_identity(), context.config.namespace),
-                );
-                let mut swarm = swarm::cli(
-                    seed.derive_libp2p_identity(),
-                    context
-                        .config
-                        .tor_socks5_port
-                        .context("Could not get Tor SOCKS5 port")?,
-                    behaviour,
-                )
-                .await?;
-                swarm.behaviour_mut().add_address(seller_peer_id, seller);
-
-                tracing::debug!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
-
-                let (event_loop, mut event_loop_handle) =
-                    EventLoop::new(swap_id, swarm, seller_peer_id)?;
-                let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
-                let estimate_fee = |amount| bitcoin_wallet.estimate_fee(TxLock::weight(), amount);
-                let (amount, fees) = match determine_btc_to_swap(
-                    context.config.json,
-                    event_loop_handle.request_quote(),
-                    bitcoin_wallet.new_address(),
-                    || bitcoin_wallet.balance(),
-                    max_givable,
-                    || bitcoin_wallet.sync(),
-                    estimate_fee,
-                )
-                .await
-                {
-                    Ok(val) => val,
-                    Err(error) => match error.downcast::<ZeroQuoteReceived>() {
-                        Ok(_) => {
-                            bail!("Seller's XMR balance is currently too low to initiate a swap, please try again later")
-                        }
-                        Err(other) => bail!(other),
+                let initialize_swap = tokio::select! {
+                    biased;
+                    _ = context.swap_lock.listen_for_swap_force_suspension() => {
+                        tracing::debug!("Shutdown signal received, exiting");
+                        bail!("Shutdown signal received");
                     },
+                    result = async {
+                        let bitcoin_wallet = Arc::clone(
+                            context
+                                .bitcoin_wallet
+                                .as_ref()
+                                .expect("Could not find Bitcoin wallet"),
+                        );
+                        let env_config = context.config.env_config;
+                        let seed = context.config.seed.clone().context("Could not get seed")?;
+
+                        let seller_peer_id = seller
+                            .extract_peer_id()
+                            .context("Seller address must contain peer ID")?;
+                        context
+                            .db
+                            .insert_address(seller_peer_id, seller.clone())
+                            .await?;
+
+                        let behaviour = cli::Behaviour::new(
+                            seller_peer_id,
+                            env_config,
+                            bitcoin_wallet.clone(),
+                            (seed.derive_libp2p_identity(), context.config.namespace),
+                        );
+                        let mut swarm = swarm::cli(
+                            seed.derive_libp2p_identity(),
+                            context
+                                .config
+                                .tor_socks5_port
+                                .context("Could not get Tor SOCKS5 port")?,
+                            behaviour,
+                        )
+                        .await?;
+                        swarm.behaviour_mut().add_address(seller_peer_id, seller);
+
+                        tracing::debug!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
+
+                        let (event_loop, mut event_loop_handle) =
+                            EventLoop::new(swap_id, swarm, seller_peer_id)?;
+                        let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
+                        let estimate_fee = |amount| bitcoin_wallet.estimate_fee(TxLock::weight(), amount);
+                        let determine_amount = determine_btc_to_swap(
+                            context.config.json,
+                            event_loop_handle.request_quote(),
+                            bitcoin_wallet.new_address(),
+                            || bitcoin_wallet.balance(),
+                            max_givable,
+                            || bitcoin_wallet.sync(),
+                            estimate_fee,
+                        );
+
+                        let (amount, fees) = tokio::select! {
+                            biased;
+                            _ = context.swap_lock.listen_for_swap_force_suspension() => {
+                                tracing::debug!("Shutdown signal received, exiting");
+                                bail!("Shutdown signal received");
+                            },
+                            result = determine_amount => {
+                                match result {
+                                    Ok(val) => val,
+                                    Err(error) => match error.downcast::<ZeroQuoteReceived>() {
+                                        Ok(_) => {
+                                            bail!("Seller's XMR balance is currently too low to initiate a swap, please try again later")
+                                        }
+                                        Err(other) => bail!(other),
+                                    },
+                                }
+                            }
+                        };
+
+                        tracing::info!(%amount, %fees,  "Determined swap amount");
+
+                        context.db.insert_peer_id(swap_id, seller_peer_id).await?;
+
+                        context
+                            .db
+                            .insert_monero_address(swap_id, monero_receive_address)
+                            .await?;
+                        let monero_wallet = context
+                            .monero_wallet
+                            .as_ref()
+                            .context("Could not get Monero wallet")?;
+
+                        let swap = Swap::new(
+                            Arc::clone(&context.db),
+                            swap_id,
+                            Arc::clone(&bitcoin_wallet),
+                            Arc::clone(monero_wallet),
+                            env_config,
+                            event_loop_handle,
+                            monero_receive_address,
+                            bitcoin_change_address,
+                            amount,
+                        );
+
+                        let event_loop = tokio::spawn(event_loop.run().in_current_span());
+                        Ok((event_loop,swap))
+                    } => result,
                 };
 
-                tracing::info!(%amount, %fees,  "Determined swap amount");
-
-                context.db.insert_peer_id(swap_id, seller_peer_id).await?;
-
-                context
-                    .db
-                    .insert_monero_address(swap_id, monero_receive_address)
-                    .await?;
-                let monero_wallet = context
-                    .monero_wallet
-                    .as_ref()
-                    .context("Could not get Monero wallet")?;
-
-                let swap = Swap::new(
-                    Arc::clone(&context.db),
-                    swap_id,
-                    Arc::clone(&bitcoin_wallet),
-                    Arc::clone(monero_wallet),
-                    env_config,
-                    event_loop_handle,
-                    monero_receive_address,
-                    bitcoin_change_address,
-                    amount,
-                );
-
-                let event_loop = tokio::spawn(event_loop.run().in_current_span());
+                let (event_loop, swap) = match initialize_swap {
+                    Ok((event_loop, swap)) => (event_loop, swap),
+                    Err(error) => {
+                        tracing::error!(%swap_id, "Swap initialization failed: {:#}", error);
+                        context
+                            .swap_lock
+                            .release_swap_lock()
+                            .await
+                            .expect("Could not release swap lock");
+                        bail!(error);
+                    }
+                };
 
                 tokio::spawn(async move {
                     tokio::select! {
