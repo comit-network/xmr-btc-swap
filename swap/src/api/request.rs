@@ -368,23 +368,14 @@ impl Request {
                             estimate_fee,
                         );
 
-                        let (amount, fees) = tokio::select! {
-                            biased;
-                            _ = context.swap_lock.listen_for_swap_force_suspension() => {
-                                tracing::debug!("Shutdown signal received, exiting");
-                                bail!("Shutdown signal received");
-                            },
-                            result = determine_amount => {
-                                match result {
-                                    Ok(val) => val,
-                                    Err(error) => match error.downcast::<ZeroQuoteReceived>() {
-                                        Ok(_) => {
-                                            bail!("Seller's XMR balance is currently too low to initiate a swap, please try again later")
-                                        }
-                                        Err(other) => bail!(other),
-                                    },
+                        let (amount, fees) = match determine_amount.await {
+                            Ok(val) => val,
+                            Err(error) => match error.downcast::<ZeroQuoteReceived>() {
+                                Ok(_) => {
+                                    bail!("Seller's XMR balance is currently too low to initiate a swap, please try again later")
                                 }
-                            }
+                                Err(other) => bail!(other),
+                            },
                         };
 
                         tracing::info!(%amount, %fees,  "Determined swap amount");
