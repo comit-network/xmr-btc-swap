@@ -551,20 +551,20 @@ impl Request {
                             event_loop_result = handle => {
                                 match event_loop_result {
                                     Ok(_) => {
-                                        tracing::debug!(%swap_id, "EventLoop completed")
+                                        tracing::debug!(%swap_id, "EventLoop completed during swap resume")
                                     }
                                     Err(error) => {
-                                        tracing::error!(%swap_id, "EventLoop failed: {:#}", error)
+                                        tracing::error!(%swap_id, "EventLoop failed during swap resume: {:#}", error)
                                     }
                                 }
                             },
                             swap_result = bob::run(swap) => {
                                 match swap_result {
                                     Ok(state) => {
-                                        tracing::debug!(%swap_id, state=%state, "Swap completed")
+                                        tracing::debug!(%swap_id, state=%state, "Swap completed after resuming")
                                     }
                                     Err(error) => {
-                                        tracing::error!(%swap_id, "Failed to complete swap: {:#}", error)
+                                        tracing::error!(%swap_id, "Failed to resume swap: {:#}", error)
                                     }
                                 }
 
