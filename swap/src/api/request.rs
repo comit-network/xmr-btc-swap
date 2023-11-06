@@ -315,6 +315,7 @@ impl Request {
                     biased;
                     _ = context.swap_lock.listen_for_swap_force_suspension() => {
                         tracing::debug!("Shutdown signal received, exiting");
+                        context.swap_lock.release_swap_lock().await.context("Shutdown signal received but failed to release swap lock. The swap process has been terminated but the swap lock is still active.")?;
                         bail!("Shutdown signal received");
                     },
                     result = async {
@@ -407,7 +408,9 @@ impl Request {
                         );
 
                         Ok((event_loop,swap))
-                    } => result,
+                    } => {
+                        result
+                    },
                 };
 
                 let (event_loop, swap) = match initialize_swap {
@@ -428,6 +431,8 @@ impl Request {
                         biased;
                         _ = context.swap_lock.listen_for_swap_force_suspension() => {
                             tracing::debug!("Shutdown signal received, exiting");
+                            context.swap_lock.release_swap_lock().await.context("Shutdown signal received but failed to release swap lock. The swap process has been terminated but the swap lock is still active.")?;
+                            bail!("Shutdown signal received");
                         },
                         _ = async {
 
@@ -555,7 +560,8 @@ impl Request {
                             },
                             _ = context.swap_lock.listen_for_swap_force_suspension() => {
                                  tracing::debug!("Shutdown signal received, exiting");
-
+                                context.swap_lock.release_swap_lock().await.context("Shutdown signal received but failed to release swap lock. The swap process has been terminated but the swap lock is still active.")?;
+                                bail!("Shutdown signal received");
                              }
                         }
                         context
