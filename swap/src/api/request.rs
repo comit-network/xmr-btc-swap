@@ -315,7 +315,7 @@ impl Request {
                     biased;
                     _ = context.swap_lock.listen_for_swap_force_suspension() => {
                         tracing::debug!("Shutdown signal received, exiting");
-                        context.swap_lock.release_swap_lock().await.context("Shutdown signal received but failed to release swap lock. The swap process has been terminated but the swap lock is still active.")?;
+                        context.swap_lock.release_swap_lock().await.expect("Shutdown signal received but failed to release swap lock. The swap process has been terminated but the swap lock is still active.");
                         bail!("Shutdown signal received");
                     },
                     result = async {
@@ -431,42 +431,39 @@ impl Request {
                         biased;
                         _ = context.swap_lock.listen_for_swap_force_suspension() => {
                             tracing::debug!("Shutdown signal received, exiting");
-                            context.swap_lock.release_swap_lock().await.context("Shutdown signal received but failed to release swap lock. The swap process has been terminated but the swap lock is still active.")?;
+                            context.swap_lock.release_swap_lock().await.expect("Shutdown signal received but failed to release swap lock. The swap process has been terminated but the swap lock is still active.");
                             bail!("Shutdown signal received");
                         },
-                        _ = async {
 
-                            tokio::select! {
-                                result = event_loop => {
-                                    match result {
-                                        Ok(_) => {
-                                            tracing::debug!(%swap_id, "EventLoop completed")
-                                        }
-                                        Err(error) => {
-                                            tracing::error!(%swap_id, "EventLoop failed: {:#}", error)
-                                        }
-                                    }
-                                },
-                                result = bob::run(swap) => {
-                                    match result {
-                                        Ok(state) => {
-                                            tracing::debug!(%swap_id, state=%state, "Swap completed")
-                                        }
-                                        Err(error) => {
-                                            tracing::error!(%swap_id, "Failed to complete swap: {:#}", error)
-                                        }
-                                    }
-                                },
+                        event_loop_result = event_loop => {
+                            match event_loop_result {
+                                Ok(_) => {
+                                    tracing::debug!(%swap_id, "EventLoop completed")
+                                }
+                                Err(error) => {
+                                    tracing::error!(%swap_id, "EventLoop failed: {:#}", error)
+                                }
                             }
-                            tracing::debug!(%swap_id, "Swap completed");
-                            Ok::<_, anyhow::Error>(())
-                        } => { }
+                        },
+                        swap_result = bob::run(swap) => {
+                            match swap_result {
+                                Ok(state) => {
+                                    tracing::debug!(%swap_id, state=%state, "Swap completed")
+                                }
+                                Err(error) => {
+                                    tracing::error!(%swap_id, "Failed to complete swap: {:#}", error)
+                                }
+                            }
+                        },
                     };
+                    tracing::debug!(%swap_id, "Swap completed");
+
                     context
                         .swap_lock
                         .release_swap_lock()
                         .await
                         .expect("Could not release swap lock");
+                    Ok::<_, anyhow::Error>(())
                 }.in_current_span());
 
                 Ok(json!({
@@ -542,33 +539,43 @@ impl Request {
 
                 tokio::spawn(
                     async move {
+                        let handle = tokio::spawn(event_loop.run().in_current_span());
                         tokio::select! {
-                            _ = async {
-                                 let handle = tokio::spawn(event_loop.run().in_current_span());
-
-                                 tokio::select! {
-                                     event_loop_result = handle => {
-                                         event_loop_result?;
-                                     },
-                                     swap_result = bob::run(swap) => {
-                                         swap_result?;
-                                     }
-                                 };
-                                 Ok::<(), anyhow::Error>(())
-                            } => {
-
-                            },
+                            biased;
                             _ = context.swap_lock.listen_for_swap_force_suspension() => {
                                  tracing::debug!("Shutdown signal received, exiting");
-                                context.swap_lock.release_swap_lock().await.context("Shutdown signal received but failed to release swap lock. The swap process has been terminated but the swap lock is still active.")?;
+                                context.swap_lock.release_swap_lock().await.expect("Shutdown signal received but failed to release swap lock. The swap process has been terminated but the swap lock is still active.");
                                 bail!("Shutdown signal received");
-                             }
+                            },
+
+                            event_loop_result = handle => {
+                                match event_loop_result {
+                                    Ok(_) => {
+                                        tracing::debug!(%swap_id, "EventLoop completed")
+                                    }
+                                    Err(error) => {
+                                        tracing::error!(%swap_id, "EventLoop failed: {:#}", error)
+                                    }
+                                }
+                            },
+                            swap_result = bob::run(swap) => {
+                                match swap_result {
+                                    Ok(state) => {
+                                        tracing::debug!(%swap_id, state=%state, "Swap completed")
+                                    }
+                                    Err(error) => {
+                                        tracing::error!(%swap_id, "Failed to complete swap: {:#}", error)
+                                    }
+                                }
+
+                            }
                         }
                         context
                             .swap_lock
                             .release_swap_lock()
                             .await
                             .expect("Could not release swap lock");
+                        Ok::<(), anyhow::Error>(())
                     }
                     .in_current_span(),
                 );
