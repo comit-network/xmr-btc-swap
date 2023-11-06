@@ -356,6 +356,8 @@ impl Request {
 
                         let (event_loop, mut event_loop_handle) =
                             EventLoop::new(swap_id, swarm, seller_peer_id)?;
+                        let event_loop = tokio::spawn(event_loop.run().in_current_span());
+
                         let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
                         let estimate_fee = |amount| bitcoin_wallet.estimate_fee(TxLock::weight(), amount);
                         let determine_amount = determine_btc_to_swap(
@@ -367,6 +369,7 @@ impl Request {
                             || bitcoin_wallet.sync(),
                             estimate_fee,
                         );
+
 
                         let (amount, fees) = match determine_amount.await {
                             Ok(val) => val,
@@ -403,7 +406,6 @@ impl Request {
                             amount,
                         );
 
-                        let event_loop = tokio::spawn(event_loop.run().in_current_span());
                         Ok((event_loop,swap))
                     } => result,
                 };
