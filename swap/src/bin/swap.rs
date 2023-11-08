@@ -56,7 +56,7 @@ mod tests {
 
         let (amount, fees) = determine_btc_to_swap(
             true,
-            async { Ok(quote_with_max(0.01)) },
+            quote_with_max(0.01),
             get_dummy_address(),
             || async { Ok(Amount::from_btc(0.001)?) },
             || async {
@@ -93,7 +93,7 @@ mod tests {
 
         let (amount, fees) = determine_btc_to_swap(
             true,
-            async { Ok(quote_with_max(0.01)) },
+            quote_with_max(0.01),
             get_dummy_address(),
             || async { Ok(Amount::from_btc(0.1001)?) },
             || async {
@@ -130,7 +130,7 @@ mod tests {
 
         let (amount, fees) = determine_btc_to_swap(
             true,
-            async { Ok(quote_with_max(0.01)) },
+            quote_with_max(0.01),
             async { panic!("should not request new address when initial balance  is > 0") },
             || async { Ok(Amount::from_btc(0.005)?) },
             || async {
@@ -163,7 +163,7 @@ mod tests {
 
         let (amount, fees) = determine_btc_to_swap(
             true,
-            async { Ok(quote_with_max(0.01)) },
+            quote_with_max(0.01),
             async { panic!("should not request new address when initial balance is > 0") },
             || async { Ok(Amount::from_btc(0.1001)?) },
             || async {
@@ -196,7 +196,7 @@ mod tests {
 
         let (amount, fees) = determine_btc_to_swap(
             true,
-            async { Ok(quote_with_min(0.01)) },
+            quote_with_min(0.01),
             get_dummy_address(),
             || async { Ok(Amount::from_btc(0.0101)?) },
             || async {
@@ -233,7 +233,7 @@ mod tests {
 
         let (amount, fees) = determine_btc_to_swap(
             true,
-            async { Ok(quote_with_min(0.01)) },
+            quote_with_min(0.01),
             get_dummy_address(),
             || async { Ok(Amount::from_btc(0.0101)?) },
             || async {
@@ -275,7 +275,7 @@ mod tests {
             Duration::from_secs(1),
             determine_btc_to_swap(
                 true,
-                async { Ok(quote_with_min(0.1)) },
+                quote_with_min(0.1),
                 get_dummy_address(),
                 || async { Ok(Amount::from_btc(0.0101)?) },
                 || async {
@@ -323,7 +323,7 @@ mod tests {
             Duration::from_secs(10),
             determine_btc_to_swap(
                 true,
-                async { Ok(quote_with_min(0.1)) },
+                quote_with_min(0.1),
                 get_dummy_address(),
                 || async { Ok(Amount::from_btc(0.21)?) },
                 || async {
@@ -358,7 +358,7 @@ mod tests {
 
         let determination_error = determine_btc_to_swap(
             true,
-            async { Ok(quote_with_max(0.00)) },
+            quote_with_max(0.00),
             get_dummy_address(),
             || async { Ok(Amount::from_btc(0.0101)?) },
             || async {

@@ -241,6 +241,7 @@ impl EventLoopHandle {
     }
 
     pub async fn request_quote(&mut self) -> Result<BidQuote> {
+        tracing::debug!("Requesting quote");
         Ok(self.quote.send_receive(()).await?)
     }
 
