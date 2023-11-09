@@ -370,6 +370,7 @@ impl Request {
                         let (event_loop, mut event_loop_handle) =
                             EventLoop::new(swap_id, swarm, seller_peer_id)?;
                         let event_loop = tokio::spawn(event_loop.run().in_current_span());
+
                         let bid_quote = event_loop_handle.request_quote().await?;
 
                         Ok::<_, anyhow::Error>((event_loop, event_loop_handle, bid_quote))
@@ -473,6 +474,7 @@ impl Request {
 
                 Ok(json!({
                     "swapId": swap_id.to_string(),
+                    "quote": bid_quote,
                 }))
             }
             Method::Resume { swap_id } => {
