@@ -803,7 +803,12 @@ impl Request {
     pub async fn call(self, context: Arc<Context>) -> Result<serde_json::Value> {
         let method_span = self.cmd.get_tracing_span(self.log_reference.clone());
 
-        self.handle_cmd(context).instrument(method_span).await
+        self.handle_cmd(context).instrument(method_span.clone()).await.map_err(|err| {
+            method_span.in_scope(|| {
+                tracing::debug!(%err, "API call resulted in an error");
+            });
+            err
+        })
     }
 }
 
