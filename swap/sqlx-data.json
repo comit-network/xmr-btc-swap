@@ -177,5 +177,23 @@
       }
     },
     "query": "\n        SELECT DISTINCT address\n        FROM peer_addresses\n        WHERE peer_id = ?\n        "
+  },
+  "e05620f420f8c1022971eeb66a803323a8cf258cbebb2834e3f7cf8f812fa646": {
+    "describe": {
+      "columns": [
+        {
+          "name": "state",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "\n           SELECT state\n           FROM swap_states\n           WHERE swap_id = ?\n        "
   }
 }
