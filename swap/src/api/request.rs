@@ -228,6 +228,7 @@ impl Request {
                     tx_lock_id,
                     tx_cancel_fee,
                     tx_refund_fee,
+                    tx_lock_fee,
                     btc_refund_address,
                     cancel_timelock,
                     punish_timelock,
@@ -245,16 +246,23 @@ impl Request {
                             let tx_lock_id = state2.tx_lock.txid();
                             let btc_refund_address = state2.refund_address.to_string();
 
-                            Some((
-                                xmr_amount,
-                                btc_amount,
-                                tx_lock_id,
-                                tx_cancel_fee,
-                                tx_refund_fee,
-                                btc_refund_address,
-                                state2.cancel_timelock,
-                                state2.punish_timelock,
-                            ))
+                            if let Ok(tx_lock_fee) = state2.tx_lock.fee() {
+                                let tx_lock_fee = tx_lock_fee.to_sat();
+
+                                Some((
+                                    xmr_amount,
+                                    btc_amount,
+                                    tx_lock_id,
+                                    tx_cancel_fee,
+                                    tx_refund_fee,
+                                    tx_lock_fee,
+                                    btc_refund_address,
+                                    state2.cancel_timelock,
+                                    state2.punish_timelock,
+                                ))
+                            }else {
+                                None
+                            }
                         } else {
                             None
                         }
@@ -295,6 +303,7 @@ impl Request {
                     "txLockId": tx_lock_id,
                     "txCancelFee": tx_cancel_fee,
                     "txRefundFee": tx_refund_fee,
+                    "txLockFee": tx_lock_fee,
                     "btcRefundAddress": btc_refund_address.to_string(),
                     "cancelTimelock": cancel_timelock,
                     "punishTimelock": punish_timelock,
@@ -805,12 +814,15 @@ impl Request {
     pub async fn call(self, context: Arc<Context>) -> Result<serde_json::Value> {
         let method_span = self.cmd.get_tracing_span(self.log_reference.clone());
 
-        self.handle_cmd(context).instrument(method_span.clone()).await.map_err(|err| {
-            method_span.in_scope(|| {
-                tracing::debug!(%err, "API call resulted in an error");
-            });
-            err
-        })
+        self.handle_cmd(context)
+            .instrument(method_span.clone())
+            .await
+            .map_err(|err| {
+                method_span.in_scope(|| {
+                    tracing::debug!(%err, "API call resulted in an error");
+                });
+                err
+            })
     }
 }
 
