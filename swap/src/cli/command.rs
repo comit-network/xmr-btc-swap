@@ -109,7 +109,9 @@ where
             (context, request)
         }
         CliCommand::Balance { bitcoin } => {
-            let request = Request::new(Method::Balance);
+            let request = Request::new(Method::Balance {
+                force_refresh: true,
+            });
 
             let context = Context::build(
                 Some(bitcoin),

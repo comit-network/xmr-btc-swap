@@ -34,8 +34,14 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
         .await
     })?;
 
-    module.register_async_method("get_bitcoin_balance", |params, context| async move {
-        execute_request(params, Method::Balance, &context).await
+    module.register_async_method("get_bitcoin_balance", |params_raw, context| async move {
+        let params: HashMap<String, bool> = params_raw.parse()?;
+
+        let force_refresh = *params.get("force_refresh").ok_or_else(|| {
+            jsonrpsee_core::Error::Custom("Does not contain force_refresh".to_string())
+        })?;
+
+        execute_request(params_raw, Method::Balance { force_refresh }, &context).await
     })?;
 
     module.register_async_method("get_history", |params, context| async move {

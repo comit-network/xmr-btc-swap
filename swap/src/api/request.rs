@@ -50,7 +50,9 @@ pub enum Method {
         amount: Option<Amount>,
         address: bitcoin::Address,
     },
-    Balance,
+    Balance {
+        force_refresh: bool,
+    },
     ListSellers {
         rendezvous_point: Multiaddr,
     },
@@ -69,7 +71,7 @@ pub enum Method {
 impl Method {
     fn get_tracing_span(&self, log_reference_id: Option<String>) -> Span {
         let span = match self {
-            Method::Balance => {
+            Method::Balance { .. } => {
                 debug_span!(
                     "method",
                     method_name = "Balance",
@@ -260,7 +262,7 @@ impl Request {
                                     state2.cancel_timelock,
                                     state2.punish_timelock,
                                 ))
-                            }else {
+                            } else {
                                 None
                             }
                         } else {
@@ -702,18 +704,29 @@ impl Request {
 
                 Ok(json!({}))
             }
-            Method::Balance => {
+            Method::Balance { force_refresh } => {
                 let bitcoin_wallet = context
                     .bitcoin_wallet
                     .as_ref()
                     .context("Could not get Bitcoin wallet")?;
 
-                bitcoin_wallet.sync().await?;
+                if force_refresh {
+                    bitcoin_wallet.sync().await?;
+                }
+
                 let bitcoin_balance = bitcoin_wallet.balance().await?;
-                tracing::info!(
-                    balance = %bitcoin_balance,
-                    "Checked Bitcoin balance",
-                );
+
+                if force_refresh {
+                    tracing::info!(
+                        balance = %bitcoin_balance,
+                        "Checked Bitcoin balance",
+                    );
+                } else {
+                    tracing::debug!(
+                        balance = %bitcoin_balance,
+                        "Current Bitcoin balance as of last sync",
+                    );
+                }
 
                 Ok(json!({
                     "balance": bitcoin_balance.to_sat()
