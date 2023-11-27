@@ -797,6 +797,7 @@ impl Request {
 
                 if let BobState::BtcRedeemed(state5) = swap_state {
                     let (spend_key, view_key) = state5.xmr_keys();
+                    let restore_height = state5.monero_wallet_restore_blockheight.height;
 
                     let address = monero::Address::standard(
                         context.config.env_config.monero_network,
@@ -804,12 +805,13 @@ impl Request {
                         monero::PublicKey::from(view_key.public()),
                     );
 
-                    tracing::info!(address=%address, spend_key=%spend_key, view_key=%view_key, "Monero recovery information");
+                    tracing::info!(restore_height=%restore_height, address=%address, spend_key=%spend_key, view_key=%view_key, "Monero recovery information");
 
                     Ok(json!({
                         "address": address,
                         "spend_key": spend_key.to_string(),
                         "view_key": view_key.to_string(),
+                        "restore_height": state5.monero_wallet_restore_blockheight.height,
                     }))
                 } else {
                     bail!(
