@@ -212,5 +212,5 @@ async fn execute_request(
     request
         .call(Arc::clone(context))
         .await
-        .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))
+        .map_err(|err| jsonrpsee_core::Error::Custom(format!("{:#}", err)))
 }
