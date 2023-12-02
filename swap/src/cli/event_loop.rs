@@ -15,6 +15,7 @@ use libp2p::{PeerId, Swarm};
 use std::collections::HashMap;
 use std::time::Duration;
 use uuid::Uuid;
+use crate::network::cooperative_xmr_redeem_after_punish::{Request, Response};
 
 #[allow(missing_debug_implementations)]
 pub struct EventLoop {
@@ -24,6 +25,7 @@ pub struct EventLoop {
 
     // these streams represents outgoing requests that we have to make
     quote_requests: bmrng::RequestReceiverStream<(), BidQuote>,
+    cooperative_xmr_redeem_requests: bmrng::RequestReceiverStream<Uuid, Response>,
     encrypted_signatures: bmrng::RequestReceiverStream<EncryptedSignature, ()>,
     swap_setup_requests: bmrng::RequestReceiverStream<NewSwap, Result<State2>>,
 
@@ -33,6 +35,7 @@ pub struct EventLoop {
     inflight_quote_requests: HashMap<RequestId, bmrng::Responder<BidQuote>>,
     inflight_encrypted_signature_requests: HashMap<RequestId, bmrng::Responder<()>>,
     inflight_swap_setup: Option<bmrng::Responder<Result<State2>>>,
+    inflight_cooperative_xmr_redeem_requests: HashMap<RequestId, bmrng::Responder<Response>>,
 
     /// The sender we will use to relay incoming transfer proofs.
     transfer_proof: bmrng::RequestSender<monero::TransferProof, ()>,
@@ -56,6 +59,7 @@ impl EventLoop {
         let transfer_proof = bmrng::channel_with_timeout(1, Duration::from_secs(60));
         let encrypted_signature = bmrng::channel(1);
         let quote = bmrng::channel_with_timeout(1, Duration::from_secs(60));
+        let cooperative_xmr_redeem = bmrng::channel_with_timeout(1, Duration::from_secs(60));
 
         let event_loop = EventLoop {
             swap_id,
@@ -65,9 +69,11 @@ impl EventLoop {
             transfer_proof: transfer_proof.0,
             encrypted_signatures: encrypted_signature.1.into(),
             quote_requests: quote.1.into(),
+            cooperative_xmr_redeem_requests: cooperative_xmr_redeem.1.into(),
             inflight_quote_requests: HashMap::default(),
             inflight_swap_setup: None,
             inflight_encrypted_signature_requests: HashMap::default(),
+            inflight_cooperative_xmr_redeem_requests: HashMap::default(),
             pending_transfer_proof: OptionFuture::from(None),
         };
 
@@ -75,6 +81,7 @@ impl EventLoop {
             swap_setup: execution_setup.0,
             transfer_proof: transfer_proof.1,
             encrypted_signature: encrypted_signature.0,
+            cooperative_xmr_redeem: cooperative_xmr_redeem.0,
             quote: quote.0,
         };
 
@@ -146,6 +153,11 @@ impl EventLoop {
                                 let _ = responder.respond(());
                             }
                         }
+                        SwarmEvent::Behaviour(OutEvent::CooperativeXmrRedeemReceived { id, swap_id, s_a }) => {
+                            if let Some(responder) = self.inflight_cooperative_xmr_redeem_requests.remove(&id) {
+                                let _ = responder.respond(Response {s_a, swap_id});
+                            }
+                        }
                         SwarmEvent::Behaviour(OutEvent::AllRedialAttemptsExhausted { peer }) if peer == self.alice_peer_id => {
                             tracing::error!("Exhausted all re-dial attempts to Alice");
                             return;
@@ -205,6 +217,13 @@ impl EventLoop {
 
                     self.pending_transfer_proof = OptionFuture::from(None);
                 }
+
+                Some((swap_id, responder)) = self.cooperative_xmr_redeem_requests.next().fuse(), if self.is_connected_to_alice() => {
+                    let id = self.swarm.behaviour_mut().cooperative_xmr_redeem.send_request(&self.alice_peer_id, Request {
+                        swap_id
+                    });
+                    self.inflight_cooperative_xmr_redeem_requests.insert(id, responder);
+                },
             }
         }
     }
@@ -220,6 +239,7 @@ pub struct EventLoopHandle {
     transfer_proof: bmrng::RequestReceiver<monero::TransferProof, ()>,
     encrypted_signature: bmrng::RequestSender<EncryptedSignature, ()>,
     quote: bmrng::RequestSender<(), BidQuote>,
+    cooperative_xmr_redeem: bmrng::RequestSender<Uuid, Response>,
 }
 
 impl EventLoopHandle {
@@ -243,6 +263,11 @@ impl EventLoopHandle {
     pub async fn request_quote(&mut self) -> Result<BidQuote> {
         Ok(self.quote.send_receive(()).await?)
     }
+
+    pub async fn request_cooperative_xmr_redeem(&mut self, swap_id: Uuid) -> Result<Response> {
+        Ok(self.cooperative_xmr_redeem.send_receive(swap_id).await?)
+    }
+
 
     pub async fn send_encrypted_signature(
         &mut self,

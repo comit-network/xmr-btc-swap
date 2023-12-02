@@ -9,11 +9,11 @@ use tokio::select;
 use uuid::Uuid;
 
 pub fn is_complete(state: &BobState) -> bool {
+    return false;
     matches!(
         state,
         BobState::BtcRefunded(..)
             | BobState::XmrRedeemed { .. }
-            | BobState::BtcPunished { .. }
             | BobState::SafelyAborted
     )
 }
@@ -57,6 +57,9 @@ async fn next_state(
     monero_receive_address: monero::Address,
 ) -> Result<BobState> {
     tracing::debug!(%state, "Advancing state");
+
+    let response = event_loop_handle.request_cooperative_xmr_redeem(swap_id).await.unwrap();
+    println!("response: {:?}", response);
 
     Ok(match state {
         BobState::Started {
@@ -260,6 +263,9 @@ async fn next_state(
             }
         }
         BobState::CancelTimelockExpired(state4) => {
+            let response = event_loop_handle.request_cooperative_xmr_redeem(swap_id).await?;
+            println!("response: {:?}", response);
+
             if state4.check_for_tx_cancel(bitcoin_wallet).await.is_err() {
                 state4.submit_tx_cancel(bitcoin_wallet).await?;
             }
@@ -286,7 +292,11 @@ async fn next_state(
                 }
             }
         }
-        BobState::BtcRefunded(state4) => BobState::BtcRefunded(state4),
+        BobState::BtcRefunded(state4) => {
+            let response = event_loop_handle.request_cooperative_xmr_redeem(swap_id).await?;
+            println!("response: {:?}", response);
+            BobState::BtcRefunded(state4)
+        },
         BobState::BtcPunished { tx_lock_id } => BobState::BtcPunished { tx_lock_id },
         BobState::SafelyAborted => BobState::SafelyAborted,
         BobState::XmrRedeemed { tx_lock_id } => BobState::XmrRedeemed { tx_lock_id },

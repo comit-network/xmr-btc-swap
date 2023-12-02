@@ -1,7 +1,7 @@
 use crate::network::quote::BidQuote;
 use crate::network::rendezvous::XmrBtcNamespace;
 use crate::network::swap_setup::bob;
-use crate::network::{encrypted_signature, quote, redial, transfer_proof};
+use crate::network::{cooperative_xmr_redeem_after_punish, encrypted_signature, quote, redial, transfer_proof};
 use crate::protocol::bob::State2;
 use crate::{bitcoin, env};
 use anyhow::{anyhow, Error, Result};
@@ -27,6 +27,11 @@ pub enum OutEvent {
     },
     EncryptedSignatureAcknowledged {
         id: RequestId,
+    },
+    CooperativeXmrRedeemReceived {
+        id: RequestId,
+        s_a: bitcoin::SecretKey,
+        swap_id: uuid::Uuid,
     },
     AllRedialAttemptsExhausted {
         peer: PeerId,
@@ -64,6 +69,7 @@ pub struct Behaviour {
     pub quote: quote::Behaviour,
     pub swap_setup: bob::Behaviour,
     pub transfer_proof: transfer_proof::Behaviour,
+    pub cooperative_xmr_redeem: cooperative_xmr_redeem_after_punish::Behaviour,
     pub encrypted_signature: encrypted_signature::Behaviour,
     pub redial: redial::Behaviour,
     pub identify: Identify,
@@ -91,6 +97,7 @@ impl Behaviour {
             swap_setup: bob::Behaviour::new(env_config, bitcoin_wallet),
             transfer_proof: transfer_proof::bob(),
             encrypted_signature: encrypted_signature::bob(),
+            cooperative_xmr_redeem: cooperative_xmr_redeem_after_punish::bob(),
             redial: redial::Behaviour::new(alice, Duration::from_secs(2)),
             ping: Ping::new(PingConfig::new().with_keep_alive(true)),
             identify: Identify::new(identifyConfig),

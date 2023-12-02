@@ -20,6 +20,8 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use uuid::Uuid;
+use rand::rngs::OsRng;
+use crate::network::cooperative_xmr_redeem_after_punish::Response;
 
 /// A future that resolves to a tuple of `PeerId`, `transfer_proof::Request` and
 /// `Responder`.
@@ -252,6 +254,51 @@ where
 
                                 channel
                             }.boxed());
+                        }
+                        SwarmEvent::Behaviour(OutEvent::CooperativeXmrRedeemRequested { swap_id, channel, peer }) => {
+                            let swap_peer = self.db.get_peer_id(swap_id).await;
+
+                            // Ensure that an incoming encrypted signature is sent by the peer-id associated with the swap
+                            let swap_peer = match swap_peer {
+                                Ok(swap_peer) => swap_peer,
+                                Err(_) => {
+                                    tracing::warn!(
+                                        unknown_swap_id = %swap_id,
+                                        from = %peer,
+                                        "Ignoring cooperative xmr redeem request for unknown swap");
+                                    continue;
+                                }
+                            };
+
+                            if swap_peer != peer {
+                                tracing::warn!(
+                                    %swap_id,
+                                    received_from = %peer,
+                                    expected_from = %swap_peer,
+                                    "Ignoring malicious cooperative xmr redeem request which was not expected from this peer",
+                                    );
+                                continue;
+                            }
+
+                            if let Ok(state) = self.db.get_state(swap_id).await {
+                                match state {
+                                    State::Alice (aliceState) => {
+                                        if let AliceState::BtcPunished { .. } = aliceState {
+                                            // TODO send the real s_a from database
+                                            if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, Response { swap_id, s_a: bitcoin::SecretKey::new_random(&mut OsRng) }).is_err() {
+                                                tracing::debug!(%peer, "Failed to respond with xmr redeem keys");
+                                            }
+                                        } else {
+                                            tracing::warn!(%swap_id, "Ignoring cooperative xmr redeem request for swap in invalid state");
+                                            continue;
+                                        }
+                                    }
+                                    State::Bob(_) => {
+                                        tracing::warn!(%swap_id, "Ignoring cooperative xmr redeem request for swap in invalid state");
+                                        continue;
+                                    }
+                                }
+                            }
                         }
                         SwarmEvent::Behaviour(OutEvent::Rendezvous(libp2p::rendezvous::client::Event::Registered { rendezvous_node, ttl, namespace })) => {
                             tracing::info!("Successfully registered with rendezvous node: {} with namespace: {} and TTL: {:?}", rendezvous_node, namespace, ttl);
