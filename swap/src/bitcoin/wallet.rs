@@ -24,7 +24,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{watch, Mutex};
-use tracing::{Instrument, Span};
+use tracing::{debug_span, Instrument};
 
 const SLED_TREE_NAME: &str = "default_tree";
 
@@ -193,7 +193,7 @@ impl Wallet {
 
                         tokio::time::sleep(Duration::from_secs(5)).await;
                     }
-                }.instrument(Span::none()));
+                }.instrument(debug_span!("BitcoinWalletSubscription")));
 
                 Subscription {
                     receiver,
