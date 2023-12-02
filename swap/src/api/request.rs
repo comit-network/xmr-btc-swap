@@ -834,7 +834,7 @@ impl Request {
             .await
             .map_err(|err| {
                 method_span.in_scope(|| {
-                    tracing::debug!(err=format!("{:?}", err), "API call resulted in an error");
+                    tracing::debug!(err = format!("{:?}", err), "API call resulted in an error");
                 });
                 err
             })
