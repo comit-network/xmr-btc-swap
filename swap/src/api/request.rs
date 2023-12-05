@@ -403,7 +403,7 @@ impl Request {
                     }
                 };
 
-                tokio::spawn(async move {
+                context.tasks.clone().spawn(async move {
                     tokio::select! {
                         biased;
                         _ = context.swap_lock.listen_for_swap_force_suspension() => {
@@ -481,7 +481,7 @@ impl Request {
                         .await
                         .expect("Could not release swap lock");
                     Ok::<_, anyhow::Error>(())
-                }.in_current_span());
+                }.in_current_span()).await;
 
                 Ok(json!({
                     "swapId": swap_id.to_string(),
@@ -555,7 +555,7 @@ impl Request {
                 )
                 .await?;
 
-                tokio::spawn(
+                context.tasks.clone().spawn(
                     async move {
                         let handle = tokio::spawn(event_loop.run().in_current_span());
                         tokio::select! {
@@ -596,7 +596,7 @@ impl Request {
                         Ok::<(), anyhow::Error>(())
                     }
                     .in_current_span(),
-                );
+                ).await;
                 Ok(json!({
                     "result": "ok",
                 }))

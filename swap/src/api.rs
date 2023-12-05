@@ -8,11 +8,14 @@ use crate::protocol::Database;
 use crate::seed::Seed;
 use crate::{bitcoin, cli, monero};
 use anyhow::{bail, Context as AnyContext, Error, Result};
+use futures::future::try_join_all;
 use std::fmt;
+use std::future::Future;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Once};
-use tokio::sync::{broadcast, broadcast::Sender, RwLock};
+use tokio::sync::{broadcast, broadcast::Sender, Mutex, RwLock};
+use tokio::task::JoinHandle;
 use url::Url;
 
 static START: Once = Once::new();
@@ -31,6 +34,38 @@ pub struct Config {
 }
 
 use uuid::Uuid;
+
+pub struct PendingTaskList(Mutex<Vec<JoinHandle<()>>>);
+
+impl PendingTaskList {
+    pub fn new() -> Self {
+        Self(Mutex::new(Vec::new()))
+    }
+
+    pub async fn spawn<F, T>(&self, future: F)
+    where
+        F: Future<Output = T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let handle = tokio::spawn(async move {
+            let _ = future.await;
+        });
+
+        self.0.lock().await.push(handle);
+    }
+
+    pub async fn wait_for_tasks(&self) -> Result<()> {
+        let tasks = {
+            // Scope for the lock, to avoid holding it for the entire duration of the async block
+            let mut guard = self.0.lock().await;
+            guard.drain(..).collect::<Vec<_>>()
+        };
+
+        try_join_all(tasks).await?;
+
+        Ok(())
+    }
+}
 
 pub struct SwapLock {
     current_swap: RwLock<Option<Uuid>>,
@@ -135,6 +170,7 @@ pub struct Context {
     monero_rpc_process: Option<monero::WalletRpcProcess>,
     pub swap_lock: Arc<SwapLock>,
     pub config: Config,
+    pub tasks: Arc<PendingTaskList>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -208,6 +244,7 @@ impl Context {
                 data_dir,
             },
             swap_lock: Arc::new(SwapLock::new()),
+            tasks: Arc::new(PendingTaskList::new()),
         };
 
         Ok(context)
@@ -231,6 +268,7 @@ impl Context {
                 .expect("Could not open sqlite database"),
             monero_rpc_process: None,
             swap_lock: Arc::new(SwapLock::new()),
+            tasks: Arc::new(PendingTaskList::new()),
         }
     }
 }

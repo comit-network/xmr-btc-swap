@@ -31,7 +31,8 @@ async fn main() -> Result<()> {
     if let Err(e) = check_latest_version(env!("CARGO_PKG_VERSION")).await {
         eprintln!("{}", e);
     }
-    let _result = request.call(Arc::clone(&context)).await?;
+    request.call(context.clone()).await?;
+    context.tasks.wait_for_tasks().await?;
     Ok(())
 }
 
