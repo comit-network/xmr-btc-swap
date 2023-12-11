@@ -16,6 +16,7 @@ pub use crate::bitcoin::timelocks::{BlockHeight, ExpiredTimelocks};
 pub use ::bitcoin::util::amount::Amount;
 pub use ::bitcoin::util::psbt::PartiallySignedTransaction;
 pub use ::bitcoin::{Address, Network, Transaction, Txid};
+use bitcoin::secp256k1::ecdsa;
 pub use ecdsa_fun::adaptor::EncryptedSignature;
 pub use ecdsa_fun::fun::Scalar;
 pub use ecdsa_fun::Signature;
@@ -25,9 +26,8 @@ pub use wallet::Wallet;
 pub use wallet::WalletBuilder;
 
 use crate::bitcoin::wallet::ScriptStatus;
-use ::bitcoin::hashes::hex::ToHex;
 use ::bitcoin::hashes::Hash;
-use ::bitcoin::{secp256k1, Sighash};
+use ::bitcoin::Sighash;
 use anyhow::{bail, Context, Result};
 use bdk::miniscript::descriptor::Wsh;
 use bdk::miniscript::{Descriptor, Segwitv0};
@@ -206,20 +206,21 @@ pub fn verify_encsig(
 #[error("encrypted signature is invalid")]
 pub struct InvalidEncryptedSignature;
 
-pub fn build_shared_output_descriptor(A: Point, B: Point) -> Descriptor<bitcoin::PublicKey> {
+pub fn build_shared_output_descriptor(
+    A: Point,
+    B: Point,
+) -> Result<Descriptor<bitcoin::PublicKey>> {
     const MINISCRIPT_TEMPLATE: &str = "c:and_v(v:pk(A),pk_k(B))";
 
-    // NOTE: This shouldn't be a source of error, but maybe it is
-    let A = ToHex::to_hex(&secp256k1::PublicKey::from(A));
-    let B = ToHex::to_hex(&secp256k1::PublicKey::from(B));
-
-    let miniscript = MINISCRIPT_TEMPLATE.replace('A', &A).replace('B', &B);
+    let miniscript = MINISCRIPT_TEMPLATE
+        .replace('A', &A.to_string())
+        .replace('B', &B.to_string());
 
     let miniscript =
         bdk::miniscript::Miniscript::<bitcoin::PublicKey, Segwitv0>::from_str(&miniscript)
             .expect("a valid miniscript");
 
-    Descriptor::Wsh(Wsh::new(miniscript).expect("a valid descriptor"))
+    Ok(Descriptor::Wsh(Wsh::new(miniscript)?))
 }
 
 pub fn recover(S: PublicKey, sig: Signature, encsig: EncryptedSignature) -> Result<SecretKey> {
@@ -248,6 +249,13 @@ pub fn current_epoch(
     }
 
     ExpiredTimelocks::None
+}
+
+// Transform the ecdsa der signature bytes into a secp256kfun ecdsa signature type.
+pub fn extract_ecdsa_sig(sig: &[u8]) -> Result<Signature> {
+    let data = &sig[..sig.len() - 1];
+    let sig = ecdsa::Signature::from_der(data)?.serialize_compact();
+    Signature::from_bytes(sig).ok_or(anyhow::anyhow!("invalid signature"))
 }
 
 /// Bitcoin error codes: https://github.com/bitcoin/bitcoin/blob/97d3500601c1d28642347d014a6de1e38f53ae4e/src/rpc/protocol.h#L23
@@ -323,6 +331,8 @@ mod tests {
     use super::*;
     use crate::env::{GetConfig, Regtest};
     use crate::protocol::{alice, bob};
+    use bitcoin::secp256k1;
+    use ecdsa_fun::fun::marker::{NonZero, Public};
     use rand::rngs::OsRng;
     use uuid::Uuid;
 
@@ -467,5 +477,17 @@ mod tests {
             is_weight,
             transaction
         )
+    }
+
+    #[test]
+    fn compare_point_hex() {
+        // secp256kfun Point and secp256k1 PublicKey should have the same bytes and hex representation
+        let secp = secp256k1::Secp256k1::default();
+        let keypair = secp256k1::KeyPair::new(&secp, &mut OsRng);
+
+        let pubkey = keypair.public_key();
+        let point: Point<_, Public, NonZero> = Point::from_bytes(pubkey.serialize()).unwrap();
+
+        assert_eq!(pubkey.to_string(), point.to_string());
     }
 }

@@ -242,7 +242,7 @@ impl State1 {
             self.A,
             self.b.public(),
             self.tx_cancel_fee,
-        );
+        )?;
         let tx_refund =
             bitcoin::TxRefund::new(&tx_cancel, &self.refund_address, self.tx_refund_fee);
 
@@ -315,7 +315,8 @@ impl State2 {
             self.A,
             self.b.public(),
             self.tx_cancel_fee,
-        );
+        )
+        .expect("valid cancel tx");
         let tx_cancel_sig = self.b.sign(tx_cancel.digest());
         let tx_punish = bitcoin::TxPunish::new(
             &tx_cancel,
@@ -449,7 +450,7 @@ impl State3 {
             self.A,
             self.b.public(),
             self.tx_cancel_fee,
-        );
+        )?;
 
         let tx_lock_status = bitcoin_wallet.status_of_script(&self.tx_lock).await?;
         let tx_cancel_status = bitcoin_wallet.status_of_script(&tx_cancel).await?;
@@ -530,7 +531,7 @@ impl State4 {
             self.A,
             self.b.public(),
             self.tx_cancel_fee,
-        );
+        )?;
 
         let tx_lock_status = bitcoin_wallet.status_of_script(&self.tx_lock).await?;
         let tx_cancel_status = bitcoin_wallet.status_of_script(&tx_cancel).await?;
@@ -611,7 +612,7 @@ impl State6 {
             self.A,
             self.b.public(),
             self.tx_cancel_fee,
-        );
+        )?;
 
         let tx_lock_status = bitcoin_wallet.status_of_script(&self.tx_lock).await?;
         let tx_cancel_status = bitcoin_wallet.status_of_script(&tx_cancel).await?;
@@ -634,7 +635,7 @@ impl State6 {
             self.A,
             self.b.public(),
             self.tx_cancel_fee,
-        );
+        )?;
 
         let tx = bitcoin_wallet.get_raw_transaction(tx_cancel.txid()).await?;
 
@@ -651,7 +652,7 @@ impl State6 {
             self.A,
             self.b.public(),
             self.tx_cancel_fee,
-        )
+        )?
         .complete_as_bob(self.A, self.b.clone(), self.tx_cancel_sig_a.clone())
         .context("Failed to complete Bitcoin cancel transaction")?;
 
@@ -674,7 +675,7 @@ impl State6 {
             self.A,
             self.b.public(),
             self.tx_cancel_fee,
-        );
+        )?;
         let tx_refund =
             bitcoin::TxRefund::new(&tx_cancel, &self.refund_address, self.tx_refund_fee);
 

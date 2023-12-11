@@ -1,7 +1,7 @@
 use crate::bitcoin::wallet::Watchable;
 use crate::bitcoin::{self, Address, Amount, PunishTimelock, Transaction, TxCancel, Txid};
 use ::bitcoin::util::sighash::SighashCache;
-use ::bitcoin::{EcdsaSighashType, Sighash};
+use ::bitcoin::{secp256k1, EcdsaSighashType, Sighash};
 use anyhow::{Context, Result};
 use bdk::bitcoin::Script;
 use bdk::miniscript::Descriptor;
@@ -64,18 +64,20 @@ impl TxPunish {
             let A = a.public().try_into()?;
             let B = B.try_into()?;
 
+            let sig_a = secp256k1::ecdsa::Signature::from_compact(&sig_a.to_bytes())?;
+            let sig_b = secp256k1::ecdsa::Signature::from_compact(&sig_b.to_bytes())?;
             // The order in which these are inserted doesn't matter
             satisfier.insert(
                 A,
                 ::bitcoin::EcdsaSig {
-                    sig: sig_a.into(),
+                    sig: sig_a,
                     hash_ty: EcdsaSighashType::All,
                 },
             );
             satisfier.insert(
                 B,
                 ::bitcoin::EcdsaSig {
-                    sig: sig_b.into(),
+                    sig: sig_b,
                     hash_ty: EcdsaSighashType::All,
                 },
             );

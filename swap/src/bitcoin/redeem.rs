@@ -6,7 +6,7 @@ use crate::bitcoin::{
 use ::bitcoin::{Sighash, Txid};
 use anyhow::{bail, Context, Result};
 use bdk::miniscript::Descriptor;
-use bitcoin::secp256k1::ecdsa;
+use bitcoin::secp256k1;
 use bitcoin::util::sighash::SighashCache;
 use bitcoin::{EcdsaSighashType, Script};
 use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
@@ -15,6 +15,8 @@ use ecdsa_fun::nonce::Deterministic;
 use ecdsa_fun::Signature;
 use sha2::Sha256;
 use std::collections::HashMap;
+
+use super::extract_ecdsa_sig;
 
 #[derive(Clone, Debug)]
 pub struct TxRedeem {
@@ -79,25 +81,27 @@ impl TxRedeem {
 
             let A = ::bitcoin::PublicKey {
                 compressed: true,
-                inner: a.public.into(),
+                inner: secp256k1::PublicKey::from_slice(&a.public.to_bytes())?,
             };
             let B = ::bitcoin::PublicKey {
                 compressed: true,
-                inner: B.0.into(),
+                inner: secp256k1::PublicKey::from_slice(&B.0.to_bytes())?,
             };
 
+            let sig_a = secp256k1::ecdsa::Signature::from_compact(&sig_a.to_bytes())?;
+            let sig_b = secp256k1::ecdsa::Signature::from_compact(&sig_b.to_bytes())?;
             // The order in which these are inserted doesn't matter
             satisfier.insert(
                 A,
                 ::bitcoin::EcdsaSig {
-                    sig: sig_a.into(),
+                    sig: sig_a,
                     hash_ty: EcdsaSighashType::All,
                 },
             );
             satisfier.insert(
                 B,
                 ::bitcoin::EcdsaSig {
-                    sig: sig_b.into(),
+                    sig: sig_b,
                     hash_ty: EcdsaSighashType::All,
                 },
             );
@@ -123,11 +127,11 @@ impl TxRedeem {
             [inputs @ ..] => bail!(TooManyInputs(inputs.len())),
         };
 
-        let sigs = match input.witness.iter().collect::<Vec<_>>().as_slice() {
+        let sigs = match input.witness.to_vec().as_slice() {
             [sig_1, sig_2, _script] => [sig_1, sig_2]
-                .iter()
-                .map(|sig| ecdsa::Signature::from_der(&sig[..sig.len() - 1]).map(Signature::from))
-                .collect::<std::result::Result<Vec<_>, _>>(),
+                .into_iter()
+                .map(|sig| extract_ecdsa_sig(sig))
+                .collect::<Result<Vec<_>, _>>(),
             [] => bail!(EmptyWitnessStack),
             [witnesses @ ..] => bail!(NotThreeWitnesses(witnesses.len())),
         }?;
