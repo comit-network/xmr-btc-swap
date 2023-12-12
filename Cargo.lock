@@ -1056,9 +1056,9 @@ dependencies = [
 
 [[package]]
 name = "digest"
-version = "0.10.5"
+version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adfbc57365a37acbd2ebf2b64d7e69bb766e2fea813521ed536f5d0520dcf86c"
+checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer 0.10.2",
  "crypto-common",
@@ -1664,7 +1664,7 @@ version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
- "digest 0.10.5",
+ "digest 0.10.7",
 ]
 
 [[package]]
@@ -2027,7 +2027,7 @@ dependencies = [
  "rand 0.8.3",
  "ring",
  "rw-stream-sink",
- "sha2 0.10.6",
+ "sha2 0.10.8",
  "smallvec",
  "thiserror",
  "unsigned-varint",
@@ -2111,7 +2111,7 @@ dependencies = [
  "prost",
  "prost-build",
  "rand 0.8.3",
- "sha2 0.10.6",
+ "sha2 0.10.8",
  "snow",
  "static_assertions",
  "x25519-dalek",
@@ -2151,7 +2151,7 @@ dependencies = [
  "prost",
  "prost-build",
  "rand 0.8.3",
- "sha2 0.10.6",
+ "sha2 0.10.8",
  "thiserror",
  "unsigned-varint",
  "void",
@@ -3681,7 +3681,7 @@ name = "secp256kfun"
 version = "0.7.1"
 source = "git+https://github.com/LLFourn/secp256kfun#9657d8c12fd26df5e57254a0063eaf41082a38ca"
 dependencies = [
- "digest 0.10.5",
+ "digest 0.10.7",
  "rand_core 0.6.2",
  "secp256k1",
  "serde",
@@ -3867,13 +3867,13 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.10.6"
+version = "0.10.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82e6b795fe2e3b1e845bafcb27aa35405c4d47cdfc92af5fc8d3002f76cebdc0"
+checksum = "793db75ad2bcafc3ffa7c68b215fee268f537982cd901d132f89c6343f3a3dc8"
 dependencies = [
  "cfg-if 1.0.0",
  "cpufeatures 0.2.1",
- "digest 0.10.5",
+ "digest 0.10.7",
 ]
 
 [[package]]
@@ -3909,7 +3909,7 @@ version = "0.4.1"
 source = "git+https://github.com/LLFourn/secp256kfun#9657d8c12fd26df5e57254a0063eaf41082a38ca"
 dependencies = [
  "curve25519-dalek-ng",
- "digest 0.10.5",
+ "digest 0.10.7",
  "generic-array",
  "rand_core 0.6.2",
  "secp256kfun",
@@ -4132,7 +4132,7 @@ dependencies = [
  "rustls 0.20.2",
  "rustls-pemfile",
  "serde",
- "sha2 0.10.6",
+ "sha2 0.10.8",
  "smallvec",
  "sqlformat",
  "sqlx-rt",
@@ -4158,7 +4158,7 @@ dependencies = [
  "quote",
  "serde",
  "serde_json",
- "sha2 0.10.6",
+ "sha2 0.10.8",
  "sqlx-core",
  "sqlx-rt",
  "syn 1.0.109",
@@ -4335,7 +4335,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serial_test",
- "sha2 0.10.6",
+ "sha2 0.10.8",
  "sigma_fun",
  "spectral",
  "sqlx",
@@ -4450,7 +4450,7 @@ dependencies = [
  "rand 0.8.3",
  "serde",
  "serde_json",
- "sha2 0.10.6",
+ "sha2 0.10.8",
 ]
 
 [[package]]
