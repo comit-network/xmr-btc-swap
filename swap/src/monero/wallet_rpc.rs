@@ -221,9 +221,10 @@ impl WalletRpc {
                 .parse::<u64>()?;
 
             tracing::info!(
-                "Downloading monero-wallet-rpc ({}) from {}",
-                content_length.big_byte(2),
-                DOWNLOAD_URL
+                progress="0%",
+                size=%content_length.big_byte(2),
+                download_url=DOWNLOAD_URL,
+                "Downloading monero-wallet-rpc",
             );
 
             let byte_stream = response
@@ -250,11 +251,23 @@ impl WalletRpc {
                 let total = 3 * content_length;
                 let percent = 100 * received as u64 / total;
                 if percent != notified && percent % 10 == 0 {
-                    tracing::debug!("{}%", percent);
+                    tracing::info!(
+                        progress=format!("{}%", percent),
+                        size=%content_length.big_byte(2),
+                        download_url=DOWNLOAD_URL,
+                        "Downloading monero-wallet-rpc",
+                    );
                     notified = percent;
                 }
                 file.write_all(&bytes).await?;
             }
+
+            tracing::info!(
+                progress="100%",
+                size=%content_length.big_byte(2),
+                download_url=DOWNLOAD_URL,
+                "Downloading monero-wallet-rpc",
+            );
 
             file.flush().await?;
 

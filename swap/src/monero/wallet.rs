@@ -278,7 +278,7 @@ impl Wallet {
 
                 match height {
                     Err(error) => {
-                        tracing::warn!(name = %wallet_name_clone, %error, "Failed to get current Monero wallet sync height");
+                        tracing::debug!(name = %wallet_name_clone, %error, "Failed to get current Monero wallet sync height");
                     }
                     Ok(height) => {
                         tracing::debug!(name = %wallet_name_clone, current_sync_height = height.height, "Syncing Monero wallet");
