@@ -35,13 +35,10 @@ pub struct Config {
 
 use uuid::Uuid;
 
+#[derive(Default)]
 pub struct PendingTaskList(Mutex<Vec<JoinHandle<()>>>);
 
 impl PendingTaskList {
-    pub fn new() -> Self {
-        Self(Mutex::new(Vec::new()))
-    }
-
     pub async fn spawn<F, T>(&self, future: F)
     where
         F: Future<Output = T> + Send + 'static,
@@ -105,8 +102,7 @@ impl SwapLock {
     }
 
     pub async fn get_current_swap_id(&self) -> Option<Uuid> {
-        let current_swap = *self.current_swap.read().await;
-        current_swap
+        *self.current_swap.read().await
     }
 
     /// Sends a signal to suspend all ongoing swap processes.
@@ -244,7 +240,7 @@ impl Context {
                 data_dir,
             },
             swap_lock: Arc::new(SwapLock::new()),
-            tasks: Arc::new(PendingTaskList::new()),
+            tasks: Arc::new(PendingTaskList::default()),
         };
 
         Ok(context)
@@ -268,7 +264,7 @@ impl Context {
                 .expect("Could not open sqlite database"),
             monero_rpc_process: None,
             swap_lock: Arc::new(SwapLock::new()),
-            tasks: Arc::new(PendingTaskList::new()),
+            tasks: Arc::new(PendingTaskList::default()),
         }
     }
 }
