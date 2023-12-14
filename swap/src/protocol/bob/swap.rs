@@ -247,7 +247,7 @@ async fn next_state(
             }
 
             // Ensure that the generated wallet is synced so we have a proper balance
-            monero_wallet.refresh().await?;
+            monero_wallet.refresh(3).await?;
             // Sweep (transfer all funds) to the given address
             let tx_hashes = monero_wallet.sweep_all(monero_receive_address).await?;
 
