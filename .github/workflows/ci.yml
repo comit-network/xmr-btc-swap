@@ -4,8 +4,6 @@ on:
   pull_request: # Need to run on pull-requests, otherwise PRs from forks don't run
   push:
     branches:
-      - "staging" # Bors uses this branch
-      - "trying" # Bors uses this branch
       - "master" # Always build head of master for the badge in the README
 
 jobs:
@@ -17,7 +15,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.67
+          toolchain: "1.70"
           components: clippy,rustfmt
 
       - uses: Swatinem/rust-cache@v2.7.1
@@ -84,7 +82,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.67
+          toolchain: "1.70"
           targets: armv7-unknown-linux-gnueabihf
 
       - name: Build binary

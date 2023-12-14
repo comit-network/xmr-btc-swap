@@ -1,5 +1,4 @@
 use anyhow::Result;
-use std::option::Option::Some;
 use std::path::Path;
 use time::format_description::well_known::Rfc3339;
 use tracing::subscriber::set_global_default;

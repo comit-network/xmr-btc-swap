@@ -14,7 +14,6 @@
 
 use anyhow::Result;
 use std::env;
-use std::sync::Arc;
 use swap::cli::command::{parse_args_and_apply_defaults, ParseResult};
 use swap::common::check_latest_version;
 
@@ -40,7 +39,7 @@ async fn main() -> Result<()> {
 mod tests {
     use super::*;
     use ::bitcoin::Amount;
-    use std::sync::Mutex;
+    use std::sync::{Arc, Mutex};
     use std::time::Duration;
     use swap::api::request::determine_btc_to_swap;
     use swap::network::quote::BidQuote;
