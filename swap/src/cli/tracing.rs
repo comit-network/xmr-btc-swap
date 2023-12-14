@@ -13,9 +13,7 @@ pub fn init(debug: bool, json: bool, dir: impl AsRef<Path>) -> Result<()> {
     let registry = Registry::default().with(level_filter);
 
     let appender = tracing_appender::rolling::never(dir.as_ref(), "swap-all.log");
-    let (appender, guard) = tracing_appender::non_blocking(appender);
-
-    std::mem::forget(guard);
+    let (appender, _guard) = tracing_appender::non_blocking(appender);
 
     let file_logger = registry.with(
         fmt::layer()
