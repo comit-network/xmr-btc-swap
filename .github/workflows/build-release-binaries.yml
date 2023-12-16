@@ -45,16 +45,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout tagged commit
-        uses: actions/checkout@v4.0.0
+        uses: actions/checkout@v4.1.1
         with:
           ref: ${{ github.event.release.target_commitish }}
           token: ${{ secrets.BOTTY_GITHUB_TOKEN }}
 
-      - uses: Swatinem/rust-cache@v2.6.2
+      - uses: Swatinem/rust-cache@v2.7.1
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.67
+          toolchain: "1.70"
           targets: armv7-unknown-linux-gnueabihf
 
       - name: Build ${{ matrix.target }} ${{ matrix.bin }} release binary
@@ -69,7 +69,7 @@ jobs:
         run: target/${{ matrix.target }}/release/${{ matrix.bin }} --help
 
       # Remove once python 3 is the default
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
 
