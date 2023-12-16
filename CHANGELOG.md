@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Minimum Supported Rust Version (MSRV) bumped to 1.70
+
 ## [0.12.3] - 2023-09-20
 
 - Swap: If no Monero daemon is manually specified, we will automatically choose one from a list of public daemons by connecting to each and checking their availability.

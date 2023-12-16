@@ -4,8 +4,6 @@ on:
   pull_request: # Need to run on pull-requests, otherwise PRs from forks don't run
   push:
     branches:
-      - "staging" # Bors uses this branch
-      - "trying" # Bors uses this branch
       - "master" # Always build head of master for the badge in the README
 
 jobs:
@@ -13,14 +11,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.0.0
+        uses: actions/checkout@v4.1.1
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.67
+          toolchain: "1.70"
           components: clippy,rustfmt
 
-      - uses: Swatinem/rust-cache@v2.6.2
+      - uses: Swatinem/rust-cache@v2.7.1
 
       - name: Check formatting
         uses: dprint/check@v2.2
@@ -37,9 +35,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.0.0
+        uses: actions/checkout@v4.1.1
 
-      - uses: Swatinem/rust-cache@v2.6.2
+      - uses: Swatinem/rust-cache@v2.7.1
 
       - name: Build swap
         run: cargo build --bin swap
@@ -51,9 +49,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.0.0
+        uses: actions/checkout@v4.1.1
 
-      - uses: Swatinem/rust-cache@v2.6.2
+      - uses: Swatinem/rust-cache@v2.7.1
 
       - name: Install sqlx-cli
         run: cargo install sqlx-cli --locked
@@ -78,13 +76,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.0.0
+        uses: actions/checkout@v4.1.1
 
-      - uses: Swatinem/rust-cache@v2.6.2
+      - uses: Swatinem/rust-cache@v2.7.1
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.67
+          toolchain: "1.70"
           targets: armv7-unknown-linux-gnueabihf
 
       - name: Build binary
@@ -100,13 +98,13 @@ jobs:
         run: cross build -p swap --target ${{ matrix.target }}
 
       - name: Upload swap binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: swap-${{ matrix.target }}
           path: target/${{ matrix.target }}/debug/swap
 
       - name: Upload asb binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: asb-${{ matrix.target }}
           path: target/${{ matrix.target }}/debug/asb
@@ -118,9 +116,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.0.0
+        uses: actions/checkout@v4.1.1
 
-      - uses: Swatinem/rust-cache@v2.6.2
+      - uses: Swatinem/rust-cache@v2.7.1
 
       - name: Build tests
         run: cargo build --tests --workspace --all-features
@@ -155,9 +153,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.0.0
+        uses: actions/checkout@v4.1.1
 
-      - uses: Swatinem/rust-cache@v2.6.2
+      - uses: Swatinem/rust-cache@v2.7.1
 
       - name: Run test ${{ matrix.test_name }}
         run: cargo test --package swap --all-features --test ${{ matrix.test_name }} -- --nocapture

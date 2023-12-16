@@ -50,7 +50,7 @@ Please have a look at the [contribution guidelines](./CONTRIBUTING.md).
 ## Rust Version Support
 
 Please note that only the latest stable Rust toolchain is supported.
-All stable toolchains since 1.67 _should_ work.
+All stable toolchains since 1.70 _should_ work.
 
 ## Contact
 
