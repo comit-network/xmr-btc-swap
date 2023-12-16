@@ -12,7 +12,7 @@ jobs:
     name: "Draft a new release"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3.5.3
+      - uses: actions/checkout@v4.1.1
         with:
           token: ${{ secrets.BOTTY_GITHUB_TOKEN }}
 
@@ -41,8 +41,12 @@ jobs:
 
       - name: Commit changelog and manifest files
         id: make-commit
+        env:
+          DPRINT_VERSION: 0.39.1
+          RUST_TOOLCHAIN: 1.70
         run: |
-          curl -fsSL https://dprint.dev/install.sh | sh
+          rustup component add rustfmt --toolchain "$RUST_TOOLCHAIN-x86_64-unknown-linux-gnu"
+          curl -fsSL https://dprint.dev/install.sh | sh -s $DPRINT_VERSION
           /home/runner/.dprint/bin/dprint fmt
 
           git add CHANGELOG.md Cargo.lock swap/Cargo.toml

@@ -767,9 +767,10 @@ impl Client {
         self.blockchain.get_tx(txid)
     }
 
-    fn update_state(&mut self) -> Result<()> {
+    fn update_state(&mut self, force_sync: bool) -> Result<()> {
         let now = Instant::now();
-        if now < self.last_sync + self.sync_interval {
+
+        if !force_sync && now < self.last_sync + self.sync_interval {
             return Ok(());
         }
 
@@ -789,9 +790,14 @@ impl Client {
 
         if !self.script_history.contains_key(&script) {
             self.script_history.insert(script.clone(), vec![]);
-        }
 
-        self.update_state()?;
+            // When we first subscribe to a script we want to immediately fetch its status
+            // Otherwise we would have to wait for the next sync interval, which can take a minute
+            // This would result in potentially inaccurate status updates until that next sync interval is hit
+            self.update_state(true)?;
+        } else {
+            self.update_state(false)?;
+        }
 
         let history = self.script_history.entry(script).or_default();
 
