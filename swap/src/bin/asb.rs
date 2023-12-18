@@ -106,8 +106,7 @@ async fn main() -> Result<()> {
         Ok(_) => {
             tracing::info!("Setting up Tor hidden service");
             let ac =
-                register_tor_services(config.network.clone().listen, tor_client, &seed)
-                    .await?;
+                register_tor_services(config.network.clone().listen, tor_client, &seed).await?;
             Some(ac)
         }
         Err(_) => {
@@ -115,8 +114,16 @@ async fn main() -> Result<()> {
             None
         }
     };
-    let tor_port = if _ac.is_some() { config.tor.socks5_port } else { 0u16 };
-    let proxy_string = if tor_port != 0u16 { format!("127.0.0.1:{}", tor_port) } else { "".to_string() };
+    let tor_port = if _ac.is_some() {
+        config.tor.socks5_port
+    } else {
+        0u16
+    };
+    let proxy_string = if tor_port != 0u16 {
+        format!("127.0.0.1:{}", tor_port)
+    } else {
+        "".to_string()
+    };
     if proxy_string.is_empty() {
         tracing::info!(%proxy_string, "Not using SOCKS5 proxy");
     } else {
@@ -163,7 +170,8 @@ async fn main() -> Result<()> {
                 }
             }
 
-            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config, proxy_string).await?;
+            let bitcoin_wallet =
+                init_bitcoin_wallet(&config, &seed, env_config, proxy_string).await?;
             let bitcoin_balance = bitcoin_wallet.balance().await?;
             tracing::info!(%bitcoin_balance, "Bitcoin wallet balance");
 
@@ -181,8 +189,9 @@ async fn main() -> Result<()> {
                 env_config,
                 namespace,
                 &rendezvous_addrs,
-                tor_port
-            ).await?;
+                tor_port,
+            )
+            .await?;
 
             for listen in config.network.listen.clone() {
                 Swarm::listen_on(&mut swarm, listen.clone())
@@ -248,7 +257,8 @@ async fn main() -> Result<()> {
             println!("{}", config_json);
         }
         Command::WithdrawBtc { amount, address } => {
-            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config, proxy_string).await?;
+            let bitcoin_wallet =
+                init_bitcoin_wallet(&config, &seed, env_config, proxy_string).await?;
 
             let amount = match amount {
                 Some(amount) => amount,
@@ -271,20 +281,23 @@ async fn main() -> Result<()> {
             let monero_balance = monero_wallet.get_balance().await?;
             tracing::info!(%monero_balance);
 
-            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config, proxy_string).await?;
+            let bitcoin_wallet =
+                init_bitcoin_wallet(&config, &seed, env_config, proxy_string).await?;
             let bitcoin_balance = bitcoin_wallet.balance().await?;
             tracing::info!(%bitcoin_balance);
             tracing::info!(%bitcoin_balance, %monero_balance, "Current balance");
         }
         Command::Cancel { swap_id } => {
-            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config, proxy_string).await?;
+            let bitcoin_wallet =
+                init_bitcoin_wallet(&config, &seed, env_config, proxy_string).await?;
 
             let (txid, _) = cancel(swap_id, Arc::new(bitcoin_wallet), db).await?;
 
             tracing::info!("Cancel transaction successfully published with id {}", txid);
         }
         Command::Refund { swap_id } => {
-            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config, proxy_string).await?;
+            let bitcoin_wallet =
+                init_bitcoin_wallet(&config, &seed, env_config, proxy_string).await?;
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
 
             refund(
@@ -298,7 +311,8 @@ async fn main() -> Result<()> {
             tracing::info!("Monero successfully refunded");
         }
         Command::Punish { swap_id } => {
-            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config, proxy_string).await?;
+            let bitcoin_wallet =
+                init_bitcoin_wallet(&config, &seed, env_config, proxy_string).await?;
 
             let (txid, _) = punish(swap_id, Arc::new(bitcoin_wallet), db).await?;
 
@@ -313,7 +327,8 @@ async fn main() -> Result<()> {
             swap_id,
             do_not_await_finality,
         } => {
-            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config, proxy_string).await?;
+            let bitcoin_wallet =
+                init_bitcoin_wallet(&config, &seed, env_config, proxy_string).await?;
 
             let (txid, _) = redeem(
                 swap_id,
@@ -326,7 +341,8 @@ async fn main() -> Result<()> {
             tracing::info!("Redeem transaction successfully published with id {}", txid);
         }
         Command::ExportBitcoinWallet => {
-            let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config, proxy_string).await?;
+            let bitcoin_wallet =
+                init_bitcoin_wallet(&config, &seed, env_config, proxy_string).await?;
             let wallet_export = bitcoin_wallet.wallet_export("asb").await?;
             println!("{}", wallet_export.to_string())
         }

@@ -72,7 +72,11 @@ impl Wallet {
             err => err?,
         };
 
-        let client = Client::new(electrum_rpc_url, electrum_socks5_proxy_string, env_config.bitcoin_sync_interval())?;
+        let client = Client::new(
+            electrum_rpc_url,
+            electrum_socks5_proxy_string,
+            env_config.bitcoin_sync_interval(),
+        )?;
 
         let network = wallet.network();
 
@@ -725,24 +729,32 @@ pub struct Client {
 }
 
 impl Client {
-    fn new(electrum_rpc_url: Url, electrum_socks5_proxy_string: &str, interval: Duration) -> Result<Self> {
-        let mut config_builder = bdk::electrum_client::ConfigBuilder::default()
-            .retry(5);
+    fn new(
+        electrum_rpc_url: Url,
+        electrum_socks5_proxy_string: &str,
+        interval: Duration,
+    ) -> Result<Self> {
+        let mut config_builder = bdk::electrum_client::ConfigBuilder::default().retry(5);
         if electrum_socks5_proxy_string.is_empty().not() {
             config_builder = config_builder
-                .socks5(Option::from(Socks5Config::new(electrum_socks5_proxy_string.to_string()))).unwrap() // use Tor with the Electrum client
+                .socks5(Option::from(Socks5Config::new(
+                    electrum_socks5_proxy_string.to_string(),
+                )))
+                .unwrap() // use Tor with the Electrum client
         }
         let config = config_builder.build();
-        let electrum = bdk::electrum_client::Client::from_config(electrum_rpc_url.as_str(), config.clone())
-            .context("Failed to initialize Electrum RPC client")?;
+        let electrum =
+            bdk::electrum_client::Client::from_config(electrum_rpc_url.as_str(), config.clone())
+                .context("Failed to initialize Electrum RPC client")?;
         // Initially fetch the latest block for storing the height.
         // We do not act on this subscription after this call.
         let latest_block = electrum
             .block_headers_subscribe()
             .context("Failed to subscribe to header notifications")?;
 
-        let client = bdk::electrum_client::Client::from_config(electrum_rpc_url.as_str(), config.clone())
-            .context("Failed to initialize Electrum RPC client")?;
+        let client =
+            bdk::electrum_client::Client::from_config(electrum_rpc_url.as_str(), config.clone())
+                .context("Failed to initialize Electrum RPC client")?;
         let blockchain = ElectrumBlockchain::from(client);
         let last_sync = Instant::now()
             .checked_sub(interval)

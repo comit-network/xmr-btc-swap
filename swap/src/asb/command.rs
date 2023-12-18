@@ -193,7 +193,7 @@ pub struct Arguments {
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
     Start {
-        resume_only: bool
+        resume_only: bool,
     },
     History,
     Config,
@@ -266,7 +266,7 @@ pub enum RawCommand {
             long = "resume-only",
             help = "For maintenance only. When set, no new swap requests will be accepted, but existing unfinished swaps will be resumed."
         )]
-        resume_only: bool
+        resume_only: bool,
     },
     #[structopt(about = "Prints swap-id and the state of each swap ever made.")]
     History,

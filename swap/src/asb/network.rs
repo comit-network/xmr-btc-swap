@@ -29,9 +29,9 @@ use std::time::Duration;
 use uuid::Uuid;
 
 pub mod transport {
-    use libp2p::core::transport::OptionalTransport;
-    use crate::network::tor_transport::TorDialOnlyTransport;
     use super::*;
+    use crate::network::tor_transport::TorDialOnlyTransport;
+    use libp2p::core::transport::OptionalTransport;
 
     /// Creates the libp2p transport for the ASB.
     pub fn new(
@@ -47,7 +47,10 @@ pub mod transport {
             None => OptionalTransport::none(),
         };
 
-        let transport = maybe_tor_transport.or_transport(tcp_with_dns).or_transport(websocket_with_dns).boxed();
+        let transport = maybe_tor_transport
+            .or_transport(tcp_with_dns)
+            .or_transport(websocket_with_dns)
+            .boxed();
 
         authenticate_and_multiplex(transport, identity)
     }
