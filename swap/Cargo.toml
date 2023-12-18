@@ -24,7 +24,7 @@ config = { version = "0.13", default-features = false, features = [ "toml" ] }
 conquer-once = "0.4"
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
 data-encoding = "2.5"
-dialoguer = "0.10"
+dialoguer = "0.11"
 directories-next = "2"
 ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", default-features = false, features = [ "libsecp_compat", "serde", "adaptor" ] }
 ed25519-dalek = "1"
