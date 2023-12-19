@@ -57,7 +57,7 @@ tokio = { version = "1", features = [ "rt-multi-thread", "time", "macros", "sync
 tokio-socks = "0.5"
 tokio-tungstenite = { version = "0.15", features = [ "rustls-tls" ] }
 tokio-util = { version = "0.7", features = [ "io", "codec" ] }
-toml = "0.7"
+toml = "0.8"
 torut = { version = "0.2", default-features = false, features = [ "v3", "control" ] }
 tracing = { version = "0.1", features = [ "attributes" ] }
 tracing-appender = "0.2"
