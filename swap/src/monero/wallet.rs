@@ -310,6 +310,7 @@ impl Wallet {
                             tracing::warn!(attempt=i, %attempts_left, name = %self.name, %error, "Failed to sync Monero wallet");
 
                             if attempts_left == 0 {
+                                tracing::error!(name = %self.name, %error, "Failed to sync Monero wallet");
                                 return Err(error);
                             }
                         }
