@@ -66,7 +66,7 @@ impl TxRedeem {
     ) -> Result<Transaction> {
         verify_encsig(
             B,
-            PublicKey::from(s_a.clone()),
+            PublicKey::from(s_a),
             &self.digest(),
             &encrypted_signature,
         )
