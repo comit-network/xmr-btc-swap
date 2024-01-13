@@ -575,6 +575,8 @@ mod test {
         .await;
     }
 
+    #[tokio::test]
+    #[serial]
     pub async fn suspend_current_swap_no_swap_running() {
         setup_test(SlowCancelConfig, |harness_ctx| async move {
             let (client, _, _) = setup_daemon(harness_ctx).await;
