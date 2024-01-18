@@ -24,13 +24,13 @@ config = { version = "0.13", default-features = false, features = [ "toml" ] }
 conquer-once = "0.4"
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
 data-encoding = "2.5"
-dialoguer = "0.10"
+dialoguer = "0.11"
 directories-next = "2"
 ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", default-features = false, features = [ "libsecp_compat", "serde", "adaptor" ] }
 ed25519-dalek = "1"
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
-itertools = "0.10"
+itertools = "0.12"
 jsonrpsee = { version = "0.16.2", features = [ "server" ] }
 jsonrpsee-core = "0.16.2"
 libp2p = { version = "0.42.2", default-features = false, features = [ "tcp-tokio", "yamux", "mplex", "dns-tokio", "noise", "request-response", "websocket", "ping", "rendezvous", "identify" ] }
@@ -59,7 +59,7 @@ tokio = { version = "1", features = [ "rt-multi-thread", "time", "macros", "sync
 tokio-socks = "0.5"
 tokio-tungstenite = { version = "0.15", features = [ "rustls-tls" ] }
 tokio-util = { version = "0.7", features = [ "io", "codec" ] }
-toml = "0.7"
+toml = "0.8"
 torut = { version = "0.2", default-features = false, features = [ "v3", "control" ] }
 tracing = { version = "0.1", features = [ "attributes" ] }
 tracing-appender = "0.2"
@@ -78,7 +78,7 @@ zip = "0.5"
 [dev-dependencies]
 bitcoin-harness = "0.2.2"
 get-port = "3"
-hyper = "1.0"
+hyper = "1.1"
 jsonrpsee = { version = "0.16.2", features = [ "ws-client" ] }
 mockito = "1.2.0"
 monero-harness = { path = "../monero-harness" }
