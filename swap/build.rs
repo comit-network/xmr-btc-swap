@@ -1,9 +1,9 @@
 use anyhow::Result;
-use vergen::{vergen, Config, SemverKind};
+use vergen::EmitBuilder;
 
 fn main() -> Result<()> {
-    let mut config = Config::default();
-    *config.git_mut().semver_kind_mut() = SemverKind::Lightweight;
-
-    vergen(config)
+    EmitBuilder::builder()
+        .git_describe(true, true, None)
+        .emit()?;
+    Ok(())
 }
