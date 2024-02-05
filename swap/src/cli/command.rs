@@ -256,7 +256,7 @@ where
     name = "swap",
     about = "CLI for swapping BTC for XMR",
     author,
-    version = env!("VERGEN_GIT_SEMVER_LIGHTWEIGHT")
+    version = env!("VERGEN_GIT_DESCRIBE")
 )]
 struct Arguments {
     // global is necessary to ensure that clap can match against testnet in subcommands
