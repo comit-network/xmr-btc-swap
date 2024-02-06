@@ -4375,7 +4375,7 @@ dependencies = [
  "tempfile",
  "testcontainers 0.12.0",
  "thiserror",
- "time 0.3.32",
+ "time 0.3.34",
  "tokio",
  "tokio-socks",
  "tokio-tar",
@@ -4560,9 +4560,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.32"
+version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe80ced77cbfb4cb91a94bf72b378b4b6791a0d9b7f09d0be747d1bdff4e68bd"
+checksum = "c8248b6521bb14bc45b4067159b9b6ad792e2d6d754d6c41fb50e29fefe38749"
 dependencies = [
  "deranged",
  "itoa 1.0.1",
@@ -4832,7 +4832,7 @@ checksum = "3566e8ce28cc0a3fe42519fc80e6b4c943cc4c8cef275620eb8dac2d3d4e06cf"
 dependencies = [
  "crossbeam-channel",
  "thiserror",
- "time 0.3.32",
+ "time 0.3.34",
  "tracing-subscriber 0.3.18",
 ]
 
@@ -4933,7 +4933,7 @@ dependencies = [
  "serde_json",
  "sharded-slab",
  "thread_local",
- "time 0.3.32",
+ "time 0.3.34",
  "tracing",
  "tracing-core",
  "tracing-log 0.2.0",
@@ -5178,7 +5178,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "git2",
  "rustversion",
- "time 0.3.32",
+ "time 0.3.34",
 ]
 
 [[package]]
