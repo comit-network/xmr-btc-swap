@@ -18,7 +18,7 @@ jobs:
           toolchain: "1.70"
           components: clippy,rustfmt
 
-      - uses: Swatinem/rust-cache@v2.7.1
+      - uses: Swatinem/rust-cache@v2.7.3
 
       - name: Check formatting
         uses: dprint/check@v2.2
@@ -37,7 +37,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4.1.1
 
-      - uses: Swatinem/rust-cache@v2.7.1
+      - uses: Swatinem/rust-cache@v2.7.3
 
       - name: Build swap
         run: cargo build --bin swap
@@ -51,7 +51,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4.1.1
 
-      - uses: Swatinem/rust-cache@v2.7.1
+      - uses: Swatinem/rust-cache@v2.7.3
 
       - name: Install sqlx-cli
         run: cargo install sqlx-cli --locked
@@ -78,7 +78,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4.1.1
 
-      - uses: Swatinem/rust-cache@v2.7.1
+      - uses: Swatinem/rust-cache@v2.7.3
 
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -98,13 +98,13 @@ jobs:
         run: cross build -p swap --target ${{ matrix.target }}
 
       - name: Upload swap binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: swap-${{ matrix.target }}
           path: target/${{ matrix.target }}/debug/swap
 
       - name: Upload asb binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: asb-${{ matrix.target }}
           path: target/${{ matrix.target }}/debug/asb
@@ -118,7 +118,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4.1.1
 
-      - uses: Swatinem/rust-cache@v2.7.1
+      - uses: Swatinem/rust-cache@v2.7.3
 
       - name: Build tests
         run: cargo build --tests --workspace --all-features
@@ -155,7 +155,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4.1.1
 
-      - uses: Swatinem/rust-cache@v2.7.1
+      - uses: Swatinem/rust-cache@v2.7.3
 
       - name: Run test ${{ matrix.test_name }}
         run: cargo test --package swap --all-features --test ${{ matrix.test_name }} -- --nocapture
