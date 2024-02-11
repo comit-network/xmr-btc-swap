@@ -17,8 +17,8 @@ mod test {
     use std::time::Duration;
     use swap::api::request::{Method, Request};
     use swap::api::Context;
-    use tracing_subscriber::filter::LevelFilter;
 
+    use tracing_subscriber::filter::LevelFilter;
     use crate::harness::alice_run_until::is_xmr_lock_transaction_sent;
     use crate::harness::bob_run_until::is_btc_locked;
     use crate::harness::{setup_test, SlowCancelConfig, TestContext};
@@ -29,7 +29,7 @@ mod test {
 
     const SERVER_ADDRESS: &str = "127.0.0.1:1234";
     const SERVER_START_TIMEOUT_SECS: u64 = 50;
-    const BITCOIN_ADDR: &str = "tb1qr3em6k3gfnyl8r7q0v7t4tlnyxzgxma3lressv";
+    const BITCOIN_ADDR: &str = "bcrt1qahvhjfc7vx5857zf8knxs8yp5lkm26jgyt0k76";
     const MONERO_ADDR: &str = "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a";
     const SELLER: &str =
         "/ip4/127.0.0.1/tcp/9939/p2p/12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
@@ -79,63 +79,16 @@ mod test {
     }
 
     // Helper function for HashMap
-    fn assert_has_keys_hashmap(map: &HashMap<String, Value>, keys: &[&str]) {
+    fn assert_has_keys_hashmap<T>(map: &HashMap<String, T>, keys: &[&str]) {
         for &key in keys {
             assert!(map.contains_key(key), "Key {} is missing", key);
         }
     }
 
-    #[tokio::test]
-    #[serial]
-    pub async fn can_start_server() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, _) = setup_daemon(harness_ctx).await;
-            assert!(client.is_connected());
-            Ok(())
-        })
-        .await;
-    }
 
     #[tokio::test]
     #[serial]
-    pub async fn get_bitcoin_balance() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, _) = setup_daemon(harness_ctx).await;
-
-            let response: HashMap<String, i32> = client
-                .request("get_bitcoin_balance", ObjectParams::new())
-                .await
-                .unwrap();
-
-            assert_eq!(response, HashMap::from([("balance".to_string(), 10000000)]));
-
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn get_bitcoin_balance_with_log_reference_id() {
-        setup_test(SlowCancelConfig,  |harness_ctx| async move {
-        let (client, writer, _) = setup_daemon(harness_ctx).await;
-
-        let mut params = ObjectParams::new();
-        params.insert("log_reference_id", "test_ref_id").unwrap();
-
-        let _: HashMap<String, i32> = client.request("get_bitcoin_balance", params).await.unwrap();
-
-        assert!(writer.captured().contains(
-            "log_reference_id=\"test_ref_id\"}: swap::api::request: Checked Bitcoin balance balance=0"
-        ));
-
-        Ok(())
-    }).await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn get_history() {
+    pub async fn get_swap_info() {
         setup_test(SlowCancelConfig, |mut harness_ctx| async move {
             // Start a swap and wait for xmr lock transaction to be published (XmrLockTransactionSent)
             let (bob_swap, _) = harness_ctx.bob_swap().await;
@@ -159,29 +112,6 @@ mod test {
 
             assert_eq!(response, HashMap::from([("swaps".to_string(), swaps)]));
 
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn get_raw_states() {
-        setup_test(SlowCancelConfig, |mut harness_ctx| async move {
-            // Start a swap and wait for xmr lock transaction to be published (XmrLockTransactionSent)
-            let (bob_swap, _) = harness_ctx.bob_swap().await;
-            let bob_swap_id = bob_swap.id;
-            tokio::spawn(bob::run_until(bob_swap, is_btc_locked));
-            let alice_swap = harness_ctx.alice_next_swap().await;
-            alice::run_until(
-                alice_swap,
-                is_xmr_lock_transaction_sent,
-                FixedRate::default(),
-            )
-            .await?;
-
-            let (client, _, _) = setup_daemon(harness_ctx).await;
-
             let response: HashMap<String, HashMap<Uuid, Vec<Value>>> = client
                 .request("get_raw_states", ObjectParams::new())
                 .await
@@ -191,29 +121,6 @@ mod test {
 
             assert!(response_raw_states.contains_key(&bob_swap_id));
             assert_eq!(response_raw_states.get(&bob_swap_id).unwrap().len(), 2);
-
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn get_swap_info_valid_swap_id() {
-        setup_test(SlowCancelConfig, |mut harness_ctx| async move {
-            // Start a swap and wait for xmr lock transaction to be published (XmrLockTransactionSent)
-            let (bob_swap, _) = harness_ctx.bob_swap().await;
-            let bob_swap_id = bob_swap.id;
-            tokio::spawn(bob::run_until(bob_swap, is_btc_locked));
-            let alice_swap = harness_ctx.alice_next_swap().await;
-            alice::run_until(
-                alice_swap,
-                is_xmr_lock_transaction_sent,
-                FixedRate::default(),
-            )
-            .await?;
-
-            let (client, _, _) = setup_daemon(harness_ctx).await;
 
             let mut params = ObjectParams::new();
             params.insert("swap_id", bob_swap_id).unwrap();
@@ -288,9 +195,35 @@ mod test {
 
     #[tokio::test]
     #[serial]
-    pub async fn swap_endpoints_invalid_or_missing_swap_id() {
+    pub async fn test_rpc_calls() {
         setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, _) = setup_daemon(harness_ctx).await;
+            let alice_addr = harness_ctx.bob_params.get_concentenated_alice_address();
+            let (change_address, receive_address) =
+                harness_ctx.bob_params.get_change_receive_addresses().await;
+
+            let (client, writer, _) = setup_daemon(harness_ctx).await;
+            assert!(client.is_connected());
+
+            let mut params = ObjectParams::new();
+
+            params.insert("force_refresh", false).unwrap();
+            let response: HashMap<String, i32> = client
+                .request("get_bitcoin_balance", params)
+                .await
+                .unwrap();
+
+            assert_eq!(response, HashMap::from([("balance".to_string(), 10000000)]));
+
+
+            let mut params = ObjectParams::new();
+            params.insert("log_reference_id", "test_ref_id").unwrap();
+            params.insert("force_refresh", false).unwrap();
+
+            let _: HashMap<String, i32> = client.request("get_bitcoin_balance", params).await.unwrap();
+
+            assert!(writer.captured().contains(
+                r#"method{method_name="Balance" log_reference_id="\"test_ref_id\""}: swap::api::request: Current Bitcoin balance as of last sync balance=0.1 BTC"#
+            ));
 
             for method in ["get_swap_info", "resume_swap", "cancel_refund_swap"].iter() {
                 let mut params = ObjectParams::new();
@@ -313,82 +246,28 @@ mod test {
                 ));
             }
 
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    pub async fn list_sellers_missing_rendezvous_point() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, _) = setup_daemon(harness_ctx).await;
-
             let params = ObjectParams::new();
             let result: Result<HashMap<String, String>, _> =
                 client.request("list_sellers", params).await;
 
             result.expect_err("Expected an error when rendezvous_point is missing");
 
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn resume_swap_valid_swap_id() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, _) = setup_daemon(harness_ctx).await;
-
             let params = ObjectParams::new();
             let result: Result<HashMap<String, String>, _> =
                 client.request("list_sellers", params).await;
 
             result.expect_err("Expected an error when rendezvous_point is missing");
-
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn withdraw_btc_missing_address() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, _) = setup_daemon(harness_ctx).await;
 
             let params = ObjectParams::new();
             let response: Result<HashMap<String, String>, _> =
                 client.request("withdraw_btc", params).await;
             response.expect_err("Expected an error when withdraw_address is missing");
 
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn withdraw_btc_invalid_address() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, _) = setup_daemon(harness_ctx).await;
-
             let mut params = ObjectParams::new();
             params.insert("address", "invalid_address").unwrap();
             let response: Result<HashMap<String, String>, _> =
                 client.request("withdraw_btc", params).await;
             response.expect_err("Expected an error when withdraw_address is malformed");
-
-            Ok(())
-        })
-        .await
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn withdraw_btc_zero_amount() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, _) = setup_daemon(harness_ctx).await;
 
             let mut params = ObjectParams::new();
             params.insert("address", BITCOIN_ADDR).unwrap();
@@ -397,22 +276,11 @@ mod test {
                 client.request("withdraw_btc", params).await;
             response.expect_err("Expected an error when amount is 0");
 
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn withdraw_btc_valid_params() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, _) = setup_daemon(harness_ctx).await;
-
             let mut params = ObjectParams::new();
             params
-                .insert("address", "mkHS9ne12qx9pS9VojpwU5xtRd4T7X7ZUt")
+                .insert("address", BITCOIN_ADDR)
                 .unwrap();
-            params.insert("amount", 0.01).unwrap();
+            params.insert("amount", "0.01").unwrap();
             let response: HashMap<String, Value> = client
                 .request("withdraw_btc", params)
                 .await
@@ -420,36 +288,14 @@ mod test {
 
             assert_has_keys_hashmap(&response, &["signed_tx", "amount", "txid"]);
             assert_eq!(
-                response.get("amount").unwrap().as_f64().unwrap(),
-                1_000_000.0
+                response.get("amount").unwrap().as_u64().unwrap(),
+                1_000_000
             );
-
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn buy_xmr_no_params() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, _) = setup_daemon(harness_ctx).await;
 
             let params = ObjectParams::new();
             let response: Result<HashMap<String, String>, _> =
                 client.request("buy_xmr", params).await;
             response.expect_err("Expected an error when no params are given");
-
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn buy_xmr_missing_seller() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, _) = setup_daemon(harness_ctx).await;
 
             let mut params = ObjectParams::new();
             params
@@ -462,17 +308,6 @@ mod test {
                 client.request("buy_xmr", params).await;
             response.expect_err("Expected an error when seller is missing");
 
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn buy_xmr_missing_monero_address() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, _) = setup_daemon(harness_ctx).await;
-
             let mut params = ObjectParams::new();
             params
                 .insert("bitcoin_change_address", BITCOIN_ADDR)
@@ -482,16 +317,6 @@ mod test {
                 client.request("buy_xmr", params).await;
             response.expect_err("Expected an error when monero_receive_address is missing");
 
-            Ok(())
-        })
-        .await;
-    }
-    #[tokio::test]
-    #[serial]
-    pub async fn buy_xmr_missing_bitcoin_address() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, _) = setup_daemon(harness_ctx).await;
-
             let mut params = ObjectParams::new();
             params
                 .insert("monero_receive_address", MONERO_ADDR)
@@ -500,17 +325,6 @@ mod test {
             let response: Result<HashMap<String, String>, _> =
                 client.request("buy_xmr", params).await;
             response.expect_err("Expected an error when bitcoin_change_address is missing");
-
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn buy_xmr_malformed_bitcoin_address() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _writer, _) = setup_daemon(harness_ctx).await;
 
             let mut params = ObjectParams::new();
             params
@@ -524,17 +338,6 @@ mod test {
                 client.request("buy_xmr", params).await;
             response.expect_err("Expected an error when bitcoin_change_address is malformed");
 
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn buy_xmr_malformed_monero_address() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, _) = setup_daemon(harness_ctx).await;
-
             let mut params = ObjectParams::new();
             params
                 .insert("bitcoin_change_address", BITCOIN_ADDR)
@@ -547,16 +350,6 @@ mod test {
                 client.request("buy_xmr", params).await;
             response.expect_err("Expected an error when monero_receive_address is malformed");
 
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn buy_xmr_malformed_seller() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, _) = setup_daemon(harness_ctx).await;
 
             let mut params = ObjectParams::new();
             params
@@ -570,90 +363,10 @@ mod test {
                 client.request("buy_xmr", params).await;
             response.expect_err("Expected an error when seller is malformed");
 
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn suspend_current_swap_no_swap_running() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, _) = setup_daemon(harness_ctx).await;
-
             let response: Result<HashMap<String, String>, _> = client
                 .request("suspend_current_swap", ObjectParams::new())
                 .await;
             response.expect_err("Expected an error when no swap is running");
-
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn suspend_current_swap_swap_running() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, ctx) = setup_daemon(harness_ctx).await;
-
-            ctx.swap_lock
-                .acquire_swap_lock(Uuid::parse_str(SWAP_ID).unwrap())
-                .await
-                .unwrap();
-
-            tokio::spawn(async move {
-                // Immediately release lock when suspend signal is received. Mocks a running swap that is then cancelled.
-                ctx.swap_lock
-                    .listen_for_swap_force_suspension()
-                    .await
-                    .unwrap();
-                ctx.swap_lock.release_swap_lock().await.unwrap();
-            });
-
-            let response: HashMap<String, String> = client
-                .request("suspend_current_swap", ObjectParams::new())
-                .await
-                .unwrap();
-            assert_eq!(
-                response,
-                HashMap::from([("swapId".to_string(), SWAP_ID.to_string())])
-            );
-
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn suspend_current_swap_timeout() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let (client, _, ctx) = setup_daemon(harness_ctx).await;
-
-            ctx.swap_lock
-                .acquire_swap_lock(Uuid::parse_str(SWAP_ID).unwrap())
-                .await
-                .unwrap();
-
-            let response: Result<HashMap<String, String>, _> = client
-                .request("suspend_current_swap", ObjectParams::new())
-                .await;
-            response.expect_err("Expected an error when suspend signal times out");
-
-            Ok(())
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    #[serial]
-    pub async fn buy_xmr_valid_params() {
-        setup_test(SlowCancelConfig, |harness_ctx| async move {
-            let alice_addr = harness_ctx.bob_params.get_concentenated_alice_address();
-            let (change_address, receive_address) =
-                harness_ctx.bob_params.get_change_receive_addresses().await;
-            let (client, _, _) = setup_daemon(harness_ctx).await;
 
             let mut params = ObjectParams::new();
             params
@@ -675,4 +388,50 @@ mod test {
         })
         .await;
     }
+
+    #[tokio::test]
+    #[serial]
+    pub async fn suspend_current_swap_swap_running() {
+        setup_test(SlowCancelConfig, |harness_ctx| async move {
+            let (client, _, ctx) = setup_daemon(harness_ctx).await;
+
+            ctx.swap_lock
+                .acquire_swap_lock(Uuid::parse_str(SWAP_ID).unwrap())
+                .await
+                .unwrap();
+            let cloned_ctx = ctx.clone();
+
+            tokio::spawn(async move {
+                // Immediately release lock when suspend signal is received. Mocks a running swap that is then cancelled.
+                ctx.swap_lock
+                    .listen_for_swap_force_suspension()
+                    .await
+                    .unwrap();
+                ctx.swap_lock.release_swap_lock().await.unwrap();
+            });
+
+            let response: HashMap<String, String> = client
+                .request("suspend_current_swap", ObjectParams::new())
+                .await
+                .unwrap();
+            assert_eq!(
+                response,
+                HashMap::from([("swapId".to_string(), SWAP_ID.to_string())])
+            );
+
+            cloned_ctx.swap_lock
+                .acquire_swap_lock(Uuid::parse_str(SWAP_ID).unwrap())
+                .await
+                .unwrap();
+
+            let response: Result<HashMap<String, String>, _> = client
+                .request("suspend_current_swap", ObjectParams::new())
+                .await;
+            response.expect_err("Expected an error when suspend signal times out");
+
+            Ok(())
+        })
+        .await;
+    }
+
 }

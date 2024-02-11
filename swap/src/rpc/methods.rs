@@ -20,28 +20,38 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
     })?;
 
     module.register_async_method("get_swap_info", |params_raw, context| async move {
-        let params: HashMap<String, Uuid> = params_raw.parse()?;
+        let params: HashMap<String, serde_json::Value> = params_raw.parse()?;
 
         let swap_id = params
             .get("swap_id")
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string()))?;
 
+        let swap_id = as_uuid(swap_id).ok_or_else( ||  jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
+
         execute_request(
             params_raw,
-            Method::GetSwapInfo { swap_id: *swap_id },
+            Method::GetSwapInfo { swap_id },
             &context,
         )
         .await
     })?;
 
     module.register_async_method("get_bitcoin_balance", |params_raw, context| async move {
-        let params: HashMap<String, bool> = params_raw.parse()?;
 
-        let force_refresh = *params.get("force_refresh").ok_or_else(|| {
-            jsonrpsee_core::Error::Custom("Does not contain force_refresh".to_string())
-        })?;
+        let params: HashMap<String, serde_json::Value> = params_raw.parse()?;
 
-        execute_request(params_raw, Method::Balance { force_refresh }, &context).await
+        let force_refresh = params.get("force_refresh")
+            .ok_or_else(|| { jsonrpsee_core::Error::Custom("Does not contain force_refresh".to_string())})?
+            .as_bool()
+            .ok_or_else(|| { jsonrpsee_core::Error::Custom("force_refesh is not a boolean".to_string())})?;
+
+
+        execute_request(
+            params_raw,
+            Method::Balance { force_refresh },
+            &context
+        )
+        .await
     })?;
 
     module.register_async_method("get_history", |params, context| async move {
@@ -53,25 +63,29 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
     })?;
 
     module.register_async_method("resume_swap", |params_raw, context| async move {
-        let params: HashMap<String, Uuid> = params_raw.parse()?;
+        let params: HashMap<String, serde_json::Value> = params_raw.parse()?;
 
         let swap_id = params
             .get("swap_id")
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string()))?;
 
-        execute_request(params_raw, Method::Resume { swap_id: *swap_id }, &context).await
+        let swap_id = as_uuid(swap_id).ok_or_else( ||  jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
+
+        execute_request(params_raw, Method::Resume { swap_id }, &context).await
     })?;
 
     module.register_async_method("cancel_refund_swap", |params_raw, context| async move {
-        let params: HashMap<String, Uuid> = params_raw.parse()?;
+        let params: HashMap<String, serde_json::Value> = params_raw.parse()?;
 
         let swap_id = params
             .get("swap_id")
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string()))?;
 
+        let swap_id = as_uuid(swap_id).ok_or_else( ||  jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
+
         execute_request(
             params_raw,
-            Method::CancelAndRefund { swap_id: *swap_id },
+            Method::CancelAndRefund { swap_id },
             &context,
         )
         .await
@@ -80,15 +94,17 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
     module.register_async_method(
         "get_monero_recovery_info",
         |params_raw, context| async move {
-            let params: HashMap<String, Uuid> = params_raw.parse()?;
+            let params: HashMap<String, serde_json::Value> = params_raw.parse()?;
 
             let swap_id = params.get("swap_id").ok_or_else(|| {
                 jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string())
             })?;
 
+            let swap_id = as_uuid(swap_id).ok_or_else( ||  jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
+
             execute_request(
                 params_raw,
-                Method::MoneroRecovery { swap_id: *swap_id },
+                Method::MoneroRecovery { swap_id },
                 &context,
             )
             .await
@@ -173,10 +189,16 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
     })?;
 
     module.register_async_method("list_sellers", |params_raw, context| async move {
-        let params: HashMap<String, Multiaddr> = params_raw.parse()?;
+        let params: HashMap<String, serde_json::Value> = params_raw.parse()?;
+
         let rendezvous_point = params.get("rendezvous_point").ok_or_else(|| {
             jsonrpsee_core::Error::Custom("Does not contain rendezvous_point".to_string())
         })?;
+
+        let rendezvous_point = rendezvous_point
+            .as_str()
+            .and_then(|addr_str| Multiaddr::from_str(addr_str).ok())
+            .ok_or_else(|| jsonrpsee_core::Error::Custom("Could not parse valid multiaddr".to_string()))?;
 
         execute_request(
             params_raw,
@@ -195,6 +217,14 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
     Ok(module)
 }
 
+fn as_uuid(json_value: &serde_json::Value) -> Option<Uuid> {
+    if let Some(uuid_str) = json_value.as_str() {
+        Uuid::parse_str(uuid_str).ok()
+    } else {
+        None
+    }
+}
+
 async fn execute_request(
     params: Params<'static>,
     cmd: Method,
@@ -204,11 +234,11 @@ async fn execute_request(
     // In that case, we want to make sure not to fail the request, so we set the log_reference_id to None
     // and swallow the error
     let reference_id = params
-        .parse::<HashMap<String, String>>()
+        .parse::<HashMap<String, serde_json::Value>>()
         .ok()
         .and_then(|params_parsed| params_parsed.get("log_reference_id").cloned());
 
-    let request = Request::with_id(cmd, reference_id);
+    let request = Request::with_id(cmd, reference_id.map(|log_ref| log_ref.to_string()));
     request
         .call(Arc::clone(context))
         .await
