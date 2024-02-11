@@ -1,6 +1,5 @@
-use std::collections::HashMap;
-use testcontainers::core::{Container, Docker, WaitForMessage};
-use testcontainers::Image;
+use std::collections::BTreeMap;
+use testcontainers::{core::WaitFor, Image, ImageArgs};
 
 pub const RPC_USER: &str = "admin";
 pub const RPC_PASSWORD: &str = "123";
@@ -9,58 +8,29 @@ pub const PORT: u16 = 18886;
 pub const DATADIR: &str = "/home/bdk";
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Bitcoind {
     args: BitcoindArgs,
     entrypoint: Option<String>,
-    volume: Option<String>,
+    volumes: BTreeMap<String, String>,
 }
 
 impl Image for Bitcoind {
     type Args = BitcoindArgs;
-    type EnvVars = HashMap<String, String>;
-    type Volumes = HashMap<String, String>;
-    type EntryPoint = str;
-
-    fn descriptor(&self) -> String {
-        "coblox/bitcoin-core:0.21.0".to_string()
+    fn name(&self) -> String {
+        "coblox/bitcoin-core".into()
     }
 
-    fn wait_until_ready<D: Docker>(&self, container: &Container<'_, D, Self>) {
-        container
-            .logs()
-            .stdout
-            .wait_for_message("init message: Done loading")
-            .unwrap();
+    fn tag(&self) -> String {
+        "0.21.0".into()
     }
 
-    fn args(&self) -> <Self as Image>::Args {
-        self.args.clone()
+    fn ready_conditions(&self) -> Vec<WaitFor> {
+        vec![WaitFor::message_on_stdout("init message: Done loading")]
     }
 
-    fn volumes(&self) -> Self::Volumes {
-        let mut volumes = HashMap::new();
-        match self.volume.clone() {
-            None => {}
-            Some(volume) => {
-                volumes.insert(volume, DATADIR.to_string());
-            }
-        }
-        volumes
-    }
-
-    fn env_vars(&self) -> Self::EnvVars {
-        HashMap::new()
-    }
-
-    fn with_args(self, args: <Self as Image>::Args) -> Self {
-        Bitcoind { args, ..self }
-    }
-
-    fn with_entrypoint(self, entrypoint: &Self::EntryPoint) -> Self {
-        Self {
-            entrypoint: Some(entrypoint.to_string()),
-            ..self
-        }
+    fn volumes(&self) -> Box<dyn Iterator<Item = (&String, &String)> + '_> {
+        Box::new(self.volumes.iter())
     }
 
     fn entrypoint(&self) -> Option<String> {
@@ -73,14 +43,14 @@ impl Default for Bitcoind {
         Bitcoind {
             args: BitcoindArgs::default(),
             entrypoint: Some("/usr/bin/bitcoind".into()),
-            volume: None,
+            volumes: BTreeMap::default(),
         }
     }
 }
 
 impl Bitcoind {
     pub fn with_volume(mut self, volume: String) -> Self {
-        self.volume = Some(volume);
+        self.volumes.insert(volume, DATADIR.to_string());
         self
     }
 }
@@ -109,7 +79,6 @@ impl IntoIterator for BitcoindArgs {
             format!("-rpcuser={}", RPC_USER),
             format!("-rpcpassword={}", RPC_PASSWORD),
             "-printtoconsole".to_string(),
-            "-rest".to_string(),
             "-fallbackfee=0.0002".to_string(),
             format!("-datadir={}", DATADIR),
             format!("-rpcport={}", RPC_PORT),
@@ -118,5 +87,11 @@ impl IntoIterator for BitcoindArgs {
         ];
 
         args.into_iter()
+    }
+}
+
+impl ImageArgs for BitcoindArgs {
+    fn into_iterator(self) -> Box<dyn Iterator<Item = String>> {
+        Box::new(self.into_iter())
     }
 }

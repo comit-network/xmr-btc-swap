@@ -61,13 +61,12 @@ mod tests {
     use monero_harness::image::Monerod;
     use monero_rpc::monerod::{Client, GetOutputsOut};
     use testcontainers::clients::Cli;
-    use testcontainers::Docker;
 
     #[tokio::test]
     async fn get_outs_for_key_offsets() {
         let cli = Cli::default();
         let container = cli.run(Monerod::default());
-        let rpc_client = Client::localhost(container.get_host_port(18081).unwrap()).unwrap();
+        let rpc_client = Client::localhost(container.get_host_port_ipv4(18081)).unwrap();
         rpc_client.generateblocks(150, "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".to_owned()).await.unwrap();
         let wallet = Wallet {
             client: rpc_client.clone(),

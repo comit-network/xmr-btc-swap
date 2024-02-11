@@ -366,7 +366,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "testcontainers 0.14.0",
+ "testcontainers",
  "thiserror",
  "tokio",
  "tracing",
@@ -891,16 +891,6 @@ name = "crypto-mac"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b584a330336237c1eecd3e94266efb216c56ed91225d634cb2991c5f3fd1aeab"
-dependencies = [
- "generic-array",
- "subtle",
-]
-
-[[package]]
-name = "crypto-mac"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4857fd85a0c34b3c3297875b747c1e02e06b6a0ea32dd892d8192b9ce0813ea6"
 dependencies = [
  "generic-array",
  "subtle",
@@ -1597,16 +1587,6 @@ name = "hex-literal"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6fe2267d4ed49bc07b63801559be28c718ea06c4738b7a03c94df7386d2cde46"
-
-[[package]]
-name = "hmac"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1441c6b1e930e2817404b5046f1f989899143a12bf92de603b69f4e0aee1e15"
-dependencies = [
- "crypto-mac 0.10.0",
- "digest 0.9.0",
-]
 
 [[package]]
 name = "hmac"
@@ -2469,7 +2449,7 @@ dependencies = [
  "monero-rpc",
  "rand 0.7.3",
  "spectral",
- "testcontainers 0.12.0",
+ "testcontainers",
  "tokio",
  "tracing",
  "tracing-subscriber 0.2.25",
@@ -2505,7 +2485,7 @@ dependencies = [
  "monero-harness",
  "monero-rpc",
  "rand 0.7.3",
- "testcontainers 0.12.0",
+ "testcontainers",
  "tokio",
  "tracing-subscriber 0.2.25",
 ]
@@ -4364,7 +4344,7 @@ dependencies = [
  "structopt",
  "strum 0.26.1",
  "tempfile",
- "testcontainers 0.12.0",
+ "testcontainers",
  "thiserror",
  "time 0.3.34",
  "tokio",
@@ -4466,21 +4446,6 @@ checksum = "86ca8ced750734db02076f44132d802af0b33b09942331f4459dde8636fd2406"
 dependencies = [
  "libc",
  "winapi",
-]
-
-[[package]]
-name = "testcontainers"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5e3ed6e3598dbf32cba8cb356b881c085e0adea57597f387723430dd94b4084"
-dependencies = [
- "hex",
- "hmac 0.10.1",
- "log",
- "rand 0.8.3",
- "serde",
- "serde_json",
- "sha2 0.9.8",
 ]
 
 [[package]]
