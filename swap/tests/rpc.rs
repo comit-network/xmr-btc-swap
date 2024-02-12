@@ -18,13 +18,13 @@ mod test {
     use swap::api::request::{Method, Request};
     use swap::api::Context;
 
-    use tracing_subscriber::filter::LevelFilter;
     use crate::harness::alice_run_until::is_xmr_lock_transaction_sent;
     use crate::harness::bob_run_until::is_btc_locked;
     use crate::harness::{setup_test, SlowCancelConfig, TestContext};
     use swap::asb::FixedRate;
     use swap::protocol::{alice, bob};
     use swap::tracing_ext::{capture_logs, MakeCapturingWriter};
+    use tracing_subscriber::filter::LevelFilter;
     use uuid::Uuid;
 
     const SERVER_ADDRESS: &str = "127.0.0.1:1234";
@@ -84,7 +84,6 @@ mod test {
             assert!(map.contains_key(key), "Key {} is missing", key);
         }
     }
-
 
     #[tokio::test]
     #[serial]
@@ -419,7 +418,8 @@ mod test {
                 HashMap::from([("swapId".to_string(), SWAP_ID.to_string())])
             );
 
-            cloned_ctx.swap_lock
+            cloned_ctx
+                .swap_lock
                 .acquire_swap_lock(Uuid::parse_str(SWAP_ID).unwrap())
                 .await
                 .unwrap();
@@ -433,5 +433,4 @@ mod test {
         })
         .await;
     }
-
 }

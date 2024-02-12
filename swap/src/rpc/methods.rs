@@ -26,32 +26,26 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
             .get("swap_id")
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string()))?;
 
-        let swap_id = as_uuid(swap_id).ok_or_else( ||  jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
+        let swap_id = as_uuid(swap_id)
+            .ok_or_else(|| jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
 
-        execute_request(
-            params_raw,
-            Method::GetSwapInfo { swap_id },
-            &context,
-        )
-        .await
+        execute_request(params_raw, Method::GetSwapInfo { swap_id }, &context).await
     })?;
 
     module.register_async_method("get_bitcoin_balance", |params_raw, context| async move {
-
         let params: HashMap<String, serde_json::Value> = params_raw.parse()?;
 
-        let force_refresh = params.get("force_refresh")
-            .ok_or_else(|| { jsonrpsee_core::Error::Custom("Does not contain force_refresh".to_string())})?
+        let force_refresh = params
+            .get("force_refresh")
+            .ok_or_else(|| {
+                jsonrpsee_core::Error::Custom("Does not contain force_refresh".to_string())
+            })?
             .as_bool()
-            .ok_or_else(|| { jsonrpsee_core::Error::Custom("force_refesh is not a boolean".to_string())})?;
+            .ok_or_else(|| {
+                jsonrpsee_core::Error::Custom("force_refesh is not a boolean".to_string())
+            })?;
 
-
-        execute_request(
-            params_raw,
-            Method::Balance { force_refresh },
-            &context
-        )
-        .await
+        execute_request(params_raw, Method::Balance { force_refresh }, &context).await
     })?;
 
     module.register_async_method("get_history", |params, context| async move {
@@ -69,7 +63,8 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
             .get("swap_id")
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string()))?;
 
-        let swap_id = as_uuid(swap_id).ok_or_else( ||  jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
+        let swap_id = as_uuid(swap_id)
+            .ok_or_else(|| jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
 
         execute_request(params_raw, Method::Resume { swap_id }, &context).await
     })?;
@@ -81,14 +76,10 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
             .get("swap_id")
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string()))?;
 
-        let swap_id = as_uuid(swap_id).ok_or_else( ||  jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
+        let swap_id = as_uuid(swap_id)
+            .ok_or_else(|| jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
 
-        execute_request(
-            params_raw,
-            Method::CancelAndRefund { swap_id },
-            &context,
-        )
-        .await
+        execute_request(params_raw, Method::CancelAndRefund { swap_id }, &context).await
     })?;
 
     module.register_async_method(
@@ -100,14 +91,11 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
                 jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string())
             })?;
 
-            let swap_id = as_uuid(swap_id).ok_or_else( ||  jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
+            let swap_id = as_uuid(swap_id).ok_or_else(|| {
+                jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string())
+            })?;
 
-            execute_request(
-                params_raw,
-                Method::MoneroRecovery { swap_id },
-                &context,
-            )
-            .await
+            execute_request(params_raw, Method::MoneroRecovery { swap_id }, &context).await
         },
     )?;
 
@@ -198,7 +186,9 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
         let rendezvous_point = rendezvous_point
             .as_str()
             .and_then(|addr_str| Multiaddr::from_str(addr_str).ok())
-            .ok_or_else(|| jsonrpsee_core::Error::Custom("Could not parse valid multiaddr".to_string()))?;
+            .ok_or_else(|| {
+                jsonrpsee_core::Error::Custom("Could not parse valid multiaddr".to_string())
+            })?;
 
         execute_request(
             params_raw,

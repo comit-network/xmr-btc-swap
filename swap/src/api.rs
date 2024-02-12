@@ -22,7 +22,7 @@ static START: Once = Once::new();
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Config {
-    tor_socks5_port: Option<u16>,
+    tor_socks5_port: u16,
     namespace: XmrBtcNamespace,
     server_address: Option<SocketAddr>,
     pub env_config: EnvConfig,
@@ -217,7 +217,7 @@ impl Context {
             }
         };
 
-        let tor_socks5_port = tor.map(|tor| tor.tor_socks5_port);
+        let tor_socks5_port = tor.map_or(9050, |tor| tor.tor_socks5_port);
 
         START.call_once(|| {
             let _ = cli::tracing::init(debug, json, data_dir.join("logs"));
@@ -356,7 +356,7 @@ impl Config {
         let data_dir = data::data_dir_from(None, false).expect("Could not find data directory");
 
         Self {
-            tor_socks5_port: None,
+            tor_socks5_port: 9050,
             namespace: XmrBtcNamespace::from_is_testnet(false),
             server_address: None,
             env_config,
@@ -399,7 +399,7 @@ pub mod api_test {
 
             let env_config = env_config_from(is_testnet);
             Self {
-                tor_socks5_port: Some(9050),
+                tor_socks5_port: 9050,
                 namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
                 server_address: None,
                 env_config,

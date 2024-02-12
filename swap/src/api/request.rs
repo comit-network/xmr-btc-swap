@@ -351,10 +351,7 @@ impl Request {
                 );
                 let mut swarm = swarm::cli(
                     seed.derive_libp2p_identity(),
-                    context
-                        .config
-                        .tor_socks5_port
-                        .context("Could not get Tor SOCKS5 port")?,
+                    context.config.tor_socks5_port,
                     behaviour,
                 )
                 .await?;
@@ -512,15 +509,8 @@ impl Request {
                     ),
                     (seed.clone(), context.config.namespace),
                 );
-                let mut swarm = swarm::cli(
-                    seed.clone(),
-                    context
-                        .config
-                        .tor_socks5_port
-                        .context("Could not get Tor SOCKS5 port")?,
-                    behaviour,
-                )
-                .await?;
+                let mut swarm =
+                    swarm::cli(seed.clone(), context.config.tor_socks5_port, behaviour).await?;
                 let our_peer_id = swarm.local_peer_id();
 
                 tracing::debug!(peer_id = %our_peer_id, "Network layer initialized");
@@ -748,10 +738,7 @@ impl Request {
                     rendezvous_node_peer_id,
                     rendezvous_point,
                     context.config.namespace,
-                    context
-                        .config
-                        .tor_socks5_port
-                        .context("Could not get Tor SOCKS5 port")?,
+                    context.config.tor_socks5_port,
                     identity,
                 )
                 .await?;
