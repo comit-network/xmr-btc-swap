@@ -115,6 +115,19 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: (Free disk space on Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+        with:
+          # removing all of these takes ~10 mins, so just do as needed
+          android: true
+          dotnet: true
+          haskell: true
+          docker-images: false
+          large-packages: false
+          swap-storage: false
+          tool-cache: false
+
       - name: Checkout sources
         uses: actions/checkout@v4.1.1
 
