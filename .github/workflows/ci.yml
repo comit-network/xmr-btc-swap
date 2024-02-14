@@ -117,7 +117,7 @@ jobs:
     steps:
       - name: (Free disk space on Ubuntu)
         if: matrix.os == 'ubuntu-latest'
-        uses: jlumbroso/free-disk-space@main
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
         with:
           # removing all of these takes ~10 mins, so just do as needed
           android: true
