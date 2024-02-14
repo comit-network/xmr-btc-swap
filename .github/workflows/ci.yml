@@ -118,6 +118,15 @@ jobs:
       - name: (Free disk space on Ubuntu)
         if: matrix.os == 'ubuntu-latest'
         uses: jlumbroso/free-disk-space@main
+        with:
+          # removing all of these takes ~10 mins, so just do as needed
+          android: true
+          dotnet: true
+          haskell: true
+          docker-images: false
+          large-packages: false
+          swap-storage: false
+          tool-cache: false
 
       - name: Checkout sources
         uses: actions/checkout@v4.1.1
