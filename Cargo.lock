@@ -1718,14 +1718,13 @@ dependencies = [
 
 [[package]]
 name = "hyper"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb5aa53871fc917b1a9ed87b683a5d86db645e23acb32c2e0785a353e522fb75"
+checksum = "186548d73ac615b32a73aafe38fb4f56c0d340e110e5a200bcadbaf2e199263a"
 dependencies = [
  "bytes",
  "http 1.0.0",
  "http-body 1.0.0",
- "pin-project-lite 0.2.13",
  "tokio",
 ]
 
@@ -4336,7 +4335,7 @@ dependencies = [
  "futures",
  "get-port",
  "hex",
- "hyper 1.1.0",
+ "hyper 1.2.0",
  "itertools 0.12.1",
  "libp2p",
  "mockito",
