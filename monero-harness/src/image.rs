@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-use testcontainers::core::{Container, Docker, WaitForMessage};
-use testcontainers::Image;
+use testcontainers::{core::WaitFor, Image, ImageArgs};
 
 pub const MONEROD_DAEMON_CONTAINER_NAME: &str = "monerod";
 pub const MONEROD_DEFAULT_NETWORK: &str = "monero_network";
@@ -13,43 +11,22 @@ pub const MONEROD_DEFAULT_NETWORK: &str = "monero_network";
 /// this doesn't matter.
 pub const RPC_PORT: u16 = 18081;
 
-#[derive(Debug, Default)]
-pub struct Monerod {
-    args: MonerodArgs,
-}
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Monerod;
 
 impl Image for Monerod {
     type Args = MonerodArgs;
-    type EnvVars = HashMap<String, String>;
-    type Volumes = HashMap<String, String>;
-    type EntryPoint = str;
 
-    fn descriptor(&self) -> String {
-        "rinocommunity/monero:v0.18.1.2".to_owned()
+    fn name(&self) -> String {
+        "rinocommunity/monero".into()
     }
 
-    fn wait_until_ready<D: Docker>(&self, container: &Container<'_, D, Self>) {
-        container
-            .logs()
-            .stdout
-            .wait_for_message("RPC server started ok")
-            .unwrap();
+    fn tag(&self) -> String {
+        "v0.18.1.2".into()
     }
 
-    fn args(&self) -> <Self as Image>::Args {
-        self.args.clone()
-    }
-
-    fn volumes(&self) -> Self::Volumes {
-        HashMap::new()
-    }
-
-    fn env_vars(&self) -> Self::EnvVars {
-        HashMap::new()
-    }
-
-    fn with_args(self, args: <Self as Image>::Args) -> Self {
-        Self { args }
+    fn ready_conditions(&self) -> Vec<WaitFor> {
+        vec![WaitFor::message_on_stdout("RPC server started ok")]
     }
 
     fn entrypoint(&self) -> Option<String> {
@@ -58,43 +35,22 @@ impl Image for Monerod {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct MoneroWalletRpc {
-    args: MoneroWalletRpcArgs,
-}
+#[derive(Clone, Copy, Debug)]
+pub struct MoneroWalletRpc;
 
 impl Image for MoneroWalletRpc {
     type Args = MoneroWalletRpcArgs;
-    type EnvVars = HashMap<String, String>;
-    type Volumes = HashMap<String, String>;
-    type EntryPoint = str;
 
-    fn descriptor(&self) -> String {
-        "rinocommunity/monero:v0.18.1.2".to_owned()
+    fn name(&self) -> String {
+        "rinocommunity/monero".into()
     }
 
-    fn wait_until_ready<D: Docker>(&self, container: &Container<'_, D, Self>) {
-        container
-            .logs()
-            .stdout
-            .wait_for_message("Run server thread name: RPC")
-            .unwrap();
+    fn tag(&self) -> String {
+        "v0.18.1.2".into()
     }
 
-    fn args(&self) -> <Self as Image>::Args {
-        self.args.clone()
-    }
-
-    fn volumes(&self) -> Self::Volumes {
-        HashMap::new()
-    }
-
-    fn env_vars(&self) -> Self::EnvVars {
-        HashMap::new()
-    }
-
-    fn with_args(self, args: <Self as Image>::Args) -> Self {
-        Self { args }
+    fn ready_conditions(&self) -> Vec<WaitFor> {
+        vec![WaitFor::message_on_stdout("Run server thread name: RPC")]
     }
 
     fn entrypoint(&self) -> Option<String> {
@@ -104,10 +60,9 @@ impl Image for MoneroWalletRpc {
 }
 
 impl MoneroWalletRpc {
-    pub fn new(name: &str, daemon_address: String) -> Self {
-        Self {
-            args: MoneroWalletRpcArgs::new(name, daemon_address),
-        }
+    pub fn new(name: &str, daemon_address: String) -> (Self, MoneroWalletRpcArgs) {
+        let args = MoneroWalletRpcArgs::new(name, daemon_address);
+        (Self, args)
     }
 }
 
@@ -191,6 +146,12 @@ impl IntoIterator for MonerodArgs {
     }
 }
 
+impl ImageArgs for MonerodArgs {
+    fn into_iterator(self) -> Box<dyn Iterator<Item = String>> {
+        Box::new(self.into_iter())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct MoneroWalletRpcArgs {
     pub disable_rpc_login: bool,
@@ -198,12 +159,6 @@ pub struct MoneroWalletRpcArgs {
     pub wallet_dir: String,
     pub rpc_bind_ip: String,
     pub daemon_address: String,
-}
-
-impl Default for MoneroWalletRpcArgs {
-    fn default() -> Self {
-        unimplemented!("A default instance for `MoneroWalletRpc` doesn't make sense because we always need to connect to a node.")
-    }
 }
 
 impl MoneroWalletRpcArgs {
@@ -245,5 +200,11 @@ impl IntoIterator for MoneroWalletRpcArgs {
         }
 
         args.into_iter()
+    }
+}
+
+impl ImageArgs for MoneroWalletRpcArgs {
+    fn into_iterator(self) -> Box<dyn Iterator<Item = String>> {
+        Box::new(self.into_iter())
     }
 }
