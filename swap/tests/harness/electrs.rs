@@ -1,8 +1,8 @@
+use std::collections::BTreeMap;
+
 use crate::harness::bitcoind;
 use bitcoin::Network;
-use std::collections::HashMap;
-use testcontainers::core::{Container, Docker, WaitForMessage};
-use testcontainers::Image;
+use testcontainers::{core::WaitFor, Image, ImageArgs};
 
 pub const HTTP_PORT: u16 = 60401;
 pub const RPC_PORT: u16 = 3002;
@@ -13,50 +13,25 @@ pub struct Electrs {
     args: ElectrsArgs,
     entrypoint: Option<String>,
     wait_for_message: String,
-    volume: String,
+    volumes: BTreeMap<String, String>,
 }
 
 impl Image for Electrs {
     type Args = ElectrsArgs;
-    type EnvVars = HashMap<String, String>;
-    type Volumes = HashMap<String, String>;
-    type EntryPoint = str;
-
-    fn descriptor(&self) -> String {
-        format!("vulpemventures/electrs:{}", self.tag)
+    fn name(&self) -> String {
+        "vulpemventures/electrs".into()
     }
 
-    fn wait_until_ready<D: Docker>(&self, container: &Container<'_, D, Self>) {
-        container
-            .logs()
-            .stderr
-            .wait_for_message(&self.wait_for_message)
-            .unwrap();
+    fn tag(&self) -> String {
+        self.tag.clone()
     }
 
-    fn args(&self) -> <Self as Image>::Args {
-        self.args.clone()
+    fn ready_conditions(&self) -> Vec<WaitFor> {
+        vec![WaitFor::message_on_stderr(self.wait_for_message.clone())]
     }
 
-    fn volumes(&self) -> Self::Volumes {
-        let mut volumes = HashMap::new();
-        volumes.insert(self.volume.clone(), bitcoind::DATADIR.to_string());
-        volumes
-    }
-
-    fn env_vars(&self) -> Self::EnvVars {
-        HashMap::new()
-    }
-
-    fn with_args(self, args: <Self as Image>::Args) -> Self {
-        Electrs { args, ..self }
-    }
-
-    fn with_entrypoint(self, entrypoint: &Self::EntryPoint) -> Self {
-        Self {
-            entrypoint: Some(entrypoint.to_string()),
-            ..self
-        }
+    fn volumes(&self) -> Box<dyn Iterator<Item = (&String, &String)> + '_> {
+        Box::new(self.volumes.iter())
     }
 
     fn entrypoint(&self) -> Option<String> {
@@ -71,7 +46,7 @@ impl Default for Electrs {
             args: ElectrsArgs::default(),
             entrypoint: Some("/build/electrs".into()),
             wait_for_message: "Running accept thread".to_string(),
-            volume: uuid::Uuid::new_v4().to_string(),
+            volumes: BTreeMap::default(),
         }
     }
 }
@@ -85,13 +60,18 @@ impl Electrs {
     }
 
     pub fn with_volume(mut self, volume: String) -> Self {
-        self.volume = volume;
+        self.volumes.insert(volume, bitcoind::DATADIR.to_string());
         self
     }
 
     pub fn with_daemon_rpc_addr(mut self, name: String) -> Self {
         self.args.daemon_rpc_addr = name;
         self
+    }
+
+    pub fn self_and_args(self) -> (Self, ElectrsArgs) {
+        let args = self.args.clone();
+        (self, args)
     }
 }
 
@@ -137,7 +117,7 @@ impl IntoIterator for ElectrsArgs {
         }
 
         args.push("-vvvvv".to_string());
-        args.push(format!("--daemon-dir=={}", self.daemon_dir.as_str()));
+        args.push(format!("--daemon-dir={}", self.daemon_dir.as_str()));
         args.push(format!("--daemon-rpc-addr={}", self.daemon_rpc_addr));
         args.push(format!("--cookie={}", self.cookie));
         args.push(format!("--http-addr={}", self.http_addr));
@@ -145,5 +125,11 @@ impl IntoIterator for ElectrsArgs {
         args.push(format!("--cors={}", self.cors));
 
         args.into_iter()
+    }
+}
+
+impl ImageArgs for ElectrsArgs {
+    fn into_iterator(self) -> Box<dyn Iterator<Item = String>> {
+        Box::new(self.into_iter())
     }
 }
