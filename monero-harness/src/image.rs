@@ -11,11 +11,8 @@ pub const MONEROD_DEFAULT_NETWORK: &str = "monero_network";
 /// this doesn't matter.
 pub const RPC_PORT: u16 = 18081;
 
-#[derive(Debug, Default)]
-#[allow(dead_code)]
-pub struct Monerod {
-    args: MonerodArgs,
-}
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Monerod;
 
 impl Image for Monerod {
     type Args = MonerodArgs;
@@ -38,11 +35,8 @@ impl Image for Monerod {
     }
 }
 
-#[derive(Debug)]
-#[allow(dead_code)]
-pub struct MoneroWalletRpc {
-    args: MoneroWalletRpcArgs,
-}
+#[derive(Clone, Copy, Debug)]
+pub struct MoneroWalletRpc;
 
 impl Image for MoneroWalletRpc {
     type Args = MoneroWalletRpcArgs;
@@ -68,7 +62,7 @@ impl Image for MoneroWalletRpc {
 impl MoneroWalletRpc {
     pub fn new(name: &str, daemon_address: String) -> (Self, MoneroWalletRpcArgs) {
         let args = MoneroWalletRpcArgs::new(name, daemon_address);
-        (Self { args: args.clone() }, args)
+        (Self, args)
     }
 }
 

@@ -8,15 +8,14 @@ pub const PORT: u16 = 18886;
 pub const DATADIR: &str = "/home/bdk";
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct Bitcoind {
-    args: BitcoindArgs,
     entrypoint: Option<String>,
     volumes: BTreeMap<String, String>,
 }
 
 impl Image for Bitcoind {
     type Args = BitcoindArgs;
+
     fn name(&self) -> String {
         "coblox/bitcoin-core".into()
     }
@@ -41,7 +40,6 @@ impl Image for Bitcoind {
 impl Default for Bitcoind {
     fn default() -> Self {
         Bitcoind {
-            args: BitcoindArgs::default(),
             entrypoint: Some("/usr/bin/bitcoind".into()),
             volumes: BTreeMap::default(),
         }

@@ -143,14 +143,14 @@ where
 async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
     let prefix = random_prefix();
     let bitcoind_name = format!("{}_{}", prefix, "bitcoind");
-    let (bitcoind, bitcoind_url, mapped_port) =
+    let (_bitcoind, bitcoind_url, mapped_port) =
         init_bitcoind_container(cli, prefix.clone(), bitcoind_name.clone(), prefix.clone())
             .await
             .expect("could not init bitcoind");
     let electrs = init_electrs_container(cli, prefix.clone(), bitcoind_name, prefix, mapped_port)
         .await
         .expect("could not init electrs");
-    let (monero, monerod_container, monero_wallet_rpc_containers) =
+    let (monero, _monerod_container, _monero_wallet_rpc_containers) =
         Monero::new(cli, vec![MONERO_WALLET_NAME_ALICE, MONERO_WALLET_NAME_BOB])
             .await
             .unwrap();
@@ -159,9 +159,9 @@ async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
         monero,
         Containers {
             bitcoind_url,
-            bitcoind,
-            monerod_container,
-            monero_wallet_rpc_containers,
+            _bitcoind,
+            _monerod_container,
+            _monero_wallet_rpc_containers,
             electrs,
         },
     )
@@ -950,12 +950,11 @@ pub async fn mint(node_url: Url, address: bitcoin::Address, amount: bitcoin::Amo
 }
 
 // This is just to keep the containers alive
-#[allow(dead_code)]
 struct Containers<'a> {
     bitcoind_url: Url,
-    bitcoind: Container<'a, bitcoind::Bitcoind>,
-    monerod_container: Container<'a, image::Monerod>,
-    monero_wallet_rpc_containers: Vec<Container<'a, image::MoneroWalletRpc>>,
+    _bitcoind: Container<'a, bitcoind::Bitcoind>,
+    _monerod_container: Container<'a, image::Monerod>,
+    _monero_wallet_rpc_containers: Vec<Container<'a, image::MoneroWalletRpc>>,
     electrs: Container<'a, electrs::Electrs>,
 }
 
