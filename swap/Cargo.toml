@@ -78,9 +78,9 @@ zip = "0.5"
 [dev-dependencies]
 bitcoin-harness = "0.2.2"
 get-port = "3"
-hyper = "1.1"
+hyper = "1.2"
 jsonrpsee = { version = "0.16.2", features = [ "ws-client" ] }
-mockito = "1.2.0"
+mockito = "1.3.0"
 monero-harness = { path = "../monero-harness" }
 port_check = "0.1"
 proptest = "1"
@@ -89,7 +89,7 @@ serde_cbor = "0.11"
 serial_test = "3.0"
 spectral = "0.6"
 tempfile = "3"
-testcontainers = "0.12"
+testcontainers = "0.14"
 
 [build-dependencies]
 anyhow = "1"

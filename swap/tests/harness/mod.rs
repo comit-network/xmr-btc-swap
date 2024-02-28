@@ -28,7 +28,7 @@ use swap::seed::Seed;
 use swap::{api, asb, bitcoin, cli, env, monero};
 use tempfile::{tempdir, NamedTempFile};
 use testcontainers::clients::Cli;
-use testcontainers::{Container, Docker, RunArgs};
+use testcontainers::{Container, RunnableImage};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
@@ -61,10 +61,7 @@ where
     let alice_starting_balances =
         StartingBalances::new(bitcoin::Amount::ZERO, xmr_amount, Some(10));
 
-    let electrs_rpc_port = containers
-        .electrs
-        .get_host_port(electrs::RPC_PORT)
-        .expect("Could not map electrs rpc port");
+    let electrs_rpc_port = containers.electrs.get_host_port_ipv4(electrs::RPC_PORT);
 
     let alice_seed = Seed::random().unwrap();
     let (alice_bitcoin_wallet, alice_monero_wallet) = init_test_wallets(
@@ -146,14 +143,14 @@ where
 async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
     let prefix = random_prefix();
     let bitcoind_name = format!("{}_{}", prefix, "bitcoind");
-    let (bitcoind, bitcoind_url) =
+    let (_bitcoind, bitcoind_url, mapped_port) =
         init_bitcoind_container(cli, prefix.clone(), bitcoind_name.clone(), prefix.clone())
             .await
             .expect("could not init bitcoind");
-    let electrs = init_electrs_container(cli, prefix.clone(), bitcoind_name, prefix)
+    let electrs = init_electrs_container(cli, prefix.clone(), bitcoind_name, prefix, mapped_port)
         .await
         .expect("could not init electrs");
-    let (monero, monerod_container, monero_wallet_rpc_containers) =
+    let (monero, _monerod_container, _monero_wallet_rpc_containers) =
         Monero::new(cli, vec![MONERO_WALLET_NAME_ALICE, MONERO_WALLET_NAME_BOB])
             .await
             .unwrap();
@@ -162,9 +159,9 @@ async fn init_containers(cli: &Cli) -> (Monero, Containers<'_>) {
         monero,
         Containers {
             bitcoind_url,
-            bitcoind,
-            monerod_container,
-            monero_wallet_rpc_containers,
+            _bitcoind,
+            _monerod_container,
+            _monero_wallet_rpc_containers,
             electrs,
         },
     )
@@ -175,29 +172,28 @@ async fn init_bitcoind_container(
     volume: String,
     name: String,
     network: String,
-) -> Result<(Container<'_, Cli, bitcoind::Bitcoind>, Url)> {
+) -> Result<(Container<'_, bitcoind::Bitcoind>, Url, u16)> {
     let image = bitcoind::Bitcoind::default().with_volume(volume);
+    let image = RunnableImage::from(image)
+        .with_container_name(name)
+        .with_network(network);
 
-    let run_args = RunArgs::default().with_name(name).with_network(network);
-
-    let docker = cli.run_with_args(image, run_args);
-    let a = docker
-        .get_host_port(bitcoind::RPC_PORT)
-        .context("Could not map bitcoind rpc port")?;
+    let docker = cli.run(image);
+    let port = docker.get_host_port_ipv4(bitcoind::RPC_PORT);
 
     let bitcoind_url = {
         let input = format!(
             "http://{}:{}@localhost:{}",
             bitcoind::RPC_USER,
             bitcoind::RPC_PASSWORD,
-            a
+            port
         );
         Url::parse(&input).unwrap()
     };
 
     init_bitcoind(bitcoind_url.clone(), 5).await?;
 
-    Ok((docker, bitcoind_url.clone()))
+    Ok((docker, bitcoind_url.clone(), bitcoind::RPC_PORT))
 }
 
 pub async fn init_electrs_container(
@@ -205,16 +201,18 @@ pub async fn init_electrs_container(
     volume: String,
     bitcoind_container_name: String,
     network: String,
-) -> Result<Container<'_, Cli, electrs::Electrs>> {
-    let bitcoind_rpc_addr = format!("{}:{}", bitcoind_container_name, bitcoind::RPC_PORT);
+    port: u16,
+) -> Result<Container<'_, electrs::Electrs>> {
+    let bitcoind_rpc_addr = format!("{}:{}", bitcoind_container_name, port);
     let image = electrs::Electrs::default()
         .with_volume(volume)
         .with_daemon_rpc_addr(bitcoind_rpc_addr)
         .with_tag("latest");
+    let image = RunnableImage::from(image.self_and_args())
+        .with_network(network.clone())
+        .with_container_name(format!("{}_electrs", network));
 
-    let run_args = RunArgs::default().with_network(network);
-
-    let docker = cli.run_with_args(image, run_args);
+    let docker = cli.run(image);
 
     Ok(docker)
 }
@@ -980,13 +978,12 @@ pub async fn mint(node_url: Url, address: bitcoin::Address, amount: bitcoin::Amo
 }
 
 // This is just to keep the containers alive
-#[allow(dead_code)]
 struct Containers<'a> {
     bitcoind_url: Url,
-    bitcoind: Container<'a, Cli, bitcoind::Bitcoind>,
-    monerod_container: Container<'a, Cli, image::Monerod>,
-    monero_wallet_rpc_containers: Vec<Container<'a, Cli, image::MoneroWalletRpc>>,
-    electrs: Container<'a, Cli, electrs::Electrs>,
+    _bitcoind: Container<'a, bitcoind::Bitcoind>,
+    _monerod_container: Container<'a, image::Monerod>,
+    _monero_wallet_rpc_containers: Vec<Container<'a, image::MoneroWalletRpc>>,
+    electrs: Container<'a, electrs::Electrs>,
 }
 
 pub mod alice_run_until {
