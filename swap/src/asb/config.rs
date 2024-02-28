@@ -134,8 +134,8 @@ pub struct Data {
 pub struct Network {
     #[serde(deserialize_with = "addr_list::deserialize")]
     pub listen: Vec<Multiaddr>,
-    #[serde(default)]
-    pub rendezvous_point: Option<Multiaddr>,
+    #[serde(default, deserialize_with = "addr_list::deserialize")]
+    pub rendezvous_point: Vec<Multiaddr>,
     #[serde(default, deserialize_with = "addr_list::deserialize")]
     pub external_addresses: Vec<Multiaddr>,
 }
@@ -156,7 +156,7 @@ mod addr_list {
                 let list: Result<Vec<_>, _> = s
                     .split(',')
                     .filter(|s| !s.is_empty())
-                    .map(|s| s.parse().map_err(de::Error::custom))
+                    .map(|s| s.trim().parse().map_err(de::Error::custom))
                     .collect();
                 Ok(list?)
             }
@@ -165,7 +165,7 @@ mod addr_list {
                     .iter()
                     .map(|v| {
                         if let Value::String(s) = v {
-                            s.parse().map_err(de::Error::custom)
+                            s.trim().parse().map_err(de::Error::custom)
                         } else {
                             Err(de::Error::custom("expected a string"))
                         }
@@ -347,10 +347,27 @@ pub fn query_user_for_initial_config(testnet: bool) -> Result<Config> {
     }
     let ask_spread = Decimal::from_f64(ask_spread).context("Unable to parse spread")?;
 
-    let rendezvous_point = Input::<Multiaddr>::with_theme(&ColorfulTheme::default())
-        .with_prompt("Do you want to advertise your ASB instance with a rendezvous node? Enter an empty string if not.")
-        .allow_empty(true)
-        .interact_text()?;
+    let mut number = 1;
+    let mut done = false;
+    let mut rendezvous_points = Vec::new();
+    println!("ASB can register with multiple rendezvous nodes for discoverability. This can also be edited in the config file later.");
+    while !done {
+        let prompt = format!(
+            "Enter the address for rendezvous node ({number}). Or just hit Enter to continue."
+        );
+        let rendezvous_addr = Input::<Multiaddr>::with_theme(&ColorfulTheme::default())
+            .with_prompt(prompt)
+            .allow_empty(true)
+            .interact_text()?;
+        if rendezvous_addr.is_empty() {
+            done = true;
+        } else if rendezvous_points.contains(&rendezvous_addr) {
+            println!("That rendezvous address is already in the list.");
+        } else {
+            rendezvous_points.push(rendezvous_addr);
+            number += 1;
+        }
+    }
 
     println!();
 
@@ -358,11 +375,7 @@ pub fn query_user_for_initial_config(testnet: bool) -> Result<Config> {
         data: Data { dir: data_dir },
         network: Network {
             listen: listen_addresses,
-            rendezvous_point: if rendezvous_point.is_empty() {
-                None
-            } else {
-                Some(rendezvous_point)
-            },
+            rendezvous_point: rendezvous_points, // keeping the singular key name for backcompat
             external_addresses: vec![],
         },
         bitcoin: Bitcoin {
@@ -417,7 +430,7 @@ mod tests {
             },
             network: Network {
                 listen: vec![defaults.listen_address_tcp, defaults.listen_address_ws],
-                rendezvous_point: None,
+                rendezvous_point: vec![],
                 external_addresses: vec![],
             },
             monero: Monero {
@@ -461,7 +474,7 @@ mod tests {
             },
             network: Network {
                 listen: vec![defaults.listen_address_tcp, defaults.listen_address_ws],
-                rendezvous_point: None,
+                rendezvous_point: vec![],
                 external_addresses: vec![],
             },
             monero: Monero {
@@ -515,7 +528,7 @@ mod tests {
             },
             network: Network {
                 listen,
-                rendezvous_point: None,
+                rendezvous_point: vec![],
                 external_addresses,
             },
             monero: Monero {

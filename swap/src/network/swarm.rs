@@ -1,9 +1,9 @@
-use crate::asb::LatestRate;
+use crate::asb::{LatestRate, RendezvousNode};
 use crate::libp2p_ext::MultiAddrExt;
 use crate::network::rendezvous::XmrBtcNamespace;
 use crate::seed::Seed;
 use crate::{asb, bitcoin, cli, env, tor};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use libp2p::swarm::{NetworkBehaviour, SwarmBuilder};
 use libp2p::{identity, Multiaddr, Swarm};
 use std::fmt::Debug;
@@ -17,22 +17,23 @@ pub fn asb<LR>(
     resume_only: bool,
     env_config: env::Config,
     namespace: XmrBtcNamespace,
-    rendezvous_point: Option<Multiaddr>,
+    rendezvous_addrs: &[Multiaddr],
 ) -> Result<Swarm<asb::Behaviour<LR>>>
 where
     LR: LatestRate + Send + 'static + Debug + Clone,
 {
     let identity = seed.derive_libp2p_identity();
 
-    let rendezvous_params = if let Some(address) = rendezvous_point {
-        let peer_id = address
-            .extract_peer_id()
-            .context("Rendezvous node address must contain peer ID")?;
+    let rendezvous_nodes = rendezvous_addrs
+        .iter()
+        .map(|addr| {
+            let peer_id = addr
+                .extract_peer_id()
+                .expect("Rendezvous node address must contain peer ID");
 
-        Some((identity.clone(), peer_id, address, namespace))
-    } else {
-        None
-    };
+            RendezvousNode::new(addr, peer_id, namespace, None)
+        })
+        .collect();
 
     let behaviour = asb::Behaviour::new(
         min_buy,
@@ -41,7 +42,7 @@ where
         resume_only,
         env_config,
         (identity.clone(), namespace),
-        rendezvous_params,
+        rendezvous_nodes,
     );
 
     let transport = asb::transport::new(&identity)?;

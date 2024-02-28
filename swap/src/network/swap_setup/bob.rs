@@ -155,13 +155,16 @@ impl ProtocolsHandler for Handler {
         let env_config = self.env_config;
 
         let protocol = tokio::time::timeout(self.timeout, async move {
-            write_cbor_message(&mut substream, SpotPriceRequest {
-                btc: info.btc,
-                blockchain_network: BlockchainNetwork {
-                    bitcoin: env_config.bitcoin_network,
-                    monero: env_config.monero_network,
+            write_cbor_message(
+                &mut substream,
+                SpotPriceRequest {
+                    btc: info.btc,
+                    blockchain_network: BlockchainNetwork {
+                        bitcoin: env_config.bitcoin_network,
+                        monero: env_config.monero_network,
+                    },
                 },
-            })
+            )
             .await?;
 
             let xmr = Result::from(read_cbor_message::<SpotPriceResponse>(&mut substream).await?)?;

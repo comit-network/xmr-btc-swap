@@ -253,8 +253,8 @@ where
                                 channel
                             }.boxed());
                         }
-                        SwarmEvent::Behaviour(OutEvent::Rendezvous(libp2p::rendezvous::client::Event::Registered { .. })) => {
-                            tracing::info!("Successfully registered with rendezvous node");
+                        SwarmEvent::Behaviour(OutEvent::Rendezvous(libp2p::rendezvous::client::Event::Registered { rendezvous_node, ttl, namespace })) => {
+                            tracing::info!("Successfully registered with rendezvous node: {} with namespace: {} and TTL: {:?}", rendezvous_node, namespace, ttl);
                         }
                         SwarmEvent::Behaviour(OutEvent::Rendezvous(libp2p::rendezvous::client::Event::RegisterFailed(error))) => {
                             tracing::error!("Registration with rendezvous node failed: {:?}", error);

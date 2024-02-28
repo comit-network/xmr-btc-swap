@@ -61,7 +61,7 @@ impl Seed {
         let file_path = Path::new(&file_path_buf);
 
         if file_path.exists() {
-            return Self::from_file(&file_path);
+            return Self::from_file(file_path);
         }
 
         tracing::debug!("No seed file found, creating at {}", file_path.display());
@@ -106,11 +106,12 @@ impl Seed {
     }
 
     fn from_pem(pem: pem::Pem) -> Result<Self, Error> {
-        if pem.contents.len() != SEED_LENGTH {
-            Err(Error::IncorrectLength(pem.contents.len()))
+        let contents = pem.contents();
+        if contents.len() != SEED_LENGTH {
+            Err(Error::IncorrectLength(contents.len()))
         } else {
             let mut array = [0; SEED_LENGTH];
-            for (i, b) in pem.contents.iter().enumerate() {
+            for (i, b) in contents.iter().enumerate() {
                 array[i] = *b;
             }
 
@@ -122,10 +123,7 @@ impl Seed {
         ensure_directory_exists(&seed_file)?;
 
         let data = self.bytes();
-        let pem = Pem {
-            tag: String::from("SEED"),
-            contents: data.to_vec(),
-        };
+        let pem = Pem::new("SEED", data);
 
         let pem_string = encode(&pem);
 
@@ -187,6 +185,9 @@ mod tests {
 
     #[test]
     fn seed_from_pem_works() {
+        use base64::engine::general_purpose;
+        use base64::Engine;
+
         let payload: &str = "syl9wSYaruvgxg9P5Q1qkZaq5YkM6GvXkxe+VYrL/XM=";
 
         // 32 bytes base64 encoded.
@@ -195,7 +196,7 @@ syl9wSYaruvgxg9P5Q1qkZaq5YkM6GvXkxe+VYrL/XM=
 -----END SEED-----
 ";
 
-        let want = base64::decode(payload).unwrap();
+        let want = general_purpose::STANDARD.decode(payload).unwrap();
         let pem = pem::parse(pem_string).unwrap();
         let got = Seed::from_pem(pem).unwrap();
 
@@ -221,19 +222,20 @@ VnZUNFZ4dlY=
     }
 
     #[test]
-    #[should_panic]
     fn seed_from_pem_fails_for_long_seed() {
         let long = "-----BEGIN SEED-----
-mbKANv2qKGmNVg1qtquj6Hx1pFPelpqOfE2JaJJAMEg1FlFhNRNlFlE=
-mbKANv2qKGmNVg1qtquj6Hx1pFPelpqOfE2JaJJAMEg1FlFhNRNlFlE=
+MIIBPQIBAAJBAOsfi5AGYhdRs/x6q5H7kScxA0Kzzqe6WI6gf6+tc6IvKQJo5rQc
+dWWSQ0nRGt2hOPDO+35NKhQEjBQxPh/v7n0CAwEAAQJBAOGaBAyuw0ICyENy5NsO
 -----END SEED-----
 ";
         let pem = pem::parse(long).unwrap();
+        assert_eq!(pem.contents().len(), 96);
+
         match Seed::from_pem(pem) {
             Ok(_) => panic!("should fail for long payload"),
             Err(e) => {
                 match e {
-                    Error::IncorrectLength(_) => {} // pass
+                    Error::IncorrectLength(len) => assert_eq!(len, 96), // pass
                     _ => panic!("should fail with IncorrectLength error"),
                 }
             }
