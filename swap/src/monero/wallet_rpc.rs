@@ -436,7 +436,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_is_daemon_available_success() {
-        let mut server = mockito::Server::new();
+        let mut server = mockito::Server::new_async().await;
 
         let _ = server
             .mock("GET", "/get_info")
@@ -467,7 +467,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_is_daemon_available_wrong_network_failure() {
-        let mut server = mockito::Server::new();
+        let mut server = mockito::Server::new_async().await;
 
         let _ = server
             .mock("GET", "/get_info")
@@ -498,7 +498,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_is_daemon_available_not_synced_failure() {
-        let mut server = mockito::Server::new();
+        let mut server = mockito::Server::new_async().await;
 
         let _ = server
             .mock("GET", "/get_info")
