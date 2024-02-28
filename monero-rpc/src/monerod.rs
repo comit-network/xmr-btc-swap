@@ -47,9 +47,10 @@ impl Client {
     }
 
     pub async fn get_o_indexes(&self, txid: Hash) -> Result<GetOIndexesResponse> {
-        self.binary_request(self.get_o_indexes_bin_url.clone(), GetOIndexesPayload {
-            txid,
-        })
+        self.binary_request(
+            self.get_o_indexes_bin_url.clone(),
+            GetOIndexesPayload { txid },
+        )
         .await
     }
 
@@ -194,7 +195,7 @@ mod monero_serde_hex_block {
     {
         let hex = String::deserialize(deserializer)?;
 
-        let bytes = hex::decode(&hex).map_err(D::Error::custom)?;
+        let bytes = hex::decode(hex).map_err(D::Error::custom)?;
         let mut cursor = Cursor::new(bytes);
 
         let block = monero::Block::consensus_decode(&mut cursor).map_err(D::Error::custom)?;

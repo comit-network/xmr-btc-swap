@@ -4,8 +4,6 @@ on:
   pull_request: # Need to run on pull-requests, otherwise PRs from forks don't run
   push:
     branches:
-      - "staging" # Bors uses this branch
-      - "trying" # Bors uses this branch
       - "master" # Always build head of master for the badge in the README
 
 jobs:
@@ -13,12 +11,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.3.0
+        uses: actions/checkout@v4.1.1
 
-      - uses: Swatinem/rust-cache@v2.2.0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.70"
+          components: clippy,rustfmt
+
+      - uses: Swatinem/rust-cache@v2.7.3
 
       - name: Check formatting
-        uses: dprint/check@v2.1
+        uses: dprint/check@v2.2
+        with:
+          dprint-version: 0.39.1
 
       - name: Run clippy with default features
         run: cargo clippy --workspace --all-targets -- -D warnings
@@ -30,9 +35,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.3.0
+        uses: actions/checkout@v4.1.1
 
-      - uses: Swatinem/rust-cache@v2.0.2
+      - uses: Swatinem/rust-cache@v2.7.3
 
       - name: Build swap
         run: cargo build --bin swap
@@ -44,12 +49,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.3.0
+        uses: actions/checkout@v4.1.1
 
-      - uses: Swatinem/rust-cache@v2.0.2
+      - uses: Swatinem/rust-cache@v2.7.3
 
       - name: Install sqlx-cli
-        run: cargo install sqlx-cli
+        run: cargo install sqlx-cli --locked
 
       - name: Run sqlite_dev_setup.sh script
         run: |
@@ -71,13 +76,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.3.0
+        uses: actions/checkout@v4.1.1
 
-      - uses: Swatinem/rust-cache@v2.2.0
+      - uses: Swatinem/rust-cache@v2.7.3
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.63
+          toolchain: "1.70"
           targets: armv7-unknown-linux-gnueabihf
 
       - name: Build binary
@@ -93,13 +98,13 @@ jobs:
         run: cross build -p swap --target ${{ matrix.target }}
 
       - name: Upload swap binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: swap-${{ matrix.target }}
           path: target/${{ matrix.target }}/debug/swap
 
       - name: Upload asb binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: asb-${{ matrix.target }}
           path: target/${{ matrix.target }}/debug/asb
@@ -110,10 +115,23 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3.3.0
+      - name: (Free disk space on Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+        with:
+          # removing all of these takes ~10 mins, so just do as needed
+          android: true
+          dotnet: true
+          haskell: true
+          docker-images: false
+          large-packages: false
+          swap-storage: false
+          tool-cache: false
 
-      - uses: Swatinem/rust-cache@v2.2.0
+      - name: Checkout sources
+        uses: actions/checkout@v4.1.1
+
+      - uses: Swatinem/rust-cache@v2.7.3
 
       - name: Build tests
         run: cargo build --tests --workspace --all-features
@@ -148,9 +166,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3.3.0
+        uses: actions/checkout@v4.1.1
 
-      - uses: Swatinem/rust-cache@v2.2.0
+      - uses: Swatinem/rust-cache@v2.7.3
 
       - name: Run test ${{ matrix.test_name }}
         run: cargo test --package swap --all-features --test ${{ matrix.test_name }} -- --nocapture

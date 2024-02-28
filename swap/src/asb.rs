@@ -8,6 +8,7 @@ pub mod tracing;
 
 pub use event_loop::{EventLoop, EventLoopHandle, FixedRate, KrakenRate, LatestRate};
 pub use network::behaviour::{Behaviour, OutEvent};
+pub use network::rendezvous::RendezvousNode;
 pub use network::transport;
 pub use rate::Rate;
 pub use recovery::cancel::cancel;
@@ -18,4 +19,4 @@ pub use recovery::safely_abort::safely_abort;
 pub use recovery::{cancel, refund};
 
 #[cfg(test)]
-pub use network::rendezous;
+pub use network::rendezvous;

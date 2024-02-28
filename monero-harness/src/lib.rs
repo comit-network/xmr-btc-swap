@@ -20,17 +20,20 @@
 //! every BLOCK_TIME_SECS seconds.
 //!
 //! Also provides standalone JSON RPC clients for monerod and monero-wallet-rpc.
-pub mod image;
+use std::time::Duration;
 
-use crate::image::{MONEROD_DAEMON_CONTAINER_NAME, MONEROD_DEFAULT_NETWORK, RPC_PORT};
 use anyhow::{anyhow, bail, Context, Result};
+use testcontainers::clients::Cli;
+use testcontainers::{Container, RunnableImage};
+use tokio::time;
+
 use monero_rpc::monerod;
 use monero_rpc::monerod::MonerodRpc as _;
 use monero_rpc::wallet::{self, GetAddress, MoneroWalletRpc as _, Refreshed, Transfer};
-use std::time::Duration;
-use testcontainers::clients::Cli;
-use testcontainers::{Container, Docker, RunArgs};
-use tokio::time;
+
+use crate::image::{MONEROD_DAEMON_CONTAINER_NAME, MONEROD_DEFAULT_NETWORK, RPC_PORT};
+
+pub mod image;
 
 /// How often we mine a block.
 const BLOCK_TIME_SECS: u64 = 1;
@@ -56,8 +59,8 @@ impl<'c> Monero {
         additional_wallets: Vec<&'static str>,
     ) -> Result<(
         Self,
-        Container<'c, Cli, image::Monerod>,
-        Vec<Container<'c, Cli, image::MoneroWalletRpc>>,
+        Container<'c, image::Monerod>,
+        Vec<Container<'c, image::MoneroWalletRpc>>,
     )> {
         let prefix = format!("{}_", random_prefix());
         let monerod_name = format!("{}{}", prefix, MONEROD_DAEMON_CONTAINER_NAME);
@@ -221,15 +224,14 @@ impl<'c> Monerod {
         cli: &'c Cli,
         name: String,
         network: String,
-    ) -> Result<(Self, Container<'c, Cli, image::Monerod>)> {
+    ) -> Result<(Self, Container<'c, image::Monerod>)> {
         let image = image::Monerod::default();
-        let run_args = RunArgs::default()
-            .with_name(name.clone())
+        let image: RunnableImage<image::Monerod> = RunnableImage::from(image)
+            .with_container_name(name.clone())
             .with_network(network.clone());
-        let container = cli.run_with_args(image, run_args);
-        let monerod_rpc_port = container
-            .get_host_port(RPC_PORT)
-            .context("port not exposed")?;
+
+        let container = cli.run(image);
+        let monerod_rpc_port = container.get_host_port_ipv4(RPC_PORT);
 
         Ok((
             Self {
@@ -249,7 +251,7 @@ impl<'c> Monerod {
     /// address
     pub async fn start_miner(&self, miner_wallet_address: &str) -> Result<()> {
         let monerod = self.client().clone();
-        let _ = tokio::spawn(mine(monerod, miner_wallet_address.to_string()));
+        tokio::spawn(mine(monerod, miner_wallet_address.to_string()));
         Ok(())
     }
 }
@@ -262,19 +264,15 @@ impl<'c> MoneroWalletRpc {
         name: &str,
         monerod: &Monerod,
         prefix: String,
-    ) -> Result<(Self, Container<'c, Cli, image::MoneroWalletRpc>)> {
+    ) -> Result<(Self, Container<'c, image::MoneroWalletRpc>)> {
         let daemon_address = format!("{}:{}", monerod.name, RPC_PORT);
-        let image = image::MoneroWalletRpc::new(name, daemon_address);
+        let (image, args) = image::MoneroWalletRpc::new(name, daemon_address);
+        let image = RunnableImage::from((image, args))
+            .with_container_name(format!("{}{}", prefix, name))
+            .with_network(monerod.network.clone());
 
-        let network = monerod.network.clone();
-        let run_args = RunArgs::default()
-            // prefix the container name so we can run multiple tests
-            .with_name(format!("{}{}", prefix, name))
-            .with_network(network.clone());
-        let container = cli.run_with_args(image, run_args);
-        let wallet_rpc_port = container
-            .get_host_port(RPC_PORT)
-            .context("port not exposed")?;
+        let container = cli.run(image);
+        let wallet_rpc_port = container.get_host_port_ipv4(RPC_PORT);
 
         let client = wallet::Client::localhost(wallet_rpc_port)?;
 
