@@ -10,6 +10,7 @@ use crate::monero_ext::ScalarExt;
 use crate::protocol::{Message0, Message1, Message2, Message3, Message4, CROSS_CURVE_PROOF_SYSTEM};
 use anyhow::{anyhow, bail, Context, Result};
 use bdk::database::BatchDatabase;
+use bdk::electrum_client::Error as BdkError;
 use ecdsa_fun::adaptor::{Adaptor, HashTranscript};
 use ecdsa_fun::nonce::Deterministic;
 use ecdsa_fun::Signature;
@@ -20,6 +21,14 @@ use sha2::Sha256;
 use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQProof;
 use std::fmt;
 use uuid::Uuid;
+
+#[derive(Debug)]
+pub struct BtcPunishedWhileRefundError;
+impl std::fmt::Display for BtcPunishedWhileRefundError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Cannot refund because BTC is punished.")
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BobState {
@@ -662,9 +671,23 @@ impl State6 {
 
     pub async fn publish_refund_btc(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<()> {
         let signed_tx_refund = self.signed_refund_transaction()?;
-        bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
+        let transaction_broadcast = bitcoin_wallet.broadcast(signed_tx_refund, "refund").await;
 
-        Ok(())
+        match transaction_broadcast {
+            Ok(_) => Ok(()),
+            Err(anyhow_error) => match anyhow_error.downcast_ref::<BdkError>() {
+                Some(&BdkError::Protocol(serde_json::Value::String(ref protocol_error)))
+                    // UTXO is already spent, swap timeout.
+                    if protocol_error.contains("bad-txns-inputs-missingorspent") =>
+                {
+                    // Correct the state and show friendly error.
+                    // Set state to CancelTimelockExpired
+
+                    Err(anyhow!(BtcPunishedWhileRefundError))
+                }
+               _ => Err(anyhow_error),
+            },
+        }
     }
 
     pub fn signed_refund_transaction(&self) -> Result<Transaction> {
