@@ -671,12 +671,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "color_quant"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
-
-[[package]]
 name = "colored"
 version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1766,14 +1760,12 @@ dependencies = [
 
 [[package]]
 name = "image"
-version = "0.24.7"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f3dfdbdd72063086ff443e297b61695500514b1e41095b6fb9a5ab48a70a711"
+checksum = "a9b4f005360d32e9325029b38ba47ebd7a56f3316df09249368939562d518645"
 dependencies = [
  "bytemuck",
  "byteorder",
- "color_quant",
- "num-rational 0.4.1",
  "num-traits",
 ]
 
@@ -2591,7 +2583,7 @@ dependencies = [
  "num-complex",
  "num-integer",
  "num-iter",
- "num-rational 0.1.42",
+ "num-rational",
  "num-traits",
 ]
 
@@ -2654,17 +2646,6 @@ dependencies = [
  "num-integer",
  "num-traits",
  "rustc-serialize",
-]
-
-[[package]]
-name = "num-rational"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0638a1c9d0a3c0914158145bc76cff373a75a627e6ecbfb71cbe6f453a5a19b0"
-dependencies = [
- "autocfg",
- "num-integer",
- "num-traits",
 ]
 
 [[package]]
@@ -3117,9 +3098,9 @@ dependencies = [
 
 [[package]]
 name = "qrcode"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "166f136dfdb199f98186f3649cf7a0536534a61417a1a30221b492b4fb60ce3f"
+checksum = "23e719ca51966ff9f5a8436edb00d6115b3c606a0bb27c8f8ca74a38ff2b036d"
 dependencies = [
  "image",
 ]
