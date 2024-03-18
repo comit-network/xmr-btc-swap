@@ -1104,7 +1104,8 @@ checksum = "5caaa75cbd2b960ff1e5392d2cfb1f44717fffe12fc1f32b7b5d1267f99732a6"
 [[package]]
 name = "ecdsa_fun"
 version = "0.10.0"
-source = "git+https://github.com/LLFourn/secp256kfun?rev=6fdc5d8#6fdc5d8cfb2f27d13e79ddc971a5b9521aff340a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fd850b7ece4e4ddaa1478d5de36b6d4d599f2d521f73456ca706b4e2b32a4ec"
 dependencies = [
  "bincode 1.3.3",
  "rand_chacha 0.3.1",
@@ -3640,7 +3641,8 @@ dependencies = [
 [[package]]
 name = "secp256kfun"
 version = "0.10.0"
-source = "git+https://github.com/LLFourn/secp256kfun?rev=6fdc5d8#6fdc5d8cfb2f27d13e79ddc971a5b9521aff340a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ecc2adce3ef929c5dc7dacdd612d65ab98002ee18119215ce25d8054ed53c1a"
 dependencies = [
  "bincode 2.0.0-rc.3",
  "digest 0.10.7",
@@ -3655,7 +3657,8 @@ dependencies = [
 [[package]]
 name = "secp256kfun_arithmetic_macros"
 version = "0.1.0"
-source = "git+https://github.com/LLFourn/secp256kfun?rev=6fdc5d8#6fdc5d8cfb2f27d13e79ddc971a5b9521aff340a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91b7c385a72530ebfe6010ff476ad9e235743fb33408a360052bb706f1481e1e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3888,7 +3891,8 @@ checksum = "24188a676b6ae68c3b2cb3a01be17fbf7240ce009799bb56d5b1409051e78fde"
 [[package]]
 name = "sigma_fun"
 version = "0.7.0"
-source = "git+https://github.com/LLFourn/secp256kfun?rev=6fdc5d8#6fdc5d8cfb2f27d13e79ddc971a5b9521aff340a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b8e9462de42c6f14c7e20154d18d8e9e8683750798885e76f06973317b1cb1d"
 dependencies = [
  "curve25519-dalek-ng",
  "digest 0.10.7",
