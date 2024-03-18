@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.1.1
+        uses: actions/checkout@v4.1.2
 
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.1.1
+        uses: actions/checkout@v4.1.2
 
       - uses: Swatinem/rust-cache@v2.7.3
 
@@ -65,12 +65,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.1.1
+        uses: actions/checkout@v4.1.2
 
       - uses: Swatinem/rust-cache@v2.7.3
 
       - name: Install sqlx-cli
-        run: cargo install sqlx-cli --locked
+        run: cargo install --version 0.6.3 sqlx-cli
 
       - name: Run sqlite_dev_setup.sh script
         run: |
@@ -92,7 +92,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.1.1
+        uses: actions/checkout@v4.1.2
 
       - uses: Swatinem/rust-cache@v2.7.3
 
@@ -145,7 +145,7 @@ jobs:
           tool-cache: false
 
       - name: Checkout sources
-        uses: actions/checkout@v4.1.1
+        uses: actions/checkout@v4.1.2
 
       - uses: Swatinem/rust-cache@v2.7.3
 
@@ -182,7 +182,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.1.1
+        uses: actions/checkout@v4.1.2
 
       - uses: Swatinem/rust-cache@v2.7.3
 
