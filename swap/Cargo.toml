@@ -64,7 +64,7 @@ tracing-appender = "0.2"
 tracing-futures = { version = "0.2", features = [ "std-future", "futures-03" ] }
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "fmt", "ansi", "env-filter", "time", "tracing-log", "json" ] }
 url = { version = "2", features = [ "serde" ] }
-uuid = { version = "1.7", features = [ "serde", "v4" ] }
+uuid = { version = "1.8", features = [ "serde", "v4" ] }
 void = "1"
 
 [target.'cfg(not(windows))'.dependencies]
