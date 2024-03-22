@@ -74,7 +74,7 @@ tokio-tar = "0.3"
 zip = "0.5"
 
 [dev-dependencies]
-bitcoin-harness = "0.2.2"
+bitcoin-harness = { git = "https://github.com/delta1/bitcoin-harness-rs.git", rev = "80cc8d05db2610d8531011be505b7bee2b5cdf9f" }
 get-port = "3"
 hyper = "1.2"
 mockito = "1.3.0"
@@ -85,7 +85,7 @@ serde_cbor = "0.11"
 serial_test = "3.0"
 spectral = "0.6"
 tempfile = "3"
-testcontainers = "0.14"
+testcontainers = "0.15"
 
 [build-dependencies]
 anyhow = "1"

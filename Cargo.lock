@@ -359,19 +359,21 @@ dependencies = [
 
 [[package]]
 name = "bitcoin-harness"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b6a18713ec8acbc96d1e843f6998f00e8c5d81173e38760023b84926b8db3b8"
+version = "0.2.1"
+source = "git+https://github.com/delta1/bitcoin-harness-rs.git?rev=80cc8d05db2610d8531011be505b7bee2b5cdf9f#80cc8d05db2610d8531011be505b7bee2b5cdf9f"
 dependencies = [
  "base64 0.12.3",
  "bitcoin",
  "bitcoincore-rpc-json",
  "futures",
  "hex",
+ "hmac 0.12.1",
  "jsonrpc_client",
- "reqwest 0.11.27",
+ "rand 0.8.3",
+ "reqwest",
  "serde",
  "serde_json",
+ "sha2 0.10.8",
  "testcontainers",
  "thiserror",
  "tokio",
@@ -459,11 +461,10 @@ dependencies = [
 
 [[package]]
 name = "bollard-stubs"
-version = "1.41.0"
+version = "1.42.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed2f2e73fffe9455141e170fb9c1feb0ac521ec7e7dcd47a7cab72a658490fb8"
+checksum = "ed59b5c00048f48d7af971b71f800fdf23e858844a6f9e4d32ca72e9399e7864"
 dependencies = [
- "chrono",
  "serde",
  "serde_with",
 ]
@@ -641,8 +642,6 @@ dependencies = [
  "libc",
  "num-integer",
  "num-traits",
- "serde",
- "time 0.1.43",
  "winapi",
 ]
 
@@ -1148,15 +1147,6 @@ name = "encode_unicode"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
-
-[[package]]
-name = "encoding_rs"
-version = "0.8.28"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80df024fbc5ac80f87dfef0d9f5209a252f2a497f7f42944cff24d8253cac065"
-dependencies = [
- "cfg-if 1.0.0",
-]
 
 [[package]]
 name = "enum-as-inner"
@@ -1702,7 +1692,6 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite 0.2.13",
- "socket2 0.5.5",
  "tokio",
  "tower-service",
  "tracing",
@@ -1916,12 +1905,11 @@ dependencies = [
 [[package]]
 name = "jsonrpc_client"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0c1ec33c537dc1d5a8b597313db6d213fee54320f81ea0d19b0c3869b282e1a"
+source = "git+https://github.com/delta1/rust-jsonrpc-client.git?rev=3b6081697cd616c952acb9c2f02d546357d35506#3b6081697cd616c952acb9c2f02d546357d35506"
 dependencies = [
  "async-trait",
  "jsonrpc_client_macro",
- "reqwest 0.11.27",
+ "reqwest",
  "serde",
  "serde_json",
  "url",
@@ -1930,8 +1918,7 @@ dependencies = [
 [[package]]
 name = "jsonrpc_client_macro"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97c11e429f0eaa41fe659013680b459d2368d8f0a3e69dccfb7a35800b0dc27b"
+source = "git+https://github.com/delta1/rust-jsonrpc-client.git?rev=3b6081697cd616c952acb9c2f02d546357d35506#3b6081697cd616c952acb9c2f02d546357d35506"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -2502,7 +2489,7 @@ dependencies = [
  "monero",
  "monero-epee-bin-serde",
  "rand 0.7.3",
- "reqwest 0.12.0",
+ "reqwest",
  "rust_decimal",
  "serde",
  "serde_json",
@@ -3370,42 +3357,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "79af64b4b6362ffba04eef3a4e10829718a4896dac19daa741851c86781edf95"
 dependencies = [
  "bytecheck",
-]
-
-[[package]]
-name = "reqwest"
-version = "0.11.27"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd67538700a17451e7cba03ac727fb961abb7607553461627b97de0b89cf4a62"
-dependencies = [
- "base64 0.21.7",
- "bytes",
- "encoding_rs",
- "futures-core",
- "futures-util",
- "h2",
- "http 0.2.11",
- "http-body 0.4.0",
- "hyper 0.14.28",
- "ipnet",
- "js-sys",
- "log",
- "mime",
- "once_cell",
- "percent-encoding",
- "pin-project-lite 0.2.13",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "sync_wrapper",
- "system-configuration",
- "tokio",
- "tower-service",
- "url",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
- "winreg 0.50.0",
 ]
 
 [[package]]
@@ -4398,7 +4349,7 @@ dependencies = [
  "qrcode",
  "rand 0.8.3",
  "rand_chacha 0.3.1",
- "reqwest 0.12.0",
+ "reqwest",
  "rust_decimal",
  "rust_decimal_macros",
  "serde",
@@ -4475,27 +4426,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "system-configuration"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba3a3adc5c275d719af8cb4272ea1c4a6d668a777f37e115f6d11ddbc1c8e0e7"
-dependencies = [
- "bitflags 1.3.2",
- "core-foundation",
- "system-configuration-sys",
-]
-
-[[package]]
-name = "system-configuration-sys"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a75fb188eb626b924683e3b95e3a48e63551fcfb51949de2f06a9d91dbee93c9"
-dependencies = [
- "core-foundation-sys",
- "libc",
-]
-
-[[package]]
 name = "tempfile"
 version = "3.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4519,9 +4449,9 @@ dependencies = [
 
 [[package]]
 name = "testcontainers"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e2b1567ca8a2b819ea7b28c92be35d9f76fb9edb214321dcc86eb96023d1f87"
+checksum = "f83d2931d7f521af5bae989f716c3fa43a6af9af7ec7a5e21b59ae40878cec00"
 dependencies = [
  "bollard-stubs",
  "futures",
