@@ -277,9 +277,10 @@ impl WalletRpc {
             let result = hasher.finalize();
             let result_hash = HEXLOWER.encode(result.as_ref());
             if result_hash != DOWNLOAD_HASH {
-                panic!(
+                bail!(
                     "SHA256 of download ({}) does not match expected ({})!",
-                    result_hash, DOWNLOAD_HASH
+                    result_hash,
+                    DOWNLOAD_HASH
                 );
             } else {
                 tracing::debug!("Hashes match");
