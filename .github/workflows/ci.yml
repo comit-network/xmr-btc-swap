@@ -54,7 +54,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2.7.3
 
       - name: Install sqlx-cli
-        run: cargo install --version 0.6.3 sqlx-cli
+        run: cargo install --locked --version 0.6.3 sqlx-cli
 
       - name: Run sqlite_dev_setup.sh script
         run: |
