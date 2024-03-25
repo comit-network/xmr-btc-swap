@@ -1,11 +1,13 @@
 use ::monero::Network;
 use anyhow::{bail, Context, Error, Result};
 use big_bytes::BigByte;
+use data_encoding::HEXLOWER;
 use futures::{StreamExt, TryStreamExt};
 use monero_rpc::wallet::{Client, MoneroWalletRpc as _};
 use reqwest::header::CONTENT_LENGTH;
 use reqwest::Url;
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::io::ErrorKind;
@@ -45,19 +47,28 @@ compile_error!("unsupported operating system");
 
 #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
 const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-mac-x64-v0.18.3.1.tar.bz2";
+#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+const DOWNLOAD_HASH: &str = "7f8bd9364ef16482b418aa802a65be0e4cc660c794bb5d77b2d17bc84427883a";
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-mac-armv8-v0.18.3.1.tar.bz2";
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+const DOWNLOAD_HASH: &str = "915288b023cb5811e626e10052adc6ac5323dd283c5a25b91059b0fb86a21fb6";
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-linux-x64-v0.18.3.1.tar.bz2";
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+const DOWNLOAD_HASH: &str = "23af572fdfe3459b9ab97e2e9aa7e3c11021c955d6064b801a27d7e8c21ae09d";
 
 #[cfg(all(target_os = "linux", target_arch = "arm"))]
-const DOWNLOAD_URL: &str =
-    "https://downloads.getmonero.org/cli/monero-linux-armv7-v0.18.3.1.tar.bz2";
+const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-linux-armv7-v0.18.3.1.tar.bz2";
+#[cfg(all(target_os = "linux", target_arch = "arm"))]
+const DOWNLOAD_HASH: &str = "2ea2c8898cbab88f49423f4f6c15f2a94046cb4bbe827493dd061edc0fd5f1ca";
 
 #[cfg(target_os = "windows")]
 const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-win-x64-v0.18.3.1.zip";
+#[cfg(target_os = "windows")]
+const DOWNLOAD_HASH: &str = "35dcc4bee4caad3442659d37837e0119e4649a77f2e3b5e80dd6d9b8fc4fb6ad";
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 const PACKED_FILE: &str = "monero-wallet-rpc";
@@ -227,8 +238,14 @@ impl WalletRpc {
                 "Downloading monero-wallet-rpc",
             );
 
+            let mut hasher = Sha256::new();
+
             let byte_stream = response
                 .bytes_stream()
+                .map_ok(|bytes| {
+                    hasher.update(&bytes);
+                    bytes
+                })
                 .map_err(|err| std::io::Error::new(ErrorKind::Other, err));
 
             #[cfg(not(target_os = "windows"))]
@@ -268,6 +285,18 @@ impl WalletRpc {
                 download_url=DOWNLOAD_URL,
                 "Downloading monero-wallet-rpc",
             );
+
+            let result = hasher.finalize();
+            let result_hash = HEXLOWER.encode(result.as_ref());
+            if result_hash != DOWNLOAD_HASH {
+                bail!(
+                    "SHA256 of download ({}) does not match expected ({})!",
+                    result_hash,
+                    DOWNLOAD_HASH
+                );
+            } else {
+                tracing::debug!("Hashes match");
+            }
 
             file.flush().await?;
 
