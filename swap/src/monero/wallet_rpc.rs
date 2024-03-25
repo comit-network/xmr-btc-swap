@@ -61,7 +61,8 @@ const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-linux-x64
 const DOWNLOAD_HASH: &str = "23af572fdfe3459b9ab97e2e9aa7e3c11021c955d6064b801a27d7e8c21ae09d";
 
 #[cfg(all(target_os = "linux", target_arch = "arm"))]
-const DOWNLOAD_URL: &str = "https://downloads.getmonero.org/cli/monero-linux-armv7-v0.18.3.1.tar.bz2";
+const DOWNLOAD_URL: &str =
+    "https://downloads.getmonero.org/cli/monero-linux-armv7-v0.18.3.1.tar.bz2";
 #[cfg(all(target_os = "linux", target_arch = "arm"))]
 const DOWNLOAD_HASH: &str = "2ea2c8898cbab88f49423f4f6c15f2a94046cb4bbe827493dd061edc0fd5f1ca";
 
