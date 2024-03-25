@@ -1,6 +1,6 @@
 use crate::bitcoin::wallet::Subscription;
 use crate::bitcoin::{parse_rpc_error_code, RpcErrorCode, Wallet};
-use crate::protocol::bob::BobState;
+use crate::protocol::bob::{BobState, BtcPunishedWhileRefundError};
 use crate::protocol::Database;
 use anyhow::{bail, Result};
 use bitcoin::Txid;
@@ -105,7 +105,23 @@ pub async fn refund(
     };
 
     tracing::info!(%swap_id, "Manually refunding swap");
-    state6.publish_refund_btc(bitcoin_wallet.as_ref()).await?;
+
+    match state6.publish_refund_btc(bitcoin_wallet.as_ref()).await {
+        Ok(_) => (),
+        Err(refund_error) => {
+            if let Some(refund_error) = refund_error.downcast_ref::<BtcPunishedWhileRefundError>() {
+                let state = BobState::BtcPunished {
+                    tx_lock_id: state6.tx_lock_id(),
+                };
+                db.insert_latest_state(swap_id, state.clone().into())
+                    .await?;
+
+                println!("{}", refund_error);
+
+                return Ok(state);
+            }
+        }
+    }
 
     let state = BobState::BtcRefunded(state6);
     db.insert_latest_state(swap_id, state.clone().into())
