@@ -863,7 +863,7 @@ impl Wallet for monero::Wallet {
     type Amount = monero::Amount;
 
     async fn refresh(&self) -> Result<()> {
-        self.refresh().await?;
+        self.refresh(1).await?;
 
         Ok(())
     }

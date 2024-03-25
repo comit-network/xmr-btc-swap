@@ -45,6 +45,7 @@ impl Wallet {
     pub async fn connect(client: wallet::Client, name: String, env_config: Config) -> Result<Self> {
         let main_address =
             monero::Address::from_str(client.get_address(0).await?.address.as_str())?;
+
         Ok(Self {
             inner: Mutex::new(client),
             network: env_config.monero_network,
@@ -144,7 +145,7 @@ impl Wallet {
             .await?;
 
         // Try to send all the funds from the generated wallet to the default wallet
-        match wallet.refresh().await {
+        match self.refresh(3).await {
             Ok(_) => match wallet.sweep_all(self.main_address.to_string()).await {
                 Ok(sweep_all) => {
                     for tx in sweep_all.tx_hash_list {
@@ -261,8 +262,70 @@ impl Wallet {
         self.main_address
     }
 
-    pub async fn refresh(&self) -> Result<Refreshed> {
-        Ok(self.inner.lock().await.refresh().await?)
+    pub async fn refresh(&self, max_attempts: usize) -> Result<Refreshed> {
+        const GET_HEIGHT_INTERVAL: Duration = Duration::from_secs(5);
+        const RETRY_INTERVAL: Duration = Duration::from_secs(2);
+
+        let inner = self.inner.lock().await;
+
+        // Cloning this is relatively cheap because reqwest::Client is a wrapper around an Arc
+        let inner_clone = inner.clone();
+        let wallet_name_clone = self.name.clone();
+
+        let refresh_task = tokio::task::spawn(async move {
+            loop {
+                let height = inner_clone.get_height().await;
+
+                match height {
+                    Err(error) => {
+                        tracing::debug!(name = %wallet_name_clone, %error, "Failed to get current Monero wallet sync height");
+                    }
+                    Ok(height) => {
+                        tracing::debug!(name = %wallet_name_clone, current_sync_height = height.height, "Syncing Monero wallet");
+                    }
+                }
+
+                tokio::time::sleep(GET_HEIGHT_INTERVAL).await;
+            }
+        });
+
+        let refresh_result = tokio::select! {
+            biased;
+            _ = refresh_task => {
+                unreachable!("Current sync height refresh task should never finish")
+            }
+            refresh_result = async {
+                for i in 1..=max_attempts {
+                    tracing::info!(name = %self.name, attempt=i, "Syncing Monero wallet");
+
+                    let result = inner.refresh().await;
+
+                    match result {
+                        Ok(refreshed) => {
+                            tracing::info!(name = %self.name, "Monero wallet synced");
+                            return Ok(refreshed);
+                        }
+                        Err(error) => {
+                            let attempts_left = max_attempts - i;
+                            tracing::warn!(attempt=i, %attempts_left, name = %self.name, %error, "Failed to sync Monero wallet");
+
+                            if attempts_left == 0 {
+                                tracing::error!(name = %self.name, %error, "Failed to sync Monero wallet");
+                                return Err(error);
+                            }
+                        }
+                    }
+
+                    tokio::time::sleep(RETRY_INTERVAL).await;
+                }
+
+                unreachable!("Loop should always return before it breaks")
+            } => {
+                refresh_result
+            }
+        };
+
+        Ok(refresh_result?)
     }
 }
 
