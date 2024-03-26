@@ -941,8 +941,7 @@ impl Confirmed {
 
     pub fn blocks_left_until<T>(&self, target: T) -> u32
     where
-        T: Into<u32>,
-        T: Copy,
+        T: Into<u32> + Copy,
     {
         if self.meets_target(target) {
             0
