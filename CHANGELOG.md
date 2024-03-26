@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 - Minimum Supported Rust Version (MSRV) bumped to 1.70
+- Update monero-wallet-rpc version to v0.18.3.1
+- Add retry logic to monero-wallet-rpc wallet refresh
 
 ## [0.12.3] - 2023-09-20
 

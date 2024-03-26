@@ -227,6 +227,9 @@ async fn next_state(
             let (spend_key, view_key) = state.xmr_keys();
 
             let wallet_file_name = swap_id.to_string();
+
+            tracing::info!(%wallet_file_name, "Generating and opening Monero wallet from the extracted keys to redeem the Monero");
+
             if let Err(e) = monero_wallet
                 .create_from_and_load(
                     wallet_file_name.clone(),
@@ -247,7 +250,7 @@ async fn next_state(
             }
 
             // Ensure that the generated wallet is synced so we have a proper balance
-            monero_wallet.refresh().await?;
+            monero_wallet.refresh(3).await?;
             // Sweep (transfer all funds) to the given address
             let tx_hashes = monero_wallet.sweep_all(monero_receive_address).await?;
 
