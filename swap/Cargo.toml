@@ -14,7 +14,7 @@ async-compression = { version = "0.3", features = [ "bzip2", "tokio" ] }
 async-trait = "0.1"
 atty = "0.2"
 backoff = { version = "0.4", features = [ "tokio" ] }
-base64 = "0.21"
+base64 = "0.22"
 bdk = "0.28"
 big-bytes = "1"
 bitcoin = { version = "0.29", features = [ "rand", "serde" ] }
@@ -25,6 +25,7 @@ conquer-once = "0.4"
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
 data-encoding = "2.5"
 dialoguer = "0.11"
+digest = "0.10.7"
 directories-next = "2"
 ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", default-features = false, features = [ "libsecp_compat", "serde", "adaptor" ] }
 ed25519-dalek = "1"
@@ -38,7 +39,7 @@ monero = { version = "0.12", features = [ "serde_support" ] }
 monero-rpc = { path = "../monero-rpc" }
 pem = "3.0"
 proptest = "1"
-qrcode = "0.13"
+qrcode = "0.14"
 rand = "0.8"
 rand_chacha = "0.3"
 reqwest = { version = "0.11", features = [ "rustls-tls", "stream", "socks" ], default-features = false }
@@ -66,7 +67,7 @@ tracing-appender = "0.2"
 tracing-futures = { version = "0.2", features = [ "std-future", "futures-03" ] }
 tracing-subscriber = { version = "0.3", default-features = false, features = [ "fmt", "ansi", "env-filter", "time", "tracing-log", "json" ] }
 url = { version = "2", features = [ "serde" ] }
-uuid = { version = "1.7", features = [ "serde", "v4" ] }
+uuid = { version = "1.8", features = [ "serde", "v4" ] }
 void = "1"
 
 [target.'cfg(not(windows))'.dependencies]
