@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use sigma_fun::ext::dl_secp256k1_ed25519_eq::{CrossCurveDLEQ, CrossCurveDLEQProof};
 use sigma_fun::HashTranscript;
+use std::collections::HashMap;
 use std::convert::TryInto;
 use uuid::Uuid;
 
@@ -139,7 +140,10 @@ pub trait Database {
     async fn get_monero_address(&self, swap_id: Uuid) -> Result<monero::Address>;
     async fn insert_address(&self, peer_id: PeerId, address: Multiaddr) -> Result<()>;
     async fn get_addresses(&self, peer_id: PeerId) -> Result<Vec<Multiaddr>>;
+    async fn get_swap_start_date(&self, swap_id: Uuid) -> Result<String>;
     async fn insert_latest_state(&self, swap_id: Uuid, state: State) -> Result<()>;
     async fn get_state(&self, swap_id: Uuid) -> Result<State>;
+    async fn get_states(&self, swap_id: Uuid) -> Result<Vec<State>>;
     async fn all(&self) -> Result<Vec<(Uuid, State)>>;
+    async fn raw_all(&self) -> Result<HashMap<Uuid, Vec<serde_json::Value>>>;
 }

@@ -16,7 +16,7 @@ use torut::onion::TorSecretKeyV3;
 
 pub const SEED_LENGTH: usize = 32;
 
-#[derive(Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct Seed([u8; SEED_LENGTH]);
 
 impl Seed {

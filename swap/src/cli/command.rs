@@ -1,18 +1,22 @@
-use crate::bitcoin::Amount;
-use crate::env::GetConfig;
-use crate::fs::system_data_dir;
-use crate::network::rendezvous::XmrBtcNamespace;
-use crate::{env, monero};
-use anyhow::{bail, Context, Result};
-use bitcoin::{Address, AddressType};
+use crate::api::request::{Method, Request};
+use crate::api::Context;
+use crate::bitcoin::{bitcoin_address, Amount};
+use crate::monero;
+use crate::monero::monero_address;
+use anyhow::Result;
 use libp2p::core::Multiaddr;
-use serde::Serialize;
 use std::ffi::OsString;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::Arc;
 use structopt::{clap, StructOpt};
 use url::Url;
 use uuid::Uuid;
+
+// See: https://moneroworld.com/
+pub const DEFAULT_MONERO_DAEMON_ADDRESS: &str = "node.community.rino.io:18081";
+pub const DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET: &str = "stagenet.community.rino.io:38081";
 
 // See: https://1209k.com/bitcoin-eye/ele.php?chain=btc
 const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://blockstream.info:700";
@@ -20,24 +24,16 @@ const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://blockstream.info:700";
 pub const DEFAULT_ELECTRUM_RPC_URL_TESTNET: &str = "ssl://electrum.blockstream.info:60002";
 
 const DEFAULT_BITCOIN_CONFIRMATION_TARGET: usize = 3;
-const DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET: usize = 1;
+pub const DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET: usize = 1;
 
 const DEFAULT_TOR_SOCKS5_PORT: &str = "9050";
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct Arguments {
-    pub env_config: env::Config,
-    pub debug: bool,
-    pub json: bool,
-    pub data_dir: PathBuf,
-    pub cmd: Command,
-}
-
 /// Represents the result of parsing the command-line parameters.
-#[derive(Debug, PartialEq, Eq)]
+
+#[derive(Debug)]
 pub enum ParseResult {
     /// The arguments we were invoked in.
-    Arguments(Box<Arguments>),
+    Context(Arc<Context>, Box<Request>),
     /// A flag or command was given that does not need further processing other
     /// than printing the provided message.
     ///
@@ -45,13 +41,13 @@ pub enum ParseResult {
     PrintAndExitZero { message: String },
 }
 
-pub fn parse_args_and_apply_defaults<I, T>(raw_args: I) -> Result<ParseResult>
+pub async fn parse_args_and_apply_defaults<I, T>(raw_args: I) -> Result<ParseResult>
 where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
 {
-    let args = match RawArguments::clap().get_matches_from_safe(raw_args) {
-        Ok(matches) => RawArguments::from_clap(&matches),
+    let args = match Arguments::clap().get_matches_from_safe(raw_args) {
+        Ok(matches) => Arguments::from_clap(&matches),
         Err(clap::Error {
             message,
             kind: clap::ErrorKind::HelpDisplayed | clap::ErrorKind::VersionDisplayed,
@@ -64,233 +60,195 @@ where
     let json = args.json;
     let is_testnet = args.testnet;
     let data = args.data;
-
-    let arguments = match args.cmd {
-        RawCommand::BuyXmr {
+    let (context, request) = match args.cmd {
+        CliCommand::BuyXmr {
             seller: Seller { seller },
             bitcoin,
             bitcoin_change_address,
             monero,
             monero_receive_address,
-            tor: Tor { tor_socks5_port },
+            tor,
         } => {
-            let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
-                bitcoin.apply_defaults(is_testnet)?;
             let monero_receive_address =
-                validate_monero_address(monero_receive_address, is_testnet)?;
+                monero_address::validate_is_testnet(monero_receive_address, is_testnet)?;
             let bitcoin_change_address =
-                validate_bitcoin_address(bitcoin_change_address, is_testnet)?;
-            let monero_daemon_address = monero.monero_daemon_address;
+                bitcoin_address::validate_is_testnet(bitcoin_change_address, is_testnet)?;
 
-            Arguments {
-                env_config: env_config_from(is_testnet),
+            let request = Request::new(Method::BuyXmr {
+                seller,
+                bitcoin_change_address,
+                monero_receive_address,
+                swap_id: Uuid::new_v4(),
+            });
+
+            let context = Context::build(
+                Some(bitcoin),
+                Some(monero),
+                Some(tor),
+                data,
+                is_testnet,
                 debug,
                 json,
-                data_dir: data::data_dir_from(data, is_testnet)?,
-                cmd: Command::BuyXmr {
-                    seller,
-                    bitcoin_electrum_rpc_url,
-                    bitcoin_target_block,
-                    bitcoin_change_address,
-                    monero_receive_address,
-                    monero_daemon_address,
-                    tor_socks5_port,
-                    namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
-                },
-            }
+                None,
+            )
+            .await?;
+            (context, request)
         }
-        RawCommand::History => Arguments {
-            env_config: env_config_from(is_testnet),
-            debug,
-            json,
-            data_dir: data::data_dir_from(data, is_testnet)?,
-            cmd: Command::History,
-        },
-        RawCommand::Config => Arguments {
-            env_config: env_config_from(is_testnet),
-            debug,
-            json,
-            data_dir: data::data_dir_from(data, is_testnet)?,
-            cmd: Command::Config,
-        },
-        RawCommand::Balance {
-            bitcoin_electrum_rpc_url,
+        CliCommand::History => {
+            let request = Request::new(Method::History);
+
+            let context =
+                Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
+            (context, request)
+        }
+        CliCommand::Config => {
+            let request = Request::new(Method::Config);
+
+            let context =
+                Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
+            (context, request)
+        }
+        CliCommand::Balance { bitcoin } => {
+            let request = Request::new(Method::Balance {
+                force_refresh: true,
+            });
+
+            let context = Context::build(
+                Some(bitcoin),
+                None,
+                None,
+                data,
+                is_testnet,
+                debug,
+                json,
+                None,
+            )
+            .await?;
+            (context, request)
+        }
+        CliCommand::StartDaemon {
+            server_address,
+            bitcoin,
+            monero,
+            tor,
         } => {
-            let bitcoin = Bitcoin {
-                bitcoin_electrum_rpc_url,
-                bitcoin_target_block: None,
-            };
-            let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
-                bitcoin.apply_defaults(is_testnet)?;
+            let request = Request::new(Method::StartDaemon { server_address });
 
-            Arguments {
-                env_config: env_config_from(is_testnet),
+            let context = Context::build(
+                Some(bitcoin),
+                Some(monero),
+                Some(tor),
+                data,
+                is_testnet,
                 debug,
                 json,
-                data_dir: data::data_dir_from(data, is_testnet)?,
-                cmd: Command::Balance {
-                    bitcoin_electrum_rpc_url,
-                    bitcoin_target_block,
-                },
-            }
+                server_address,
+            )
+            .await?;
+            (context, request)
         }
-        RawCommand::WithdrawBtc {
+        CliCommand::WithdrawBtc {
             bitcoin,
             amount,
             address,
         } => {
-            let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
-                bitcoin.apply_defaults(is_testnet)?;
+            let address = bitcoin_address::validate_is_testnet(address, is_testnet)?;
+            let request = Request::new(Method::WithdrawBtc { amount, address });
 
-            Arguments {
-                env_config: env_config_from(is_testnet),
+            let context = Context::build(
+                Some(bitcoin),
+                None,
+                None,
+                data,
+                is_testnet,
                 debug,
                 json,
-                data_dir: data::data_dir_from(data, is_testnet)?,
-                cmd: Command::WithdrawBtc {
-                    bitcoin_electrum_rpc_url,
-                    bitcoin_target_block,
-                    amount,
-                    address: bitcoin_address(address, is_testnet)?,
-                },
-            }
+                None,
+            )
+            .await?;
+            (context, request)
         }
-        RawCommand::Resume {
+        CliCommand::Resume {
             swap_id: SwapId { swap_id },
             bitcoin,
             monero,
-            tor: Tor { tor_socks5_port },
+            tor,
         } => {
-            let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
-                bitcoin.apply_defaults(is_testnet)?;
-            let monero_daemon_address = monero.monero_daemon_address;
+            let request = Request::new(Method::Resume { swap_id });
 
-            Arguments {
-                env_config: env_config_from(is_testnet),
+            let context = Context::build(
+                Some(bitcoin),
+                Some(monero),
+                Some(tor),
+                data,
+                is_testnet,
                 debug,
                 json,
-                data_dir: data::data_dir_from(data, is_testnet)?,
-                cmd: Command::Resume {
-                    swap_id,
-                    bitcoin_electrum_rpc_url,
-                    bitcoin_target_block,
-                    monero_daemon_address,
-                    tor_socks5_port,
-                    namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
-                },
-            }
+                None,
+            )
+            .await?;
+            (context, request)
         }
-        RawCommand::CancelAndRefund {
+        CliCommand::CancelAndRefund {
             swap_id: SwapId { swap_id },
             bitcoin,
+            tor,
         } => {
-            let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
-                bitcoin.apply_defaults(is_testnet)?;
+            let request = Request::new(Method::CancelAndRefund { swap_id });
 
-            Arguments {
-                env_config: env_config_from(is_testnet),
+            let context = Context::build(
+                Some(bitcoin),
+                None,
+                Some(tor),
+                data,
+                is_testnet,
                 debug,
                 json,
-                data_dir: data::data_dir_from(data, is_testnet)?,
-                cmd: Command::CancelAndRefund {
-                    swap_id,
-                    bitcoin_electrum_rpc_url,
-                    bitcoin_target_block,
-                },
-            }
+                None,
+            )
+            .await?;
+            (context, request)
         }
-        RawCommand::ListSellers {
+        CliCommand::ListSellers {
             rendezvous_point,
-            tor: Tor { tor_socks5_port },
-        } => Arguments {
-            env_config: env_config_from(is_testnet),
-            debug,
-            json,
-            data_dir: data::data_dir_from(data, is_testnet)?,
-            cmd: Command::ListSellers {
-                rendezvous_point,
-                tor_socks5_port,
-                namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
-            },
-        },
-        RawCommand::ExportBitcoinWallet { bitcoin } => {
-            let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
-                bitcoin.apply_defaults(is_testnet)?;
+            tor,
+        } => {
+            let request = Request::new(Method::ListSellers { rendezvous_point });
 
-            Arguments {
-                env_config: env_config_from(is_testnet),
+            let context =
+                Context::build(None, None, Some(tor), data, is_testnet, debug, json, None).await?;
+
+            (context, request)
+        }
+        CliCommand::ExportBitcoinWallet { bitcoin } => {
+            let request = Request::new(Method::ExportBitcoinWallet);
+
+            let context = Context::build(
+                Some(bitcoin),
+                None,
+                None,
+                data,
+                is_testnet,
                 debug,
                 json,
-                data_dir: data::data_dir_from(data, is_testnet)?,
-                cmd: Command::ExportBitcoinWallet {
-                    bitcoin_electrum_rpc_url,
-                    bitcoin_target_block,
-                },
-            }
+                None,
+            )
+            .await?;
+            (context, request)
         }
-        RawCommand::MoneroRecovery { swap_id } => Arguments {
-            env_config: env_config_from(is_testnet),
-            debug,
-            json,
-            data_dir: data::data_dir_from(data, is_testnet)?,
-            cmd: Command::MoneroRecovery {
-                swap_id: swap_id.swap_id,
-            },
-        },
+        CliCommand::MoneroRecovery {
+            swap_id: SwapId { swap_id },
+        } => {
+            let request = Request::new(Method::MoneroRecovery { swap_id });
+
+            let context =
+                Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
+
+            (context, request)
+        }
     };
 
-    Ok(ParseResult::Arguments(Box::new(arguments)))
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum Command {
-    BuyXmr {
-        seller: Multiaddr,
-        bitcoin_electrum_rpc_url: Url,
-        bitcoin_target_block: usize,
-        bitcoin_change_address: bitcoin::Address,
-        monero_receive_address: monero::Address,
-        monero_daemon_address: Option<String>,
-        tor_socks5_port: u16,
-        namespace: XmrBtcNamespace,
-    },
-    History,
-    Config,
-    WithdrawBtc {
-        bitcoin_electrum_rpc_url: Url,
-        bitcoin_target_block: usize,
-        amount: Option<Amount>,
-        address: Address,
-    },
-    Balance {
-        bitcoin_electrum_rpc_url: Url,
-        bitcoin_target_block: usize,
-    },
-    Resume {
-        swap_id: Uuid,
-        bitcoin_electrum_rpc_url: Url,
-        bitcoin_target_block: usize,
-        monero_daemon_address: Option<String>,
-        tor_socks5_port: u16,
-        namespace: XmrBtcNamespace,
-    },
-    CancelAndRefund {
-        swap_id: Uuid,
-        bitcoin_electrum_rpc_url: Url,
-        bitcoin_target_block: usize,
-    },
-    ListSellers {
-        rendezvous_point: Multiaddr,
-        namespace: XmrBtcNamespace,
-        tor_socks5_port: u16,
-    },
-    ExportBitcoinWallet {
-        bitcoin_electrum_rpc_url: Url,
-        bitcoin_target_block: usize,
-    },
-    MoneroRecovery {
-        swap_id: Uuid,
-    },
+    Ok(ParseResult::Context(Arc::new(context), Box::new(request)))
 }
 
 #[derive(structopt::StructOpt, Debug)]
@@ -300,7 +258,7 @@ pub enum Command {
     author,
     version = env!("VERGEN_GIT_DESCRIBE")
 )]
-struct RawArguments {
+struct Arguments {
     // global is necessary to ensure that clap can match against testnet in subcommands
     #[structopt(
         long,
@@ -327,11 +285,11 @@ struct RawArguments {
     json: bool,
 
     #[structopt(subcommand)]
-    cmd: RawCommand,
+    cmd: CliCommand,
 }
 
 #[derive(structopt::StructOpt, Debug)]
-enum RawCommand {
+enum CliCommand {
     /// Start a BTC for XMR swap
     BuyXmr {
         #[structopt(flatten)]
@@ -342,7 +300,8 @@ enum RawCommand {
 
         #[structopt(
             long = "change-address",
-            help = "The bitcoin address where any form of change or excess funds should be sent to"
+            help = "The bitcoin address where any form of change or excess funds should be sent to",
+            parse(try_from_str = bitcoin_address::parse)
         )]
         bitcoin_change_address: bitcoin::Address,
 
@@ -351,7 +310,7 @@ enum RawCommand {
 
         #[structopt(long = "receive-address",
             help = "The monero address where you would like to receive monero",
-            parse(try_from_str = parse_monero_address)
+            parse(try_from_str = monero_address::parse)
         )]
         monero_receive_address: monero::Address,
 
@@ -372,13 +331,34 @@ enum RawCommand {
             help = "Optionally specify the amount of Bitcoin to be withdrawn. If not specified the wallet will be drained."
         )]
         amount: Option<Amount>,
-        #[structopt(long = "address", help = "The address to receive the Bitcoin.")]
-        address: Address,
+
+        #[structopt(long = "address",
+            help = "The address to receive the Bitcoin.",
+            parse(try_from_str = bitcoin_address::parse)
+        )]
+        address: bitcoin::Address,
     },
     #[structopt(about = "Prints the Bitcoin balance.")]
     Balance {
-        #[structopt(long = "electrum-rpc", help = "Provide the Bitcoin Electrum RPC URL")]
-        bitcoin_electrum_rpc_url: Option<Url>,
+        #[structopt(flatten)]
+        bitcoin: Bitcoin,
+    },
+    #[structopt(about = "Starts a JSON-RPC server")]
+    StartDaemon {
+        #[structopt(flatten)]
+        bitcoin: Bitcoin,
+
+        #[structopt(flatten)]
+        monero: Monero,
+
+        #[structopt(
+            long = "server-address",
+            help = "The socket address the server should use"
+        )]
+        server_address: Option<SocketAddr>,
+
+        #[structopt(flatten)]
+        tor: Tor,
     },
     /// Resume a swap
     Resume {
@@ -402,6 +382,9 @@ enum RawCommand {
 
         #[structopt(flatten)]
         bitcoin: Bitcoin,
+
+        #[structopt(flatten)]
+        tor: Tor,
     },
     /// Discover and list sellers (i.e. ASB providers)
     ListSellers {
@@ -429,28 +412,40 @@ enum RawCommand {
 }
 
 #[derive(structopt::StructOpt, Debug)]
-struct Monero {
+pub struct Monero {
     #[structopt(
         long = "monero-daemon-address",
-        help = "Specify to connect to a monero daemon of your choice: <host>:<port>. If none is specified, we will connect to a public node."
+        help = "Specify to connect to a monero daemon of your choice: <host>:<port>"
     )]
-    monero_daemon_address: Option<String>,
+    pub monero_daemon_address: Option<String>,
+}
+
+impl Monero {
+    pub fn apply_defaults(self, testnet: bool) -> String {
+        if let Some(address) = self.monero_daemon_address {
+            address
+        } else if testnet {
+            DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET.to_string()
+        } else {
+            DEFAULT_MONERO_DAEMON_ADDRESS.to_string()
+        }
+    }
 }
 
 #[derive(structopt::StructOpt, Debug)]
-struct Bitcoin {
+pub struct Bitcoin {
     #[structopt(long = "electrum-rpc", help = "Provide the Bitcoin Electrum RPC URL")]
-    bitcoin_electrum_rpc_url: Option<Url>,
+    pub bitcoin_electrum_rpc_url: Option<Url>,
 
     #[structopt(
         long = "bitcoin-target-block",
         help = "Estimate Bitcoin fees such that transactions are confirmed within the specified number of blocks"
     )]
-    bitcoin_target_block: Option<usize>,
+    pub bitcoin_target_block: Option<usize>,
 }
 
 impl Bitcoin {
-    fn apply_defaults(self, testnet: bool) -> Result<(Url, usize)> {
+    pub fn apply_defaults(self, testnet: bool) -> Result<(Url, usize)> {
         let bitcoin_electrum_rpc_url = if let Some(url) = self.bitcoin_electrum_rpc_url {
             url
         } else if testnet {
@@ -472,13 +467,13 @@ impl Bitcoin {
 }
 
 #[derive(structopt::StructOpt, Debug)]
-struct Tor {
+pub struct Tor {
     #[structopt(
         long = "tor-socks5-port",
         help = "Your local Tor socks5 proxy port",
         default_value = DEFAULT_TOR_SOCKS5_PORT
     )]
-    tor_socks5_port: u16,
+    pub tor_socks5_port: u16,
 }
 
 #[derive(structopt::StructOpt, Debug)]
@@ -499,137 +494,26 @@ struct Seller {
     seller: Multiaddr,
 }
 
-mod data {
-    use super::*;
-
-    pub fn data_dir_from(arg_dir: Option<PathBuf>, testnet: bool) -> Result<PathBuf> {
-        let base_dir = match arg_dir {
-            Some(custom_base_dir) => custom_base_dir,
-            None => os_default()?,
-        };
-
-        let sub_directory = if testnet { "testnet" } else { "mainnet" };
-
-        Ok(base_dir.join(sub_directory))
-    }
-
-    fn os_default() -> Result<PathBuf> {
-        Ok(system_data_dir()?.join("cli"))
-    }
-}
-
-fn env_config_from(testnet: bool) -> env::Config {
-    if testnet {
-        env::Testnet::get_config()
-    } else {
-        env::Mainnet::get_config()
-    }
-}
-
-fn bitcoin_address(address: Address, is_testnet: bool) -> Result<Address> {
-    let network = if is_testnet {
-        bitcoin::Network::Testnet
-    } else {
-        bitcoin::Network::Bitcoin
-    };
-
-    if address.network != network {
-        bail!(BitcoinAddressNetworkMismatch {
-            expected: network,
-            actual: address.network
-        });
-    }
-
-    Ok(address)
-}
-
-fn validate_monero_address(
-    address: monero::Address,
-    testnet: bool,
-) -> Result<monero::Address, MoneroAddressNetworkMismatch> {
-    let expected_network = if testnet {
-        monero::Network::Stagenet
-    } else {
-        monero::Network::Mainnet
-    };
-
-    if address.network != expected_network {
-        return Err(MoneroAddressNetworkMismatch {
-            expected: expected_network,
-            actual: address.network,
-        });
-    }
-
-    Ok(address)
-}
-
-fn validate_bitcoin_address(address: bitcoin::Address, testnet: bool) -> Result<bitcoin::Address> {
-    let expected_network = if testnet {
-        bitcoin::Network::Testnet
-    } else {
-        bitcoin::Network::Bitcoin
-    };
-
-    if address.network != expected_network {
-        anyhow::bail!(
-            "Invalid Bitcoin address provided; expected network {} but provided address is for {}",
-            expected_network,
-            address.network
-        );
-    }
-
-    if address.address_type() != Some(AddressType::P2wpkh) {
-        anyhow::bail!("Invalid Bitcoin address provided, only bech32 format is supported!")
-    }
-
-    Ok(address)
-}
-
-fn parse_monero_address(s: &str) -> Result<monero::Address> {
-    monero::Address::from_str(s).with_context(|| {
-        format!(
-            "Failed to parse {} as a monero address, please make sure it is a valid address",
-            s
-        )
-    })
-}
-
-#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq)]
-#[error("Invalid monero address provided, expected address on network {expected:?} but address provided is on {actual:?}")]
-pub struct MoneroAddressNetworkMismatch {
-    expected: monero::Network,
-    actual: monero::Network,
-}
-
-#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[error("Invalid Bitcoin address provided, expected address on network {expected:?}  but address provided is on {actual:?}")]
-pub struct BitcoinAddressNetworkMismatch {
-    #[serde(with = "crate::bitcoin::network")]
-    expected: bitcoin::Network,
-    #[serde(with = "crate::bitcoin::network")]
-    actual: bitcoin::Network,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tor::DEFAULT_SOCKS5_PORT;
+
+    use crate::api::api_test::*;
+    use crate::api::Config;
+    use crate::monero::monero_address::MoneroAddressNetworkMismatch;
 
     const BINARY_NAME: &str = "swap";
+    const ARGS_DATA_DIR: &str = "/tmp/dir/";
 
-    const TESTNET: &str = "testnet";
-    const MAINNET: &str = "mainnet";
+    #[tokio::test]
 
-    const MONERO_STAGENET_ADDRESS: &str = "53gEuGZUhP9JMEBZoGaFNzhwEgiG7hwQdMCqFxiyiTeFPmkbt1mAoNybEUvYBKHcnrSgxnVWgZsTvRBaHBNXPa8tHiCU51a";
-    const BITCOIN_TESTNET_ADDRESS: &str = "tb1qr3em6k3gfnyl8r7q0v7t4tlnyxzgxma3lressv";
-    const MONERO_MAINNET_ADDRESS: &str = "44Ato7HveWidJYUAVw5QffEcEtSH1DwzSP3FPPkHxNAS4LX9CqgucphTisH978FLHE34YNEx7FcbBfQLQUU8m3NUC4VqsRa";
-    const BITCOIN_MAINNET_ADDRESS: &str = "bc1qe4epnfklcaa0mun26yz5g8k24em5u9f92hy325";
-    const MULTI_ADDRESS: &str =
-        "/ip4/127.0.0.1/tcp/9939/p2p/12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
-    const SWAP_ID: &str = "ea030832-3be9-454f-bb98-5ea9a788406b";
+    // this test is very long, however it just checks that various CLI arguments sets the
+    // internal Context and Request properly. It is unlikely to fail and splitting it in various
+    // tests would require to run the tests sequantially which is very slow (due to the context
+    // need to access files like the Bitcoin wallet).
+    async fn test_cli_arguments() {
+        // given_buy_xmr_on_mainnet_then_defaults_to_mainnet
 
-    #[test]
-    fn given_buy_xmr_on_mainnet_then_defaults_to_mainnet() {
         let raw_ars = vec![
             BINARY_NAME,
             "buy-xmr",
@@ -641,15 +525,34 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let expected_args =
-            ParseResult::Arguments(Arguments::buy_xmr_mainnet_defaults().into_boxed());
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (false, false, false);
 
-        assert_eq!(expected_args, args);
-    }
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
 
-    #[test]
-    fn given_buy_xmr_on_testnet_then_defaults_to_testnet() {
+        let (expected_config, mut expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::buy_xmr(is_testnet),
+        );
+
+        // since Uuid is random, copy before comparing requests
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_buy_xmr_on_testnet_then_defaults_to_testnet
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -662,16 +565,33 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (true, false, false);
 
-        assert_eq!(
-            args,
-            ParseResult::Arguments(Arguments::buy_xmr_testnet_defaults().into_boxed())
+        let (expected_config, mut expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::buy_xmr(is_testnet),
         );
-    }
 
-    #[test]
-    fn given_buy_xmr_on_mainnet_with_testnet_address_then_fails() {
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_buy_xmr_on_mainnet_with_testnet_address_then_fails
         let raw_ars = vec![
             BINARY_NAME,
             "buy-xmr",
@@ -683,7 +603,7 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let err = parse_args_and_apply_defaults(raw_ars).unwrap_err();
+        let err = parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
 
         assert_eq!(
             err.downcast_ref::<MoneroAddressNetworkMismatch>().unwrap(),
@@ -692,10 +612,8 @@ mod tests {
                 actual: monero::Network::Stagenet
             }
         );
-    }
 
-    #[test]
-    fn given_buy_xmr_on_testnet_with_mainnet_address_then_fails() {
+        // given_buy_xmr_on_testnet_with_mainnet_address_then_fails
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -708,7 +626,7 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let err = parse_args_and_apply_defaults(raw_ars).unwrap_err();
+        let err = parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
 
         assert_eq!(
             err.downcast_ref::<MoneroAddressNetworkMismatch>().unwrap(),
@@ -717,88 +635,126 @@ mod tests {
                 actual: monero::Network::Mainnet
             }
         );
-    }
 
-    #[test]
-    fn given_resume_on_mainnet_then_defaults_to_mainnet() {
+        // given_resume_on_mainnet_then_defaults_to_mainnet
         let raw_ars = vec![BINARY_NAME, "resume", "--swap-id", SWAP_ID];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (false, false, false);
 
-        assert_eq!(
-            args,
-            ParseResult::Arguments(Arguments::resume_mainnet_defaults().into_boxed())
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::resume(),
         );
-    }
 
-    #[test]
-    fn given_resume_on_testnet_then_defaults_to_testnet() {
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_resume_on_testnet_then_defaults_to_testnet
         let raw_ars = vec![BINARY_NAME, "--testnet", "resume", "--swap-id", SWAP_ID];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (true, false, false);
 
-        assert_eq!(
-            args,
-            ParseResult::Arguments(Arguments::resume_testnet_defaults().into_boxed())
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::resume(),
         );
-    }
 
-    #[test]
-    fn given_cancel_on_mainnet_then_defaults_to_mainnet() {
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_cancel_on_mainnet_then_defaults_to_mainnet
         let raw_ars = vec![BINARY_NAME, "cancel", "--swap-id", SWAP_ID];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
 
-        assert_eq!(
-            args,
-            ParseResult::Arguments(Arguments::cancel_mainnet_defaults().into_boxed())
+        let (is_testnet, debug, json) = (false, false, false);
+
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::cancel(),
         );
-    }
 
-    #[test]
-    fn given_cancel_on_testnet_then_defaults_to_testnet() {
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_cancel_on_testnet_then_defaults_to_testnet
         let raw_ars = vec![BINARY_NAME, "--testnet", "cancel", "--swap-id", SWAP_ID];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (true, false, false);
 
-        assert_eq!(
-            args,
-            ParseResult::Arguments(Arguments::cancel_testnet_defaults().into_boxed())
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::cancel(),
         );
-    }
 
-    #[test]
-    fn given_refund_on_mainnet_then_defaults_to_mainnet() {
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
         let raw_ars = vec![BINARY_NAME, "refund", "--swap-id", SWAP_ID];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (false, false, false);
 
-        assert_eq!(
-            args,
-            ParseResult::Arguments(Arguments::refund_mainnet_defaults().into_boxed())
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::refund(),
         );
-    }
 
-    #[test]
-    fn given_refund_on_testnet_then_defaults_to_testnet() {
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_refund_on_testnet_then_defaults_to_testnet
         let raw_ars = vec![BINARY_NAME, "--testnet", "refund", "--swap-id", SWAP_ID];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (true, false, false);
 
-        assert_eq!(
-            args,
-            ParseResult::Arguments(Arguments::refund_testnet_defaults().into_boxed())
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::refund(),
         );
-    }
 
-    #[test]
-    fn given_with_data_dir_then_data_dir_set() {
-        let data_dir = "/some/path/to/dir";
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
 
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_buy_xmr_on_mainnet_with_data_dir_then_data_dir_set
         let raw_ars = vec![
             BINARY_NAME,
             "--data-base-dir",
-            data_dir,
+            ARGS_DATA_DIR,
             "buy-xmr",
             "--change-address",
             BITCOIN_MAINNET_ADDRESS,
@@ -808,22 +764,39 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (false, false, false);
+        let data_dir = PathBuf::from_str(ARGS_DATA_DIR).unwrap();
 
-        assert_eq!(
-            args,
-            ParseResult::Arguments(
-                Arguments::buy_xmr_mainnet_defaults()
-                    .with_data_dir(PathBuf::from_str(data_dir).unwrap().join("mainnet"))
-                    .into_boxed()
-            )
+        let (expected_config, mut expected_request) = (
+            Config::default(is_testnet, Some(data_dir.clone()), debug, json),
+            Request::buy_xmr(is_testnet),
         );
 
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_buy_xmr_on_testnet_with_data_dir_then_data_dir_set
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
             "--data-base-dir",
-            data_dir,
+            ARGS_DATA_DIR,
             "buy-xmr",
             "--change-address",
             BITCOIN_TESTNET_ADDRESS,
@@ -833,61 +806,99 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+        let data_dir = PathBuf::from_str(ARGS_DATA_DIR).unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (true, false, false);
 
-        assert_eq!(
-            args,
-            ParseResult::Arguments(
-                Arguments::buy_xmr_testnet_defaults()
-                    .with_data_dir(PathBuf::from_str(data_dir).unwrap().join("testnet"))
-                    .into_boxed()
-            )
+        let (expected_config, mut expected_request) = (
+            Config::default(is_testnet, Some(data_dir.clone()), debug, json),
+            Request::buy_xmr(is_testnet),
         );
 
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_resume_on_mainnet_with_data_dir_then_data_dir_set
         let raw_ars = vec![
             BINARY_NAME,
             "--data-base-dir",
-            data_dir,
+            ARGS_DATA_DIR,
             "resume",
             "--swap-id",
             SWAP_ID,
         ];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+        let data_dir = PathBuf::from_str(ARGS_DATA_DIR).unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (false, false, false);
 
-        assert_eq!(
-            args,
-            ParseResult::Arguments(
-                Arguments::resume_mainnet_defaults()
-                    .with_data_dir(PathBuf::from_str(data_dir).unwrap().join("mainnet"))
-                    .into_boxed()
-            )
+        let (expected_config, mut expected_request) = (
+            Config::default(is_testnet, Some(data_dir.clone()), debug, json),
+            Request::resume(),
         );
 
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_resume_on_testnet_with_data_dir_then_data_dir_set
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
             "--data-base-dir",
-            data_dir,
+            ARGS_DATA_DIR,
             "resume",
             "--swap-id",
             SWAP_ID,
         ];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
+        let data_dir = PathBuf::from_str(ARGS_DATA_DIR).unwrap();
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (true, false, false);
 
-        assert_eq!(
-            args,
-            ParseResult::Arguments(
-                Arguments::resume_testnet_defaults()
-                    .with_data_dir(PathBuf::from_str(data_dir).unwrap().join("testnet"))
-                    .into_boxed()
-            )
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, Some(data_dir.clone()), debug, json),
+            Request::resume(),
         );
-    }
 
-    #[test]
-    fn given_with_debug_then_debug_set() {
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_buy_xmr_on_mainnet_with_debug_then_debug_set
         let raw_ars = vec![
             BINARY_NAME,
             "--debug",
@@ -900,16 +911,33 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(
-            args,
-            ParseResult::Arguments(
-                Arguments::buy_xmr_mainnet_defaults()
-                    .with_debug()
-                    .into_boxed()
-            )
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (false, true, false);
+
+        let (expected_config, mut expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::buy_xmr(is_testnet),
         );
 
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_buy_xmr_on_testnet_with_debug_then_debug_set
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -923,28 +951,62 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(
-            args,
-            ParseResult::Arguments(
-                Arguments::buy_xmr_testnet_defaults()
-                    .with_debug()
-                    .into_boxed()
-            )
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (true, true, false);
+
+        let (expected_config, mut expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::buy_xmr(is_testnet),
         );
 
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_resume_on_mainnet_with_debug_then_debug_set
         let raw_ars = vec![BINARY_NAME, "--debug", "resume", "--swap-id", SWAP_ID];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(
-            args,
-            ParseResult::Arguments(
-                Arguments::resume_mainnet_defaults()
-                    .with_debug()
-                    .into_boxed()
-            )
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (false, true, false);
+
+        let (expected_config, mut expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::resume(),
         );
 
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_resume_on_testnet_with_debug_then_debug_set
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -954,19 +1016,23 @@ mod tests {
             SWAP_ID,
         ];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(
-            args,
-            ParseResult::Arguments(
-                Arguments::resume_testnet_defaults()
-                    .with_debug()
-                    .into_boxed()
-            )
-        );
-    }
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (true, true, false);
 
-    #[test]
-    fn given_with_json_then_json_set() {
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::resume(),
+        );
+
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_buy_xmr_on_mainnet_with_json_then_json_set
         let raw_ars = vec![
             BINARY_NAME,
             "--json",
@@ -979,16 +1045,33 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(
-            args,
-            ParseResult::Arguments(
-                Arguments::buy_xmr_mainnet_defaults()
-                    .with_json()
-                    .into_boxed()
-            )
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (false, false, true);
+
+        let (expected_config, mut expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::buy_xmr(is_testnet),
         );
 
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_buy_xmr_on_testnet_with_json_then_json_set
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -1002,28 +1085,51 @@ mod tests {
             MULTI_ADDRESS,
         ];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(
-            args,
-            ParseResult::Arguments(
-                Arguments::buy_xmr_testnet_defaults()
-                    .with_json()
-                    .into_boxed()
-            )
-        );
+        let (is_testnet, debug, json) = (true, false, true);
 
+        let (expected_config, mut expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::buy_xmr(is_testnet),
+        );
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        if let Method::BuyXmr {
+            ref mut swap_id, ..
+        } = expected_request.cmd
+        {
+            *swap_id = match actual_request.cmd {
+                Method::BuyXmr { swap_id, .. } => swap_id,
+                _ => panic!("Not the Method we expected"),
+            }
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_resume_on_mainnet_with_json_then_json_set
         let raw_ars = vec![BINARY_NAME, "--json", "resume", "--swap-id", SWAP_ID];
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (false, false, true);
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(
-            args,
-            ParseResult::Arguments(
-                Arguments::resume_mainnet_defaults()
-                    .with_json()
-                    .into_boxed()
-            )
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::resume(),
         );
 
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // given_resume_on_testnet_with_json_then_json_set
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -1033,19 +1139,23 @@ mod tests {
             SWAP_ID,
         ];
 
-        let args = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert_eq!(
-            args,
-            ParseResult::Arguments(
-                Arguments::resume_testnet_defaults()
-                    .with_json()
-                    .into_boxed()
-            )
-        );
-    }
+        let args = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        let (is_testnet, debug, json) = (true, false, true);
 
-    #[test]
-    fn only_bech32_addresses_mainnet_are_allowed() {
+        let (expected_config, expected_request) = (
+            Config::default(is_testnet, None, debug, json),
+            Request::resume(),
+        );
+
+        let (actual_config, actual_request) = match args {
+            ParseResult::Context(context, request) => (context.config.clone(), request),
+            _ => panic!("Couldn't parse result"),
+        };
+
+        assert_eq!(actual_config, expected_config);
+        assert_eq!(actual_request, Box::new(expected_request));
+
+        // only_bech32_addresses_mainnet_are_allowed
         let raw_ars = vec![
             BINARY_NAME,
             "buy-xmr",
@@ -1056,11 +1166,7 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars);
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "Invalid Bitcoin address provided, only bech32 format is supported!"
-        );
+        parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -1072,11 +1178,7 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars);
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "Invalid Bitcoin address provided, only bech32 format is supported!"
-        );
+        parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -1088,12 +1190,10 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert!(matches!(result, ParseResult::Arguments(_)));
-    }
+        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        assert!(matches!(result, ParseResult::Context(_, _)));
 
-    #[test]
-    fn only_bech32_addresses_testnet_are_allowed() {
+        // only_bech32_addresses_testnet_are_allowed
         let raw_ars = vec![
             BINARY_NAME,
             "--testnet",
@@ -1105,11 +1205,7 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars);
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "Invalid Bitcoin address provided, only bech32 format is supported!"
-        );
+        parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -1122,11 +1218,7 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars);
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "Invalid Bitcoin address provided, only bech32 format is supported!"
-        );
+        parse_args_and_apply_defaults(raw_ars).await.unwrap_err();
 
         let raw_ars = vec![
             BINARY_NAME,
@@ -1139,166 +1231,7 @@ mod tests {
             "--seller",
             MULTI_ADDRESS,
         ];
-        let result = parse_args_and_apply_defaults(raw_ars).unwrap();
-        assert!(matches!(result, ParseResult::Arguments(_)));
-    }
-
-    impl Arguments {
-        pub fn buy_xmr_testnet_defaults() -> Self {
-            Self {
-                env_config: env::Testnet::get_config(),
-                debug: false,
-                json: false,
-                data_dir: data_dir_path_cli().join(TESTNET),
-                cmd: Command::BuyXmr {
-                    seller: Multiaddr::from_str(MULTI_ADDRESS).unwrap(),
-                    bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)
-                        .unwrap(),
-                    bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET,
-                    bitcoin_change_address: BITCOIN_TESTNET_ADDRESS.parse().unwrap(),
-                    monero_receive_address: monero::Address::from_str(MONERO_STAGENET_ADDRESS)
-                        .unwrap(),
-                    monero_daemon_address: None,
-                    tor_socks5_port: DEFAULT_SOCKS5_PORT,
-                    namespace: XmrBtcNamespace::Testnet,
-                },
-            }
-        }
-
-        pub fn buy_xmr_mainnet_defaults() -> Self {
-            Self {
-                env_config: env::Mainnet::get_config(),
-                debug: false,
-                json: false,
-                data_dir: data_dir_path_cli().join(MAINNET),
-                cmd: Command::BuyXmr {
-                    seller: Multiaddr::from_str(MULTI_ADDRESS).unwrap(),
-                    bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
-                    bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET,
-                    bitcoin_change_address: BITCOIN_MAINNET_ADDRESS.parse().unwrap(),
-                    monero_receive_address: monero::Address::from_str(MONERO_MAINNET_ADDRESS)
-                        .unwrap(),
-                    monero_daemon_address: None,
-                    tor_socks5_port: DEFAULT_SOCKS5_PORT,
-                    namespace: XmrBtcNamespace::Mainnet,
-                },
-            }
-        }
-
-        pub fn resume_testnet_defaults() -> Self {
-            Self {
-                env_config: env::Testnet::get_config(),
-                debug: false,
-                json: false,
-                data_dir: data_dir_path_cli().join(TESTNET),
-                cmd: Command::Resume {
-                    swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-                    bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)
-                        .unwrap(),
-                    bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET,
-                    monero_daemon_address: None,
-                    tor_socks5_port: DEFAULT_SOCKS5_PORT,
-                    namespace: XmrBtcNamespace::Testnet,
-                },
-            }
-        }
-
-        pub fn resume_mainnet_defaults() -> Self {
-            Self {
-                env_config: env::Mainnet::get_config(),
-                debug: false,
-                json: false,
-                data_dir: data_dir_path_cli().join(MAINNET),
-                cmd: Command::Resume {
-                    swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-                    bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
-                    bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET,
-                    monero_daemon_address: None,
-                    tor_socks5_port: DEFAULT_SOCKS5_PORT,
-                    namespace: XmrBtcNamespace::Mainnet,
-                },
-            }
-        }
-
-        pub fn cancel_testnet_defaults() -> Self {
-            Self {
-                env_config: env::Testnet::get_config(),
-                debug: false,
-                json: false,
-                data_dir: data_dir_path_cli().join(TESTNET),
-                cmd: Command::CancelAndRefund {
-                    swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-                    bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)
-                        .unwrap(),
-                    bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET,
-                },
-            }
-        }
-
-        pub fn cancel_mainnet_defaults() -> Self {
-            Self {
-                env_config: env::Mainnet::get_config(),
-                debug: false,
-                json: false,
-                data_dir: data_dir_path_cli().join(MAINNET),
-                cmd: Command::CancelAndRefund {
-                    swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-                    bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
-                    bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET,
-                },
-            }
-        }
-
-        pub fn refund_testnet_defaults() -> Self {
-            Self {
-                env_config: env::Testnet::get_config(),
-                debug: false,
-                json: false,
-                data_dir: data_dir_path_cli().join(TESTNET),
-                cmd: Command::CancelAndRefund {
-                    swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-                    bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL_TESTNET)
-                        .unwrap(),
-                    bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET,
-                },
-            }
-        }
-
-        pub fn refund_mainnet_defaults() -> Self {
-            Self {
-                env_config: env::Mainnet::get_config(),
-                debug: false,
-                json: false,
-                data_dir: data_dir_path_cli().join(MAINNET),
-                cmd: Command::CancelAndRefund {
-                    swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-                    bitcoin_electrum_rpc_url: Url::from_str(DEFAULT_ELECTRUM_RPC_URL).unwrap(),
-                    bitcoin_target_block: DEFAULT_BITCOIN_CONFIRMATION_TARGET,
-                },
-            }
-        }
-
-        pub fn with_data_dir(mut self, data_dir: PathBuf) -> Self {
-            self.data_dir = data_dir;
-            self
-        }
-
-        pub fn with_debug(mut self) -> Self {
-            self.debug = true;
-            self
-        }
-
-        pub fn with_json(mut self) -> Self {
-            self.json = true;
-            self
-        }
-
-        pub fn into_boxed(self) -> Box<Self> {
-            Box::new(self)
-        }
-    }
-
-    fn data_dir_path_cli() -> PathBuf {
-        system_data_dir().unwrap().join("cli")
+        let result = parse_args_and_apply_defaults(raw_ars).await.unwrap();
+        assert!(matches!(result, ParseResult::Context(_, _)));
     }
 }

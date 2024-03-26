@@ -23,9 +23,9 @@ use swap::network::rendezvous::XmrBtcNamespace;
 use swap::network::swarm;
 use swap::protocol::alice::{AliceState, Swap};
 use swap::protocol::bob::BobState;
-use swap::protocol::{alice, bob};
+use swap::protocol::{alice, bob, Database};
 use swap::seed::Seed;
-use swap::{asb, bitcoin, cli, env, monero};
+use swap::{api, asb, bitcoin, cli, env, monero};
 use tempfile::{tempdir, NamedTempFile};
 use testcontainers::clients::Cli;
 use testcontainers::{Container, RunnableImage};
@@ -400,7 +400,7 @@ impl StartingBalances {
     }
 }
 
-struct BobParams {
+pub struct BobParams {
     seed: Seed,
     db_path: PathBuf,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
@@ -411,6 +411,21 @@ struct BobParams {
 }
 
 impl BobParams {
+    pub fn get_concentenated_alice_address(&self) -> String {
+        format!(
+            "{}/p2p/{}",
+            self.alice_address.clone(),
+            self.alice_peer_id.clone().to_base58()
+        )
+    }
+
+    pub async fn get_change_receive_addresses(&self) -> (bitcoin::Address, monero::Address) {
+        (
+            self.bitcoin_wallet.new_address().await.unwrap(),
+            self.monero_wallet.get_main_address(),
+        )
+    }
+
     pub async fn new_swap_from_db(&self, swap_id: Uuid) -> Result<(bob::Swap, cli::EventLoop)> {
         let (event_loop, handle) = self.new_eventloop(swap_id).await?;
 
@@ -451,6 +466,8 @@ impl BobParams {
             tokio::fs::File::create(&self.db_path).await?;
         }
         let db = Arc::new(SqliteDatabase::open(&self.db_path).await?);
+
+        db.insert_peer_id(swap_id, self.alice_peer_id).await?;
 
         let swap = bob::Swap::new(
             db,
@@ -525,13 +542,24 @@ pub struct TestContext {
     alice_swap_handle: mpsc::Receiver<Swap>,
     alice_handle: AliceApplicationHandle,
 
-    bob_params: BobParams,
+    pub bob_params: BobParams,
     bob_starting_balances: StartingBalances,
     bob_bitcoin_wallet: Arc<bitcoin::Wallet>,
     bob_monero_wallet: Arc<monero::Wallet>,
 }
 
 impl TestContext {
+    pub async fn get_bob_context(self) -> api::Context {
+        api::Context::for_harness(
+            self.bob_params.seed,
+            self.env_config,
+            self.bob_params.db_path,
+            self.bob_bitcoin_wallet,
+            self.bob_monero_wallet,
+        )
+        .await
+    }
+
     pub async fn restart_alice(&mut self) {
         self.alice_handle.abort();
 

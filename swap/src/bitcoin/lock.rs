@@ -4,9 +4,10 @@ use crate::bitcoin::{
 };
 use ::bitcoin::util::psbt::PartiallySignedTransaction;
 use ::bitcoin::{OutPoint, TxIn, TxOut, Txid};
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use bdk::database::BatchDatabase;
 use bdk::miniscript::Descriptor;
+use bdk::psbt::PsbtUtils;
 use bitcoin::{PackedLockTime, Script, Sequence};
 use serde::{Deserialize, Serialize};
 
@@ -98,6 +99,15 @@ impl TxLock {
 
     pub fn lock_amount(&self) -> Amount {
         Amount::from_sat(self.inner.clone().extract_tx().output[self.lock_output_vout()].value)
+    }
+
+    pub fn fee(&self) -> Result<Amount> {
+        Ok(Amount::from_sat(
+            self.inner
+                .clone()
+                .fee_amount()
+                .context("The PSBT is missing a TxOut for an input")?,
+        ))
     }
 
     pub fn txid(&self) -> Txid {
