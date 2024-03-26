@@ -1,6 +1,5 @@
 use monero_harness::{Monero, MoneroWalletRpc};
 use monero_rpc::wallet::MoneroWalletRpc as _;
-use spectral::prelude::*;
 use std::time::Duration;
 use testcontainers::clients::Cli;
 use tokio::time::sleep;
@@ -29,7 +28,7 @@ async fn fund_transfer_and_check_tx_key() {
 
     // check alice balance
     let got_alice_balance = alice_wallet.balance().await.unwrap();
-    assert_that(&got_alice_balance).is_equal_to(fund_alice);
+    assert_eq!(got_alice_balance, fund_alice);
 
     // transfer from alice to bob
     let bob_address = bob_wallet.address().await.unwrap().address;
@@ -41,7 +40,7 @@ async fn fund_transfer_and_check_tx_key() {
     wait_for_wallet_to_catch_up(bob_wallet, send_to_bob).await;
 
     let got_bob_balance = bob_wallet.balance().await.unwrap();
-    assert_that(&got_bob_balance).is_equal_to(send_to_bob);
+    assert_eq!(got_bob_balance, send_to_bob);
 
     // check if tx was actually seen
     let tx_id = transfer.tx_hash;
@@ -52,7 +51,7 @@ async fn fund_transfer_and_check_tx_key() {
         .await
         .expect("failed to check tx by key");
 
-    assert_that!(res.received).is_equal_to(send_to_bob);
+    assert_eq!(res.received, send_to_bob);
 }
 
 async fn wait_for_wallet_to_catch_up(wallet: &MoneroWalletRpc, expected_balance: u64) {

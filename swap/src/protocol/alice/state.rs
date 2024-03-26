@@ -310,7 +310,8 @@ impl State2 {
             self.a.public(),
             self.B,
             self.tx_cancel_fee,
-        );
+        )
+        .expect("valid cancel tx");
 
         let tx_refund =
             bitcoin::TxRefund::new(&tx_cancel, &self.refund_address, self.tx_refund_fee);
@@ -335,7 +336,7 @@ impl State2 {
             self.a.public(),
             self.B,
             self.tx_cancel_fee,
-        );
+        )?;
         bitcoin::verify_sig(&self.B, &tx_cancel.digest(), &msg.tx_cancel_sig)
             .context("Failed to verify cancel transaction")?;
         let tx_punish = bitcoin::TxPunish::new(
@@ -458,6 +459,7 @@ impl State3 {
             self.B,
             self.tx_cancel_fee,
         )
+        .expect("valid cancel tx")
     }
 
     pub fn tx_refund(&self) -> TxRefund {
