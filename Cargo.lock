@@ -4351,6 +4351,7 @@ dependencies = [
  "curve25519-dalek-ng",
  "data-encoding",
  "dialoguer",
+ "digest 0.10.7",
  "directories-next",
  "ecdsa_fun",
  "ed25519-dalek",
