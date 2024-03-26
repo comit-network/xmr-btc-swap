@@ -972,8 +972,7 @@ impl ScriptStatus {
     // Calculate the number of blocks left until the target is met.
     pub fn blocks_left_until<T>(&self, target: T) -> u32
     where
-        T: Into<u32>,
-        T: Copy,
+        T: Into<u32> + Copy,
     {
         match self {
             ScriptStatus::Confirmed(inner) => inner.blocks_left_until(target),
