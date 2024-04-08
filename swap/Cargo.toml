@@ -83,7 +83,7 @@ hyper = "1.2"
 jsonrpsee = { version = "0.16.2", features = [ "ws-client" ] }
 mockito = "1.3.0"
 monero-harness = { path = "../monero-harness" }
-port_check = "0.1"
+port_check = "0.2"
 proptest = "1"
 sequential-test = "0.2.4"
 serde_cbor = "0.11"
