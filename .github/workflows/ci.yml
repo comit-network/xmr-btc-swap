@@ -172,3 +172,16 @@ jobs:
 
       - name: Run test ${{ matrix.test_name }}
         run: cargo test --package swap --all-features --test ${{ matrix.test_name }} -- --nocapture
+
+  check_stable:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4.1.2
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2.7.3
+
+      - name: Run cargo check on stable rust
+        run: cargo check --all-targets
