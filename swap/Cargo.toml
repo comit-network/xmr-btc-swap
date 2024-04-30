@@ -23,7 +23,7 @@ comfy-table = "7.1"
 config = { version = "0.14", default-features = false, features = [ "toml" ] }
 conquer-once = "0.4"
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
-data-encoding = "2.5"
+data-encoding = "2.6"
 dialoguer = "0.11"
 digest = "0.10.7"
 directories-next = "2"
