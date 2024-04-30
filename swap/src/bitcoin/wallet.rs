@@ -6,7 +6,7 @@ use ::bitcoin::Txid;
 use anyhow::{bail, Context, Result};
 use bdk::blockchain::{Blockchain, ElectrumBlockchain, GetTx};
 use bdk::database::BatchDatabase;
-use bdk::electrum_client::{ElectrumApi, GetHistoryRes};
+use bdk::electrum_client::{ElectrumApi, GetHistoryRes, Socks5Config};
 use bdk::sled::Tree;
 use bdk::wallet::export::FullyNodedExport;
 use bdk::wallet::AddressIndex;
@@ -20,6 +20,7 @@ use rust_decimal_macros::dec;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::fmt;
+use std::ops::Not;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -47,6 +48,7 @@ pub struct Wallet<D = Tree, C = Client> {
 impl Wallet {
     pub async fn new(
         electrum_rpc_url: Url,
+        electrum_socks5_proxy_string: &str,
         data_dir: impl AsRef<Path>,
         xprivkey: ExtendedPrivKey,
         env_config: env::Config,
@@ -70,7 +72,11 @@ impl Wallet {
             err => err?,
         };
 
-        let client = Client::new(electrum_rpc_url, env_config.bitcoin_sync_interval())?;
+        let client = Client::new(
+            electrum_rpc_url,
+            electrum_socks5_proxy_string,
+            env_config.bitcoin_sync_interval(),
+        )?;
 
         let network = wallet.network();
 
@@ -723,20 +729,32 @@ pub struct Client {
 }
 
 impl Client {
-    fn new(electrum_rpc_url: Url, interval: Duration) -> Result<Self> {
-        let config = bdk::electrum_client::ConfigBuilder::default()
-            .retry(5)
-            .build();
-        let electrum = bdk::electrum_client::Client::from_config(electrum_rpc_url.as_str(), config)
-            .context("Failed to initialize Electrum RPC client")?;
+    fn new(
+        electrum_rpc_url: Url,
+        electrum_socks5_proxy_string: &str,
+        interval: Duration,
+    ) -> Result<Self> {
+        let mut config_builder = bdk::electrum_client::ConfigBuilder::default().retry(5);
+        if electrum_socks5_proxy_string.is_empty().not() {
+            config_builder = config_builder
+                .socks5(Option::from(Socks5Config::new(
+                    electrum_socks5_proxy_string.to_string(),
+                )))
+                .unwrap() // use Tor with the Electrum client
+        }
+        let config = config_builder.build();
+        let electrum =
+            bdk::electrum_client::Client::from_config(electrum_rpc_url.as_str(), config.clone())
+                .context("Failed to initialize Electrum RPC client")?;
         // Initially fetch the latest block for storing the height.
         // We do not act on this subscription after this call.
         let latest_block = electrum
             .block_headers_subscribe()
             .context("Failed to subscribe to header notifications")?;
 
-        let client = bdk::electrum_client::Client::new(electrum_rpc_url.as_str())
-            .context("Failed to initialize Electrum RPC client")?;
+        let client =
+            bdk::electrum_client::Client::from_config(electrum_rpc_url.as_str(), config.clone())
+                .context("Failed to initialize Electrum RPC client")?;
         let blockchain = ElectrumBlockchain::from(client);
         let last_sync = Instant::now()
             .checked_sub(interval)
