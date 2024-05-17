@@ -31,7 +31,7 @@ ecdsa_fun = { git = "https://github.com/LLFourn/secp256kfun", default-features =
 ed25519-dalek = "1"
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
-itertools = "0.12"
+itertools = "0.13"
 libp2p = { version = "0.42.2", default-features = false, features = [ "tcp-tokio", "yamux", "mplex", "dns-tokio", "noise", "request-response", "websocket", "ping", "rendezvous", "identify" ] }
 monero = { version = "0.12", features = [ "serde_support" ] }
 monero-rpc = { path = "../monero-rpc" }
