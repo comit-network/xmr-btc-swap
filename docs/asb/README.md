@@ -186,16 +186,16 @@ Sparrow wallet import works as follows:
 - Click "Enter Private Key" for "Master Private Key (BIP32)"
 - Enter the `xprv...` or `tprv...` part of the descriptor (example above is `tprv8Zgredacted...`:
 
-![image](https://user-images.githubusercontent.com/351403/212085114-450725b3-3ff4-4010-a142-b7d39b3200d3.png)
+![image](enter-master-private-key.png)
 
 - Click "Import"
 - Leave the derivation path as `m/84'/0'/0'` and click "Import Keystore" button
 - Click "Apply" and then supply password
 
-![image](https://user-images.githubusercontent.com/351403/212085483-47ab7cc8-8d65-454a-877b-10b309d71bc6.png)
+![image](import-keystore.png)
 
 - Click Transactions tab
 - ???
 - Profit!
 
-![image](https://user-images.githubusercontent.com/351403/212085966-d318011d-79bf-4e72-aced-4026499591c5.png)
+![image](transactions-tab.png)
