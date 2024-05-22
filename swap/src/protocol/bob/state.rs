@@ -21,9 +21,10 @@ use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQProof;
 use std::fmt;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum BobState {
     Started {
+        #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
         btc_amount: bitcoin::Amount,
         change_address: bitcoin::Address,
     },
@@ -287,13 +288,13 @@ pub struct State2 {
     S_a_monero: monero::PublicKey,
     S_a_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
-    xmr: monero::Amount,
-    cancel_timelock: CancelTimelock,
-    punish_timelock: PunishTimelock,
-    refund_address: bitcoin::Address,
+    pub xmr: monero::Amount,
+    pub cancel_timelock: CancelTimelock,
+    pub punish_timelock: PunishTimelock,
+    pub refund_address: bitcoin::Address,
     redeem_address: bitcoin::Address,
     punish_address: bitcoin::Address,
-    tx_lock: bitcoin::TxLock,
+    pub tx_lock: bitcoin::TxLock,
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: bitcoin::EncryptedSignature,
     min_monero_confirmations: u64,
@@ -302,9 +303,9 @@ pub struct State2 {
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     tx_punish_fee: bitcoin::Amount,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
-    tx_refund_fee: bitcoin::Amount,
+    pub tx_refund_fee: bitcoin::Amount,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
-    tx_cancel_fee: bitcoin::Amount,
+    pub tx_cancel_fee: bitcoin::Amount,
 }
 
 impl State2 {
@@ -439,7 +440,7 @@ impl State3 {
         self.tx_lock.txid()
     }
 
-    pub async fn current_epoch(
+    pub async fn expired_timelock(
         &self,
         bitcoin_wallet: &bitcoin::Wallet,
     ) -> Result<ExpiredTimelocks> {
