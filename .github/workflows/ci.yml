@@ -181,7 +181,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4.1.1
 
-      - uses: Swatinem/rust-cache@v2.7.1
+      - uses: Swatinem/rust-cache@v2.7.3
 
       - name: Run RPC server tests
         run: cargo test --package swap --all-features --test rpc -- --nocapture
