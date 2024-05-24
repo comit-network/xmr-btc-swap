@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 - Minimum Supported Rust Version (MSRV) bumped to 1.70
+- Lowered default Bitcoin confirmation target for Bob to 1 to make sure Bitcoin transactions get confirmed in time
+- Added support for starting the CLI (using the `start-daemon` subcommand) as a Daemon that accepts JSON-RPC requests
 
 ## [0.12.3] - 2023-09-20
 
