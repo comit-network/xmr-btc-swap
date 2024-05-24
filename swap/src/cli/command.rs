@@ -23,7 +23,7 @@ const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://blockstream.info:700";
 // See: https://1209k.com/bitcoin-eye/ele.php?chain=tbtc
 pub const DEFAULT_ELECTRUM_RPC_URL_TESTNET: &str = "ssl://electrum.blockstream.info:60002";
 
-const DEFAULT_BITCOIN_CONFIRMATION_TARGET: usize = 3;
+const DEFAULT_BITCOIN_CONFIRMATION_TARGET: usize = 1;
 pub const DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET: usize = 1;
 
 const DEFAULT_TOR_SOCKS5_PORT: &str = "9050";
