@@ -168,7 +168,7 @@ impl EventLoop {
                             tracing::info!("Successfully closed connection to Alice");
                             return;
                         }
-                        SwarmEvent::OutgoingConnectionError { peer_id,  error } if matches!(peer_id, Some(alice_peer_id) if alice_peer_id == self.alice_peer_id) => {
+                        SwarmEvent::OutgoingConnectionError { peer_id: Some(alice_peer_id),  error } if alice_peer_id == self.alice_peer_id => {
                             tracing::warn!(%error, "Failed to dial Alice");
 
                             if let Some(duration) = self.swarm.behaviour_mut().redial.until_next_redial() {

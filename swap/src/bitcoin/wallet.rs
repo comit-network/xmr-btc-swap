@@ -65,9 +65,7 @@ impl Wallet {
             database,
         ) {
             Ok(w) => w,
-            Err(e) if matches!(e, bdk::Error::ChecksumMismatch) => {
-                Self::migrate(data_dir, xprivkey, network)?
-            }
+            Err(bdk::Error::ChecksumMismatch) => Self::migrate(data_dir, xprivkey, network)?,
             err => err?,
         };
 

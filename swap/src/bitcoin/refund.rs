@@ -131,7 +131,7 @@ impl TxRefund {
         let input = match candidate_transaction.input.as_slice() {
             [input] => input,
             [] => bail!(NoInputs),
-            [inputs @ ..] => bail!(TooManyInputs(inputs.len())),
+            inputs => bail!(TooManyInputs(inputs.len())),
         };
 
         let sigs = match input.witness.to_vec().as_slice() {
@@ -140,7 +140,7 @@ impl TxRefund {
                 .map(|sig| extract_ecdsa_sig(sig))
                 .collect::<Result<Vec<_>, _>>(),
             [] => bail!(EmptyWitnessStack),
-            [witnesses @ ..] => bail!(NotThreeWitnesses(witnesses.len())),
+            witnesses => bail!(NotThreeWitnesses(witnesses.len())),
         }?;
 
         let sig = sigs
