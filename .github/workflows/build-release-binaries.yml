@@ -6,8 +6,9 @@ on:
 
 jobs:
   build_binaries:
-    name: Build swap and asb binaries
+    name: Build
     strategy:
+      fail-fast: false
       matrix:
         include:
           - bin: swap
@@ -63,11 +64,16 @@ jobs:
         with:
           toolchain: "1.74"
 
-      - name: install armv7 target
-        if: matrix.target != 'armv7-unknown-linux-gnueabihf'
-        run: rustup target add armv7-unknown-linux-gnueabihf
+      - name: Cross Build ${{ matrix.target }} ${{ matrix.bin }} binary
+        if: matrix.target == 'armv7-unknown-linux-gnueabihf'
+        run: |
+          curl -L "https://github.com/cross-rs/cross/releases/download/v0.2.5/cross-x86_64-unknown-linux-gnu.tar.gz" | tar xzv
+          sudo mv cross /usr/bin
+          sudo mv cross-util /usr/bin
+          cross build --target=${{ matrix.target }} --release --package swap --bin ${{ matrix.bin }}
 
       - name: Build ${{ matrix.target }} ${{ matrix.bin }} release binary
+        if: matrix.target != 'armv7-unknown-linux-gnueabihf'
         run: cargo build --target=${{ matrix.target }} --release --package swap --bin ${{ matrix.bin }}
 
       - name: Smoke test the binary
