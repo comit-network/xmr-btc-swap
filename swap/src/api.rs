@@ -187,7 +187,7 @@ impl Context {
         START.call_once(|| {
             let _ = cli::tracing::init(debug, json, data_dir.join("logs"));
         });
-        
+
         let seed = Seed::from_file_or_generate(data_dir.as_path())
             .context("Failed to read seed in file")?;
 
