@@ -28,6 +28,24 @@
     },
     "query": "\n        insert into peer_addresses (\n            peer_id,\n            address\n            ) values (?, ?);\n        "
   },
+  "0d465a17ebbb5761421def759c73cad023c30705d5b41a1399ef79d8d2571d7c": {
+    "describe": {
+      "columns": [
+        {
+          "name": "start_date",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        true
+      ],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "\n                SELECT min(entered_at) as start_date\n                FROM swap_states\n                WHERE swap_id = ?\n                "
+  },
   "1ec38c85e7679b2eb42b3df75d9098772ce44fdb8db3012d3c2410d828b74157": {
     "describe": {
       "columns": [
@@ -62,6 +80,30 @@
     },
     "query": "\n        insert into peers (\n            swap_id,\n            peer_id\n            ) values (?, ?);\n        "
   },
+  "3f2bfdd2d134586ccad22171cd85a465800fc5c4fdaf191d206974e530240c87": {
+    "describe": {
+      "columns": [
+        {
+          "name": "swap_id",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "state",
+          "ordinal": 1,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "\n                SELECT swap_id, state\n                FROM swap_states\n                "
+  },
   "50a5764546f69c118fa0b64120da50f51073d36257d49768de99ff863e3511e0": {
     "describe": {
       "columns": [],
@@ -90,24 +132,6 @@
     },
     "query": "\n           SELECT state\n           FROM swap_states\n           WHERE swap_id = ?\n           ORDER BY id desc\n           LIMIT 1;\n\n        "
   },
-  "a0eb85d04ee3842c52291dad4d225941d1141af735922fcbc665868997fce304": {
-    "describe": {
-      "columns": [
-        {
-          "name": "address",
-          "ordinal": 0,
-          "type_info": "Text"
-        }
-      ],
-      "nullable": [
-        false
-      ],
-      "parameters": {
-        "Right": 1
-      }
-    },
-    "query": "\n        SELECT address\n        FROM peer_addresses\n        WHERE peer_id = ?\n        "
-  },
   "b703032b4ddc627a1124817477e7a8e5014bdc694c36a14053ef3bb2fc0c69b0": {
     "describe": {
       "columns": [],
@@ -135,5 +159,41 @@
       }
     },
     "query": "\n        SELECT address\n        FROM monero_addresses\n        WHERE swap_id = ?\n        "
+  },
+  "d78acba5eb8563826dd190e0886aa665aae3c6f1e312ee444e65df1c95afe8b2": {
+    "describe": {
+      "columns": [
+        {
+          "name": "address",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "\n        SELECT DISTINCT address\n        FROM peer_addresses\n        WHERE peer_id = ?\n        "
+  },
+  "e05620f420f8c1022971eeb66a803323a8cf258cbebb2834e3f7cf8f812fa646": {
+    "describe": {
+      "columns": [
+        {
+          "name": "state",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "\n           SELECT state\n           FROM swap_states\n           WHERE swap_id = ?\n        "
   }
 }

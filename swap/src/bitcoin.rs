@@ -15,7 +15,7 @@ pub use crate::bitcoin::refund::TxRefund;
 pub use crate::bitcoin::timelocks::{BlockHeight, ExpiredTimelocks};
 pub use ::bitcoin::util::amount::Amount;
 pub use ::bitcoin::util::psbt::PartiallySignedTransaction;
-pub use ::bitcoin::{Address, Network, Transaction, Txid};
+pub use ::bitcoin::{Address, AddressType, Network, Transaction, Txid};
 pub use ecdsa_fun::adaptor::EncryptedSignature;
 pub use ecdsa_fun::fun::Scalar;
 pub use ecdsa_fun::Signature;
@@ -244,10 +244,65 @@ pub fn current_epoch(
     }
 
     if tx_lock_status.is_confirmed_with(cancel_timelock) {
-        return ExpiredTimelocks::Cancel;
+        return ExpiredTimelocks::Cancel {
+            blocks_left: tx_cancel_status.blocks_left_until(punish_timelock),
+        };
     }
 
-    ExpiredTimelocks::None
+    ExpiredTimelocks::None {
+        blocks_left: tx_lock_status.blocks_left_until(cancel_timelock),
+    }
+}
+
+pub mod bitcoin_address {
+    use anyhow::{bail, Result};
+    use serde::Serialize;
+    use std::str::FromStr;
+
+    #[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Serialize)]
+    #[error("Invalid Bitcoin address provided, expected address on network {expected:?}  but address provided is on {actual:?}")]
+    pub struct BitcoinAddressNetworkMismatch {
+        #[serde(with = "crate::bitcoin::network")]
+        expected: bitcoin::Network,
+        #[serde(with = "crate::bitcoin::network")]
+        actual: bitcoin::Network,
+    }
+
+    pub fn parse(addr_str: &str) -> Result<bitcoin::Address> {
+        let address = bitcoin::Address::from_str(addr_str)?;
+
+        if address.address_type() != Some(bitcoin::AddressType::P2wpkh) {
+            anyhow::bail!("Invalid Bitcoin address provided, only bech32 format is supported!")
+        }
+
+        Ok(address)
+    }
+
+    pub fn validate(
+        address: bitcoin::Address,
+        expected_network: bitcoin::Network,
+    ) -> Result<bitcoin::Address> {
+        if address.network != expected_network {
+            bail!(BitcoinAddressNetworkMismatch {
+                expected: expected_network,
+                actual: address.network
+            });
+        }
+
+        Ok(address)
+    }
+
+    pub fn validate_is_testnet(
+        address: bitcoin::Address,
+        is_testnet: bool,
+    ) -> Result<bitcoin::Address> {
+        let expected_network = if is_testnet {
+            bitcoin::Network::Testnet
+        } else {
+            bitcoin::Network::Bitcoin
+        };
+        validate(address, expected_network)
+    }
 }
 
 /// Bitcoin error codes: https://github.com/bitcoin/bitcoin/blob/97d3500601c1d28642347d014a6de1e38f53ae4e/src/rpc/protocol.h#L23
@@ -324,6 +379,7 @@ mod tests {
     use crate::env::{GetConfig, Regtest};
     use crate::protocol::{alice, bob};
     use rand::rngs::OsRng;
+    use std::matches;
     use uuid::Uuid;
 
     #[test]
@@ -338,7 +394,7 @@ mod tests {
             tx_cancel_status,
         );
 
-        assert_eq!(expired_timelock, ExpiredTimelocks::None)
+        assert!(matches!(expired_timelock, ExpiredTimelocks::None { .. }));
     }
 
     #[test]
@@ -353,7 +409,7 @@ mod tests {
             tx_cancel_status,
         );
 
-        assert_eq!(expired_timelock, ExpiredTimelocks::Cancel)
+        assert!(matches!(expired_timelock, ExpiredTimelocks::Cancel { .. }));
     }
 
     #[test]

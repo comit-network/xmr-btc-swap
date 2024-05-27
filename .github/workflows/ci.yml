@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.1.1
+        uses: actions/checkout@v4.1.6
 
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.1.1
+        uses: actions/checkout@v4.1.6
 
       - uses: Swatinem/rust-cache@v2.7.3
 
@@ -49,12 +49,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.1.1
+        uses: actions/checkout@v4.1.6
 
       - uses: Swatinem/rust-cache@v2.7.3
 
       - name: Install sqlx-cli
-        run: cargo install sqlx-cli --locked
+        run: cargo install --locked --version 0.6.3 sqlx-cli
 
       - name: Run sqlite_dev_setup.sh script
         run: |
@@ -70,13 +70,15 @@ jobs:
           - target: armv7-unknown-linux-gnueabihf
             os: ubuntu-latest
           - target: x86_64-apple-darwin
+            os: macos-12
+          - target: aarch64-apple-darwin
             os: macos-latest
           - target: x86_64-pc-windows-msvc
             os: windows-latest
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.1.1
+        uses: actions/checkout@v4.1.6
 
       - uses: Swatinem/rust-cache@v2.7.3
 
@@ -129,7 +131,7 @@ jobs:
           tool-cache: false
 
       - name: Checkout sources
-        uses: actions/checkout@v4.1.1
+        uses: actions/checkout@v4.1.6
 
       - uses: Swatinem/rust-cache@v2.7.3
 
@@ -166,9 +168,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.1.1
+        uses: actions/checkout@v4.1.6
 
       - uses: Swatinem/rust-cache@v2.7.3
 
       - name: Run test ${{ matrix.test_name }}
         run: cargo test --package swap --all-features --test ${{ matrix.test_name }} -- --nocapture
+
+  rpc_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4.1.6
+
+      - uses: Swatinem/rust-cache@v2.7.3
+
+      - name: Run RPC server tests
+        run: cargo test --package swap --all-features --test rpc -- --nocapture
+
+  check_stable:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4.1.6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2.7.3
+
+      - name: Run cargo check on stable rust
+        run: cargo check --all-targets

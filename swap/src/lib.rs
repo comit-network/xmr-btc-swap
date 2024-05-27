@@ -16,6 +16,7 @@
     missing_copy_implementations
 )]
 
+pub mod api;
 pub mod asb;
 pub mod bitcoin;
 pub mod cli;
@@ -28,6 +29,7 @@ pub mod libp2p_ext;
 pub mod monero;
 pub mod network;
 pub mod protocol;
+pub mod rpc;
 pub mod seed;
 pub mod tor;
 pub mod tracing_ext;

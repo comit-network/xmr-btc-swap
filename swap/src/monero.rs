@@ -42,6 +42,13 @@ pub fn private_key_from_secp256k1_scalar(scalar: bitcoin::Scalar) -> PrivateKey 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PrivateViewKey(#[serde(with = "monero_private_key")] PrivateKey);
 
+impl fmt::Display for PrivateViewKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Delegate to the Display implementation of PrivateKey
+        write!(f, "{}", self.0)
+    }
+}
+
 impl PrivateViewKey {
     pub fn new_random<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
         let scalar = Scalar::random(rng);
@@ -317,6 +324,52 @@ pub mod monero_amount {
         let amount = Amount::from_piconero(picos);
 
         Ok(amount)
+    }
+}
+
+pub mod monero_address {
+    use anyhow::{bail, Context, Result};
+    use std::str::FromStr;
+
+    #[derive(thiserror::Error, Debug, Clone, Copy, PartialEq)]
+    #[error("Invalid monero address provided, expected address on network {expected:?} but address provided is on {actual:?}")]
+    pub struct MoneroAddressNetworkMismatch {
+        pub expected: monero::Network,
+        pub actual: monero::Network,
+    }
+
+    pub fn parse(s: &str) -> Result<monero::Address> {
+        monero::Address::from_str(s).with_context(|| {
+            format!(
+                "Failed to parse {} as a monero address, please make sure it is a valid address",
+                s
+            )
+        })
+    }
+
+    pub fn validate(
+        address: monero::Address,
+        expected_network: monero::Network,
+    ) -> Result<monero::Address> {
+        if address.network != expected_network {
+            bail!(MoneroAddressNetworkMismatch {
+                expected: expected_network,
+                actual: address.network,
+            });
+        }
+        Ok(address)
+    }
+
+    pub fn validate_is_testnet(
+        address: monero::Address,
+        is_testnet: bool,
+    ) -> Result<monero::Address> {
+        let expected_network = if is_testnet {
+            monero::Network::Stagenet
+        } else {
+            monero::Network::Mainnet
+        };
+        validate(address, expected_network)
     }
 }
 
