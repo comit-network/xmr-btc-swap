@@ -62,17 +62,16 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: "1.74"
-          targets: armv7-unknown-linux-gnueabihf
+
+      - name: install armv7 target
+        if: matrix.target != 'armv7-unknown-linux-gnueabihf'
+        run: rustup target add armv7-unknown-linux-gnueabihf
 
       - name: Build ${{ matrix.target }} ${{ matrix.bin }} release binary
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --target=${{ matrix.target }} --release --package swap --bin ${{ matrix.bin }}
-          use-cross: true
+        run: cargo build --target=${{ matrix.target }} --release --package swap --bin ${{ matrix.bin }}
 
       - name: Smoke test the binary
-        if: matrix.target != 'armv7-unknown-linux-gnueabihf' # armv7-unknown-linux-gnueabihf is only cross-compiled, no smoke test
+        if: matrix.target != 'armv7-unknown-linux-gnueabihf'
         run: target/${{ matrix.target }}/release/${{ matrix.bin }} --help
 
       # Remove once python 3 is the default
