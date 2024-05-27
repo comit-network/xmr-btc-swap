@@ -15,7 +15,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.70"
+          toolchain: "1.74"
           components: clippy,rustfmt
 
       - uses: Swatinem/rust-cache@v2.7.3
@@ -100,7 +100,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.70"
+          toolchain: "1.74"
           targets: armv7-unknown-linux-gnueabihf
 
       - name: Build binary
