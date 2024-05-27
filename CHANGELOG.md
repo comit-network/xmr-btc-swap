@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Minimum Supported Rust Version (MSRV) bumped to 1.70
+- Minimum Supported Rust Version (MSRV) bumped to 1.74
 - Lowered default Bitcoin confirmation target for Bob to 1 to make sure Bitcoin transactions get confirmed in time
 - Added support for starting the CLI (using the `start-daemon` subcommand) as a Daemon that accepts JSON-RPC requests
 - Update monero-wallet-rpc version to v0.18.3.1

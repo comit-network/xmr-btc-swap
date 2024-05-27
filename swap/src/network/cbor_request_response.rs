@@ -19,7 +19,7 @@ pub struct CborCodec<P, Req, Res> {
 impl<P, Req, Res> Default for CborCodec<P, Req, Res> {
     fn default() -> Self {
         Self {
-            phantom: PhantomData::default(),
+            phantom: PhantomData,
         }
     }
 }

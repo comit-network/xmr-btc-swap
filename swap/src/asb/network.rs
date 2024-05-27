@@ -302,7 +302,7 @@ pub mod rendezvous {
 
         fn inject_disconnected(&mut self, peer_id: &PeerId) {
             for i in 0..self.rendezvous_nodes.len() {
-                let mut node = &mut self.rendezvous_nodes[i];
+                let node = &mut self.rendezvous_nodes[i];
                 if peer_id == &node.peer_id {
                     node.connection_status = ConnectionStatus::Disconnected;
                 }
@@ -325,7 +325,7 @@ pub mod rendezvous {
             _error: &DialError,
         ) {
             for i in 0..self.rendezvous_nodes.len() {
-                let mut node = &mut self.rendezvous_nodes[i];
+                let node = &mut self.rendezvous_nodes[i];
                 if let Some(id) = peer_id {
                     if id == node.peer_id {
                         node.connection_status = ConnectionStatus::Disconnected;

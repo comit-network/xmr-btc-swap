@@ -65,7 +65,7 @@ mod tests {
     #[tokio::test]
     async fn get_outs_for_key_offsets() {
         let cli = Cli::default();
-        let container = cli.run(Monerod::default());
+        let container = cli.run(Monerod);
         let rpc_client = Client::localhost(container.get_host_port_ipv4(18081)).unwrap();
         rpc_client.generateblocks(150, "498AVruCDWgP9Az9LjMm89VWjrBrSZ2W2K3HFBiyzzrRjUJWUcCVxvY1iitfuKoek2FdX6MKGAD9Qb1G1P8QgR5jPmmt3Vj".to_owned()).await.unwrap();
         let wallet = Wallet {
