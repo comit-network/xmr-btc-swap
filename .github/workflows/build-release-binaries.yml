@@ -93,10 +93,7 @@ jobs:
 
           archive_name=f'${{ matrix.bin }}_${{ github.event.release.tag_name }}_{os_info.system}_{arch}.${{ matrix.archive_ext }}'
 
-          print(f'archive={archive_name} >> $GITHUB_OUTPUT')
-
-      - name: debug
-        run: tree ./target
+          print(f'::set-output name=archive::{archive_name}')
 
       - name: Pack macos archive
         if: startsWith(matrix.os, 'macos')
