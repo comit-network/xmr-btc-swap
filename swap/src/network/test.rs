@@ -40,7 +40,7 @@ where
         .expect("failed to create dh_keys");
     let noise = NoiseConfig::xx(dh_keys).into_authenticated();
 
-    let transport = MemoryTransport::default()
+    let transport = MemoryTransport
         .or_transport(TokioTcpConfig::new())
         .upgrade(Version::V1)
         .authenticate(noise)

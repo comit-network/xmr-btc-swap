@@ -151,28 +151,28 @@ impl EventLoop {
                             return;
                         }
                         SwarmEvent::Behaviour(OutEvent::Failure { peer, error }) => {
-                            tracing::warn!(%peer, "Communication error: {:#}", error);
+                            tracing::warn!(%peer, err = %error, "Communication error");
                             return;
                         }
                         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } if peer_id == self.alice_peer_id => {
-                            tracing::info!("Connected to Alice at {}", endpoint.get_remote_address());
+                            tracing::info!(peer_id = %endpoint.get_remote_address(), "Connected to Alice");
                         }
                         SwarmEvent::Dialing(peer_id) if peer_id == self.alice_peer_id => {
-                            tracing::debug!("Dialling Alice at {}", peer_id);
+                            tracing::debug!(%peer_id, "Dialling Alice");
                         }
                         SwarmEvent::ConnectionClosed { peer_id, endpoint, num_established, cause: Some(error) } if peer_id == self.alice_peer_id && num_established == 0 => {
-                            tracing::warn!("Lost connection to Alice at {}, cause: {}", endpoint.get_remote_address(), error);
+                            tracing::warn!(peer_id = %endpoint.get_remote_address(), cause = %error, "Lost connection to Alice");
                         }
                         SwarmEvent::ConnectionClosed { peer_id, num_established, cause: None, .. } if peer_id == self.alice_peer_id && num_established == 0 => {
                             // no error means the disconnection was requested
                             tracing::info!("Successfully closed connection to Alice");
                             return;
                         }
-                        SwarmEvent::OutgoingConnectionError { peer_id,  error } if matches!(peer_id, Some(alice_peer_id) if alice_peer_id == self.alice_peer_id) => {
-                            tracing::warn!( "Failed to dial Alice: {}", error);
+                        SwarmEvent::OutgoingConnectionError { peer_id: Some(alice_peer_id),  error } if alice_peer_id == self.alice_peer_id => {
+                            tracing::warn!(%error, "Failed to dial Alice");
 
                             if let Some(duration) = self.swarm.behaviour_mut().redial.until_next_redial() {
-                                tracing::info!("Next redial attempt in {}s", duration.as_secs());
+                                tracing::info!(seconds_until_next_redial = %duration.as_secs(), "Waiting for next redial attempt");
                             }
 
                         }
@@ -241,6 +241,7 @@ impl EventLoopHandle {
     }
 
     pub async fn request_quote(&mut self) -> Result<BidQuote> {
+        tracing::debug!("Requesting quote");
         Ok(self.quote.send_receive(()).await?)
     }
 
