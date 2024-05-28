@@ -80,11 +80,6 @@ jobs:
         if: matrix.target != 'armv7-unknown-linux-gnueabihf'
         run: target/${{ matrix.target }}/release/${{ matrix.bin }} --help
 
-      # Remove once python 3 is the default
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-
       - id: create-archive-name
         shell: python # Use python to have a prettier name for the archive on Windows.
         run: |
@@ -98,10 +93,13 @@ jobs:
 
           archive_name=f'${{ matrix.bin }}_${{ github.event.release.tag_name }}_{os_info.system}_{arch}.${{ matrix.archive_ext }}'
 
-          print(f'::set-output name=archive::{archive_name}')
+          print(f'archive={archive_name} >> $GITHUB_OUTPUT')
+
+      - name: debug
+        run: tree ./target
 
       - name: Pack macos archive
-        if: matrix.os == 'macos-latest'
+        if: startsWith(matrix.os, 'macos')
         shell: bash
         run: gtar -C ./target/${{ matrix.target }}/release --create --file=${{ steps.create-archive-name.outputs.archive }} ${{ matrix.bin }}
 
