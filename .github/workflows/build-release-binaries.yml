@@ -22,6 +22,7 @@ jobs:
           - bin: swap
             target: x86_64-apple-darwin
             os: macos-12
+            archive_ext: tar
           - bin: swap
             target: aarch64-apple-darwin
             os: macos-latest
