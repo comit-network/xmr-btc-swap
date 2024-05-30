@@ -28,7 +28,7 @@ dialoguer = "0.11"
 digest = "0.10.7"
 directories-next = "2"
 ecdsa_fun = { version = "0.10", default-features = false, features = [ "libsecp_compat", "serde", "adaptor" ] }
-ed25519-dalek = "1"
+ed25519-dalek = "2"
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
 itertools = "0.13"
