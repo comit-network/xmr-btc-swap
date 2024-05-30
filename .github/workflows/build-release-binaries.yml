@@ -6,8 +6,9 @@ on:
 
 jobs:
   build_binaries:
-    name: Build swap and asb binaries
+    name: Build
     strategy:
+      fail-fast: false
       matrix:
         include:
           - bin: swap
@@ -20,6 +21,10 @@ jobs:
             archive_ext: tar
           - bin: swap
             target: x86_64-apple-darwin
+            os: macos-12
+            archive_ext: tar
+          - bin: swap
+            target: aarch64-apple-darwin
             os: macos-latest
             archive_ext: tar
           - bin: swap
@@ -36,6 +41,10 @@ jobs:
             archive_ext: tar
           - bin: asb
             target: x86_64-apple-darwin
+            os: macos-12
+            archive_ext: tar
+          - bin: asb
+            target: aarch64-apple-darwin
             os: macos-latest
             archive_ext: tar
           - bin: asb
@@ -45,7 +54,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout tagged commit
-        uses: actions/checkout@v4.1.2
+        uses: actions/checkout@v4.1.6
         with:
           ref: ${{ github.event.release.target_commitish }}
           token: ${{ secrets.BOTTY_GITHUB_TOKEN }}
@@ -54,24 +63,23 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.70"
-          targets: armv7-unknown-linux-gnueabihf
+          toolchain: "1.74"
+
+      - name: Cross Build ${{ matrix.target }} ${{ matrix.bin }} binary
+        if: matrix.target == 'armv7-unknown-linux-gnueabihf'
+        run: |
+          curl -L "https://github.com/cross-rs/cross/releases/download/v0.2.5/cross-x86_64-unknown-linux-gnu.tar.gz" | tar xzv
+          sudo mv cross /usr/bin
+          sudo mv cross-util /usr/bin
+          cross build --target=${{ matrix.target }} --release --package swap --bin ${{ matrix.bin }}
 
       - name: Build ${{ matrix.target }} ${{ matrix.bin }} release binary
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --target=${{ matrix.target }} --release --package swap --bin ${{ matrix.bin }}
-          use-cross: true
+        if: matrix.target != 'armv7-unknown-linux-gnueabihf'
+        run: cargo build --target=${{ matrix.target }} --release --package swap --bin ${{ matrix.bin }}
 
       - name: Smoke test the binary
-        if: matrix.target != 'armv7-unknown-linux-gnueabihf' # armv7-unknown-linux-gnueabihf is only cross-compiled, no smoke test
+        if: matrix.target != 'armv7-unknown-linux-gnueabihf'
         run: target/${{ matrix.target }}/release/${{ matrix.bin }} --help
-
-      # Remove once python 3 is the default
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
 
       - id: create-archive-name
         shell: python # Use python to have a prettier name for the archive on Windows.
@@ -89,7 +97,7 @@ jobs:
           print(f'::set-output name=archive::{archive_name}')
 
       - name: Pack macos archive
-        if: matrix.os == 'macos-latest'
+        if: startsWith(matrix.os, 'macos')
         shell: bash
         run: gtar -C ./target/${{ matrix.target }}/release --create --file=${{ steps.create-archive-name.outputs.archive }} ${{ matrix.bin }}
 

@@ -117,7 +117,7 @@ async fn next_state(
         } => {
             let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
 
-            if let ExpiredTimelocks::None = state3.current_epoch(bitcoin_wallet).await? {
+            if let ExpiredTimelocks::None { .. } = state3.expired_timelock(bitcoin_wallet).await? {
                 let transfer_proof_watcher = event_loop_handle.recv_transfer_proof();
                 let cancel_timelock_expires =
                     tx_lock_status.wait_until_confirmed_with(state3.cancel_timelock);
@@ -156,7 +156,7 @@ async fn next_state(
         } => {
             let tx_lock_status = bitcoin_wallet.subscribe_to(state.tx_lock.clone()).await;
 
-            if let ExpiredTimelocks::None = state.current_epoch(bitcoin_wallet).await? {
+            if let ExpiredTimelocks::None { .. } = state.expired_timelock(bitcoin_wallet).await? {
                 let watch_request = state.lock_xmr_watch_request(lock_transfer_proof);
 
                 select! {
@@ -185,7 +185,7 @@ async fn next_state(
         BobState::XmrLocked(state) => {
             let tx_lock_status = bitcoin_wallet.subscribe_to(state.tx_lock.clone()).await;
 
-            if let ExpiredTimelocks::None = state.expired_timelock(bitcoin_wallet).await? {
+            if let ExpiredTimelocks::None { .. } = state.expired_timelock(bitcoin_wallet).await? {
                 // Alice has locked Xmr
                 // Bob sends Alice his key
 
@@ -209,7 +209,7 @@ async fn next_state(
         BobState::EncSigSent(state) => {
             let tx_lock_status = bitcoin_wallet.subscribe_to(state.tx_lock.clone()).await;
 
-            if let ExpiredTimelocks::None = state.expired_timelock(bitcoin_wallet).await? {
+            if let ExpiredTimelocks::None { .. } = state.expired_timelock(bitcoin_wallet).await? {
                 select! {
                     state5 = state.watch_for_redeem_btc(bitcoin_wallet) => {
                         BobState::BtcRedeemed(state5?)
@@ -227,6 +227,9 @@ async fn next_state(
             let (spend_key, view_key) = state.xmr_keys();
 
             let wallet_file_name = swap_id.to_string();
+
+            tracing::info!(%wallet_file_name, "Generating and opening Monero wallet from the extracted keys to redeem the Monero");
+
             if let Err(e) = monero_wallet
                 .create_from_and_load(
                     wallet_file_name.clone(),
@@ -269,12 +272,12 @@ async fn next_state(
         BobState::BtcCancelled(state) => {
             // Bob has cancelled the swap
             match state.expired_timelock(bitcoin_wallet).await? {
-                ExpiredTimelocks::None => {
+                ExpiredTimelocks::None { .. } => {
                     bail!(
                         "Internal error: canceled state reached before cancel timelock was expired"
                     );
                 }
-                ExpiredTimelocks::Cancel => {
+                ExpiredTimelocks::Cancel { .. } => {
                     state.publish_refund_btc(bitcoin_wallet).await?;
                     BobState::BtcRefunded(state)
                 }

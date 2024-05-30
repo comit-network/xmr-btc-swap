@@ -5,7 +5,8 @@ use crate::bitcoin::{
 };
 use ::bitcoin::util::sighash::SighashCache;
 use ::bitcoin::{
-    EcdsaSighashType, OutPoint, PackedLockTime, Script, Sequence, Sighash, TxIn, TxOut, Txid,
+    secp256k1, EcdsaSighashType, OutPoint, PackedLockTime, Script, Sequence, Sighash, TxIn, TxOut,
+    Txid,
 };
 use anyhow::Result;
 use bdk::miniscript::Descriptor;
@@ -23,6 +24,12 @@ use std::ops::Add;
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(transparent)]
 pub struct CancelTimelock(u32);
+
+impl From<CancelTimelock> for u32 {
+    fn from(cancel_timelock: CancelTimelock) -> Self {
+        cancel_timelock.0
+    }
+}
 
 impl CancelTimelock {
     pub const fn new(number_of_blocks: u32) -> Self {
@@ -63,6 +70,12 @@ impl fmt::Display for CancelTimelock {
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(transparent)]
 pub struct PunishTimelock(u32);
+
+impl From<PunishTimelock> for u32 {
+    fn from(punish_timelock: PunishTimelock) -> Self {
+        punish_timelock.0
+    }
+}
 
 impl PunishTimelock {
     pub const fn new(number_of_blocks: u32) -> Self {
@@ -105,8 +118,8 @@ impl TxCancel {
         A: PublicKey,
         B: PublicKey,
         spending_fee: Amount,
-    ) -> Self {
-        let cancel_output_descriptor = build_shared_output_descriptor(A.0, B.0);
+    ) -> Result<Self> {
+        let cancel_output_descriptor = build_shared_output_descriptor(A.0, B.0)?;
 
         let tx_in = TxIn {
             previous_output: tx_lock.as_outpoint(),
@@ -136,12 +149,12 @@ impl TxCancel {
             )
             .expect("sighash");
 
-        Self {
+        Ok(Self {
             inner: transaction,
             digest,
             output_descriptor: cancel_output_descriptor,
             lock_output_descriptor: tx_lock.output_descriptor.clone(),
-        }
+        })
     }
 
     pub fn txid(&self) -> Txid {
@@ -202,25 +215,27 @@ impl TxCancel {
 
             let A = ::bitcoin::PublicKey {
                 compressed: true,
-                inner: A.0.into(),
+                inner: secp256k1::PublicKey::from_slice(&A.0.to_bytes())?,
             };
             let B = ::bitcoin::PublicKey {
                 compressed: true,
-                inner: B.0.into(),
+                inner: secp256k1::PublicKey::from_slice(&B.0.to_bytes())?,
             };
 
             // The order in which these are inserted doesn't matter
+            let sig_a = secp256k1::ecdsa::Signature::from_compact(&sig_a.to_bytes())?;
+            let sig_b = secp256k1::ecdsa::Signature::from_compact(&sig_b.to_bytes())?;
             satisfier.insert(
                 A,
                 ::bitcoin::EcdsaSig {
-                    sig: sig_a.into(),
+                    sig: sig_a,
                     hash_ty: EcdsaSighashType::All,
                 },
             );
             satisfier.insert(
                 B,
                 ::bitcoin::EcdsaSig {
-                    sig: sig_b.into(),
+                    sig: sig_b,
                     hash_ty: EcdsaSighashType::All,
                 },
             );

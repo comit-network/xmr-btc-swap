@@ -279,10 +279,10 @@ where
                         SwarmEvent::IncomingConnectionError { send_back_addr: address, error, .. } => {
                             tracing::warn!(%address, "Failed to set up connection with peer: {:#}", error);
                         }
-                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause: Some(error) } if num_established == 0 => {
+                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established: 0, endpoint, cause: Some(error) } => {
                             tracing::debug!(%peer, address = %endpoint.get_remote_address(), "Lost connection to peer: {:#}", error);
                         }
-                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established, endpoint, cause: None } if num_established == 0 => {
+                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established: 0, endpoint, cause: None } => {
                             tracing::info!(%peer, address = %endpoint.get_remote_address(), "Successfully closed connection");
                         }
                         SwarmEvent::NewListenAddr{address, ..} => {
@@ -296,7 +296,7 @@ where
                         Some(Ok((peer, transfer_proof, responder))) => {
                             if !self.swarm.behaviour_mut().transfer_proof.is_connected(&peer) {
                                 tracing::warn!(%peer, "No active connection to peer, buffering transfer proof");
-                                self.buffered_transfer_proofs.entry(peer).or_insert_with(Vec::new).push((transfer_proof, responder));
+                                self.buffered_transfer_proofs.entry(peer).or_default().push((transfer_proof, responder));
                                 continue;
                             }
 

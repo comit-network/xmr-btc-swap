@@ -164,3 +164,38 @@ May 01 01:32:05.018  INFO Tor found. Setting up hidden service.
 May 01 01:32:07.475  INFO /onion3/z4findrdwtfbpoq64ayjtmxvr52vvxnsynerlenlfkmm52dqxsl4deyd:9939
 May 01 01:32:07.476  INFO /onion3/z4findrdwtfbpoq64ayjtmxvr52vvxnsynerlenlfkmm52dqxsl4deyd:9940
 ```
+
+### Exporting the Bitcoin wallet descriptor
+
+First use `swap` or `asb` with the `export-bitcoin-wallet` subcommand.
+
+Output example:
+
+```json
+{"descriptor":"wpkh(tprv8Zgredacted.../84'/1'/0'/0/*)","blockheight":2415616,"label":"asb-testnet"}
+```
+
+The wallet can theoretically be directly imported into
+[bdk-cli](https://bitcoindevkit.org/bdk-cli/installation/) but it is easier to
+use Sparrow Wallet.
+
+Sparrow wallet import works as follows:
+
+- File -> New wallet -> Give it a name
+- Select "New or Imported Software Wallet"
+- Click "Enter Private Key" for "Master Private Key (BIP32)"
+- Enter the `xprv...` or `tprv...` part of the descriptor (example above is `tprv8Zgredacted...`:
+
+![image](enter-master-private-key.png)
+
+- Click "Import"
+- Leave the derivation path as `m/84'/0'/0'` and click "Import Keystore" button
+- Click "Apply" and then supply password
+
+![image](import-keystore.png)
+
+- Click Transactions tab
+- ???
+- Profit!
+
+![image](transactions-tab.png)

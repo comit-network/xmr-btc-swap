@@ -25,7 +25,7 @@ pub struct JsonPullCodec<P, Res> {
 impl<P, Res> Default for JsonPullCodec<P, Res> {
     fn default() -> Self {
         Self {
-            phantom: PhantomData::default(),
+            phantom: PhantomData,
         }
     }
 }

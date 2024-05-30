@@ -225,7 +225,7 @@ impl<'c> Monerod {
         name: String,
         network: String,
     ) -> Result<(Self, Container<'c, image::Monerod>)> {
-        let image = image::Monerod::default();
+        let image = image::Monerod;
         let image: RunnableImage<image::Monerod> = RunnableImage::from(image)
             .with_container_name(name.clone())
             .with_network(network.clone());

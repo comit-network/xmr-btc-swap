@@ -4,9 +4,10 @@ use crate::bitcoin::{
 };
 use ::bitcoin::util::psbt::PartiallySignedTransaction;
 use ::bitcoin::{OutPoint, TxIn, TxOut, Txid};
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use bdk::database::BatchDatabase;
 use bdk::miniscript::Descriptor;
+use bdk::psbt::PsbtUtils;
 use bitcoin::{PackedLockTime, Script, Sequence};
 use serde::{Deserialize, Serialize};
 
@@ -31,7 +32,7 @@ impl TxLock {
         C: EstimateFeeRate,
         D: BatchDatabase,
     {
-        let lock_output_descriptor = build_shared_output_descriptor(A.0, B.0);
+        let lock_output_descriptor = build_shared_output_descriptor(A.0, B.0)?;
         let address = lock_output_descriptor
             .address(wallet.get_network())
             .expect("can derive address from descriptor");
@@ -83,7 +84,7 @@ impl TxLock {
             }
         };
 
-        let descriptor = build_shared_output_descriptor(A.0, B.0);
+        let descriptor = build_shared_output_descriptor(A.0, B.0)?;
         let legit_shared_output_script = descriptor.script_pubkey();
 
         if shared_output_candidate.script_pubkey != legit_shared_output_script {
@@ -98,6 +99,15 @@ impl TxLock {
 
     pub fn lock_amount(&self) -> Amount {
         Amount::from_sat(self.inner.clone().extract_tx().output[self.lock_output_vout()].value)
+    }
+
+    pub fn fee(&self) -> Result<Amount> {
+        Ok(Amount::from_sat(
+            self.inner
+                .clone()
+                .fee_amount()
+                .context("The PSBT is missing a TxOut for an input")?,
+        ))
     }
 
     pub fn txid(&self) -> Txid {
@@ -253,7 +263,7 @@ mod tests {
         fn estimated_tx_lock_script_size_never_changes(a in crate::proptest::ecdsa_fun::point(), b in crate::proptest::ecdsa_fun::point()) {
             proptest::prop_assume!(a != b);
 
-            let computed_size = build_shared_output_descriptor(a, b).script_pubkey().len();
+            let computed_size = build_shared_output_descriptor(a, b).unwrap().script_pubkey().len();
 
             assert_eq!(computed_size, SCRIPT_SIZE);
         }
