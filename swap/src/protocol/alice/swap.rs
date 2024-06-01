@@ -1,13 +1,17 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
+use std::time::Duration;
+
 use crate::asb::{EventLoopHandle, LatestRate};
 use crate::bitcoin::ExpiredTimelocks;
 use crate::env::Config;
 use crate::protocol::alice::{AliceState, Swap};
 use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
+use backoff::backoff::Backoff;
+use backoff::ExponentialBackoff;
 use tokio::select;
-use tokio::time::timeout;
+use tokio::time::{sleep, timeout};
 use uuid::Uuid;
 
 pub async fn run<LR>(swap: Swap, rate_service: LR) -> Result<AliceState>
@@ -165,15 +169,37 @@ where
         } => {
             let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
 
-            tokio::select! {
-                result = event_loop_handle.send_transfer_proof(transfer_proof.clone()) => {
-                   result?;
+            // Configure the backoff policy
+            let mut backoff = ExponentialBackoff {
+                initial_interval: Duration::from_secs(1),
+                max_interval: Duration::from_secs(60),
+                max_elapsed_time: None,
+                ..ExponentialBackoff::default()
+            };
 
-                   AliceState::XmrLockTransferProofSent {
-                       monero_wallet_restore_blockheight,
-                       transfer_proof,
-                       state3,
-                   }
+            tokio::select! {
+                result = async {
+                    let mut attempt_result = Err(anyhow::Error::msg("Initial error"));
+                    let transfer_proof_clone = transfer_proof.clone();
+                    let state3_clone = state3.clone();
+        
+                    while let Some(next_backoff) = backoff.next_backoff() {
+                        attempt_result = event_loop_handle.send_transfer_proof(transfer_proof_clone.clone()).await;
+                        if attempt_result.is_ok() {
+                            tracing::info!("Transfer proof sent successfully 8i think)");
+                            break;
+                        } else {
+                            tracing::warn!("Failed to send transfer proof, will retry...");
+                            sleep(next_backoff).await;
+                        }
+                    }
+                    attempt_result.map(|_| AliceState::XmrLockTransferProofSent {
+                        monero_wallet_restore_blockheight,
+                        transfer_proof: transfer_proof_clone,
+                        state3: state3_clone,
+                    })
+                } => {
+                    result?
                 },
                 result = tx_lock_status.wait_until_confirmed_with(state3.cancel_timelock) => {
                     result?;
