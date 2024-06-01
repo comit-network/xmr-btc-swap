@@ -118,12 +118,13 @@ impl EventLoop {
                             }
 
                             if swap_id != self.swap_id {
-
                                 // TODO: Save unexpected transfer proofs in the database and check for messages in the database when handling swaps
                                 tracing::warn!("Received unexpected transfer proof for swap {} while running swap {}. This transfer proof will be ignored", swap_id, self.swap_id);
 
-                                // When receiving a transfer proof that is unexpected we still have to acknowledge that it was received
-                                let _ = self.swarm.behaviour_mut().transfer_proof.send_response(channel, ());
+                                // When receiving a transfer proof that is unexpected we do not want to acknowledge it.
+                                // If we acknowledge it, Alice will think we have received the transfer proof and will not send it again.
+                                // But we haven't processed the transfer proof yet, so we need to wait for Alice to send it again.
+                                // Ideally we would save the transfer proof in the database and check for messages in the database when handling swaps.
                                 continue;
                             }
 
