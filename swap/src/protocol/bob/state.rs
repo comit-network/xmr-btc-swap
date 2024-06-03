@@ -489,12 +489,6 @@ pub struct State4 {
 }
 
 impl State4 {
-    pub fn tx_redeem_encsig(&self) -> bitcoin::EncryptedSignature {
-        let tx_redeem =
-            bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address, self.tx_redeem_fee);
-        self.b.encsign(self.S_a_bitcoin, tx_redeem.digest())
-    }
-
     pub async fn check_for_tx_redeem(
         &self,
         bitcoin_wallet: &bitcoin::Wallet,
@@ -517,6 +511,12 @@ impl State4 {
             tx_lock: self.tx_lock.clone(),
             monero_wallet_restore_blockheight: self.monero_wallet_restore_blockheight,
         })
+    }
+
+    pub fn tx_redeem_encsig(&self) -> bitcoin::EncryptedSignature {
+        let tx_redeem =
+            bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address, self.tx_redeem_fee);
+        self.b.encsign(self.S_a_bitcoin, tx_redeem.digest())
     }
 
     pub async fn watch_for_redeem_btc(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<State5> {
