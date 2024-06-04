@@ -23,3 +23,9 @@ CREATE TABLE if NOT EXISTS peer_addresses
     peer_id     TEXT                NOT NULL,
     address     TEXT                NOT NULL
 );
+
+CREATE TABLE if NOT EXISTS buffered_transfer_proofs
+(
+    swap_id     TEXT    PRIMARY KEY NOT NULL,
+    proof       TEXT                NOT NULL
+);

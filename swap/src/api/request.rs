@@ -376,7 +376,7 @@ impl Request {
                     },
                     result = async {
                         let (event_loop, mut event_loop_handle) =
-                            EventLoop::new(swap_id, swarm, seller_peer_id)?;
+                            EventLoop::new(swap_id, swarm, seller_peer_id, context.db.clone())?;
                         let event_loop = tokio::spawn(event_loop.run().in_current_span());
 
                         let bid_quote = event_loop_handle.request_quote().await?;
@@ -522,7 +522,7 @@ impl Request {
                 }
 
                 let (event_loop, event_loop_handle) =
-                    EventLoop::new(swap_id, swarm, seller_peer_id)?;
+                    EventLoop::new(swap_id, swarm, seller_peer_id, context.db.clone())?;
                 let monero_receive_address = context.db.get_monero_address(swap_id).await?;
                 let swap = Swap::from_db(
                     Arc::clone(&context.db),

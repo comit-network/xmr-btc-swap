@@ -1,10 +1,11 @@
 use crate::bitcoin::{ExpiredTimelocks, TxCancel, TxRefund};
 use crate::cli::EventLoopHandle;
 use crate::network::swap_setup::bob::NewSwap;
-use crate::protocol::bob;
 use crate::protocol::bob::state::*;
+use crate::protocol::{bob, Database};
 use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
+use std::sync::Arc;
 use tokio::select;
 use uuid::Uuid;
 
@@ -34,6 +35,7 @@ pub async fn run_until(
             swap.id,
             current_state.clone(),
             &mut swap.event_loop_handle,
+            swap.db.clone(),
             swap.bitcoin_wallet.as_ref(),
             swap.monero_wallet.as_ref(),
             swap.monero_receive_address,
@@ -52,6 +54,7 @@ async fn next_state(
     swap_id: Uuid,
     state: BobState,
     event_loop_handle: &mut EventLoopHandle,
+    db: Arc<dyn Database + Send + Sync>,
     bitcoin_wallet: &bitcoin::Wallet,
     monero_wallet: &monero::Wallet,
     monero_receive_address: monero::Address,
@@ -118,11 +121,27 @@ async fn next_state(
             let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
 
             if let ExpiredTimelocks::None { .. } = state3.expired_timelock(bitcoin_wallet).await? {
+                tracing::info!("Waiting for Alice to lock Monero");
+
+                let buffered_transfer_proof = db
+                    .get_buffered_transfer_proof(swap_id)
+                    .await
+                    .context("Failed to get buffered transfer proof")?;
+
+                if let Some(transfer_proof) = buffered_transfer_proof {
+                    tracing::debug!(txid = %transfer_proof.tx_hash(), "Found buffered transfer proof");
+                    tracing::info!(txid = %transfer_proof.tx_hash(), "Alice locked Monero");
+
+                    return Ok(BobState::XmrLockProofReceived {
+                        state: state3,
+                        lock_transfer_proof: transfer_proof,
+                        monero_wallet_restore_blockheight,
+                    });
+                }
+
                 let transfer_proof_watcher = event_loop_handle.recv_transfer_proof();
                 let cancel_timelock_expires =
                     tx_lock_status.wait_until_confirmed_with(state3.cancel_timelock);
-
-                tracing::info!("Waiting for Alice to lock Monero");
 
                 select! {
                     transfer_proof = transfer_proof_watcher => {

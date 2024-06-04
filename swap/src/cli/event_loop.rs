@@ -5,6 +5,7 @@ use crate::network::encrypted_signature;
 use crate::network::quote::BidQuote;
 use crate::network::swap_setup::bob::NewSwap;
 use crate::protocol::bob::State2;
+use crate::protocol::Database;
 use anyhow::{Context, Result};
 use futures::future::{BoxFuture, OptionFuture};
 use futures::{FutureExt, StreamExt};
@@ -13,6 +14,7 @@ use libp2p::swarm::dial_opts::DialOpts;
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;
 
@@ -21,6 +23,7 @@ pub struct EventLoop {
     swap_id: Uuid,
     swarm: libp2p::Swarm<Behaviour>,
     alice_peer_id: PeerId,
+    db: Arc<dyn Database + Send + Sync>,
 
     // these streams represents outgoing requests that we have to make
     quote_requests: bmrng::RequestReceiverStream<(), BidQuote>,
@@ -51,6 +54,7 @@ impl EventLoop {
         swap_id: Uuid,
         swarm: Swarm<Behaviour>,
         alice_peer_id: PeerId,
+        db: Arc<dyn Database + Send + Sync>,
     ) -> Result<(Self, EventLoopHandle)> {
         let execution_setup = bmrng::channel_with_timeout(1, Duration::from_secs(60));
         let transfer_proof = bmrng::channel_with_timeout(1, Duration::from_secs(60));
@@ -69,6 +73,7 @@ impl EventLoop {
             inflight_swap_setup: None,
             inflight_encrypted_signature_requests: HashMap::default(),
             pending_transfer_proof: OptionFuture::from(None),
+            db,
         };
 
         let handle = EventLoopHandle {
@@ -118,12 +123,19 @@ impl EventLoop {
                             }
 
                             if swap_id != self.swap_id {
+                                tracing::warn!("Received unexpected transfer proof for swap {} while running swap {}", swap_id, self.swap_id);
 
-                                // TODO: Save unexpected transfer proofs in the database and check for messages in the database when handling swaps
-                                tracing::warn!("Received unexpected transfer proof for swap {} while running swap {}. This transfer proof will be ignored", swap_id, self.swap_id);
+                                // Save transfer proof in the database such that we can process it later when we resume the swap
+                                match self.db.insert_buffered_transfer_proof(swap_id, msg.tx_lock_proof).await {
+                                    Ok(_) => {
+                                        tracing::info!("Saved unexpected transfer proof for swap {}", swap_id);
+                                        let _ = self.swarm.behaviour_mut().transfer_proof.send_response(channel, ());
+                                    }
+                                    Err(e) => {
+                                        tracing::error!("Failed to save unexpected transfer proof for swap {}: {:#}", swap_id, e);
+                                    }
+                                };
 
-                                // When receiving a transfer proof that is unexpected we still have to acknowledge that it was received
-                                let _ = self.swarm.behaviour_mut().transfer_proof.send_response(channel, ());
                                 continue;
                             }
 
