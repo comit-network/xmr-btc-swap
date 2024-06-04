@@ -164,6 +164,7 @@ jobs:
             ensure_same_swap_id,
             concurrent_bobs_before_xmr_lock_proof_sent,
             alice_manually_redeems_after_enc_sig_learned,
+            given_bob_restarts_while_alice_redeems_btc,
           ]
     runs-on: ubuntu-latest
     steps:
