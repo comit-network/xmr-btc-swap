@@ -1,4 +1,4 @@
-use crate::bitcoin::{parse_rpc_error_code, RpcErrorCode, Wallet};
+use crate::bitcoin::{parse_rpc_error_code, ExpiredTimelocks, RpcErrorCode, Wallet};
 use crate::protocol::bob::BobState;
 use crate::protocol::Database;
 use anyhow::{bail, Result};
@@ -11,14 +11,8 @@ pub async fn cancel_and_refund(
     bitcoin_wallet: Arc<Wallet>,
     db: Arc<dyn Database + Send + Sync>,
 ) -> Result<BobState> {
-    match cancel(swap_id, bitcoin_wallet.clone(), db.clone()).await {
-        Ok((_, state @ BobState::BtcPunished { .. })) => {
-            return Ok(state);
-        }
-        Err(err) => {
-            tracing::info!(%err, "Could not submit cancel transaction");
-        }
-        _ => {}
+    if let Err(err) = cancel(swap_id, bitcoin_wallet.clone(), db.clone()).await {
+        tracing::info!(%err, "Could not submit cancel transaction");
     };
 
     let state = match refund(swap_id, bitcoin_wallet, db).await {
@@ -62,35 +56,36 @@ pub async fn cancel(
 
     match state6.submit_tx_cancel(bitcoin_wallet.as_ref()).await {
         Ok((txid, _)) => {
-            let state = BobState::BtcPunished {
-                tx_lock_id: state6.tx_lock_id(),
-            };
+            let state = BobState::BtcCancelled(state6);
             db.insert_latest_state(swap_id, state.clone().into())
                 .await?;
             Ok((txid, state))
         }
         Err(err) => {
             if let Ok(error_code) = parse_rpc_error_code(&err) {
-                tracing::debug!(%error_code, "parse rpc error");
-                if error_code == i64::from(RpcErrorCode::RpcVerifyAlreadyInChain)
-                    || error_code == i64::from(RpcErrorCode::RpcVerifyError)
-                {
-                    let txid = state6
-                        .construct_tx_cancel()
-                        .expect("Error when constructing tx_cancel")
-                        .txid();
-                    let state = BobState::BtcCancelled(state6);
-                    db.insert_latest_state(swap_id, state.clone().into())
-                        .await?;
-                    tracing::info!("Cancel transaction has already been confirmed on chain. The swap has therefore already been cancelled by Alice");
-                    return Ok((txid, state));
+                if error_code == i64::from(RpcErrorCode::RpcVerifyError) {
+                    if let ExpiredTimelocks::None { .. } =
+                        state6.expired_timelock(bitcoin_wallet.as_ref()).await?
+                    {
+                        tracing::debug!(%error_code, "parse rpc error");
+                        tracing::info!("General error trying to submit cancel transaction");
+                    } else {
+                        let txid = state6
+                            .construct_tx_cancel()
+                            .expect("Error when constructing tx_cancel")
+                            .txid();
+                        let state = BobState::BtcCancelled(state6);
+                        db.insert_latest_state(swap_id, state.clone().into())
+                            .await?;
+                        tracing::info!("Cancel transaction has already been confirmed on chain. The swap has therefore already been cancelled by Alice.");
+                        return Ok((txid, state));
+                    }
                 }
             }
             bail!(err);
         }
     }
 }
-
 pub async fn refund(
     swap_id: Uuid,
     bitcoin_wallet: Arc<Wallet>,
@@ -119,8 +114,26 @@ pub async fn refund(
     };
 
     tracing::info!(%swap_id, "Manually refunding swap");
-    state6.publish_refund_btc(bitcoin_wallet.as_ref()).await?;
 
+    match state6.publish_refund_btc(bitcoin_wallet.as_ref()).await {
+        Ok(_) => (),
+        Err(refund_error) => {
+            if refund_error
+                .to_string()
+                .contains("Failed to broadcast Bitcoin refund transaction")
+            {
+                let state = BobState::BtcPunished {
+                    tx_lock_id: state6.tx_lock_id(),
+                };
+                db.insert_latest_state(swap_id, state.clone().into())
+                    .await?;
+
+                tracing::info!("Cannot refund because BTC is punished by Alice.");
+                return Ok(state);
+            }
+            bail!(refund_error);
+        }
+    }
     let state = BobState::BtcRefunded(state6);
     db.insert_latest_state(swap_id, state.clone().into())
         .await?;
