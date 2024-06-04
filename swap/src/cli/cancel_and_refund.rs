@@ -12,7 +12,7 @@ pub async fn cancel_and_refund(
     db: Arc<dyn Database + Send + Sync>,
 ) -> Result<BobState> {
     match cancel(swap_id, bitcoin_wallet.clone(), db.clone()).await {
-        Ok((_, state @ BobState::BtcCancelled { .. })) => {
+        Ok((_, state @ BobState::BtcPunished { .. })) => {
             return Ok(state);
         }
         Err(err) => {
@@ -62,10 +62,12 @@ pub async fn cancel(
 
     match state6.submit_tx_cancel(bitcoin_wallet.as_ref()).await {
         Ok((txid, _)) => {
-            let state = BobState::BtcCancelled(state6);
+            let state = BobState::BtcPunished {
+                tx_lock_id: state6.tx_lock_id(),
+            };
             db.insert_latest_state(swap_id, state.clone().into())
                 .await?;
-            return Ok((txid, state));
+            Ok((txid, state))
         }
         Err(err) => {
             if let Ok(error_code) = parse_rpc_error_code(&err) {
@@ -73,7 +75,10 @@ pub async fn cancel(
                 if error_code == i64::from(RpcErrorCode::RpcVerifyAlreadyInChain)
                     || error_code == i64::from(RpcErrorCode::RpcVerifyError)
                 {
-                    let txid = state6.construct_tx_cancel().unwrap().txid();
+                    let txid = state6
+                        .construct_tx_cancel()
+                        .expect("Error when constructing tx_cancel")
+                        .txid();
                     let state = BobState::BtcCancelled(state6);
                     db.insert_latest_state(swap_id, state.clone().into())
                         .await?;
@@ -83,7 +88,7 @@ pub async fn cancel(
             }
             bail!(err);
         }
-    };
+    }
 }
 
 pub async fn refund(
