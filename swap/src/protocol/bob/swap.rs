@@ -183,6 +183,13 @@ async fn next_state(
             }
         }
         BobState::XmrLocked(state) => {
+            // In case we send the encrypted signature to Alice, but she doesn't give us a confirmation
+            // We need to check if she still published the Bitcoin redeem transaction
+            // Otherwise we risk staying stuck in "XmrLocked"
+            if let Ok(state5) = state.check_for_tx_redeem(bitcoin_wallet).await {
+                return Ok(BobState::BtcRedeemed(state5));
+            }
+
             let tx_lock_status = bitcoin_wallet.subscribe_to(state.tx_lock.clone()).await;
 
             if let ExpiredTimelocks::None { .. } = state.expired_timelock(bitcoin_wallet).await? {
@@ -207,6 +214,13 @@ async fn next_state(
             }
         }
         BobState::EncSigSent(state) => {
+            // We need to make sure that Alice did not publish the redeem transaction while we were offline
+            // Even if the cancel timelock expired, if Alice published the redeem transaction while we were away we cannot miss it
+            // If we do we cannot refund and will never be able to leave the "CancelTimelockExpired" state
+            if let Ok(state5) = state.check_for_tx_redeem(bitcoin_wallet).await {
+                return Ok(BobState::BtcRedeemed(state5));
+            }
+
             let tx_lock_status = bitcoin_wallet.subscribe_to(state.tx_lock.clone()).await;
 
             if let ExpiredTimelocks::None { .. } = state.expired_timelock(bitcoin_wallet).await? {

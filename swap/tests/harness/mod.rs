@@ -996,6 +996,10 @@ pub mod alice_run_until {
     pub fn is_encsig_learned(state: &AliceState) -> bool {
         matches!(state, AliceState::EncSigLearned { .. })
     }
+
+    pub fn is_btc_redeemed(state: &AliceState) -> bool {
+        matches!(state, AliceState::BtcRedeemed { .. })
+    }
 }
 
 pub mod bob_run_until {
