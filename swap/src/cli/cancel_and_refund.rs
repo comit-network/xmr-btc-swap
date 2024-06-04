@@ -12,14 +12,13 @@ pub async fn cancel_and_refund(
     db: Arc<dyn Database + Send + Sync>,
 ) -> Result<BobState> {
     match cancel(swap_id, bitcoin_wallet.clone(), db.clone()).await {
-        Ok((_, state)) => {
-            if matches!(state, BobState::BtcCancelled { .. }) {
-                return Ok(state);
-            }
+        Ok((_, state @ BobState::BtcCancelled {..})) => {
+            return Ok(state);
         }
         Err(err) => {
             tracing::info!(%err, "Could not submit cancel transaction");
         }
+        _ => {}
     };
 
     let state = match refund(swap_id, bitcoin_wallet, db).await {
