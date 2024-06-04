@@ -663,12 +663,8 @@ impl State6 {
 
         Ok(tx)
     }
-
-    pub async fn submit_tx_cancel(
-        &self,
-        bitcoin_wallet: &bitcoin::Wallet,
-    ) -> Result<(Txid, Subscription)> {
-        let transaction = bitcoin::TxCancel::new(
+    pub fn construct_tx_cancel(&self) -> Result<Transaction> {
+        bitcoin::TxCancel::new(
             &self.tx_lock,
             self.cancel_timelock,
             self.A,
@@ -676,7 +672,13 @@ impl State6 {
             self.tx_cancel_fee,
         )?
         .complete_as_bob(self.A, self.b.clone(), self.tx_cancel_sig_a.clone())
-        .context("Failed to complete Bitcoin cancel transaction")?;
+        .context("Failed to complete Bitcoin cancel transaction")
+    }
+    pub async fn submit_tx_cancel(
+        &self,
+        bitcoin_wallet: &bitcoin::Wallet,
+    ) -> Result<(Txid, Subscription)> {
+        let transaction = self.construct_tx_cancel()?;
 
         let (tx_id, subscription) = bitcoin_wallet.broadcast(transaction, "cancel").await?;
 
