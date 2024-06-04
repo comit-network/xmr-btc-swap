@@ -1,10 +1,10 @@
 pub mod harness;
 
-use tokio::join;
+use crate::harness::bob_run_until::is_encsig_sent;
 use swap::asb::FixedRate;
-use swap::protocol::{alice, bob};
 use swap::protocol::bob::BobState;
-use crate::harness::bob_run_until::{is_encsig_sent};
+use swap::protocol::{alice, bob};
+use tokio::join;
 
 #[tokio::test]
 async fn given_bob_restarts_while_alice_redeems_btc() {
@@ -21,9 +21,8 @@ async fn given_bob_restarts_while_alice_redeems_btc() {
         ctx.assert_alice_redeemed(alice_state??).await;
         assert!(matches!(bob_state??, BobState::EncSigSent { .. }));
 
-        
         let (bob_swap, _) = ctx.stop_and_resume_bob_from_db(bob_handle, swap_id).await;
-        
+
         if let BobState::EncSigSent(state4) = bob_swap.state.clone() {
             bob_swap
                 .bitcoin_wallet
@@ -34,7 +33,7 @@ async fn given_bob_restarts_while_alice_redeems_btc() {
         } else {
             panic!("Bob in unexpected state {}", bob_swap.state);
         }
-        
+
         // Restart Bob
         let bob_state = bob::run(bob_swap).await?;
         ctx.assert_bob_redeemed(bob_state).await;

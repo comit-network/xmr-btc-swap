@@ -489,10 +489,7 @@ pub struct State4 {
 }
 
 impl State4 {
-    pub async fn check_for_tx_redeem(
-        &self,
-        bitcoin_wallet: &bitcoin::Wallet,
-    ) -> Result<State5> {
+    pub async fn check_for_tx_redeem(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<State5> {
         let tx_redeem =
             bitcoin::TxRedeem::new(&self.tx_lock, &self.redeem_address, self.tx_redeem_fee);
         let tx_redeem_encsig = self.b.encsign(self.S_a_bitcoin, tx_redeem.digest());
