@@ -117,21 +117,25 @@ pub async fn refund(
 
     match state6.publish_refund_btc(bitcoin_wallet.as_ref()).await {
         Ok(_) => (),
-        Err(refund_error) => {
-            if refund_error
-                .to_string()
-                .contains("Failed to broadcast Bitcoin refund transaction")
-            {
-                let state = BobState::BtcPunished {
-                    tx_lock_id: state6.tx_lock_id(),
-                };
-                db.insert_latest_state(swap_id, state.clone().into())
-                    .await?;
+        Err(error) => {
+            if let Ok(error_code) = parse_rpc_error_code(&error) {
+                if error_code == i64::from(RpcErrorCode::RpcVerifyError) {
+                    if let ExpiredTimelocks::None { .. } =
+                        state6.expired_timelock(bitcoin_wallet.as_ref()).await?
+                    {
+                        bail!(error);
+                    } else {
+                        let state = BobState::BtcPunished {
+                            tx_lock_id: state6.tx_lock_id(),
+                        };
+                        db.insert_latest_state(swap_id, state.clone().into())
+                            .await?;
 
-                tracing::info!("Cannot refund because BTC is punished by Alice.");
-                return Ok(state);
+                        tracing::info!("Cannot refund because BTC is punished by Alice.");
+                        return Ok(state);
+                    }
+                }
             }
-            bail!(refund_error);
         }
     }
     let state = BobState::BtcRefunded(state6);
