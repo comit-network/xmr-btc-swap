@@ -663,7 +663,7 @@ impl State6 {
 
         Ok(tx)
     }
-    pub fn construct_tx_cancel(&self) -> Result<Transaction> {
+    pub fn construct_tx_cancel(&self) -> Result<Transaction> { // Just construct the tx_cancel without broadcasting.
         bitcoin::TxCancel::new(
             &self.tx_lock,
             self.cancel_timelock,
