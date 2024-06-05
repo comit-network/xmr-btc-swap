@@ -20,6 +20,20 @@ use sha2::Sha256;
 use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQProof;
 use std::fmt;
 use uuid::Uuid;
+#[derive(Debug)]
+pub struct BtcCancelledByAlice;
+impl std::fmt::Display for BtcCancelledByAlice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Cancel transaction has already been confirmed on chain. The swap has therefore already been cancelled by Alice.")
+    }
+}
+#[derive(Debug)]
+pub struct BtcPunishedWhileRefundError;
+impl std::fmt::Display for BtcPunishedWhileRefundError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Cannot refund because BTC is punished.")
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum BobState {
@@ -663,6 +677,7 @@ impl State6 {
 
         Ok(tx)
     }
+
     pub fn construct_tx_cancel(&self) -> Result<Transaction> {
         bitcoin::TxCancel::new(
             &self.tx_lock,
@@ -674,24 +689,51 @@ impl State6 {
         .complete_as_bob(self.A, self.b.clone(), self.tx_cancel_sig_a.clone())
         .context("Failed to complete Bitcoin cancel transaction")
     }
+    pub fn print_type_of<T>(&self, _: &T) {
+        tracing::debug!("{}", std::any::type_name::<T>())
+    }
     pub async fn submit_tx_cancel(
         &self,
         bitcoin_wallet: &bitcoin::Wallet,
     ) -> Result<(Txid, Subscription)> {
         let transaction = self.construct_tx_cancel()?;
-
-        let (tx_id, subscription) = bitcoin_wallet.broadcast(transaction, "cancel").await?;
-
-        Ok((tx_id, subscription))
+        match bitcoin_wallet.broadcast(transaction, "cancel").await {
+            Ok((txid, subscription)) => Ok((txid, subscription)),
+            Err(error) => {
+                match error.downcast_ref::<bdk::Error>() {
+                        Some(bdk::Error::Electrum(bdk::electrum_client::Error::Protocol(serde_json::Value::String(ref protocol_error))))
+                            // UTXO is already spent, swap timeout.
+                            if protocol_error.contains("bad-txns-inputs-missingorspent") =>
+                        {
+                            return Err(anyhow!(BtcCancelledByAlice));
+                        }
+                       _ => {
+                        Err(error)
+                       }
+                    }
+            }
+        }
     }
 
     pub async fn publish_refund_btc(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<()> {
         let signed_tx_refund = self.signed_refund_transaction()?;
-        bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
 
-        Ok(())
+        match bitcoin_wallet.broadcast(signed_tx_refund, "refund").await {
+            Ok((_, _)) => Ok(()),
+            Err(error) => {
+                match error.downcast_ref::<bdk::Error>() {
+                    Some(bdk::Error::Electrum(bdk::electrum_client::Error::Protocol(serde_json::Value::String(ref protocol_error))))
+                        if protocol_error.contains("bad-txns-inputs-missingorspent") =>
+                    {
+                        return Err(anyhow!(BtcPunishedWhileRefundError));
+                    }
+                   _ => {
+                    Err(error)
+                   }
+                }
+            }
+        }
     }
-
     pub fn signed_refund_transaction(&self) -> Result<Transaction> {
         let tx_cancel = bitcoin::TxCancel::new(
             &self.tx_lock,
