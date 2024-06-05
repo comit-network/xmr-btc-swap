@@ -131,7 +131,7 @@ pub async fn refund(
                     {
                         let state = BobState::BtcPunished {
                             tx_lock_id: state6.tx_lock_id(),
-                        }; // Set state to punished.
+                        }; // Set state to punished, because timelock expired and in punished state.
                         db.insert_latest_state(swap_id, state.clone().into())
                             .await?;
 
