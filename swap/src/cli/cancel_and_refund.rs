@@ -1,5 +1,5 @@
 use crate::bitcoin::{parse_rpc_error_code, RpcErrorCode, Wallet};
-use crate::protocol::bob::{BobState, BtcCancelledByAlice, BtcPunishedWhileRefundError};
+use crate::protocol::bob::BobState;
 use crate::protocol::Database;
 use anyhow::{bail, Result};
 use bitcoin::Txid;
@@ -16,11 +16,12 @@ pub async fn cancel_and_refund(
     };
 
     let state = match refund(swap_id, bitcoin_wallet, db).await {
-        Ok(s) => s,
+        Ok(s) => {
+            tracing::info!("Refund transaction submitted");
+            s
+        }
         Err(e) => bail!(e),
     };
-
-    tracing::info!("Refund transaction submitted");
     Ok(state)
 }
 
@@ -64,21 +65,24 @@ pub async fn cancel(
         Err(err) => {
             if let Ok(error_code) = parse_rpc_error_code(&err) {
                 if error_code == i64::from(RpcErrorCode::RpcVerifyError) {
-                    tracing::debug!(%error_code, "parse rpc error");
-                    tracing::info!("General error trying to submit cancel transaction");
-                } else if error_code == i64::from(RpcErrorCode::RpcVerifyAlreadyInChain) {
-                    tracing::info!("Cancel transaction has already been confirmed on chain");
+                    if err
+                        .to_string()
+                        .contains("Failed to broadcast Bitcoin refund transaction")
+                    {
+                        let txid = state6
+                            .construct_tx_cancel()
+                            .expect("Error when constructing tx_cancel")
+                            .txid();
+                        let state = BobState::BtcCancelled(state6);
+                        db.insert_latest_state(swap_id, state.clone().into())
+                            .await?;
+                        tracing::info!("Cancel transaction has already been confirmed on chain. The swap has therefore already been cancelled by Alice.");
+                        return Ok((txid, state));
+                    } else {
+                        tracing::debug!(%error_code, "parse rpc error");
+                        tracing::info!("General error trying to submit cancel transaction");
+                    }
                 }
-            } else if let Some(error) = err.downcast_ref::<BtcCancelledByAlice>() {
-                let txid = state6
-                    .construct_tx_cancel()
-                    .expect("Error when constructing tx_cancel")
-                    .txid();
-                let state = BobState::BtcCancelled(state6);
-                db.insert_latest_state(swap_id, state.clone().into())
-                    .await?;
-                tracing::info!(%error);
-                return Ok((txid, state));
             }
             bail!(err);
         }
@@ -112,24 +116,29 @@ pub async fn refund(
     };
 
     tracing::info!(%swap_id, "Manually refunding swap");
+
     match state6.publish_refund_btc(bitcoin_wallet.as_ref()).await {
-        Ok(()) => {
-            let state = BobState::BtcRefunded(state6);
-            db.insert_latest_state(swap_id, state.clone().into())
-                .await?;
-            Ok(state)
-        }
-        Err(error) => {
-            if let Some(error) = error.downcast_ref::<BtcPunishedWhileRefundError>() {
-                tracing::info!(%error);
+        Ok(_) => (),
+        Err(refund_error) => {
+            if refund_error
+                .to_string()
+                .contains("Failed to broadcast Bitcoin refund transaction")
+            {
                 let state = BobState::BtcPunished {
                     tx_lock_id: state6.tx_lock_id(),
                 };
                 db.insert_latest_state(swap_id, state.clone().into())
                     .await?;
+
+                tracing::info!("Cannot refund because BTC is punished by Alice.");
                 return Ok(state);
             }
-            bail!(error);
+            bail!(refund_error);
         }
     }
+    let state = BobState::BtcRefunded(state6);
+    db.insert_latest_state(swap_id, state.clone().into())
+        .await?;
+
+    Ok(state)
 }
