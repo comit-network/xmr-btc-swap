@@ -19,8 +19,9 @@ pub async fn cancel_and_refund(
         Ok(s) => s,
         Err(e) => bail!(e),
     };
-
-    tracing::info!("Refund transaction submitted");
+    if matches!(state, BobState::BtcRefunded { .. }) {
+        tracing::info!("Refund transaction submitted");
+    }
     Ok(state)
 }
 
