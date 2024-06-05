@@ -19,7 +19,8 @@ pub async fn cancel_and_refund(
         Ok(s) => s,
         Err(e) => bail!(e),
     };
-    if matches!(state, BobState::BtcRefunded { .. }) { //Print success message only if refund succeeded.
+    if matches!(state, BobState::BtcRefunded { .. }) {
+        //Print success message only if refund succeeded.
         tracing::info!("Refund transaction submitted");
     }
     Ok(state)
@@ -65,14 +66,16 @@ pub async fn cancel(
         Err(err) => {
             if let Ok(error_code) = parse_rpc_error_code(&err) {
                 if error_code == i64::from(RpcErrorCode::RpcVerifyError) {
-                    if let ExpiredTimelocks::None { .. } = // Check if timelock haven't expired.
-                        state6.expired_timelock(bitcoin_wallet.as_ref()).await? 
+                    if let ExpiredTimelocks::None { .. } = // Check if timelock hasn't expired.
+                        state6.expired_timelock(bitcoin_wallet.as_ref()).await?
                     {
                         tracing::debug!(%error_code, "parse rpc error");
                         tracing::info!("General error trying to submit cancel transaction");
-                    } else { // Timelock expired and network rejected tx_cancel, so we are out-of-sync with Alice. (I assume that there's no other states under these conditions, am I right?)
+                    } else {
+                        // Timelock expired and network rejected tx_cancel, so we are out-of-sync with Alice. (I assume that there's no other states under these conditions, am I right?)
                         let txid = state6
-                            .construct_tx_cancel() // Construct tx_cancel without broadcasting to the network, because swap has already been cancelled by Alice.
+                            // Construct tx_cancel without broadcasting to the network, because swap has already been cancelled by Alice.
+                            .construct_tx_cancel()
                             .expect("Error when constructing tx_cancel")
                             .txid();
                         let state = BobState::BtcCancelled(state6); // Set state to cancelled to sync with Alice.
@@ -121,11 +124,13 @@ pub async fn refund(
         Err(error) => {
             if let Ok(error_code) = parse_rpc_error_code(&error) {
                 if error_code == i64::from(RpcErrorCode::RpcVerifyError) {
-                    if let ExpiredTimelocks::None { .. } = // Check if timelock haven't expired.
+                     // Check if timelock hasn't expired.
+                    if let ExpiredTimelocks::None { .. } =
                         state6.expired_timelock(bitcoin_wallet.as_ref()).await?
                     {
                         bail!(error);
-                    } else {  // Timelock expired and network rejected refund, so we are out-of-sync with Alice. (I assume that there's no other states under these conditions, am I right?)
+                        // Timelock expired and network rejected refund, so we are out-of-sync with Alice. (I assume that there's no other states under these conditions, am I right?)
+                    } else { 
                         let state = BobState::BtcPunished {
                             tx_lock_id: state6.tx_lock_id(),
                         }; // Set state to punished.
