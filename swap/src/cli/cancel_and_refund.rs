@@ -1,4 +1,4 @@
-use crate::bitcoin::{parse_rpc_error_code, RpcErrorCode, Wallet};
+use crate::bitcoin::{parse_rpc_error_code, ExpiredTimelocks, RpcErrorCode, Wallet};
 use crate::protocol::bob::BobState;
 use crate::protocol::Database;
 use anyhow::{bail, Result};
@@ -16,12 +16,11 @@ pub async fn cancel_and_refund(
     };
 
     let state = match refund(swap_id, bitcoin_wallet, db).await {
-        Ok(s) => {
-            tracing::info!("Refund transaction submitted");
-            s
-        }
+        Ok(s) => s,
         Err(e) => bail!(e),
     };
+
+    tracing::info!("Refund transaction submitted");
     Ok(state)
 }
 
@@ -65,10 +64,12 @@ pub async fn cancel(
         Err(err) => {
             if let Ok(error_code) = parse_rpc_error_code(&err) {
                 if error_code == i64::from(RpcErrorCode::RpcVerifyError) {
-                    if err
-                        .to_string()
-                        .contains("Failed to broadcast Bitcoin refund transaction")
+                    if let ExpiredTimelocks::None { .. } =
+                        state6.expired_timelock(bitcoin_wallet.as_ref()).await?
                     {
+                        tracing::debug!(%error_code, "parse rpc error");
+                        tracing::info!("General error trying to submit cancel transaction");
+                    } else {
                         let txid = state6
                             .construct_tx_cancel()
                             .expect("Error when constructing tx_cancel")
@@ -78,9 +79,6 @@ pub async fn cancel(
                             .await?;
                         tracing::info!("Cancel transaction has already been confirmed on chain. The swap has therefore already been cancelled by Alice.");
                         return Ok((txid, state));
-                    } else {
-                        tracing::debug!(%error_code, "parse rpc error");
-                        tracing::info!("General error trying to submit cancel transaction");
                     }
                 }
             }
