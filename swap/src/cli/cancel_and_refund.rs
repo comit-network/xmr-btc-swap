@@ -19,7 +19,7 @@ pub async fn cancel_and_refund(
         Ok(s) => s,
         Err(e) => bail!(e),
     };
-    if matches!(state, BobState::BtcRefunded { .. }) {
+    if matches!(state, BobState::BtcRefunded { .. }) { //Print success message only if refund succeeded.
         tracing::info!("Refund transaction submitted");
     }
     Ok(state)
@@ -65,17 +65,17 @@ pub async fn cancel(
         Err(err) => {
             if let Ok(error_code) = parse_rpc_error_code(&err) {
                 if error_code == i64::from(RpcErrorCode::RpcVerifyError) {
-                    if let ExpiredTimelocks::None { .. } =
-                        state6.expired_timelock(bitcoin_wallet.as_ref()).await?
+                    if let ExpiredTimelocks::None { .. } = // Check if timelock haven't expired.
+                        state6.expired_timelock(bitcoin_wallet.as_ref()).await? 
                     {
                         tracing::debug!(%error_code, "parse rpc error");
                         tracing::info!("General error trying to submit cancel transaction");
-                    } else {
+                    } else { // Timelock expired and network rejected tx_cancel, so we are out-of-sync with Alice. (I assume that there's no other states under these conditions, am I right?)
                         let txid = state6
-                            .construct_tx_cancel()
+                            .construct_tx_cancel() // Construct tx_cancel without broadcasting to the network, because swap has already been cancelled by Alice.
                             .expect("Error when constructing tx_cancel")
                             .txid();
-                        let state = BobState::BtcCancelled(state6);
+                        let state = BobState::BtcCancelled(state6); // Set state to cancelled to sync with Alice.
                         db.insert_latest_state(swap_id, state.clone().into())
                             .await?;
                         tracing::info!("Cancel transaction has already been confirmed on chain. The swap has therefore already been cancelled by Alice.");
@@ -121,14 +121,14 @@ pub async fn refund(
         Err(error) => {
             if let Ok(error_code) = parse_rpc_error_code(&error) {
                 if error_code == i64::from(RpcErrorCode::RpcVerifyError) {
-                    if let ExpiredTimelocks::None { .. } =
+                    if let ExpiredTimelocks::None { .. } = // Check if timelock haven't expired.
                         state6.expired_timelock(bitcoin_wallet.as_ref()).await?
                     {
                         bail!(error);
-                    } else {
+                    } else {  // Timelock expired and network rejected refund, so we are out-of-sync with Alice. (I assume that there's no other states under these conditions, am I right?)
                         let state = BobState::BtcPunished {
                             tx_lock_id: state6.tx_lock_id(),
-                        };
+                        }; // Set state to punished.
                         db.insert_latest_state(swap_id, state.clone().into())
                             .await?;
 
@@ -137,6 +137,7 @@ pub async fn refund(
                     }
                 }
             }
+            bail!(error);
         }
     }
     let state = BobState::BtcRefunded(state6);
