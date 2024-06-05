@@ -124,13 +124,13 @@ pub async fn refund(
         Err(error) => {
             if let Ok(error_code) = parse_rpc_error_code(&error) {
                 if error_code == i64::from(RpcErrorCode::RpcVerifyError) {
-                     // Check if timelock hasn't expired.
+                    // Check if timelock hasn't expired.
                     if let ExpiredTimelocks::None { .. } =
                         state6.expired_timelock(bitcoin_wallet.as_ref()).await?
                     {
                         bail!(error);
                         // Timelock expired and network rejected refund, so we are out-of-sync with Alice. (I assume that there's no other states under these conditions, am I right?)
-                    } else { 
+                    } else {
                         let state = BobState::BtcPunished {
                             tx_lock_id: state6.tx_lock_id(),
                         }; // Set state to punished.
