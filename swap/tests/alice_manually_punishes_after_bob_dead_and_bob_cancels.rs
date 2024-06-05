@@ -76,7 +76,7 @@ async fn alice_manually_punishes_after_bob_dead_and_bob_cancels() {
 
         let state =
             cli::cancel_and_refund(bob_swap_id, bob_swap.bitcoin_wallet, bob_swap.db).await?;
-        assert!(matches!(state, BobState::BtcPunished { .. })); 
+        assert!(matches!(state, BobState::BtcPunished { .. }));
         Ok(())
     })
     .await;
