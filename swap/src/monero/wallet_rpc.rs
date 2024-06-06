@@ -369,7 +369,7 @@ impl WalletRpc {
         }
 
         // If we do not hear from the monero_wallet_rpc process for 3 seconds we assume
-        // it is is ready
+        // it is ready
         #[cfg(target_os = "windows")]
         while let Ok(line) =
             tokio::time::timeout(std::time::Duration::from_secs(3), reader.next_line()).await

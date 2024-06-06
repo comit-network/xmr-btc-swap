@@ -258,7 +258,7 @@ async fn next_state(
                 // might not be able to ever transfer the Monero.
                 tracing::warn!("Failed to generate monero wallet from keys: {:#}", e);
                 tracing::info!(%wallet_file_name,
-                    "Falling back to trying to open the the wallet if it already exists",
+                    "Falling back to trying to open the wallet if it already exists",
                 );
                 monero_wallet.open(wallet_file_name).await?;
             }
