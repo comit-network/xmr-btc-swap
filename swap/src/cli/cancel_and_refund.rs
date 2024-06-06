@@ -1,4 +1,4 @@
-use crate::bitcoin::{parse_rpc_error_code, ExpiredTimelocks, RpcErrorCode, Wallet};
+use crate::bitcoin::{parse_rpc_error_code, RpcErrorCode, Wallet};
 use crate::protocol::bob::BobState;
 use crate::protocol::Database;
 use anyhow::{bail, Result};
@@ -65,26 +65,27 @@ pub async fn cancel(
             Ok((txid, state))
         }
         Err(err) => {
+            if state6
+                .check_for_tx_cancel(bitcoin_wallet.as_ref())
+                .await
+                .is_ok()
+            {
+                // Alice already cancelled, so we are out-of-sync with Alice.
+                let txid = state6
+                    // Construct tx_cancel without broadcasting to the network, because swap has already been cancelled by Alice.
+                    .construct_tx_cancel()
+                    .expect("Error when constructing tx_cancel")
+                    .txid();
+                let state = BobState::BtcCancelled(state6); // Set state to cancelled to sync with Alice.
+                db.insert_latest_state(swap_id, state.clone().into())
+                    .await?;
+                tracing::info!("Cancel transaction has already been confirmed on chain. The swap has therefore already been cancelled by Alice.");
+                return Ok((txid, state));
+            }
             if let Ok(error_code) = parse_rpc_error_code(&err) {
                 if error_code == i64::from(RpcErrorCode::RpcVerifyError) {
-                    if let ExpiredTimelocks::Punish { .. } = // Check if timelock is punished.
-                        state6.expired_timelock(bitcoin_wallet.as_ref()).await?
-                    {
-                        // Timelock expired and network rejected tx_cancel, so we are out-of-sync with Alice. (Assuming that there's no other possible states under these conditions)
-                        let txid = state6
-                            // Construct tx_cancel without broadcasting to the network, because swap has already been cancelled by Alice.
-                            .construct_tx_cancel()
-                            .expect("Error when constructing tx_cancel")
-                            .txid();
-                        let state = BobState::BtcCancelled(state6); // Set state to cancelled to sync with Alice.
-                        db.insert_latest_state(swap_id, state.clone().into())
-                            .await?;
-                        tracing::info!("Cancel transaction has already been confirmed on chain. The swap has therefore already been cancelled by Alice.");
-                        return Ok((txid, state));
-                    } else {
-                        tracing::debug!(%error_code, "parse rpc error");
-                        tracing::info!("General error trying to submit cancel transaction");
-                    }
+                    tracing::debug!(%error_code, "parse rpc error");
+                    tracing::info!("General error trying to submit cancel transaction");
                 }
             }
             bail!(err);
@@ -121,32 +122,31 @@ pub async fn refund(
     tracing::info!(%swap_id, "Manually refunding swap");
 
     match state6.publish_refund_btc(bitcoin_wallet.as_ref()).await {
-        Ok(_) => (),
-        Err(error) => {
-            if let Ok(error_code) = parse_rpc_error_code(&error) {
-                if error_code == i64::from(RpcErrorCode::RpcVerifyError) {
-                    // Check if timelock expired.
-                    if let ExpiredTimelocks::Punish { .. } =
-                        state6.expired_timelock(bitcoin_wallet.as_ref()).await?
-                    {
-                        // Timelock expired and network rejected refund, so we are out-of-sync with Alice and punished. (Assuming that there's no other possible states under these conditions)
-                        let state = BobState::BtcPunished {
-                            tx_lock_id: state6.tx_lock_id(),
-                        };
-                        db.insert_latest_state(swap_id, state.clone().into())
-                            .await?;
+        Ok(_) => {
+            let state = BobState::BtcRefunded(state6);
+            db.insert_latest_state(swap_id, state.clone().into())
+                .await?;
 
-                        tracing::info!("Cannot refund because BTC is punished by Alice.");
-                        return Ok(state);
-                    }
-                }
+            Ok(state)
+        }
+        Err(error) => {
+            if state6
+                .check_for_tx_punish(bitcoin_wallet.as_ref())
+                .await
+                .is_ok()
+            {
+                // Alice already punished us, so we are out-of-sync with Alice and should set our state to the BtcPunished.
+                tracing::debug!("we are punished");
+                let state = BobState::BtcPunished {
+                    tx_lock_id: state6.tx_lock_id(),
+                };
+                db.insert_latest_state(swap_id, state.clone().into())
+                    .await?;
+
+                tracing::info!("Cannot refund because BTC is punished by Alice.");
+                return Ok(state);
             }
             bail!(error);
         }
     }
-    let state = BobState::BtcRefunded(state6);
-    db.insert_latest_state(swap_id, state.clone().into())
-        .await?;
-
-    Ok(state)
 }
