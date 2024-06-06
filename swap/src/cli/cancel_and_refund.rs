@@ -65,22 +65,13 @@ pub async fn cancel(
             Ok((txid, state))
         }
         Err(err) => {
-            if state6
-                .check_for_tx_cancel(bitcoin_wallet.as_ref())
-                .await
-                .is_ok()
-            {
+            if let Ok(tx) = state6.check_for_tx_cancel(bitcoin_wallet.as_ref()).await {
                 // Alice already cancelled, so we are out-of-sync with Alice.
-                let txid = state6
-                    // Construct tx_cancel without broadcasting to the network, because swap has already been cancelled by Alice.
-                    .construct_tx_cancel()
-                    .expect("Error when constructing tx_cancel")
-                    .txid();
                 let state = BobState::BtcCancelled(state6); // Set state to cancelled to sync with Alice.
                 db.insert_latest_state(swap_id, state.clone().into())
                     .await?;
                 tracing::info!("Cancel transaction has already been confirmed on chain. The swap has therefore already been cancelled by Alice.");
-                return Ok((txid, state));
+                return Ok((tx.txid(), state));
             }
             if let Ok(error_code) = parse_rpc_error_code(&err) {
                 tracing::debug!(%error_code, "parse rpc error");
