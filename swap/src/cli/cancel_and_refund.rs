@@ -83,6 +83,7 @@ pub async fn cancel(
                 return Ok((txid, state));
             }
             if let Ok(error_code) = parse_rpc_error_code(&err) {
+                tracing::debug!(%error_code, "parse rpc error");
                 if error_code == i64::from(RpcErrorCode::RpcVerifyAlreadyInChain) {
                     tracing::info!("Cancel transaction has already been confirmed on chain");
                 } else if error_code == i64::from(RpcErrorCode::RpcVerifyError) {
