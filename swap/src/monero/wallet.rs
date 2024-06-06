@@ -280,7 +280,7 @@ impl Wallet {
 
                     // We would not want to fail here if the height is not available
                     // as it is not critical for the operation of the wallet.
-                    // We can just log the error and continue.
+                    // We can just log a warning and continue.
                     let height = match self.inner.lock().await.get_height().await {
                         Ok(height) => height.to_string(),
                         Err(_) => {
