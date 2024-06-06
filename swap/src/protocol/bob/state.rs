@@ -680,7 +680,7 @@ impl State6 {
 
         Ok(tx)
     }
-    // Check if tx_punish already exists.
+
     pub async fn check_for_tx_punish(
         &self,
         bitcoin_wallet: &bitcoin::Wallet,
