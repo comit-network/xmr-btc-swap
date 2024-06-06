@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- CLI: Buffer received transfer proofs for later processing if we're currently running a different swap
+
 ## [0.13.0] - 2024-05-29
 
 - Minimum Supported Rust Version (MSRV) bumped to 1.74
