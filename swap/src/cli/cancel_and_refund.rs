@@ -138,7 +138,6 @@ pub async fn refund(
                 .is_ok()
             {
                 // Alice already punished us, so we are out-of-sync with Alice and should set our state to the BtcPunished.
-                tracing::debug!("we are punished");
                 let state = BobState::BtcPunished {
                     tx_lock_id: state6.tx_lock_id(),
                 };
