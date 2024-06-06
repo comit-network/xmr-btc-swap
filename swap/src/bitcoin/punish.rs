@@ -44,7 +44,9 @@ impl TxPunish {
             watch_script: punish_address.script_pubkey(),
         }
     }
-
+    pub fn txid(&self) -> Txid {
+        self.inner.txid()
+    }
     pub fn digest(&self) -> Sighash {
         self.digest
     }

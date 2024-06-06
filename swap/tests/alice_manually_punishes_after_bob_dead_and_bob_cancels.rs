@@ -70,12 +70,21 @@ async fn alice_manually_punishes_after_bob_dead_and_bob_cancels() {
             asb::punish(alice_swap.swap_id, alice_swap.bitcoin_wallet, alice_swap.db).await?;
         ctx.assert_alice_punished(alice_state).await;
 
-        let (bob_swap, _) = ctx
+        let (bob_swap, bob_join_handle) = ctx
             .stop_and_resume_bob_from_db(bob_join_handle, bob_swap_id)
             .await;
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. })); // Bob is out of sync with Alice.
-        let state =
-            cli::cancel_and_refund(bob_swap_id, bob_swap.bitcoin_wallet, bob_swap.db).await?; // Bob tries to cancel and refund.
+        bob_join_handle.abort();
+
+        let (_, state) = cli::cancel(bob_swap_id, bob_swap.bitcoin_wallet, bob_swap.db).await?;
+        assert!(matches!(state, BobState::BtcCancelled { .. }));
+
+        let (bob_swap, _) = ctx
+            .stop_and_resume_bob_from_db(bob_join_handle, bob_swap_id)
+            .await;
+        assert!(matches!(bob_swap.state, BobState::BtcCancelled { .. }));
+
+        let state = cli::refund(bob_swap_id, bob_swap.bitcoin_wallet, bob_swap.db).await?; // Bob tries to refund.
         ctx.assert_bob_punished(state).await; // Bob should be in punished state now. (PR #1668 adds that behaviour.)
         Ok(())
     })
