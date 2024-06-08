@@ -1,6 +1,6 @@
 use crate::bitcoin::{parse_rpc_error_code, RpcErrorCode, Wallet};
 use crate::protocol::bob::BobState;
-use crate::protocol::Database;
+use crate::protocol::{Database, State};
 use anyhow::{bail, Result};
 use bitcoin::Txid;
 use std::sync::Arc;
@@ -123,7 +123,19 @@ pub async fn refund(
             Ok(state)
         }
         Err(error) => {
-            if state6
+            let state3 = db
+            .get_states(swap_id)
+            .await?
+            .iter()
+            .find_map(|state| {
+                if let State::Bob(BobState::BtcLocked { state3, .. }) = state {
+                    Some(state3.clone())
+                    } else {
+                        None
+                    }
+            });
+            if state3
+                .expect("Error: weren't able to extract State3 from database.")
                 .check_for_tx_punish(bitcoin_wallet.as_ref())
                 .await
                 .is_ok()
