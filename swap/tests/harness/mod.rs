@@ -1020,6 +1020,10 @@ pub mod bob_run_until {
     pub fn is_encsig_sent(state: &BobState) -> bool {
         matches!(state, BobState::EncSigSent(..))
     }
+
+    pub fn is_btc_punished(state: &BobState) -> bool {
+        matches!(state, BobState::BtcPunished { .. })
+    }
 }
 
 pub struct SlowCancelConfig;
