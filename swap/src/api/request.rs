@@ -288,6 +288,7 @@ impl Request {
                     BobState::BtcPunished { .. } => Some(Ok(ExpiredTimelocks::Punish)),
                     BobState::BtcRefunded(_)
                     | BobState::BtcRedeemed(_)
+                    | BobState::BtcPunishedCooperativeRefundFailed(_)
                     | BobState::XmrRedeemed { .. } => None,
                 };
 

@@ -48,6 +48,10 @@ pub enum BobState {
         tx_lock_id: bitcoin::Txid,
     },
     BtcPunished {
+        state: State6,
+        tx_lock_id: bitcoin::Txid,
+    },
+    BtcPunishedCooperativeRefundFailed {
         tx_lock_id: bitcoin::Txid,
     },
     SafelyAborted,
@@ -70,6 +74,9 @@ impl fmt::Display for BobState {
             BobState::BtcRefunded(..) => write!(f, "btc is refunded"),
             BobState::XmrRedeemed { .. } => write!(f, "xmr is redeemed"),
             BobState::BtcPunished { .. } => write!(f, "btc is punished"),
+            BobState::BtcPunishedCooperativeRefundFailed { .. } => {
+                write!(f, "btc is punished and cooperative refund failed")
+            }
             BobState::SafelyAborted => write!(f, "safely aborted"),
         }
     }
@@ -426,6 +433,8 @@ impl State3 {
             A: self.A,
             b: self.b.clone(),
             s_b: self.s_b,
+            v: self.v,
+            monero_wallet_restore_blockheight,
             cancel_timelock: self.cancel_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: self.refund_address.clone(),
@@ -571,6 +580,8 @@ impl State4 {
             A: self.A,
             b: self.b,
             s_b: self.s_b,
+            v: self.v,
+            monero_wallet_restore_blockheight: self.monero_wallet_restore_blockheight,
             cancel_timelock: self.cancel_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: self.refund_address,
@@ -611,6 +622,8 @@ pub struct State6 {
     A: bitcoin::PublicKey,
     b: bitcoin::SecretKey,
     s_b: monero::Scalar,
+    v: monero::PrivateViewKey,
+    monero_wallet_restore_blockheight: BlockHeight,
     cancel_timelock: CancelTimelock,
     punish_timelock: PunishTimelock,
     refund_address: bitcoin::Address,
@@ -715,4 +728,15 @@ impl State6 {
     pub fn tx_lock_id(&self) -> bitcoin::Txid {
         self.tx_lock.txid()
     }
+
+    pub fn xmr_keys(
+        &self,
+        s_a: monero::PrivateKey,
+    ) -> (monero::PrivateKey, monero::PrivateViewKey) {
+        let s_b = dbg!(monero::PrivateKey { scalar: self.s_b });
+        let s = s_a + s_b;
+
+        (s, self.v)
+    }
+
 }

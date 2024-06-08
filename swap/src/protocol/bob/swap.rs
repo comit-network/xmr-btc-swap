@@ -13,7 +13,7 @@ pub fn is_complete(state: &BobState) -> bool {
         state,
         BobState::BtcRefunded(..)
             | BobState::XmrRedeemed { .. }
-            | BobState::BtcPunished { .. }
+            | BobState::BtcPunishedCooperativeRefundFailed { .. }
             | BobState::SafelyAborted
     )
 }
@@ -298,14 +298,69 @@ async fn next_state(
                 ExpiredTimelocks::Punish => {
                     tracing::info!("You have been punished for not refunding in time");
                     BobState::BtcPunished {
+                        state: state.clone(),
                         tx_lock_id: state.tx_lock_id(),
                     }
                 }
             }
         }
         BobState::BtcRefunded(state4) => BobState::BtcRefunded(state4),
-        BobState::BtcPunished { tx_lock_id } => BobState::BtcPunished { tx_lock_id },
+        BobState::BtcPunished { state, tx_lock_id } => {
+            tracing::info!("Asking Alice to reveal XMR key to us.");
+            let response = dbg!(event_loop_handle
+                .request_cooperative_xmr_redeem(swap_id)
+                .await);
+            match response {
+                Ok(response) => {
+                    tracing::info!("Alice revealed XMR key to us, redeeming XMR.");
+                    let s_a = dbg!(monero::PrivateKey {
+                        scalar: response.s_a,
+                    });
+                    let (spend_key, view_key) = dbg!(state.xmr_keys(s_a));
+
+                    let wallet_file_name = swap_id.to_string();
+
+                    tracing::info!(%wallet_file_name, "Generating and opening Monero wallet from the extracted keys to redeem the Monero");
+                    if let Err(e) = monero_wallet
+                        .create_from_and_load(
+                            wallet_file_name.clone(),
+                            spend_key,
+                            view_key,
+                            monero_wallet_restore_blockheight,
+                        )
+                        .await
+                    {
+                        // In case we failed to refresh/sweep, when resuming the wallet might already
+                        // exist! This is a very unlikely scenario, but if we don't take care of it we
+                        // might not be able to ever transfer the Monero.
+                        tracing::warn!("Failed to generate monero wallet from keys: {:#}", e);
+                        tracing::info!(%wallet_file_name,
+                            "Falling back to trying to open the wallet if it already exists",
+                        );
+                        monero_wallet.open(wallet_file_name).await?;
+                    }
+
+                    // Ensure that the generated wallet is synced so we have a proper balance
+                    monero_wallet.refresh().await?;
+                    // Sweep (transfer all funds) to the given address
+                    dbg!(monero_wallet.get_balance().await?);
+                    let tx_hashes = monero_wallet.sweep_all(monero_receive_address).await?;
+
+                    for tx_hash in tx_hashes {
+                        tracing::info!(%monero_receive_address, txid=%tx_hash.0, "Successfully transferred XMR to wallet");
+                    }
+                    return Ok(BobState::XmrRedeemed { tx_lock_id });
+                }
+                Err(error) => {
+                    tracing::error!(%error, "Failed to get XMR keys from Alice.");
+                    return Ok(BobState::BtcPunishedCooperativeRefundFailed { tx_lock_id });
+                }
+            };
+        }
         BobState::SafelyAborted => BobState::SafelyAborted,
         BobState::XmrRedeemed { tx_lock_id } => BobState::XmrRedeemed { tx_lock_id },
+        BobState::BtcPunishedCooperativeRefundFailed { tx_lock_id } => {
+            BobState::BtcPunishedCooperativeRefundFailed { tx_lock_id }
+        }
     })
 }

@@ -44,7 +44,7 @@ pub enum BobEndState {
     SafelyAborted,
     XmrRedeemed { tx_lock_id: bitcoin::Txid },
     BtcRefunded(Box<bob::State6>),
-    BtcPunished { tx_lock_id: bitcoin::Txid },
+    BtcPunishedCooperativeRefundFailed { tx_lock_id: bitcoin::Txid },
 }
 
 impl From<BobState> for Bob {
@@ -83,8 +83,8 @@ impl From<BobState> for Bob {
             BobState::XmrRedeemed { tx_lock_id } => {
                 Bob::Done(BobEndState::XmrRedeemed { tx_lock_id })
             }
-            BobState::BtcPunished { tx_lock_id } => {
-                Bob::Done(BobEndState::BtcPunished { tx_lock_id })
+            BobState::BtcPunishedCooperativeRefundFailed(tx_lock_id) => {
+                Bob::Done(BobEndState::BtcPunishedCooperativeRefundFailed(tx_lock_id))
             }
             BobState::SafelyAborted => Bob::Done(BobEndState::SafelyAborted),
         }

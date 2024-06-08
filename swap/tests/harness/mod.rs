@@ -818,7 +818,7 @@ impl TestContext {
     async fn bob_punished_btc_balance(&self, state: BobState) -> Result<bitcoin::Amount> {
         self.bob_bitcoin_wallet.sync().await?;
 
-        let lock_tx_id = if let BobState::BtcPunished { tx_lock_id } = state {
+        let lock_tx_id = if let BobState::BtcPunished {state, tx_lock_id } = state {
             tx_lock_id
         } else {
             bail!("Bob in not in btc punished state: {:?}", state);
