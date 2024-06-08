@@ -123,12 +123,16 @@ pub async fn refund(
             Ok(state)
         }
         Err(error) => {
-            let state3 = db.get_states(swap_id).await?.iter().find_map(|state| {
+            let state3 = db
+            .get_states(swap_id)
+            .await?
+            .iter()
+            .find_map(|state| {
                 if let State::Bob(BobState::BtcLocked { state3, .. }) = state {
                     Some(state3.clone())
-                } else {
-                    None
-                }
+                    } else {
+                        None
+                    }
             });
             if state3
                 .expect("Error: weren't able to extract State3 from database.")
