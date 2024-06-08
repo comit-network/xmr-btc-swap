@@ -436,7 +436,6 @@ impl State3 {
             cancel_timelock: self.cancel_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: self.refund_address.clone(),
-            punish_address: self.punish_address.clone(),
             tx_lock: self.tx_lock.clone(),
             tx_cancel_sig_a: self.tx_cancel_sig_a.clone(),
             tx_refund_encsig: self.tx_refund_encsig.clone(),
@@ -471,6 +470,26 @@ impl State3 {
             tx_lock_status,
             tx_cancel_status,
         ))
+    }
+    pub async fn check_for_tx_punish(
+        &self,
+        bitcoin_wallet: &bitcoin::Wallet,
+    ) -> Result<Transaction> {
+        let tx_cancel = bitcoin::TxCancel::new(
+            &self.tx_lock,
+            self.cancel_timelock,
+            self.A,
+            self.b.public(),
+            self.tx_cancel_fee,
+        )?;
+        let tx_punish = bitcoin::TxPunish::new(
+            &tx_cancel,
+            &self.punish_address,
+            self.punish_timelock,
+            self.tx_punish_fee,
+        );
+        let tx = bitcoin_wallet.get_raw_transaction(tx_punish.txid()).await?;
+        Ok(tx)
     }
 }
 
@@ -586,7 +605,6 @@ impl State4 {
             cancel_timelock: self.cancel_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: self.refund_address,
-            punish_address: self.punish_address,
             tx_lock: self.tx_lock,
             tx_cancel_sig_a: self.tx_cancel_sig_a,
             tx_refund_encsig: self.tx_refund_encsig,
@@ -628,7 +646,6 @@ pub struct State6 {
     cancel_timelock: CancelTimelock,
     punish_timelock: PunishTimelock,
     refund_address: bitcoin::Address,
-    punish_address: bitcoin::Address,
     tx_lock: bitcoin::TxLock,
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: bitcoin::EncryptedSignature,
@@ -678,27 +695,6 @@ impl State6 {
 
         let tx = bitcoin_wallet.get_raw_transaction(tx_cancel.txid()).await?;
 
-        Ok(tx)
-    }
-
-    pub async fn check_for_tx_punish(
-        &self,
-        bitcoin_wallet: &bitcoin::Wallet,
-    ) -> Result<Transaction> {
-        let tx_cancel = bitcoin::TxCancel::new(
-            &self.tx_lock,
-            self.cancel_timelock,
-            self.A,
-            self.b.public(),
-            self.tx_cancel_fee,
-        )?;
-        let tx_punish = bitcoin::TxPunish::new(
-            &tx_cancel,
-            &self.punish_address,
-            self.punish_timelock,
-            self.tx_punish_fee,
-        );
-        let tx = bitcoin_wallet.get_raw_transaction(tx_punish.txid()).await?;
         Ok(tx)
     }
 
