@@ -861,7 +861,6 @@ impl Request {
                         .request_cooperative_xmr_redeem(swap_id)
                         .await?
                 );
-                println!("{:?}", response);
                 Ok(json!({
                     "result": "ok",
                 }))
