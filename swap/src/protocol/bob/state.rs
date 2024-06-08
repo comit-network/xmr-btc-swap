@@ -41,15 +41,25 @@ pub enum BobState {
     XmrLocked(State4),
     EncSigSent(State4),
     BtcRedeemed(State5),
-    CancelTimelockExpired(State6),
-    BtcCancelled(State6),
-    BtcRefunded(State6),
+    CancelTimelockExpired {
+        state: State6,
+        monero_wallet_restore_blockheight: BlockHeight,
+    },
+    BtcCancelled {
+        state: State6,
+        monero_wallet_restore_blockheight: BlockHeight,
+    },
+    BtcRefunded {
+        state: State6,
+        monero_wallet_restore_blockheight: BlockHeight,
+    },
     XmrRedeemed {
         tx_lock_id: bitcoin::Txid,
     },
     BtcPunished {
         state: State6,
         tx_lock_id: bitcoin::Txid,
+        monero_wallet_restore_blockheight: BlockHeight,
     },
     BtcPunishedCooperativeRefundFailed {
         tx_lock_id: bitcoin::Txid,
@@ -69,9 +79,9 @@ impl fmt::Display for BobState {
             BobState::XmrLocked(..) => write!(f, "xmr is locked"),
             BobState::EncSigSent(..) => write!(f, "encrypted signature is sent"),
             BobState::BtcRedeemed(..) => write!(f, "btc is redeemed"),
-            BobState::CancelTimelockExpired(..) => write!(f, "cancel timelock is expired"),
-            BobState::BtcCancelled(..) => write!(f, "btc is cancelled"),
-            BobState::BtcRefunded(..) => write!(f, "btc is refunded"),
+            BobState::CancelTimelockExpired { .. } => write!(f, "cancel timelock is expired"),
+            BobState::BtcCancelled { .. } => write!(f, "btc is cancelled"),
+            BobState::BtcRefunded { .. } => write!(f, "btc is refunded"),
             BobState::XmrRedeemed { .. } => write!(f, "xmr is redeemed"),
             BobState::BtcPunished { .. } => write!(f, "btc is punished"),
             BobState::BtcPunishedCooperativeRefundFailed { .. } => {
@@ -434,7 +444,6 @@ impl State3 {
             b: self.b.clone(),
             s_b: self.s_b,
             v: self.v,
-            monero_wallet_restore_blockheight,
             cancel_timelock: self.cancel_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: self.refund_address.clone(),
@@ -488,7 +497,7 @@ pub struct State4 {
     pub tx_lock: bitcoin::TxLock,
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: bitcoin::EncryptedSignature,
-    monero_wallet_restore_blockheight: BlockHeight,
+    pub monero_wallet_restore_blockheight: BlockHeight,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     tx_redeem_fee: bitcoin::Amount,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
@@ -581,7 +590,6 @@ impl State4 {
             b: self.b,
             s_b: self.s_b,
             v: self.v,
-            monero_wallet_restore_blockheight: self.monero_wallet_restore_blockheight,
             cancel_timelock: self.cancel_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: self.refund_address,
@@ -623,7 +631,6 @@ pub struct State6 {
     b: bitcoin::SecretKey,
     s_b: monero::Scalar,
     v: monero::PrivateViewKey,
-    monero_wallet_restore_blockheight: BlockHeight,
     cancel_timelock: CancelTimelock,
     punish_timelock: PunishTimelock,
     refund_address: bitcoin::Address,
@@ -733,10 +740,9 @@ impl State6 {
         &self,
         s_a: monero::PrivateKey,
     ) -> (monero::PrivateKey, monero::PrivateViewKey) {
-        let s_b = dbg!(monero::PrivateKey { scalar: self.s_b });
+        let s_b = monero::PrivateKey { scalar: self.s_b };
         let s = s_a + s_b;
 
         (s, self.v)
     }
-
 }

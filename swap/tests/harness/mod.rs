@@ -694,8 +694,8 @@ impl TestContext {
     pub async fn assert_bob_refunded(&self, state: BobState) {
         self.bob_bitcoin_wallet.sync().await.unwrap();
 
-        let lock_tx_id = if let BobState::BtcRefunded(state4) = state {
-            state4.tx_lock_id()
+        let lock_tx_id = if let BobState::BtcRefunded { state, .. } = state {
+            state.tx_lock_id()
         } else {
             panic!("Bob in not in btc refunded state: {:?}", state);
         };
@@ -818,7 +818,7 @@ impl TestContext {
     async fn bob_punished_btc_balance(&self, state: BobState) -> Result<bitcoin::Amount> {
         self.bob_bitcoin_wallet.sync().await?;
 
-        let lock_tx_id = if let BobState::BtcPunished {state, tx_lock_id } = state {
+        let lock_tx_id = if let BobState::BtcPunished { tx_lock_id, .. } = state {
             tx_lock_id
         } else {
             bail!("Bob in not in btc punished state: {:?}", state);

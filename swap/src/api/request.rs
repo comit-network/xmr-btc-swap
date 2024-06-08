@@ -66,11 +66,17 @@ pub enum Method {
         swap_id: Uuid,
     },
     GetRawStates,
+    AttemptCooperativeRelease {
+        swap_id: Uuid,
+    },
 }
 
 impl Method {
     fn get_tracing_span(&self, log_reference_id: Option<String>) -> Span {
         let span = match self {
+            Method::AttemptCooperativeRelease { swap_id } => {
+                debug_span!("method", method_name="AttemptCooperativeRelease", swap_id=%swap_id, log_reference_id=field::Empty)
+            }
             Method::Balance { .. } => {
                 debug_span!(
                     "method",
@@ -282,13 +288,14 @@ impl Request {
                     BobState::XmrLocked(state) | BobState::EncSigSent(state) => {
                         Some(state.expired_timelock(bitcoin_wallet).await)
                     }
-                    BobState::CancelTimelockExpired(state) | BobState::BtcCancelled(state) => {
+                    BobState::CancelTimelockExpired { state, .. }
+                    | BobState::BtcCancelled { state, .. } => {
                         Some(state.expired_timelock(bitcoin_wallet).await)
                     }
                     BobState::BtcPunished { .. } => Some(Ok(ExpiredTimelocks::Punish)),
-                    BobState::BtcRefunded(_)
+                    BobState::BtcRefunded { .. }
                     | BobState::BtcRedeemed(_)
-                    | BobState::BtcPunishedCooperativeRefundFailed(_)
+                    | BobState::BtcPunishedCooperativeRefundFailed { .. }
                     | BobState::XmrRedeemed { .. } => None,
                 };
 
@@ -811,6 +818,54 @@ impl Request {
             Method::GetCurrentSwap => Ok(json!({
                 "swap_id": context.swap_lock.get_current_swap_id().await
             })),
+            Method::AttemptCooperativeRelease { swap_id } => {
+                context.swap_lock.acquire_swap_lock(swap_id).await?;
+
+                let seller_peer_id = context.db.get_peer_id(swap_id).await?;
+                let seller_addresses = context.db.get_addresses(seller_peer_id).await?;
+
+                let seed = context
+                    .config
+                    .seed
+                    .as_ref()
+                    .context("Could not get seed")?
+                    .derive_libp2p_identity();
+
+                let behaviour = cli::Behaviour::new(
+                    seller_peer_id,
+                    context.config.env_config,
+                    Arc::clone(
+                        context
+                            .bitcoin_wallet
+                            .as_ref()
+                            .context("Could not get Bitcoin wallet")?,
+                    ),
+                    (seed.clone(), context.config.namespace),
+                );
+                let mut swarm =
+                    swarm::cli(seed.clone(), context.config.tor_socks5_port, behaviour).await?;
+                let our_peer_id = swarm.local_peer_id();
+
+                tracing::debug!(peer_id = %our_peer_id, "Network layer initialized");
+
+                for seller_address in seller_addresses {
+                    swarm
+                        .behaviour_mut()
+                        .add_address(seller_peer_id, seller_address);
+                }
+
+                let (_, mut event_loop_handle) =
+                    EventLoop::new(swap_id, swarm, seller_peer_id)?;
+                let response = dbg!(
+                    event_loop_handle
+                        .request_cooperative_xmr_redeem(swap_id)
+                        .await?
+                );
+                println!("{:?}", response);
+                Ok(json!({
+                    "result": "ok",
+                }))
+            }
         }
     }
 

@@ -11,7 +11,7 @@ use uuid::Uuid;
 pub fn is_complete(state: &BobState) -> bool {
     matches!(
         state,
-        BobState::BtcRefunded(..)
+        BobState::BtcRefunded { .. }
             | BobState::XmrRedeemed { .. }
             | BobState::BtcPunishedCooperativeRefundFailed { .. }
             | BobState::SafelyAborted
@@ -141,12 +141,15 @@ async fn next_state(
                         tracing::info!("Alice took too long to lock Monero, cancelling the swap");
 
                         let state4 = state3.cancel();
-                        BobState::CancelTimelockExpired(state4)
+                        BobState::CancelTimelockExpired { monero_wallet_restore_blockheight, state: state4 }
                     },
                 }
             } else {
                 let state4 = state3.cancel();
-                BobState::CancelTimelockExpired(state4)
+                BobState::CancelTimelockExpired {
+                    monero_wallet_restore_blockheight,
+                    state: state4,
+                }
             }
         }
         BobState::XmrLockProofReceived {
@@ -169,17 +172,20 @@ async fn next_state(
 
                                 tx_lock_status.wait_until_confirmed_with(state.cancel_timelock).await?;
 
-                                BobState::CancelTimelockExpired(state.cancel())
+                                BobState::CancelTimelockExpired { monero_wallet_restore_blockheight, state: state.cancel() }
                             },
                         }
                     }
                     result = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
                         result?;
-                        BobState::CancelTimelockExpired(state.cancel())
+                        BobState::CancelTimelockExpired { monero_wallet_restore_blockheight, state: state.cancel() }
                     }
                 }
             } else {
-                BobState::CancelTimelockExpired(state.cancel())
+                BobState::CancelTimelockExpired {
+                    monero_wallet_restore_blockheight,
+                    state: state.cancel(),
+                }
             }
         }
         BobState::XmrLocked(state) => {
@@ -206,11 +212,16 @@ async fn next_state(
                     },
                     result = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
                         result?;
-                        BobState::CancelTimelockExpired(state.cancel())
+                        BobState::CancelTimelockExpired { monero_wallet_restore_blockheight: state.clone().monero_wallet_restore_blockheight, state: state.cancel() }
                     }
                 }
             } else {
-                BobState::CancelTimelockExpired(state.cancel())
+                BobState::CancelTimelockExpired {
+                    monero_wallet_restore_blockheight: state
+                        .clone()
+                        .monero_wallet_restore_blockheight,
+                    state: state.cancel(),
+                }
             }
         }
         BobState::EncSigSent(state) => {
@@ -230,11 +241,16 @@ async fn next_state(
                     },
                     result = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
                         result?;
-                        BobState::CancelTimelockExpired(state.cancel())
+                        BobState::CancelTimelockExpired { monero_wallet_restore_blockheight: state.clone().monero_wallet_restore_blockheight, state: state.cancel() }
                     }
                 }
             } else {
-                BobState::CancelTimelockExpired(state.cancel())
+                BobState::CancelTimelockExpired {
+                    monero_wallet_restore_blockheight: state
+                        .clone()
+                        .monero_wallet_restore_blockheight,
+                    state: state.cancel(),
+                }
             }
         }
         BobState::BtcRedeemed(state) => {
@@ -276,14 +292,23 @@ async fn next_state(
                 tx_lock_id: state.tx_lock_id(),
             }
         }
-        BobState::CancelTimelockExpired(state4) => {
-            if state4.check_for_tx_cancel(bitcoin_wallet).await.is_err() {
-                state4.submit_tx_cancel(bitcoin_wallet).await?;
+        BobState::CancelTimelockExpired {
+            state,
+            monero_wallet_restore_blockheight,
+        } => {
+            if state.check_for_tx_cancel(bitcoin_wallet).await.is_err() {
+                state.submit_tx_cancel(bitcoin_wallet).await?;
             }
 
-            BobState::BtcCancelled(state4)
+            BobState::BtcCancelled {
+                state,
+                monero_wallet_restore_blockheight,
+            }
         }
-        BobState::BtcCancelled(state) => {
+        BobState::BtcCancelled {
+            state,
+            monero_wallet_restore_blockheight,
+        } => {
             // Bob has cancelled the swap
             match state.expired_timelock(bitcoin_wallet).await? {
                 ExpiredTimelocks::None { .. } => {
@@ -293,30 +318,44 @@ async fn next_state(
                 }
                 ExpiredTimelocks::Cancel { .. } => {
                     state.publish_refund_btc(bitcoin_wallet).await?;
-                    BobState::BtcRefunded(state)
+                    BobState::BtcRefunded {
+                        state,
+                        monero_wallet_restore_blockheight,
+                    }
                 }
                 ExpiredTimelocks::Punish => {
                     tracing::info!("You have been punished for not refunding in time");
                     BobState::BtcPunished {
-                        state: state.clone(),
-                        tx_lock_id: state.tx_lock_id(),
+                        tx_lock_id: state.clone().tx_lock_id(),
+                        state: state,
+                        monero_wallet_restore_blockheight,
                     }
                 }
             }
         }
-        BobState::BtcRefunded(state4) => BobState::BtcRefunded(state4),
-        BobState::BtcPunished { state, tx_lock_id } => {
+        BobState::BtcRefunded {
+            state,
+            monero_wallet_restore_blockheight,
+        } => BobState::BtcRefunded {
+            state,
+            monero_wallet_restore_blockheight,
+        },
+        BobState::BtcPunished {
+            state,
+            tx_lock_id,
+            monero_wallet_restore_blockheight,
+        } => {
             tracing::info!("Asking Alice to reveal XMR key to us.");
-            let response = dbg!(event_loop_handle
+            let response = event_loop_handle
                 .request_cooperative_xmr_redeem(swap_id)
-                .await);
+                .await;
             match response {
                 Ok(response) => {
                     tracing::info!("Alice revealed XMR key to us, redeeming XMR.");
-                    let s_a = dbg!(monero::PrivateKey {
+                    let s_a = monero::PrivateKey {
                         scalar: response.s_a,
-                    });
-                    let (spend_key, view_key) = dbg!(state.xmr_keys(s_a));
+                    };
+                    let (spend_key, view_key) = state.xmr_keys(s_a);
 
                     let wallet_file_name = swap_id.to_string();
 
@@ -343,7 +382,6 @@ async fn next_state(
                     // Ensure that the generated wallet is synced so we have a proper balance
                     monero_wallet.refresh().await?;
                     // Sweep (transfer all funds) to the given address
-                    dbg!(monero_wallet.get_balance().await?);
                     let tx_hashes = monero_wallet.sweep_all(monero_receive_address).await?;
 
                     for tx_hash in tx_hashes {
