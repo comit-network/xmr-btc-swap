@@ -382,15 +382,21 @@ async fn next_state(
                     // Ensure that the generated wallet is synced so we have a proper balance
                     monero_wallet.refresh().await?;
                     // Sweep (transfer all funds) to the given address
-                    let tx_hashes = monero_wallet.sweep_all(monero_receive_address).await?;
-
-                    for tx_hash in tx_hashes {
-                        tracing::info!(%monero_receive_address, txid=%tx_hash.0, "Successfully transferred XMR to wallet");
+                    match monero_wallet.sweep_all(monero_receive_address).await {
+                        Ok(tx_hashes) => {
+                            for tx_hash in tx_hashes {
+                                tracing::info!(%monero_receive_address, txid=%tx_hash.0, "Successfully transferred XMR to wallet");
+                            }
+                            return Ok(BobState::XmrRedeemed { tx_lock_id });
+                        }
+                        Err(error) => {
+                            tracing::error!(%error, "Failed to redeem XMR with key from Alice.");
+                            return Ok(BobState::BtcPunishedCooperativeRefundFailed { tx_lock_id });
+                        }
                     }
-                    return Ok(BobState::XmrRedeemed { tx_lock_id });
                 }
                 Err(error) => {
-                    tracing::error!(%error, "Failed to get XMR keys from Alice.");
+                    tracing::error!(%error, "Failed to get XMR key from Alice.");
                     return Ok(BobState::BtcPunishedCooperativeRefundFailed { tx_lock_id });
                 }
             };

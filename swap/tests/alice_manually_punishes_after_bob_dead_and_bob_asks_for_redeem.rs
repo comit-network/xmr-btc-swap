@@ -13,7 +13,7 @@ use swap::protocol::{alice, bob};
 /// the encsig and fail to refund or redeem. Alice punishes using the cancel and
 /// punish command. Bob then asks for cooperative redeem of XMR.
 #[tokio::test]
-async fn alice_manually_punishes_after_bob_dead() {
+async fn alice_manually_punishes_after_bob_dead_and_bob_asks_for_redeem() {
     harness::setup_test(FastPunishConfig, |mut ctx| async move {
         let (bob_swap, bob_join_handle) = ctx.bob_swap().await;
         let bob_swap_id = bob_swap.id;
