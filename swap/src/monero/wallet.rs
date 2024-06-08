@@ -130,9 +130,9 @@ impl Wallet {
 
         // Close the default wallet before generating the other wallet to ensure that
         // it saves its state correctly
-        let _ = wallet.close_wallet().await?;
+        let _ = self.inner.lock().await.close_wallet().await?;
 
-        let _ = wallet
+        let _ = self.inner.lock().await
             .generate_from_keys(
                 file_name,
                 temp_wallet_address.to_string(),
@@ -167,7 +167,7 @@ impl Wallet {
             }
         }
 
-        let _ = wallet.open_wallet(self.name.clone()).await?;
+        let _ = self.inner.lock().await.open_wallet(self.name.clone()).await?;
 
         Ok(())
     }
