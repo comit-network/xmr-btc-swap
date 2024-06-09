@@ -69,7 +69,7 @@ pub async fn cancel(
                 let state = BobState::BtcCancelled(state6);
                 db.insert_latest_state(swap_id, state.clone().into())
                     .await?;
-                tracing::info!("Cancel transaction has already been confirmed on chain.");
+                tracing::info!("Cancel transaction has already been confirmed on chain");
                 return Ok((tx.txid(), state));
             }
             if let ExpiredTimelocks::None { .. } =
@@ -137,7 +137,7 @@ pub async fn refund(
                 db.insert_latest_state(swap_id, state.clone().into())
                     .await?;
 
-                tracing::info!("Cannot refund because BTC is punished.");
+                tracing::info!("Cannot refund because BTC punish timelock expired");
                 return Ok(state);
             }
             bail!(error);
