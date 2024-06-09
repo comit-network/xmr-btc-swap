@@ -75,7 +75,7 @@ pub async fn cancel(
             if let ExpiredTimelocks::None { .. } =
                 state6.expired_timelock(bitcoin_wallet.as_ref()).await?
             {
-                tracing::info!("Timelock hasn't expired yet.");
+                tracing::info!("Cancel timelock hasn't expired yet.");
             }
             if let Ok(error_code) = parse_rpc_error_code(&err) {
                 tracing::debug!(%error_code, "parse rpc error");
