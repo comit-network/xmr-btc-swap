@@ -126,8 +126,6 @@ impl Wallet {
         let temp_wallet_address =
             Address::standard(self.network, public_spend_key, public_view_key);
 
-        let wallet = self.inner.lock().await;
-
         // Close the default wallet before generating the other wallet to ensure that
         // it saves its state correctly
         let _ = self.inner.lock().await.close_wallet().await?;
@@ -149,7 +147,7 @@ impl Wallet {
 
         // Try to send all the funds from the generated wallet to the default wallet
         match self.refresh(3).await {
-            Ok(_) => match wallet.sweep_all(self.main_address.to_string()).await {
+            Ok(_) => match self.inner.lock().await.sweep_all(self.main_address.to_string()).await {
                 Ok(sweep_all) => {
                     for tx in sweep_all.tx_hash_list {
                         tracing::info!(
