@@ -1,4 +1,4 @@
-use crate::bitcoin::{parse_rpc_error_code, RpcErrorCode, Wallet};
+use crate::bitcoin::{parse_rpc_error_code, ExpiredTimelocks, RpcErrorCode, Wallet};
 use crate::protocol::bob::BobState;
 use crate::protocol::Database;
 use anyhow::{bail, Result};
@@ -72,6 +72,11 @@ pub async fn cancel(
                 tracing::info!("Cancel transaction has already been confirmed on chain. The swap has therefore already been cancelled by Alice.");
                 return Ok((tx.txid(), state));
             }
+            if let ExpiredTimelocks::None { .. } =
+                state6.expired_timelock(bitcoin_wallet.as_ref()).await?
+            {
+                tracing::info!("Timelock hasn't expired yet.");
+            }
             if let Ok(error_code) = parse_rpc_error_code(&err) {
                 tracing::debug!(%error_code, "parse rpc error");
                 if error_code == i64::from(RpcErrorCode::RpcVerifyAlreadyInChain) {
@@ -122,10 +127,8 @@ pub async fn refund(
             Ok(state)
         }
         Err(error) => {
-            if state6
-                .check_for_tx_punish(bitcoin_wallet.as_ref())
-                .await
-                .is_ok()
+            if let ExpiredTimelocks::Punish { .. } =
+                state6.expired_timelock(bitcoin_wallet.as_ref()).await?
             {
                 // Alice already punished Bob, so Bob sets his state to BtcPunished.
                 let state = BobState::BtcPunished {
@@ -134,7 +137,7 @@ pub async fn refund(
                 db.insert_latest_state(swap_id, state.clone().into())
                     .await?;
 
-                tracing::info!("Cannot refund because BTC is punished by Alice.");
+                tracing::info!("Cannot refund because BTC is punished.");
                 return Ok(state);
             }
             bail!(error);
