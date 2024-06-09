@@ -61,10 +61,10 @@ where
     let is_testnet = args.testnet;
     let data = args.data;
     let (context, request) = match args.cmd {
-        CliCommand::AttemptCooperativeRelease { swap_id: SwapId { swap_id } } => {
-            let request = Request::new(Method::AttemptCooperativeRelease {
-                swap_id: swap_id,
-            });
+        CliCommand::AttemptCooperativeRedeem {
+            swap_id: SwapId { swap_id },
+        } => {
+            let request = Request::new(Method::AttemptCooperativeRedeem { swap_id: swap_id });
 
             let context =
                 Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
@@ -300,7 +300,7 @@ struct Arguments {
 #[derive(structopt::StructOpt, Debug)]
 enum CliCommand {
     #[structopt(about = "Asks Alice for XMR key to redeem funds, if Bob is punished by Alice.")]
-    AttemptCooperativeRelease {
+    AttemptCooperativeRedeem {
         #[structopt(flatten)]
         swap_id: SwapId,
     },

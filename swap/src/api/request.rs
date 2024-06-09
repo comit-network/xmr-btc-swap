@@ -66,7 +66,7 @@ pub enum Method {
         swap_id: Uuid,
     },
     GetRawStates,
-    AttemptCooperativeRelease {
+    AttemptCooperativeRedeem {
         swap_id: Uuid,
     },
 }
@@ -74,8 +74,8 @@ pub enum Method {
 impl Method {
     fn get_tracing_span(&self, log_reference_id: Option<String>) -> Span {
         let span = match self {
-            Method::AttemptCooperativeRelease { swap_id } => {
-                debug_span!("method", method_name="AttemptCooperativeRelease", swap_id=%swap_id, log_reference_id=field::Empty)
+            Method::AttemptCooperativeRedeem { swap_id } => {
+                debug_span!("method", method_name="AttemptCooperativeRedeem", swap_id=%swap_id, log_reference_id=field::Empty)
             }
             Method::Balance { .. } => {
                 debug_span!(
@@ -816,7 +816,7 @@ impl Request {
             Method::GetCurrentSwap => Ok(json!({
                 "swap_id": context.swap_lock.get_current_swap_id().await
             })),
-            Method::AttemptCooperativeRelease { swap_id } => {
+            Method::AttemptCooperativeRedeem { swap_id } => {
                 context.swap_lock.acquire_swap_lock(swap_id).await?;
 
                 let seller_peer_id = context.db.get_peer_id(swap_id).await?;
