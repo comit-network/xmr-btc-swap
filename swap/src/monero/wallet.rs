@@ -301,11 +301,10 @@ impl Wallet {
                         }
                     };
 
+                    tracing::warn!(attempt=i, %height, %attempts_left, name = %self.name, %error, "Failed to sync Monero wallet");
+
                     if attempts_left == 0 {
-                        tracing::error!(name = %self.name, %height, %error, "Failed to sync Monero wallet");
                         return Err(error.into());
-                    } else {
-                        tracing::warn!(attempt=i, %height, %attempts_left, name = %self.name, %error, "Failed to sync Monero wallet");
                     }
                 }
             }
