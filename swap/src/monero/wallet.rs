@@ -147,7 +147,13 @@ impl Wallet {
 
         // Try to send all the funds from the generated wallet to the default wallet
         match self.refresh(3).await {
-            Ok(_) => match self.inner.lock().await.sweep_all(self.main_address.to_string()).await {
+            Ok(_) => match self
+                .inner
+                .lock()
+                .await
+                .sweep_all(self.main_address.to_string())
+                .await
+            {
                 Ok(sweep_all) => {
                     for tx in sweep_all.tx_hash_list {
                         tracing::info!(
