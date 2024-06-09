@@ -69,7 +69,7 @@ pub async fn cancel(
                 let state = BobState::BtcCancelled(state6);
                 db.insert_latest_state(swap_id, state.clone().into())
                     .await?;
-                tracing::info!("Cancel transaction has already been confirmed on chain. The swap has therefore already been cancelled by Alice.");
+                tracing::info!("Cancel transaction has already been confirmed on chain.");
                 return Ok((tx.txid(), state));
             }
             if let ExpiredTimelocks::None { .. } =
