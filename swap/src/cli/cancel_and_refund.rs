@@ -40,6 +40,7 @@ pub async fn cancel(
         BobState::CancelTimelockExpired(state6) => state6,
         BobState::BtcRefunded(state6) => state6,
         BobState::BtcCancelled(state6) => state6,
+
         BobState::Started { .. }
         | BobState::SwapSetupCompleted(_)
         | BobState::BtcRedeemed(_)
