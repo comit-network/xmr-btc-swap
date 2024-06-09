@@ -295,7 +295,7 @@ where
                                             };
                                             let s_a = states.iter().find_map(|state| {
                                                 if let State::Alice(AliceState::BtcLocked { state3 }) = state {
-                                                        Some(state3.s_a)
+                                                        Some(state3.cooperative_xmr_redeem_after_punish())
                                                 } else {
                                                     None
                                                 }

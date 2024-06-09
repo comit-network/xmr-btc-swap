@@ -377,7 +377,7 @@ impl State2 {
 pub struct State3 {
     a: bitcoin::SecretKey,
     B: bitcoin::PublicKey,
-    pub s_a: monero::Scalar,
+    s_a: monero::Scalar,
     S_b_monero: monero::PublicKey,
     S_b_bitcoin: bitcoin::PublicKey,
     pub v: monero::PrivateViewKey,
@@ -568,5 +568,8 @@ impl State3 {
             self.punish_timelock,
             self.tx_punish_fee,
         )
+    }
+    pub fn cooperative_xmr_redeem_after_punish(&self) -> monero::Scalar {
+        self.s_a
     }
 }
