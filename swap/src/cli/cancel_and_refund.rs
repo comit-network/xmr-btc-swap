@@ -66,8 +66,8 @@ pub async fn cancel(
         }
         Err(err) => {
             if let Ok(tx) = state6.check_for_tx_cancel(bitcoin_wallet.as_ref()).await {
-                // Alice already cancelled, so we are out-of-sync with Alice.
-                let state = BobState::BtcCancelled(state6); // Set state to cancelled to sync with Alice.
+                // Alice already cancelled swap, so Bob sets his state to BtcCancelled.
+                let state = BobState::BtcCancelled(state6);
                 db.insert_latest_state(swap_id, state.clone().into())
                     .await?;
                 tracing::info!("Cancel transaction has already been confirmed on chain. The swap has therefore already been cancelled by Alice.");
@@ -128,7 +128,7 @@ pub async fn refund(
                 .await
                 .is_ok()
             {
-                // Alice already punished us, so we are out-of-sync with Alice and should set our state to the BtcPunished.
+                // Alice already punished Bob, so Bob sets his state to BtcPunished.
                 let state = BobState::BtcPunished {
                     tx_lock_id: state6.tx_lock_id(),
                 };
