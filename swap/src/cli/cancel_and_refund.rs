@@ -31,7 +31,6 @@ pub async fn cancel(
     bitcoin_wallet: Arc<Wallet>,
     db: Arc<dyn Database + Send + Sync>,
 ) -> Result<(Txid, BobState)> {
-    // Subscription was introduced in commit f39e1de964f7e2f81f9624043834a31154b68a55, but isn't used anywhere. In case tx_cancel already exists, the function can't return a subscription from submit_tx_cancel because Alice has already broadcast tx_cancel.
     let state = db.get_state(swap_id).await?.try_into()?;
 
     let state6 = match state {
