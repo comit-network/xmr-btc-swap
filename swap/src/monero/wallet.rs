@@ -132,7 +132,10 @@ impl Wallet {
         // it saves its state correctly
         let _ = self.inner.lock().await.close_wallet().await?;
 
-        let _ = self.inner.lock().await
+        let _ = self
+            .inner
+            .lock()
+            .await
             .generate_from_keys(
                 file_name,
                 temp_wallet_address.to_string(),
@@ -167,7 +170,12 @@ impl Wallet {
             }
         }
 
-        let _ = self.inner.lock().await.open_wallet(self.name.clone()).await?;
+        let _ = self
+            .inner
+            .lock()
+            .await
+            .open_wallet(self.name.clone())
+            .await?;
 
         Ok(())
     }
