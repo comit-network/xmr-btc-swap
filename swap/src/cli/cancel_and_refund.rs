@@ -130,7 +130,7 @@ pub async fn refund(
             if let ExpiredTimelocks::Punish { .. } =
                 state6.expired_timelock(bitcoin_wallet.as_ref()).await?
             {
-                // Alice already punished Bob, so Bob sets his state to BtcPunished.
+                // Punish timelock already expired, so we can't refund.
                 let state = BobState::BtcPunished {
                     tx_lock_id: state6.tx_lock_id(),
                 };
