@@ -37,9 +37,9 @@ pub async fn cancel(
         BobState::XmrLockProofReceived { state, .. } => state.cancel(),
         BobState::XmrLocked(state4) => state4.cancel(),
         BobState::EncSigSent(state4) => state4.cancel(),
-        BobState::CancelTimelockExpired(state) => state,
-        BobState::BtcRefunded(state) => state,
-        BobState::BtcCancelled(state) => state,
+        BobState::CancelTimelockExpired(state6) => state6,
+        BobState::BtcRefunded(state6) => state6,
+        BobState::BtcCancelled(state6) => state6,
         BobState::Started { .. }
         | BobState::SwapSetupCompleted(_)
         | BobState::BtcRedeemed(_)
@@ -88,12 +88,12 @@ pub async fn refund(
         BobState::XmrLockProofReceived { state, .. } => state.cancel(),
         BobState::XmrLocked(state4) => state4.cancel(),
         BobState::EncSigSent(state4) => state4.cancel(),
-        BobState::CancelTimelockExpired(state) => state,
-        BobState::BtcCancelled(state) => state,
+        BobState::CancelTimelockExpired(state6) => state6,
+        BobState::BtcCancelled(state6) => state6,
         BobState::Started { .. }
         | BobState::SwapSetupCompleted(_)
         | BobState::BtcRedeemed(_)
-        | BobState::BtcRefunded { .. }
+        | BobState::BtcRefunded(_)
         | BobState::XmrRedeemed { .. }
         | BobState::BtcPunished { .. }
         | BobState::SafelyAborted => bail!(
@@ -107,7 +107,6 @@ pub async fn refund(
     state6.publish_refund_btc(bitcoin_wallet.as_ref()).await?;
 
     let state = BobState::BtcRefunded(state6);
-
     db.insert_latest_state(swap_id, state.clone().into())
         .await?;
 

@@ -80,11 +80,11 @@ impl From<BobState> for Bob {
             BobState::CancelTimelockExpired(state6) => Bob::CancelTimelockExpired(state6),
             BobState::BtcCancelled(state6) => Bob::BtcCancelled(state6),
             BobState::BtcRefunded(state6) => Bob::Done(BobEndState::BtcRefunded(Box::new(state6))),
-            BobState::BtcPunished { tx_lock_id } => {
-                Bob::Done(BobEndState::BtcPunished { tx_lock_id })
-            }
             BobState::XmrRedeemed { tx_lock_id } => {
                 Bob::Done(BobEndState::XmrRedeemed { tx_lock_id })
+            }
+            BobState::BtcPunished { tx_lock_id } => {
+                Bob::Done(BobEndState::BtcPunished { tx_lock_id })
             }
             BobState::SafelyAborted => Bob::Done(BobEndState::SafelyAborted),
         }
@@ -143,8 +143,8 @@ impl fmt::Display for Bob {
                 f.write_str("XMR lock transaction transfer proof received")
             }
             Bob::XmrLocked { .. } => f.write_str("Monero locked"),
-            Bob::CancelTimelockExpired { .. } => f.write_str("Cancel timelock is expired"),
-            Bob::BtcCancelled { .. } => f.write_str("Bitcoin refundable"),
+            Bob::CancelTimelockExpired(_) => f.write_str("Cancel timelock is expired"),
+            Bob::BtcCancelled(_) => f.write_str("Bitcoin refundable"),
             Bob::BtcRedeemed(_) => f.write_str("Monero redeemable"),
             Bob::Done(end_state) => write!(f, "Done: {}", end_state),
             Bob::EncSigSent { .. } => f.write_str("Encrypted signature sent"),
