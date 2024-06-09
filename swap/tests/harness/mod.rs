@@ -694,8 +694,8 @@ impl TestContext {
     pub async fn assert_bob_refunded(&self, state: BobState) {
         self.bob_bitcoin_wallet.sync().await.unwrap();
 
-        let lock_tx_id = if let BobState::BtcRefunded { state, .. } = state {
-            state.tx_lock_id()
+        let lock_tx_id = if let BobState::BtcRefunded(state4) = state {
+            state4.tx_lock_id()
         } else {
             panic!("Bob in not in btc refunded state: {:?}", state);
         };
@@ -1021,9 +1021,6 @@ pub mod bob_run_until {
         matches!(state, BobState::EncSigSent(..))
     }
 
-    pub fn is_btc_punished(state: &BobState) -> bool {
-        matches!(state, BobState::BtcPunished { .. })
-    }
 }
 
 pub struct SlowCancelConfig;
