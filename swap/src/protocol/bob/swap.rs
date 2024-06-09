@@ -13,7 +13,7 @@ pub fn is_complete(state: &BobState) -> bool {
         state,
         BobState::BtcRefunded(..)
             | BobState::XmrRedeemed { .. }
-            | BobState::BtcPunished(..)
+            | BobState::BtcPunished { .. }
             | BobState::SafelyAborted
     )
 }
@@ -276,12 +276,12 @@ async fn next_state(
                 tx_lock_id: state.tx_lock_id(),
             }
         }
-        BobState::CancelTimelockExpired(state) => {
-            if state.check_for_tx_cancel(bitcoin_wallet).await.is_err() {
-                state.submit_tx_cancel(bitcoin_wallet).await?;
+        BobState::CancelTimelockExpired(state4) => {
+            if state4.check_for_tx_cancel(bitcoin_wallet).await.is_err() {
+                state4.submit_tx_cancel(bitcoin_wallet).await?;
             }
 
-            BobState::BtcCancelled(state)
+            BobState::BtcCancelled(state4)
         }
         BobState::BtcCancelled(state) => {
             // Bob has cancelled the swap
@@ -297,12 +297,14 @@ async fn next_state(
                 }
                 ExpiredTimelocks::Punish => {
                     tracing::info!("You have been punished for not refunding in time");
-                    BobState::BtcPunished(state.clone().tx_lock_id())
+                    BobState::BtcPunished {
+                        tx_lock_id: state.tx_lock_id(),
+                    }
                 }
             }
         }
-        BobState::BtcRefunded(state) => BobState::BtcRefunded(state),
-        BobState::BtcPunished(tx_lock_id) => BobState::BtcPunished(tx_lock_id),
+        BobState::BtcRefunded(state4) => BobState::BtcRefunded(state4),
+        BobState::BtcPunished { tx_lock_id } => BobState::BtcPunished { tx_lock_id },
         BobState::SafelyAborted => BobState::SafelyAborted,
         BobState::XmrRedeemed { tx_lock_id } => BobState::XmrRedeemed { tx_lock_id },
     })

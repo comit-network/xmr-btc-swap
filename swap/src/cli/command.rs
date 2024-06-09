@@ -299,7 +299,7 @@ struct Arguments {
 
 #[derive(structopt::StructOpt, Debug)]
 enum CliCommand {
-    #[structopt(about = "Asks Alice for XMR key to redeem funds, if Bob is punished by Alice.")]
+    #[structopt(about = "Asks Alice for XMR key to redeem XMR")]
     AttemptCooperativeRedeem {
         #[structopt(flatten)]
         swap_id: SwapId,

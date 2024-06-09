@@ -47,7 +47,9 @@ pub enum BobState {
     XmrRedeemed {
         tx_lock_id: bitcoin::Txid,
     },
-    BtcPunished(bitcoin::Txid),
+    BtcPunished {
+        tx_lock_id: bitcoin::Txid,
+    },
     SafelyAborted,
 }
 
@@ -490,7 +492,7 @@ pub struct State4 {
     pub tx_lock: bitcoin::TxLock,
     tx_cancel_sig_a: Signature,
     tx_refund_encsig: bitcoin::EncryptedSignature,
-    pub monero_wallet_restore_blockheight: BlockHeight,
+    monero_wallet_restore_blockheight: BlockHeight,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     tx_redeem_fee: bitcoin::Amount,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
