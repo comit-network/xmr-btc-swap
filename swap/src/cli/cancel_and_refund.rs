@@ -32,42 +32,19 @@ pub async fn cancel(
 ) -> Result<(Txid, Subscription, BobState)> {
     let state = db.get_state(swap_id).await?.try_into()?;
 
-    let (monero_wallet_restore_blockheight, state6) = match state {
-        BobState::BtcLocked {
-            state3,
-            monero_wallet_restore_blockheight,
-        } => (monero_wallet_restore_blockheight, state3.cancel()),
-        BobState::XmrLockProofReceived {
-            state,
-            monero_wallet_restore_blockheight,
-            ..
-        } => (monero_wallet_restore_blockheight, state.cancel()),
-        BobState::XmrLocked(state4) => (
-            state4.clone().monero_wallet_restore_blockheight,
-            state4.cancel(),
-        ),
-        BobState::EncSigSent(state4) => (
-            state4.clone().monero_wallet_restore_blockheight,
-            state4.cancel(),
-        ),
-        BobState::CancelTimelockExpired {
-            state,
-            monero_wallet_restore_blockheight,
-        } => (monero_wallet_restore_blockheight, state),
-        BobState::BtcRefunded {
-            state,
-            monero_wallet_restore_blockheight,
-        } => (monero_wallet_restore_blockheight, state),
-        BobState::BtcCancelled {
-            state,
-            monero_wallet_restore_blockheight,
-        } => (monero_wallet_restore_blockheight, state),
+    let state6 = match state {
+        BobState::BtcLocked { state3, .. } => state3.cancel(),
+        BobState::XmrLockProofReceived { state, .. } => state.cancel(),
+        BobState::XmrLocked(state4) => state4.cancel(),
+        BobState::EncSigSent(state4) => state4.cancel(),
+        BobState::CancelTimelockExpired(state) => state,
+        BobState::BtcRefunded(state) => state,
+        BobState::BtcCancelled(state) => state,
         BobState::Started { .. }
         | BobState::SwapSetupCompleted(_)
         | BobState::BtcRedeemed(_)
         | BobState::XmrRedeemed { .. }
         | BobState::BtcPunished { .. }
-        | BobState::BtcPunishedCooperativeRefundFailed { .. }
         | BobState::SafelyAborted => bail!(
             "Cannot cancel swap {} because it is in state {} which is not refundable.",
             swap_id,
@@ -92,10 +69,7 @@ pub async fn cancel(
         }
     };
 
-    let state = BobState::BtcCancelled {
-        state: state6,
-        monero_wallet_restore_blockheight,
-    };
+    let state = BobState::BtcCancelled(state6);
     db.insert_latest_state(swap_id, state.clone().into())
         .await?;
 
@@ -109,39 +83,17 @@ pub async fn refund(
 ) -> Result<BobState> {
     let state = db.get_state(swap_id).await?.try_into()?;
 
-    let (monero_wallet_restore_blockheight, state6) = match state {
-        BobState::BtcLocked {
-            state3,
-            monero_wallet_restore_blockheight,
-        } => (monero_wallet_restore_blockheight, state3.cancel()),
-        BobState::XmrLockProofReceived {
-            state,
-            monero_wallet_restore_blockheight,
-            ..
-        } => (monero_wallet_restore_blockheight, state.cancel()),
-        BobState::XmrLocked(state4) => (
-            state4.clone().monero_wallet_restore_blockheight,
-            state4.cancel(),
-        ),
-        BobState::EncSigSent(state4) => (
-            state4.clone().monero_wallet_restore_blockheight,
-            state4.cancel(),
-        ),
-        BobState::CancelTimelockExpired {
-            state,
-            monero_wallet_restore_blockheight,
-            ..
-        } => (monero_wallet_restore_blockheight, state),
-        BobState::BtcCancelled {
-            state,
-            monero_wallet_restore_blockheight,
-            ..
-        } => (monero_wallet_restore_blockheight, state),
+    let state6 = match state {
+        BobState::BtcLocked { state3, .. } => state3.cancel(),
+        BobState::XmrLockProofReceived { state, .. } => state.cancel(),
+        BobState::XmrLocked(state4) => state4.cancel(),
+        BobState::EncSigSent(state4) => state4.cancel(),
+        BobState::CancelTimelockExpired(state) => state,
+        BobState::BtcCancelled(state) => state,
         BobState::Started { .. }
         | BobState::SwapSetupCompleted(_)
         | BobState::BtcRedeemed(_)
         | BobState::BtcRefunded { .. }
-        | BobState::BtcPunishedCooperativeRefundFailed { .. }
         | BobState::XmrRedeemed { .. }
         | BobState::BtcPunished { .. }
         | BobState::SafelyAborted => bail!(
@@ -154,10 +106,7 @@ pub async fn refund(
     tracing::info!(%swap_id, "Manually refunding swap");
     state6.publish_refund_btc(bitcoin_wallet.as_ref()).await?;
 
-    let state = BobState::BtcRefunded {
-        state: state6,
-        monero_wallet_restore_blockheight,
-    };
+    let state = BobState::BtcRefunded(state6);
 
     db.insert_latest_state(swap_id, state.clone().into())
         .await?;

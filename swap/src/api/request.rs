@@ -288,14 +288,12 @@ impl Request {
                     BobState::XmrLocked(state) | BobState::EncSigSent(state) => {
                         Some(state.expired_timelock(bitcoin_wallet).await)
                     }
-                    BobState::CancelTimelockExpired { state, .. }
-                    | BobState::BtcCancelled { state, .. } => {
+                    BobState::CancelTimelockExpired(state) | BobState::BtcCancelled(state) => {
                         Some(state.expired_timelock(bitcoin_wallet).await)
                     }
                     BobState::BtcPunished { .. } => Some(Ok(ExpiredTimelocks::Punish)),
                     BobState::BtcRefunded { .. }
                     | BobState::BtcRedeemed(_)
-                    | BobState::BtcPunishedCooperativeRefundFailed { .. }
                     | BobState::XmrRedeemed { .. } => None,
                 };
 
@@ -823,7 +821,30 @@ impl Request {
 
                 let seller_peer_id = context.db.get_peer_id(swap_id).await?;
                 let seller_addresses = context.db.get_addresses(seller_peer_id).await?;
-
+                let monero_wallet = Arc::clone(
+                    context
+                        .monero_wallet
+                        .as_ref()
+                        .context("Could not get Monero wallet")?,
+                );
+                let monero_receive_address = context.db.get_monero_address(swap_id).await?;
+                let (state3, monero_wallet_restore_blockheight) = context
+                    .db
+                    .get_states(swap_id)
+                    .await?
+                    .iter()
+                    .find_map(|state| {
+                        if let State::Bob(BobState::BtcLocked {
+                            state3,
+                            monero_wallet_restore_blockheight,
+                        }) = state
+                        {
+                            Some((state3.clone(), monero_wallet_restore_blockheight.clone()))
+                        } else {
+                            None
+                        }
+                    })
+                    .expect("Could not get state3 from database");
                 let seed = context
                     .config
                     .seed
@@ -854,13 +875,68 @@ impl Request {
                         .add_address(seller_peer_id, seller_address);
                 }
 
-                let (_, mut event_loop_handle) =
-                    EventLoop::new(swap_id, swarm, seller_peer_id)?;
-                let response = dbg!(
-                    event_loop_handle
-                        .request_cooperative_xmr_redeem(swap_id)
-                        .await?
-                );
+                let (_, mut event_loop_handle) = EventLoop::new(swap_id, swarm, seller_peer_id)?;
+                tracing::info!("Asking Alice to reveal XMR key to us.");
+                let response = event_loop_handle
+                    .request_cooperative_xmr_redeem(swap_id)
+                    .await;
+                match response {
+                    Ok(response) => {
+                        tracing::info!("Alice revealed XMR key to us, redeeming XMR.");
+                        let s_a = monero::PrivateKey {
+                            scalar: response.s_a,
+                        };
+                        let state5 = state3
+                            .attempt_cooperative_redeem(s_a, monero_wallet_restore_blockheight);
+                        let (spend_key, view_key) = state5.xmr_keys();
+
+                        let wallet_file_name = swap_id.to_string();
+
+                        tracing::info!(%wallet_file_name, "Generating and opening Monero wallet from the extracted keys to redeem the Monero");
+                        if let Err(e) = monero_wallet
+                            .create_from_and_load(
+                                wallet_file_name.clone(),
+                                spend_key,
+                                view_key,
+                                state5.monero_wallet_restore_blockheight,
+                            )
+                            .await
+                        {
+                            // In case we failed to refresh/sweep, when resuming the wallet might already
+                            // exist! This is a very unlikely scenario, but if we don't take care of it we
+                            // might not be able to ever transfer the Monero.
+                            tracing::warn!("Failed to generate monero wallet from keys: {:#}", e);
+                            tracing::info!(%wallet_file_name,
+                                "Falling back to trying to open the wallet if it already exists",
+                            );
+                            monero_wallet.open(wallet_file_name).await?;
+                        }
+
+                        // Ensure that the generated wallet is synced so we have a proper balance
+                        monero_wallet.refresh().await?;
+                        // Sweep (transfer all funds) to the given address
+                        match monero_wallet.sweep_all(monero_receive_address).await {
+                            Ok(tx_hashes) => {
+                                for tx_hash in tx_hashes {
+                                    tracing::info!(%monero_receive_address, txid=%tx_hash.0, "Successfully transferred XMR to wallet");
+                                }
+                                let state = BobState::XmrRedeemed {
+                                    tx_lock_id: state3.tx_lock.txid(),
+                                };
+                                context
+                                    .db
+                                    .insert_latest_state(swap_id, state.clone().into())
+                                    .await?;
+                            }
+                            Err(error) => {
+                                tracing::error!(%error, "Failed to redeem XMR with key from Alice.");
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        tracing::error!(%error, "Failed to get XMR key from Alice.");
+                    }
+                };
                 Ok(json!({
                     "result": "ok",
                 }))
