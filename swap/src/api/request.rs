@@ -292,7 +292,7 @@ impl Request {
                         Some(state.expired_timelock(bitcoin_wallet).await)
                     }
                     BobState::BtcPunished { .. } => Some(Ok(ExpiredTimelocks::Punish)),
-                    BobState::BtcRefunded { .. }
+                    BobState::BtcRefunded(_)
                     | BobState::BtcRedeemed(_)
                     | BobState::XmrRedeemed { .. } => None,
                 };
