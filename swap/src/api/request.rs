@@ -875,14 +875,37 @@ impl Request {
                         .add_address(seller_peer_id, seller_address);
                 }
 
-                let (_, mut event_loop_handle) = EventLoop::new(swap_id, swarm, seller_peer_id)?;
+                let (event_loop, event_loop_handle) =
+                    EventLoop::new(swap_id, swarm, seller_peer_id)?;
+                let mut swap = Swap::from_db(
+                    Arc::clone(&context.db),
+                    swap_id,
+                    Arc::clone(
+                        context
+                            .bitcoin_wallet
+                            .as_ref()
+                            .context("Could not get Bitcoin wallet")?,
+                    ),
+                    Arc::clone(
+                        context
+                            .monero_wallet
+                            .as_ref()
+                            .context("Could not get Monero wallet")?,
+                    ),
+                    context.config.env_config,
+                    event_loop_handle,
+                    monero_receive_address,
+                )
+                .await?;
+                tokio::spawn(event_loop.run().in_current_span());
                 tracing::info!("Asking Alice to reveal XMR key to us.");
-                let response = event_loop_handle
+                let response = swap
+                    .event_loop_handle
                     .request_cooperative_xmr_redeem(swap_id)
                     .await;
                 match response {
                     Ok(response) => {
-                        tracing::info!("Alice revealed XMR key to us, redeeming XMR.");
+                        tracing::info!("Alice revealed XMR key to us, redeeming XMR...");
                         let s_a = monero::PrivateKey {
                             scalar: response.s_a,
                         };
@@ -936,7 +959,12 @@ impl Request {
                     Err(error) => {
                         tracing::error!(%error, "Failed to get XMR key from Alice.");
                     }
-                };
+                }
+                context
+                    .swap_lock
+                    .release_swap_lock()
+                    .await
+                    .expect("Could not release swap lock");
                 Ok(json!({
                     "result": "ok",
                 }))
