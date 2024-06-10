@@ -224,7 +224,7 @@ mod test {
                 r#"method{method_name="Balance" log_reference_id="\"test_ref_id\""}: swap::api::request: Current Bitcoin balance as of last sync balance=0.1 BTC"#
             ));
 
-            for method in ["get_swap_info", "resume_swap", "cancel_refund_swap"].iter() {
+            for method in ["get_swap_info", "resume_swap", "cancel_refund_swap", "attempt_cooperative_redeem"].iter() {
                 let mut params = ObjectParams::new();
                 params.insert("swap_id", "invalid_swap").unwrap();
 
