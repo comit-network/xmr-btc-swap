@@ -844,7 +844,7 @@ impl Request {
                             None
                         }
                     })
-                    .expect("Could not get state3 from database");
+                    .with_context(|| "Did not find BtcLocked state for swap")?;
                 let seed = context
                     .config
                     .seed
