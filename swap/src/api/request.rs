@@ -839,7 +839,7 @@ impl Request {
                             monero_wallet_restore_blockheight,
                         }) = state
                         {
-                            Some((state3.clone(), monero_wallet_restore_blockheight.clone()))
+                            Some((state3.clone(), *monero_wallet_restore_blockheight))
                         } else {
                             None
                         }

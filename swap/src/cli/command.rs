@@ -64,7 +64,7 @@ where
         CliCommand::AttemptCooperativeRedeem {
             swap_id: SwapId { swap_id },
         } => {
-            let request = Request::new(Method::AttemptCooperativeRedeem { swap_id: swap_id });
+            let request = Request::new(Method::AttemptCooperativeRedeem { swap_id });
 
             let context =
                 Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
