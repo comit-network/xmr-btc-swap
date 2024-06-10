@@ -569,7 +569,7 @@ impl State3 {
             self.tx_punish_fee,
         )
     }
-    pub fn cooperative_xmr_redeem_after_punish(&self) -> monero::Scalar {
+    pub fn cooperative_xmr_redeem(&self) -> monero::Scalar {
         self.s_a
     }
 }
