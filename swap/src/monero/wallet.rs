@@ -45,6 +45,7 @@ impl Wallet {
     pub async fn connect(client: wallet::Client, name: String, env_config: Config) -> Result<Self> {
         let main_address =
             monero::Address::from_str(client.get_address(0).await?.address.as_str())?;
+
         Ok(Self {
             inner: Mutex::new(client),
             network: env_config.monero_network,
@@ -125,13 +126,14 @@ impl Wallet {
         let temp_wallet_address =
             Address::standard(self.network, public_spend_key, public_view_key);
 
-        let wallet = self.inner.lock().await;
-
         // Close the default wallet before generating the other wallet to ensure that
         // it saves its state correctly
-        let _ = wallet.close_wallet().await?;
+        let _ = self.inner.lock().await.close_wallet().await?;
 
-        let _ = wallet
+        let _ = self
+            .inner
+            .lock()
+            .await
             .generate_from_keys(
                 file_name,
                 temp_wallet_address.to_string(),
@@ -144,8 +146,14 @@ impl Wallet {
             .await?;
 
         // Try to send all the funds from the generated wallet to the default wallet
-        match wallet.refresh().await {
-            Ok(_) => match wallet.sweep_all(self.main_address.to_string()).await {
+        match self.refresh(3).await {
+            Ok(_) => match self
+                .inner
+                .lock()
+                .await
+                .sweep_all(self.main_address.to_string())
+                .await
+            {
                 Ok(sweep_all) => {
                     for tx in sweep_all.tx_hash_list {
                         tracing::info!(
@@ -166,7 +174,12 @@ impl Wallet {
             }
         }
 
-        let _ = wallet.open_wallet(self.name.clone()).await?;
+        let _ = self
+            .inner
+            .lock()
+            .await
+            .open_wallet(self.name.clone())
+            .await?;
 
         Ok(())
     }
@@ -261,8 +274,44 @@ impl Wallet {
         self.main_address
     }
 
-    pub async fn refresh(&self) -> Result<Refreshed> {
-        Ok(self.inner.lock().await.refresh().await?)
+    pub async fn refresh(&self, max_attempts: usize) -> Result<Refreshed> {
+        const RETRY_INTERVAL: Duration = Duration::from_secs(1);
+
+        for i in 1..=max_attempts {
+            tracing::info!(name = %self.name, attempt=i, "Syncing Monero wallet");
+
+            let result = self.inner.lock().await.refresh().await;
+
+            match result {
+                Ok(refreshed) => {
+                    tracing::info!(name = %self.name, "Monero wallet synced");
+                    return Ok(refreshed);
+                }
+                Err(error) => {
+                    let attempts_left = max_attempts - i;
+
+                    // We would not want to fail here if the height is not available
+                    // as it is not critical for the operation of the wallet.
+                    // We can just log a warning and continue.
+                    let height = match self.inner.lock().await.get_height().await {
+                        Ok(height) => height.to_string(),
+                        Err(_) => {
+                            tracing::warn!(name = %self.name, "Failed to fetch Monero wallet height during sync");
+                            "unknown".to_string()
+                        }
+                    };
+
+                    tracing::warn!(attempt=i, %height, %attempts_left, name = %self.name, %error, "Failed to sync Monero wallet");
+
+                    if attempts_left == 0 {
+                        return Err(error.into());
+                    }
+                }
+            }
+
+            tokio::time::sleep(RETRY_INTERVAL).await;
+        }
+        unreachable!("Loop should have returned by now");
     }
 }
 

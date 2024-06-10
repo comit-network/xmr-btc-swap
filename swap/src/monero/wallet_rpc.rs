@@ -352,6 +352,7 @@ impl WalletRpc {
             .arg("--disable-rpc-login")
             .arg("--wallet-dir")
             .arg(self.working_dir.join("monero-data"))
+            .arg("--no-initial-sync")
             .spawn()?;
 
         let stdout = child
