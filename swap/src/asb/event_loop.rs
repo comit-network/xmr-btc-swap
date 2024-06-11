@@ -289,7 +289,7 @@ where
                                             .await {
                                                 Ok(states) => states,
                                                 Err(_) => {
-                                                    tracing::error!("Failed to get xmr redeem keys.");
+                                                    tracing::error!("Failed to read states from database");
                                                     continue;
                                                 }
                                             };
@@ -300,8 +300,16 @@ where
                                                     None
                                                 }
                                             });
-                                            if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, Response { swap_id, s_a: s_a.expect("Failed to get xmr redeem keys.") }).is_err() {
-                                                tracing::debug!(%peer, "Failed to respond with xmr redeem keys");
+                                            if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, Response { swap_id, s_a: s_a.expect("Failed to get xmr key from database") }).is_err() {
+                                                tracing::debug!(%peer, "Failed to respond with xmr key");
+                                            } else {
+                                                let state = AliceState::BtcRedeemed;
+                                                match self.db.insert_latest_state(swap_id, state.into()).await {
+                                                    Ok(_) => {},
+                                                    Err(error) => {
+                                                        tracing::warn!(%swap_id, "Unable to save latest state in database: {}", error);
+                                                    }
+                                                }
                                             }
                                         } else {
                                             tracing::warn!(%swap_id, "Ignoring cooperative xmr redeem request for swap in invalid state");

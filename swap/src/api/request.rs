@@ -898,14 +898,14 @@ impl Request {
                 )
                 .await?;
                 tokio::spawn(event_loop.run().in_current_span());
-                tracing::info!("Asking Alice to reveal XMR key to us.");
+                tracing::info!("Asking Alice to reveal xmr key to us.");
                 let response = swap
                     .event_loop_handle
                     .request_cooperative_xmr_redeem(swap_id)
                     .await;
                 match response {
                     Ok(response) => {
-                        tracing::info!("Alice revealed XMR key to us, redeeming XMR...");
+                        tracing::info!("Alice revealed xmr key to us, redeeming xmr...");
                         let s_a = monero::PrivateKey {
                             scalar: response.s_a,
                         };
@@ -952,12 +952,12 @@ impl Request {
                                     .await?;
                             }
                             Err(error) => {
-                                tracing::error!(%error, "Failed to redeem XMR with key from Alice.");
+                                tracing::error!(%error, "Failed to redeem xmr with key from Alice.");
                             }
                         }
                     }
                     Err(error) => {
-                        tracing::error!(%error, "Failed to get XMR key from Alice.");
+                        tracing::error!(%error, "Failed to get xmr key from Alice.");
                     }
                 }
                 context
