@@ -83,6 +83,7 @@ pub async fn cancel(
                     tracing::info!("General error trying to submit cancel transaction");
                 }
                 let state = BobState::BtcCancelled(state6);
+                let txid = state6.construct_tx_cancel().txid();
                 db.insert_latest_state(swap_id, state.clone().into())
                     .await?;
                 Ok((txid, state))
