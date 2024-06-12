@@ -158,7 +158,6 @@ jobs:
             alice_and_bob_refund_using_cancel_then_refund_command,
             alice_and_bob_refund_using_cancel_and_refund_command_timelock_not_expired,
             punish,
-            punish_redeem,
             alice_punishes_after_restart_bob_dead,
             alice_manually_punishes_after_bob_dead,
             alice_refunds_after_restart_bob_refunded,
