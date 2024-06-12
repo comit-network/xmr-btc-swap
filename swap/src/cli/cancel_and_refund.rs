@@ -82,8 +82,8 @@ pub async fn cancel(
                 } else if error_code == i64::from(RpcErrorCode::RpcVerifyError) {
                     tracing::info!("General error trying to submit cancel transaction");
                 }
-                let state = BobState::BtcCancelled(state6);
                 let txid = state6.construct_tx_cancel()?.txid();
+                let state = BobState::BtcCancelled(state6);
                 db.insert_latest_state(swap_id, state.clone().into())
                     .await?;
                 Ok((txid, state))
