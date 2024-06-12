@@ -646,7 +646,7 @@ impl State6 {
             tx_cancel_status,
         ))
     }
-    pub async fn construct_tx_cancel(&self) -> Result<bitcoin::TxCancel> {
+    pub fn construct_tx_cancel(&self) -> Result<bitcoin::TxCancel> {
         bitcoin::TxCancel::new(
             &self.tx_lock,
             self.cancel_timelock,
