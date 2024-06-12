@@ -288,24 +288,19 @@ where
                                 continue;
                             };
 
-                            let Ok(states) = self.db.get_states(swap_id).await else {
-                                tracing::error!(%swap_id, "Failed to read states from database");
+                            let state3 = match state {
+                                State::Alice (AliceState::BtcPunished { state3 }) => state3,
+                                _ => {
+                                tracing::warn!(%swap_id, "Ignoring cooperative XMR redeem request for swap in invalid state");
                                 continue;
+                                }
                             };
 
-                            let s_a = states.iter().find_map(|state| {
-                                if let State::Alice(AliceState::BtcLocked { state3 }) = state {
-                                        Some(state3.s_a)
-                                } else {
-                                    None
-                                }
-                            });
-
-                            if let Err(_) = self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, Response { swap_id, s_a: s_a.expect("Failed to get xmr key from database") }) {
+                            if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, Response { swap_id, s_a: state3.s_a }).is_err() {
                                 tracing::debug!(%peer, "Failed to respond with XMR key");
                                 continue;
-                            } 
-                            
+                            }
+
                             let new_state = AliceState::BtcRedeemed;
                             if let Err(error) = self.db.insert_latest_state(swap_id, new_state.into()).await {
                                 tracing::warn!(%swap_id, "Unable to save latest state in database: {}", error);

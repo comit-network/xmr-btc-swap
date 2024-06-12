@@ -1,6 +1,7 @@
 use crate::monero::TransferProof;
 use crate::protocol::bob;
 use crate::protocol::bob::BobState;
+use bitcoin::Txid;
 use monero_rpc::wallet::BlockHeight;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -33,6 +34,10 @@ pub enum Bob {
     EncSigSent {
         state4: bob::State4,
     },
+    BtcPunished {
+        state: bob::State6,
+        tx_lock_id: Txid,
+    },
     BtcRedeemed(bob::State5),
     CancelTimelockExpired(bob::State6),
     BtcCancelled(bob::State6),
@@ -44,7 +49,7 @@ pub enum BobEndState {
     SafelyAborted,
     XmrRedeemed { tx_lock_id: bitcoin::Txid },
     BtcRefunded(Box<bob::State6>),
-    BtcPunished { tx_lock_id: bitcoin::Txid },
+    BtcPunishedCooperativeRedeemFailed(bitcoin::Txid),
 }
 
 impl From<BobState> for Bob {
@@ -79,12 +84,13 @@ impl From<BobState> for Bob {
             BobState::BtcRedeemed(state5) => Bob::BtcRedeemed(state5),
             BobState::CancelTimelockExpired(state6) => Bob::CancelTimelockExpired(state6),
             BobState::BtcCancelled(state6) => Bob::BtcCancelled(state6),
+            BobState::BtcPunished { state, tx_lock_id } => Bob::BtcPunished { state, tx_lock_id },
             BobState::BtcRefunded(state6) => Bob::Done(BobEndState::BtcRefunded(Box::new(state6))),
             BobState::XmrRedeemed { tx_lock_id } => {
                 Bob::Done(BobEndState::XmrRedeemed { tx_lock_id })
             }
-            BobState::BtcPunished { tx_lock_id } => {
-                Bob::Done(BobEndState::BtcPunished { tx_lock_id })
+            BobState::BtcPunishedCooperativeRedeemFailed(tx_lock_id) => {
+                Bob::Done(BobEndState::BtcPunishedCooperativeRedeemFailed(tx_lock_id))
             }
             BobState::SafelyAborted => Bob::Done(BobEndState::SafelyAborted),
         }
@@ -123,11 +129,14 @@ impl From<Bob> for BobState {
             Bob::BtcRedeemed(state5) => BobState::BtcRedeemed(state5),
             Bob::CancelTimelockExpired(state6) => BobState::CancelTimelockExpired(state6),
             Bob::BtcCancelled(state6) => BobState::BtcCancelled(state6),
+            Bob::BtcPunished { state, tx_lock_id } => BobState::BtcPunished { state, tx_lock_id },
             Bob::Done(end_state) => match end_state {
                 BobEndState::SafelyAborted => BobState::SafelyAborted,
                 BobEndState::XmrRedeemed { tx_lock_id } => BobState::XmrRedeemed { tx_lock_id },
                 BobEndState::BtcRefunded(state6) => BobState::BtcRefunded(*state6),
-                BobEndState::BtcPunished { tx_lock_id } => BobState::BtcPunished { tx_lock_id },
+                BobEndState::BtcPunishedCooperativeRedeemFailed(tx_lock_id) => {
+                    BobState::BtcPunishedCooperativeRedeemFailed(tx_lock_id)
+                }
             },
         }
     }
@@ -148,6 +157,7 @@ impl fmt::Display for Bob {
             Bob::BtcRedeemed(_) => f.write_str("Monero redeemable"),
             Bob::Done(end_state) => write!(f, "Done: {}", end_state),
             Bob::EncSigSent { .. } => f.write_str("Encrypted signature sent"),
+            Bob::BtcPunished { .. } => f.write_str("Bitcoin punished"),
         }
     }
 }

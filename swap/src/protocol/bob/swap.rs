@@ -13,7 +13,7 @@ pub fn is_complete(state: &BobState) -> bool {
         state,
         BobState::BtcRefunded(..)
             | BobState::XmrRedeemed { .. }
-            | BobState::BtcPunished { .. }
+            | BobState::BtcPunishedCooperativeRedeemFailed(..)
             | BobState::SafelyAborted
     )
 }
@@ -140,12 +140,12 @@ async fn next_state(
                         result?;
                         tracing::info!("Alice took too long to lock Monero, cancelling the swap");
 
-                        let state4 = state3.cancel();
+                        let state4 = state3.cancel(monero_wallet_restore_blockheight);
                         BobState::CancelTimelockExpired(state4)
                     },
                 }
             } else {
-                let state4 = state3.cancel();
+                let state4 = state3.cancel(monero_wallet_restore_blockheight);
                 BobState::CancelTimelockExpired(state4)
             }
         }
@@ -169,17 +169,17 @@ async fn next_state(
 
                                 tx_lock_status.wait_until_confirmed_with(state.cancel_timelock).await?;
 
-                                BobState::CancelTimelockExpired(state.cancel())
+                                BobState::CancelTimelockExpired(state.cancel(monero_wallet_restore_blockheight))
                             },
                         }
                     }
                     result = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
                         result?;
-                        BobState::CancelTimelockExpired(state.cancel())
+                        BobState::CancelTimelockExpired(state.cancel(monero_wallet_restore_blockheight))
                     }
                 }
             } else {
-                BobState::CancelTimelockExpired(state.cancel())
+                BobState::CancelTimelockExpired(state.cancel(monero_wallet_restore_blockheight))
             }
         }
         BobState::XmrLocked(state) => {
@@ -238,39 +238,9 @@ async fn next_state(
             }
         }
         BobState::BtcRedeemed(state) => {
-            let (spend_key, view_key) = state.xmr_keys();
-
-            let wallet_file_name = swap_id.to_string();
-
-            tracing::info!(%wallet_file_name, "Generating and opening Monero wallet from the extracted keys to redeem the Monero");
-
-            if let Err(e) = monero_wallet
-                .create_from_and_load(
-                    wallet_file_name.clone(),
-                    spend_key,
-                    view_key,
-                    state.monero_wallet_restore_blockheight,
-                )
-                .await
-            {
-                // In case we failed to refresh/sweep, when resuming the wallet might already
-                // exist! This is a very unlikely scenario, but if we don't take care of it we
-                // might not be able to ever transfer the Monero.
-                tracing::warn!("Failed to generate monero wallet from keys: {:#}", e);
-                tracing::info!(%wallet_file_name,
-                    "Falling back to trying to open the wallet if it already exists",
-                );
-                monero_wallet.open(wallet_file_name).await?;
-            }
-
-            // Ensure that the generated wallet is synced so we have a proper balance
-            monero_wallet.refresh(20).await?;
-            // Sweep (transfer all funds) to the given address
-            let tx_hashes = monero_wallet.sweep_all(monero_receive_address).await?;
-
-            for tx_hash in tx_hashes {
-                tracing::info!(%monero_receive_address, txid=%tx_hash.0, "Successfully transferred XMR to wallet");
-            }
+            state
+                .redeem_xmr(monero_wallet, swap_id.to_string(), monero_receive_address)
+                .await?;
 
             BobState::XmrRedeemed {
                 tx_lock_id: state.tx_lock_id(),
@@ -299,12 +269,47 @@ async fn next_state(
                     tracing::info!("You have been punished for not refunding in time");
                     BobState::BtcPunished {
                         tx_lock_id: state.tx_lock_id(),
+                        state,
                     }
                 }
             }
         }
         BobState::BtcRefunded(state4) => BobState::BtcRefunded(state4),
-        BobState::BtcPunished { tx_lock_id } => BobState::BtcPunished { tx_lock_id },
+        BobState::BtcPunished { state, tx_lock_id } => {
+            tracing::info!("Asking Alice to reveal XMR key to us");
+            let response = event_loop_handle
+                .request_cooperative_xmr_redeem(swap_id)
+                .await;
+            match response {
+                Ok(response) => {
+                    tracing::info!("Alice revealed XMR key to us, redeeming XMR...");
+                    let s_a = monero::PrivateKey {
+                        scalar: response.s_a,
+                    };
+                    let state5 = state.attempt_cooperative_redeem(s_a);
+                    match state5
+                        .redeem_xmr(monero_wallet, swap_id.to_string(), monero_receive_address)
+                        .await
+                    {
+                        Ok(_) => {
+                            return Ok(BobState::XmrRedeemed { tx_lock_id });
+                        }
+                        Err(error) => {
+                            tracing::error!(%error, "Failed to redeem XMR with key from Alice");
+
+                            return Ok(BobState::BtcPunishedCooperativeRedeemFailed(tx_lock_id));
+                        }
+                    }
+                }
+                Err(error) => {
+                    tracing::error!(%error, "Failed to get XMR key from Alice");
+                    return Ok(BobState::BtcPunishedCooperativeRedeemFailed(tx_lock_id));
+                }
+            };
+        }
+        BobState::BtcPunishedCooperativeRedeemFailed(tx_lock_id) => {
+            BobState::BtcPunishedCooperativeRedeemFailed(tx_lock_id)
+        }
         BobState::SafelyAborted => BobState::SafelyAborted,
         BobState::XmrRedeemed { tx_lock_id } => BobState::XmrRedeemed { tx_lock_id },
     })

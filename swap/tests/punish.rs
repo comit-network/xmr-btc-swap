@@ -1,6 +1,6 @@
 pub mod harness;
 
-use harness::bob_run_until::is_btc_locked;
+use harness::bob_run_until::{is_btc_locked, is_btc_punished};
 use harness::FastPunishConfig;
 use swap::asb::FixedRate;
 use swap::protocol::bob::BobState;
@@ -31,7 +31,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
             .await;
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));
 
-        let bob_state = bob::run(bob_swap).await?;
+        let bob_state = bob::run_until(bob_swap, is_btc_punished).await?;
 
         ctx.assert_bob_punished(bob_state).await;
 

@@ -651,7 +651,7 @@ impl TestContext {
     }
 
     pub async fn assert_alice_punished(&self, state: AliceState) {
-        assert!(matches!(state, AliceState::BtcPunished));
+        assert!(matches!(state, AliceState::BtcPunished { .. }));
 
         assert_eventual_balance(
             self.alice_bitcoin_wallet.as_ref(),
@@ -697,7 +697,7 @@ impl TestContext {
         let lock_tx_id = if let BobState::BtcRefunded(state4) = state {
             state4.tx_lock_id()
         } else {
-            panic!("Bob in not in btc refunded state: {:?}", state);
+            panic!("Bob is not in btc refunded state: {:?}", state);
         };
         let lock_tx_bitcoin_fee = self
             .bob_bitcoin_wallet
@@ -818,7 +818,7 @@ impl TestContext {
     async fn bob_punished_btc_balance(&self, state: BobState) -> Result<bitcoin::Amount> {
         self.bob_bitcoin_wallet.sync().await?;
 
-        let lock_tx_id = if let BobState::BtcPunished { tx_lock_id } = state {
+        let lock_tx_id = if let BobState::BtcPunished { tx_lock_id, .. } = state {
             tx_lock_id
         } else {
             bail!("Bob in not in btc punished state: {:?}", state);
@@ -1019,6 +1019,9 @@ pub mod bob_run_until {
 
     pub fn is_encsig_sent(state: &BobState) -> bool {
         matches!(state, BobState::EncSigSent(..))
+    }
+    pub fn is_btc_punished(state: &BobState) -> bool {
+        matches!(state, BobState::BtcPunished { .. })
     }
 }
 

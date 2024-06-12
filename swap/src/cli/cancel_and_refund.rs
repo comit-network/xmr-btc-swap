@@ -33,8 +33,16 @@ pub async fn cancel(
     let state = db.get_state(swap_id).await?.try_into()?;
 
     let state6 = match state {
-        BobState::BtcLocked { state3, .. } => state3.cancel(),
-        BobState::XmrLockProofReceived { state, .. } => state.cancel(),
+        BobState::BtcLocked {
+            state3,
+            monero_wallet_restore_blockheight,
+            ..
+        } => state3.cancel(monero_wallet_restore_blockheight),
+        BobState::XmrLockProofReceived {
+            state,
+            monero_wallet_restore_blockheight,
+            ..
+        } => state.cancel(monero_wallet_restore_blockheight),
         BobState::XmrLocked(state4) => state4.cancel(),
         BobState::EncSigSent(state4) => state4.cancel(),
         BobState::CancelTimelockExpired(state6) => state6,
@@ -46,6 +54,7 @@ pub async fn cancel(
         | BobState::BtcRedeemed(_)
         | BobState::XmrRedeemed { .. }
         | BobState::BtcPunished { .. }
+        | BobState::BtcPunishedCooperativeRedeemFailed(_)
         | BobState::SafelyAborted => bail!(
             "Cannot cancel swap {} because it is in state {} which is not refundable.",
             swap_id,
@@ -85,8 +94,15 @@ pub async fn refund(
     let state = db.get_state(swap_id).await?.try_into()?;
 
     let state6 = match state {
-        BobState::BtcLocked { state3, .. } => state3.cancel(),
-        BobState::XmrLockProofReceived { state, .. } => state.cancel(),
+        BobState::BtcLocked {
+            state3,
+            monero_wallet_restore_blockheight,
+        } => state3.cancel(monero_wallet_restore_blockheight),
+        BobState::XmrLockProofReceived {
+            state,
+            monero_wallet_restore_blockheight,
+            ..
+        } => state.cancel(monero_wallet_restore_blockheight),
         BobState::XmrLocked(state4) => state4.cancel(),
         BobState::EncSigSent(state4) => state4.cancel(),
         BobState::CancelTimelockExpired(state6) => state6,
@@ -97,6 +113,7 @@ pub async fn refund(
         | BobState::BtcRefunded(_)
         | BobState::XmrRedeemed { .. }
         | BobState::BtcPunished { .. }
+        | BobState::BtcPunishedCooperativeRedeemFailed(_)
         | BobState::SafelyAborted => bail!(
             "Cannot refund swap {} because it is in state {} which is not refundable.",
             swap_id,

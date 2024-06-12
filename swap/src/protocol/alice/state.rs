@@ -74,7 +74,9 @@ pub enum AliceState {
         transfer_proof: TransferProof,
         state3: Box<State3>,
     },
-    BtcPunished,
+    BtcPunished {
+        state3: Box<State3>,
+    },
     SafelyAborted,
 }
 
@@ -98,7 +100,7 @@ impl fmt::Display for AliceState {
             AliceState::BtcRedeemed => write!(f, "btc is redeemed"),
             AliceState::BtcCancelled { .. } => write!(f, "btc is cancelled"),
             AliceState::BtcRefunded { .. } => write!(f, "btc is refunded"),
-            AliceState::BtcPunished => write!(f, "btc is punished"),
+            AliceState::BtcPunished { .. } => write!(f, "btc is punished"),
             AliceState::SafelyAborted => write!(f, "safely aborted"),
             AliceState::BtcPunishable { .. } => write!(f, "btc is punishable"),
             AliceState::XmrRefunded => write!(f, "xmr is refunded"),

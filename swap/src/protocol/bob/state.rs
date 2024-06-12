@@ -48,8 +48,10 @@ pub enum BobState {
         tx_lock_id: bitcoin::Txid,
     },
     BtcPunished {
+        state: State6,
         tx_lock_id: bitcoin::Txid,
     },
+    BtcPunishedCooperativeRedeemFailed(bitcoin::Txid),
     SafelyAborted,
 }
 
@@ -70,6 +72,9 @@ impl fmt::Display for BobState {
             BobState::BtcRefunded(..) => write!(f, "btc is refunded"),
             BobState::XmrRedeemed { .. } => write!(f, "xmr is redeemed"),
             BobState::BtcPunished { .. } => write!(f, "btc is punished"),
+            BobState::BtcPunishedCooperativeRedeemFailed(..) => {
+                write!(f, "btc is punished and cooperative redeem failed")
+            }
             BobState::SafelyAborted => write!(f, "safely aborted"),
         }
     }
@@ -421,11 +426,13 @@ impl State3 {
         }
     }
 
-    pub fn cancel(&self) -> State6 {
+    pub fn cancel(&self, monero_wallet_restore_blockheight: BlockHeight) -> State6 {
         State6 {
             A: self.A,
             b: self.b.clone(),
             s_b: self.s_b,
+            v: self.v,
+            monero_wallet_restore_blockheight,
             cancel_timelock: self.cancel_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: self.refund_address.clone(),
@@ -584,6 +591,8 @@ impl State4 {
             A: self.A,
             b: self.b,
             s_b: self.s_b,
+            v: self.v,
+            monero_wallet_restore_blockheight: self.monero_wallet_restore_blockheight,
             cancel_timelock: self.cancel_timelock,
             punish_timelock: self.punish_timelock,
             refund_address: self.refund_address,
@@ -617,6 +626,43 @@ impl State5 {
     pub fn tx_lock_id(&self) -> bitcoin::Txid {
         self.tx_lock.txid()
     }
+    pub async fn redeem_xmr(
+        &self,
+        monero_wallet: &monero::Wallet,
+        wallet_file_name: std::string::String,
+        monero_receive_address: monero::Address,
+    ) -> Result<()> {
+        let (spend_key, view_key) = self.xmr_keys();
+
+        tracing::info!(%wallet_file_name, "Generating and opening Monero wallet from the extracted keys to redeem the Monero");
+        if let Err(e) = monero_wallet
+            .create_from_and_load(
+                wallet_file_name.clone(),
+                spend_key,
+                view_key,
+                self.monero_wallet_restore_blockheight,
+            )
+            .await
+        {
+            // In case we failed to refresh/sweep, when resuming the wallet might already
+            // exist! This is a very unlikely scenario, but if we don't take care of it we
+            // might not be able to ever transfer the Monero.
+            tracing::warn!("Failed to generate monero wallet from keys: {:#}", e);
+            tracing::info!(%wallet_file_name,
+                "Falling back to trying to open the wallet if it already exists",
+            );
+            monero_wallet.open(wallet_file_name).await?;
+        }
+
+        // Ensure that the generated wallet is synced so we have a proper balance
+        monero_wallet.refresh(20).await?;
+        // Sweep (transfer all funds) to the given address
+        let tx_hashes = monero_wallet.sweep_all(monero_receive_address).await?;
+        for tx_hash in tx_hashes {
+            tracing::info!(%monero_receive_address, txid=%tx_hash.0, "Successfully transferred XMR to wallet");
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -624,6 +670,8 @@ pub struct State6 {
     A: bitcoin::PublicKey,
     b: bitcoin::SecretKey,
     s_b: monero::Scalar,
+    v: monero::PrivateViewKey,
+    pub monero_wallet_restore_blockheight: BlockHeight,
     cancel_timelock: CancelTimelock,
     punish_timelock: PunishTimelock,
     refund_address: bitcoin::Address,
@@ -727,5 +775,14 @@ impl State6 {
 
     pub fn tx_lock_id(&self) -> bitcoin::Txid {
         self.tx_lock.txid()
+    }
+    pub fn attempt_cooperative_redeem(&self, s_a: monero::PrivateKey) -> State5 {
+        State5 {
+            s_a,
+            s_b: self.s_b,
+            v: self.v,
+            tx_lock: self.tx_lock.clone(),
+            monero_wallet_restore_blockheight: self.monero_wallet_restore_blockheight,
+        }
     }
 }

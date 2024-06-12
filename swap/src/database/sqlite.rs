@@ -367,9 +367,8 @@ mod tests {
         let db = setup_test_db().await.unwrap();
 
         let state_1 = State::Alice(AliceState::BtcRedeemed);
-        let state_2 = State::Alice(AliceState::BtcPunished);
-        let state_3 = State::Alice(AliceState::SafelyAborted);
-        let state_4 = State::Bob(BobState::SafelyAborted);
+        let state_2 = State::Alice(AliceState::SafelyAborted);
+        let state_3 = State::Bob(BobState::SafelyAborted);
         let swap_id_1 = Uuid::new_v4();
         let swap_id_2 = Uuid::new_v4();
 
@@ -379,10 +378,7 @@ mod tests {
         db.insert_latest_state(swap_id_1, state_2.clone())
             .await
             .unwrap();
-        db.insert_latest_state(swap_id_1, state_3.clone())
-            .await
-            .unwrap();
-        db.insert_latest_state(swap_id_2, state_4.clone())
+        db.insert_latest_state(swap_id_2, state_3.clone())
             .await
             .unwrap();
 
@@ -390,11 +386,10 @@ mod tests {
 
         assert_eq!(latest_loaded.len(), 2);
 
-        assert!(latest_loaded.contains(&(swap_id_1, state_3)));
-        assert!(latest_loaded.contains(&(swap_id_2, state_4)));
+        assert!(latest_loaded.contains(&(swap_id_1, state_2)));
+        assert!(latest_loaded.contains(&(swap_id_2, state_3)));
 
         assert!(!latest_loaded.contains(&(swap_id_1, state_1)));
-        assert!(!latest_loaded.contains(&(swap_id_1, state_2)));
     }
 
     #[tokio::test]
