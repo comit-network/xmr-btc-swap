@@ -70,7 +70,7 @@ pub async fn cancel(
                 db.insert_latest_state(swap_id, state.clone().into())
                     .await?;
                 tracing::info!("Cancel transaction has already been confirmed on chain");
-                Ok((tx.txid(), state));
+                Ok((tx.txid(), state))
             } else if let ExpiredTimelocks::None { .. } =
                 state6.expired_timelock(bitcoin_wallet.as_ref()).await?
             {
