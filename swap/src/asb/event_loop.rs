@@ -255,7 +255,7 @@ where
                             }.boxed());
                         }
                         SwarmEvent::Behaviour(OutEvent::CooperativeXmrRedeemRequested { swap_id, channel, peer }) => {
-                            tracing::debug!("Cooperative XMR Redeem requested by Bob.");
+                            tracing::debug!("Cooperative XMR Redeem requested by Bob");
                             let swap_peer = self.db.get_peer_id(swap_id).await;
 
                             // Ensure that an incoming encrypted signature is sent by the peer-id associated with the swap
@@ -263,7 +263,7 @@ where
                                 tracing::warn!(
                                     unknown_swap_id = %swap_id,
                                     from = %peer,
-                                    "Ignoring cooperative xmr redeem request for unknown swap"
+                                    "Ignoring cooperative XMR redeem request for unknown swap"
                                 );
                                 continue;
                             };
@@ -273,7 +273,7 @@ where
                                     %swap_id,
                                     received_from = %peer,
                                     expected_from = %swap_peer,
-                                    "Ignoring malicious cooperative xmr redeem request which was not expected from this peer",
+                                    "Ignoring malicious cooperative XMR redeem request which was not expected from this peer",
                                 );
                                 continue;
                             }
@@ -284,7 +284,7 @@ where
                             };
 
                             let State::Alice (AliceState::BtcPunished { .. }) = state else {
-                                tracing::warn!(%swap_id, "Ignoring cooperative xmr redeem request for swap in invalid state");
+                                tracing::warn!(%swap_id, "Ignoring cooperative XMR redeem request for swap in invalid state");
                                 continue;
                             };
 
@@ -302,7 +302,7 @@ where
                             });
 
                             if let Err(_) = self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, Response { swap_id, s_a: s_a.expect("Failed to get xmr key from database") }) {
-                                tracing::debug!(%peer, "Failed to respond with xmr key");
+                                tracing::debug!(%peer, "Failed to respond with XMR key");
                                 continue;
                             } 
                             
