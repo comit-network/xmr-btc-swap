@@ -42,7 +42,7 @@ async fn given_alice_and_bob_manually_cancel_when_timelock_not_expired_errors() 
         let error = cli::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db)
             .await
             .unwrap_err();
-        assert_eq!(error.to_string(), "Cancel timelock hasn't expired yet");
+        assert_eq!(error.to_string(), "Cancel timelock hasn't expired yet. Bob tried to cancel the swap too early");
 
         ctx.restart_alice().await;
         let alice_swap = ctx.alice_next_swap().await;
