@@ -71,21 +71,24 @@ pub async fn cancel(
                     .await?;
                 tracing::info!("Cancel transaction has already been confirmed on chain");
                 return Ok((tx.txid(), state));
-            }
-            if let ExpiredTimelocks::None { .. } =
+            } else if let ExpiredTimelocks::None { .. } =
                 state6.expired_timelock(bitcoin_wallet.as_ref()).await?
             {
-                bail!("Cancel timelock hasn't expired yet");
-            }
-            if let Ok(error_code) = parse_rpc_error_code(&err) {
+                bail!("Cancel timelock hasn't expired yet. Bob tried to cancel the swap too early");
+            } else if let Ok(error_code) = parse_rpc_error_code(&err) {
                 tracing::debug!(%error_code, "parse rpc error");
                 if error_code == i64::from(RpcErrorCode::RpcVerifyAlreadyInChain) {
                     tracing::info!("Cancel transaction has already been confirmed on chain");
                 } else if error_code == i64::from(RpcErrorCode::RpcVerifyError) {
                     tracing::info!("General error trying to submit cancel transaction");
                 }
+                let state = BobState::BtcCancelled(state6);
+                db.insert_latest_state(swap_id, state.clone().into())
+                    .await?;
+                Ok((txid, state))
+            } else {
+                bail!("Error while trying to submit cancel transaction, this shouldn't have happened. {}", err);
             }
-            bail!(err);
         }
     }
 }
