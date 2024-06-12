@@ -670,9 +670,10 @@ impl State6 {
         &self,
         bitcoin_wallet: &bitcoin::Wallet,
     ) -> Result<(Txid, Subscription)> {
-        let transaction = self.construct_tx_cancel()?
-        .complete_as_bob(self.A, self.b.clone(), self.tx_cancel_sig_a.clone())
-        .context("Failed to complete Bitcoin cancel transaction")?;
+        let transaction = self
+            .construct_tx_cancel()?
+            .complete_as_bob(self.A, self.b.clone(), self.tx_cancel_sig_a.clone())
+            .context("Failed to complete Bitcoin cancel transaction")?;
 
         let (tx_id, subscription) = bitcoin_wallet.broadcast(transaction, "cancel").await?;
 
