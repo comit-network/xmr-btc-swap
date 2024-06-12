@@ -468,6 +468,7 @@ impl BobParams {
         let db = Arc::new(SqliteDatabase::open(&self.db_path).await?);
 
         db.insert_peer_id(swap_id, self.alice_peer_id).await?;
+
         let swap = bob::Swap::new(
             db,
             swap_id,
@@ -650,7 +651,7 @@ impl TestContext {
     }
 
     pub async fn assert_alice_punished(&self, state: AliceState) {
-        assert!(matches!(state, AliceState::BtcPunished { .. }));
+        assert!(matches!(state, AliceState::BtcPunished));
 
         assert_eventual_balance(
             self.alice_bitcoin_wallet.as_ref(),
@@ -693,8 +694,8 @@ impl TestContext {
     pub async fn assert_bob_refunded(&self, state: BobState) {
         self.bob_bitcoin_wallet.sync().await.unwrap();
 
-        let lock_tx_id = if let BobState::BtcRefunded { state, .. } = state {
-            state.tx_lock_id()
+        let lock_tx_id = if let BobState::BtcRefunded(state4) = state {
+            state4.tx_lock_id()
         } else {
             panic!("Bob in not in btc refunded state: {:?}", state);
         };
@@ -817,10 +818,10 @@ impl TestContext {
     async fn bob_punished_btc_balance(&self, state: BobState) -> Result<bitcoin::Amount> {
         self.bob_bitcoin_wallet.sync().await?;
 
-        let lock_tx_id = if let BobState::BtcPunished { tx_lock_id, .. } = state {
+        let lock_tx_id = if let BobState::BtcPunished { tx_lock_id } = state {
             tx_lock_id
         } else {
-            bail!("Bob is not in btc punished state: {:?}", state);
+            bail!("Bob in not in btc punished state: {:?}", state);
         };
 
         let lock_tx_bitcoin_fee = self.bob_bitcoin_wallet.transaction_fee(lock_tx_id).await?;
@@ -1018,10 +1019,6 @@ pub mod bob_run_until {
 
     pub fn is_encsig_sent(state: &BobState) -> bool {
         matches!(state, BobState::EncSigSent(..))
-    }
-
-    pub fn is_btc_punished(state: &BobState) -> bool {
-        matches!(state, BobState::BtcPunished { .. })
     }
 }
 

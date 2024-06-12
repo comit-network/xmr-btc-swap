@@ -70,12 +70,12 @@ pub enum Alice {
     Done(AliceEndState),
 }
 
-#[derive(Clone, strum::Display, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Copy, Clone, strum::Display, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub enum AliceEndState {
     SafelyAborted,
     BtcRedeemed,
     XmrRefunded,
-    BtcPunished { state3: alice::State3 },
+    BtcPunished,
 }
 
 impl From<AliceState> for Alice {
@@ -173,9 +173,7 @@ impl From<AliceState> for Alice {
                 transfer_proof,
                 state3: state3.as_ref().clone(),
             },
-            AliceState::BtcPunished { state3 } => Alice::Done(AliceEndState::BtcPunished {
-                state3: state3.as_ref().clone(),
-            }),
+            AliceState::BtcPunished => Alice::Done(AliceEndState::BtcPunished),
             AliceState::SafelyAborted => Alice::Done(AliceEndState::SafelyAborted),
         }
     }
@@ -279,9 +277,7 @@ impl From<Alice> for AliceState {
                 AliceEndState::SafelyAborted => AliceState::SafelyAborted,
                 AliceEndState::BtcRedeemed => AliceState::BtcRedeemed,
                 AliceEndState::XmrRefunded => AliceState::XmrRefunded,
-                AliceEndState::BtcPunished { state3 } => AliceState::BtcPunished {
-                    state3: Box::new(state3),
-                },
+                AliceEndState::BtcPunished => AliceState::BtcPunished,
             },
         }
     }

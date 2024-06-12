@@ -38,7 +38,7 @@ pub async fn punish(
         // Alice already in final state
         | AliceState::BtcRedeemed
         | AliceState::XmrRefunded
-        | AliceState::BtcPunished { .. }
+        | AliceState::BtcPunished
         | AliceState::SafelyAborted => bail!(Error::SwapNotPunishable(state)),
     };
 
@@ -46,9 +46,7 @@ pub async fn punish(
 
     let txid = state3.punish_btc(&bitcoin_wallet).await?;
 
-    let state = AliceState::BtcPunished {
-        state3: state3.clone(),
-    };
+    let state = AliceState::BtcPunished;
     db.insert_latest_state(swap_id, state.clone().into())
         .await?;
 

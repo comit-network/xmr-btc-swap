@@ -304,8 +304,8 @@ where
                             if let Err(_) = self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, Response { swap_id, s_a: s_a.expect("Failed to get xmr key from database") }) {
                                 tracing::debug!(%peer, "Failed to respond with XMR key");
                                 continue;
-                            }
-
+                            } 
+                            
                             let new_state = AliceState::BtcRedeemed;
                             if let Err(error) = self.db.insert_latest_state(swap_id, new_state.into()).await {
                                 tracing::warn!(%swap_id, "Unable to save latest state in database: {}", error);

@@ -31,7 +31,7 @@ pub async fn safely_abort(swap_id: Uuid, db: Arc<dyn Database>) -> Result<AliceS
         | AliceState::BtcPunishable { .. }
         | AliceState::BtcRedeemed
         | AliceState::XmrRefunded
-        | AliceState::BtcPunished { .. }
+        | AliceState::BtcPunished
         | AliceState::SafelyAborted => bail!(
             "Cannot safely abort swap {} because it is in state {} which cannot be safely aborted",
             swap_id,
