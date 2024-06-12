@@ -259,15 +259,13 @@ where
                             let swap_peer = self.db.get_peer_id(swap_id).await;
 
                             // Ensure that an incoming encrypted signature is sent by the peer-id associated with the swap
-                            let swap_peer = match swap_peer {
-                                Ok(swap_peer) => swap_peer,
-                                Err(_) => {
-                                    tracing::warn!(
-                                        unknown_swap_id = %swap_id,
-                                        from = %peer,
-                                        "Ignoring cooperative xmr redeem request for unknown swap");
-                                    continue;
-                                }
+                            let Ok(swap_peer) = swap_peer else {
+                                tracing::warn!(
+                                    unknown_swap_id = %swap_id,
+                                    from = %peer,
+                                    "Ignoring cooperative xmr redeem request for unknown swap"
+                                );
+                                continue;
                             };
 
                             if swap_peer != peer {
@@ -276,51 +274,41 @@ where
                                     received_from = %peer,
                                     expected_from = %swap_peer,
                                     "Ignoring malicious cooperative xmr redeem request which was not expected from this peer",
-                                    );
+                                );
                                 continue;
                             }
 
-                            if let Ok(state) = self.db.get_state(swap_id).await {
-                                match state {
-                                    State::Alice (aliceState) => {
-                                        if let AliceState::BtcPunished { .. } = aliceState {
-                                            let states = match self.db
-                                            .get_states(swap_id)
-                                            .await {
-                                                Ok(states) => states,
-                                                Err(_) => {
-                                                    tracing::error!("Failed to read states from database");
-                                                    continue;
-                                                }
-                                            };
-                                            let s_a = states.iter().find_map(|state| {
-                                                if let State::Alice(AliceState::BtcLocked { state3 }) = state {
-                                                        Some(state3.s_a)
-                                                } else {
-                                                    None
-                                                }
-                                            });
-                                            if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, Response { swap_id, s_a: s_a.expect("Failed to get xmr key from database") }).is_err() {
-                                                tracing::debug!(%peer, "Failed to respond with xmr key");
-                                            } else {
-                                                let state = AliceState::BtcRedeemed;
-                                                match self.db.insert_latest_state(swap_id, state.into()).await {
-                                                    Ok(_) => {},
-                                                    Err(error) => {
-                                                        tracing::warn!(%swap_id, "Unable to save latest state in database: {}", error);
-                                                    }
-                                                }
-                                            }
-                                        } else {
-                                            tracing::warn!(%swap_id, "Ignoring cooperative xmr redeem request for swap in invalid state");
-                                            continue;
-                                        }
-                                    }
-                                    State::Bob(_) => {
-                                        tracing::warn!(%swap_id, "Ignoring cooperative xmr redeem request for swap in invalid state");
-                                        continue;
-                                    }
+                            let Ok(state) = self.db.get_state(swap_id).await else {
+                                tracing::error!(%swap_id, "Failed to read swap state from database");
+                                continue;
+                            };
+
+                            let State::Alice (AliceState::BtcPunished { .. }) = state else {
+                                tracing::warn!(%swap_id, "Ignoring cooperative xmr redeem request for swap in invalid state");
+                                continue;
+                            };
+
+                            let Ok(states) = self.db.get_states(swap_id).await else {
+                                tracing::error!(%swap_id, "Failed to read states from database");
+                                continue;
+                            };
+
+                            let s_a = states.iter().find_map(|state| {
+                                if let State::Alice(AliceState::BtcLocked { state3 }) = state {
+                                        Some(state3.s_a)
+                                } else {
+                                    None
                                 }
+                            });
+
+                            if let Err(_) = self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, Response { swap_id, s_a: s_a.expect("Failed to get xmr key from database") }) {
+                                tracing::debug!(%peer, "Failed to respond with xmr key");
+                                continue;
+                            } 
+                            
+                            let new_state = AliceState::BtcRedeemed;
+                            if let Err(error) = self.db.insert_latest_state(swap_id, new_state.into()).await {
+                                tracing::warn!(%swap_id, "Unable to save latest state in database: {}", error);
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::Rendezvous(libp2p::rendezvous::client::Event::Registered { rendezvous_node, ttl, namespace })) => {
