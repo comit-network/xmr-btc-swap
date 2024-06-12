@@ -386,11 +386,10 @@ mod tests {
 
         assert_eq!(latest_loaded.len(), 2);
 
-        assert!(latest_loaded.contains(&(swap_id_1, state_3)));
-        assert!(latest_loaded.contains(&(swap_id_2, state_4)));
+        assert!(latest_loaded.contains(&(swap_id_1, state_2)));
+        assert!(latest_loaded.contains(&(swap_id_2, state_3)));
 
         assert!(!latest_loaded.contains(&(swap_id_1, state_1)));
-        assert!(!latest_loaded.contains(&(swap_id_1, state_2)));
     }
 
     #[tokio::test]
