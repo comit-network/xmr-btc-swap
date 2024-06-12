@@ -653,7 +653,7 @@ impl State6 {
             self.A,
             self.b.public(),
             self.tx_cancel_fee,
-        )?;
+        )
     }
     pub async fn check_for_tx_cancel(
         &self,
@@ -687,13 +687,7 @@ impl State6 {
     }
 
     pub fn signed_refund_transaction(&self) -> Result<Transaction> {
-        let tx_cancel = bitcoin::TxCancel::new(
-            &self.tx_lock,
-            self.cancel_timelock,
-            self.A,
-            self.b.public(),
-            self.tx_cancel_fee,
-        )?;
+        let tx_cancel = self.construct_tx_cancel()?;
         let tx_refund =
             bitcoin::TxRefund::new(&tx_cancel, &self.refund_address, self.tx_refund_fee);
 
