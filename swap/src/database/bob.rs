@@ -112,7 +112,7 @@ impl From<BobState> for Bob {
                 monero_wallet_restore_blockheight,
                 tx_lock_id,
             } => Bob::BtcPunished {
-                state: state,
+                state,
                 monero_wallet_restore_blockheight,
                 tx_lock_id,
             },
