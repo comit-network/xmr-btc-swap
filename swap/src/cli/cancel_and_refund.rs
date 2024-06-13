@@ -88,7 +88,7 @@ pub async fn cancel(
                     .await?;
                 Ok((txid, state))
             } else {
-                bail!("Error while trying to submit cancel transaction, this shouldn't have happened. {}", err);
+                bail!("Error while trying to submit cancel transaction, this shouldn't have happened {}", err);
             }
         }
     }
