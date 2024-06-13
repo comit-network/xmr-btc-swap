@@ -1,0 +1,53 @@
+{
+  "db": "SQLite",
+  "0a4540e8c33c71222a68ff5ecc1a167b406de9961ac3cc69649c6152a6d7a9b7": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "VACUUM"
+  },
+  "37fe11a635dd321ef95fe2a39d3f6c02a7fd89e91ec2e7bef64e993b4c8a64b5": {
+    "describe": {
+      "columns": [
+        {
+          "name": "state",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "id",
+          "ordinal": 1,
+          "type_info": "Int64"
+        },
+        {
+          "name": "swap_id",
+          "ordinal": 2,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "\n       SELECT state,id,swap_id\n       FROM swap_states\n    "
+  },
+  "9cfddb04af8a3722b67206a99e5dd98b5e27387deb0195d22b5cc634ac476813": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 3
+      }
+    },
+    "query": "\n           UPDATE swap_states\n           SET state = ?\n           WHERE swap_id = ?\n           AND id = ?\n        "
+  }
+}
