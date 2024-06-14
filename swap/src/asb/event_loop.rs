@@ -283,17 +283,9 @@ where
                                 continue;
                             };
 
-                            let State::Alice (AliceState::BtcPunished { .. }) = state else {
+                            let State::Alice (AliceState::BtcPunished { state3 }) = state else {
                                 tracing::warn!(%swap_id, "Ignoring cooperative XMR redeem request for swap in invalid state");
                                 continue;
-                            };
-
-                            let state3 = match state {
-                                State::Alice (AliceState::BtcPunished { state3 }) => state3,
-                                _ => {
-                                tracing::warn!(%swap_id, "Ignoring cooperative XMR redeem request for swap in invalid state");
-                                continue;
-                                }
                             };
 
                             if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, Response { swap_id, s_a: state3.s_a }).is_err() {
