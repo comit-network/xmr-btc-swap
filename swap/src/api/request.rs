@@ -2,6 +2,7 @@ use crate::api::Context;
 use crate::bitcoin::{Amount, ExpiredTimelocks, TxLock};
 use crate::cli::{list_sellers, EventLoop, SellerStatus};
 use crate::libp2p_ext::MultiAddrExt;
+use crate::network::cooperative_xmr_redeem_after_punish::Response::{FailResponse, OkResponse};
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
 use crate::network::swarm;
 use crate::protocol::bob::{BobState, Swap};
@@ -896,11 +897,9 @@ impl Request {
                     .request_cooperative_xmr_redeem(swap_id)
                     .await;
                 match response {
-                    Ok(response) => {
+                    Ok(OkResponse { s_a, .. }) => {
                         tracing::info!("Alice revealed XMR key to us, redeeming XMR...");
-                        let s_a = monero::PrivateKey {
-                            scalar: response.s_a,
-                        };
+                        let s_a = monero::PrivateKey { scalar: s_a };
                         let state5 = state6.attempt_cooperative_redeem(s_a);
                         match state5
                             .redeem_xmr(&monero_wallet, swap_id.to_string(), monero_receive_address)
@@ -919,6 +918,9 @@ impl Request {
                                 tracing::error!(%error, "Failed to redeem XMR with key from Alice");
                             }
                         }
+                    }
+                    Ok(FailResponse { error, .. }) => {
+                        tracing::error!(%error);
                     }
                     Err(error) => {
                         tracing::error!(%error, "Failed to get XMR key from Alice");

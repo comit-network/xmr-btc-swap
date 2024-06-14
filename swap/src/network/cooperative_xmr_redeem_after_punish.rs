@@ -31,11 +31,16 @@ pub struct Request {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Response {
-    pub swap_id: Uuid,
-    pub s_a: Scalar,
+pub enum Response {
+    OkResponse {
+        swap_id: Uuid,
+        s_a: Scalar,
+    },
+    FailResponse {
+        swap_id: Uuid,
+        error: std::string::String,
+    },
 }
-
 pub fn alice() -> Behaviour {
     Behaviour::new(
         CborCodec::default(),
@@ -76,10 +81,19 @@ impl From<(PeerId, Message)> for cli::OutEvent {
             Message::Response {
                 response,
                 request_id,
-            } => Self::CooperativeXmrRedeemReceived {
-                id: request_id,
-                swap_id: response.swap_id,
-                s_a: response.s_a,
+            } => match response {
+                Response::OkResponse { swap_id, s_a } => Self::CooperativeXmrRedeemReceived {
+                    id: request_id,
+                    swap_id,
+                    s_a,
+                },
+                Response::FailResponse { swap_id, error } => {
+                    Self::CooperativeXmrRedeemReceivedFailure {
+                        id: request_id,
+                        swap_id,
+                        error,
+                    }
+                }
             },
         }
     }

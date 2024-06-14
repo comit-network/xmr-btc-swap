@@ -1,5 +1,6 @@
 use crate::bitcoin::{ExpiredTimelocks, TxCancel, TxRefund};
 use crate::cli::EventLoopHandle;
+use crate::network::cooperative_xmr_redeem_after_punish::Response::{FailResponse, OkResponse};
 use crate::network::swap_setup::bob::NewSwap;
 use crate::protocol::bob;
 use crate::protocol::bob::state::*;
@@ -281,11 +282,9 @@ async fn next_state(
                 .request_cooperative_xmr_redeem(swap_id)
                 .await;
             match response {
-                Ok(response) => {
+                Ok(OkResponse { s_a, .. }) => {
                     tracing::info!("Alice revealed XMR key to us, redeeming XMR...");
-                    let s_a = monero::PrivateKey {
-                        scalar: response.s_a,
-                    };
+                    let s_a = monero::PrivateKey { scalar: s_a };
                     let state5 = state.attempt_cooperative_redeem(s_a);
                     match state5
                         .redeem_xmr(monero_wallet, swap_id.to_string(), monero_receive_address)
@@ -300,6 +299,10 @@ async fn next_state(
                             return Ok(BobState::BtcPunishedCooperativeRedeemFailed(tx_lock_id));
                         }
                     }
+                }
+                Ok(FailResponse { error, .. }) => {
+                    tracing::error!(%error);
+                    return Ok(BobState::BtcPunishedCooperativeRedeemFailed(tx_lock_id));
                 }
                 Err(error) => {
                     tracing::error!(%error, "Failed to get XMR key from Alice");

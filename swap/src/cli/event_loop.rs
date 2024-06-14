@@ -153,7 +153,12 @@ impl EventLoop {
                         }
                         SwarmEvent::Behaviour(OutEvent::CooperativeXmrRedeemReceived { id, swap_id, s_a }) => {
                             if let Some(responder) = self.inflight_cooperative_xmr_redeem_requests.remove(&id) {
-                                let _ = responder.respond(Response {s_a, swap_id});
+                                let _ = responder.respond(Response::OkResponse { s_a, swap_id });
+                            }
+                        }
+                        SwarmEvent::Behaviour(OutEvent::CooperativeXmrRedeemReceivedFailure { id, swap_id, error }) => {
+                            if let Some(responder) = self.inflight_cooperative_xmr_redeem_requests.remove(&id) {
+                                let _ = responder.respond(Response::FailResponse { error, swap_id });
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::AllRedialAttemptsExhausted { peer }) if peer == self.alice_peer_id => {

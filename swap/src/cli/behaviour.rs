@@ -36,6 +36,11 @@ pub enum OutEvent {
         s_a: Scalar,
         swap_id: uuid::Uuid,
     },
+    CooperativeXmrRedeemReceivedFailure {
+        id: RequestId,
+        error: std::string::String,
+        swap_id: uuid::Uuid,
+    },
     AllRedialAttemptsExhausted {
         peer: PeerId,
     },
