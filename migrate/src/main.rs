@@ -113,20 +113,20 @@ async fn migrate(pool: &SqlitePool) -> Result<()> {
             }
         }
         let state_string = bob.to_string();
+        sqlx::query!(
+            r#"
+           UPDATE swap_states
+           SET state = ?
+           WHERE swap_id = ?
+           AND id = ?
+        "#,
+            state_string,
+            swap_id,
+            id
+        )
+        .execute(&mut *conn)
+        .await?;
     }
-    sqlx::query!(
-        r#"
-       UPDATE swap_states
-       SET state = ?
-       WHERE swap_id = ?
-       AND id = ?
-    "#,
-        state_string,
-        swap_id,
-        id
-    )
-    .execute(&mut *conn)
-    .await?;
     sqlx::query!("VACUUM").execute(&mut *conn).await?; // clear old values.
     Ok(())
 }
