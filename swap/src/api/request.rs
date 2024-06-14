@@ -920,7 +920,7 @@ impl Request {
                         }
                     }
                     Ok(FailResponse { error, .. }) => {
-                        tracing::error!(%error);
+                        tracing::error!(%error, "Alice cancelled XMR redeem request");
                     }
                     Err(error) => {
                         tracing::error!(%error, "Failed to get XMR key from Alice");

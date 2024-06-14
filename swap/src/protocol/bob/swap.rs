@@ -301,7 +301,7 @@ async fn next_state(
                     }
                 }
                 Ok(FailResponse { error, .. }) => {
-                    tracing::error!(%error);
+                    tracing::error!(%error, "Alice cancelled XMR redeem request");
                     return Ok(BobState::BtcPunishedCooperativeRedeemFailed(tx_lock_id));
                 }
                 Err(error) => {
