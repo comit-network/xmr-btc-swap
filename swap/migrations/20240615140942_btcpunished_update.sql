@@ -1,4 +1,4 @@
-UPDATE  swap_states  SET  state = json_replace(
+UPDATE swap_states SET state = json_replace(
     state, 
     '$.Alice.Done', 
     json_object(
