@@ -78,6 +78,7 @@ async fn alice_manually_punishes_after_bob_dead() {
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));
 
         let bob_state = bob::run(bob_swap).await?;
+        ctx.assert_bob_redeemed(bob_state).await?;
         Ok(())
     })
     .await;
