@@ -7,7 +7,7 @@ use swap::protocol::bob::BobState;
 use swap::protocol::{alice, bob};
 
 /// Bob locks Btc and Alice locks Xmr. Bob does not act; he fails to send Alice
-/// the encsig and fail to refund or redeem. Alice punishes.
+/// the encsig and fail to refund or redeem. Alice punishes. Bob then cooperates with Alice and redeems XMR with her key.
 #[tokio::test]
 async fn alice_punishes_if_bob_never_acts_after_fund() {
     harness::setup_test(FastPunishConfig, |mut ctx| async move {
@@ -26,7 +26,7 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
 
         // Restart Bob after Alice punished to ensure Bob transitions to
         // punished and does not run indefinitely
-        let (bob_swap, _) = ctx
+        let (bob_swap, bob_join_handle) = ctx
             .stop_and_resume_bob_from_db(bob_join_handle, bob_swap_id)
             .await;
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));
@@ -34,7 +34,11 @@ async fn alice_punishes_if_bob_never_acts_after_fund() {
         let bob_state = bob::run_until(bob_swap, is_btc_punished).await?;
 
         ctx.assert_bob_punished(bob_state).await;
-
+        let (bob_swap, _) = ctx
+            .stop_and_resume_bob_from_db(bob_join_handle, bob_swap_id)
+            .await;
+        let bob_state = bob::run(bob_swap).await?;
+        ctx.assert_bob_redeemed(bob_state).await;
         Ok(())
     })
     .await;
