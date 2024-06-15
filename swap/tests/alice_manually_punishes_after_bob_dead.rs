@@ -72,7 +72,7 @@ async fn alice_manually_punishes_after_bob_dead() {
 
         // Restart Bob after Alice punished to ensure Bob transitions to
         // punished and does not run indefinitely
-        let (bob_swap, bob_join_handle) = ctx
+        let (bob_swap, _) = ctx
             .stop_and_resume_bob_from_db(bob_join_handle, bob_swap_id)
             .await;
         assert!(matches!(bob_swap.state, BobState::BtcLocked { .. }));
