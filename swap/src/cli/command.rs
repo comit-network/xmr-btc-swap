@@ -61,27 +61,6 @@ where
     let is_testnet = args.testnet;
     let data = args.data;
     let (context, request) = match args.cmd {
-        CliCommand::AttemptCooperativeRedeem {
-            swap_id: SwapId { swap_id },
-            bitcoin,
-            monero,
-            tor,
-        } => {
-            let request = Request::new(Method::AttemptCooperativeRedeem { swap_id });
-
-            let context = Context::build(
-                Some(bitcoin),
-                Some(monero),
-                Some(tor),
-                data,
-                is_testnet,
-                debug,
-                json,
-                None,
-            )
-            .await?;
-            (context, request)
-        }
         CliCommand::BuyXmr {
             seller: Seller { seller },
             bitcoin,
@@ -311,20 +290,6 @@ struct Arguments {
 
 #[derive(structopt::StructOpt, Debug)]
 enum CliCommand {
-    #[structopt(about = "Asks Alice for XMR key to redeem XMR")]
-    AttemptCooperativeRedeem {
-        #[structopt(flatten)]
-        swap_id: SwapId,
-
-        #[structopt(flatten)]
-        bitcoin: Bitcoin,
-
-        #[structopt(flatten)]
-        monero: Monero,
-
-        #[structopt(flatten)]
-        tor: Tor,
-    },
     /// Start a BTC for XMR swap
     BuyXmr {
         #[structopt(flatten)]

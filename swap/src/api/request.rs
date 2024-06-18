@@ -2,7 +2,6 @@ use crate::api::Context;
 use crate::bitcoin::{Amount, ExpiredTimelocks, TxLock};
 use crate::cli::{list_sellers, EventLoop, SellerStatus};
 use crate::libp2p_ext::MultiAddrExt;
-use crate::network::cooperative_xmr_redeem_after_punish::Response::{FailResponse, OkResponse};
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
 use crate::network::swarm;
 use crate::protocol::bob::{BobState, Swap};
@@ -67,17 +66,11 @@ pub enum Method {
         swap_id: Uuid,
     },
     GetRawStates,
-    AttemptCooperativeRedeem {
-        swap_id: Uuid,
-    },
 }
 
 impl Method {
     fn get_tracing_span(&self, log_reference_id: Option<String>) -> Span {
         let span = match self {
-            Method::AttemptCooperativeRedeem { swap_id } => {
-                debug_span!("method", method_name="AttemptCooperativeRedeem", swap_id=%swap_id, log_reference_id=field::Empty)
-            }
             Method::Balance { .. } => {
                 debug_span!(
                     "method",
@@ -292,10 +285,7 @@ impl Request {
                     BobState::CancelTimelockExpired(state) | BobState::BtcCancelled(state) => {
                         Some(state.expired_timelock(bitcoin_wallet).await)
                     }
-                    BobState::BtcPunished { .. }
-                    | BobState::BtcPunishedCooperativeRedeemFailed(_) => {
-                        Some(Ok(ExpiredTimelocks::Punish))
-                    }
+                    BobState::BtcPunished { .. } => Some(Ok(ExpiredTimelocks::Punish)),
                     BobState::BtcRefunded(_)
                     | BobState::BtcRedeemed(_)
                     | BobState::XmrRedeemed { .. } => None,
@@ -820,121 +810,6 @@ impl Request {
             Method::GetCurrentSwap => Ok(json!({
                 "swap_id": context.swap_lock.get_current_swap_id().await
             })),
-            Method::AttemptCooperativeRedeem { swap_id } => {
-                context.swap_lock.acquire_swap_lock(swap_id).await?;
-                let state = context.db.get_state(swap_id).await?;
-                let state6 = match state {
-                    State::Bob(BobState::BtcPunished { state, .. }) => state,
-                    _ => {
-                        bail!("The swap is not in BtcPunished state. Try to resume the swap, and then run this command again");
-                    }
-                };
-                let seller_peer_id = context.db.get_peer_id(swap_id).await?;
-                let seller_addresses = context.db.get_addresses(seller_peer_id).await?;
-                let monero_wallet = Arc::clone(
-                    context
-                        .monero_wallet
-                        .as_ref()
-                        .context("Could not get Monero wallet")?,
-                );
-                let monero_receive_address = context.db.get_monero_address(swap_id).await?;
-                let seed = context
-                    .config
-                    .seed
-                    .as_ref()
-                    .context("Could not get seed")?
-                    .derive_libp2p_identity();
-
-                let behaviour = cli::Behaviour::new(
-                    seller_peer_id,
-                    context.config.env_config,
-                    Arc::clone(
-                        context
-                            .bitcoin_wallet
-                            .as_ref()
-                            .context("Could not get Bitcoin wallet")?,
-                    ),
-                    (seed.clone(), context.config.namespace),
-                );
-                let mut swarm =
-                    swarm::cli(seed.clone(), context.config.tor_socks5_port, behaviour).await?;
-                let our_peer_id = swarm.local_peer_id();
-
-                tracing::debug!(peer_id = %our_peer_id, "Network layer initialized");
-
-                for seller_address in seller_addresses {
-                    swarm
-                        .behaviour_mut()
-                        .add_address(seller_peer_id, seller_address);
-                }
-
-                let (event_loop, event_loop_handle) =
-                    EventLoop::new(swap_id, swarm, seller_peer_id)?;
-                let mut swap = Swap::from_db(
-                    Arc::clone(&context.db),
-                    swap_id,
-                    Arc::clone(
-                        context
-                            .bitcoin_wallet
-                            .as_ref()
-                            .context("Could not get Bitcoin wallet")?,
-                    ),
-                    Arc::clone(
-                        context
-                            .monero_wallet
-                            .as_ref()
-                            .context("Could not get Monero wallet")?,
-                    ),
-                    context.config.env_config,
-                    event_loop_handle,
-                    monero_receive_address,
-                )
-                .await?;
-                tokio::spawn(event_loop.run().in_current_span());
-                tracing::info!("Asking Alice to reveal XMR key to us");
-                let response = swap
-                    .event_loop_handle
-                    .request_cooperative_xmr_redeem(swap_id)
-                    .await;
-                match response {
-                    Ok(OkResponse { s_a, .. }) => {
-                        tracing::info!("Alice revealed XMR key to us, redeeming XMR...");
-                        let s_a = monero::PrivateKey { scalar: s_a };
-                        let state5 = state6.attempt_cooperative_redeem(s_a);
-                        match state5
-                            .redeem_xmr(&monero_wallet, swap_id.to_string(), monero_receive_address)
-                            .await
-                        {
-                            Ok(_) => {
-                                let state = BobState::XmrRedeemed {
-                                    tx_lock_id: state6.tx_lock_id(),
-                                };
-                                context
-                                    .db
-                                    .insert_latest_state(swap_id, state.clone().into())
-                                    .await?;
-                            }
-                            Err(error) => {
-                                tracing::error!(%error, "Failed to redeem XMR with key from Alice");
-                            }
-                        }
-                    }
-                    Ok(FailResponse { error, .. }) => {
-                        tracing::error!(%error, "Alice cancelled XMR redeem request");
-                    }
-                    Err(error) => {
-                        tracing::error!(%error, "Failed to get XMR key from Alice");
-                    }
-                }
-                context
-                    .swap_lock
-                    .release_swap_lock()
-                    .await
-                    .expect("Could not release swap lock");
-                Ok(json!({
-                    "result": "ok",
-                }))
-            }
         }
     }
 

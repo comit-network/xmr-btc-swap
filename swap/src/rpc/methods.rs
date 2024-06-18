@@ -203,28 +203,6 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
     module.register_async_method("get_current_swap", |params, context| async move {
         execute_request(params, Method::GetCurrentSwap, &context).await
     })?;
-
-    module.register_async_method(
-        "attempt_cooperative_redeem",
-        |params_raw, context| async move {
-            let params: HashMap<String, serde_json::Value> = params_raw.parse()?;
-
-            let swap_id = params.get("swap_id").ok_or_else(|| {
-                jsonrpsee_core::Error::Custom("Does not contain swap_id".to_string())
-            })?;
-
-            let swap_id = as_uuid(swap_id).ok_or_else(|| {
-                jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string())
-            })?;
-
-            execute_request(
-                params_raw,
-                Method::AttemptCooperativeRedeem { swap_id },
-                &context,
-            )
-            .await
-        },
-    )?;
     Ok(module)
 }
 

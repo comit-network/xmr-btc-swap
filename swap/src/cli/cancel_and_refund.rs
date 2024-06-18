@@ -54,7 +54,6 @@ pub async fn cancel(
         | BobState::BtcRedeemed(_)
         | BobState::XmrRedeemed { .. }
         | BobState::BtcPunished { .. }
-        | BobState::BtcPunishedCooperativeRedeemFailed(_)
         | BobState::SafelyAborted => bail!(
             "Cannot cancel swap {} because it is in state {} which is not refundable.",
             swap_id,
@@ -113,7 +112,6 @@ pub async fn refund(
         | BobState::BtcRefunded(_)
         | BobState::XmrRedeemed { .. }
         | BobState::BtcPunished { .. }
-        | BobState::BtcPunishedCooperativeRedeemFailed(_)
         | BobState::SafelyAborted => bail!(
             "Cannot refund swap {} because it is in state {} which is not refundable.",
             swap_id,

@@ -12,10 +12,7 @@ use uuid::Uuid;
 pub fn is_complete(state: &BobState) -> bool {
     matches!(
         state,
-        BobState::BtcRefunded(..)
-            | BobState::XmrRedeemed { .. }
-            | BobState::BtcPunishedCooperativeRedeemFailed(..)
-            | BobState::SafelyAborted
+        BobState::BtcRefunded(..) | BobState::XmrRedeemed { .. } | BobState::SafelyAborted
     )
 }
 
@@ -40,10 +37,12 @@ pub async fn run_until(
             swap.monero_receive_address,
         )
         .await?;
-
         swap.db
             .insert_latest_state(swap.id, current_state.clone().into())
             .await?;
+        if matches!(current_state, BobState::BtcPunished { .. }) {
+            break; // User should be able to resume swap in BtcPunished state.
+        };
     }
 
     Ok(current_state)
@@ -296,22 +295,19 @@ async fn next_state(
                         Err(error) => {
                             tracing::error!(%error, "Failed to redeem XMR with key from Alice");
 
-                            return Ok(BobState::BtcPunishedCooperativeRedeemFailed(tx_lock_id));
+                            return Ok(BobState::BtcPunished { state, tx_lock_id });
                         }
                     }
                 }
                 Ok(FailResponse { error, .. }) => {
-                    tracing::error!(%error, "Alice cancelled XMR redeem request");
-                    return Ok(BobState::BtcPunishedCooperativeRedeemFailed(tx_lock_id));
+                    tracing::error!(%error, "Alice cancelled XMR redeem request. Try to resume the swap later");
+                    return Ok(BobState::BtcPunished { state, tx_lock_id });
                 }
                 Err(error) => {
-                    tracing::error!(%error, "Failed to get XMR key from Alice");
-                    return Ok(BobState::BtcPunishedCooperativeRedeemFailed(tx_lock_id));
+                    tracing::error!(%error, "Failed to get XMR key from Alice. Try to resume the swap later");
+                    return Ok(BobState::BtcPunished { state, tx_lock_id });
                 }
             };
-        }
-        BobState::BtcPunishedCooperativeRedeemFailed(tx_lock_id) => {
-            BobState::BtcPunishedCooperativeRedeemFailed(tx_lock_id)
         }
         BobState::SafelyAborted => BobState::SafelyAborted,
         BobState::XmrRedeemed { tx_lock_id } => BobState::XmrRedeemed { tx_lock_id },

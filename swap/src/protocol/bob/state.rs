@@ -51,7 +51,6 @@ pub enum BobState {
         state: State6,
         tx_lock_id: bitcoin::Txid,
     },
-    BtcPunishedCooperativeRedeemFailed(bitcoin::Txid),
     SafelyAborted,
 }
 
@@ -72,9 +71,6 @@ impl fmt::Display for BobState {
             BobState::BtcRefunded(..) => write!(f, "btc is refunded"),
             BobState::XmrRedeemed { .. } => write!(f, "xmr is redeemed"),
             BobState::BtcPunished { .. } => write!(f, "btc is punished"),
-            BobState::BtcPunishedCooperativeRedeemFailed(..) => {
-                write!(f, "btc is punished and cooperative redeem failed")
-            }
             BobState::SafelyAborted => write!(f, "safely aborted"),
         }
     }
