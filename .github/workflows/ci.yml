@@ -3,9 +3,7 @@ name: CI
 on:
   pull_request: # Need to run on pull-requests, otherwise PRs from forks don't run
   push:
-    branches:
-      - "master" # Always build head of master for the badge in the README
-
+  workflow_dispatch:
 jobs:
   static_analysis:
     runs-on: ubuntu-latest
