@@ -49,7 +49,7 @@ UPDATE swap_states SET
                         SELECT json_extract(states.state, '$.Bob.BtcLocked.monero_wallet_restore_blockheight')
                         FROM swap_states AS states
                         WHERE
-                            states.swap_id = swap_states.swap_id -- swap_states.swap_id is id of the BtcPunished row
+                            states.swap_id = swap_states.swap_id -- swap_states.swap_id is id of the BtcPunished row, states.swap_id is id of the row that we are looking for
                             AND json_extract(
                                 states.state, '$.Bob.BtcLocked'
                             ) IS NOT NULL  -- Filters out only the BtcLocked state. (json_extract returns null if property doesn't exist)
@@ -71,7 +71,7 @@ UPDATE swap_states SET
             SELECT json_extract(states.state, '$.Bob.BtcLocked.state3.v')
             FROM swap_states AS states
             WHERE
-                states.swap_id = swap_states.swap_id -- swap_states.swap_id is id of the BtcPunished row
+                states.swap_id = swap_states.swap_id -- swap_states.swap_id is id of the BtcRefunded row, states.swap_id is id of the row that we are looking for
                 AND json_extract(states.state, '$.Bob.BtcLocked') IS NOT NULL
         ),
         '$.monero_wallet_restore_blockheight',  -- {"Bob":{"BtcRefunded":{..., "monero_wallet_restore_blockheight": {"height":...}} }}
