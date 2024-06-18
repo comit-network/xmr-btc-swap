@@ -203,6 +203,7 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
     module.register_async_method("get_current_swap", |params, context| async move {
         execute_request(params, Method::GetCurrentSwap, &context).await
     })?;
+
     Ok(module)
 }
 
