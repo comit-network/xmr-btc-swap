@@ -25,7 +25,7 @@ pub async fn run_until(
     mut swap: bob::Swap,
     is_target_state: fn(&BobState) -> bool,
 ) -> Result<BobState> {
-    let mut current_state = swap.state;
+    let mut current_state = swap.state.clone();
 
     while !is_target_state(&current_state) {
         current_state = next_state(
@@ -40,7 +40,9 @@ pub async fn run_until(
         swap.db
             .insert_latest_state(swap.id, current_state.clone().into())
             .await?;
-        if matches!(current_state, BobState::BtcPunished { .. }) {
+        if matches!(current_state, BobState::BtcPunished { .. })
+            && matches!(swap.state, BobState::BtcPunished { .. })
+        {
             break; // User should be able to resume swap in BtcPunished state.
         };
     }
