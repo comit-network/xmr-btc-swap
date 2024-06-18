@@ -826,7 +826,7 @@ impl Request {
                 let state6 = match state {
                     State::Bob(BobState::BtcPunished { state, .. }) => state,
                     _ => {
-                        bail!("The swap is not in BtcPunished state");
+                        bail!("The swap is not in BtcPunished state. Try to resume the swap, and then run this command again");
                     }
                 };
                 let seller_peer_id = context.db.get_peer_id(swap_id).await?;
