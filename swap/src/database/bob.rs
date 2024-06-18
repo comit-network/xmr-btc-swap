@@ -1,7 +1,6 @@
 use crate::monero::TransferProof;
 use crate::protocol::bob;
 use crate::protocol::bob::BobState;
-use bitcoin::Txid;
 use monero_rpc::wallet::BlockHeight;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -36,7 +35,7 @@ pub enum Bob {
     },
     BtcPunished {
         state: bob::State6,
-        tx_lock_id: Txid,
+        tx_lock_id: bitcoin::Txid,
     },
     BtcRedeemed(bob::State5),
     CancelTimelockExpired(bob::State6),
