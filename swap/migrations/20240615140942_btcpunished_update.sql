@@ -34,7 +34,7 @@ UPDATE swap_states SET
                                 states.state, '$.Bob.BtcCancelled'
                             ) IS NOT NULL -- Filters out only the BtcCancelled state. (json_extract returns null if property doesn't exist)
                     ),
-                    '$.v' -- {"Bob":{"BtcPunished":{"state": {..., "v": "..."}, "tx_lock_id": "..."}}}
+                    '$.v', -- {"Bob":{"BtcPunished":{"state": {..., "v": "..."}, "tx_lock_id": "..."}}}
                     ( -- We get v property from BtcLocked state
                         SELECT json_extract(states.state, '$.Bob.BtcLocked.state3.v') -- Get v property from BtcLocked state
                         FROM swap_states AS states
