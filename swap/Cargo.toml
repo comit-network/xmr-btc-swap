@@ -87,7 +87,7 @@ port_check = "0.2"
 proptest = "1"
 sequential-test = "0.2.4"
 serde_cbor = "0.11"
-serial_test = "3.0"
+serial_test = "3.1"
 tempfile = "3"
 testcontainers = "0.15"
 
