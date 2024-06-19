@@ -43,7 +43,7 @@ pub async fn run_until(
         if matches!(current_state, BobState::BtcPunished { .. })
             && matches!(swap.state, BobState::BtcPunished { .. })
         {
-            break; // Stops swap when cooperative redeem failed.
+            break; // Stops swap when cooperative redeem fails without preventing resuming swap in BtcPunished state.
         };
     }
 
