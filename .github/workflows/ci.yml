@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@v4.1.7
 
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@v4.1.7
 
       - uses: Swatinem/rust-cache@v2.7.3
 
@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@v4.1.7
 
       - uses: Swatinem/rust-cache@v2.7.3
 
@@ -78,7 +78,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@v4.1.7
 
       - uses: Swatinem/rust-cache@v2.7.3
 
@@ -131,7 +131,7 @@ jobs:
           tool-cache: false
 
       - name: Checkout sources
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@v4.1.7
 
       - uses: Swatinem/rust-cache@v2.7.3
 
@@ -164,11 +164,12 @@ jobs:
             ensure_same_swap_id,
             concurrent_bobs_before_xmr_lock_proof_sent,
             alice_manually_redeems_after_enc_sig_learned,
+            happy_path_bob_offline_while_alice_redeems_btc,
           ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@v4.1.7
 
       - uses: Swatinem/rust-cache@v2.7.3
 
@@ -179,7 +180,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@v4.1.7
 
       - uses: Swatinem/rust-cache@v2.7.3
 
@@ -190,7 +191,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@v4.1.7
 
       - uses: dtolnay/rust-toolchain@stable
 

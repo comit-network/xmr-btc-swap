@@ -891,7 +891,7 @@ impl Wallet for monero::Wallet {
     type Amount = monero::Amount;
 
     async fn refresh(&self) -> Result<()> {
-        self.refresh().await?;
+        self.refresh(1).await?;
 
         Ok(())
     }
@@ -995,6 +995,10 @@ pub mod alice_run_until {
 
     pub fn is_encsig_learned(state: &AliceState) -> bool {
         matches!(state, AliceState::EncSigLearned { .. })
+    }
+
+    pub fn is_btc_redeemed(state: &AliceState) -> bool {
+        matches!(state, AliceState::BtcRedeemed { .. })
     }
 }
 

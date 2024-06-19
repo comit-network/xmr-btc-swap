@@ -22,6 +22,7 @@ jobs:
           - bin: swap
             target: x86_64-apple-darwin
             os: macos-12
+            archive_ext: tar
           - bin: swap
             target: aarch64-apple-darwin
             os: macos-latest
@@ -53,7 +54,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout tagged commit
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@v4.1.7
         with:
           ref: ${{ github.event.release.target_commitish }}
           token: ${{ secrets.BOTTY_GITHUB_TOKEN }}
