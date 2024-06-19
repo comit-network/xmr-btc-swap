@@ -1,4 +1,4 @@
-UPDATE swap_states SET
+UPDATE swap_states SET -- This query adds state3 to the BtcPunished state. (Introduced in PR #1676)
     state = json_replace( -- Replaces "{"Alice":{"Done":"BtcPunished"}}" with "{"Alice": {"Done": "BtcPunished": {"state": <state3 object from BtcLocked>} }}"
         state,
         '$.Alice.Done',
@@ -16,7 +16,7 @@ UPDATE swap_states SET
         )
     )
 WHERE json_extract(state, '$.Alice.Done') = 'BtcPunished'; -- Apply update only to BtcPunished state rows
-UPDATE swap_states SET
+UPDATE swap_states SET -- This query adds state6 to the BtcPunished state. It then adds new attributes v (monero viewkey) and monero_wallet_restore_blockheight to state6. (Introduced in PR #1676)
     state = json_replace(
         state,
         '$.Bob',  -- Replace '{"Bob":{"Done": {"BtcPunished": {"tx_lock_id":"..."} }}}' with {"Bob":{"BtcPunished":{"state":{<state6 object>}, "tx_lock_id": "..."}}}
@@ -63,7 +63,7 @@ UPDATE swap_states SET
         )
     )
 WHERE json_extract(state, '$.Bob.Done.BtcPunished') IS NOT NULL; -- Apply update only to BtcPunished state rows (json_extract returns null if property doesn't exist)
-UPDATE swap_states SET
+UPDATE swap_states SET -- This query adds the new state6 attributes v (monero viewkey) and monero_wallet_restore_blockheight to the BtcRefunded state. (Introduced in PR #1676)
     state = json_insert(
         state, -- object that we insert properties into (original state from the row)
         '$.v', -- {"Bob":{"BtcRefunded":{..., "v": "..."}}
