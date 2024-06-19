@@ -84,7 +84,7 @@ UPDATE swap_states SET -- This query adds the new state6 attributes v (monero vi
         )
     )
 WHERE json_extract(state, '$.Bob.Done.BtcRefunded') IS NOT NULL; -- Apply update only to BtcRefunded state rows (json_extract returns null if property doesn't exist)
-UPDATE swap_states SET -- Copy of previous query
+UPDATE swap_states SET -- This query adds the new state6 attributes v (monero viewkey) and monero_wallet_restore_blockheight to the BtcCancelled state. (Introduced in PR #1676)
     state = json_insert(
         state,
         '$.v',
@@ -105,7 +105,7 @@ UPDATE swap_states SET -- Copy of previous query
         )
     )
 WHERE json_extract(state, '$.Bob.BtcCancelled') IS NOT NULL;
-UPDATE swap_states SET
+UPDATE swap_states SET -- This query adds the new state6 attributes v (monero viewkey) and monero_wallet_restore_blockheight to the CancelTimelockExpired state. (Introduced in PR #1676)
     state = json_insert(
         state,
         '$.v',
