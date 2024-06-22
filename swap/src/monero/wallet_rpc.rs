@@ -352,6 +352,7 @@ impl WalletRpc {
             .arg("--disable-rpc-login")
             .arg("--wallet-dir")
             .arg(self.working_dir.join("monero-data"))
+            .arg("--no-initial-sync")
             .spawn()?;
 
         let stdout = child
@@ -369,7 +370,7 @@ impl WalletRpc {
         }
 
         // If we do not hear from the monero_wallet_rpc process for 3 seconds we assume
-        // it is is ready
+        // it is ready
         #[cfg(target_os = "windows")]
         while let Ok(line) =
             tokio::time::timeout(std::time::Duration::from_secs(3), reader.next_line()).await
@@ -479,7 +480,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_is_daemon_available_success() {
-        let mut server = mockito::Server::new();
+        let mut server = mockito::Server::new_async().await;
 
         let _ = server
             .mock("GET", "/get_info")
@@ -510,7 +511,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_is_daemon_available_wrong_network_failure() {
-        let mut server = mockito::Server::new();
+        let mut server = mockito::Server::new_async().await;
 
         let _ = server
             .mock("GET", "/get_info")
@@ -541,7 +542,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_is_daemon_available_not_synced_failure() {
-        let mut server = mockito::Server::new();
+        let mut server = mockito::Server::new_async().await;
 
         let _ = server
             .mock("GET", "/get_info")
