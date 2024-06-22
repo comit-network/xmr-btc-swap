@@ -39,7 +39,7 @@ pub async fn cancel(
         | AliceState::BtcRedeemed
         | AliceState::XmrRefunded
         | AliceState::BtcPunished
-        | AliceState::SafelyAborted => bail!("Swap is is in state {} which is not cancelable", state),
+        | AliceState::SafelyAborted => bail!("Swap is in state {} which is not cancelable", state),
     };
 
     let txid = match state3.submit_tx_cancel(bitcoin_wallet.as_ref()).await {

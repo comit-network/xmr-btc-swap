@@ -162,6 +162,12 @@ pub struct BlockHeight {
     pub height: u32,
 }
 
+impl fmt::Display for BlockHeight {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.height)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(from = "CheckTxKeyResponse")]
 pub struct CheckTxKey {
