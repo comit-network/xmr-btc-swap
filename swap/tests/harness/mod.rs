@@ -89,7 +89,6 @@ where
         env_config,
         alice_bitcoin_wallet.clone(),
         alice_monero_wallet.clone(),
-        false
     )
     .await;
 
@@ -225,7 +224,6 @@ async fn start_alice(
     env_config: Config,
     bitcoin_wallet: Arc<bitcoin::Wallet>,
     monero_wallet: Arc<monero::Wallet>,
-    resume_only: bool,
 ) -> (AliceApplicationHandle, Receiver<alice::Swap>) {
     if let Some(parent_dir) = db_path.parent() {
         ensure_directory_exists(parent_dir).unwrap();
@@ -238,6 +236,7 @@ async fn start_alice(
     let min_buy = bitcoin::Amount::from_sat(u64::MIN);
     let max_buy = bitcoin::Amount::from_sat(u64::MAX);
     let latest_rate = FixedRate::default();
+    let resume_only = false;
 
     let mut swarm = swarm::asb(
         seed,
@@ -436,7 +435,7 @@ impl BobParams {
         }
         let db = Arc::new(SqliteDatabase::open(&self.db_path).await?);
 
-        let (event_loop, handle) = self.new_eventloop(swap_id, db.clone()).await?;
+        let (event_loop, handle) = self.new_eventloop(swap_id, db).await?;
 
         let swap = bob::Swap::from_db(
             db,
@@ -505,7 +504,7 @@ impl BobParams {
             .behaviour_mut()
             .add_address(self.alice_peer_id, self.alice_address.clone());
 
-        cli::EventLoop::new(swap_id, swarm, self.alice_peer_id, db)
+        cli::EventLoop::new(swap_id, swarm, self.alice_peer_id, db.clone());
     }
 }
 
@@ -562,7 +561,7 @@ impl TestContext {
         .await
     }
 
-    pub async fn restart_alice_resume_only(&mut self, resume_only: bool) {
+    pub async fn restart_alice(&mut self) {
         self.alice_handle.abort();
 
         let (alice_handle, alice_swap_handle) = start_alice(
@@ -572,16 +571,11 @@ impl TestContext {
             self.env_config,
             self.alice_bitcoin_wallet.clone(),
             self.alice_monero_wallet.clone(),
-            resume_only,
         )
         .await;
 
         self.alice_handle = alice_handle;
         self.alice_swap_handle = alice_swap_handle;
-    }
-
-    pub async fn restart_alice(&mut self) {
-        self.restart_alice_resume_only(true).await;
     }
 
     pub async fn alice_next_swap(&mut self) -> alice::Swap {
@@ -1002,14 +996,6 @@ pub mod alice_run_until {
 
     pub fn is_encsig_learned(state: &AliceState) -> bool {
         matches!(state, AliceState::EncSigLearned { .. })
-    }
-
-    pub fn is_transfer_proof_sent(state: &AliceState) -> bool {
-        matches!(state, AliceState::XmrLockTransferProofSent { .. })
-    }
-
-    pub fn is_btc_locked(state: &AliceState) -> bool {
-        matches!(state, AliceState::BtcLocked { .. })
     }
 }
 
