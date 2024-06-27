@@ -71,7 +71,7 @@ pub async fn cancel(
                 let state = BobState::BtcCancelled(state6);
                 db.insert_latest_state(swap_id, state.clone().into())
                     .await?;
-                tracing::info!("Cancel transaction has already been published by Alice");
+                tracing::info!("Alice has already cancelled the swap");
                 return Ok((tx.txid(), state));
             }
 
@@ -89,9 +89,12 @@ pub async fn cancel(
                     bail!(err.context("Cannot cancel swap because we have already been punished"));
                 }
                 // We cannot cancel because the cancel timelock has not expired yet
-                Ok(ExpiredTimelocks::None { .. }) => {
+                Ok(ExpiredTimelocks::None { blocks_left }) => {
                     bail!(err.context(
-                        "Cannot cancel swap because the cancel timelock has not expired yet"
+                        format!(
+                            "Cannot cancel swap because the cancel timelock has not expired yet. Blocks left: {}",
+                            blocks_left
+                        )
                     ));
                 }
                 Ok(ExpiredTimelocks::Cancel { .. }) => {
