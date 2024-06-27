@@ -435,10 +435,10 @@ impl BobParams {
         }
         let db = Arc::new(SqliteDatabase::open(&self.db_path).await?);
 
-        let (event_loop, handle) = self.new_eventloop(swap_id, db).await?;
+        let (event_loop, handle) = self.new_eventloop(swap_id, db.clone()).await?;
 
         let swap = bob::Swap::from_db(
-            db,
+            db.clone(),
             swap_id,
             self.bitcoin_wallet.clone(),
             self.monero_wallet.clone(),
@@ -504,7 +504,7 @@ impl BobParams {
             .behaviour_mut()
             .add_address(self.alice_peer_id, self.alice_address.clone());
 
-        cli::EventLoop::new(swap_id, swarm, self.alice_peer_id, db.clone());
+        cli::EventLoop::new(swap_id, swarm, self.alice_peer_id, db.clone())
     }
 }
 
