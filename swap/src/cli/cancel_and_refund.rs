@@ -78,6 +78,7 @@ pub async fn cancel(
             // The cancel transaction has not been published yet and we failed to publish it ourselves
             // Here we try to figure out why
             match state6.expired_timelock(bitcoin_wallet.as_ref()).await {
+                // We cannot cancel because Alice has already cancelled and punished afterwards
                 Ok(ExpiredTimelocks::Punish { .. }) => {
                     let state = BobState::BtcPunished {
                         tx_lock_id: state6.tx_lock_id(),
@@ -87,6 +88,7 @@ pub async fn cancel(
 
                     bail!(err.context("Cannot cancel swap because we have already been punished"));
                 }
+                // We cannot cancel because the cancel timelock has not expired yet
                 Ok(ExpiredTimelocks::None { .. }) => {
                     bail!(err.context(
                         "Cannot cancel swap because the cancel timelock has not expired yet"
@@ -96,7 +98,9 @@ pub async fn cancel(
                     bail!(err.context("Failed to cancel swap even though cancel timelock has expired. This is unexpected."));
                 }
                 Err(timelock_err) => {
-                    bail!(err.context(format!("Failed to check timelock status: {}", timelock_err)))
+                    bail!(err
+                        .context(timelock_err)
+                        .context("Failed to cancel swap and could not check timelock status"));
                 }
             }
         }
