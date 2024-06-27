@@ -1,9 +1,8 @@
-use crate::bitcoin::{parse_rpc_error_code, ExpiredTimelocks, RpcErrorCode, Wallet};
+use crate::bitcoin::{ExpiredTimelocks, Wallet};
 use crate::protocol::bob::BobState;
 use crate::protocol::Database;
 use anyhow::{bail, Result};
 use bitcoin::Txid;
-use digest::typenum::bit;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -76,16 +75,30 @@ pub async fn cancel(
                 return Ok((tx.txid(), state));
             }
 
-            // Check if the cancel timelock has not expired yet
-            if let ExpiredTimelocks::None { .. } =
-                state6.expired_timelock(bitcoin_wallet.as_ref()).await?
-            {
-                bail!(err
-                    .context("Cannot cancel swap because the cancel timelock has not expired yet"));
-            }
+            // The cancel transaction has not been published yet and we failed to publish it ourselves
+            // Here we try to figure out why
+            match state6.expired_timelock(bitcoin_wallet.as_ref()).await {
+                Ok(ExpiredTimelocks::Punish { .. }) => {
+                    let state = BobState::BtcPunished {
+                        tx_lock_id: state6.tx_lock_id(),
+                    };
+                    db.insert_latest_state(swap_id, state.clone().into())
+                        .await?;
 
-            // If none of the above conditions are met, we have a real error (or expired_timelock(..) is returning incorrect results)
-            bail!(err.context("Failed to submit cancel transaction"));
+                    bail!(err.context("Cannot cancel swap because we have already been punished"));
+                }
+                Ok(ExpiredTimelocks::None { .. }) => {
+                    bail!(err.context(
+                        "Cannot cancel swap because the cancel timelock has not expired yet"
+                    ));
+                }
+                Ok(ExpiredTimelocks::Cancel { .. }) => {
+                    bail!(err.context("Failed to cancel swap even though cancel timelock has expired. This is unexpected."));
+                }
+                Err(timelock_err) => {
+                    bail!(err.context(format!("Failed to check timelock status: {}", timelock_err)))
+                }
+            }
         }
     }
 }
