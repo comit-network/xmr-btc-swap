@@ -3,6 +3,7 @@ use crate::protocol::bob::BobState;
 use crate::protocol::Database;
 use anyhow::{bail, Result};
 use bitcoin::Txid;
+use digest::typenum::bit;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -12,17 +13,14 @@ pub async fn cancel_and_refund(
     db: Arc<dyn Database + Send + Sync>,
 ) -> Result<BobState> {
     if let Err(err) = cancel(swap_id, bitcoin_wallet.clone(), db.clone()).await {
-        tracing::info!(%err, "Could not submit cancel transaction");
+        tracing::warn!(%err, "Could not cancel swap. Attempting to refund anyway");
     };
 
     let state = match refund(swap_id, bitcoin_wallet, db).await {
         Ok(s) => s,
         Err(e) => bail!(e),
     };
-    if matches!(state, BobState::BtcRefunded { .. }) {
-        //Print success message only if refund succeeded.
-        tracing::info!("Refund transaction submitted");
-    }
+
     Ok(state)
 }
 
@@ -56,6 +54,7 @@ pub async fn cancel(
 
     tracing::info!(%swap_id, "Manually cancelling swap");
 
+    // Attempt to just publish the cancel transaction
     match state6.submit_tx_cancel(bitcoin_wallet.as_ref()).await {
         Ok((txid, _)) => {
             let state = BobState::BtcCancelled(state6);
@@ -63,36 +62,34 @@ pub async fn cancel(
                 .await?;
             Ok((txid, state))
         }
+
+        // If we fail to submit the cancel transaction it can have one of two reasons:
+        // 1. The cancel timelock hasn't expired yet
+        // 2. The cancel transaction has already been published by Alice
         Err(err) => {
+            // Check if Alice has already published the cancel transaction while we were absent
             if let Ok(tx) = state6.check_for_tx_cancel(bitcoin_wallet.as_ref()).await {
-                // Alice already cancelled swap, so Bob sets his state to BtcCancelled.
                 let state = BobState::BtcCancelled(state6);
                 db.insert_latest_state(swap_id, state.clone().into())
                     .await?;
-                tracing::info!("Cancel transaction has already been confirmed on chain");
-                Ok((tx.txid(), state))
-            } else if let ExpiredTimelocks::None { .. } =
+                tracing::info!("Cancel transaction has already been published by Alice");
+                return Ok((tx.txid(), state));
+            }
+
+            // Check if the cancel timelock has not expired yet
+            if let ExpiredTimelocks::None { .. } =
                 state6.expired_timelock(bitcoin_wallet.as_ref()).await?
             {
-                bail!("Cancel timelock hasn't expired yet. Bob tried to cancel the swap too early");
-            } else if let Ok(error_code) = parse_rpc_error_code(&err) {
-                tracing::debug!(%error_code, "parse rpc error");
-                if error_code == i64::from(RpcErrorCode::RpcVerifyAlreadyInChain) {
-                    tracing::info!("Cancel transaction has already been confirmed on chain");
-                } else if error_code == i64::from(RpcErrorCode::RpcVerifyError) {
-                    tracing::info!("General error trying to submit cancel transaction");
-                }
-                let txid = state6.construct_tx_cancel()?.txid();
-                let state = BobState::BtcCancelled(state6);
-                db.insert_latest_state(swap_id, state.clone().into())
-                    .await?;
-                Ok((txid, state))
-            } else {
-                bail!("Unhandled error while trying to submit cancel transaction, this shouldn't have happened {}", err);
+                bail!(err
+                    .context("Cannot cancel swap because the cancel timelock has not expired yet"));
             }
+
+            // If none of the above conditions are met, we have a real error (or expired_timelock(..) is returning incorrect results)
+            bail!(err.context("Failed to submit cancel transaction"));
         }
     }
 }
+
 pub async fn refund(
     swap_id: Uuid,
     bitcoin_wallet: Arc<Wallet>,
@@ -122,6 +119,7 @@ pub async fn refund(
 
     tracing::info!(%swap_id, "Manually refunding swap");
 
+    // Attempt to just publish the refund transaction
     match state6.publish_refund_btc(bitcoin_wallet.as_ref()).await {
         Ok(_) => {
             let state = BobState::BtcRefunded(state6);
@@ -130,21 +128,40 @@ pub async fn refund(
 
             Ok(state)
         }
-        Err(error) => {
-            if let ExpiredTimelocks::Punish { .. } =
-                state6.expired_timelock(bitcoin_wallet.as_ref()).await?
-            {
-                // Punish timelock already expired, so we can't refund.
-                let state = BobState::BtcPunished {
-                    tx_lock_id: state6.tx_lock_id(),
-                };
-                db.insert_latest_state(swap_id, state.clone().into())
-                    .await?;
 
-                tracing::info!("Cannot refund because BTC punish timelock expired");
-                return Ok(state);
+        // If we fail to submit the refund transaction it can have one of two reasons:
+        // 1. The cancel transaction has not been published yet
+        // 2. The refund timelock has already expired and we have been punished
+        Err(bitcoin_publication_err) => {
+            match state6.expired_timelock(bitcoin_wallet.as_ref()).await {
+                // We have been punished
+                Ok(ExpiredTimelocks::Punish { .. }) => {
+                    let state = BobState::BtcPunished {
+                        tx_lock_id: state6.tx_lock_id(),
+                    };
+                    db.insert_latest_state(swap_id, state.clone().into())
+                        .await?;
+
+                    tracing::info!("Cannot refund swap because we have already been punished");
+                    Ok(state)
+                }
+                Ok(ExpiredTimelocks::None { blocks_left }) => {
+                    bail!(
+                        bitcoin_publication_err.context(format!(
+                            "Cannot refund swap because the refund timelock has not expired yet. Blocks left: {}",
+                            blocks_left
+                        ))
+                    );
+                }
+                Ok(ExpiredTimelocks::Cancel { .. }) => {
+                    bail!(bitcoin_publication_err.context("Failed to refund swap even though cancel timelock has expired. This should is unexpected."));
+                }
+                Err(e) => {
+                    bail!(bitcoin_publication_err
+                        .context(e)
+                        .context("Failed to refund swap and could not check timelock status"));
+                }
             }
-            bail!(error);
         }
     }
 }
