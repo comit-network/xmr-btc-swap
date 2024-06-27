@@ -165,7 +165,7 @@ pub async fn refund(
                 Ok(ExpiredTimelocks::None { blocks_left }) => {
                     bail!(
                         bitcoin_publication_err.context(format!(
-                            "Cannot refund swap because the refund timelock has not expired yet. Blocks left: {}",
+                            "Cannot refund swap because the cancel timelock has not expired yet. Blocks left: {}",
                             blocks_left
                         ))
                     );
