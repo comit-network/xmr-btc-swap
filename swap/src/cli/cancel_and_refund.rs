@@ -45,13 +45,13 @@ pub async fn cancel(
         | BobState::XmrRedeemed { .. }
         | BobState::BtcPunished { .. }
         | BobState::SafelyAborted => bail!(
-            "Cannot cancel swap {} because it is in state {} which is not refundable.",
+            "Cannot cancel swap {} because it is in state {} which is not cancellable.",
             swap_id,
             state
         ),
     };
 
-    tracing::info!(%swap_id, "Manually cancelling swap");
+    tracing::info!(%swap_id, "Attempting to manually cancel swap");
 
     // Attempt to just publish the cancel transaction
     match state6.submit_tx_cancel(bitcoin_wallet.as_ref()).await {
@@ -85,7 +85,7 @@ pub async fn cancel(
                     };
                     db.insert_latest_state(swap_id, state.clone().into())
                         .await?;
-
+                    tracing::info!("You have been punished for not refunding in time");
                     bail!(err.context("Cannot cancel swap because we have already been punished"));
                 }
                 // We cannot cancel because the cancel timelock has not expired yet
@@ -134,7 +134,7 @@ pub async fn refund(
         ),
     };
 
-    tracing::info!(%swap_id, "Manually refunding swap");
+    tracing::info!(%swap_id, "Attempting to manually refund swap");
 
     // Attempt to just publish the refund transaction
     match state6.publish_refund_btc(bitcoin_wallet.as_ref()).await {
@@ -158,9 +158,9 @@ pub async fn refund(
                     };
                     db.insert_latest_state(swap_id, state.clone().into())
                         .await?;
-
-                    tracing::info!("Cannot refund swap because we have already been punished");
-                    Ok(state)
+                    tracing::info!("You have been punished for not refunding in time");
+                    bail!(bitcoin_publication_err
+                        .context("Cannot refund swap because we have already been punished"));
                 }
                 Ok(ExpiredTimelocks::None { blocks_left }) => {
                     bail!(
