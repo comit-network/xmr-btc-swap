@@ -104,16 +104,6 @@
     },
     "query": "\n                SELECT swap_id, state\n                FROM swap_states\n                "
   },
-  "480ae07600eebde51d8522c37162f28f88deaf4d0ed85c0819d8ed991025b258": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Right": 2
-      }
-    },
-    "query": "\n            insert into buffered_transfer_proofs (\n                swap_id,\n                proof\n                ) values (?, ?);\n        "
-  },
   "50a5764546f69c118fa0b64120da50f51073d36257d49768de99ff863e3511e0": {
     "describe": {
       "columns": [],
@@ -205,6 +195,16 @@
       }
     },
     "query": "\n           SELECT state\n           FROM swap_states\n           WHERE swap_id = ?\n        "
+  },
+  "e36c287aa98ae80ad4b6bb6f7e4b59cced041406a9db71da827b09f0d3bacfd6": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 2
+      }
+    },
+    "query": "\n            INSERT INTO buffered_transfer_proofs (\n                swap_id,\n                proof\n                ) VALUES (?, ?);\n        "
   },
   "e9d422daf774d099fcbde6c4cda35821da948bd86cc57798b4d8375baf0b51ae": {
     "describe": {
