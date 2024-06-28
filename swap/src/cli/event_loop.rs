@@ -139,6 +139,7 @@ impl EventLoop {
                             }else {
                                 // Check if the transfer proof is sent from the correct peer and if we have a record of the swap
                                 match self.db.get_peer_id(swap_id).await {
+                                    // We have a record of the swap
                                     Ok(buffer_swap_alice_peer_id) => {
                                         if buffer_swap_alice_peer_id == self.alice_peer_id {
                                             // Save transfer proof in the database such that we can process it later when we resume the swap
@@ -159,6 +160,7 @@ impl EventLoop {
                                                 buffer_swap_alice_peer_id);
                                         }
                                     },
+                                    // We do not have a record of the swap or an error occurred while retrieving the peer id of Alice
                                     Err(e) => {
                                         if let Some(sqlx::Error::RowNotFound) = e.downcast_ref::<sqlx::Error>() {
                                             tracing::warn!("Ignoring transfer proof for swap {} while running swap {}. We do not have a record of this swap", swap_id, self.swap_id);
