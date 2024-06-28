@@ -89,7 +89,7 @@ async fn alice_manually_punishes_after_bob_dead_and_bob_cancels() {
             .await
             .unwrap_err();
         assert_eq!(
-            &error,
+            error.to_string(),
             "Cannot refund swap because we have already been punished"
         );
         Ok(())
