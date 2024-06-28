@@ -144,8 +144,7 @@ impl EventLoop {
                                         }else {
                                             tracing::warn!(
                                                 %swap_id,
-                                                "Ignoring transfer proof for swap {} while running swap {}. Expected to receive it from {}",
-                                                swap_id,
+                                                "Ignoring malicious transfer proof from {}, expected to receive it from {}",
                                                 self.swap_id,
                                                 buffer_swap_alice_peer_id);
                                             continue;
@@ -166,7 +165,7 @@ impl EventLoop {
                                         if let Some(sqlx::Error::RowNotFound) = e.downcast_ref::<sqlx::Error>() {
                                             tracing::warn!("Ignoring transfer proof for swap {} while running swap {}. We do not have a record of this swap", swap_id, self.swap_id);
                                         } else {
-                                            tracing::error!("Ignoring transfer proof for swap {} while running swap {}. Failed to retrieve the peer id of the corresponding swap: {:#}", swap_id, self.swap_id, e);
+                                            tracing::error!("Ignoring transfer proof for swap {} while running swap {}. Failed to retrieve the peer id of Alice for the corresponding swap: {:#}", swap_id, self.swap_id, e);
                                         }
                                     }
                                 }

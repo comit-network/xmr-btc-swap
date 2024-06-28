@@ -1,0 +1,9 @@
+
+running 1 test
+[2m2024-06-28T14:26:34.451940Z[0m [32m INFO[0m [2mtestcontainers::core::logs[0m[2m:[0m Found message after comparing 76 lines    
+[2m2024-06-28T14:26:38.028659Z[0m [32m INFO[0m [2mtestcontainers::core::logs[0m[2m:[0m Found message after comparing 2 lines    
+[2m2024-06-28T14:26:38.049614Z[0m [32m INFO[0m [2mmonero_harness[0m[2m:[0m Starting monerod: S7RU_monerod
+[2m2024-06-28T14:26:40.014081Z[0m [32m INFO[0m [2mtestcontainers::core::logs[0m[2m:[0m Found message after comparing 197 lines    
+[2m2024-06-28T14:26:40.034969Z[0m [32m INFO[0m [2mmonero_harness[0m[2m:[0m Starting miner wallet: miner
+[2m2024-06-28T14:26:42.084045Z[0m [32m INFO[0m [2mtestcontainers::core::logs[0m[2m:[0m Found message after comparing 14 lines    
+[2m2024-06-28T14:26:43.604128Z[0m [32m INFO[0m [2mmonero_harness[0m[2m:[0m Starting wallet: alice
