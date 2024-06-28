@@ -47,7 +47,6 @@ async fn given_alice_and_bob_manually_cancel_when_timelock_not_expired_errors() 
             .to_string()
             .contains("Cannot cancel swap because the cancel timelock has not expired yet"));
 
-
         ctx.restart_alice().await;
         let alice_swap = ctx.alice_next_swap().await;
         assert!(matches!(
