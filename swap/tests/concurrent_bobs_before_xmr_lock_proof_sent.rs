@@ -46,15 +46,13 @@ async fn concurrent_bobs_before_xmr_lock_proof_sent() {
             .await;
         assert!(matches!(bob_state_1, BobState::BtcLocked { .. }));
 
-        // The 1st (paused) swap is expected to refund, because the transfer
-        // proof is delivered to the wrong swap, and we currently don't store it in the
-        // database for the other swap.
+        // The 1st (paused) swap is expected to finish successfully because the transfer proof is buffered when it is receives while another swap is running.
 
         let bob_state_1 = bob::run(bob_swap_1).await?;
-        assert!(matches!(bob_state_1, BobState::BtcRefunded { .. }));
+        assert!(matches!(bob_state_1, BobState::XmrRedeemed { .. }));
 
         let alice_state_1 = alice_swap_1.await??;
-        assert!(matches!(alice_state_1, AliceState::XmrRefunded { .. }));
+        assert!(matches!(alice_state_1, AliceState::BtcRedeemed { .. }));
 
         Ok(())
     })
