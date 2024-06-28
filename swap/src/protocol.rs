@@ -146,4 +146,13 @@ pub trait Database {
     async fn get_states(&self, swap_id: Uuid) -> Result<Vec<State>>;
     async fn all(&self) -> Result<Vec<(Uuid, State)>>;
     async fn raw_all(&self) -> Result<HashMap<Uuid, Vec<serde_json::Value>>>;
+    async fn insert_buffered_transfer_proof(
+        &self,
+        swap_id: Uuid,
+        proof: monero::TransferProof,
+    ) -> Result<()>;
+    async fn get_buffered_transfer_proof(
+        &self,
+        swap_id: Uuid,
+    ) -> Result<Option<monero::TransferProof>>;
 }
