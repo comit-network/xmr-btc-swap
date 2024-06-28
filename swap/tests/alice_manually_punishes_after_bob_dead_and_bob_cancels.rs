@@ -85,8 +85,13 @@ async fn alice_manually_punishes_after_bob_dead_and_bob_cancels() {
             .await;
         assert!(matches!(bob_swap.state, BobState::BtcCancelled { .. }));
         // Alice punished Bob, so he should be in the BtcPunished state.
-        let state = cli::refund(bob_swap_id, bob_swap.bitcoin_wallet, bob_swap.db).await?;
-        ctx.assert_bob_punished(state).await;
+        let error = cli::refund(bob_swap_id, bob_swap.bitcoin_wallet, bob_swap.db)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Cannot refund swap because we have already been punished"
+        );
         Ok(())
     })
     .await;
