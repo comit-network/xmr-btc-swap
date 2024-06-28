@@ -48,11 +48,11 @@ async fn concurrent_bobs_before_xmr_lock_proof_sent() {
 
         // The 1st (paused) swap is expected to finish successfully because the transfer proof is buffered when it is receives while another swap is running.
 
-        let bob_state_1 = bob::run(bob_swap_1).await?;
-        assert!(matches!(bob_state_1, BobState::XmrRedeemed { .. }));
-
         let alice_state_1 = alice_swap_1.await??;
         assert!(matches!(alice_state_1, AliceState::BtcRedeemed { .. }));
+
+        let bob_state_1 = bob::run(bob_swap_1).await?;
+        assert!(matches!(bob_state_1, BobState::XmrRedeemed { .. }));
 
         Ok(())
     })
