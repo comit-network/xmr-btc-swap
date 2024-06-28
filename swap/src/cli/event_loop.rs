@@ -137,29 +137,27 @@ impl EventLoop {
                                     channel
                                 }.boxed()));
                             }else {
+                                // Check if the transfer proof is sent from the correct peer and if we have a record of the swap
                                 match self.db.get_peer_id(swap_id).await {
                                     Ok(buffer_swap_alice_peer_id) => {
                                         if buffer_swap_alice_peer_id == self.alice_peer_id {
-                                            tracing::info!("Received transfer proof for swap {} while running swap {}. Buffering this transfer proof in the database for later retrieval", swap_id, self.swap_id);
+                                            // Save transfer proof in the database such that we can process it later when we resume the swap
+                                            match self.db.insert_buffered_transfer_proof(swap_id, msg.tx_lock_proof).await {
+                                                Ok(_) => {
+                                                    tracing::info!("Received transfer proof for swap {} while running swap {}. Buffering this transfer proof in the database for later retrieval", swap_id, self.swap_id);
+                                                    let _ = self.swarm.behaviour_mut().transfer_proof.send_response(channel, ());
+                                                }
+                                                Err(e) => {
+                                                    tracing::error!("Failed to buffer transfer proof for swap {}: {:#}", swap_id, e);
+                                                }
+                                            };
                                         }else {
                                             tracing::warn!(
                                                 %swap_id,
                                                 "Ignoring malicious transfer proof from {}, expected to receive it from {}",
                                                 self.swap_id,
                                                 buffer_swap_alice_peer_id);
-                                            continue;
                                         }
-
-                                        // Save transfer proof in the database such that we can process it later when we resume the swap
-                                        match self.db.insert_buffered_transfer_proof(swap_id, msg.tx_lock_proof).await {
-                                            Ok(_) => {
-                                                tracing::debug!("Buffered transfer proof for swap {}", swap_id);
-                                                let _ = self.swarm.behaviour_mut().transfer_proof.send_response(channel, ());
-                                            }
-                                            Err(e) => {
-                                                tracing::error!("Failed to buffer transfer proof for swap {}: {:#}", swap_id, e);
-                                            }
-                                        };
                                     },
                                     Err(e) => {
                                         if let Some(sqlx::Error::RowNotFound) = e.downcast_ref::<sqlx::Error>() {
