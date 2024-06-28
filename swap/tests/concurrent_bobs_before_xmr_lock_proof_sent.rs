@@ -32,8 +32,7 @@ async fn concurrent_bobs_before_xmr_lock_proof_sent() {
         let alice_swap_2 = tokio::spawn(alice::run(alice_swap_2, FixedRate::default()));
 
         // The 2nd swap ALWAYS finish successfully in this
-        // scenario, but will receive an "unwanted" transfer proof that is ignored in
-        // the event loop.
+        // scenario, but will receive an "unwanted" transfer proof that is buffered until the 1st swap is resumed
 
         let bob_state_2 = bob_swap_2.await??;
         assert!(matches!(bob_state_2, BobState::XmrRedeemed { .. }));
