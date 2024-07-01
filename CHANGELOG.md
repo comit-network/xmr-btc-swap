@@ -9,8 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.13.2] - 2024-07-01
 
-## [0.13.2] - 2024-07-01
-
 - CLI: Buffer received transfer proofs for later processing if we're currently running a different swap
 - CLI: We now display the reason for a failed cancel-refund operation to the user (#683)
 
@@ -368,7 +366,6 @@ It is possible to migrate critical data from the old db to the sqlite but there 
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
 [unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.13.2...HEAD
-[0.13.2]: https://github.com/comit-network/xmr-btc-swap/compare/0.13.2...0.13.2
 [0.13.2]: https://github.com/comit-network/xmr-btc-swap/compare/0.13.1...0.13.2
 [0.13.1]: https://github.com/comit-network/xmr-btc-swap/compare/0.13.0...0.13.1
 [0.13.0]: https://github.com/comit-network/xmr-btc-swap/compare/0.12.3...0.13.0
