@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 - CLI: Buffer received transfer proofs for later processing if we're currently running a different swap
+- CLI: We now display the reason for a failed cancel-refund operation to the user (#683)
 
 ## [0.13.1] - 2024-06-10
 
