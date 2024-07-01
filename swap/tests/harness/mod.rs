@@ -427,8 +427,6 @@ impl BobParams {
     }
 
     pub async fn new_swap_from_db(&self, swap_id: Uuid) -> Result<(bob::Swap, cli::EventLoop)> {
-        let (event_loop, handle) = self.new_eventloop(swap_id).await?;
-
         if let Some(parent_dir) = self.db_path.parent() {
             ensure_directory_exists(parent_dir)?;
         }
@@ -437,8 +435,10 @@ impl BobParams {
         }
         let db = Arc::new(SqliteDatabase::open(&self.db_path).await?);
 
+        let (event_loop, handle) = self.new_eventloop(swap_id, db.clone()).await?;
+
         let swap = bob::Swap::from_db(
-            db,
+            db.clone(),
             swap_id,
             self.bitcoin_wallet.clone(),
             self.monero_wallet.clone(),
@@ -457,8 +457,6 @@ impl BobParams {
     ) -> Result<(bob::Swap, cli::EventLoop)> {
         let swap_id = Uuid::new_v4();
 
-        let (event_loop, handle) = self.new_eventloop(swap_id).await?;
-
         if let Some(parent_dir) = self.db_path.parent() {
             ensure_directory_exists(parent_dir)?;
         }
@@ -466,6 +464,8 @@ impl BobParams {
             tokio::fs::File::create(&self.db_path).await?;
         }
         let db = Arc::new(SqliteDatabase::open(&self.db_path).await?);
+
+        let (event_loop, handle) = self.new_eventloop(swap_id, db.clone()).await?;
 
         db.insert_peer_id(swap_id, self.alice_peer_id).await?;
 
@@ -487,6 +487,7 @@ impl BobParams {
     pub async fn new_eventloop(
         &self,
         swap_id: Uuid,
+        db: Arc<dyn Database + Send + Sync>,
     ) -> Result<(cli::EventLoop, cli::EventLoopHandle)> {
         let tor_socks5_port = get_port()
             .expect("We don't care about Tor in the tests so we get a free port to disable it.");
@@ -503,7 +504,7 @@ impl BobParams {
             .behaviour_mut()
             .add_address(self.alice_peer_id, self.alice_address.clone());
 
-        cli::EventLoop::new(swap_id, swarm, self.alice_peer_id)
+        cli::EventLoop::new(swap_id, swarm, self.alice_peer_id, db.clone())
     }
 }
 

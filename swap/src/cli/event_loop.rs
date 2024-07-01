@@ -5,6 +5,7 @@ use crate::network::encrypted_signature;
 use crate::network::quote::BidQuote;
 use crate::network::swap_setup::bob::NewSwap;
 use crate::protocol::bob::State2;
+use crate::protocol::Database;
 use anyhow::{Context, Result};
 use futures::future::{BoxFuture, OptionFuture};
 use futures::{FutureExt, StreamExt};
@@ -13,6 +14,7 @@ use libp2p::swarm::dial_opts::DialOpts;
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;
 
@@ -21,6 +23,7 @@ pub struct EventLoop {
     swap_id: Uuid,
     swarm: libp2p::Swarm<Behaviour>,
     alice_peer_id: PeerId,
+    db: Arc<dyn Database + Send + Sync>,
 
     // these streams represents outgoing requests that we have to make
     quote_requests: bmrng::RequestReceiverStream<(), BidQuote>,
@@ -51,6 +54,7 @@ impl EventLoop {
         swap_id: Uuid,
         swarm: Swarm<Behaviour>,
         alice_peer_id: PeerId,
+        db: Arc<dyn Database + Send + Sync>,
     ) -> Result<(Self, EventLoopHandle)> {
         let execution_setup = bmrng::channel_with_timeout(1, Duration::from_secs(60));
         let transfer_proof = bmrng::channel_with_timeout(1, Duration::from_secs(60));
@@ -69,6 +73,7 @@ impl EventLoop {
             inflight_swap_setup: None,
             inflight_encrypted_signature_requests: HashMap::default(),
             pending_transfer_proof: OptionFuture::from(None),
+            db,
         };
 
         let handle = EventLoopHandle {
@@ -108,38 +113,63 @@ impl EventLoop {
                         SwarmEvent::Behaviour(OutEvent::TransferProofReceived { msg, channel, peer }) => {
                             let swap_id = msg.swap_id;
 
-                            if peer != self.alice_peer_id {
-                                tracing::warn!(
-                                            %swap_id,
-                                            "Ignoring malicious transfer proof from {}, expected to receive it from {}",
-                                            peer,
-                                            self.alice_peer_id);
-                                        continue;
-                            }
-
-                            if swap_id != self.swap_id {
-
-                                // TODO: Save unexpected transfer proofs in the database and check for messages in the database when handling swaps
-                                tracing::warn!("Received unexpected transfer proof for swap {} while running swap {}. This transfer proof will be ignored", swap_id, self.swap_id);
-
-                                // When receiving a transfer proof that is unexpected we still have to acknowledge that it was received
-                                let _ = self.swarm.behaviour_mut().transfer_proof.send_response(channel, ());
-                                continue;
-                            }
-
-                            let mut responder = match self.transfer_proof.send(msg.tx_lock_proof).await {
-                                Ok(responder) => responder,
-                                Err(e) => {
-                                    tracing::warn!("Failed to pass on transfer proof: {:#}", e);
-                                    continue;
+                            if swap_id == self.swap_id {
+                                if peer != self.alice_peer_id {
+                                    tracing::warn!(
+                                                %swap_id,
+                                                "Ignoring malicious transfer proof from {}, expected to receive it from {}",
+                                                peer,
+                                                self.alice_peer_id);
+                                            continue;
                                 }
-                            };
 
-                            self.pending_transfer_proof = OptionFuture::from(Some(async move {
-                                let _ = responder.recv().await;
+                                let mut responder = match self.transfer_proof.send(msg.tx_lock_proof).await {
+                                    Ok(responder) => responder,
+                                    Err(e) => {
+                                        tracing::warn!("Failed to pass on transfer proof: {:#}", e);
+                                        continue;
+                                    }
+                                };
 
-                                channel
-                            }.boxed()));
+                                self.pending_transfer_proof = OptionFuture::from(Some(async move {
+                                    let _ = responder.recv().await;
+
+                                    channel
+                                }.boxed()));
+                            }else {
+                                // Check if the transfer proof is sent from the correct peer and if we have a record of the swap
+                                match self.db.get_peer_id(swap_id).await {
+                                    // We have a record of the swap
+                                    Ok(buffer_swap_alice_peer_id) => {
+                                        if buffer_swap_alice_peer_id == self.alice_peer_id {
+                                            // Save transfer proof in the database such that we can process it later when we resume the swap
+                                            match self.db.insert_buffered_transfer_proof(swap_id, msg.tx_lock_proof).await {
+                                                Ok(_) => {
+                                                    tracing::info!("Received transfer proof for swap {} while running swap {}. Buffering this transfer proof in the database for later retrieval", swap_id, self.swap_id);
+                                                    let _ = self.swarm.behaviour_mut().transfer_proof.send_response(channel, ());
+                                                }
+                                                Err(e) => {
+                                                    tracing::error!("Failed to buffer transfer proof for swap {}: {:#}", swap_id, e);
+                                                }
+                                            };
+                                        }else {
+                                            tracing::warn!(
+                                                %swap_id,
+                                                "Ignoring malicious transfer proof from {}, expected to receive it from {}",
+                                                self.swap_id,
+                                                buffer_swap_alice_peer_id);
+                                        }
+                                    },
+                                    // We do not have a record of the swap or an error occurred while retrieving the peer id of Alice
+                                    Err(e) => {
+                                        if let Some(sqlx::Error::RowNotFound) = e.downcast_ref::<sqlx::Error>() {
+                                            tracing::warn!("Ignoring transfer proof for swap {} while running swap {}. We do not have a record of this swap", swap_id, self.swap_id);
+                                        } else {
+                                            tracing::error!("Ignoring transfer proof for swap {} while running swap {}. Failed to retrieve the peer id of Alice for the corresponding swap: {:#}", swap_id, self.swap_id, e);
+                                        }
+                                    }
+                                }
+                            }
                         }
                         SwarmEvent::Behaviour(OutEvent::EncryptedSignatureAcknowledged { id }) => {
                             if let Some(responder) = self.inflight_encrypted_signature_requests.remove(&id) {
