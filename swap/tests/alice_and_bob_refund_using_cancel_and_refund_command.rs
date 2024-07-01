@@ -50,7 +50,7 @@ async fn given_alice_and_bob_manually_refund_after_funds_locked_both_refund() {
 
         // Bob manually cancels
         bob_join_handle.abort();
-        let (_, _, state) = cli::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db).await?;
+        let (_, state) = cli::cancel(bob_swap.id, bob_swap.bitcoin_wallet, bob_swap.db).await?;
         assert!(matches!(state, BobState::BtcCancelled { .. }));
 
         let (bob_swap, bob_join_handle) = ctx

@@ -821,6 +821,7 @@ impl Request {
             .await
             .map_err(|err| {
                 method_span.in_scope(|| {
+                    // The {:?} formatter is used to print the entire error chain
                     tracing::debug!(err = format!("{:?}", err), "API call resulted in an error");
                 });
                 err
