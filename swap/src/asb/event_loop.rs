@@ -1,5 +1,6 @@
 use crate::asb::{Behaviour, OutEvent, Rate};
 use crate::monero::Amount;
+use crate::network::cooperative_xmr_redeem_after_punish::CooperativeXmrRedeemError;
 use crate::network::cooperative_xmr_redeem_after_punish::Response::{FailResponse, OkResponse};
 use crate::network::quote::BidQuote;
 use crate::network::swap_setup::alice::WalletSnapshot;
@@ -265,7 +266,8 @@ where
                                     from = %peer,
                                     "Ignoring cooperative XMR redeem request for unknown swap"
                                 );
-                                if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, FailResponse { swap_id, error: String::from("Cooperative XMR redeem request for unknown swap") }).is_err() {
+
+                                if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, FailResponse { swap_id, error: CooperativeXmrRedeemError::UnknownSwap }).is_err() {
                                     tracing::error!(%swap_id, "Failed to respond with XMR redeem request for unknown swap error");
                                 }
                                 continue;
@@ -278,7 +280,7 @@ where
                                     expected_from = %swap_peer,
                                     "Ignoring malicious cooperative XMR redeem request which was not expected from this peer",
                                 );
-                                if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, FailResponse { swap_id, error: String::from("Ignoring malicious cooperative XMR redeem request which was not expected from this peer") }).is_err() {
+                                if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, FailResponse { swap_id, error: CooperativeXmrRedeemError::MaliciousRequest }).is_err() {
                                     tracing::error!(%swap_id, "Failed to respond with XMR redeem request which was not expected from this peer error");
                                 }
                                 continue;
@@ -286,7 +288,7 @@ where
 
                             let Ok(state) = self.db.get_state(swap_id).await else {
                                 tracing::error!(%swap_id, "Failed to read swap state from database");
-                                if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, FailResponse { swap_id, error: String::from("Failed to read swap state from database") }).is_err() {
+                                if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, FailResponse { swap_id, error: CooperativeXmrRedeemError::UnknownSwap }).is_err() {
                                     tracing::error!(%swap_id, "Failed to respond with database error");
                                 }
                                 continue;
@@ -294,7 +296,7 @@ where
 
                             let State::Alice (AliceState::BtcPunished { state3 }) = state else {
                                 tracing::warn!(%swap_id, "Ignoring cooperative XMR redeem request for swap in invalid state");
-                                if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, FailResponse { swap_id, error: String::from("Cooperative XMR redeem request for swap in invalid state") }).is_err() {
+                                if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, FailResponse { swap_id, error: CooperativeXmrRedeemError::SwapInvalidState }).is_err() {
                                     tracing::error!(%swap_id, "Failed to respond with cooperative XMR redeem request for swap in invalid state error");
                                 }
                                 continue;
@@ -303,11 +305,6 @@ where
                             if self.swarm.behaviour_mut().cooperative_xmr_redeem.send_response(channel, OkResponse { swap_id, s_a: state3.s_a }).is_err() {
                                 tracing::debug!(%peer, "Failed to respond with XMR key");
                                 continue;
-                            }
-
-                            let new_state = AliceState::BtcRedeemed;
-                            if let Err(error) = self.db.insert_latest_state(swap_id, new_state.into()).await {
-                                tracing::warn!(%swap_id, "Unable to save latest state in database: {}", error);
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::Rendezvous(libp2p::rendezvous::client::Event::Registered { rendezvous_node, ttl, namespace })) => {

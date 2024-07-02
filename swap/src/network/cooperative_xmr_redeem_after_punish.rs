@@ -25,6 +25,16 @@ impl ProtocolName for CooperativeXmrRedeemProtocol {
     }
 }
 
+#[derive(Debug, thiserror::Error, Clone, Serialize, Deserialize)]
+pub enum CooperativeXmrRedeemError {
+    #[error("Alice does not have a record of the swap")]
+    UnknownSwap,
+    #[error("Alice rejected the request because it deemed it malicious")]
+    MaliciousRequest,
+    #[error("Alice is in a state where a cooperative redeem is not possible")]
+    SwapInvalidState,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Request {
     pub swap_id: Uuid,
@@ -38,7 +48,7 @@ pub enum Response {
     },
     FailResponse {
         swap_id: Uuid,
-        error: std::string::String,
+        error: CooperativeXmrRedeemError,
     },
 }
 pub fn alice() -> Behaviour {

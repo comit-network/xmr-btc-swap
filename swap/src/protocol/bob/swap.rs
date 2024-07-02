@@ -5,7 +5,7 @@ use crate::network::swap_setup::bob::NewSwap;
 use crate::protocol::bob::state::*;
 use crate::protocol::{bob, Database};
 use crate::{bitcoin, monero};
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Context, Error, Result};
 use std::sync::Arc;
 use tokio::select;
 use uuid::Uuid;
@@ -301,11 +301,14 @@ async fn next_state(
             let response = event_loop_handle
                 .request_cooperative_xmr_redeem(swap_id)
                 .await;
+
             match response {
                 Ok(OkResponse { s_a, .. }) => {
-                    tracing::info!("Alice revealed XMR key to us, redeeming XMR...");
+                    tracing::debug!("Alice revealed XMR key to us");
+
                     let s_a = monero::PrivateKey { scalar: s_a };
                     let state5 = state.attempt_cooperative_redeem(s_a);
+
                     match state5
                         .redeem_xmr(monero_wallet, swap_id.to_string(), monero_receive_address)
                         .await
@@ -314,19 +317,18 @@ async fn next_state(
                             return Ok(BobState::XmrRedeemed { tx_lock_id });
                         }
                         Err(error) => {
-                            tracing::error!(%error, "Failed to redeem XMR with key from Alice");
-
-                            return Ok(BobState::BtcPunished { state, tx_lock_id });
+                            return Err(error)
+                                .context("Failed to redeem XMR with revealed XMR key");
                         }
                     }
                 }
                 Ok(FailResponse { error, .. }) => {
-                    tracing::error!(%error, "Alice cancelled XMR redeem request. Try to resume the swap later");
-                    return Ok(BobState::BtcPunished { state, tx_lock_id });
+                    return Err(error)
+                        .context("Alice rejected our request for cooperative XMR redeem");
                 }
                 Err(error) => {
-                    tracing::error!(%error, "Failed to get XMR key from Alice. Try to resume the swap later");
-                    return Ok(BobState::BtcPunished { state, tx_lock_id });
+                    return Err(error)
+                        .context("Failed to request cooperative XMR redeem from Alice");
                 }
             };
         }

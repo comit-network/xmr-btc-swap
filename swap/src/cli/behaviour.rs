@@ -1,4 +1,5 @@
 use crate::monero::Scalar;
+use crate::network::cooperative_xmr_redeem_after_punish::CooperativeXmrRedeemError;
 use crate::network::quote::BidQuote;
 use crate::network::rendezvous::XmrBtcNamespace;
 use crate::network::swap_setup::bob;
@@ -38,7 +39,7 @@ pub enum OutEvent {
     },
     CooperativeXmrRedeemReceivedFailure {
         id: RequestId,
-        error: std::string::String,
+        error: CooperativeXmrRedeemError,
         swap_id: uuid::Uuid,
     },
     AllRedialAttemptsExhausted {
