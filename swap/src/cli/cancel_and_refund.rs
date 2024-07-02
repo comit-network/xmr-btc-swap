@@ -174,7 +174,7 @@ pub async fn refund(
                     );
                 }
                 Ok(ExpiredTimelocks::Cancel { .. }) => {
-                    bail!(bitcoin_publication_err.context("Failed to refund swap even though cancel timelock has expired. This should is unexpected."));
+                    bail!(bitcoin_publication_err.context("Failed to refund swap even though cancel timelock has expired. This is unexpected."));
                 }
                 Err(e) => {
                     bail!(bitcoin_publication_err
