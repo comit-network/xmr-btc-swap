@@ -1,5 +1,5 @@
 use crate::database::Swap;
-use crate::monero::Address;
+use crate::monero::{Address, TransferProof};
 use crate::protocol::{Database, State};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -301,6 +301,56 @@ impl Database for SqliteDatabase {
             .collect::<Result<Vec<State>>>();
 
         result
+    }
+
+    async fn insert_buffered_transfer_proof(
+        &self,
+        swap_id: Uuid,
+        proof: TransferProof,
+    ) -> Result<()> {
+        let mut conn = self.pool.acquire().await?;
+        let swap_id = swap_id.to_string();
+        let proof = serde_json::to_string(&proof)?;
+
+        sqlx::query!(
+            r#"
+            INSERT INTO buffered_transfer_proofs (
+                swap_id,
+                proof
+                ) VALUES (?, ?);
+        "#,
+            swap_id,
+            proof
+        )
+        .execute(&mut conn)
+        .await?;
+
+        Ok(())
+    }
+
+    async fn get_buffered_transfer_proof(&self, swap_id: Uuid) -> Result<Option<TransferProof>> {
+        let mut conn = self.pool.acquire().await?;
+        let swap_id = swap_id.to_string();
+
+        let row = sqlx::query!(
+            r#"
+           SELECT proof
+           FROM buffered_transfer_proofs
+           WHERE swap_id = ?
+            "#,
+            swap_id
+        )
+        .fetch_all(&mut conn)
+        .await?;
+
+        if row.is_empty() {
+            return Ok(None);
+        }
+
+        let proof_str = &row[0].proof;
+        let proof = serde_json::from_str(proof_str)?;
+
+        Ok(Some(proof))
     }
 
     async fn raw_all(&self) -> Result<HashMap<Uuid, Vec<serde_json::Value>>> {

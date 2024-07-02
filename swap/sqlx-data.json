@@ -195,5 +195,33 @@
       }
     },
     "query": "\n           SELECT state\n           FROM swap_states\n           WHERE swap_id = ?\n        "
+  },
+  "e36c287aa98ae80ad4b6bb6f7e4b59cced041406a9db71da827b09f0d3bacfd6": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 2
+      }
+    },
+    "query": "\n            INSERT INTO buffered_transfer_proofs (\n                swap_id,\n                proof\n                ) VALUES (?, ?);\n        "
+  },
+  "e9d422daf774d099fcbde6c4cda35821da948bd86cc57798b4d8375baf0b51ae": {
+    "describe": {
+      "columns": [
+        {
+          "name": "proof",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "\n           SELECT proof\n           FROM buffered_transfer_proofs\n           WHERE swap_id = ?\n            "
   }
 }

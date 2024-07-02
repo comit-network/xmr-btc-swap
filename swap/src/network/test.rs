@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use futures::stream::FusedStream;
-use futures::{future, Future, Stream, StreamExt};
+use futures::{future, Future, StreamExt};
 use libp2p::core::muxing::StreamMuxerBox;
 use libp2p::core::transport::upgrade::Version;
 use libp2p::core::transport::MemoryTransport;
@@ -75,8 +75,8 @@ async fn get_local_tcp_address() -> Multiaddr {
 }
 
 pub async fn await_events_or_timeout<A, B, E1, E2>(
-    swarm_1: &mut (impl Stream<Item = SwarmEvent<A, E1>> + FusedStream + Unpin),
-    swarm_2: &mut (impl Stream<Item = SwarmEvent<B, E2>> + FusedStream + Unpin),
+    swarm_1: &mut (impl FusedStream<Item = SwarmEvent<A, E1>> + FusedStream + Unpin),
+    swarm_2: &mut (impl FusedStream<Item = SwarmEvent<B, E2>> + FusedStream + Unpin),
 ) -> (SwarmEvent<A, E1>, SwarmEvent<B, E2>)
 where
     SwarmEvent<A, E1>: Debug,

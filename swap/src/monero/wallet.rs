@@ -6,6 +6,7 @@ use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::{Context, Result};
 use monero_rpc::wallet::{BlockHeight, MoneroWalletRpc as _, Refreshed};
 use monero_rpc::{jsonrpc, wallet};
+use std::ops::Div;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -233,7 +234,7 @@ impl Wallet {
 
         let address = Address::standard(self.network, public_spend_key, public_view_key.into());
 
-        let check_interval = tokio::time::interval(self.sync_interval);
+        let check_interval = tokio::time::interval(self.sync_interval.div(10));
 
         wait_for_confirmations(
             &self.inner,
