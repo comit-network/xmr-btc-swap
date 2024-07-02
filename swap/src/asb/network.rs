@@ -5,7 +5,9 @@ use crate::network::rendezvous::XmrBtcNamespace;
 use crate::network::swap_setup::alice;
 use crate::network::swap_setup::alice::WalletSnapshot;
 use crate::network::transport::authenticate_and_multiplex;
-use crate::network::{encrypted_signature, quote, transfer_proof};
+use crate::network::{
+    cooperative_xmr_redeem_after_punish, encrypted_signature, quote, transfer_proof,
+};
 use crate::protocol::alice::State3;
 use anyhow::{anyhow, Error, Result};
 use futures::FutureExt;
@@ -76,6 +78,11 @@ pub mod behaviour {
             channel: ResponseChannel<()>,
             peer: PeerId,
         },
+        CooperativeXmrRedeemRequested {
+            channel: ResponseChannel<cooperative_xmr_redeem_after_punish::Response>,
+            swap_id: Uuid,
+            peer: PeerId,
+        },
         Rendezvous(libp2p::rendezvous::client::Event),
         Failure {
             peer: PeerId,
@@ -114,6 +121,7 @@ pub mod behaviour {
         pub quote: quote::Behaviour,
         pub swap_setup: alice::Behaviour<LR>,
         pub transfer_proof: transfer_proof::Behaviour,
+        pub cooperative_xmr_redeem: cooperative_xmr_redeem_after_punish::Behaviour,
         pub encrypted_signature: encrypted_signature::Behaviour,
         pub identify: Identify,
 
@@ -160,6 +168,7 @@ pub mod behaviour {
                 ),
                 transfer_proof: transfer_proof::alice(),
                 encrypted_signature: encrypted_signature::alice(),
+                cooperative_xmr_redeem: cooperative_xmr_redeem_after_punish::alice(),
                 ping: Ping::new(PingConfig::new().with_keep_alive(true)),
                 identify: Identify::new(identifyConfig),
             }

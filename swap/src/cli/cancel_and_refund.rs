@@ -31,8 +31,16 @@ pub async fn cancel(
     let state = db.get_state(swap_id).await?.try_into()?;
 
     let state6 = match state {
-        BobState::BtcLocked { state3, .. } => state3.cancel(),
-        BobState::XmrLockProofReceived { state, .. } => state.cancel(),
+        BobState::BtcLocked {
+            state3,
+            monero_wallet_restore_blockheight,
+            ..
+        } => state3.cancel(monero_wallet_restore_blockheight),
+        BobState::XmrLockProofReceived {
+            state,
+            monero_wallet_restore_blockheight,
+            ..
+        } => state.cancel(monero_wallet_restore_blockheight),
         BobState::XmrLocked(state4) => state4.cancel(),
         BobState::EncSigSent(state4) => state4.cancel(),
         BobState::CancelTimelockExpired(state6) => state6,
@@ -81,6 +89,7 @@ pub async fn cancel(
                 // We cannot cancel because Alice has already cancelled and punished afterwards
                 Ok(ExpiredTimelocks::Punish { .. }) => {
                     let state = BobState::BtcPunished {
+                        state: state6.clone(),
                         tx_lock_id: state6.tx_lock_id(),
                     };
                     db.insert_latest_state(swap_id, state.clone().into())
@@ -118,8 +127,15 @@ pub async fn refund(
     let state = db.get_state(swap_id).await?.try_into()?;
 
     let state6 = match state {
-        BobState::BtcLocked { state3, .. } => state3.cancel(),
-        BobState::XmrLockProofReceived { state, .. } => state.cancel(),
+        BobState::BtcLocked {
+            state3,
+            monero_wallet_restore_blockheight,
+        } => state3.cancel(monero_wallet_restore_blockheight),
+        BobState::XmrLockProofReceived {
+            state,
+            monero_wallet_restore_blockheight,
+            ..
+        } => state.cancel(monero_wallet_restore_blockheight),
         BobState::XmrLocked(state4) => state4.cancel(),
         BobState::EncSigSent(state4) => state4.cancel(),
         BobState::CancelTimelockExpired(state6) => state6,
@@ -157,6 +173,7 @@ pub async fn refund(
                 // We have been punished
                 Ok(ExpiredTimelocks::Punish { .. }) => {
                     let state = BobState::BtcPunished {
+                        state: state6.clone(),
                         tx_lock_id: state6.tx_lock_id(),
                     };
                     db.insert_latest_state(swap_id, state.clone().into())
