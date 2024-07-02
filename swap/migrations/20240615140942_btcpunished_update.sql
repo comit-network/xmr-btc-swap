@@ -1,3 +1,4 @@
+-- Alice: Adds new attribute to the BtcPunished state (state3)
 UPDATE swap_states SET -- This query adds state3 to the BtcPunished state. (Introduced in PR #1676)
     state = json_replace( -- Replaces "{"Alice":{"Done":"BtcPunished"}}" with "{"Alice": {"Done": "BtcPunished": {"state": <state3 object from BtcLocked>} }}"
         state,
@@ -16,6 +17,8 @@ UPDATE swap_states SET -- This query adds state3 to the BtcPunished state. (Intr
         )
     )
 WHERE json_extract(state, '$.Alice.Done') = 'BtcPunished'; -- Apply update only to BtcPunished state rows
+
+-- Bob: Adds new attributes to the BtcPunished state (state6, v, monero_wallet_restore_blockheight)
 UPDATE swap_states SET -- This query adds state6 to the BtcPunished state. It then adds new attributes v (monero viewkey) and monero_wallet_restore_blockheight to state6. (Introduced in PR #1676)
     state = json_replace(
         state,
@@ -63,10 +66,12 @@ UPDATE swap_states SET -- This query adds state6 to the BtcPunished state. It th
         )
     )
 WHERE json_extract(state, '$.Bob.Done.BtcPunished') IS NOT NULL; -- Apply update only to BtcPunished state rows (json_extract returns null if property doesn't exist)
+
+-- Bob: Adds new attributes to the BtcRefunded state (v, monero_wallet_restore_blockheight)
 UPDATE swap_states SET -- This query adds the new state6 attributes v (monero viewkey) and monero_wallet_restore_blockheight to the BtcRefunded state. (Introduced in PR #1676)
     state = json_insert(
         state, -- object that we insert properties into (original state from the row)
-        '$.v', -- {"Bob":{"BtcRefunded":{..., "v": "..."}}
+        '$.Bob.Done.BtcRefunded.v', -- {"Bob":{"BtcRefunded":{..., "v": "..."}}
         (
             SELECT json_extract(states.state, '$.Bob.BtcLocked.state3.v')
             FROM swap_states AS states
@@ -74,7 +79,7 @@ UPDATE swap_states SET -- This query adds the new state6 attributes v (monero vi
                 states.swap_id = swap_states.swap_id -- swap_states.swap_id is id of the BtcRefunded row, states.swap_id is id of the row that we are looking for
                 AND json_extract(states.state, '$.Bob.BtcLocked') IS NOT NULL
         ),
-        '$.monero_wallet_restore_blockheight',  -- {"Bob":{"BtcRefunded":{..., "monero_wallet_restore_blockheight": {"height":...}} }}
+        '$.Bob.Done.BtcRefunded.monero_wallet_restore_blockheight',  -- {"Bob":{"BtcRefunded":{..., "monero_wallet_restore_blockheight": {"height":...}} }}
         (
             SELECT json_extract(states.state, '$.Bob.BtcLocked.monero_wallet_restore_blockheight')
             FROM swap_states AS states
@@ -84,10 +89,12 @@ UPDATE swap_states SET -- This query adds the new state6 attributes v (monero vi
         )
     )
 WHERE json_extract(state, '$.Bob.Done.BtcRefunded') IS NOT NULL; -- Apply update only to BtcRefunded state rows (json_extract returns null if property doesn't exist)
+
+-- Bob: Adds new attributes to the BtcCancelled state (v, monero_wallet_restore_blockheight)
 UPDATE swap_states SET -- This query adds the new state6 attributes v (monero viewkey) and monero_wallet_restore_blockheight to the BtcCancelled state. (Introduced in PR #1676)
     state = json_insert(
         state,
-        '$.v',
+        '$.Bob.BtcCancelled.v',
         (
             SELECT json_extract(states.state, '$.Bob.BtcLocked.state3.v')
             FROM swap_states AS states
@@ -95,7 +102,7 @@ UPDATE swap_states SET -- This query adds the new state6 attributes v (monero vi
                 states.swap_id = swap_states.swap_id
                 AND json_extract(states.state, '$.Bob.BtcLocked') IS NOT NULL
         ),
-        '$.monero_wallet_restore_blockheight',
+        '$.Bob.BtcCancelled.monero_wallet_restore_blockheight',
         (
             SELECT json_extract(states.state, '$.Bob.BtcLocked.monero_wallet_restore_blockheight')
             FROM swap_states AS states
@@ -105,10 +112,12 @@ UPDATE swap_states SET -- This query adds the new state6 attributes v (monero vi
         )
     )
 WHERE json_extract(state, '$.Bob.BtcCancelled') IS NOT NULL;
+
+-- Bob: Adds new attributes to the CancelTimelockExpired state (v, monero_wallet_restore_blockheight)
 UPDATE swap_states SET -- This query adds the new state6 attributes v (monero viewkey) and monero_wallet_restore_blockheight to the CancelTimelockExpired state. (Introduced in PR #1676)
     state = json_insert(
         state,
-        '$.v',
+        '$.Bob.CancelTimelockExpired.v',
         (
             SELECT json_extract(states.state, '$.Bob.BtcLocked.state3.v')
             FROM swap_states AS states
@@ -116,7 +125,7 @@ UPDATE swap_states SET -- This query adds the new state6 attributes v (monero vi
                 states.swap_id = swap_states.swap_id
                 AND json_extract(states.state, '$.Bob.BtcLocked') IS NOT NULL
         ),
-        '$.monero_wallet_restore_blockheight',
+        '$.Bob.CancelTimelockExpired.monero_wallet_restore_blockheight',
         (
             SELECT json_extract(states.state, '$.Bob.BtcLocked.monero_wallet_restore_blockheight')
             FROM swap_states AS states
