@@ -89,6 +89,7 @@ pub async fn cancel(
                 // We cannot cancel because Alice has already cancelled and punished afterwards
                 Ok(ExpiredTimelocks::Punish { .. }) => {
                     let state = BobState::BtcPunished {
+                        state: state6.clone(),
                         tx_lock_id: state6.tx_lock_id(),
                     };
                     db.insert_latest_state(swap_id, state.clone().into())
@@ -172,6 +173,7 @@ pub async fn refund(
                 // We have been punished
                 Ok(ExpiredTimelocks::Punish { .. }) => {
                     let state = BobState::BtcPunished {
+                        state: state6.clone(),
                         tx_lock_id: state6.tx_lock_id(),
                     };
                     db.insert_latest_state(swap_id, state.clone().into())
