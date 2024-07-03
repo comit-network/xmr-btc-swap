@@ -17,11 +17,13 @@ pub fn is_complete(state: &BobState) -> bool {
     )
 }
 
-// Checks if this is a state where we should exit after reaching it
-// but we don't want to prevent resuming the swap in this state
-// This is currently only used for the BtcPunished state because we might be able to
-// recover from this state by attempting a cooperative XMR redeem but it might also fail.
-// We want to avoid an infinite retry loop but also allow the user to retry manually by resuming the swap.
+// Identifies states that should be run at most once before exiting.
+// This is used to prevent infinite retry loops while still allowing manual resumption.
+//
+// Currently, this applies to the BtcPunished state:
+// - We want to attempt recovery via cooperative XMR redeem once.
+// - If unsuccessful, we exit to avoid an infinite retry loop.
+// - The swap can still be manually resumed later and retried if desired.
 pub fn is_run_at_most_once(state: &BobState) -> bool {
     matches!(state, BobState::BtcPunished { .. })
 }
