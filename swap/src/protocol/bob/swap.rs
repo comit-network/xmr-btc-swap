@@ -17,12 +17,12 @@ pub fn is_complete(state: &BobState) -> bool {
     )
 }
 
-// Checks if this is a state where we should exit after
+// Checks if this is a state where we should exit after reaching it
 // but we don't want to prevent resuming the swap in this state
 // This is currently only used for the BtcPunished state because we might be able to
 // recover from this state by attempting a cooperative XMR redeem but it might also fail.
 // We want to avoid an infinite retry loop but also allow the user to retry manually by resuming the swap.
-pub fn is_exit_early(state: &BobState) -> bool {
+pub fn is_run_at_most_once(state: &BobState) -> bool {
     matches!(state, BobState::BtcPunished { .. })
 }
 
@@ -38,7 +38,7 @@ pub async fn run_until(
     let mut current_state = swap.state.clone();
 
     while !is_target_state(&current_state) {
-        current_state = next_state(
+        let next_state = next_state(
             swap.id,
             current_state.clone(),
             &mut swap.event_loop_handle,
@@ -50,12 +50,14 @@ pub async fn run_until(
         .await?;
 
         swap.db
-            .insert_latest_state(swap.id, current_state.clone().into())
+            .insert_latest_state(swap.id, next_state.clone().into())
             .await?;
 
-        if is_exit_early(&current_state) {
+        if is_run_at_most_once(&current_state) && next_state == current_state {
             break;
         }
+
+        current_state = next_state;
     }
 
     Ok(current_state)
