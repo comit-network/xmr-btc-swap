@@ -17,6 +17,15 @@ pub fn is_complete(state: &BobState) -> bool {
     )
 }
 
+// Checks if this is a state where we should exit after
+// but we don't want to prevent resuming the swap in this state
+// This is currently only used for the BtcPunished state because we might be able to
+// recover from this state by attempting a cooperative XMR redeem but it might also fail.
+// We want to avoid an infinite retry loop but also allow the user to retry manually by resuming the swap.
+pub fn is_exit_early(state: &BobState) -> bool {
+    matches!(state, BobState::BtcPunished { .. })
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn run(swap: bob::Swap) -> Result<BobState> {
     run_until(swap, is_complete).await
@@ -39,14 +48,14 @@ pub async fn run_until(
             swap.monero_receive_address,
         )
         .await?;
+
         swap.db
             .insert_latest_state(swap.id, current_state.clone().into())
             .await?;
-        if matches!(current_state, BobState::BtcPunished { .. })
-            && matches!(swap.state, BobState::BtcPunished { .. })
-        {
-            break; // Stops swap when cooperative redeem fails without preventing resuming swap in BtcPunished state.
-        };
+
+        if is_exit_early(&current_state) {
+            break;
+        }
     }
 
     Ok(current_state)
