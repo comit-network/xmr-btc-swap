@@ -310,14 +310,16 @@ async fn next_state(
         }
         BobState::BtcRefunded(state4) => BobState::BtcRefunded(state4),
         BobState::BtcPunished { state, tx_lock_id } => {
-            tracing::info!("Attempting cooperative XMR redeem");
+            tracing::info!("Attempting to cooperatively redeem XMR after being punished");
             let response = event_loop_handle
                 .request_cooperative_xmr_redeem(swap_id)
                 .await;
 
             match response {
                 Ok(Fullfilled { s_a, .. }) => {
-                    tracing::debug!("Alice revealed XMR key to us");
+                    tracing::info!(
+                        "Alice has accepted our request to cooperatively redeem the XMR"
+                    );
 
                     let s_a = monero::PrivateKey { scalar: s_a };
                     let state5 = state.attempt_cooperative_redeem(s_a);
