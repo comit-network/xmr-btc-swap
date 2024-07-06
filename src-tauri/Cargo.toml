@@ -1,0 +1,22 @@
+[package]
+name = "unstoppableswap-gui-rs"
+version = "0.0.0"
+description = "A Tauri App"
+authors = ["you"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "unstoppableswap_gui_rs_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0.0-beta", features = [] }
+
+[dependencies]
+tauri = { version = "2.0.0-beta", features = [] }
+tauri-plugin-shell = "2.0.0-beta"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
