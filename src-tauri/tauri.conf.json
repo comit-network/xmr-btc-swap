@@ -1,7 +1,7 @@
 {
   "productName": "unstoppableswap-gui-rs",
   "version": "0.0.0",
-  "identifier": "com.tauri.dev",
+  "identifier": "net.unstoppableswap.gui",
   "build": {
     "beforeDevCommand": "yarn dev",
     "devUrl": "http://localhost:1420",
