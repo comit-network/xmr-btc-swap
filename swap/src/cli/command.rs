@@ -65,10 +65,34 @@ where
             seller: Seller { seller },
             bitcoin,
             bitcoin_change_address,
+            refund_to_internal_wallet,
             monero,
             monero_receive_address,
             tor,
         } => {
+            let context = Context::build(
+                Some(bitcoin),
+                Some(monero),
+                Some(tor),
+                data,
+                is_testnet,
+                debug,
+                json,
+                None,
+            )
+            .await?;
+
+            let bitcoin_change_address = match bitcoin_change_address {
+                Some(addr) => addr,
+                None => {
+                    context
+                        .bitcoint_wallet()
+                        .expect("bitcoin wallet should exist")
+                        .new_address()
+                        .await?
+                }
+            };
+
             let monero_receive_address =
                 monero_address::validate_is_testnet(monero_receive_address, is_testnet)?;
             let bitcoin_change_address =
@@ -81,17 +105,6 @@ where
                 swap_id: Uuid::new_v4(),
             });
 
-            let context = Context::build(
-                Some(bitcoin),
-                Some(monero),
-                Some(tor),
-                data,
-                is_testnet,
-                debug,
-                json,
-                None,
-            )
-            .await?;
             (context, request)
         }
         CliCommand::History => {
@@ -303,7 +316,15 @@ enum CliCommand {
             help = "The bitcoin address where any form of change or excess funds should be sent to",
             parse(try_from_str = bitcoin_address::parse)
         )]
-        bitcoin_change_address: bitcoin::Address,
+        bitcoin_change_address: Option<bitcoin::Address>,
+
+        #[structopt(
+            conflicts_with = "change-address",
+            long = "refund-to-internal-wallet",
+            help = "Instead of providing a bitcoin address to deposit refunded Bitcoin to, \
+                this option will deposit them in the internal wallet for use in future swaps."
+        )]
+        refund_to_internal_wallet: bool,
 
         #[structopt(flatten)]
         monero: Monero,

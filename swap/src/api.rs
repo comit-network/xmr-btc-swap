@@ -267,6 +267,13 @@ impl Context {
             tasks: Arc::new(PendingTaskList::default()),
         }
     }
+
+    pub fn bitcoint_wallet(&self) -> Option<Arc<bitcoin::Wallet>> {
+        match &self.bitcoin_wallet {
+            None => None,
+            Some(wallet) => Some(wallet.clone()),
+        }
+    }
 }
 
 impl fmt::Debug for Context {
