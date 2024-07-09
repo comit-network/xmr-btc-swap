@@ -268,11 +268,8 @@ impl Context {
         }
     }
 
-    pub fn bitcoint_wallet(&self) -> Option<Arc<bitcoin::Wallet>> {
-        match &self.bitcoin_wallet {
-            None => None,
-            Some(wallet) => Some(wallet.clone()),
-        }
+    pub fn bitcoin_wallet(&self) -> Option<Arc<bitcoin::Wallet>> {
+        self.bitcoin_wallet.clone()
     }
 }
 

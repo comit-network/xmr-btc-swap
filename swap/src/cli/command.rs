@@ -86,7 +86,7 @@ where
                 Some(addr) => addr,
                 None => {
                     context
-                        .bitcoint_wallet()
+                        .bitcoin_wallet()
                         .expect("bitcoin wallet should exist")
                         .new_address()
                         .await?
@@ -319,7 +319,8 @@ enum CliCommand {
         bitcoin_change_address: Option<bitcoin::Address>,
 
         #[structopt(
-            conflicts_with = "change-address",
+            conflicts_with = "bitcoin-change-address",
+            required_unless = "bitcoin-change-address",
             long = "refund-to-internal-wallet",
             help = "Instead of providing a bitcoin address to deposit refunded Bitcoin to, \
                 this option will deposit them in the internal wallet for use in future swaps."
