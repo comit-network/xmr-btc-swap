@@ -85,11 +85,18 @@ where
             let bitcoin_change_address = match bitcoin_change_address {
                 Some(addr) => addr,
                 None => {
-                    context
+                    let internal_wallet = context
                         .bitcoin_wallet()
                         .expect("bitcoin wallet should exist")
                         .new_address()
-                        .await?
+                        .await?;
+
+                    tracing::info!(
+                        internal_wallet=%internal_wallet,
+                        "Found flag --refund-to-internal-wallet. Incase of a refund the bitcoin will be send to this internal wallet."
+                    );
+
+                    internal_wallet
                 }
             };
 
