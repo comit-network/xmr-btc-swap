@@ -314,6 +314,7 @@ enum CliCommand {
         #[structopt(
             long = "change-address",
             help = "The bitcoin address where any form of change or excess funds should be sent to",
+            required_unless = "refund-to-internal-wallet",
             parse(try_from_str = bitcoin_address::parse)
         )]
         bitcoin_change_address: Option<bitcoin::Address>,
