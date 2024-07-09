@@ -65,7 +65,7 @@ where
             seller: Seller { seller },
             bitcoin,
             bitcoin_change_address,
-            refund_to_internal_wallet,
+            refund_to_internal_wallet: _,
             monero,
             monero_receive_address,
             tor,
