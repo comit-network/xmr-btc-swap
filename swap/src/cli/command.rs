@@ -81,21 +81,22 @@ where
             )
             .await?;
 
+            // when no refund address was provided we default to the internal wallet
             let bitcoin_change_address = match bitcoin_change_address {
                 Some(addr) => addr,
                 None => {
-                    let internal_wallet = context
+                    let internal_wallet_address = context
                         .bitcoin_wallet()
                         .expect("bitcoin wallet should exist")
                         .new_address()
                         .await?;
 
                     tracing::info!(
-                        internal_wallet=%internal_wallet,
+                        internal_wallet_address=%internal_wallet_address,
                         "No --change-address supplied. Incase of a refund funds will be sent to internal wallet."
                     );
 
-                    internal_wallet
+                    internal_wallet_address
                 }
             };
 
