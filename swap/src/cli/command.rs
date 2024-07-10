@@ -93,7 +93,7 @@ where
 
                     tracing::info!(
                         internal_wallet_address=%internal_wallet_address,
-                        "No --change-address supplied. Incase of a refund funds will be sent to internal wallet."
+                        "No --change-address supplied. Any change will be received to the internal wallet."
                     );
 
                     internal_wallet_address
