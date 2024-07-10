@@ -65,7 +65,6 @@ where
             seller: Seller { seller },
             bitcoin,
             bitcoin_change_address,
-            refund_to_internal_wallet: _,
             monero,
             monero_receive_address,
             tor,
@@ -93,7 +92,7 @@ where
 
                     tracing::info!(
                         internal_wallet=%internal_wallet,
-                        "Found flag --refund-to-internal-wallet. Incase of a refund the bitcoin will be send to this internal wallet."
+                        "No --change-address supplied. Incase of a refund funds will be sent to internal wallet."
                     );
 
                     internal_wallet
@@ -320,20 +319,10 @@ enum CliCommand {
 
         #[structopt(
             long = "change-address",
-            help = "The bitcoin address where any form of change or excess funds should be sent to",
-            required_unless = "refund-to-internal-wallet",
+            help = "The bitcoin address where any form of change or excess funds should be sent to. If omitted they will be sent to the internal wallet.",
             parse(try_from_str = bitcoin_address::parse)
         )]
         bitcoin_change_address: Option<bitcoin::Address>,
-
-        #[structopt(
-            conflicts_with = "bitcoin-change-address",
-            required_unless = "bitcoin-change-address",
-            long = "refund-to-internal-wallet",
-            help = "Instead of providing a bitcoin address to deposit refunded Bitcoin to, \
-                this option will deposit them in the internal wallet for use in future swaps."
-        )]
-        refund_to_internal_wallet: bool,
 
         #[structopt(flatten)]
         monero: Monero,
