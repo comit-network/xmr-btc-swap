@@ -338,12 +338,18 @@ async fn next_state(
                     }
                 }
                 Ok(Rejected { reason, .. }) => {
-                    tracing::error!(?reason, "Alice rejected our request for cooperative XMR redeem");
+                    tracing::error!(
+                        ?reason, 
+                        "Alice rejected our request for cooperative XMR redeem"
+                    );
                     return Err(reason)
                         .context("Alice rejected our request for cooperative XMR redeem");
                 }
                 Err(error) => {
-                    tracing::error!(?error, "Failed to request cooperative XMR redeem from Alice");
+                    tracing::error!(
+                        ?error, 
+                        "Failed to request cooperative XMR redeem from Alice"
+                    );
                     return Err(error)
                         .context("Failed to request cooperative XMR redeem from Alice");
                 }
