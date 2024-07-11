@@ -75,7 +75,7 @@ OPTIONS:
 
 This command has three core options:
 
-- `--change-address`: A Bitcoin address you control. Will be used for refunds of any kind.
+- `--change-address`: A Bitcoin address you control. Will be used for refunds of any kind. You can also omit this flag which will refund any change to the internal wallet.
 - `--receive-address`: A Monero address you control. This is where you will receive the Monero after the swap.
 - `--seller`: The multiaddress of the seller you want to swap with.
 

@@ -69,6 +69,37 @@ where
             monero_receive_address,
             tor,
         } => {
+            let context = Context::build(
+                Some(bitcoin),
+                Some(monero),
+                Some(tor),
+                data,
+                is_testnet,
+                debug,
+                json,
+                None,
+            )
+            .await?;
+
+            // when no refund address was provided we default to the internal wallet
+            let bitcoin_change_address = match bitcoin_change_address {
+                Some(addr) => addr,
+                None => {
+                    let internal_wallet_address = context
+                        .bitcoin_wallet()
+                        .expect("bitcoin wallet should exist")
+                        .new_address()
+                        .await?;
+
+                    tracing::info!(
+                        internal_wallet_address=%internal_wallet_address,
+                        "No --change-address supplied. Any change will be received to the internal wallet."
+                    );
+
+                    internal_wallet_address
+                }
+            };
+
             let monero_receive_address =
                 monero_address::validate_is_testnet(monero_receive_address, is_testnet)?;
             let bitcoin_change_address =
@@ -81,17 +112,6 @@ where
                 swap_id: Uuid::new_v4(),
             });
 
-            let context = Context::build(
-                Some(bitcoin),
-                Some(monero),
-                Some(tor),
-                data,
-                is_testnet,
-                debug,
-                json,
-                None,
-            )
-            .await?;
             (context, request)
         }
         CliCommand::History => {
@@ -300,10 +320,10 @@ enum CliCommand {
 
         #[structopt(
             long = "change-address",
-            help = "The bitcoin address where any form of change or excess funds should be sent to",
+            help = "The bitcoin address where any form of change or excess funds should be sent to. If omitted they will be sent to the internal wallet.",
             parse(try_from_str = bitcoin_address::parse)
         )]
-        bitcoin_change_address: bitcoin::Address,
+        bitcoin_change_address: Option<bitcoin::Address>,
 
         #[structopt(flatten)]
         monero: Monero,
