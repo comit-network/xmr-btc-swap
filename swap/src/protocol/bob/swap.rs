@@ -1,5 +1,6 @@
 use crate::bitcoin::{ExpiredTimelocks, TxCancel, TxRefund};
 use crate::cli::EventLoopHandle;
+use crate::network::cooperative_xmr_redeem_after_punish::Response::{Fullfilled, Rejected};
 use crate::network::swap_setup::bob::NewSwap;
 use crate::protocol::bob::state::*;
 use crate::protocol::{bob, Database};
@@ -12,11 +13,19 @@ use uuid::Uuid;
 pub fn is_complete(state: &BobState) -> bool {
     matches!(
         state,
-        BobState::BtcRefunded(..)
-            | BobState::XmrRedeemed { .. }
-            | BobState::BtcPunished { .. }
-            | BobState::SafelyAborted
+        BobState::BtcRefunded(..) | BobState::XmrRedeemed { .. } | BobState::SafelyAborted
     )
+}
+
+// Identifies states that should be run at most once before exiting.
+// This is used to prevent infinite retry loops while still allowing manual resumption.
+//
+// Currently, this applies to the BtcPunished state:
+// - We want to attempt recovery via cooperative XMR redeem once.
+// - If unsuccessful, we exit to avoid an infinite retry loop.
+// - The swap can still be manually resumed later and retried if desired.
+pub fn is_run_at_most_once(state: &BobState) -> bool {
+    matches!(state, BobState::BtcPunished { .. })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -28,10 +37,10 @@ pub async fn run_until(
     mut swap: bob::Swap,
     is_target_state: fn(&BobState) -> bool,
 ) -> Result<BobState> {
-    let mut current_state = swap.state;
+    let mut current_state = swap.state.clone();
 
     while !is_target_state(&current_state) {
-        current_state = next_state(
+        let next_state = next_state(
             swap.id,
             current_state.clone(),
             &mut swap.event_loop_handle,
@@ -43,8 +52,14 @@ pub async fn run_until(
         .await?;
 
         swap.db
-            .insert_latest_state(swap.id, current_state.clone().into())
+            .insert_latest_state(swap.id, next_state.clone().into())
             .await?;
+
+        if is_run_at_most_once(&current_state) && next_state == current_state {
+            break;
+        }
+
+        current_state = next_state;
     }
 
     Ok(current_state)
@@ -159,12 +174,12 @@ async fn next_state(
                         result?;
                         tracing::info!("Alice took too long to lock Monero, cancelling the swap");
 
-                        let state4 = state3.cancel();
+                        let state4 = state3.cancel(monero_wallet_restore_blockheight);
                         BobState::CancelTimelockExpired(state4)
                     },
                 }
             } else {
-                let state4 = state3.cancel();
+                let state4 = state3.cancel(monero_wallet_restore_blockheight);
                 BobState::CancelTimelockExpired(state4)
             }
         }
@@ -188,17 +203,17 @@ async fn next_state(
 
                                 tx_lock_status.wait_until_confirmed_with(state.cancel_timelock).await?;
 
-                                BobState::CancelTimelockExpired(state.cancel())
+                                BobState::CancelTimelockExpired(state.cancel(monero_wallet_restore_blockheight))
                             },
                         }
                     }
                     result = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
                         result?;
-                        BobState::CancelTimelockExpired(state.cancel())
+                        BobState::CancelTimelockExpired(state.cancel(monero_wallet_restore_blockheight))
                     }
                 }
             } else {
-                BobState::CancelTimelockExpired(state.cancel())
+                BobState::CancelTimelockExpired(state.cancel(monero_wallet_restore_blockheight))
             }
         }
         BobState::XmrLocked(state) => {
@@ -257,39 +272,9 @@ async fn next_state(
             }
         }
         BobState::BtcRedeemed(state) => {
-            let (spend_key, view_key) = state.xmr_keys();
-
-            let wallet_file_name = swap_id.to_string();
-
-            tracing::info!(%wallet_file_name, "Generating and opening Monero wallet from the extracted keys to redeem the Monero");
-
-            if let Err(e) = monero_wallet
-                .create_from_and_load(
-                    wallet_file_name.clone(),
-                    spend_key,
-                    view_key,
-                    state.monero_wallet_restore_blockheight,
-                )
-                .await
-            {
-                // In case we failed to refresh/sweep, when resuming the wallet might already
-                // exist! This is a very unlikely scenario, but if we don't take care of it we
-                // might not be able to ever transfer the Monero.
-                tracing::warn!("Failed to generate monero wallet from keys: {:#}", e);
-                tracing::info!(%wallet_file_name,
-                    "Falling back to trying to open the wallet if it already exists",
-                );
-                monero_wallet.open(wallet_file_name).await?;
-            }
-
-            // Ensure that the generated wallet is synced so we have a proper balance
-            monero_wallet.refresh(20).await?;
-            // Sweep (transfer all funds) to the given address
-            let tx_hashes = monero_wallet.sweep_all(monero_receive_address).await?;
-
-            for tx_hash in tx_hashes {
-                tracing::info!(%monero_receive_address, txid=%tx_hash.0, "Successfully transferred XMR to wallet");
-            }
+            state
+                .redeem_xmr(monero_wallet, swap_id.to_string(), monero_receive_address)
+                .await?;
 
             BobState::XmrRedeemed {
                 tx_lock_id: state.tx_lock_id(),
@@ -318,12 +303,58 @@ async fn next_state(
                     tracing::info!("You have been punished for not refunding in time");
                     BobState::BtcPunished {
                         tx_lock_id: state.tx_lock_id(),
+                        state,
                     }
                 }
             }
         }
         BobState::BtcRefunded(state4) => BobState::BtcRefunded(state4),
-        BobState::BtcPunished { tx_lock_id } => BobState::BtcPunished { tx_lock_id },
+        BobState::BtcPunished { state, tx_lock_id } => {
+            tracing::info!("Attempting to cooperatively redeem XMR after being punished");
+            let response = event_loop_handle
+                .request_cooperative_xmr_redeem(swap_id)
+                .await;
+
+            match response {
+                Ok(Fullfilled { s_a, .. }) => {
+                    tracing::info!(
+                        "Alice has accepted our request to cooperatively redeem the XMR"
+                    );
+
+                    let s_a = monero::PrivateKey { scalar: s_a };
+                    let state5 = state.attempt_cooperative_redeem(s_a);
+
+                    match state5
+                        .redeem_xmr(monero_wallet, swap_id.to_string(), monero_receive_address)
+                        .await
+                    {
+                        Ok(_) => {
+                            return Ok(BobState::XmrRedeemed { tx_lock_id });
+                        }
+                        Err(error) => {
+                            return Err(error)
+                                .context("Failed to redeem XMR with revealed XMR key");
+                        }
+                    }
+                }
+                Ok(Rejected { reason, .. }) => {
+                    tracing::error!(
+                        ?reason,
+                        "Alice rejected our request for cooperative XMR redeem"
+                    );
+                    return Err(reason)
+                        .context("Alice rejected our request for cooperative XMR redeem");
+                }
+                Err(error) => {
+                    tracing::error!(
+                        ?error,
+                        "Failed to request cooperative XMR redeem from Alice"
+                    );
+                    return Err(error)
+                        .context("Failed to request cooperative XMR redeem from Alice");
+                }
+            };
+        }
         BobState::SafelyAborted => BobState::SafelyAborted,
         BobState::XmrRedeemed { tx_lock_id } => BobState::XmrRedeemed { tx_lock_id },
     })
