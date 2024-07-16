@@ -1,11 +1,11 @@
-FROM rust:1.74 AS builder
+FROM rust:1.59-slim AS builder
 
 WORKDIR /build
 
 RUN apt-get update
 RUN apt-get install -y git clang cmake libsnappy-dev
 
-RUN git clone https://github.com/comit-network/xmr-btc-swap .
+COPY . .
 
 RUN cargo build --release --bin=asb
 
