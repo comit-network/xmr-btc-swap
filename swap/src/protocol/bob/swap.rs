@@ -339,7 +339,7 @@ async fn next_state(
                 }
                 Ok(Rejected { reason, .. }) => {
                     tracing::error!(
-                        ?reason,
+                        %reason,
                         "Alice rejected our request for cooperative XMR redeem"
                     );
                     return Err(reason)
@@ -347,7 +347,7 @@ async fn next_state(
                 }
                 Err(error) => {
                     tracing::error!(
-                        ?error,
+                        %error,
                         "Failed to request cooperative XMR redeem from Alice"
                     );
                     return Err(error)
