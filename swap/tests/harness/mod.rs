@@ -231,7 +231,11 @@ async fn start_alice(
     if !&db_path.exists() {
         tokio::fs::File::create(&db_path).await.unwrap();
     }
-    let db = Arc::new(SqliteDatabase::open(db_path.as_path()).await.unwrap());
+    let db = Arc::new(
+        SqliteDatabase::open(db_path.as_path(), false)
+            .await
+            .unwrap(),
+    );
 
     let min_buy = bitcoin::Amount::from_sat(u64::MIN);
     let max_buy = bitcoin::Amount::from_sat(u64::MAX);
@@ -433,7 +437,7 @@ impl BobParams {
         if !self.db_path.exists() {
             tokio::fs::File::create(&self.db_path).await?;
         }
-        let db = Arc::new(SqliteDatabase::open(&self.db_path).await?);
+        let db = Arc::new(SqliteDatabase::open(&self.db_path, false).await?);
 
         let (event_loop, handle) = self.new_eventloop(swap_id, db.clone()).await?;
 
@@ -463,7 +467,7 @@ impl BobParams {
         if !self.db_path.exists() {
             tokio::fs::File::create(&self.db_path).await?;
         }
-        let db = Arc::new(SqliteDatabase::open(&self.db_path).await?);
+        let db = Arc::new(SqliteDatabase::open(&self.db_path, false).await?);
 
         let (event_loop, handle) = self.new_eventloop(swap_id, db.clone()).await?;
 

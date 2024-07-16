@@ -224,7 +224,7 @@ impl Context {
         let tor_socks5_port = tor.map_or(9050, |tor| tor.tor_socks5_port);
 
         let context = Context {
-            db: open_db(data_dir.join("sqlite")).await?,
+            db: open_db(data_dir.join("sqlite"), false).await?,
             bitcoin_wallet,
             monero_wallet,
             monero_rpc_process,
@@ -259,7 +259,7 @@ impl Context {
             bitcoin_wallet: Some(bob_bitcoin_wallet),
             monero_wallet: Some(bob_monero_wallet),
             config,
-            db: open_db(db_path)
+            db: open_db(db_path, false)
                 .await
                 .expect("Could not open sqlite database"),
             monero_rpc_process: None,

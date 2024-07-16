@@ -4,7 +4,7 @@ use crate::protocol::{Database, State};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use libp2p::{Multiaddr, PeerId};
-use sqlx::sqlite::Sqlite;
+use sqlx::sqlite::{Sqlite, SqliteConnectOptions};
 use sqlx::{Pool, SqlitePool};
 use std::collections::HashMap;
 use std::path::Path;
@@ -17,14 +17,20 @@ pub struct SqliteDatabase {
 }
 
 impl SqliteDatabase {
-    pub async fn open(path: impl AsRef<Path>) -> Result<Self>
+    pub async fn open(path: impl AsRef<Path>, read_only: bool) -> Result<Self>
     where
         Self: std::marker::Sized,
     {
         let path_str = format!("sqlite:{}", path.as_ref().display());
-        let pool = SqlitePool::connect(&path_str).await?;
+        let options = SqliteConnectOptions::from_str(&path_str)?.read_only(read_only);
+
+        let pool = SqlitePool::connect_with(options).await?;
         let mut sqlite = Self { pool };
-        sqlite.run_migrations().await?;
+
+        if !read_only {
+            sqlite.run_migrations().await?;
+        }
+
         Ok(sqlite)
     }
 
@@ -509,7 +515,7 @@ mod tests {
         // file has to exist in order to connect with sqlite
         File::create(temp_db.clone()).unwrap();
 
-        let db = SqliteDatabase::open(temp_db).await?;
+        let db = SqliteDatabase::open(temp_db, false).await?;
 
         Ok(db)
     }

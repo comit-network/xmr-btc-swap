@@ -83,16 +83,19 @@ impl Swap {
     }
 }
 
-pub async fn open_db(sqlite_path: impl AsRef<Path>) -> Result<Arc<dyn Database + Send + Sync>> {
+pub async fn open_db(
+    sqlite_path: impl AsRef<Path>,
+    read_only: bool,
+) -> Result<Arc<dyn Database + Send + Sync>> {
     if sqlite_path.as_ref().exists() {
         tracing::debug!("Using existing sqlite database.");
-        let sqlite = SqliteDatabase::open(sqlite_path).await?;
+        let sqlite = SqliteDatabase::open(sqlite_path, read_only).await?;
         Ok(Arc::new(sqlite))
     } else {
         tracing::debug!("Creating and using new sqlite database.");
         ensure_directory_exists(sqlite_path.as_ref())?;
         tokio::fs::File::create(&sqlite_path).await?;
-        let sqlite = SqliteDatabase::open(sqlite_path).await?;
+        let sqlite = SqliteDatabase::open(sqlite_path, read_only).await?;
         Ok(Arc::new(sqlite))
     }
 }
