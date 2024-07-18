@@ -1,0 +1,112 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+	ignorecase = true
+	precomposeunicode = true
+[submodule]
+	active = .
+[remote "origin"]
+	url = https://github.com/comit-network/xmr-btc-swap.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "master"]
+	remote = origin
+	merge = refs/heads/master
+[lfs]
+	repositoryformatversion = 0
+[branch "0.11.x"]
+	remote = origin
+	merge = refs/heads/0.11.x
+[branch "immediately-fetch-tx-2"]
+	remote = origin
+	merge = refs/heads/immediately-fetch-tx-2
+[remote "yama"]
+	url = https://github.com/yamabiiko/xmr-btc-swap.git
+	fetch = +refs/heads/*:refs/remotes/yama/*
+[branch "rpc-server"]
+	remote = yama
+	merge = refs/heads/rpc-server
+[branch "monero-rpc-download-0.11x-m1m2"]
+	remote = origin
+	merge = refs/heads/monero-rpc-download-0.11x-m1m2
+[remote "delta1upstream"]
+	url = https://github.com/delta1/xmr-btc-swap.git
+	fetch = +refs/heads/*:refs/remotes/delta1upstream/*
+[branch "sqlx"]
+	remote = delta1upstream
+	merge = refs/heads/sqlx
+[branch "pr/1417"]
+	remote = delta1upstream
+	merge = refs/heads/multi-rendezvous
+[branch "multi-rendezvous"]
+	remote = delta1upstream
+	merge = refs/heads/multi-rendezvous
+[branch "rpc-server-tracing-log-files"]
+	remote = origin
+	merge = refs/heads/rpc-server-tracing-log-files
+[branch "kill-monero-rpc-on-signal-receive"]
+	remote = origin
+	merge = refs/heads/kill-monero-rpc-on-signal-receive
+[branch "change-xmr-node-moneroworld"]
+	remote = origin
+	merge = refs/heads/change-xmr-node-moneroworld
+[branch "cooperative-xmr-redeem"]
+	remote = origin
+	merge = refs/heads/cooperative-xmr-redeem
+[branch "monero-wallet-refresh-fix"]
+	remote = origin
+	merge = refs/heads/monero-wallet-refresh-fix
+[remote "delta12"]
+	url = https://github.com/delta1/xmr-btc-swap.git
+	fetch = +refs/heads/*:refs/remotes/delta12/*
+[branch "issues-1459"]
+	remote = delta12
+	merge = refs/heads/issues-1459
+[branch "wallet-refresh"]
+	remote = origin
+	merge = refs/heads/wallet-refresh
+[branch "blocking-log-appender"]
+	remote = origin
+	merge = refs/heads/blocking-log-appender
+[branch "early-tracing-init"]
+	remote = origin
+	merge = refs/heads/early-tracing-init
+[branch "monero-wallet-rpc-update"]
+	remote = origin
+	merge = refs/heads/monero-wallet-rpc-update
+[branch "transfer-proof-acknowledgement"]
+	remote = origin
+	merge = refs/heads/transfer-proof-acknowledgement
+[remote "pokkst"]
+	url = https://github.com/pokkst/xmr-btc-swap.git
+	fetch = +refs/heads/*:refs/remotes/pokkst/*
+[branch "pr/1427"]
+	remote = pokkst
+	merge = refs/heads/bugfix/bob-xmrlocked-redeemed
+[branch "bob-buffer-transfer-proofs"]
+	vscode-merge-base = origin/master
+	remote = origin
+	merge = refs/heads/bob-buffer-transfer-proofs
+[branch "reduce-check-interval-monero-alice"]
+	remote = origin
+	merge = refs/heads/reduce-check-interval-monero-alice
+[branch "reduce-check-interval-monero-asb"]
+	remote = origin
+	merge = refs/heads/reduce-check-interval-monero-asb
+[branch "reduce-check-interval-asb-alice"]
+	remote = origin
+	merge = refs/heads/reduce-check-interval-asb-alice
+[remote "github-desktop-patrini32"]
+	url = https://github.com/patrini32/xmr-btc-swap.git
+	fetch = +refs/heads/*:refs/remotes/github-desktop-patrini32/*
+[branch "pr/1668"]
+	remote = github-desktop-patrini32
+	merge = refs/heads/master
+[branch "pr/1676"]
+	remote = github-desktop-patrini32
+	merge = refs/heads/cooperative-release-of-funds
+	vscode-merge-base = origin/master
+[branch "transfer-proof-buffer-sqlx-own-migration-script"]
+	remote = origin
+	merge = refs/heads/transfer-proof-buffer-sqlx-own-migration-script

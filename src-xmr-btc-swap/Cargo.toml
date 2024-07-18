@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = [ "monero-harness", "monero-rpc", "swap", "monero-wallet", "src-tauri" ]
+
+[patch.crates-io]
+# patch until new release https://github.com/thomaseizinger/rust-jsonrpc-client/pull/51
+jsonrpc_client = { git = "https://github.com/delta1/rust-jsonrpc-client.git", rev = "3b6081697cd616c952acb9c2f02d546357d35506" }
+monero = { git = "https://github.com/comit-network/monero-rs", rev = "818f38b" }

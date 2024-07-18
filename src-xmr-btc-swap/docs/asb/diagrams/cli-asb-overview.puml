@@ -1,0 +1,34 @@
+@startuml
+
+package "Service Provider 1" {
+
+    rectangle CLI as cli01
+    rectangle CLI as cli02
+    rectangle CLI as cli03
+
+
+    rectangle ASB as asb01
+    note right of asb01
+      Service provider
+      advertising to
+      multiple users.
+    end note
+
+    cli01 -> asb01
+    cli02 --> asb01
+    asb01 <-- cli03
+
+}
+
+package "Service Provider 2" {
+    rectangle CLI as cli04
+    rectangle ASB as asb02
+    note right of asb02
+      Service provider
+      advertising to
+      one single users.
+    end note
+
+    cli04 -> asb02
+}
+@enduml

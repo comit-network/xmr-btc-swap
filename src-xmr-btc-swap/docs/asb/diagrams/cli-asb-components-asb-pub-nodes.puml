@@ -1,0 +1,57 @@
+@startuml
+
+package "User Host" {
+    component [Monero Wallet RPC\n(auto installed)] as CliMonRpc
+    () RPC as MonRpcCli
+    component "swap" {
+        component [CLI] as CLI
+        component [Bitcoin Wallet] as CliBitWal
+    }
+    CliMonRpc - MonRpcCli
+    CLI - CliBitWal
+    MonRpcCli - CLI
+}
+
+package "Public Monero Server" {
+    component "monerod" as Monerod
+}
+
+package "Public Bitcoin Server" {
+    component "Electrum Server" as Electrum
+    component "bitcoind" as Bitcoind
+    () "RPC" as BitRPC
+    BitRPC -- Electrum
+    Electrum - Bitcoind
+}
+
+package "Service Provider Host" {
+    component [Monero Wallet RPC] as AsbMonRpc
+    () RPC as MonRpcAsb
+    component "asb" {
+        component [ASB] as ASB
+        component [Bitcoin Wallet] as AsbBitWal
+    }
+    AsbMonRpc - MonRpcAsb
+    ASB - AsbBitWal
+    MonRpcAsb - ASB
+}
+
+package "Public Price Server" {
+    component [CEX Price Ticker] as CEX
+    () "websocket" as Ticker
+    Ticker - CEX
+    Ticker -- ASB
+}
+
+CliBitWal -- BitRPC
+CliMonRpc -- Monerod
+
+AsbMonRpc -- Monerod
+AsbBitWal -- BitRPC
+
+() "libp2p" as Libp2p
+Libp2p -- CLI
+ASB -- Libp2p
+
+footer XMR<>BTC swap CLI & ASB overview (public nodes)\nRendered with PlantUML version %version()
+@enduml

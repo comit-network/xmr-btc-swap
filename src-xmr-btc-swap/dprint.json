@@ -1,0 +1,18 @@
+{
+  "$schema": "https://dprint.dev/schemas/v0.json",
+  "projectType": "openSource",
+  "incremental": true,
+  "markdown": {},
+  "exec": {
+    "associations": "**/*.{rs}",
+    "rustfmt": "rustfmt --edition 2021",
+    "rustfmt.associations": "**/*.rs"
+  },
+  "includes": ["**/*.{md}", "**/*.{toml}", "**/*.{rs}"],
+  "excludes": ["target/"],
+  "plugins": [
+    "https://plugins.dprint.dev/markdown-0.13.1.wasm",
+    "https://github.com/thomaseizinger/dprint-plugin-cargo-toml/releases/download/0.1.0/cargo-toml-0.1.0.wasm",
+    "https://plugins.dprint.dev/exec-0.3.5.json@d687dda57be0fe9a0088ccdaefa5147649ff24127d8b3ea227536c68ee7abeab"
+  ]
+}
