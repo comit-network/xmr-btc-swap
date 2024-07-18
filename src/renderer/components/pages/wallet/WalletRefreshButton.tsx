@@ -1,16 +1,10 @@
-import { CircularProgress } from '@material-ui/core';
+import { Button, CircularProgress, IconButton } from '@material-ui/core';
 import RefreshIcon from '@material-ui/icons/Refresh';
 import IpcInvokeButton from '../../IpcInvokeButton';
+import { checkBitcoinBalance } from 'renderer/rpc';
 
 export default function WalletRefreshButton() {
-  return (
-    <IpcInvokeButton
-      loadIcon={<CircularProgress size={24} />}
-      size="small"
-      isIconButton
-      endIcon={<RefreshIcon />}
-      ipcArgs={[]}
-      ipcChannel="spawn-balance-check"
-    />
-  );
+  return <IconButton onClick={() => checkBitcoinBalance(true)}>
+    <RefreshIcon />
+  </IconButton>
 }

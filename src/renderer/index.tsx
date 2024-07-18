@@ -12,6 +12,12 @@ import {
 } from './api';
 import logger from '../utils/logger';
 import App from './components/App';
+import { checkBitcoinBalance, getRawSwapInfos } from './rpc';
+
+setTimeout(() => {
+  checkBitcoinBalance();
+  getRawSwapInfos();
+}, 10000);
 
 render(
   <Provider store={store}>
