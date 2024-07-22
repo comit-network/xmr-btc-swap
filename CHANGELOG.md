@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.13.3] - 2024-07-16
-
 - Introduced a cooperative Monero redeem feature for Bob to request from Alice if Bob is punished for not refunding in time. Alice can choose to cooperate but is not obligated to do so. This change is backwards compatible. To attempt recovery, resume a swap in the "Bitcoin punished" state. Success depends on Alice being active and still having a record of the swap. Note that Alice's cooperation is voluntary and recovery is not guaranteed
 - CLI: `--change-address` can now be omitted. In that case, any change is refunded to the internal bitcoin wallet.
 
