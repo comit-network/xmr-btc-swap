@@ -145,6 +145,15 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Set Docker tags
+        id: docker_tags
+        run: |
+          if [[ ${{ github.event.release.tag_name }} == "preview" ]]; then
+            echo "::set-output name=preview::true"
+          else
+            echo "::set-output name=preview::false"
+          fi
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
@@ -152,5 +161,15 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ${{ env.DOCKER_IMAGE_NAME }}:latest
             ${{ env.DOCKER_IMAGE_NAME }}:${{ github.event.release.tag_name }}
+            ${{ env.DOCKER_IMAGE_NAME }}:latest
+        if: steps.docker_tags.outputs.preview == 'false'
+
+      - name: Build and push Docker image without latest tag (preview release)
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ env.DOCKER_IMAGE_NAME }}:${{ github.event.release.tag_name }}
+        if: steps.docker_tags.outputs.preview == 'true'
