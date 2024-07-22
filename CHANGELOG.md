@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- ASB: The `history` command can now be used while the asb is running.
 - CLI: `--change-address` can now be omitted. In that case, any change is refunded to the internal bitcoin wallet.
 
 ## [0.13.2] - 2024-07-02
