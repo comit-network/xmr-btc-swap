@@ -395,7 +395,9 @@ mod tests {
             disable_timestamp: false,
             config_path: default_mainnet_conf_path,
             env_config: mainnet_env_config,
-            cmd: Command::History,
+            cmd: Command::History {
+                only_unfinished: false,
+            },
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
@@ -578,7 +580,9 @@ mod tests {
             disable_timestamp: false,
             config_path: default_testnet_conf_path,
             env_config: testnet_env_config,
-            cmd: Command::History,
+            cmd: Command::History {
+                only_unfinished: false,
+            }
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
