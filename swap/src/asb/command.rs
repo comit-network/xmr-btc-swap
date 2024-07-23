@@ -582,7 +582,7 @@ mod tests {
             env_config: testnet_env_config,
             cmd: Command::History {
                 only_unfinished: false,
-            }
+            },
         };
         let args = parse_args(raw_ars).unwrap();
         assert_eq!(expected_args, args);
