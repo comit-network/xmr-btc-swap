@@ -384,8 +384,8 @@ pub struct State3 {
     S_b_bitcoin: bitcoin::PublicKey,
     pub v: monero::PrivateViewKey,
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
-    btc: bitcoin::Amount,
-    xmr: monero::Amount,
+    pub btc: bitcoin::Amount,
+    pub xmr: monero::Amount,
     pub cancel_timelock: CancelTimelock,
     pub punish_timelock: PunishTimelock,
     refund_address: bitcoin::Address,

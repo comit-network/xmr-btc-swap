@@ -33,13 +33,13 @@ where
             env_config: env_config(testnet),
             cmd: Command::Start { resume_only },
         },
-        RawCommand::History => Arguments {
+        RawCommand::History { only_unfinished } => Arguments {
             testnet,
             json,
             disable_timestamp,
             config_path: config_path(config, testnet)?,
             env_config: env_config(testnet),
-            cmd: Command::History,
+            cmd: Command::History { only_unfinished },
         },
         RawCommand::WithdrawBtc { amount, address } => Arguments {
             testnet,
@@ -195,7 +195,9 @@ pub enum Command {
     Start {
         resume_only: bool,
     },
-    History,
+    History {
+        only_unfinished: bool,
+    },
     Config,
     WithdrawBtc {
         amount: Option<Amount>,
@@ -269,7 +271,13 @@ pub enum RawCommand {
         resume_only: bool,
     },
     #[structopt(about = "Prints swap-id and the state of each swap ever made.")]
-    History,
+    History {
+        #[structopt(
+            long = "only-unfinished",
+            help = "If set, only unfinished swaps will be printed."
+        )]
+        only_unfinished: bool,
+    },
     #[structopt(about = "Prints the current config")]
     Config,
     #[structopt(about = "Allows withdrawing BTC from the internal Bitcoin wallet.")]

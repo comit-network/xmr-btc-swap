@@ -18,6 +18,8 @@ use libp2p::core::multiaddr::Protocol;
 use libp2p::core::Multiaddr;
 use libp2p::swarm::AddressScore;
 use libp2p::Swarm;
+use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
 use std::convert::TryInto;
 use std::env;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -33,7 +35,9 @@ use swap::common::check_latest_version;
 use swap::database::open_db;
 use swap::network::rendezvous::XmrBtcNamespace;
 use swap::network::swarm;
+use swap::protocol::alice::swap::is_complete;
 use swap::protocol::alice::{run, AliceState};
+use swap::protocol::State;
 use swap::seed::Seed;
 use swap::tor::AuthenticatedClient;
 use swap::{asb, bitcoin, kraken, monero, tor};
@@ -224,17 +228,81 @@ async fn main() -> Result<()> {
 
             event_loop.run().await;
         }
-        Command::History => {
+        Command::History { only_unfinished } => {
             let mut table = Table::new();
+            table.set_header(vec![
+                "SWAP ID",
+                "START DATETIME",
+                "CURRENT STATE",
+                "BTC AMOUNT",
+                "XMR AMOUNT",
+                "EXCHANGE RATE",
+                "TRADING PARTNER PEER ID",
+            ]);
 
-            table.set_header(vec!["SWAP ID", "STATE"]);
+            let all_swaps = db.all().await?;
+            for (swap_id, state) in all_swaps {
+                if let Err(e) = async {
+                    let latest_state: AliceState = state.try_into()?;
 
-            for (swap_id, state) in db.all().await? {
-                let state: AliceState = state.try_into()?;
-                table.add_row(vec![swap_id.to_string(), state.to_string()]);
+                    if only_unfinished && is_complete(&latest_state) {
+                        () // Skip finished swaps
+                    }
+
+                    let all_states = db.get_states(swap_id).await?;
+                    let state3 = all_states
+                        .iter()
+                        .find_map(|s| match s {
+                            State::Alice(AliceState::BtcLockTransactionSeen { state3 }) => {
+                                Some(state3)
+                            }
+                            _ => None,
+                        })
+                        .context("Failed to get \"BtcLockTransactionSeen\" state")?;
+
+                    let swap_start_date = db.get_swap_start_date(swap_id).await?;
+                    let peer_id = db.get_peer_id(swap_id).await?;
+
+                    let exchange_rate = format!(
+                        "{} XMR/BTC",
+                        (Decimal::from_f64(state3.btc.to_btc()).unwrap() / state3.xmr.as_xmr())
+                            .round_dp(8)
+                    );
+
+                    if json {
+                        tracing::info!(
+                            swap_id = %swap_id,
+                            swap_start_date = %swap_start_date,
+                            latest_state = %latest_state,
+                            btc_amount = %state3.btc,
+                            xmr_amount = %state3.xmr,
+                            exchange_rate = %exchange_rate,
+                            trading_partner_peer_id = %peer_id,
+                            "Found swap in database"
+                        );
+                    } else {
+                        table.add_row(vec![
+                            swap_id.to_string(),
+                            swap_start_date.to_string(),
+                            latest_state.to_string(),
+                            state3.btc.to_string(),
+                            state3.xmr.to_string(),
+                            exchange_rate,
+                            peer_id.to_string(),
+                        ]);
+                    }
+
+                    Ok::<_, anyhow::Error>(())
+                }
+                .await
+                {
+                    tracing::error!(swap_id = %swap_id, "{:#}", e);
+                }
             }
 
-            println!("{}", table);
+            if !json {
+                println!("{}", table);
+            }
         }
         Command::Config => {
             let config_json = serde_json::to_string_pretty(&config)?;
