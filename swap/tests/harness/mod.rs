@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use swap::asb::FixedRate;
 use swap::bitcoin::{CancelTimelock, PunishTimelock, TxCancel, TxPunish, TxRedeem, TxRefund};
-use swap::database::SqliteDatabase;
+use swap::database::{AccessMode, SqliteDatabase};
 use swap::env::{Config, GetConfig};
 use swap::fs::ensure_directory_exists;
 use swap::network::rendezvous::XmrBtcNamespace;
@@ -231,7 +231,11 @@ async fn start_alice(
     if !&db_path.exists() {
         tokio::fs::File::create(&db_path).await.unwrap();
     }
-    let db = Arc::new(SqliteDatabase::open(db_path.as_path()).await.unwrap());
+    let db = Arc::new(
+        SqliteDatabase::open(db_path.as_path(), AccessMode::ReadWrite)
+            .await
+            .unwrap(),
+    );
 
     let min_buy = bitcoin::Amount::from_sat(u64::MIN);
     let max_buy = bitcoin::Amount::from_sat(u64::MAX);
@@ -433,7 +437,7 @@ impl BobParams {
         if !self.db_path.exists() {
             tokio::fs::File::create(&self.db_path).await?;
         }
-        let db = Arc::new(SqliteDatabase::open(&self.db_path).await?);
+        let db = Arc::new(SqliteDatabase::open(&self.db_path, AccessMode::ReadWrite).await?);
 
         let (event_loop, handle) = self.new_eventloop(swap_id, db.clone()).await?;
 
@@ -463,7 +467,7 @@ impl BobParams {
         if !self.db_path.exists() {
             tokio::fs::File::create(&self.db_path).await?;
         }
-        let db = Arc::new(SqliteDatabase::open(&self.db_path).await?);
+        let db = Arc::new(SqliteDatabase::open(&self.db_path, AccessMode::ReadWrite).await?);
 
         let (event_loop, handle) = self.new_eventloop(swap_id, db.clone()).await?;
 
