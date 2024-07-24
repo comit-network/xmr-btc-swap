@@ -31,7 +31,7 @@ pub struct Request {
 pub enum Method {
     BuyXmr {
         seller: Multiaddr,
-        bitcoin_change_address: bitcoin::Address,
+        bitcoin_change_address: Option<bitcoin::Address>,
         monero_receive_address: monero::Address,
         swap_id: Uuid,
     },
@@ -334,6 +334,25 @@ impl Request {
                 );
                 let env_config = context.config.env_config;
                 let seed = context.config.seed.clone().context("Could not get seed")?;
+
+                // When no change address was provided we default to the internal wallet
+                let bitcoin_change_address = match bitcoin_change_address {
+                    Some(addr) => addr,
+                    None => {
+                        let internal_wallet_address = context
+                            .bitcoin_wallet()
+                            .expect("bitcoin wallet should exist")
+                            .new_address()
+                            .await?;
+
+                        tracing::info!(
+                            internal_wallet_address=%internal_wallet_address,
+                            "No --change-address supplied. Any change will be received to the internal wallet."
+                        );
+
+                        internal_wallet_address
+                    }
+                };
 
                 let seller_peer_id = seller
                     .extract_peer_id()
