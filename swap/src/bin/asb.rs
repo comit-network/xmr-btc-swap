@@ -240,14 +240,16 @@ async fn main() -> Result<()> {
                 "XMR AMOUNT",
                 "EXCHANGE RATE",
                 "TRADING PARTNER PEER ID",
+                "COMPLETED",
             ]);
 
             let all_swaps = db.all().await?;
             for (swap_id, state) in all_swaps {
                 if let Err(e) = async {
                     let latest_state: AliceState = state.try_into()?;
+                    let is_completed = is_complete(&latest_state);
 
-                    if only_unfinished && is_complete(&latest_state) {
+                    if only_unfinished && is_completed {
                         return Ok::<_, anyhow::Error>(());
                     }
 
@@ -265,11 +267,9 @@ async fn main() -> Result<()> {
                     let swap_start_date = db.get_swap_start_date(swap_id).await?;
                     let peer_id = db.get_peer_id(swap_id).await?;
 
-                    let exchange_rate = format!(
-                        "{} XMR/BTC",
-                        (Decimal::from_f64(state3.btc.to_btc()).unwrap() / state3.xmr.as_xmr())
-                            .round_dp(8)
-                    );
+                    let exchange_rate =
+                        Decimal::from_f64(state3.btc.to_btc()).unwrap() / state3.xmr.as_xmr();
+                    let exchange_rate = format!("{} XMR/BTC", exchange_rate.round_dp(8));
 
                     if json {
                         tracing::info!(
@@ -280,6 +280,7 @@ async fn main() -> Result<()> {
                             xmr_amount = %state3.xmr,
                             exchange_rate = %exchange_rate,
                             trading_partner_peer_id = %peer_id,
+                            completed = is_completed,
                             "Found swap in database"
                         );
                     } else {
@@ -291,6 +292,7 @@ async fn main() -> Result<()> {
                             state3.xmr.to_string(),
                             exchange_rate,
                             peer_id.to_string(),
+                            is_completed.to_string(),
                         ]);
                     }
 
