@@ -632,26 +632,34 @@ impl Request {
                     "Exchange Rate",
                     "Trading Partner Peer ID",
                 ]);
-            
+
                 let all_swaps = context.db.all().await?;
                 let mut json_results = Vec::new();
-            
+
                 for (swap_id, state) in all_swaps {
                     let result: Result<_> = async {
                         let latest_state: BobState = state.try_into()?;
                         let all_states = context.db.get_states(swap_id).await?;
                         let state3 = all_states
                             .iter()
-                            .find_map(|s| if let State::Bob(BobState::BtcLocked { state3, .. }) = s { Some(state3) } else { None })
+                            .find_map(|s| {
+                                if let State::Bob(BobState::BtcLocked { state3, .. }) = s {
+                                    Some(state3)
+                                } else {
+                                    None
+                                }
+                            })
                             .context("Failed to get \"BtcLocked\" state")?;
-            
+
                         let swap_start_date = context.db.get_swap_start_date(swap_id).await?;
                         let peer_id = context.db.get_peer_id(swap_id).await?;
                         let btc_amount = state3.tx_lock.lock_amount();
                         let xmr_amount = state3.xmr;
-                        let exchange_rate = (Decimal::from_f64(btc_amount.to_btc()).unwrap() / xmr_amount.as_xmr()).round_dp(8);
+                        let exchange_rate = (Decimal::from_f64(btc_amount.to_btc()).unwrap()
+                            / xmr_amount.as_xmr())
+                        .round_dp(8);
                         let exchange_rate_str = format!("{} XMR/BTC", exchange_rate);
-            
+
                         let swap_data = json!({
                             "swap_id": swap_id.to_string(),
                             "start_date": swap_start_date.to_string(),
@@ -661,7 +669,7 @@ impl Request {
                             "exchange_rate": exchange_rate_str,
                             "trading_partner_peer_id": peer_id.to_string()
                         });
-            
+
                         if context.config.json {
                             tracing::info!(
                                 swap_id = %swap_id,
@@ -684,20 +692,23 @@ impl Request {
                                 peer_id.to_string(),
                             ]);
                         }
-            
+
                         Ok(swap_data)
-                    }.await;
-            
+                    }
+                    .await;
+
                     match result {
                         Ok(swap_data) => json_results.push(swap_data),
-                        Err(e) => tracing::error!(swap_id = %swap_id, error = ?e, "Failed to get swap details"),
+                        Err(e) => {
+                            tracing::error!(swap_id = %swap_id, error = ?e, "Failed to get swap details")
+                        }
                     }
                 }
-            
+
                 if !context.config.json {
                     println!("{}", table);
                 }
-            
+
                 Ok(json!({"swaps": json_results}))
             }
             Method::GetRawStates => {
