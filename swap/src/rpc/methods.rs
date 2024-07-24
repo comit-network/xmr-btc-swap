@@ -140,11 +140,17 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
             .map(|addr_str| {
                 bitcoin::Address::from_str(addr_str)
                     .map_err(|err| {
-                        jsonrpsee_core::Error::Custom(format!("Could not parse bitcoin address: {}", err))
+                        jsonrpsee_core::Error::Custom(format!(
+                            "Could not parse bitcoin address: {}",
+                            err
+                        ))
                     })
                     .and_then(|address| {
-                        bitcoin_address::validate(address, context.config.env_config.bitcoin_network)
-                            .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))
+                        bitcoin_address::validate(
+                            address,
+                            context.config.env_config.bitcoin_network,
+                        )
+                        .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))
                     })
             })
             .transpose()?;
