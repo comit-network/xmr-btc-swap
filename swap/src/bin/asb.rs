@@ -300,7 +300,7 @@ async fn main() -> Result<()> {
                 }
                 .await
                 {
-                    tracing::error!(swap_id = %swap_id, "{:#}", e);
+                    tracing::error!(swap_id = %swap_id, error = ?e, "Failed to get swap details");
                 }
             }
 
