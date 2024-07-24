@@ -248,7 +248,7 @@ async fn main() -> Result<()> {
                     let latest_state: AliceState = state.try_into()?;
 
                     if only_unfinished && is_complete(&latest_state) {
-                        () // Skip finished swaps
+                        return Ok::<_, anyhow::Error>(());
                     }
 
                     let all_states = db.get_states(swap_id).await?;
