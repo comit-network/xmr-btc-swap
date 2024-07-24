@@ -8,9 +8,12 @@ use crate::protocol::bob::{BobState, Swap};
 use crate::protocol::{bob, State};
 use crate::{bitcoin, cli, monero, rpc};
 use anyhow::{bail, Context as AnyContext, Result};
+use comfy_table::Table;
 use libp2p::core::Multiaddr;
 use qrcode::render::unicode;
 use qrcode::QrCode;
+use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
 use serde_json::json;
 use std::cmp::min;
 use std::convert::TryInto;
@@ -619,14 +622,83 @@ impl Request {
                 })
             }
             Method::History => {
-                let swaps = context.db.all().await?;
-                let mut vec: Vec<(Uuid, String)> = Vec::new();
-                for (swap_id, state) in swaps {
-                    let state: BobState = state.try_into()?;
-                    vec.push((swap_id, state.to_string()));
+                let mut table = Table::new();
+                table.set_header(vec![
+                    "Swap ID",
+                    "Start Date",
+                    "State",
+                    "BTC Amount",
+                    "XMR Amount",
+                    "Exchange Rate",
+                    "Trading Partner Peer ID",
+                ]);
+            
+                let all_swaps = context.db.all().await?;
+                let mut json_results = Vec::new();
+            
+                for (swap_id, state) in all_swaps {
+                    let result: Result<_> = async {
+                        let latest_state: BobState = state.try_into()?;
+                        let all_states = context.db.get_states(swap_id).await?;
+                        let state3 = all_states
+                            .iter()
+                            .find_map(|s| if let State::Bob(BobState::BtcLocked { state3, .. }) = s { Some(state3) } else { None })
+                            .context("Failed to get \"BtcLocked\" state")?;
+            
+                        let swap_start_date = context.db.get_swap_start_date(swap_id).await?;
+                        let peer_id = context.db.get_peer_id(swap_id).await?;
+                        let btc_amount = state3.tx_lock.lock_amount();
+                        let xmr_amount = state3.xmr;
+                        let exchange_rate = (Decimal::from_f64(btc_amount.to_btc()).unwrap() / xmr_amount.as_xmr()).round_dp(8);
+                        let exchange_rate_str = format!("{} XMR/BTC", exchange_rate);
+            
+                        let swap_data = json!({
+                            "swap_id": swap_id.to_string(),
+                            "start_date": swap_start_date.to_string(),
+                            "state": latest_state.to_string(),
+                            "btc_amount": btc_amount.to_string(),
+                            "xmr_amount": xmr_amount.to_string(),
+                            "exchange_rate": exchange_rate_str,
+                            "trading_partner_peer_id": peer_id.to_string()
+                        });
+            
+                        if context.config.json {
+                            tracing::info!(
+                                swap_id = %swap_id,
+                                swap_start_date = %swap_start_date,
+                                latest_state = %latest_state,
+                                btc_amount = %btc_amount,
+                                xmr_amount = %xmr_amount,
+                                exchange_rate = %exchange_rate_str,
+                                trading_partner_peer_id = %peer_id,
+                                "Found swap in database"
+                            );
+                        } else {
+                            table.add_row(vec![
+                                swap_id.to_string(),
+                                swap_start_date.to_string(),
+                                latest_state.to_string(),
+                                btc_amount.to_string(),
+                                xmr_amount.to_string(),
+                                exchange_rate_str,
+                                peer_id.to_string(),
+                            ]);
+                        }
+            
+                        Ok(swap_data)
+                    }.await;
+            
+                    match result {
+                        Ok(swap_data) => json_results.push(swap_data),
+                        Err(e) => tracing::error!(swap_id = %swap_id, error = ?e, "Failed to get swap details"),
+                    }
                 }
-
-                Ok(json!({ "swaps": vec }))
+            
+                if !context.config.json {
+                    println!("{}", table);
+                }
+            
+                Ok(json!({"swaps": json_results}))
             }
             Method::GetRawStates => {
                 let raw_history = context.db.raw_all().await?;

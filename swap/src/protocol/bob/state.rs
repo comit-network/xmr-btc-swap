@@ -369,7 +369,7 @@ pub struct State3 {
     S_a_monero: monero::PublicKey,
     S_a_bitcoin: bitcoin::PublicKey,
     v: monero::PrivateViewKey,
-    xmr: monero::Amount,
+    pub xmr: monero::Amount,
     pub cancel_timelock: CancelTimelock,
     punish_timelock: PunishTimelock,
     refund_address: bitcoin::Address,

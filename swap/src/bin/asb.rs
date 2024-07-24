@@ -230,8 +230,8 @@ async fn main() -> Result<()> {
         }
         Command::History { only_unfinished } => {
             let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadOnly).await?;
-
             let mut table = Table::new();
+
             table.set_header(vec![
                 "SWAP ID",
                 "START DATETIME",
