@@ -1,5 +1,7 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
+use std::time::Duration;
+
 use crate::asb::{EventLoopHandle, LatestRate};
 use crate::bitcoin::ExpiredTimelocks;
 use crate::env::Config;
@@ -117,9 +119,29 @@ where
                     // block 0 for scenarios where we create a refund wallet.
                     let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
 
-                    let transfer_proof = monero_wallet
+                    let mut transfer_proof = monero_wallet
                         .transfer(state3.lock_xmr_transfer_request())
-                        .await?;
+                        .await;
+
+                    // retry again after waiting 1, 2, 4, ... seconds up until 64
+                    let mut sleep_duration: u64 = 1;
+                    while let Err(err) = transfer_proof {
+                        // when the error still is there after many retries, stop trying.
+                        if sleep_duration > 64 {
+                            tracing::error!("Failed to lock XMR, giving up.");
+                            return Err(err);
+                        }
+                        // otherwise sleep for the specified duration and then try again
+                        tracing::info!("Failed to lock XMR, retrying in {}s.", sleep_duration);
+                        tokio::time::sleep(Duration::from_secs(sleep_duration)).await;
+                        transfer_proof = monero_wallet
+                            .transfer(state3.lock_xmr_transfer_request())
+                            .await;
+                        // double next sleep duration
+                        sleep_duration *= 2;
+                    }
+                    // at this point it can't be Err anymore
+                    let transfer_proof = transfer_proof?;
 
                     AliceState::XmrLockTransactionSent {
                         monero_wallet_restore_blockheight,
