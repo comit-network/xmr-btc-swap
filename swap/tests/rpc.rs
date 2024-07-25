@@ -79,7 +79,7 @@ mod test {
     }
 
     // Helper function for HashMap
-    fn assert_has_keys_hashmap(map: &serde_json::Map<String, serde_json::Value>, keys: &[&str]) {
+    fn assert_has_keys_hashmap(map: &HashMap<String, Value>, keys: &[&str]) {
         for &key in keys {
             assert!(map.contains_key(key), "Key {} is missing", key);
         }
@@ -110,7 +110,8 @@ mod test {
 
             let swaps = response.get("swaps").unwrap();
             assert_eq!(swaps.len(), 1);
-            assert_has_keys_hashmap(
+
+            assert_has_keys_serde(
                 swaps[0].as_object().unwrap(),
                 &[
                     "swapId",
