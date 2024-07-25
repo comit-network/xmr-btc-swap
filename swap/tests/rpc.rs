@@ -110,15 +110,18 @@ mod test {
 
             let swaps = response.get("swaps").unwrap();
             assert_eq!(swaps.len(), 1);
-            assert_has_keys_hashmap(swaps[0].as_object().unwrap(), &[
-                "swapId",
-                "startDate",
-                "state",
-                "btcAmount",
-                "xmrAmount",
-                "exchangeRate",
-                "tradingPartnerPeerId"
-            ]);
+            assert_has_keys_hashmap(
+                swaps[0].as_object().unwrap(),
+                &[
+                    "swapId",
+                    "startDate",
+                    "state",
+                    "btcAmount",
+                    "xmrAmount",
+                    "exchangeRate",
+                    "tradingPartnerPeerId",
+                ],
+            );
 
             let response: HashMap<String, HashMap<Uuid, Vec<Value>>> = client
                 .request("get_raw_states", ObjectParams::new())
