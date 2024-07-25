@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.13.4] - 2024-07-25
-
 - ASB: The `history` command can now be used while the asb is running.
 - ASB: Retry locking of Monero if it fails on first attempt
 
