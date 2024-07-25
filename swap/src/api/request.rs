@@ -664,13 +664,13 @@ impl Request {
                         let exchange_rate = format!("{} XMR/BTC", exchange_rate.round_dp(8));
 
                         let swap_data = json!({
-                            "swap_id": swap_id.to_string(),
-                            "start_date": swap_start_date.to_string(),
+                            "swapId": swap_id.to_string(),
+                            "startDate": swap_start_date.to_string(),
                             "state": latest_state.to_string(),
-                            "btc_amount": btc_amount.to_string(),
-                            "xmr_amount": xmr_amount.to_string(),
-                            "exchange_rate": exchange_rate,
-                            "trading_partner_peer_id": peer_id.to_string()
+                            "btcAmount": btc_amount.to_string(),
+                            "xmrAmount": xmr_amount.to_string(),
+                            "exchangeRate": exchange_rate,
+                            "tradingPartnerPeerId": peer_id.to_string()
                         });
 
                         if context.config.json {
