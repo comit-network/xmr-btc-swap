@@ -67,7 +67,7 @@ pub fn redact(input: &str) -> String {
         // for every matched address check whether we already found it
         // and if we didn't, generate a placeholder for it
         for address in regex.find_iter(input) {
-            if replacements.contains_key(address.as_str()) {
+            if !replacements.contains_key(address.as_str()) {
                 replacements.insert(address.as_str().to_owned(), create_placeholder(counter));
                 counter += 1;
             }
