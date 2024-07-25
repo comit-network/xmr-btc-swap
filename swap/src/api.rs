@@ -437,7 +437,7 @@ pub mod api_test {
 
             Request::new(Method::BuyXmr {
                 seller,
-                bitcoin_change_address,
+                bitcoin_change_address: Some(bitcoin_change_address),
                 monero_receive_address,
                 swap_id: Uuid::new_v4(),
             })

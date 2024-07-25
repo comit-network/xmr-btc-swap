@@ -81,29 +81,11 @@ where
             )
             .await?;
 
-            // when no refund address was provided we default to the internal wallet
-            let bitcoin_change_address = match bitcoin_change_address {
-                Some(addr) => addr,
-                None => {
-                    let internal_wallet_address = context
-                        .bitcoin_wallet()
-                        .expect("bitcoin wallet should exist")
-                        .new_address()
-                        .await?;
-
-                    tracing::info!(
-                        internal_wallet_address=%internal_wallet_address,
-                        "No --change-address supplied. Any change will be received to the internal wallet."
-                    );
-
-                    internal_wallet_address
-                }
-            };
-
             let monero_receive_address =
                 monero_address::validate_is_testnet(monero_receive_address, is_testnet)?;
-            let bitcoin_change_address =
-                bitcoin_address::validate_is_testnet(bitcoin_change_address, is_testnet)?;
+            let bitcoin_change_address = bitcoin_change_address
+                .map(|address| bitcoin_address::validate_is_testnet(address, is_testnet))
+                .transpose()?;
 
             let request = Request::new(Method::BuyXmr {
                 seller,
