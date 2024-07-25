@@ -79,7 +79,7 @@ mod test {
     }
 
     // Helper function for HashMap
-    fn assert_has_keys_hashmap(map: &serde_json::Map<String, _>, keys: &[&str]) {
+    fn assert_has_keys_hashmap(map: &serde_json::Map<String, serde_json::Value>, keys: &[&str]) {
         for &key in keys {
             assert!(map.contains_key(key), "Key {} is missing", key);
         }
