@@ -123,6 +123,7 @@ where
             let backoff = ExponentialBackoffBuilder::new()
                 .with_initial_interval(Duration::from_secs(5))
                 .with_max_interval(Duration::from_secs(60 * 3))
+                .with_max_elapsed_time(None)
                 .build();
 
             let result = backoff::future::retry_notify(
@@ -148,11 +149,11 @@ where
                         Err(e) => Err(backoff::Error::transient(e)),
                     }
                 },
-                |err, duration| {
+                |err, delay| {
                     tracing::warn!(
                         ?err,
-                        ?duration,
-                        "Retry attempt failed, will try again after delay"
+                        ?delay,
+                        "Failed to lock XMR. We will retry after a delay"
                     );
                 },
             )
