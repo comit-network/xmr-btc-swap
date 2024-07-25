@@ -655,9 +655,13 @@ impl Request {
                         let peer_id = context.db.get_peer_id(swap_id).await?;
                         let btc_amount = state3.tx_lock.lock_amount();
                         let xmr_amount = state3.xmr;
-                        let exchange_rate = (Decimal::from_f64(btc_amount.to_btc()).unwrap()
-                            / xmr_amount.as_xmr())
-                        .round_dp(8);
+                        let exchange_rate = Decimal::from_f64(btc_amount.to_btc())
+                            .ok_or_else(|| {
+                                anyhow::anyhow!("Failed to convert BTC amount to Decimal")
+                            })?
+                            .checked_div(xmr_amount.as_xmr())
+                            .ok_or_else(|| anyhow::anyhow!("Division by zero or overflow"))?
+                            .round_dp(8);
                         let exchange_rate_str = format!("{} XMR/BTC", exchange_rate);
 
                         let swap_data = json!({
