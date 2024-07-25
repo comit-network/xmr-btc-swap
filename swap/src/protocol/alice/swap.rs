@@ -125,10 +125,6 @@ where
                 .with_max_interval(Duration::from_secs(60 * 3))
                 .build();
         
-            let notify = |err: backoff::Error<anyhow::Error>, duration: Duration| {
-                tracing::warn!(?err, ?duration, "Retry attempt failed, will try again after delay");
-            };
-        
             let result = backoff::future::retry_notify(
                 backoff,
                 || async {
@@ -148,7 +144,9 @@ where
                         Err(e) => Err(backoff::Error::transient(e)),
                     }
                 },
-                notify
+                |err, duration| {
+                    tracing::warn!(?err, ?duration, "Retry attempt failed, will try again after delay");
+                }
             )
             .await;
         
