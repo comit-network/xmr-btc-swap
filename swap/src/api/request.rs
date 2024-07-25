@@ -661,7 +661,7 @@ impl Request {
                             })?
                             .checked_div(xmr_amount.as_xmr())
                             .ok_or_else(|| anyhow::anyhow!("Division by zero or overflow"))?;
-                        let exchange_rate_str = format!("{} XMR/BTC", exchange_rate.round_dp(8));
+                        let exchange_rate = format!("{} XMR/BTC", exchange_rate.round_dp(8));
 
                         let swap_data = json!({
                             "swap_id": swap_id.to_string(),
@@ -669,7 +669,7 @@ impl Request {
                             "state": latest_state.to_string(),
                             "btc_amount": btc_amount.to_string(),
                             "xmr_amount": xmr_amount.to_string(),
-                            "exchange_rate": exchange_rate_str,
+                            "exchange_rate": exchange_rate,
                             "trading_partner_peer_id": peer_id.to_string()
                         });
 
@@ -680,7 +680,7 @@ impl Request {
                                 latest_state = %latest_state,
                                 btc_amount = %btc_amount,
                                 xmr_amount = %xmr_amount,
-                                exchange_rate = %exchange_rate_str,
+                                exchange_rate = %exchange_rate,
                                 trading_partner_peer_id = %peer_id,
                                 "Found swap in database"
                             );
@@ -691,7 +691,7 @@ impl Request {
                                 latest_state.to_string(),
                                 btc_amount.to_string(),
                                 xmr_amount.to_string(),
-                                exchange_rate_str,
+                                exchange_rate,
                                 peer_id.to_string(),
                             ]);
                         }
