@@ -31,6 +31,7 @@ use swap::asb::config::{
 use swap::asb::{cancel, punish, redeem, refund, safely_abort, EventLoop, Finality, KrakenRate};
 use swap::common::check_latest_version;
 use swap::database::{open_db, AccessMode};
+use swap::fs::system_data_dir;
 use swap::network::rendezvous::XmrBtcNamespace;
 use swap::network::swarm;
 use swap::protocol::alice::{run, AliceState};
@@ -72,7 +73,9 @@ async fn main() -> Result<()> {
         eprintln!("{}", e);
     }
 
-    asb::tracing::init(LevelFilter::DEBUG, json, !disable_timestamp).expect("initialize tracing");
+    let log_dir = system_data_dir()?.join("logs");
+    asb::tracing::init(LevelFilter::DEBUG, json, !disable_timestamp, log_dir)
+        .expect("initialize tracing");
 
     let config = match read_config(config_path.clone())? {
         Ok(config) => config,
