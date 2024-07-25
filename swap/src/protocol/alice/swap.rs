@@ -119,12 +119,22 @@ where
 
                     let transfer_proof = monero_wallet
                         .transfer(state3.lock_xmr_transfer_request())
-                        .await?;
+                        .await;
 
-                    AliceState::XmrLockTransactionSent {
-                        monero_wallet_restore_blockheight,
-                        transfer_proof,
-                        state3,
+                    match transfer_proof {
+                        Ok(transfer_proof) => {
+                            AliceState::XmrLockTransactionSent {
+                                monero_wallet_restore_blockheight,
+                                transfer_proof,
+                                state3,
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to lock XMR: {:#}", e);
+                            // Sleep 10seconds
+                            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                            AliceState::BtcLocked { state3 }
+                        }
                     }
                 }
                 _ => AliceState::SafelyAborted,
