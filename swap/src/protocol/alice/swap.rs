@@ -169,8 +169,7 @@ where
                 }
                 Ok(None) => AliceState::SafelyAborted,
                 Err(e) => {
-                    tracing::error!(%e, "Failed to lock XMR after all retries");
-                    AliceState::SafelyAborted
+                    unreachable!("We should retry forever until the cancel timelock expires. But we got an error: {:#}", e);
                 }
             }
         }
