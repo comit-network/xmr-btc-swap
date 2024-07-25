@@ -230,17 +230,17 @@ async fn main() -> Result<()> {
         }
         Command::History { only_unfinished } => {
             let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadOnly).await?;
-            let mut table = Table::new();
+            let mut table: Table = Table::new();
 
             table.set_header(vec![
-                "SWAP ID",
-                "START DATETIME",
-                "CURRENT STATE",
-                "BTC AMOUNT",
-                "XMR AMOUNT",
-                "EXCHANGE RATE",
-                "TRADING PARTNER PEER ID",
-                "COMPLETED",
+                "Swap ID",
+                "Start Date",
+                "State",
+                "BTC Amount",
+                "XMR Amount",
+                "Exchange Rate",
+                "Trading Partner Peer ID",
+                "Completed",
             ]);
 
             let all_swaps = db.all().await?;
