@@ -660,9 +660,8 @@ impl Request {
                                 anyhow::anyhow!("Failed to convert BTC amount to Decimal")
                             })?
                             .checked_div(xmr_amount.as_xmr())
-                            .ok_or_else(|| anyhow::anyhow!("Division by zero or overflow"))?
-                            .round_dp(8);
-                        let exchange_rate_str = format!("{} XMR/BTC", exchange_rate);
+                            .ok_or_else(|| anyhow::anyhow!("Division by zero or overflow"))?;
+                        let exchange_rate_str = format!("{} XMR/BTC", exchange_rate.round_dp(8));
 
                         let swap_data = json!({
                             "swap_id": swap_id.to_string(),
