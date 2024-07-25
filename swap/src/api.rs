@@ -1,6 +1,6 @@
 pub mod request;
 use crate::cli::command::{Bitcoin, Monero, Tor};
-use crate::database::open_db;
+use crate::database::{open_db, AccessMode};
 use crate::env::{Config as EnvConfig, GetConfig, Mainnet, Testnet};
 use crate::fs::system_data_dir;
 use crate::network::rendezvous::XmrBtcNamespace;
@@ -224,7 +224,7 @@ impl Context {
         let tor_socks5_port = tor.map_or(9050, |tor| tor.tor_socks5_port);
 
         let context = Context {
-            db: open_db(data_dir.join("sqlite")).await?,
+            db: open_db(data_dir.join("sqlite"), AccessMode::ReadWrite).await?,
             bitcoin_wallet,
             monero_wallet,
             monero_rpc_process,
@@ -259,7 +259,7 @@ impl Context {
             bitcoin_wallet: Some(bob_bitcoin_wallet),
             monero_wallet: Some(bob_monero_wallet),
             config,
-            db: open_db(db_path)
+            db: open_db(db_path, AccessMode::ReadWrite)
                 .await
                 .expect("Could not open sqlite database"),
             monero_rpc_process: None,
@@ -437,7 +437,7 @@ pub mod api_test {
 
             Request::new(Method::BuyXmr {
                 seller,
-                bitcoin_change_address,
+                bitcoin_change_address: Some(bitcoin_change_address),
                 monero_receive_address,
                 swap_id: Uuid::new_v4(),
             })

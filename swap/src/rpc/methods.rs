@@ -135,16 +135,25 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
     module.register_async_method("buy_xmr", |params_raw, context| async move {
         let params: HashMap<String, String> = params_raw.parse()?;
 
-        let bitcoin_change_address =
-            bitcoin::Address::from_str(params.get("bitcoin_change_address").ok_or_else(|| {
-                jsonrpsee_core::Error::Custom("Does not contain bitcoin_change_address".to_string())
-            })?)
-            .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
-
-        let bitcoin_change_address = bitcoin_address::validate(
-            bitcoin_change_address,
-            context.config.env_config.bitcoin_network,
-        )?;
+        let bitcoin_change_address = params
+            .get("bitcoin_change_address")
+            .map(|addr_str| {
+                bitcoin::Address::from_str(addr_str)
+                    .map_err(|err| {
+                        jsonrpsee_core::Error::Custom(format!(
+                            "Could not parse bitcoin address: {}",
+                            err
+                        ))
+                    })
+                    .and_then(|address| {
+                        bitcoin_address::validate(
+                            address,
+                            context.config.env_config.bitcoin_network,
+                        )
+                        .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))
+                    })
+            })
+            .transpose()?;
 
         let monero_receive_address =
             monero::Address::from_str(params.get("monero_receive_address").ok_or_else(|| {
