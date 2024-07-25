@@ -78,12 +78,12 @@ pub fn redact(input: &str) -> String {
 
     // TODO: verify regex patterns
 
-    const MONERO_ADDR_REGEX: &'static str = r#"[48][1-9A-HJ-NP-Za-km-z]{94}"#;
-    const BITCOIN_ADDR_REGEX: &'static str = r#"\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b"#;
+    const MONERO_ADDR_REGEX: &str = r#"[48][1-9A-HJ-NP-Za-km-z]{94}"#;
+    const BITCOIN_ADDR_REGEX: &str = r#"\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b"#;
     // Both XMR and BTC transactions have
     // a 64 bit hex id so they aren't distinguishible
-    const TX_ID_REGEX: &'static str = r#"\b[a-fA-F0-9]{64}\b"#;
-    const SWAP_ID_REGEX: &'static str =
+    const TX_ID_REGEX: &str = r#"\b[a-fA-F0-9]{64}\b"#;
+    const SWAP_ID_REGEX: &str =
         r#"\b[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89aAbB][a-f0-9]{3}-[a-f0-9]{12}\b"#;
 
     insert_placeholders(input, &mut replacements, MONERO_ADDR_REGEX, |count| {
