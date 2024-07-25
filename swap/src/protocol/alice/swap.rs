@@ -124,7 +124,7 @@ where
                 .with_initial_interval(Duration::from_secs(5))
                 .with_max_interval(Duration::from_secs(60 * 3))
                 .build();
-        
+
             let result = backoff::future::retry_notify(
                 backoff,
                 || async {
@@ -132,12 +132,16 @@ where
                         Ok(ExpiredTimelocks::None { .. }) => {
                             // Record the current monero wallet block height so we don't have to scan from
                             // block 0 for scenarios where we create a refund wallet.
-                            let monero_wallet_restore_blockheight = monero_wallet.block_height().await
+                            let monero_wallet_restore_blockheight = monero_wallet
+                                .block_height()
+                                .await
                                 .map_err(backoff::Error::transient)?;
-        
-                            let transfer_proof = monero_wallet.transfer(state3.lock_xmr_transfer_request()).await
+
+                            let transfer_proof = monero_wallet
+                                .transfer(state3.lock_xmr_transfer_request())
+                                .await
                                 .map_err(backoff::Error::transient)?;
-                            
+
                             Ok(Some((monero_wallet_restore_blockheight, transfer_proof)))
                         }
                         Ok(_) => Ok(None),
@@ -145,11 +149,15 @@ where
                     }
                 },
                 |err, duration| {
-                    tracing::warn!(?err, ?duration, "Retry attempt failed, will try again after delay");
-                }
+                    tracing::warn!(
+                        ?err,
+                        ?duration,
+                        "Retry attempt failed, will try again after delay"
+                    );
+                },
             )
             .await;
-        
+
             match result {
                 Ok(Some((monero_wallet_restore_blockheight, transfer_proof))) => {
                     AliceState::XmrLockTransactionSent {
