@@ -114,35 +114,57 @@ where
             }
         }
         AliceState::BtcLocked { state3 } => {
-            match state3.expired_timelocks(bitcoin_wallet).await? {
-                ExpiredTimelocks::None { .. } => {
-                    // Record the current monero wallet block height so we don't have to scan from
-                    // block 0 for scenarios where we create a refund wallet.
-                    let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
-
-                    let backoff = ExponentialBackoffBuilder::new()
-                        .with_initial_interval(Duration::from_secs(5))
-                        .with_max_interval(Duration::from_secs(60 * 3))
-                        .build();
+            // We retry to lock the Monero wallet until we succeed or until the cancel timelock expires.
+            //
+            // This is necessary because the monero-wallet-rpc can sometimes error out due to various reasons, such as
+            // - no connection to the daemon
+            // - "failed to get output distribution"
+            // See https://github.com/comit-network/xmr-btc-swap/issues/1726
+            let backoff = ExponentialBackoffBuilder::new()
+                .with_initial_interval(Duration::from_secs(5))
+                .with_max_interval(Duration::from_secs(60 * 3))
+                .build();
         
-                    let transfer_proof = backoff::future::retry(backoff, || async {
-                        monero_wallet
-                            .transfer(state3.lock_xmr_transfer_request())
-                            .await
-                            .map_err(|err| {
-                                tracing::info!(%err, "Failed to lock XMR. We'll retry");
-                                backoff::Error::transient(err)
-                            })
-                    })
-                    .await?;
-
+            let notify = |err: backoff::Error<anyhow::Error>, duration: Duration| {
+                tracing::warn!(?err, ?duration, "Retry attempt failed, will try again after delay");
+            };
+        
+            let result = backoff::future::retry_notify(
+                backoff,
+                || async {
+                    match state3.expired_timelocks(bitcoin_wallet).await {
+                        Ok(ExpiredTimelocks::None { .. }) => {
+                            // Record the current monero wallet block height so we don't have to scan from
+                            // block 0 for scenarios where we create a refund wallet.
+                            let monero_wallet_restore_blockheight = monero_wallet.block_height().await
+                                .map_err(backoff::Error::transient)?;
+        
+                            let transfer_proof = monero_wallet.transfer(state3.lock_xmr_transfer_request()).await
+                                .map_err(backoff::Error::transient)?;
+                            
+                            Ok(Some((monero_wallet_restore_blockheight, transfer_proof)))
+                        }
+                        Ok(_) => Ok(None),
+                        Err(e) => Err(backoff::Error::transient(e)),
+                    }
+                },
+                notify
+            )
+            .await;
+        
+            match result {
+                Ok(Some((monero_wallet_restore_blockheight, transfer_proof))) => {
                     AliceState::XmrLockTransactionSent {
                         monero_wallet_restore_blockheight,
                         transfer_proof,
                         state3,
                     }
                 }
-                _ => AliceState::SafelyAborted,
+                Ok(None) => AliceState::SafelyAborted,
+                Err(e) => {
+                    tracing::error!(%e, "Failed to lock XMR after all retries");
+                    AliceState::SafelyAborted
+                }
             }
         }
         AliceState::XmrLockTransactionSent {
