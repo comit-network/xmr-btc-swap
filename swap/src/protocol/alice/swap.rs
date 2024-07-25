@@ -8,6 +8,7 @@ use crate::env::Config;
 use crate::protocol::alice::{AliceState, Swap};
 use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
+use backoff::ExponentialBackoffBuilder;
 use tokio::select;
 use tokio::time::timeout;
 use uuid::Uuid;
@@ -119,29 +120,21 @@ where
                     // block 0 for scenarios where we create a refund wallet.
                     let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
 
-                    let mut transfer_proof = monero_wallet
-                        .transfer(state3.lock_xmr_transfer_request())
-                        .await;
-
-                    // retry again after waiting 1, 2, 4, ... seconds up until 64
-                    let mut sleep_duration: u64 = 1;
-                    while let Err(err) = transfer_proof {
-                        // when the error still is there after many retries, stop trying.
-                        if sleep_duration > 64 {
-                            tracing::error!("Failed to lock XMR, giving up.");
-                            return Err(err);
-                        }
-                        // otherwise sleep for the specified duration and then try again
-                        tracing::info!("Failed to lock XMR, retrying in {}s.", sleep_duration);
-                        tokio::time::sleep(Duration::from_secs(sleep_duration)).await;
-                        transfer_proof = monero_wallet
+                    let backoff = ExponentialBackoffBuilder::new()
+                        .with_initial_interval(Duration::from_secs(5))
+                        .with_max_interval(Duration::from_secs(60 * 3))
+                        .build();
+        
+                    let transfer_proof = backoff::future::retry(backoff, || async {
+                        monero_wallet
                             .transfer(state3.lock_xmr_transfer_request())
-                            .await;
-                        // double next sleep duration
-                        sleep_duration *= 2;
-                    }
-                    // at this point it can't be Err anymore
-                    let transfer_proof = transfer_proof?;
+                            .await
+                            .map_err(|err| {
+                                tracing::info!(%err, "Failed to lock XMR. We'll retry");
+                                backoff::Error::transient(err)
+                            })
+                    })
+                    .await?;
 
                     AliceState::XmrLockTransactionSent {
                         monero_wallet_restore_blockheight,
