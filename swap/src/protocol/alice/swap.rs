@@ -149,10 +149,10 @@ where
                         Err(e) => Err(backoff::Error::transient(e)),
                     }
                 },
-                |err, delay| {
+                |err, delay: Duration| {
                     tracing::warn!(
-                        ?err,
-                        ?delay,
+                        %err,
+                        delay_secs = delay.as_secs(),
                         "Failed to lock XMR. We will retry after a delay"
                     );
                 },
