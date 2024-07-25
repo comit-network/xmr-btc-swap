@@ -38,11 +38,11 @@ fn is_latest_version(current: &str, latest: &str) -> bool {
 
 /// Redact logs, etc. by replacing Bitcoin and Monero addresses
 /// with generic placeholders.
-/// 
+///
 /// # Example
 /// ```rust
 /// use swap::common::redact;
-/// 
+///
 /// let redacted = redact("a9165a1e-d26d-4b56-bf6d-ca9658825c44");
 /// assert_eq!(redacted, "<swap_id_0>");
 /// ```
@@ -54,9 +54,9 @@ pub fn redact(input: &str) -> String {
     /// of a specific regex pattern into the hashmap.
     fn insert_placeholders(
         input: &str,
-        replacements: &mut HashMap<String, String>, 
-        pattern: &str, 
-        create_placeholder: impl Fn(usize) -> String
+        replacements: &mut HashMap<String, String>,
+        pattern: &str,
+        create_placeholder: impl Fn(usize) -> String,
     ) -> Result<(), regex::Error> {
         // compile the regex pattern
         let regex = Regex::new(pattern)?;
@@ -80,42 +80,35 @@ pub fn redact(input: &str) -> String {
 
     const MONERO_ADDR_REGEX: &'static str = r#"[48][1-9A-HJ-NP-Za-km-z]{94}"#;
     const BITCOIN_ADDR_REGEX: &'static str = r#"\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b"#;
-    // Both XMR and BTC transactions have 
+    // Both XMR and BTC transactions have
     // a 64 bit hex id so they aren't distinguishible
     const TX_ID_REGEX: &'static str = r#"\b[a-fA-F0-9]{64}\b"#;
-    const SWAP_ID_REGEX: &'static str = r#"\b[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89aAbB][a-f0-9]{3}-[a-f0-9]{12}\b"#;
+    const SWAP_ID_REGEX: &'static str =
+        r#"\b[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89aAbB][a-f0-9]{3}-[a-f0-9]{12}\b"#;
 
-    insert_placeholders(
-        input, 
-        &mut replacements,
-        MONERO_ADDR_REGEX,
-        |count| format!("<monero_address_{count}>")
-    ).expect("regex to be valid");
+    insert_placeholders(input, &mut replacements, MONERO_ADDR_REGEX, |count| {
+        format!("<monero_address_{count}>")
+    })
+    .expect("regex to be valid");
 
-    insert_placeholders(
-        input, 
-        &mut replacements,
-        BITCOIN_ADDR_REGEX,
-        |count| format!("<bitcoin_address_{count}>")
-    ).expect("regex to be valid");
+    insert_placeholders(input, &mut replacements, BITCOIN_ADDR_REGEX, |count| {
+        format!("<bitcoin_address_{count}>")
+    })
+    .expect("regex to be valid");
 
-    insert_placeholders(
-        input,
-        &mut replacements,
-        TX_ID_REGEX,
-        |count| format!("<transaction_{count}>")
-    ).expect("regex to be valid");
+    insert_placeholders(input, &mut replacements, TX_ID_REGEX, |count| {
+        format!("<transaction_{count}>")
+    })
+    .expect("regex to be valid");
 
-    insert_placeholders(
-        input,
-        &mut replacements,
-        SWAP_ID_REGEX,
-        |count| format!("<swap_id_{count}>")
-    ).expect("regex to be valid");
+    insert_placeholders(input, &mut replacements, SWAP_ID_REGEX, |count| {
+        format!("<swap_id_{count}>")
+    })
+    .expect("regex to be valid");
 
     // allocate string variable to operate on
     let mut redacted = input.to_owned();
-    
+
     // Finally we go through the input string and replace each occurance of an
     // address we want to redact with the corresponding placeholder
     for (address, placeholder) in replacements.iter() {
@@ -125,8 +118,6 @@ pub fn redact(input: &str) -> String {
 
     redacted
 }
-
-
 
 #[cfg(test)]
 mod test {
