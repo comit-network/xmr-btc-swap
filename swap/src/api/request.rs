@@ -722,7 +722,7 @@ impl Request {
                     match result {
                         Ok(swap_data) => json_results.push(swap_data),
                         Err(e) => {
-                            tracing::error!(swap_id = %swap_id, error = ?e, "Failed to get swap details")
+                            tracing::error!(swap_id = %swap_id, error = %e, "Failed to get swap details")
                         }
                     }
                 }
