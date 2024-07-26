@@ -79,7 +79,7 @@ mod test {
     }
 
     // Helper function for HashMap
-    fn assert_has_keys_hashmap(map: &HashMap<String, Value>, keys: &[&str]) {
+    fn assert_has_keys_hashmap<T>(map: &HashMap<String, T>, keys: &[&str]) {
         for &key in keys {
             assert!(map.contains_key(key), "Key {} is missing", key);
         }
