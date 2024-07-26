@@ -727,7 +727,7 @@ impl Request {
                     }
                 }
 
-                if !context.config.json {
+                if !context.config.json && !context.is_daemon {
                     println!("{}", table);
                 }
 
