@@ -16,6 +16,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
 use std::ops::Add;
+use bdk::bitcoin::consensus::encode::{serialize_hex, serialize};
 
 /// Represent a timelock, expressed in relative block height as defined in
 /// [BIP68](https://github.com/bitcoin/bips/blob/master/bip-0068.mediawiki).
@@ -159,6 +160,10 @@ impl TxCancel {
 
     pub fn txid(&self) -> Txid {
         self.inner.txid()
+    }
+    
+    pub fn serialize_hex(&self) -> String {
+        serialize_hex(&self.inner)
     }
 
     pub fn digest(&self) -> Sighash {

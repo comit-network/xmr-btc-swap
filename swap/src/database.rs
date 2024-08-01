@@ -1,10 +1,12 @@
 pub use alice::Alice;
 pub use bob::Bob;
+use monero_rpc::wallet::BlockHeight;
 pub use sqlite::SqliteDatabase;
 
 use crate::fs::ensure_directory_exists;
+use crate::protocol::bob::{BobState, State2, State3};
 use crate::protocol::{Database, State};
-use anyhow::{bail, Result};
+use anyhow::{bail, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::path::Path;
@@ -103,5 +105,20 @@ pub async fn open_db(
         tokio::fs::File::create(&sqlite_path).await?;
         let sqlite = SqliteDatabase::open(sqlite_path, access_mode).await?;
         Ok(Arc::new(sqlite))
+    }
+}
+
+pub trait SwapStateVecExt {
+    fn find_state3(&self) -> Result<State3>;
+}
+
+impl SwapStateVecExt for Vec<State> {
+    fn find_state3(&self) -> Result<State3> {
+        self.iter()
+            .find_map(|state| match state {
+                State::Bob(BobState::BtcLocked {state3, ..}) => Some(state3.clone()),
+                _ => None
+            })
+            .ok_or_else(|| anyhow!("No BobState::BtcLocked found"))
     }
 }

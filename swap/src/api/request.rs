@@ -7,9 +7,12 @@ use crate::network::swarm;
 use crate::protocol::bob::{BobState, Swap};
 use crate::protocol::{bob, State};
 use crate::{bitcoin, cli, monero, rpc};
+use crate::database::SwapStateVecExt;
 use anyhow::{bail, Context as AnyContext, Result};
+use ::bitcoin::consensus::encode::serialize_hex;
 use comfy_table::Table;
 use libp2p::core::Multiaddr;
+use monero_rpc::wallet::BlockHeight;
 use qrcode::render::unicode;
 use qrcode::QrCode;
 use rust_decimal::prelude::FromPrimitive;
@@ -69,6 +72,9 @@ pub enum Method {
         swap_id: Uuid,
     },
     GetRawStates,
+    GetRawTransactions {
+        swap_id: Uuid,
+    },
 }
 
 impl Method {
@@ -162,6 +168,14 @@ impl Method {
                 debug_span!(
                     "method",
                     method_name = "WithdrawBtc",
+                    log_reference_id = field::Empty
+                )
+            },
+            Method::GetRawTransactions { swap_id } => {
+                debug_span!(
+                    "method",
+                    method_name = "GetRawTransactions",
+                    swap_id=%swap_id,
                     log_reference_id = field::Empty
                 )
             }
@@ -660,15 +674,7 @@ impl Request {
                         let latest_state: BobState = state.try_into()?;
                         let all_states = context.db.get_states(swap_id).await?;
                         let state3 = all_states
-                            .iter()
-                            .find_map(|s| {
-                                if let State::Bob(BobState::BtcLocked { state3, .. }) = s {
-                                    Some(state3)
-                                } else {
-                                    None
-                                }
-                            })
-                            .context("Failed to get \"BtcLocked\" state")?;
+                            .find_state3()?;
 
                         let swap_start_date = context.db.get_swap_start_date(swap_id).await?;
                         let peer_id = context.db.get_peer_id(swap_id).await?;
@@ -915,6 +921,19 @@ impl Request {
             Method::GetCurrentSwap => Ok(json!({
                 "swap_id": context.swap_lock.get_current_swap_id().await
             })),
+            Method::GetRawTransactions { swap_id } => {
+                let all_states = context.db.get_states(swap_id).await?;
+                let state3 = all_states.find_state3()?;
+                
+                let cancelledState = state3.cancel(BlockHeight { height: 0 });
+                let txCancel = cancelledState.construct_tx_cancel()?;
+                let txRefund = cancelledState.signed_refund_transaction()?;
+
+                Ok(json!({
+                    "tx_cancel": txCancel.serialize_hex(),
+                    "tx_refund": serialize_hex(&txRefund),
+                }))
+            }
         }
     }
 

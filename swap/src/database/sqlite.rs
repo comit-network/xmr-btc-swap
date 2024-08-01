@@ -1,5 +1,6 @@
 use crate::database::Swap;
 use crate::monero::{Address, TransferProof};
+use crate::protocol::bob::{BobState, State3};
 use crate::protocol::{Database, State};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;

@@ -727,11 +727,7 @@ impl State6 {
         &self,
         bitcoin_wallet: &bitcoin::Wallet,
     ) -> Result<(Txid, Subscription)> {
-        let transaction = self
-            .construct_tx_cancel()?
-            .complete_as_bob(self.A, self.b.clone(), self.tx_cancel_sig_a.clone())
-            .context("Failed to complete Bitcoin cancel transaction")?;
-
+        let transaction = self.signed_cancel_transaction()?;
         let (tx_id, subscription) = bitcoin_wallet.broadcast(transaction, "cancel").await?;
 
         Ok((tx_id, subscription))
@@ -758,6 +754,10 @@ impl State6 {
         let signed_tx_refund =
             tx_refund.add_signatures((self.A, sig_a), (self.b.public(), sig_b))?;
         Ok(signed_tx_refund)
+    }
+
+    pub fn signed_cancel_transaction(&self) -> Result<Transaction> {
+        self.construct_tx_cancel()?.complete_as_bob(self.A, self.b.clone(), self.tx_cancel_sig_a.clone())
     }
 
     pub fn tx_lock_id(&self) -> bitcoin::Txid {
