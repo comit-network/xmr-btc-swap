@@ -440,7 +440,7 @@ where
     })
 }
 
-pub(crate) fn is_complete(state: &AliceState) -> bool {
+pub fn is_complete(state: &AliceState) -> bool {
     matches!(
         state,
         AliceState::XmrRefunded

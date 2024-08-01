@@ -103,13 +103,26 @@ mod test {
 
             let (client, _, _) = setup_daemon(harness_ctx).await;
 
-            let response: HashMap<String, Vec<(Uuid, String)>> = client
+            let response: HashMap<String, Vec<Value>> = client
                 .request("get_history", ObjectParams::new())
                 .await
                 .unwrap();
-            let swaps: Vec<(Uuid, String)> = vec![(bob_swap_id, "btc is locked".to_string())];
 
-            assert_eq!(response, HashMap::from([("swaps".to_string(), swaps)]));
+            let swaps = response.get("swaps").unwrap();
+            assert_eq!(swaps.len(), 1);
+
+            assert_has_keys_serde(
+                swaps[0].as_object().unwrap(),
+                &[
+                    "swapId",
+                    "startDate",
+                    "state",
+                    "btcAmount",
+                    "xmrAmount",
+                    "exchangeRate",
+                    "tradingPartnerPeerId",
+                ],
+            );
 
             let response: HashMap<String, HashMap<Uuid, Vec<Value>>> = client
                 .request("get_raw_states", ObjectParams::new())
