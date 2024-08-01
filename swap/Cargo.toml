@@ -81,7 +81,7 @@ bitcoin-harness = { git = "https://github.com/delta1/bitcoin-harness-rs.git", re
 get-port = "3"
 hyper = "1.4"
 jsonrpsee = { version = "0.16.2", features = [ "ws-client" ] }
-mockito = "1.4"
+mockito = "1.5"
 monero-harness = { path = "../monero-harness" }
 port_check = "0.2"
 proptest = "1"
