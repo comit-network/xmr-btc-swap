@@ -41,6 +41,17 @@ where
             env_config: env_config(testnet),
             cmd: Command::History,
         },
+        RawCommand::Logs { dir_path, redact } => Arguments {
+            testnet,
+            json,
+            disable_timestamp,
+            config_path: config_path(config, testnet)?,
+            env_config: env_config(testnet),
+            cmd: Command::Logs {
+                path: dir_path,
+                redact,
+            },
+        },
         RawCommand::WithdrawBtc { amount, address } => Arguments {
             testnet,
             json,
@@ -197,6 +208,10 @@ pub enum Command {
     },
     History,
     Config,
+    Logs {
+        path: Option<PathBuf>,
+        redact: bool,
+    },
     WithdrawBtc {
         amount: Option<Amount>,
         address: Address,
@@ -270,6 +285,16 @@ pub enum RawCommand {
     },
     #[structopt(about = "Prints swap-id and the state of each swap ever made.")]
     History,
+    #[structopt(about = "Prints all logging messages issued in the past.")]
+    Logs {
+        #[structopt(help = "Print the logs from this directory instead of the default one.")]
+        dir_path: Option<PathBuf>,
+        #[structopt(
+            help = "Redact swap-ids, Bitcoin and Monero addresses.",
+            long = "redact"
+        )]
+        redact: bool,
+    },
     #[structopt(about = "Prints the current config")]
     Config,
     #[structopt(about = "Allows withdrawing BTC from the internal Bitcoin wallet.")]

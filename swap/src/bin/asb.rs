@@ -20,6 +20,7 @@ use libp2p::swarm::AddressScore;
 use libp2p::Swarm;
 use std::convert::TryInto;
 use std::env;
+use std::fs::read_dir;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use structopt::clap;
@@ -29,7 +30,7 @@ use swap::asb::config::{
     initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
 };
 use swap::asb::{cancel, punish, redeem, refund, safely_abort, EventLoop, Finality, KrakenRate};
-use swap::common::check_latest_version;
+use swap::common::{self, check_latest_version};
 use swap::database::{open_db, AccessMode};
 use swap::fs::system_data_dir;
 use swap::network::rendezvous::XmrBtcNamespace;
@@ -38,6 +39,8 @@ use swap::protocol::alice::{run, AliceState};
 use swap::seed::Seed;
 use swap::tor::AuthenticatedClient;
 use swap::{asb, bitcoin, kraken, monero, tor};
+use tokio::fs::File;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tracing_subscriber::filter::LevelFilter;
 
 const DEFAULT_WALLET_NAME: &str = "asb-wallet";
@@ -244,6 +247,31 @@ async fn main() -> Result<()> {
         Command::Config => {
             let config_json = serde_json::to_string_pretty(&config)?;
             println!("{}", config_json);
+        }
+        Command::Logs { path, redact } => {
+            // use provided directory of default one
+            let default_dir = system_data_dir()?.join("logs");
+            let logs_dir = path.unwrap_or(default_dir);
+
+            // go through each file and print it
+            let log_files = read_dir(&logs_dir)?;
+
+            for entry in log_files {
+                let file_name = entry?.path();
+                let file = File::open(&file_name).await?;
+                let buf_reader = BufReader::new(file);
+                let mut lines = buf_reader.lines();
+
+                println!("====reading log from file `{}`", &file_name.display());
+
+                // print each line, redacted if the flag is set
+                while let Some(line) = lines.next_line().await? {
+                    let line = if redact { common::redact(&line) } else { line };
+                    println!("{}", line);
+                }
+
+                println!("====no more log files found");
+            }
         }
         Command::WithdrawBtc { amount, address } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
