@@ -19,10 +19,10 @@ use libp2p::core::Multiaddr;
 use libp2p::swarm::AddressScore;
 use libp2p::Swarm;
 use std::convert::TryInto;
-use std::env;
 use std::fs::read_dir;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
+use std::{env, io};
 use structopt::clap;
 use structopt::clap::ErrorKind;
 use swap::asb::command::{parse_args, Arguments, Command};
@@ -39,8 +39,8 @@ use swap::protocol::alice::{run, AliceState};
 use swap::seed::Seed;
 use swap::tor::AuthenticatedClient;
 use swap::{asb, bitcoin, kraken, monero, tor};
-use tokio::fs::File;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::fs::{create_dir_all, try_exists, File};
+use tokio::io::{stdout, AsyncBufReadExt, AsyncWriteExt, BufReader, Stdout};
 use tracing_subscriber::filter::LevelFilter;
 
 const DEFAULT_WALLET_NAME: &str = "asb-wallet";
@@ -248,29 +248,68 @@ async fn main() -> Result<()> {
             let config_json = serde_json::to_string_pretty(&config)?;
             println!("{}", config_json);
         }
-        Command::Logs { path, redact } => {
+        Command::Logs {
+            logs_dir,
+            output_path,
+            redact,
+        } => {
             // use provided directory of default one
             let default_dir = system_data_dir()?.join("logs");
-            let logs_dir = path.unwrap_or(default_dir);
+            let logs_dir = logs_dir.unwrap_or(default_dir);
 
-            // go through each file and print it
+            // get all files in the directory
             let log_files = read_dir(&logs_dir)?;
 
+            /// Enum for abstracting over output channels
+            enum OutputChannel {
+                File(File),
+                Stdout(Stdout),
+            }
+
+            /// Conveniance method for writing to either file or stdout
+            async fn write_to_channel(
+                mut channel: &mut OutputChannel,
+                output: &str,
+            ) -> Result<(), io::Error> {
+                match &mut channel {
+                    OutputChannel::File(file) => file.write_all(output.as_bytes()).await,
+                    OutputChannel::Stdout(stdout) => stdout.write_all(output.as_bytes()).await,
+                }
+            }
+
+            // check where we should write to
+            let mut output_channel = match output_path {
+                Some(path) => {
+                    // make sure the directory exists
+                    if !try_exists(&path).await? {
+                        let mut dir_part = path.clone();
+                        dir_part.pop();
+                        create_dir_all(&dir_part).await?;
+                    }
+
+                    tracing::info!(path = ?path, "writing logs to the file");
+
+                    // create/open and truncate file.
+                    // this means we aren't appending which is probably intuitive behaviour
+                    // since we reprint the complete logs anyway
+                    OutputChannel::File(File::create(&path).await?)
+                }
+                None => OutputChannel::Stdout(stdout()),
+            };
+
+            // print all lines from every log file. TODO: sort files by date?
             for entry in log_files {
                 let file_name = entry?.path();
-                let file = File::open(&file_name).await?;
-                let buf_reader = BufReader::new(file);
+                let buf_reader = BufReader::new(File::open(&file_name).await?);
                 let mut lines = buf_reader.lines();
-
-                println!("====reading log from file `{}`", &file_name.display());
 
                 // print each line, redacted if the flag is set
                 while let Some(line) = lines.next_line().await? {
                     let line = if redact { common::redact(&line) } else { line };
-                    println!("{}", line);
+                    write_to_channel(&mut output_channel, &line).await?;
+                    // don't forget newlines
+                    write_to_channel(&mut output_channel, "\n").await?;
                 }
-
-                println!("====no more log files found");
             }
         }
         Command::WithdrawBtc { amount, address } => {
