@@ -293,7 +293,10 @@ pub enum RawCommand {
     History,
     #[structopt(about = "Prints all logging messages issued in the past.")]
     Logs {
-        #[structopt(help = "Print the logs from this directory instead of the default one.")]
+        #[structopt(
+            short = "d",
+            help = "Print the logs from this directory instead of the default one."
+        )]
         logs_dir: Option<PathBuf>,
         #[structopt(
             short = "o",

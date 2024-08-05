@@ -257,6 +257,8 @@ async fn main() -> Result<()> {
             let default_dir = system_data_dir()?.join("logs");
             let logs_dir = logs_dir.unwrap_or(default_dir);
 
+            tracing::info!("Reading `*.log` files from `{}`", logs_dir.display());
+
             // get all files in the directory
             let log_files = read_dir(&logs_dir)?;
 
@@ -287,7 +289,7 @@ async fn main() -> Result<()> {
                         create_dir_all(&dir_part).await?;
                     }
 
-                    tracing::info!(path = ?path, "writing logs to the file");
+                    tracing::info!("Writing logs to `{}`", path.display());
 
                     // create/open and truncate file.
                     // this means we aren't appending which is probably intuitive behaviour
@@ -299,8 +301,20 @@ async fn main() -> Result<()> {
 
             // print all lines from every log file. TODO: sort files by date?
             for entry in log_files {
-                let file_name = entry?.path();
-                let buf_reader = BufReader::new(File::open(&file_name).await?);
+                // get the file path
+                let file_path = entry?.path();
+
+                // filter for .log files
+                let file_name = file_path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("");
+
+                if !file_name.ends_with(".log") {
+                    continue;
+                }
+
+                let buf_reader = BufReader::new(File::open(&file_path).await?);
                 let mut lines = buf_reader.lines();
 
                 // print each line, redacted if the flag is set
