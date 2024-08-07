@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use anyhow::anyhow;
-use regex::Regex;
 
 const LATEST_RELEASE_URL: &str = "https://github.com/comit-network/xmr-btc-swap/releases/latest";
 
@@ -36,6 +35,26 @@ fn is_latest_version(current: &str, latest: &str) -> bool {
     current == latest
 }
 
+/// helper macro for [`redact`]... eldrich sorcery
+macro_rules! regex_find_placeholders {
+    ($pattern:expr, $create_placeholder:expr, $replacements:expr, $input:expr) => {{
+        // compile the regex pattern
+        let regex = once_cell::sync::Lazy::new(|| regex::Regex::new($pattern).expect("invalid regex pattern"));
+
+        // keep count of count patterns to generate distinct placeholders
+        let mut counter: usize = 0;
+
+        // for every matched address check whether we already found it
+        // and if we didn't, generate a placeholder for it
+        for address in regex.find_iter($input) {
+            if !$replacements.contains_key(address.as_str()) {
+                $replacements.insert(address.as_str().to_owned(), $create_placeholder(counter));
+                counter += 1;
+            }
+        }
+    }};
+}
+
 /// Redact logs, etc. by replacing Bitcoin and Monero addresses
 /// with generic placeholders.
 ///
@@ -50,32 +69,6 @@ pub fn redact(input: &str) -> String {
     // Use a hashmap to keep track of which address we replace with which placeholder
     let mut replacements: HashMap<String, String> = HashMap::new();
 
-    /// Helper function to insert placeholders for all addresses
-    /// of a specific regex pattern into the hashmap.
-    fn insert_placeholders(
-        input: &str,
-        replacements: &mut HashMap<String, String>,
-        pattern: &str,
-        create_placeholder: impl Fn(usize) -> String,
-    ) -> Result<(), regex::Error> {
-        // compile the regex pattern
-        let regex = Regex::new(pattern)?;
-
-        // keep count to generate distinct placeholders
-        let mut counter: usize = 0;
-
-        // for every matched address check whether we already found it
-        // and if we didn't, generate a placeholder for it
-        for address in regex.find_iter(input) {
-            if !replacements.contains_key(address.as_str()) {
-                replacements.insert(address.as_str().to_owned(), create_placeholder(counter));
-                counter += 1;
-            }
-        }
-
-        Ok(())
-    }
-
     // TODO: verify regex patterns
 
     const MONERO_ADDR_REGEX: &str = r#"[48][1-9A-HJ-NP-Za-km-z]{94}"#;
@@ -86,25 +79,12 @@ pub fn redact(input: &str) -> String {
     const SWAP_ID_REGEX: &str =
         r#"\b[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89aAbB][a-f0-9]{3}-[a-f0-9]{12}\b"#;
 
-    insert_placeholders(input, &mut replacements, MONERO_ADDR_REGEX, |count| {
-        format!("<monero_address_{count}>")
-    })
-    .expect("regex to be valid");
-
-    insert_placeholders(input, &mut replacements, BITCOIN_ADDR_REGEX, |count| {
-        format!("<bitcoin_address_{count}>")
-    })
-    .expect("regex to be valid");
-
-    insert_placeholders(input, &mut replacements, TX_ID_REGEX, |count| {
-        format!("<transaction_{count}>")
-    })
-    .expect("regex to be valid");
-
-    insert_placeholders(input, &mut replacements, SWAP_ID_REGEX, |count| {
-        format!("<swap_id_{count}>")
-    })
-    .expect("regex to be valid");
+    // use the macro to find all addresses and generate placeholders
+    // has to be a macro in order to create the regex automata only once.
+    regex_find_placeholders!(MONERO_ADDR_REGEX, |count| format!("<monero_address_{count}>"), replacements, input);
+    regex_find_placeholders!(BITCOIN_ADDR_REGEX, |count| format!("<bitcoin_address_{count}>"), replacements, input);
+    regex_find_placeholders!(TX_ID_REGEX, |count| format!("<tx_id_{count}>"), replacements, input);
+    regex_find_placeholders!(SWAP_ID_REGEX, |count| format!("<swap_id_{count}>"), replacements, input);
 
     // allocate string variable to operate on
     let mut redacted = input.to_owned();

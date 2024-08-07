@@ -4571,6 +4571,7 @@ dependencies = [
  "monero",
  "monero-harness",
  "monero-rpc",
+ "once_cell",
  "pem",
  "port_check",
  "proptest",
