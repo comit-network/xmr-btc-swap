@@ -22,6 +22,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug_span, field, Instrument, Span};
 use uuid::Uuid;
+use tracing:
 
 #[derive(PartialEq, Debug)]
 pub struct Request {
@@ -113,6 +114,7 @@ pub enum Method {
     GetRawStates,
 }
 
+// TODO: Simplify this using
 impl Method {
     fn get_tracing_span(&self, log_reference_id: Option<String>) -> Span {
         let span = match self {
@@ -215,6 +217,7 @@ impl Method {
     }
 }
 
+#[tracing::instrument(fields(method="suspend_current_swap"), skip(context))]
 async fn suspend_current_swap(context: Arc<Context>) -> Result<serde_json::Value> {
     let swap_id = context.swap_lock.get_current_swap_id().await;
 
@@ -227,17 +230,17 @@ async fn suspend_current_swap(context: Arc<Context>) -> Result<serde_json::Value
     }
 }
 
+#[tracing::instrument(fields(method="get_swap_info", swap_id = args.swap_id), skip(context))]
 async fn get_swap_info(
-    get_swap_info: GetSwapInfoArgs,
+    args: GetSwapInfoArgs,
     context: Arc<Context>,
 ) -> Result<serde_json::Value> {
-    let GetSwapInfoArgs { swap_id } = get_swap_info;
     let bitcoin_wallet = context
         .bitcoin_wallet
         .as_ref()
         .context("Could not get Bitcoin wallet")?;
 
-    let state = context.db.get_state(swap_id).await?;
+    let state = context.db.get_state(args.swap_id).await?;
     let is_completed = state.swap_finished();
 
     let peerId = context
@@ -252,7 +255,7 @@ async fn get_swap_info(
         .await
         .with_context(|| "Could not get addressess")?;
 
-    let start_date = context.db.get_swap_start_date(swap_id).await?;
+    let start_date = context.db.get_swap_start_date(args.swap_id).await?;
 
     let swap_state: BobState = state.try_into()?;
     let state_name = format!("{}", swap_state);
@@ -269,7 +272,7 @@ async fn get_swap_info(
         punish_timelock,
     ) = context
         .db
-        .get_states(swap_id)
+        .get_states(args.swap_id)
         .await?
         .iter()
         .find_map(|state| {
@@ -323,7 +326,7 @@ async fn get_swap_info(
     };
 
     Ok(json!({
-        "swapId": swap_id,
+        "swapId": args.swap_id,
         "seller": {
             "peerId": peerId.to_string(),
             "addresses": addresses
@@ -740,6 +743,7 @@ async fn start_daemon(
     Ok(json!({}))
 }
 
+#[instrument(method="get_balance")
 pub async fn get_balance(balance: BalanceArgs, context: Arc<Context>) -> Result<BalanceResponse> {
     let BalanceArgs { force_refresh } = balance;
     let bitcoin_wallet = context
