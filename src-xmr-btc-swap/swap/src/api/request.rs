@@ -22,7 +22,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug_span, field, Instrument, Span};
 use uuid::Uuid;
-use tracing:
 
 #[derive(PartialEq, Debug)]
 pub struct Request {
@@ -219,7 +218,7 @@ impl Method {
     }
 }
 
-#[tracing::instrument(fields(method="suspend_current_swap"), skip(context))]
+// #[tracing::instrument(fields(method = "suspend_current_swap"), skip(context))]
 async fn suspend_current_swap(context: Arc<Context>) -> Result<serde_json::Value> {
     let swap_id = context.swap_lock.get_current_swap_id().await;
 
@@ -232,11 +231,8 @@ async fn suspend_current_swap(context: Arc<Context>) -> Result<serde_json::Value
     }
 }
 
-#[tracing::instrument(fields(method="get_swap_info", swap_id = args.swap_id), skip(context))]
-async fn get_swap_info(
-    args: GetSwapInfoArgs,
-    context: Arc<Context>,
-) -> Result<serde_json::Value> {
+// #[tracing::instrument(fields(method="get_swap_info", swap_id = args.swap_id), skip(context))]
+async fn get_swap_info(args: GetSwapInfoArgs, context: Arc<Context>) -> Result<serde_json::Value> {
     let bitcoin_wallet = context
         .bitcoin_wallet
         .as_ref()
@@ -247,7 +243,7 @@ async fn get_swap_info(
 
     let peerId = context
         .db
-        .get_peer_id(swap_id)
+        .get_peer_id(args.swap_id)
         .await
         .with_context(|| "Could not get PeerID")?;
 
@@ -745,7 +741,7 @@ async fn start_daemon(
     Ok(json!({}))
 }
 
-#[instrument(method="get_balance")
+// #[instrument(fields(method = "get_balance"))]
 pub async fn get_balance(balance: BalanceArgs, context: Arc<Context>) -> Result<BalanceResponse> {
     let BalanceArgs { force_refresh } = balance;
     let bitcoin_wallet = context
