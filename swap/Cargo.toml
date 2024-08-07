@@ -34,9 +34,10 @@ hex = "0.4"
 itertools = "0.13"
 jsonrpsee = { version = "0.16.2", features = [ "server" ] }
 jsonrpsee-core = "0.16.2"
-libp2p = { version = "0.42.2", default-features = false, features = [ "tcp-tokio", "yamux", "mplex", "dns-tokio", "noise", "request-response", "websocket", "ping", "rendezvous", "identify" ] }
+libp2p = { version = "0.53.2", default-features = false, features = [ "tcp", "yamux", "dns", "noise", "request-response", "websocket", "ping", "rendezvous", "identify" ] }
 monero = { version = "0.12", features = [ "serde_support" ] }
 monero-rpc = { path = "../monero-rpc" }
+watchtower = { path = "../watchtower" }
 pem = "3.0"
 proptest = "1"
 qrcode = "0.14"

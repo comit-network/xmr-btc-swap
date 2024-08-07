@@ -1,5 +1,6 @@
 use crate::bitcoin::EncryptedSignature;
 use crate::cli::behaviour::{Behaviour, OutEvent};
+use libp2p::swarm::NetworkBehaviour;
 use crate::monero;
 use crate::network::cooperative_xmr_redeem_after_punish::{Request, Response};
 use crate::network::encrypted_signature;
@@ -202,10 +203,10 @@ impl EventLoop {
                         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } if peer_id == self.alice_peer_id => {
                             tracing::info!(peer_id = %endpoint.get_remote_address(), "Connected to Alice");
                         }
-                        SwarmEvent::Dialing(peer_id) if peer_id == self.alice_peer_id => {
-                            tracing::debug!(%peer_id, "Dialling Alice");
+                        SwarmEvent::Dialing { peer_id: Some(alice_peer_id), connection_id } if alice_peer_id == self.alice_peer_id => {
+                            tracing::debug!(%alice_peer_id, "Dialling Alice");
                         }
-                        SwarmEvent::ConnectionClosed { peer_id, endpoint, num_established, cause: Some(error) } if peer_id == self.alice_peer_id && num_established == 0 => {
+                        SwarmEvent::ConnectionClosed { peer_id, endpoint, num_established, cause: Some(error), connection_id } if peer_id == self.alice_peer_id && num_established == 0 => {
                             tracing::warn!(peer_id = %endpoint.get_remote_address(), cause = %error, "Lost connection to Alice");
                         }
                         SwarmEvent::ConnectionClosed { peer_id, num_established, cause: None, .. } if peer_id == self.alice_peer_id && num_established == 0 => {
@@ -213,7 +214,7 @@ impl EventLoop {
                             tracing::info!("Successfully closed connection to Alice");
                             return;
                         }
-                        SwarmEvent::OutgoingConnectionError { peer_id: Some(alice_peer_id),  error } if alice_peer_id == self.alice_peer_id => {
+                        SwarmEvent::OutgoingConnectionError { peer_id: Some(alice_peer_id),  error, connection_id } if alice_peer_id == self.alice_peer_id => {
                             tracing::warn!(%error, "Failed to dial Alice");
 
                             if let Some(duration) = self.swarm.behaviour_mut().redial.until_next_redial() {
