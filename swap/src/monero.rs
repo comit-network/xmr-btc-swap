@@ -199,6 +199,13 @@ pub struct TransferProof {
     tx_key: PrivateKey,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub struct ReserveProof {
+    address: String,
+    signature: String,
+    message: Option<String>,
+}
+
 impl TransferProof {
     pub fn new(tx_hash: TxHash, tx_key: PrivateKey) -> Self {
         Self { tx_hash, tx_key }

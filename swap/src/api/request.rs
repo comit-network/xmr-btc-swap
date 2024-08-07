@@ -2,6 +2,7 @@ use crate::api::Context;
 use crate::bitcoin::{Amount, ExpiredTimelocks, TxLock};
 use crate::cli::{list_sellers, EventLoop, SellerStatus};
 use crate::libp2p_ext::MultiAddrExt;
+use crate::monero::ReserveProof;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
 use crate::network::swarm;
 use crate::protocol::bob::{BobState, Swap};
@@ -419,6 +420,8 @@ impl Request {
                     }
                 };
 
+                let bid_quote_clone = bid_quote.clone();
+
                 context.tasks.clone().spawn(async move {
                     tokio::select! {
                         biased;
@@ -440,6 +443,9 @@ impl Request {
                         swap_result = async {
                             let max_givable = || bitcoin_wallet.max_giveable(TxLock::script_size());
                             let estimate_fee = |amount| bitcoin_wallet.estimate_fee(TxLock::weight(), amount);
+                            let check_reserve_proof = |reserve_proof: ReserveProof| {
+                                monero_wallet.check_reserve_proof(reserve_proof)
+                            };
 
                             let determine_amount = determine_btc_to_swap(
                                 context.config.json,
@@ -449,6 +455,7 @@ impl Request {
                                 max_givable,
                                 || bitcoin_wallet.sync(),
                                 estimate_fee,
+                                check_reserve_proof,
                             );
 
                             let (amount, fees) = match determine_amount.await {
@@ -501,7 +508,7 @@ impl Request {
 
                 Ok(json!({
                     "swapId": swap_id.to_string(),
-                    "quote": bid_quote,
+                    "quote": bid_quote_clone,
                 }))
             }
             Method::Resume { swap_id } => {
@@ -763,7 +770,7 @@ impl Request {
                 .await?;
 
                 for seller in &sellers {
-                    match seller.status {
+                    match seller.status.clone() {
                         SellerStatus::Online(quote) => {
                             tracing::info!(
                                 price = %quote.price.to_string(),
@@ -858,7 +865,7 @@ fn qr_code(value: &impl ToString) -> Result<String> {
     Ok(qr_code)
 }
 
-pub async fn determine_btc_to_swap<FB, TB, FMG, TMG, FS, TS, FFE, TFE>(
+pub async fn determine_btc_to_swap<FB, TB, FMG, TMG, FS, TS, FFE, TFE, FCRP, CRP>(
     json: bool,
     bid_quote: BidQuote,
     get_new_address: impl Future<Output = Result<bitcoin::Address>>,
@@ -866,6 +873,7 @@ pub async fn determine_btc_to_swap<FB, TB, FMG, TMG, FS, TS, FFE, TFE>(
     max_giveable_fn: FMG,
     sync: FS,
     estimate_fee: FFE,
+    check_reserve_proof: FCRP,
 ) -> Result<(Amount, Amount)>
 where
     TB: Future<Output = Result<Amount>>,
@@ -874,8 +882,10 @@ where
     FMG: Fn() -> TMG,
     TS: Future<Output = Result<()>>,
     FS: Fn() -> TS,
-    FFE: Fn(Amount) -> TFE,
     TFE: Future<Output = Result<Amount>>,
+    FFE: Fn(Amount) -> TFE,
+    CRP: Future<Output = Result<bool>>,
+    FCRP: Fn(ReserveProof) -> CRP,
 {
     if bid_quote.max_quantity == Amount::ZERO {
         bail!(ZeroQuoteReceived)
@@ -887,6 +897,15 @@ where
         maximum_amount = %bid_quote.max_quantity,
         "Received quote",
     );
+
+    if let Some(reserve_proof) = &bid_quote.reserve_proof {
+        tracing::info!("Received reserve proof");
+        if check_reserve_proof(reserve_proof.clone()).await? {
+            tracing::info!("Reserve proof is valid");
+        } else {
+            bail!("Reserve proof is invalid");
+        }
+    }
 
     sync().await?;
     let mut max_giveable = max_giveable_fn().await?;
