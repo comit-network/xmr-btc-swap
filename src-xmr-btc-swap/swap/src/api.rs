@@ -375,6 +375,7 @@ pub mod api_test {
     use crate::api::request::{Method, Request};
 
     use libp2p::Multiaddr;
+    use request::BuyXmrArgs;
     use std::str::FromStr;
     use uuid::Uuid;
 
@@ -431,12 +432,12 @@ pub mod api_test {
                 }
             };
 
-            Request::new(Method::BuyXmr {
+            Request::new(Method::BuyXmr(BuyXmrArgs {
                 seller,
                 bitcoin_change_address,
                 monero_receive_address,
                 swap_id: Uuid::new_v4(),
-            })
+            }))
         }
 
         pub fn resume() -> Request {

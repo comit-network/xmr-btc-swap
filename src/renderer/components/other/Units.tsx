@@ -1,6 +1,6 @@
-import { piconerosToXmr, satsToBtc } from 'utils/conversionUtils';
-import { Tooltip } from '@material-ui/core';
-import { useAppSelector } from 'store/hooks';
+import { piconerosToXmr, satsToBtc } from "utils/conversionUtils";
+import { Tooltip } from "@material-ui/core";
+import { useAppSelector } from "store/hooks";
 
 type Amount = number | null | undefined;
 
@@ -21,13 +21,13 @@ export function AmountWithUnit({
       title={
         dollarRate != null && amount != null
           ? `≈ $${(dollarRate * amount).toFixed(2)}`
-          : ''
+          : ""
       }
     >
       <span>
         {amount != null
           ? Number.parseFloat(amount.toFixed(fixedPrecision))
-          : '?'}{' '}
+          : "?"}{" "}
         {unit}
       </span>
     </Tooltip>

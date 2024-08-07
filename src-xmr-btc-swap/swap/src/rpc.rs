@@ -1,11 +1,11 @@
 use crate::api::Context;
 use std::{net::SocketAddr, sync::Arc};
 use thiserror::Error;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 
 use jsonrpsee::{
-	core::server::host_filtering::AllowHosts,
-	server::{RpcModule, ServerBuilder, ServerHandle},
+    core::server::host_filtering::AllowHosts,
+    server::{RpcModule, ServerBuilder, ServerHandle},
 };
 
 pub mod methods;
@@ -21,10 +21,13 @@ pub async fn run_server(
     context: Arc<Context>,
 ) -> anyhow::Result<(SocketAddr, ServerHandle)> {
     let cors = CorsLayer::permissive();
-	let middleware = tower::ServiceBuilder::new().layer(cors);
+    let middleware = tower::ServiceBuilder::new().layer(cors);
 
-    let server = ServerBuilder::default().set_host_filtering(AllowHosts::Any)
-    .set_middleware(middleware).build(server_address).await?;
+    let server = ServerBuilder::default()
+        .set_host_filtering(AllowHosts::Any)
+        .set_middleware(middleware)
+        .build(server_address)
+        .await?;
     let mut modules = RpcModule::new(());
     {
         modules

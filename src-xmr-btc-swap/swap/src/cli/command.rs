@@ -1,4 +1,7 @@
-use crate::api::request::{Method, Request};
+use crate::api::request::{
+    BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, ListSellersArgs, Method, MoneroRecoveryArgs,
+    Request, ResumeArgs, StartDaemonArgs, WithdrawBtcArgs,
+};
 use crate::api::Context;
 use crate::bitcoin::{bitcoin_address, Amount};
 use crate::monero;
@@ -74,12 +77,12 @@ where
             let bitcoin_change_address =
                 bitcoin_address::validate_is_testnet(bitcoin_change_address, is_testnet)?;
 
-            let request = Request::new(Method::BuyXmr {
+            let request = Request::new(Method::BuyXmr(BuyXmrArgs {
                 seller,
                 bitcoin_change_address,
                 monero_receive_address,
                 swap_id: Uuid::new_v4(),
-            });
+            }));
 
             let context = Context::build(
                 Some(bitcoin),
@@ -109,9 +112,9 @@ where
             (context, request)
         }
         CliCommand::Balance { bitcoin } => {
-            let request = Request::new(Method::Balance {
+            let request = Request::new(Method::Balance(BalanceArgs {
                 force_refresh: true,
-            });
+            }));
 
             let context = Context::build(
                 Some(bitcoin),
@@ -132,7 +135,7 @@ where
             monero,
             tor,
         } => {
-            let request = Request::new(Method::StartDaemon { server_address });
+            let request = Request::new(Method::StartDaemon(StartDaemonArgs { server_address }));
 
             let context = Context::build(
                 Some(bitcoin),
@@ -153,7 +156,7 @@ where
             address,
         } => {
             let address = bitcoin_address::validate_is_testnet(address, is_testnet)?;
-            let request = Request::new(Method::WithdrawBtc { amount, address });
+            let request = Request::new(Method::WithdrawBtc(WithdrawBtcArgs { amount, address }));
 
             let context = Context::build(
                 Some(bitcoin),
@@ -174,7 +177,7 @@ where
             monero,
             tor,
         } => {
-            let request = Request::new(Method::Resume { swap_id });
+            let request = Request::new(Method::Resume(ResumeArgs { swap_id }));
 
             let context = Context::build(
                 Some(bitcoin),
@@ -194,7 +197,7 @@ where
             bitcoin,
             tor,
         } => {
-            let request = Request::new(Method::CancelAndRefund { swap_id });
+            let request = Request::new(Method::CancelAndRefund(CancelAndRefundArgs { swap_id }));
 
             let context = Context::build(
                 Some(bitcoin),
@@ -213,7 +216,7 @@ where
             rendezvous_point,
             tor,
         } => {
-            let request = Request::new(Method::ListSellers { rendezvous_point });
+            let request = Request::new(Method::ListSellers(ListSellersArgs { rendezvous_point }));
 
             let context =
                 Context::build(None, None, Some(tor), data, is_testnet, debug, json, None).await?;
@@ -239,7 +242,7 @@ where
         CliCommand::MoneroRecovery {
             swap_id: SwapId { swap_id },
         } => {
-            let request = Request::new(Method::MoneroRecovery { swap_id });
+            let request = Request::new(Method::MoneroRecovery(MoneroRecoveryArgs { swap_id }));
 
             let context =
                 Context::build(None, None, None, data, is_testnet, debug, json, None).await?;

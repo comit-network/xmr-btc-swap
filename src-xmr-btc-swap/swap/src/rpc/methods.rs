@@ -1,4 +1,7 @@
-use crate::api::request::{Method, Request};
+use crate::api::request::{
+    BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, GetSwapInfoArgs, ListSellersArgs, Method,
+    MoneroRecoveryArgs, Request, ResumeArgs, WithdrawBtcArgs,
+};
 use crate::api::Context;
 use crate::bitcoin::bitcoin_address;
 use crate::monero::monero_address;
@@ -29,7 +32,12 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
         let swap_id = as_uuid(swap_id)
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
 
-        execute_request(params_raw, Method::GetSwapInfo { swap_id }, &context).await
+        execute_request(
+            params_raw,
+            Method::GetSwapInfo(GetSwapInfoArgs { swap_id }),
+            &context,
+        )
+        .await
     })?;
 
     module.register_async_method("get_bitcoin_balance", |params_raw, context| async move {
@@ -45,7 +53,12 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
                 jsonrpsee_core::Error::Custom("force_refesh is not a boolean".to_string())
             })?;
 
-        execute_request(params_raw, Method::Balance { force_refresh }, &context).await
+        execute_request(
+            params_raw,
+            Method::Balance(BalanceArgs { force_refresh }),
+            &context,
+        )
+        .await
     })?;
 
     module.register_async_method("get_history", |params, context| async move {
@@ -66,7 +79,7 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
         let swap_id = as_uuid(swap_id)
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
 
-        execute_request(params_raw, Method::Resume { swap_id }, &context).await
+        execute_request(params_raw, Method::Resume(ResumeArgs { swap_id }), &context).await
     })?;
 
     module.register_async_method("cancel_refund_swap", |params_raw, context| async move {
@@ -79,7 +92,12 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
         let swap_id = as_uuid(swap_id)
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
 
-        execute_request(params_raw, Method::CancelAndRefund { swap_id }, &context).await
+        execute_request(
+            params_raw,
+            Method::CancelAndRefund(CancelAndRefundArgs { swap_id }),
+            &context,
+        )
+        .await
     })?;
 
     module.register_async_method(
@@ -95,7 +113,12 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
                 jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string())
             })?;
 
-            execute_request(params_raw, Method::MoneroRecovery { swap_id }, &context).await
+            execute_request(
+                params_raw,
+                Method::MoneroRecovery(MoneroRecoveryArgs { swap_id }),
+                &context,
+            )
+            .await
         },
     )?;
 
@@ -123,10 +146,10 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
 
         execute_request(
             params_raw,
-            Method::WithdrawBtc {
+            Method::WithdrawBtc(WithdrawBtcArgs {
                 amount,
                 address: withdraw_address,
-            },
+            }),
             &context,
         )
         .await
@@ -165,12 +188,12 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
 
         execute_request(
             params_raw,
-            Method::BuyXmr {
+            Method::BuyXmr(BuyXmrArgs {
                 bitcoin_change_address,
                 monero_receive_address,
                 seller,
                 swap_id: Uuid::new_v4(),
-            },
+            }),
             &context,
         )
         .await
@@ -192,9 +215,9 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
 
         execute_request(
             params_raw,
-            Method::ListSellers {
+            Method::ListSellers(ListSellersArgs {
                 rendezvous_point: rendezvous_point.clone(),
-            },
+            }),
             &context,
         )
         .await

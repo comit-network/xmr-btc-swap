@@ -1,17 +1,29 @@
 use std::sync::Arc;
 
 use once_cell::sync::OnceCell;
-use swap::{api::{request::{Method, Request}, Context}, cli::command::{Bitcoin, Monero}};
+use swap::{
+    api::{
+        request::{get_balance, BalanceArgs, BalanceResponse},
+        Context,
+    },
+    cli::command::{Bitcoin, Monero},
+};
 
 // Lazy load the Context
 static CONTEXT: OnceCell<Arc<Context>> = OnceCell::new();
 
 #[tauri::command]
-async fn balance() -> String {
+async fn balance() -> Result<BalanceResponse, String> {
     let context = CONTEXT.get().unwrap();
-    let request = Request::new(Method::Balance { force_refresh: true });
-    let response = request.call(context.clone()).await.unwrap();
-    response.to_string()
+
+    get_balance(
+        BalanceArgs {
+            force_refresh: true,
+        },
+        context.clone(),
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 fn setup<'a>(app: &'a mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -34,7 +46,9 @@ fn setup<'a>(app: &'a mut tauri::App) -> Result<(), Box<dyn std::error::Error>> 
         .await
         .unwrap();
 
-        CONTEXT.set(Arc::new(context)).expect("Failed to initialize cli context");
+        CONTEXT
+            .set(Arc::new(context))
+            .expect("Failed to initialize cli context");
     });
     Ok(())
 }
