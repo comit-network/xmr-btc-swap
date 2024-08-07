@@ -116,7 +116,7 @@ pub enum Method {
     GetRawStates,
 }
 
-// TODO: Simplify this using
+// TODO: Simplify this using instrument macro
 impl Method {
     fn get_tracing_span(&self, log_reference_id: Option<String>) -> Span {
         let span = match self {
