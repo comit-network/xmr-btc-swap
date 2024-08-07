@@ -95,6 +95,8 @@ pub struct GetSwapInfoArgs {
     pub swap_id: Uuid,
 }
 
+// TODO: We probably dont even need this.
+// We can just call the method directly from the RPC server, the CLI and the Tauri connector
 #[derive(Debug, PartialEq)]
 pub enum Method {
     BuyXmr(BuyXmrArgs),
