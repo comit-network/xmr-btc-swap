@@ -251,6 +251,7 @@ async fn main() -> Result<()> {
         Command::Logs {
             logs_dir,
             output_path,
+            swap_id,
             redact,
         } => {
             // use provided directory of default one
@@ -299,6 +300,17 @@ async fn main() -> Result<()> {
                 None => OutputChannel::Stdout(stdout()),
             };
 
+            // conveniance method for checking whether we should filter a specific line
+            let filter_by_swap_id: Box<dyn Fn(&str) -> bool> = match swap_id {
+                // if we should filter by swap id, check if the line contains the string
+                Some(swap_id) => {
+                    let swap_id = swap_id.to_string();
+                    Box::new(move |line: &str| line.contains(&swap_id))
+                }
+                // otherwise we let every line pass
+                None => Box::new(|_| true),
+            };
+            
             // print all lines from every log file. TODO: sort files by date?
             for entry in log_files {
                 // get the file path
@@ -319,6 +331,11 @@ async fn main() -> Result<()> {
 
                 // print each line, redacted if the flag is set
                 while let Some(line) = lines.next_line().await? {
+                    // check if we should filter this line
+                    if !filter_by_swap_id(&line) {
+                        continue;
+                    }
+
                     let line = if redact { common::redact(&line) } else { line };
                     write_to_channel(&mut output_channel, &line).await?;
                     // don't forget newlines

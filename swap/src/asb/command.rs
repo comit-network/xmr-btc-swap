@@ -44,6 +44,7 @@ where
         RawCommand::Logs {
             output_path,
             logs_dir: dir_path,
+            swap_id,
             redact,
         } => Arguments {
             testnet,
@@ -54,6 +55,7 @@ where
             cmd: Command::Logs {
                 logs_dir: dir_path,
                 output_path,
+                swap_id,
                 redact,
             },
         },
@@ -216,6 +218,7 @@ pub enum Command {
     Logs {
         logs_dir: Option<PathBuf>,
         output_path: Option<PathBuf>,
+        swap_id: Option<Uuid>,
         redact: bool,
     },
     WithdrawBtc {
@@ -308,6 +311,12 @@ pub enum RawCommand {
             long = "redact"
         )]
         redact: bool,
+        #[structopt(
+            long = "swap-id",
+            help = "Filter for logs concerning this swap.",
+            long_help = "This checks whether each logging message contains the swap id. Some messages might be skipped when they don't contain the swap id even though they're relevant.",
+        )]
+        swap_id: Option<Uuid>
     },
     #[structopt(about = "Prints the current config")]
     Config,
