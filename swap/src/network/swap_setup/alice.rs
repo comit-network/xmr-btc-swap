@@ -118,6 +118,7 @@ pub struct Behaviour<LR> {
     events: VecDeque<OutEvent>,
     min_buy: bitcoin::Amount,
     max_buy: bitcoin::Amount,
+    max_swap_timeout: Duration,
     env_config: env::Config,
 
     latest_rate: LR,
@@ -128,6 +129,7 @@ impl<LR> Behaviour<LR> {
     pub fn new(
         min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,
+        max_swap_timeout: Duration,
         env_config: env::Config,
         latest_rate: LR,
         resume_only: bool,
@@ -136,6 +138,7 @@ impl<LR> Behaviour<LR> {
             events: Default::default(),
             min_buy,
             max_buy,
+            max_swap_timeout,
             env_config,
             latest_rate,
             resume_only,
@@ -154,6 +157,7 @@ where
         Handler::new(
             self.min_buy,
             self.max_buy,
+            self.max_swap_timeout,
             self.env_config,
             self.latest_rate.clone(),
             self.resume_only,
@@ -214,7 +218,7 @@ pub struct Handler<LR> {
     latest_rate: LR,
     resume_only: bool,
 
-    timeout: Duration,
+    max_swap_timeout: Duration,
     keep_alive: KeepAlive,
 }
 
@@ -222,6 +226,7 @@ impl<LR> Handler<LR> {
     fn new(
         min_buy: bitcoin::Amount,
         max_buy: bitcoin::Amount,
+        max_swap_timeout: Duration,
         env_config: env::Config,
         latest_rate: LR,
         resume_only: bool,
@@ -234,7 +239,7 @@ impl<LR> Handler<LR> {
             env_config,
             latest_rate,
             resume_only,
-            timeout: Duration::from_secs(120),
+            max_swap_timeout,
             keep_alive: KeepAlive::Until(Instant::now() + Duration::from_secs(10)),
         }
     }
@@ -280,7 +285,7 @@ where
         let latest_rate = self.latest_rate.latest_rate();
         let env_config = self.env_config;
 
-        let protocol = tokio::time::timeout(self.timeout, async move {
+        let protocol = tokio::time::timeout(self.max_swap_timeout, async move {
             let request = swap_setup::read_cbor_message::<SpotPriceRequest>(&mut substream)
                 .await
                 .context("Failed to read spot price request")?;
@@ -404,7 +409,7 @@ where
             Ok((swap_id, state3))
         });
 
-        let max_seconds = self.timeout.as_secs();
+        let max_seconds = self.max_swap_timeout.as_secs();
         self.inbound_stream = OptionFuture::from(Some(
             async move {
                 protocol.await.with_context(|| {
