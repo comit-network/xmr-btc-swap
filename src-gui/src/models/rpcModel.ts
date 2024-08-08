@@ -1,24 +1,24 @@
-import { piconerosToXmr, satsToBtc } from 'utils/conversionUtils';
-import { exhaustiveGuard } from 'utils/typescriptUtils';
+import { piconerosToXmr, satsToBtc } from "utils/conversionUtils";
+import { exhaustiveGuard } from "utils/typescriptUtils";
 
 export enum RpcMethod {
-  GET_BTC_BALANCE = 'get_bitcoin_balance',
-  WITHDRAW_BTC = 'withdraw_btc',
-  BUY_XMR = 'buy_xmr',
-  RESUME_SWAP = 'resume_swap',
-  LIST_SELLERS = 'list_sellers',
-  CANCEL_REFUND_SWAP = 'cancel_refund_swap',
-  GET_SWAP_INFO = 'get_swap_info',
-  SUSPEND_CURRENT_SWAP = 'suspend_current_swap',
-  GET_HISTORY = 'get_history',
-  GET_MONERO_RECOVERY_KEYS = 'get_monero_recovery_info',
+  GET_BTC_BALANCE = "get_bitcoin_balance",
+  WITHDRAW_BTC = "withdraw_btc",
+  BUY_XMR = "buy_xmr",
+  RESUME_SWAP = "resume_swap",
+  LIST_SELLERS = "list_sellers",
+  CANCEL_REFUND_SWAP = "cancel_refund_swap",
+  GET_SWAP_INFO = "get_swap_info",
+  SUSPEND_CURRENT_SWAP = "suspend_current_swap",
+  GET_HISTORY = "get_history",
+  GET_MONERO_RECOVERY_KEYS = "get_monero_recovery_info",
 }
 
 export enum RpcProcessStateType {
-  STARTED = 'starting...',
-  LISTENING_FOR_CONNECTIONS = 'running',
-  EXITED = 'exited',
-  NOT_STARTED = 'not started',
+  STARTED = "starting...",
+  LISTENING_FOR_CONNECTIONS = "running",
+  EXITED = "exited",
+  NOT_STARTED = "not started",
 }
 
 export type RawRpcResponseSuccess<T> = {
@@ -38,13 +38,13 @@ export type RawRpcResponse<T> = RawRpcResponseSuccess<T> | RawRpcResponseError;
 export function isSuccessResponse<T>(
   response: RawRpcResponse<T>,
 ): response is RawRpcResponseSuccess<T> {
-  return 'result' in response;
+  return "result" in response;
 }
 
 export function isErrorResponse<T>(
   response: RawRpcResponse<T>,
 ): response is RawRpcResponseError {
-  return 'error' in response;
+  return "error" in response;
 }
 
 export interface RpcSellerStatus {
@@ -56,7 +56,7 @@ export interface RpcSellerStatus {
           max_quantity: number;
         };
       }
-    | 'Unreachable';
+    | "Unreachable";
   multiaddr: string;
 }
 
@@ -80,7 +80,7 @@ export type SwapTimelockInfoCancelled = {
   };
 };
 
-export type SwapTimelockInfoPunished = 'Punish';
+export type SwapTimelockInfoPunished = "Punish";
 
 export type SwapTimelockInfo =
   | SwapTimelockInfoNone
@@ -90,19 +90,19 @@ export type SwapTimelockInfo =
 export function isSwapTimelockInfoNone(
   info: SwapTimelockInfo,
 ): info is SwapTimelockInfoNone {
-  return typeof info === 'object' && 'None' in info;
+  return typeof info === "object" && "None" in info;
 }
 
 export function isSwapTimelockInfoCancelled(
   info: SwapTimelockInfo,
 ): info is SwapTimelockInfoCancelled {
-  return typeof info === 'object' && 'Cancel' in info;
+  return typeof info === "object" && "Cancel" in info;
 }
 
 export function isSwapTimelockInfoPunished(
   info: SwapTimelockInfo,
 ): info is SwapTimelockInfoPunished {
-  return info === 'Punish';
+  return info === "Punish";
 }
 
 export type SwapSellerInfo = {
@@ -111,21 +111,21 @@ export type SwapSellerInfo = {
 };
 
 export interface GetSwapInfoResponse {
-  swapId: string;
+  swap_id: string;
   completed: boolean;
   seller: SwapSellerInfo;
-  startDate: string;
-  stateName: SwapStateName;
+  start_date: string;
+  state_name: SwapStateName;
   timelock: null | SwapTimelockInfo;
-  txLockId: string;
-  txCancelFee: number;
-  txRefundFee: number;
-  txLockFee: number;
-  btcAmount: number;
-  xmrAmount: number;
-  btcRefundAddress: string;
-  cancelTimelock: number;
-  punishTimelock: number;
+  tx_lock_id: string;
+  tx_cancel_fee: number;
+  tx_refund_fee: number;
+  tx_lock_fee: number;
+  btc_amount: number;
+  xmr_amount: number;
+  btc_refund_address: string;
+  cancel_timelock: number;
+  punish_timelock: number;
 }
 
 export type MoneroRecoveryResponse = {
@@ -144,19 +144,19 @@ export interface GetHistoryResponse {
 }
 
 export enum SwapStateName {
-  Started = 'quote has been requested',
-  SwapSetupCompleted = 'execution setup done',
-  BtcLocked = 'btc is locked',
-  XmrLockProofReceived = 'XMR lock transaction transfer proof received',
-  XmrLocked = 'xmr is locked',
-  EncSigSent = 'encrypted signature is sent',
-  BtcRedeemed = 'btc is redeemed',
-  CancelTimelockExpired = 'cancel timelock is expired',
-  BtcCancelled = 'btc is cancelled',
-  BtcRefunded = 'btc is refunded',
-  XmrRedeemed = 'xmr is redeemed',
-  BtcPunished = 'btc is punished',
-  SafelyAborted = 'safely aborted',
+  Started = "quote has been requested",
+  SwapSetupCompleted = "execution setup done",
+  BtcLocked = "btc is locked",
+  XmrLockProofReceived = "XMR lock transaction transfer proof received",
+  XmrLocked = "xmr is locked",
+  EncSigSent = "encrypted signature is sent",
+  BtcRedeemed = "btc is redeemed",
+  CancelTimelockExpired = "cancel timelock is expired",
+  BtcCancelled = "btc is cancelled",
+  BtcRefunded = "btc is refunded",
+  XmrRedeemed = "xmr is redeemed",
+  BtcPunished = "btc is punished",
+  SafelyAborted = "safely aborted",
 }
 
 export type SwapStateNameRunningSwap = Exclude<
@@ -275,7 +275,7 @@ export function isSwapStateNamePossiblyRefundableSwap(
 export function isGetSwapInfoResponseRunningSwap(
   response: GetSwapInfoResponse,
 ): response is GetSwapInfoResponseRunningSwap {
-  return isSwapStateNameRunningSwap(response.stateName);
+  return isSwapStateNameRunningSwap(response.state_name);
 }
 
 export function isSwapMoneroRecoverable(swapStateName: SwapStateName): boolean {
@@ -286,46 +286,46 @@ export function isSwapMoneroRecoverable(swapStateName: SwapStateName): boolean {
 export function getHumanReadableDbStateType(type: SwapStateName): string {
   switch (type) {
     case SwapStateName.Started:
-      return 'Quote has been requested';
+      return "Quote has been requested";
     case SwapStateName.SwapSetupCompleted:
-      return 'Swap has been initiated';
+      return "Swap has been initiated";
     case SwapStateName.BtcLocked:
-      return 'Bitcoin has been locked';
+      return "Bitcoin has been locked";
     case SwapStateName.XmrLockProofReceived:
-      return 'Monero lock transaction transfer proof has been received';
+      return "Monero lock transaction transfer proof has been received";
     case SwapStateName.XmrLocked:
-      return 'Monero has been locked';
+      return "Monero has been locked";
     case SwapStateName.EncSigSent:
-      return 'Encrypted signature has been sent';
+      return "Encrypted signature has been sent";
     case SwapStateName.BtcRedeemed:
-      return 'Bitcoin has been redeemed';
+      return "Bitcoin has been redeemed";
     case SwapStateName.CancelTimelockExpired:
-      return 'Cancel timelock has expired';
+      return "Cancel timelock has expired";
     case SwapStateName.BtcCancelled:
-      return 'Swap has been cancelled';
+      return "Swap has been cancelled";
     case SwapStateName.BtcRefunded:
-      return 'Bitcoin has been refunded';
+      return "Bitcoin has been refunded";
     case SwapStateName.XmrRedeemed:
-      return 'Monero has been redeemed';
+      return "Monero has been redeemed";
     case SwapStateName.BtcPunished:
-      return 'Bitcoin has been punished';
+      return "Bitcoin has been punished";
     case SwapStateName.SafelyAborted:
-      return 'Swap has been safely aborted';
+      return "Swap has been safely aborted";
     default:
       return exhaustiveGuard(type);
   }
 }
 
 export function getSwapTxFees(swap: GetSwapInfoResponse): number {
-  return satsToBtc(swap.txLockFee);
+  return satsToBtc(swap.tx_lock_fee);
 }
 
 export function getSwapBtcAmount(swap: GetSwapInfoResponse): number {
-  return satsToBtc(swap.btcAmount);
+  return satsToBtc(swap.btc_amount);
 }
 
 export function getSwapXmrAmount(swap: GetSwapInfoResponse): number {
-  return piconerosToXmr(swap.xmrAmount);
+  return piconerosToXmr(swap.xmr_amount);
 }
 
 export function getSwapExchangeRate(swap: GetSwapInfoResponse): number {

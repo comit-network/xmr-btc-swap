@@ -1,11 +1,11 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { ExtendedProviderStatus, ProviderStatus } from 'models/apiModel';
-import { MoneroWalletRpcUpdateState } from 'models/storeModel';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { ExtendedProviderStatus, ProviderStatus } from "models/apiModel";
+import { MoneroWalletRpcUpdateState } from "models/storeModel";
 import {
   GetSwapInfoResponse,
   MoneroRecoveryResponse,
   RpcProcessStateType,
-} from '../../models/rpcModel';
+} from "../../models/rpcModel";
 import {
   CliLog,
   isCliLog,
@@ -14,8 +14,8 @@ import {
   isCliLogFinishedSyncingMoneroWallet,
   isCliLogStartedRpcServer,
   isCliLogStartedSyncingMoneroWallet,
-} from '../../models/cliModel';
-import { getLogsAndStringsFromRawFileString } from 'utils/parseUtils';
+} from "../../models/cliModel";
+import { getLogsAndStringsFromRawFileString } from "utils/parseUtils";
 
 type Process =
   | {
@@ -82,7 +82,7 @@ const initialState: RPCSlice = {
 };
 
 export const rpcSlice = createSlice({
-  name: 'rpc',
+  name: "rpc",
   initialState,
   reducers: {
     rpcAddLogs(slice, action: PayloadAction<(CliLog | string)[]>) {
@@ -110,7 +110,7 @@ export const rpcSlice = createSlice({
               downloadUrl: log.fields.download_url,
             };
 
-            if (log.fields.progress === '100%') {
+            if (log.fields.progress === "100%") {
               slice.state.moneroWalletRpc.updateState = false;
             }
           } else if (isCliLogStartedSyncingMoneroWallet(log)) {
@@ -169,7 +169,7 @@ export const rpcSlice = createSlice({
       slice.state.withdrawTxId = null;
     },
     rpcSetSwapInfo(slice, action: PayloadAction<GetSwapInfoResponse>) {
-      slice.state.swapInfos[action.payload.swapId] = action.payload;
+      slice.state.swapInfos[action.payload.swap_id] = action.payload;
     },
     rpcSetEndpointBusy(slice, action: PayloadAction<string>) {
       if (!slice.busyEndpoints.includes(action.payload)) {

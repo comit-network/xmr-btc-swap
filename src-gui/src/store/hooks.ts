@@ -1,7 +1,7 @@
-import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
-import type { AppDispatch, RootState } from 'renderer/store/storeRenderer';
-import { sortBy } from 'lodash';
-import { parseDateString } from 'utils/parseUtils';
+import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
+import type { AppDispatch, RootState } from "renderer/store/storeRenderer";
+import { sortBy } from "lodash";
+import { parseDateString } from "utils/parseUtils";
 
 // Use throughout your app instead of plain `useDispatch` and `useSelector`
 export const useAppDispatch = () => useDispatch<AppDispatch>();
@@ -22,7 +22,7 @@ export function useIsSwapRunning() {
 
 export function useSwapInfo(swapId: string | null) {
   return useAppSelector((state) =>
-    swapId ? state.rpc.state.swapInfos[swapId] ?? null : null,
+    swapId ? (state.rpc.state.swapInfos[swapId] ?? null) : null,
   );
 }
 
@@ -51,6 +51,6 @@ export function useSwapInfosSortedByDate() {
   const swapInfos = useAppSelector((state) => state.rpc.state.swapInfos);
   return sortBy(
     Object.values(swapInfos),
-    (swap) => -parseDateString(swap.startDate),
+    (swap) => -parseDateString(swap.start_date),
   );
 }

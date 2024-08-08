@@ -7,6 +7,7 @@ use crate::network::swarm;
 use crate::protocol::bob::{BobState, Swap};
 use crate::protocol::{bob, State};
 use crate::{bitcoin, cli, monero, rpc};
+use ::bitcoin::Txid;
 use anyhow::{bail, Context as AnyContext, Result};
 use libp2p::core::Multiaddr;
 use qrcode::render::unicode;
@@ -52,22 +53,6 @@ pub struct MoneroRecoveryArgs {
     pub swap_id: Uuid,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ResumeSwapResponse {
-    pub result: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BalanceResponse {
-    pub balance: u64, // in satoshis
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BuyXmrResponse {
-    pub swap_id: String,
-    pub quote: BidQuote, // You'll need to import or define BidQuote
-}
-
 #[derive(Debug, Eq, PartialEq)]
 pub struct WithdrawBtcArgs {
     pub amount: Option<Amount>,
@@ -92,6 +77,52 @@ pub struct StartDaemonArgs {
 #[derive(Debug, Eq, PartialEq)]
 pub struct GetSwapInfoArgs {
     pub swap_id: Uuid,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ResumeSwapResponse {
+    pub result: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BalanceResponse {
+    pub balance: u64, // in satoshis
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BuyXmrResponse {
+    pub swap_id: String,
+    pub quote: BidQuote, // You'll need to import or define BidQuote
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetHistoryResponse {
+    swaps: Vec<(Uuid, String)>,
+}
+
+#[derive(Serialize)]
+pub struct GetSwapInfoResponse {
+    pub swap_id: Uuid,
+    pub seller: Seller,
+    pub completed: bool,
+    pub start_date: String,
+    pub state_name: String,
+    pub xmr_amount: u64,
+    pub btc_amount: u64,
+    pub tx_lock_id: Txid,
+    pub tx_cancel_fee: u64,
+    pub tx_refund_fee: u64,
+    pub tx_lock_fee: u64,
+    pub btc_refund_address: String,
+    pub cancel_timelock: u32,
+    pub punish_timelock: u32,
+    pub timelock: Option<ExpiredTimelocks>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Seller {
+    pub peer_id: String,
+    pub addresses: Vec<Multiaddr>,
 }
 
 // TODO: We probably dont even need this.
@@ -231,8 +262,23 @@ async fn suspend_current_swap(context: Arc<Context>) -> Result<serde_json::Value
     }
 }
 
+pub async fn get_swap_infos_all(context: Arc<Context>) -> Result<Vec<GetSwapInfoResponse>> {
+    let swap_ids = context.db.all().await?;
+    let mut swap_infos = Vec::new();
+
+    for (swap_id, _) in swap_ids {
+        let swap_info = get_swap_info(GetSwapInfoArgs { swap_id }, context.clone()).await?;
+        swap_infos.push(swap_info);
+    }
+
+    Ok(swap_infos)
+}
+
 // #[tracing::instrument(fields(method="get_swap_info", swap_id = args.swap_id), skip(context))]
-async fn get_swap_info(args: GetSwapInfoArgs, context: Arc<Context>) -> Result<serde_json::Value> {
+pub async fn get_swap_info(
+    args: GetSwapInfoArgs,
+    context: Arc<Context>,
+) -> Result<GetSwapInfoResponse> {
     let bitcoin_wallet = context
         .bitcoin_wallet
         .as_ref()
@@ -311,38 +357,38 @@ async fn get_swap_info(args: GetSwapInfoArgs, context: Arc<Context>) -> Result<s
         }
         BobState::BtcLocked { state3: state, .. }
         | BobState::XmrLockProofReceived { state, .. } => {
-            Some(state.expired_timelock(bitcoin_wallet).await)
+            Some(state.expired_timelock(bitcoin_wallet).await?)
         }
         BobState::XmrLocked(state) | BobState::EncSigSent(state) => {
-            Some(state.expired_timelock(bitcoin_wallet).await)
+            Some(state.expired_timelock(bitcoin_wallet).await?)
         }
         BobState::CancelTimelockExpired(state) | BobState::BtcCancelled(state) => {
-            Some(state.expired_timelock(bitcoin_wallet).await)
+            Some(state.expired_timelock(bitcoin_wallet).await?)
         }
-        BobState::BtcPunished { .. } => Some(Ok(ExpiredTimelocks::Punish)),
+        BobState::BtcPunished { .. } => Some(ExpiredTimelocks::Punish),
         BobState::BtcRefunded(_) | BobState::BtcRedeemed(_) | BobState::XmrRedeemed { .. } => None,
     };
 
-    Ok(json!({
-        "swapId": args.swap_id,
-        "seller": {
-            "peerId": peerId.to_string(),
-            "addresses": addresses
+    Ok(GetSwapInfoResponse {
+        swap_id: args.swap_id,
+        seller: Seller {
+            peer_id: peerId.to_string(),
+            addresses,
         },
-        "completed": is_completed,
-        "startDate": start_date,
-        "stateName": state_name,
-        "xmrAmount": xmr_amount,
-        "btcAmount": btc_amount,
-        "txLockId": tx_lock_id,
-        "txCancelFee": tx_cancel_fee,
-        "txRefundFee": tx_refund_fee,
-        "txLockFee": tx_lock_fee,
-        "btcRefundAddress": btc_refund_address.to_string(),
-        "cancelTimelock": cancel_timelock,
-        "punishTimelock": punish_timelock,
-        "timelock": timelock.map(|tl| tl.map(|tl| json!(tl)).unwrap_or(json!(null))).unwrap_or(json!(null)),
-    }))
+        completed: is_completed,
+        start_date,
+        state_name,
+        xmr_amount: xmr_amount.as_piconero(),
+        btc_amount,
+        tx_lock_id,
+        tx_cancel_fee,
+        tx_refund_fee,
+        tx_lock_fee,
+        btc_refund_address: btc_refund_address.to_string(),
+        cancel_timelock: cancel_timelock.into(),
+        punish_timelock: punish_timelock.into(),
+        timelock,
+    })
 }
 
 async fn buy_xmr(buy_xmr: BuyXmrArgs, context: Arc<Context>) -> Result<serde_json::Value> {
@@ -653,7 +699,7 @@ async fn cancel_and_refund(
     })
 }
 
-async fn get_history(context: Arc<Context>) -> Result<serde_json::Value> {
+async fn get_history(context: Arc<Context>) -> Result<GetHistoryResponse> {
     let swaps = context.db.all().await?;
     let mut vec: Vec<(Uuid, String)> = Vec::new();
     for (swap_id, state) in swaps {
@@ -661,7 +707,7 @@ async fn get_history(context: Arc<Context>) -> Result<serde_json::Value> {
         vec.push((swap_id, state.to_string()));
     }
 
-    Ok(json!({ "swaps": vec }))
+    Ok(GetHistoryResponse { swaps: vec })
 }
 
 async fn get_raw_states(context: Arc<Context>) -> Result<serde_json::Value> {
