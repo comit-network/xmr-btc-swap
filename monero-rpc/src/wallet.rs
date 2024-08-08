@@ -1,9 +1,8 @@
-use std::fmt;
-
 use anyhow::{Context, Result};
 use rust_decimal::Decimal;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::fmt;
 
 #[jsonrpc_client::api(version = "2.0")]
 pub trait MoneroWalletRpc {
@@ -36,6 +35,18 @@ pub trait MoneroWalletRpc {
     async fn refresh(&self) -> Refreshed;
     async fn sweep_all(&self, address: String) -> SweepAll;
     async fn get_version(&self) -> Version;
+    async fn get_reserve_proof(
+        &self,
+        all: bool,
+        amount: Option<u64>,
+        message: Option<String>,
+    ) -> GetReserveProof;
+    async fn check_reserve_proof(
+        &self,
+        address: String,
+        message: Option<String>,
+        signature: String,
+    ) -> CheckReserveProof;
 }
 
 #[jsonrpc_client::implement(MoneroWalletRpc)]
@@ -214,6 +225,16 @@ pub struct Refreshed {
 #[derive(Debug, Clone, Deserialize)]
 pub struct SweepAll {
     pub tx_hash_list: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GetReserveProof {
+    pub signature: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CheckReserveProof {
+    pub good: bool,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize)]
