@@ -4,7 +4,7 @@ import { rpcSetBalance, rpcSetSwapInfo } from "store/features/rpcSlice";
 
 export async function checkBitcoinBalance() {
   // TODO: use tauri-bindgen here
-  const response = (await invoke("balance")) as {
+  const response = (await invoke("get_balance")) as {
     balance: number;
   };
 
@@ -12,7 +12,7 @@ export async function checkBitcoinBalance() {
 }
 
 export async function getRawSwapInfos() {
-  const response = await invoke("swap_infos_all");
+  const response = await invoke("get_swap_infos_all");
 
   (response as any[]).forEach((info) => store.dispatch(rpcSetSwapInfo(info)));
 }

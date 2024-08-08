@@ -146,111 +146,8 @@ pub enum Method {
     GetRawStates,
 }
 
-// TODO: Simplify this using instrument macro
-impl Method {
-    fn get_tracing_span(&self, log_reference_id: Option<String>) -> Span {
-        let span = match self {
-            Method::Balance { .. } => {
-                debug_span!(
-                    "method",
-                    method_name = "Balance",
-                    log_reference_id = field::Empty
-                )
-            }
-            Method::BuyXmr(BuyXmrArgs { swap_id, .. }) => {
-                debug_span!("method", method_name="BuyXmr", swap_id=%swap_id, log_reference_id=field::Empty)
-            }
-            Method::CancelAndRefund(CancelAndRefundArgs { swap_id }) => {
-                debug_span!("method", method_name="CancelAndRefund", swap_id=%swap_id, log_reference_id=field::Empty)
-            }
-            Method::Resume(ResumeArgs { swap_id }) => {
-                debug_span!("method", method_name="Resume", swap_id=%swap_id, log_reference_id=field::Empty)
-            }
-            Method::Config => {
-                debug_span!(
-                    "method",
-                    method_name = "Config",
-                    log_reference_id = field::Empty
-                )
-            }
-            Method::ExportBitcoinWallet => {
-                debug_span!(
-                    "method",
-                    method_name = "ExportBitcoinWallet",
-                    log_reference_id = field::Empty
-                )
-            }
-            Method::GetCurrentSwap => {
-                debug_span!(
-                    "method",
-                    method_name = "GetCurrentSwap",
-                    log_reference_id = field::Empty
-                )
-            }
-            Method::GetSwapInfo { .. } => {
-                debug_span!(
-                    "method",
-                    method_name = "GetSwapInfo",
-                    log_reference_id = field::Empty
-                )
-            }
-            Method::History => {
-                debug_span!(
-                    "method",
-                    method_name = "History",
-                    log_reference_id = field::Empty
-                )
-            }
-            Method::ListSellers { .. } => {
-                debug_span!(
-                    "method",
-                    method_name = "ListSellers",
-                    log_reference_id = field::Empty
-                )
-            }
-            Method::MoneroRecovery { .. } => {
-                debug_span!(
-                    "method",
-                    method_name = "MoneroRecovery",
-                    log_reference_id = field::Empty
-                )
-            }
-            Method::GetRawStates => debug_span!(
-                "method",
-                method_name = "RawHistory",
-                log_reference_id = field::Empty
-            ),
-            Method::StartDaemon { .. } => {
-                debug_span!(
-                    "method",
-                    method_name = "StartDaemon",
-                    log_reference_id = field::Empty
-                )
-            }
-            Method::SuspendCurrentSwap => {
-                debug_span!(
-                    "method",
-                    method_name = "SuspendCurrentSwap",
-                    log_reference_id = field::Empty
-                )
-            }
-            Method::WithdrawBtc { .. } => {
-                debug_span!(
-                    "method",
-                    method_name = "WithdrawBtc",
-                    log_reference_id = field::Empty
-                )
-            }
-        };
-        if let Some(log_reference_id) = log_reference_id {
-            span.record("log_reference_id", log_reference_id.as_str());
-        }
-        span
-    }
-}
-
-// #[tracing::instrument(fields(method = "suspend_current_swap"), skip(context))]
-async fn suspend_current_swap(context: Arc<Context>) -> Result<serde_json::Value> {
+#[tracing::instrument(fields(method = "suspend_current_swap"), skip(context))]
+pub async fn suspend_current_swap(context: Arc<Context>) -> Result<serde_json::Value> {
     let swap_id = context.swap_lock.get_current_swap_id().await;
 
     if let Some(id_value) = swap_id {
@@ -262,6 +159,7 @@ async fn suspend_current_swap(context: Arc<Context>) -> Result<serde_json::Value
     }
 }
 
+#[tracing::instrument(fields(method = "get_swap_infos_all"), skip(context))]
 pub async fn get_swap_infos_all(context: Arc<Context>) -> Result<Vec<GetSwapInfoResponse>> {
     let swap_ids = context.db.all().await?;
     let mut swap_infos = Vec::new();
@@ -274,7 +172,7 @@ pub async fn get_swap_infos_all(context: Arc<Context>) -> Result<Vec<GetSwapInfo
     Ok(swap_infos)
 }
 
-// #[tracing::instrument(fields(method="get_swap_info", swap_id = args.swap_id), skip(context))]
+#[tracing::instrument(fields(method = "get_swap_info"), skip(context))]
 pub async fn get_swap_info(
     args: GetSwapInfoArgs,
     context: Arc<Context>,
@@ -391,7 +289,8 @@ pub async fn get_swap_info(
     })
 }
 
-async fn buy_xmr(buy_xmr: BuyXmrArgs, context: Arc<Context>) -> Result<serde_json::Value> {
+#[tracing::instrument(fields(method = "buy_xmr"), skip(context))]
+pub async fn buy_xmr(buy_xmr: BuyXmrArgs, context: Arc<Context>) -> Result<serde_json::Value> {
     let BuyXmrArgs {
         seller,
         bitcoin_change_address,
@@ -564,7 +463,8 @@ async fn buy_xmr(buy_xmr: BuyXmrArgs, context: Arc<Context>) -> Result<serde_jso
     }))
 }
 
-async fn resume_swap(resume: ResumeArgs, context: Arc<Context>) -> Result<serde_json::Value> {
+#[tracing::instrument(fields(method = "resume_swap"), skip(context))]
+pub async fn resume_swap(resume: ResumeArgs, context: Arc<Context>) -> Result<serde_json::Value> {
     let ResumeArgs { swap_id } = resume;
     context.swap_lock.acquire_swap_lock(swap_id).await?;
 
@@ -671,7 +571,8 @@ async fn resume_swap(resume: ResumeArgs, context: Arc<Context>) -> Result<serde_
     }))
 }
 
-async fn cancel_and_refund(
+#[tracing::instrument(fields(method = "cancel_and_refund"), skip(context))]
+pub async fn cancel_and_refund(
     cancel_and_refund: CancelAndRefundArgs,
     context: Arc<Context>,
 ) -> Result<serde_json::Value> {
@@ -699,7 +600,8 @@ async fn cancel_and_refund(
     })
 }
 
-async fn get_history(context: Arc<Context>) -> Result<GetHistoryResponse> {
+#[tracing::instrument(fields(method = "get_history"), skip(context))]
+pub async fn get_history(context: Arc<Context>) -> Result<GetHistoryResponse> {
     let swaps = context.db.all().await?;
     let mut vec: Vec<(Uuid, String)> = Vec::new();
     for (swap_id, state) in swaps {
@@ -710,13 +612,15 @@ async fn get_history(context: Arc<Context>) -> Result<GetHistoryResponse> {
     Ok(GetHistoryResponse { swaps: vec })
 }
 
-async fn get_raw_states(context: Arc<Context>) -> Result<serde_json::Value> {
+#[tracing::instrument(fields(method = "get_raw_states"), skip(context))]
+pub async fn get_raw_states(context: Arc<Context>) -> Result<serde_json::Value> {
     let raw_history = context.db.raw_all().await?;
 
     Ok(json!({ "raw_states": raw_history }))
 }
 
-async fn get_config(context: Arc<Context>) -> Result<serde_json::Value> {
+#[tracing::instrument(fields(method = "get_config"), skip(context))]
+pub async fn get_config(context: Arc<Context>) -> Result<serde_json::Value> {
     let data_dir_display = context.config.data_dir.display();
     tracing::info!(path=%data_dir_display, "Data directory");
     tracing::info!(path=%format!("{}/logs", data_dir_display), "Log files directory");
@@ -734,7 +638,8 @@ async fn get_config(context: Arc<Context>) -> Result<serde_json::Value> {
     }))
 }
 
-async fn withdraw_btc(
+#[tracing::instrument(fields(method = "withdraw_btc"), skip(context))]
+pub async fn withdraw_btc(
     withdraw_btc: WithdrawBtcArgs,
     context: Arc<Context>,
 ) -> Result<serde_json::Value> {
@@ -768,7 +673,8 @@ async fn withdraw_btc(
     }))
 }
 
-async fn start_daemon(
+#[tracing::instrument(fields(method = "start_daemon"), skip(context))]
+pub async fn start_daemon(
     start_daemon: StartDaemonArgs,
     context: Arc<Context>,
 ) -> Result<serde_json::Value> {
@@ -776,7 +682,7 @@ async fn start_daemon(
     // Default to 127.0.0.1:1234
     let server_address = server_address.unwrap_or("127.0.0.1:1234".parse()?);
 
-    let (addr, server_handle) = rpc::run_server(server_address, Arc::clone(&context)).await?;
+    let (addr, server_handle) = rpc::run_server(server_address, context).await?;
 
     tracing::info!(%addr, "Started RPC server");
 
@@ -787,7 +693,7 @@ async fn start_daemon(
     Ok(json!({}))
 }
 
-// #[instrument(fields(method = "get_balance"))]
+#[tracing::instrument(fields(method = "get_balance"), skip(context))]
 pub async fn get_balance(balance: BalanceArgs, context: Arc<Context>) -> Result<BalanceResponse> {
     let BalanceArgs { force_refresh } = balance;
     let bitcoin_wallet = context
@@ -818,7 +724,8 @@ pub async fn get_balance(balance: BalanceArgs, context: Arc<Context>) -> Result<
     })
 }
 
-async fn list_sellers(
+#[tracing::instrument(fields(method = "list_sellers"), skip(context))]
+pub async fn list_sellers(
     list_sellers: ListSellersArgs,
     context: Arc<Context>,
 ) -> Result<serde_json::Value> {
@@ -868,7 +775,8 @@ async fn list_sellers(
     Ok(json!({ "sellers": sellers }))
 }
 
-async fn export_bitcoin_wallet(context: Arc<Context>) -> Result<serde_json::Value> {
+#[tracing::instrument(fields(method = "export_bitcoin_wallet"), skip(context))]
+pub async fn export_bitcoin_wallet(context: Arc<Context>) -> Result<serde_json::Value> {
     let bitcoin_wallet = context
         .bitcoin_wallet
         .as_ref()
@@ -881,7 +789,8 @@ async fn export_bitcoin_wallet(context: Arc<Context>) -> Result<serde_json::Valu
     }))
 }
 
-async fn monero_recovery(
+#[tracing::instrument(fields(method = "monero_recovery"), skip(context))]
+pub async fn monero_recovery(
     monero_recovery: MoneroRecoveryArgs,
     context: Arc<Context>,
 ) -> Result<serde_json::Value> {
@@ -914,7 +823,8 @@ async fn monero_recovery(
     }
 }
 
-async fn get_current_swap(context: Arc<Context>) -> Result<serde_json::Value> {
+#[tracing::instrument(fields(method = "get_current_swap"), skip(context))]
+pub async fn get_current_swap(context: Arc<Context>) -> Result<serde_json::Value> {
     Ok(json!({
         "swap_id": context.swap_lock.get_current_swap_id().await
     }))
@@ -946,19 +856,7 @@ impl Request {
     }
 
     pub async fn call(self, context: Arc<Context>) -> Result<JsonValue> {
-        let method_span = self.cmd.get_tracing_span(self.log_reference.clone());
-
-        self.handle_cmd(context)
-            .instrument(method_span.clone())
-            .await
-            .map_err(|err| {
-                method_span.in_scope(|| {
-                    // The {:?} formatter is used to print the entire error chain
-                    tracing::debug!(err = format!("{:?}", err), "API call resulted in an error");
-                });
-                err
-            })
-            .map(|result| json!(result))
+        unreachable!("This function should never be called")
     }
 }
 

@@ -28,10 +28,11 @@ pub async fn run_server(
         .set_middleware(middleware)
         .build(server_address)
         .await?;
+
     let mut modules = RpcModule::new(());
     {
         modules
-            .merge(methods::register_modules(Arc::clone(&context))?)
+            .merge(methods::register_modules(context)?)
             .expect("Could not register RPC modules")
     }
 

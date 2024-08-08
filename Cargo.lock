@@ -7586,7 +7586,6 @@ dependencies = [
  "swap",
  "tauri",
  "tauri-build",
- "uuid",
 ]
 
 [[package]]
