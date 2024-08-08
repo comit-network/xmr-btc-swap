@@ -36,10 +36,17 @@ fn is_latest_version(current: &str, latest: &str) -> bool {
 }
 
 /// helper macro for [`redact`]... eldrich sorcery
+/// the macro does in essence the following:
+/// 1. create a static regex automaton for the pattern
+/// 2. find all matching patterns using regex
+/// 3. create a placeholder for each distinct matching pattern
+/// 4. add the placeholder to the hashmap
 macro_rules! regex_find_placeholders {
     ($pattern:expr, $create_placeholder:expr, $replacements:expr, $input:expr) => {{
         // compile the regex pattern
-        let regex = once_cell::sync::Lazy::new(|| regex::Regex::new($pattern).expect("invalid regex pattern"));
+        let regex = once_cell::sync::Lazy::new(|| {
+            regex::Regex::new($pattern).expect("invalid regex pattern")
+        });
 
         // keep count of count patterns to generate distinct placeholders
         let mut counter: usize = 0;
@@ -81,10 +88,30 @@ pub fn redact(input: &str) -> String {
 
     // use the macro to find all addresses and generate placeholders
     // has to be a macro in order to create the regex automata only once.
-    regex_find_placeholders!(MONERO_ADDR_REGEX, |count| format!("<monero_address_{count}>"), replacements, input);
-    regex_find_placeholders!(BITCOIN_ADDR_REGEX, |count| format!("<bitcoin_address_{count}>"), replacements, input);
-    regex_find_placeholders!(TX_ID_REGEX, |count| format!("<tx_id_{count}>"), replacements, input);
-    regex_find_placeholders!(SWAP_ID_REGEX, |count| format!("<swap_id_{count}>"), replacements, input);
+    regex_find_placeholders!(
+        MONERO_ADDR_REGEX,
+        |count| format!("<monero_address_{count}>"),
+        replacements,
+        input
+    );
+    regex_find_placeholders!(
+        BITCOIN_ADDR_REGEX,
+        |count| format!("<bitcoin_address_{count}>"),
+        replacements,
+        input
+    );
+    regex_find_placeholders!(
+        TX_ID_REGEX,
+        |count| format!("<tx_id_{count}>"),
+        replacements,
+        input
+    );
+    regex_find_placeholders!(
+        SWAP_ID_REGEX,
+        |count| format!("<swap_id_{count}>"),
+        replacements,
+        input
+    );
 
     // allocate string variable to operate on
     let mut redacted = input.to_owned();
