@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import { BalanceBitcoinResponse } from "models/rpcModel";
 import { store } from "./store/storeRenderer";
 import { rpcSetBalance, rpcSetSwapInfo } from "store/features/rpcSlice";
 
@@ -14,6 +13,6 @@ export async function checkBitcoinBalance() {
 
 export async function getRawSwapInfos() {
   const response = await invoke("swap_infos_all");
-  console.log(response);
+
   (response as any[]).forEach((info) => store.dispatch(rpcSetSwapInfo(info)));
 }
