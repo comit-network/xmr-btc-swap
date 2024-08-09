@@ -21,19 +21,18 @@ use std::env;
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
-    let (context, request) = match parse_args_and_apply_defaults(env::args_os()).await? {
-        ParseResult::Context(context, request) => (context, request),
+    if let Err(e) = check_latest_version(env!("CARGO_PKG_VERSION")).await {
+        eprintln!("{}", e);
+    }
+
+    match parse_args_and_apply_defaults(env::args_os()).await? {
+        ParseResult::Success => {}
         ParseResult::PrintAndExitZero { message } => {
             println!("{}", message);
             std::process::exit(0);
         }
     };
 
-    if let Err(e) = check_latest_version(env!("CARGO_PKG_VERSION")).await {
-        eprintln!("{}", e);
-    }
-    request.call(context.clone()).await?;
-    context.tasks.wait_for_tasks().await?;
     Ok(())
 }
 

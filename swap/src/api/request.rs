@@ -290,7 +290,10 @@ pub async fn get_swap_info(
 }
 
 #[tracing::instrument(fields(method = "buy_xmr"), skip(context))]
-pub async fn buy_xmr(buy_xmr: BuyXmrArgs, context: Arc<Context>) -> Result<serde_json::Value> {
+pub async fn buy_xmr(
+    buy_xmr: BuyXmrArgs,
+    context: Arc<Context>,
+) -> Result<serde_json::Value, anyhow::Error> {
     let BuyXmrArgs {
         seller,
         bitcoin_change_address,
