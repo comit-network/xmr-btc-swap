@@ -1,15 +1,15 @@
-import { Box, makeStyles } from '@material-ui/core';
-import ContactInfoBox from './ContactInfoBox';
-import FeedbackInfoBox from './FeedbackInfoBox';
-import DonateInfoBox from './DonateInfoBox';
-import TorInfoBox from './TorInfoBox';
-import RpcControlBox from './RpcControlBox';
+import { Box, makeStyles } from "@material-ui/core";
+import ContactInfoBox from "./ContactInfoBox";
+import FeedbackInfoBox from "./FeedbackInfoBox";
+import DonateInfoBox from "./DonateInfoBox";
+import TorInfoBox from "./TorInfoBox";
+import RpcControlBox from "./RpcControlBox";
 
 const useStyles = makeStyles((theme) => ({
   outer: {
-    display: 'flex',
+    display: "flex",
     gap: theme.spacing(2),
-    flexDirection: 'column',
+    flexDirection: "column",
   },
 }));
 

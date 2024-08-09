@@ -1,5 +1,5 @@
-import { SvgIcon } from '@material-ui/core';
-import { SvgIconProps } from '@material-ui/core/SvgIcon/SvgIcon';
+import { SvgIcon } from "@material-ui/core";
+import { SvgIconProps } from "@material-ui/core/SvgIcon/SvgIcon";
 
 export default function MoneroIcon(props: SvgIconProps) {
   return (

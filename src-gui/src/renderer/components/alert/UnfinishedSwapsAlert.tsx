@@ -1,7 +1,7 @@
-import { Button } from '@material-ui/core';
-import Alert from '@material-ui/lab/Alert';
-import { useNavigate } from 'react-router-dom';
-import { useResumeableSwapsCount } from 'store/hooks';
+import { Button } from "@material-ui/core";
+import Alert from "@material-ui/lab/Alert";
+import { useNavigate } from "react-router-dom";
+import { useResumeableSwapsCount } from "store/hooks";
 
 export default function UnfinishedSwapsAlert() {
   const resumableSwapsCount = useResumeableSwapsCount();
@@ -16,16 +16,16 @@ export default function UnfinishedSwapsAlert() {
           <Button
             color="inherit"
             size="small"
-            onClick={() => navigate('/history')}
+            onClick={() => navigate("/history")}
           >
             VIEW
           </Button>
         }
       >
-        You have{' '}
+        You have{" "}
         {resumableSwapsCount > 1
           ? `${resumableSwapsCount} unfinished swaps`
-          : 'one unfinished swap'}
+          : "one unfinished swap"}
       </Alert>
     );
   }

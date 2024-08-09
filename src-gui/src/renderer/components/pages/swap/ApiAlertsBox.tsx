@@ -1,7 +1,7 @@
-import { Box } from '@material-ui/core';
-import { Alert, AlertTitle } from '@material-ui/lab';
-import { removeAlert } from 'store/features/alertsSlice';
-import { useAppDispatch, useAppSelector } from 'store/hooks';
+import { Box } from "@material-ui/core";
+import { Alert, AlertTitle } from "@material-ui/lab";
+import { removeAlert } from "store/features/alertsSlice";
+import { useAppDispatch, useAppSelector } from "store/hooks";
 
 export default function ApiAlertsBox() {
   const alerts = useAppSelector((state) => state.alerts.alerts);
@@ -14,7 +14,7 @@ export default function ApiAlertsBox() {
   if (alerts.length === 0) return null;
 
   return (
-    <Box style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
+    <Box style={{ display: "flex", justifyContent: "center", gap: "1rem" }}>
       {alerts.map((alert) => (
         <Alert
           variant="filled"

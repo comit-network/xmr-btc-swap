@@ -1,7 +1,7 @@
-import { Box, DialogContentText } from '@material-ui/core';
-import { SwapStateBtcLockInMempool } from 'models/storeModel';
-import BitcoinTransactionInfoBox from '../../BitcoinTransactionInfoBox';
-import SwapMightBeCancelledAlert from '../../../../alert/SwapMightBeCancelledAlert';
+import { Box, DialogContentText } from "@material-ui/core";
+import { SwapStateBtcLockInMempool } from "models/storeModel";
+import BitcoinTransactionInfoBox from "../../BitcoinTransactionInfoBox";
+import SwapMightBeCancelledAlert from "../../../../alert/SwapMightBeCancelledAlert";
 
 type BitcoinLockTxInMempoolPageProps = {
   state: SwapStateBtcLockInMempool;

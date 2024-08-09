@@ -1,5 +1,5 @@
-import { Box, DialogContentText } from '@material-ui/core';
-import FeedbackInfoBox from '../../../../pages/help/FeedbackInfoBox';
+import { Box, DialogContentText } from "@material-ui/core";
+import FeedbackInfoBox from "../../../../pages/help/FeedbackInfoBox";
 
 export default function BitcoinPunishedPage() {
   return (

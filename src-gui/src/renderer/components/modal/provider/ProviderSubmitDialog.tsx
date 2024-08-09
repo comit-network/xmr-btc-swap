@@ -1,4 +1,4 @@
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useState } from "react";
 import {
   DialogTitle,
   Dialog,
@@ -7,8 +7,8 @@ import {
   TextField,
   DialogActions,
   Button,
-} from '@material-ui/core';
-import { Multiaddr } from 'multiaddr';
+} from "@material-ui/core";
+import { Multiaddr } from "multiaddr";
 
 type ProviderSubmitDialogProps = {
   open: boolean;
@@ -19,23 +19,23 @@ export default function ProviderSubmitDialog({
   open,
   onClose,
 }: ProviderSubmitDialogProps) {
-  const [multiAddr, setMultiAddr] = useState('');
-  const [peerId, setPeerId] = useState('');
+  const [multiAddr, setMultiAddr] = useState("");
+  const [peerId, setPeerId] = useState("");
 
   async function handleProviderSubmit() {
     if (multiAddr && peerId) {
-      await fetch('https://api.unstoppableswap.net/api/submit-provider', {
-        method: 'post',
+      await fetch("https://api.unstoppableswap.net/api/submit-provider", {
+        method: "post",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           multiAddr,
           peerId,
         }),
       });
-      setMultiAddr('');
-      setPeerId('');
+      setMultiAddr("");
+      setPeerId("");
       onClose();
     }
   }
@@ -51,15 +51,15 @@ export default function ProviderSubmitDialog({
   function getMultiAddressError(): string | null {
     try {
       const multiAddress = new Multiaddr(multiAddr);
-      if (multiAddress.protoNames().includes('p2p')) {
-        return 'The multi address should not contain the peer id (/p2p/)';
+      if (multiAddress.protoNames().includes("p2p")) {
+        return "The multi address should not contain the peer id (/p2p/)";
       }
-      if (multiAddress.protoNames().find((name) => name.includes('onion'))) {
-        return 'It is currently not possible to add a provider that is only reachable via Tor';
+      if (multiAddress.protoNames().find((name) => name.includes("onion"))) {
+        return "It is currently not possible to add a provider that is only reachable via Tor";
       }
       return null;
     } catch (e) {
-      return 'Not a valid multi address';
+      return "Not a valid multi address";
     }
   }
 
@@ -78,7 +78,7 @@ export default function ProviderSubmitDialog({
           fullWidth
           helperText={
             getMultiAddressError() ||
-            'Tells the swap client where the provider can be reached'
+            "Tells the swap client where the provider can be reached"
           }
           value={multiAddr}
           onChange={handleMultiAddrChange}

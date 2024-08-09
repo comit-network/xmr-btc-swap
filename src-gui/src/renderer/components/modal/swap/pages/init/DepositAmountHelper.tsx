@@ -1,24 +1,24 @@
-import { useState } from 'react';
-import { Box, makeStyles, TextField, Typography } from '@material-ui/core';
-import { SwapStateWaitingForBtcDeposit } from 'models/storeModel';
-import { useAppSelector } from 'store/hooks';
-import { satsToBtc } from 'utils/conversionUtils';
-import { MoneroAmount } from '../../../../other/Units';
+import { useState } from "react";
+import { Box, makeStyles, TextField, Typography } from "@material-ui/core";
+import { SwapStateWaitingForBtcDeposit } from "models/storeModel";
+import { useAppSelector } from "store/hooks";
+import { satsToBtc } from "utils/conversionUtils";
+import { MoneroAmount } from "../../../../other/Units";
 
 const MONERO_FEE = 0.000016;
 
 const useStyles = makeStyles((theme) => ({
   outer: {
-    display: 'flex',
-    alignItems: 'center',
+    display: "flex",
+    alignItems: "center",
     gap: theme.spacing(1),
   },
   textField: {
-    '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
-      display: 'none',
+    "& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button": {
+      display: "none",
     },
-    '& input[type=number]': {
-      MozAppearance: 'textfield',
+    "& input[type=number]": {
+      MozAppearance: "textfield",
     },
     maxWidth: theme.spacing(16),
   },
@@ -83,7 +83,7 @@ export default function DepositAmountHelper({
         className={classes.textField}
       />
       <Typography variant="subtitle2">
-        BTC will give you approximately{' '}
+        BTC will give you approximately{" "}
         <MoneroAmount amount={calcXMRAmount()} />.
       </Typography>
     </Box>

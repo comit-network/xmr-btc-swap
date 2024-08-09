@@ -1,32 +1,28 @@
-import { Box, DialogContentText, makeStyles } from '@material-ui/core';
-import { useState } from 'react';
-import BitcoinAddressTextField from 'renderer/components/inputs/BitcoinAddressTextField';
-import MoneroAddressTextField from 'renderer/components/inputs/MoneroAddressTextField';
-import { useAppSelector } from 'store/hooks';
-import PlayArrowIcon from '@material-ui/icons/PlayArrow';
-import { isTestnet } from 'store/config';
-import RemainingFundsWillBeUsedAlert from '../../../../alert/RemainingFundsWillBeUsedAlert';
-import IpcInvokeButton from '../../../../IpcInvokeButton';
+import { Box, DialogContentText, makeStyles } from "@material-ui/core";
+import { useState } from "react";
+import BitcoinAddressTextField from "renderer/components/inputs/BitcoinAddressTextField";
+import MoneroAddressTextField from "renderer/components/inputs/MoneroAddressTextField";
+import { useAppSelector } from "store/hooks";
+import PlayArrowIcon from "@material-ui/icons/PlayArrow";
+import { isTestnet } from "store/config";
+import RemainingFundsWillBeUsedAlert from "../../../../alert/RemainingFundsWillBeUsedAlert";
+import IpcInvokeButton from "../../../../IpcInvokeButton";
 
 const useStyles = makeStyles((theme) => ({
   initButton: {
     marginTop: theme.spacing(1),
   },
   fieldsOuter: {
-    display: 'flex',
-    flexDirection: 'column',
+    display: "flex",
+    flexDirection: "column",
     gap: theme.spacing(2),
   },
 }));
 
 export default function InitPage() {
   const classes = useStyles();
-  const [redeemAddress, setRedeemAddress] = useState(
-    ''
-  );
-  const [refundAddress, setRefundAddress] = useState(
-    ''
-  );
+  const [redeemAddress, setRedeemAddress] = useState("");
+  const [refundAddress, setRefundAddress] = useState("");
   const [redeemAddressValid, setRedeemAddressValid] = useState(false);
   const [refundAddressValid, setRefundAddressValid] = useState(false);
   const selectedProvider = useAppSelector(

@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 export interface RatesState {
   btcPrice: number | null;
@@ -11,7 +11,7 @@ const initialState: RatesState = {
 };
 
 const ratesSlice = createSlice({
-  name: 'rates',
+  name: "rates",
   initialState,
   reducers: {
     setBtcPrice: (state, action: PayloadAction<number>) => {

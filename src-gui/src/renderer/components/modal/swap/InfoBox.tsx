@@ -4,8 +4,8 @@ import {
   makeStyles,
   Paper,
   Typography,
-} from '@material-ui/core';
-import { ReactNode } from 'react';
+} from "@material-ui/core";
+import { ReactNode } from "react";
 
 type Props = {
   title: ReactNode;
@@ -18,14 +18,14 @@ type Props = {
 const useStyles = makeStyles((theme) => ({
   outer: {
     padding: theme.spacing(1.5),
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
+    overflow: "hidden",
+    display: "flex",
+    flexDirection: "column",
     gap: theme.spacing(1),
   },
   upperContent: {
-    display: 'flex',
-    alignItems: 'center',
+    display: "flex",
+    alignItems: "center",
     gap: theme.spacing(0.5),
   },
 }));

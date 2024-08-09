@@ -1,4 +1,4 @@
-import CircularProgressWithSubtitle from '../../CircularProgressWithSubtitle';
+import CircularProgressWithSubtitle from "../../CircularProgressWithSubtitle";
 
 export function SyncingMoneroWalletPage() {
   return (

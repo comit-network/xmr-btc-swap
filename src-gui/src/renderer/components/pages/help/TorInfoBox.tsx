@@ -1,14 +1,14 @@
-import { Box, makeStyles, Typography } from '@material-ui/core';
-import IpcInvokeButton from 'renderer/components/IpcInvokeButton';
-import { useAppSelector } from 'store/hooks';
-import StopIcon from '@material-ui/icons/Stop';
-import PlayArrowIcon from '@material-ui/icons/PlayArrow';
-import InfoBox from '../../modal/swap/InfoBox';
-import CliLogsBox from '../../other/RenderedCliLog';
+import { Box, makeStyles, Typography } from "@material-ui/core";
+import IpcInvokeButton from "renderer/components/IpcInvokeButton";
+import { useAppSelector } from "store/hooks";
+import StopIcon from "@material-ui/icons/Stop";
+import PlayArrowIcon from "@material-ui/icons/PlayArrow";
+import InfoBox from "../../modal/swap/InfoBox";
+import CliLogsBox from "../../other/RenderedCliLog";
 
 const useStyles = makeStyles((theme) => ({
   actionsOuter: {
-    display: 'flex',
+    display: "flex",
     gap: theme.spacing(1),
   },
 }));
@@ -24,10 +24,10 @@ export default function TorInfoBox() {
       mainContent={
         <Box
           style={{
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px",
           }}
         >
           <Typography variant="subtitle2">
@@ -37,7 +37,7 @@ export default function TorInfoBox() {
             below. If Tor is running, all traffic will be routed through it and
             the swap provider will not be able to see your IP address.
           </Typography>
-          <CliLogsBox label="Tor Daemon Logs" logs={torStdOut.split('\n')} />
+          <CliLogsBox label="Tor Daemon Logs" logs={torStdOut.split("\n")} />
         </Box>
       }
       additionalContent={

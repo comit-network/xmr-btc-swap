@@ -4,12 +4,12 @@ import {
   CircularProgress,
   IconButton,
   Tooltip,
-} from '@material-ui/core';
-import { ReactElement, ReactNode, useEffect, useState } from 'react';
-import { useSnackbar } from 'notistack';
-import { useAppSelector } from 'store/hooks';
-import { RpcProcessStateType } from 'models/rpcModel';
-import { isExternalRpc } from 'store/config';
+} from "@material-ui/core";
+import { ReactElement, ReactNode, useEffect, useState } from "react";
+import { useSnackbar } from "notistack";
+import { useAppSelector } from "store/hooks";
+import { RpcProcessStateType } from "models/rpcModel";
+import { isExternalRpc } from "store/config";
 
 function IpcButtonTooltip({
   requiresRpcAndNotReady,
@@ -27,19 +27,19 @@ function IpcButtonTooltip({
   }
 
   const getMessage = () => {
-    if (!requiresRpcAndNotReady) return '';
+    if (!requiresRpcAndNotReady) return "";
 
     switch (processType) {
       case RpcProcessStateType.LISTENING_FOR_CONNECTIONS:
-        return '';
+        return "";
       case RpcProcessStateType.STARTED:
-        return 'Cannot execute this action because the Swap Daemon is still starting and not yet ready to accept connections. Please wait a moment and try again';
+        return "Cannot execute this action because the Swap Daemon is still starting and not yet ready to accept connections. Please wait a moment and try again";
       case RpcProcessStateType.EXITED:
-        return 'Cannot execute this action because the Swap Daemon has been stopped. Please start the Swap Daemon again to continue';
+        return "Cannot execute this action because the Swap Daemon has been stopped. Please start the Swap Daemon again to continue";
       case RpcProcessStateType.NOT_STARTED:
-        return 'Cannot execute this action because the Swap Daemon has not been started yet. Please start the Swap Daemon first';
+        return "Cannot execute this action because the Swap Daemon has not been started yet. Please start the Swap Daemon first";
       default:
-        return '';
+        return "";
     }
   };
 
@@ -108,13 +108,13 @@ export default function IpcInvokeButton<T>({
       setIsPending(true);
       try {
         // const result = await ipcRenderer.invoke(ipcChannel, ...ipcArgs);
-        throw new Error('Not implemented');
+        throw new Error("Not implemented");
         // onSuccess?.(result);
       } catch (e: unknown) {
         if (displayErrorSnackbar) {
           enqueueSnackbar((e as Error).message, {
             autoHideDuration: 60 * 1000,
-            variant: 'error',
+            variant: "error",
           });
         }
       } finally {

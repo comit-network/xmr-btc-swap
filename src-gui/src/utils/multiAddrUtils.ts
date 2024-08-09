@@ -1,9 +1,9 @@
-import { Multiaddr } from 'multiaddr';
-import semver from 'semver';
-import { ExtendedProviderStatus, Provider } from 'models/apiModel';
-import { isTestnet } from 'store/config';
+import { Multiaddr } from "multiaddr";
+import semver from "semver";
+import { ExtendedProviderStatus, Provider } from "models/apiModel";
+import { isTestnet } from "store/config";
 
-const MIN_ASB_VERSION = '0.12.0';
+const MIN_ASB_VERSION = "0.12.0";
 
 export function providerToConcatenatedMultiAddr(provider: Provider) {
   return new Multiaddr(provider.multiAddr)

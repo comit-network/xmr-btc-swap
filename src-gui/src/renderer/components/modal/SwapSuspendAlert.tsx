@@ -5,8 +5,8 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-} from '@material-ui/core';
-import IpcInvokeButton from '../IpcInvokeButton';
+} from "@material-ui/core";
+import IpcInvokeButton from "../IpcInvokeButton";
 
 type SwapCancelAlertProps = {
   open: boolean;

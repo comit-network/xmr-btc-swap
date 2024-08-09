@@ -1,8 +1,8 @@
-import { isTestnet } from 'store/config';
-import { getMoneroTxExplorerUrl } from 'utils/conversionUtils';
-import MoneroIcon from 'renderer/components/icons/MoneroIcon';
-import { ReactNode } from 'react';
-import TransactionInfoBox from './TransactionInfoBox';
+import { isTestnet } from "store/config";
+import { getMoneroTxExplorerUrl } from "utils/conversionUtils";
+import MoneroIcon from "renderer/components/icons/MoneroIcon";
+import { ReactNode } from "react";
+import TransactionInfoBox from "./TransactionInfoBox";
 
 type Props = {
   title: string;

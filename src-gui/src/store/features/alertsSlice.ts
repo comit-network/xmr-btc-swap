@@ -1,5 +1,5 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { Alert } from 'models/apiModel';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { Alert } from "models/apiModel";
 
 export interface AlertsSlice {
   alerts: Alert[];
@@ -10,7 +10,7 @@ const initialState: AlertsSlice = {
 };
 
 const alertsSlice = createSlice({
-  name: 'alerts',
+  name: "alerts",
   initialState,
   reducers: {
     setAlerts(slice, action: PayloadAction<Alert[]>) {

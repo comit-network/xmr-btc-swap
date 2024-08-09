@@ -1,10 +1,10 @@
-import { Box, List } from '@material-ui/core';
-import SwapHorizOutlinedIcon from '@material-ui/icons/SwapHorizOutlined';
-import HistoryOutlinedIcon from '@material-ui/icons/HistoryOutlined';
-import AccountBalanceWalletIcon from '@material-ui/icons/AccountBalanceWallet';
-import HelpOutlineIcon from '@material-ui/icons/HelpOutline';
-import RouteListItemIconButton from './RouteListItemIconButton';
-import UnfinishedSwapsBadge from './UnfinishedSwapsCountBadge';
+import { Box, List } from "@material-ui/core";
+import SwapHorizOutlinedIcon from "@material-ui/icons/SwapHorizOutlined";
+import HistoryOutlinedIcon from "@material-ui/icons/HistoryOutlined";
+import AccountBalanceWalletIcon from "@material-ui/icons/AccountBalanceWallet";
+import HelpOutlineIcon from "@material-ui/icons/HelpOutline";
+import RouteListItemIconButton from "./RouteListItemIconButton";
+import UnfinishedSwapsBadge from "./UnfinishedSwapsCountBadge";
 
 export default function NavigationHeader() {
   return (

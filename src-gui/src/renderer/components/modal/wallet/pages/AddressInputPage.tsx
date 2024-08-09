@@ -15,20 +15,18 @@ export default function AddressInputPage({
 }) {
   return (
     <>
-      <WithdrawDialogContent>
-        <DialogContentText>
-          To withdraw the BTC of the internal wallet, please enter an address.
-          All funds will be sent to that address.
-        </DialogContentText>
+      <DialogContentText>
+        To withdraw the Bitcoin inside the internal wallet, please enter an
+        address. All funds will be sent to that address.
+      </DialogContentText>
 
-        <BitcoinAddressTextField
-          address={withdrawAddress}
-          onAddressChange={setWithdrawAddress}
-          onAddressValidityChange={setWithdrawAddressValid}
-          helperText="All Bitcoin of the internal wallet will be transferred to this address"
-          fullWidth
-        />
-      </WithdrawDialogContent>
+      <BitcoinAddressTextField
+        address={withdrawAddress}
+        onAddressChange={setWithdrawAddress}
+        onAddressValidityChange={setWithdrawAddressValid}
+        helperText="All Bitcoin of the internal wallet will be transferred to this address"
+        fullWidth
+      />
     </>
   );
 }

@@ -1,25 +1,25 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Button,
   Dialog,
   DialogActions,
   DialogContent,
   makeStyles,
-} from '@material-ui/core';
-import { useAppDispatch, useAppSelector } from 'store/hooks';
-import { swapReset } from 'store/features/swapSlice';
-import SwapStatePage from './pages/SwapStatePage';
-import SwapStateStepper from './SwapStateStepper';
-import SwapSuspendAlert from '../SwapSuspendAlert';
-import SwapDialogTitle from './SwapDialogTitle';
-import DebugPage from './pages/DebugPage';
+} from "@material-ui/core";
+import { useAppDispatch, useAppSelector } from "store/hooks";
+import { swapReset } from "store/features/swapSlice";
+import SwapStatePage from "./pages/SwapStatePage";
+import SwapStateStepper from "./SwapStateStepper";
+import SwapSuspendAlert from "../SwapSuspendAlert";
+import SwapDialogTitle from "./SwapDialogTitle";
+import DebugPage from "./pages/DebugPage";
 
 const useStyles = makeStyles({
   content: {
-    minHeight: '25rem',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
+    minHeight: "25rem",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
   },
 });
 

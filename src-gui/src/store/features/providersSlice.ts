@@ -1,8 +1,8 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { ExtendedProviderStatus, ProviderStatus } from 'models/apiModel';
-import { sortProviderList } from 'utils/sortUtils';
-import { isProviderCompatible } from 'utils/multiAddrUtils';
-import { getStubTestnetProvider } from 'store/config';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { ExtendedProviderStatus, ProviderStatus } from "models/apiModel";
+import { sortProviderList } from "utils/sortUtils";
+import { isProviderCompatible } from "utils/multiAddrUtils";
+import { getStubTestnetProvider } from "store/config";
 
 const stubTestnetProvider = getStubTestnetProvider();
 
@@ -44,7 +44,7 @@ function selectNewSelectedProvider(
 }
 
 export const providersSlice = createSlice({
-  name: 'providers',
+  name: "providers",
   initialState,
   reducers: {
     discoveredProvidersByRendezvous(

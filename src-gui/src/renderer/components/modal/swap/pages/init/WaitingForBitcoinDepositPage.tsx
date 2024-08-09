@@ -1,25 +1,25 @@
-import { Box, makeStyles, Typography } from '@material-ui/core';
-import { SwapStateWaitingForBtcDeposit } from 'models/storeModel';
-import { useAppSelector } from 'store/hooks';
-import DepositAddressInfoBox from '../../DepositAddressInfoBox';
-import BitcoinIcon from '../../../../icons/BitcoinIcon';
-import DepositAmountHelper from './DepositAmountHelper';
+import { Box, makeStyles, Typography } from "@material-ui/core";
+import { SwapStateWaitingForBtcDeposit } from "models/storeModel";
+import { useAppSelector } from "store/hooks";
+import DepositAddressInfoBox from "../../DepositAddressInfoBox";
+import BitcoinIcon from "../../../../icons/BitcoinIcon";
+import DepositAmountHelper from "./DepositAmountHelper";
 import {
   BitcoinAmount,
   MoneroBitcoinExchangeRate,
   SatsAmount,
-} from '../../../../other/Units';
+} from "../../../../other/Units";
 
 const useStyles = makeStyles((theme) => ({
   amountHelper: {
-    display: 'flex',
-    alignItems: 'center',
+    display: "flex",
+    alignItems: "center",
   },
   additionalContent: {
     paddingTop: theme.spacing(1),
     gap: theme.spacing(0.5),
-    display: 'flex',
-    flexDirection: 'column',
+    display: "flex",
+    flexDirection: "column",
   },
 }));
 
@@ -45,13 +45,13 @@ export default function WaitingForBtcDepositPage({
               <ul>
                 {bitcoinBalance > 0 ? (
                   <li>
-                    You have already deposited{' '}
+                    You have already deposited{" "}
                     <SatsAmount amount={bitcoinBalance} />
                   </li>
                 ) : null}
                 <li>
-                  Send any amount between{' '}
-                  <BitcoinAmount amount={state.minDeposit} /> and{' '}
+                  Send any amount between{" "}
+                  <BitcoinAmount amount={state.minDeposit} /> and{" "}
                   <BitcoinAmount amount={state.maxDeposit} /> to the address
                   above
                   {bitcoinBalance > 0 && (
@@ -60,11 +60,11 @@ export default function WaitingForBtcDepositPage({
                 </li>
                 <li>
                   All Bitcoin sent to this this address will converted into
-                  Monero at an exchance rate of{' '}
+                  Monero at an exchance rate of{" "}
                   <MoneroBitcoinExchangeRate rate={state.price} />
                 </li>
                 <li>
-                  The network fee of{' '}
+                  The network fee of{" "}
                   <BitcoinAmount amount={state.minBitcoinLockTxFee} /> will
                   automatically be deducted from the deposited coins
                 </li>
@@ -74,9 +74,7 @@ export default function WaitingForBtcDepositPage({
                 </li>
               </ul>
             </Typography>
-            <DepositAmountHelper
-              state={state}
-            />
+            <DepositAmountHelper state={state} />
           </Box>
         }
         icon={<BitcoinIcon />}

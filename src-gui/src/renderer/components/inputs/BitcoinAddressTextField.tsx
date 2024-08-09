@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
-import { TextField } from '@material-ui/core';
-import { TextFieldProps } from '@material-ui/core/TextField/TextField';
-import { isBtcAddressValid } from 'utils/conversionUtils';
-import { isTestnet } from 'store/config';
+import { useEffect } from "react";
+import { TextField } from "@material-ui/core";
+import { TextFieldProps } from "@material-ui/core/TextField/TextField";
+import { isBtcAddressValid } from "utils/conversionUtils";
+import { isTestnet } from "store/config";
 
 export default function BitcoinAddressTextField({
   address,
@@ -16,11 +16,11 @@ export default function BitcoinAddressTextField({
   onAddressValidityChange: (valid: boolean) => void;
   helperText: string;
 } & TextFieldProps) {
-  const placeholder = isTestnet() ? 'tb1q4aelwalu...' : 'bc18ociqZ9mZ...';
+  const placeholder = isTestnet() ? "tb1q4aelwalu..." : "bc18ociqZ9mZ...";
   const errorText = isBtcAddressValid(address, isTestnet())
     ? null
     : `Only bech32 addresses are supported. They begin with "${
-        isTestnet() ? 'tb1' : 'bc1'
+        isTestnet() ? "tb1" : "bc1"
       }"`;
 
   useEffect(() => {

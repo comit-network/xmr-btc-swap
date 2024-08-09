@@ -1,13 +1,13 @@
-import { Box, makeStyles, CssBaseline } from '@material-ui/core';
-import { createTheme, ThemeProvider } from '@material-ui/core/styles';
-import { indigo } from '@material-ui/core/colors';
-import { MemoryRouter as Router, Routes, Route } from 'react-router-dom';
-import Navigation, { drawerWidth } from './navigation/Navigation';
-import HistoryPage from './pages/history/HistoryPage';
-import SwapPage from './pages/swap/SwapPage';
-import WalletPage from './pages/wallet/WalletPage';
-import HelpPage from './pages/help/HelpPage';
-import GlobalSnackbarProvider from './snackbar/GlobalSnackbarProvider';
+import { Box, makeStyles, CssBaseline } from "@material-ui/core";
+import { createTheme, ThemeProvider } from "@material-ui/core/styles";
+import { indigo } from "@material-ui/core/colors";
+import { MemoryRouter as Router, Routes, Route } from "react-router-dom";
+import Navigation, { drawerWidth } from "./navigation/Navigation";
+import HistoryPage from "./pages/history/HistoryPage";
+import SwapPage from "./pages/swap/SwapPage";
+import WalletPage from "./pages/wallet/WalletPage";
+import HelpPage from "./pages/help/HelpPage";
+import GlobalSnackbarProvider from "./snackbar/GlobalSnackbarProvider";
 
 const useStyles = makeStyles((theme) => ({
   innerContent: {
@@ -20,14 +20,14 @@ const useStyles = makeStyles((theme) => ({
 
 const theme = createTheme({
   palette: {
-    type: 'dark',
+    type: "dark",
     primary: {
-      main: '#f4511e',
+      main: "#f4511e",
     },
     secondary: indigo,
   },
   transitions: {
-    create: () => 'none',
+    create: () => "none",
   },
   props: {
     MuiButtonBase: {

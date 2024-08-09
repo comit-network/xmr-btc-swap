@@ -6,7 +6,7 @@ import { ReactNode, useEffect, useState } from "react";
 interface IpcInvokeButtonProps<T> {
   onSuccess?: (data: T) => void;
   onClick: () => Promise<T>;
-  onPendingChange?: (bool) => void;
+  onPendingChange?: (isPending: boolean) => void;
   isLoadingOverride?: boolean;
   isIconButton?: boolean;
   loadIcon?: ReactNode;
@@ -46,7 +46,7 @@ export default function PromiseInvokeButton<T>({
         onSuccess?.(result);
       } catch (e: unknown) {
         if (displayErrorSnackbar) {
-          enqueueSnackbar((e as Error).message, {
+          enqueueSnackbar(e as String, {
             autoHideDuration: 60 * 1000,
             variant: "error",
           });

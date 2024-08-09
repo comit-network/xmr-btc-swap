@@ -1,15 +1,15 @@
-import { ButtonProps } from '@material-ui/core/Button/Button';
+import { ButtonProps } from "@material-ui/core/Button/Button";
 import {
   Button,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-} from '@material-ui/core';
-import { useState } from 'react';
-import { CliLog } from 'models/cliModel';
-import IpcInvokeButton from '../../../IpcInvokeButton';
-import CliLogsBox from '../../../other/RenderedCliLog';
+} from "@material-ui/core";
+import { useState } from "react";
+import { CliLog } from "models/cliModel";
+import IpcInvokeButton from "../../../IpcInvokeButton";
+import CliLogsBox from "../../../other/RenderedCliLog";
 
 export default function SwapLogFileOpenButton({
   swapId,

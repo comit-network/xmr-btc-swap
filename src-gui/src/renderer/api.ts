@@ -1,6 +1,6 @@
-import { Alert, ExtendedProviderStatus } from 'models/apiModel';
+import { Alert, ExtendedProviderStatus } from "models/apiModel";
 
-const API_BASE_URL = 'https://api.unstoppableswap.net';
+const API_BASE_URL = "https://api.unstoppableswap.net";
 
 export async function fetchProvidersViaHttp(): Promise<
   ExtendedProviderStatus[]
@@ -23,9 +23,9 @@ export async function submitFeedbackViaHttp(
   };
 
   const response = await fetch(`${API_BASE_URL}/api/submit-feedback`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({ body, attachedData }),
   });
@@ -53,9 +53,9 @@ async function fetchCurrencyUsdPrice(currency: string): Promise<number> {
 }
 
 export async function fetchBtcPrice(): Promise<number> {
-  return fetchCurrencyUsdPrice('bitcoin');
+  return fetchCurrencyUsdPrice("bitcoin");
 }
 
 export async function fetchXmrPrice(): Promise<number> {
-  return fetchCurrencyUsdPrice('monero');
+  return fetchCurrencyUsdPrice("monero");
 }

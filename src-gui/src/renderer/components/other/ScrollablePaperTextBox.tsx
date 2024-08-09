@@ -1,12 +1,12 @@
-import { Box, Divider, IconButton, Paper, Typography } from '@material-ui/core';
-import { ReactNode, useRef } from 'react';
-import KeyboardArrowDownIcon from '@material-ui/icons/KeyboardArrowDown';
-import KeyboardArrowUpIcon from '@material-ui/icons/KeyboardArrowUp';
-import { VList, VListHandle } from 'virtua';
-import FileCopyOutlinedIcon from '@material-ui/icons/FileCopyOutlined';
-import { ExpandableSearchBox } from './ExpandableSearchBox';
+import { Box, Divider, IconButton, Paper, Typography } from "@material-ui/core";
+import { ReactNode, useRef } from "react";
+import KeyboardArrowDownIcon from "@material-ui/icons/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@material-ui/icons/KeyboardArrowUp";
+import { VList, VListHandle } from "virtua";
+import FileCopyOutlinedIcon from "@material-ui/icons/FileCopyOutlined";
+import { ExpandableSearchBox } from "./ExpandableSearchBox";
 
-const MIN_HEIGHT = '10rem';
+const MIN_HEIGHT = "10rem";
 
 export default function ScrollablePaperTextBox({
   rows,
@@ -41,31 +41,31 @@ export default function ScrollablePaperTextBox({
     <Paper
       variant="outlined"
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.5rem',
-        padding: '0.5rem',
-        width: '100%',
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.5rem",
+        padding: "0.5rem",
+        width: "100%",
       }}
     >
       <Typography>{title}</Typography>
       <Divider />
       <Box
         style={{
-          overflow: 'auto',
-          whiteSpace: 'nowrap',
+          overflow: "auto",
+          whiteSpace: "nowrap",
           maxHeight: minHeight,
           minHeight,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.5rem',
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.5rem",
         }}
       >
-        <VList ref={virtuaEl} style={{ height: MIN_HEIGHT, width: '100%' }}>
+        <VList ref={virtuaEl} style={{ height: MIN_HEIGHT, width: "100%" }}>
           {rows}
         </VList>
       </Box>
-      <Box style={{ display: 'flex', gap: '0.5rem' }}>
+      <Box style={{ display: "flex", gap: "0.5rem" }}>
         <IconButton onClick={onCopy} size="small">
           <FileCopyOutlinedIcon />
         </IconButton>

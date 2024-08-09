@@ -1,7 +1,7 @@
-import { Button } from '@material-ui/core';
-import Alert from '@material-ui/lab/Alert';
-import { useNavigate } from 'react-router-dom';
-import { useAppSelector } from 'store/hooks';
+import { Button } from "@material-ui/core";
+import Alert from "@material-ui/lab/Alert";
+import { useNavigate } from "react-router-dom";
+import { useAppSelector } from "store/hooks";
 
 export default function FundsLeftInWalletAlert() {
   const fundsLeft = useAppSelector((state) => state.rpc.state.balance);
@@ -16,7 +16,7 @@ export default function FundsLeftInWalletAlert() {
           <Button
             color="inherit"
             size="small"
-            onClick={() => navigate('/wallet')}
+            onClick={() => navigate("/wallet")}
           >
             View
           </Button>

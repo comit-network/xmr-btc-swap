@@ -1,11 +1,11 @@
-import { Box, makeStyles, Typography } from '@material-ui/core';
-import { Alert } from '@material-ui/lab';
-import WithdrawWidget from './WithdrawWidget';
+import { Box, makeStyles, Typography } from "@material-ui/core";
+import { Alert } from "@material-ui/lab";
+import WithdrawWidget from "./WithdrawWidget";
 
 const useStyles = makeStyles((theme) => ({
   outer: {
-    display: 'flex',
-    flexDirection: 'column',
+    display: "flex",
+    flexDirection: "column",
     gridGap: theme.spacing(0.5),
   },
 }));

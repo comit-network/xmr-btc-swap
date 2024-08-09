@@ -1,4 +1,4 @@
-import { ExtendedProviderStatus } from 'models/apiModel';
+import { ExtendedProviderStatus } from "models/apiModel";
 
 export function sortProviderList(list: ExtendedProviderStatus[]) {
   return list.concat().sort((firstEl, secondEl) => {

@@ -1,6 +1,6 @@
-import { Link, Typography } from '@material-ui/core';
-import { ReactNode } from 'react';
-import InfoBox from './InfoBox';
+import { Link, Typography } from "@material-ui/core";
+import { ReactNode } from "react";
+import InfoBox from "./InfoBox";
 
 type TransactionInfoBoxProps = {
   title: string;

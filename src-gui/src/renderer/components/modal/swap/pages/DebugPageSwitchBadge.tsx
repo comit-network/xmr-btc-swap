@@ -1,6 +1,6 @@
-import { Tooltip } from '@material-ui/core';
-import IconButton from '@material-ui/core/IconButton';
-import DeveloperBoardIcon from '@material-ui/icons/DeveloperBoard';
+import { Tooltip } from "@material-ui/core";
+import IconButton from "@material-ui/core/IconButton";
+import DeveloperBoardIcon from "@material-ui/icons/DeveloperBoard";
 
 export default function DebugPageSwitchBadge({
   enabled,
@@ -14,10 +14,10 @@ export default function DebugPageSwitchBadge({
   };
 
   return (
-    <Tooltip title={enabled ? 'Hide debug view' : 'Show debug view'}>
+    <Tooltip title={enabled ? "Hide debug view" : "Show debug view"}>
       <IconButton
         onClick={handleToggle}
-        color={enabled ? 'primary' : 'default'}
+        color={enabled ? "primary" : "default"}
       >
         <DeveloperBoardIcon />
       </IconButton>

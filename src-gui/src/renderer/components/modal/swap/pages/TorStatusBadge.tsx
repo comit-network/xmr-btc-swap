@@ -1,6 +1,6 @@
-import { IconButton, Tooltip } from '@material-ui/core';
-import { useAppSelector } from 'store/hooks';
-import TorIcon from '../../../icons/TorIcon';
+import { IconButton, Tooltip } from "@material-ui/core";
+import { useAppSelector } from "store/hooks";
+import TorIcon from "../../../icons/TorIcon";
 
 export default function TorStatusBadge() {
   const tor = useAppSelector((s) => s.tor);

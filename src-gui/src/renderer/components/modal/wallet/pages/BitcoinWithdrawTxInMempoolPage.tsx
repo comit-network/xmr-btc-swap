@@ -11,18 +11,16 @@ export default function BtcTxInMempoolPageContent({
 }) {
   return (
     <>
-      <WithdrawDialogContent>
-        <DialogContentText>
-          All funds of the internal Bitcoin wallet have been transferred to your
-          withdraw address.
-        </DialogContentText>
-        <BitcoinTransactionInfoBox
-          txId={withdrawTxId}
-          loading={false}
-          title="Bitcoin Withdraw Transaction"
-          additionalContent={null}
-        />
-      </WithdrawDialogContent>
+      <DialogContentText>
+        All funds of the internal Bitcoin wallet have been transferred to your
+        withdraw address.
+      </DialogContentText>
+      <BitcoinTransactionInfoBox
+        txId={withdrawTxId}
+        loading={false}
+        title="Bitcoin Withdraw Transaction"
+        additionalContent={null}
+      />
     </>
   );
 }

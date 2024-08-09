@@ -9,6 +9,7 @@ import { useState } from "react";
 import { withdrawBtc } from "renderer/rpc";
 import BtcTxInMempoolPageContent from "./pages/BitcoinWithdrawTxInMempoolPage";
 import AddressInputPage from "./pages/AddressInputPage";
+import WithdrawDialogContent from "./WithdrawDialogContent";
 
 export default function WithdrawDialog({
   open,
@@ -30,27 +31,30 @@ export default function WithdrawDialog({
     }
   }
 
-  // This prevents an issue where the Dialog is shown for a split second without a present withdraw state
-  if (!open) return null;
-
   return (
-    <Dialog open onClose={onCancel} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onCancel} maxWidth="sm" fullWidth>
       <DialogHeader title="Withdraw Bitcoin" />
-      {withdrawTxId === null ? (
-        <AddressInputPage
-          setWithdrawAddress={setWithdrawAddress}
-          withdrawAddress={withdrawAddress}
-          setWithdrawAddressValid={setWithdrawAddressValid}
-        />
-      ) : (
-        <BtcTxInMempoolPageContent
-          withdrawTxId={withdrawTxId}
-          onCancel={onCancel}
-        />
-      )}
-      <DialogActions>
+      <WithdrawDialogContent isPending={pending} withdrawTxId={withdrawTxId}>
         {withdrawTxId === null ? (
+          <AddressInputPage
+            setWithdrawAddress={setWithdrawAddress}
+            withdrawAddress={withdrawAddress}
+            setWithdrawAddressValid={setWithdrawAddressValid}
+          />
+        ) : (
+          <BtcTxInMempoolPageContent
+            withdrawTxId={withdrawTxId}
+            onCancel={onCancel}
+          />
+        )}
+      </WithdrawDialogContent>
+      <DialogActions>
+        <Button onClick={onCancel} color="primary" disabled={pending}>
+          {withdrawTxId === null ? "Cancel" : "Done"}
+        </Button>
+        {withdrawTxId === null && (
           <PromiseInvokeButton
+            displayErrorSnackbar
             variant="contained"
             color="primary"
             disabled={!withdrawAddressValid}
@@ -65,10 +69,6 @@ export default function WithdrawDialog({
           >
             Withdraw
           </PromiseInvokeButton>
-        ) : (
-          <Button onClick={onCancel} color="primary" disabled={pending}>
-            Close
-          </Button>
         )}
       </DialogActions>
     </Dialog>

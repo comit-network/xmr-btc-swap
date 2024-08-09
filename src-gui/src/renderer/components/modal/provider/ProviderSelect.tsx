@@ -4,25 +4,25 @@ import {
   CardContent,
   Box,
   IconButton,
-} from '@material-ui/core';
-import ArrowForwardIosIcon from '@material-ui/icons/ArrowForwardIos';
-import { useState } from 'react';
-import { useAppSelector } from 'store/hooks';
-import ProviderInfo from './ProviderInfo';
-import ProviderListDialog from './ProviderListDialog';
+} from "@material-ui/core";
+import ArrowForwardIosIcon from "@material-ui/icons/ArrowForwardIos";
+import { useState } from "react";
+import { useAppSelector } from "store/hooks";
+import ProviderInfo from "./ProviderInfo";
+import ProviderListDialog from "./ProviderListDialog";
 
 const useStyles = makeStyles({
   inner: {
-    textAlign: 'left',
-    width: '100%',
-    height: '100%',
+    textAlign: "left",
+    width: "100%",
+    height: "100%",
   },
   providerCard: {
-    width: '100%',
+    width: "100%",
   },
   providerCardContent: {
-    display: 'flex',
-    alignItems: 'center',
+    display: "flex",
+    alignItems: "center",
   },
 });
 

@@ -1,24 +1,24 @@
-import { makeStyles, Box, Typography, Chip, Tooltip } from '@material-ui/core';
-import { VerifiedUser } from '@material-ui/icons';
-import { satsToBtc, secondsToDays } from 'utils/conversionUtils';
-import { ExtendedProviderStatus } from 'models/apiModel';
+import { makeStyles, Box, Typography, Chip, Tooltip } from "@material-ui/core";
+import { VerifiedUser } from "@material-ui/icons";
+import { satsToBtc, secondsToDays } from "utils/conversionUtils";
+import { ExtendedProviderStatus } from "models/apiModel";
 import {
   MoneroBitcoinExchangeRate,
   SatsAmount,
-} from 'renderer/components/other/Units';
+} from "renderer/components/other/Units";
 
 const useStyles = makeStyles((theme) => ({
   content: {
     flex: 1,
-    '& *': {
-      lineBreak: 'anywhere',
+    "& *": {
+      lineBreak: "anywhere",
     },
   },
   chipsOuter: {
-    display: 'flex',
+    display: "flex",
     marginTop: theme.spacing(1),
     gap: theme.spacing(0.5),
-    flexWrap: 'wrap',
+    flexWrap: "wrap",
   },
 }));
 
@@ -41,7 +41,7 @@ export default function ProviderInfo({
         {provider.peerId.substring(0, 8)}...{provider.peerId.slice(-8)}
       </Typography>
       <Typography variant="caption">
-        Exchange rate:{' '}
+        Exchange rate:{" "}
         <MoneroBitcoinExchangeRate rate={satsToBtc(provider.price)} />
         <br />
         Minimum swap amount: <SatsAmount amount={provider.minSwapAmount} />
@@ -49,7 +49,7 @@ export default function ProviderInfo({
         Maximum swap amount: <SatsAmount amount={provider.maxSwapAmount} />
       </Typography>
       <Box className={classes.chipsOuter}>
-        <Chip label={provider.testnet ? 'Testnet' : 'Mainnet'} />
+        <Chip label={provider.testnet ? "Testnet" : "Mainnet"} />
         {provider.uptime && (
           <Tooltip title="A high uptime indicates reliability. Providers with low uptime may be unreliable and cause swaps to take longer to complete or fail entirely.">
             <Chip label={`${Math.round(provider.uptime * 100)} % uptime`} />
@@ -58,7 +58,7 @@ export default function ProviderInfo({
         {provider.age ? (
           <Chip
             label={`Went online ${Math.round(secondsToDays(provider.age))} ${
-              provider.age === 1 ? 'day' : 'days'
+              provider.age === 1 ? "day" : "days"
             } ago`}
           />
         ) : (

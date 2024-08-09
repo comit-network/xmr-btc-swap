@@ -1,5 +1,5 @@
-import { ReactNode } from 'react';
-import { IconButton } from '@material-ui/core';
+import { ReactNode } from "react";
+import { IconButton } from "@material-ui/core";
 
 export default function LinkIconButton({
   url,
@@ -9,7 +9,7 @@ export default function LinkIconButton({
   children: ReactNode;
 }) {
   return (
-    <IconButton component="span" onClick={() => window.open(url, '_blank')}>
+    <IconButton component="span" onClick={() => window.open(url, "_blank")}>
       {children}
     </IconButton>
   );

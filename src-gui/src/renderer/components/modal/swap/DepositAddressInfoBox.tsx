@@ -1,9 +1,9 @@
-import { ReactNode } from 'react';
-import { Box, Typography } from '@material-ui/core';
-import FileCopyOutlinedIcon from '@material-ui/icons/FileCopyOutlined';
-import InfoBox from './InfoBox';
-import ClipboardIconButton from './ClipbiardIconButton';
-import BitcoinQrCode from './BitcoinQrCode';
+import { ReactNode } from "react";
+import { Box, Typography } from "@material-ui/core";
+import FileCopyOutlinedIcon from "@material-ui/icons/FileCopyOutlined";
+import InfoBox from "./InfoBox";
+import ClipboardIconButton from "./ClipbiardIconButton";
+import BitcoinQrCode from "./BitcoinQrCode";
 
 type Props = {
   title: string;
@@ -34,10 +34,10 @@ export default function DepositAddressInfoBox({
             />
             <Box
               style={{
-                display: 'flex',
-                flexDirection: 'row',
-                gap: '0.5rem',
-                alignItems: 'center',
+                display: "flex",
+                flexDirection: "row",
+                gap: "0.5rem",
+                alignItems: "center",
               }}
             >
               <Box>{additionalContent}</Box>

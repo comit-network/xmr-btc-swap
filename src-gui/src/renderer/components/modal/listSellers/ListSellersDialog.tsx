@@ -1,4 +1,4 @@
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useState } from "react";
 import {
   DialogTitle,
   Dialog,
@@ -11,20 +11,20 @@ import {
   Chip,
   makeStyles,
   Theme,
-} from '@material-ui/core';
-import { Multiaddr } from 'multiaddr';
-import { useSnackbar } from 'notistack';
-import IpcInvokeButton from '../../IpcInvokeButton';
+} from "@material-ui/core";
+import { Multiaddr } from "multiaddr";
+import { useSnackbar } from "notistack";
+import IpcInvokeButton from "../../IpcInvokeButton";
 
 const PRESET_RENDEZVOUS_POINTS = [
-  '/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE',
-  '/dns4/eratosthen.es/tcp/7798/p2p/12D3KooWAh7EXXa2ZyegzLGdjvj1W4G3EXrTGrf6trraoT1MEobs',
+  "/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE",
+  "/dns4/eratosthen.es/tcp/7798/p2p/12D3KooWAh7EXXa2ZyegzLGdjvj1W4G3EXrTGrf6trraoT1MEobs",
 ];
 
 const useStyles = makeStyles((theme: Theme) => ({
   chipOuter: {
-    display: 'flex',
-    flexWrap: 'wrap',
+    display: "flex",
+    flexWrap: "wrap",
     gap: theme.spacing(1),
   },
 }));
@@ -39,7 +39,7 @@ export default function ListSellersDialog({
   onClose,
 }: ListSellersDialogProps) {
   const classes = useStyles();
-  const [rendezvousAddress, setRendezvousAddress] = useState('');
+  const [rendezvousAddress, setRendezvousAddress] = useState("");
   const { enqueueSnackbar } = useSnackbar();
 
   function handleMultiAddrChange(event: ChangeEvent<HTMLInputElement>) {
@@ -49,12 +49,12 @@ export default function ListSellersDialog({
   function getMultiAddressError(): string | null {
     try {
       const multiAddress = new Multiaddr(rendezvousAddress);
-      if (!multiAddress.protoNames().includes('p2p')) {
-        return 'The multi address must contain the peer id (/p2p/)';
+      if (!multiAddress.protoNames().includes("p2p")) {
+        return "The multi address must contain the peer id (/p2p/)";
       }
       return null;
     } catch (e) {
-      return 'Not a valid multi address';
+      return "Not a valid multi address";
     }
   }
 
@@ -73,7 +73,7 @@ export default function ListSellersDialog({
     }
 
     enqueueSnackbar(message, {
-      variant: 'success',
+      variant: "success",
       autoHideDuration: 5000,
     });
 
@@ -96,7 +96,7 @@ export default function ListSellersDialog({
           label="Rendezvous point"
           fullWidth
           helperText={
-            getMultiAddressError() || 'Multiaddress of the rendezvous point'
+            getMultiAddressError() || "Multiaddress of the rendezvous point"
           }
           value={rendezvousAddress}
           onChange={handleMultiAddrChange}

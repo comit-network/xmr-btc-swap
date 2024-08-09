@@ -24,5 +24,5 @@ export interface Alert {
   id: number;
   title: string;
   body: string;
-  severity: 'info' | 'warning' | 'error';
+  severity: "info" | "warning" | "error";
 }

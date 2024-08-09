@@ -11,21 +11,21 @@ import {
   DialogContent,
   makeStyles,
   CircularProgress,
-} from '@material-ui/core';
-import AddIcon from '@material-ui/icons/Add';
-import { useState } from 'react';
-import SearchIcon from '@material-ui/icons/Search';
-import { ExtendedProviderStatus } from 'models/apiModel';
+} from "@material-ui/core";
+import AddIcon from "@material-ui/icons/Add";
+import { useState } from "react";
+import SearchIcon from "@material-ui/icons/Search";
+import { ExtendedProviderStatus } from "models/apiModel";
 import {
   useAllProviders,
   useAppDispatch,
   useIsRpcEndpointBusy,
-} from 'store/hooks';
-import { setSelectedProvider } from 'store/features/providersSlice';
-import { RpcMethod } from 'models/rpcModel';
-import ProviderSubmitDialog from './ProviderSubmitDialog';
-import ListSellersDialog from '../listSellers/ListSellersDialog';
-import ProviderInfo from './ProviderInfo';
+} from "store/hooks";
+import { setSelectedProvider } from "store/features/providersSlice";
+import { RpcMethod } from "models/rpcModel";
+import ProviderSubmitDialog from "./ProviderSubmitDialog";
+import ListSellersDialog from "../listSellers/ListSellersDialog";
+import ProviderInfo from "./ProviderInfo";
 
 const useStyles = makeStyles({
   dialogContent: {

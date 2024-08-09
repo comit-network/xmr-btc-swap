@@ -1,7 +1,7 @@
-import { Alert } from '@material-ui/lab';
-import { CircularProgress } from '@material-ui/core';
-import { useAppSelector } from 'store/hooks';
-import { RpcProcessStateType } from 'models/rpcModel';
+import { Alert } from "@material-ui/lab";
+import { CircularProgress } from "@material-ui/core";
+import { useAppSelector } from "store/hooks";
+import { RpcProcessStateType } from "models/rpcModel";
 
 export default function RpcStatusAlert() {
   const rpcProcess = useAppSelector((s) => s.rpc.process);

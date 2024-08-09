@@ -1,12 +1,8 @@
-import { Step, StepLabel, Stepper } from '@material-ui/core';
-import { useAppSelector, useIsRpcEndpointBusy } from 'store/hooks';
-import { RpcMethod } from 'models/rpcModel';
+import { Step, StepLabel, Stepper } from "@material-ui/core";
+import { useAppSelector, useIsRpcEndpointBusy } from "store/hooks";
 
-function getActiveStep(
-  isWithdrawInProgress: boolean,
-  withdrawTxId: string | null,
-) {
-  if (isWithdrawInProgress) {
+function getActiveStep(isPending: boolean, withdrawTxId: string | null) {
+  if (isPending) {
     return 1;
   }
   if (withdrawTxId !== null) {
@@ -15,12 +11,15 @@ function getActiveStep(
   return 0;
 }
 
-export default function WithdrawStepper() {
-  const isWithdrawInProgress = useIsRpcEndpointBusy(RpcMethod.WITHDRAW_BTC);
-  const withdrawTxId = useAppSelector((s) => s.rpc.state.withdrawTxId);
-
+export default function WithdrawStepper({
+  isPending,
+  withdrawTxId,
+}: {
+  isPending: boolean;
+  withdrawTxId: string | null;
+}) {
   return (
-    <Stepper activeStep={getActiveStep(isWithdrawInProgress, withdrawTxId)}>
+    <Stepper activeStep={getActiveStep(isPending, withdrawTxId)}>
       <Step key={0}>
         <StepLabel>Enter withdraw address</StepLabel>
       </Step>

@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useState } from 'react';
+import { ChangeEvent, useEffect, useState } from "react";
 import {
   makeStyles,
   Box,
@@ -7,21 +7,21 @@ import {
   TextField,
   LinearProgress,
   Fab,
-} from '@material-ui/core';
-import InputAdornment from '@material-ui/core/InputAdornment';
-import ArrowDownwardIcon from '@material-ui/icons/ArrowDownward';
-import SwapHorizIcon from '@material-ui/icons/SwapHoriz';
-import { Alert } from '@material-ui/lab';
-import { satsToBtc } from 'utils/conversionUtils';
-import { useAppSelector } from 'store/hooks';
-import { ExtendedProviderStatus } from 'models/apiModel';
-import { isSwapState } from 'models/storeModel';
-import SwapDialog from '../../modal/swap/SwapDialog';
-import ProviderSelect from '../../modal/provider/ProviderSelect';
+} from "@material-ui/core";
+import InputAdornment from "@material-ui/core/InputAdornment";
+import ArrowDownwardIcon from "@material-ui/icons/ArrowDownward";
+import SwapHorizIcon from "@material-ui/icons/SwapHoriz";
+import { Alert } from "@material-ui/lab";
+import { satsToBtc } from "utils/conversionUtils";
+import { useAppSelector } from "store/hooks";
+import { ExtendedProviderStatus } from "models/apiModel";
+import { isSwapState } from "models/storeModel";
+import SwapDialog from "../../modal/swap/SwapDialog";
+import ProviderSelect from "../../modal/provider/ProviderSelect";
 import {
   ListSellersDialogOpenButton,
   ProviderSubmitDialogOpenButton,
-} from '../../modal/provider/ProviderListDialog';
+} from "../../modal/provider/ProviderListDialog";
 
 // After RECONNECTION_ATTEMPTS_UNTIL_ASSUME_DOWN failed reconnection attempts we can assume the public registry is down
 const RECONNECTION_ATTEMPTS_UNTIL_ASSUME_DOWN = 1;
@@ -32,9 +32,9 @@ function isRegistryDown(reconnectionAttempts: number): boolean {
 
 const useStyles = makeStyles((theme) => ({
   inner: {
-    width: 'min(480px, 100%)',
-    minHeight: '150px',
-    display: 'grid',
+    width: "min(480px, 100%)",
+    minHeight: "150px",
+    display: "grid",
     padding: theme.spacing(1),
     gridGap: theme.spacing(1),
   },
@@ -48,19 +48,19 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(1),
   },
   swapIconOuter: {
-    display: 'flex',
-    justifyContent: 'center',
+    display: "flex",
+    justifyContent: "center",
   },
   swapIcon: {
     marginRight: theme.spacing(1),
   },
   noProvidersAlertOuter: {
-    display: 'flex',
-    flexDirection: 'column',
+    display: "flex",
+    flexDirection: "column",
     gap: theme.spacing(1),
   },
   noProvidersAlertButtonsOuter: {
-    display: 'flex',
+    display: "flex",
     gap: theme.spacing(1),
   },
 }));
@@ -111,7 +111,7 @@ function HasProviderSwapWidget({
   function getBtcFieldError(): string | null {
     const parsedBtcAmount = Number(btcFieldValue);
     if (Number.isNaN(parsedBtcAmount)) {
-      return 'This is not a valid number';
+      return "This is not a valid number";
     }
     if (parsedBtcAmount < satsToBtc(selectedProvider.minSwapAmount)) {
       return `The minimum swap amount is ${satsToBtc(

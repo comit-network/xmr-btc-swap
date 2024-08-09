@@ -1,6 +1,6 @@
-import { Drawer, makeStyles, Box } from '@material-ui/core';
-import NavigationHeader from './NavigationHeader';
-import NavigationFooter from './NavigationFooter';
+import { Drawer, makeStyles, Box } from "@material-ui/core";
+import NavigationHeader from "./NavigationHeader";
+import NavigationFooter from "./NavigationFooter";
 
 export const drawerWidth = 240;
 
@@ -13,11 +13,11 @@ const useStyles = makeStyles({
     width: drawerWidth,
   },
   drawerContainer: {
-    overflow: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-    height: '100%',
+    overflow: "auto",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    height: "100%",
   },
 });
 

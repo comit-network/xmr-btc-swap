@@ -1,6 +1,6 @@
-import { Alert } from '@material-ui/lab';
-import { Box, LinearProgress } from '@material-ui/core';
-import { useAppSelector } from 'store/hooks';
+import { Alert } from "@material-ui/lab";
+import { Box, LinearProgress } from "@material-ui/core";
+import { useAppSelector } from "store/hooks";
 
 export default function MoneroWalletRpcUpdatingAlert() {
   const updateState = useAppSelector(
@@ -17,7 +17,7 @@ export default function MoneroWalletRpcUpdatingAlert() {
 
   return (
     <Alert severity="info">
-      <Box style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <Box style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
         <span>The Monero wallet is updating. This may take a few moments</span>
         <LinearProgress
           variant="determinate"

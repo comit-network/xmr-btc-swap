@@ -1,17 +1,17 @@
-import { Box, Button, makeStyles, Typography } from '@material-ui/core';
-import InfoBox from '../../modal/swap/InfoBox';
+import { Box, Button, makeStyles, Typography } from "@material-ui/core";
+import InfoBox from "../../modal/swap/InfoBox";
 
 const useStyles = makeStyles((theme) => ({
   spacedBox: {
-    display: 'flex',
+    display: "flex",
     gap: theme.spacing(1),
   },
 }));
 
 const GITHUB_ISSUE_URL =
-  'https://github.com/UnstoppableSwap/unstoppableswap-gui/issues/new/choose';
-const MATRIX_ROOM_URL = 'https://matrix.to/#/#unstoppableswap:matrix.org';
-export const DISCORD_URL = 'https://discord.gg/APJ6rJmq';
+  "https://github.com/UnstoppableSwap/unstoppableswap-gui/issues/new/choose";
+const MATRIX_ROOM_URL = "https://matrix.to/#/#unstoppableswap:matrix.org";
+export const DISCORD_URL = "https://discord.gg/APJ6rJmq";
 
 export default function ContactInfoBox() {
   const classes = useStyles();

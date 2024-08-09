@@ -1,5 +1,5 @@
-import { Box } from '@material-ui/core';
-import { useAppSelector } from 'store/hooks';
+import { Box } from "@material-ui/core";
+import { useAppSelector } from "store/hooks";
 import {
   isSwapStateBtcCancelled,
   isSwapStateBtcLockInMempool,
@@ -15,23 +15,23 @@ import {
   isSwapStateXmrLockInMempool,
   isSwapStateXmrRedeemInMempool,
   SwapState,
-} from '../../../../../models/storeModel';
-import InitiatedPage from './init/InitiatedPage';
-import WaitingForBitcoinDepositPage from './init/WaitingForBitcoinDepositPage';
-import StartedPage from './in_progress/StartedPage';
-import BitcoinLockTxInMempoolPage from './in_progress/BitcoinLockTxInMempoolPage';
-import XmrLockTxInMempoolPage from './in_progress/XmrLockInMempoolPage';
+} from "../../../../../models/storeModel";
+import InitiatedPage from "./init/InitiatedPage";
+import WaitingForBitcoinDepositPage from "./init/WaitingForBitcoinDepositPage";
+import StartedPage from "./in_progress/StartedPage";
+import BitcoinLockTxInMempoolPage from "./in_progress/BitcoinLockTxInMempoolPage";
+import XmrLockTxInMempoolPage from "./in_progress/XmrLockInMempoolPage";
 // eslint-disable-next-line import/no-cycle
-import ProcessExitedPage from './exited/ProcessExitedPage';
-import XmrRedeemInMempoolPage from './done/XmrRedeemInMempoolPage';
-import ReceivedQuotePage from './in_progress/ReceivedQuotePage';
-import BitcoinRedeemedPage from './in_progress/BitcoinRedeemedPage';
-import InitPage from './init/InitPage';
-import XmrLockedPage from './in_progress/XmrLockedPage';
-import BitcoinCancelledPage from './in_progress/BitcoinCancelledPage';
-import BitcoinRefundedPage from './done/BitcoinRefundedPage';
-import BitcoinPunishedPage from './done/BitcoinPunishedPage';
-import { SyncingMoneroWalletPage } from './in_progress/SyncingMoneroWalletPage';
+import ProcessExitedPage from "./exited/ProcessExitedPage";
+import XmrRedeemInMempoolPage from "./done/XmrRedeemInMempoolPage";
+import ReceivedQuotePage from "./in_progress/ReceivedQuotePage";
+import BitcoinRedeemedPage from "./in_progress/BitcoinRedeemedPage";
+import InitPage from "./init/InitPage";
+import XmrLockedPage from "./in_progress/XmrLockedPage";
+import BitcoinCancelledPage from "./in_progress/BitcoinCancelledPage";
+import BitcoinRefundedPage from "./done/BitcoinRefundedPage";
+import BitcoinPunishedPage from "./done/BitcoinPunishedPage";
+import { SyncingMoneroWalletPage } from "./in_progress/SyncingMoneroWalletPage";
 
 export default function SwapStatePage({
   swapState,

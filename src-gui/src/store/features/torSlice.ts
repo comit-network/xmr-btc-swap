@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 export interface TorSlice {
   exitCode: number | null;
@@ -16,7 +16,7 @@ export interface TorSlice {
 const initialState: TorSlice = {
   processRunning: false,
   exitCode: null,
-  stdOut: '',
+  stdOut: "",
   proxyStatus: false,
 };
 
@@ -25,13 +25,13 @@ const socksListenerRegex =
 const bootstrapDoneRegex = /Bootstrapped 100% \(done\)/;
 
 export const torSlice = createSlice({
-  name: 'tor',
+  name: "tor",
   initialState,
   reducers: {
     torAppendStdOut(slice, action: PayloadAction<string>) {
       slice.stdOut += action.payload;
 
-      const logs = slice.stdOut.split('\n');
+      const logs = slice.stdOut.split("\n");
       logs.forEach((log) => {
         if (socksListenerRegex.test(log)) {
           const match = socksListenerRegex.exec(log);

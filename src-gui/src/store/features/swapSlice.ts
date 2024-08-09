@@ -1,6 +1,6 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { extractAmountFromUnitString } from 'utils/parseUtils';
-import { Provider } from 'models/apiModel';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { extractAmountFromUnitString } from "utils/parseUtils";
+import { Provider } from "models/apiModel";
 import {
   isSwapStateBtcLockInMempool,
   isSwapStateProcessExited,
@@ -21,7 +21,7 @@ import {
   SwapStateXmrLocked,
   SwapStateXmrLockInMempool,
   SwapStateXmrRedeemInMempool,
-} from '../../models/storeModel';
+} from "../../models/storeModel";
 import {
   isCliLogAliceLockedXmr,
   isCliLogBtcTxStatusChanged,
@@ -41,8 +41,8 @@ import {
   isCliLogApiCallError,
   isCliLogDeterminedSwapAmount,
   isCliLogAttemptingToCooperativelyRedeemXmr,
-} from '../../models/cliModel';
-import logger from '../../utils/logger';
+} from "../../models/cliModel";
+import logger from "../../utils/logger";
 
 const initialState: SwapSlice = {
   state: null,
@@ -54,7 +54,7 @@ const initialState: SwapSlice = {
 };
 
 export const swapSlice = createSlice({
-  name: 'swap',
+  name: "swap",
   initialState,
   reducers: {
     swapAddLog(
@@ -164,7 +164,7 @@ export const swapSlice = createSlice({
 
           slice.swapId = log.fields.swap_id;
         } else if (isCliLogPublishedBtcTx(log)) {
-          if (log.fields.kind === 'lock') {
+          if (log.fields.kind === "lock") {
             const nextState: SwapStateBtcLockInMempool = {
               type: SwapStateType.BTC_LOCK_TX_IN_MEMPOOL,
               bobBtcLockTxId: log.fields.txid,
@@ -172,14 +172,14 @@ export const swapSlice = createSlice({
             };
 
             slice.state = nextState;
-          } else if (log.fields.kind === 'cancel') {
+          } else if (log.fields.kind === "cancel") {
             const nextState: SwapStateBtcCancelled = {
               type: SwapStateType.BTC_CANCELLED,
               btcCancelTxId: log.fields.txid,
             };
 
             slice.state = nextState;
-          } else if (log.fields.kind === 'refund') {
+          } else if (log.fields.kind === "refund") {
             const nextState: SwapStateBtcRefunded = {
               type: SwapStateType.BTC_REFUNDED,
               bobBtcRefundTxId: log.fields.txid,
@@ -194,9 +194,9 @@ export const swapSlice = createSlice({
                 ? log.fields.new_status
                 : log.fields.status;
 
-              if (newStatusText.startsWith('confirmed with')) {
+              if (newStatusText.startsWith("confirmed with")) {
                 const confirmations = Number.parseInt(
-                  newStatusText.split(' ')[2],
+                  newStatusText.split(" ")[2],
                   10,
                 );
 
@@ -222,13 +222,13 @@ export const swapSlice = createSlice({
             }
           }
         } else if (isCliLogAdvancingState(log)) {
-          if (log.fields.state === 'xmr is locked') {
+          if (log.fields.state === "xmr is locked") {
             const nextState: SwapStateXmrLocked = {
               type: SwapStateType.XMR_LOCKED,
             };
 
             slice.state = nextState;
-          } else if (log.fields.state === 'btc is redeemed') {
+          } else if (log.fields.state === "btc is redeemed") {
             const nextState: SwapStateBtcRedemeed = {
               type: SwapStateType.BTC_REDEEMED,
             };
@@ -255,8 +255,7 @@ export const swapSlice = createSlice({
           };
 
           slice.state = nextState;
-        }
-         else if (
+        } else if (
           isCliLogReleasingSwapLockLog(log) &&
           !action.payload.isFromRestore
         ) {

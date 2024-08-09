@@ -3,14 +3,14 @@ import {
   SnackbarKey,
   SnackbarProvider,
   useSnackbar,
-} from 'notistack';
-import { IconButton, styled } from '@material-ui/core';
-import { Close } from '@material-ui/icons';
-import { ReactNode } from 'react';
+} from "notistack";
+import { IconButton, styled } from "@material-ui/core";
+import { Close } from "@material-ui/icons";
+import { ReactNode } from "react";
 
 const StyledMaterialDesignContent = styled(MaterialDesignContent)(() => ({
-  '&.notistack-MuiContent': {
-    maxWidth: '50vw',
+  "&.notistack-MuiContent": {
+    maxWidth: "50vw",
   },
 }));
 

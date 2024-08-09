@@ -1,8 +1,8 @@
-import { isTestnet } from 'store/config';
-import { getBitcoinTxExplorerUrl } from 'utils/conversionUtils';
-import BitcoinIcon from 'renderer/components/icons/BitcoinIcon';
-import { ReactNode } from 'react';
-import TransactionInfoBox from './TransactionInfoBox';
+import { isTestnet } from "store/config";
+import { getBitcoinTxExplorerUrl } from "utils/conversionUtils";
+import BitcoinIcon from "renderer/components/icons/BitcoinIcon";
+import { ReactNode } from "react";
+import TransactionInfoBox from "./TransactionInfoBox";
 
 type Props = {
   title: string;

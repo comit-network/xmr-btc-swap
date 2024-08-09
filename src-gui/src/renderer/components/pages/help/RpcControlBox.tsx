@@ -1,18 +1,18 @@
-import { Box, makeStyles } from '@material-ui/core';
-import IpcInvokeButton from 'renderer/components/IpcInvokeButton';
-import { useAppSelector } from 'store/hooks';
-import StopIcon from '@material-ui/icons/Stop';
-import PlayArrowIcon from '@material-ui/icons/PlayArrow';
-import { RpcProcessStateType } from 'models/rpcModel';
-import InfoBox from '../../modal/swap/InfoBox';
-import CliLogsBox from '../../other/RenderedCliLog';
-import FolderOpenIcon from '@material-ui/icons/FolderOpen';
+import { Box, makeStyles } from "@material-ui/core";
+import IpcInvokeButton from "renderer/components/IpcInvokeButton";
+import { useAppSelector } from "store/hooks";
+import StopIcon from "@material-ui/icons/Stop";
+import PlayArrowIcon from "@material-ui/icons/PlayArrow";
+import { RpcProcessStateType } from "models/rpcModel";
+import InfoBox from "../../modal/swap/InfoBox";
+import CliLogsBox from "../../other/RenderedCliLog";
+import FolderOpenIcon from "@material-ui/icons/FolderOpen";
 
 const useStyles = makeStyles((theme) => ({
   actionsOuter: {
-    display: 'flex',
+    display: "flex",
     gap: theme.spacing(1),
-    alignItems: 'center',
+    alignItems: "center",
   },
 }));
 

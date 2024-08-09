@@ -1,5 +1,5 @@
-import { CliLog, SwapSpawnType } from './cliModel';
-import { Provider } from './apiModel';
+import { CliLog, SwapSpawnType } from "./cliModel";
+import { Provider } from "./apiModel";
 
 export interface SwapSlice {
   state: SwapState | null;
@@ -20,21 +20,21 @@ export interface SwapState {
 }
 
 export enum SwapStateType {
-  INITIATED = 'initiated',
-  RECEIVED_QUOTE = 'received quote',
-  WAITING_FOR_BTC_DEPOSIT = 'waiting for btc deposit',
-  STARTED = 'started',
-  BTC_LOCK_TX_IN_MEMPOOL = 'btc lock tx is in mempool',
-  XMR_LOCK_TX_IN_MEMPOOL = 'xmr lock tx is in mempool',
-  XMR_LOCKED = 'xmr is locked',
-  BTC_REDEEMED = 'btc redeemed',
-  XMR_REDEEM_IN_MEMPOOL = 'xmr redeem tx is in mempool',
-  PROCESS_EXITED = 'process exited',
-  BTC_CANCELLED = 'btc cancelled',
-  BTC_REFUNDED = 'btc refunded',
-  BTC_PUNISHED = 'btc punished',
-  ATTEMPTING_COOPERATIVE_REDEEM = 'attempting cooperative redeem',
-  COOPERATIVE_REDEEM_REJECTED = 'cooperative redeem rejected',
+  INITIATED = "initiated",
+  RECEIVED_QUOTE = "received quote",
+  WAITING_FOR_BTC_DEPOSIT = "waiting for btc deposit",
+  STARTED = "started",
+  BTC_LOCK_TX_IN_MEMPOOL = "btc lock tx is in mempool",
+  XMR_LOCK_TX_IN_MEMPOOL = "xmr lock tx is in mempool",
+  XMR_LOCKED = "xmr is locked",
+  BTC_REDEEMED = "btc redeemed",
+  XMR_REDEEM_IN_MEMPOOL = "xmr redeem tx is in mempool",
+  PROCESS_EXITED = "process exited",
+  BTC_CANCELLED = "btc cancelled",
+  BTC_REFUNDED = "btc refunded",
+  BTC_PUNISHED = "btc punished",
+  ATTEMPTING_COOPERATIVE_REDEEM = "attempting cooperative redeem",
+  COOPERATIVE_REDEEM_REJECTED = "cooperative redeem rejected",
 }
 
 export function isSwapState(state?: SwapState | null): state is SwapState {

@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
-import { TextField } from '@material-ui/core';
-import { TextFieldProps } from '@material-ui/core/TextField/TextField';
-import { isXmrAddressValid } from 'utils/conversionUtils';
-import { isTestnet } from 'store/config';
+import { useEffect } from "react";
+import { TextField } from "@material-ui/core";
+import { TextFieldProps } from "@material-ui/core/TextField/TextField";
+import { isXmrAddressValid } from "utils/conversionUtils";
+import { isTestnet } from "store/config";
 
 export default function MoneroAddressTextField({
   address,
@@ -16,10 +16,10 @@ export default function MoneroAddressTextField({
   onAddressValidityChange: (valid: boolean) => void;
   helperText: string;
 } & TextFieldProps) {
-  const placeholder = isTestnet() ? '59McWTPGc745...' : '888tNkZrPN6J...';
+  const placeholder = isTestnet() ? "59McWTPGc745..." : "888tNkZrPN6J...";
   const errorText = isXmrAddressValid(address, isTestnet())
     ? null
-    : 'Not a valid Monero address';
+    : "Not a valid Monero address";
 
   useEffect(() => {
     onAddressValidityChange(!errorText);

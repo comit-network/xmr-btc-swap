@@ -1,9 +1,9 @@
-import { DialogTitle, makeStyles, Typography } from '@material-ui/core';
+import { DialogTitle, makeStyles, Typography } from "@material-ui/core";
 
 const useStyles = makeStyles({
   root: {
-    display: 'flex',
-    justifyContent: 'space-between',
+    display: "flex",
+    justifyContent: "space-between",
   },
 });
 

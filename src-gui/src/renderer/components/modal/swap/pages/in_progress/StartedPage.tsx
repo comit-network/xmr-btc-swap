@@ -1,6 +1,6 @@
-import { SwapStateStarted } from 'models/storeModel';
-import { BitcoinAmount } from 'renderer/components/other/Units';
-import CircularProgressWithSubtitle from '../../CircularProgressWithSubtitle';
+import { SwapStateStarted } from "models/storeModel";
+import { BitcoinAmount } from "renderer/components/other/Units";
+import CircularProgressWithSubtitle from "../../CircularProgressWithSubtitle";
 
 export default function StartedPage({ state }: { state: SwapStateStarted }) {
   const description = state.txLockDetails ? (
@@ -9,7 +9,7 @@ export default function StartedPage({ state }: { state: SwapStateStarted }) {
       network fee of <BitcoinAmount amount={state.txLockDetails.fees} />
     </>
   ) : (
-    'Locking Bitcoin'
+    "Locking Bitcoin"
   );
 
   return <CircularProgressWithSubtitle description={description} />;

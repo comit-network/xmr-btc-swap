@@ -1,22 +1,17 @@
-import {
-  Box,
-  DialogTitle,
-  makeStyles,
-  Typography,
-} from '@material-ui/core';
-import TorStatusBadge from './pages/TorStatusBadge';
-import FeedbackSubmitBadge from './pages/FeedbackSubmitBadge';
-import DebugPageSwitchBadge from './pages/DebugPageSwitchBadge';
+import { Box, DialogTitle, makeStyles, Typography } from "@material-ui/core";
+import TorStatusBadge from "./pages/TorStatusBadge";
+import FeedbackSubmitBadge from "./pages/FeedbackSubmitBadge";
+import DebugPageSwitchBadge from "./pages/DebugPageSwitchBadge";
 
 const useStyles = makeStyles((theme) => ({
   root: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   rightSide: {
-    display: 'flex',
-    alignItems: 'center',
+    display: "flex",
+    alignItems: "center",
     gridGap: theme.spacing(1),
   },
 }));

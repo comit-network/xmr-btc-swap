@@ -3,8 +3,8 @@ import {
   CircularProgress,
   makeStyles,
   Typography,
-} from '@material-ui/core';
-import { ReactNode } from 'react';
+} from "@material-ui/core";
+import { ReactNode } from "react";
 
 const useStyles = makeStyles((theme) => ({
   subtitle: {
