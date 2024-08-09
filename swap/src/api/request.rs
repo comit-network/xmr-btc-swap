@@ -21,7 +21,7 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug_span, field, Instrument, Span};
+use tracing::Instrument;
 use uuid::Uuid;
 
 #[derive(PartialEq, Debug)]
@@ -53,9 +53,9 @@ pub struct MoneroRecoveryArgs {
     pub swap_id: Uuid,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct WithdrawBtcArgs {
-    pub amount: Option<Amount>,
+    pub amount: Option<u64>,
     pub address: bitcoin::Address,
 }
 
@@ -117,6 +117,12 @@ pub struct GetSwapInfoResponse {
     pub cancel_timelock: u32,
     pub punish_timelock: u32,
     pub timelock: Option<ExpiredTimelocks>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WithdrawBtcResponse {
+    amount: u64,
+    txid: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -645,7 +651,7 @@ pub async fn get_config(context: Arc<Context>) -> Result<serde_json::Value> {
 pub async fn withdraw_btc(
     withdraw_btc: WithdrawBtcArgs,
     context: Arc<Context>,
-) -> Result<serde_json::Value> {
+) -> Result<WithdrawBtcResponse> {
     let WithdrawBtcArgs { address, amount } = withdraw_btc;
     let bitcoin_wallet = context
         .bitcoin_wallet
@@ -653,7 +659,7 @@ pub async fn withdraw_btc(
         .context("Could not get Bitcoin wallet")?;
 
     let amount = match amount {
-        Some(amount) => amount,
+        Some(amount) => Amount::from_sat(amount),
         None => {
             bitcoin_wallet
                 .max_giveable(address.script_pubkey().len())
@@ -669,11 +675,10 @@ pub async fn withdraw_btc(
         .broadcast(signed_tx.clone(), "withdraw")
         .await?;
 
-    Ok(json!({
-        "signed_tx": signed_tx,
-        "amount": amount.to_sat(),
-        "txid": signed_tx.txid(),
-    }))
+    Ok(WithdrawBtcResponse {
+        txid: signed_tx.txid().to_string(),
+        amount: amount.to_sat(),
+    })
 }
 
 #[tracing::instrument(fields(method = "start_daemon"), skip(context))]
@@ -848,17 +853,7 @@ impl Request {
         }
     }
 
-    async fn handle_cmd(self, context: Arc<Context>) -> Result<Box<dyn erased_serde::Serialize>> {
-        match self.cmd {
-            Method::Balance(args) => {
-                let response = get_balance(args, context).await?;
-                Ok(Box::new(response) as Box<dyn erased_serde::Serialize>)
-            }
-            _ => todo!(),
-        }
-    }
-
-    pub async fn call(self, context: Arc<Context>) -> Result<JsonValue> {
+    pub async fn call(self, _: Arc<Context>) -> Result<JsonValue> {
         unreachable!("This function should never be called")
     }
 }

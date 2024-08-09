@@ -1,6 +1,6 @@
-import { Button, DialogActions, DialogContentText } from '@material-ui/core';
-import BitcoinTransactionInfoBox from '../../swap/BitcoinTransactionInfoBox';
-import WithdrawDialogContent from '../WithdrawDialogContent';
+import { Button, DialogActions, DialogContentText } from "@material-ui/core";
+import BitcoinTransactionInfoBox from "../../swap/BitcoinTransactionInfoBox";
+import WithdrawDialogContent from "../WithdrawDialogContent";
 
 export default function BtcTxInMempoolPageContent({
   withdrawTxId,
@@ -23,14 +23,6 @@ export default function BtcTxInMempoolPageContent({
           additionalContent={null}
         />
       </WithdrawDialogContent>
-      <DialogActions>
-        <Button onClick={onCancel} variant="text">
-          Cancel
-        </Button>
-        <Button onClick={onCancel} color="primary" variant="contained">
-          Done
-        </Button>
-      </DialogActions>
     </>
   );
 }

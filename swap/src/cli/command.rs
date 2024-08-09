@@ -1,8 +1,8 @@
 use crate::api::request::{
     buy_xmr, cancel_and_refund, export_bitcoin_wallet, get_balance, get_config, get_history,
     list_sellers, monero_recovery, resume_swap, start_daemon, withdraw_btc, BalanceArgs,
-    BuyXmrArgs, CancelAndRefundArgs, ListSellersArgs, Method, MoneroRecoveryArgs, Request,
-    ResumeArgs, StartDaemonArgs, WithdrawBtcArgs,
+    BuyXmrArgs, CancelAndRefundArgs, ListSellersArgs, MoneroRecoveryArgs, ResumeArgs,
+    StartDaemonArgs, WithdrawBtcArgs,
 };
 use crate::api::Context;
 use crate::bitcoin::{bitcoin_address, Amount};
@@ -10,7 +10,6 @@ use crate::monero;
 use crate::monero::monero_address;
 use anyhow::Result;
 use libp2p::core::Multiaddr;
-use serde_json::Value;
 use std::ffi::OsString;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -193,7 +192,14 @@ where
                 .await?,
             );
 
-            withdraw_btc(WithdrawBtcArgs { amount, address }, context).await?;
+            withdraw_btc(
+                WithdrawBtcArgs {
+                    amount: amount.map(Amount::to_sat),
+                    address,
+                },
+                context,
+            )
+            .await?;
 
             Ok(())
         }

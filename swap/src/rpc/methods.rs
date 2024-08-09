@@ -13,7 +13,6 @@ use jsonrpsee::server::RpcModule;
 use libp2p::core::Multiaddr;
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::Arc;
 use uuid::Uuid;
 
 trait ConvertToJsonRpseeError<T> {
@@ -29,7 +28,7 @@ impl<T> ConvertToJsonRpseeError<T> for Result<T, anyhow::Error> {
 pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
     let mut module = RpcModule::new(outer_context);
 
-    module.register_async_method("suspend_current_swap", |params, context| async move {
+    module.register_async_method("suspend_current_swap", |_, context| async move {
         suspend_current_swap(context).await.to_jsonrpsee_result()
     })?;
 
@@ -66,11 +65,11 @@ pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
             .to_jsonrpsee_result()
     })?;
 
-    module.register_async_method("get_history", |params, context| async move {
+    module.register_async_method("get_history", |_, context| async move {
         get_history(context).await.to_jsonrpsee_result()
     })?;
 
-    module.register_async_method("get_raw_states", |params, context| async move {
+    module.register_async_method("get_raw_states", |_, context| async move {
         get_raw_states(context).await.to_jsonrpsee_result()
     })?;
 
@@ -131,7 +130,8 @@ pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
                 ::bitcoin::Amount::from_str_in(amount_str, ::bitcoin::Denomination::Bitcoin)
                     .map_err(|_| {
                         jsonrpsee_core::Error::Custom("Unable to parse amount".to_string())
-                    })?,
+                    })?
+                    .to_sat(),
             )
         } else {
             None
@@ -224,7 +224,7 @@ pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
         .to_jsonrpsee_result()
     })?;
 
-    module.register_async_method("get_current_swap", |params, context| async move {
+    module.register_async_method("get_current_swap", |_, context| async move {
         get_current_swap(context).await.to_jsonrpsee_result()
     })?;
 

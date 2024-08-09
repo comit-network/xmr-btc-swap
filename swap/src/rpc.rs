@@ -1,11 +1,11 @@
 use crate::api::Context;
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 use thiserror::Error;
 use tower_http::cors::CorsLayer;
 
 use jsonrpsee::{
     core::server::host_filtering::AllowHosts,
-    server::{RpcModule, ServerBuilder, ServerHandle},
+    server::{ServerBuilder, ServerHandle},
 };
 
 pub mod methods;

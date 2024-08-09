@@ -6,6 +6,7 @@ import { ReactNode, useEffect, useState } from "react";
 interface IpcInvokeButtonProps<T> {
   onSuccess?: (data: T) => void;
   onClick: () => Promise<T>;
+  onPendingChange?: (bool) => void;
   isLoadingOverride?: boolean;
   isIconButton?: boolean;
   loadIcon?: ReactNode;
@@ -24,26 +25,22 @@ export default function PromiseInvokeButton<T>({
   isIconButton,
   displayErrorSnackbar,
   tooltipTitle,
+  onPendingChange,
   ...rest
 }: IpcInvokeButtonProps<T> & ButtonProps) {
   const { enqueueSnackbar } = useSnackbar();
 
   const [isPending, setIsPending] = useState(false);
-  const [hasMinLoadingTimePassed, setHasMinLoadingTimePassed] = useState(false);
 
-  const isLoading = (isPending && hasMinLoadingTimePassed) || isLoadingOverride;
+  const isLoading = isPending || isLoadingOverride;
   const actualEndIcon = isLoading
     ? loadIcon || <CircularProgress size="1em" />
     : endIcon;
 
-  useEffect(() => {
-    setHasMinLoadingTimePassed(false);
-    setTimeout(() => setHasMinLoadingTimePassed(true), 100);
-  }, [isPending]);
-
   async function handleClick(event: React.MouseEvent<HTMLButtonElement>) {
     if (!isPending) {
       try {
+        onPendingChange?.(true);
         setIsPending(true);
         let result = await onClick();
         onSuccess?.(result);
@@ -56,32 +53,23 @@ export default function PromiseInvokeButton<T>({
         }
       } finally {
         setIsPending(false);
+        onPendingChange?.(false);
       }
     }
   }
 
   const isDisabled = disabled || isLoading;
 
-  return (
-    <Tooltip title={tooltipTitle}>
-      <span>
-        {isIconButton ? (
-          <IconButton
-            onClick={handleClick}
-            disabled={isDisabled}
-            {...(rest as any)}
-          >
-            {actualEndIcon}
-          </IconButton>
-        ) : (
-          <Button
-            onClick={handleClick}
-            disabled={isDisabled}
-            endIcon={actualEndIcon}
-            {...rest}
-          />
-        )}
-      </span>
-    </Tooltip>
+  return isIconButton ? (
+    <IconButton onClick={handleClick} disabled={isDisabled} {...(rest as any)}>
+      {actualEndIcon}
+    </IconButton>
+  ) : (
+    <Button
+      onClick={handleClick}
+      disabled={isDisabled}
+      endIcon={actualEndIcon}
+      {...rest}
+    />
   );
 }

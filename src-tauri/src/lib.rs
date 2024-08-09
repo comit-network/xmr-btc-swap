@@ -1,20 +1,17 @@
-use std::sync::Arc;
-
-use once_cell::sync::OnceCell;
 use std::result::Result;
+use std::sync::Arc;
 use swap::{
     api::{
         request::{
             get_balance as get_balance_impl, get_swap_infos_all as get_swap_infos_all_impl,
-            BalanceArgs, BalanceResponse, GetSwapInfoResponse,
+            withdraw_btc as withdraw_btc_impl, BalanceArgs, BalanceResponse, GetSwapInfoResponse,
+            WithdrawBtcArgs, WithdrawBtcResponse,
         },
         Context,
     },
     cli::command::{Bitcoin, Monero},
 };
-
-// Lazy load the Context
-static CONTEXT: OnceCell<Arc<Context>> = OnceCell::new();
+use tauri::{Manager, State};
 
 trait ToStringResult<T> {
     fn to_string_result(self) -> Result<T, String>;
@@ -31,24 +28,46 @@ impl<T, E: ToString> ToStringResult<T> for Result<T, E> {
 }
 
 #[tauri::command]
-async fn get_balance() -> Result<BalanceResponse, String> {
-    let context = CONTEXT.get().unwrap();
-
+async fn get_balance(context: State<'_, Arc<Context>>) -> Result<BalanceResponse, String> {
     get_balance_impl(
         BalanceArgs {
             force_refresh: true,
         },
-        context.clone(),
+        context.inner().clone(),
     )
     .await
     .to_string_result()
 }
 
 #[tauri::command]
-async fn get_swap_infos_all() -> Result<Vec<GetSwapInfoResponse>, String> {
-    let context = CONTEXT.get().unwrap();
+async fn get_swap_infos_all(
+    context: State<'_, Arc<Context>>,
+) -> Result<Vec<GetSwapInfoResponse>, String> {
+    get_swap_infos_all_impl(context.inner().clone())
+        .await
+        .to_string_result()
+}
 
-    get_swap_infos_all_impl(context.clone())
+/*macro_rules! tauri_command {
+    ($command_name:ident, $command_args:ident, $command_response:ident) => {
+        #[tauri::command]
+        async fn $command_name(
+            context: State<'_, Context>,
+            args: $command_args,
+        ) -> Result<$command_response, String> {
+            swap::api::request::$command_name(args, context)
+                .await
+                .to_string_result()
+        }
+    };
+}*/
+
+#[tauri::command]
+async fn withdraw_btc(
+    context: State<'_, Arc<Context>>,
+    args: WithdrawBtcArgs,
+) -> Result<WithdrawBtcResponse, String> {
+    withdraw_btc_impl(args, context.inner().clone())
         .await
         .to_string_result()
 }
@@ -73,9 +92,7 @@ fn setup<'a>(app: &'a mut tauri::App) -> Result<(), Box<dyn std::error::Error>> 
         .await
         .unwrap();
 
-        CONTEXT
-            .set(Arc::new(context))
-            .expect("Failed to initialize cli context");
+        app.manage(Arc::new(context));
     });
 
     Ok(())
@@ -84,7 +101,11 @@ fn setup<'a>(app: &'a mut tauri::App) -> Result<(), Box<dyn std::error::Error>> 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![get_balance, get_swap_infos_all])
+        .invoke_handler(tauri::generate_handler![
+            get_balance,
+            get_swap_infos_all,
+            withdraw_btc
+        ])
         .setup(setup)
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
