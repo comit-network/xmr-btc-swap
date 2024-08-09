@@ -12,10 +12,8 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
-use crate::{
-    cli::command::{parse_args_and_apply_defaults, ParseResult},
-    common::check_latest_version,
-};
+use crate::cli::command::{parse_args_and_apply_defaults, ParseResult};
+use crate::common::check_latest_version;
 use anyhow::Result;
 use std::env;
 

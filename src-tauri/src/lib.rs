@@ -77,6 +77,7 @@ fn setup<'a>(app: &'a mut tauri::App) -> Result<(), Box<dyn std::error::Error>> 
             .set(Arc::new(context))
             .expect("Failed to initialize cli context");
     });
+
     Ok(())
 }
 
