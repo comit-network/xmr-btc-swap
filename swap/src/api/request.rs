@@ -679,7 +679,7 @@ pub async fn withdraw_btc(
 #[tracing::instrument(fields(method = "start_daemon"), skip(context))]
 pub async fn start_daemon(
     start_daemon: StartDaemonArgs,
-    context: Arc<Context>,
+    context: Context,
 ) -> Result<serde_json::Value> {
     let StartDaemonArgs { server_address } = start_daemon;
     // Default to 127.0.0.1:1234

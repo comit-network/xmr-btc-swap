@@ -26,13 +26,11 @@ impl<T> ConvertToJsonRpseeError<T> for Result<T, anyhow::Error> {
     }
 }
 
-pub fn register_modules(outer_context: Arc<Context>) -> Result<RpcModule<Arc<Context>>> {
+pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
     let mut module = RpcModule::new(outer_context);
 
     module.register_async_method("suspend_current_swap", |params, context| async move {
-        suspend_current_swap(Arc::unwrap_or_clone(context))
-            .await
-            .to_jsonrpsee_result()
+        suspend_current_swap(context).await.to_jsonrpsee_result()
     })?;
 
     module.register_async_method("get_swap_info", |params_raw, context| async move {
@@ -45,7 +43,7 @@ pub fn register_modules(outer_context: Arc<Context>) -> Result<RpcModule<Arc<Con
         let swap_id = as_uuid(swap_id)
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
 
-        get_swap_info(GetSwapInfoArgs { swap_id }, Arc::unwrap_or_clone(context))
+        get_swap_info(GetSwapInfoArgs { swap_id }, context)
             .await
             .to_jsonrpsee_result()
     })?;
@@ -63,21 +61,17 @@ pub fn register_modules(outer_context: Arc<Context>) -> Result<RpcModule<Arc<Con
                 jsonrpsee_core::Error::Custom("force_refesh is not a boolean".to_string())
             })?;
 
-        get_balance(BalanceArgs { force_refresh }, Arc::unwrap_or_clone(context))
+        get_balance(BalanceArgs { force_refresh }, context)
             .await
             .to_jsonrpsee_result()
     })?;
 
     module.register_async_method("get_history", |params, context| async move {
-        get_history(Arc::unwrap_or_clone(context))
-            .await
-            .to_jsonrpsee_result()
+        get_history(context).await.to_jsonrpsee_result()
     })?;
 
     module.register_async_method("get_raw_states", |params, context| async move {
-        get_raw_states(Arc::unwrap_or_clone(context))
-            .await
-            .to_jsonrpsee_result()
+        get_raw_states(context).await.to_jsonrpsee_result()
     })?;
 
     module.register_async_method("resume_swap", |params_raw, context| async move {
@@ -90,7 +84,7 @@ pub fn register_modules(outer_context: Arc<Context>) -> Result<RpcModule<Arc<Con
         let swap_id = as_uuid(swap_id)
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
 
-        resume_swap(ResumeArgs { swap_id }, Arc::unwrap_or_clone(context))
+        resume_swap(ResumeArgs { swap_id }, context)
             .await
             .to_jsonrpsee_result()
     })?;
@@ -105,12 +99,9 @@ pub fn register_modules(outer_context: Arc<Context>) -> Result<RpcModule<Arc<Con
         let swap_id = as_uuid(swap_id)
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
 
-        cancel_and_refund(
-            CancelAndRefundArgs { swap_id },
-            Arc::unwrap_or_clone(context),
-        )
-        .await
-        .to_jsonrpsee_result()
+        cancel_and_refund(CancelAndRefundArgs { swap_id }, context)
+            .await
+            .to_jsonrpsee_result()
     })?;
 
     module.register_async_method(
@@ -126,12 +117,9 @@ pub fn register_modules(outer_context: Arc<Context>) -> Result<RpcModule<Arc<Con
                 jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string())
             })?;
 
-            monero_recovery(
-                MoneroRecoveryArgs { swap_id },
-                Arc::unwrap_or_clone(context),
-            )
-            .await
-            .to_jsonrpsee_result()
+            monero_recovery(MoneroRecoveryArgs { swap_id }, context)
+                .await
+                .to_jsonrpsee_result()
         },
     )?;
 
@@ -162,7 +150,7 @@ pub fn register_modules(outer_context: Arc<Context>) -> Result<RpcModule<Arc<Con
                 amount,
                 address: withdraw_address,
             },
-            Arc::unwrap_or_clone(context),
+            context,
         )
         .await
         .to_jsonrpsee_result()
@@ -206,7 +194,7 @@ pub fn register_modules(outer_context: Arc<Context>) -> Result<RpcModule<Arc<Con
                 monero_receive_address,
                 swap_id: Uuid::new_v4(),
             },
-            Arc::unwrap_or_clone(context),
+            context,
         )
         .await
         .to_jsonrpsee_result()
@@ -230,16 +218,14 @@ pub fn register_modules(outer_context: Arc<Context>) -> Result<RpcModule<Arc<Con
             ListSellersArgs {
                 rendezvous_point: rendezvous_point.clone(),
             },
-            Arc::unwrap_or_clone(context),
+            context,
         )
         .await
         .to_jsonrpsee_result()
     })?;
 
     module.register_async_method("get_current_swap", |params, context| async move {
-        get_current_swap(Arc::unwrap_or_clone(context))
-            .await
-            .to_jsonrpsee_result()
+        get_current_swap(context).await.to_jsonrpsee_result()
     })?;
 
     Ok(module)

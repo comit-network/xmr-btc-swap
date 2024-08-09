@@ -156,19 +156,17 @@ where
             monero,
             tor,
         } => {
-            let context = Arc::new(
-                Context::build(
-                    Some(bitcoin),
-                    Some(monero),
-                    Some(tor),
-                    data,
-                    is_testnet,
-                    debug,
-                    json,
-                    server_address,
-                )
-                .await?,
-            );
+            let context = Context::build(
+                Some(bitcoin),
+                Some(monero),
+                Some(tor),
+                data,
+                is_testnet,
+                debug,
+                json,
+                server_address,
+            )
+            .await?;
 
             start_daemon(StartDaemonArgs { server_address }, context).await?;
 

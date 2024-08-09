@@ -18,7 +18,7 @@ pub enum Error {
 
 pub async fn run_server(
     server_address: SocketAddr,
-    context: Arc<Context>,
+    context: Context,
 ) -> anyhow::Result<(SocketAddr, ServerHandle)> {
     let cors = CorsLayer::permissive();
     let middleware = tower::ServiceBuilder::new().layer(cors);
@@ -29,12 +29,7 @@ pub async fn run_server(
         .build(server_address)
         .await?;
 
-    let mut modules = RpcModule::new(());
-    {
-        modules
-            .merge(methods::register_modules(context)?)
-            .expect("Could not register RPC modules")
-    }
+    let modules = methods::register_modules(context)?;
 
     let addr = server.local_addr()?;
     let server_handle = server.start(modules)?;
