@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use once_cell::sync::OnceCell;
+use std::result::Result;
 use swap::{
     api::{
         request::{
@@ -15,6 +16,20 @@ use swap::{
 // Lazy load the Context
 static CONTEXT: OnceCell<Arc<Context>> = OnceCell::new();
 
+trait ToStringResult<T> {
+    fn to_string_result(self) -> Result<T, String>;
+}
+
+// Implement the trait for Result<T, E>
+impl<T, E: ToString> ToStringResult<T> for Result<T, E> {
+    fn to_string_result(self) -> Result<T, String> {
+        match self {
+            Ok(value) => Ok(value),
+            Err(err) => Err(err.to_string()),
+        }
+    }
+}
+
 #[tauri::command]
 async fn get_balance() -> Result<BalanceResponse, String> {
     let context = CONTEXT.get().unwrap();
@@ -26,7 +41,7 @@ async fn get_balance() -> Result<BalanceResponse, String> {
         context.clone(),
     )
     .await
-    .map_err(|e| e.to_string())
+    .to_string_result()
 }
 
 #[tauri::command]
@@ -35,7 +50,7 @@ async fn get_swap_infos_all() -> Result<Vec<GetSwapInfoResponse>, String> {
 
     get_swap_infos_all_impl(context.clone())
         .await
-        .map_err(|e| e.to_string())
+        .to_string_result()
 }
 
 fn setup<'a>(app: &'a mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
