@@ -10,5 +10,25 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/renderer/index.tsx"></script>
+    <style>
+      ::-webkit-scrollbar {
+        display: none;
+      }
+      *,
+      *::after,
+      *::before {
+        -webkit-user-select: none;
+        -webkit-user-drag: none;
+        -webkit-app-region: no-drag;
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        overflow: auto;
+        overscroll-behavior: none; /* Prevents the bounce effect */
+      }
+    </style>
   </body>
 </html>
