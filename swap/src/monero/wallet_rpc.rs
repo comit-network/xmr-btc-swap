@@ -8,12 +8,12 @@ use reqwest::header::CONTENT_LENGTH;
 use reqwest::Url;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
+use std::{fmt, io};
 use tokio::fs::{remove_file, OpenOptions};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
@@ -177,6 +177,10 @@ impl WalletRpcProcess {
     pub fn endpoint(&self) -> Url {
         Url::parse(&format!("http://127.0.0.1:{}/json_rpc", self.port))
             .expect("Static url template is always valid")
+    }
+
+    pub fn kill(&mut self) -> io::Result<()> {
+        self._child.start_kill()
     }
 }
 
