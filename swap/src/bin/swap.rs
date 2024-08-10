@@ -1,7 +1,6 @@
 #![warn(
     unused_extern_crates,
     missing_copy_implementations,
-    rust_2018_idioms,
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
     clippy::fallible_impl_from,
@@ -12,26 +11,27 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
+use crate::{
+    cli::command::{parse_args_and_apply_defaults, ParseResult},
+    common::check_latest_version,
+};
 use anyhow::Result;
 use std::env;
-use swap::cli::command::{parse_args_and_apply_defaults, ParseResult};
-use swap::common::check_latest_version;
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    let (context, request) = match parse_args_and_apply_defaults(env::args_os()).await? {
-        ParseResult::Context(context, request) => (context, request),
+pub async fn main() -> Result<()> {
+    if let Err(e) = check_latest_version(env!("CARGO_PKG_VERSION")).await {
+        eprintln!("{}", e);
+    }
+
+    match parse_args_and_apply_defaults(env::args_os()).await? {
+        ParseResult::Success => {}
         ParseResult::PrintAndExitZero { message } => {
             println!("{}", message);
             std::process::exit(0);
         }
     };
 
-    if let Err(e) = check_latest_version(env!("CARGO_PKG_VERSION")).await {
-        eprintln!("{}", e);
-    }
-    request.call(context.clone()).await?;
-    context.tasks.wait_for_tasks().await?;
     Ok(())
 }
 

@@ -18,6 +18,7 @@
 
 pub mod api;
 pub mod asb;
+pub mod bin;
 pub mod bitcoin;
 pub mod cli;
 pub mod common;
@@ -27,14 +28,13 @@ pub mod fs;
 pub mod kraken;
 pub mod libp2p_ext;
 pub mod monero;
+mod monero_ext;
 pub mod network;
 pub mod protocol;
 pub mod rpc;
 pub mod seed;
 pub mod tor;
 pub mod tracing_ext;
-
-mod monero_ext;
 
 #[cfg(test)]
 mod proptest;

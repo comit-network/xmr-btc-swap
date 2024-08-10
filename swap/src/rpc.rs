@@ -1,8 +1,12 @@
 use crate::api::Context;
-use jsonrpsee::server::{RpcModule, ServerBuilder, ServerHandle};
 use std::net::SocketAddr;
-use std::sync::Arc;
 use thiserror::Error;
+use tower_http::cors::CorsLayer;
+
+use jsonrpsee::{
+    core::server::host_filtering::AllowHosts,
+    server::{ServerBuilder, ServerHandle},
+};
 
 pub mod methods;
 
@@ -14,15 +18,18 @@ pub enum Error {
 
 pub async fn run_server(
     server_address: SocketAddr,
-    context: Arc<Context>,
+    context: Context,
 ) -> anyhow::Result<(SocketAddr, ServerHandle)> {
-    let server = ServerBuilder::default().build(server_address).await?;
-    let mut modules = RpcModule::new(());
-    {
-        modules
-            .merge(methods::register_modules(Arc::clone(&context))?)
-            .expect("Could not register RPC modules")
-    }
+    let cors = CorsLayer::permissive();
+    let middleware = tower::ServiceBuilder::new().layer(cors);
+
+    let server = ServerBuilder::default()
+        .set_host_filtering(AllowHosts::Any)
+        .set_middleware(middleware)
+        .build(server_address)
+        .await?;
+
+    let modules = methods::register_modules(context)?;
 
     let addr = server.local_addr()?;
     let server_handle = server.start(modules)?;

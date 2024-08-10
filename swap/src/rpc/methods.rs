@@ -1,22 +1,35 @@
-use crate::api::request::{Method, Request};
+use crate::api::request::{
+    buy_xmr, cancel_and_refund, get_balance, get_current_swap, get_history, get_raw_states,
+    get_swap_info, list_sellers, monero_recovery, resume_swap, suspend_current_swap, withdraw_btc,
+    BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, GetSwapInfoArgs, ListSellersArgs, Method,
+    MoneroRecoveryArgs, ResumeArgs, WithdrawBtcArgs,
+};
 use crate::api::Context;
 use crate::bitcoin::bitcoin_address;
 use crate::monero::monero_address;
 use crate::{bitcoin, monero};
 use anyhow::Result;
 use jsonrpsee::server::RpcModule;
-use jsonrpsee::types::Params;
 use libp2p::core::Multiaddr;
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::Arc;
 use uuid::Uuid;
 
-pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>> {
-    let mut module = RpcModule::new(context);
+trait ConvertToJsonRpseeError<T> {
+    fn to_jsonrpsee_result(self) -> Result<T, jsonrpsee_core::Error>;
+}
 
-    module.register_async_method("suspend_current_swap", |params, context| async move {
-        execute_request(params, Method::SuspendCurrentSwap, &context).await
+impl<T> ConvertToJsonRpseeError<T> for Result<T, anyhow::Error> {
+    fn to_jsonrpsee_result(self) -> Result<T, jsonrpsee_core::Error> {
+        self.map_err(|e| jsonrpsee_core::Error::Custom(e.to_string()))
+    }
+}
+
+pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
+    let mut module = RpcModule::new(outer_context);
+
+    module.register_async_method("suspend_current_swap", |_, context| async move {
+        suspend_current_swap(context).await.to_jsonrpsee_result()
     })?;
 
     module.register_async_method("get_swap_info", |params_raw, context| async move {
@@ -29,7 +42,9 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
         let swap_id = as_uuid(swap_id)
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
 
-        execute_request(params_raw, Method::GetSwapInfo { swap_id }, &context).await
+        get_swap_info(GetSwapInfoArgs { swap_id }, context)
+            .await
+            .to_jsonrpsee_result()
     })?;
 
     module.register_async_method("get_bitcoin_balance", |params_raw, context| async move {
@@ -45,15 +60,17 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
                 jsonrpsee_core::Error::Custom("force_refesh is not a boolean".to_string())
             })?;
 
-        execute_request(params_raw, Method::Balance { force_refresh }, &context).await
+        get_balance(BalanceArgs { force_refresh }, context)
+            .await
+            .to_jsonrpsee_result()
     })?;
 
-    module.register_async_method("get_history", |params, context| async move {
-        execute_request(params, Method::History, &context).await
+    module.register_async_method("get_history", |_, context| async move {
+        get_history(context).await.to_jsonrpsee_result()
     })?;
 
-    module.register_async_method("get_raw_states", |params, context| async move {
-        execute_request(params, Method::GetRawStates, &context).await
+    module.register_async_method("get_raw_states", |_, context| async move {
+        get_raw_states(context).await.to_jsonrpsee_result()
     })?;
 
     module.register_async_method("resume_swap", |params_raw, context| async move {
@@ -66,7 +83,9 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
         let swap_id = as_uuid(swap_id)
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
 
-        execute_request(params_raw, Method::Resume { swap_id }, &context).await
+        resume_swap(ResumeArgs { swap_id }, context)
+            .await
+            .to_jsonrpsee_result()
     })?;
 
     module.register_async_method("cancel_refund_swap", |params_raw, context| async move {
@@ -79,7 +98,9 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
         let swap_id = as_uuid(swap_id)
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
 
-        execute_request(params_raw, Method::CancelAndRefund { swap_id }, &context).await
+        cancel_and_refund(CancelAndRefundArgs { swap_id }, context)
+            .await
+            .to_jsonrpsee_result()
     })?;
 
     module.register_async_method(
@@ -95,7 +116,9 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
                 jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string())
             })?;
 
-            execute_request(params_raw, Method::MoneroRecovery { swap_id }, &context).await
+            monero_recovery(MoneroRecoveryArgs { swap_id }, context)
+                .await
+                .to_jsonrpsee_result()
         },
     )?;
 
@@ -107,7 +130,8 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
                 ::bitcoin::Amount::from_str_in(amount_str, ::bitcoin::Denomination::Bitcoin)
                     .map_err(|_| {
                         jsonrpsee_core::Error::Custom("Unable to parse amount".to_string())
-                    })?,
+                    })?
+                    .to_sat(),
             )
         } else {
             None
@@ -121,39 +145,30 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
         let withdraw_address =
             bitcoin_address::validate(withdraw_address, context.config.env_config.bitcoin_network)?;
 
-        execute_request(
-            params_raw,
-            Method::WithdrawBtc {
+        withdraw_btc(
+            WithdrawBtcArgs {
                 amount,
                 address: withdraw_address,
             },
-            &context,
+            context,
         )
         .await
+        .to_jsonrpsee_result()
     })?;
 
     module.register_async_method("buy_xmr", |params_raw, context| async move {
         let params: HashMap<String, String> = params_raw.parse()?;
 
-        let bitcoin_change_address = params
-            .get("bitcoin_change_address")
-            .map(|addr_str| {
-                bitcoin::Address::from_str(addr_str)
-                    .map_err(|err| {
-                        jsonrpsee_core::Error::Custom(format!(
-                            "Could not parse bitcoin address: {}",
-                            err
-                        ))
-                    })
-                    .and_then(|address| {
-                        bitcoin_address::validate(
-                            address,
-                            context.config.env_config.bitcoin_network,
-                        )
-                        .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))
-                    })
-            })
-            .transpose()?;
+        let bitcoin_change_address =
+            bitcoin::Address::from_str(params.get("bitcoin_change_address").ok_or_else(|| {
+                jsonrpsee_core::Error::Custom("Does not contain bitcoin_change_address".to_string())
+            })?)
+            .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
+
+        let bitcoin_change_address = bitcoin_address::validate(
+            bitcoin_change_address,
+            context.config.env_config.bitcoin_network,
+        )?;
 
         let monero_receive_address =
             monero::Address::from_str(params.get("monero_receive_address").ok_or_else(|| {
@@ -172,17 +187,17 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
             })?)
             .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
 
-        execute_request(
-            params_raw,
-            Method::BuyXmr {
+        buy_xmr(
+            BuyXmrArgs {
+                seller,
                 bitcoin_change_address,
                 monero_receive_address,
-                seller,
                 swap_id: Uuid::new_v4(),
             },
-            &context,
+            context,
         )
         .await
+        .to_jsonrpsee_result()
     })?;
 
     module.register_async_method("list_sellers", |params_raw, context| async move {
@@ -199,18 +214,18 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
                 jsonrpsee_core::Error::Custom("Could not parse valid multiaddr".to_string())
             })?;
 
-        execute_request(
-            params_raw,
-            Method::ListSellers {
+        list_sellers(
+            ListSellersArgs {
                 rendezvous_point: rendezvous_point.clone(),
             },
-            &context,
+            context,
         )
         .await
+        .to_jsonrpsee_result()
     })?;
 
-    module.register_async_method("get_current_swap", |params, context| async move {
-        execute_request(params, Method::GetCurrentSwap, &context).await
+    module.register_async_method("get_current_swap", |_, context| async move {
+        get_current_swap(context).await.to_jsonrpsee_result()
     })?;
 
     Ok(module)
@@ -222,24 +237,4 @@ fn as_uuid(json_value: &serde_json::Value) -> Option<Uuid> {
     } else {
         None
     }
-}
-
-async fn execute_request(
-    params: Params<'static>,
-    cmd: Method,
-    context: &Arc<Context>,
-) -> Result<serde_json::Value, jsonrpsee_core::Error> {
-    // If we fail to parse the params as a String HashMap, it's most likely because its an empty object
-    // In that case, we want to make sure not to fail the request, so we set the log_reference_id to None
-    // and swallow the error
-    let reference_id = params
-        .parse::<HashMap<String, serde_json::Value>>()
-        .ok()
-        .and_then(|params_parsed| params_parsed.get("log_reference_id").cloned());
-
-    let request = Request::with_id(cmd, reference_id.map(|log_ref| log_ref.to_string()));
-    request
-        .call(Arc::clone(context))
-        .await
-        .map_err(|err| jsonrpsee_core::Error::Custom(format!("{:#}", err)))
 }

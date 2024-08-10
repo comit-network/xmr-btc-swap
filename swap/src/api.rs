@@ -1,6 +1,6 @@
 pub mod request;
 use crate::cli::command::{Bitcoin, Monero, Tor};
-use crate::database::{open_db, AccessMode};
+use crate::database::open_db;
 use crate::env::{Config as EnvConfig, GetConfig, Mainnet, Testnet};
 use crate::fs::system_data_dir;
 use crate::network::rendezvous::XmrBtcNamespace;
@@ -159,11 +159,12 @@ impl Default for SwapLock {
 
 // workaround for warning over monero_rpc_process which we must own but not read
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct Context {
     pub db: Arc<dyn Database + Send + Sync>,
     bitcoin_wallet: Option<Arc<bitcoin::Wallet>>,
     monero_wallet: Option<Arc<monero::Wallet>>,
-    monero_rpc_process: Option<monero::WalletRpcProcess>,
+    monero_rpc_process: Option<Arc<monero::WalletRpcProcess>>,
     pub swap_lock: Arc<SwapLock>,
     pub config: Config,
     pub tasks: Arc<PendingTaskList>,
@@ -224,10 +225,10 @@ impl Context {
         let tor_socks5_port = tor.map_or(9050, |tor| tor.tor_socks5_port);
 
         let context = Context {
-            db: open_db(data_dir.join("sqlite"), AccessMode::ReadWrite).await?,
+            db: open_db(data_dir.join("sqlite")).await?,
             bitcoin_wallet,
             monero_wallet,
-            monero_rpc_process,
+            monero_rpc_process: monero_rpc_process.map(Arc::new),
             config: Config {
                 tor_socks5_port,
                 namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
@@ -259,17 +260,13 @@ impl Context {
             bitcoin_wallet: Some(bob_bitcoin_wallet),
             monero_wallet: Some(bob_monero_wallet),
             config,
-            db: open_db(db_path, AccessMode::ReadWrite)
+            db: open_db(db_path)
                 .await
                 .expect("Could not open sqlite database"),
             monero_rpc_process: None,
             swap_lock: Arc::new(SwapLock::new()),
             tasks: Arc::new(PendingTaskList::default()),
         }
-    }
-
-    pub fn bitcoin_wallet(&self) -> Option<Arc<bitcoin::Wallet>> {
-        self.bitcoin_wallet.clone()
     }
 }
 
@@ -379,6 +376,7 @@ pub mod api_test {
     use crate::api::request::{Method, Request};
 
     use libp2p::Multiaddr;
+    use request::BuyXmrArgs;
     use std::str::FromStr;
     use uuid::Uuid;
 
@@ -435,12 +433,12 @@ pub mod api_test {
                 }
             };
 
-            Request::new(Method::BuyXmr {
+            Request::new(Method::BuyXmr(BuyXmrArgs {
                 seller,
-                bitcoin_change_address: Some(bitcoin_change_address),
+                bitcoin_change_address,
                 monero_receive_address,
                 swap_id: Uuid::new_v4(),
-            })
+            }))
         }
 
         pub fn resume() -> Request {

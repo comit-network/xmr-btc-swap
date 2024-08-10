@@ -1,4 +1,9 @@
-use crate::api::request::{Method, Request};
+use crate::api::request::{
+    buy_xmr, cancel_and_refund, export_bitcoin_wallet, get_balance, get_config, get_history,
+    list_sellers, monero_recovery, resume_swap, start_daemon, withdraw_btc, BalanceArgs,
+    BuyXmrArgs, CancelAndRefundArgs, ListSellersArgs, MoneroRecoveryArgs, ResumeArgs,
+    StartDaemonArgs, WithdrawBtcArgs,
+};
 use crate::api::Context;
 use crate::bitcoin::{bitcoin_address, Amount};
 use crate::monero;
@@ -33,7 +38,7 @@ const DEFAULT_TOR_SOCKS5_PORT: &str = "9050";
 #[derive(Debug)]
 pub enum ParseResult {
     /// The arguments we were invoked in.
-    Context(Arc<Context>, Box<Request>),
+    Success,
     /// A flag or command was given that does not need further processing other
     /// than printing the provided message.
     ///
@@ -60,7 +65,7 @@ where
     let json = args.json;
     let is_testnet = args.testnet;
     let data = args.data;
-    let (context, request) = match args.cmd {
+    let result = match args.cmd {
         CliCommand::BuyXmr {
             seller: Seller { seller },
             bitcoin,
@@ -69,64 +74,80 @@ where
             monero_receive_address,
             tor,
         } => {
-            let context = Context::build(
-                Some(bitcoin),
-                Some(monero),
-                Some(tor),
-                data,
-                is_testnet,
-                debug,
-                json,
-                None,
-            )
-            .await?;
-
             let monero_receive_address =
                 monero_address::validate_is_testnet(monero_receive_address, is_testnet)?;
-            let bitcoin_change_address = bitcoin_change_address
-                .map(|address| bitcoin_address::validate_is_testnet(address, is_testnet))
-                .transpose()?;
+            let bitcoin_change_address =
+                bitcoin_address::validate_is_testnet(bitcoin_change_address, is_testnet)?;
 
-            let request = Request::new(Method::BuyXmr {
-                seller,
-                bitcoin_change_address,
-                monero_receive_address,
-                swap_id: Uuid::new_v4(),
-            });
+            let context = Arc::new(
+                Context::build(
+                    Some(bitcoin),
+                    Some(monero),
+                    Some(tor),
+                    data,
+                    is_testnet,
+                    debug,
+                    json,
+                    None,
+                )
+                .await?,
+            );
 
-            (context, request)
-        }
-        CliCommand::History => {
-            let request = Request::new(Method::History);
-
-            let context =
-                Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
-            (context, request)
-        }
-        CliCommand::Config => {
-            let request = Request::new(Method::Config);
-
-            let context =
-                Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
-            (context, request)
-        }
-        CliCommand::Balance { bitcoin } => {
-            let request = Request::new(Method::Balance {
-                force_refresh: true,
-            });
-
-            let context = Context::build(
-                Some(bitcoin),
-                None,
-                None,
-                data,
-                is_testnet,
-                debug,
-                json,
-                None,
+            buy_xmr(
+                BuyXmrArgs {
+                    seller,
+                    bitcoin_change_address,
+                    monero_receive_address,
+                    swap_id: Uuid::new_v4(),
+                },
+                context,
             )
             .await?;
-            (context, request)
+
+            Ok(()) as Result<(), anyhow::Error>
+        }
+        CliCommand::History => {
+            let context = Arc::new(
+                Context::build(None, None, None, data, is_testnet, debug, json, None).await?,
+            );
+
+            get_history(context).await?;
+
+            Ok(())
+        }
+        CliCommand::Config => {
+            let context = Arc::new(
+                Context::build(None, None, None, data, is_testnet, debug, json, None).await?,
+            );
+
+            get_config(context).await?;
+
+            Ok(())
+        }
+        CliCommand::Balance { bitcoin } => {
+            let context = Arc::new(
+                Context::build(
+                    Some(bitcoin),
+                    None,
+                    None,
+                    data,
+                    is_testnet,
+                    debug,
+                    json,
+                    None,
+                )
+                .await?,
+            );
+
+            get_balance(
+                BalanceArgs {
+                    force_refresh: true,
+                },
+                context,
+            )
+            .await?;
+
+            Ok(())
         }
         CliCommand::StartDaemon {
             server_address,
@@ -134,8 +155,6 @@ where
             monero,
             tor,
         } => {
-            let request = Request::new(Method::StartDaemon { server_address });
-
             let context = Context::build(
                 Some(bitcoin),
                 Some(monero),
@@ -147,7 +166,10 @@ where
                 server_address,
             )
             .await?;
-            (context, request)
+
+            start_daemon(StartDaemonArgs { server_address }, context).await?;
+
+            Ok(())
         }
         CliCommand::WithdrawBtc {
             bitcoin,
@@ -155,20 +177,31 @@ where
             address,
         } => {
             let address = bitcoin_address::validate_is_testnet(address, is_testnet)?;
-            let request = Request::new(Method::WithdrawBtc { amount, address });
 
-            let context = Context::build(
-                Some(bitcoin),
-                None,
-                None,
-                data,
-                is_testnet,
-                debug,
-                json,
-                None,
+            let context = Arc::new(
+                Context::build(
+                    Some(bitcoin),
+                    None,
+                    None,
+                    data,
+                    is_testnet,
+                    debug,
+                    json,
+                    None,
+                )
+                .await?,
+            );
+
+            withdraw_btc(
+                WithdrawBtcArgs {
+                    amount: amount.map(Amount::to_sat),
+                    address,
+                },
+                context,
             )
             .await?;
-            (context, request)
+
+            Ok(())
         }
         CliCommand::Resume {
             swap_id: SwapId { swap_id },
@@ -176,81 +209,94 @@ where
             monero,
             tor,
         } => {
-            let request = Request::new(Method::Resume { swap_id });
+            let context = Arc::new(
+                Context::build(
+                    Some(bitcoin),
+                    Some(monero),
+                    Some(tor),
+                    data,
+                    is_testnet,
+                    debug,
+                    json,
+                    None,
+                )
+                .await?,
+            );
 
-            let context = Context::build(
-                Some(bitcoin),
-                Some(monero),
-                Some(tor),
-                data,
-                is_testnet,
-                debug,
-                json,
-                None,
-            )
-            .await?;
-            (context, request)
+            resume_swap(ResumeArgs { swap_id }, context).await?;
+
+            Ok(())
         }
         CliCommand::CancelAndRefund {
             swap_id: SwapId { swap_id },
             bitcoin,
             tor,
         } => {
-            let request = Request::new(Method::CancelAndRefund { swap_id });
+            let context = Arc::new(
+                Context::build(
+                    Some(bitcoin),
+                    None,
+                    Some(tor),
+                    data,
+                    is_testnet,
+                    debug,
+                    json,
+                    None,
+                )
+                .await?,
+            );
 
-            let context = Context::build(
-                Some(bitcoin),
-                None,
-                Some(tor),
-                data,
-                is_testnet,
-                debug,
-                json,
-                None,
-            )
-            .await?;
-            (context, request)
+            cancel_and_refund(CancelAndRefundArgs { swap_id }, context).await?;
+
+            Ok(())
         }
         CliCommand::ListSellers {
             rendezvous_point,
             tor,
         } => {
-            let request = Request::new(Method::ListSellers { rendezvous_point });
+            let context = Arc::new(
+                Context::build(None, None, Some(tor), data, is_testnet, debug, json, None).await?,
+            );
 
-            let context =
-                Context::build(None, None, Some(tor), data, is_testnet, debug, json, None).await?;
+            list_sellers(ListSellersArgs { rendezvous_point }, context).await?;
 
-            (context, request)
+            Ok(())
         }
         CliCommand::ExportBitcoinWallet { bitcoin } => {
-            let request = Request::new(Method::ExportBitcoinWallet);
+            let context = Arc::new(
+                Context::build(
+                    Some(bitcoin),
+                    None,
+                    None,
+                    data,
+                    is_testnet,
+                    debug,
+                    json,
+                    None,
+                )
+                .await?,
+            );
 
-            let context = Context::build(
-                Some(bitcoin),
-                None,
-                None,
-                data,
-                is_testnet,
-                debug,
-                json,
-                None,
-            )
-            .await?;
-            (context, request)
+            export_bitcoin_wallet(context).await?;
+
+            Ok(())
         }
         CliCommand::MoneroRecovery {
             swap_id: SwapId { swap_id },
         } => {
-            let request = Request::new(Method::MoneroRecovery { swap_id });
+            let context = Arc::new(
+                Context::build(None, None, None, data, is_testnet, debug, json, None).await?,
+            );
 
-            let context =
-                Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
+            monero_recovery(MoneroRecoveryArgs { swap_id }, context).await?;
 
-            (context, request)
+            Ok(())
         }
     };
 
-    Ok(ParseResult::Context(Arc::new(context), Box::new(request)))
+    result?;
+
+    Ok(ParseResult::Success)
 }
 
 #[derive(structopt::StructOpt, Debug)]
@@ -302,10 +348,10 @@ enum CliCommand {
 
         #[structopt(
             long = "change-address",
-            help = "The bitcoin address where any form of change or excess funds should be sent to. If omitted they will be sent to the internal wallet.",
+            help = "The bitcoin address where any form of change or excess funds should be sent to",
             parse(try_from_str = bitcoin_address::parse)
         )]
-        bitcoin_change_address: Option<bitcoin::Address>,
+        bitcoin_change_address: bitcoin::Address,
 
         #[structopt(flatten)]
         monero: Monero,
