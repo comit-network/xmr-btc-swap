@@ -34,7 +34,7 @@ export default function PromiseInvokeButton<T>({
 
   const isLoading = isPending || isLoadingOverride;
   const actualEndIcon = isLoading
-    ? loadIcon || <CircularProgress size="1em" />
+    ? loadIcon || <CircularProgress size={24} />
     : endIcon;
 
   async function handleClick(event: React.MouseEvent<HTMLButtonElement>) {
