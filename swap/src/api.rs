@@ -7,14 +7,15 @@ use crate::network::rendezvous::XmrBtcNamespace;
 use crate::protocol::Database;
 use crate::seed::Seed;
 use crate::{bitcoin, cli, monero};
-use anyhow::{anyhow, bail, Context as AnyContext, Error, Result};
+use anyhow::{bail, Context as AnyContext, Error, Result};
 use futures::future::try_join_all;
 use std::fmt;
 use std::future::Future;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, Once};
-use tokio::sync::{broadcast, broadcast::Sender, Mutex as TokioMutex, RwLock};
+use std::sync::{Arc, Once};
+use tauri::AppHandle;
+use tokio::sync::{broadcast, broadcast::Sender, Mutex, RwLock};
 use tokio::task::JoinHandle;
 use url::Url;
 
@@ -36,7 +37,7 @@ pub struct Config {
 use uuid::Uuid;
 
 #[derive(Default)]
-pub struct PendingTaskList(TokioMutex<Vec<JoinHandle<()>>>);
+pub struct PendingTaskList(Mutex<Vec<JoinHandle<()>>>);
 
 impl PendingTaskList {
     pub async fn spawn<F, T>(&self, future: F)
@@ -164,10 +165,11 @@ pub struct Context {
     pub db: Arc<dyn Database + Send + Sync>,
     bitcoin_wallet: Option<Arc<bitcoin::Wallet>>,
     monero_wallet: Option<Arc<monero::Wallet>>,
-    monero_rpc_process: Option<Arc<Mutex<monero::WalletRpcProcess>>>,
+    monero_rpc_process: Option<Arc<monero::WalletRpcProcess>>,
     pub swap_lock: Arc<SwapLock>,
     pub config: Config,
     pub tasks: Arc<PendingTaskList>,
+    tauri_handle: Option<Arc<AppHandle>>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -228,7 +230,7 @@ impl Context {
             db: open_db(data_dir.join("sqlite")).await?,
             bitcoin_wallet,
             monero_wallet,
-            monero_rpc_process: monero_rpc_process.map(|prc| Arc::new(Mutex::new(prc))),
+            monero_rpc_process: monero_rpc_process.map(Arc::new),
             config: Config {
                 tor_socks5_port,
                 namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
@@ -242,9 +244,23 @@ impl Context {
             },
             swap_lock: Arc::new(SwapLock::new()),
             tasks: Arc::new(PendingTaskList::default()),
+            tauri_handle: None,
         };
 
         Ok(context)
+    }
+
+    pub fn with_tauri_handle(mut self, tauri_handle: Arc<AppHandle>) -> Self {
+        self.tauri_handle = Some(tauri_handle);
+        self
+    }
+
+    pub fn emit_tauri_event<S: Serialize + Clone>(mut self, event: &str, payload: S) -> Result<()> {
+        self.tauri_handle
+            .ok_or_else(|| anyhow!("Tauri handle not set"))?
+            .emit(event, payload)?;
+
+        Ok(())
     }
 
     pub async fn for_harness(
@@ -266,20 +282,8 @@ impl Context {
             monero_rpc_process: None,
             swap_lock: Arc::new(SwapLock::new()),
             tasks: Arc::new(PendingTaskList::default()),
+            tauri_handle: None,
         }
-    }
-
-    pub fn cleanup(&self) -> Result<()> {
-        if let Some(ref monero_rpc_process) = self.monero_rpc_process {
-            let mut process = monero_rpc_process
-                .lock()
-                .map_err(|_| anyhow!("Failed to lock monero_rpc_process for cleanup"))?;
-
-            process.kill()?;
-            println!("Killed monero-wallet-rpc process");
-        }
-
-        Ok(())
     }
 }
 

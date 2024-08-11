@@ -11,7 +11,7 @@ use swap::{
     },
     cli::command::{Bitcoin, Monero},
 };
-use tauri::{Manager, RunEvent, State};
+use tauri::{Emitter, Manager, State};
 
 trait ToStringResult<T> {
     fn to_string_result(self) -> Result<T, String>;
@@ -89,8 +89,8 @@ fn setup<'a>(app: &'a mut tauri::App) -> Result<(), Box<dyn std::error::Error>> 
             true,
             None,
         )
-        .await
-        .unwrap();
+        .await?
+        .with_tauri_handle(app.app_handle().to_owned());
 
         app.manage(Arc::new(context));
     });
@@ -107,16 +107,6 @@ pub fn run() {
             withdraw_btc
         ])
         .setup(setup)
-        .build(tauri::generate_context!())
-        .expect("error while building tauri application")
-        .run(|app, event| match event {
-            RunEvent::Exit | RunEvent::ExitRequested { .. } => {
-                let context = app.state::<Arc<Context>>().inner();
-
-                if let Err(err) = context.cleanup() {
-                    println!("Cleanup failed {}", err);
-                }
-            }
-            _ => {}
-        })
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }
