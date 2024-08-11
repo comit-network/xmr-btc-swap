@@ -9,36 +9,7 @@ description = "XMR/BTC trustless atomic swaps."
 name = "swap"
 
 [dependencies]
-tauri = { version = "2.0.0-rc.1" }
-
-[target.'cfg(not(windows))'.dependencies]
-tokio-tar = "0.3"
-
-[target.'cfg(windows)'.dependencies]
-zip = "0.5"
-
-[dev-dependencies]
-bitcoin-harness = { git = "https://github.com/delta1/bitcoin-harness-rs.git", rev = "80cc8d05db2610d8531011be505b7bee2b5cdf9f" }
-get-port = "3"
-hyper = "1.3"
-jsonrpsee = { version = "0.16.2", features = ["ws-client"] }
-mockito = "1.4"
-monero-harness = { path = "../monero-harness" }
-port_check = "0.2"
-proptest = "1"
-sequential-test = "0.2.4"
-serde_cbor = "0.11"
-serial_test = "3.1"
-tempfile = "3"
-testcontainers = "0.15"
-
-[build-dependencies]
 anyhow = "1"
-vergen = { version = "8.3", default-features = false, features = [
-    "build",
-    "git",
-    "git2",
-] }
 async-compression = { version = "0.3", features = ["bzip2", "tokio"] }
 async-trait = "0.1"
 atty = "0.2"
@@ -150,3 +121,33 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
 url = { version = "2", features = ["serde"] }
 uuid = { version = "1.9", features = ["serde", "v4"] }
 void = "1"
+tauri = { version = "2.0.0-rc.1", features = ["config-json5"] }
+
+[target.'cfg(not(windows))'.dependencies]
+tokio-tar = "0.3"
+
+[target.'cfg(windows)'.dependencies]
+zip = "0.5"
+
+[dev-dependencies]
+bitcoin-harness = { git = "https://github.com/delta1/bitcoin-harness-rs.git", rev = "80cc8d05db2610d8531011be505b7bee2b5cdf9f" }
+get-port = "3"
+hyper = "1.3"
+jsonrpsee = { version = "0.16.2", features = ["ws-client"] }
+mockito = "1.4"
+monero-harness = { path = "../monero-harness" }
+port_check = "0.2"
+proptest = "1"
+sequential-test = "0.2.4"
+serde_cbor = "0.11"
+serial_test = "3.1"
+tempfile = "3"
+testcontainers = "0.15"
+
+[build-dependencies]
+anyhow = "1"
+vergen = { version = "8.3", default-features = false, features = [
+    "build",
+    "git",
+    "git2",
+] }

@@ -7,14 +7,15 @@ use crate::network::rendezvous::XmrBtcNamespace;
 use crate::protocol::Database;
 use crate::seed::Seed;
 use crate::{bitcoin, cli, monero};
-use anyhow::{bail, Context as AnyContext, Error, Result};
+use anyhow::{anyhow, bail, Context as AnyContext, Error, Result};
 use futures::future::try_join_all;
+use serde::Serialize;
 use std::fmt;
 use std::future::Future;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Once};
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 use tokio::sync::{broadcast, broadcast::Sender, Mutex, RwLock};
 use tokio::task::JoinHandle;
 use url::Url;
@@ -250,14 +251,15 @@ impl Context {
         Ok(context)
     }
 
-    pub fn with_tauri_handle(mut self, tauri_handle: Arc<AppHandle>) -> Self {
-        self.tauri_handle = Some(tauri_handle);
+    pub fn with_tauri_handle(mut self, tauri_handle: AppHandle) -> Self {
+        self.tauri_handle = Some(Arc::new(tauri_handle));
         self
     }
 
-    pub fn emit_tauri_event<S: Serialize + Clone>(mut self, event: &str, payload: S) -> Result<()> {
+    pub fn emit_tauri_event<S: Serialize + Clone>(self, event: &str, payload: S) -> Result<()> {
         self.tauri_handle
-            .ok_or_else(|| anyhow!("Tauri handle not set"))?
+            .ok_or(anyhow!("Tauri handle not set"))?
+            .as_ref()
             .emit(event, payload)?;
 
         Ok(())

@@ -89,7 +89,8 @@ fn setup<'a>(app: &'a mut tauri::App) -> Result<(), Box<dyn std::error::Error>> 
             true,
             None,
         )
-        .await?
+        .await
+        .unwrap()
         .with_tauri_handle(app.app_handle().to_owned());
 
         app.manage(Arc::new(context));
