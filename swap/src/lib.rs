@@ -18,7 +18,6 @@
 
 pub mod api;
 pub mod asb;
-pub mod bin;
 pub mod bitcoin;
 pub mod cli;
 pub mod common;
