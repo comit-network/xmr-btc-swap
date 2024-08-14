@@ -18,7 +18,7 @@ use libp2p::core::multiaddr::Protocol;
 use libp2p::core::Multiaddr;
 use libp2p::swarm::AddressScore;
 use libp2p::Swarm;
-use swap::asb::tracing::Format;
+use swap::common::tracing_util::Format;
 use std::convert::TryInto;
 use std::fs::read_dir;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -39,7 +39,7 @@ use swap::network::swarm;
 use swap::protocol::alice::{run, AliceState};
 use swap::seed::Seed;
 use swap::tor::AuthenticatedClient;
-use swap::{asb, bitcoin, kraken, monero, tor};
+use swap::{bitcoin, kraken, monero, tor};
 use tokio::fs::{create_dir_all, try_exists, File};
 use tokio::io::{stdout, AsyncBufReadExt, AsyncWriteExt, BufReader, Stdout};
 use tracing_subscriber::filter::LevelFilter;
@@ -77,7 +77,7 @@ async fn main() -> Result<()> {
     // initialize tracing
     let format = if json { Format::Json } else { Format::Raw };
     let log_dir = system_data_dir()?.join("logs");
-    asb::tracing::init(LevelFilter::DEBUG, format, log_dir)
+    common::tracing_util::init(LevelFilter::DEBUG, format, log_dir)
         .expect("initialize tracing");
 
     // read config from the specified path

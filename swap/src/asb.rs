@@ -4,7 +4,6 @@ mod event_loop;
 mod network;
 mod rate;
 mod recovery;
-pub mod tracing;
 
 pub use event_loop::{EventLoop, EventLoopHandle, FixedRate, KrakenRate, LatestRate};
 pub use network::behaviour::{Behaviour, OutEvent};
