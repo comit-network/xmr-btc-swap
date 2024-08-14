@@ -5,75 +5,57 @@ use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::fmt::time::UtcTime;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::fmt;
+use tracing_subscriber::util::SubscriberInitExt;
 
-
+/// Output formats for logging messages.
+pub enum Format {
+    /// Standard, human readable format.
+    Raw,
+    /// Machine readable format.
+    Json,
+}
 
 pub fn init(
     level: LevelFilter,
-    json_format: bool,
-    timestamp: bool,
+    format: Format,
     dir: impl AsRef<Path>,
 ) -> Result<()> {
     if level == LevelFilter::OFF {
         return Ok(());
     }
 
-    let is_terminal = atty::is(atty::Stream::Stderr);
-
-    // File logger will always write in JSON format and with timestamps
+    // file logger will always write in JSON format and with timestamps
     let file_appender = tracing_appender::rolling::never(dir.as_ref(), "swap-all.log");
 
     let file_layer = fmt::layer()
-    .with_writer(std::io::stdout)
-    .with_ansi(false)
-    .with_timer(UtcTime::rfc_3339())
-    .with_target(false)
-    .json();
+        .with_writer(file_appender)
+        .with_ansi(false)
+        .with_timer(UtcTime::rfc_3339())
+        .with_target(false)
+        .json();
 
-    // Terminal logger
-    let terminal_layer_base = fmt::layer() 
+    // terminal logger
+    let is_terminal = atty::is(atty::Stream::Stderr);
+    let terminal_layer = fmt::layer() 
         .with_writer(std::io::stdout)
         .with_ansi(is_terminal)
         .with_timer(UtcTime::rfc_3339())
         .with_target(false);
 
-    // Since tracing is stupid, and makes each option return a different type
-    // but also doesn't allow dynamic dispatch we have to use this beauty
-    let (
-        a,
-        b, 
-        c, 
-        d
-    ) = match (json_format, timestamp) {
-        (true, true) => (Some(terminal_layer_base.json()), None, None, None),
-        (true, false) => (None, Some(terminal_layer_base.json().without_time()), None, None),
-        (false, true) => (None, None, Some(terminal_layer_base), None),
-        (false, false) => (None, None, None, Some(terminal_layer_base.without_time())),
-    };
-
-    let combined_subscriber = tracing_subscriber::registry()
-        .with(file_layer)
-        .with(a);
-
-    combined_subscriber.init();
+    // combine the layers and start logging, format with json if specified 
+    if let Format::Json = format {
+        tracing_subscriber::registry()
+            .with(file_layer)
+            .with(terminal_layer.json())
+            .init();
+    } else {
+        tracing_subscriber::registry()
+            .with(file_layer)
+            .with(terminal_layer)
+            .init();
+    }
     
-    // let builder = FmtSubscriber::builder()
-    //     .with_env_filter(format!("asb={},swap={}", level, level))
-    //     .with_writer(async_file_appender.and(std::io::stderr))
-    //     .with_ansi(is_terminal)
-    //     .with_timer(UtcTime::rfc_3339())
-    //     .with_target(false);
-
-    
-
-
-    // match (json_format, timestamp) {
-    //     (true, true) => builder.json().init(),
-    //     (true, false) => builder.json().without_time().init(),
-    //     (false, true) => builder.init(),
-    //     (false, false) => builder.without_time().init(),
-    // }
-
+    // now we can use the tracing macros to log messages
     tracing::info!(%level, "Initialized tracing");
 
     Ok(())

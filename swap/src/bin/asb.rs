@@ -18,6 +18,7 @@ use libp2p::core::multiaddr::Protocol;
 use libp2p::core::Multiaddr;
 use libp2p::swarm::AddressScore;
 use libp2p::Swarm;
+use swap::asb::tracing::Format;
 use std::convert::TryInto;
 use std::fs::read_dir;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -47,39 +48,39 @@ const DEFAULT_WALLET_NAME: &str = "asb-wallet";
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // parse cli arguments
     let Arguments {
         testnet,
         json,
-        disable_timestamp,
         config_path,
         env_config,
         cmd,
     } = match parse_args(env::args_os()) {
         Ok(args) => args,
         Err(e) => {
+            // make sure to display the clap error message it exists
             if let Some(clap_err) = e.downcast_ref::<clap::Error>() {
-                match clap_err.kind {
-                    ErrorKind::HelpDisplayed | ErrorKind::VersionDisplayed => {
-                        println!("{}", clap_err.message);
-                        std::process::exit(0);
-                    }
-                    _ => {
-                        bail!(e);
-                    }
+                if let ErrorKind::HelpDisplayed | ErrorKind::VersionDisplayed = clap_err.kind {
+                    println!("{}", clap_err.message);
+                    std::process::exit(0);
                 }
             }
             bail!(e);
         }
     };
 
+    // warn if we're not on the latest version
     if let Err(e) = check_latest_version(env!("CARGO_PKG_VERSION")).await {
         eprintln!("{}", e);
     }
 
+    // initialize tracing
+    let format = if json { Format::Json } else { Format::Raw };
     let log_dir = system_data_dir()?.join("logs");
-    asb::tracing::init(LevelFilter::DEBUG, json, !disable_timestamp, log_dir)
+    asb::tracing::init(LevelFilter::DEBUG, format, log_dir)
         .expect("initialize tracing");
 
+    // read config from the specified path
     let config = match read_config(config_path.clone())? {
         Ok(config) => config,
         Err(ConfigNotInitialized {}) => {
@@ -88,6 +89,7 @@ async fn main() -> Result<()> {
         }
     };
 
+    // check for conflicting env / config values
     if config.monero.network != env_config.monero_network {
         bail!(format!(
             "Expected monero network in config file to be {:?} but was {:?}",
@@ -114,6 +116,7 @@ async fn main() -> Result<()> {
             rendezvous_addrs.sort();
             rendezvous_addrs.dedup();
             let new_len = rendezvous_addrs.len();
+
             if new_len < prev_len {
                 tracing::warn!(
                     "`rendezvous_point` config has {} duplicate entries, they are being ignored.",
@@ -121,9 +124,12 @@ async fn main() -> Result<()> {
                 );
             }
 
+            // initialize monero wallet
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
             let monero_address = monero_wallet.get_main_address();
             tracing::info!(%monero_address, "Monero wallet address");
+
+            // check monero balance
             let monero = monero_wallet.get_balance().await?;
             match (monero.balance, monero.unlocked_balance) {
                 (0, _) => {
@@ -146,6 +152,7 @@ async fn main() -> Result<()> {
                 }
             }
 
+            // init bitcoin wallet
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
             let bitcoin_balance = bitcoin_wallet.balance().await?;
             tracing::info!(%bitcoin_balance, "Bitcoin wallet balance");

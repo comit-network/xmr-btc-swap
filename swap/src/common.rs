@@ -44,7 +44,7 @@ fn is_latest_version(current: &str, latest: &str) -> bool {
 macro_rules! regex_find_placeholders {
     ($pattern:expr, $create_placeholder:expr, $replacements:expr, $input:expr) => {{
         // compile the regex pattern
-        let regex = once_cell::sync::Lazy::new(|| {
+        static REGEX: once_cell::sync::Lazy<regex::Regex> = once_cell::sync::Lazy::new(|| {
             regex::Regex::new($pattern).expect("invalid regex pattern")
         });
 
@@ -53,7 +53,7 @@ macro_rules! regex_find_placeholders {
 
         // for every matched address check whether we already found it
         // and if we didn't, generate a placeholder for it
-        for address in regex.find_iter($input) {
+        for address in REGEX.find_iter($input) {
             if !$replacements.contains_key(address.as_str()) {
                 $replacements.insert(address.as_str().to_owned(), $create_placeholder(counter));
                 counter += 1;
