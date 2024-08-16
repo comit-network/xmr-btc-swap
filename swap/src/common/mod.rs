@@ -1,8 +1,12 @@
 pub mod tracing_util;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::anyhow;
+use tokio::{fs::{create_dir_all, read_dir, try_exists, File}, io::{self, stdout, AsyncBufReadExt, AsyncWriteExt, BufReader, Stdout}};
+use uuid::Uuid;
+
+use crate::fs::system_data_dir;
 
 const LATEST_RELEASE_URL: &str = "https://github.com/comit-network/xmr-btc-swap/releases/latest";
 
@@ -62,6 +66,103 @@ macro_rules! regex_find_placeholders {
             }
         }
     }};
+}
+
+/// Print the logs from the specified logs or from the default location 
+/// to the specified path or the terminal.
+/// 
+/// If specified, filter by swap id or redact addresses.
+pub async fn print_or_write_logs(logs_dir: Option<PathBuf>, output_path: Option<PathBuf>, swap_id: Option<Uuid>, redact_addresses: bool) -> anyhow::Result<()> {
+    // use provided directory of default one
+    let default_dir = system_data_dir()?.join("logs");
+    let logs_dir = logs_dir.unwrap_or(default_dir);
+
+    tracing::info!("Reading `*.log` files from `{}`", logs_dir.display());
+
+    // get all files in the directory
+    let mut log_files = read_dir(&logs_dir).await?;
+
+    /// Enum for abstracting over output channels
+    enum OutputChannel {
+        File(File),
+        Stdout(Stdout),
+    }
+
+    /// Conveniance method for writing to either file or stdout
+    async fn write_to_channel(
+        mut channel: &mut OutputChannel,
+        output: &str,
+    ) -> Result<(), io::Error> {
+        match &mut channel {
+            OutputChannel::File(file) => file.write_all(output.as_bytes()).await,
+            OutputChannel::Stdout(stdout) => stdout.write_all(output.as_bytes()).await,
+        }
+    }
+
+    // check where we should write to
+    let mut output_channel = match output_path {
+        Some(path) => {
+            // make sure the directory exists
+            if !try_exists(&path).await? {
+                let mut dir_part = path.clone();
+                dir_part.pop();
+                create_dir_all(&dir_part).await?;
+            }
+
+            tracing::info!("Writing logs to `{}`", path.display());
+
+            // create/open and truncate file.
+            // this means we aren't appending which is probably intuitive behaviour
+            // since we reprint the complete logs anyway
+            OutputChannel::File(File::create(&path).await?)
+        }
+        None => OutputChannel::Stdout(stdout()),
+    };
+
+    // conveniance method for checking whether we should filter a specific line
+    let filter_by_swap_id: Box<dyn Fn(&str) -> bool + Send + Sync> = match swap_id {
+        // if we should filter by swap id, check if the line contains the string
+        Some(swap_id) => {
+            let swap_id = swap_id.to_string();
+            Box::new(move |line: &str| line.contains(&swap_id))
+        }
+        // otherwise we let every line pass
+        None => Box::new(|_| true),
+    };
+    
+    // print all lines from every log file. TODO: sort files by date?
+    while let Some(entry) = log_files.next_entry().await? {
+        // get the file path
+        let file_path = entry.path();
+
+        // filter for .log files
+        let file_name = file_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("");
+
+        if !file_name.ends_with(".log") {
+            continue;
+        }
+
+        let buf_reader = BufReader::new(File::open(&file_path).await?);
+        let mut lines = buf_reader.lines();
+
+        // print each line, redacted if the flag is set
+        while let Some(line) = lines.next_line().await? {
+            // check if we should filter this line
+            if !filter_by_swap_id(&line) {
+                continue;
+            }
+
+            let line = if redact_addresses { redact(&line) } else { line };
+            write_to_channel(&mut output_channel, &line).await?;
+            // don't forget newlines
+            write_to_channel(&mut output_channel, "\n").await?;
+        }
+    }
+
+    Ok(())
 }
 
 /// Redact logs, etc. by replacing Bitcoin and Monero addresses

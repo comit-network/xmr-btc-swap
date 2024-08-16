@@ -1,6 +1,7 @@
 use crate::api::Context;
 use crate::bitcoin::{Amount, ExpiredTimelocks, TxLock};
 use crate::cli::{list_sellers, EventLoop, SellerStatus};
+use crate::common::print_or_write_logs;
 use crate::libp2p_ext::MultiAddrExt;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
 use crate::network::swarm;
@@ -16,6 +17,7 @@ use std::cmp::min;
 use std::convert::TryInto;
 use std::future::Future;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug_span, field, Instrument, Span};
@@ -45,6 +47,12 @@ pub enum Method {
         swap_id: Uuid,
     },
     History,
+    Logs {
+        logs_dir: Option<PathBuf>,
+        output_path: Option<PathBuf>,
+        redact: bool,
+        swap_id: Option<Uuid>
+    },
     Config,
     WithdrawBtc {
         amount: Option<Amount>,
@@ -119,6 +127,13 @@ impl Method {
                 debug_span!(
                     "method",
                     method_name = "History",
+                    log_reference_id = field::Empty
+                )
+            }
+            Method::Logs { .. } => {
+                debug_span!(
+                    "method", 
+                    method_name = "Logs", 
                     log_reference_id = field::Empty
                 )
             }
@@ -646,6 +661,11 @@ impl Request {
                 }
 
                 Ok(json!({ "swaps": vec }))
+            }
+            Method::Logs { logs_dir, output_path, redact, swap_id } => {
+                print_or_write_logs(logs_dir, output_path, swap_id, redact).await?;
+
+                Ok(json!({ "success": true }))
             }
             Method::GetRawStates => {
                 let raw_history = context.db.raw_all().await?;
