@@ -12,7 +12,7 @@ use anyhow::{Context, Result};
 use futures::future;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::{FuturesUnordered, StreamExt};
-use libp2p::request_response::{RequestId, ResponseChannel};
+use libp2p::request_response::{InboundRequestId, OutboundRequestId, ResponseChannel};
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
 use rust_decimal::Decimal;
@@ -62,7 +62,7 @@ where
 
     /// Tracks [`transfer_proof::Request`]s which are currently inflight and
     /// awaiting an acknowledgement.
-    inflight_transfer_proofs: HashMap<RequestId, bmrng::Responder<()>>,
+    inflight_transfer_proofs: HashMap<OutboundRequestId, bmrng::Responder<()>>,
 }
 
 impl<LR> EventLoop<LR>
@@ -334,10 +334,10 @@ where
                         SwarmEvent::IncomingConnectionError { send_back_addr: address, error, .. } => {
                             tracing::warn!(%address, "Failed to set up connection with peer: {:#}", error);
                         }
-                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established: 0, endpoint, cause: Some(error) } => {
+                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established: 0, endpoint, cause: Some(error), connection_id } => {
                             tracing::debug!(%peer, address = %endpoint.get_remote_address(), "Lost connection to peer: {:#}", error);
                         }
-                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established: 0, endpoint, cause: None } => {
+                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established: 0, endpoint, cause: None, connection_id } => {
                             tracing::info!(%peer, address = %endpoint.get_remote_address(), "Successfully closed connection");
                         }
                         SwarmEvent::NewListenAddr{address, ..} => {

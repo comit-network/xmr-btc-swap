@@ -11,32 +11,27 @@ use crate::network::{
 use crate::protocol::alice::State3;
 use anyhow::{anyhow, Error, Result};
 use futures::FutureExt;
-use libp2p::core::connection::ConnectionId;
 use libp2p::core::muxing::StreamMuxerBox;
 use libp2p::core::transport::Boxed;
-use libp2p::dns::TokioDnsConfig;
-use libp2p::identify::{Identify, IdentifyConfig, IdentifyEvent};
-use libp2p::ping::{Ping, PingConfig, PingEvent};
-use libp2p::request_response::{RequestId, ResponseChannel};
+use libp2p::request_response::{ResponseChannel};
 use libp2p::swarm::dial_opts::PeerCondition;
 use libp2p::swarm::{
-    IntoProtocolsHandler, NetworkBehaviour, NetworkBehaviourAction, PollParameters,
-    ProtocolsHandler,
+    NetworkBehaviour
 };
-use libp2p::tcp::TokioTcpConfig;
-use libp2p::websocket::WsConfig;
-use libp2p::{identity, Multiaddr, NetworkBehaviour, PeerId, Transport};
+use libp2p::{Multiaddr, PeerId, Transport};
 use std::task::Poll;
 use std::time::Duration;
 use uuid::Uuid;
 
 pub mod transport {
+    use libp2p::{dns, identity, tcp, websocket::WsConfig};
+
     use super::*;
 
     /// Creates the libp2p transport for the ASB.
     pub fn new(identity: &identity::Keypair) -> Result<Boxed<(PeerId, StreamMuxerBox)>> {
-        let tcp = TokioTcpConfig::new().nodelay(true);
-        let tcp_with_dns = TokioDnsConfig::system(tcp)?;
+        let tcp = tcp::Config::new().nodelay(true);
+        let tcp_with_dns = dns::ResolverConfig::default::system(tcp)?;
         let websocket_with_dns = WsConfig::new(tcp_with_dns.clone());
 
         let transport = tcp_with_dns.or_transport(websocket_with_dns).boxed();

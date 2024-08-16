@@ -5,7 +5,6 @@ use libp2p::core::multiaddr::{Multiaddr, Protocol};
 use libp2p::core::transport::TransportError;
 use libp2p::core::Transport;
 use libp2p::tcp::tokio::{Tcp, TcpStream};
-use libp2p::tcp::TcpListenStream;
 use std::borrow::Cow;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::{fmt, io};
@@ -34,7 +33,7 @@ impl Transport for TorDialOnlyTransport {
         Err(TransportError::MultiaddrNotSupported(addr))
     }
 
-    fn dial(self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {
+    fn dial(&mut self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {
         let address = TorCompatibleAddress::from_multiaddr(Cow::Borrowed(&addr))?;
 
         if address.is_certainly_not_reachable_via_tor_daemon() {
@@ -60,7 +59,7 @@ impl Transport for TorDialOnlyTransport {
     fn address_translation(&self, _: &Multiaddr, _: &Multiaddr) -> Option<Multiaddr> {
         None
     }
-    fn dial_as_listener(self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {
+    fn dial_as_listener(&mut self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {
         let address = TorCompatibleAddress::from_multiaddr(Cow::Borrowed(&addr))?;
 
         if address.is_certainly_not_reachable_via_tor_daemon() {
