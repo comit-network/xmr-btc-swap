@@ -1,6 +1,6 @@
 import { Box, Chip, Typography } from "@material-ui/core";
-import { useMemo, useState } from "react";
 import { CliLog } from "models/cliModel";
+import { useMemo, useState } from "react";
 import { logsToRawString } from "utils/parseUtils";
 import ScrollablePaperTextBox from "./ScrollablePaperTextBox";
 

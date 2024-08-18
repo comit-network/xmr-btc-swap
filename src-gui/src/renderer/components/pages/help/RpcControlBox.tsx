@@ -1,12 +1,12 @@
 import { Box, makeStyles } from "@material-ui/core";
+import FolderOpenIcon from "@material-ui/icons/FolderOpen";
+import PlayArrowIcon from "@material-ui/icons/PlayArrow";
+import StopIcon from "@material-ui/icons/Stop";
+import { RpcProcessStateType } from "models/rpcModel";
 import IpcInvokeButton from "renderer/components/IpcInvokeButton";
 import { useAppSelector } from "store/hooks";
-import StopIcon from "@material-ui/icons/Stop";
-import PlayArrowIcon from "@material-ui/icons/PlayArrow";
-import { RpcProcessStateType } from "models/rpcModel";
 import InfoBox from "../../modal/swap/InfoBox";
 import CliLogsBox from "../../other/RenderedCliLog";
-import FolderOpenIcon from "@material-ui/icons/FolderOpen";
 
 const useStyles = makeStyles((theme) => ({
   actionsOuter: {

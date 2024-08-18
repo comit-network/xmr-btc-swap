@@ -1,13 +1,13 @@
-import RedditIcon from "@material-ui/icons/Reddit";
-import GitHubIcon from "@material-ui/icons/GitHub";
 import { Box, makeStyles } from "@material-ui/core";
-import LinkIconButton from "../icons/LinkIconButton";
-import UnfinishedSwapsAlert from "../alert/UnfinishedSwapsAlert";
+import GitHubIcon from "@material-ui/icons/GitHub";
+import RedditIcon from "@material-ui/icons/Reddit";
 import FundsLeftInWalletAlert from "../alert/FundsLeftInWalletAlert";
-import RpcStatusAlert from "../alert/RpcStatusAlert";
-import DiscordIcon from "../icons/DiscordIcon";
-import { DISCORD_URL } from "../pages/help/ContactInfoBox";
 import MoneroWalletRpcUpdatingAlert from "../alert/MoneroWalletRpcUpdatingAlert";
+import RpcStatusAlert from "../alert/RpcStatusAlert";
+import UnfinishedSwapsAlert from "../alert/UnfinishedSwapsAlert";
+import DiscordIcon from "../icons/DiscordIcon";
+import LinkIconButton from "../icons/LinkIconButton";
+import { DISCORD_URL } from "../pages/help/ContactInfoBox";
 
 const useStyles = makeStyles((theme) => ({
   outer: {

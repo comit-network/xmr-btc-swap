@@ -1,12 +1,12 @@
-import { Box, makeStyles, CssBaseline } from "@material-ui/core";
-import { createTheme, ThemeProvider } from "@material-ui/core/styles";
+import { Box, CssBaseline, makeStyles } from "@material-ui/core";
 import { indigo } from "@material-ui/core/colors";
-import { MemoryRouter as Router, Routes, Route } from "react-router-dom";
+import { createTheme, ThemeProvider } from "@material-ui/core/styles";
+import { Route, MemoryRouter as Router, Routes } from "react-router-dom";
 import Navigation, { drawerWidth } from "./navigation/Navigation";
+import HelpPage from "./pages/help/HelpPage";
 import HistoryPage from "./pages/history/HistoryPage";
 import SwapPage from "./pages/swap/SwapPage";
 import WalletPage from "./pages/wallet/WalletPage";
-import HelpPage from "./pages/help/HelpPage";
 import GlobalSnackbarProvider from "./snackbar/GlobalSnackbarProvider";
 
 const useStyles = makeStyles((theme) => ({

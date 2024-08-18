@@ -1,6 +1,6 @@
 import { Box, makeStyles } from "@material-ui/core";
-import SwapWidget from "./SwapWidget";
 import ApiAlertsBox from "./ApiAlertsBox";
+import SwapWidget from "./SwapWidget";
 
 const useStyles = makeStyles((theme) => ({
   outer: {

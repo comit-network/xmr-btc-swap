@@ -1,9 +1,9 @@
 import { Box, makeStyles } from "@material-ui/core";
 import ContactInfoBox from "./ContactInfoBox";
-import FeedbackInfoBox from "./FeedbackInfoBox";
 import DonateInfoBox from "./DonateInfoBox";
-import TorInfoBox from "./TorInfoBox";
+import FeedbackInfoBox from "./FeedbackInfoBox";
 import RpcControlBox from "./RpcControlBox";
+import TorInfoBox from "./TorInfoBox";
 
 const useStyles = makeStyles((theme) => ({
   outer: {

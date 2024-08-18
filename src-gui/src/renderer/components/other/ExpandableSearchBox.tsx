@@ -1,7 +1,7 @@
-import { useState } from "react";
 import { Box, IconButton, TextField } from "@material-ui/core";
-import SearchIcon from "@material-ui/icons/Search";
 import CloseIcon from "@material-ui/icons/Close";
+import SearchIcon from "@material-ui/icons/Search";
+import { useState } from "react";
 
 export function ExpandableSearchBox({
   query,

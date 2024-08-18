@@ -1,6 +1,6 @@
-import { Drawer, makeStyles, Box } from "@material-ui/core";
-import NavigationHeader from "./NavigationHeader";
+import { Box, Drawer, makeStyles } from "@material-ui/core";
 import NavigationFooter from "./NavigationFooter";
+import NavigationHeader from "./NavigationHeader";
 
 export const drawerWidth = 240;
 

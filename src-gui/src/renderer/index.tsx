@@ -1,18 +1,18 @@
 import { render } from "react-dom";
 import { Provider } from "react-redux";
-import { store } from "./store/storeRenderer";
-import { setRegistryProviders } from "store/features/providersSlice";
 import { setAlerts } from "store/features/alertsSlice";
-import { setXmrPrice, setBtcPrice } from "store/features/ratesSlice";
+import { setRegistryProviders } from "store/features/providersSlice";
+import { setBtcPrice, setXmrPrice } from "store/features/ratesSlice";
+import logger from "../utils/logger";
 import {
   fetchAlertsViaHttp,
   fetchBtcPrice,
   fetchProvidersViaHttp,
   fetchXmrPrice,
 } from "./api";
-import logger from "../utils/logger";
 import App from "./components/App";
 import { checkBitcoinBalance, getRawSwapInfos } from "./rpc";
+import { store } from "./store/storeRenderer";
 
 setTimeout(() => {
   checkBitcoinBalance();

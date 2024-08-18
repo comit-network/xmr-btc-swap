@@ -1,8 +1,8 @@
 import { Box, makeStyles, Typography } from "@material-ui/core";
+import PlayArrowIcon from "@material-ui/icons/PlayArrow";
+import StopIcon from "@material-ui/icons/Stop";
 import IpcInvokeButton from "renderer/components/IpcInvokeButton";
 import { useAppSelector } from "store/hooks";
-import StopIcon from "@material-ui/icons/Stop";
-import PlayArrowIcon from "@material-ui/icons/PlayArrow";
 import InfoBox from "../../modal/swap/InfoBox";
 import CliLogsBox from "../../other/RenderedCliLog";
 
