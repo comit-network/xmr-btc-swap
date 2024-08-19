@@ -20,6 +20,19 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.7.3
 
+      - name: Install dependencies required by Tauri v2 (ubuntu only)
+        run: |
+          sudo apt update
+          sudo apt install libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+            
       - name: Check formatting
         uses: dprint/check@v2.2
         with:
@@ -39,6 +52,19 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.7.3
 
+      - name: Install dependencies required by Tauri v2 (ubuntu only)
+        run: |
+          sudo apt update
+          sudo apt install libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+            
       - name: Build swap
         run: cargo build --bin swap
 
@@ -53,6 +79,19 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.7.3
 
+      - name: Install dependencies required by Tauri v2 (ubuntu only)
+        run: |
+          sudo apt update
+          sudo apt install libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+            
       - name: Install sqlx-cli
         run: cargo install --locked --version 0.6.3 sqlx-cli
 
@@ -87,6 +126,20 @@ jobs:
           toolchain: "1.74"
           targets: armv7-unknown-linux-gnueabihf
 
+      - name: Install dependencies required by Tauri v2 (ubuntu only)
+        if: matrix.os == 'ubuntu-latest' # This must match the platform value defined above.
+        run: |
+          sudo apt update
+          sudo apt install libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+            
       - name: Build binary
         if: matrix.target != 'armv7-unknown-linux-gnueabihf'
         run: cargo build -p swap --target ${{ matrix.target }}
@@ -130,6 +183,20 @@ jobs:
           swap-storage: false
           tool-cache: false
 
+      - name: Install dependencies required by Tauri v2 (ubuntu only)
+        if: matrix.os == 'ubuntu-latest' # This must match the platform value defined above.
+        run: |
+          sudo apt update
+          sudo apt install libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+            
       - name: Checkout sources
         uses: actions/checkout@v4.1.7
 
@@ -175,6 +242,19 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.7.3
 
+      - name: Install dependencies required by Tauri v2 (ubuntu only)
+        run: |
+          sudo apt update
+          sudo apt install libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+            
       - name: Run test ${{ matrix.test_name }}
         run: cargo test --package swap --all-features --test ${{ matrix.test_name }} -- --nocapture
 
@@ -186,6 +266,19 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.7.3
 
+      - name: Install dependencies required by Tauri v2 (ubuntu only)
+        run: |
+          sudo apt update
+          sudo apt install libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+            
       - name: Run RPC server tests
         run: cargo test --package swap --all-features --test rpc -- --nocapture
 
@@ -199,5 +292,18 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.7.3
 
+      - name: Install dependencies required by Tauri v2 (ubuntu only)
+        run: |
+          sudo apt update
+          sudo apt install libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+            
       - name: Run cargo check on stable rust
         run: cargo check --all-targets
