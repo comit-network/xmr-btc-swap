@@ -30,9 +30,8 @@ use swap::asb::config::{
     initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
 };
 use swap::asb::{cancel, punish, redeem, refund, safely_abort, EventLoop, Finality, KrakenRate};
-use swap::common::{self, check_latest_version, print_or_write_logs};
+use swap::common::{self, check_latest_version, get_logs};
 use swap::database::{open_db, AccessMode};
-use swap::fs::system_data_dir;
 use swap::network::rendezvous::XmrBtcNamespace;
 use swap::network::swarm;
 use swap::protocol::alice::{run, AliceState};
@@ -69,13 +68,7 @@ async fn main() -> Result<()> {
     // warn if we're not on the latest version
     if let Err(e) = check_latest_version(env!("CARGO_PKG_VERSION")).await {
         eprintln!("{}", e);
-    }
-
-    // initialize tracing
-    let format = if json { Format::Json } else { Format::Raw };
-    let log_dir = system_data_dir()?.join("logs");
-    common::tracing_util::init(LevelFilter::DEBUG, format, log_dir)
-        .expect("initialize tracing");
+    }   
 
     // read config from the specified path
     let config = match read_config(config_path.clone())? {
@@ -86,6 +79,12 @@ async fn main() -> Result<()> {
         }
     };
 
+    // initialize tracing
+    let format = if json { Format::Json } else { Format::Raw };
+    let log_dir = config.data.dir.join("logs");
+    common::tracing_util::init(LevelFilter::DEBUG, format, log_dir)
+        .expect("initialize tracing");
+        
     // check for conflicting env / config values
     if config.monero.network != env_config.monero_network {
         bail!(format!(
@@ -254,11 +253,16 @@ async fn main() -> Result<()> {
         }
         Command::Logs {
             logs_dir,
-            output_path,
             swap_id,
             redact,
         } => {
-            print_or_write_logs(logs_dir, output_path, swap_id, redact).await?;
+            let dir = logs_dir.unwrap_or(config.data.dir.join("logs"));
+
+            let log_messages = get_logs(dir, swap_id, redact).await?;
+
+            for msg in log_messages {
+                println!("{msg}");
+            }
         }
         Command::WithdrawBtc { amount, address } => {
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;

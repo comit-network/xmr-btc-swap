@@ -1,7 +1,7 @@
 use crate::api::Context;
 use crate::bitcoin::{Amount, ExpiredTimelocks, TxLock};
 use crate::cli::{list_sellers, EventLoop, SellerStatus};
-use crate::common::print_or_write_logs;
+use crate::common::get_logs;
 use crate::libp2p_ext::MultiAddrExt;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
 use crate::network::swarm;
@@ -49,7 +49,6 @@ pub enum Method {
     History,
     Logs {
         logs_dir: Option<PathBuf>,
-        output_path: Option<PathBuf>,
         redact: bool,
         swap_id: Option<Uuid>
     },
@@ -662,10 +661,12 @@ impl Request {
 
                 Ok(json!({ "swaps": vec }))
             }
-            Method::Logs { logs_dir, output_path, redact, swap_id } => {
-                print_or_write_logs(logs_dir, output_path, swap_id, redact).await?;
+            Method::Logs { logs_dir, redact, swap_id } => {
+                let dir = logs_dir.unwrap_or(context.config.data_dir.join("logs"));
 
-                Ok(json!({ "success": true }))
+                let logs = get_logs(dir, swap_id, redact).await?;
+
+                Ok(json!({ "logs": logs }))
             }
             Method::GetRawStates => {
                 let raw_history = context.db.raw_all().await?;

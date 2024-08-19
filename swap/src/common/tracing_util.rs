@@ -60,7 +60,7 @@ pub fn init(
     }
     
     // now we can use the tracing macros to log messages
-    tracing::info!(%level_filter, "Initialized tracing");
+    tracing::info!(%level_filter, logs_dir=%dir.as_ref().display(), "Initialized tracing");
 
     Ok(())
 }

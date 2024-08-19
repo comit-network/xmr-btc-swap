@@ -39,7 +39,6 @@ where
             cmd: Command::History,
         },
         RawCommand::Logs {
-            output_path,
             logs_dir: dir_path,
             swap_id,
             redact,
@@ -50,7 +49,6 @@ where
             env_config: env_config(testnet),
             cmd: Command::Logs {
                 logs_dir: dir_path,
-                output_path,
                 swap_id,
                 redact,
             },
@@ -203,7 +201,6 @@ pub enum Command {
     Config,
     Logs {
         logs_dir: Option<PathBuf>,
-        output_path: Option<PathBuf>,
         swap_id: Option<Uuid>,
         redact: bool,
     },
@@ -287,11 +284,6 @@ pub enum RawCommand {
             help = "Print the logs from this directory instead of the default one."
         )]
         logs_dir: Option<PathBuf>,
-        #[structopt(
-            short = "o",
-            help = "Print the logs into this file instead of the terminal."
-        )]
-        output_path: Option<PathBuf>,
         #[structopt(
             help = "Redact swap-ids, Bitcoin and Monero addresses.",
             long = "redact"

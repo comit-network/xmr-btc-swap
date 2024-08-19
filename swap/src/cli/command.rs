@@ -105,13 +105,13 @@ where
         }
         CliCommand::Logs {
             logs_dir,
-            output_path,
             redact,
             swap_id
         } => {
-            let request = Request::new(Method::Logs { logs_dir, output_path, redact, swap_id });
+            let request = Request::new(Method::Logs { logs_dir, redact, swap_id });
             let context = Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
 
+            println!("here");
             (context, request)
         }
         CliCommand::Config => {
@@ -339,11 +339,6 @@ enum CliCommand {
             help = "Print the logs from this directory instead of the default one."
         )]
         logs_dir: Option<PathBuf>,
-        #[structopt(
-            short = "o",
-            help = "Print the logs into this file instead of the terminal."
-        )]
-        output_path: Option<PathBuf>,
         #[structopt(
             help = "Redact swap-ids, Bitcoin and Monero addresses.",
             long = "redact"

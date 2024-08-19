@@ -7,7 +7,9 @@ use anyhow::Result;
 use jsonrpsee::server::RpcModule;
 use jsonrpsee::types::Params;
 use libp2p::core::Multiaddr;
+use serde::Deserialize;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -48,8 +50,21 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
         execute_request(params_raw, Method::Balance { force_refresh }, &context).await
     })?;
 
-    module.register_async_method("get_history", |params, context| async move {
-        execute_request(params, Method::History, &context).await
+    module.register_async_method("get_history", |params_raw, context| async move {
+        execute_request(params_raw, Method::History, &context).await
+    })?;
+
+    module.register_async_method("get_logs", |params_raw, context| async move {
+        #[derive(Debug, Clone, Deserialize)]
+        struct Params {
+            swap_id: Option<Uuid>,
+            logs_dir: Option<PathBuf>,
+            redact: bool
+        }
+
+        let params: Params = params_raw.parse()?;
+
+        execute_request(params_raw, Method::Logs { swap_id: params.swap_id, logs_dir: params.logs_dir, redact: params.redact }, &context).await
     })?;
 
     module.register_async_method("get_raw_states", |params, context| async move {
