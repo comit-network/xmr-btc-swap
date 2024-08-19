@@ -663,8 +663,11 @@ impl Request {
             }
             Method::Logs { logs_dir, redact, swap_id } => {
                 let dir = logs_dir.unwrap_or(context.config.data_dir.join("logs"));
-
                 let logs = get_logs(dir, swap_id, redact).await?;
+
+                for msg in &logs {
+                    println!("{msg}");
+                }
 
                 Ok(json!({ "logs": logs }))
             }

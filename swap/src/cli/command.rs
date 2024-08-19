@@ -111,7 +111,6 @@ where
             let request = Request::new(Method::Logs { logs_dir, redact, swap_id });
             let context = Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
 
-            println!("here");
             (context, request)
         }
         CliCommand::Config => {
