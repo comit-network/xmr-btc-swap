@@ -104,18 +104,10 @@ pub async fn get_logs(logs_dir: PathBuf, swap_id: Option<Uuid>, redact_addresses
         while let Some(line) = lines.next_line().await? {
             // if we should filter by swap id, check if the line contains it
             if let Some(swap_id) = swap_id {
+                // we only want lines which contain the swap id
                 if !line.contains(&swap_id.to_string()) {
                     continue;
                 }  
-            }
-
-            if line.contains(r#""level":"TRACE""#) {
-                continue;
-            }
-
-            // skip debug logs
-            if line.contains(r#""level":"DEBUG""#) {
-                continue;
             }
 
             // redact if necessary
