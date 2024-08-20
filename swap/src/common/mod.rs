@@ -72,12 +72,14 @@ macro_rules! regex_find_placeholders {
 /// 
 /// If specified, filter by swap id or redact addresses.
 pub async fn get_logs(logs_dir: PathBuf, swap_id: Option<Uuid>, redact_addresses: bool) -> anyhow::Result<Vec<String>> {
-    tracing::debug!(logs_dir=%logs_dir.display(), "reading logfiles from");
+    tracing::debug!("reading logfiles from {}", logs_dir.display());
 
     // get all files in the directory
     let mut log_files = read_dir(&logs_dir).await?;
 
     let mut log_messages = Vec::new();
+    // when we redact we need to store the placeholder
+    let mut placeholders = HashMap::new();
 
     // print all lines from every log file. TODO: sort files by date?
     while let Some(entry) = log_files.next_entry().await? {
@@ -94,20 +96,30 @@ pub async fn get_logs(logs_dir: PathBuf, swap_id: Option<Uuid>, redact_addresses
             continue;
         }
 
+        // use BufReader to stay easy on memory and then read line by line
         let buf_reader = BufReader::new(File::open(&file_path).await?);
         let mut lines = buf_reader.lines();
 
         // print each line, redacted if the flag is set
         while let Some(line) = lines.next_line().await? {
-            // check if we should filter this line
+            // if we should filter by swap id, check if the line contains it
             if let Some(swap_id) = swap_id {
-                if line.contains(&swap_id.to_string()) {
+                if !line.contains(&swap_id.to_string()) {
                     continue;
                 }  
             }
 
+            if line.contains(r#""level":"TRACE""#) {
+                continue;
+            }
+
+            // skip debug logs
+            if line.contains(r#""level":"DEBUG""#) {
+                continue;
+            }
+
             // redact if necessary
-            let line = if redact_addresses { redact(&line) } else { line };
+            let line = if redact_addresses { redact_with(&line, &mut placeholders) } else { line };
             // save redacted message
             log_messages.push(line);
         }
@@ -127,11 +139,14 @@ pub async fn get_logs(logs_dir: PathBuf, swap_id: Option<Uuid>, redact_addresses
 /// assert_eq!(redacted, "<swap_id_0>");
 /// ```
 pub fn redact(input: &str) -> String {
-    // Use a hashmap to keep track of which address we replace with which placeholder
-    let mut replacements: HashMap<String, String> = HashMap::new();
+    let mut replacements = HashMap::new();
+    redact_with(input, &mut replacements)
+}
 
+/// Same as [`redact`] but retrieves palceholders from and stores them 
+/// in a specified hashmap.
+pub fn redact_with(input: &str, replacements: &mut HashMap<String, String>) -> String {
     // TODO: verify regex patterns
-
     const MONERO_ADDR_REGEX: &str = r#"[48][1-9A-HJ-NP-Za-km-z]{94}"#;
     const BITCOIN_ADDR_REGEX: &str = r#"\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b"#;
     // Both XMR and BTC transactions have
@@ -173,7 +188,6 @@ pub fn redact(input: &str) -> String {
     // Finally we go through the input string and replace each occurance of an
     // address we want to redact with the corresponding placeholder
     for (address, placeholder) in replacements.iter() {
-        println!("replacing `{address}` with `{placeholder}`");
         redacted = redacted.replace(address, placeholder);
     }
 

@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::Result;
+use tracing::Level;
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::fmt::time::UtcTime;
 use tracing_subscriber::layer::SubscriberExt;
@@ -36,7 +37,8 @@ pub fn init(
         .with_ansi(false)
         .with_timer(UtcTime::rfc_3339())
         .with_target(false)
-        .json();
+        .json()
+        .with_filter(LevelFilter::from_level(Level::DEBUG));
 
     // terminal logger
     let is_terminal = atty::is(atty::Stream::Stderr);
