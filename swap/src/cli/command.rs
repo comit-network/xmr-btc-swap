@@ -111,7 +111,7 @@ where
             swap_id
         } => {
             let request = Request::new(Method::Logs { logs_dir, redact, swap_id });
-            let context = Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
+            let context = Context::build(None, None, None, data, is_testnet, debug, json, None, false).await?;
 
             (context, request)
         }
