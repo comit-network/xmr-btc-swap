@@ -26,8 +26,7 @@ impl SqliteDatabase {
         let read_only = matches!(access_mode, AccessMode::ReadOnly);
 
         let path_str = format!("sqlite:{}", path.as_ref().display());
-        let mut options = SqliteConnectOptions::from_str(&path_str)?
-            .read_only(read_only);
+        let mut options = SqliteConnectOptions::from_str(&path_str)?.read_only(read_only);
         options.disable_statement_logging();
 
         let pool = SqlitePool::connect_with(options).await?;

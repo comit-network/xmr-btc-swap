@@ -3,7 +3,10 @@ pub mod tracing_util;
 use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::anyhow;
-use tokio::{fs::{read_dir, File}, io::{AsyncBufReadExt, BufReader}};
+use tokio::{
+    fs::{read_dir, File},
+    io::{AsyncBufReadExt, BufReader},
+};
 use uuid::Uuid;
 
 const LATEST_RELEASE_URL: &str = "https://github.com/comit-network/xmr-btc-swap/releases/latest";
@@ -67,11 +70,15 @@ macro_rules! regex_find_placeholders {
     }};
 }
 
-/// Print the logs from the specified logs or from the default location 
+/// Print the logs from the specified logs or from the default location
 /// to the specified path or the terminal.
-/// 
+///
 /// If specified, filter by swap id or redact addresses.
-pub async fn get_logs(logs_dir: PathBuf, swap_id: Option<Uuid>, redact_addresses: bool) -> anyhow::Result<Vec<String>> {
+pub async fn get_logs(
+    logs_dir: PathBuf,
+    swap_id: Option<Uuid>,
+    redact_addresses: bool,
+) -> anyhow::Result<Vec<String>> {
     tracing::debug!("reading logfiles from {}", logs_dir.display());
 
     // get all files in the directory
@@ -107,11 +114,15 @@ pub async fn get_logs(logs_dir: PathBuf, swap_id: Option<Uuid>, redact_addresses
                 // we only want lines which contain the swap id
                 if !line.contains(&swap_id.to_string()) {
                     continue;
-                }  
+                }
             }
 
             // redact if necessary
-            let line = if redact_addresses { redact_with(&line, &mut placeholders) } else { line };
+            let line = if redact_addresses {
+                redact_with(&line, &mut placeholders)
+            } else {
+                line
+            };
             // save redacted message
             log_messages.push(line);
         }
@@ -135,7 +146,7 @@ pub fn redact(input: &str) -> String {
     redact_with(input, &mut replacements)
 }
 
-/// Same as [`redact`] but retrieves palceholders from and stores them 
+/// Same as [`redact`] but retrieves palceholders from and stores them
 /// in a specified hashmap.
 pub fn redact_with(input: &str, replacements: &mut HashMap<String, String>) -> String {
     // TODO: verify regex patterns

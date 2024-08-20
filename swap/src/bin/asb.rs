@@ -18,13 +18,12 @@ use libp2p::core::multiaddr::Protocol;
 use libp2p::core::Multiaddr;
 use libp2p::swarm::AddressScore;
 use libp2p::Swarm;
-use swap::common::tracing_util::Format;
 use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use std::convert::TryInto;
+use std::env;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
-use std::env;
 use structopt::clap;
 use structopt::clap::ErrorKind;
 use swap::asb::command::{parse_args, Arguments, Command};
@@ -32,6 +31,7 @@ use swap::asb::config::{
     initial_setup, query_user_for_initial_config, read_config, Config, ConfigNotInitialized,
 };
 use swap::asb::{cancel, punish, redeem, refund, safely_abort, EventLoop, Finality, KrakenRate};
+use swap::common::tracing_util::Format;
 use swap::common::{self, check_latest_version, get_logs};
 use swap::database::{open_db, AccessMode};
 use swap::network::rendezvous::XmrBtcNamespace;
@@ -72,7 +72,7 @@ async fn main() -> Result<()> {
     // warn if we're not on the latest version
     if let Err(e) = check_latest_version(env!("CARGO_PKG_VERSION")).await {
         eprintln!("{}", e);
-    }   
+    }
 
     // read config from the specified path
     let config = match read_config(config_path.clone())? {
@@ -86,9 +86,8 @@ async fn main() -> Result<()> {
     // initialize tracing
     let format = if json { Format::Json } else { Format::Raw };
     let log_dir = config.data.dir.join("logs");
-    common::tracing_util::init(LevelFilter::DEBUG, format, log_dir)
-        .expect("initialize tracing");
-        
+    common::tracing_util::init(LevelFilter::DEBUG, format, log_dir).expect("initialize tracing");
+
     // check for conflicting env / config values
     if config.monero.network != env_config.monero_network {
         bail!(format!(

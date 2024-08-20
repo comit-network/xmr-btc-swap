@@ -10,8 +10,6 @@ use crate::seed::Seed;
 use crate::{bitcoin, common, monero};
 use anyhow::{bail, Context as AnyContext, Error, Result};
 use futures::future::try_join_all;
-use tracing::level_filters::LevelFilter;
-use tracing::Level;
 use std::fmt;
 use std::future::Future;
 use std::net::SocketAddr;
@@ -19,6 +17,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Once};
 use tokio::sync::{broadcast, broadcast::Sender, Mutex, RwLock};
 use tokio::task::JoinHandle;
+use tracing::level_filters::LevelFilter;
+use tracing::Level;
 use url::Url;
 
 static START: Once = Once::new();

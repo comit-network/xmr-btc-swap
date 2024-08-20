@@ -292,9 +292,9 @@ pub enum RawCommand {
         #[structopt(
             long = "swap-id",
             help = "Filter for logs concerning this swap.",
-            long_help = "This checks whether each logging message contains the swap id. Some messages might be skipped when they don't contain the swap id even though they're relevant.",
+            long_help = "This checks whether each logging message contains the swap id. Some messages might be skipped when they don't contain the swap id even though they're relevant."
         )]
-        swap_id: Option<Uuid>
+        swap_id: Option<Uuid>,
     },
     #[structopt(about = "Prints swap-id and the state of each swap ever made.")]
     History {

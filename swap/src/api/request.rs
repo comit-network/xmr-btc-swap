@@ -53,7 +53,7 @@ pub enum Method {
     Logs {
         logs_dir: Option<PathBuf>,
         redact: bool,
-        swap_id: Option<Uuid>
+        swap_id: Option<Uuid>,
     },
     Config,
     WithdrawBtc {
@@ -134,8 +134,8 @@ impl Method {
             }
             Method::Logs { .. } => {
                 debug_span!(
-                    "method", 
-                    method_name = "Logs", 
+                    "method",
+                    method_name = "Logs",
                     log_reference_id = field::Empty
                 )
             }
@@ -747,7 +747,11 @@ impl Request {
 
                 Ok(json!({"swaps": json_results}))
             }
-            Method::Logs { logs_dir, redact, swap_id } => {
+            Method::Logs {
+                logs_dir,
+                redact,
+                swap_id,
+            } => {
                 let dir = logs_dir.unwrap_or(context.config.data_dir.join("logs"));
                 let logs = get_logs(dir, swap_id, redact).await?;
 
@@ -944,7 +948,7 @@ impl Request {
 
     pub async fn call(self, context: Arc<Context>) -> Result<serde_json::Value> {
         let method_span = self.cmd.get_tracing_span(self.log_reference.clone());
-        
+
         self.handle_cmd(context)
             .instrument(method_span.clone())
             .await

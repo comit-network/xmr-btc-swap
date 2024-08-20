@@ -59,12 +59,21 @@ pub fn register_modules(context: Arc<Context>) -> Result<RpcModule<Arc<Context>>
         struct Params {
             swap_id: Option<Uuid>,
             logs_dir: Option<PathBuf>,
-            redact: bool
+            redact: bool,
         }
 
         let params: Params = params_raw.parse()?;
 
-        execute_request(params_raw, Method::Logs { swap_id: params.swap_id, logs_dir: params.logs_dir, redact: params.redact }, &context).await
+        execute_request(
+            params_raw,
+            Method::Logs {
+                swap_id: params.swap_id,
+                logs_dir: params.logs_dir,
+                redact: params.redact,
+            },
+            &context,
+        )
+        .await
     })?;
 
     module.register_async_method("get_raw_states", |params, context| async move {

@@ -108,10 +108,16 @@ where
         CliCommand::Logs {
             logs_dir,
             redact,
-            swap_id
+            swap_id,
         } => {
-            let request = Request::new(Method::Logs { logs_dir, redact, swap_id });
-            let context = Context::build(None, None, None, data, is_testnet, debug, json, None, false).await?;
+            let request = Request::new(Method::Logs {
+                logs_dir,
+                redact,
+                swap_id,
+            });
+            let context =
+                Context::build(None, None, None, data, is_testnet, debug, json, None, false)
+                    .await?;
 
             (context, request)
         }
@@ -366,9 +372,9 @@ enum CliCommand {
         #[structopt(
             long = "swap-id",
             help = "Filter for logs concerning this swap.",
-            long_help = "This checks whether each logging message contains the swap id. Some messages might be skipped when they don't contain the swap id even though they're relevant.",
+            long_help = "This checks whether each logging message contains the swap id. Some messages might be skipped when they don't contain the swap id even though they're relevant."
         )]
-        swap_id: Option<Uuid>
+        swap_id: Option<Uuid>,
     },
     #[structopt(about = "Prints the current config")]
     Config,
