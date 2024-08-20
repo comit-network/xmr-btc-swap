@@ -78,6 +78,7 @@ where
                 debug,
                 json,
                 None,
+                false,
             )
             .await?;
 
@@ -100,7 +101,8 @@ where
             let request = Request::new(Method::History);
 
             let context =
-                Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
+                Context::build(None, None, None, data, is_testnet, debug, json, None, false)
+                    .await?;
             (context, request)
         }
         CliCommand::Logs {
@@ -117,7 +119,8 @@ where
             let request = Request::new(Method::Config);
 
             let context =
-                Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
+                Context::build(None, None, None, data, is_testnet, debug, json, None, false)
+                    .await?;
             (context, request)
         }
         CliCommand::Balance { bitcoin } => {
@@ -134,6 +137,7 @@ where
                 debug,
                 json,
                 None,
+                false,
             )
             .await?;
             (context, request)
@@ -155,6 +159,7 @@ where
                 debug,
                 json,
                 server_address,
+                true,
             )
             .await?;
             (context, request)
@@ -176,6 +181,7 @@ where
                 debug,
                 json,
                 None,
+                false,
             )
             .await?;
             (context, request)
@@ -197,6 +203,7 @@ where
                 debug,
                 json,
                 None,
+                false,
             )
             .await?;
             (context, request)
@@ -217,6 +224,7 @@ where
                 debug,
                 json,
                 None,
+                false,
             )
             .await?;
             (context, request)
@@ -227,8 +235,18 @@ where
         } => {
             let request = Request::new(Method::ListSellers { rendezvous_point });
 
-            let context =
-                Context::build(None, None, Some(tor), data, is_testnet, debug, json, None).await?;
+            let context = Context::build(
+                None,
+                None,
+                Some(tor),
+                data,
+                is_testnet,
+                debug,
+                json,
+                None,
+                false,
+            )
+            .await?;
 
             (context, request)
         }
@@ -244,6 +262,7 @@ where
                 debug,
                 json,
                 None,
+                false,
             )
             .await?;
             (context, request)
@@ -254,7 +273,8 @@ where
             let request = Request::new(Method::MoneroRecovery { swap_id });
 
             let context =
-                Context::build(None, None, None, data, is_testnet, debug, json, None).await?;
+                Context::build(None, None, None, data, is_testnet, debug, json, None, false)
+                    .await?;
 
             (context, request)
         }

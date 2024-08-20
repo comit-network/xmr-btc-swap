@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.4] - 2024-07-25
+
 - ASB: The `history` command can now be used while the asb is running.
+- ASB: Retry locking of Monero if it fails on first attempt
 
 ## [0.13.3] - 2024-07-15
 
@@ -372,7 +375,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.13.3...HEAD
+[unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.13.4...HEAD
+[0.13.4]: https://github.com/comit-network/xmr-btc-swap/compare/0.13.3...0.13.4
 [0.13.3]: https://github.com/comit-network/xmr-btc-swap/compare/0.13.2...0.13.3
 [0.13.2]: https://github.com/comit-network/xmr-btc-swap/compare/0.13.1...0.13.2
 [0.13.1]: https://github.com/comit-network/xmr-btc-swap/compare/0.13.0...0.13.1

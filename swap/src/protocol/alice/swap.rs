@@ -1,11 +1,14 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
+use std::time::Duration;
+
 use crate::asb::{EventLoopHandle, LatestRate};
 use crate::bitcoin::ExpiredTimelocks;
 use crate::env::Config;
 use crate::protocol::alice::{AliceState, Swap};
 use crate::{bitcoin, monero};
 use anyhow::{bail, Context, Result};
+use backoff::ExponentialBackoffBuilder;
 use tokio::select;
 use tokio::time::timeout;
 use uuid::Uuid;
@@ -111,23 +114,63 @@ where
             }
         }
         AliceState::BtcLocked { state3 } => {
-            match state3.expired_timelocks(bitcoin_wallet).await? {
-                ExpiredTimelocks::None { .. } => {
-                    // Record the current monero wallet block height so we don't have to scan from
-                    // block 0 for scenarios where we create a refund wallet.
-                    let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
+            // We retry to lock the Monero wallet until we succeed or until the cancel timelock expires.
+            //
+            // This is necessary because the monero-wallet-rpc can sometimes error out due to various reasons, such as
+            // - no connection to the daemon
+            // - "failed to get output distribution"
+            // See https://github.com/comit-network/xmr-btc-swap/issues/1726
+            let backoff = ExponentialBackoffBuilder::new()
+                .with_initial_interval(Duration::from_secs(5))
+                .with_max_interval(Duration::from_secs(60 * 3))
+                .with_max_elapsed_time(None)
+                .build();
 
-                    let transfer_proof = monero_wallet
-                        .transfer(state3.lock_xmr_transfer_request())
-                        .await?;
+            let result = backoff::future::retry_notify(
+                backoff,
+                || async {
+                    match state3.expired_timelocks(bitcoin_wallet).await {
+                        Ok(ExpiredTimelocks::None { .. }) => {
+                            // Record the current monero wallet block height so we don't have to scan from
+                            // block 0 for scenarios where we create a refund wallet.
+                            let monero_wallet_restore_blockheight = monero_wallet
+                                .block_height()
+                                .await
+                                .map_err(backoff::Error::transient)?;
 
+                            let transfer_proof = monero_wallet
+                                .transfer(state3.lock_xmr_transfer_request())
+                                .await
+                                .map_err(backoff::Error::transient)?;
+
+                            Ok(Some((monero_wallet_restore_blockheight, transfer_proof)))
+                        }
+                        Ok(_) => Ok(None),
+                        Err(e) => Err(backoff::Error::transient(e)),
+                    }
+                },
+                |err, delay: Duration| {
+                    tracing::warn!(
+                        %err,
+                        delay_secs = delay.as_secs(),
+                        "Failed to lock XMR. We will retry after a delay"
+                    );
+                },
+            )
+            .await;
+
+            match result {
+                Ok(Some((monero_wallet_restore_blockheight, transfer_proof))) => {
                     AliceState::XmrLockTransactionSent {
                         monero_wallet_restore_blockheight,
                         transfer_proof,
                         state3,
                     }
                 }
-                _ => AliceState::SafelyAborted,
+                Ok(None) => AliceState::SafelyAborted,
+                Err(e) => {
+                    unreachable!("We should retry forever until the cancel timelock expires. But we got an error: {:#}", e);
+                }
             }
         }
         AliceState::XmrLockTransactionSent {
@@ -397,7 +440,7 @@ where
     })
 }
 
-pub(crate) fn is_complete(state: &AliceState) -> bool {
+pub fn is_complete(state: &AliceState) -> bool {
     matches!(
         state,
         AliceState::XmrRefunded

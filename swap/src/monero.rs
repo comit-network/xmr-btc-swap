@@ -142,6 +142,14 @@ impl Amount {
         Decimal::from(self.as_piconero())
     }
 
+    pub fn as_xmr(&self) -> Decimal {
+        let mut decimal = Decimal::from(self.0);
+        decimal
+            .set_scale(12)
+            .expect("12 is smaller than max precision of 28");
+        decimal
+    }
+
     fn from_decimal(amount: Decimal) -> Result<Self> {
         let piconeros_dec =
             amount.mul(Decimal::from_u64(PICONERO_OFFSET).expect("constant to fit into u64"));
@@ -184,11 +192,8 @@ impl From<Amount> for u64 {
 
 impl fmt::Display for Amount {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut decimal = Decimal::from(self.0);
-        decimal
-            .set_scale(12)
-            .expect("12 is smaller than max precision of 28");
-        write!(f, "{} XMR", decimal)
+        let xmr_value = self.as_xmr();
+        write!(f, "{} XMR", xmr_value)
     }
 }
 

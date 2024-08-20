@@ -1,6 +1,6 @@
 [package]
 name = "swap"
-version = "0.13.3"
+version = "0.13.4"
 authors = [ "The COMIT guys <hello@comit.network>" ]
 edition = "2021"
 description = "XMR/BTC trustless atomic swaps."
@@ -83,7 +83,7 @@ bitcoin-harness = { git = "https://github.com/delta1/bitcoin-harness-rs.git", re
 get-port = "3"
 hyper = "1.4"
 jsonrpsee = { version = "0.16.2", features = [ "ws-client" ] }
-mockito = "1.4"
+mockito = "1.5"
 monero-harness = { path = "../monero-harness" }
 port_check = "0.2"
 proptest = "1"

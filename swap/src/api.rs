@@ -170,6 +170,7 @@ pub struct Context {
     pub swap_lock: Arc<SwapLock>,
     pub config: Config,
     pub tasks: Arc<PendingTaskList>,
+    pub is_daemon: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -183,6 +184,7 @@ impl Context {
         debug: bool,
         json: bool,
         server_address: Option<SocketAddr>,
+        is_daemon: bool,
     ) -> Result<Context> {
         let data_dir = data::data_dir_from(data, is_testnet)?;
         let env_config = env_config_from(is_testnet);
@@ -251,6 +253,7 @@ impl Context {
             },
             swap_lock: Arc::new(SwapLock::new()),
             tasks: Arc::new(PendingTaskList::default()),
+            is_daemon,
         };
 
         Ok(context)
@@ -275,6 +278,7 @@ impl Context {
             monero_rpc_process: None,
             swap_lock: Arc::new(SwapLock::new()),
             tasks: Arc::new(PendingTaskList::default()),
+            is_daemon: true,
         }
     }
 
