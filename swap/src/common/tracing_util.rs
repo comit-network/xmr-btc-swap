@@ -1,11 +1,11 @@
 use std::path::Path;
+use std::str::FromStr;
 
 use anyhow::Result;
-use tracing::Level;
-use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::filter::{Directive, LevelFilter};
 use tracing_subscriber::fmt::time::UtcTime;
 use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::{fmt, Layer};
+use tracing_subscriber::{fmt, EnvFilter, Layer};
 use tracing_subscriber::util::SubscriberInitExt;
 
 /// Output formats for logging messages.
@@ -25,9 +25,14 @@ pub fn init(
     format: Format,
     dir: impl AsRef<Path>,
 ) -> Result<()> {
-    if level_filter == LevelFilter::OFF {
-        return Ok(());
-    }
+    let env_filter = EnvFilter::from_default_env()
+        .add_directive(Directive::from_str(
+            &format!(
+                "asb={}", 
+                &level_filter,
+            )
+        )?)
+        .add_directive(Directive::from_str(&format!("swap={}", &level_filter))?);
 
     // file logger will always write in JSON format and with timestamps
     let file_appender = tracing_appender::rolling::never(&dir, "swap-all.log");
@@ -38,7 +43,7 @@ pub fn init(
         .with_timer(UtcTime::rfc_3339())
         .with_target(false)
         .json()
-        .with_filter(LevelFilter::from_level(Level::DEBUG));
+        .with_filter(env_filter);
 
     // terminal logger
     let is_terminal = atty::is(atty::Stream::Stderr);

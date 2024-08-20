@@ -189,7 +189,7 @@ impl Context {
 
         let format = if json { Format::Json } else { Format::Raw };
         let level_filter = if debug {
-            LevelFilter::from_level(Level::DEBUG) 
+            LevelFilter::from_level(Level::DEBUG)
         } else {
             LevelFilter::from_level(Level::INFO)
         };
