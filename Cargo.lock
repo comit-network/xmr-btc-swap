@@ -2662,7 +2662,7 @@ dependencies = [
  "testcontainers",
  "tokio",
  "tracing",
- "tracing-subscriber 0.2.25",
+ "tracing-subscriber 0.3.18",
 ]
 
 [[package]]
