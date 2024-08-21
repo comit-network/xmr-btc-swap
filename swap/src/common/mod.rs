@@ -63,6 +63,7 @@ macro_rules! regex_find_placeholders {
         // and if we didn't, generate a placeholder for it
         for address in REGEX.find_iter($input) {
             if !$replacements.contains_key(address.as_str()) {
+                #[allow(clippy::redundant_closure_call)]
                 $replacements.insert(address.as_str().to_owned(), $create_placeholder(counter));
                 counter += 1;
             }
