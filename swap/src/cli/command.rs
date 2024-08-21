@@ -105,6 +105,22 @@ where
                     .await?;
             (context, request)
         }
+        CliCommand::Logs {
+            logs_dir,
+            redact,
+            swap_id,
+        } => {
+            let request = Request::new(Method::Logs {
+                logs_dir,
+                redact,
+                swap_id,
+            });
+            let context =
+                Context::build(None, None, None, data, is_testnet, debug, json, None, false)
+                    .await?;
+
+            (context, request)
+        }
         CliCommand::Config => {
             let request = Request::new(Method::Config);
 
@@ -341,6 +357,25 @@ enum CliCommand {
     },
     /// Show a list of past, ongoing and completed swaps
     History,
+    /// Output all logging messages that have been issued.
+    Logs {
+        #[structopt(
+            short = "d",
+            help = "Print the logs from this directory instead of the default one."
+        )]
+        logs_dir: Option<PathBuf>,
+        #[structopt(
+            help = "Redact swap-ids, Bitcoin and Monero addresses.",
+            long = "redact"
+        )]
+        redact: bool,
+        #[structopt(
+            long = "swap-id",
+            help = "Filter for logs concerning this swap.",
+            long_help = "This checks whether each logging message contains the swap id. Some messages might be skipped when they don't contain the swap id even though they're relevant."
+        )]
+        swap_id: Option<Uuid>,
+    },
     #[structopt(about = "Prints the current config")]
     Config,
     #[structopt(about = "Allows withdrawing BTC from the internal Bitcoin wallet.")]

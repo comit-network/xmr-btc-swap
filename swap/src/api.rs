@@ -1,12 +1,13 @@
 pub mod request;
 use crate::cli::command::{Bitcoin, Monero, Tor};
+use crate::common::tracing_util::Format;
 use crate::database::{open_db, AccessMode};
 use crate::env::{Config as EnvConfig, GetConfig, Mainnet, Testnet};
 use crate::fs::system_data_dir;
 use crate::network::rendezvous::XmrBtcNamespace;
 use crate::protocol::Database;
 use crate::seed::Seed;
-use crate::{bitcoin, cli, monero};
+use crate::{bitcoin, common, monero};
 use anyhow::{bail, Context as AnyContext, Error, Result};
 use futures::future::try_join_all;
 use std::fmt;
@@ -16,6 +17,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Once};
 use tokio::sync::{broadcast, broadcast::Sender, Mutex, RwLock};
 use tokio::task::JoinHandle;
+use tracing::level_filters::LevelFilter;
+use tracing::Level;
 use url::Url;
 
 static START: Once = Once::new();
@@ -186,8 +189,15 @@ impl Context {
         let data_dir = data::data_dir_from(data, is_testnet)?;
         let env_config = env_config_from(is_testnet);
 
+        let format = if json { Format::Json } else { Format::Raw };
+        let level_filter = if debug {
+            LevelFilter::from_level(Level::DEBUG)
+        } else {
+            LevelFilter::from_level(Level::INFO)
+        };
+
         START.call_once(|| {
-            let _ = cli::tracing::init(debug, json, data_dir.join("logs"));
+            let _ = common::tracing_util::init(level_filter, format, data_dir.join("logs"));
         });
 
         let seed = Seed::from_file_or_generate(data_dir.as_path())

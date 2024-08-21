@@ -1,9 +1,9 @@
 use crate::fs::ensure_directory_exists;
-use ::bitcoin::secp256k1::constants::SECRET_KEY_SIZE;
-use ::bitcoin::secp256k1::{self, SecretKey};
 use anyhow::{Context, Result};
 use bdk::bitcoin::util::bip32::ExtendedPrivKey;
 use bitcoin::hashes::{sha256, Hash, HashEngine};
+use bitcoin::secp256k1::constants::SECRET_KEY_SIZE;
+use bitcoin::secp256k1::{self, SecretKey};
 use libp2p::identity;
 use pem::{encode, Pem};
 use rand::prelude::*;

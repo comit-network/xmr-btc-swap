@@ -1,6 +1,7 @@
 use crate::api::Context;
 use crate::bitcoin::{Amount, ExpiredTimelocks, TxLock};
 use crate::cli::{list_sellers, EventLoop, SellerStatus};
+use crate::common::get_logs;
 use crate::libp2p_ext::MultiAddrExt;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
 use crate::network::swarm;
@@ -19,6 +20,7 @@ use std::cmp::min;
 use std::convert::TryInto;
 use std::future::Future;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug_span, field, Instrument, Span};
@@ -48,6 +50,11 @@ pub enum Method {
         swap_id: Uuid,
     },
     History,
+    Logs {
+        logs_dir: Option<PathBuf>,
+        redact: bool,
+        swap_id: Option<Uuid>,
+    },
     Config,
     WithdrawBtc {
         amount: Option<Amount>,
@@ -122,6 +129,13 @@ impl Method {
                 debug_span!(
                     "method",
                     method_name = "History",
+                    log_reference_id = field::Empty
+                )
+            }
+            Method::Logs { .. } => {
+                debug_span!(
+                    "method",
+                    method_name = "Logs",
                     log_reference_id = field::Empty
                 )
             }
@@ -732,6 +746,20 @@ impl Request {
                 }
 
                 Ok(json!({"swaps": json_results}))
+            }
+            Method::Logs {
+                logs_dir,
+                redact,
+                swap_id,
+            } => {
+                let dir = logs_dir.unwrap_or(context.config.data_dir.join("logs"));
+                let logs = get_logs(dir, swap_id, redact).await?;
+
+                for msg in &logs {
+                    println!("{msg}");
+                }
+
+                Ok(json!({ "logs": logs }))
             }
             Method::GetRawStates => {
                 let raw_history = context.db.raw_all().await?;
