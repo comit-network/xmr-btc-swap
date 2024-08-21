@@ -22,7 +22,7 @@ pub enum Format {
 /// disregarding the arguments to this function.
 pub fn init(level_filter: LevelFilter, format: Format, dir: impl AsRef<Path>) -> Result<()> {
     let env_filter = EnvFilter::from_default_env()
-        .add_directive(Directive::from_str(&format!("asb={}", &level_filter,))?)
+        .add_directive(Directive::from_str(&format!("asb={}", &level_filter))?)
         .add_directive(Directive::from_str(&format!("swap={}", &level_filter))?);
 
     // file logger will always write in JSON format and with timestamps
