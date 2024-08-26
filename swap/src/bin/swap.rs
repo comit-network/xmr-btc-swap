@@ -41,7 +41,7 @@ mod tests {
     use ::bitcoin::Amount;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
-    use swap::api::request::determine_btc_to_swap;
+    use swap::cli::api::request::determine_btc_to_swap;
     use swap::network::quote::BidQuote;
     use swap::tracing_ext::capture_logs;
     use tracing::level_filters::LevelFilter;
@@ -65,6 +65,7 @@ mod tests {
             },
             || async { Ok(()) },
             |_| async { Ok(Amount::from_sat(1000)) },
+            None,
         )
         .await
         .unwrap();
@@ -102,6 +103,7 @@ mod tests {
             },
             || async { Ok(()) },
             |_| async { Ok(Amount::from_sat(1000)) },
+            None,
         )
         .await
         .unwrap();
@@ -139,6 +141,7 @@ mod tests {
             },
             || async { Ok(()) },
             |_| async { Ok(Amount::from_sat(1000)) },
+            None,
         )
         .await
         .unwrap();
@@ -172,6 +175,7 @@ mod tests {
             },
             || async { Ok(()) },
             |_| async { Ok(Amount::from_sat(1000)) },
+            None,
         )
         .await
         .unwrap();
@@ -205,6 +209,7 @@ mod tests {
             },
             || async { Ok(()) },
             |_| async { Ok(Amount::from_sat(1000)) },
+            None,
         )
         .await
         .unwrap();
@@ -242,6 +247,7 @@ mod tests {
             },
             || async { Ok(()) },
             |_| async { Ok(Amount::from_sat(1000)) },
+            None,
         )
         .await
         .unwrap();
@@ -284,6 +290,7 @@ mod tests {
                 },
                 || async { Ok(()) },
                 |_| async { Ok(Amount::from_sat(1000)) },
+                None,
             ),
         )
         .await
@@ -333,6 +340,7 @@ mod tests {
                 },
                 || async { Ok(()) },
                 |_| async { Ok(Amount::from_sat(1000)) },
+                None,
             ),
         )
         .await
@@ -367,6 +375,7 @@ mod tests {
             },
             || async { Ok(()) },
             |_| async { Ok(Amount::from_sat(1000)) },
+            None,
         )
         .await
         .err()
