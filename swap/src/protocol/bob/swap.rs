@@ -67,6 +67,7 @@ pub async fn run_until(
     Ok(current_state)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn next_state(
     swap_id: Uuid,
     state: BobState,

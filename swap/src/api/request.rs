@@ -1152,7 +1152,7 @@ where
                     min_deposit_until_swap_will_start,
                     max_deposit_until_maximum_amount_is_reached,
                     min_bitcoin_lock_tx_fee,
-                    quote: bid_quote.clone(),
+                    quote: bid_quote,
                 },
             );
 
