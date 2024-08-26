@@ -172,7 +172,11 @@ First use `swap` or `asb` with the `export-bitcoin-wallet` subcommand.
 Output example:
 
 ```json
-{"descriptor":"wpkh(tprv8Zgredacted.../84'/1'/0'/0/*)","blockheight":2415616,"label":"asb-testnet"}
+{
+  "descriptor": "wpkh(tprv8Zgredacted.../84'/1'/0'/0/*)",
+  "blockheight": 2415616,
+  "label": "asb-testnet"
+}
 ```
 
 The wallet can theoretically be directly imported into

@@ -44,9 +44,12 @@ macro_rules! tauri_command {
             context: tauri::State<'_, Arc<Context>>,
             args: $request_name,
         ) -> Result<<$request_name as swap::cli::api::request::Request>::Response, String> {
-            <$request_name as swap::cli::api::request::Request>::request(args, context.inner().clone())
-                .await
-                .to_string_result()
+            <$request_name as swap::cli::api::request::Request>::request(
+                args,
+                context.inner().clone(),
+            )
+            .await
+            .to_string_result()
         }
     };
 }

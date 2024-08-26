@@ -1,10 +1,10 @@
+use crate::bitcoin::bitcoin_address;
 use crate::cli::api::request::{
     get_current_swap, get_history, get_raw_states, suspend_current_swap, BalanceArgs, BuyXmrArgs,
     CancelAndRefundArgs, GetSwapInfoArgs, ListSellersArgs, MoneroRecoveryArgs, Request,
     ResumeSwapArgs, WithdrawBtcArgs,
 };
 use crate::cli::api::Context;
-use crate::bitcoin::bitcoin_address;
 use crate::monero::monero_address;
 use crate::{bitcoin, monero};
 use anyhow::Result;

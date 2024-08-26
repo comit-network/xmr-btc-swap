@@ -27,8 +27,8 @@ use tracing::Instrument;
 use typeshare::typeshare;
 use uuid::Uuid;
 
-/// This trait is implemented by all types of request args that 
-/// the CLI can handle. 
+/// This trait is implemented by all types of request args that
+/// the CLI can handle.
 /// It provides a unified abstraction that can be useful for generics.
 #[allow(async_fn_in_trait)]
 pub trait Request {

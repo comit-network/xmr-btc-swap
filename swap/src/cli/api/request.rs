@@ -1,7 +1,7 @@
 use super::tauri_bindings::TauriHandle;
+use crate::bitcoin::{CancelTimelock, ExpiredTimelocks, PunishTimelock, TxLock};
 use crate::cli::api::tauri_bindings::{TauriEmitter, TauriSwapProgressEvent};
 use crate::cli::api::Context;
-use crate::bitcoin::{CancelTimelock, ExpiredTimelocks, PunishTimelock, TxLock};
 use crate::cli::{list_sellers as list_sellers_impl, EventLoop, SellerStatus};
 use crate::libp2p_ext::MultiAddrExt;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
