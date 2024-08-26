@@ -264,6 +264,7 @@ mod wire {
     #[serde(transparent)]
     pub struct TickerUpdate(Vec<TickerField>);
 
+    #[allow(unused)]
     #[derive(Debug, Deserialize)]
     #[serde(untagged)]
     pub enum TickerField {
@@ -277,6 +278,7 @@ mod wire {
         ask: Vec<RateElement>,
     }
 
+    #[allow(unused)]
     #[derive(Debug, Deserialize)]
     #[serde(untagged)]
     pub enum RateElement {

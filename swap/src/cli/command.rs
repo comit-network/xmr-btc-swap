@@ -1,10 +1,9 @@
-use crate::api::request::{
-    buy_xmr, cancel_and_refund, export_bitcoin_wallet, get_balance, get_config, get_history,
-    list_sellers, monero_recovery, resume_swap, start_daemon, withdraw_btc, BalanceArgs,
-    BuyXmrArgs, CancelAndRefundArgs, ExportBitcoinWalletArgs, GetConfigArgs, GetHistoryArgs,
-    ListSellersArgs, MoneroRecoveryArgs, Request, ResumeSwapArgs, StartDaemonArgs, WithdrawBtcArgs,
+use crate::cli::api::request::{
+    BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, ExportBitcoinWalletArgs, GetConfigArgs,
+    GetHistoryArgs, ListSellersArgs, MoneroRecoveryArgs, Request, ResumeSwapArgs, StartDaemonArgs,
+    WithdrawBtcArgs,
 };
-use crate::api::Context;
+use crate::cli::api::Context;
 use crate::bitcoin::{bitcoin_address, Amount};
 use crate::monero;
 use crate::monero::monero_address;
@@ -544,15 +543,14 @@ struct Seller {
 mod tests {
     use super::*;
 
-    use crate::api::api_test::*;
-    use crate::api::Config;
+    use crate::cli::api::api_test::*;
+    use crate::cli::api::Config;
     use crate::monero::monero_address::MoneroAddressNetworkMismatch;
 
     const BINARY_NAME: &str = "swap";
     const ARGS_DATA_DIR: &str = "/tmp/dir/";
 
     #[tokio::test]
-
     // this test is very long, however it just checks that various CLI arguments sets the
     // internal Context and Request properly. It is unlikely to fail and splitting it in various
     // tests would require to run the tests sequantially which is very slow (due to the context

@@ -73,6 +73,7 @@ pub enum Status {
     Unreachable,
 }
 
+#[allow(unused)]
 #[derive(Debug)]
 enum OutEvent {
     Rendezvous(rendezvous::client::Event),

@@ -27,11 +27,7 @@ impl TauriHandle {
 }
 
 pub trait TauriEmitter {
-    fn emit_tauri_event<S: Serialize + Clone>(
-        &self,
-        event: &str,
-        payload: S,
-    ) -> Result<()>;
+    fn emit_tauri_event<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<()>;
 
     fn emit_swap_progress_event(&self, swap_id: Uuid, event: TauriSwapProgressEvent) {
         let _ = self.emit_tauri_event(
@@ -42,21 +38,13 @@ pub trait TauriEmitter {
 }
 
 impl TauriEmitter for TauriHandle {
-    fn emit_tauri_event<S: Serialize + Clone>(
-        &self,
-        event: &str,
-        payload: S,
-    ) -> Result<()> {
+    fn emit_tauri_event<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<()> {
         self.emit_tauri_event(event, payload)
     }
 }
 
 impl TauriEmitter for Option<TauriHandle> {
-    fn emit_tauri_event<S: Serialize + Clone>(
-        &self,
-        event: &str,
-        payload: S,
-    ) -> Result<()> {
+    fn emit_tauri_event<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<()> {
         match self {
             Some(tauri) => tauri.emit_tauri_event(event, payload),
             None => Ok(()),

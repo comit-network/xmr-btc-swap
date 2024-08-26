@@ -1,7 +1,7 @@
 use std::result::Result;
 use std::sync::Arc;
 use swap::{
-    api::{
+    cli::api::{
         request::{
             BalanceArgs, BuyXmrArgs, GetHistoryArgs, ResumeSwapArgs, SuspendCurrentSwapArgs,
             WithdrawBtcArgs,
@@ -25,7 +25,7 @@ impl<T, E: ToString> ToStringResult<T> for Result<T, E> {
 
 /// This macro is used to create boilerplate functions as tauri commands
 /// that simply delegate handling to the respective request type.
-/// 
+///
 /// # Example
 /// ```ignored
 /// tauri_command!(get_balance, BalanceArgs);
@@ -43,8 +43,8 @@ macro_rules! tauri_command {
         async fn $fn_name(
             context: tauri::State<'_, Arc<Context>>,
             args: $request_name,
-        ) -> Result<<$request_name as swap::api::request::Request>::Response, String> {
-            <$request_name as swap::api::request::Request>::request(args, context.inner().clone())
+        ) -> Result<<$request_name as swap::cli::api::request::Request>::Response, String> {
+            <$request_name as swap::cli::api::request::Request>::request(args, context.inner().clone())
                 .await
                 .to_string_result()
         }

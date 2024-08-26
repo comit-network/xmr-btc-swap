@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use uuid::Uuid;
 
-use crate::api::tauri_bindings::TauriHandle;
+use crate::cli::api::tauri_bindings::TauriHandle;
 use crate::protocol::Database;
 use crate::{bitcoin, cli, env, monero};
 
