@@ -1,4 +1,4 @@
-import { CliLog, isCliLog } from "models/cliModel";
+import { CliLog } from "models/cliModel";
 
 /*
 Extract btc amount from string
@@ -17,21 +17,28 @@ export function extractAmountFromUnitString(text: string): number | null {
   return null;
 }
 
-// E.g 2021-12-29 14:25:59.64082 +00:00:00
+// E.g: 2024-08-19 6:11:37.475038 +00:00:00
 export function parseDateString(str: string): number {
-  const parts = str.split(" ").slice(0, -1);
-  if (parts.length !== 2) {
-    throw new Error(
-      `Date string does not consist solely of date and time Str: ${str} Parts: ${parts}`,
-    );
+  // Split the string and take only the date and time parts
+  const [datePart, timePart] = str.split(" ");
+
+  if (!datePart || !timePart) {
+    throw new Error(`Invalid date string format: ${str}`);
   }
-  const wholeString = parts.join(" ");
-  const date = Date.parse(wholeString);
+
+  // Parse time part
+  const [hours, minutes, seconds] = timePart.split(":");
+  const paddedHours = hours.padStart(2, "0"); // Ensure two-digit hours
+
+  // Combine date and time parts, ensuring two-digit hours
+  const dateTimeString = `${datePart}T${paddedHours}:${minutes}:${seconds.split(".")[0]}Z`;
+
+  const date = Date.parse(dateTimeString);
+
   if (Number.isNaN(date)) {
-    throw new Error(
-      `Date string could not be parsed Str: ${str} Parts: ${parts}`,
-    );
+    throw new Error(`Date string could not be parsed: ${str}`);
   }
+
   return date;
 }
 
@@ -50,13 +57,15 @@ export function getLogsAndStringsFromRawFileString(
   return getLinesOfString(rawFileData).map((line) => {
     try {
       return JSON.parse(line);
-    } catch (e) {
+    } catch {
       return line;
     }
   });
 }
 
 export function getLogsFromRawFileString(rawFileData: string): CliLog[] {
+  // TODO: Reimplement this using Tauri
+  return [];
   return getLogsAndStringsFromRawFileString(rawFileData).filter(isCliLog);
 }
 

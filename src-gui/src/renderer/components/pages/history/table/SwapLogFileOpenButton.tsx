@@ -1,4 +1,3 @@
-import { ButtonProps } from "@material-ui/core/Button/Button";
 import {
   Button,
   Dialog,
@@ -6,9 +5,10 @@ import {
   DialogContent,
   DialogTitle,
 } from "@material-ui/core";
-import { useState } from "react";
+import { ButtonProps } from "@material-ui/core/Button/Button";
 import { CliLog } from "models/cliModel";
-import IpcInvokeButton from "../../../IpcInvokeButton";
+import { useState } from "react";
+import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
 import CliLogsBox from "../../../other/RenderedCliLog";
 
 export default function SwapLogFileOpenButton({
@@ -19,16 +19,17 @@ export default function SwapLogFileOpenButton({
 
   return (
     <>
-      <IpcInvokeButton
-        ipcArgs={[swapId]}
-        ipcChannel="get-swap-logs"
+      <PromiseInvokeButton
         onSuccess={(data) => {
           setLogs(data as CliLog[]);
         }}
+        onClick={async () => {
+          throw new Error("Not implemented");
+        }}
         {...props}
       >
-        view log
-      </IpcInvokeButton>
+        View log
+      </PromiseInvokeButton>
       {logs && (
         <Dialog open onClose={() => setLogs(null)} fullWidth maxWidth="lg">
           <DialogTitle>Logs of swap {swapId}</DialogTitle>

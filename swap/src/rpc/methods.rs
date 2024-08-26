@@ -1,10 +1,9 @@
-use crate::api::request::{
-    buy_xmr, cancel_and_refund, get_balance, get_current_swap, get_history, get_raw_states,
-    get_swap_info, list_sellers, monero_recovery, resume_swap, suspend_current_swap, withdraw_btc,
-    BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, GetSwapInfoArgs, ListSellersArgs, Method,
-    MoneroRecoveryArgs, ResumeArgs, WithdrawBtcArgs,
+use crate::cli::api::request::{
+    get_current_swap, get_history, get_raw_states, suspend_current_swap, BalanceArgs, BuyXmrArgs,
+    CancelAndRefundArgs, GetSwapInfoArgs, ListSellersArgs, MoneroRecoveryArgs, Request,
+    ResumeSwapArgs, WithdrawBtcArgs,
 };
-use crate::api::Context;
+use crate::cli::api::Context;
 use crate::bitcoin::bitcoin_address;
 use crate::monero::monero_address;
 use crate::{bitcoin, monero};
@@ -42,7 +41,8 @@ pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
         let swap_id = as_uuid(swap_id)
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
 
-        get_swap_info(GetSwapInfoArgs { swap_id }, context)
+        GetSwapInfoArgs { swap_id }
+            .request(context)
             .await
             .to_jsonrpsee_result()
     })?;
@@ -60,7 +60,8 @@ pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
                 jsonrpsee_core::Error::Custom("force_refesh is not a boolean".to_string())
             })?;
 
-        get_balance(BalanceArgs { force_refresh }, context)
+        BalanceArgs { force_refresh }
+            .request(context)
             .await
             .to_jsonrpsee_result()
     })?;
@@ -83,7 +84,8 @@ pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
         let swap_id = as_uuid(swap_id)
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
 
-        resume_swap(ResumeArgs { swap_id }, context)
+        ResumeSwapArgs { swap_id }
+            .request(context)
             .await
             .to_jsonrpsee_result()
     })?;
@@ -98,7 +100,8 @@ pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
         let swap_id = as_uuid(swap_id)
             .ok_or_else(|| jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string()))?;
 
-        cancel_and_refund(CancelAndRefundArgs { swap_id }, context)
+        CancelAndRefundArgs { swap_id }
+            .request(context)
             .await
             .to_jsonrpsee_result()
     })?;
@@ -116,7 +119,8 @@ pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
                 jsonrpsee_core::Error::Custom("Could not parse swap_id".to_string())
             })?;
 
-            monero_recovery(MoneroRecoveryArgs { swap_id }, context)
+            MoneroRecoveryArgs { swap_id }
+                .request(context)
                 .await
                 .to_jsonrpsee_result()
         },
@@ -130,8 +134,7 @@ pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
                 ::bitcoin::Amount::from_str_in(amount_str, ::bitcoin::Denomination::Bitcoin)
                     .map_err(|_| {
                         jsonrpsee_core::Error::Custom("Unable to parse amount".to_string())
-                    })?
-                    .to_sat(),
+                    })?,
             )
         } else {
             None
@@ -145,13 +148,11 @@ pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
         let withdraw_address =
             bitcoin_address::validate(withdraw_address, context.config.env_config.bitcoin_network)?;
 
-        withdraw_btc(
-            WithdrawBtcArgs {
-                amount,
-                address: withdraw_address,
-            },
-            context,
-        )
+        WithdrawBtcArgs {
+            amount,
+            address: withdraw_address,
+        }
+        .request(context)
         .await
         .to_jsonrpsee_result()
     })?;
@@ -187,15 +188,12 @@ pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
             })?)
             .map_err(|err| jsonrpsee_core::Error::Custom(err.to_string()))?;
 
-        buy_xmr(
-            BuyXmrArgs {
-                seller,
-                bitcoin_change_address,
-                monero_receive_address,
-                swap_id: Uuid::new_v4(),
-            },
-            context,
-        )
+        BuyXmrArgs {
+            seller,
+            bitcoin_change_address,
+            monero_receive_address,
+        }
+        .request(context)
         .await
         .to_jsonrpsee_result()
     })?;
@@ -214,12 +212,10 @@ pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
                 jsonrpsee_core::Error::Custom("Could not parse valid multiaddr".to_string())
             })?;
 
-        list_sellers(
-            ListSellersArgs {
-                rendezvous_point: rendezvous_point.clone(),
-            },
-            context,
-        )
+        ListSellersArgs {
+            rendezvous_point: rendezvous_point.clone(),
+        }
+        .request(context)
         .await
         .to_jsonrpsee_result()
     })?;

@@ -1,7 +1,7 @@
 import { Button, Typography } from "@material-ui/core";
 import { useState } from "react";
-import InfoBox from "../../modal/swap/InfoBox";
 import FeedbackDialog from "../../modal/feedback/FeedbackDialog";
+import InfoBox from "../../modal/swap/InfoBox";
 
 export default function FeedbackInfoBox() {
   const [showDialog, setShowDialog] = useState(false);

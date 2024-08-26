@@ -11,10 +11,10 @@
 #![forbid(unsafe_code)]
 #![allow(non_snake_case)]
 
-use swap::cli::command::{parse_args_and_apply_defaults, ParseResult};
-use swap::common::check_latest_version;
 use anyhow::Result;
 use std::env;
+use swap::cli::command::{parse_args_and_apply_defaults, ParseResult};
+use swap::common::check_latest_version;
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
@@ -23,7 +23,9 @@ pub async fn main() -> Result<()> {
     }
 
     match parse_args_and_apply_defaults(env::args_os()).await? {
-        ParseResult::Success => {}
+        ParseResult::Success(context) => {
+            context.tasks.wait_for_tasks().await?;
+        }
         ParseResult::PrintAndExitZero { message } => {
             println!("{}", message);
             std::process::exit(0);

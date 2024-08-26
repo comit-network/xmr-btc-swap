@@ -1,8 +1,11 @@
-import { Alert } from "@material-ui/lab";
 import { Box, LinearProgress } from "@material-ui/core";
+import { Alert } from "@material-ui/lab";
 import { useAppSelector } from "store/hooks";
 
 export default function MoneroWalletRpcUpdatingAlert() {
+  // TODO: Reimplement this using Tauri Events
+  return <></>;
+
   const updateState = useAppSelector(
     (s) => s.rpc.state.moneroWalletRpc.updateState,
   );

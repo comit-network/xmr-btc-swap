@@ -6,23 +6,14 @@ import {
   TableCell,
   TableRow,
 } from "@material-ui/core";
-import { useState } from "react";
 import ArrowForwardIcon from "@material-ui/icons/ArrowForward";
 import KeyboardArrowDownIcon from "@material-ui/icons/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@material-ui/icons/KeyboardArrowUp";
-import {
-  getHumanReadableDbStateType,
-  getSwapBtcAmount,
-  getSwapXmrAmount,
-  GetSwapInfoResponse,
-} from "../../../../../models/rpcModel";
+import { GetSwapInfoResponse } from "models/tauriModel";
+import { useState } from "react";
+import { PiconeroAmount, SatsAmount } from "../../../other/Units";
 import HistoryRowActions from "./HistoryRowActions";
 import HistoryRowExpanded from "./HistoryRowExpanded";
-import { BitcoinAmount, MoneroAmount } from "../../../other/Units";
-
-type HistoryRowProps = {
-  swap: GetSwapInfoResponse;
-};
 
 const useStyles = makeStyles((theme) => ({
   amountTransferContainer: {
@@ -43,17 +34,14 @@ function AmountTransfer({
 
   return (
     <Box className={classes.amountTransferContainer}>
-      <BitcoinAmount amount={btcAmount} />
+      <SatsAmount amount={btcAmount} />
       <ArrowForwardIcon />
-      <MoneroAmount amount={xmrAmount} />
+      <PiconeroAmount amount={xmrAmount} />
     </Box>
   );
 }
 
-export default function HistoryRow({ swap }: HistoryRowProps) {
-  const btcAmount = getSwapBtcAmount(swap);
-  const xmrAmount = getSwapXmrAmount(swap);
-
+export default function HistoryRow(swap: GetSwapInfoResponse) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -64,13 +52,16 @@ export default function HistoryRow({ swap }: HistoryRowProps) {
             {expanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
           </IconButton>
         </TableCell>
-        <TableCell>{swap.swap_id.substring(0, 5)}...</TableCell>
+        <TableCell>{swap.swap_id}</TableCell>
         <TableCell>
-          <AmountTransfer xmrAmount={xmrAmount} btcAmount={btcAmount} />
+          <AmountTransfer
+            xmrAmount={swap.xmr_amount}
+            btcAmount={swap.btc_amount}
+          />
         </TableCell>
-        <TableCell>{getHumanReadableDbStateType(swap.state_name)}</TableCell>
+        <TableCell>{swap.state_name.toString()}</TableCell>
         <TableCell>
-          <HistoryRowActions swap={swap} />
+          <HistoryRowActions {...swap} />
         </TableCell>
       </TableRow>
 

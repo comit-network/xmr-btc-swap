@@ -1,4 +1,3 @@
-import { ButtonProps } from "@material-ui/core/Button/Button";
 import {
   Box,
   Button,
@@ -8,17 +7,17 @@ import {
   DialogContentText,
   Link,
 } from "@material-ui/core";
-import { useAppDispatch, useAppSelector } from "store/hooks";
+import { ButtonProps } from "@material-ui/core/Button/Button";
+import { GetSwapInfoArgs } from "models/tauriModel";
 import { rpcResetMoneroRecoveryKeys } from "store/features/rpcSlice";
-import {
-  GetSwapInfoResponse,
-  isSwapMoneroRecoverable,
-} from "../../../../../models/rpcModel";
-import IpcInvokeButton from "../../../IpcInvokeButton";
+import { useAppDispatch, useAppSelector } from "store/hooks";
 import DialogHeader from "../../../modal/DialogHeader";
 import ScrollablePaperTextBox from "../../../other/ScrollablePaperTextBox";
 
-function MoneroRecoveryKeysDialog({ swap }: { swap: GetSwapInfoResponse }) {
+function MoneroRecoveryKeysDialog() {
+  // TODO: Reimplement this using the new Tauri API
+  return null;
+
   const dispatch = useAppDispatch();
   const keys = useAppSelector((s) => s.rpc.state.moneroRecovery);
 
@@ -96,8 +95,11 @@ function MoneroRecoveryKeysDialog({ swap }: { swap: GetSwapInfoResponse }) {
 export function SwapMoneroRecoveryButton({
   swap,
   ...props
-}: { swap: GetSwapInfoResponse } & ButtonProps) {
+}: { swap: GetSwapInfoArgs } & ButtonProps) {
+  return <> </>;
+  /* TODO: Reimplement this using the new Tauri API
   const isRecoverable = isSwapMoneroRecoverable(swap.state_name);
+
 
   if (!isRecoverable) {
     return <></>;
@@ -105,15 +107,16 @@ export function SwapMoneroRecoveryButton({
 
   return (
     <>
-      <IpcInvokeButton
-        ipcChannel="spawn-monero-recovery"
-        ipcArgs={[swap.swap_id]}
-        requiresRpc
+      <PromiseInvokeButton
+        onClick={async () => {
+          throw new Error("Not implemented");
+        }}
         {...props}
       >
         Display Monero Recovery Keys
-      </IpcInvokeButton>
+      </PromiseInvokeButton>
       <MoneroRecoveryKeysDialog swap={swap} />
     </>
   );
+  */
 }

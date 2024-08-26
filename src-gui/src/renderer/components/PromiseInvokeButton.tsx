@@ -1,9 +1,9 @@
-import { Button, ButtonProps, IconButton, Tooltip } from "@material-ui/core";
+import { Button, ButtonProps, IconButton } from "@material-ui/core";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import { useSnackbar } from "notistack";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useState } from "react";
 
-interface IpcInvokeButtonProps<T> {
+interface PromiseInvokeButtonProps<T> {
   onSuccess?: (data: T) => void;
   onClick: () => Promise<T>;
   onPendingChange?: (isPending: boolean) => void;
@@ -24,10 +24,9 @@ export default function PromiseInvokeButton<T>({
   isLoadingOverride,
   isIconButton,
   displayErrorSnackbar,
-  tooltipTitle,
   onPendingChange,
   ...rest
-}: IpcInvokeButtonProps<T> & ButtonProps) {
+}: ButtonProps & PromiseInvokeButtonProps<T>) {
   const { enqueueSnackbar } = useSnackbar();
 
   const [isPending, setIsPending] = useState(false);
@@ -42,11 +41,11 @@ export default function PromiseInvokeButton<T>({
       try {
         onPendingChange?.(true);
         setIsPending(true);
-        let result = await onClick();
+        const result = await onClick();
         onSuccess?.(result);
       } catch (e: unknown) {
         if (displayErrorSnackbar) {
-          enqueueSnackbar(e as String, {
+          enqueueSnackbar(e as string, {
             autoHideDuration: 60 * 1000,
             variant: "error",
           });

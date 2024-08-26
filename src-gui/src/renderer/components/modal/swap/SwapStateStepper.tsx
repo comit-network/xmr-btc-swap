@@ -1,7 +1,11 @@
 import { Step, StepLabel, Stepper, Typography } from "@material-ui/core";
 import { SwapSpawnType } from "models/cliModel";
-import { SwapStateName } from "models/rpcModel";
-import { useActiveSwapInfo, useAppSelector } from "store/hooks";
+import { BobStateName } from "models/tauriModelExt";
+import {
+  useActiveSwapInfo,
+  useAppSelector,
+  useIsSwapRunning,
+} from "store/hooks";
 import { exhaustiveGuard } from "utils/typescriptUtils";
 
 export enum PathType {
@@ -9,8 +13,10 @@ export enum PathType {
   UNHAPPY_PATH = "unhappy path",
 }
 
+// TODO: Consider using a TauriProgressEvent here instead of BobStateName
+// TauriProgressEvent is always up to date, BobStateName is not (needs to be periodically fetched)
 function getActiveStep(
-  stateName: SwapStateName | null,
+  stateName: BobStateName | null,
   processExited: boolean,
 ): [PathType, number, boolean] {
   switch (stateName) {
@@ -18,56 +24,56 @@ function getActiveStep(
     // Step: 0 (Waiting for Bitcoin lock tx to be published)
     case null:
       return [PathType.HAPPY_PATH, 0, false];
-    case SwapStateName.Started:
-    case SwapStateName.SwapSetupCompleted:
+    case BobStateName.Started:
+    case BobStateName.SwapSetupCompleted:
       return [PathType.HAPPY_PATH, 0, processExited];
 
     // Step: 1 (Waiting for Bitcoin Lock confirmation and XMR Lock Publication)
     // We have locked the Bitcoin and are waiting for the other party to lock their XMR
-    case SwapStateName.BtcLocked:
+    case BobStateName.BtcLocked:
       return [PathType.HAPPY_PATH, 1, processExited];
 
     // Step: 2 (Waiting for XMR Lock confirmation)
     // We have locked the Bitcoin and the other party has locked their XMR
-    case SwapStateName.XmrLockProofReceived:
+    case BobStateName.XmrLockProofReceived:
       return [PathType.HAPPY_PATH, 1, processExited];
 
     // Step: 3 (Sending Encrypted Signature and waiting for Bitcoin Redemption)
     // The XMR lock transaction has been confirmed
     // We now need to send the encrypted signature to the other party and wait for them to redeem the Bitcoin
-    case SwapStateName.XmrLocked:
-    case SwapStateName.EncSigSent:
+    case BobStateName.XmrLocked:
+    case BobStateName.EncSigSent:
       return [PathType.HAPPY_PATH, 2, processExited];
 
     // Step: 4 (Waiting for XMR Redemption)
-    case SwapStateName.BtcRedeemed:
+    case BobStateName.BtcRedeemed:
       return [PathType.HAPPY_PATH, 3, processExited];
 
     // Step: 4 (Completed) (Swap completed, XMR redeemed)
-    case SwapStateName.XmrRedeemed:
+    case BobStateName.XmrRedeemed:
       return [PathType.HAPPY_PATH, 4, false];
 
     // Edge Case of Happy Path where the swap is safely aborted. We "fail" at the first step.
-    case SwapStateName.SafelyAborted:
+    case BobStateName.SafelyAborted:
       return [PathType.HAPPY_PATH, 0, true];
 
     // // Unhappy Path
     // Step: 1 (Cancelling swap, checking if cancel transaction has been published already by the other party)
-    case SwapStateName.CancelTimelockExpired:
+    case BobStateName.CancelTimelockExpired:
       return [PathType.UNHAPPY_PATH, 0, processExited];
 
     // Step: 2 (Attempt to publish the Bitcoin refund transaction)
-    case SwapStateName.BtcCancelled:
+    case BobStateName.BtcCancelled:
       return [PathType.UNHAPPY_PATH, 1, processExited];
 
     // Step: 2 (Completed) (Bitcoin refunded)
-    case SwapStateName.BtcRefunded:
+    case BobStateName.BtcRefunded:
       return [PathType.UNHAPPY_PATH, 2, false];
 
     // Step: 2 (We failed to publish the Bitcoin refund transaction)
     // We failed to publish the Bitcoin refund transaction because the timelock has expired.
     // We will be punished. Nothing we can do about it now.
-    case SwapStateName.BtcPunished:
+    case BobStateName.BtcPunished:
       return [PathType.UNHAPPY_PATH, 1, true];
     default:
       return exhaustiveGuard(stateName);
@@ -149,11 +155,14 @@ function UnhappyPathStepper({
 }
 
 export default function SwapStateStepper() {
+  // TODO: There's no equivalent of this with Tauri yet.
   const currentSwapSpawnType = useAppSelector((s) => s.swap.spawnType);
+
   const stateName = useActiveSwapInfo()?.state_name ?? null;
-  const processExited = useAppSelector((s) => !s.swap.processRunning);
+  const processExited = !useIsSwapRunning();
   const [pathType, activeStep, error] = getActiveStep(stateName, processExited);
 
+  // TODO: Fix this to work with Tauri
   // If the current swap is being manually cancelled and refund, we want to show the unhappy path even though the current state is not a "unhappy" state
   if (currentSwapSpawnType === SwapSpawnType.CANCEL_REFUND) {
     return <UnhappyPathStepper activeStep={0} error={error} />;

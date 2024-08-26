@@ -1,15 +1,12 @@
 import { Box, DialogContentText } from "@material-ui/core";
-import { SwapStateXmrLockInMempool } from "models/storeModel";
+import { TauriSwapProgressEventContent } from "models/tauriModelExt";
 import MoneroTransactionInfoBox from "../../MoneroTransactionInfoBox";
 
-type XmrLockTxInMempoolPageProps = {
-  state: SwapStateXmrLockInMempool;
-};
-
 export default function XmrLockTxInMempoolPage({
-  state,
-}: XmrLockTxInMempoolPageProps) {
-  const additionalContent = `Confirmations: ${state.aliceXmrLockTxConfirmations}/10`;
+  xmr_lock_tx_confirmations,
+  xmr_lock_txid,
+}: TauriSwapProgressEventContent<"XmrLockTxInMempool">) {
+  const additionalContent = `Confirmations: ${xmr_lock_tx_confirmations}/10`;
 
   return (
     <Box>
@@ -20,7 +17,7 @@ export default function XmrLockTxInMempoolPage({
 
       <MoneroTransactionInfoBox
         title="Monero Lock Transaction"
-        txId={state.aliceXmrLockTxId}
+        txId={xmr_lock_txid}
         additionalContent={additionalContent}
         loading
       />

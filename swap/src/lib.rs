@@ -16,7 +16,6 @@
     missing_copy_implementations
 )]
 
-pub mod api;
 pub mod asb;
 pub mod bitcoin;
 pub mod cli;

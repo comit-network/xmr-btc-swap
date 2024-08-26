@@ -1,16 +1,19 @@
-import { SwapStateStarted } from "models/storeModel";
-import { BitcoinAmount } from "renderer/components/other/Units";
+import { TauriSwapProgressEventContent } from "models/tauriModelExt";
+import { SatsAmount } from "renderer/components/other/Units";
 import CircularProgressWithSubtitle from "../../CircularProgressWithSubtitle";
 
-export default function StartedPage({ state }: { state: SwapStateStarted }) {
-  const description = state.txLockDetails ? (
-    <>
-      Locking <BitcoinAmount amount={state.txLockDetails.amount} /> with a
-      network fee of <BitcoinAmount amount={state.txLockDetails.fees} />
-    </>
-  ) : (
-    "Locking Bitcoin"
+export default function StartedPage({
+  btc_lock_amount,
+  btc_tx_lock_fee,
+}: TauriSwapProgressEventContent<"Started">) {
+  return (
+    <CircularProgressWithSubtitle
+      description={
+        <>
+          Locking <SatsAmount amount={btc_lock_amount} /> with a network fee of{" "}
+          <SatsAmount amount={btc_tx_lock_fee} />
+        </>
+      }
+    />
   );
-
-  return <CircularProgressWithSubtitle description={description} />;
 }

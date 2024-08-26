@@ -16,6 +16,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
 use std::ops::Add;
+use typeshare::typeshare;
 
 /// Represent a timelock, expressed in relative block height as defined in
 /// [BIP68](https://github.com/bitcoin/bips/blob/master/bip-0068.mediawiki).
@@ -23,6 +24,7 @@ use std::ops::Add;
 /// mined.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(transparent)]
+#[typeshare]
 pub struct CancelTimelock(u32);
 
 impl From<CancelTimelock> for u32 {
@@ -69,6 +71,7 @@ impl fmt::Display for CancelTimelock {
 /// mined.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(transparent)]
+#[typeshare]
 pub struct PunishTimelock(u32);
 
 impl From<PunishTimelock> for u32 {

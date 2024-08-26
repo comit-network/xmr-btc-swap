@@ -1,8 +1,8 @@
-import { useState } from "react";
 import { Box, makeStyles, TextField, Typography } from "@material-ui/core";
-import { SwapStateWaitingForBtcDeposit } from "models/storeModel";
+import { BidQuote } from "models/tauriModel";
+import { useState } from "react";
 import { useAppSelector } from "store/hooks";
-import { satsToBtc } from "utils/conversionUtils";
+import { btcToSats, satsToBtc } from "utils/conversionUtils";
 import { MoneroAmount } from "../../../../other/Units";
 
 const MONERO_FEE = 0.000016;
@@ -29,42 +29,42 @@ function calcBtcAmountWithoutFees(amount: number, fees: number) {
 }
 
 export default function DepositAmountHelper({
-  state,
+  min_deposit_until_swap_will_start,
+  max_deposit_until_maximum_amount_is_reached,
+  min_bitcoin_lock_tx_fee,
+  quote,
 }: {
-  state: SwapStateWaitingForBtcDeposit;
+  min_deposit_until_swap_will_start: number;
+  max_deposit_until_maximum_amount_is_reached: number;
+  min_bitcoin_lock_tx_fee: number;
+  quote: BidQuote;
 }) {
   const classes = useStyles();
-  const [amount, setAmount] = useState(state.minDeposit);
+  const [amount, setAmount] = useState(min_deposit_until_swap_will_start);
   const bitcoinBalance = useAppSelector((s) => s.rpc.state.balance) || 0;
 
   function getTotalAmountAfterDeposit() {
-    return amount + satsToBtc(bitcoinBalance);
+    return amount + bitcoinBalance;
   }
 
   function hasError() {
     return (
-      amount < state.minDeposit ||
-      getTotalAmountAfterDeposit() > state.maximumAmount
+      amount < min_deposit_until_swap_will_start ||
+      getTotalAmountAfterDeposit() > max_deposit_until_maximum_amount_is_reached
     );
   }
 
   function calcXMRAmount(): number | null {
     if (Number.isNaN(amount)) return null;
     if (hasError()) return null;
-    if (state.price == null) return null;
-
-    console.log(
-      `Calculating calcBtcAmountWithoutFees(${getTotalAmountAfterDeposit()}, ${
-        state.minBitcoinLockTxFee
-      }) / ${state.price} - ${MONERO_FEE}`,
-    );
+    if (quote.price == null) return null;
 
     return (
       calcBtcAmountWithoutFees(
         getTotalAmountAfterDeposit(),
-        state.minBitcoinLockTxFee,
+        min_bitcoin_lock_tx_fee,
       ) /
-        state.price -
+        quote.price -
       MONERO_FEE
     );
   }
@@ -75,9 +75,9 @@ export default function DepositAmountHelper({
         Depositing {bitcoinBalance > 0 && <>another</>}
       </Typography>
       <TextField
-        error={hasError()}
-        value={amount}
-        onChange={(e) => setAmount(parseFloat(e.target.value))}
+        error={!!hasError()}
+        value={satsToBtc(amount)}
+        onChange={(e) => setAmount(btcToSats(parseFloat(e.target.value)))}
         size="small"
         type="number"
         className={classes.textField}

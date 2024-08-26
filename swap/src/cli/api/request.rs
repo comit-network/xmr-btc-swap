@@ -1,6 +1,6 @@
 use super::tauri_bindings::TauriHandle;
-use crate::api::tauri_bindings::{TauriEmitter, TauriSwapProgressEvent};
-use crate::api::Context;
+use crate::cli::api::tauri_bindings::{TauriEmitter, TauriSwapProgressEvent};
+use crate::cli::api::Context;
 use crate::bitcoin::{CancelTimelock, ExpiredTimelocks, PunishTimelock, TxLock};
 use crate::cli::{list_sellers as list_sellers_impl, EventLoop, SellerStatus};
 use crate::libp2p_ext::MultiAddrExt;
@@ -27,8 +27,8 @@ use tracing::Instrument;
 use typeshare::typeshare;
 use uuid::Uuid;
 
-/// This trait is implemented by all types of request args that 
-/// the CLI can handle. 
+/// This trait is implemented by all types of request args that
+/// the CLI can handle.
 /// It provides a unified abstraction that can be useful for generics.
 #[allow(async_fn_in_trait)]
 pub trait Request {
@@ -622,7 +622,7 @@ pub async fn buy_xmr(
                     max_givable,
                     || bitcoin_wallet.sync(),
                     estimate_fee,
-                    context.tauri_handle.clone(),
+                    context.tauri_handle.clone()
                 );
 
                 let (amount, fees) = match determine_amount.await {

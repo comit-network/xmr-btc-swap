@@ -1,5 +1,5 @@
-import { useAppSelector } from "store/hooks";
 import { SwapSpawnType } from "models/cliModel";
+import { useAppSelector } from "store/hooks";
 import CircularProgressWithSubtitle from "../../CircularProgressWithSubtitle";
 
 export default function InitiatedPage() {

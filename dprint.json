@@ -13,6 +13,7 @@
   "plugins": [
     "https://plugins.dprint.dev/markdown-0.13.1.wasm",
     "https://github.com/thomaseizinger/dprint-plugin-cargo-toml/releases/download/0.1.0/cargo-toml-0.1.0.wasm",
-    "https://plugins.dprint.dev/exec-0.3.5.json@d687dda57be0fe9a0088ccdaefa5147649ff24127d8b3ea227536c68ee7abeab"
+    "https://plugins.dprint.dev/exec-0.3.5.json@d687dda57be0fe9a0088ccdaefa5147649ff24127d8b3ea227536c68ee7abeab",
+    "https://plugins.dprint.dev/prettier-0.26.6.json@0118376786f37496e41bb19dbcfd1e7214e2dc859a55035c5e54d1107b4c9c57"
   ]
 }

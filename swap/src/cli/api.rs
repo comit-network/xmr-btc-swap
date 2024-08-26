@@ -1,4 +1,5 @@
 pub mod request;
+pub mod tauri_bindings;
 use crate::cli::command::{Bitcoin, Monero, Tor};
 use crate::database::open_db;
 use crate::env::{Config as EnvConfig, GetConfig, Mainnet, Testnet};
@@ -13,10 +14,13 @@ use std::fmt;
 use std::future::Future;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, Once};
+use std::sync::{Arc, Mutex as SyncMutex, Once};
+use tauri::AppHandle;
+use tauri_bindings::TauriHandle;
 use tokio::sync::{broadcast, broadcast::Sender, Mutex as TokioMutex, RwLock};
 use tokio::task::JoinHandle;
 use url::Url;
+use uuid::Uuid;
 
 static START: Once = Once::new();
 
@@ -32,8 +36,6 @@ pub struct Config {
     data_dir: PathBuf,
     is_testnet: bool,
 }
-
-use uuid::Uuid;
 
 #[derive(Default)]
 pub struct PendingTaskList(TokioMutex<Vec<JoinHandle<()>>>);
@@ -64,6 +66,13 @@ impl PendingTaskList {
     }
 }
 
+/// The `SwapLock` manages the state of the current swap, ensuring that only one swap can be active at a time.
+/// It includes:
+/// - A lock for the current swap (`current_swap`)
+/// - A broadcast channel for suspension signals (`suspension_trigger`)
+///
+/// The `SwapLock` provides methods to acquire and release the swap lock, and to listen for suspension signals.
+/// This ensures that swap operations do not overlap and can be safely suspended if needed.
 pub struct SwapLock {
     current_swap: RwLock<Option<Uuid>>,
     suspension_trigger: Sender<()>,
@@ -157,17 +166,22 @@ impl Default for SwapLock {
     }
 }
 
-// workaround for warning over monero_rpc_process which we must own but not read
-#[allow(dead_code)]
+/// Holds shared data for different parts of the CLI.
+///
+/// Some components are optional, allowing initialization of only necessary parts.
+/// For example, the `history` command doesn't require wallet initialization.
+///
+/// Many fields are wrapped in `Arc` for thread-safe sharing.
 #[derive(Clone)]
 pub struct Context {
     pub db: Arc<dyn Database + Send + Sync>,
-    bitcoin_wallet: Option<Arc<bitcoin::Wallet>>,
-    monero_wallet: Option<Arc<monero::Wallet>>,
-    monero_rpc_process: Option<Arc<Mutex<monero::WalletRpcProcess>>>,
     pub swap_lock: Arc<SwapLock>,
     pub config: Config,
     pub tasks: Arc<PendingTaskList>,
+    tauri_handle: Option<TauriHandle>,
+    bitcoin_wallet: Option<Arc<bitcoin::Wallet>>,
+    monero_wallet: Option<Arc<monero::Wallet>>,
+    monero_rpc_process: Option<Arc<SyncMutex<monero::WalletRpcProcess>>>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -216,7 +230,7 @@ impl Context {
                 let monero_daemon_address = monero.apply_defaults(is_testnet);
                 let (wlt, prc) =
                     init_monero_wallet(data_dir.clone(), monero_daemon_address, env_config).await?;
-                (Some(Arc::new(wlt)), Some(prc))
+                (Some(Arc::new(wlt)), Some(Arc::new(SyncMutex::new(prc))))
             } else {
                 (None, None)
             }
@@ -228,7 +242,7 @@ impl Context {
             db: open_db(data_dir.join("sqlite")).await?,
             bitcoin_wallet,
             monero_wallet,
-            monero_rpc_process: monero_rpc_process.map(|prc| Arc::new(Mutex::new(prc))),
+            monero_rpc_process,
             config: Config {
                 tor_socks5_port,
                 namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
@@ -242,9 +256,16 @@ impl Context {
             },
             swap_lock: Arc::new(SwapLock::new()),
             tasks: Arc::new(PendingTaskList::default()),
+            tauri_handle: None,
         };
 
         Ok(context)
+    }
+
+    pub fn with_tauri_handle(mut self, tauri_handle: AppHandle) -> Self {
+        self.tauri_handle = Some(TauriHandle::new(tauri_handle));
+
+        self
     }
 
     pub async fn for_harness(
@@ -266,6 +287,7 @@ impl Context {
             monero_rpc_process: None,
             swap_lock: Arc::new(SwapLock::new()),
             tasks: Arc::new(PendingTaskList::default()),
+            tauri_handle: None,
         }
     }
 
@@ -386,12 +408,6 @@ impl Config {
 #[cfg(test)]
 pub mod api_test {
     use super::*;
-    use crate::api::request::{Method, Request};
-
-    use libp2p::Multiaddr;
-    use request::BuyXmrArgs;
-    use std::str::FromStr;
-    use uuid::Uuid;
 
     pub const MULTI_ADDRESS: &str =
         "/ip4/127.0.0.1/tcp/9939/p2p/12D3KooWCdMKjesXMJz1SiZ7HgotrxuqhQJbP5sgBm2BwP1cqThi";
@@ -424,52 +440,6 @@ pub mod api_test {
                 is_testnet,
                 data_dir,
             }
-        }
-    }
-
-    impl Request {
-        pub fn buy_xmr(is_testnet: bool) -> Request {
-            let seller = Multiaddr::from_str(MULTI_ADDRESS).unwrap();
-            let bitcoin_change_address = {
-                if is_testnet {
-                    bitcoin::Address::from_str(BITCOIN_TESTNET_ADDRESS).unwrap()
-                } else {
-                    bitcoin::Address::from_str(BITCOIN_MAINNET_ADDRESS).unwrap()
-                }
-            };
-
-            let monero_receive_address = {
-                if is_testnet {
-                    monero::Address::from_str(MONERO_STAGENET_ADDRESS).unwrap()
-                } else {
-                    monero::Address::from_str(MONERO_MAINNET_ADDRESS).unwrap()
-                }
-            };
-
-            Request::new(Method::BuyXmr(BuyXmrArgs {
-                seller,
-                bitcoin_change_address,
-                monero_receive_address,
-                swap_id: Uuid::new_v4(),
-            }))
-        }
-
-        pub fn resume() -> Request {
-            Request::new(Method::Resume {
-                swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-            })
-        }
-
-        pub fn cancel() -> Request {
-            Request::new(Method::CancelAndRefund {
-                swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-            })
-        }
-
-        pub fn refund() -> Request {
-            Request::new(Method::CancelAndRefund {
-                swap_id: Uuid::from_str(SWAP_ID).unwrap(),
-            })
         }
     }
 }

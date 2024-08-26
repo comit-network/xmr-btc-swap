@@ -1,19 +1,16 @@
 import { Box, DialogContentText } from "@material-ui/core";
-import { SwapStateBtcLockInMempool } from "models/storeModel";
-import BitcoinTransactionInfoBox from "../../BitcoinTransactionInfoBox";
+import { TauriSwapProgressEventContent } from "models/tauriModelExt";
 import SwapMightBeCancelledAlert from "../../../../alert/SwapMightBeCancelledAlert";
-
-type BitcoinLockTxInMempoolPageProps = {
-  state: SwapStateBtcLockInMempool;
-};
+import BitcoinTransactionInfoBox from "../../BitcoinTransactionInfoBox";
 
 export default function BitcoinLockTxInMempoolPage({
-  state,
-}: BitcoinLockTxInMempoolPageProps) {
+  btc_lock_confirmations,
+  btc_lock_txid,
+}: TauriSwapProgressEventContent<"BtcLockTxInMempool">) {
   return (
     <Box>
       <SwapMightBeCancelledAlert
-        bobBtcLockTxConfirmations={state.bobBtcLockTxConfirmations}
+        bobBtcLockTxConfirmations={btc_lock_confirmations}
       />
       <DialogContentText>
         The Bitcoin lock transaction has been published. The swap will proceed
@@ -22,14 +19,14 @@ export default function BitcoinLockTxInMempoolPage({
       </DialogContentText>
       <BitcoinTransactionInfoBox
         title="Bitcoin Lock Transaction"
-        txId={state.bobBtcLockTxId}
+        txId={btc_lock_txid}
         loading
         additionalContent={
           <>
             Most swap providers require one confirmation before locking their
             Monero
             <br />
-            Confirmations: {state.bobBtcLockTxConfirmations}
+            Confirmations: {btc_lock_confirmations}
           </>
         }
       />

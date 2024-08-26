@@ -1,7 +1,7 @@
 import { Box, DialogContentText } from "@material-ui/core";
 import { useActiveSwapInfo, useAppSelector } from "store/hooks";
-import CliLogsBox from "../../../other/RenderedCliLog";
 import JsonTreeView from "../../../other/JSONViewTree";
+import CliLogsBox from "../../../other/RenderedCliLog";
 
 export default function DebugPage() {
   const torStdOut = useAppSelector((s) => s.tor.stdOut);

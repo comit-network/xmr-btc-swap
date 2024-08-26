@@ -1,32 +1,32 @@
 {
-    "productName": "unstoppableswap-gui-rs",
-    "version": "0.1.0",
-    "identifier": "net.unstoppableswap.gui",
-    "build": {
-        "devUrl": "http://localhost:1420",
-        "frontendDist": "../src-gui/dist"
-    },
-    "app": {
-        "windows": [
-            {
-                "title": "unstoppableswap-gui-rs",
-                "width": 800,
-                "height": 600
-            }
-        ],
-        "security": {
-            "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' http://localhost:1234"
-        }
-    },
-    "bundle": {
-        "active": true,
-        "targets": "all",
-        "icon": [
-            "icons/32x32.png",
-            "icons/128x128.png",
-            "icons/128x128@2x.png",
-            "icons/icon.icns",
-            "icons/icon.ico"
-        ]
+  "productName": "unstoppableswap-gui-rs",
+  "version": "0.1.0",
+  "identifier": "net.unstoppableswap.gui",
+  "build": {
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../src-gui/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "unstoppableswap-gui-rs",
+        "width": 800,
+        "height": 600
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' http://localhost:1234 https://api.unstoppableswap.net"
     }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
 }

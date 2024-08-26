@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Button,
   Dialog,
@@ -6,13 +5,14 @@ import {
   DialogContent,
   makeStyles,
 } from "@material-ui/core";
-import { useAppDispatch, useAppSelector } from "store/hooks";
+import { useState } from "react";
 import { swapReset } from "store/features/swapSlice";
-import SwapStatePage from "./pages/SwapStatePage";
-import SwapStateStepper from "./SwapStateStepper";
+import { useAppDispatch, useAppSelector, useIsSwapRunning } from "store/hooks";
 import SwapSuspendAlert from "../SwapSuspendAlert";
-import SwapDialogTitle from "./SwapDialogTitle";
 import DebugPage from "./pages/DebugPage";
+import SwapStatePage from "./pages/SwapStatePage";
+import SwapDialogTitle from "./SwapDialogTitle";
+import SwapStateStepper from "./SwapStateStepper";
 
 const useStyles = makeStyles({
   content: {
@@ -32,16 +32,17 @@ export default function SwapDialog({
 }) {
   const classes = useStyles();
   const swap = useAppSelector((state) => state.swap);
+  const isSwapRunning = useIsSwapRunning();
   const [debug, setDebug] = useState(false);
   const [openSuspendAlert, setOpenSuspendAlert] = useState(false);
   const dispatch = useAppDispatch();
 
   function onCancel() {
-    if (swap.processRunning) {
+    if (isSwapRunning) {
       setOpenSuspendAlert(true);
     } else {
       onClose();
-      setTimeout(() => dispatch(swapReset()), 0);
+      dispatch(swapReset());
     }
   }
 
@@ -61,7 +62,7 @@ export default function SwapDialog({
           <DebugPage />
         ) : (
           <>
-            <SwapStatePage swapState={swap.state} />
+            <SwapStatePage state={swap.state} />
             <SwapStateStepper />
           </>
         )}
@@ -75,7 +76,7 @@ export default function SwapDialog({
           color="primary"
           variant="contained"
           onClick={onCancel}
-          disabled={!(swap.state !== null && !swap.processRunning)}
+          disabled={isSwapRunning}
         >
           Done
         </Button>

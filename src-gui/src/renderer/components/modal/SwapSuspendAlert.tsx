@@ -6,7 +6,8 @@ import {
   DialogContentText,
   DialogTitle,
 } from "@material-ui/core";
-import IpcInvokeButton from "../IpcInvokeButton";
+import { suspendCurrentSwap } from "renderer/rpc";
+import PromiseInvokeButton from "../PromiseInvokeButton";
 
 type SwapCancelAlertProps = {
   open: boolean;
@@ -29,15 +30,13 @@ export default function SwapSuspendAlert({
         <Button onClick={onClose} color="primary">
           No
         </Button>
-        <IpcInvokeButton
-          ipcChannel="suspend-current-swap"
-          ipcArgs={[]}
+        <PromiseInvokeButton
           color="primary"
           onSuccess={onClose}
-          requiresRpc
+          onClick={suspendCurrentSwap}
         >
           Force stop
-        </IpcInvokeButton>
+        </PromiseInvokeButton>
       </DialogActions>
     </Dialog>
   );

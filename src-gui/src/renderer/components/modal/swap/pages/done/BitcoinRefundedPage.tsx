@@ -1,14 +1,13 @@
 import { Box, DialogContentText } from "@material-ui/core";
-import { SwapStateBtcRefunded } from "models/storeModel";
+import { TauriSwapProgressEventContent } from "models/tauriModelExt";
 import { useActiveSwapInfo } from "store/hooks";
-import BitcoinTransactionInfoBox from "../../BitcoinTransactionInfoBox";
 import FeedbackInfoBox from "../../../../pages/help/FeedbackInfoBox";
+import BitcoinTransactionInfoBox from "../../BitcoinTransactionInfoBox";
 
 export default function BitcoinRefundedPage({
-  state,
-}: {
-  state: SwapStateBtcRefunded | null;
-}) {
+  btc_refund_txid,
+}: TauriSwapProgressEventContent<"BtcRefunded">) {
+  // TODO: Reimplement this using Tauri
   const swap = useActiveSwapInfo();
   const additionalContent = swap
     ? `Refund address: ${swap.btc_refund_address}`
@@ -28,14 +27,15 @@ export default function BitcoinRefundedPage({
           gap: "0.5rem",
         }}
       >
-        {state && (
-          <BitcoinTransactionInfoBox
-            title="Bitcoin Refund Transaction"
-            txId={state.bobBtcRefundTxId}
-            loading={false}
-            additionalContent={additionalContent}
-          />
-        )}
+        {
+          // TODO: We should display the confirmation count here
+        }
+        <BitcoinTransactionInfoBox
+          title="Bitcoin Refund Transaction"
+          txId={btc_refund_txid}
+          loading={false}
+          additionalContent={additionalContent}
+        />
         <FeedbackInfoBox />
       </Box>
     </Box>
