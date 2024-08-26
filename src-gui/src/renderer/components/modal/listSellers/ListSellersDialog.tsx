@@ -1,20 +1,20 @@
-import { ChangeEvent, useState } from "react";
 import {
-  DialogTitle,
+  Box,
+  Button,
+  Chip,
   Dialog,
+  DialogActions,
   DialogContent,
   DialogContentText,
-  TextField,
-  DialogActions,
-  Button,
-  Box,
-  Chip,
+  DialogTitle,
   makeStyles,
+  TextField,
   Theme,
 } from "@material-ui/core";
 import { Multiaddr } from "multiaddr";
 import { useSnackbar } from "notistack";
-import IpcInvokeButton from "../../IpcInvokeButton";
+import { ChangeEvent, useState } from "react";
+import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
 
 const PRESET_RENDEZVOUS_POINTS = [
   "/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE",
@@ -53,7 +53,7 @@ export default function ListSellersDialog({
         return "The multi address must contain the peer id (/p2p/)";
       }
       return null;
-    } catch (e) {
+    } catch {
       return "Not a valid multi address";
     }
   }
@@ -119,17 +119,17 @@ export default function ListSellersDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <IpcInvokeButton
+        <PromiseInvokeButton
           variant="contained"
           disabled={!(rendezvousAddress && !getMultiAddressError())}
           color="primary"
           onSuccess={handleSuccess}
-          ipcChannel="spawn-list-sellers"
-          ipcArgs={[rendezvousAddress]}
-          requiresRpc
+          onClick={() => {
+            throw new Error("Not implemented");
+          }}
         >
           Connect
-        </IpcInvokeButton>
+        </PromiseInvokeButton>
       </DialogActions>
     </Dialog>
   );

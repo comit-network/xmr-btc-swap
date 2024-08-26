@@ -1,43 +1,28 @@
 import { Box } from "@material-ui/core";
-import { useAppSelector } from "store/hooks";
-import {
-  isSwapStateBtcCancelled,
-  isSwapStateBtcLockInMempool,
-  isSwapStateBtcPunished,
-  isSwapStateBtcRedemeed,
-  isSwapStateBtcRefunded,
-  isSwapStateInitiated,
-  isSwapStateProcessExited,
-  isSwapStateReceivedQuote,
-  isSwapStateStarted,
-  isSwapStateWaitingForBtcDeposit,
-  isSwapStateXmrLocked,
-  isSwapStateXmrLockInMempool,
-  isSwapStateXmrRedeemInMempool,
-  SwapState,
-} from "../../../../../models/storeModel";
-import InitiatedPage from "./init/InitiatedPage";
-import WaitingForBitcoinDepositPage from "./init/WaitingForBitcoinDepositPage";
-import StartedPage from "./in_progress/StartedPage";
-import BitcoinLockTxInMempoolPage from "./in_progress/BitcoinLockTxInMempoolPage";
-import XmrLockTxInMempoolPage from "./in_progress/XmrLockInMempoolPage";
-// eslint-disable-next-line import/no-cycle
-import ProcessExitedPage from "./exited/ProcessExitedPage";
-import XmrRedeemInMempoolPage from "./done/XmrRedeemInMempoolPage";
-import ReceivedQuotePage from "./in_progress/ReceivedQuotePage";
-import BitcoinRedeemedPage from "./in_progress/BitcoinRedeemedPage";
-import InitPage from "./init/InitPage";
-import XmrLockedPage from "./in_progress/XmrLockedPage";
-import BitcoinCancelledPage from "./in_progress/BitcoinCancelledPage";
-import BitcoinRefundedPage from "./done/BitcoinRefundedPage";
+import { SwapSlice } from "models/storeModel";
+import CircularProgressWithSubtitle from "../CircularProgressWithSubtitle";
 import BitcoinPunishedPage from "./done/BitcoinPunishedPage";
-import { SyncingMoneroWalletPage } from "./in_progress/SyncingMoneroWalletPage";
+import BitcoinRefundedPage from "./done/BitcoinRefundedPage";
+import XmrRedeemInMempoolPage from "./done/XmrRedeemInMempoolPage";
+import ProcessExitedPage from "./exited/ProcessExitedPage";
+import BitcoinCancelledPage from "./in_progress/BitcoinCancelledPage";
+import BitcoinLockTxInMempoolPage from "./in_progress/BitcoinLockTxInMempoolPage";
+import BitcoinRedeemedPage from "./in_progress/BitcoinRedeemedPage";
+import ReceivedQuotePage from "./in_progress/ReceivedQuotePage";
+import StartedPage from "./in_progress/StartedPage";
+import XmrLockedPage from "./in_progress/XmrLockedPage";
+import XmrLockTxInMempoolPage from "./in_progress/XmrLockInMempoolPage";
+import InitiatedPage from "./init/InitiatedPage";
+import InitPage from "./init/InitPage";
+import WaitingForBitcoinDepositPage from "./init/WaitingForBitcoinDepositPage";
 
 export default function SwapStatePage({
-  swapState,
+  state,
 }: {
-  swapState: SwapState | null;
+  state: SwapSlice["state"];
 }) {
+  // TODO: Reimplement this using tauri events
+  /*
   const isSyncingMoneroWallet = useAppSelector(
     (state) => state.rpc.state.moneroWallet.isSyncing,
   );
@@ -45,62 +30,57 @@ export default function SwapStatePage({
   if (isSyncingMoneroWallet) {
     return <SyncingMoneroWalletPage />;
   }
+  */
 
-  if (swapState === null) {
+  if (state === null) {
     return <InitPage />;
   }
-  if (isSwapStateInitiated(swapState)) {
-    return <InitiatedPage />;
+  switch (state.curr.type) {
+    case "Initiated":
+      return <InitiatedPage />;
+    case "ReceivedQuote":
+      return <ReceivedQuotePage />;
+    case "WaitingForBtcDeposit":
+      return <WaitingForBitcoinDepositPage {...state.curr.content} />;
+    case "Started":
+      return <StartedPage {...state.curr.content} />;
+    case "BtcLockTxInMempool":
+      return <BitcoinLockTxInMempoolPage {...state.curr.content} />;
+    case "XmrLockTxInMempool":
+      return <XmrLockTxInMempoolPage {...state.curr.content} />;
+    case "XmrLocked":
+      return <XmrLockedPage />;
+    case "BtcRedeemed":
+      return <BitcoinRedeemedPage />;
+    case "XmrRedeemInMempool":
+      return <XmrRedeemInMempoolPage {...state.curr.content} />;
+    case "BtcCancelled":
+      return <BitcoinCancelledPage />;
+    case "BtcRefunded":
+      return <BitcoinRefundedPage {...state.curr.content} />;
+    case "BtcPunished":
+      return <BitcoinPunishedPage />;
+    case "AttemptingCooperativeRedeem":
+      return (
+        <CircularProgressWithSubtitle description="Attempting to redeem the Monero with the help of the other party" />
+      );
+    case "CooperativeRedeemAccepted":
+      return (
+        <CircularProgressWithSubtitle description="The other party is cooperating with us to redeem the Monero..." />
+      );
+    case "CooperativeRedeemRejected":
+      return <BitcoinPunishedPage />;
+    case "Released":
+      return <ProcessExitedPage prevState={state.prev} swapId={state.swapId} />;
+    default:
+      // TODO: Use this when we have all states implemented, ensures we don't forget to implement a state
+      // return exhaustiveGuard(state.curr.type);
+      return (
+        <Box>
+          No information to display
+          <br />
+          State: {JSON.stringify(state, null, 4)}
+        </Box>
+      );
   }
-  if (isSwapStateReceivedQuote(swapState)) {
-    return <ReceivedQuotePage />;
-  }
-  if (isSwapStateWaitingForBtcDeposit(swapState)) {
-    return <WaitingForBitcoinDepositPage state={swapState} />;
-  }
-  if (isSwapStateStarted(swapState)) {
-    return <StartedPage state={swapState} />;
-  }
-  if (isSwapStateBtcLockInMempool(swapState)) {
-    return <BitcoinLockTxInMempoolPage state={swapState} />;
-  }
-  if (isSwapStateXmrLockInMempool(swapState)) {
-    return <XmrLockTxInMempoolPage state={swapState} />;
-  }
-  if (isSwapStateXmrLocked(swapState)) {
-    return <XmrLockedPage />;
-  }
-  if (isSwapStateBtcRedemeed(swapState)) {
-    return <BitcoinRedeemedPage />;
-  }
-  if (isSwapStateXmrRedeemInMempool(swapState)) {
-    return <XmrRedeemInMempoolPage state={swapState} />;
-  }
-  if (isSwapStateBtcCancelled(swapState)) {
-    return <BitcoinCancelledPage />;
-  }
-  if (isSwapStateBtcRefunded(swapState)) {
-    return <BitcoinRefundedPage state={swapState} />;
-  }
-  if (isSwapStateBtcPunished(swapState)) {
-    return <BitcoinPunishedPage />;
-  }
-  if (isSwapStateProcessExited(swapState)) {
-    return <ProcessExitedPage state={swapState} />;
-  }
-
-  console.error(
-    `No swap state page found for swap state State: ${JSON.stringify(
-      swapState,
-      null,
-      4,
-    )}`,
-  );
-  return (
-    <Box>
-      No information to display
-      <br />
-      State: ${JSON.stringify(swapState, null, 4)}
-    </Box>
-  );
 }

@@ -1,5 +1,5 @@
-import { ReactNode } from "react";
 import { IconButton } from "@material-ui/core";
+import { ReactNode } from "react";
 
 export default function LinkIconButton({
   url,

@@ -1,7 +1,7 @@
 import { Box, makeStyles, Typography } from "@material-ui/core";
 import PlayArrowIcon from "@material-ui/icons/PlayArrow";
 import StopIcon from "@material-ui/icons/Stop";
-import IpcInvokeButton from "renderer/components/IpcInvokeButton";
+import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
 import { useAppSelector } from "store/hooks";
 import InfoBox from "../../modal/swap/InfoBox";
 import CliLogsBox from "../../other/RenderedCliLog";
@@ -42,26 +42,26 @@ export default function TorInfoBox() {
       }
       additionalContent={
         <Box className={classes.actionsOuter}>
-          <IpcInvokeButton
+          <PromiseInvokeButton
             variant="contained"
             disabled={isTorRunning}
-            ipcChannel="spawn-tor"
-            ipcArgs={[]}
             endIcon={<PlayArrowIcon />}
-            requiresRpc={false}
+            onClick={() => {
+              throw new Error("Not implemented");
+            }}
           >
             Start Tor
-          </IpcInvokeButton>
-          <IpcInvokeButton
+          </PromiseInvokeButton>
+          <PromiseInvokeButton
             variant="contained"
             disabled={!isTorRunning}
-            ipcChannel="stop-tor"
-            ipcArgs={[]}
             endIcon={<StopIcon />}
-            requiresRpc={false}
+            onClick={() => {
+              throw new Error("Not implemented");
+            }}
           >
             Stop Tor
-          </IpcInvokeButton>
+          </PromiseInvokeButton>
         </Box>
       }
       icon={null}

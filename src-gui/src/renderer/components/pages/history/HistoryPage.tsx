@@ -1,11 +1,11 @@
 import { Typography } from "@material-ui/core";
-import { useIsSwapRunning } from "store/hooks";
+import { useAppSelector } from "store/hooks";
 import SwapTxLockAlertsBox from "../../alert/SwapTxLockAlertsBox";
 import SwapDialog from "../../modal/swap/SwapDialog";
 import HistoryTable from "./table/HistoryTable";
 
 export default function HistoryPage() {
-  const showDialog = useIsSwapRunning();
+  const showDialog = useAppSelector((state) => state.swap.state !== null);
 
   return (
     <>

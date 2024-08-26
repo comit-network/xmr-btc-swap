@@ -10,15 +10,15 @@ import {
   Select,
   TextField,
 } from "@material-ui/core";
-import { useState } from "react";
+import { CliLog } from "models/cliModel";
 import { useSnackbar } from "notistack";
+import { useState } from "react";
+import { store } from "renderer/store/storeRenderer";
 import { useActiveSwapInfo, useAppSelector } from "store/hooks";
 import { parseDateString } from "utils/parseUtils";
-import { store } from "renderer/store/storeRenderer";
-import { CliLog } from "models/cliModel";
 import { submitFeedbackViaHttp } from "../../../api";
-import { PiconeroAmount } from "../../other/Units";
 import LoadingButton from "../../other/LoadingButton";
+import { PiconeroAmount } from "../../other/Units";
 
 async function submitFeedback(body: string, swapId: string | number) {
   let attachedBody = "";
@@ -67,7 +67,7 @@ function SwapSelectDropDown({
     >
       <MenuItem value={0}>Do not attach logs</MenuItem>
       {swaps.map((swap) => (
-        <MenuItem value={swap.swap_id}>
+        <MenuItem value={swap.swap_id} key={swap.swap_id}>
           Swap {swap.swap_id.substring(0, 5)}... from{" "}
           {new Date(parseDateString(swap.start_date)).toDateString()} (
           <PiconeroAmount amount={swap.xmr_amount} />)

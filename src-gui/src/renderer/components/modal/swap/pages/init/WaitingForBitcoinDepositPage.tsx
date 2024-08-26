@@ -1,14 +1,10 @@
 import { Box, makeStyles, Typography } from "@material-ui/core";
-import { SwapStateWaitingForBtcDeposit } from "models/storeModel";
+import { TauriSwapProgressEventContent } from "models/tauriModelExt";
 import { useAppSelector } from "store/hooks";
-import DepositAddressInfoBox from "../../DepositAddressInfoBox";
 import BitcoinIcon from "../../../../icons/BitcoinIcon";
+import { MoneroSatsExchangeRate, SatsAmount } from "../../../../other/Units";
+import DepositAddressInfoBox from "../../DepositAddressInfoBox";
 import DepositAmountHelper from "./DepositAmountHelper";
-import {
-  BitcoinAmount,
-  MoneroBitcoinExchangeRate,
-  SatsAmount,
-} from "../../../../other/Units";
 
 const useStyles = makeStyles((theme) => ({
   amountHelper: {
@@ -23,13 +19,13 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-type WaitingForBtcDepositPageProps = {
-  state: SwapStateWaitingForBtcDeposit;
-};
-
 export default function WaitingForBtcDepositPage({
-  state,
-}: WaitingForBtcDepositPageProps) {
+  deposit_address,
+  min_deposit_until_swap_will_start,
+  max_deposit_until_maximum_amount_is_reached,
+  min_bitcoin_lock_tx_fee,
+  quote,
+}: TauriSwapProgressEventContent<"WaitingForBtcDeposit">) {
   const classes = useStyles();
   const bitcoinBalance = useAppSelector((s) => s.rpc.state.balance) || 0;
 
@@ -38,7 +34,7 @@ export default function WaitingForBtcDepositPage({
     <Box>
       <DepositAddressInfoBox
         title="Bitcoin Deposit Address"
-        address={state.depositAddress}
+        address={deposit_address}
         additionalContent={
           <Box className={classes.additionalContent}>
             <Typography variant="subtitle2">
@@ -51,9 +47,11 @@ export default function WaitingForBtcDepositPage({
                 ) : null}
                 <li>
                   Send any amount between{" "}
-                  <BitcoinAmount amount={state.minDeposit} /> and{" "}
-                  <BitcoinAmount amount={state.maxDeposit} /> to the address
-                  above
+                  <SatsAmount amount={min_deposit_until_swap_will_start} /> and{" "}
+                  <SatsAmount
+                    amount={max_deposit_until_maximum_amount_is_reached}
+                  />{" "}
+                  to the address above
                   {bitcoinBalance > 0 && (
                     <> (on top of the already deposited funds)</>
                   )}
@@ -61,11 +59,11 @@ export default function WaitingForBtcDepositPage({
                 <li>
                   All Bitcoin sent to this this address will converted into
                   Monero at an exchance rate of{" "}
-                  <MoneroBitcoinExchangeRate rate={state.price} />
+                  <MoneroSatsExchangeRate rate={quote.price} />
                 </li>
                 <li>
                   The network fee of{" "}
-                  <BitcoinAmount amount={state.minBitcoinLockTxFee} /> will
+                  <SatsAmount amount={min_bitcoin_lock_tx_fee} /> will
                   automatically be deducted from the deposited coins
                 </li>
                 <li>
@@ -74,7 +72,16 @@ export default function WaitingForBtcDepositPage({
                 </li>
               </ul>
             </Typography>
-            <DepositAmountHelper state={state} />
+            <DepositAmountHelper
+              min_deposit_until_swap_will_start={
+                min_deposit_until_swap_will_start
+              }
+              max_deposit_until_maximum_amount_is_reached={
+                max_deposit_until_maximum_amount_is_reached
+              }
+              min_bitcoin_lock_tx_fee={min_bitcoin_lock_tx_fee}
+              quote={quote}
+            />
           </Box>
         }
         icon={<BitcoinIcon />}

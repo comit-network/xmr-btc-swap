@@ -1,6 +1,6 @@
-import { piconerosToXmr, satsToBtc } from "utils/conversionUtils";
 import { Tooltip } from "@material-ui/core";
 import { useAppSelector } from "store/hooks";
+import { piconerosToXmr, satsToBtc } from "utils/conversionUtils";
 
 type Amount = number | null | undefined;
 
@@ -64,8 +64,25 @@ export function MoneroAmount({ amount }: { amount: Amount }) {
   );
 }
 
-export function MoneroBitcoinExchangeRate({ rate }: { rate: Amount }) {
+export function MoneroBitcoinExchangeRate(
+  state: { rate: Amount } | { satsAmount: number; piconeroAmount: number },
+) {
+  if ("rate" in state) {
+    return (
+      <AmountWithUnit amount={state.rate} unit="BTC/XMR" fixedPrecision={8} />
+    );
+  }
+
+  const rate =
+    satsToBtc(state.satsAmount) / piconerosToXmr(state.piconeroAmount);
+
   return <AmountWithUnit amount={rate} unit="BTC/XMR" fixedPrecision={8} />;
+}
+
+export function MoneroSatsExchangeRate({ rate }: { rate: Amount }) {
+  const btc = satsToBtc(rate);
+
+  return <AmountWithUnit amount={btc} unit="BTC/XMR" fixedPrecision={6} />;
 }
 
 export function SatsAmount({ amount }: { amount: Amount }) {

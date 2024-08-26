@@ -1,11 +1,11 @@
-import { makeStyles, Box, Typography, Chip, Tooltip } from "@material-ui/core";
+import { Box, Chip, makeStyles, Tooltip, Typography } from "@material-ui/core";
 import { VerifiedUser } from "@material-ui/icons";
-import { satsToBtc, secondsToDays } from "utils/conversionUtils";
 import { ExtendedProviderStatus } from "models/apiModel";
 import {
   MoneroBitcoinExchangeRate,
   SatsAmount,
 } from "renderer/components/other/Units";
+import { satsToBtc, secondsToDays } from "utils/conversionUtils";
 
 const useStyles = makeStyles((theme) => ({
   content: {

@@ -1,14 +1,14 @@
-import { ChangeEvent, useState } from "react";
 import {
-  DialogTitle,
+  Button,
   Dialog,
+  DialogActions,
   DialogContent,
   DialogContentText,
+  DialogTitle,
   TextField,
-  DialogActions,
-  Button,
 } from "@material-ui/core";
 import { Multiaddr } from "multiaddr";
+import { ChangeEvent, useState } from "react";
 
 type ProviderSubmitDialogProps = {
   open: boolean;

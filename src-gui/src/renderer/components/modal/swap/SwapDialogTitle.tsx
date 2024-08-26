@@ -1,7 +1,7 @@
 import { Box, DialogTitle, makeStyles, Typography } from "@material-ui/core";
-import TorStatusBadge from "./pages/TorStatusBadge";
-import FeedbackSubmitBadge from "./pages/FeedbackSubmitBadge";
 import DebugPageSwitchBadge from "./pages/DebugPageSwitchBadge";
+import FeedbackSubmitBadge from "./pages/FeedbackSubmitBadge";
+import TorStatusBadge from "./pages/TorStatusBadge";
 
 const useStyles = makeStyles((theme) => ({
   root: {

@@ -1,8 +1,5 @@
-import { useState } from "react";
-import { Button, DialogActions, DialogContentText } from "@material-ui/core";
+import { DialogContentText } from "@material-ui/core";
 import BitcoinAddressTextField from "../../../inputs/BitcoinAddressTextField";
-import WithdrawDialogContent from "../WithdrawDialogContent";
-import IpcInvokeButton from "../../../IpcInvokeButton";
 
 export default function AddressInputPage({
   withdrawAddress,

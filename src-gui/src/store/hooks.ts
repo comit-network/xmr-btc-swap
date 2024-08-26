@@ -17,17 +17,20 @@ export function useResumeableSwapsCount() {
 }
 
 export function useIsSwapRunning() {
-  return useAppSelector((state) => state.swap.state !== null);
+  return useAppSelector(
+    (state) =>
+      state.swap.state !== null && state.swap.state.curr.type !== "Released",
+  );
 }
 
 export function useSwapInfo(swapId: string | null) {
   return useAppSelector((state) =>
-    swapId ? state.rpc.state.swapInfos[swapId] ?? null : null,
+    swapId ? (state.rpc.state.swapInfos[swapId] ?? null) : null,
   );
 }
 
 export function useActiveSwapId() {
-  return useAppSelector((s) => s.swap.swapId);
+  return useAppSelector((s) => s.swap.state?.swapId ?? null);
 }
 
 export function useActiveSwapInfo() {

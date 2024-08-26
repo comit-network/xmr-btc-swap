@@ -3,7 +3,6 @@ import GitHubIcon from "@material-ui/icons/GitHub";
 import RedditIcon from "@material-ui/icons/Reddit";
 import FundsLeftInWalletAlert from "../alert/FundsLeftInWalletAlert";
 import MoneroWalletRpcUpdatingAlert from "../alert/MoneroWalletRpcUpdatingAlert";
-import RpcStatusAlert from "../alert/RpcStatusAlert";
 import UnfinishedSwapsAlert from "../alert/UnfinishedSwapsAlert";
 import DiscordIcon from "../icons/DiscordIcon";
 import LinkIconButton from "../icons/LinkIconButton";
@@ -29,7 +28,11 @@ export default function NavigationFooter() {
     <Box className={classes.outer}>
       <FundsLeftInWalletAlert />
       <UnfinishedSwapsAlert />
-      <RpcStatusAlert />
+
+      {
+        // TODO: Uncomment when we have implemented a way for the UI to be displayed before the context has been initialized
+        // <RpcStatusAlert />
+      }
       <MoneroWalletRpcUpdatingAlert />
       <Box className={classes.linksOuter}>
         <LinkIconButton url="https://reddit.com/r/unstoppableswap">

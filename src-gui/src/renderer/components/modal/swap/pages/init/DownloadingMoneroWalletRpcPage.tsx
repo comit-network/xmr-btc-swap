@@ -1,5 +1,5 @@
-import CircularProgressWithSubtitle from "../../CircularProgressWithSubtitle";
 import { MoneroWalletRpcUpdateState } from "../../../../../../models/storeModel";
+import CircularProgressWithSubtitle from "../../CircularProgressWithSubtitle";
 
 export default function DownloadingMoneroWalletRpcPage({
   updateState,

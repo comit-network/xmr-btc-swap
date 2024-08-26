@@ -8,24 +8,15 @@ import {
   TableContainer,
   TableRow,
 } from "@material-ui/core";
-import { getBitcoinTxExplorerUrl } from "utils/conversionUtils";
-import { isTestnet } from "store/config";
+import { GetSwapInfoResponse } from "models/tauriModel";
 import {
-  getHumanReadableDbStateType,
-  getSwapBtcAmount,
-  getSwapExchangeRate,
-  getSwapTxFees,
-  getSwapXmrAmount,
-  GetSwapInfoResponse,
-} from "../../../../../models/rpcModel";
-import SwapLogFileOpenButton from "./SwapLogFileOpenButton";
-import { SwapCancelRefundButton } from "./HistoryRowActions";
-import { SwapMoneroRecoveryButton } from "./SwapMoneroRecoveryButton";
-import {
-  BitcoinAmount,
-  MoneroAmount,
   MoneroBitcoinExchangeRate,
+  PiconeroAmount,
+  SatsAmount,
 } from "renderer/components/other/Units";
+import { isTestnet } from "store/config";
+import { getBitcoinTxExplorerUrl } from "utils/conversionUtils";
+import SwapLogFileOpenButton from "./SwapLogFileOpenButton";
 
 const useStyles = makeStyles((theme) => ({
   outer: {
@@ -47,12 +38,6 @@ export default function HistoryRowExpanded({
 }) {
   const classes = useStyles();
 
-  const { seller, start_date: startDate } = swap;
-  const btcAmount = getSwapBtcAmount(swap);
-  const xmrAmount = getSwapXmrAmount(swap);
-  const txFees = getSwapTxFees(swap);
-  const exchangeRate = getSwapExchangeRate(swap);
-
   return (
     <Box className={classes.outer}>
       <TableContainer>
@@ -60,7 +45,7 @@ export default function HistoryRowExpanded({
           <TableBody>
             <TableRow>
               <TableCell>Started on</TableCell>
-              <TableCell>{startDate}</TableCell>
+              <TableCell>{swap.start_date}</TableCell>
             </TableRow>
             <TableRow>
               <TableCell>Swap ID</TableCell>
@@ -68,38 +53,39 @@ export default function HistoryRowExpanded({
             </TableRow>
             <TableRow>
               <TableCell>State Name</TableCell>
-              <TableCell>
-                {getHumanReadableDbStateType(swap.state_name)}
-              </TableCell>
+              <TableCell>{swap.state_name}</TableCell>
             </TableRow>
             <TableRow>
               <TableCell>Monero Amount</TableCell>
               <TableCell>
-                <MoneroAmount amount={xmrAmount} />
+                <PiconeroAmount amount={swap.xmr_amount} />
               </TableCell>
             </TableRow>
             <TableRow>
               <TableCell>Bitcoin Amount</TableCell>
               <TableCell>
-                <BitcoinAmount amount={btcAmount} />
+                <SatsAmount amount={swap.btc_amount} />
               </TableCell>
             </TableRow>
             <TableRow>
               <TableCell>Exchange Rate</TableCell>
               <TableCell>
-                <MoneroBitcoinExchangeRate rate={exchangeRate} />
+                <MoneroBitcoinExchangeRate
+                  satsAmount={swap.btc_amount}
+                  piconeroAmount={swap.xmr_amount}
+                />
               </TableCell>
             </TableRow>
             <TableRow>
               <TableCell>Bitcoin Network Fees</TableCell>
               <TableCell>
-                <BitcoinAmount amount={txFees} />
+                <SatsAmount amount={swap.tx_lock_fee} />
               </TableCell>
             </TableRow>
             <TableRow>
               <TableCell>Provider Address</TableCell>
               <TableCell>
-                <Box>{seller.addresses.join(", ")}</Box>
+                <Box>{swap.seller.addresses.join(", ")}</Box>
               </TableCell>
             </TableRow>
             <TableRow>
@@ -122,12 +108,16 @@ export default function HistoryRowExpanded({
           variant="outlined"
           size="small"
         />
-        <SwapCancelRefundButton swap={swap} variant="contained" size="small" />
-        <SwapMoneroRecoveryButton
-          swap={swap}
-          variant="contained"
-          size="small"
-        />
+        {/*
+          // TOOD: reimplement these buttons using Tauri
+
+          <SwapCancelRefundButton swap={swap} variant="contained" size="small" />
+          <SwapMoneroRecoveryButton
+            swap={swap}
+            variant="contained"
+            size="small"
+          />
+          */}
       </Box>
     </Box>
   );

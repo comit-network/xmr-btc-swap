@@ -3,7 +3,7 @@ import FolderOpenIcon from "@material-ui/icons/FolderOpen";
 import PlayArrowIcon from "@material-ui/icons/PlayArrow";
 import StopIcon from "@material-ui/icons/Stop";
 import { RpcProcessStateType } from "models/rpcModel";
-import IpcInvokeButton from "renderer/components/IpcInvokeButton";
+import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
 import { useAppSelector } from "store/hooks";
 import InfoBox from "../../modal/swap/InfoBox";
 import CliLogsBox from "../../other/RenderedCliLog";
@@ -36,34 +36,34 @@ export default function RpcControlBox() {
       }
       additionalContent={
         <Box className={classes.actionsOuter}>
-          <IpcInvokeButton
+          <PromiseInvokeButton
             variant="contained"
-            ipcChannel="spawn-start-rpc"
-            ipcArgs={[]}
             endIcon={<PlayArrowIcon />}
             disabled={isRunning}
-            requiresRpc={false}
+            onClick={() => {
+              throw new Error("Not implemented");
+            }}
           >
             Start Daemon
-          </IpcInvokeButton>
-          <IpcInvokeButton
+          </PromiseInvokeButton>
+          <PromiseInvokeButton
             variant="contained"
-            ipcChannel="stop-cli"
-            ipcArgs={[]}
             endIcon={<StopIcon />}
             disabled={!isRunning}
-            requiresRpc={false}
+            onClick={() => {
+              throw new Error("Not implemented");
+            }}
           >
             Stop Daemon
-          </IpcInvokeButton>
-          <IpcInvokeButton
-            ipcChannel="open-data-dir-in-file-explorer"
-            ipcArgs={[]}
+          </PromiseInvokeButton>
+          <PromiseInvokeButton
             endIcon={<FolderOpenIcon />}
-            requiresRpc={false}
             isIconButton
             size="small"
             tooltipTitle="Open the data directory of the Swap Daemon in your file explorer"
+            onClick={() => {
+              throw new Error("Not implemented");
+            }}
           />
         </Box>
       }
