@@ -3,15 +3,14 @@ use std::sync::Arc;
 use swap::{
     api::{
         request::{
-            get_balance as get_balance_impl, get_swap_infos_all as get_swap_infos_all_impl,
-            withdraw_btc as withdraw_btc_impl, BalanceArgs, BalanceResponse, GetSwapInfoResponse,
-            WithdrawBtcArgs, WithdrawBtcResponse,
+            BalanceArgs, BuyXmrArgs, GetHistoryArgs, ResumeSwapArgs, SuspendCurrentSwapArgs,
+            WithdrawBtcArgs,
         },
         Context,
     },
     cli::command::{Bitcoin, Monero},
 };
-use tauri::{Manager, RunEvent, State};
+use tauri::{Manager, RunEvent};
 
 trait ToStringResult<T> {
     fn to_string_result(self) -> Result<T, String>;
@@ -20,57 +19,44 @@ trait ToStringResult<T> {
 // Implement the trait for Result<T, E>
 impl<T, E: ToString> ToStringResult<T> for Result<T, E> {
     fn to_string_result(self) -> Result<T, String> {
-        match self {
-            Ok(value) => Ok(value),
-            Err(err) => Err(err.to_string()),
-        }
+        self.map_err(|e| e.to_string())
     }
 }
 
-#[tauri::command]
-async fn get_balance(context: State<'_, Arc<Context>>) -> Result<BalanceResponse, String> {
-    get_balance_impl(
-        BalanceArgs {
-            force_refresh: true,
-        },
-        context.inner().clone(),
-    )
-    .await
-    .to_string_result()
-}
-
-#[tauri::command]
-async fn get_swap_infos_all(
-    context: State<'_, Arc<Context>>,
-) -> Result<Vec<GetSwapInfoResponse>, String> {
-    get_swap_infos_all_impl(context.inner().clone())
-        .await
-        .to_string_result()
-}
-
-/*macro_rules! tauri_command {
-    ($command_name:ident, $command_args:ident, $command_response:ident) => {
+/// This macro is used to create boilerplate functions as tauri commands
+/// that simply delegate handling to the respective request type.
+/// 
+/// # Example
+/// ```ignored
+/// tauri_command!(get_balance, BalanceArgs);
+/// ```
+/// will resolve to
+/// ```ignored
+/// #[tauri::command]
+/// async fn get_balance(context: tauri::State<'...>, args: BalanceArgs) -> Result<BalanceArgs::Response, String> {
+///     args.handle(context.inner().clone()).await.to_string_result()
+/// }
+/// ```
+macro_rules! tauri_command {
+    ($fn_name:ident, $request_name:ident) => {
         #[tauri::command]
-        async fn $command_name(
-            context: State<'_, Context>,
-            args: $command_args,
-        ) -> Result<$command_response, String> {
-            swap::api::request::$command_name(args, context)
+        async fn $fn_name(
+            context: tauri::State<'_, Arc<Context>>,
+            args: $request_name,
+        ) -> Result<<$request_name as swap::api::request::Request>::Response, String> {
+            <$request_name as swap::api::request::Request>::request(args, context.inner().clone())
                 .await
                 .to_string_result()
         }
     };
-}*/
-
-#[tauri::command]
-async fn withdraw_btc(
-    context: State<'_, Arc<Context>>,
-    args: WithdrawBtcArgs,
-) -> Result<WithdrawBtcResponse, String> {
-    withdraw_btc_impl(args, context.inner().clone())
-        .await
-        .to_string_result()
 }
+tauri_command!(get_balance, BalanceArgs);
+tauri_command!(get_swap_infos_all, BalanceArgs);
+tauri_command!(buy_xmr, BuyXmrArgs);
+tauri_command!(get_history, GetHistoryArgs);
+tauri_command!(resume_swap, ResumeSwapArgs);
+tauri_command!(withdraw_btc, WithdrawBtcArgs);
+tauri_command!(suspend_current_swap, SuspendCurrentSwapArgs);
 
 fn setup<'a>(app: &'a mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     tauri::async_runtime::block_on(async {
@@ -90,7 +76,8 @@ fn setup<'a>(app: &'a mut tauri::App) -> Result<(), Box<dyn std::error::Error>> 
             None,
         )
         .await
-        .unwrap();
+        .unwrap()
+        .with_tauri_handle(app.app_handle().to_owned());
 
         app.manage(Arc::new(context));
     });
@@ -104,7 +91,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_balance,
             get_swap_infos_all,
-            withdraw_btc
+            withdraw_btc,
+            buy_xmr,
+            resume_swap,
+            get_history,
+            suspend_current_swap
         ])
         .setup(setup)
         .build(tauri::generate_context!())
