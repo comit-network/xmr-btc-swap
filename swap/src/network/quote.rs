@@ -7,6 +7,7 @@ use libp2p::request_response::{
 };
 use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
 const PROTOCOL: &str = "/comit/xmr/btc/bid-quote/1.0.0";
 pub type OutEvent = RequestResponseEvent<(), BidQuote>;
@@ -25,15 +26,20 @@ impl ProtocolName for BidQuoteProtocol {
 
 /// Represents a quote for buying XMR.
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+#[typeshare]
 pub struct BidQuote {
     /// The price at which the maker is willing to buy at.
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[typeshare(serialized_as = "number")]
     pub price: bitcoin::Amount,
     /// The minimum quantity the maker is willing to buy.
+    ///     #[typeshare(serialized_as = "number")]
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[typeshare(serialized_as = "number")]
     pub min_quantity: bitcoin::Amount,
     /// The maximum quantity the maker is willing to buy.
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    #[typeshare(serialized_as = "number")]
     pub max_quantity: bitcoin::Amount,
 }
 

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use uuid::Uuid;
 
+use crate::api::tauri_bindings::TauriHandle;
 use crate::protocol::Database;
 use crate::{bitcoin, cli, env, monero};
 
@@ -22,6 +23,7 @@ pub struct Swap {
     pub env_config: env::Config,
     pub id: Uuid,
     pub monero_receive_address: monero::Address,
+    pub event_emitter: Option<TauriHandle>,
 }
 
 impl Swap {
@@ -49,6 +51,7 @@ impl Swap {
             env_config,
             id,
             monero_receive_address,
+            event_emitter: None,
         }
     }
 
@@ -73,6 +76,12 @@ impl Swap {
             env_config,
             id,
             monero_receive_address,
+            event_emitter: None,
         })
+    }
+
+    pub fn with_event_emitter(mut self, event_emitter: Option<TauriHandle>) -> Self {
+        self.event_emitter = event_emitter;
+        self
     }
 }

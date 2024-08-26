@@ -4,6 +4,7 @@ mod wallet_rpc;
 pub use ::monero::network::Network;
 pub use ::monero::{Address, PrivateKey, PublicKey};
 pub use curve25519_dalek::scalar::Scalar;
+use typeshare::typeshare;
 pub use wallet::Wallet;
 pub use wallet_rpc::{WalletRpc, WalletRpcProcess};
 
@@ -86,6 +87,7 @@ impl From<PublicViewKey> for PublicKey {
 pub struct PublicViewKey(PublicKey);
 
 #[derive(Debug, Copy, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd)]
+#[typeshare(serialized_as = "number")]
 pub struct Amount(u64);
 
 // Median tx fees on Monero as found here: https://www.monero.how/monero-transaction-fees, XMR 0.000_008 * 2 (to be on the safe side)

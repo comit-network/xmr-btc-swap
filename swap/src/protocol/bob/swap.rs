@@ -1,3 +1,4 @@
+use crate::api::tauri_bindings::{TauriEmitter, TauriHandle, TauriSwapProgressEvent};
 use crate::bitcoin::{ExpiredTimelocks, TxCancel, TxRefund};
 use crate::cli::EventLoopHandle;
 use crate::network::cooperative_xmr_redeem_after_punish::Response::{Fullfilled, Rejected};
@@ -48,6 +49,7 @@ pub async fn run_until(
             swap.bitcoin_wallet.as_ref(),
             swap.monero_wallet.as_ref(),
             swap.monero_receive_address,
+            swap.event_emitter.clone(),
         )
         .await?;
 
@@ -73,6 +75,7 @@ async fn next_state(
     bitcoin_wallet: &bitcoin::Wallet,
     monero_wallet: &monero::Wallet,
     monero_receive_address: monero::Address,
+    event_emitter: Option<TauriHandle>,
 ) -> Result<BobState> {
     tracing::debug!(%state, "Advancing state");
 
@@ -120,6 +123,16 @@ async fn next_state(
                 .sign_and_finalize(tx_lock.clone().into())
                 .await
                 .context("Failed to sign Bitcoin lock transaction")?;
+
+            event_emitter.emit_swap_progress_event(
+                swap_id,
+                TauriSwapProgressEvent::Started {
+                    btc_lock_amount: tx_lock.lock_amount(),
+                    // TODO: Replace this with the actual fee
+                    btc_tx_lock_fee: bitcoin::Amount::ZERO,
+                },
+            );
+
             let (..) = bitcoin_wallet.broadcast(signed_tx, "lock").await?;
 
             BobState::BtcLocked {
@@ -133,6 +146,15 @@ async fn next_state(
             state3,
             monero_wallet_restore_blockheight,
         } => {
+            event_emitter.emit_swap_progress_event(
+                swap_id,
+                TauriSwapProgressEvent::BtcLockTxInMempool {
+                    btc_lock_txid: state3.tx_lock_id(),
+                    // TODO: Replace this with the actual confirmations
+                    btc_lock_confirmations: 0,
+                },
+            );
+
             let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
 
             if let ExpiredTimelocks::None { .. } = state3.expired_timelock(bitcoin_wallet).await? {
@@ -188,6 +210,14 @@ async fn next_state(
             lock_transfer_proof,
             monero_wallet_restore_blockheight,
         } => {
+            event_emitter.emit_swap_progress_event(
+                swap_id,
+                TauriSwapProgressEvent::XmrLockTxInMempool {
+                    xmr_lock_txid: lock_transfer_proof.tx_hash(),
+                    xmr_lock_tx_confirmations: 0,
+                },
+            );
+
             let tx_lock_status = bitcoin_wallet.subscribe_to(state.tx_lock.clone()).await;
 
             if let ExpiredTimelocks::None { .. } = state.expired_timelock(bitcoin_wallet).await? {
@@ -207,6 +237,7 @@ async fn next_state(
                             },
                         }
                     }
+                    // TODO: Send Tauri event here everytime we receive a new confirmation
                     result = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
                         result?;
                         BobState::CancelTimelockExpired(state.cancel(monero_wallet_restore_blockheight))
@@ -217,6 +248,8 @@ async fn next_state(
             }
         }
         BobState::XmrLocked(state) => {
+            event_emitter.emit_swap_progress_event(swap_id, TauriSwapProgressEvent::XmrLocked);
+
             // In case we send the encrypted signature to Alice, but she doesn't give us a confirmation
             // We need to check if she still published the Bitcoin redeem transaction
             // Otherwise we risk staying stuck in "XmrLocked"
@@ -272,9 +305,20 @@ async fn next_state(
             }
         }
         BobState::BtcRedeemed(state) => {
+            event_emitter.emit_swap_progress_event(swap_id, TauriSwapProgressEvent::BtcRedeemed);
+
             state
                 .redeem_xmr(monero_wallet, swap_id.to_string(), monero_receive_address)
                 .await?;
+
+            event_emitter.emit_swap_progress_event(
+                swap_id,
+                TauriSwapProgressEvent::XmrRedeemInMempool {
+                    // TODO: Replace this with the actual txid
+                    xmr_redeem_txid: monero::TxHash("placeholder".to_string()),
+                    xmr_redeem_address: monero_receive_address,
+                },
+            );
 
             BobState::XmrRedeemed {
                 tx_lock_id: state.tx_lock_id(),
@@ -288,6 +332,13 @@ async fn next_state(
             BobState::BtcCancelled(state4)
         }
         BobState::BtcCancelled(state) => {
+            event_emitter.emit_swap_progress_event(
+                swap_id,
+                TauriSwapProgressEvent::BtcCancelled {
+                    btc_cancel_txid: state.construct_tx_cancel()?.txid(),
+                },
+            );
+
             // Bob has cancelled the swap
             match state.expired_timelock(bitcoin_wallet).await? {
                 ExpiredTimelocks::None { .. } => {
@@ -308,8 +359,24 @@ async fn next_state(
                 }
             }
         }
-        BobState::BtcRefunded(state4) => BobState::BtcRefunded(state4),
+        BobState::BtcRefunded(state4) => {
+            event_emitter.emit_swap_progress_event(
+                swap_id,
+                TauriSwapProgressEvent::BtcRefunded {
+                    btc_refund_txid: state4.signed_refund_transaction()?.txid(),
+                },
+            );
+
+            BobState::BtcRefunded(state4)
+        }
         BobState::BtcPunished { state, tx_lock_id } => {
+            event_emitter.emit_swap_progress_event(swap_id, TauriSwapProgressEvent::BtcPunished);
+
+            event_emitter.emit_swap_progress_event(
+                swap_id,
+                TauriSwapProgressEvent::AttemptingCooperativeRedeem,
+            );
+
             tracing::info!("Attempting to cooperatively redeem XMR after being punished");
             let response = event_loop_handle
                 .request_cooperative_xmr_redeem(swap_id)
@@ -321,7 +388,13 @@ async fn next_state(
                         "Alice has accepted our request to cooperatively redeem the XMR"
                     );
 
+                    event_emitter.emit_swap_progress_event(
+                        swap_id,
+                        TauriSwapProgressEvent::CooperativeRedeemAccepted,
+                    );
+
                     let s_a = monero::PrivateKey { scalar: s_a };
+
                     let state5 = state.attempt_cooperative_redeem(s_a);
 
                     match state5
@@ -329,33 +402,78 @@ async fn next_state(
                         .await
                     {
                         Ok(_) => {
+                            event_emitter.emit_swap_progress_event(
+                                swap_id,
+                                TauriSwapProgressEvent::XmrRedeemInMempool {
+                                    xmr_redeem_txid: monero::TxHash("placeholder".to_string()),
+                                    xmr_redeem_address: monero_receive_address,
+                                },
+                            );
+
                             return Ok(BobState::XmrRedeemed { tx_lock_id });
                         }
                         Err(error) => {
-                            return Err(error)
-                                .context("Failed to redeem XMR with revealed XMR key");
+                            event_emitter.emit_swap_progress_event(
+                                swap_id,
+                                TauriSwapProgressEvent::CooperativeRedeemRejected {
+                                    reason: error.to_string(),
+                                },
+                            );
+
+                            let err: std::result::Result<_, anyhow::Error> =
+                                Err(error).context("Failed to redeem XMR with revealed XMR key");
+
+                            return err;
                         }
                     }
                 }
                 Ok(Rejected { reason, .. }) => {
+                    let err = Err(reason.clone())
+                        .context("Alice rejected our request for cooperative XMR redeem");
+
+                    event_emitter.emit_swap_progress_event(
+                        swap_id,
+                        TauriSwapProgressEvent::CooperativeRedeemRejected {
+                            reason: reason.to_string(),
+                        },
+                    );
+
                     tracing::error!(
                         ?reason,
                         "Alice rejected our request for cooperative XMR redeem"
                     );
-                    return Err(reason)
-                        .context("Alice rejected our request for cooperative XMR redeem");
+
+                    return err;
                 }
                 Err(error) => {
                     tracing::error!(
                         ?error,
                         "Failed to request cooperative XMR redeem from Alice"
                     );
+
+                    event_emitter.emit_swap_progress_event(
+                        swap_id,
+                        TauriSwapProgressEvent::CooperativeRedeemRejected {
+                            reason: error.to_string(),
+                        },
+                    );
+
                     return Err(error)
                         .context("Failed to request cooperative XMR redeem from Alice");
                 }
             };
         }
         BobState::SafelyAborted => BobState::SafelyAborted,
-        BobState::XmrRedeemed { tx_lock_id } => BobState::XmrRedeemed { tx_lock_id },
+        BobState::XmrRedeemed { tx_lock_id } => {
+            // TODO: Replace this with the actual txid
+            event_emitter.emit_swap_progress_event(
+                swap_id,
+                TauriSwapProgressEvent::XmrRedeemInMempool {
+                    xmr_redeem_txid: monero::TxHash("placeholder".to_string()),
+                    xmr_redeem_address: monero_receive_address,
+                },
+            );
+            BobState::XmrRedeemed { tx_lock_id }
+        }
     })
 }

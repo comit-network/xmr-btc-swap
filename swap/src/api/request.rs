@@ -1,5 +1,7 @@
+use super::tauri_bindings::TauriHandle;
+use crate::api::tauri_bindings::{TauriEmitter, TauriSwapProgressEvent};
 use crate::api::Context;
-use crate::bitcoin::{Amount, ExpiredTimelocks, TxLock};
+use crate::bitcoin::{CancelTimelock, ExpiredTimelocks, PunishTimelock, TxLock};
 use crate::cli::{list_sellers as list_sellers_impl, EventLoop, SellerStatus};
 use crate::libp2p_ext::MultiAddrExt;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
@@ -10,11 +12,11 @@ use crate::{bitcoin, cli, monero, rpc};
 use ::bitcoin::Txid;
 use anyhow::{bail, Context as AnyContext, Result};
 use libp2p::core::Multiaddr;
+use libp2p::PeerId;
 use qrcode::render::unicode;
 use qrcode::QrCode;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use serde_json::Value as JsonValue;
 use std::cmp::min;
 use std::convert::TryInto;
 use std::future::Future;
@@ -22,144 +24,334 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::Instrument;
+use typeshare::typeshare;
 use uuid::Uuid;
 
-#[derive(PartialEq, Debug)]
-pub struct Request {
-    pub cmd: Method,
-    pub log_reference: Option<String>,
+/// This trait is implemented by all types of request args that 
+/// the CLI can handle. 
+/// It provides a unified abstraction that can be useful for generics.
+#[allow(async_fn_in_trait)]
+pub trait Request {
+    type Response: Serialize;
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response>;
 }
 
-#[derive(Debug, Eq, PartialEq)]
-pub struct BuyXmrArgs {
-    pub seller: Multiaddr,
-    pub bitcoin_change_address: bitcoin::Address,
-    pub monero_receive_address: monero::Address,
-    pub swap_id: Uuid,
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub struct ResumeArgs {
-    pub swap_id: Uuid,
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub struct CancelAndRefundArgs {
-    pub swap_id: Uuid,
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub struct MoneroRecoveryArgs {
-    pub swap_id: Uuid,
-}
-
+// BuyXmr
+#[typeshare]
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct WithdrawBtcArgs {
-    pub amount: Option<u64>,
-    pub address: bitcoin::Address,
+pub struct BuyXmrArgs {
+    #[typeshare(serialized_as = "string")]
+    pub seller: Multiaddr,
+    #[typeshare(serialized_as = "string")]
+    pub bitcoin_change_address: bitcoin::Address,
+    #[typeshare(serialized_as = "string")]
+    pub monero_receive_address: monero::Address,
 }
 
-#[derive(Debug, Eq, PartialEq)]
-pub struct BalanceArgs {
-    pub force_refresh: bool,
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BuyXmrResponse {
+    #[typeshare(serialized_as = "string")]
+    pub swap_id: Uuid,
+    pub quote: BidQuote,
 }
 
-#[derive(Debug, Eq, PartialEq)]
-pub struct ListSellersArgs {
-    pub rendezvous_point: Multiaddr,
+impl Request for BuyXmrArgs {
+    type Response = BuyXmrResponse;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        buy_xmr(self, ctx).await
+    }
 }
 
-#[derive(Debug, Eq, PartialEq)]
-pub struct StartDaemonArgs {
-    pub server_address: Option<SocketAddr>,
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub struct GetSwapInfoArgs {
+// ResumeSwap
+#[typeshare]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ResumeSwapArgs {
+    #[typeshare(serialized_as = "string")]
     pub swap_id: Uuid,
 }
 
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ResumeSwapResponse {
     pub result: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BalanceResponse {
-    pub balance: u64, // in satoshis
+impl Request for ResumeSwapArgs {
+    type Response = ResumeSwapResponse;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        resume_swap(self, ctx).await
+    }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BuyXmrResponse {
-    pub swap_id: String,
-    pub quote: BidQuote, // You'll need to import or define BidQuote
+// CancelAndRefund
+#[typeshare]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CancelAndRefundArgs {
+    #[typeshare(serialized_as = "string")]
+    pub swap_id: Uuid,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GetHistoryResponse {
-    swaps: Vec<(Uuid, String)>,
+impl Request for CancelAndRefundArgs {
+    type Response = serde_json::Value;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        cancel_and_refund(self, ctx).await
+    }
 }
 
+// MoneroRecovery
+#[typeshare]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct MoneroRecoveryArgs {
+    #[typeshare(serialized_as = "string")]
+    pub swap_id: Uuid,
+}
+
+impl Request for MoneroRecoveryArgs {
+    type Response = serde_json::Value;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        monero_recovery(self, ctx).await
+    }
+}
+
+// WithdrawBtc
+#[typeshare]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct WithdrawBtcArgs {
+    #[typeshare(serialized_as = "number")]
+    #[serde(default, with = "::bitcoin::util::amount::serde::as_sat::opt")]
+    pub amount: Option<bitcoin::Amount>,
+    #[typeshare(serialized_as = "string")]
+    pub address: bitcoin::Address,
+}
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct WithdrawBtcResponse {
+    #[typeshare(serialized_as = "number")]
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    pub amount: bitcoin::Amount,
+    pub txid: String,
+}
+
+impl Request for WithdrawBtcArgs {
+    type Response = WithdrawBtcResponse;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        withdraw_btc(self, ctx).await
+    }
+}
+
+// ListSellers
+#[typeshare]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ListSellersArgs {
+    #[typeshare(serialized_as = "string")]
+    pub rendezvous_point: Multiaddr,
+}
+
+impl Request for ListSellersArgs {
+    type Response = serde_json::Value;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        list_sellers(self, ctx).await
+    }
+}
+
+// StartDaemon
+#[typeshare]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct StartDaemonArgs {
+    #[typeshare(serialized_as = "string")]
+    pub server_address: Option<SocketAddr>,
+}
+
+impl Request for StartDaemonArgs {
+    type Response = serde_json::Value;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        start_daemon(self, (*ctx).clone()).await
+    }
+}
+
+// GetSwapInfo
+#[typeshare]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GetSwapInfoArgs {
+    #[typeshare(serialized_as = "string")]
+    pub swap_id: Uuid,
+}
+
+#[typeshare]
 #[derive(Serialize)]
 pub struct GetSwapInfoResponse {
+    #[typeshare(serialized_as = "string")]
     pub swap_id: Uuid,
     pub seller: Seller,
     pub completed: bool,
     pub start_date: String,
+    #[typeshare(serialized_as = "string")]
     pub state_name: String,
-    pub xmr_amount: u64,
-    pub btc_amount: u64,
+    #[typeshare(serialized_as = "number")]
+    pub xmr_amount: monero::Amount,
+    #[typeshare(serialized_as = "number")]
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    pub btc_amount: bitcoin::Amount,
+    #[typeshare(serialized_as = "string")]
     pub tx_lock_id: Txid,
-    pub tx_cancel_fee: u64,
-    pub tx_refund_fee: u64,
-    pub tx_lock_fee: u64,
+    #[typeshare(serialized_as = "number")]
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    pub tx_cancel_fee: bitcoin::Amount,
+    #[typeshare(serialized_as = "number")]
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    pub tx_refund_fee: bitcoin::Amount,
+    #[typeshare(serialized_as = "number")]
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    pub tx_lock_fee: bitcoin::Amount,
     pub btc_refund_address: String,
-    pub cancel_timelock: u32,
-    pub punish_timelock: u32,
+    pub cancel_timelock: CancelTimelock,
+    pub punish_timelock: PunishTimelock,
     pub timelock: Option<ExpiredTimelocks>,
 }
 
+impl Request for GetSwapInfoArgs {
+    type Response = GetSwapInfoResponse;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        get_swap_info(self, ctx).await
+    }
+}
+
+// Balance
+#[typeshare]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct BalanceArgs {
+    pub force_refresh: bool,
+}
+
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug)]
-pub struct WithdrawBtcResponse {
-    amount: u64,
-    txid: String,
+pub struct BalanceResponse {
+    #[typeshare(serialized_as = "number")]
+    #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
+    pub balance: bitcoin::Amount,
 }
 
-#[derive(Serialize, Deserialize)]
+impl Request for BalanceArgs {
+    type Response = BalanceResponse;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        get_balance(self, ctx).await
+    }
+}
+
+// GetHistory
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetHistoryArgs;
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GetHistoryEntry {
+    #[typeshare(serialized_as = "string")]
+    swap_id: Uuid,
+    state: String,
+}
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetHistoryResponse {
+    pub swaps: Vec<GetHistoryEntry>,
+}
+
+impl Request for GetHistoryArgs {
+    type Response = GetHistoryResponse;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        get_history(ctx).await
+    }
+}
+
+// Additional structs
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Seller {
-    pub peer_id: String,
-    pub addresses: Vec<Multiaddr>,
+    #[typeshare(serialized_as = "string")]
+    pub peer_id: PeerId,
+    pub addresses: Vec<String>,
 }
 
-// TODO: We probably dont even need this.
-// We can just call the method directly from the RPC server, the CLI and the Tauri connector
-#[derive(Debug, PartialEq)]
-pub enum Method {
-    BuyXmr(BuyXmrArgs),
-    Resume(ResumeArgs),
-    CancelAndRefund(CancelAndRefundArgs),
-    MoneroRecovery(MoneroRecoveryArgs),
-    History,
-    Config,
-    WithdrawBtc(WithdrawBtcArgs),
-    Balance(BalanceArgs),
-    ListSellers(ListSellersArgs),
-    ExportBitcoinWallet,
-    SuspendCurrentSwap,
-    StartDaemon(StartDaemonArgs),
-    GetCurrentSwap,
-    GetSwapInfo(GetSwapInfoArgs),
-    GetRawStates,
+// Suspend current swap
+#[derive(Debug, Deserialize)]
+pub struct SuspendCurrentSwapArgs;
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SuspendCurrentSwapResponse {
+    #[typeshare(serialized_as = "string")]
+    pub swap_id: Uuid,
+}
+
+impl Request for SuspendCurrentSwapArgs {
+    type Response = SuspendCurrentSwapResponse;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        suspend_current_swap(ctx).await
+    }
+}
+
+pub struct GetCurrentSwap;
+
+impl Request for GetCurrentSwap {
+    type Response = serde_json::Value;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        get_current_swap(ctx).await
+    }
+}
+
+pub struct GetConfig;
+
+impl Request for GetConfig {
+    type Response = serde_json::Value;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        get_config(ctx).await
+    }
+}
+
+pub struct ExportBitcoinWalletArgs;
+
+impl Request for ExportBitcoinWalletArgs {
+    type Response = serde_json::Value;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        export_bitcoin_wallet(ctx).await
+    }
+}
+
+pub struct GetConfigArgs;
+
+impl Request for GetConfigArgs {
+    type Response = serde_json::Value;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        get_config(ctx).await
+    }
 }
 
 #[tracing::instrument(fields(method = "suspend_current_swap"), skip(context))]
-pub async fn suspend_current_swap(context: Arc<Context>) -> Result<serde_json::Value> {
+pub async fn suspend_current_swap(context: Arc<Context>) -> Result<SuspendCurrentSwapResponse> {
     let swap_id = context.swap_lock.get_current_swap_id().await;
 
     if let Some(id_value) = swap_id {
         context.swap_lock.send_suspend_signal().await?;
 
-        Ok(json!({ "swapId": id_value }))
+        Ok(SuspendCurrentSwapResponse { swap_id: id_value })
     } else {
         bail!("No swap is currently running")
     }
@@ -191,7 +383,7 @@ pub async fn get_swap_info(
     let state = context.db.get_state(args.swap_id).await?;
     let is_completed = state.swap_finished();
 
-    let peerId = context
+    let peer_id = context
         .db
         .get_peer_id(args.swap_id)
         .await
@@ -199,14 +391,13 @@ pub async fn get_swap_info(
 
     let addresses = context
         .db
-        .get_addresses(peerId)
+        .get_addresses(peer_id)
         .await
         .with_context(|| "Could not get addressess")?;
 
     let start_date = context.db.get_swap_start_date(args.swap_id).await?;
 
     let swap_state: BobState = state.try_into()?;
-    let state_name = format!("{}", swap_state);
 
     let (
         xmr_amount,
@@ -226,15 +417,13 @@ pub async fn get_swap_info(
         .find_map(|state| {
             if let State::Bob(BobState::SwapSetupCompleted(state2)) = state {
                 let xmr_amount = state2.xmr;
-                let btc_amount = state2.tx_lock.lock_amount().to_sat();
-                let tx_cancel_fee = state2.tx_cancel_fee.to_sat();
-                let tx_refund_fee = state2.tx_refund_fee.to_sat();
+                let btc_amount = state2.tx_lock.lock_amount();
+                let tx_cancel_fee = state2.tx_cancel_fee;
+                let tx_refund_fee = state2.tx_refund_fee;
                 let tx_lock_id = state2.tx_lock.txid();
                 let btc_refund_address = state2.refund_address.to_string();
 
                 if let Ok(tx_lock_fee) = state2.tx_lock.fee() {
-                    let tx_lock_fee = tx_lock_fee.to_sat();
-
                     Some((
                         xmr_amount,
                         btc_amount,
@@ -255,7 +444,7 @@ pub async fn get_swap_info(
         })
         .with_context(|| "Did not find SwapSetupCompleted state for swap")?;
 
-    let timelock = match swap_state {
+    let timelock = match swap_state.clone() {
         BobState::Started { .. } | BobState::SafelyAborted | BobState::SwapSetupCompleted(_) => {
             None
         }
@@ -276,21 +465,21 @@ pub async fn get_swap_info(
     Ok(GetSwapInfoResponse {
         swap_id: args.swap_id,
         seller: Seller {
-            peer_id: peerId.to_string(),
-            addresses,
+            peer_id,
+            addresses: addresses.iter().map(|a| a.to_string()).collect(),
         },
         completed: is_completed,
         start_date,
-        state_name,
-        xmr_amount: xmr_amount.as_piconero(),
+        state_name: format!("{}", swap_state),
+        xmr_amount,
         btc_amount,
         tx_lock_id,
         tx_cancel_fee,
         tx_refund_fee,
         tx_lock_fee,
         btc_refund_address: btc_refund_address.to_string(),
-        cancel_timelock: cancel_timelock.into(),
-        punish_timelock: punish_timelock.into(),
+        cancel_timelock,
+        punish_timelock,
         timelock,
     })
 }
@@ -299,13 +488,15 @@ pub async fn get_swap_info(
 pub async fn buy_xmr(
     buy_xmr: BuyXmrArgs,
     context: Arc<Context>,
-) -> Result<serde_json::Value, anyhow::Error> {
+) -> Result<BuyXmrResponse, anyhow::Error> {
     let BuyXmrArgs {
         seller,
         bitcoin_change_address,
         monero_receive_address,
-        swap_id,
     } = buy_xmr;
+
+    let swap_id = Uuid::new_v4();
+
     let bitcoin_wallet = Arc::clone(
         context
             .bitcoin_wallet
@@ -358,6 +549,9 @@ pub async fn buy_xmr(
         _ = context.swap_lock.listen_for_swap_force_suspension() => {
             tracing::debug!("Shutdown signal received, exiting");
             context.swap_lock.release_swap_lock().await.expect("Shutdown signal received but failed to release swap lock. The swap process has been terminated but the swap lock is still active.");
+
+            context.tauri_handle.emit_swap_progress_event(swap_id, TauriSwapProgressEvent::Released);
+
             bail!("Shutdown signal received");
         },
         result = async {
@@ -382,9 +576,18 @@ pub async fn buy_xmr(
                 .release_swap_lock()
                 .await
                 .expect("Could not release swap lock");
+
+            context
+                .tauri_handle
+                .emit_swap_progress_event(swap_id, TauriSwapProgressEvent::Released);
+
             bail!(error);
         }
     };
+
+    context
+        .tauri_handle
+        .emit_swap_progress_event(swap_id, TauriSwapProgressEvent::ReceivedQuote(bid_quote));
 
     context.tasks.clone().spawn(async move {
         tokio::select! {
@@ -392,6 +595,9 @@ pub async fn buy_xmr(
             _ = context.swap_lock.listen_for_swap_force_suspension() => {
                 tracing::debug!("Shutdown signal received, exiting");
                 context.swap_lock.release_swap_lock().await.expect("Shutdown signal received but failed to release swap lock. The swap process has been terminated but the swap lock is still active.");
+
+                context.tauri_handle.emit_swap_progress_event(swap_id, TauriSwapProgressEvent::Released);
+
                 bail!("Shutdown signal received");
             },
             event_loop_result = event_loop => {
@@ -416,6 +622,7 @@ pub async fn buy_xmr(
                     max_givable,
                     || bitcoin_wallet.sync(),
                     estimate_fee,
+                    context.tauri_handle.clone(),
                 );
 
                 let (amount, fees) = match determine_amount.await {
@@ -442,7 +649,7 @@ pub async fn buy_xmr(
                     monero_receive_address,
                     bitcoin_change_address,
                     amount,
-                );
+                ).with_event_emitter(context.tauri_handle.clone());
 
                 bob::run(swap).await
             } => {
@@ -463,18 +670,24 @@ pub async fn buy_xmr(
             .release_swap_lock()
             .await
             .expect("Could not release swap lock");
+
+        context.tauri_handle.emit_swap_progress_event(swap_id, TauriSwapProgressEvent::Released);
+
         Ok::<_, anyhow::Error>(())
     }.in_current_span()).await;
 
-    Ok(json!({
-        "swapId": swap_id.to_string(),
-        "quote": bid_quote,
-    }))
+    Ok(BuyXmrResponse {
+        swap_id,
+        quote: bid_quote,
+    })
 }
 
 #[tracing::instrument(fields(method = "resume_swap"), skip(context))]
-pub async fn resume_swap(resume: ResumeArgs, context: Arc<Context>) -> Result<serde_json::Value> {
-    let ResumeArgs { swap_id } = resume;
+pub async fn resume_swap(
+    resume: ResumeSwapArgs,
+    context: Arc<Context>,
+) -> Result<ResumeSwapResponse> {
+    let ResumeSwapArgs { swap_id } = resume;
     context.swap_lock.acquire_swap_lock(swap_id).await?;
 
     let seller_peer_id = context.db.get_peer_id(swap_id).await?;
@@ -531,7 +744,8 @@ pub async fn resume_swap(resume: ResumeArgs, context: Arc<Context>) -> Result<se
         event_loop_handle,
         monero_receive_address,
     )
-    .await?;
+    .await?
+    .with_event_emitter(context.tauri_handle.clone());
 
     context.tasks.clone().spawn(
         async move {
@@ -541,6 +755,9 @@ pub async fn resume_swap(resume: ResumeArgs, context: Arc<Context>) -> Result<se
                 _ = context.swap_lock.listen_for_swap_force_suspension() => {
                      tracing::debug!("Shutdown signal received, exiting");
                     context.swap_lock.release_swap_lock().await.expect("Shutdown signal received but failed to release swap lock. The swap process has been terminated but the swap lock is still active.");
+
+                    context.tauri_handle.emit_swap_progress_event(swap_id, TauriSwapProgressEvent::Released);
+
                     bail!("Shutdown signal received");
                 },
 
@@ -571,13 +788,17 @@ pub async fn resume_swap(resume: ResumeArgs, context: Arc<Context>) -> Result<se
                 .release_swap_lock()
                 .await
                 .expect("Could not release swap lock");
+
+            context.tauri_handle.emit_swap_progress_event(swap_id, TauriSwapProgressEvent::Released);
+
             Ok::<(), anyhow::Error>(())
         }
         .in_current_span(),
     ).await;
-    Ok(json!({
-        "result": "ok",
-    }))
+
+    Ok(ResumeSwapResponse {
+        result: "OK".to_string(),
+    })
 }
 
 #[tracing::instrument(fields(method = "cancel_and_refund"), skip(context))]
@@ -602,6 +823,10 @@ pub async fn cancel_and_refund(
         .await
         .expect("Could not release swap lock");
 
+    context
+        .tauri_handle
+        .emit_swap_progress_event(swap_id, TauriSwapProgressEvent::Released);
+
     state.map(|state| {
         json!({
             "result": state,
@@ -612,10 +837,13 @@ pub async fn cancel_and_refund(
 #[tracing::instrument(fields(method = "get_history"), skip(context))]
 pub async fn get_history(context: Arc<Context>) -> Result<GetHistoryResponse> {
     let swaps = context.db.all().await?;
-    let mut vec: Vec<(Uuid, String)> = Vec::new();
+    let mut vec: Vec<GetHistoryEntry> = Vec::new();
     for (swap_id, state) in swaps {
         let state: BobState = state.try_into()?;
-        vec.push((swap_id, state.to_string()));
+        vec.push(GetHistoryEntry {
+            swap_id,
+            state: state.to_string(),
+        })
     }
 
     Ok(GetHistoryResponse { swaps: vec })
@@ -659,7 +887,7 @@ pub async fn withdraw_btc(
         .context("Could not get Bitcoin wallet")?;
 
     let amount = match amount {
-        Some(amount) => Amount::from_sat(amount),
+        Some(amount) => amount,
         None => {
             bitcoin_wallet
                 .max_giveable(address.script_pubkey().len())
@@ -677,7 +905,7 @@ pub async fn withdraw_btc(
 
     Ok(WithdrawBtcResponse {
         txid: signed_tx.txid().to_string(),
-        amount: amount.to_sat(),
+        amount,
     })
 }
 
@@ -728,7 +956,7 @@ pub async fn get_balance(balance: BalanceArgs, context: Arc<Context>) -> Result<
     }
 
     Ok(BalanceResponse {
-        balance: bitcoin_balance.to_sat(),
+        balance: bitcoin_balance,
     })
 }
 
@@ -838,26 +1066,6 @@ pub async fn get_current_swap(context: Arc<Context>) -> Result<serde_json::Value
     }))
 }
 
-impl Request {
-    pub fn new(cmd: Method) -> Request {
-        Request {
-            cmd,
-            log_reference: None,
-        }
-    }
-
-    pub fn with_id(cmd: Method, id: Option<String>) -> Request {
-        Request {
-            cmd,
-            log_reference: id,
-        }
-    }
-
-    pub async fn call(self, _: Arc<Context>) -> Result<JsonValue> {
-        unreachable!("This function should never be called")
-    }
-}
-
 fn qr_code(value: &impl ToString) -> Result<String> {
     let code = QrCode::new(value.to_string())?;
     let qr_code = code
@@ -868,6 +1076,7 @@ fn qr_code(value: &impl ToString) -> Result<String> {
     Ok(qr_code)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn determine_btc_to_swap<FB, TB, FMG, TMG, FS, TS, FFE, TFE>(
     json: bool,
     bid_quote: BidQuote,
@@ -876,18 +1085,19 @@ pub async fn determine_btc_to_swap<FB, TB, FMG, TMG, FS, TS, FFE, TFE>(
     max_giveable_fn: FMG,
     sync: FS,
     estimate_fee: FFE,
-) -> Result<(Amount, Amount)>
+    event_emitter: Option<TauriHandle>,
+) -> Result<(bitcoin::Amount, bitcoin::Amount)>
 where
-    TB: Future<Output = Result<Amount>>,
+    TB: Future<Output = Result<bitcoin::Amount>>,
     FB: Fn() -> TB,
-    TMG: Future<Output = Result<Amount>>,
+    TMG: Future<Output = Result<bitcoin::Amount>>,
     FMG: Fn() -> TMG,
     TS: Future<Output = Result<()>>,
     FS: Fn() -> TS,
-    FFE: Fn(Amount) -> TFE,
-    TFE: Future<Output = Result<Amount>>,
+    FFE: Fn(bitcoin::Amount) -> TFE,
+    TFE: Future<Output = Result<bitcoin::Amount>>,
 {
-    if bid_quote.max_quantity == Amount::ZERO {
+    if bid_quote.max_quantity == bitcoin::Amount::ZERO {
         bail!(ZeroQuoteReceived)
     }
 
@@ -901,7 +1111,7 @@ where
     sync().await?;
     let mut max_giveable = max_giveable_fn().await?;
 
-    if max_giveable == Amount::ZERO || max_giveable < bid_quote.min_quantity {
+    if max_giveable == bitcoin::Amount::ZERO || max_giveable < bid_quote.min_quantity {
         let deposit_address = get_new_address.await?;
         let minimum_amount = bid_quote.min_quantity;
         let maximum_amount = bid_quote.max_quantity;
@@ -931,6 +1141,19 @@ where
                 %min_bitcoin_lock_tx_fee,
                 price = %bid_quote.price,
                 "Waiting for Bitcoin deposit",
+            );
+
+            // TODO: Use the real swap id here
+            event_emitter.emit_swap_progress_event(
+                Uuid::new_v4(),
+                TauriSwapProgressEvent::WaitingForBtcDeposit {
+                    deposit_address: deposit_address.clone(),
+                    max_giveable,
+                    min_deposit_until_swap_will_start,
+                    max_deposit_until_maximum_amount_is_reached,
+                    min_bitcoin_lock_tx_fee,
+                    quote: bid_quote.clone(),
+                },
             );
 
             max_giveable = loop {

@@ -3,6 +3,7 @@ use bdk::electrum_client::HeaderNotification;
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use std::ops::Add;
+use typeshare::typeshare;
 
 /// Represent a block height, or block number, expressed in absolute block
 /// count. E.g. The transaction was included in block #655123, 655123 block
@@ -37,7 +38,9 @@ impl Add<u32> for BlockHeight {
     }
 }
 
-#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(tag = "type", content = "content")]
 pub enum ExpiredTimelocks {
     None { blocks_left: u32 },
     Cancel { blocks_left: u32 },

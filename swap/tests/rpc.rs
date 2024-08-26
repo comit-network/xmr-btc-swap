@@ -15,7 +15,7 @@ mod test {
     use std::net::SocketAddr;
     use std::sync::Arc;
     use std::time::Duration;
-    use swap::api::request::{Method, Request};
+    use swap::api::request::{start_daemon, StartDaemonArgs};
     use swap::api::Context;
 
     use crate::harness::alice_run_until::is_xmr_lock_transaction_sent;
@@ -39,18 +39,14 @@ mod test {
         harness_ctx: TestContext,
     ) -> (Client, MakeCapturingWriter, Arc<Context>) {
         let writer = capture_logs(LevelFilter::DEBUG);
-        let server_address: SocketAddr = SERVER_ADDRESS.parse().unwrap();
-
-        let request = Request::new(Method::StartDaemon {
-            server_address: Some(server_address),
-        });
+        let server_address: Option<SocketAddr> = SERVER_ADDRESS.parse().unwrap().into();
 
         let context = Arc::new(harness_ctx.get_bob_context().await);
 
         let context_clone = context.clone();
 
         tokio::spawn(async move {
-            if let Err(err) = request.call(context_clone).await {
+            if let Err(err) = start_daemon(StartDaemonArgs { server_address }, context).await {
                 println!("Failed to initialize daemon for testing: {}", err);
             }
         });
