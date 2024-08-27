@@ -1,14 +1,14 @@
 use std::result::Result;
 use std::sync::Arc;
-use swap::{
-    cli::api::{
+use swap::cli::{
+    api::{
         request::{
             BalanceArgs, BuyXmrArgs, GetHistoryArgs, ResumeSwapArgs, SuspendCurrentSwapArgs,
             WithdrawBtcArgs,
         },
-        Context,
+        Context, ContextBuilder,
     },
-    cli::command::{Bitcoin, Monero},
+    command::{Bitcoin, Monero},
 };
 use tauri::{Manager, RunEvent};
 
@@ -63,25 +63,20 @@ tauri_command!(suspend_current_swap, SuspendCurrentSwapArgs);
 
 fn setup<'a>(app: &'a mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     tauri::async_runtime::block_on(async {
-        let context = Context::build(
-            Some(Bitcoin {
+        let context = ContextBuilder::new(true)
+            .with_bitcoin(Bitcoin {
                 bitcoin_electrum_rpc_url: None,
                 bitcoin_target_block: None,
-            }),
-            Some(Monero {
+            })
+            .with_monero(Monero {
                 monero_daemon_address: None,
-            }),
-            None,
-            None,
-            true,
-            true,
-            true,
-            None,
-        )
-        .await
-        .unwrap()
-        .with_tauri_handle(app.app_handle().to_owned());
-
+            })
+            .with_json(true)
+            .with_debug(true)
+            .with_tauri(app.app_handle().to_owned())
+            .build()
+            .await
+            .expect("failed to create context");
         app.manage(Arc::new(context));
     });
 

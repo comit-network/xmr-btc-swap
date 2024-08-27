@@ -18,6 +18,8 @@ use structopt::{clap, StructOpt};
 use url::Url;
 use uuid::Uuid;
 
+use super::api::ContextBuilder;
+
 // See: https://moneroworld.com/
 pub const DEFAULT_MONERO_DAEMON_ADDRESS: &str = "node.community.rino.io:18081";
 pub const DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET: &str = "stagenet.community.rino.io:38081";
@@ -79,17 +81,15 @@ where
                 bitcoin_address::validate_is_testnet(bitcoin_change_address, is_testnet)?;
 
             let context = Arc::new(
-                Context::build(
-                    Some(bitcoin),
-                    Some(monero),
-                    Some(tor),
-                    data,
-                    is_testnet,
-                    debug,
-                    json,
-                    None,
-                )
-                .await?,
+                ContextBuilder::new(is_testnet)
+                    .with_bitcoin(bitcoin)
+                    .with_monero(monero)
+                    .with_tor(tor)
+                    .with_data_dir(data)
+                    .with_debug(debug)
+                    .with_json(json)
+                    .build()
+                    .await?,
             );
 
             BuyXmrArgs {
@@ -104,7 +104,12 @@ where
         }
         CliCommand::History => {
             let context = Arc::new(
-                Context::build(None, None, None, data, is_testnet, debug, json, None).await?,
+                ContextBuilder::new(is_testnet)
+                    .with_data_dir(data)
+                    .with_debug(debug)
+                    .with_json(json)
+                    .build()
+                    .await?,
             );
 
             GetHistoryArgs {}.request(context.clone()).await?;
@@ -113,7 +118,12 @@ where
         }
         CliCommand::Config => {
             let context = Arc::new(
-                Context::build(None, None, None, data, is_testnet, debug, json, None).await?,
+                ContextBuilder::new(is_testnet)
+                    .with_data_dir(data)
+                    .with_debug(debug)
+                    .with_json(json)
+                    .build()
+                    .await?,
             );
 
             GetConfigArgs {}.request(context.clone()).await?;
@@ -122,17 +132,13 @@ where
         }
         CliCommand::Balance { bitcoin } => {
             let context = Arc::new(
-                Context::build(
-                    Some(bitcoin),
-                    None,
-                    None,
-                    data,
-                    is_testnet,
-                    debug,
-                    json,
-                    None,
-                )
-                .await?,
+                ContextBuilder::new(is_testnet)
+                    .with_bitcoin(bitcoin)
+                    .with_data_dir(data)
+                    .with_debug(debug)
+                    .with_json(json)
+                    .build()
+                    .await?,
             );
 
             BalanceArgs {
@@ -150,17 +156,15 @@ where
             tor,
         } => {
             let context = Arc::new(
-                Context::build(
-                    Some(bitcoin),
-                    Some(monero),
-                    Some(tor),
-                    data,
-                    is_testnet,
-                    debug,
-                    json,
-                    server_address,
-                )
-                .await?,
+                ContextBuilder::new(is_testnet)
+                    .with_bitcoin(bitcoin)
+                    .with_monero(monero)
+                    .with_tor(tor)
+                    .with_data_dir(data)
+                    .with_debug(debug)
+                    .with_json(json)
+                    .build()
+                    .await?,
             );
 
             StartDaemonArgs { server_address }
@@ -177,17 +181,13 @@ where
             let address = bitcoin_address::validate_is_testnet(address, is_testnet)?;
 
             let context = Arc::new(
-                Context::build(
-                    Some(bitcoin),
-                    None,
-                    None,
-                    data,
-                    is_testnet,
-                    debug,
-                    json,
-                    None,
-                )
-                .await?,
+                ContextBuilder::new(is_testnet)
+                    .with_bitcoin(bitcoin)
+                    .with_data_dir(data)
+                    .with_debug(debug)
+                    .with_json(json)
+                    .build()
+                    .await?,
             );
 
             WithdrawBtcArgs { amount, address }
@@ -203,17 +203,15 @@ where
             tor,
         } => {
             let context = Arc::new(
-                Context::build(
-                    Some(bitcoin),
-                    Some(monero),
-                    Some(tor),
-                    data,
-                    is_testnet,
-                    debug,
-                    json,
-                    None,
-                )
-                .await?,
+                ContextBuilder::new(is_testnet)
+                    .with_bitcoin(bitcoin)
+                    .with_monero(monero)
+                    .with_tor(tor)
+                    .with_data_dir(data)
+                    .with_debug(debug)
+                    .with_json(json)
+                    .build()
+                    .await?,
             );
 
             ResumeSwapArgs { swap_id }.request(context.clone()).await?;
@@ -226,17 +224,14 @@ where
             tor,
         } => {
             let context = Arc::new(
-                Context::build(
-                    Some(bitcoin),
-                    None,
-                    Some(tor),
-                    data,
-                    is_testnet,
-                    debug,
-                    json,
-                    None,
-                )
-                .await?,
+                ContextBuilder::new(is_testnet)
+                    .with_bitcoin(bitcoin)
+                    .with_tor(tor)
+                    .with_data_dir(data)
+                    .with_debug(debug)
+                    .with_json(json)
+                    .build()
+                    .await?,
             );
 
             CancelAndRefundArgs { swap_id }
@@ -250,7 +245,13 @@ where
             tor,
         } => {
             let context = Arc::new(
-                Context::build(None, None, Some(tor), data, is_testnet, debug, json, None).await?,
+                ContextBuilder::new(is_testnet)
+                    .with_tor(tor)
+                    .with_data_dir(data)
+                    .with_debug(debug)
+                    .with_json(json)
+                    .build()
+                    .await?,
             );
 
             ListSellersArgs { rendezvous_point }
@@ -261,17 +262,13 @@ where
         }
         CliCommand::ExportBitcoinWallet { bitcoin } => {
             let context = Arc::new(
-                Context::build(
-                    Some(bitcoin),
-                    None,
-                    None,
-                    data,
-                    is_testnet,
-                    debug,
-                    json,
-                    None,
-                )
-                .await?,
+                ContextBuilder::new(is_testnet)
+                    .with_bitcoin(bitcoin)
+                    .with_data_dir(data)
+                    .with_debug(debug)
+                    .with_json(json)
+                    .build()
+                    .await?,
             );
 
             ExportBitcoinWalletArgs {}.request(context.clone()).await?;
@@ -282,7 +279,12 @@ where
             swap_id: SwapId { swap_id },
         } => {
             let context = Arc::new(
-                Context::build(None, None, None, data, is_testnet, debug, json, None).await?,
+                ContextBuilder::new(is_testnet)
+                    .with_data_dir(data)
+                    .with_debug(debug)
+                    .with_json(json)
+                    .build()
+                    .await?,
             );
 
             MoneroRecoveryArgs { swap_id }

@@ -12,7 +12,6 @@ use anyhow::{anyhow, bail, Context as AnyContext, Error, Result};
 use futures::future::try_join_all;
 use std::fmt;
 use std::future::Future;
-use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex as SyncMutex, Once};
 use tauri::AppHandle;
@@ -28,7 +27,6 @@ static START: Once = Once::new();
 pub struct Config {
     tor_socks5_port: u16,
     namespace: XmrBtcNamespace,
-    server_address: Option<SocketAddr>,
     pub env_config: EnvConfig,
     seed: Option<Seed>,
     debug: bool,
@@ -184,32 +182,109 @@ pub struct Context {
     monero_rpc_process: Option<Arc<SyncMutex<monero::WalletRpcProcess>>>,
 }
 
-#[allow(clippy::too_many_arguments)]
-impl Context {
-    pub async fn build(
-        bitcoin: Option<Bitcoin>,
-        monero: Option<Monero>,
-        tor: Option<Tor>,
-        data: Option<PathBuf>,
-        is_testnet: bool,
-        debug: bool,
-        json: bool,
-        server_address: Option<SocketAddr>,
-    ) -> Result<Context> {
-        let data_dir = data::data_dir_from(data, is_testnet)?;
-        let env_config = env_config_from(is_testnet);
+/// A conveniant builder struct for [`Context`].
+#[derive(Debug)]
+#[must_use = "ContextBuilder must be built to be useful"]
+pub struct ContextBuilder {
+    monero: Option<Monero>,
+    bitcoin: Option<Bitcoin>,
+    tor: Option<Tor>,
+    data: Option<PathBuf>,
+    is_testnet: bool,
+    debug: bool,
+    json: bool,
+    tauri_handle: Option<AppHandle>,
+}
+
+impl ContextBuilder {
+    /// Start building a context
+    pub fn new(is_testnet: bool) -> Self {
+        if is_testnet {
+            Self::testnet()
+        } else {
+            Self::mainnet()
+        }
+    }
+
+    /// Basic builder with default options for mainnet
+    pub fn mainnet() -> Self {
+        ContextBuilder {
+            monero: None,
+            bitcoin: None,
+            tor: None,
+            data: None,
+            is_testnet: false,
+            debug: false,
+            json: false,
+            tauri_handle: None,
+        }
+    }
+
+    /// Basic builder with default options for testnet
+    pub fn testnet() -> Self {
+        let mut builder = Self::mainnet();
+        builder.is_testnet = true;
+        builder
+    }
+
+    /// Configures the Context to initialize a Monero wallet with the given configuration.
+    pub fn with_monero(mut self, monero: impl Into<Option<Monero>>) -> Self {
+        self.monero = monero.into();
+        self
+    }
+
+    /// Configures the Context to initialize a Bitcoin wallet with the given configuration.
+    pub fn with_bitcoin(mut self, bitcoin: impl Into<Option<Bitcoin>>) -> Self {
+        self.bitcoin = bitcoin.into();
+        self
+    }
+
+    /// Configures the Context to use Tor with the given configuration.
+    pub fn with_tor(mut self, tor: impl Into<Option<Tor>>) -> Self {
+        self.tor = tor.into();
+        self
+    }
+
+    /// Attach a handle to Tauri to the Context for emitting events etc.
+    pub fn with_tauri(mut self, tauri: impl Into<Option<AppHandle>>) -> Self {
+        self.tauri_handle = tauri.into();
+        self
+    }
+
+    /// Configures where the data and logs are saved in the filesystem
+    pub fn with_data_dir(mut self, data: impl Into<Option<PathBuf>>) -> Self {
+        self.data = data.into();
+        self
+    }
+
+    /// Whether to include debug level logging messages (default false)
+    pub fn with_debug(mut self, debug: bool) -> Self {
+        self.debug = debug;
+        self
+    }
+
+    /// Set logging format to json (default false)
+    pub fn with_json(mut self, json: bool) -> Self {
+        self.json = json;
+        self
+    }
+
+    /// Takes the builder, initializes the context by initializing the wallets and other components and returns the Context.
+    pub async fn build(self) -> Result<Context> {
+        let data_dir = data::data_dir_from(self.data, self.is_testnet)?;
+        let env_config = env_config_from(self.is_testnet);
 
         START.call_once(|| {
-            let _ = cli::tracing::init(debug, json, data_dir.join("logs"));
+            let _ = cli::tracing::init(self.debug, self.json, data_dir.join("logs"));
         });
 
         let seed = Seed::from_file_or_generate(data_dir.as_path())
             .context("Failed to read seed in file")?;
 
         let bitcoin_wallet = {
-            if let Some(bitcoin) = bitcoin {
+            if let Some(bitcoin) = self.bitcoin {
                 let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
-                    bitcoin.apply_defaults(is_testnet)?;
+                    bitcoin.apply_defaults(self.is_testnet)?;
                 Some(Arc::new(
                     init_bitcoin_wallet(
                         bitcoin_electrum_rpc_url,
@@ -226,8 +301,8 @@ impl Context {
         };
 
         let (monero_wallet, monero_rpc_process) = {
-            if let Some(monero) = monero {
-                let monero_daemon_address = monero.apply_defaults(is_testnet);
+            if let Some(monero) = self.monero {
+                let monero_daemon_address = monero.apply_defaults(self.is_testnet);
                 let (wlt, prc) =
                     init_monero_wallet(data_dir.clone(), monero_daemon_address, env_config).await?;
                 (Some(Arc::new(wlt)), Some(Arc::new(SyncMutex::new(prc))))
@@ -236,7 +311,7 @@ impl Context {
             }
         };
 
-        let tor_socks5_port = tor.map_or(9050, |tor| tor.tor_socks5_port);
+        let tor_socks5_port = self.tor.map_or(9050, |tor| tor.tor_socks5_port);
 
         let context = Context {
             db: open_db(data_dir.join("sqlite")).await?,
@@ -245,23 +320,24 @@ impl Context {
             monero_rpc_process,
             config: Config {
                 tor_socks5_port,
-                namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
+                namespace: XmrBtcNamespace::from_is_testnet(self.is_testnet),
                 env_config,
                 seed: Some(seed),
-                server_address,
-                debug,
-                json,
-                is_testnet,
+                debug: self.debug,
+                json: self.json,
+                is_testnet: self.is_testnet,
                 data_dir,
             },
             swap_lock: Arc::new(SwapLock::new()),
             tasks: Arc::new(PendingTaskList::default()),
-            tauri_handle: None,
+            tauri_handle: self.tauri_handle.map(TauriHandle::new),
         };
 
         Ok(context)
     }
+}
 
+impl Context {
     pub fn with_tauri_handle(mut self, tauri_handle: AppHandle) -> Self {
         self.tauri_handle = Some(TauriHandle::new(tauri_handle));
 
@@ -394,7 +470,6 @@ impl Config {
         Self {
             tor_socks5_port: 9050,
             namespace: XmrBtcNamespace::from_is_testnet(false),
-            server_address: None,
             env_config,
             seed: Some(seed),
             debug: false,
