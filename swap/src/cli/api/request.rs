@@ -622,7 +622,8 @@ pub async fn buy_xmr(
                     max_givable,
                     || bitcoin_wallet.sync(),
                     estimate_fee,
-                    context.tauri_handle.clone()
+                    context.tauri_handle.clone(),
+                    Some(swap_id)
                 );
 
                 let (amount, fees) = match determine_amount.await {
@@ -1086,6 +1087,7 @@ pub async fn determine_btc_to_swap<FB, TB, FMG, TMG, FS, TS, FFE, TFE>(
     sync: FS,
     estimate_fee: FFE,
     event_emitter: Option<TauriHandle>,
+    swap_id: Option<Uuid>,
 ) -> Result<(bitcoin::Amount, bitcoin::Amount)>
 where
     TB: Future<Output = Result<bitcoin::Amount>>,
@@ -1143,18 +1145,19 @@ where
                 "Waiting for Bitcoin deposit",
             );
 
-            // TODO: Use the real swap id here
-            event_emitter.emit_swap_progress_event(
-                Uuid::new_v4(),
-                TauriSwapProgressEvent::WaitingForBtcDeposit {
-                    deposit_address: deposit_address.clone(),
-                    max_giveable,
-                    min_deposit_until_swap_will_start,
-                    max_deposit_until_maximum_amount_is_reached,
-                    min_bitcoin_lock_tx_fee,
-                    quote: bid_quote,
-                },
-            );
+            if let Some(swap_id) = swap_id {
+                event_emitter.emit_swap_progress_event(
+                    swap_id,
+                    TauriSwapProgressEvent::WaitingForBtcDeposit {
+                        deposit_address: deposit_address.clone(),
+                        max_giveable,
+                        min_deposit_until_swap_will_start,
+                        max_deposit_until_maximum_amount_is_reached,
+                        min_bitcoin_lock_tx_fee,
+                        quote: bid_quote.clone(),
+                    },
+                );
+            }
 
             max_giveable = loop {
                 sync().await?;

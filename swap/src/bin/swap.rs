@@ -66,6 +66,7 @@ mod tests {
             || async { Ok(()) },
             |_| async { Ok(Amount::from_sat(1000)) },
             None,
+            None,
         )
         .await
         .unwrap();
@@ -103,6 +104,7 @@ mod tests {
             },
             || async { Ok(()) },
             |_| async { Ok(Amount::from_sat(1000)) },
+            None,
             None,
         )
         .await
@@ -142,6 +144,7 @@ mod tests {
             || async { Ok(()) },
             |_| async { Ok(Amount::from_sat(1000)) },
             None,
+            None,
         )
         .await
         .unwrap();
@@ -176,6 +179,7 @@ mod tests {
             || async { Ok(()) },
             |_| async { Ok(Amount::from_sat(1000)) },
             None,
+            None,
         )
         .await
         .unwrap();
@@ -209,6 +213,7 @@ mod tests {
             },
             || async { Ok(()) },
             |_| async { Ok(Amount::from_sat(1000)) },
+            None,
             None,
         )
         .await
@@ -247,6 +252,7 @@ mod tests {
             },
             || async { Ok(()) },
             |_| async { Ok(Amount::from_sat(1000)) },
+            None,
             None,
         )
         .await
@@ -290,6 +296,7 @@ mod tests {
                 },
                 || async { Ok(()) },
                 |_| async { Ok(Amount::from_sat(1000)) },
+                None,
                 None,
             ),
         )
@@ -341,6 +348,7 @@ mod tests {
                 || async { Ok(()) },
                 |_| async { Ok(Amount::from_sat(1000)) },
                 None,
+                None,
             ),
         )
         .await
@@ -375,6 +383,7 @@ mod tests {
             },
             || async { Ok(()) },
             |_| async { Ok(Amount::from_sat(1000)) },
+            None,
             None,
         )
         .await
