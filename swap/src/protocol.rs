@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use sigma_fun::ext::dl_secp256k1_ed25519_eq::{CrossCurveDLEQ, CrossCurveDLEQProof};
 use sigma_fun::HashTranscript;
-use std::collections::HashMap;
 use std::convert::TryInto;
 use uuid::Uuid;
 
@@ -145,7 +144,6 @@ pub trait Database {
     async fn get_state(&self, swap_id: Uuid) -> Result<State>;
     async fn get_states(&self, swap_id: Uuid) -> Result<Vec<State>>;
     async fn all(&self) -> Result<Vec<(Uuid, State)>>;
-    async fn raw_all(&self) -> Result<HashMap<Uuid, Vec<serde_json::Value>>>;
     async fn insert_buffered_transfer_proof(
         &self,
         swap_id: Uuid,

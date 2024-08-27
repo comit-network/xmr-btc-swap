@@ -6,7 +6,6 @@ use async_trait::async_trait;
 use libp2p::{Multiaddr, PeerId};
 use sqlx::sqlite::Sqlite;
 use sqlx::{Pool, SqlitePool};
-use std::collections::HashMap;
 use std::path::Path;
 use std::str::FromStr;
 use time::OffsetDateTime;
@@ -351,36 +350,6 @@ impl Database for SqliteDatabase {
         let proof = serde_json::from_str(proof_str)?;
 
         Ok(Some(proof))
-    }
-
-    async fn raw_all(&self) -> Result<HashMap<Uuid, Vec<serde_json::Value>>> {
-        let mut conn = self.pool.acquire().await?;
-        let rows = sqlx::query!(
-            r#"
-                SELECT swap_id, state
-                FROM swap_states
-                "#
-        )
-        .fetch_all(&mut conn)
-        .await?;
-
-        let mut swaps: HashMap<Uuid, Vec<serde_json::Value>> = HashMap::new();
-
-        for row in &rows {
-            let swap_id = Uuid::from_str(&row.swap_id)?;
-            let state = serde_json::from_str(&row.state)?;
-
-            if let std::collections::hash_map::Entry::Vacant(e) = swaps.entry(swap_id) {
-                e.insert(vec![state]);
-            } else {
-                swaps
-                    .get_mut(&swap_id)
-                    .ok_or_else(|| anyhow!("Error while retrieving the swap"))?
-                    .push(state);
-            }
-        }
-
-        Ok(swaps)
     }
 }
 
