@@ -32,7 +32,7 @@ jobs:
             libssl-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-            
+
       - name: Check formatting
         uses: dprint/check@v2.2
         with:
@@ -64,7 +64,7 @@ jobs:
             libssl-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-            
+
       - name: Build swap
         run: cargo build --bin swap
 
@@ -91,7 +91,7 @@ jobs:
             libssl-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-            
+
       - name: Install sqlx-cli
         run: cargo install --locked --version 0.6.3 sqlx-cli
 
@@ -106,8 +106,8 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-          - target: armv7-unknown-linux-gnueabihf
-            os: ubuntu-latest
+          #- target: armv7-unknown-linux-gnueabihf
+          #   os: ubuntu-latest
           - target: x86_64-apple-darwin
             os: macos-12
           - target: aarch64-apple-darwin
@@ -139,7 +139,7 @@ jobs:
             libssl-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-            
+
       - name: Build binary
         if: matrix.target != 'armv7-unknown-linux-gnueabihf'
         run: cargo build -p swap --target ${{ matrix.target }}
@@ -196,7 +196,7 @@ jobs:
             libssl-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-            
+
       - name: Checkout sources
         uses: actions/checkout@v4.1.7
 
@@ -254,7 +254,7 @@ jobs:
             libssl-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-            
+
       - name: Run test ${{ matrix.test_name }}
         run: cargo test --package swap --all-features --test ${{ matrix.test_name }} -- --nocapture
 
@@ -278,7 +278,7 @@ jobs:
             libssl-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-            
+
       - name: Run RPC server tests
         run: cargo test --package swap --all-features --test rpc -- --nocapture
 
@@ -304,6 +304,6 @@ jobs:
             libssl-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-            
+
       - name: Run cargo check on stable rust
         run: cargo check --all-targets
