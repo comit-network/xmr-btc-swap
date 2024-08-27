@@ -344,6 +344,16 @@ impl Request for GetConfigArgs {
     }
 }
 
+pub struct GetSwapInfosAllArgs;
+
+impl Request for GetSwapInfosAllArgs {
+    type Response = Vec<GetSwapInfoResponse>;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        get_swap_infos_all(ctx).await
+    }
+}
+
 #[tracing::instrument(fields(method = "suspend_current_swap"), skip(context))]
 pub async fn suspend_current_swap(context: Arc<Context>) -> Result<SuspendCurrentSwapResponse> {
     let swap_id = context.swap_lock.get_current_swap_id().await;

@@ -34,7 +34,7 @@ async function invoke<ARGS, RESPONSE>(
 }
 
 async function invokeNoArgs<RESPONSE>(command: string): Promise<RESPONSE> {
-  return invokeUnsafe(command, {}) as Promise<RESPONSE>;
+  return invokeUnsafe(command) as Promise<RESPONSE>;
 }
 
 export async function checkBitcoinBalance() {
