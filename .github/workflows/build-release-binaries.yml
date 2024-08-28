@@ -18,11 +18,10 @@ jobs:
             target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             archive_ext: tar
-          # This has been temporarily disabled. Cross compilation is currently broken due to the missing system dependencies (libwebkit)
-          #- bin: swap
-          #   target: armv7-unknown-linux-gnueabihf
-          #   os: ubuntu-latest
-          #   archive_ext: tar
+          - bin: swap
+            target: armv7-unknown-linux-gnueabihf
+            os: ubuntu-latest
+            archive_ext: tar
           - bin: swap
             target: x86_64-apple-darwin
             os: macos-12
@@ -39,11 +38,10 @@ jobs:
             target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             archive_ext: tar
-          # This has been temporarily disabled. Cross compilation is currently broken due to the missing system dependencies (libwebkit)
-          #- bin: asb
-          #   target: armv7-unknown-linux-gnueabihf
-          #   os: ubuntu-latest
-          #   archive_ext: tar
+          - bin: asb
+            target: armv7-unknown-linux-gnueabihf
+            os: ubuntu-latest
+            archive_ext: tar
           - bin: asb
             target: x86_64-apple-darwin
             os: macos-12
