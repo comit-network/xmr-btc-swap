@@ -125,5 +125,7 @@ pub enum TauriSwapProgressEvent {
     CooperativeRedeemRejected {
         reason: String,
     },
-    Released,
+    Released {
+        error: Option<String>,
+    },
 }
