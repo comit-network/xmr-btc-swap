@@ -101,23 +101,17 @@ mod test {
 
             let (client, _, _) = setup_daemon(harness_ctx).await;
 
-            let response: HashMap<String, Vec<(Uuid, String)>> = client
+            let response: HashMap<String, Vec<HashMap<String, String>>> = client
                 .request("get_history", ObjectParams::new())
                 .await
                 .unwrap();
-            let swaps: Vec<(Uuid, String)> = vec![(bob_swap_id, "btc is locked".to_string())];
 
-            assert_eq!(response, HashMap::from([("swaps".to_string(), swaps)]));
+            let swaps: Vec<HashMap<String, String>> = vec![HashMap::from([
+                ("swap_id".to_string(), bob_swap_id.to_string()),
+                ("state".to_string(), "btc is locked".to_string()),
+            ])];
 
-            let response: HashMap<String, HashMap<Uuid, Vec<Value>>> = client
-                .request("get_raw_states", ObjectParams::new())
-                .await
-                .unwrap();
-
-            let response_raw_states = response.get("raw_states").unwrap();
-
-            assert!(response_raw_states.contains_key(&bob_swap_id));
-            assert_eq!(response_raw_states.get(&bob_swap_id).unwrap().len(), 2);
+            assert_eq!(response.get("swaps").unwrap(), &swaps);
 
             let mut params = ObjectParams::new();
             params.insert("swap_id", bob_swap_id).unwrap();
@@ -128,27 +122,27 @@ mod test {
             assert_has_keys_hashmap(
                 &response,
                 &[
-                    "txRefundFee",
-                    "swapId",
-                    "cancelTimelock",
+                    "tx_refund_fee",
+                    "swap_id",
+                    "cancel_timelock",
                     "timelock",
-                    "punishTimelock",
-                    "stateName",
-                    "btcAmount",
-                    "startDate",
-                    "btcRefundAddress",
-                    "txCancelFee",
-                    "xmrAmount",
+                    "punish_timelock",
+                    "state_name",
+                    "btc_amount",
+                    "start_date",
+                    "btc_refund_address",
+                    "tx_cancel_fee",
+                    "xmr_amount",
                     "completed",
-                    "txLockId",
+                    "tx_lock_id",
                     "seller",
                 ],
             );
 
             // Assert specific fields
-            assert_eq!(response.get("swapId").unwrap(), &bob_swap_id.to_string());
+            assert_eq!(response.get("swap_id").unwrap(), &bob_swap_id.to_string());
             assert_eq!(
-                response.get("stateName").unwrap(),
+                response.get("state_name").unwrap(),
                 &"btc is locked".to_string()
             );
             assert_eq!(response.get("completed").unwrap(), &Value::Bool(false));
@@ -159,7 +153,7 @@ mod test {
                 .expect("Field 'seller' is missing from response")
                 .as_object()
                 .expect("'seller' is not an object");
-            assert_has_keys_serde(seller, &["peerId"]);
+            assert_has_keys_serde(seller, &["peer_id"]);
 
             // Check timelock object, nested 'None' object, and blocks_left
             let timelock = response
@@ -167,12 +161,20 @@ mod test {
                 .expect("Field 'timelock' is missing from response")
                 .as_object()
                 .expect("'timelock' is not an object");
-            let none_obj = timelock
-                .get("None")
-                .expect("Field 'None' is missing from 'timelock'")
+            let timelock_type = timelock
+                .get("type")
+                .expect("Field 'type' is missing from 'timelock'")
+                .as_str()
+                .expect("'type' is not a string");
+
+            assert_eq!(timelock_type, "None");
+
+            let timelock_content = timelock
+                .get("content")
+                .expect("Field 'content' is missing from 'None'")
                 .as_object()
-                .expect("'None' is not an object in 'timelock'");
-            let blocks_left = none_obj
+                .expect("'content' is not an object");
+            let blocks_left = timelock_content
                 .get("blocks_left")
                 .expect("Field 'blocks_left' is missing from 'None'")
                 .as_i64()
@@ -198,29 +200,29 @@ mod test {
             let (change_address, receive_address) =
                 harness_ctx.bob_params.get_change_receive_addresses().await;
 
-            let (client, writer, _) = setup_daemon(harness_ctx).await;
+            let (client, _, _) = setup_daemon(harness_ctx).await;
             assert!(client.is_connected());
 
             let mut params = ObjectParams::new();
 
             params.insert("force_refresh", false).unwrap();
-            let response: HashMap<String, i32> = client
-                .request("get_bitcoin_balance", params)
-                .await
-                .unwrap();
+            let response: HashMap<String, i32> =
+                client.request("get_bitcoin_balance", params).await.unwrap();
 
             assert_eq!(response, HashMap::from([("balance".to_string(), 10000000)]));
 
+            // TODO: Renable this test once the "log reference id" feature has been added again. The feature was removed as part of this PR:
+            // https://github.com/UnstoppableSwap/xmr-btc-swap/pull/10
+            //
+            // let mut params = ObjectParams::new();
+            // params.insert("log_reference_id", "test_ref_id").unwrap();
+            // params.insert("force_refresh", false).unwrap();
 
-            let mut params = ObjectParams::new();
-            params.insert("log_reference_id", "test_ref_id").unwrap();
-            params.insert("force_refresh", false).unwrap();
+            // let _: HashMap<String, i32> = client.request("get_bitcoin_balance", params).await.unwrap();
 
-            let _: HashMap<String, i32> = client.request("get_bitcoin_balance", params).await.unwrap();
-
-            assert!(writer.captured().contains(
-                r#"method{method_name="Balance" log_reference_id="\"test_ref_id\""}: swap::api::request: Current Bitcoin balance as of last sync balance=0.1 BTC"#
-            ));
+            // assert!(writer.captured().contains(
+            //     r#"method{method_name="Balance" log_reference_id="\"test_ref_id\""}: swap::api::request: Current Bitcoin balance as of last sync balance=0.1 BTC"#
+            // ));
 
             for method in ["get_swap_info", "resume_swap", "cancel_refund_swap"].iter() {
                 let mut params = ObjectParams::new();
@@ -274,20 +276,15 @@ mod test {
             response.expect_err("Expected an error when amount is 0");
 
             let mut params = ObjectParams::new();
-            params
-                .insert("address", BITCOIN_ADDR)
-                .unwrap();
-            params.insert("amount", "0.01").unwrap();
+            params.insert("address", BITCOIN_ADDR).unwrap();
+            params.insert("amount", 1000000).unwrap();
             let response: HashMap<String, Value> = client
                 .request("withdraw_btc", params)
                 .await
                 .expect("Expected a valid response");
 
-            assert_has_keys_hashmap(&response, &["signed_tx", "amount", "txid"]);
-            assert_eq!(
-                response.get("amount").unwrap().as_u64().unwrap(),
-                1_000_000
-            );
+            assert_has_keys_hashmap(&response, &["amount", "txid"]);
+            assert_eq!(response.get("amount").unwrap().as_u64().unwrap(), 1_000_000);
 
             let params = ObjectParams::new();
             let response: Result<HashMap<String, String>, _> =
@@ -347,7 +344,6 @@ mod test {
                 client.request("buy_xmr", params).await;
             response.expect_err("Expected an error when monero_receive_address is malformed");
 
-
             let mut params = ObjectParams::new();
             params
                 .insert("bitcoin_change_address", BITCOIN_ADDR)
@@ -379,7 +375,7 @@ mod test {
                 .await
                 .expect("Expected a HashMap, got an error");
 
-            assert_has_keys_hashmap(&response, &["swapId"]);
+            assert_has_keys_hashmap(&response, &["swap_id"]);
 
             Ok(())
         })
@@ -413,7 +409,7 @@ mod test {
                 .unwrap();
             assert_eq!(
                 response,
-                HashMap::from([("swapId".to_string(), SWAP_ID.to_string())])
+                HashMap::from([("swap_id".to_string(), SWAP_ID.to_string())])
             );
 
             cloned_ctx

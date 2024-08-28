@@ -507,7 +507,6 @@ pub mod api_test {
             Self {
                 tor_socks5_port: 9050,
                 namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
-                server_address: None,
                 env_config,
                 seed: Some(seed),
                 debug,

@@ -80,30 +80,6 @@
     },
     "query": "\n        insert into peers (\n            swap_id,\n            peer_id\n            ) values (?, ?);\n        "
   },
-  "3f2bfdd2d134586ccad22171cd85a465800fc5c4fdaf191d206974e530240c87": {
-    "describe": {
-      "columns": [
-        {
-          "name": "swap_id",
-          "ordinal": 0,
-          "type_info": "Text"
-        },
-        {
-          "name": "state",
-          "ordinal": 1,
-          "type_info": "Text"
-        }
-      ],
-      "nullable": [
-        false,
-        false
-      ],
-      "parameters": {
-        "Right": 0
-      }
-    },
-    "query": "\n                SELECT swap_id, state\n                FROM swap_states\n                "
-  },
   "50a5764546f69c118fa0b64120da50f51073d36257d49768de99ff863e3511e0": {
     "describe": {
       "columns": [],

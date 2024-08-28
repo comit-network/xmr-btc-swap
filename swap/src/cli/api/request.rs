@@ -304,9 +304,9 @@ impl Request for SuspendCurrentSwapArgs {
     }
 }
 
-pub struct GetCurrentSwap;
+pub struct GetCurrentSwapArgs;
 
-impl Request for GetCurrentSwap {
+impl Request for GetCurrentSwapArgs {
     type Response = serde_json::Value;
 
     async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
@@ -860,13 +860,6 @@ pub async fn get_history(context: Arc<Context>) -> Result<GetHistoryResponse> {
     Ok(GetHistoryResponse { swaps: vec })
 }
 
-#[tracing::instrument(fields(method = "get_raw_states"), skip(context))]
-pub async fn get_raw_states(context: Arc<Context>) -> Result<serde_json::Value> {
-    let raw_history = context.db.raw_all().await?;
-
-    Ok(json!({ "raw_states": raw_history }))
-}
-
 #[tracing::instrument(fields(method = "get_config"), skip(context))]
 pub async fn get_config(context: Arc<Context>) -> Result<serde_json::Value> {
     let data_dir_display = context.config.data_dir.display();
@@ -1164,7 +1157,7 @@ where
                         min_deposit_until_swap_will_start,
                         max_deposit_until_maximum_amount_is_reached,
                         min_bitcoin_lock_tx_fee,
-                        quote: bid_quote.clone(),
+                        quote: bid_quote,
                     },
                 );
             }
