@@ -1,5 +1,6 @@
 pub mod request;
 pub mod tauri_bindings;
+
 use crate::cli::command::{Bitcoin, Monero, Tor};
 use crate::database::open_db;
 use crate::env::{Config as EnvConfig, GetConfig, Mainnet, Testnet};
@@ -14,7 +15,6 @@ use std::fmt;
 use std::future::Future;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex as SyncMutex, Once};
-use tauri::AppHandle;
 use tauri_bindings::TauriHandle;
 use tokio::sync::{broadcast, broadcast::Sender, Mutex as TokioMutex, RwLock};
 use tokio::task::JoinHandle;
@@ -193,7 +193,7 @@ pub struct ContextBuilder {
     is_testnet: bool,
     debug: bool,
     json: bool,
-    tauri_handle: Option<AppHandle>,
+    tauri_handle: Option<TauriHandle>,
 }
 
 impl ContextBuilder {
@@ -246,7 +246,7 @@ impl ContextBuilder {
     }
 
     /// Attach a handle to Tauri to the Context for emitting events etc.
-    pub fn with_tauri(mut self, tauri: impl Into<Option<AppHandle>>) -> Self {
+    pub fn with_tauri(mut self, tauri: impl Into<Option<TauriHandle>>) -> Self {
         self.tauri_handle = tauri.into();
         self
     }
@@ -330,7 +330,7 @@ impl ContextBuilder {
             },
             swap_lock: Arc::new(SwapLock::new()),
             tasks: Arc::new(PendingTaskList::default()),
-            tauri_handle: self.tauri_handle.map(TauriHandle::new),
+            tauri_handle: self.tauri_handle,
         };
 
         Ok(context)
@@ -338,8 +338,8 @@ impl ContextBuilder {
 }
 
 impl Context {
-    pub fn with_tauri_handle(mut self, tauri_handle: AppHandle) -> Self {
-        self.tauri_handle = Some(TauriHandle::new(tauri_handle));
+    pub fn with_tauri_handle(mut self, tauri_handle: impl Into<Option<TauriHandle>>) -> Self {
+        self.tauri_handle = tauri_handle.into();
 
         self
     }

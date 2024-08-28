@@ -6,6 +6,7 @@ use swap::cli::{
             BalanceArgs, BuyXmrArgs, GetHistoryArgs, GetSwapInfosAllArgs, ResumeSwapArgs,
             SuspendCurrentSwapArgs, WithdrawBtcArgs,
         },
+        tauri_bindings::TauriHandle,
         Context, ContextBuilder,
     },
     command::{Bitcoin, Monero},
@@ -86,7 +87,7 @@ tauri_command!(suspend_current_swap, SuspendCurrentSwapArgs, no_args);
 tauri_command!(get_swap_infos_all, GetSwapInfosAllArgs, no_args);
 tauri_command!(get_history, GetHistoryArgs, no_args);
 
-fn setup<'a>(app: &'a mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     tauri::async_runtime::block_on(async {
         let context = ContextBuilder::new(true)
             .with_bitcoin(Bitcoin {
@@ -98,7 +99,7 @@ fn setup<'a>(app: &'a mut tauri::App) -> Result<(), Box<dyn std::error::Error>> 
             })
             .with_json(true)
             .with_debug(true)
-            .with_tauri(app.app_handle().to_owned())
+            .with_tauri(TauriHandle::new(app.app_handle().to_owned()))
             .build()
             .await
             .expect("failed to create context");
