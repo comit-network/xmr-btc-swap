@@ -1,11 +1,15 @@
 import { TauriSwapProgressEvent } from "models/tauriModel";
+import { TauriSwapProgressEventType } from "models/tauriModelExt";
 import SwapStatePage from "../SwapStatePage";
+import ProcessExitedAndNotDonePage from "./ProcessExitedAndNotDonePage";
 
 export default function ProcessExitedPage({
   prevState,
+  currState,
   swapId,
 }: {
   prevState: TauriSwapProgressEvent | null;
+  currState: TauriSwapProgressEventType<"Released">;
   swapId: string;
 }) {
   // If we have a previous state, we can show the user the last state of the swap
@@ -27,15 +31,5 @@ export default function ProcessExitedPage({
     );
   }
 
-  // TODO: Display something useful here
-  return (
-    <>
-      If the swap is not a "done" state (or we don't have a db state because the
-      swap did complete the SwapSetup yet) we should tell the user and show logs
-      Not implemented yet
-    </>
-  );
-
-  // If the swap is not a "done" state (or we don't have a db state because the swap did complete the SwapSetup yet) we should tell the user and show logs
-  // return <ProcessExitedAndNotDonePage state={state} />;
+  return <ProcessExitedAndNotDonePage currState={currState.content} />;
 }

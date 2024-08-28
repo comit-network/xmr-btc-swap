@@ -1,13 +1,13 @@
 import { Box, DialogContentText } from "@material-ui/core";
 import { SwapSpawnType } from "models/cliModel";
-import { SwapStateProcessExited } from "models/storeModel";
+import { TauriSwapProgressEventContent } from "models/tauriModelExt";
 import { useActiveSwapInfo, useAppSelector } from "store/hooks";
 import CliLogsBox from "../../../../other/RenderedCliLog";
 
 export default function ProcessExitedAndNotDonePage({
-  state,
+  currState,
 }: {
-  state: SwapStateProcessExited;
+  currState: TauriSwapProgressEventContent<"Released">;
 }) {
   const swap = useActiveSwapInfo();
   const logs = useAppSelector((s) => s.swap.logs);
@@ -15,7 +15,7 @@ export default function ProcessExitedAndNotDonePage({
 
   function getText() {
     const isCancelRefund = spawnType === SwapSpawnType.CANCEL_REFUND;
-    const hasRpcError = state.rpcError != null;
+    const hasRpcError = currState.error != null;
     const hasSwap = swap != null;
 
     const messages = [];
@@ -58,11 +58,8 @@ export default function ProcessExitedAndNotDonePage({
           gap: "0.5rem",
         }}
       >
-        {state.rpcError && (
-          <CliLogsBox
-            logs={[state.rpcError]}
-            label="Error returned by the Swap Daemon"
-          />
+        {currState.error != null && (
+          <CliLogsBox logs={[currState.error]} label="Error" />
         )}
         <CliLogsBox logs={logs} label="Logs relevant to the swap" />
       </Box>

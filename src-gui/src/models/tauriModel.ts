@@ -138,102 +138,6 @@ export interface SuspendCurrentSwapResponse {
 	swap_id: string;
 }
 
-export interface BuyXmrArgs {
-	seller: string;
-	bitcoin_change_address: string;
-	monero_receive_address: string;
-}
-
-export interface BuyXmrResponse {
-	swap_id: string;
-	quote: BidQuote;
-}
-
-export interface ResumeSwapArgs {
-	swap_id: string;
-}
-
-export interface ResumeSwapResponse {
-	result: string;
-}
-
-export interface CancelAndRefundArgs {
-	swap_id: string;
-}
-
-export interface MoneroRecoveryArgs {
-	swap_id: string;
-}
-
-export interface WithdrawBtcArgs {
-	amount?: number;
-	address: string;
-}
-
-export interface WithdrawBtcResponse {
-	amount: number;
-	txid: string;
-}
-
-export interface ListSellersArgs {
-	rendezvous_point: string;
-}
-
-export interface StartDaemonArgs {
-	server_address: string;
-}
-
-export interface GetSwapInfoArgs {
-	swap_id: string;
-}
-
-export interface GetSwapInfoResponse {
-	swap_id: string;
-	seller: Seller;
-	completed: boolean;
-	start_date: string;
-	state_name: string;
-	xmr_amount: number;
-	btc_amount: number;
-	tx_lock_id: string;
-	tx_cancel_fee: number;
-	tx_refund_fee: number;
-	tx_lock_fee: number;
-	btc_refund_address: string;
-	cancel_timelock: CancelTimelock;
-	punish_timelock: PunishTimelock;
-	timelock?: ExpiredTimelocks;
-}
-
-export interface BalanceArgs {
-	force_refresh: boolean;
-}
-
-export interface BalanceResponse {
-	balance: number;
-}
-
-export interface GetHistoryArgs {
-}
-
-export interface GetHistoryEntry {
-	swap_id: string;
-	state: string;
-}
-
-export interface GetHistoryResponse {
-	swaps: GetHistoryEntry[];
-}
-
-export interface Seller {
-	peer_id: string;
-	addresses: string[];
-}
-
-export interface SuspendCurrentSwapResponse {
-	swap_id: string;
-}
-
 export type TauriSwapProgressEvent = 
 	| { type: "Initiated", content?: undefined }
 	| { type: "ReceivedQuote", content: BidQuote }
@@ -275,7 +179,9 @@ export type TauriSwapProgressEvent =
 	| { type: "CooperativeRedeemRejected", content: {
 	reason: string;
 }}
-	| { type: "Released", content?: undefined };
+	| { type: "Released", content: {
+	error?: string;
+}};
 
 export interface TauriSwapProgressEventWrapper {
 	swap_id: string;

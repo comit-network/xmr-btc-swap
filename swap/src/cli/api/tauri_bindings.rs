@@ -4,6 +4,8 @@
 use anyhow::Result;
 use bitcoin::Txid;
 use serde::Serialize;
+use std::sync::Arc;
+use tauri::{AppHandle, Emitter};
 use typeshare::typeshare;
 use uuid::Uuid;
 
@@ -12,27 +14,15 @@ use crate::{monero, network::quote::BidQuote};
 static SWAP_PROGRESS_EVENT_NAME: &str = "swap-progress-update";
 
 #[derive(Debug, Clone)]
-pub struct TauriHandle(
-    #[cfg(feature = "tauri")]
-    #[cfg_attr(feature = "tauri", allow(unused))]
-    std::sync::Arc<tauri::AppHandle>,
-);
+pub struct TauriHandle(Arc<AppHandle>);
 
 impl TauriHandle {
-    #[cfg(feature = "tauri")]
-    pub fn new(tauri_handle: tauri::AppHandle) -> Self {
-        Self(
-            #[cfg(feature = "tauri")]
-            std::sync::Arc::new(tauri_handle),
-        )
+    pub fn new(tauri_handle: AppHandle) -> Self {
+        Self(Arc::new(tauri_handle))
     }
 
-    #[allow(unused_variables)]
     pub fn emit_tauri_event<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<()> {
-        #[cfg(tauri)]
-        self.0.emit(event, payload).map_err(|e| e.into())?;
-
-        Ok(())
+        self.0.emit(event, payload).map_err(|e| e.into())
     }
 }
 

@@ -4,6 +4,11 @@ import {
   TauriSwapProgressEvent,
 } from "./tauriModel";
 
+export type TauriSwapProgressEventType<T extends string> = Extract<
+  TauriSwapProgressEvent,
+  { type: T }
+>;
+
 export type TauriSwapProgressEventContent<
   T extends TauriSwapProgressEvent["type"],
 > = Extract<TauriSwapProgressEvent, { type: T }>["content"];

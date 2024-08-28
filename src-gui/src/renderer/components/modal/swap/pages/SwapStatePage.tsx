@@ -71,7 +71,13 @@ export default function SwapStatePage({
     case "CooperativeRedeemRejected":
       return <BitcoinPunishedPage />;
     case "Released":
-      return <ProcessExitedPage prevState={state.prev} swapId={state.swapId} />;
+      return (
+        <ProcessExitedPage
+          currState={state.curr}
+          prevState={state.prev}
+          swapId={state.swapId}
+        />
+      );
     default:
       // TODO: Use this when we have all states implemented, ensures we don't forget to implement a state
       // return exhaustiveGuard(state.curr.type);
