@@ -1,13 +1,9 @@
-/**
- * TOOD: Perhaps we should move this to the `src-tauri` package.
- */
+use crate::{monero, network::quote::BidQuote};
 use anyhow::Result;
 use bitcoin::Txid;
 use serde::Serialize;
 use typeshare::typeshare;
 use uuid::Uuid;
-
-use crate::{monero, network::quote::BidQuote};
 
 static SWAP_PROGRESS_EVENT_NAME: &str = "swap-progress-update";
 
@@ -29,8 +25,8 @@ impl TauriHandle {
 
     #[allow(unused_variables)]
     pub fn emit_tauri_event<S: Serialize + Clone>(&self, event: &str, payload: S) -> Result<()> {
-        #[cfg(tauri)]
-        self.0.emit(event, payload).map_err(|e| e.into())?;
+        #[cfg(feature = "tauri")]
+        tauri::Emitter::emit(self.0.as_ref(), event, payload).map_err(anyhow::Error::from)?;
 
         Ok(())
     }

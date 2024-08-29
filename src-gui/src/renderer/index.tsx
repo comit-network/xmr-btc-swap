@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
+import { PersistGate } from "redux-persist/integration/react";
 import { setAlerts } from "store/features/alertsSlice";
 import { setRegistryProviders } from "store/features/providersSlice";
 import { setBtcPrice, setXmrPrice } from "store/features/ratesSlice";
@@ -12,7 +13,7 @@ import {
 } from "./api";
 import App from "./components/App";
 import { checkBitcoinBalance, getRawSwapInfos } from "./rpc";
-import { store } from "./store/storeRenderer";
+import { persistor, store } from "./store/storeRenderer";
 
 setInterval(() => {
   checkBitcoinBalance();
@@ -23,7 +24,9 @@ const container = document.getElementById("root");
 const root = createRoot(container!);
 root.render(
   <Provider store={store}>
-    <App />
+    <PersistGate loading={null} persistor={persistor}>
+      <App />
+    </PersistGate>
   </Provider>,
 );
 
