@@ -27,7 +27,7 @@ pub const DEFAULT_MONERO_DAEMON_ADDRESS_STAGENET: &str = "stagenet.community.rin
 // See: https://1209k.com/bitcoin-eye/ele.php?chain=btc
 const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://blockstream.info:700";
 // See: https://1209k.com/bitcoin-eye/ele.php?chain=tbtc
-pub const DEFAULT_ELECTRUM_RPC_URL_TESTNET: &str = "ssl://bitcoin-testnet.stackwallet.com:51002";
+pub const DEFAULT_ELECTRUM_RPC_URL_TESTNET: &str = "ssl://testnet.foundation.xyz:50002";
 
 const DEFAULT_BITCOIN_CONFIRMATION_TARGET: usize = 1;
 pub const DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET: usize = 1;
