@@ -15,6 +15,7 @@
     "@material-ui/lab": "^4.0.0-alpha.61",
     "@reduxjs/toolkit": "^2.2.6",
     "@tauri-apps/api": "2.0.0-rc.1",
+    "@tauri-apps/plugin-clipboard-manager": "^2.0.0-rc.0",
     "humanize-duration": "^3.32.1",
     "lodash": "^4.17.21",
     "multiaddr": "^10.0.1",

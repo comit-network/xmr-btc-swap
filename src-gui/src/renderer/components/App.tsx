@@ -34,6 +34,11 @@ const theme = createTheme({
       disableRipple: true,
     },
   },
+  typography: {
+    overline: {
+      textTransform: 'none', // This prevents the text from being all caps
+    },
+  }
 });
 
 function InnerContent() {

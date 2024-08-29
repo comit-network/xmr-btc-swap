@@ -1,8 +1,7 @@
-import { Box, Typography } from "@material-ui/core";
-import FileCopyOutlinedIcon from "@material-ui/icons/FileCopyOutlined";
+import { Box } from "@material-ui/core";
 import { ReactNode } from "react";
+import CopyableMonospaceTextBox from "renderer/components/other/CopyableMonospaceTextBox";
 import BitcoinQrCode from "./BitcoinQrCode";
-import ClipboardIconButton from "./ClipbiardIconButton";
 import InfoBox from "./InfoBox";
 
 type Props = {
@@ -21,29 +20,18 @@ export default function DepositAddressInfoBox({
   return (
     <InfoBox
       title={title}
-      mainContent={<Typography variant="h5">{address}</Typography>}
+      mainContent={<CopyableMonospaceTextBox address={address} />}
       additionalContent={
-        <Box>
-          <Box>
-            <ClipboardIconButton
-              text={address}
-              endIcon={<FileCopyOutlinedIcon />}
-              color="primary"
-              variant="contained"
-              size="medium"
-            />
-            <Box
-              style={{
-                display: "flex",
-                flexDirection: "row",
-                gap: "0.5rem",
-                alignItems: "center",
-              }}
-            >
-              <Box>{additionalContent}</Box>
-              <BitcoinQrCode address={address} />
-            </Box>
-          </Box>
+        <Box
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            gap: "0.5rem",
+            alignItems: "center",
+          }}
+        >
+          <Box>{additionalContent}</Box>
+          <BitcoinQrCode address={address} />
         </Box>
       }
       icon={icon}

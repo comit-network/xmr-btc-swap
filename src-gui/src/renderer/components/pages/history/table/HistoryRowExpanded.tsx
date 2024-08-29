@@ -8,7 +8,10 @@ import {
   TableContainer,
   TableRow,
 } from "@material-ui/core";
+import { OpenInNew } from "@material-ui/icons";
 import { GetSwapInfoResponse } from "models/tauriModel";
+import CopyableMonospaceTextBox from "renderer/components/other/CopyableAddress";
+import MonospaceTextBox from "renderer/components/other/InlineCode";
 import {
   MoneroBitcoinExchangeRate,
   PiconeroAmount,
@@ -85,7 +88,11 @@ export default function HistoryRowExpanded({
             <TableRow>
               <TableCell>Provider Address</TableCell>
               <TableCell>
-                <Box>{swap.seller.addresses.join(", ")}</Box>
+                <Box>
+                  {swap.seller.addresses.map((addr) => (
+                    <CopyableMonospaceTextBox key={addr} address={addr} />
+                  ))}
+                </Box>
               </TableCell>
             </TableRow>
             <TableRow>
@@ -95,7 +102,10 @@ export default function HistoryRowExpanded({
                   href={getBitcoinTxExplorerUrl(swap.tx_lock_id, isTestnet())}
                   target="_blank"
                 >
-                  {swap.tx_lock_id}
+                  <MonospaceTextBox
+                    content={swap.tx_lock_id}
+                    endIcon={<OpenInNew />}
+                  />
                 </Link>
               </TableCell>
             </TableRow>

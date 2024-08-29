@@ -61,7 +61,7 @@ export function SwapCancelRefundButton({
 export default function HistoryRowActions(swap: GetSwapInfoResponse) {
   if (swap.state_name === BobStateName.XmrRedeemed) {
     return (
-      <Tooltip title="The swap is completed because you have redeemed the XMR">
+      <Tooltip title="This swap is completed. You have redeemed the Monero.">
         <DoneIcon style={{ color: green[500] }} />
       </Tooltip>
     );
@@ -69,7 +69,7 @@ export default function HistoryRowActions(swap: GetSwapInfoResponse) {
 
   if (swap.state_name === BobStateName.BtcRefunded) {
     return (
-      <Tooltip title="The swap is completed because your BTC have been refunded">
+      <Tooltip title="This swap is completed. Your Bitcoin has been refunded.">
         <DoneIcon style={{ color: green[500] }} />
       </Tooltip>
     );
@@ -79,7 +79,7 @@ export default function HistoryRowActions(swap: GetSwapInfoResponse) {
   // See this PR: https://github.com/UnstoppableSwap/unstoppableswap-gui/pull/212
   if (swap.state_name === BobStateName.BtcPunished) {
     return (
-      <Tooltip title="The swap is completed because you have been punished">
+      <Tooltip title="This swap is completed. You have been punished.">
         <ErrorIcon style={{ color: red[500] }} />
       </Tooltip>
     );

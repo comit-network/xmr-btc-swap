@@ -26,7 +26,7 @@ const useStyles = makeStyles((theme) => ({
   upperContent: {
     display: "flex",
     alignItems: "center",
-    gap: theme.spacing(0.5),
+    gap: theme.spacing(1),
   },
 }));
 
