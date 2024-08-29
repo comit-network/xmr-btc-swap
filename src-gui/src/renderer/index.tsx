@@ -18,7 +18,7 @@ import { persistor, store } from "./store/storeRenderer";
 setInterval(() => {
   checkBitcoinBalance();
   getRawSwapInfos();
-}, 5000);
+}, 30 * 1000);
 
 const container = document.getElementById("root");
 const root = createRoot(container!);
@@ -65,3 +65,4 @@ async function fetchInitialData() {
 }
 
 fetchInitialData();
+initEventListeners();

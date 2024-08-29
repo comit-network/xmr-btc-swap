@@ -19,10 +19,12 @@ import { store } from "./store/storeRenderer";
 import { Provider } from "models/apiModel";
 import { providerToConcatenatedMultiAddr } from "utils/multiAddrUtils";
 
-listen<TauriSwapProgressEventWrapper>("swap-progress-update", (event) => {
-  console.log("Received swap progress event", event.payload);
-  store.dispatch(swapTauriEventReceived(event.payload));
-});
+export async function initEventListeners() {
+  listen<TauriSwapProgressEventWrapper>("swap-progress-update", (event) => {
+    console.log("Received swap progress event", event.payload);
+    store.dispatch(swapTauriEventReceived(event.payload));
+  });
+}
 
 async function invoke<ARGS, RESPONSE>(
   command: string,
