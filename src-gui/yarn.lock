@@ -2372,6 +2372,13 @@ minimatch@^3.1.2:
   dependencies:
     brace-expansion "^1.1.7"
 
+minimatch@^5.1.1:
+  version "5.1.6"
+  resolved "https://registry.yarnpkg.com/minimatch/-/minimatch-5.1.6.tgz#1cfcb8cf5522ea69952cd2af95ae09477f122a96"
+  integrity sha512-lKwV/1brpG6mBUFHtb7NUmtABCb2WZZmm2wNiOA5hAb8VdCS4B3dtMWyvcoViccwAW/COERjXLt0zP1zXUN26g==
+  dependencies:
+    brace-expansion "^2.0.1"
+
 minimatch@^9.0.4:
   version "9.0.5"
   resolved "https://registry.yarnpkg.com/minimatch/-/minimatch-9.0.5.tgz#d74f9dd6b57d83d8e98cfb82133b03978bc929e5"
@@ -3293,6 +3300,13 @@ virtua@^0.33.2:
   version "0.33.2"
   resolved "https://registry.yarnpkg.com/virtua/-/virtua-0.33.2.tgz#b9596387bc77664293359d438319e81180a0e051"
   integrity sha512-4NgtryQH/idQ3oKkwM6DRCoCsn+IrjrStGcDOARPdlY7zIg0AtTcUq24nysM8YyHoS6KhqcVe8A3+lHJidNQWA==
+
+vite-plugin-watch@^0.3.1:
+  version "0.3.1"
+  resolved "https://registry.yarnpkg.com/vite-plugin-watch/-/vite-plugin-watch-0.3.1.tgz#5000f7ded6eb1c42e9483d6ea3d812061ab8188f"
+  integrity sha512-tmLJ5tqSqXY7wSXoM8+huOgbictUG6SKLh/tZ6LAY51KPSAnPBr0dYwyxPPPQm+JgIIBbKSyNnPHpW11ad+qlw==
+  dependencies:
+    minimatch "^5.1.1"
 
 vite-tsconfig-paths@^4.3.2:
   version "4.3.2"
