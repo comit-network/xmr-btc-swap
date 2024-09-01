@@ -3,6 +3,7 @@ use crate::bitcoin::{CancelTimelock, ExpiredTimelocks, PunishTimelock, TxLock};
 use crate::cli::api::tauri_bindings::{TauriEmitter, TauriSwapProgressEvent};
 use crate::cli::api::Context;
 use crate::cli::{list_sellers as list_sellers_impl, EventLoop, SellerStatus};
+use crate::common::get_logs;
 use crate::libp2p_ext::MultiAddrExt;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
 use crate::network::swarm;
@@ -21,6 +22,7 @@ use std::cmp::min;
 use std::convert::TryInto;
 use std::future::Future;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::Instrument;
@@ -351,6 +353,36 @@ impl Request for GetSwapInfosAllArgs {
 
     async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
         get_swap_infos_all(ctx).await
+    }
+}
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetLogsArgs {
+    pub swap_id: Option<Uuid>,
+    pub redact: bool,
+    #[typeshare(serialized_as = "string")]
+    pub logs_dir: Option<PathBuf>,
+}
+
+#[typeshare]
+#[derive(Serialize, Debug)]
+pub struct GetLogsResponse {
+    logs: Vec<String>,
+}
+
+impl Request for GetLogsArgs {
+    type Response = GetLogsResponse;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        let dir = self.logs_dir.unwrap_or(ctx.config.data_dir.join("logs"));
+        let logs = get_logs(dir, self.swap_id, self.redact).await?;
+
+        for msg in &logs {
+            println!("{msg}");
+        }
+
+        Ok(GetLogsResponse { logs })
     }
 }
 

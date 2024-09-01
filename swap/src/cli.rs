@@ -4,7 +4,6 @@ pub mod cancel_and_refund;
 pub mod command;
 mod event_loop;
 mod list_sellers;
-pub mod tracing;
 pub mod transport;
 
 pub use behaviour::{Behaviour, OutEvent};

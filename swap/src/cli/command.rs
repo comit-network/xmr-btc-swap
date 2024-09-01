@@ -18,6 +18,7 @@ use structopt::{clap, StructOpt};
 use url::Url;
 use uuid::Uuid;
 
+use super::api::request::GetLogsArgs;
 use super::api::ContextBuilder;
 
 // See: https://moneroworld.com/
@@ -113,6 +114,30 @@ where
             );
 
             GetHistoryArgs {}.request(context.clone()).await?;
+
+            Ok(context)
+        }
+        CliCommand::Logs {
+            logs_dir,
+            redact,
+            swap_id,
+        } => {
+            let context = Arc::new(
+                ContextBuilder::new(is_testnet)
+                    .with_data_dir(data)
+                    .with_debug(debug)
+                    .with_json(json)
+                    .build()
+                    .await?,
+            );
+
+            GetLogsArgs {
+                logs_dir,
+                redact,
+                swap_id,
+            }
+            .request(context.clone())
+            .await?;
 
             Ok(context)
         }
@@ -366,6 +391,25 @@ enum CliCommand {
     },
     /// Show a list of past, ongoing and completed swaps
     History,
+    /// Output all logging messages that have been issued.
+    Logs {
+        #[structopt(
+            short = "d",
+            help = "Print the logs from this directory instead of the default one."
+        )]
+        logs_dir: Option<PathBuf>,
+        #[structopt(
+            help = "Redact swap-ids, Bitcoin and Monero addresses.",
+            long = "redact"
+        )]
+        redact: bool,
+        #[structopt(
+            long = "swap-id",
+            help = "Filter for logs concerning this swap.",
+            long_help = "This checks whether each logging message contains the swap id. Some messages might be skipped when they don't contain the swap id even though they're relevant."
+        )]
+        swap_id: Option<Uuid>,
+    },
     #[structopt(about = "Prints the current config")]
     Config,
     #[structopt(about = "Allows withdrawing BTC from the internal Bitcoin wallet.")]

@@ -97,7 +97,7 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             .with_monero(Monero {
                 monero_daemon_address: None,
             })
-            .with_json(true)
+            .with_json(false)
             .with_debug(true)
             .with_tauri(TauriHandle::new(app.app_handle().to_owned()))
             .build()

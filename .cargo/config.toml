@@ -1,5 +1,6 @@
 [target.armv7-unknown-linux-gnueabihf]
 linker = "arm-linux-gnueabihf-gcc"
 
+# windows defaults to smaller stack sizes which isn't enough
 [target.'cfg(windows)']
 rustflags = ["-C", "link-args=/STACK:8388608"]

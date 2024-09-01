@@ -2,14 +2,16 @@ pub mod request;
 pub mod tauri_bindings;
 
 use crate::cli::command::{Bitcoin, Monero, Tor};
+use crate::common::tracing_util::Format;
 use crate::database::open_db;
 use crate::env::{Config as EnvConfig, GetConfig, Mainnet, Testnet};
 use crate::fs::system_data_dir;
 use crate::network::rendezvous::XmrBtcNamespace;
 use crate::protocol::Database;
 use crate::seed::Seed;
-use crate::{bitcoin, cli, monero};
-use anyhow::{anyhow, bail, Context as AnyContext, Error, Result};
+use crate::{bitcoin, common, monero};
+use anyhow::anyhow;
+use anyhow::{bail, Context as AnyContext, Error, Result};
 use futures::future::try_join_all;
 use std::fmt;
 use std::future::Future;
@@ -18,6 +20,8 @@ use std::sync::{Arc, Mutex as SyncMutex, Once};
 use tauri_bindings::TauriHandle;
 use tokio::sync::{broadcast, broadcast::Sender, Mutex as TokioMutex, RwLock};
 use tokio::task::JoinHandle;
+use tracing::level_filters::LevelFilter;
+use tracing::Level;
 use url::Url;
 use uuid::Uuid;
 
@@ -274,8 +278,15 @@ impl ContextBuilder {
         let data_dir = data::data_dir_from(self.data, self.is_testnet)?;
         let env_config = env_config_from(self.is_testnet);
 
+        let format = if self.json { Format::Json } else { Format::Raw };
+        let level_filter = if self.debug {
+            LevelFilter::from_level(Level::DEBUG)
+        } else {
+            LevelFilter::from_level(Level::INFO)
+        };
+
         START.call_once(|| {
-            let _ = cli::tracing::init(self.debug, self.json, data_dir.join("logs"));
+            let _ = common::tracing_util::init(level_filter, format, data_dir.join("logs"));
         });
 
         let seed = Seed::from_file_or_generate(data_dir.as_path())

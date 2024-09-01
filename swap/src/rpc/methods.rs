@@ -1,6 +1,6 @@
 use crate::bitcoin::bitcoin_address;
 use crate::cli::api::request::{
-    BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, GetCurrentSwapArgs, GetHistoryArgs,
+    BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, GetCurrentSwapArgs, GetHistoryArgs, GetLogsArgs,
     GetSwapInfoArgs, ListSellersArgs, MoneroRecoveryArgs, Request, ResumeSwapArgs,
     SuspendCurrentSwapArgs, WithdrawBtcArgs,
 };
@@ -46,6 +46,14 @@ pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
             .request(context)
             .await
             .to_jsonrpsee_result()
+    })?;
+
+    module.register_async_method("get_logs", |params_raw, context| async move {
+        let params: GetLogsArgs = params_raw.parse()?;
+
+        let logs = params.request(context).await?;
+
+        Ok(logs)
     })?;
 
     module.register_async_method("resume_swap", |params_raw, context| async move {
