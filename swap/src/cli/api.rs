@@ -17,7 +17,9 @@ use std::fmt;
 use std::future::Future;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex as SyncMutex, Once};
-use tauri_bindings::TauriHandle;
+use tauri_bindings::{
+    TauriContextInitializationProgress, TauriContextStatusEvent, TauriEmitter, TauriHandle,
+};
 use tokio::sync::{broadcast, broadcast::Sender, Mutex as TokioMutex, RwLock};
 use tokio::task::JoinHandle;
 use tracing::level_filters::LevelFilter;
@@ -292,6 +294,13 @@ impl ContextBuilder {
         let seed = Seed::from_file_or_generate(data_dir.as_path())
             .context("Failed to read seed in file")?;
 
+        // We initialize the Bitcoin wallet below
+        // To display the progress to the user, we emit events to the Tauri frontend
+        self.tauri_handle
+            .emit_context_init_progress_event(TauriContextStatusEvent::Initializing(
+                TauriContextInitializationProgress::OpeningBitcoinWallet,
+            ));
+
         let bitcoin_wallet = {
             if let Some(bitcoin) = self.bitcoin {
                 let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
@@ -311,6 +320,13 @@ impl ContextBuilder {
             }
         };
 
+        // We initialize the Monero wallet below
+        // To display the progress to the user, we emit events to the Tauri frontend
+        self.tauri_handle
+            .emit_context_init_progress_event(TauriContextStatusEvent::Initializing(
+                TauriContextInitializationProgress::OpeningMoneroWallet,
+            ));
+
         let (monero_wallet, monero_rpc_process) = {
             if let Some(monero) = self.monero {
                 let monero_daemon_address = monero.apply_defaults(self.is_testnet);
@@ -322,10 +338,19 @@ impl ContextBuilder {
             }
         };
 
+        // We initialize the Database below
+        // To display the progress to the user, we emit events to the Tauri frontend
+        self.tauri_handle
+            .emit_context_init_progress_event(TauriContextStatusEvent::Initializing(
+                TauriContextInitializationProgress::OpeningDatabase,
+            ));
+
+        let db = open_db(data_dir.join("sqlite")).await?;
+
         let tor_socks5_port = self.tor.map_or(9050, |tor| tor.tor_socks5_port);
 
         let context = Context {
-            db: open_db(data_dir.join("sqlite")).await?,
+            db,
             bitcoin_wallet,
             monero_wallet,
             monero_rpc_process,

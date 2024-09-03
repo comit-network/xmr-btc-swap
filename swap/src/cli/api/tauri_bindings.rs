@@ -2,10 +2,12 @@ use crate::{monero, network::quote::BidQuote};
 use anyhow::Result;
 use bitcoin::Txid;
 use serde::Serialize;
+use strum::Display;
 use typeshare::typeshare;
 use uuid::Uuid;
 
 static SWAP_PROGRESS_EVENT_NAME: &str = "swap-progress-update";
+static CONTEXT_INIT_PROGRESS_EVENT_NAME: &str = "context-init-progress-update";
 
 #[derive(Debug, Clone)]
 pub struct TauriHandle(
@@ -41,6 +43,10 @@ pub trait TauriEmitter {
             TauriSwapProgressEventWrapper { swap_id, event },
         );
     }
+
+    fn emit_context_init_progress_event(&self, event: TauriContextStatusEvent) {
+        let _ = self.emit_tauri_event(CONTEXT_INIT_PROGRESS_EVENT_NAME, event);
+    }
 }
 
 impl TauriEmitter for TauriHandle {
@@ -56,6 +62,23 @@ impl TauriEmitter for Option<TauriHandle> {
             None => Ok(()),
         }
     }
+}
+
+#[typeshare]
+#[derive(Display, Clone, Serialize)]
+pub enum TauriContextInitializationProgress {
+    OpeningBitcoinWallet,
+    OpeningMoneroWallet,
+    OpeningDatabase,
+}
+
+#[typeshare]
+#[derive(Display, Clone, Serialize)]
+#[serde(tag = "type", content = "content")]
+pub enum TauriContextStatusEvent {
+    Initializing(TauriContextInitializationProgress),
+    Available,
+    Failed,
 }
 
 #[derive(Serialize, Clone)]

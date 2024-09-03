@@ -9,11 +9,16 @@ import {
   ResumeSwapArgs,
   ResumeSwapResponse,
   SuspendCurrentSwapResponse,
+  TauriContextStatusEvent,
   TauriSwapProgressEventWrapper,
   WithdrawBtcArgs,
   WithdrawBtcResponse,
 } from "models/tauriModel";
-import { rpcSetBalance, rpcSetSwapInfo } from "store/features/rpcSlice";
+import {
+  contextStatusEventReceived,
+  rpcSetBalance,
+  rpcSetSwapInfo,
+} from "store/features/rpcSlice";
 import { swapTauriEventReceived } from "store/features/swapSlice";
 import { store } from "./store/storeRenderer";
 import { Provider } from "models/apiModel";
@@ -23,6 +28,11 @@ export async function initEventListeners() {
   listen<TauriSwapProgressEventWrapper>("swap-progress-update", (event) => {
     console.log("Received swap progress event", event.payload);
     store.dispatch(swapTauriEventReceived(event.payload));
+  });
+
+  listen<TauriContextStatusEvent>("context-init-progress-update", (event) => {
+    console.log("Received context init progress event", event.payload);
+    store.dispatch(contextStatusEventReceived(event.payload));
   });
 }
 
@@ -47,7 +57,7 @@ export async function checkBitcoinBalance() {
   store.dispatch(rpcSetBalance(response.balance));
 }
 
-export async function getRawSwapInfos() {
+export async function getAllSwapInfos() {
   const response =
     await invokeNoArgs<GetSwapInfoResponse[]>("get_swap_infos_all");
 

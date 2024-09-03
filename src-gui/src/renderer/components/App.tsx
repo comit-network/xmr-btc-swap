@@ -26,19 +26,11 @@ const theme = createTheme({
     },
     secondary: indigo,
   },
-  transitions: {
-    create: () => "none",
-  },
-  props: {
-    MuiButtonBase: {
-      disableRipple: true,
-    },
-  },
   typography: {
     overline: {
-      textTransform: 'none', // This prevents the text from being all caps
+      textTransform: "none", // This prevents the text from being all caps
     },
-  }
+  },
 });
 
 function InnerContent() {

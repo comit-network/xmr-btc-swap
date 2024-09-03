@@ -1,31 +1,11 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { ExtendedProviderStatus, ProviderStatus } from "models/apiModel";
-import { GetSwapInfoResponse } from "models/tauriModel";
-import { CliLog } from "../../models/cliModel";
 import {
-  MoneroRecoveryResponse,
-  RpcProcessStateType,
-} from "../../models/rpcModel";
+  GetSwapInfoResponse,
+  TauriContextStatusEvent,
+} from "models/tauriModel";
+import { MoneroRecoveryResponse } from "../../models/rpcModel";
 import { GetSwapInfoResponseExt } from "models/tauriModelExt";
-
-type Process =
-  | {
-      type: RpcProcessStateType.STARTED;
-      logs: (CliLog | string)[];
-    }
-  | {
-      type: RpcProcessStateType.LISTENING_FOR_CONNECTIONS;
-      logs: (CliLog | string)[];
-      address: string;
-    }
-  | {
-      type: RpcProcessStateType.EXITED;
-      logs: (CliLog | string)[];
-      exitCode: number | null;
-    }
-  | {
-      type: RpcProcessStateType.NOT_STARTED;
-    };
 
 interface State {
   balance: number | null;
@@ -48,15 +28,13 @@ interface State {
 }
 
 export interface RPCSlice {
-  process: Process;
+  status: TauriContextStatusEvent | null;
   state: State;
   busyEndpoints: string[];
 }
 
 const initialState: RPCSlice = {
-  process: {
-    type: RpcProcessStateType.NOT_STARTED,
-  },
+  status: null,
   state: {
     balance: null,
     withdrawTxId: null,
@@ -77,35 +55,11 @@ export const rpcSlice = createSlice({
   name: "rpc",
   initialState,
   reducers: {
-    rpcInitiate(slice) {
-      slice.process = {
-        type: RpcProcessStateType.STARTED,
-        logs: [],
-      };
-    },
-    rpcProcessExited(
+    contextStatusEventReceived(
       slice,
-      action: PayloadAction<{
-        exitCode: number | null;
-        exitSignal: NodeJS.Signals | null;
-      }>,
+      action: PayloadAction<TauriContextStatusEvent>,
     ) {
-      if (
-        slice.process.type === RpcProcessStateType.STARTED ||
-        slice.process.type === RpcProcessStateType.LISTENING_FOR_CONNECTIONS
-      ) {
-        slice.process = {
-          type: RpcProcessStateType.EXITED,
-          logs: slice.process.logs,
-          exitCode: action.payload.exitCode,
-        };
-        slice.state.moneroWalletRpc = {
-          updateState: false,
-        };
-        slice.state.moneroWallet = {
-          isSyncing: false,
-        };
-      }
+      slice.status = action.payload;
     },
     rpcSetBalance(slice, action: PayloadAction<number>) {
       slice.state.balance = action.payload;
@@ -156,8 +110,7 @@ export const rpcSlice = createSlice({
 });
 
 export const {
-  rpcProcessExited,
-  rpcInitiate,
+  contextStatusEventReceived,
   rpcSetBalance,
   rpcSetWithdrawTxId,
   rpcResetWithdrawTxId,

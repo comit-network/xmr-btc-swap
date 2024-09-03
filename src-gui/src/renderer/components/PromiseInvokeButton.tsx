@@ -1,33 +1,44 @@
-import { Button, ButtonProps, IconButton } from "@material-ui/core";
+import {
+  Button,
+  ButtonProps,
+  IconButton,
+  IconButtonProps,
+  Tooltip,
+} from "@material-ui/core";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import { useSnackbar } from "notistack";
 import { ReactNode, useState } from "react";
+import { useIsContextAvailable } from "store/hooks";
 
 interface PromiseInvokeButtonProps<T> {
-  onSuccess?: (data: T) => void;
+  onSuccess: (data: T) => void | null;
   onClick: () => Promise<T>;
-  onPendingChange?: (isPending: boolean) => void;
-  isLoadingOverride?: boolean;
-  isIconButton?: boolean;
-  loadIcon?: ReactNode;
-  disabled?: boolean;
-  displayErrorSnackbar?: boolean;
-  tooltipTitle?: string;
+  onPendingChange: (isPending: boolean) => void | null;
+  isLoadingOverride: boolean;
+  isIconButton: boolean;
+  loadIcon: ReactNode;
+  disabled: boolean;
+  displayErrorSnackbar: boolean;
+  tooltipTitle: string | null;
+  requiresContext: boolean;
 }
 
 export default function PromiseInvokeButton<T>({
-  disabled,
-  onSuccess,
+  disabled = false,
+  onSuccess = null,
   onClick,
   endIcon,
-  loadIcon,
-  isLoadingOverride,
-  isIconButton,
-  displayErrorSnackbar,
-  onPendingChange,
+  loadIcon = null,
+  isLoadingOverride = false,
+  isIconButton = false,
+  displayErrorSnackbar = false,
+  onPendingChange = null,
+  requiresContext = true,
+  tooltipTitle = null,
   ...rest
 }: ButtonProps & PromiseInvokeButtonProps<T>) {
   const { enqueueSnackbar } = useSnackbar();
+  const isContextAvailable = useIsContextAvailable();
 
   const [isPending, setIsPending] = useState(false);
 
@@ -36,7 +47,7 @@ export default function PromiseInvokeButton<T>({
     ? loadIcon || <CircularProgress size={24} />
     : endIcon;
 
-  async function handleClick(event: React.MouseEvent<HTMLButtonElement>) {
+  async function handleClick() {
     if (!isPending) {
       try {
         onPendingChange?.(true);
@@ -57,18 +68,34 @@ export default function PromiseInvokeButton<T>({
     }
   }
 
-  const isDisabled = disabled || isLoading;
+  const requiresContextButNotAvailable = requiresContext && !isContextAvailable;
+  const isDisabled = disabled || isLoading || requiresContextButNotAvailable;
 
-  return isIconButton ? (
-    <IconButton onClick={handleClick} disabled={isDisabled} {...(rest as any)}>
-      {actualEndIcon}
-    </IconButton>
-  ) : (
-    <Button
-      onClick={handleClick}
-      disabled={isDisabled}
-      endIcon={actualEndIcon}
-      {...rest}
-    />
+  const actualTooltipTitle =
+    (requiresContextButNotAvailable
+      ? "Wait for the application to load all required components"
+      : tooltipTitle) ?? "";
+
+  return (
+    <Tooltip title={actualTooltipTitle}>
+      <span>
+        {isIconButton ? (
+          <IconButton
+            onClick={handleClick}
+            disabled={isDisabled}
+            {...(rest as IconButtonProps)}
+          >
+            {actualEndIcon}
+          </IconButton>
+        ) : (
+          <Button
+            onClick={handleClick}
+            disabled={isDisabled}
+            endIcon={actualEndIcon}
+            {...rest}
+          />
+        )}
+      </span>
+    </Tooltip>
   );
 }

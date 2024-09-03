@@ -2,9 +2,8 @@ import { Box, makeStyles } from "@material-ui/core";
 import FolderOpenIcon from "@material-ui/icons/FolderOpen";
 import PlayArrowIcon from "@material-ui/icons/PlayArrow";
 import StopIcon from "@material-ui/icons/Stop";
-import { RpcProcessStateType } from "models/rpcModel";
 import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
-import { useAppSelector } from "store/hooks";
+import { useIsContextAvailable } from "store/hooks";
 import InfoBox from "../../modal/swap/InfoBox";
 import CliLogsBox from "../../other/RenderedCliLog";
 
@@ -17,20 +16,17 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 export default function RpcControlBox() {
-  const rpcProcess = useAppSelector((state) => state.rpc.process);
-  const isRunning =
-    rpcProcess.type === RpcProcessStateType.STARTED ||
-    rpcProcess.type === RpcProcessStateType.LISTENING_FOR_CONNECTIONS;
+  const isRunning = useIsContextAvailable();
   const classes = useStyles();
 
   return (
     <InfoBox
-      title={`Swap Daemon (${rpcProcess.type})`}
+      title={`Daemon Controller`}
       mainContent={
-        isRunning || rpcProcess.type === RpcProcessStateType.EXITED ? (
+        isRunning ? (
           <CliLogsBox
             label="Swap Daemon Logs (current session only)"
-            logs={rpcProcess.logs}
+            logs={[]}
           />
         ) : null
       }

@@ -23,6 +23,10 @@ export function useIsSwapRunning() {
   );
 }
 
+export function useIsContextAvailable() {
+  return useAppSelector((state) => state.rpc.status?.type === "Available");
+}
+
 export function useSwapInfo(swapId: string | null) {
   return useAppSelector((state) =>
     swapId ? (state.rpc.state.swapInfos[swapId] ?? null) : null,

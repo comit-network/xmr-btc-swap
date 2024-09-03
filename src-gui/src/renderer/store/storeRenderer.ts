@@ -2,6 +2,7 @@ import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import { persistReducer, persistStore } from "redux-persist";
 import sessionStorage from "redux-persist/lib/storage/session";
 import { reducers } from "store/combinedReducer";
+import { createMainListeners } from "store/middleware/storeListener";
 
 // We persist the redux store in sessionStorage
 // The point of this is to preserve the store across reloads while not persisting it across GUI restarts
@@ -20,6 +21,8 @@ const persistedReducer = persistReducer(
 
 export const store = configureStore({
   reducer: persistedReducer,
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().prepend(createMainListeners().middleware),
 });
 
 export const persistor = persistStore(store);

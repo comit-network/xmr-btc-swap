@@ -1,6 +1,7 @@
 import { Box, makeStyles } from "@material-ui/core";
 import GitHubIcon from "@material-ui/icons/GitHub";
 import RedditIcon from "@material-ui/icons/Reddit";
+import DaemonStatusAlert from "../alert/DaemonStatusAlert";
 import FundsLeftInWalletAlert from "../alert/FundsLeftInWalletAlert";
 import MoneroWalletRpcUpdatingAlert from "../alert/MoneroWalletRpcUpdatingAlert";
 import UnfinishedSwapsAlert from "../alert/UnfinishedSwapsAlert";
@@ -28,11 +29,7 @@ export default function NavigationFooter() {
     <Box className={classes.outer}>
       <FundsLeftInWalletAlert />
       <UnfinishedSwapsAlert />
-
-      {
-        // TODO: Uncomment when we have implemented a way for the UI to be displayed before the context has been initialized
-        // <RpcStatusAlert />
-      }
+      <DaemonStatusAlert />
       <MoneroWalletRpcUpdatingAlert />
       <Box className={classes.linksOuter}>
         <LinkIconButton url="https://reddit.com/r/unstoppableswap">

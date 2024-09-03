@@ -12,12 +12,16 @@ import {
   fetchXmrPrice,
 } from "./api";
 import App from "./components/App";
-import { checkBitcoinBalance, getRawSwapInfos } from "./rpc";
+import {
+  checkBitcoinBalance,
+  getAllSwapInfos,
+  initEventListeners,
+} from "./rpc";
 import { persistor, store } from "./store/storeRenderer";
 
 setInterval(() => {
   checkBitcoinBalance();
-  getRawSwapInfos();
+  getAllSwapInfos();
 }, 30 * 1000);
 
 const container = document.getElementById("root");
