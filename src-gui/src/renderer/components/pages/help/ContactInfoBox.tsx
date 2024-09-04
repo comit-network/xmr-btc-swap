@@ -1,4 +1,5 @@
 import { Box, Button, makeStyles, Typography } from "@material-ui/core";
+import { open } from "@tauri-apps/plugin-shell";
 import InfoBox from "../../modal/swap/InfoBox";
 
 const useStyles = makeStyles((theme) => ({
@@ -27,19 +28,13 @@ export default function ContactInfoBox() {
       }
       additionalContent={
         <Box className={classes.spacedBox}>
-          <Button
-            variant="outlined"
-            onClick={() => window.open(GITHUB_ISSUE_URL)}
-          >
+          <Button variant="outlined" onClick={() => open(GITHUB_ISSUE_URL)}>
             Open GitHub issue
           </Button>
-          <Button
-            variant="outlined"
-            onClick={() => window.open(MATRIX_ROOM_URL)}
-          >
+          <Button variant="outlined" onClick={() => open(MATRIX_ROOM_URL)}>
             Join Matrix room
           </Button>
-          <Button variant="outlined" onClick={() => window.open(DISCORD_URL)}>
+          <Button variant="outlined" onClick={() => open(DISCORD_URL)}>
             Join Discord
           </Button>
         </Box>

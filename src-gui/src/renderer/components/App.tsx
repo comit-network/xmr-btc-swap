@@ -1,6 +1,7 @@
 import { Box, CssBaseline, makeStyles } from "@material-ui/core";
 import { indigo } from "@material-ui/core/colors";
 import { createTheme, ThemeProvider } from "@material-ui/core/styles";
+import "@tauri-apps/plugin-shell";
 import { Route, MemoryRouter as Router, Routes } from "react-router-dom";
 import Navigation, { drawerWidth } from "./navigation/Navigation";
 import HelpPage from "./pages/help/HelpPage";
