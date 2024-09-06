@@ -4,6 +4,7 @@ import { GetSwapInfoResponse } from "models/tauriModel";
 import {
   BobStateName,
   GetSwapInfoResponseExt,
+  isGetSwapInfoResponseRunningSwap,
   TimelockCancel,
   TimelockNone,
 } from "models/tauriModelExt";
@@ -206,7 +207,7 @@ export default function SwapStatusAlert({
   // If the swap is completed, there is no need to display the alert
   // TODO: Here we should also check if the swap is in a state where any funds can be lost
   // TODO: If the no Bitcoin have been locked yet, we can safely ignore the swap
-  if (swap.completed) {
+  if (!isGetSwapInfoResponseRunningSwap(swap)) {
     return null;
   }
 
