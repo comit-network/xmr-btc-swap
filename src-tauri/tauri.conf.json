@@ -4,7 +4,11 @@
   "identifier": "net.unstoppableswap.gui",
   "build": {
     "devUrl": "http://localhost:1420",
-    "frontendDist": "../src-gui/dist"
+    "frontendDist": "../src-gui/dist",
+    "beforeDevCommand": {
+      "cwd": "../src-gui",
+      "script": "yarn run dev"
+    }
   },
   "app": {
     "windows": [
