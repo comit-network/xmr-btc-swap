@@ -8,7 +8,7 @@
     "gen-bindings": "typeshare --lang=typescript --output-file ./src/models/tauriModel.ts ../swap/src && dprint fmt ./src/models/tauriModel.ts",
     "dev": "vite",
     "prebuild": "yarn run gen-bindings",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri"
   },

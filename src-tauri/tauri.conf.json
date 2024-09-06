@@ -8,6 +8,10 @@
     "beforeDevCommand": {
       "cwd": "../src-gui",
       "script": "yarn run dev"
+    },
+    "beforeBuildCommand": {
+      "cwd": "../src-gui",
+      "script": "yarn run build"
     }
   },
   "app": {
@@ -19,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' http://localhost:1234 https://api.unstoppableswap.net"
+      "dangerousDisableAssetCspModification": true
     }
   },
   "bundle": {
