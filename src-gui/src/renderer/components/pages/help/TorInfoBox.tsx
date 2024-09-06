@@ -46,7 +46,7 @@ export default function TorInfoBox() {
             variant="contained"
             disabled={isTorRunning}
             endIcon={<PlayArrowIcon />}
-            onClick={() => {
+            onInvoke={() => {
               throw new Error("Not implemented");
             }}
           >
@@ -56,7 +56,7 @@ export default function TorInfoBox() {
             variant="contained"
             disabled={!isTorRunning}
             endIcon={<StopIcon />}
-            onClick={() => {
+            onInvoke={() => {
               throw new Error("Not implemented");
             }}
           >

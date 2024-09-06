@@ -51,7 +51,7 @@ export default function WithdrawDialog({
             variant="contained"
             color="primary"
             disabled={!withdrawAddressValid}
-            onClick={() => withdrawBtc(withdrawAddress)}
+            onInvoke={() => withdrawBtc(withdrawAddress)}
             onPendingChange={(pending) => {
               console.log("pending", pending);
               setPending(pending);

@@ -7,7 +7,7 @@ export default function WalletRefreshButton() {
     <PromiseInvokeButton
       endIcon={<RefreshIcon />}
       isIconButton
-      onClick={() => checkBitcoinBalance()}
+      onInvoke={() => checkBitcoinBalance()}
       size="small"
     />
   );

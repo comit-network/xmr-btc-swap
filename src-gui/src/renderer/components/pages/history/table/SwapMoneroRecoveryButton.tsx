@@ -8,16 +8,22 @@ import {
   Link,
 } from "@material-ui/core";
 import { ButtonProps } from "@material-ui/core/Button/Button";
-import { GetSwapInfoArgs } from "models/tauriModel";
-import { rpcResetMoneroRecoveryKeys } from "store/features/rpcSlice";
+import { BobStateName, GetSwapInfoResponseExt } from "models/tauriModelExt";
+import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
+import { getMoneroRecoveryKeys } from "renderer/rpc";
+import { store } from "renderer/store/storeRenderer";
+import {
+  rpcResetMoneroRecoveryKeys,
+  rpcSetMoneroRecoveryKeys,
+} from "store/features/rpcSlice";
 import { useAppDispatch, useAppSelector } from "store/hooks";
 import DialogHeader from "../../../modal/DialogHeader";
 import ScrollablePaperTextBox from "../../../other/ScrollablePaperTextBox";
 
-function MoneroRecoveryKeysDialog() {
-  // TODO: Reimplement this using the new Tauri API
-  return null;
-
+function MoneroRecoveryKeysDialog({
+  swap_id,
+  ...rest
+}: GetSwapInfoResponseExt) {
   const dispatch = useAppDispatch();
   const keys = useAppSelector((s) => s.rpc.state.moneroRecovery);
 
@@ -25,14 +31,14 @@ function MoneroRecoveryKeysDialog() {
     dispatch(rpcResetMoneroRecoveryKeys());
   }
 
-  if (keys === null || keys.swapId !== swap.swap_id) {
-    return <></>;
+  if (keys === null || keys.swapId !== swap_id) {
+    return null;
   }
 
   return (
     <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
       <DialogHeader
-        title={`Recovery Keys for swap ${swap.swap_id.substring(0, 5)}...`}
+        title={`Recovery Keys for swap ${swap_id.substring(0, 5)}...`}
       />
       <DialogContent>
         <DialogContentText>
@@ -40,7 +46,7 @@ function MoneroRecoveryKeysDialog() {
           the multi-signature wallet.
           <ul>
             <li>
-              This is useful if the swap daemon fails to redeem the funds itself
+              This is useful if the application fails to redeem the funds itself
             </li>
             <li>
               If you have come this far, there is no risk of losing funds. You
@@ -79,6 +85,7 @@ function MoneroRecoveryKeysDialog() {
               title={title}
               copyValue={value}
               rows={[value]}
+              key={title}
             />
           ))}
         </Box>
@@ -95,11 +102,8 @@ function MoneroRecoveryKeysDialog() {
 export function SwapMoneroRecoveryButton({
   swap,
   ...props
-}: { swap: GetSwapInfoArgs } & ButtonProps) {
-  return <> </>;
-  /* TODO: Reimplement this using the new Tauri API
-  const isRecoverable = isSwapMoneroRecoverable(swap.state_name);
-
+}: { swap: GetSwapInfoResponseExt } & ButtonProps) {
+  const isRecoverable = swap.state_name === BobStateName.BtcRedeemed;
 
   if (!isRecoverable) {
     return <></>;
@@ -108,15 +112,15 @@ export function SwapMoneroRecoveryButton({
   return (
     <>
       <PromiseInvokeButton
-        onClick={async () => {
-          throw new Error("Not implemented");
-        }}
+        onInvoke={() => getMoneroRecoveryKeys(swap.swap_id)}
+        onSuccess={(keys) =>
+          store.dispatch(rpcSetMoneroRecoveryKeys([swap.swap_id, keys]))
+        }
         {...props}
       >
         Display Monero Recovery Keys
       </PromiseInvokeButton>
-      <MoneroRecoveryKeysDialog swap={swap} />
+      <MoneroRecoveryKeysDialog {...swap} />
     </>
   );
-  */
 }

@@ -71,7 +71,7 @@ export default function InitPage() {
         size="large"
         className={classes.initButton}
         endIcon={<PlayArrowIcon />}
-        onClick={init}
+        onInvoke={init}
         displayErrorSnackbar
       >
         Start swap

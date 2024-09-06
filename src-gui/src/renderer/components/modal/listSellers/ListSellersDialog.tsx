@@ -124,7 +124,7 @@ export default function ListSellersDialog({
           disabled={!(rendezvousAddress && !getMultiAddressError())}
           color="primary"
           onSuccess={handleSuccess}
-          onClick={() => {
+          onInvoke={() => {
             throw new Error("Not implemented");
           }}
         >

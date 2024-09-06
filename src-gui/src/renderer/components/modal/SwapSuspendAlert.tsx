@@ -33,7 +33,7 @@ export default function SwapSuspendAlert({
         <PromiseInvokeButton
           color="primary"
           onSuccess={onClose}
-          onClick={suspendCurrentSwap}
+          onInvoke={suspendCurrentSwap}
         >
           Force stop
         </PromiseInvokeButton>

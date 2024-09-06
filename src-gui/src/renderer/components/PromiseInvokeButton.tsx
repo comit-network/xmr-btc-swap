@@ -11,22 +11,22 @@ import { ReactNode, useState } from "react";
 import { useIsContextAvailable } from "store/hooks";
 
 interface PromiseInvokeButtonProps<T> {
-  onSuccess: (data: T) => void | null;
-  onClick: () => Promise<T>;
-  onPendingChange: (isPending: boolean) => void | null;
-  isLoadingOverride: boolean;
-  isIconButton: boolean;
-  loadIcon: ReactNode;
-  disabled: boolean;
-  displayErrorSnackbar: boolean;
-  tooltipTitle: string | null;
-  requiresContext: boolean;
+  onSuccess?: (data: T) => void | null;
+  onInvoke: () => Promise<T>;
+  onPendingChange?: (isPending: boolean) => void | null;
+  isLoadingOverride?: boolean;
+  isIconButton?: boolean;
+  loadIcon?: ReactNode;
+  disabled?: boolean;
+  displayErrorSnackbar?: boolean;
+  tooltipTitle?: string | null;
+  requiresContext?: boolean;
 }
 
 export default function PromiseInvokeButton<T>({
   disabled = false,
   onSuccess = null,
-  onClick,
+  onInvoke,
   endIcon,
   loadIcon = null,
   isLoadingOverride = false,
@@ -36,7 +36,7 @@ export default function PromiseInvokeButton<T>({
   requiresContext = true,
   tooltipTitle = null,
   ...rest
-}: ButtonProps & PromiseInvokeButtonProps<T>) {
+}: PromiseInvokeButtonProps<T> & ButtonProps) {
   const { enqueueSnackbar } = useSnackbar();
   const isContextAvailable = useIsContextAvailable();
 
@@ -52,7 +52,7 @@ export default function PromiseInvokeButton<T>({
       try {
         onPendingChange?.(true);
         setIsPending(true);
-        const result = await onClick();
+        const result = await onInvoke();
         onSuccess?.(result);
       } catch (e: unknown) {
         if (displayErrorSnackbar) {

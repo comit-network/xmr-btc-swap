@@ -36,7 +36,7 @@ export default function RpcControlBox() {
             variant="contained"
             endIcon={<PlayArrowIcon />}
             disabled={isRunning}
-            onClick={() => {
+            onInvoke={() => {
               throw new Error("Not implemented");
             }}
           >
@@ -46,7 +46,7 @@ export default function RpcControlBox() {
             variant="contained"
             endIcon={<StopIcon />}
             disabled={!isRunning}
-            onClick={() => {
+            onInvoke={() => {
               throw new Error("Not implemented");
             }}
           >
@@ -57,7 +57,7 @@ export default function RpcControlBox() {
             isIconButton
             size="small"
             tooltipTitle="Open the data directory of the Swap Daemon in your file explorer"
-            onClick={() => {
+            onInvoke={() => {
               throw new Error("Not implemented");
             }}
           />

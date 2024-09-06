@@ -6,6 +6,7 @@ import {
   BuyXmrArgs,
   BuyXmrResponse,
   GetSwapInfoResponse,
+  MoneroRecoveryArgs,
   ResumeSwapArgs,
   ResumeSwapResponse,
   SuspendCurrentSwapResponse,
@@ -23,8 +24,16 @@ import { swapTauriEventReceived } from "store/features/swapSlice";
 import { store } from "./store/storeRenderer";
 import { Provider } from "models/apiModel";
 import { providerToConcatenatedMultiAddr } from "utils/multiAddrUtils";
+import { MoneroRecoveryResponse } from "models/rpcModel";
 
 export async function initEventListeners() {
+  // This operation is in-expensive
+  // We do this in case we miss the context init progress event because the frontend took too long to load
+  // TOOD: Replace this with a more reliable mechanism (such as an event replay mechanism)
+  if (await checkContextAvailability()) {
+    store.dispatch(contextStatusEventReceived({ type: "Available" }));
+  }
+
   listen<TauriSwapProgressEventWrapper>("swap-progress-update", (event) => {
     console.log("Received swap progress event", event.payload);
     store.dispatch(swapTauriEventReceived(event.payload));
@@ -98,4 +107,20 @@ export async function resumeSwap(swapId: string) {
 
 export async function suspendCurrentSwap() {
   await invokeNoArgs<SuspendCurrentSwapResponse>("suspend_current_swap");
+}
+
+export async function getMoneroRecoveryKeys(
+  swapId: string,
+): Promise<MoneroRecoveryResponse> {
+  return await invoke<MoneroRecoveryArgs, MoneroRecoveryResponse>(
+    "monero_recovery",
+    {
+      swap_id: swapId,
+    },
+  );
+}
+
+export async function checkContextAvailability(): Promise<boolean> {
+  const available = await invokeNoArgs<boolean>("is_context_available");
+  return available;
 }

@@ -24,7 +24,7 @@ export function SwapResumeButton({
       color="primary"
       disabled={swap.completed}
       endIcon={<PlayArrowIcon />}
-      onClick={() => resumeSwap(swap.swap_id)}
+      onInvoke={() => resumeSwap(swap.swap_id)}
       {...props}
     >
       Resume
@@ -48,7 +48,7 @@ export function SwapCancelRefundButton({
     <PromiseInvokeButton
       displayErrorSnackbar={false}
       {...props}
-      onClick={async () => {
+      onInvoke={async () => {
         // TODO: Implement this using the Tauri RPC
         throw new Error("Not implemented");
       }}

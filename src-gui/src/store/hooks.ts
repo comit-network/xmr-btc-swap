@@ -56,6 +56,7 @@ export function useAllProviders() {
 
 export function useSwapInfosSortedByDate() {
   const swapInfos = useAppSelector((state) => state.rpc.state.swapInfos);
+
   return sortBy(
     Object.values(swapInfos),
     (swap) => -parseDateString(swap.start_date),

@@ -23,7 +23,7 @@ export default function SwapLogFileOpenButton({
         onSuccess={(data) => {
           setLogs(data as CliLog[]);
         }}
-        onClick={async () => {
+        onInvoke={async () => {
           throw new Error("Not implemented");
         }}
         {...props}
