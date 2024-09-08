@@ -48,15 +48,25 @@ jobs:
         working-directory: src-gui
         run: yarn install
 
-      - uses: tauri-apps/tauri-action@v0.5
+      - name: install tauri-cli globally
+        run: cargo install tauri-cli@^2.0.0-rc
+
+      - name: install typeshare-cli globally
+        run: cargo install typeshare-cli
+
+      - name: install dprint globally
+        run: cargo install dprint@0.39.1
+
+      - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: gui-preview
           releaseName: "GUI Preview Release"
-          releaseBody: "This is a preview release of the GUI. This is not a stable release. Please only use this release for testing purposes."
+          releaseBody: "This is a preview release of the GUI. This is not a stable release. Please only use this release for testing purposes. Download the [legacy GUI](https://github.com/UnstoppableSwap/Unstoppableswap-gui) instead."
           releaseDraft: true
           prerelease: true
           includeDebug: true
           projectPath: src-tauri
           args: ${{ matrix.args }}
+          tauriScript: cargo tauri
