@@ -90,11 +90,13 @@ pub fn register_modules(outer_context: Context) -> Result<RpcModule<Context>> {
     module.register_async_method("buy_xmr", |params_raw, context| async move {
         let mut params: BuyXmrArgs = params_raw.parse()?;
 
-        params.bitcoin_change_address = bitcoin_address::validate(
-            params.bitcoin_change_address,
-            context.config.env_config.bitcoin_network,
-        )
-        .to_jsonrpsee_result()?;
+        params.bitcoin_change_address = params
+            .bitcoin_change_address
+            .map(|address| {
+                bitcoin_address::validate(address, context.config.env_config.bitcoin_network)
+            })
+            .transpose()
+            .to_jsonrpsee_result()?;
 
         params.monero_receive_address = monero_address::validate(
             params.monero_receive_address,

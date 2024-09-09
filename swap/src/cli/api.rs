@@ -415,6 +415,10 @@ impl Context {
 
         Ok(())
     }
+
+    pub fn bitcoin_wallet(&self) -> Option<Arc<bitcoin::Wallet>> {
+        self.bitcoin_wallet.clone()
+    }
 }
 
 impl fmt::Debug for Context {

@@ -44,8 +44,8 @@ pub trait Request {
 pub struct BuyXmrArgs {
     #[typeshare(serialized_as = "string")]
     pub seller: Multiaddr,
-    #[typeshare(serialized_as = "string")]
-    pub bitcoin_change_address: bitcoin::Address,
+    #[typeshare(serialized_as = "Option<string>")]
+    pub bitcoin_change_address: Option<bitcoin::Address>,
     #[typeshare(serialized_as = "string")]
     pub monero_receive_address: monero::Address,
 }
@@ -545,6 +545,21 @@ pub async fn buy_xmr(
             .as_ref()
             .expect("Could not find Bitcoin wallet"),
     );
+
+    let bitcoin_change_address = match bitcoin_change_address {
+        Some(addr) => addr,
+        None => {
+            let internal_wallet_address = bitcoin_wallet.new_address().await?;
+
+            tracing::info!(
+                internal_wallet_address=%internal_wallet_address,
+                "No --change-address supplied. Any change will be received to the internal wallet."
+            );
+
+            internal_wallet_address
+        }
+    };
+
     let monero_wallet = Arc::clone(
         context
             .monero_wallet
