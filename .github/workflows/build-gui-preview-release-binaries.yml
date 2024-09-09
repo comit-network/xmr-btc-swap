@@ -18,7 +18,7 @@ jobs:
             args: "--target aarch64-apple-darwin"
           - platform: "macos-latest" # for Intel based macs.
             args: "--target x86_64-apple-darwin"
-          - platform: "ubuntu-22.04" # for Tauri v1 you could replace this with ubuntu-20.04.
+          - platform: "ubuntu-22.04"
             args: ""
           - platform: "windows-latest"
             args: ""
@@ -59,10 +59,10 @@ jobs:
 
       - uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.BOTTY_GITHUB_TOKEN }}
         with:
           tagName: gui-preview
-          releaseName: "GUI Preview Release"
+          releaseName: "preview gui"
           releaseBody: "This is a preview release of the GUI. This is not a stable release. Please only use this release for testing purposes. Download the [legacy GUI](https://github.com/UnstoppableSwap/Unstoppableswap-gui) instead."
           releaseDraft: true
           prerelease: true
