@@ -11,6 +11,7 @@ import KeyboardArrowDownIcon from "@material-ui/icons/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@material-ui/icons/KeyboardArrowUp";
 import { GetSwapInfoResponse } from "models/tauriModel";
 import { useState } from "react";
+import TruncatedText from "renderer/components/other/TruncatedText";
 import { PiconeroAmount, SatsAmount } from "../../../other/Units";
 import HistoryRowActions from "./HistoryRowActions";
 import HistoryRowExpanded from "./HistoryRowExpanded";
@@ -52,7 +53,9 @@ export default function HistoryRow(swap: GetSwapInfoResponse) {
             {expanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
           </IconButton>
         </TableCell>
-        <TableCell>{swap.swap_id}</TableCell>
+        <TableCell>
+          <TruncatedText>{swap.swap_id}</TruncatedText>
+        </TableCell>
         <TableCell>
           <AmountTransfer
             xmrAmount={swap.xmr_amount}

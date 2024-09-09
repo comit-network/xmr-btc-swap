@@ -14,6 +14,7 @@ import {
 import { Multiaddr } from "multiaddr";
 import { useSnackbar } from "notistack";
 import { ChangeEvent, useState } from "react";
+import TruncatedText from "renderer/components/other/TruncatedText";
 import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
 
 const PRESET_RENDEZVOUS_POINTS = [
@@ -108,10 +109,7 @@ export default function ListSellersDialog({
             <Chip
               key={rAddress}
               clickable
-              label={`${rAddress.substring(
-                0,
-                Math.min(rAddress.length - 1, 20),
-              )}...`}
+              label={<TruncatedText limit={30}>{rAddress}</TruncatedText>}
               onClick={() => setRendezvousAddress(rAddress)}
             />
           ))}

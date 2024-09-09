@@ -18,3 +18,26 @@ export interface CliLog {
     [index: string]: unknown;
   }[];
 }
+
+function isCliLog(log: unknown): log is CliLog {
+  return (
+    typeof log === "object" &&
+    log !== null &&
+    "timestamp" in log &&
+    "level" in log &&
+    "fields" in log
+  );
+}
+
+export function parseCliLogString(log: string): CliLog | string {
+  try {
+    const parsed = JSON.parse(log);
+    if (isCliLog(parsed)) {
+      return parsed;
+    } else {
+      return log;
+    }
+  } catch (err) {
+    return log;
+  }
+}

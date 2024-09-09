@@ -3,8 +3,8 @@ use std::sync::Arc;
 use swap::cli::{
     api::{
         request::{
-            BalanceArgs, BuyXmrArgs, GetHistoryArgs, GetSwapInfosAllArgs, MoneroRecoveryArgs,
-            ResumeSwapArgs, SuspendCurrentSwapArgs, WithdrawBtcArgs,
+            BalanceArgs, BuyXmrArgs, GetHistoryArgs, GetLogsArgs, GetSwapInfosAllArgs,
+            MoneroRecoveryArgs, ResumeSwapArgs, SuspendCurrentSwapArgs, WithdrawBtcArgs,
         },
         tauri_bindings::{TauriContextStatusEvent, TauriEmitter, TauriHandle},
         Context, ContextBuilder,
@@ -168,6 +168,7 @@ pub fn run() {
             resume_swap,
             get_history,
             monero_recovery,
+            get_logs,
             suspend_current_swap,
             is_context_available,
         ])
@@ -206,6 +207,7 @@ tauri_command!(buy_xmr, BuyXmrArgs);
 tauri_command!(resume_swap, ResumeSwapArgs);
 tauri_command!(withdraw_btc, WithdrawBtcArgs);
 tauri_command!(monero_recovery, MoneroRecoveryArgs);
+tauri_command!(get_logs, GetLogsArgs);
 
 // These commands require no arguments
 tauri_command!(suspend_current_swap, SuspendCurrentSwapArgs, no_args);

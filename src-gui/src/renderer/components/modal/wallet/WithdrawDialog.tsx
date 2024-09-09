@@ -19,6 +19,8 @@ export default function WithdrawDialog({
   const [withdrawAddressValid, setWithdrawAddressValid] = useState(false);
   const [withdrawAddress, setWithdrawAddress] = useState<string>("");
 
+  const haveFundsBeenWithdrawn = withdrawTxId !== null;
+
   function onCancel() {
     if (!pending) {
       setWithdrawTxId(null);
@@ -31,34 +33,34 @@ export default function WithdrawDialog({
     <Dialog open={open} onClose={onCancel} maxWidth="sm" fullWidth>
       <DialogHeader title="Withdraw Bitcoin" />
       <WithdrawDialogContent isPending={pending} withdrawTxId={withdrawTxId}>
-        {withdrawTxId === null ? (
+        {haveFundsBeenWithdrawn ? (
+          <BtcTxInMempoolPageContent withdrawTxId={withdrawTxId} />
+        ) : (
           <AddressInputPage
             setWithdrawAddress={setWithdrawAddress}
             withdrawAddress={withdrawAddress}
             setWithdrawAddressValid={setWithdrawAddressValid}
           />
-        ) : (
-          <BtcTxInMempoolPageContent withdrawTxId={withdrawTxId} />
         )}
       </WithdrawDialogContent>
       <DialogActions>
-        <Button onClick={onCancel} color="primary" disabled={pending}>
-          {withdrawTxId === null ? "Cancel" : "Done"}
+        <Button
+          onClick={onCancel}
+          color="primary"
+          disabled={pending}
+          variant={haveFundsBeenWithdrawn ? "contained" : "text"}
+        >
+          {haveFundsBeenWithdrawn ? "Done" : "Close"}
         </Button>
-        {withdrawTxId === null && (
+        {!haveFundsBeenWithdrawn && (
           <PromiseInvokeButton
             displayErrorSnackbar
             variant="contained"
             color="primary"
             disabled={!withdrawAddressValid}
             onInvoke={() => withdrawBtc(withdrawAddress)}
-            onPendingChange={(pending) => {
-              console.log("pending", pending);
-              setPending(pending);
-            }}
-            onSuccess={(txId) => {
-              setWithdrawTxId(txId);
-            }}
+            onPendingChange={setPending}
+            onSuccess={setWithdrawTxId}
           >
             Withdraw
           </PromiseInvokeButton>

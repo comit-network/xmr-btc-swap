@@ -1,6 +1,7 @@
 import { Box, Chip, makeStyles, Tooltip, Typography } from "@material-ui/core";
 import { VerifiedUser } from "@material-ui/icons";
 import { ExtendedProviderStatus } from "models/apiModel";
+import TruncatedText from "renderer/components/other/TruncatedText";
 import {
   MoneroBitcoinExchangeRate,
   SatsAmount,
@@ -38,7 +39,7 @@ export default function ProviderInfo({
         {provider.multiAddr}
       </Typography>
       <Typography color="textSecondary" gutterBottom>
-        {provider.peerId.substring(0, 8)}...{provider.peerId.slice(-8)}
+        <TruncatedText limit={12}>{provider.peerId}</TruncatedText>
       </Typography>
       <Typography variant="caption">
         Exchange rate:{" "}
