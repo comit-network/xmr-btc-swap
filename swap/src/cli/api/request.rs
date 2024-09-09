@@ -359,9 +359,10 @@ impl Request for GetSwapInfosAllArgs {
 #[typeshare]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetLogsArgs {
+    #[typeshare(serialized_as = "Option<string>")]
     pub swap_id: Option<Uuid>,
     pub redact: bool,
-    #[typeshare(serialized_as = "string")]
+    #[typeshare(serialized_as = "Option<string>")]
     pub logs_dir: Option<PathBuf>,
 }
 
