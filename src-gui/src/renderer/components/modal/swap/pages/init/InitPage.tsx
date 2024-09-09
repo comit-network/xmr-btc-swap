@@ -22,7 +22,7 @@ const useStyles = makeStyles((theme) => ({
   fieldsOuter: {
     display: "flex",
     flexDirection: "column",
-    gap: theme.spacing(2),
+    gap: theme.spacing(1.5),
   },
 }));
 
@@ -51,8 +51,8 @@ export default function InitPage() {
 
   return (
     <Box>
-      <RemainingFundsWillBeUsedAlert />
       <Box className={classes.fieldsOuter}>
+        <RemainingFundsWillBeUsedAlert />
         <MoneroAddressTextField
           label="Monero redeem address"
           address={redeemAddress}
