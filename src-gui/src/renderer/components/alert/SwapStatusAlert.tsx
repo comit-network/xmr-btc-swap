@@ -11,6 +11,7 @@ import {
 import { ReactNode } from "react";
 import { exhaustiveGuard } from "utils/typescriptUtils";
 import HumanizedBitcoinBlockDuration from "../other/HumanizedBitcoinBlockDuration";
+import TruncatedText from "../other/TruncatedText";
 import {
   SwapCancelRefundButton,
   SwapResumeButton,
@@ -219,7 +220,7 @@ export default function SwapStatusAlert({
       variant="filled"
     >
       <AlertTitle>
-        Swap {swap.swap_id.substring(0, 5)}... is unfinished
+        Swap <TruncatedText>{swap.swap_id}</TruncatedText> is unfinished
       </AlertTitle>
       <SwapAlertStatusText swap={swap} />
     </Alert>

@@ -1,4 +1,5 @@
 import { DialogTitle, makeStyles, Typography } from "@material-ui/core";
+import { ReactNode } from "react";
 
 const useStyles = makeStyles({
   root: {
@@ -8,7 +9,7 @@ const useStyles = makeStyles({
 });
 
 type DialogTitleProps = {
-  title: string;
+  title: ReactNode;
 };
 
 export default function DialogHeader({ title }: DialogTitleProps) {

@@ -13,6 +13,7 @@ import {
 import { CliLog } from "models/cliModel";
 import { useSnackbar } from "notistack";
 import { useState } from "react";
+import TruncatedText from "renderer/components/other/TruncatedText";
 import { store } from "renderer/store/storeRenderer";
 import { useActiveSwapInfo, useAppSelector } from "store/hooks";
 import { parseDateString } from "utils/parseUtils";
@@ -68,7 +69,7 @@ function SwapSelectDropDown({
       <MenuItem value={0}>Do not attach logs</MenuItem>
       {swaps.map((swap) => (
         <MenuItem value={swap.swap_id} key={swap.swap_id}>
-          Swap {swap.swap_id.substring(0, 5)}... from{" "}
+          Swap <TruncatedText>{swap.swap_id}</TruncatedText> from{" "}
           {new Date(parseDateString(swap.start_date)).toDateString()} (
           <PiconeroAmount amount={swap.xmr_amount} />)
         </MenuItem>
