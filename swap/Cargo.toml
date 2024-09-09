@@ -91,7 +91,9 @@ sqlx = { version = "0.6.3", features = [
 ] }
 structopt = "0.3"
 strum = { version = "0.26", features = [ "derive" ] }
-tauri = { version = "2.0.0-rc.1", features = [ "config-json5" ], optional = true }
+tauri = { version = "2.0.0-rc.1", features = [
+    "config-json5",
+], optional = true, default-features = false }
 thiserror = "1"
 time = "0.3"
 tokio = { version = "1", features = [
