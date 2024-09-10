@@ -1,5 +1,5 @@
 # This file is used to build the preview release binaries for the Tauri GUI
-name: "publish gui preview release"
+name: "Publish GUI preview release"
 
 on:
   push:
