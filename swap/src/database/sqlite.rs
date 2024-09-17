@@ -11,25 +11,30 @@ use std::str::FromStr;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+use super::AccessMode;
+
 pub struct SqliteDatabase {
     pool: Pool<Sqlite>,
 }
 
 impl SqliteDatabase {
-    pub async fn open(path: impl AsRef<Path>) -> Result<Self>
+    pub async fn open(path: impl AsRef<Path>, access_mode: AccessMode) -> Result<Self>
     where
         Self: std::marker::Sized,
     {
+        let read_only = matches!(access_mode, AccessMode::ReadOnly);
+
         let path_str = format!("sqlite:{}", path.as_ref().display());
 
-        let mut options = SqliteConnectOptions::from_str(&path_str)?;
+        let mut options = SqliteConnectOptions::from_str(&path_str)?.read_only(read_only);
+        let options = options.disable_statement_logging();
 
-        options.disable_statement_logging();
-
-        let pool = SqlitePool::connect_with(options).await?;
+        let pool = SqlitePool::connect_with(options.to_owned()).await?;
         let mut sqlite = Self { pool };
 
-        sqlite.run_migrations().await?;
+        if !read_only {
+            sqlite.run_migrations().await?;
+        }
 
         Ok(sqlite)
     }
@@ -480,7 +485,7 @@ mod tests {
         // file has to exist in order to connect with sqlite
         File::create(temp_db.clone()).unwrap();
 
-        let db = SqliteDatabase::open(temp_db).await?;
+        let db = SqliteDatabase::open(temp_db, AccessMode::ReadWrite).await?;
 
         Ok(db)
     }

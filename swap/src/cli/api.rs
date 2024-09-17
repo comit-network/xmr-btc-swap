@@ -3,7 +3,7 @@ pub mod tauri_bindings;
 
 use crate::cli::command::{Bitcoin, Monero, Tor};
 use crate::common::tracing_util::Format;
-use crate::database::open_db;
+use crate::database::{open_db, AccessMode};
 use crate::env::{Config as EnvConfig, GetConfig, Mainnet, Testnet};
 use crate::fs::system_data_dir;
 use crate::network::rendezvous::XmrBtcNamespace;
@@ -345,12 +345,10 @@ impl ContextBuilder {
                 TauriContextInitializationProgress::OpeningDatabase,
             ));
 
-        let db = open_db(data_dir.join("sqlite")).await?;
-
         let tor_socks5_port = self.tor.map_or(9050, |tor| tor.tor_socks5_port);
 
         let context = Context {
-            db,
+            db: open_db(data_dir.join("sqlite"), AccessMode::ReadWrite).await?,
             bitcoin_wallet,
             monero_wallet,
             monero_rpc_process,
@@ -393,7 +391,7 @@ impl Context {
             bitcoin_wallet: Some(bob_bitcoin_wallet),
             monero_wallet: Some(bob_monero_wallet),
             config,
-            db: open_db(db_path)
+            db: open_db(db_path, AccessMode::ReadWrite)
                 .await
                 .expect("Could not open sqlite database"),
             monero_rpc_process: None,
