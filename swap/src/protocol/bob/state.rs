@@ -3,8 +3,8 @@ use crate::bitcoin::{
     self, current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, Transaction, TxCancel,
     TxLock, Txid,
 };
-use crate::monero;
 use crate::monero::wallet::WatchRequest;
+use crate::monero::{self, TxHash};
 use crate::monero::{monero_private_key, TransferProof};
 use crate::monero_ext::ScalarExt;
 use crate::protocol::{Message0, Message1, Message2, Message3, Message4, CROSS_CURVE_PROOF_SYSTEM};
@@ -627,7 +627,7 @@ impl State5 {
         monero_wallet: &monero::Wallet,
         wallet_file_name: std::string::String,
         monero_receive_address: monero::Address,
-    ) -> Result<()> {
+    ) -> Result<Vec<TxHash>> {
         let (spend_key, view_key) = self.xmr_keys();
 
         tracing::info!(%wallet_file_name, "Generating and opening Monero wallet from the extracted keys to redeem the Monero");
@@ -652,12 +652,15 @@ impl State5 {
 
         // Ensure that the generated wallet is synced so we have a proper balance
         monero_wallet.refresh(20).await?;
-        // Sweep (transfer all funds) to the given address
+
+        // Sweep (transfer all funds) to the Bobs Monero redeem address
         let tx_hashes = monero_wallet.sweep_all(monero_receive_address).await?;
-        for tx_hash in tx_hashes {
+
+        for tx_hash in &tx_hashes {
             tracing::info!(%monero_receive_address, txid=%tx_hash.0, "Successfully transferred XMR to wallet");
         }
-        Ok(())
+
+        Ok(tx_hashes)
     }
 }
 

@@ -2,10 +2,10 @@ import { Link, Typography } from "@material-ui/core";
 import { ReactNode } from "react";
 import InfoBox from "./InfoBox";
 
-type TransactionInfoBoxProps = {
+export type TransactionInfoBoxProps = {
   title: string;
-  txId: string;
-  explorerUrl: string;
+  txId: string | null;
+  explorerUrlCreator: ((txId: string) => string) | null;
   additionalContent: ReactNode;
   loading: boolean;
   icon: JSX.Element;
@@ -14,24 +14,31 @@ type TransactionInfoBoxProps = {
 export default function TransactionInfoBox({
   title,
   txId,
-  explorerUrl,
   additionalContent,
   icon,
   loading,
+  explorerUrlCreator,
 }: TransactionInfoBoxProps) {
   return (
     <InfoBox
       title={title}
-      mainContent={<Typography variant="h5">{txId}</Typography>}
+      mainContent={
+        <Typography variant="h5">
+          {txId ?? "Transaction ID not available"}
+        </Typography>
+      }
       loading={loading}
       additionalContent={
         <>
           <Typography variant="subtitle2">{additionalContent}</Typography>
-          <Typography variant="body1">
-            <Link href={explorerUrl} target="_blank">
-              View on explorer
-            </Link>
-          </Typography>
+          {explorerUrlCreator != null &&
+            txId != null && ( // Only show the link if the txId is not null and we have a creator for the explorer URL
+              <Typography variant="body1">
+                <Link href={explorerUrlCreator(txId)} target="_blank">
+                  View on explorer
+                </Link>
+              </Typography>
+            )}
         </>
       }
       icon={icon}

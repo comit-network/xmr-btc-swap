@@ -6,7 +6,9 @@ use ::monero::{Address, Network, PrivateKey, PublicKey};
 use anyhow::{Context, Result};
 use monero_rpc::wallet::{BlockHeight, MoneroWalletRpc as _, Refreshed};
 use monero_rpc::{jsonrpc, wallet};
+use std::future::Future;
 use std::ops::Div;
+use std::pin::Pin;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -215,7 +217,18 @@ impl Wallet {
         ))
     }
 
+    /// Wait until the specified transfer has been completed or failed.
     pub async fn watch_for_transfer(&self, request: WatchRequest) -> Result<(), InsufficientFunds> {
+        self.watch_for_transfer_with(request, None).await
+    }
+
+    /// Wait until the specified transfer has been completed or failed and listen to each new confirmation.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn watch_for_transfer_with(
+        &self,
+        request: WatchRequest,
+        listener: Option<ConfirmationListener>,
+    ) -> Result<(), InsufficientFunds> {
         let WatchRequest {
             conf_target,
             public_view_key,
@@ -236,7 +249,7 @@ impl Wallet {
 
         let check_interval = tokio::time::interval(self.sync_interval.div(10));
 
-        wait_for_confirmations(
+        wait_for_confirmations_with(
             &self.inner,
             transfer_proof,
             address,
@@ -244,6 +257,7 @@ impl Wallet {
             conf_target,
             check_interval,
             self.name.clone(),
+            listener,
         )
         .await?;
 
@@ -332,7 +346,13 @@ pub struct WatchRequest {
     pub expected: Amount,
 }
 
-async fn wait_for_confirmations<C: monero_rpc::wallet::MoneroWalletRpc<reqwest::Client> + Sync>(
+type ConfirmationListener =
+    Box<dyn Fn(u64) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>> + Send + 'static>;
+
+#[allow(clippy::too_many_arguments)]
+async fn wait_for_confirmations_with<
+    C: monero_rpc::wallet::MoneroWalletRpc<reqwest::Client> + Sync,
+>(
     client: &Mutex<C>,
     transfer_proof: TransferProof,
     to_address: Address,
@@ -340,6 +360,7 @@ async fn wait_for_confirmations<C: monero_rpc::wallet::MoneroWalletRpc<reqwest::
     conf_target: u64,
     mut check_interval: Interval,
     wallet_name: String,
+    listener: Option<ConfirmationListener>,
 ) -> Result<(), InsufficientFunds> {
     let mut seen_confirmations = 0u64;
 
@@ -405,6 +426,11 @@ async fn wait_for_confirmations<C: monero_rpc::wallet::MoneroWalletRpc<reqwest::
                 needed_confirmations = %conf_target,
                 "Received new confirmation for Monero lock tx"
             );
+
+            // notify the listener we received new confirmations
+            if let Some(listener) = &listener {
+                listener(seen_confirmations).await;
+            }
         }
     }
 
@@ -418,6 +444,30 @@ mod tests {
     use monero_rpc::wallet::CheckTxKey;
     use std::sync::atomic::{AtomicU32, Ordering};
     use tracing::metadata::LevelFilter;
+
+    async fn wait_for_confirmations<
+        C: monero_rpc::wallet::MoneroWalletRpc<reqwest::Client> + Sync,
+    >(
+        client: &Mutex<C>,
+        transfer_proof: TransferProof,
+        to_address: Address,
+        expected: Amount,
+        conf_target: u64,
+        check_interval: Interval,
+        wallet_name: String,
+    ) -> Result<(), InsufficientFunds> {
+        wait_for_confirmations_with(
+            client,
+            transfer_proof,
+            to_address,
+            expected,
+            conf_target,
+            check_interval,
+            wallet_name,
+            None,
+        )
+        .await
+    }
 
     #[tokio::test]
     async fn given_exact_confirmations_does_not_fetch_tx_again() {
@@ -435,7 +485,7 @@ mod tests {
             Amount::from_piconero(100),
             10,
             tokio::time::interval(Duration::from_millis(10)),
-            "foo-wallet".to_owned()
+            "foo-wallet".to_owned(),
         )
         .await;
 
@@ -533,7 +583,7 @@ mod tests {
             Amount::from_piconero(100),
             5,
             tokio::time::interval(Duration::from_millis(10)),
-            "foo-wallet".to_owned()
+            "foo-wallet".to_owned(),
         )
         .await
         .unwrap();

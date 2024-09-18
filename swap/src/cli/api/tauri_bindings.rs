@@ -135,8 +135,8 @@ pub enum TauriSwapProgressEvent {
     XmrLocked,
     BtcRedeemed,
     XmrRedeemInMempool {
-        #[typeshare(serialized_as = "string")]
-        xmr_redeem_txid: monero::TxHash,
+        #[typeshare(serialized_as = "Vec<string>")]
+        xmr_redeem_txids: Vec<monero::TxHash>,
         #[typeshare(serialized_as = "string")]
         xmr_redeem_address: monero::Address,
     },
