@@ -8,6 +8,7 @@ import {
   GetLogsArgs,
   GetLogsResponse,
   GetSwapInfoResponse,
+  ListSellersArgs,
   MoneroRecoveryArgs,
   ResumeSwapArgs,
   ResumeSwapResponse,
@@ -27,6 +28,7 @@ import { store } from "./store/storeRenderer";
 import { Provider } from "models/apiModel";
 import { providerToConcatenatedMultiAddr } from "utils/multiAddrUtils";
 import { MoneroRecoveryResponse } from "models/rpcModel";
+import { ListSellersResponse } from "../models/tauriModel";
 
 export async function initEventListeners() {
   // This operation is in-expensive
@@ -142,5 +144,13 @@ export async function getLogsOfSwap(
   return await invoke<GetLogsArgs, GetLogsResponse>("get_logs", {
     swap_id: swapId,
     redact,
+  });
+}
+
+export async function listSellersAtRendezvousPoint(
+  rendezvousPointAddress: string,
+): Promise<ListSellersResponse> {
+  return await invoke<ListSellersArgs, ListSellersResponse>("list_sellers", {
+    rendezvous_point: rendezvousPointAddress,
   });
 }

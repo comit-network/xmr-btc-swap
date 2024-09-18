@@ -2,7 +2,7 @@ use super::tauri_bindings::TauriHandle;
 use crate::bitcoin::{CancelTimelock, ExpiredTimelocks, PunishTimelock, TxLock};
 use crate::cli::api::tauri_bindings::{TauriEmitter, TauriSwapProgressEvent};
 use crate::cli::api::Context;
-use crate::cli::{list_sellers as list_sellers_impl, EventLoop, SellerStatus};
+use crate::cli::{list_sellers as list_sellers_impl, EventLoop, Seller, SellerStatus};
 use crate::common::get_logs;
 use crate::libp2p_ext::MultiAddrExt;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
@@ -156,8 +156,14 @@ pub struct ListSellersArgs {
     pub rendezvous_point: Multiaddr,
 }
 
+#[typeshare]
+#[derive(Debug, Eq, PartialEq, Serialize)]
+pub struct ListSellersResponse {
+    sellers: Vec<Seller>,
+}
+
 impl Request for ListSellersArgs {
-    type Response = serde_json::Value;
+    type Response = ListSellersResponse;
 
     async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
         list_sellers(self, ctx).await
@@ -193,7 +199,7 @@ pub struct GetSwapInfoArgs {
 pub struct GetSwapInfoResponse {
     #[typeshare(serialized_as = "string")]
     pub swap_id: Uuid,
-    pub seller: Seller,
+    pub seller: AliceAddress,
     pub completed: bool,
     pub start_date: String,
     #[typeshare(serialized_as = "string")]
@@ -280,8 +286,8 @@ impl Request for GetHistoryArgs {
 
 // Additional structs
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Seller {
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub struct AliceAddress {
     #[typeshare(serialized_as = "string")]
     pub peer_id: PeerId,
     pub addresses: Vec<String>,
@@ -507,7 +513,7 @@ pub async fn get_swap_info(
 
     Ok(GetSwapInfoResponse {
         swap_id: args.swap_id,
-        seller: Seller {
+        seller: AliceAddress {
             peer_id,
             addresses: addresses.iter().map(|a| a.to_string()).collect(),
         },
@@ -1016,7 +1022,7 @@ pub async fn get_balance(balance: BalanceArgs, context: Arc<Context>) -> Result<
 pub async fn list_sellers(
     list_sellers: ListSellersArgs,
     context: Arc<Context>,
-) -> Result<serde_json::Value> {
+) -> Result<ListSellersResponse> {
     let ListSellersArgs { rendezvous_point } = list_sellers;
     let rendezvous_node_peer_id = rendezvous_point
         .extract_peer_id()
@@ -1060,7 +1066,7 @@ pub async fn list_sellers(
         }
     }
 
-    Ok(json!({ "sellers": sellers }))
+    Ok(ListSellersResponse { sellers })
 }
 
 #[tracing::instrument(fields(method = "export_bitcoin_wallet"), skip(context))]

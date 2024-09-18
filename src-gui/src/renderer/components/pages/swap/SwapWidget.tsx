@@ -177,7 +177,7 @@ function HasNoProvidersSwapWidget() {
   const forceShowDialog = useAppSelector((state) => state.swap.state !== null);
   const isPublicRegistryDown = useAppSelector((state) =>
     isRegistryDown(
-      state.providers.registry.failedReconnectAttemptsSinceLastSuccess,
+      state.providers.registry.connectionFailsCount,
     ),
   );
   const classes = useStyles();
@@ -255,7 +255,7 @@ export default function SwapWidget() {
     (state) =>
       state.providers.registry.providers === null &&
       !isRegistryDown(
-        state.providers.registry.failedReconnectAttemptsSinceLastSuccess,
+        state.providers.registry.connectionFailsCount,
       ),
   );
 

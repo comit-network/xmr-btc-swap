@@ -1,4 +1,5 @@
 import { CliLog } from "models/cliModel";
+import { Multiaddr } from "multiaddr";
 
 /*
 Extract btc amount from string
@@ -71,4 +72,39 @@ export function getLogsFromRawFileString(rawFileData: string): CliLog[] {
 
 export function logsToRawString(logs: (CliLog | string)[]): string {
   return logs.map((l) => JSON.stringify(l)).join("\n");
+}
+
+// This function checks if a given multi address string is a valid multi address
+// and contains a peer ID component.
+export function isValidMultiAddressWithPeerId(
+  multiAddressStr: string,
+): boolean {
+  try {
+    const multiAddress = new Multiaddr(multiAddressStr);
+    const peerId = multiAddress.getPeerId();
+
+    return peerId !== null;
+  } catch {
+    return false;
+  }
+}
+
+// This function splits a multi address string into the multi address and peer ID components.
+// It throws an error if the multi address string is invalid or does not contain a peer ID component.
+export function splitPeerIdFromMultiAddress(
+  multiAddressStr: string,
+): [multiAddress: string, peerId: string] {
+  const multiAddress = new Multiaddr(multiAddressStr);
+
+  // Extract the peer ID
+  const peerId = multiAddress.getPeerId();
+
+  if (peerId) {
+    // Remove the peer ID component
+    const p2pMultiaddr = new Multiaddr("/p2p/" + peerId);
+    const multiAddressWithoutPeerId = multiAddress.decapsulate(p2pMultiaddr);
+    return [multiAddressWithoutPeerId.toString(), peerId];
+  } else {
+    throw new Error("No peer id encapsulated in multi address");
+  }
 }

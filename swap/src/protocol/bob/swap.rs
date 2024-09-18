@@ -398,6 +398,14 @@ async fn next_state(
                 }
                 ExpiredTimelocks::Cancel { .. } => {
                     state.publish_refund_btc(bitcoin_wallet).await?;
+
+                    event_emitter.emit_swap_progress_event(
+                        swap_id,
+                        TauriSwapProgressEvent::BtcRefunded {
+                            btc_refund_txid: state.signed_refund_transaction()?.txid(),
+                        },
+                    );
+
                     BobState::BtcRefunded(state)
                 }
                 ExpiredTimelocks::Punish => {

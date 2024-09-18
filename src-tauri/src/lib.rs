@@ -4,7 +4,8 @@ use swap::cli::{
     api::{
         request::{
             BalanceArgs, BuyXmrArgs, GetHistoryArgs, GetLogsArgs, GetSwapInfosAllArgs,
-            MoneroRecoveryArgs, ResumeSwapArgs, SuspendCurrentSwapArgs, WithdrawBtcArgs,
+            ListSellersArgs, MoneroRecoveryArgs, ResumeSwapArgs, SuspendCurrentSwapArgs,
+            WithdrawBtcArgs,
         },
         tauri_bindings::{TauriContextStatusEvent, TauriEmitter, TauriHandle},
         Context, ContextBuilder,
@@ -169,6 +170,7 @@ pub fn run() {
             get_history,
             monero_recovery,
             get_logs,
+            list_sellers,
             suspend_current_swap,
             is_context_available,
         ])
@@ -208,6 +210,7 @@ tauri_command!(resume_swap, ResumeSwapArgs);
 tauri_command!(withdraw_btc, WithdrawBtcArgs);
 tauri_command!(monero_recovery, MoneroRecoveryArgs);
 tauri_command!(get_logs, GetLogsArgs);
+tauri_command!(list_sellers, ListSellersArgs);
 
 // These commands require no arguments
 tauri_command!(suspend_current_swap, SuspendCurrentSwapArgs, no_args);

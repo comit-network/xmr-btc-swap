@@ -2,7 +2,10 @@ import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
 import { setAlerts } from "store/features/alertsSlice";
-import { setRegistryProviders } from "store/features/providersSlice";
+import {
+  registryConnectionFailed,
+  setRegistryProviders,
+} from "store/features/providersSlice";
 import { setBtcPrice, setXmrPrice } from "store/features/ratesSlice";
 import logger from "../utils/logger";
 import {
@@ -12,17 +15,8 @@ import {
   fetchXmrPrice,
 } from "./api";
 import App from "./components/App";
-import {
-  checkBitcoinBalance,
-  getAllSwapInfos,
-  initEventListeners,
-} from "./rpc";
+import { initEventListeners } from "./rpc";
 import { persistor, store } from "./store/storeRenderer";
-
-setInterval(() => {
-  checkBitcoinBalance();
-  getAllSwapInfos();
-}, 30 * 1000);
 
 const container = document.getElementById("root");
 const root = createRoot(container!);
@@ -44,6 +38,7 @@ async function fetchInitialData() {
       "Fetched providers via UnstoppableSwap HTTP API",
     );
   } catch (e) {
+    store.dispatch(registryConnectionFailed());
     logger.error(e, "Failed to fetch providers via UnstoppableSwap HTTP API");
   }
 

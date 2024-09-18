@@ -11,11 +11,15 @@ import {
   TextField,
   Theme,
 } from "@material-ui/core";
-import { Multiaddr } from "multiaddr";
+import { ListSellersResponse } from "models/tauriModel";
 import { useSnackbar } from "notistack";
 import { ChangeEvent, useState } from "react";
 import TruncatedText from "renderer/components/other/TruncatedText";
 import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
+import { listSellersAtRendezvousPoint } from "renderer/rpc";
+import { discoveredProvidersByRendezvous } from "store/features/providersSlice";
+import { useAppDispatch } from "store/hooks";
+import { isValidMultiAddressWithPeerId } from "utils/parseUtils";
 
 const PRESET_RENDEZVOUS_POINTS = [
   "/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE",
@@ -42,27 +46,23 @@ export default function ListSellersDialog({
   const classes = useStyles();
   const [rendezvousAddress, setRendezvousAddress] = useState("");
   const { enqueueSnackbar } = useSnackbar();
+  const dispatch = useAppDispatch();
 
   function handleMultiAddrChange(event: ChangeEvent<HTMLInputElement>) {
     setRendezvousAddress(event.target.value);
   }
 
   function getMultiAddressError(): string | null {
-    try {
-      const multiAddress = new Multiaddr(rendezvousAddress);
-      if (!multiAddress.protoNames().includes("p2p")) {
-        return "The multi address must contain the peer id (/p2p/)";
-      }
-      return null;
-    } catch {
-      return "Not a valid multi address";
-    }
+    return isValidMultiAddressWithPeerId(rendezvousAddress) ? null : "Address is invalid or missing peer ID";
   }
 
-  function handleSuccess(amountOfSellers: number) {
+  function handleSuccess({ sellers }: ListSellersResponse) {
+    dispatch(discoveredProvidersByRendezvous(sellers));
+
+    const discoveredSellersCount = sellers.length;
     let message: string;
 
-    switch (amountOfSellers) {
+    switch (discoveredSellersCount) {
       case 0:
         message = `No providers were discovered at the rendezvous point`;
         break;
@@ -70,7 +70,7 @@ export default function ListSellersDialog({
         message = `Discovered one provider at the rendezvous point`;
         break;
       default:
-        message = `Discovered ${amountOfSellers} providers at the rendezvous point`;
+        message = `Discovered ${discoveredSellersCount} providers at the rendezvous point`;
     }
 
     enqueueSnackbar(message, {
@@ -119,12 +119,13 @@ export default function ListSellersDialog({
         <Button onClick={onClose}>Cancel</Button>
         <PromiseInvokeButton
           variant="contained"
-          disabled={!(rendezvousAddress && !getMultiAddressError())}
+          disabled={
+            // We disable the button if the multiaddress is invalid
+            getMultiAddressError() !== null
+          }
           color="primary"
           onSuccess={handleSuccess}
-          onInvoke={() => {
-            throw new Error("Not implemented");
-          }}
+          onInvoke={() => listSellersAtRendezvousPoint(rendezvousAddress)}
         >
           Connect
         </PromiseInvokeButton>
