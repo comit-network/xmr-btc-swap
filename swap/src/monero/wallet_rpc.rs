@@ -22,10 +22,9 @@ use tokio_util::io::StreamReader;
 
 // See: https://www.moneroworld.com/#nodes, https://monero.fail
 // We don't need any testnet nodes because we don't support testnet at all
-const MONERO_DAEMONS: [MoneroDaemon; 17] = [
+const MONERO_DAEMONS: [MoneroDaemon; 16] = [
     MoneroDaemon::new("xmr-node.cakewallet.com", 18081, Network::Mainnet),
     MoneroDaemon::new("nodex.monerujo.io", 18081, Network::Mainnet),
-    MoneroDaemon::new("node.moneroworld.com", 18089, Network::Mainnet),
     MoneroDaemon::new("nodes.hashvault.pro", 18081, Network::Mainnet),
     MoneroDaemon::new("p2pmd.xmrvsbeast.com", 18081, Network::Mainnet),
     MoneroDaemon::new("node.monerodevs.org", 18089, Network::Mainnet),
