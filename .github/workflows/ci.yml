@@ -210,7 +210,7 @@ jobs:
         run: cargo test --package monero-harness --all-features
 
       - name: Run library tests for swap
-        run: cargo test --package swap --lib --all-features
+        run: cargo test --package swap --lib
 
   docker_tests:
     strategy:
@@ -256,7 +256,7 @@ jobs:
             librsvg2-dev
 
       - name: Run test ${{ matrix.test_name }}
-        run: cargo test --package swap --all-features --test ${{ matrix.test_name }} -- --nocapture
+        run: cargo test --package swap --test ${{ matrix.test_name }} -- --nocapture
 
   rpc_tests:
     runs-on: ubuntu-latest
@@ -280,7 +280,7 @@ jobs:
             librsvg2-dev
 
       - name: Run RPC server tests
-        run: cargo test --package swap --all-features --test rpc -- --nocapture
+        run: cargo test --package swap --test rpc -- --nocapture
 
   check_stable:
     runs-on: ubuntu-latest
