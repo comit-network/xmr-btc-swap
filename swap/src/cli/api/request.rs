@@ -25,7 +25,9 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::debug_span;
 use tracing::Instrument;
+use tracing::Span;
 use typeshare::typeshare;
 use uuid::Uuid;
 
@@ -36,6 +38,11 @@ use uuid::Uuid;
 pub trait Request {
     type Response: Serialize;
     async fn request(self, ctx: Arc<Context>) -> Result<Self::Response>;
+}
+
+/// This generates a tracing span which is attached to all logs caused by a swap
+fn get_swap_tracing_span(swap_id: Uuid) -> Span {
+    debug_span!("swap", swap_id = %swap_id)
 }
 
 // BuyXmr
@@ -62,7 +69,10 @@ impl Request for BuyXmrArgs {
     type Response = BuyXmrResponse;
 
     async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
-        buy_xmr(self, ctx).await
+        let swap_id = Uuid::new_v4();
+        let swap_span = get_swap_tracing_span(swap_id);
+
+        buy_xmr(self, swap_id, ctx).instrument(swap_span).await
     }
 }
 
@@ -84,7 +94,9 @@ impl Request for ResumeSwapArgs {
     type Response = ResumeSwapResponse;
 
     async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
-        resume_swap(self, ctx).await
+        let swap_span = get_swap_tracing_span(self.swap_id);
+
+        resume_swap(self, ctx).instrument(swap_span).await
     }
 }
 
@@ -100,7 +112,9 @@ impl Request for CancelAndRefundArgs {
     type Response = serde_json::Value;
 
     async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
-        cancel_and_refund(self, ctx).await
+        let swap_span = get_swap_tracing_span(self.swap_id);
+
+        cancel_and_refund(self, ctx).instrument(swap_span).await
     }
 }
 
@@ -536,6 +550,7 @@ pub async fn get_swap_info(
 #[tracing::instrument(fields(method = "buy_xmr"), skip(context))]
 pub async fn buy_xmr(
     buy_xmr: BuyXmrArgs,
+    swap_id: Uuid,
     context: Arc<Context>,
 ) -> Result<BuyXmrResponse, anyhow::Error> {
     let BuyXmrArgs {
@@ -543,8 +558,6 @@ pub async fn buy_xmr(
         bitcoin_change_address,
         monero_receive_address,
     } = buy_xmr;
-
-    let swap_id = Uuid::new_v4();
 
     let bitcoin_wallet = Arc::clone(
         context
