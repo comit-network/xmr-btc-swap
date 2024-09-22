@@ -1,5 +1,5 @@
 import { Box } from "@material-ui/core";
-import { SwapSlice } from "models/storeModel";
+import { SwapSlice, SwapState } from "models/storeModel";
 import CircularProgressWithSubtitle from "../CircularProgressWithSubtitle";
 import BitcoinPunishedPage from "./done/BitcoinPunishedPage";
 import BitcoinRefundedPage from "./done/BitcoinRefundedPage";
@@ -8,6 +8,8 @@ import ProcessExitedPage from "./exited/ProcessExitedPage";
 import BitcoinCancelledPage from "./in_progress/BitcoinCancelledPage";
 import BitcoinLockTxInMempoolPage from "./in_progress/BitcoinLockTxInMempoolPage";
 import BitcoinRedeemedPage from "./in_progress/BitcoinRedeemedPage";
+import CancelTimelockExpiredPage from "./in_progress/CancelTimelockExpiredPage";
+import EncryptedSignatureSentPage from "./in_progress/EncryptedSignatureSentPage";
 import ReceivedQuotePage from "./in_progress/ReceivedQuotePage";
 import StartedPage from "./in_progress/StartedPage";
 import XmrLockedPage from "./in_progress/XmrLockedPage";
@@ -19,7 +21,7 @@ import WaitingForBitcoinDepositPage from "./init/WaitingForBitcoinDepositPage";
 export default function SwapStatePage({
   state,
 }: {
-  state: SwapSlice["state"];
+  state: SwapState | null
 }) {
   // TODO: Reimplement this using tauri events
   /*
@@ -50,10 +52,14 @@ export default function SwapStatePage({
       return <XmrLockTxInMempoolPage {...state.curr.content} />;
     case "XmrLocked":
       return <XmrLockedPage />;
+    case "EncryptedSignatureSent":
+      return <EncryptedSignatureSentPage />;
     case "BtcRedeemed":
       return <BitcoinRedeemedPage />;
     case "XmrRedeemInMempool":
       return <XmrRedeemInMempoolPage {...state.curr.content} />;
+    case "CancelTimelockExpired":
+      return <CancelTimelockExpiredPage />;
     case "BtcCancelled":
       return <BitcoinCancelledPage />;
     case "BtcRefunded":

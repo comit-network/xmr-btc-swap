@@ -328,6 +328,9 @@ async fn next_state(
             }
         }
         BobState::EncSigSent(state) => {
+            event_emitter
+                .emit_swap_progress_event(swap_id, TauriSwapProgressEvent::EncryptedSignatureSent);
+
             // We need to make sure that Alice did not publish the redeem transaction while we were offline
             // Even if the cancel timelock expired, if Alice published the redeem transaction while we were away we cannot miss it
             // If we do we cannot refund and will never be able to leave the "CancelTimelockExpired" state
@@ -375,6 +378,9 @@ async fn next_state(
             }
         }
         BobState::CancelTimelockExpired(state4) => {
+            event_emitter
+                .emit_swap_progress_event(swap_id, TauriSwapProgressEvent::CancelTimelockExpired);
+
             if state4.check_for_tx_cancel(bitcoin_wallet).await.is_err() {
                 state4.submit_tx_cancel(bitcoin_wallet).await?;
             }
@@ -397,13 +403,11 @@ async fn next_state(
                     );
                 }
                 ExpiredTimelocks::Cancel { .. } => {
-                    state.publish_refund_btc(bitcoin_wallet).await?;
+                    let btc_refund_txid = state.publish_refund_btc(bitcoin_wallet).await?;
 
                     event_emitter.emit_swap_progress_event(
                         swap_id,
-                        TauriSwapProgressEvent::BtcRefunded {
-                            btc_refund_txid: state.signed_refund_transaction()?.txid(),
-                        },
+                        TauriSwapProgressEvent::BtcRefunded { btc_refund_txid },
                     );
 
                     BobState::BtcRefunded(state)
@@ -521,6 +525,7 @@ async fn next_state(
                 }
             };
         }
+        // TODO: Emit a Tauri event here
         BobState::SafelyAborted => BobState::SafelyAborted,
         BobState::XmrRedeemed { tx_lock_id } => {
             event_emitter.emit_swap_progress_event(

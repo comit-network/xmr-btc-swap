@@ -133,6 +133,7 @@ pub enum TauriSwapProgressEvent {
         xmr_lock_tx_confirmations: u64,
     },
     XmrLocked,
+    EncryptedSignatureSent,
     BtcRedeemed,
     XmrRedeemInMempool {
         #[typeshare(serialized_as = "Vec<string>")]
@@ -140,6 +141,7 @@ pub enum TauriSwapProgressEvent {
         #[typeshare(serialized_as = "string")]
         xmr_redeem_address: monero::Address,
     },
+    CancelTimelockExpired,
     BtcCancelled {
         #[typeshare(serialized_as = "string")]
         btc_cancel_txid: Txid,

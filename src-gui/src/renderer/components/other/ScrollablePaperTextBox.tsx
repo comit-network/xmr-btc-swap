@@ -12,16 +12,16 @@ export default function ScrollablePaperTextBox({
   rows,
   title,
   copyValue,
-  searchQuery,
-  setSearchQuery,
-  minHeight,
+  searchQuery = null,
+  setSearchQuery = null,
+  minHeight = MIN_HEIGHT,
 }: {
   rows: ReactNode[];
   title: string;
   copyValue: string;
-  searchQuery?: string;
-  setSearchQuery?: (query: string) => void;
-  minHeight?: string;
+  searchQuery: string | null;
+  setSearchQuery?: ((query: string) => void) | null;
+  minHeight: string;
 }) {
   const virtuaEl = useRef<VListHandle | null>(null);
 
@@ -82,9 +82,3 @@ export default function ScrollablePaperTextBox({
     </Paper>
   );
 }
-
-ScrollablePaperTextBox.defaultProps = {
-  searchQuery: undefined,
-  setSearchQuery: undefined,
-  minHeight: MIN_HEIGHT,
-};

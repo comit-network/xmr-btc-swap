@@ -4,8 +4,10 @@ import {
   TauriSwapProgressEvent,
 } from "./tauriModel";
 
+export type TauriSwapProgressEventType = TauriSwapProgressEvent["type"];
+
 export type TauriSwapProgressEventContent<
-  T extends TauriSwapProgressEvent["type"],
+  T extends TauriSwapProgressEventType,
 > = Extract<TauriSwapProgressEvent, { type: T }>["content"];
 
 // See /swap/src/protocol/bob/state.rs#L57

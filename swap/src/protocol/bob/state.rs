@@ -740,11 +740,15 @@ impl State6 {
         Ok((tx_id, subscription))
     }
 
-    pub async fn publish_refund_btc(&self, bitcoin_wallet: &bitcoin::Wallet) -> Result<()> {
+    pub async fn publish_refund_btc(
+        &self,
+        bitcoin_wallet: &bitcoin::Wallet,
+    ) -> Result<bitcoin::Txid> {
         let signed_tx_refund = self.signed_refund_transaction()?;
+        let signed_tx_refund_txid = signed_tx_refund.txid();
         bitcoin_wallet.broadcast(signed_tx_refund, "refund").await?;
 
-        Ok(())
+        Ok(signed_tx_refund_txid)
     }
 
     pub fn signed_refund_transaction(&self) -> Result<Transaction> {

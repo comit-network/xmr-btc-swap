@@ -18,9 +18,6 @@ interface State {
     swapId: string;
     keys: MoneroRecoveryResponse;
   } | null;
-  moneroWallet: {
-    isSyncing: boolean;
-  };
   moneroWalletRpc: {
     // TODO: Reimplement this using Tauri
     updateState: false;
@@ -41,9 +38,6 @@ const initialState: RPCSlice = {
     rendezvous_discovered_sellers: [],
     swapInfos: {},
     moneroRecovery: null,
-    moneroWallet: {
-      isSyncing: false,
-    },
     moneroWalletRpc: {
       updateState: false,
     },

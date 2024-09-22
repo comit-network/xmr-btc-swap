@@ -6,6 +6,8 @@
   "scripts": {
     "check-bindings": "typeshare --lang=typescript --output-file __temp_bindings.ts ../swap/src && dprint fmt __temp_bindings.ts && diff -wbB __temp_bindings.ts ./src/models/tauriModel.ts && rm __temp_bindings.ts",
     "gen-bindings": "typeshare --lang=typescript --output-file ./src/models/tauriModel.ts ../swap/src && dprint fmt ./src/models/tauriModel.ts",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
     "dev": "vite",
     "prebuild": "yarn run gen-bindings",
     "build": "vite build --mode dev",
@@ -38,6 +40,8 @@
   "devDependencies": {
     "@eslint/js": "^9.9.0",
     "@tauri-apps/cli": ">=2.0.0-beta.0",
+    "@testing-library/react": "^16.0.1",
+    "@testing-library/user-event": "^14.5.2",
     "@types/humanize-duration": "^3.27.4",
     "@types/lodash": "^4.17.6",
     "@types/node": "^20.14.10",
@@ -53,6 +57,7 @@
     "typescript-eslint": "^8.1.0",
     "vite": "^5.3.1",
     "vite-plugin-watch": "^0.3.1",
-    "vite-tsconfig-paths": "^4.3.2"
+    "vite-tsconfig-paths": "^4.3.2",
+    "vitest": "^2.1.1"
   }
 }

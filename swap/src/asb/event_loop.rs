@@ -161,7 +161,6 @@ where
                 swarm_event = self.swarm.select_next_some() => {
                     match swarm_event {
                         SwarmEvent::Behaviour(OutEvent::SwapSetupInitiated { mut send_wallet_snapshot }) => {
-
                             let (btc, responder) = match send_wallet_snapshot.recv().await {
                                 Ok((btc, responder)) => (btc, responder),
                                 Err(error) => {
