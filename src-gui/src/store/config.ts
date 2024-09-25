@@ -6,11 +6,15 @@ export const isTestnet = () => true;
 export const isDevelopment = true;
 
 export function getStubTestnetProvider(): ExtendedProviderStatus | null {
-  const stubProviderAddress = process.env.TESTNET_STUB_PROVIDER_ADDRESS;
+  const stubProviderAddress = import.meta.env
+    .VITE_TESTNET_STUB_PROVIDER_ADDRESS;
 
-  if(stubProviderAddress != null) {
+  console.log(import.meta.env);
+
+  if (stubProviderAddress != null) {
     try {
-      const [multiAddr, peerId] = splitPeerIdFromMultiAddress(stubProviderAddress);
+      const [multiAddr, peerId] =
+        splitPeerIdFromMultiAddress(stubProviderAddress);
 
       return {
         multiAddr,
@@ -20,7 +24,7 @@ export function getStubTestnetProvider(): ExtendedProviderStatus | null {
         minSwapAmount: 0,
         price: 0,
       };
-    }catch {
+    } catch {
       return null;
     }
   }
