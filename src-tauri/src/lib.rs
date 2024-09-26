@@ -138,15 +138,12 @@ fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         match context {
             Ok(context) => {
                 let state = app_handle.state::<RwLock<State>>();
-
                 state.write().await.set_context(Arc::new(context));
-
                 // To display to the user that the setup is done, we emit an event to the Tauri frontend
                 tauri_handle.emit_context_init_progress_event(TauriContextStatusEvent::Available);
             }
             Err(e) => {
                 println!("Error while initializing context: {:?}", e);
-
                 // To display to the user that the setup failed, we emit an event to the Tauri frontend
                 tauri_handle.emit_context_init_progress_event(TauriContextStatusEvent::Failed);
             }
@@ -182,7 +179,8 @@ pub fn run() {
             RunEvent::Exit | RunEvent::ExitRequested { .. } => {
                 // Here we cleanup the Context when the application is closed
                 // This is necessary to among other things stop the monero-wallet-rpc process
-                // If the application is forcibly closed, this may not be called
+                // If the application is forcibly closed, this may not be called.
+                // TODO: fix that
                 let context = app.state::<RwLock<State>>().inner().try_read();
 
                 match context {

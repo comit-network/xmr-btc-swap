@@ -1,11 +1,14 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { ExtendedProviderStatus, ProviderStatus } from "models/apiModel";
 import {
+  CliLogEmittedEvent,
   GetSwapInfoResponse,
   TauriContextStatusEvent,
 } from "models/tauriModel";
 import { MoneroRecoveryResponse } from "../../models/rpcModel";
 import { GetSwapInfoResponseExt } from "models/tauriModelExt";
+import { getLogsAndStringsFromRawFileString } from "utils/parseUtils";
+import { CliLog } from "models/cliModel";
 
 interface State {
   balance: number | null;
@@ -27,7 +30,7 @@ interface State {
 export interface RPCSlice {
   status: TauriContextStatusEvent | null;
   state: State;
-  busyEndpoints: string[];
+  logs: (CliLog | string)[];
 }
 
 const initialState: RPCSlice = {
@@ -42,13 +45,18 @@ const initialState: RPCSlice = {
       updateState: false,
     },
   },
-  busyEndpoints: [],
+  logs: [],
 };
 
 export const rpcSlice = createSlice({
   name: "rpc",
   initialState,
   reducers: {
+    receivedCliLog(slice, action: PayloadAction<CliLogEmittedEvent>) {
+      const buffer = action.payload.buffer;
+      const logs = getLogsAndStringsFromRawFileString(buffer);
+      slice.logs = slice.logs.concat(logs);
+    },
     contextStatusEventReceived(
       slice,
       action: PayloadAction<TauriContextStatusEvent>,
@@ -74,17 +82,6 @@ export const rpcSlice = createSlice({
       slice.state.swapInfos[action.payload.swap_id] =
         action.payload as GetSwapInfoResponseExt;
     },
-    rpcSetEndpointBusy(slice, action: PayloadAction<string>) {
-      if (!slice.busyEndpoints.includes(action.payload)) {
-        slice.busyEndpoints.push(action.payload);
-      }
-    },
-    rpcSetEndpointFree(slice, action: PayloadAction<string>) {
-      const index = slice.busyEndpoints.indexOf(action.payload);
-      if (index >= 0) {
-        slice.busyEndpoints.splice(index);
-      }
-    },
     rpcSetMoneroRecoveryKeys(
       slice,
       action: PayloadAction<[string, MoneroRecoveryResponse]>,
@@ -105,11 +102,10 @@ export const rpcSlice = createSlice({
 
 export const {
   contextStatusEventReceived,
+  receivedCliLog,
   rpcSetBalance,
   rpcSetWithdrawTxId,
   rpcResetWithdrawTxId,
-  rpcSetEndpointBusy,
-  rpcSetEndpointFree,
   rpcSetRendezvousDiscoveredProviders,
   rpcSetSwapInfo,
   rpcSetMoneroRecoveryKeys,

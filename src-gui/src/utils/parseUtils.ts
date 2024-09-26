@@ -1,4 +1,4 @@
-import { CliLog } from "models/cliModel";
+import { CliLog, parseCliLogString } from "models/cliModel";
 import { Multiaddr } from "multiaddr";
 
 /*
@@ -55,19 +55,7 @@ export function getLinesOfString(data: string): string[] {
 export function getLogsAndStringsFromRawFileString(
   rawFileData: string,
 ): (CliLog | string)[] {
-  return getLinesOfString(rawFileData).map((line) => {
-    try {
-      return JSON.parse(line);
-    } catch {
-      return line;
-    }
-  });
-}
-
-export function getLogsFromRawFileString(rawFileData: string): CliLog[] {
-  // TODO: Reimplement this using Tauri
-  return [];
-  return getLogsAndStringsFromRawFileString(rawFileData).filter(isCliLog);
+  return getLinesOfString(rawFileData).map(parseCliLogString);
 }
 
 export function logsToRawString(logs: (CliLog | string)[]): string {

@@ -81,7 +81,8 @@ pub async fn main() -> Result<()> {
     // initialize tracing
     let format = if json { Format::Json } else { Format::Raw };
     let log_dir = config.data.dir.join("logs");
-    common::tracing_util::init(LevelFilter::DEBUG, format, log_dir).expect("initialize tracing");
+    common::tracing_util::init(LevelFilter::DEBUG, format, log_dir, None)
+        .expect("initialize tracing");
 
     // check for conflicting env / config values
     if config.monero.network != env_config.monero_network {

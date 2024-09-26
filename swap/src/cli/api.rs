@@ -288,7 +288,12 @@ impl ContextBuilder {
         };
 
         START.call_once(|| {
-            let _ = common::tracing_util::init(level_filter, format, data_dir.join("logs"));
+            let _ = common::tracing_util::init(
+                level_filter,
+                format,
+                data_dir.join("logs"),
+                self.tauri_handle.clone(),
+            );
         });
 
         let seed = Seed::from_file_or_generate(data_dir.as_path())

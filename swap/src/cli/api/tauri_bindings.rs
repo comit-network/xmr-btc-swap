@@ -6,8 +6,9 @@ use strum::Display;
 use typeshare::typeshare;
 use uuid::Uuid;
 
-static SWAP_PROGRESS_EVENT_NAME: &str = "swap-progress-update";
-static CONTEXT_INIT_PROGRESS_EVENT_NAME: &str = "context-init-progress-update";
+const SWAP_PROGRESS_EVENT_NAME: &str = "swap-progress-update";
+const CONTEXT_INIT_PROGRESS_EVENT_NAME: &str = "context-init-progress-update";
+const CLI_LOG_EMITTED_EVENT_NAME: &str = "cli-log-emitted";
 
 #[derive(Debug, Clone)]
 pub struct TauriHandle(
@@ -46,6 +47,12 @@ pub trait TauriEmitter {
 
     fn emit_context_init_progress_event(&self, event: TauriContextStatusEvent) {
         let _ = self.emit_tauri_event(CONTEXT_INIT_PROGRESS_EVENT_NAME, event);
+    }
+
+    fn emit_cli_log_event(&self, event: CliLogEmittedEvent) {
+        let _ = self
+            .emit_tauri_event(CLI_LOG_EMITTED_EVENT_NAME, event)
+            .ok();
     }
 }
 
@@ -157,4 +164,15 @@ pub enum TauriSwapProgressEvent {
         reason: String,
     },
     Released,
+}
+
+/// This event is emitted whenever there is a log message issued in the CLI.
+///
+/// It contains a json serialized object containing the log message and metadata.
+#[typeshare]
+#[derive(Debug, Serialize, Clone)]
+#[typeshare]
+pub struct CliLogEmittedEvent {
+    /// The serialized object containing the log message and metadata.
+    pub buffer: String
 }

@@ -5,6 +5,7 @@ import {
   BalanceResponse,
   BuyXmrArgs,
   BuyXmrResponse,
+  CliLogEmittedEvent,
   GetLogsArgs,
   GetLogsResponse,
   GetSwapInfoResponse,
@@ -20,6 +21,7 @@ import {
 } from "models/tauriModel";
 import {
   contextStatusEventReceived,
+  receivedCliLog,
   rpcSetBalance,
   rpcSetSwapInfo,
 } from "store/features/rpcSlice";
@@ -47,6 +49,11 @@ export async function initEventListeners() {
     console.log("Received context init progress event", event.payload);
     store.dispatch(contextStatusEventReceived(event.payload));
   });
+
+  listen<CliLogEmittedEvent>("cli-log-emitted", (event) => {
+    console.log("Received cli log event", event.payload);
+    store.dispatch(receivedCliLog(event.payload))
+  })
 }
 
 async function invoke<ARGS, RESPONSE>(

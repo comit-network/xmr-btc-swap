@@ -42,10 +42,6 @@ export function useActiveSwapInfo() {
   return useSwapInfo(swapId);
 }
 
-export function useIsRpcEndpointBusy(method: string) {
-  return useAppSelector((state) => state.rpc.busyEndpoints.includes(method));
-}
-
 export function useAllProviders() {
   return useAppSelector((state) => {
     const registryProviders = state.providers.registry.providers || [];

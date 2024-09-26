@@ -37,7 +37,7 @@ export function parseCliLogString(log: string): CliLog | string {
     } else {
       return log;
     }
-  } catch (err) {
+  } catch {
     return log;
   }
 }

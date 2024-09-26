@@ -3,7 +3,7 @@ import SendIcon from "@material-ui/icons/Send";
 import { RpcMethod } from "models/rpcModel";
 import { useState } from "react";
 import { SatsAmount } from "renderer/components/other/Units";
-import { useAppSelector, useIsRpcEndpointBusy } from "store/hooks";
+import { useAppSelector } from "store/hooks";
 import BitcoinIcon from "../../icons/BitcoinIcon";
 import InfoBox from "../../modal/swap/InfoBox";
 import WithdrawDialog from "../../modal/wallet/WithdrawDialog";
@@ -20,7 +20,6 @@ const useStyles = makeStyles((theme) => ({
 export default function WithdrawWidget() {
   const classes = useStyles();
   const walletBalance = useAppSelector((state) => state.rpc.state.balance);
-  const checkingBalance = useIsRpcEndpointBusy(RpcMethod.GET_BTC_BALANCE);
   const [showDialog, setShowDialog] = useState(false);
 
   function onShowDialog() {
@@ -50,7 +49,7 @@ export default function WithdrawWidget() {
             size="large"
             onClick={onShowDialog}
             disabled={
-              walletBalance === null || checkingBalance || walletBalance <= 0
+              walletBalance === null || walletBalance <= 0
             }
           >
             Withdraw

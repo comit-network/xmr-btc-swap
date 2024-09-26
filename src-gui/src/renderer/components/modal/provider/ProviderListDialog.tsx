@@ -1,7 +1,6 @@
 import {
   Avatar,
   Button,
-  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -15,14 +14,9 @@ import {
 import AddIcon from "@material-ui/icons/Add";
 import SearchIcon from "@material-ui/icons/Search";
 import { ExtendedProviderStatus } from "models/apiModel";
-import { RpcMethod } from "models/rpcModel";
 import { useState } from "react";
 import { setSelectedProvider } from "store/features/providersSlice";
-import {
-  useAllProviders,
-  useAppDispatch,
-  useIsRpcEndpointBusy,
-} from "store/hooks";
+import { useAllProviders, useAppDispatch } from "store/hooks";
 import ListSellersDialog from "../listSellers/ListSellersDialog";
 import ProviderInfo from "./ProviderInfo";
 import ProviderSubmitDialog from "./ProviderSubmitDialog";
@@ -65,13 +59,11 @@ export function ProviderSubmitDialogOpenButton() {
 
 export function ListSellersDialogOpenButton() {
   const [open, setOpen] = useState(false);
-  const running = useIsRpcEndpointBusy(RpcMethod.LIST_SELLERS);
 
   return (
     <ListItem
       autoFocus
       button
-      disabled={running}
       onClick={() => {
         // Prevents background from being clicked and reopening dialog
         if (!open) {
@@ -81,7 +73,9 @@ export function ListSellersDialogOpenButton() {
     >
       <ListSellersDialog open={open} onClose={() => setOpen(false)} />
       <ListItemAvatar>
-        <Avatar>{running ? <CircularProgress /> : <SearchIcon />}</Avatar>
+        <Avatar>
+          <SearchIcon />
+        </Avatar>
       </ListItemAvatar>
       <ListItemText primary="Discover providers by connecting to a rendezvous point" />
     </ListItem>
