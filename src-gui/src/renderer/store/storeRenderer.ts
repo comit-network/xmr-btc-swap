@@ -18,7 +18,7 @@ const rootPersistConfig = {
 };
 
 // Use Tauri's store plugin for persistent settings
-const tauriStore = await createStore(`${getNetworkName()}_settings.bin`, {
+const tauriStore = createStore(`${getNetworkName()}_settings.bin`, {
   autoSave: 1000 as unknown as boolean,
 });
 
@@ -26,9 +26,9 @@ const tauriStore = await createStore(`${getNetworkName()}_settings.bin`, {
 const settingsPersistConfig = {
   key: "settings",
   storage: {
-    getItem: (key: string) => tauriStore.get(key),
-    setItem: (key: string, value: unknown) => tauriStore.set(key, value),
-    removeItem: (key: string) => tauriStore.delete(key),
+    getItem: async (key: string) => (await tauriStore).get(key),
+    setItem: async (key: string, value: unknown) => (await tauriStore).set(key, value),
+    removeItem: async (key: string) => (await tauriStore).delete(key),
   },
 };
 
