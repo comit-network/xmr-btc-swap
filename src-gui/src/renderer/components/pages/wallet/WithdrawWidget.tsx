@@ -48,9 +48,7 @@ export default function WithdrawWidget() {
             endIcon={<SendIcon />}
             size="large"
             onClick={onShowDialog}
-            disabled={
-              walletBalance === null || walletBalance <= 0
-            }
+            disabled={walletBalance === null || walletBalance <= 0}
           >
             Withdraw
           </Button>

@@ -14,7 +14,7 @@ export default function FundsLeftInWalletAlert() {
         severity="info"
         action={
           <Button
-            color="inherit"
+            variant="outlined"
             size="small"
             onClick={() => navigate("/wallet")}
           >

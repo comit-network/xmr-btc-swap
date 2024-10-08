@@ -64,7 +64,7 @@ export default function SwapDialog({
         ) : (
           <>
             <SwapStatePage state={swap.state} />
-            <SwapStateStepper state={swap.state}/>
+            <SwapStateStepper state={swap.state} />
           </>
         )}
       </DialogContent>

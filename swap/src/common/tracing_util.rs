@@ -64,13 +64,13 @@ pub fn init(
             .with(file_layer)
             .with(tauri_layer)
             .with(terminal_layer.json().with_filter(level_filter))
-            .init();
+            .try_init()?;
     } else {
         tracing_subscriber::registry()
             .with(file_layer)
             .with(tauri_layer)
             .with(terminal_layer.with_filter(level_filter))
-            .init();
+            .try_init()?;
     }
 
     // Now we can use the tracing macros to log messages
@@ -83,7 +83,11 @@ pub fn init(
 fn env_filter(level_filter: LevelFilter) -> Result<EnvFilter> {
     Ok(EnvFilter::from_default_env()
         .add_directive(Directive::from_str(&format!("asb={}", &level_filter))?)
-        .add_directive(Directive::from_str(&format!("swap={}", &level_filter))?))
+        .add_directive(Directive::from_str(&format!("swap={}", &level_filter))?)
+        .add_directive(Directive::from_str(&format!(
+            "unstoppableswap-gui-rs={}",
+            &level_filter
+        ))?))
 }
 
 /// A writer that forwards tracing log messages to the tauri guest.

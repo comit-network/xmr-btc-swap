@@ -435,7 +435,7 @@ async fn init_bitcoin_wallet(
     seed: &Seed,
     data_dir: PathBuf,
     env_config: EnvConfig,
-    bitcoin_target_block: usize,
+    bitcoin_target_block: u16,
 ) -> Result<bitcoin::Wallet> {
     let wallet_dir = data_dir.join("wallet");
 
@@ -467,14 +467,16 @@ async fn init_monero_wallet(
 
     let monero_wallet_rpc_process = monero_wallet_rpc
         .run(network, Some(monero_daemon_address))
-        .await?;
+        .await
+        .context("Failed to start monero-wallet-rpc process")?;
 
     let monero_wallet = monero::Wallet::open_or_create(
         monero_wallet_rpc_process.endpoint(),
         MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME.to_string(),
         env_config,
     )
-    .await?;
+    .await
+    .context("Failed to open or create Monero wallet")?;
 
     Ok((monero_wallet, monero_wallet_rpc_process))
 }

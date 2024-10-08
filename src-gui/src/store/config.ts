@@ -9,8 +9,6 @@ export function getStubTestnetProvider(): ExtendedProviderStatus | null {
   const stubProviderAddress = import.meta.env
     .VITE_TESTNET_STUB_PROVIDER_ADDRESS;
 
-  console.log(import.meta.env);
-
   if (stubProviderAddress != null) {
     try {
       const [multiAddr, peerId] =
@@ -30,4 +28,12 @@ export function getStubTestnetProvider(): ExtendedProviderStatus | null {
   }
 
   return null;
+}
+
+export function getNetworkName(): string {
+  if (isTestnet()) {
+    return "Testnet";
+  }else {
+    return "Mainnet";
+  }
 }

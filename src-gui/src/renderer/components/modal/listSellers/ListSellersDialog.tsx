@@ -53,7 +53,9 @@ export default function ListSellersDialog({
   }
 
   function getMultiAddressError(): string | null {
-    return isValidMultiAddressWithPeerId(rendezvousAddress) ? null : "Address is invalid or missing peer ID";
+    return isValidMultiAddressWithPeerId(rendezvousAddress)
+      ? null
+      : "Address is invalid or missing peer ID";
   }
 
   function handleSuccess({ sellers }: ListSellersResponse) {

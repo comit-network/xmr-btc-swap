@@ -87,6 +87,7 @@ pub struct WalletRpcProcess {
     port: u16,
 }
 
+#[derive(Debug, Copy, Clone)]
 struct MoneroDaemon {
     address: &'static str,
     port: u16,
@@ -100,6 +101,16 @@ impl MoneroDaemon {
             port,
             network,
         }
+    }
+
+    pub fn from_str(address: String, network: Network) -> Result<Self, Error> {
+        let (address, port) = extract_host_and_port(address)?;
+
+        Ok(Self {
+            address,
+            port,
+            network,
+        })
     }
 
     /// Checks if the Monero daemon is available by sending a request to its `get_info` endpoint.
@@ -144,7 +155,7 @@ struct MoneroDaemonGetInfoResponse {
 }
 
 /// Chooses an available Monero daemon based on the specified network.
-async fn choose_monero_daemon(network: Network) -> Result<&'static MoneroDaemon, Error> {
+async fn choose_monero_daemon(network: Network) -> Result<MoneroDaemon, Error> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .https_only(false)
@@ -159,7 +170,7 @@ async fn choose_monero_daemon(network: Network) -> Result<&'static MoneroDaemon,
         match daemon.is_available(&client).await {
             Ok(true) => {
                 tracing::debug!(%daemon, "Found available Monero daemon");
-                return Ok(daemon);
+                return Ok(*daemon);
             }
             Err(err) => {
                 tracing::debug!(%err, %daemon, "Failed to connect to Monero daemon");
@@ -320,10 +331,20 @@ impl WalletRpc {
             .local_addr()?
             .port();
 
-        let daemon_address = match daemon_address {
-            Some(daemon_address) => daemon_address,
-            None => choose_monero_daemon(network).await?.to_string(),
+        let daemon = match daemon_address {
+            Some(daemon_address) => {
+                let daemon = MoneroDaemon::from_str(daemon_address, network)?;
+
+                if !daemon.is_available(&reqwest::Client::new()).await? {
+                    bail!("Specified daemon is not available or not on the correct network");
+                }
+
+                daemon
+            }
+            None => choose_monero_daemon(network).await?,
         };
+
+        let daemon_address = daemon.to_string();
 
         tracing::debug!(
             %daemon_address,
@@ -465,21 +486,35 @@ impl WalletRpc {
     }
 }
 
+fn extract_host_and_port(address: String) -> Result<(&'static str, u16), Error> {
+    // Strip the protocol (anything before "://")
+    let stripped_address = if let Some(pos) = address.find("://") {
+        address[(pos + 3)..].to_string()
+    } else {
+        address
+    };
+
+    // Split the remaining address into parts (host and port)
+    let parts: Vec<&str> = stripped_address.split(':').collect();
+
+    if parts.len() == 2 {
+        let host = parts[0].to_string();
+        let port = parts[1].parse::<u16>()?;
+
+        // Leak the host string to create a 'static lifetime string
+        let static_str_host: &'static str = Box::leak(host.into_boxed_str());
+        return Ok((static_str_host, port));
+    }
+
+    bail!(
+        "Could not extract host and port from address: {}",
+        stripped_address
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn extract_host_and_port(address: String) -> (&'static str, u16) {
-        let parts: Vec<&str> = address.split(':').collect();
-
-        if parts.len() == 2 {
-            let host = parts[0].to_string();
-            let port = parts[1].parse::<u16>().unwrap();
-            let static_str_host: &'static str = Box::leak(host.into_boxed_str());
-            return (static_str_host, port);
-        }
-        panic!("Could not extract host and port from address: {}", address)
-    }
 
     #[tokio::test]
     async fn test_is_daemon_available_success() {
@@ -501,7 +536,7 @@ mod tests {
             )
             .create();
 
-        let (host, port) = extract_host_and_port(server.host_with_port());
+        let (host, port) = extract_host_and_port(server.host_with_port()).unwrap();
 
         let client = reqwest::Client::new();
         let result = MoneroDaemon::new(host, port, Network::Mainnet)
@@ -532,7 +567,7 @@ mod tests {
             )
             .create();
 
-        let (host, port) = extract_host_and_port(server.host_with_port());
+        let (host, port) = extract_host_and_port(server.host_with_port()).unwrap();
 
         let client = reqwest::Client::new();
         let result = MoneroDaemon::new(host, port, Network::Stagenet)
@@ -563,7 +598,7 @@ mod tests {
             )
             .create();
 
-        let (host, port) = extract_host_and_port(server.host_with_port());
+        let (host, port) = extract_host_and_port(server.host_with_port()).unwrap();
 
         let client = reqwest::Client::new();
         let result = MoneroDaemon::new(host, port, Network::Mainnet)

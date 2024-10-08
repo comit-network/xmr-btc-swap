@@ -66,7 +66,7 @@ OPTIONS:
         --change-address <bitcoin-change-address>           The bitcoin address where any form of change or excess funds should be sent to
         --receive-address <monero-receive-address>          The monero address where you would like to receive monero
         --seller <seller>                                   The seller's address. Must include a peer ID part, i.e. `/p2p/`
-        
+
         --electrum-rpc <bitcoin-electrum-rpc-url>           Provide the Bitcoin Electrum RPC URL
         --bitcoin-target-block <bitcoin-target-block>       Estimate Bitcoin fees such that transactions are confirmed within the specified number of blocks
         --monero-daemon-address <monero-daemon-address>     Specify to connect to a monero daemon of your choice: <host>:<port>

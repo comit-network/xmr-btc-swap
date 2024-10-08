@@ -3,7 +3,6 @@ import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "renderer/store/storeRenderer";
 import { parseDateString } from "utils/parseUtils";
 
-// Use throughout your app instead of plain `useDispatch` and `useSelector`
 export const useAppDispatch = () => useDispatch<AppDispatch>();
 export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
 
@@ -29,7 +28,7 @@ export function useIsContextAvailable() {
 
 export function useSwapInfo(swapId: string | null) {
   return useAppSelector((state) =>
-    swapId ? (state.rpc.state.swapInfos[swapId] ?? null) : null,
+    swapId ? state.rpc.state.swapInfos[swapId] ?? null : null,
   );
 }
 
@@ -57,4 +56,8 @@ export function useSwapInfosSortedByDate() {
     Object.values(swapInfos),
     (swap) => -parseDateString(swap.start_date),
   );
+}
+
+export function useSettings() {
+  return useAppSelector((state) => state.settings);
 }

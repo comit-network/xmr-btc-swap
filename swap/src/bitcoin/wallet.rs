@@ -42,7 +42,7 @@ pub struct Wallet<D = Tree, C = Client> {
     wallet: Arc<Mutex<bdk::Wallet<D>>>,
     finality_confirmations: u32,
     network: Network,
-    target_block: usize,
+    target_block: u16,
 }
 
 impl Wallet {
@@ -51,7 +51,7 @@ impl Wallet {
         data_dir: impl AsRef<Path>,
         xprivkey: ExtendedPrivKey,
         env_config: env::Config,
-        target_block: usize,
+        target_block: u16,
     ) -> Result<Self> {
         let data_dir = data_dir.as_ref();
         let wallet_dir = data_dir.join(WALLET);
@@ -577,7 +577,7 @@ impl<D, C> Wallet<D, C> {
 }
 
 pub trait EstimateFeeRate {
-    fn estimate_feerate(&self, target_block: usize) -> Result<FeeRate>;
+    fn estimate_feerate(&self, target_block: u16) -> Result<FeeRate>;
     fn min_relay_fee(&self) -> Result<bitcoin::Amount>;
 }
 
@@ -589,7 +589,7 @@ pub struct StaticFeeRate {
 
 #[cfg(test)]
 impl EstimateFeeRate for StaticFeeRate {
-    fn estimate_feerate(&self, _target_block: usize) -> Result<FeeRate> {
+    fn estimate_feerate(&self, _target_block: u16) -> Result<FeeRate> {
         Ok(self.fee_rate)
     }
 
@@ -726,8 +726,10 @@ impl Client {
         let config = bdk::electrum_client::ConfigBuilder::default()
             .retry(5)
             .build();
+
         let electrum = bdk::electrum_client::Client::from_config(electrum_rpc_url.as_str(), config)
             .context("Failed to initialize Electrum RPC client")?;
+
         // Initially fetch the latest block for storing the height.
         // We do not act on this subscription after this call.
         let latest_block = electrum
@@ -736,6 +738,7 @@ impl Client {
 
         let client = bdk::electrum_client::Client::new(electrum_rpc_url.as_str())
             .context("Failed to initialize Electrum RPC client")?;
+
         let blockchain = ElectrumBlockchain::from(client);
         let last_sync = Instant::now()
             .checked_sub(interval)
@@ -867,10 +870,10 @@ impl Client {
 }
 
 impl EstimateFeeRate for Client {
-    fn estimate_feerate(&self, target_block: usize) -> Result<FeeRate> {
+    fn estimate_feerate(&self, target_block: u16) -> Result<FeeRate> {
         // https://github.com/romanz/electrs/blob/f9cf5386d1b5de6769ee271df5eef324aa9491bc/src/rpc.rs#L213
         // Returned estimated fees are per BTC/kb.
-        let fee_per_byte = self.electrum.estimate_fee(target_block)?;
+        let fee_per_byte = self.electrum.estimate_fee(target_block.into())?;
         // we do not expect fees being that high.
         #[allow(clippy::cast_possible_truncation)]
         Ok(FeeRate::from_btc_per_kvb(fee_per_byte as f32))

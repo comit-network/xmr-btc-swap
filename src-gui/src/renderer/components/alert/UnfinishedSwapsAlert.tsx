@@ -14,7 +14,7 @@ export default function UnfinishedSwapsAlert() {
         variant="filled"
         action={
           <Button
-            color="inherit"
+            variant="outlined"
             size="small"
             onClick={() => navigate("/history")}
           >

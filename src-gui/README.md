@@ -21,7 +21,7 @@ yarn install && yarn run dev
 
 ```bash
 cd src-tauri
-cargo tauri dev 
+cargo tauri dev
 # let this run as well
 ```
 

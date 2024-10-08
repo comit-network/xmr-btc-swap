@@ -1,21 +1,21 @@
 import {
-    Box,
-    Link,
-    makeStyles,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableRow,
+  Box,
+  Link,
+  makeStyles,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableRow,
 } from "@material-ui/core";
 import { OpenInNew } from "@material-ui/icons";
 import { GetSwapInfoResponse } from "models/tauriModel";
 import CopyableMonospaceTextBox from "renderer/components/other/CopyableMonospaceTextBox";
 import MonospaceTextBox from "renderer/components/other/MonospaceTextBox";
 import {
-    MoneroBitcoinExchangeRate,
-    PiconeroAmount,
-    SatsAmount,
+  MoneroBitcoinExchangeRate,
+  PiconeroAmount,
+  SatsAmount,
 } from "renderer/components/other/Units";
 import { isTestnet } from "store/config";
 import { getBitcoinTxExplorerUrl } from "utils/conversionUtils";

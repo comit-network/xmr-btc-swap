@@ -27,7 +27,7 @@ pub struct Defaults {
     electrum_rpc_url: Url,
     monero_wallet_rpc_url: Url,
     price_ticker_ws_url: Url,
-    bitcoin_confirmation_target: usize,
+    bitcoin_confirmation_target: u16,
 }
 
 impl GetDefaults for Testnet {
@@ -185,7 +185,7 @@ mod addr_list {
 #[serde(deny_unknown_fields)]
 pub struct Bitcoin {
     pub electrum_rpc_url: Url,
-    pub target_block: usize,
+    pub target_block: u16,
     pub finality_confirmations: Option<u32>,
     #[serde(with = "crate::bitcoin::network")]
     pub network: bitcoin::Network,

@@ -15,12 +15,12 @@ type PathStep = [type: PathType, step: number, isError: boolean];
  * @param latestState - The latest state of the swap process
  * @returns A tuple containing [PathType, activeStep, errorFlag]
  */
-function getActiveStep(
-  state: SwapState | null
-): PathStep {
+function getActiveStep(state: SwapState | null): PathStep {
   // In case we cannot infer a correct step from the state
   function fallbackStep(reason: string) {
-    console.error(`Unable to choose correct stepper type (reason: ${reason}, state: ${JSON.stringify(state)}`);
+    console.error(
+      `Unable to choose correct stepper type (reason: ${reason}, state: ${JSON.stringify(state)}`,
+    );
     return [PathType.HAPPY_PATH, 0, true] as PathStep;
   }
 
@@ -36,12 +36,16 @@ function getActiveStep(
 
   // If the swap is released but we do not have a previous state we fallback
   if (latestState === null) {
-    return fallbackStep("Swap has been released but we do not have a previous state saved to display");
+    return fallbackStep(
+      "Swap has been released but we do not have a previous state saved to display",
+    );
   }
 
   // This should really never happen. For this statement to be true, the host has to submit a "Released" event twice
-  if(latestState.type === "Released") {
-    return fallbackStep("Both the current and previous states are both of type 'Released'.");
+  if (latestState.type === "Released") {
+    return fallbackStep(
+      "Both the current and previous states are both of type 'Released'.",
+    );
   }
 
   switch (latestState.type) {
@@ -111,8 +115,8 @@ function getActiveStep(
       return [PathType.UNHAPPY_PATH, 1, true];
     default:
       return fallbackStep("No step is assigned to the current state");
-      // TODO: Make this guard work. It should force the compiler to check if we have covered all possible cases.
-      // return exhaustiveGuard(latestState.type);
+    // TODO: Make this guard work. It should force the compiler to check if we have covered all possible cases.
+    // return exhaustiveGuard(latestState.type);
   }
 }
 
@@ -158,7 +162,7 @@ const UNHAPPY_PATH_STEP_LABELS = [
 export default function SwapStateStepper({
   state,
 }: {
-  state: SwapState | null
+  state: SwapState | null;
 }) {
   const [pathType, activeStep, error] = getActiveStep(state);
 

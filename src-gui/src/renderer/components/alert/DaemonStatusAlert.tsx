@@ -1,26 +1,9 @@
-import { CircularProgress } from "@material-ui/core";
+import { Button, CircularProgress } from "@material-ui/core";
 import { Alert, AlertProps } from "@material-ui/lab";
 import { TauriContextInitializationProgress } from "models/tauriModel";
-import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAppSelector } from "store/hooks";
 import { exhaustiveGuard } from "utils/typescriptUtils";
-
-const FUNNY_INIT_MESSAGES = [
-  "Initializing quantum entanglement...",
-  "Generating one-time pads from cosmic background radiation...",
-  "Negotiating key exchange with aliens...",
-  "Optimizing elliptic curves for maximum sneakiness...",
-  "Transforming plaintext into ciphertext via arcane XOR rituals...",
-  "Salting your hash with exotic mathematical seasonings...",
-  "Performing advanced modular arithmetic gymnastics...",
-  "Consulting the Oracle of Randomness...",
-  "Executing top-secret permutation protocols...",
-  "Summoning prime factors from the mathematical aether...",
-  "Deploying steganographic squirrels to hide your nuts of data...",
-  "Initializing the quantum superposition of your keys...",
-  "Applying post-quantum cryptographic voodoo...",
-  "Encrypting your data with the tears of frustrated regulators...",
-];
 
 function LoadingSpinnerAlert({ ...rest }: AlertProps) {
   return <Alert icon={<CircularProgress size={22} />} {...rest} />;
@@ -28,17 +11,10 @@ function LoadingSpinnerAlert({ ...rest }: AlertProps) {
 
 export default function DaemonStatusAlert() {
   const contextStatus = useAppSelector((s) => s.rpc.status);
+  const navigate = useNavigate();
 
-  const [initMessage] = useState(
-    FUNNY_INIT_MESSAGES[Math.floor(Math.random() * FUNNY_INIT_MESSAGES.length)],
-  );
-
-  if (contextStatus == null) {
-    return (
-      <LoadingSpinnerAlert severity="warning">
-        {initMessage}
-      </LoadingSpinnerAlert>
-    );
+  if (contextStatus === null) {
+    return <Alert severity="info">The daemon is not running</Alert>;
   }
 
   switch (contextStatus.type) {
@@ -68,7 +44,20 @@ export default function DaemonStatusAlert() {
       return <Alert severity="success">The daemon is running</Alert>;
     case "Failed":
       return (
-        <Alert severity="error">The daemon has stopped unexpectedly</Alert>
+        <Alert
+          severity="error"
+          action={
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => navigate("/help")}
+            >
+              View Logs
+            </Button>
+          }
+        >
+          The daemon has stopped unexpectedly
+        </Alert>
       );
     default:
       return exhaustiveGuard(contextStatus);

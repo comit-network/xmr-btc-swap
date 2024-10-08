@@ -30,8 +30,8 @@ const DEFAULT_ELECTRUM_RPC_URL: &str = "ssl://blockstream.info:700";
 // See: https://1209k.com/bitcoin-eye/ele.php?chain=tbtc
 pub const DEFAULT_ELECTRUM_RPC_URL_TESTNET: &str = "ssl://testnet.foundation.xyz:50002";
 
-const DEFAULT_BITCOIN_CONFIRMATION_TARGET: usize = 1;
-pub const DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET: usize = 1;
+const DEFAULT_BITCOIN_CONFIRMATION_TARGET: u16 = 1;
+pub const DEFAULT_BITCOIN_CONFIRMATION_TARGET_TESTNET: u16 = 1;
 
 const DEFAULT_TOR_SOCKS5_PORT: &str = "9050";
 
@@ -534,11 +534,11 @@ pub struct Bitcoin {
         long = "bitcoin-target-block",
         help = "Estimate Bitcoin fees such that transactions are confirmed within the specified number of blocks"
     )]
-    pub bitcoin_target_block: Option<usize>,
+    pub bitcoin_target_block: Option<u16>,
 }
 
 impl Bitcoin {
-    pub fn apply_defaults(self, testnet: bool) -> Result<(Url, usize)> {
+    pub fn apply_defaults(self, testnet: bool) -> Result<(Url, u16)> {
         let bitcoin_electrum_rpc_url = if let Some(url) = self.bitcoin_electrum_rpc_url {
             url
         } else if testnet {
