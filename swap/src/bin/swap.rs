@@ -403,6 +403,7 @@ mod tests {
             price: Amount::from_btc(0.001).unwrap(),
             max_quantity: Amount::from_btc(btc).unwrap(),
             min_quantity: Amount::ZERO,
+            valid_duration: Some(Duration::from_secs(120)),
         }
     }
 
@@ -411,6 +412,7 @@ mod tests {
             price: Amount::from_btc(0.001).unwrap(),
             max_quantity: Amount::max_value(),
             min_quantity: Amount::from_btc(btc).unwrap(),
+            valid_duration: Some(Duration::from_secs(120)),
         }
     }
 
