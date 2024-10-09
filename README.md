@@ -9,6 +9,10 @@ Currently, swaps are only offered in one direction with the `swap` CLI on the bu
 We are working on implementing a protocol where XMR moves first, but are currently blocked by advances on Monero itself.
 You can read [this blogpost](https://comit.network/blog/2021/07/02/transaction-presigning) for more information.
 
+## Maintenance
+
+This repository is currently maintained by community volunteers. While it remains safe to use, the original developers (@comit-network) have stopped contributing. For a more actively maintained version that includes a GUI, please check out this community fork: https://github.com/UnstoppableSwap/core
+
 ## Quick Start
 
 1. Download the [latest `swap` binary release](https://github.com/comit-network/xmr-btc-swap/releases/latest) for your operating system.
