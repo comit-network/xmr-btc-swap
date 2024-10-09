@@ -43,6 +43,8 @@ impl Watcher {
         // Note: since this is de-facto a daemon, we have to gracefully handle errors
         // (which in our case means logging the error message and trying again later)
         loop {
+            tokio::time::sleep(Duration::from_secs(Watcher::CHECK_INTERVAL)).await;
+
             // Fetch current transactions and timelocks
             let current_swaps = match self.get_current_swaps().await {
                 Ok(val) => val,
@@ -82,9 +84,6 @@ impl Watcher {
                 // Insert new status
                 self.cached_timelocks.insert(swap_id, new_timelock_status);
             }
-
-            // Sleep and check again later
-            tokio::time::sleep(Duration::from_secs(Watcher::CHECK_INTERVAL)).await;
         }
     }
 
