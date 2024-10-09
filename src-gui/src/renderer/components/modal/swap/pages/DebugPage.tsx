@@ -1,11 +1,15 @@
 import { Box, DialogContentText } from "@material-ui/core";
-import { useActiveSwapInfo, useAppSelector } from "store/hooks";
+import {
+  useActiveSwapInfo,
+  useActiveSwapLogs,
+  useAppSelector,
+} from "store/hooks";
 import JsonTreeView from "../../../other/JSONViewTree";
 import CliLogsBox from "../../../other/RenderedCliLog";
 
 export default function DebugPage() {
   const torStdOut = useAppSelector((s) => s.tor.stdOut);
-  const logs = useAppSelector((s) => s.swap.logs);
+  const logs = useActiveSwapLogs();
   const guiState = useAppSelector((s) => s);
   const cliState = useActiveSwapInfo();
 
@@ -19,7 +23,10 @@ export default function DebugPage() {
             gap: "8px",
           }}
         >
-          <CliLogsBox logs={logs} label="Logs relevant to the swap" />
+          <CliLogsBox
+            logs={logs}
+            label="Logs relevant to the swap (only current session)"
+          />
           <JsonTreeView
             data={guiState}
             label="Internal GUI State (inferred from Logs)"

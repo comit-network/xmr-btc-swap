@@ -15,15 +15,13 @@ export function AmountWithUnit({
   fixedPrecision: number;
   dollarRate?: Amount;
 }) {
+  const title =
+    dollarRate != null && amount != null
+      ? `≈ $${(dollarRate * amount).toFixed(2)}`
+      : "";
+
   return (
-    <Tooltip
-      arrow
-      title={
-        dollarRate != null && amount != null
-          ? `≈ $${(dollarRate * amount).toFixed(2)}`
-          : ""
-      }
-    >
+    <Tooltip arrow title={title}>
       <span>
         {amount != null
           ? Number.parseFloat(amount.toFixed(fixedPrecision))

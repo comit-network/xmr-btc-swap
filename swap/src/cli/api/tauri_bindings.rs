@@ -1,4 +1,4 @@
-use crate::{monero, network::quote::BidQuote};
+use crate::{bitcoin::ExpiredTimelocks, monero, network::quote::BidQuote};
 use anyhow::Result;
 use bitcoin::Txid;
 use serde::{Deserialize, Serialize};
@@ -7,9 +7,11 @@ use typeshare::typeshare;
 use url::Url;
 use uuid::Uuid;
 
-const SWAP_PROGRESS_EVENT_NAME: &str = "swap-progress-update";
-const CONTEXT_INIT_PROGRESS_EVENT_NAME: &str = "context-init-progress-update";
 const CLI_LOG_EMITTED_EVENT_NAME: &str = "cli-log-emitted";
+const SWAP_PROGRESS_EVENT_NAME: &str = "swap-progress-update";
+const SWAP_STATE_CHANGE_EVENT_NAME: &str = "swap-database-state-update";
+const TIMELOCK_CHANGE_EVENT_NAME: &str = "timelock-change";
+const CONTEXT_INIT_PROGRESS_EVENT_NAME: &str = "context-init-progress-update";
 
 #[derive(Debug, Clone)]
 pub struct TauriHandle(
@@ -50,10 +52,24 @@ pub trait TauriEmitter {
         let _ = self.emit_tauri_event(CONTEXT_INIT_PROGRESS_EVENT_NAME, event);
     }
 
-    fn emit_cli_log_event(&self, event: CliLogEmittedEvent) {
+    fn emit_cli_log_event(&self, event: TauriLogEvent) {
         let _ = self
             .emit_tauri_event(CLI_LOG_EMITTED_EVENT_NAME, event)
             .ok();
+    }
+
+    fn emit_swap_state_change_event(&self, swap_id: Uuid) {
+        let _ = self.emit_tauri_event(
+            SWAP_STATE_CHANGE_EVENT_NAME,
+            TauriDatabaseStateEvent { swap_id },
+        );
+    }
+
+    fn emit_timelock_change_event(&self, swap_id: Uuid, timelock: Option<ExpiredTimelocks>) {
+        let _ = self.emit_tauri_event(
+            TIMELOCK_CHANGE_EVENT_NAME,
+            TauriTimelockChangeEvent { swap_id, timelock },
+        );
     }
 }
 
@@ -174,9 +190,24 @@ pub enum TauriSwapProgressEvent {
 #[typeshare]
 #[derive(Debug, Serialize, Clone)]
 #[typeshare]
-pub struct CliLogEmittedEvent {
+pub struct TauriLogEvent {
     /// The serialized object containing the log message and metadata.
     pub buffer: String,
+}
+
+#[derive(Serialize, Clone)]
+#[typeshare]
+pub struct TauriDatabaseStateEvent {
+    #[typeshare(serialized_as = "string")]
+    swap_id: Uuid,
+}
+
+#[derive(Serialize, Clone)]
+#[typeshare]
+pub struct TauriTimelockChangeEvent {
+    #[typeshare(serialized_as = "string")]
+    swap_id: Uuid,
+    timelock: Option<ExpiredTimelocks>,
 }
 
 /// This struct contains the settings for the Context

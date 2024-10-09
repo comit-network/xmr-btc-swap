@@ -52,7 +52,6 @@ macro_rules! regex_find_placeholders {
     ($pattern:expr, $create_placeholder:expr, $replacements:expr, $input:expr) => {{
         // compile the regex pattern
         static REGEX: once_cell::sync::Lazy<regex::Regex> = once_cell::sync::Lazy::new(|| {
-            tracing::debug!("initializing regex");
             regex::Regex::new($pattern).expect("invalid regex pattern")
         });
 

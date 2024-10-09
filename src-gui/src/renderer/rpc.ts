@@ -5,7 +5,7 @@ import {
   BalanceResponse,
   BuyXmrArgs,
   BuyXmrResponse,
-  CliLogEmittedEvent,
+  TauriLogEvent,
   GetLogsArgs,
   GetLogsResponse,
   GetSwapInfoResponse,
@@ -18,14 +18,18 @@ import {
   TauriSwapProgressEventWrapper,
   WithdrawBtcArgs,
   WithdrawBtcResponse,
+  TauriDatabaseStateEvent,
+  TauriTimelockChangeEvent,
+  GetSwapInfoArgs,
 } from "models/tauriModel";
 import {
   contextStatusEventReceived,
   receivedCliLog,
   rpcSetBalance,
   rpcSetSwapInfo,
+  timelockChangeEventReceived,
 } from "store/features/rpcSlice";
-import { swapTauriEventReceived } from "store/features/swapSlice";
+import { swapProgressEventReceived } from "store/features/swapSlice";
 import { store } from "./store/storeRenderer";
 import { Provider } from "models/apiModel";
 import { providerToConcatenatedMultiAddr } from "utils/multiAddrUtils";
@@ -49,7 +53,7 @@ export async function initEventListeners() {
 
   listen<TauriSwapProgressEventWrapper>("swap-progress-update", (event) => {
     console.log("Received swap progress event", event.payload);
-    store.dispatch(swapTauriEventReceived(event.payload));
+    store.dispatch(swapProgressEventReceived(event.payload));
   });
 
   listen<TauriContextStatusEvent>("context-init-progress-update", (event) => {
@@ -57,10 +61,25 @@ export async function initEventListeners() {
     store.dispatch(contextStatusEventReceived(event.payload));
   });
 
-  listen<CliLogEmittedEvent>("cli-log-emitted", (event) => {
+  listen<TauriLogEvent>("cli-log-emitted", (event) => {
     console.log("Received cli log event", event.payload);
     store.dispatch(receivedCliLog(event.payload));
   });
+
+  listen<TauriDatabaseStateEvent>("swap-database-state-update", (event) => {
+    console.log("Received swap database state update event", event.payload);
+    getSwapInfo(event.payload.swap_id);
+
+    // This is ugly but it's the best we can do for now
+    // Sometimes we are too quick to fetch the swap info and the new state is not yet reflected
+    // in the database. So we wait a bit before fetching the new state
+    setTimeout(() => getSwapInfo(event.payload.swap_id), 3000);
+  });
+
+  listen<TauriTimelockChangeEvent>('timelock-change', (event) => {
+    console.log('Received timelock change event', event.payload);
+    store.dispatch(timelockChangeEventReceived(event.payload));
+  })
 }
 
 async function invoke<ARGS, RESPONSE>(
@@ -91,6 +110,17 @@ export async function getAllSwapInfos() {
   response.forEach((swapInfo) => {
     store.dispatch(rpcSetSwapInfo(swapInfo));
   });
+}
+
+export async function getSwapInfo(swapId: string) {
+  const response = await invoke<GetSwapInfoArgs, GetSwapInfoResponse>(
+    "get_swap_info",
+    {
+      swap_id: swapId,
+    },
+  );
+
+  store.dispatch(rpcSetSwapInfo(response));
 }
 
 export async function withdrawBtc(address: string): Promise<string> {

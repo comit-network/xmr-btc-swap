@@ -5,6 +5,7 @@ pub mod command;
 mod event_loop;
 mod list_sellers;
 pub mod transport;
+pub mod watcher;
 
 pub use behaviour::{Behaviour, OutEvent};
 pub use cancel_and_refund::{cancel, cancel_and_refund, refund};

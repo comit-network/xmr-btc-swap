@@ -81,7 +81,9 @@ export default function CliLogsBox({
       setSearchQuery={setSearchQuery}
       rows={memoizedLogs.map((log) =>
         typeof log === "string" ? (
-          <Typography component="pre">{log}</Typography>
+          <Typography key={log} component="pre">
+            {log}
+          </Typography>
         ) : (
           <RenderedCliLog log={log} key={JSON.stringify(log)} />
         ),

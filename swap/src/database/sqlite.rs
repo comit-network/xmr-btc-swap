@@ -1,3 +1,5 @@
+use crate::cli::api::tauri_bindings::TauriEmitter;
+use crate::cli::api::tauri_bindings::TauriHandle;
 use crate::database::Swap;
 use crate::monero::{Address, TransferProof};
 use crate::protocol::{Database, State};
@@ -15,6 +17,7 @@ use super::AccessMode;
 
 pub struct SqliteDatabase {
     pool: Pool<Sqlite>,
+    tauri_handle: Option<TauriHandle>,
 }
 
 impl SqliteDatabase {
@@ -30,13 +33,21 @@ impl SqliteDatabase {
         let options = options.disable_statement_logging();
 
         let pool = SqlitePool::connect_with(options.to_owned()).await?;
-        let mut sqlite = Self { pool };
+        let mut sqlite = Self {
+            pool,
+            tauri_handle: None,
+        };
 
         if !read_only {
             sqlite.run_migrations().await?;
         }
 
         Ok(sqlite)
+    }
+
+    pub fn with_tauri_handle(mut self, tauri_handle: impl Into<Option<TauriHandle>>) -> Self {
+        self.tauri_handle = tauri_handle.into();
+        self
     }
 
     async fn run_migrations(&mut self) -> anyhow::Result<()> {
@@ -204,9 +215,9 @@ impl Database for SqliteDatabase {
         let mut conn = self.pool.acquire().await?;
         let entered_at = OffsetDateTime::now_utc();
 
-        let swap_id = swap_id.to_string();
         let swap = serde_json::to_string(&Swap::from(state))?;
         let entered_at = entered_at.to_string();
+        let swap_id_str = swap_id.to_string();
 
         sqlx::query!(
             r#"
@@ -216,12 +227,16 @@ impl Database for SqliteDatabase {
                 state
                 ) values (?, ?, ?);
         "#,
-            swap_id,
+            swap_id_str,
             entered_at,
             swap
         )
         .execute(&mut conn)
         .await?;
+
+        // Emit event to Tauri, the frontend will then send another request to get the latest state
+        // This is why we don't send the state here
+        self.tauri_handle.emit_swap_state_change_event(swap_id);
 
         Ok(())
     }

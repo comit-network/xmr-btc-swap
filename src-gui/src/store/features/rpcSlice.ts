@@ -1,14 +1,17 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { ExtendedProviderStatus, ProviderStatus } from "models/apiModel";
 import {
-  CliLogEmittedEvent,
+  TauriLogEvent,
   GetSwapInfoResponse,
   TauriContextStatusEvent,
+  TauriDatabaseStateEvent,
+  TauriTimelockChangeEvent,
 } from "models/tauriModel";
 import { MoneroRecoveryResponse } from "../../models/rpcModel";
 import { GetSwapInfoResponseExt } from "models/tauriModelExt";
 import { getLogsAndStringsFromRawFileString } from "utils/parseUtils";
 import { CliLog } from "models/cliModel";
+import logger from "utils/logger";
 
 interface State {
   balance: number | null;
@@ -52,7 +55,7 @@ export const rpcSlice = createSlice({
   name: "rpc",
   initialState,
   reducers: {
-    receivedCliLog(slice, action: PayloadAction<CliLogEmittedEvent>) {
+    receivedCliLog(slice, action: PayloadAction<TauriLogEvent>) {
       const buffer = action.payload.buffer;
       const logs = getLogsAndStringsFromRawFileString(buffer);
       slice.logs = slice.logs.concat(logs);
@@ -62,6 +65,16 @@ export const rpcSlice = createSlice({
       action: PayloadAction<TauriContextStatusEvent>,
     ) {
       slice.status = action.payload;
+    },
+    timelockChangeEventReceived(
+      slice,
+      action: PayloadAction<TauriTimelockChangeEvent>
+    ) {
+      if (slice.state.swapInfos[action.payload.swap_id]) {
+        slice.state.swapInfos[action.payload.swap_id].timelock = action.payload.timelock;
+      } else {
+        logger.warn(`Received timelock change event for unknown swap ${action.payload.swap_id}`);
+      }
     },
     rpcSetBalance(slice, action: PayloadAction<number>) {
       slice.state.balance = action.payload;
@@ -110,6 +123,7 @@ export const {
   rpcSetSwapInfo,
   rpcSetMoneroRecoveryKeys,
   rpcResetMoneroRecoveryKeys,
+  timelockChangeEventReceived
 } = rpcSlice.actions;
 
 export default rpcSlice.reducer;

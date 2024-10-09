@@ -27,6 +27,8 @@ use tracing::Level;
 use url::Url;
 use uuid::Uuid;
 
+use super::watcher::Watcher;
+
 static START: Once = Once::new();
 
 #[derive(Clone, PartialEq, Debug)]
@@ -306,24 +308,30 @@ impl ContextBuilder {
                 TauriContextInitializationProgress::OpeningBitcoinWallet,
             ));
 
-        let bitcoin_wallet = {
-            if let Some(bitcoin) = self.bitcoin {
-                let (bitcoin_electrum_rpc_url, bitcoin_target_block) =
-                    bitcoin.apply_defaults(self.is_testnet)?;
-                Some(Arc::new(
-                    init_bitcoin_wallet(
-                        bitcoin_electrum_rpc_url,
-                        &seed,
-                        data_dir.clone(),
-                        env_config,
-                        bitcoin_target_block,
-                    )
-                    .await?,
-                ))
-            } else {
-                None
-            }
+        let bitcoin_wallet = if let Some(bitcoin) = self.bitcoin {
+            let (url, target_block) = bitcoin.apply_defaults(self.is_testnet)?;
+            Some(Arc::new(
+                init_bitcoin_wallet(url, &seed, data_dir.clone(), env_config, target_block).await?,
+            ))
+        } else {
+            None
         };
+
+        let db = open_db(
+            data_dir.join("sqlite"),
+            AccessMode::ReadWrite,
+            self.tauri_handle.clone(),
+        )
+        .await?;
+
+        // If we are connected to the Bitcoin blockchain and if there is a handle to Tauri present,
+        // we start a background task to watch for timelock changes.
+        if let Some(wallet) = bitcoin_wallet.clone() {
+            if self.tauri_handle.is_some() {
+                let watcher = Watcher::new(wallet, db.clone(), self.tauri_handle.clone());
+                tokio::spawn(watcher.run());
+            }
+        }
 
         // We initialize the Monero wallet below
         // To display the progress to the user, we emit events to the Tauri frontend
@@ -353,7 +361,7 @@ impl ContextBuilder {
         let tor_socks5_port = self.tor.map_or(9050, |tor| tor.tor_socks5_port);
 
         let context = Context {
-            db: open_db(data_dir.join("sqlite"), AccessMode::ReadWrite).await?,
+            db,
             bitcoin_wallet,
             monero_wallet,
             monero_rpc_process,
@@ -396,7 +404,7 @@ impl Context {
             bitcoin_wallet: Some(bob_bitcoin_wallet),
             monero_wallet: Some(bob_monero_wallet),
             config,
-            db: open_db(db_path, AccessMode::ReadWrite)
+            db: open_db(db_path, AccessMode::ReadWrite, None)
                 .await
                 .expect("Could not open sqlite database"),
             monero_rpc_process: None,

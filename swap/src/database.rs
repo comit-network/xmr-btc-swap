@@ -2,6 +2,7 @@ pub use alice::Alice;
 pub use bob::Bob;
 pub use sqlite::SqliteDatabase;
 
+use crate::cli::api::tauri_bindings::TauriHandle;
 use crate::fs::ensure_directory_exists;
 use crate::protocol::{Database, State};
 use anyhow::{bail, Result};
@@ -92,16 +93,25 @@ pub enum AccessMode {
 pub async fn open_db(
     sqlite_path: impl AsRef<Path>,
     access_mode: AccessMode,
+    tauri_handle: impl Into<Option<TauriHandle>>,
 ) -> Result<Arc<dyn Database + Send + Sync>> {
     if sqlite_path.as_ref().exists() {
         tracing::debug!("Using existing sqlite database.");
-        let sqlite = SqliteDatabase::open(sqlite_path, access_mode).await?;
+
+        let sqlite = SqliteDatabase::open(sqlite_path, access_mode)
+            .await?
+            .with_tauri_handle(tauri_handle.into());
+
         Ok(Arc::new(sqlite))
     } else {
         tracing::debug!("Creating and using new sqlite database.");
+
         ensure_directory_exists(sqlite_path.as_ref())?;
         tokio::fs::File::create(&sqlite_path).await?;
-        let sqlite = SqliteDatabase::open(sqlite_path, access_mode).await?;
+        let sqlite = SqliteDatabase::open(sqlite_path, access_mode)
+            .await?
+            .with_tauri_handle(tauri_handle.into());
+
         Ok(Arc::new(sqlite))
     }
 }

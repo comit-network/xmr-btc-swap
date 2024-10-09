@@ -1,4 +1,7 @@
+import { Box, DialogContentText } from "@material-ui/core";
 import { TauriSwapProgressEvent } from "models/tauriModel";
+import CliLogsBox from "renderer/components/other/RenderedCliLog";
+import { useActiveSwapInfo, useActiveSwapLogs } from "store/hooks";
 import SwapStatePage from "../SwapStatePage";
 
 export default function ProcessExitedPage({
@@ -8,8 +11,11 @@ export default function ProcessExitedPage({
   prevState: TauriSwapProgressEvent | null;
   swapId: string;
 }) {
+  const swap = useActiveSwapInfo();
+  const logs = useActiveSwapLogs();
+
   // If we have a previous state, we can show the user the last state of the swap
-  // We only show the last state if its a final state (XmrRedeemInMempool, BtcRefunded, BtcPunished)
+  // We only show the last state if its a final state (XmrRedeemInMempool, BtcRefunded, BtcPunished, CooperativeRedeemRejected)
   if (
     prevState != null &&
     (prevState.type === "XmrRedeemInMempool" ||
@@ -28,15 +34,17 @@ export default function ProcessExitedPage({
     );
   }
 
-  // TODO: Display something useful here
   return (
-    <>
-      If the swap is not a "done" state (or we don't have a db state because the
-      swap did complete the SwapSetup yet) we should tell the user and show logs
-      Not implemented yet
-    </>
+    <Box>
+      <DialogContentText>
+        The swap was stopped but it has not been completed yet. Check the logs
+        below for more information. The current GUI state is{" "}
+        {prevState?.type ?? "unknown"}. The current database state is{" "}
+        {swap?.state_name ?? "unknown"}.
+      </DialogContentText>
+      <Box>
+        <CliLogsBox logs={logs} label="Logs relevant to the swap" />
+      </Box>
+    </Box>
   );
-
-  // If the swap is not a "done" state (or we don't have a db state because the swap did complete the SwapSetup yet) we should tell the user and show logs
-  // return <ProcessExitedAndNotDonePage state={state} />;
 }

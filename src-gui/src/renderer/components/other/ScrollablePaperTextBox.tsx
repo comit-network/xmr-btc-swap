@@ -21,7 +21,7 @@ export default function ScrollablePaperTextBox({
   copyValue: string;
   searchQuery: string | null;
   setSearchQuery?: ((query: string) => void) | null;
-  minHeight: string;
+  minHeight?: string;
 }) {
   const virtuaEl = useRef<VListHandle | null>(null);
 

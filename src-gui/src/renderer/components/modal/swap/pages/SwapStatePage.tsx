@@ -19,20 +19,10 @@ import InitPage from "./init/InitPage";
 import WaitingForBitcoinDepositPage from "./init/WaitingForBitcoinDepositPage";
 
 export default function SwapStatePage({ state }: { state: SwapState | null }) {
-  // TODO: Reimplement this using tauri events
-  /*
-  const isSyncingMoneroWallet = useAppSelector(
-    (state) => state.rpc.state.moneroWallet.isSyncing,
-  );
-
-  if (isSyncingMoneroWallet) {
-    return <SyncingMoneroWalletPage />;
-  }
-  */
-
   if (state === null) {
     return <InitPage />;
   }
+  
   switch (state.curr.type) {
     case "Initiated":
       return <InitiatedPage />;

@@ -280,7 +280,7 @@ impl Subscription {
             .await
     }
 
-    async fn wait_until(&self, mut predicate: impl FnMut(&ScriptStatus) -> bool) -> Result<()> {
+    pub async fn wait_until(&self, mut predicate: impl FnMut(&ScriptStatus) -> bool) -> Result<()> {
         let mut receiver = self.receiver.clone();
 
         while !predicate(&receiver.borrow()) {

@@ -61,7 +61,11 @@ function getActiveStep(state: SwapState | null): PathStep {
     // Step 1: Waiting for Bitcoin lock confirmation
     // Bitcoin has been locked, waiting for the counterparty to lock their XMR
     case "BtcLockTxInMempool":
-      return [PathType.HAPPY_PATH, 1, isReleased];
+      // We only display the first step as completed if the Bitcoin lock has been confirmed
+      if(latestState.content.btc_lock_confirmations > 0) {
+        return [PathType.HAPPY_PATH, 1, isReleased];
+      }
+      return [PathType.HAPPY_PATH, 0, isReleased];
 
     // Still Step 1: Both Bitcoin and XMR have been locked, waiting for Monero lock to be confirmed
     case "XmrLockTxInMempool":

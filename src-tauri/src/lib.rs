@@ -5,8 +5,8 @@ use swap::cli::{
     api::{
         request::{
             BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, GetHistoryArgs, GetLogsArgs,
-            GetSwapInfosAllArgs, ListSellersArgs, MoneroRecoveryArgs, ResumeSwapArgs,
-            SuspendCurrentSwapArgs, WithdrawBtcArgs,
+            GetSwapInfoArgs, GetSwapInfosAllArgs, ListSellersArgs, MoneroRecoveryArgs,
+            ResumeSwapArgs, SuspendCurrentSwapArgs, WithdrawBtcArgs,
         },
         tauri_bindings::{TauriContextStatusEvent, TauriEmitter, TauriHandle, TauriSettings},
         Context, ContextBuilder,
@@ -40,7 +40,7 @@ impl<T, E: ToString> ToStringResult<T> for Result<T, E> {
 /// async fn get_balance(context: tauri::State<'...>, args: BalanceArgs) -> Result<BalanceArgs::Response, String> {
 ///     args.handle(context.inner().clone()).await.to_string_result()
 /// }
-///
+/// ```
 /// # Example 2
 /// ```ignored
 /// tauri_command!(get_balance, BalanceArgs, no_args);
@@ -130,6 +130,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             get_balance,
+            get_swap_info,
             get_swap_infos_all,
             withdraw_btc,
             buy_xmr,
@@ -185,6 +186,7 @@ tauri_command!(cancel_and_refund, CancelAndRefundArgs);
 
 // These commands require no arguments
 tauri_command!(suspend_current_swap, SuspendCurrentSwapArgs, no_args);
+tauri_command!(get_swap_info, GetSwapInfoArgs);
 tauri_command!(get_swap_infos_all, GetSwapInfosAllArgs, no_args);
 tauri_command!(get_history, GetHistoryArgs, no_args);
 

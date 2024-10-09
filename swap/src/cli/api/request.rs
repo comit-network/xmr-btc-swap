@@ -478,52 +478,36 @@ pub async fn get_swap_info(
         .await?
         .iter()
         .find_map(|state| {
-            if let State::Bob(BobState::SwapSetupCompleted(state2)) = state {
-                let xmr_amount = state2.xmr;
-                let btc_amount = state2.tx_lock.lock_amount();
-                let tx_cancel_fee = state2.tx_cancel_fee;
-                let tx_refund_fee = state2.tx_refund_fee;
-                let tx_lock_id = state2.tx_lock.txid();
-                let btc_refund_address = state2.refund_address.to_string();
+            let State::Bob(BobState::SwapSetupCompleted(state2)) = state else {
+                return None;
+            };
 
-                if let Ok(tx_lock_fee) = state2.tx_lock.fee() {
-                    Some((
-                        xmr_amount,
-                        btc_amount,
-                        tx_lock_id,
-                        tx_cancel_fee,
-                        tx_refund_fee,
-                        tx_lock_fee,
-                        btc_refund_address,
-                        state2.cancel_timelock,
-                        state2.punish_timelock,
-                    ))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
+            let xmr_amount = state2.xmr;
+            let btc_amount = state2.tx_lock.lock_amount();
+            let tx_cancel_fee = state2.tx_cancel_fee;
+            let tx_refund_fee = state2.tx_refund_fee;
+            let tx_lock_id = state2.tx_lock.txid();
+            let btc_refund_address = state2.refund_address.to_string();
+
+            let Ok(tx_lock_fee) = state2.tx_lock.fee() else {
+                return None;
+            };
+
+            Some((
+                xmr_amount,
+                btc_amount,
+                tx_lock_id,
+                tx_cancel_fee,
+                tx_refund_fee,
+                tx_lock_fee,
+                btc_refund_address,
+                state2.cancel_timelock,
+                state2.punish_timelock,
+            ))
         })
         .with_context(|| "Did not find SwapSetupCompleted state for swap")?;
 
-    let timelock = match swap_state.clone() {
-        BobState::Started { .. } | BobState::SafelyAborted | BobState::SwapSetupCompleted(_) => {
-            None
-        }
-        BobState::BtcLocked { state3: state, .. }
-        | BobState::XmrLockProofReceived { state, .. } => {
-            Some(state.expired_timelock(bitcoin_wallet).await?)
-        }
-        BobState::XmrLocked(state) | BobState::EncSigSent(state) => {
-            Some(state.expired_timelock(bitcoin_wallet).await?)
-        }
-        BobState::CancelTimelockExpired(state) | BobState::BtcCancelled(state) => {
-            Some(state.expired_timelock(bitcoin_wallet).await?)
-        }
-        BobState::BtcPunished { .. } => Some(ExpiredTimelocks::Punish),
-        BobState::BtcRefunded(_) | BobState::BtcRedeemed(_) | BobState::XmrRedeemed { .. } => None,
-    };
+    let timelock = swap_state.expired_timelocks(bitcoin_wallet.clone()).await?;
 
     Ok(GetSwapInfoResponse {
         swap_id: args.swap_id,

@@ -1,7 +1,7 @@
 use crate::bitcoin::wallet::{EstimateFeeRate, Subscription};
 use crate::bitcoin::{
     self, current_epoch, CancelTimelock, ExpiredTimelocks, PunishTimelock, Transaction, TxCancel,
-    TxLock, Txid,
+    TxLock, Txid, Wallet,
 };
 use crate::monero::wallet::WatchRequest;
 use crate::monero::{self, TxHash};
@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use sigma_fun::ext::dl_secp256k1_ed25519_eq::CrossCurveDLEQProof;
 use std::fmt;
+use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -73,6 +74,35 @@ impl fmt::Display for BobState {
             BobState::BtcPunished { .. } => write!(f, "btc is punished"),
             BobState::SafelyAborted => write!(f, "safely aborted"),
         }
+    }
+}
+
+impl BobState {
+    /// Fetch the expired timelocks for the swap.
+    /// Depending on the State, there are no locks to expire.
+    pub async fn expired_timelocks(
+        &self,
+        bitcoin_wallet: Arc<Wallet>,
+    ) -> Result<Option<ExpiredTimelocks>> {
+        Ok(match self.clone() {
+            BobState::Started { .. }
+            | BobState::SafelyAborted
+            | BobState::SwapSetupCompleted(_) => None,
+            BobState::BtcLocked { state3: state, .. }
+            | BobState::XmrLockProofReceived { state, .. } => {
+                Some(state.expired_timelock(&bitcoin_wallet).await?)
+            }
+            BobState::XmrLocked(state) | BobState::EncSigSent(state) => {
+                Some(state.expired_timelock(&bitcoin_wallet).await?)
+            }
+            BobState::CancelTimelockExpired(state) | BobState::BtcCancelled(state) => {
+                Some(state.expired_timelock(&bitcoin_wallet).await?)
+            }
+            BobState::BtcPunished { .. } => Some(ExpiredTimelocks::Punish),
+            BobState::BtcRefunded(_) | BobState::BtcRedeemed(_) | BobState::XmrRedeemed { .. } => {
+                None
+            }
+        })
     }
 }
 

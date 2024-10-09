@@ -14,7 +14,7 @@ export const swapSlice = createSlice({
   name: "swap",
   initialState,
   reducers: {
-    swapTauriEventReceived(
+    swapProgressEventReceived(
       swap,
       action: PayloadAction<TauriSwapProgressEventWrapper>,
     ) {
@@ -42,6 +42,6 @@ export const swapSlice = createSlice({
   },
 });
 
-export const { swapReset, swapTauriEventReceived } = swapSlice.actions;
+export const { swapReset, swapProgressEventReceived } = swapSlice.actions;
 
 export default swapSlice.reducer;

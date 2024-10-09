@@ -103,7 +103,7 @@ pub async fn main() -> Result<()> {
 
     match cmd {
         Command::Start { resume_only } => {
-            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite).await?;
+            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite, None).await?;
 
             // check and warn for duplicate rendezvous points
             let mut rendezvous_addrs = config.network.rendezvous_point.clone();
@@ -233,7 +233,7 @@ pub async fn main() -> Result<()> {
             event_loop.run().await;
         }
         Command::History => {
-            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadOnly).await?;
+            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadOnly, None).await?;
 
             let mut table = Table::new();
 
@@ -293,7 +293,7 @@ pub async fn main() -> Result<()> {
             tracing::info!(%bitcoin_balance, %monero_balance, "Current balance");
         }
         Command::Cancel { swap_id } => {
-            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite).await?;
+            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite, None).await?;
 
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
 
@@ -302,7 +302,7 @@ pub async fn main() -> Result<()> {
             tracing::info!("Cancel transaction successfully published with id {}", txid);
         }
         Command::Refund { swap_id } => {
-            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite).await?;
+            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite, None).await?;
 
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
             let monero_wallet = init_monero_wallet(&config, env_config).await?;
@@ -318,7 +318,7 @@ pub async fn main() -> Result<()> {
             tracing::info!("Monero successfully refunded");
         }
         Command::Punish { swap_id } => {
-            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite).await?;
+            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite, None).await?;
 
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
 
@@ -327,7 +327,7 @@ pub async fn main() -> Result<()> {
             tracing::info!("Punish transaction successfully published with id {}", txid);
         }
         Command::SafelyAbort { swap_id } => {
-            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite).await?;
+            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite, None).await?;
 
             safely_abort(swap_id, db).await?;
 
@@ -337,7 +337,7 @@ pub async fn main() -> Result<()> {
             swap_id,
             do_not_await_finality,
         } => {
-            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite).await?;
+            let db = open_db(config.data.dir.join("sqlite"), AccessMode::ReadWrite, None).await?;
 
             let bitcoin_wallet = init_bitcoin_wallet(&config, &seed, env_config).await?;
 

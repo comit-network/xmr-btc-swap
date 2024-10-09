@@ -1,7 +1,10 @@
 import { sortBy } from "lodash";
+import { GetSwapInfoResponseExt } from "models/tauriModelExt";
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "renderer/store/storeRenderer";
 import { parseDateString } from "utils/parseUtils";
+import { useMemo } from "react";
+import { isCliLogRelatedToSwap } from "models/cliModel";
 
 export const useAppDispatch = () => useDispatch<AppDispatch>();
 export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
@@ -26,7 +29,9 @@ export function useIsContextAvailable() {
   return useAppSelector((state) => state.rpc.status?.type === "Available");
 }
 
-export function useSwapInfo(swapId: string | null) {
+export function useSwapInfo(
+  swapId: string | null,
+): GetSwapInfoResponseExt | null {
   return useAppSelector((state) =>
     swapId ? state.rpc.state.swapInfos[swapId] ?? null : null,
   );
@@ -36,9 +41,19 @@ export function useActiveSwapId() {
   return useAppSelector((s) => s.swap.state?.swapId ?? null);
 }
 
-export function useActiveSwapInfo() {
+export function useActiveSwapInfo(): GetSwapInfoResponseExt | null {
   const swapId = useActiveSwapId();
   return useSwapInfo(swapId);
+}
+
+export function useActiveSwapLogs() {
+  const swapId = useActiveSwapId();
+  const logs = useAppSelector((s) => s.rpc.logs);
+
+  return useMemo(
+    () => logs.filter((log) => isCliLogRelatedToSwap(log, swapId)),
+    [logs, swapId],
+  );
 }
 
 export function useAllProviders() {
