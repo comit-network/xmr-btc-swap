@@ -1,7 +1,12 @@
 import { ExtendedProviderStatus } from "models/apiModel";
 import { splitPeerIdFromMultiAddress } from "utils/parseUtils";
+import { getMatches } from '@tauri-apps/plugin-cli';
 
-export const isTestnet = () => true;
+const matches = await getMatches();
+
+export function isTestnet() {
+  return matches.args.testnet?.value === true
+}
 
 export const isDevelopment = true;
 

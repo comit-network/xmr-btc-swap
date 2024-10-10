@@ -36,6 +36,7 @@ import { providerToConcatenatedMultiAddr } from "utils/multiAddrUtils";
 import { MoneroRecoveryResponse } from "models/rpcModel";
 import { ListSellersResponse } from "../models/tauriModel";
 import logger from "utils/logger";
+import { isTestnet } from "store/config";
 
 export async function initEventListeners() {
   // This operation is in-expensive
@@ -201,7 +202,10 @@ export async function listSellersAtRendezvousPoint(
 
 export async function initializeContext() {
   const settings = store.getState().settings;
+  const testnet = isTestnet();
+
   await invokeUnsafe<void>("initialize_context", {
     settings,
+    testnet,
   });
 }

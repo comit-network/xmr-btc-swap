@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 import { watch } from "vite-plugin-watch";
 import path from "path";
+import topLevelAwait from "vite-plugin-top-level-await";
 
 const mobile = !!/android|ios/.exec(process.env.TAURI_ENV_PLATFORM);
 
@@ -12,7 +13,8 @@ export default defineConfig(async () => ({
   plugins: [
     react(),
     tsconfigPaths(),
-    // automatically regenerate the typescript bindings when there's a change
+    topLevelAwait(),
+    // Automatically regenerate the typescript bindings when there's a change to the rust code
     watch({
       pattern: ["../swap/src/**/*"],
       command: "yarn run gen-bindings",
@@ -25,9 +27,6 @@ export default defineConfig(async () => ({
         server.watcher.add(path.resolve(__dirname, "../swap/src"));
       },
     },
-    // VitePluginRestart({
-    //   restart: ["../swap/src/**/*"]
-    // })
   ],
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

@@ -31,11 +31,12 @@ export default function SwapDialog({
   onClose: () => void;
 }) {
   const classes = useStyles();
+
   const swap = useAppSelector((state) => state.swap);
   const isSwapRunning = useIsSwapRunning();
-
   const [debug, setDebug] = useState(false);
   const [openSuspendAlert, setOpenSuspendAlert] = useState(false);
+
   const dispatch = useAppDispatch();
 
   function onCancel() {

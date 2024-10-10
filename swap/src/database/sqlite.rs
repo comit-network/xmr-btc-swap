@@ -283,17 +283,27 @@ impl Database for SqliteDatabase {
 
         let result = rows
             .iter()
-            .map(|row| {
-                let swap_id = Uuid::from_str(&row.swap_id)?;
+            .filter_map(|row| {
+                let swap_id = match Uuid::from_str(&row.swap_id) {
+                    Ok(id) => id,
+                    Err(e) => {
+                        tracing::error!(swap_id = %row.swap_id, error = ?e, "Failed to parse UUID");
+                        return None;
+                    }
+                };
                 let state = match serde_json::from_str::<Swap>(&row.state) {
-                    Ok(a) => Ok(State::from(a)),
-                    Err(e) => Err(e),
-                }?;
-                Ok((swap_id, state))
-            })
-            .collect::<Result<Vec<(Uuid, State)>>>();
+                    Ok(a) => State::from(a),
+                    Err(e) => {
+                        tracing::error!(swap_id = %swap_id, error = ?e, "Failed to deserialize state");
+                        return None;
+                    }
+                };
 
-        result
+                Some((swap_id, state))
+            })
+            .collect::<Vec<(Uuid, State)>>();
+
+        Ok(result)
     }
 
     async fn get_states(&self, swap_id: Uuid) -> Result<Vec<State>> {

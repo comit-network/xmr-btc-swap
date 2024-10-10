@@ -9,6 +9,7 @@ import {
   Box,
   makeStyles,
   Tooltip,
+  Switch,
 } from "@material-ui/core";
 import InfoBox from "renderer/components/modal/swap/InfoBox";
 import {
@@ -16,7 +17,7 @@ import {
   setElectrumRpcUrl,
   setMoneroNodeUrl,
 } from "store/features/settingsSlice";
-import { useAppDispatch, useAppSelector } from "store/hooks";
+import { useAppDispatch, useSettings } from "store/hooks";
 import ValidatedTextField from "renderer/components/other/ValidatedTextField";
 import RefreshIcon from "@material-ui/icons/Refresh";
 import HelpIcon from '@material-ui/icons/HelpOutline';
@@ -80,7 +81,7 @@ function isValidUrl(url: string, allowedProtocols: string[]): boolean {
 }
 
 function ElectrumRpcUrlSetting() {
-  const electrumRpcUrl = useAppSelector((s) => s.settings.electrum_rpc_url);
+  const electrumRpcUrl = useSettings((s) => s.electrum_rpc_url);
   const dispatch = useAppDispatch();
 
   function isValid(url: string): boolean {
@@ -123,7 +124,7 @@ function SettingLabel({ label, tooltip }: { label: ReactNode, tooltip: string | 
 }
 
 function MoneroNodeUrlSetting() {
-  const moneroNodeUrl = useAppSelector((s) => s.settings.monero_node_url);
+  const moneroNodeUrl = useSettings((s) => s.monero_node_url);
   const dispatch = useAppDispatch();
 
   function isValid(url: string): boolean {

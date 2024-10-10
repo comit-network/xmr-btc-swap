@@ -214,8 +214,6 @@ pub struct TauriTimelockChangeEvent {
 #[typeshare]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TauriSettings {
-    /// This is used for estimating the target block for Bitcoin (fee)
-    pub bitcoin_confirmation_target: u16,
     /// The URL of the Monero node e.g `http://xmr.node:18081`
     pub monero_node_url: Option<String>,
     /// The URL of the Electrum RPC server e.g `ssl://bitcoin.com:50001`

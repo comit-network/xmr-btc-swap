@@ -9,6 +9,7 @@
     "clipboard-manager:allow-write-text",
     "shell:allow-open",
     "store:default",
-    "process:default"
+    "process:default",
+    "cli:allow-cli-matches"
   ]
 }

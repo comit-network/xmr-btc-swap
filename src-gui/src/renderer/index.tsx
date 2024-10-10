@@ -17,9 +17,11 @@ import {
 import App from "./components/App";
 import { initEventListeners } from "./rpc";
 import { persistor, store } from "./store/storeRenderer";
+import { Box } from "@material-ui/core";
 
 const container = document.getElementById("root");
 const root = createRoot(container!);
+
 root.render(
   <Provider store={store}>
     <PersistGate loading={null} persistor={persistor}>

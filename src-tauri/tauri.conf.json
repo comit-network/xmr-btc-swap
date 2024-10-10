@@ -5,10 +5,6 @@
   "build": {
     "devUrl": "http://localhost:1420",
     "frontendDist": "../src-gui/dist",
-    "beforeDevCommand": {
-      "cwd": "../src-gui",
-      "script": "yarn run dev"
-    },
     "beforeBuildCommand": {
       "cwd": "../src-gui",
       "script": "yarn run build"
@@ -36,5 +32,15 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "cli": {
+      "description": "Start the GUI application",
+      "args": [
+        {
+          "name": "testnet"
+        }
+      ]
+    }
   }
 }

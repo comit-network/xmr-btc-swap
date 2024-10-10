@@ -10,7 +10,6 @@ import {
   Select,
   TextField,
 } from "@material-ui/core";
-import { CliLog } from "models/cliModel";
 import { useSnackbar } from "notistack";
 import { useState } from "react";
 import TruncatedText from "renderer/components/other/TruncatedText";
@@ -20,21 +19,22 @@ import { parseDateString } from "utils/parseUtils";
 import { submitFeedbackViaHttp } from "../../../api";
 import LoadingButton from "../../other/LoadingButton";
 import { PiconeroAmount } from "../../other/Units";
+import { getLogsOfSwap } from "renderer/rpc";
 
 async function submitFeedback(body: string, swapId: string | number) {
   let attachedBody = "";
 
   if (swapId !== 0 && typeof swapId === "string") {
     const swapInfo = store.getState().rpc.state.swapInfos[swapId];
-    const logs = [] as CliLog[];
-
-    throw new Error("Not implemented");
-
+    
     if (swapInfo === undefined) {
       throw new Error(`Swap with id ${swapId} not found`);
     }
 
-    attachedBody = `${JSON.stringify(swapInfo, null, 4)} \n\nLogs: ${logs
+    // Retrieve logs for the specific swap
+    const logs = await getLogsOfSwap(swapId, false);
+
+    attachedBody = `${JSON.stringify(swapInfo, null, 4)} \n\nLogs: ${logs.logs
       .map((l) => JSON.stringify(l))
       .join("\n====\n")}`;
   }
