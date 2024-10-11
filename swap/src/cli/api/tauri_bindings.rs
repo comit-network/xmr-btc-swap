@@ -118,7 +118,8 @@ pub struct TauriSwapProgressEventWrapper {
 #[serde(tag = "type", content = "content")]
 #[typeshare]
 pub enum TauriSwapProgressEvent {
-    Initiated,
+    RequestingQuote,
+    Resuming,
     ReceivedQuote(BidQuote),
     WaitingForBtcDeposit {
         #[typeshare(serialized_as = "string")]

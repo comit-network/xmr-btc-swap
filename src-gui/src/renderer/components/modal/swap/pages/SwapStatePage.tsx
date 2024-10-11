@@ -14,7 +14,6 @@ import ReceivedQuotePage from "./in_progress/ReceivedQuotePage";
 import StartedPage from "./in_progress/StartedPage";
 import XmrLockedPage from "./in_progress/XmrLockedPage";
 import XmrLockTxInMempoolPage from "./in_progress/XmrLockInMempoolPage";
-import InitiatedPage from "./init/InitiatedPage";
 import InitPage from "./init/InitPage";
 import WaitingForBitcoinDepositPage from "./init/WaitingForBitcoinDepositPage";
 
@@ -24,8 +23,10 @@ export default function SwapStatePage({ state }: { state: SwapState | null }) {
   }
   
   switch (state.curr.type) {
-    case "Initiated":
-      return <InitiatedPage />;
+    case "RequestingQuote":
+      return <CircularProgressWithSubtitle description="Requesting quote..." />;
+    case "Resuming":
+      return <CircularProgressWithSubtitle description="Resuming swap..." />;
     case "ReceivedQuote":
       return <ReceivedQuotePage />;
     case "WaitingForBtcDeposit":

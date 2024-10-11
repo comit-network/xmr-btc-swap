@@ -15,13 +15,13 @@ type PathStep = [type: PathType, step: number, isError: boolean];
  * @param latestState - The latest state of the swap process
  * @returns A tuple containing [PathType, activeStep, errorFlag]
  */
-function getActiveStep(state: SwapState | null): PathStep {
+function getActiveStep(state: SwapState | null): PathStep | null {
   // In case we cannot infer a correct step from the state
   function fallbackStep(reason: string) {
     console.error(
       `Unable to choose correct stepper type (reason: ${reason}, state: ${JSON.stringify(state)}`,
     );
-    return [PathType.HAPPY_PATH, 0, true] as PathStep;
+    return null;
   }
 
   if (state === null) {
@@ -52,7 +52,7 @@ function getActiveStep(state: SwapState | null): PathStep {
     // Step 0: Initializing the swap
     // These states represent the very beginning of the swap process
     // No funds have been locked
-    case "Initiated":
+    case "RequestingQuote":
     case "ReceivedQuote":
     case "WaitingForBtcDeposit":
     case "Started":
@@ -86,12 +86,7 @@ function getActiveStep(state: SwapState | null): PathStep {
     // XMR redemption transaction is in mempool, swap is essentially complete
     case "XmrRedeemInMempool":
       return [PathType.HAPPY_PATH, 4, false];
-
-    // Edge Case of Happy Path where the swap is safely aborted. We "fail" at the first step.
-    // TODO: There's no equivalent for this with the Tauri events
-    // case BobStateName.SafelyAborted:
-    //  return [PathType.HAPPY_PATH, 0, true];
-
+      
     // Unhappy Path States
 
     // Step 1: Cancel timelock has expired. Waiting for cancel transaction to be published
@@ -117,10 +112,13 @@ function getActiveStep(state: SwapState | null): PathStep {
       return [PathType.UNHAPPY_PATH, 1, isReleased];
     case "CooperativeRedeemRejected":
       return [PathType.UNHAPPY_PATH, 1, true];
+
+    case "Resuming":
+      return null;
     default:
       return fallbackStep("No step is assigned to the current state");
-    // TODO: Make this guard work. It should force the compiler to check if we have covered all possible cases.
-    // return exhaustiveGuard(latestState.type);
+      // TODO: Make this guard work. It should force the compiler to check if we have covered all possible cases.
+      // return exhaustiveGuard(latestState.type);  
   }
 }
 
@@ -168,7 +166,13 @@ export default function SwapStateStepper({
 }: {
   state: SwapState | null;
 }) {
-  const [pathType, activeStep, error] = getActiveStep(state);
+  const result = getActiveStep(state);
+
+  if (result === null) {
+    return null;
+  }
+
+  const [pathType, activeStep, error] = result;
 
   const steps =
     pathType === PathType.HAPPY_PATH
