@@ -1,10 +1,10 @@
 import { Button } from "@material-ui/core";
 import Alert from "@material-ui/lab/Alert";
 import { useNavigate } from "react-router-dom";
-import { useResumeableSwapsCount } from "store/hooks";
+import { useResumeableSwapsCountExcludingPunished } from "store/hooks";
 
 export default function UnfinishedSwapsAlert() {
-  const resumableSwapsCount = useResumeableSwapsCount();
+  const resumableSwapsCount = useResumeableSwapsCountExcludingPunished();
   const navigate = useNavigate();
 
   if (resumableSwapsCount > 0) {

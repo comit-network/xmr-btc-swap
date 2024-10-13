@@ -10,6 +10,8 @@ export type TauriSwapProgressEventContent<
   T extends TauriSwapProgressEventType,
 > = Extract<TauriSwapProgressEvent, { type: T }>["content"];
 
+export type TauriSwapProgressEventExt<T extends TauriSwapProgressEventType> = Extract<TauriSwapProgressEvent, { type: T }>;
+
 // See /swap/src/protocol/bob/state.rs#L57
 // TODO: Replace this with a typeshare definition
 export enum BobStateName {

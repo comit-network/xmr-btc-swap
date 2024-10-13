@@ -1,12 +1,16 @@
 import {
   Box,
   Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
   DialogTitle,
+  FormControl,
+  FormControlLabel,
   MenuItem,
+  Paper,
   Select,
   TextField,
 } from "@material-ui/core";
@@ -21,7 +25,7 @@ import LoadingButton from "../../other/LoadingButton";
 import { PiconeroAmount } from "../../other/Units";
 import { getLogsOfSwap } from "renderer/rpc";
 
-async function submitFeedback(body: string, swapId: string | number) {
+async function submitFeedback(body: string, swapId: string | number, submitDaemonLogs: boolean) {
   let attachedBody = "";
 
   if (swapId !== 0 && typeof swapId === "string") {
@@ -35,6 +39,13 @@ async function submitFeedback(body: string, swapId: string | number) {
     const logs = await getLogsOfSwap(swapId, false);
 
     attachedBody = `${JSON.stringify(swapInfo, null, 4)} \n\nLogs: ${logs.logs
+      .map((l) => JSON.stringify(l))
+      .join("\n====\n")}`;
+  }
+
+  if (submitDaemonLogs) {
+    const logs = store.getState().rpc?.logs ?? [];
+    attachedBody += `\n\nDaemon Logs: ${logs
       .map((l) => JSON.stringify(l))
       .join("\n====\n")}`;
   }
@@ -66,7 +77,7 @@ function SwapSelectDropDown({
       variant="outlined"
       onChange={(e) => setSelectedSwap(e.target.value as string)}
     >
-      <MenuItem value={0}>Do not attach logs</MenuItem>
+      <MenuItem value={0}>Do not attach a swap</MenuItem>
       {swaps.map((swap) => (
         <MenuItem value={swap.swap_id} key={swap.swap_id}>
           Swap <TruncatedText>{swap.swap_id}</TruncatedText> from{" "}
@@ -96,6 +107,7 @@ export default function FeedbackDialog({
   const [selectedAttachedSwap, setSelectedAttachedSwap] = useState<
     string | number
   >(currentSwapId?.swap_id || 0);
+  const [attachDaemonLogs, setAttachDaemonLogs] = useState(true);
 
   const bodyTooLong = bodyText.length > MAX_FEEDBACK_LENGTH;
 
@@ -106,9 +118,9 @@ export default function FeedbackDialog({
         <DialogContentText>
           Got something to say? Drop us a message below. If you had an issue
           with a specific swap, select it from the dropdown to attach the logs.
-          It will help us figure out what went wrong. Hit that submit button
-          when you are ready. We appreciate you taking the time to share your
-          thoughts!
+          It will help us figure out what went wrong.
+          <br />
+          We appreciate you taking the time to share your thoughts! Every feedback is read by a core developer!
         </DialogContentText>
         <Box
           style={{
@@ -124,7 +136,7 @@ export default function FeedbackDialog({
             label={
               bodyTooLong
                 ? `Text is too long (${bodyText.length}/${MAX_FEEDBACK_LENGTH})`
-                : "Feedback"
+                : "Message"
             }
             multiline
             minRows={4}
@@ -136,6 +148,18 @@ export default function FeedbackDialog({
             selectedSwap={selectedAttachedSwap}
             setSelectedSwap={setSelectedAttachedSwap}
           />
+          <Paper variant="outlined" style={{ padding: "0.5rem" }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  color="primary"
+                  checked={attachDaemonLogs}
+                  onChange={(e) => setAttachDaemonLogs(e.target.checked)}
+                />
+              }
+              label="Attach daemon logs"
+            />
+          </Paper>
         </Box>
       </DialogContent>
       <DialogActions>
@@ -150,7 +174,7 @@ export default function FeedbackDialog({
 
             try {
               setPending(true);
-              await submitFeedback(bodyText, selectedAttachedSwap);
+              await submitFeedback(bodyText, selectedAttachedSwap, attachDaemonLogs);
               enqueueSnackbar("Feedback submitted successfully!", {
                 variant: "success",
               });

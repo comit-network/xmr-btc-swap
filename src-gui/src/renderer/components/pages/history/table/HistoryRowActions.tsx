@@ -16,6 +16,7 @@ import { resumeSwap } from "renderer/rpc";
 
 export function SwapResumeButton({
   swap,
+  children,
   ...props
 }: ButtonProps & { swap: GetSwapInfoResponse }) {
   return (
@@ -27,7 +28,7 @@ export function SwapResumeButton({
       onInvoke={() => resumeSwap(swap.swap_id)}
       {...props}
     >
-      Resume
+      { children }
     </PromiseInvokeButton>
   );
 }
@@ -75,15 +76,13 @@ export default function HistoryRowActions(swap: GetSwapInfoResponse) {
     );
   }
 
-  // TODO: Display a button here to attempt a cooperative redeem
-  // See this PR: https://github.com/UnstoppableSwap/unstoppableswap-gui/pull/212
   if (swap.state_name === BobStateName.BtcPunished) {
     return (
-      <Tooltip title="This swap is completed. You have been punished.">
-        <ErrorIcon style={{ color: red[500] }} />
+      <Tooltip title="You have been punished. You can attempt to recover the Monero with the help of the other party but that is not guaranteed to work">
+        <SwapResumeButton swap={swap} size="small">Attempt recovery</SwapResumeButton>
       </Tooltip>
     );
   }
 
-  return <SwapResumeButton swap={swap} />;
+  return <SwapResumeButton swap={swap}>Resume</SwapResumeButton>;
 }

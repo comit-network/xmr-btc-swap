@@ -1,5 +1,5 @@
 import { sortBy } from "lodash";
-import { GetSwapInfoResponseExt } from "models/tauriModelExt";
+import { BobStateName, GetSwapInfoResponseExt } from "models/tauriModelExt";
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "renderer/store/storeRenderer";
 import { parseDateString } from "utils/parseUtils";
@@ -10,12 +10,22 @@ import { TauriSettings } from "models/tauriModel";
 export const useAppDispatch = () => useDispatch<AppDispatch>();
 export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
 
-export function useResumeableSwapsCount() {
+export function useResumeableSwapsCount(
+  additionalFilter?: (s: GetSwapInfoResponseExt) => boolean,
+) {
   return useAppSelector(
     (state) =>
       Object.values(state.rpc.state.swapInfos).filter(
-        (swapInfo) => !swapInfo.completed,
+        (swapInfo: GetSwapInfoResponseExt) =>
+          !swapInfo.completed && (additionalFilter == null || additionalFilter(swapInfo))
       ).length,
+  );
+}
+
+
+export function useResumeableSwapsCountExcludingPunished() {
+  return useResumeableSwapsCount(
+    (s) => s.state_name !== BobStateName.BtcPunished,
   );
 }
 

@@ -30,9 +30,9 @@ export function isBtcAddressValid(address: string, testnet: boolean) {
 }
 
 export function getBitcoinTxExplorerUrl(txid: string, testnet: boolean) {
-  return `https://blockchair.com/bitcoin${
+  return `https://mempool.space/${
     testnet ? "/testnet" : ""
-  }/transaction/${txid}`;
+  }/tx/${txid}`;
 }
 
 export function getMoneroTxExplorerUrl(txid: string, stagenet: boolean) {
