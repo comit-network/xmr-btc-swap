@@ -10,7 +10,7 @@ import {
 } from "@material-ui/core";
 import { OpenInNew } from "@material-ui/icons";
 import { GetSwapInfoResponse } from "models/tauriModel";
-import CopyableMonospaceTextBox from "renderer/components/other/CopyableMonospaceTextBox";
+import ActionableMonospaceTextBox from "renderer/components/other/ActionableMonospaceTextBox";
 import MonospaceTextBox from "renderer/components/other/MonospaceTextBox";
 import {
   MoneroBitcoinExchangeRate,
@@ -90,7 +90,7 @@ export default function HistoryRowExpanded({
               <TableCell>
                 <Box>
                   {swap.seller.addresses.map((addr) => (
-                    <CopyableMonospaceTextBox key={addr} address={addr} />
+                    <ActionableMonospaceTextBox key={addr} content={addr} displayCopyIcon={false} enableQrCode={false} />
                   ))}
                 </Box>
               </TableCell>

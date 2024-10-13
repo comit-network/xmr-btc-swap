@@ -1,7 +1,6 @@
 import { Box } from "@material-ui/core";
 import { ReactNode } from "react";
-import CopyableMonospaceTextBox from "renderer/components/other/CopyableMonospaceTextBox";
-import BitcoinQrCode from "./BitcoinQrCode";
+import ActionableMonospaceTextBox from "renderer/components/other/ActionableMonospaceTextBox";
 import InfoBox from "./InfoBox";
 
 type Props = {
@@ -20,7 +19,7 @@ export default function DepositAddressInfoBox({
   return (
     <InfoBox
       title={title}
-      mainContent={<CopyableMonospaceTextBox address={address} />}
+      mainContent={<ActionableMonospaceTextBox content={address} displayCopyIcon={true} enableQrCode={true} />}
       additionalContent={
         <Box
           style={{
@@ -31,7 +30,6 @@ export default function DepositAddressInfoBox({
           }}
         >
           <Box>{additionalContent}</Box>
-          <BitcoinQrCode address={address} />
         </Box>
       }
       icon={icon}

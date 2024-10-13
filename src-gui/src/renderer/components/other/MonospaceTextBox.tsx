@@ -1,10 +1,7 @@
 import { Box, Typography, makeStyles } from "@material-ui/core";
-import { ReactNode } from "react";
 
 type Props = {
-  content: string;
-  onClick?: (content: string) => void;
-  endIcon?: ReactNode;
+  children: React.ReactNode;
 };
 
 const useStyles = makeStyles((theme) => ({
@@ -14,31 +11,25 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.palette.grey[900],
     borderRadius: theme.shape.borderRadius,
     padding: theme.spacing(1),
-    gap: theme.spacing(1),
   },
   content: {
     wordBreak: "break-word",
     whiteSpace: "pre-wrap",
     fontFamily: "monospace",
-    lineHeight: "1.5em",
+    lineHeight: 1.5,
+    display: "flex",
+    alignItems: "center",
   },
 }));
 
-export default function MonospaceTextBox({ content, endIcon, onClick }: Props) {
+export default function MonospaceTextBox({ children }: Props) {
   const classes = useStyles();
 
-  const handleClick = () => onClick?.(content);
-
   return (
-    <Box className={classes.root} onClick={handleClick}>
-      <Typography
-        component="span"
-        variant="overline"
-        className={classes.content}
-      >
-        {content}
+    <Box className={classes.root}>
+      <Typography component="span" variant="overline" className={classes.content}>
+        {children}
       </Typography>
-      {endIcon}
     </Box>
   );
 }
