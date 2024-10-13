@@ -90,7 +90,12 @@ export default function HistoryRowExpanded({
               <TableCell>
                 <Box>
                   {swap.seller.addresses.map((addr) => (
-                    <ActionableMonospaceTextBox key={addr} content={addr} displayCopyIcon={false} enableQrCode={false} />
+                    <ActionableMonospaceTextBox
+                      key={addr}
+                      content={addr}
+                      displayCopyIcon={true}
+                      enableQrCode={false}
+                    />
                   ))}
                 </Box>
               </TableCell>
@@ -102,10 +107,9 @@ export default function HistoryRowExpanded({
                   href={getBitcoinTxExplorerUrl(swap.tx_lock_id, isTestnet())}
                   target="_blank"
                 >
-                  <MonospaceTextBox
-                    content={swap.tx_lock_id}
-                    endIcon={<OpenInNew />}
-                  />
+                  <MonospaceTextBox>
+                    {swap.tx_lock_id}
+                  </MonospaceTextBox>
                 </Link>
               </TableCell>
             </TableRow>
