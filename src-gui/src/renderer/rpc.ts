@@ -67,6 +67,11 @@ export async function initEventListeners() {
     store.dispatch(receivedCliLog(event.payload));
   });
 
+  listen<BalanceResponse>("balance-change", (event) => {
+    console.log("Received balance change event", event.payload);
+    store.dispatch(rpcSetBalance(event.payload.balance));
+  });
+
   listen<TauriDatabaseStateEvent>("swap-database-state-update", (event) => {
     console.log("Received swap database state update event", event.payload);
     getSwapInfo(event.payload.swap_id);

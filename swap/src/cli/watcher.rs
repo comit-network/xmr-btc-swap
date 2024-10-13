@@ -3,13 +3,13 @@ use crate::bitcoin::{ExpiredTimelocks, Wallet};
 use crate::cli::api::tauri_bindings::TauriHandle;
 use crate::protocol::bob::BobState;
 use crate::protocol::{Database, State};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;
 
-/// A long running task which watches for changes to timelocks
+/// A long running task which watches for changes to timelocks and balance
 #[derive(Clone)]
 pub struct Watcher {
     wallet: Arc<Wallet>,
@@ -40,51 +40,67 @@ impl Watcher {
     /// Start running the watcher event loop.
     /// Should be done in a new task using [`tokio::spawn`].
     pub async fn run(mut self) {
-        // Note: since this is de-facto a daemon, we have to gracefully handle errors
+        // Note: since this is a daemon, we have to gracefully handle errors
         // (which in our case means logging the error message and trying again later)
         loop {
             tokio::time::sleep(Duration::from_secs(Watcher::CHECK_INTERVAL)).await;
 
-            // Fetch current transactions and timelocks
-            let current_swaps = match self.get_current_swaps().await {
-                Ok(val) => val,
-                Err(e) => {
-                    tracing::error!(error=%e, "Failed to fetch current transactions, retrying later");
-                    continue;
-                }
-            };
+            match self.do_work().await {
+                Ok(()) => (),
+                Err(error) => tracing::error!(%error, "Watcher daemon encountered error"),
+            }
+        }
+    }
 
-            // Check for changes for every current swap
-            for (swap_id, state) in current_swaps {
-                // Determine if the timelock has expired for the current swap.
-                // We intentionally do not skip swaps with a None timelock status, as this represents a valid state.
-                // When a swap reaches its final state, the timelock becomes irrelevant, but it is still important to explicitly send None
-                // This indicates that the timelock no longer needs to be displayed in the GUI
-                let new_timelock_status = match state.expired_timelocks(self.wallet.clone()).await {
-                    Ok(val) => val,
-                    Err(e) => {
-                        tracing::error!(error=%e, swap_id=%swap_id, "Failed to check timelock status, retrying later");
-                        continue;
-                    }
-                };
+    /// This function performs the actual work and get's called every [`Watcher::CHECK_INTERVAL`]
+    /// seconds.
+    ///
+    /// Splitting the content of the loop like this allows better error handling.
+    async fn do_work(&mut self) -> Result<()> {
+        // Fetch the current Bitcoin balance
+        let new_balance = self
+            .wallet
+            .balance()
+            .await
+            .context("Failed to fetch Bitcoin balance, retrying later")?;
+        // Emit a balance update event
+        self.tauri.emit_balance_update_event(new_balance);
 
-                // Check if the status changed
-                if let Some(old_status) = self.cached_timelocks.get(&swap_id) {
-                    // And send a tauri event if it did
-                    if *old_status != new_timelock_status {
-                        self.tauri
-                            .emit_timelock_change_event(swap_id, new_timelock_status);
-                    }
-                } else {
-                    // If this is the first time we see this swap, send a tauri event, too
+        // Fetch current transactions and timelocks
+        let current_swaps = self
+            .get_current_swaps()
+            .await
+            .context("Failed to ftech current transactions, retrying later")?;
+
+        // Check for changes for every current swap
+        for (swap_id, state) in current_swaps {
+            // Determine if the timelock has expired for the current swap.
+            // We intentionally do not skip swaps with a None timelock status, as this represents a valid state.
+            // When a swap reaches its final state, the timelock becomes irrelevant, but it is still important to explicitly send None
+            // This indicates that the timelock no longer needs to be displayed in the GUI
+            let new_timelock_status = state
+                .expired_timelocks(self.wallet.clone())
+                .await
+                .context("Failed to check timelock status")?;
+
+            // Check if the status changed
+            if let Some(old_status) = self.cached_timelocks.get(&swap_id) {
+                // And send a tauri event if it did
+                if *old_status != new_timelock_status {
                     self.tauri
                         .emit_timelock_change_event(swap_id, new_timelock_status);
                 }
-
-                // Insert new status
-                self.cached_timelocks.insert(swap_id, new_timelock_status);
+            } else {
+                // If this is the first time we see this swap, send a tauri event, too
+                self.tauri
+                    .emit_timelock_change_event(swap_id, new_timelock_status);
             }
+
+            // Insert new status
+            self.cached_timelocks.insert(swap_id, new_timelock_status);
         }
+
+        Ok(())
     }
 
     /// Helper function for fetching the current list of swaps

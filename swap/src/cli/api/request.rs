@@ -256,7 +256,7 @@ pub struct BalanceArgs {
 }
 
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BalanceResponse {
     #[typeshare(serialized_as = "number")]
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]

@@ -7,12 +7,14 @@ use typeshare::typeshare;
 use url::Url;
 use uuid::Uuid;
 
+use super::request::BalanceResponse;
+
 const CLI_LOG_EMITTED_EVENT_NAME: &str = "cli-log-emitted";
 const SWAP_PROGRESS_EVENT_NAME: &str = "swap-progress-update";
 const SWAP_STATE_CHANGE_EVENT_NAME: &str = "swap-database-state-update";
 const TIMELOCK_CHANGE_EVENT_NAME: &str = "timelock-change";
 const CONTEXT_INIT_PROGRESS_EVENT_NAME: &str = "context-init-progress-update";
-
+const BALANCE_CHANGE_EVENT_NAME: &str = "balance-change";
 #[derive(Debug, Clone)]
 pub struct TauriHandle(
     #[cfg(feature = "tauri")]
@@ -69,6 +71,15 @@ pub trait TauriEmitter {
         let _ = self.emit_tauri_event(
             TIMELOCK_CHANGE_EVENT_NAME,
             TauriTimelockChangeEvent { swap_id, timelock },
+        );
+    }
+
+    fn emit_balance_update_event(&self, new_balance: bitcoin::Amount) {
+        let _ = self.emit_tauri_event(
+            BALANCE_CHANGE_EVENT_NAME,
+            BalanceResponse {
+                balance: new_balance,
+            },
         );
     }
 }
