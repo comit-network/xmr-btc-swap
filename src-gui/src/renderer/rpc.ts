@@ -21,6 +21,7 @@ import {
   TauriDatabaseStateEvent,
   TauriTimelockChangeEvent,
   GetSwapInfoArgs,
+  ExportBitcoinWalletResponse,
 } from "models/tauriModel";
 import {
   contextStatusEventReceived,
@@ -213,4 +214,8 @@ export async function initializeContext() {
     settings,
     testnet,
   });
+}
+
+export async function getWalletDescriptor() {
+  return await invokeNoArgs<ExportBitcoinWalletResponse>("get_wallet_descriptor");
 }

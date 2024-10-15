@@ -346,13 +346,22 @@ impl Request for GetConfig {
     }
 }
 
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ExportBitcoinWalletArgs;
 
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ExportBitcoinWalletResponse {
+    pub wallet_descriptor: serde_json::Value,
+}
+
 impl Request for ExportBitcoinWalletArgs {
-    type Response = serde_json::Value;
+    type Response = ExportBitcoinWalletResponse;
 
     async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
-        export_bitcoin_wallet(ctx).await
+        let wallet_descriptor = export_bitcoin_wallet(ctx).await?;
+        Ok(ExportBitcoinWalletResponse { wallet_descriptor })
     }
 }
 

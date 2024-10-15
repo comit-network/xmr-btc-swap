@@ -11,10 +11,9 @@ export default function FeedbackInfoBox() {
       title="Feedback"
       mainContent={
         <Typography variant="subtitle2">
-          The main goal of this project is to make Atomic Swaps easier to use,
-          and for that we need genuine users&apos; input. Please leave some
-          feedback, it takes just two minutes. I&apos;ll read each and every
-          survey response and take your feedback into consideration.
+          Your input is crucial to us! We'd love to hear your thoughts on
+          Atomic Swaps. We personally read every response to improve the
+          project. Got two minutes to share?
         </Typography>
       }
       additionalContent={

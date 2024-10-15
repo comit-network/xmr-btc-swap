@@ -4,7 +4,7 @@ import DonateInfoBox from "./DonateInfoBox";
 import FeedbackInfoBox from "./FeedbackInfoBox";
 import DaemonControlBox from "./DaemonControlBox";
 import SettingsBox from "./SettingsBox";
-
+import ExportDataBox from "./ExportDataBox";
 const useStyles = makeStyles((theme) => ({
   outer: {
     display: "flex",
@@ -19,9 +19,10 @@ export default function HelpPage() {
 
   return (
     <Box className={classes.outer}>
+      <FeedbackInfoBox />
       <DaemonControlBox />
       <SettingsBox />
-      <FeedbackInfoBox />
+      <ExportDataBox />
       <ContactInfoBox />
       <DonateInfoBox />
     </Box>
