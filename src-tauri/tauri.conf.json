@@ -23,6 +23,7 @@
     }
   },
   "bundle": {
+    "createUpdaterArtifacts": true,
     "active": true,
     "targets": "all",
     "icon": [
@@ -34,6 +35,14 @@
     ]
   },
   "plugins": {
+    "updater": {
+      "active": true,
+      "dialog": true,
+      "endpoints": [
+        "https://cdn.crabnebula.app/update/unstoppableswap/unstoppableswap-gui-rs/{{target}}-{{arch}}/{{current_version}}"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQyNTQ3NTQxQTQ2MkI4N0IKUldSN3VHS2tRWFZVMGpWYytkRFg4dFBzNEh5ZnlxaHBubGpRalVMMG5nVytiR3JPOUE3QjRxc00K"
+    },
     "cli": {
       "description": "Start the GUI application",
       "args": [

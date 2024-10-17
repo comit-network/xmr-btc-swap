@@ -1,0 +1,102 @@
+# This file is used to build the preview release binaries for the Tauri GUI with CloudNebula integration
+name: "Publish GUI Preview Release with CloudNebula"
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  UBUNTU: "ubuntu-22.04"
+  MACOS_ARM: "macos-latest"
+  MACOS_INTEL: "macos-13"
+  WINDOWS: "windows-latest"
+  CN_APPLICATION: "UnstoppableSwap/unstoppableswap-gui-rs"
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create Draft Release
+        uses: crabnebula-dev/cloud-release@v0
+        with:
+          command: release draft ${{ env.CN_APPLICATION }} --framework tauri
+          api-key: ${{ secrets.CN_API_KEY }}
+
+  build:
+    needs: draft
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest"   # For Arm-based Macs (M1 and above)
+            args: "--target aarch64-apple-darwin"
+          - platform: "macos-13"       # For Intel-based Macs
+            args: "--target x86_64-apple-darwin"
+          - platform: "ubuntu-22.04"
+            args: ""
+          - platform: "windows-latest"
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Install Rust Stable
+        uses: dtolnay/rust-toolchain@1.79
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Install Dependencies (Ubuntu Only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install Frontend Dependencies
+        working-directory: src-gui
+        run: yarn install
+
+      - name: Install Tauri CLI Globally
+        run: cargo install tauri-cli@^2.0.0-rc
+
+      - name: Install Typeshare CLI Globally
+        run: cargo install typeshare-cli
+
+      - name: Install Dprint Globally
+        run: cargo install dprint@0.39.1
+
+      - name: Build Tauri App
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOTTY_GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cargo tauri build ${{ matrix.args }}
+
+      - name: Upload Assets
+        uses: crabnebula-dev/cloud-release@v0
+        with:
+          command: release upload ${{ env.CN_APPLICATION }} --framework tauri
+          api-key: ${{ secrets.CN_API_KEY }}
+          path: ./src-tauri/target/release/bundle
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish Release
+        uses: crabnebula-dev/cloud-release@v0
+        with:
+          command: release publish ${{ env.CN_APPLICATION }} --framework tauri
+          api-key: ${{ secrets.CN_API_KEY }}

@@ -18,6 +18,7 @@ import App from "./components/App";
 import { initEventListeners } from "./rpc";
 import { persistor, store } from "./store/storeRenderer";
 import { Box } from "@material-ui/core";
+import { checkForAppUpdates } from "./updater";
 
 const container = document.getElementById("root");
 const root = createRoot(container!);
@@ -67,3 +68,4 @@ async function fetchInitialData() {
 
 fetchInitialData();
 initEventListeners();
+checkForAppUpdates();
