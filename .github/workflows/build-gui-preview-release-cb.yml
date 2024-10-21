@@ -90,7 +90,7 @@ jobs:
         with:
           command: release upload ${{ env.CN_APPLICATION }} --framework tauri
           api-key: ${{ secrets.CN_API_KEY }}
-          path: ./src-tauri/target/release/bundle
+          path: ./target/release/bundle
 
   publish:
     needs: build
