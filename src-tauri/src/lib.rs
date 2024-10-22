@@ -14,7 +14,6 @@ use swap::cli::{
     command::{Bitcoin, Monero},
 };
 use tauri::{async_runtime::RwLock, Manager, RunEvent};
-use tauri_plugin_dialog;
 
 /// Trait to convert Result<T, E> to Result<T, String>
 /// Tauri commands require the error type to be a string

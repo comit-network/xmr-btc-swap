@@ -9256,7 +9256,7 @@ dependencies = [
 
 [[package]]
 name = "unstoppableswap-gui-rs"
-version = "0.0.0"
+version = "1.0.0-alpha.1"
 dependencies = [
  "anyhow",
  "once_cell",
