@@ -6,12 +6,13 @@ import {
   registryConnectionFailed,
   setRegistryProviders,
 } from "store/features/providersSlice";
-import { setBtcPrice, setXmrPrice } from "store/features/ratesSlice";
+import { setBtcPrice, setXmrBtcRate, setXmrPrice } from "store/features/ratesSlice";
 import logger from "../utils/logger";
 import {
   fetchAlertsViaHttp,
   fetchBtcPrice,
   fetchProvidersViaHttp,
+  fetchXmrBtcRate,
   fetchXmrPrice,
 } from "./api";
 import App from "./components/App";
@@ -63,6 +64,14 @@ async function fetchInitialData() {
     logger.info({ btcPrice }, "Fetched BTC price");
   } catch (e) {
     logger.error(e, "Error retrieving fiat prices");
+  }
+
+  try {
+    const xmrBtcRate = await fetchXmrBtcRate();
+    store.dispatch(setXmrBtcRate(xmrBtcRate));
+    logger.info({ xmrBtcRate }, "Fetched XMR/BTC rate");
+  } catch (e) {
+    logger.error(e, "Error retrieving XMR/BTC rate");
   }
 }
 

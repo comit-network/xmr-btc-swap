@@ -9,6 +9,7 @@ import {
 import { satsToBtc, secondsToDays } from "utils/conversionUtils";
 import { isProviderOutdated } from 'utils/multiAddrUtils';
 import WarningIcon from '@material-ui/icons/Warning';
+import { useAppSelector } from "store/hooks";
 
 const useStyles = makeStyles((theme) => ({
   content: {
@@ -24,6 +25,24 @@ const useStyles = makeStyles((theme) => ({
     flexWrap: "wrap",
   },
 }));
+
+function ProviderSpreadChip({ provider }: { provider: ExtendedProviderStatus }) {
+  const xmrBtcPrice = useAppSelector(s => s.rates?.xmrBtcRate);
+
+  if (xmrBtcPrice === null) {
+    return null;
+  }
+
+  const providerPrice = satsToBtc(provider.price);
+  const spread = ((providerPrice - xmrBtcPrice) / xmrBtcPrice) * 100;
+
+  return (
+    <Tooltip title="The spread is the difference between the provider's exchange rate and the market rate. A high spread indicates that the provider is charging more than the market rate.">
+      <Chip label={`Spread: ${spread.toFixed(2)} %`} />
+    </Tooltip>
+  );
+
+}
 
 export default function ProviderInfo({
   provider,
@@ -78,6 +97,7 @@ export default function ProviderInfo({
             <Chip label="Outdated" icon={<WarningIcon />} color="primary" />
           </Tooltip>
         )}
+        <ProviderSpreadChip provider={provider} />
       </Box>
     </Box>
   );

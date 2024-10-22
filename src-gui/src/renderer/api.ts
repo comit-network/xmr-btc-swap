@@ -58,6 +58,26 @@ async function fetchCurrencyUsdPrice(currency: string): Promise<number> {
   }
 }
 
+export async function fetchXmrBtcRate(): Promise<number> {
+  try {
+    const response = await fetch('https://api.kraken.com/0/public/Ticker?pair=XMRXBT');
+    const data = await response.json();
+    
+    if (data.error && data.error.length > 0) {
+      throw new Error(`Kraken API error: ${data.error[0]}`);
+    }
+
+    const result = data.result.XXMRXXBT;
+    const lastTradePrice = parseFloat(result.c[0]);
+
+    return lastTradePrice;
+  } catch (error) {
+    console.error('Error fetching XMR/BTC rate from Kraken:', error);
+    throw error;
+  }
+}
+
+
 export async function fetchBtcPrice(): Promise<number> {
   return fetchCurrencyUsdPrice("bitcoin");
 }
