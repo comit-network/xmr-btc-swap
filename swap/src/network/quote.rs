@@ -7,6 +7,7 @@ use libp2p::request_response::{
 };
 use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 const PROTOCOL: &str = "/comit/xmr/btc/bid-quote/1.0.0";
 pub type OutEvent = RequestResponseEvent<(), BidQuote>;
@@ -35,6 +36,7 @@ pub struct BidQuote {
     /// The maximum quantity the maker is willing to buy.
     #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
     pub max_quantity: bitcoin::Amount,
+    pub valid_duration: Option<Duration>,
 }
 
 #[derive(Clone, Copy, Debug, thiserror::Error)]
