@@ -1,0 +1,117 @@
+# How to complete your first Atomic Swap
+
+In this guide, we'll walk you through the process of completing your first atomic swap using the UnstoppableSwap GUI.
+Although the process is quite intuitive, there are some nuances to be aware of, so we'll cover everything you need to know to get started.
+
+## Prerequisites
+
+To complete an Atomic Swap, you'll need to have the following:
+
+1. A Monero wallet you can use to receive funds
+2. A Bitcoin wallet you can use with some funds in it. 
+This wallet should also be able to generate a native SegWit address (an address starting with `bc1`). 
+This address will also receive any refunded Bitcoin if the swap is not completed.
+3. _UnstoppableSwap GUI_ installed on your computer. 
+We'll refer to this as _GUI_ from now on. View the [installation instructions](../getting_started/install_instructions) if you haven't already installed the GUI.
+
+import { Steps } from 'nextra/components'
+ 
+## Performing the swap
+<Steps>
+### Choose a _Swap Provider_ to swap with
+
+After opening the GUI, you'll be greeted with the main screen. 
+In the bottom of the screen you can see the currently selected _Swap Provider_. 
+This is who you'll send your Bitcoin to and who you'll receive the Monero from. 
+You can change the _Swap Provider_ by clicking on the arrow and selecting a different _Swap Provider_ from the list.
+
+import { Callout } from 'nextra/components'
+
+<Callout type="info">
+Different _Swap Providers_ offer different exchange rates and differing amounts of liquidity. You may want to choose the _Swap Provider_ that best suits your needs.
+</Callout>
+
+You can also use input field to calculate the approximate amount of Monero you'll receive for a given amount of Bitcoin. 
+
+<Callout type="info">
+The actual swap amount will be determined when you deposit your Bitcoin. 
+This is only used as a reference for you to get a rough idea of how much Monero you'll receive for your Bitcoin.
+</Callout>
+
+![image](/first_swap_1.png)
+
+### Start the Swap
+
+Once you've selected a _Swap Provider_, you can start the swap by clicking the `Swap` button. 
+This will open a new window where you need to enter two addresses:
+
+1. the Monero address you want to receive the Monero to
+2. the Bitcoin address where you want to receive the Bitcoin refund incase the swap is not completed successfully. 
+
+![image](/first_swap_2.png)
+
+### Depositing Bitcoin
+
+After pressing the <img src="/start_swap_button.png" style={{
+    height: "1lh",
+    display: "inline-block",
+    // center vertically
+    verticalAlign: "middle",
+}}/> button, you'll be shown an offer by the _Swap Provider_. This includes:
+
+- the exchange rate (how much Bitcoin they demand for 1 Monero)
+- the minimum and maximum amounts you can swap
+- the network fees that'll be spent on the Bitcoin lock transaction
+
+<Callout type="info">
+You can hover over these values to see their value in `USD`.
+</Callout>
+
+If you're happy with the offer, you can proceed by sending the Bitcoin to the address displayed on the screen.
+All funds sent to this address will be used for the swap as long as they below the maximum amount.
+
+<Callout type="info">
+This is where the actual swap amount is determined.
+Be careful to send only as much Bitcoin as you want to swap.
+</Callout>
+
+![image](/first_swap_3.png)
+
+### Waiting for the swap to complete
+
+After sending the Bitcoin, you'll need to wait a moment for the Bitcoin to be locked.
+After the lock transaction has been confirmed, the other party will lock the Monero funds.
+In most cases, it will take around 10 minutes for the Bitcoin lock transaction to be confirmed and 2 minutes later the Monero lock transaction will be confirmed.
+
+![image](/first_swap_4.png)
+
+
+The swap will go through four stages:
+
+1. **Locking the Bitcoin**:
+Your Bitcoin is locked in a 2-of-2 multisig address.
+
+2. **_Swap Provider_ locks the Monero**:
+The other party locks their Monero as well.
+
+3. **_Swap Provider_ redeems _Bitcoin_**:
+The other party redeems the Bitcoin.
+
+4. **Redeeming the Monero**:
+You redeem the Monero using a key that was revealed in step 3.
+
+<table>
+  <tr>
+    <td>
+      ![imgage](/first_swap_5.png)
+    </td>
+    <td>
+      ![image](/first_swap_6.png)
+    </td>
+    <td>
+      ![image](/first_swap_7.png)
+    </td>
+  </tr>
+</table>
+
+</Steps>

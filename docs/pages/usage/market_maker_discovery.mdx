@@ -1,0 +1,49 @@
+# _Swap Provider_ discovery
+
+A _Swap Provider_ is a service run by a pseudonymous entity that offers to sell Monero in exchange for Bitcoin. To swap your Bitcoin for Monero you need to connect to a one of these _Swap Providers_.
+The different ways to discover _Swap Providers_ are described below.
+
+There are two ways to discover _Swap Providers_:
+
+1. **Public Registry**: Community volunteers maintain a list of _Swap Providers_ that is provided to the GUI and is kept up to date automatically. This list is displayed in the GUI by default. The _Public Registry_ also stores additional information about the _Swap Providers_ such as their uptime and age, and makes it available to the GUI.
+2. **Rendezvous**: The GUI can discover Swap Providers using the [_Rendezvous_ protocol](https://docs.libp2p.io/concepts/discovery-routing/rendezvous/). This protocol enables the GUI to find providers that register themselves at a _Rendezvous Point_. The GUI can query these points to get a list of registered providers. _Rendezvous Points_ are operated by community volunteers, and anyone can run one. The GUI can connect to various _Rendezvous Points_ to discover different _Swap Providers_.
+
+## _Public Registry_
+
+The providers from the registry are displayed in the GUI. If you want to connect to them directly without the GUI choose one from the table below.
+
+import SwapProviderTable from "../../components/SwapProviderTable";
+
+<div>
+  <SwapProviderTable />
+</div>
+
+## How to discover _Swap Providers_ via the _Rendezvous_ protocol
+
+1. Open the _Swap Provider_ list by clicking the right-facing arrow in the widget on the _Swap_ tab.
+
+   <img src="/rendezvous_1.png" />
+
+2. Click the <img src="/rendezvous_button_1.png" style={{
+       height: "1lh",
+       display: "inline-block",
+       // center vertically
+       verticalAlign: "middle",
+   }}/> button to open the _Discover swap providers_ dialog. Enter the _Multiaddress_ of the _Rendezvous Point_ you want to connect to. You can also choose one of the predined ones from the list below the Textfield. Click the _Connect_ button to connect to the rendezvous point.
+   <img src="/rendezvous_2.png" />
+
+## How to add a _Swap Provider_ to the _Public Registry_
+
+If you know of a _Swap Provider_ that is not yet in the _Public Registry_, you can submit it manually. Here's how you can do it:
+
+1. Open the _Swap Provider_ list by clicking the right-facing arrow in the widget on the _Swap_ tab.
+
+   <img src="/rendezvous_1.png" />
+
+2. Click the <img src="/public_registry_button_1.png" style={{
+       height: "1lh",
+       display: "inline-block",
+       // center vertically
+       verticalAlign: "middle",
+   }}/> button. Enter the _Multiaddress_ of the _Swap Provider_ as well as the _Peer ID_ of the provider. Click the _Submit_ button to submit the provider to the _Public Registry_.
+   <img src="/public_registry.png" />

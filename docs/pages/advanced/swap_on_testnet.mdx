@@ -1,0 +1,49 @@
+# Swapping on Testnet
+
+Swapping on the testnet is a great way to test out the swap functionality without risking your mainnet assets. The testnet is a separate network from the mainnet, and the assets on the testnet are worthless.
+To be exact, `testnet3` bitcoin will be swapped for `stagenet` Monero. You will need to set up two wallets to perform a swap:
+
+- A Testnet3 Electrum Wallet (Bitcoin)
+- A Stagenet Monero GUI Wallet
+
+## Electrum
+
+Download Electrum from the official [site](https://electrum.org/#download) and then start the wallet with the `--testnet` flag.
+
+### Linux
+
+```
+./electrum --testnet
+```
+
+### Mac OS:
+
+```
+open -n /Applications/Electrum.app --args --testnet
+```
+
+### Windows:
+
+If you install Electrum on Windows, you will have two programs you can start. One of them is called "Electrum Testnet".
+
+### Getting testnet coins
+
+To get some free Testnet coins visit a faucet like [this](https://testnet-faucet.mempool.co) one.
+
+## Monero
+
+If you use the `monero-wallet-cli` you simply need to start it with the `--stagenet` flag. If you use the GUI you can follow [this](https://www.youtube.com/watch?v=5E4aO3UAqJo) tutorial by the COMIT guys.
+
+You can use this remote note:
+
+```
+stagenet.melo.tools:38081
+```
+
+## Installing the GUI
+
+View the [Installation Instructions](../getting_started/install_instructions) if you haven't already installed the GUI.
+
+## Making a swap
+
+Start the GUI with the environment variable `TESTNET=true`. From here on you can follow the [Complete your first Atomic Swap](../usage/first_swap) guide with the difference that you will be using the testnet wallets. The process is the same, but you will be using the testnet wallets instead of the mainnet wallets.

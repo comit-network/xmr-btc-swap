@@ -1,0 +1,23 @@
+{
+  "name": "unstoppableswap-docs",
+  "version": "1.0.0",
+  "description": "Documentation for the UnstoppableSwap GUI",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "dev": "next",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "^14.2.4",
+    "nextra": "^2.13.4",
+    "nextra-theme-docs": "^2.13.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.5",
+    "typescript": "5.4.5"
+  }
+}

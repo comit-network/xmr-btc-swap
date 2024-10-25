@@ -1,0 +1,22 @@
+# Cancel, Refund, and Punish explained
+
+Atomic Swaps offer a lot of security and privacy benefits, but they also come with some responsibilities. It is important to recognize that Atomic Swaps are trustless, but not risk-free. As long as you follow the rules of the protocol, you can be sure that you will not lose your funds.
+
+If you want to learn more about technical details, you can read this paper: [Atomic Swaps between Bitcoin and Monero, _Philipp Hoenisch, Lucas Soriano del Pino_](https://arxiv.org/abs/2101.12332) or read this [blog post](https://comit.network/blog/2020/10/06/monero-bitcoin/).
+
+## Cancel
+
+If the _Swap Provider_ has not been able to redeem the Bitcoin within 12 hours (144 Bitcoin blocks) from the start of the swap, the swap will be cancelled.
+This is done by either you or the _Swap Provider_ publishing a special Bitcoin transaction called the `Bitcoin Cancel Transaction`.
+As soon as this transaction is included in the Bitcoin blockchain, the swap is locked in a state where only the [_Refund_](#refund) and [_Punish_](#punish) paths can be activated. The _Happy Path_ path where you redeem the Monero is no longer possible.
+
+## Refund
+
+As soon as the swap is cancelled, you can refund your Bitcoin. This is done by publishing the `Bitcoin Refund Transaction` on the Bitcoin blockchain.
+If this is done within 12 hours (144 Bitcoin blocks) from the inclusion of the `Bitcoin Cancel Transaction`, you will get your Bitcoin back.
+If you do not refund your Bitcoin within this time frame, the _Swap Provider_ can punish you. This is a security measure to ensure that you do not cancel the swap and then refuse to refund your Bitcoin which would result in the _Swap Provider_ losing their Monero.
+
+## Punish
+
+If you do not refund your Bitcoin within 12 hours (144 Bitcoin blocks) from the inclusion of the `Bitcoin Cancel Transaction`, the _Swap Provider_ will _punish_ you. This will result in the _Swap Provider_ taking your Bitcoin as a penalty for not refunding it in time.
+Even if this state is reached and the _Swap Provider_ has punished you, there's still hope to redeem the Monero. The _Swap Provider_ can choose to allow you to redeem the Monero by transmitting a secret key to you. This however is at the discretion of the _Swap Provider_ and they are not obligated to do so.
