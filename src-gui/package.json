@@ -1,7 +1,7 @@
 {
   "name": "unstoppableswap-gui-rs",
   "private": true,
-  "version": "1.0.0-alpha.1",
+  "version": "0.7.0",
   "type": "module",
   "scripts": {
     "check-bindings": "typeshare --lang=typescript --output-file __temp_bindings.ts ../swap/src && dprint fmt __temp_bindings.ts && diff -wbB __temp_bindings.ts ./src/models/tauriModel.ts && rm __temp_bindings.ts",
