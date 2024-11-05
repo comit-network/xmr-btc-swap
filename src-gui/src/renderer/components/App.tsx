@@ -9,6 +9,7 @@ import HistoryPage from "./pages/history/HistoryPage";
 import SwapPage from "./pages/swap/SwapPage";
 import WalletPage from "./pages/wallet/WalletPage";
 import GlobalSnackbarProvider from "./snackbar/GlobalSnackbarProvider";
+import UpdaterDialog from "./modal/updater/UpdaterDialog";
 
 const useStyles = makeStyles((theme) => ({
   innerContent: {
@@ -58,6 +59,7 @@ export default function App() {
         <Router>
           <Navigation />
           <InnerContent />
+          <UpdaterDialog/>
         </Router>
       </GlobalSnackbarProvider>
     </ThemeProvider>
