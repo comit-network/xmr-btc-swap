@@ -23,7 +23,6 @@ swap = { path = "../swap", features = [ "tauri" ] }
 tauri = { version = "2.0", features = [ "config-json5" ] }
 tauri-plugin-clipboard-manager = "2.0"
 tauri-plugin-devtools = "2.0"
-tauri-plugin-dialog = "2.0.1"
 tauri-plugin-process = "2.0"
 tauri-plugin-shell = "2.0"
 tauri-plugin-store = "2.0"
@@ -32,3 +31,4 @@ tracing = "0.1"
 
 [target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
 tauri-plugin-cli = "2.0"
+tauri-plugin-single-instance = "2.0.0-rc"
