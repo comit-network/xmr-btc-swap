@@ -406,8 +406,11 @@ where
                 price: ask_price,
                 min_quantity: bitcoin::Amount::ZERO,
                 max_quantity: bitcoin::Amount::ZERO,
+                reserve_proof: None,
             });
         }
+
+        let xmr_reserve_proof = self.monero_wallet.get_reserve_proof(None, None).await?;
 
         if max_buy > max_bitcoin_for_monero {
             tracing::warn!(
@@ -418,6 +421,7 @@ where
                 price: ask_price,
                 min_quantity: min_buy,
                 max_quantity: max_bitcoin_for_monero,
+                reserve_proof: Some(xmr_reserve_proof),
             });
         }
 
@@ -425,6 +429,7 @@ where
             price: ask_price,
             min_quantity: min_buy,
             max_quantity: max_buy,
+            reserve_proof: Some(xmr_reserve_proof),
         })
     }
 
