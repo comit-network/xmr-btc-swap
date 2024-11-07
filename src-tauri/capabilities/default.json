@@ -11,7 +11,6 @@
     "store:default",
     "process:default",
     "cli:allow-cli-matches",
-    "dialog:default",
     "updater:default",
     "process:allow-restart"
   ]
