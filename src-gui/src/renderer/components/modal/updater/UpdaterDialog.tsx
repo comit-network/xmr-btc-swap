@@ -87,11 +87,11 @@ export default function UpdaterDialog() {
             ...prev,
             downloadedBytes: prev.downloadedBytes + event.data.chunkLength,
           }));
-        } else if (event.event === 'Finished') {
-            // Relaunch the application for the new version to be used
-          relaunch();
         }
       });
+
+      // Once the promise resolves, relaunch the application for the new version to be used
+      relaunch();
     } catch (err) {
         enqueueSnackbar(`Failed to install update: ${err}`, {
             variant: "error"
