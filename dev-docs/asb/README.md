@@ -12,7 +12,7 @@ This quickstart guide assumes that you are running the software on testnet (i.e.
 3. Run the ASB in terminal: `./asb --testnet start`
 4. Follow the setup wizard in the terminal
 
-Public Monero nodes for running the Monero Wallet RPC can be found [here](https://community.rino.io/nodes.html).
+Public Monero nodes for running the Monero Wallet RPC on stagenet can be found [here](https://monero.fail/?chain=monero). Public Electrum nodes for testnet can be found [here](https://1209k.com/bitcoin-eye/ele.php?chain=tbtc).
 
 Run `./asb --help` for more information.
 
@@ -22,7 +22,7 @@ For running the ASB on mainnet you will have to change you `monero-wallet-rpc` s
 
 It is recommended that you run your own Monero and Bitcoin node when running on mainnet.
 It is possible to plug into public blockchain nodes but be aware that you might lose some privacy doing so.
-Public Monero mainnet nodes can be found [here](https://moneroworld.com/#nodes).
+Public Monero mainnet nodes can be found [here](https://monero.fail/?chain=monero).
 Public Electrum mainnet nodes can be found [here](https://1209k.com/bitcoin-eye/ele.php?chain=btc).
 
 ## ASB Details
