@@ -119,7 +119,7 @@ const BitcoinPossiblyCancelledAlert = ({
       <MessageList
         messages={[
           "The swap was cancelled because it did not complete in time",
-          "You must resume the swap immediately to refund your Bitcoin. If that fails, you can manually refund it",
+          "You must resume the swap immediately to refund your Bitcoin",
           <>
             You might lose your funds if you do not refund within{" "}
             <HumanizedBitcoinBlockDuration
@@ -128,7 +128,6 @@ const BitcoinPossiblyCancelledAlert = ({
           </>,
         ]}
       />
-      <SwapCancelRefundButton swap={swap} size="small" variant="contained" />
     </Box>
   );
 };
