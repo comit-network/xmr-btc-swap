@@ -24,14 +24,14 @@ You can read [this blogpost](https://comit.network/blog/2021/07/02/transaction-p
 ./swap --testnet buy-xmr --receive-address <YOUR MONERO ADDRESS> --change-address <YOUR BITCOIN CHANGE ADDRESS> --seller <SELLER MULTIADDRESS>
 ```
 
-For more detailed documentation on the CLI, see [this README](./docs/cli/README.md).
+For more detailed documentation on the CLI, see [this README](./dev-docs/cli/README.md).
 
 ## Becoming a Market Maker
 
 Swapping of course needs two parties - and the CLI is only one of them: The taker that occasionally starts a swap with a market maker.
 
 If you are interested in becoming a market maker you will want to run the second binary provided in this repository: `asb` - the Automated Swap Backend.
-Detailed documentation for the `asb` can be found [in this README](./docs/asb/README.md).
+Detailed documentation for the `asb` can be found [in this README](./dev-docs/asb/README.md).
 
 ## Safety
 
