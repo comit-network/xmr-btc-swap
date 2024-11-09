@@ -10,6 +10,14 @@ import SwapPage from "./pages/swap/SwapPage";
 import WalletPage from "./pages/wallet/WalletPage";
 import GlobalSnackbarProvider from "./snackbar/GlobalSnackbarProvider";
 import UpdaterDialog from "./modal/updater/UpdaterDialog";
+import { initEventListeners } from "renderer/rpc";
+import { useEffect } from "react";
+import { fetchProvidersViaHttp, fetchAlertsViaHttp, fetchXmrPrice, fetchBtcPrice, fetchXmrBtcRate } from "renderer/api";
+import { store } from "renderer/store/storeRenderer";
+import { setAlerts } from "store/features/alertsSlice";
+import { setRegistryProviders, registryConnectionFailed } from "store/features/providersSlice";
+import { setXmrPrice, setBtcPrice, setXmrBtcRate } from "store/features/ratesSlice";
+import logger from "utils/logger";
 
 const useStyles = makeStyles((theme) => ({
   innerContent: {
@@ -52,6 +60,11 @@ function InnerContent() {
 }
 
 export default function App() {
+  useEffect(() => {
+    fetchInitialData();
+    initEventListeners();
+  }, []);
+
   return (
     <ThemeProvider theme={theme}>
       <GlobalSnackbarProvider>
@@ -64,4 +77,47 @@ export default function App() {
       </GlobalSnackbarProvider>
     </ThemeProvider>
   );
+}
+
+async function fetchInitialData() {
+  try {
+    const providerList = await fetchProvidersViaHttp();
+    store.dispatch(setRegistryProviders(providerList));
+
+    logger.info(
+      { providerList },
+      "Fetched providers via UnstoppableSwap HTTP API",
+    );
+  } catch (e) {
+    store.dispatch(registryConnectionFailed());
+    logger.error(e, "Failed to fetch providers via UnstoppableSwap HTTP API");
+  }
+
+  try {
+    const alerts = await fetchAlertsViaHttp();
+    store.dispatch(setAlerts(alerts));
+    logger.info({ alerts }, "Fetched alerts via UnstoppableSwap HTTP API");
+  } catch (e) {
+    logger.error(e, "Failed to fetch alerts via UnstoppableSwap HTTP API");
+  }
+
+  try {
+    const xmrPrice = await fetchXmrPrice();
+    store.dispatch(setXmrPrice(xmrPrice));
+    logger.info({ xmrPrice }, "Fetched XMR price");
+
+    const btcPrice = await fetchBtcPrice();
+    store.dispatch(setBtcPrice(btcPrice));
+    logger.info({ btcPrice }, "Fetched BTC price");
+  } catch (e) {
+    logger.error(e, "Error retrieving fiat prices");
+  }
+
+  try {
+    const xmrBtcRate = await fetchXmrBtcRate();
+    store.dispatch(setXmrBtcRate(xmrBtcRate));
+    logger.info({ xmrBtcRate }, "Fetched XMR/BTC rate");
+  } catch (e) {
+    logger.error(e, "Error retrieving XMR/BTC rate");
+  }
 }

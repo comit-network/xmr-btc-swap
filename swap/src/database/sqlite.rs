@@ -143,6 +143,21 @@ impl Database for SqliteDatabase {
         Ok(address)
     }
 
+    async fn get_monero_addresses(&self) -> Result<Vec<monero::Address>> {
+        let mut conn = self.pool.acquire().await?;
+
+        let rows = sqlx::query!("SELECT DISTINCT address FROM monero_addresses")
+            .fetch_all(&mut conn)
+            .await?;
+
+        let addresses = rows
+            .iter()
+            .map(|row| row.address.parse())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(addresses)
+    }
+
     async fn insert_address(&self, peer_id: PeerId, address: Multiaddr) -> Result<()> {
         let mut conn = self.pool.acquire().await?;
 

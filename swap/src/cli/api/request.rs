@@ -416,6 +416,26 @@ impl Request for GetLogsArgs {
     }
 }
 
+#[typeshare]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GetMoneroAddressesArgs;
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetMoneroAddressesResponse {
+    #[typeshare(serialized_as = "Vec<String>")]
+    pub addresses: Vec<monero::Address>,
+}
+
+impl Request for GetMoneroAddressesArgs {
+    type Response = GetMoneroAddressesResponse;
+
+    async fn request(self, ctx: Arc<Context>) -> Result<Self::Response> {
+        let addresses = ctx.db.get_monero_addresses().await?;
+        Ok(GetMoneroAddressesResponse { addresses })
+    }
+}
+
 #[tracing::instrument(fields(method = "suspend_current_swap"), skip(context))]
 pub async fn suspend_current_swap(context: Arc<Context>) -> Result<SuspendCurrentSwapResponse> {
     let swap_id = context.swap_lock.get_current_swap_id().await;

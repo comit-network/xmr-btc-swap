@@ -9,7 +9,9 @@
           "type_info": "Text"
         }
       ],
-      "nullable": [false],
+      "nullable": [
+        false
+      ],
       "parameters": {
         "Right": 1
       }
@@ -35,7 +37,9 @@
           "type_info": "Text"
         }
       ],
-      "nullable": [true],
+      "nullable": [
+        true
+      ],
       "parameters": {
         "Right": 1
       }
@@ -56,7 +60,10 @@
           "type_info": "Text"
         }
       ],
-      "nullable": [false, false],
+      "nullable": [
+        false,
+        false
+      ],
       "parameters": {
         "Right": 0
       }
@@ -92,12 +99,32 @@
           "type_info": "Text"
         }
       ],
-      "nullable": [false],
+      "nullable": [
+        false
+      ],
       "parameters": {
         "Right": 1
       }
     },
     "query": "\n           SELECT state\n           FROM swap_states\n           WHERE swap_id = ?\n           ORDER BY id desc\n           LIMIT 1;\n\n        "
+  },
+  "98a8b7f4971e0eb4ab8f5aa688aa22e7fdc6b925de211f7784782f051c2dcd8c": {
+    "describe": {
+      "columns": [
+        {
+          "name": "address",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "SELECT DISTINCT address FROM monero_addresses"
   },
   "b703032b4ddc627a1124817477e7a8e5014bdc694c36a14053ef3bb2fc0c69b0": {
     "describe": {
@@ -118,7 +145,9 @@
           "type_info": "Text"
         }
       ],
-      "nullable": [false],
+      "nullable": [
+        false
+      ],
       "parameters": {
         "Right": 1
       }
@@ -134,7 +163,9 @@
           "type_info": "Text"
         }
       ],
-      "nullable": [false],
+      "nullable": [
+        false
+      ],
       "parameters": {
         "Right": 1
       }
@@ -150,7 +181,9 @@
           "type_info": "Text"
         }
       ],
-      "nullable": [false],
+      "nullable": [
+        false
+      ],
       "parameters": {
         "Right": 1
       }
@@ -176,7 +209,9 @@
           "type_info": "Text"
         }
       ],
-      "nullable": [false],
+      "nullable": [
+        false
+      ],
       "parameters": {
         "Right": 1
       }

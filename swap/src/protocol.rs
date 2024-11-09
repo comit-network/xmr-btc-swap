@@ -137,6 +137,7 @@ pub trait Database {
     async fn get_peer_id(&self, swap_id: Uuid) -> Result<PeerId>;
     async fn insert_monero_address(&self, swap_id: Uuid, address: monero::Address) -> Result<()>;
     async fn get_monero_address(&self, swap_id: Uuid) -> Result<monero::Address>;
+    async fn get_monero_addresses(&self) -> Result<Vec<monero::Address>>;
     async fn insert_address(&self, peer_id: PeerId, address: Multiaddr) -> Result<()>;
     async fn get_addresses(&self, peer_id: PeerId) -> Result<Vec<Multiaddr>>;
     async fn get_swap_start_date(&self, swap_id: Uuid) -> Result<String>;

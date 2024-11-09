@@ -22,6 +22,7 @@ import {
   TauriTimelockChangeEvent,
   GetSwapInfoArgs,
   ExportBitcoinWalletResponse,
+  GetMoneroAddressesResponse,
 } from "models/tauriModel";
 import {
   contextStatusEventReceived,
@@ -218,4 +219,8 @@ export async function initializeContext() {
 
 export async function getWalletDescriptor() {
   return await invokeNoArgs<ExportBitcoinWalletResponse>("get_wallet_descriptor");
+}
+
+export async function getMoneroAddresses(): Promise<GetMoneroAddressesResponse> {
+  return await invokeNoArgs<GetMoneroAddressesResponse>("get_monero_addresses");
 }
