@@ -3,7 +3,7 @@ import { persistReducer, persistStore } from "redux-persist";
 import sessionStorage from "redux-persist/lib/storage/session";
 import { reducers } from "store/combinedReducer";
 import { createMainListeners } from "store/middleware/storeListener";
-import { createStore } from "@tauri-apps/plugin-store";
+import { LazyStore } from "@tauri-apps/plugin-store";
 import { getNetworkName } from "store/config";
 
 // Goal: Maintain application state across page reloads while allowing a clean slate on application restart
@@ -18,17 +18,15 @@ const rootPersistConfig = {
 };
 
 // Use Tauri's store plugin for persistent settings
-const tauriStore = createStore(`${getNetworkName()}_settings.bin`, {
-  autoSave: 1000 as unknown as boolean,
-});
+const tauriStore = new LazyStore(`${getNetworkName()}_settings.bin`);
 
 // Configure how settings are stored and retrieved using Tauri's storage
 const settingsPersistConfig = {
   key: "settings",
   storage: {
-    getItem: async (key: string) => (await tauriStore).get(key),
-    setItem: async (key: string, value: unknown) => (await tauriStore).set(key, value),
-    removeItem: async (key: string) => (await tauriStore).delete(key),
+    getItem: async (key: string) => tauriStore.get(key),
+    setItem: async (key: string, value: unknown) => tauriStore.set(key, value),
+    removeItem: async (key: string) => tauriStore.delete(key),
   },
 };
 

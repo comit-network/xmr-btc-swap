@@ -25,7 +25,7 @@ tauri-plugin-clipboard-manager = "2.0"
 tauri-plugin-devtools = "2.0"
 tauri-plugin-process = "2.0"
 tauri-plugin-shell = "2.0"
-tauri-plugin-store = "2.0"
+tauri-plugin-store = "2.1.0"
 tauri-plugin-updater = "2.0.2"
 tracing = "0.1"
 
