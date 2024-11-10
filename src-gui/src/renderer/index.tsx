@@ -16,7 +16,6 @@ import {
   fetchXmrPrice,
 } from "./api";
 import App from "./components/App";
-import { initEventListeners } from "./rpc";
 import { persistor, store } from "./store/storeRenderer";
 
 const container = document.getElementById("root");

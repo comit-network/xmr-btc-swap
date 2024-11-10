@@ -4,9 +4,11 @@ use crate::network::rendezvous::XmrBtcNamespace;
 use crate::seed::Seed;
 use crate::{asb, bitcoin, cli, env, tor};
 use anyhow::Result;
-use libp2p::swarm::{NetworkBehaviour, SwarmBuilder};
+use libp2p::swarm::NetworkBehaviour;
+use libp2p::SwarmBuilder;
 use libp2p::{identity, Multiaddr, Swarm};
 use std::fmt::Debug;
+use std::time::Duration;
 
 #[allow(clippy::too_many_arguments)]
 pub fn asb<LR>(
@@ -46,12 +48,12 @@ where
     );
 
     let transport = asb::transport::new(&identity)?;
-    let peer_id = identity.public().into();
 
-    let swarm = SwarmBuilder::new(transport, behaviour, peer_id)
-        .executor(Box::new(|f| {
-            tokio::spawn(f);
-        }))
+    let swarm = SwarmBuilder::with_existing_identity(identity)
+        .with_tokio()
+        .with_other_transport(|_| transport)?
+        .with_behaviour(|_| behaviour)?
+        .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::MAX))
         .build();
 
     Ok(swarm)
@@ -71,12 +73,12 @@ where
     };
 
     let transport = cli::transport::new(&identity, maybe_tor_socks5_port)?;
-    let peer_id = identity.public().into();
 
-    let swarm = SwarmBuilder::new(transport, behaviour, peer_id)
-        .executor(Box::new(|f| {
-            tokio::spawn(f);
-        }))
+    let swarm = SwarmBuilder::with_existing_identity(identity)
+        .with_tokio()
+        .with_other_transport(|_| transport)?
+        .with_behaviour(|_| behaviour)?
+        .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::MAX))
         .build();
 
     Ok(swarm)

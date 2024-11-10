@@ -16,7 +16,6 @@ use anyhow::{bail, Context, Result};
 use comfy_table::Table;
 use libp2p::core::multiaddr::Protocol;
 use libp2p::core::Multiaddr;
-use libp2p::swarm::AddressScore;
 use libp2p::Swarm;
 use std::convert::TryInto;
 use std::env;
@@ -186,18 +185,15 @@ pub async fn main() -> Result<()> {
             )?;
 
             for listen in config.network.listen.clone() {
-                Swarm::listen_on(&mut swarm, listen.clone())
-                    .with_context(|| format!("Failed to listen on network interface {}", listen))?;
+                if let Err(e) = Swarm::listen_on(&mut swarm, listen.clone()) {
+                    tracing::warn!("Failed to listen on network interface {}: {}. Consider removing it from the config.", listen, e);
+                }
             }
 
             tracing::info!(peer_id = %swarm.local_peer_id(), "Network layer initialized");
 
             for external_address in config.network.external_addresses {
-                let _ = Swarm::add_external_address(
-                    &mut swarm,
-                    external_address,
-                    AddressScore::Infinite,
-                );
+                Swarm::add_external_address(&mut swarm, external_address);
             }
 
             let (event_loop, mut swap_receiver) = EventLoop::new(

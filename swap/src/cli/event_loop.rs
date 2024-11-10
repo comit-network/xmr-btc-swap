@@ -1,16 +1,17 @@
 use crate::bitcoin::EncryptedSignature;
 use crate::cli::behaviour::{Behaviour, OutEvent};
 use crate::monero;
-use crate::network::cooperative_xmr_redeem_after_punish::{Request, Response};
+use crate::network::cooperative_xmr_redeem_after_punish::{self, Request, Response};
 use crate::network::encrypted_signature;
 use crate::network::quote::BidQuote;
 use crate::network::swap_setup::bob::NewSwap;
-use crate::protocol::bob::State2;
+use crate::protocol::bob::swap::has_already_processed_transfer_proof;
+use crate::protocol::bob::{BobState, State2};
 use crate::protocol::Database;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use futures::future::{BoxFuture, OptionFuture};
 use futures::{FutureExt, StreamExt};
-use libp2p::request_response::{RequestId, ResponseChannel};
+use libp2p::request_response::{OutboundFailure, OutboundRequestId, ResponseChannel};
 use libp2p::swarm::dial_opts::DialOpts;
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
@@ -19,6 +20,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;
 
+static REQUEST_RESPONSE_PROTOCOL_TIMEOUT: Duration = Duration::from_secs(60);
+static EXECUTION_SETUP_PROTOCOL_TIMEOUT: Duration = Duration::from_secs(120);
+
 #[allow(missing_debug_implementations)]
 pub struct EventLoop {
     swap_id: Uuid,
@@ -26,21 +30,35 @@ pub struct EventLoop {
     alice_peer_id: PeerId,
     db: Arc<dyn Database + Send + Sync>,
 
-    // these streams represents outgoing requests that we have to make
-    quote_requests: bmrng::RequestReceiverStream<(), BidQuote>,
-    cooperative_xmr_redeem_requests: bmrng::RequestReceiverStream<Uuid, Response>,
-    encrypted_signatures: bmrng::RequestReceiverStream<EncryptedSignature, ()>,
-    swap_setup_requests: bmrng::RequestReceiverStream<NewSwap, Result<State2>>,
+    // These streams represents outgoing requests that we have to make
+    // These are essentially queues of requests that we will send to Alice once we are connected to her.
+    quote_requests: bmrng::RequestReceiverStream<(), Result<BidQuote, OutboundFailure>>,
+    cooperative_xmr_redeem_requests: bmrng::RequestReceiverStream<
+        (),
+        Result<cooperative_xmr_redeem_after_punish::Response, OutboundFailure>,
+    >,
+    encrypted_signatures_requests:
+        bmrng::RequestReceiverStream<EncryptedSignature, Result<(), OutboundFailure>>,
+    execution_setup_requests: bmrng::RequestReceiverStream<NewSwap, Result<State2>>,
 
-    // these represents requests that are currently in-flight.
-    // once we get a response to a matching [`RequestId`], we will use the responder to relay the
+    // These represents requests that are currently in-flight.
+    // Meaning that we have sent them to Alice, but we have not yet received a response.
+    // Once we get a response to a matching [`RequestId`], we will use the responder to relay the
     // response.
-    inflight_quote_requests: HashMap<RequestId, bmrng::Responder<BidQuote>>,
-    inflight_encrypted_signature_requests: HashMap<RequestId, bmrng::Responder<()>>,
+    inflight_quote_requests:
+        HashMap<OutboundRequestId, bmrng::Responder<Result<BidQuote, OutboundFailure>>>,
+    inflight_encrypted_signature_requests:
+        HashMap<OutboundRequestId, bmrng::Responder<Result<(), OutboundFailure>>>,
     inflight_swap_setup: Option<bmrng::Responder<Result<State2>>>,
-    inflight_cooperative_xmr_redeem_requests: HashMap<RequestId, bmrng::Responder<Response>>,
-    /// The sender we will use to relay incoming transfer proofs.
-    transfer_proof: bmrng::RequestSender<monero::TransferProof, ()>,
+    inflight_cooperative_xmr_redeem_requests: HashMap<
+        OutboundRequestId,
+        bmrng::Responder<Result<cooperative_xmr_redeem_after_punish::Response, OutboundFailure>>,
+    >,
+
+    /// The sender we will use to relay incoming transfer proofs to the EventLoopHandle
+    /// The corresponding receiver is stored in the EventLoopHandle
+    transfer_proof_sender: bmrng::RequestSender<monero::TransferProof, ()>,
+
     /// The future representing the successful handling of an incoming transfer
     /// proof.
     ///
@@ -58,20 +76,26 @@ impl EventLoop {
         alice_peer_id: PeerId,
         db: Arc<dyn Database + Send + Sync>,
     ) -> Result<(Self, EventLoopHandle)> {
-        let execution_setup = bmrng::channel_with_timeout(1, Duration::from_secs(60));
-        let transfer_proof = bmrng::channel_with_timeout(1, Duration::from_secs(60));
-        let encrypted_signature = bmrng::channel(1);
-        let quote = bmrng::channel_with_timeout(1, Duration::from_secs(60));
-        let cooperative_xmr_redeem = bmrng::channel_with_timeout(1, Duration::from_secs(60));
+        // We still use a timeout here, because this protocol does not dial Alice itself
+        // and we want to fail if we cannot reach Alice
+        let (execution_setup_sender, execution_setup_receiver) =
+            bmrng::channel_with_timeout(1, EXECUTION_SETUP_PROTOCOL_TIMEOUT);
+
+        // It is okay to not have a timeout here, as timeouts are enforced by the request-response protocol
+        let (transfer_proof_sender, transfer_proof_receiver) = bmrng::channel(1);
+        let (encrypted_signature_sender, encrypted_signature_receiver) = bmrng::channel(1);
+        let (quote_sender, quote_receiver) = bmrng::channel(1);
+        let (cooperative_xmr_redeem_sender, cooperative_xmr_redeem_receiver) = bmrng::channel(1);
+
         let event_loop = EventLoop {
             swap_id,
             swarm,
             alice_peer_id,
-            swap_setup_requests: execution_setup.1.into(),
-            transfer_proof: transfer_proof.0,
-            encrypted_signatures: encrypted_signature.1.into(),
-            cooperative_xmr_redeem_requests: cooperative_xmr_redeem.1.into(),
-            quote_requests: quote.1.into(),
+            execution_setup_requests: execution_setup_receiver.into(),
+            transfer_proof_sender,
+            encrypted_signatures_requests: encrypted_signature_receiver.into(),
+            cooperative_xmr_redeem_requests: cooperative_xmr_redeem_receiver.into(),
+            quote_requests: quote_receiver.into(),
             inflight_quote_requests: HashMap::default(),
             inflight_swap_setup: None,
             inflight_encrypted_signature_requests: HashMap::default(),
@@ -81,11 +105,11 @@ impl EventLoop {
         };
 
         let handle = EventLoopHandle {
-            swap_setup: execution_setup.0,
-            transfer_proof: transfer_proof.1,
-            encrypted_signature: encrypted_signature.0,
-            cooperative_xmr_redeem: cooperative_xmr_redeem.0,
-            quote: quote.0,
+            execution_setup_sender,
+            transfer_proof_receiver,
+            encrypted_signature_sender,
+            cooperative_xmr_redeem_sender,
+            quote_sender,
         };
 
         Ok((event_loop, handle))
@@ -107,7 +131,7 @@ impl EventLoop {
                     match swarm_event {
                         SwarmEvent::Behaviour(OutEvent::QuoteReceived { id, response }) => {
                             if let Some(responder) = self.inflight_quote_requests.remove(&id) {
-                                let _ = responder.respond(response);
+                                let _ = responder.respond(Ok(response));
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::SwapSetupCompleted(response)) => {
@@ -128,7 +152,27 @@ impl EventLoop {
                                             continue;
                                 }
 
-                                let mut responder = match self.transfer_proof.send(msg.tx_lock_proof).await {
+                                // Immediately acknowledge if we've already processed this transfer proof
+                                // This handles the case where Alice didn't receive our previous acknowledgment
+                                // and is retrying sending the transfer proof
+                                if let Ok(state) = self.db.get_state(swap_id).await {
+                                    let state: BobState = state.try_into()
+                                        .expect("Bobs database only contains Bob states");
+
+                                    if has_already_processed_transfer_proof(&state) {
+                                        tracing::warn!("Received transfer proof for swap {} but we are already in state {}. Acknowledging immediately. Alice most likely did not receive the acknowledgment when we sent it before", swap_id, state);
+
+                                        // We set this to a future that will resolve immediately, and returns the channel
+                                        // This will be resolved in the next iteration of the event loop, and a response will be sent to Alice
+                                        self.pending_transfer_proof = OptionFuture::from(Some(async move {
+                                            channel
+                                        }.boxed()));
+
+                                        continue;
+                                    }
+                                }
+
+                                let mut responder = match self.transfer_proof_sender.send(msg.tx_lock_proof).await {
                                     Ok(responder) => responder,
                                     Err(e) => {
                                         tracing::warn!("Failed to pass on transfer proof: {:#}", e);
@@ -178,22 +222,18 @@ impl EventLoop {
                         }
                         SwarmEvent::Behaviour(OutEvent::EncryptedSignatureAcknowledged { id }) => {
                             if let Some(responder) = self.inflight_encrypted_signature_requests.remove(&id) {
-                                let _ = responder.respond(());
+                                let _ = responder.respond(Ok(()));
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::CooperativeXmrRedeemFulfilled { id, swap_id, s_a }) => {
                             if let Some(responder) = self.inflight_cooperative_xmr_redeem_requests.remove(&id) {
-                                let _ = responder.respond(Response::Fullfilled { s_a, swap_id });
+                                let _ = responder.respond(Ok(Response::Fullfilled { s_a, swap_id }));
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::CooperativeXmrRedeemRejected { id, swap_id, reason }) => {
                             if let Some(responder) = self.inflight_cooperative_xmr_redeem_requests.remove(&id) {
-                                let _ = responder.respond(Response::Rejected { reason, swap_id });
+                                let _ = responder.respond(Ok(Response::Rejected { reason, swap_id }));
                             }
-                        }
-                        SwarmEvent::Behaviour(OutEvent::AllRedialAttemptsExhausted { peer }) if peer == self.alice_peer_id => {
-                            tracing::error!("Exhausted all re-dial attempts to Alice");
-                            return;
                         }
                         SwarmEvent::Behaviour(OutEvent::Failure { peer, error }) => {
                             tracing::warn!(%peer, err = %error, "Communication error");
@@ -202,40 +242,75 @@ impl EventLoop {
                         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } if peer_id == self.alice_peer_id => {
                             tracing::info!(peer_id = %endpoint.get_remote_address(), "Connected to Alice");
                         }
-                        SwarmEvent::Dialing(peer_id) if peer_id == self.alice_peer_id => {
-                            tracing::debug!(%peer_id, "Dialling Alice");
+                        SwarmEvent::Dialing { peer_id: Some(alice_peer_id), connection_id } if alice_peer_id == self.alice_peer_id => {
+                            tracing::debug!(%alice_peer_id, %connection_id, "Dialing Alice");
                         }
-                        SwarmEvent::ConnectionClosed { peer_id, endpoint, num_established, cause: Some(error) } if peer_id == self.alice_peer_id && num_established == 0 => {
-                            tracing::warn!(peer_id = %endpoint.get_remote_address(), cause = %error, "Lost connection to Alice");
+                        SwarmEvent::ConnectionClosed { peer_id, endpoint, num_established, cause: Some(error), connection_id } if peer_id == self.alice_peer_id && num_established == 0 => {
+                            tracing::warn!(peer_id = %endpoint.get_remote_address(), cause = %error, %connection_id, "Lost connection to Alice");
+
+                            if let Some(duration) = self.swarm.behaviour_mut().redial.until_next_redial() {
+                                tracing::info!(seconds_until_next_redial = %duration.as_secs(), "Waiting for next redial attempt");
+                            }
                         }
                         SwarmEvent::ConnectionClosed { peer_id, num_established, cause: None, .. } if peer_id == self.alice_peer_id && num_established == 0 => {
                             // no error means the disconnection was requested
                             tracing::info!("Successfully closed connection to Alice");
                             return;
                         }
-                        SwarmEvent::OutgoingConnectionError { peer_id: Some(alice_peer_id),  error } if alice_peer_id == self.alice_peer_id => {
-                            tracing::warn!(%error, "Failed to dial Alice");
+                        SwarmEvent::OutgoingConnectionError { peer_id: Some(alice_peer_id),  error, connection_id } if alice_peer_id == self.alice_peer_id => {
+                            tracing::warn!(%alice_peer_id, %connection_id, %error, "Failed to connect to Alice");
 
                             if let Some(duration) = self.swarm.behaviour_mut().redial.until_next_redial() {
                                 tracing::info!(seconds_until_next_redial = %duration.as_secs(), "Waiting for next redial attempt");
                             }
+                        }
+                        SwarmEvent::Behaviour(OutEvent::OutboundRequestResponseFailure {peer, error, request_id, protocol}) => {
+                            tracing::error!(
+                                %peer,
+                                %request_id,
+                                %error,
+                                %protocol,
+                                "Failed to send request-response request to peer");
 
+                            // If we fail to send a request-response request, we should notify the responder that the request failed
+                            // We will remove the responder from the inflight requests and respond with an error
+
+                            // Check for encrypted signature requests
+                            if let Some(responder) = self.inflight_encrypted_signature_requests.remove(&request_id) {
+                                let _ = responder.respond(Err(error));
+                                continue;
+                            }
+
+                            // Check for quote requests
+                            if let Some(responder) = self.inflight_quote_requests.remove(&request_id) {
+                                let _ = responder.respond(Err(error));
+                                continue;
+                            }
+
+                            // Check for cooperative xmr redeem requests
+                            if let Some(responder) = self.inflight_cooperative_xmr_redeem_requests.remove(&request_id) {
+                                let _ = responder.respond(Err(error));
+                                continue;
+                            }
+                        }
+                        SwarmEvent::Behaviour(OutEvent::InboundRequestResponseFailure {peer, error, request_id, protocol}) => {
+                            tracing::error!(
+                                %peer,
+                                %request_id,
+                                %error,
+                                %protocol,
+                                "Failed to receive request-response request from peer");
                         }
                         _ => {}
                     }
                 },
 
-                // Handle to-be-sent requests for all our network protocols.
-                // Use `self.is_connected_to_alice` as a guard to "buffer" requests until we are connected.
-                Some(((), responder)) = self.quote_requests.next().fuse(), if self.is_connected_to_alice() => {
+                // Handle to-be-sent outgoing requests for all our network protocols.
+                Some(((), responder)) = self.quote_requests.next().fuse() => {
                     let id = self.swarm.behaviour_mut().quote.send_request(&self.alice_peer_id, ());
                     self.inflight_quote_requests.insert(id, responder);
                 },
-                Some((swap, responder)) = self.swap_setup_requests.next().fuse(), if self.is_connected_to_alice() => {
-                    self.swarm.behaviour_mut().swap_setup.start(self.alice_peer_id, swap).await;
-                    self.inflight_swap_setup = Some(responder);
-                },
-                Some((tx_redeem_encsig, responder)) = self.encrypted_signatures.next().fuse(), if self.is_connected_to_alice() => {
+                Some((tx_redeem_encsig, responder)) = self.encrypted_signatures_requests.next().fuse() => {
                     let request = encrypted_signature::Request {
                         swap_id: self.swap_id,
                         tx_redeem_encsig
@@ -244,18 +319,32 @@ impl EventLoop {
                     let id = self.swarm.behaviour_mut().encrypted_signature.send_request(&self.alice_peer_id, request);
                     self.inflight_encrypted_signature_requests.insert(id, responder);
                 },
-
-                Some(response_channel) = &mut self.pending_transfer_proof => {
-                    let _ = self.swarm.behaviour_mut().transfer_proof.send_response(response_channel, ());
-
-                    self.pending_transfer_proof = OptionFuture::from(None);
-                },
-
-                Some((swap_id, responder)) = self.cooperative_xmr_redeem_requests.next().fuse(), if self.is_connected_to_alice() => {
+                Some((_, responder)) = self.cooperative_xmr_redeem_requests.next().fuse() => {
                     let id = self.swarm.behaviour_mut().cooperative_xmr_redeem.send_request(&self.alice_peer_id, Request {
-                        swap_id
+                        swap_id: self.swap_id
                     });
                     self.inflight_cooperative_xmr_redeem_requests.insert(id, responder);
+                },
+
+                // We use `self.is_connected_to_alice` as a guard to "buffer" requests until we are connected.
+                // because the protocol does not dial Alice itself
+                // (unlike request-response above)
+                Some((swap, responder)) = self.execution_setup_requests.next().fuse(), if self.is_connected_to_alice() => {
+                    self.swarm.behaviour_mut().swap_setup.start(self.alice_peer_id, swap).await;
+                    self.inflight_swap_setup = Some(responder);
+                },
+
+                // Send an acknowledgement to Alice once the EventLoopHandle has processed a received transfer proof
+                // We use `self.is_connected_to_alice` as a guard to "buffer" requests until we are connected.
+                //
+                // Why do we do this here but not for the other request-response channels?
+                // This is the only request, we don't have a retry mechanism for. We lazily send this.
+                Some(response_channel) = &mut self.pending_transfer_proof, if self.is_connected_to_alice() => {
+                    if self.swarm.behaviour_mut().transfer_proof.send_response(response_channel, ()).is_err() {
+                        tracing::warn!("Failed to send acknowledgment to Alice that we have received the transfer proof");
+                    } else {
+                        self.pending_transfer_proof = OptionFuture::from(None);
+                    }
                 },
             }
         }
@@ -268,24 +357,84 @@ impl EventLoop {
 
 #[derive(Debug)]
 pub struct EventLoopHandle {
-    swap_setup: bmrng::RequestSender<NewSwap, Result<State2>>,
-    transfer_proof: bmrng::RequestReceiver<monero::TransferProof, ()>,
-    encrypted_signature: bmrng::RequestSender<EncryptedSignature, ()>,
-    quote: bmrng::RequestSender<(), BidQuote>,
-    cooperative_xmr_redeem: bmrng::RequestSender<Uuid, Response>,
+    /// When a NewSwap object is sent into this channel, the EventLoop will:
+    /// 1. Trigger the swap setup protocol with Alice to negotiate the swap parameters
+    /// 2. Return the resulting State2 if successful
+    /// 3. Return an anyhow error if the request fails
+    execution_setup_sender: bmrng::RequestSender<NewSwap, Result<State2>>,
+
+    /// Receiver for incoming Monero transfer proofs from Alice.
+    /// When a proof is received, we process it and acknowledge receipt back to the EventLoop
+    /// The EventLoop will then send an acknowledgment back to Alice over the network
+    transfer_proof_receiver: bmrng::RequestReceiver<monero::TransferProof, ()>,
+
+    /// When an encrypted signature is sent into this channel, the EventLoop will:
+    /// 1. Send the encrypted signature to Alice over the network
+    /// 2. Return Ok(()) if Alice acknowledges receipt, or
+    /// 3. Return an OutboundFailure error if the request fails
+    encrypted_signature_sender:
+        bmrng::RequestSender<EncryptedSignature, Result<(), OutboundFailure>>,
+
+    /// When a () is sent into this channel, the EventLoop will:
+    /// 1. Request a price quote from Alice
+    /// 2. Return the quote if successful
+    /// 3. Return an OutboundFailure error if the request fails
+    quote_sender: bmrng::RequestSender<(), Result<BidQuote, OutboundFailure>>,
+
+    /// When a () is sent into this channel, the EventLoop will:
+    /// 1. Request Alice's cooperation in redeeming the Monero
+    /// 2. Return the a response object (Fullfilled or Rejected), if the network request is successful
+    ///    The Fullfilled object contains the keys required to redeem the Monero
+    /// 3. Return an OutboundFailure error if the network request fails
+    cooperative_xmr_redeem_sender: bmrng::RequestSender<
+        (),
+        Result<cooperative_xmr_redeem_after_punish::Response, OutboundFailure>,
+    >,
 }
 
 impl EventLoopHandle {
+    fn create_retry_config(max_elapsed_time: Duration) -> backoff::ExponentialBackoff {
+        backoff::ExponentialBackoffBuilder::new()
+            .with_max_elapsed_time(max_elapsed_time.into())
+            .with_max_interval(Duration::from_secs(5))
+            .build()
+    }
+
     pub async fn setup_swap(&mut self, swap: NewSwap) -> Result<State2> {
-        self.swap_setup.send_receive(swap).await?
+        tracing::debug!(swap = ?swap, "Sending swap setup request");
+
+        let backoff = Self::create_retry_config(EXECUTION_SETUP_PROTOCOL_TIMEOUT);
+
+        backoff::future::retry(backoff, || async {
+            match self.execution_setup_sender.send_receive(swap.clone()).await {
+                Ok(Ok(state2)) => Ok(state2),
+                // These are errors thrown by the swap_setup/bob behaviour
+                Ok(Err(err)) => {
+                    tracing::warn!(%err, "Failed to setup swap. Will retry");
+                    Err(backoff::Error::transient(err))
+                }
+                // This will happen if we don't establish a connection to Alice within the timeout of the MPSC channel
+                // The protocol does not dial Alice it self
+                // This is handled by redial behaviour
+                Err(bmrng::error::RequestError::RecvTimeoutError) => {
+                    Err(backoff::Error::permanent(anyhow!("We failed to setup the swap in the allotted time by the event loop channel")))
+                }
+                Err(_) => {
+                    unreachable!("We never drop the receiver of the execution setup channel, so this should never happen")
+                }
+            }
+        })
+        .await
+        .context("Failed to setup swap after retries")
     }
 
     pub async fn recv_transfer_proof(&mut self) -> Result<monero::TransferProof> {
         let (transfer_proof, responder) = self
-            .transfer_proof
+            .transfer_proof_receiver
             .recv()
             .await
             .context("Failed to receive transfer proof")?;
+
         responder
             .respond(())
             .context("Failed to acknowledge receipt of transfer proof")?;
@@ -295,18 +444,71 @@ impl EventLoopHandle {
 
     pub async fn request_quote(&mut self) -> Result<BidQuote> {
         tracing::debug!("Requesting quote");
-        Ok(self.quote.send_receive(()).await?)
+
+        let backoff = Self::create_retry_config(REQUEST_RESPONSE_PROTOCOL_TIMEOUT);
+
+        backoff::future::retry(backoff, || async {
+            match self.quote_sender.send_receive(()).await {
+                Ok(Ok(quote)) => Ok(quote),
+                Ok(Err(err)) => {
+                    tracing::warn!(%err, "Failed to request quote due to network error. Will retry");
+                    Err(backoff::Error::transient(err))
+                }
+                Err(_) => {
+                    unreachable!("We initiate the quote channel without a timeout and store both the sender and receiver in the same struct, so this should never happen");
+                }
+            }
+        })
+        .await
+        .context("Failed to request quote after retries")
     }
-    pub async fn request_cooperative_xmr_redeem(&mut self, swap_id: Uuid) -> Result<Response> {
-        Ok(self.cooperative_xmr_redeem.send_receive(swap_id).await?)
+
+    pub async fn request_cooperative_xmr_redeem(&mut self) -> Result<Response> {
+        tracing::debug!("Requesting cooperative XMR redeem");
+
+        let backoff = Self::create_retry_config(REQUEST_RESPONSE_PROTOCOL_TIMEOUT);
+
+        backoff::future::retry(backoff, || async {
+            match self.cooperative_xmr_redeem_sender.send_receive(()).await {
+                Ok(Ok(response)) => Ok(response),
+                Ok(Err(err)) => {
+                    tracing::warn!(%err, "Failed to request cooperative XMR redeem due to network error. Will retry");
+                    Err(backoff::Error::transient(err))
+                }
+                Err(_) => {
+                    unreachable!("We initiate the cooperative xmr redeem channel without a timeout and store both the sender and receiver in the same struct, so this should never happen");
+                }
+            }
+        })
+        .await
+        .context("Failed to request cooperative XMR redeem after retries")
     }
 
     pub async fn send_encrypted_signature(
         &mut self,
         tx_redeem_encsig: EncryptedSignature,
-    ) -> Result<(), bmrng::error::RequestError<EncryptedSignature>> {
-        self.encrypted_signature
-            .send_receive(tx_redeem_encsig)
-            .await
+    ) -> Result<()> {
+        tracing::debug!("Sending encrypted signature");
+
+        // We will retry indefinitely until we succeed
+        let backoff = backoff::ExponentialBackoffBuilder::new()
+            .with_max_elapsed_time(None)
+            .with_max_interval(REQUEST_RESPONSE_PROTOCOL_TIMEOUT)
+            .build();
+
+        backoff::future::retry(backoff, || async {
+            match self.encrypted_signature_sender.send_receive(tx_redeem_encsig.clone()).await {
+                Ok(Ok(_)) => Ok(()),
+                Ok(Err(err)) => {
+                    tracing::warn!(%err, "Failed to send encrypted signature due to a network error. Will retry");
+                    Err(backoff::Error::transient(err))
+                }
+                Err(_) => {
+                    unreachable!("We initiate the encrypted signature channel without a timeout and store both the sender and receiver in the same struct, so this should never happen");
+                }
+            }
+        })
+        .await
+        .context("Failed to send encrypted signature after retries")
     }
 }

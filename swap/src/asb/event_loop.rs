@@ -5,14 +5,15 @@ use crate::network::cooperative_xmr_redeem_after_punish::Response::{Fullfilled, 
 use crate::network::quote::BidQuote;
 use crate::network::swap_setup::alice::WalletSnapshot;
 use crate::network::transfer_proof;
+use crate::protocol::alice::swap::has_already_processed_enc_sig;
 use crate::protocol::alice::{AliceState, State3, Swap};
 use crate::protocol::{Database, State};
 use crate::{bitcoin, env, kraken, monero};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use futures::future;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::{FuturesUnordered, StreamExt};
-use libp2p::request_response::{RequestId, ResponseChannel};
+use libp2p::request_response::{OutboundFailure, OutboundRequestId, ResponseChannel};
 use libp2p::swarm::SwarmEvent;
 use libp2p::{PeerId, Swarm};
 use rust_decimal::Decimal;
@@ -20,18 +21,9 @@ use std::collections::HashMap;
 use std::convert::{Infallible, TryInto};
 use std::fmt::Debug;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use std::time::Duration;
+use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
-
-/// A future that resolves to a tuple of `PeerId`, `transfer_proof::Request` and
-/// `Responder`.
-///
-/// When this future resolves, the `transfer_proof::Request` shall be sent to
-/// the peer identified by the `PeerId`. Once the request has been acknowledged
-/// by the peer, i.e. a `()` response has been received, the `Responder` shall
-/// be used to let the original sender know about the successful transfer.
-type OutgoingTransferProof =
-    BoxFuture<'static, Result<(PeerId, transfer_proof::Request, bmrng::Responder<()>)>>;
 
 #[allow(missing_debug_implementations)]
 pub struct EventLoop<LR>
@@ -50,19 +42,70 @@ where
 
     swap_sender: mpsc::Sender<Swap>,
 
-    /// Stores incoming [`EncryptedSignature`]s per swap.
+    /// Stores where to send [`EncryptedSignature`]s to
+    /// The corresponding receiver for this channel is stored in the EventLoopHandle
+    /// that is responsible for the swap.
+    ///
+    /// Once a [`EncryptedSignature`] has been sent to the EventLoopHandle,
+    /// the sender is removed from this map.
     recv_encrypted_signature: HashMap<Uuid, bmrng::RequestSender<bitcoin::EncryptedSignature, ()>>,
+
+    /// Once we receive an [`EncryptedSignature`] from Bob, we forward it to the EventLoopHandle.
+    /// Once the EventLoopHandle acknowledges the receipt of the [`EncryptedSignature`], we need to confirm this to Bob.
+    /// When the EventLoopHandle acknowledges the receipt, a future in this collection resolves and returns the libp2p channel
+    /// which we use to confirm to Bob that we have received the [`EncryptedSignature`].
+    ///
+    /// Flow:
+    /// 1. When signature forwarded via recv_encrypted_signature sender
+    /// 2. New future pushed here to await EventLoopHandle's acknowledgement
+    /// 3. When future completes, the EventLoop uses the ResponseChannel to send an acknowledgment to Bob
+    /// 4. Future is removed from this collection
     inflight_encrypted_signatures: FuturesUnordered<BoxFuture<'static, ResponseChannel<()>>>,
 
-    send_transfer_proof: FuturesUnordered<OutgoingTransferProof>,
+    /// Channel for sending transfer proofs to Bobs. The sender is shared with every EventLoopHandle.
+    /// The receiver is polled by the event loop to send transfer proofs over the network to Bob.
+    ///
+    /// Flow:
+    /// 1. EventLoopHandle sends (PeerId, Request, Responder) through sender
+    /// 2. Event loop receives and attempts to send to peer
+    /// 3. Result (Ok or network failure) is sent back to EventLoopHandle
+    #[allow(clippy::type_complexity)]
+    outgoing_transfer_proofs_requests: tokio::sync::mpsc::UnboundedReceiver<(
+        PeerId,
+        transfer_proof::Request,
+        oneshot::Sender<Result<(), OutboundFailure>>,
+    )>,
+    #[allow(clippy::type_complexity)]
+    outgoing_transfer_proofs_sender: tokio::sync::mpsc::UnboundedSender<(
+        PeerId,
+        transfer_proof::Request,
+        oneshot::Sender<Result<(), OutboundFailure>>,
+    )>,
 
-    /// Tracks [`transfer_proof::Request`]s which could not yet be sent because
-    /// we are currently disconnected from the peer.
-    buffered_transfer_proofs: HashMap<PeerId, Vec<(transfer_proof::Request, bmrng::Responder<()>)>>,
+    /// Temporarily stores transfer proof requests for peers that are currently disconnected.
+    ///
+    /// When a transfer proof cannot be sent because there's no connection to the peer:
+    /// 1. It is moved from [`outgoing_transfer_proofs_requests`] to this buffer
+    /// 2. Once a connection is established with the peer, the proof is send back into the [`outgoing_transfer_proofs_sender`]
+    /// 3. The buffered request is then removed from this collection
+    #[allow(clippy::type_complexity)]
+    buffered_transfer_proofs: HashMap<
+        PeerId,
+        Vec<(
+            transfer_proof::Request,
+            oneshot::Sender<Result<(), OutboundFailure>>,
+        )>,
+    >,
 
-    /// Tracks [`transfer_proof::Request`]s which are currently inflight and
-    /// awaiting an acknowledgement.
-    inflight_transfer_proofs: HashMap<RequestId, bmrng::Responder<()>>,
+    /// Tracks [`transfer_proof::Request`]s which are currently inflight and awaiting an acknowledgement from Bob
+    ///
+    /// When a transfer proof is sent to Bob:
+    /// 1. A unique request ID is generated by libp2p
+    /// 2. The response channel is stored in this map with the request ID as key
+    /// 3. When Bob acknowledges the proof, we use the stored channel to notify the EventLoopHandle
+    /// 4. The entry is then removed from this map
+    inflight_transfer_proofs:
+        HashMap<OutboundRequestId, oneshot::Sender<Result<(), OutboundFailure>>>,
 }
 
 impl<LR> EventLoop<LR>
@@ -82,6 +125,8 @@ where
         external_redeem_address: Option<bitcoin::Address>,
     ) -> Result<(Self, mpsc::Receiver<Swap>)> {
         let swap_channel = MpscChannels::default();
+        let (outgoing_transfer_proofs_sender, outgoing_transfer_proofs_requests) =
+            tokio::sync::mpsc::unbounded_channel();
 
         let event_loop = EventLoop {
             swarm,
@@ -96,7 +141,8 @@ where
             external_redeem_address,
             recv_encrypted_signature: Default::default(),
             inflight_encrypted_signatures: Default::default(),
-            send_transfer_proof: Default::default(),
+            outgoing_transfer_proofs_requests,
+            outgoing_transfer_proofs_sender,
             buffered_transfer_proofs: Default::default(),
             inflight_transfer_proofs: Default::default(),
         };
@@ -110,7 +156,6 @@ where
     pub async fn run(mut self) {
         // ensure that these streams are NEVER empty, otherwise it will
         // terminate forever.
-        self.send_transfer_proof.push(future::pending().boxed());
         self.inflight_encrypted_signatures
             .push(future::pending().boxed());
 
@@ -201,8 +246,9 @@ where
                         }
                         SwarmEvent::Behaviour(OutEvent::TransferProofAcknowledged { peer, id }) => {
                             tracing::debug!(%peer, "Bob acknowledged transfer proof");
+
                             if let Some(responder) = self.inflight_transfer_proofs.remove(&id) {
-                                let _ = responder.respond(());
+                                let _ = responder.send(Ok(()));
                             }
                         }
                         SwarmEvent::Behaviour(OutEvent::EncryptedSignatureReceived{ msg, channel, peer }) => {
@@ -231,10 +277,33 @@ where
                                 continue;
                             }
 
+                            // Immediately acknowledge if we've already processed this encrypted signature
+                            // This handles the case where Bob didn't receive our previous acknowledgment
+                            // and is retrying sending the encrypted signature
+                            if let Ok(state) = self.db.get_state(swap_id).await {
+                                let state: AliceState = state.try_into()
+                                    .expect("Alices database only contains Alice states");
+
+                                // Check if we have already processed the encrypted signature
+                                if has_already_processed_enc_sig(&state) {
+                                    tracing::warn!(%swap_id, "Received encrypted signature for swap in state {}. We have already processed this encrypted signature. Acknowledging immediately.", state);
+
+                                    // We push create a future that will resolve immediately, and returns the channel
+                                    // This will be resolved in the next iteration of the event loop, and the acknowledgment will be sent to Bob
+                                    self.inflight_encrypted_signatures.push(async move {
+                                        channel
+                                    }.boxed());
+
+                                    continue;
+                                }
+                            }
+
                             let sender = match self.recv_encrypted_signature.remove(&swap_id) {
                                 Some(sender) => sender,
                                 None => {
                                     // TODO: Don't just drop encsig if we currently don't have a running swap for it, save in db
+                                    // 1. Save the encrypted signature in the database
+                                    // 2. Acknowledge the receipt of the encrypted signature
                                     tracing::warn!(%swap_id, "No sender for encrypted signature, maybe already handled?");
                                     continue;
                                 }
@@ -310,8 +379,28 @@ where
                         SwarmEvent::Behaviour(OutEvent::Rendezvous(libp2p::rendezvous::client::Event::Registered { rendezvous_node, ttl, namespace })) => {
                             tracing::info!("Successfully registered with rendezvous node: {} with namespace: {} and TTL: {:?}", rendezvous_node, namespace, ttl);
                         }
-                        SwarmEvent::Behaviour(OutEvent::Rendezvous(libp2p::rendezvous::client::Event::RegisterFailed(error))) => {
-                            tracing::error!("Registration with rendezvous node failed: {:?}", error);
+                        SwarmEvent::Behaviour(OutEvent::Rendezvous(libp2p::rendezvous::client::Event::RegisterFailed { rendezvous_node, namespace, error })) => {
+                            tracing::error!("Registration with rendezvous node {} failed for namespace {}: {:?}", rendezvous_node, namespace, error);
+                        }
+                        SwarmEvent::Behaviour(OutEvent::OutboundRequestResponseFailure {peer, error, request_id, protocol}) => {
+                            tracing::error!(
+                                %peer,
+                                %request_id,
+                                %error,
+                                %protocol,
+                                "Failed to send request-response request to peer");
+
+                            if let Some(responder) = self.inflight_transfer_proofs.remove(&request_id) {
+                                let _ = responder.send(Err(error));
+                            }
+                        }
+                        SwarmEvent::Behaviour(OutEvent::InboundRequestResponseFailure {peer, error, request_id, protocol}) => {
+                            tracing::error!(
+                                %peer,
+                                %request_id,
+                                %error,
+                                %protocol,
+                                "Failed to receive request-response request from peer");
                         }
                         SwarmEvent::Behaviour(OutEvent::Failure {peer, error}) => {
                             tracing::error!(
@@ -321,23 +410,27 @@ where
                         SwarmEvent::ConnectionEstablished { peer_id: peer, endpoint, .. } => {
                             tracing::debug!(%peer, address = %endpoint.get_remote_address(), "New connection established");
 
+                            // If we have buffered transfer proofs for this peer, we can now send them
                             if let Some(transfer_proofs) = self.buffered_transfer_proofs.remove(&peer) {
                                 for (transfer_proof, responder) in transfer_proofs {
                                     tracing::debug!(%peer, "Found buffered transfer proof for peer");
 
-                                    let id = self.swarm.behaviour_mut().transfer_proof.send_request(&peer, transfer_proof);
-                                    self.inflight_transfer_proofs.insert(id, responder);
+                                    // We have an established connection to the peer, so we can add the transfer proof to the queue
+                                    // This is then polled in the next iteration of the event loop, and attempted to be sent to the peer
+                                    if let Err(e) = self.outgoing_transfer_proofs_sender.send((peer, transfer_proof, responder)) {
+                                        tracing::error!(%peer, error = %e, "Failed to forward buffered transfer proof to event loop channel");
+                                    }
                                 }
                             }
                         }
                         SwarmEvent::IncomingConnectionError { send_back_addr: address, error, .. } => {
                             tracing::warn!(%address, "Failed to set up connection with peer: {:#}", error);
                         }
-                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established: 0, endpoint, cause: Some(error) } => {
-                            tracing::debug!(%peer, address = %endpoint.get_remote_address(), "Lost connection to peer: {:#}", error);
+                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established: 0, endpoint, cause: Some(error), connection_id } => {
+                            tracing::debug!(%peer, address = %endpoint.get_remote_address(), %connection_id, "Lost connection to peer: {:#}", error);
                         }
-                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established: 0, endpoint, cause: None } => {
-                            tracing::info!(%peer, address = %endpoint.get_remote_address(), "Successfully closed connection");
+                        SwarmEvent::ConnectionClosed { peer_id: peer, num_established: 0, endpoint, cause: None, connection_id } => {
+                            tracing::info!(%peer, address = %endpoint.get_remote_address(), %connection_id,  "Successfully closed connection");
                         }
                         SwarmEvent::NewListenAddr{address, ..} => {
                             tracing::info!(%address, "New listen address reported");
@@ -345,26 +438,18 @@ where
                         _ => {}
                     }
                 },
-                next_transfer_proof = self.send_transfer_proof.next() => {
-                    match next_transfer_proof {
-                        Some(Ok((peer, transfer_proof, responder))) => {
-                            if !self.swarm.behaviour_mut().transfer_proof.is_connected(&peer) {
-                                tracing::warn!(%peer, "No active connection to peer, buffering transfer proof");
-                                self.buffered_transfer_proofs.entry(peer).or_default().push((transfer_proof, responder));
-                                continue;
-                            }
-
-                            let id = self.swarm.behaviour_mut().transfer_proof.send_request(&peer, transfer_proof);
-                            self.inflight_transfer_proofs.insert(id, responder);
-                        },
-                        Some(Err(error)) => {
-                            tracing::debug!("A swap stopped without sending a transfer proof: {:#}", error);
-                        }
-                        None => {
-                            unreachable!("stream of transfer proof receivers must never terminate")
-                        }
+                Some((peer, transfer_proof, responder)) = self.outgoing_transfer_proofs_requests.recv() => {
+                    // If we are not connected to the peer, we buffer the transfer proof
+                    if !self.swarm.behaviour_mut().transfer_proof.is_connected(&peer) {
+                        tracing::warn!(%peer, "No active connection to peer, buffering transfer proof");
+                        self.buffered_transfer_proofs.entry(peer).or_default().push((transfer_proof, responder));
+                        continue;
                     }
-                }
+
+                    // If we are connected to the peer, we attempt to send the transfer proof
+                    let id = self.swarm.behaviour_mut().transfer_proof.send_request(&peer, transfer_proof);
+                    self.inflight_transfer_proofs.insert(id, responder);
+                },
                 Some(response_channel) = self.inflight_encrypted_signatures.next() => {
                     let _ = self.swarm.behaviour_mut().encrypted_signature.send_response(response_channel, ());
                 }
@@ -387,13 +472,20 @@ where
         let balance = self.monero_wallet.get_balance().await?;
 
         // use unlocked monero balance for quote
-        let xmr = Amount::from_piconero(balance.unlocked_balance);
+        let xmr_balance = Amount::from_piconero(balance.unlocked_balance);
 
-        let max_bitcoin_for_monero = xmr.max_bitcoin_for_price(ask_price).ok_or_else(|| {
-            anyhow::anyhow!("Bitcoin price ({}) x Monero ({}) overflow", ask_price, xmr)
-        })?;
+        let max_bitcoin_for_monero =
+            xmr_balance
+                .max_bitcoin_for_price(ask_price)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "Bitcoin price ({}) x Monero ({}) overflow",
+                        ask_price,
+                        xmr_balance
+                    )
+                })?;
 
-        tracing::debug!(%ask_price, %xmr, %max_bitcoin_for_monero);
+        tracing::debug!(%ask_price, %xmr_balance, %max_bitcoin_for_monero, "Computed quote");
 
         if min_buy > max_bitcoin_for_monero {
             tracing::warn!(
@@ -467,32 +559,23 @@ where
     /// Create a new [`EventLoopHandle`] that is scoped for communication with
     /// the given peer.
     fn new_handle(&mut self, peer: PeerId, swap_id: Uuid) -> EventLoopHandle {
-        // we deliberately don't put timeouts on these channels because the swap always
-        // races these futures against a timelock
+        // Create a new channel for receiving encrypted signatures from Bob
+        // The channel has a capacity of 1 since we only expect one signature per swap
+        let (encrypted_signature_sender, encrypted_signature_receiver) = bmrng::channel(1);
 
-        let (transfer_proof_sender, mut transfer_proof_receiver) = bmrng::channel(1);
-        let encrypted_signature = bmrng::channel(1);
-
+        // The sender is stored in the EventLoop
+        // The receiver is stored in the EventLoopHandle
+        // When a signature is received, the EventLoop uses the sender to notify the EventLoopHandle
         self.recv_encrypted_signature
-            .insert(swap_id, encrypted_signature.0);
+            .insert(swap_id, encrypted_signature_sender);
 
-        self.send_transfer_proof.push(
-            async move {
-                let (transfer_proof, responder) = transfer_proof_receiver.recv().await?;
-
-                let request = transfer_proof::Request {
-                    swap_id,
-                    tx_lock_proof: transfer_proof,
-                };
-
-                Ok((peer, request, responder))
-            }
-            .boxed(),
-        );
+        let transfer_proof_sender = self.outgoing_transfer_proofs_sender.clone();
 
         EventLoopHandle {
-            recv_encrypted_signature: Some(encrypted_signature.1),
-            send_transfer_proof: Some(transfer_proof_sender),
+            swap_id,
+            peer,
+            recv_encrypted_signature: Some(encrypted_signature_receiver),
+            transfer_proof_sender: Some(transfer_proof_sender),
         }
     }
 }
@@ -561,33 +644,98 @@ impl LatestRate for KrakenRate {
 
 #[derive(Debug)]
 pub struct EventLoopHandle {
+    swap_id: Uuid,
+    peer: PeerId,
     recv_encrypted_signature: Option<bmrng::RequestReceiver<bitcoin::EncryptedSignature, ()>>,
-    send_transfer_proof: Option<bmrng::RequestSender<monero::TransferProof, ()>>,
+    #[allow(clippy::type_complexity)]
+    transfer_proof_sender: Option<
+        tokio::sync::mpsc::UnboundedSender<(
+            PeerId,
+            transfer_proof::Request,
+            oneshot::Sender<Result<(), OutboundFailure>>,
+        )>,
+    >,
 }
 
 impl EventLoopHandle {
-    pub async fn recv_encrypted_signature(&mut self) -> Result<bitcoin::EncryptedSignature> {
-        let (tx_redeem_encsig, responder) = self
-            .recv_encrypted_signature
-            .take()
-            .context("Encrypted signature was already received")?
-            .recv()
-            .await?;
+    fn build_transfer_proof_request(
+        &self,
+        transfer_proof: monero::TransferProof,
+    ) -> transfer_proof::Request {
+        transfer_proof::Request {
+            swap_id: self.swap_id,
+            tx_lock_proof: transfer_proof,
+        }
+    }
 
+    /// Wait for an encrypted signature from Bob
+    pub async fn recv_encrypted_signature(&mut self) -> Result<bitcoin::EncryptedSignature> {
+        let receiver = self
+            .recv_encrypted_signature
+            .as_mut()
+            .context("Encrypted signature was already received")?;
+
+        let (tx_redeem_encsig, responder) = receiver.recv().await?;
+
+        // Acknowledge receipt of the encrypted signature
+        // This notifies the EventLoop that the signature has been processed
+        // The EventLoop can then send an acknowledgement back to Bob over the network
         responder
             .respond(())
             .context("Failed to acknowledge receipt of encrypted signature")?;
 
+        // Only take after successful receipt and acknowledgement
+        self.recv_encrypted_signature.take();
+
         Ok(tx_redeem_encsig)
     }
 
+    /// Send a transfer proof to Bob
+    ///
+    /// This function will retry indefinitely until the transfer proof is sent successfully
+    /// and acknowledged by Bob
+    ///
+    /// This will fail if
+    /// 1. the transfer proof has already been sent once
+    /// 2. there is an error with the bmrng channel
     pub async fn send_transfer_proof(&mut self, msg: monero::TransferProof) -> Result<()> {
-        self.send_transfer_proof
-            .take()
-            .context("Transfer proof was already sent")?
-            .send_receive(msg)
-            .await
-            .context("Failed to send transfer proof")?;
+        let sender = self
+            .transfer_proof_sender
+            .as_ref()
+            .context("Transfer proof was already sent")?;
+
+        // We will retry indefinitely until we succeed
+        let backoff = backoff::ExponentialBackoffBuilder::new()
+            .with_max_elapsed_time(None)
+            .with_max_interval(Duration::from_secs(60))
+            .build();
+
+        let transfer_proof = self.build_transfer_proof_request(msg);
+
+        backoff::future::retry(backoff, || async {
+            // Create a oneshot channel to receive the acknowledgment of the transfer proof
+            let (singular_sender, singular_receiver) = oneshot::channel();
+
+            if let Err(err) = sender.send((self.peer, transfer_proof.clone(), singular_sender)) {
+                let err = anyhow!(err).context("Failed to communicate transfer proof through event loop channel");
+                tracing::error!(%err, swap_id = %self.swap_id, "Failed to send transfer proof");
+                return Err(backoff::Error::permanent(err));
+            }
+
+            match singular_receiver.await {
+                Ok(Ok(())) => Ok(()),
+                Ok(Err(err)) => {
+                    tracing::warn!(%err, "Failed to send transfer proof due to a network error. We will retry");
+                    Err(backoff::Error::transient(anyhow!(err)))
+                }
+                Err(_) => {
+                    Err(backoff::Error::permanent(anyhow!("The sender channel should never be closed without sending a response")))
+                }
+            }
+        })
+            .await?;
+
+        self.transfer_proof_sender.take();
 
         Ok(())
     }

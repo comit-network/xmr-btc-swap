@@ -23,12 +23,15 @@ mod tests {
     use crate::network::rendezvous::XmrBtcNamespace;
     use crate::network::test::{new_swarm, SwarmExt};
     use futures::StreamExt;
+    use libp2p::core::Endpoint;
     use libp2p::multiaddr::Protocol;
-    use libp2p::request_response::RequestResponseEvent;
-    use libp2p::swarm::{AddressScore, NetworkBehaviourEventProcess};
-    use libp2p::{identity, rendezvous, Multiaddr, PeerId};
+    use libp2p::swarm::{
+        ConnectionDenied, ConnectionId, FromSwarm, THandlerInEvent, THandlerOutEvent, ToSwarm,
+    };
+    use libp2p::{identity, rendezvous, request_response, Multiaddr, PeerId};
     use std::collections::HashSet;
     use std::iter::FromIterator;
+    use std::task::Poll;
     use std::time::Duration;
 
     #[tokio::test]
@@ -57,7 +60,7 @@ mod tests {
     }
 
     async fn setup_rendezvous_point() -> (Multiaddr, PeerId) {
-        let mut rendezvous_node = new_swarm(|_, _| RendezvousPointBehaviour::default());
+        let mut rendezvous_node = new_swarm(|_| RendezvousPointBehaviour::default());
         let rendezvous_address = rendezvous_node.listen_on_tcp_localhost().await;
         let rendezvous_peer_id = *rendezvous_node.local_peer_id();
 
@@ -81,22 +84,23 @@ mod tests {
             max_quantity: bitcoin::Amount::from_sat(9001),
         };
 
-        let mut asb = new_swarm(|_, identity| {
+        let mut asb = new_swarm(|identity| {
             let rendezvous_node =
                 RendezvousNode::new(rendezvous_address, rendezvous_peer_id, namespace, None);
             let rendezvous = asb::rendezvous::Behaviour::new(identity, vec![rendezvous_node]);
 
             StaticQuoteAsbBehaviour {
-                rendezvous,
-                ping: Default::default(),
-                quote: quote::asb(),
+                inner: StaticQuoteAsbBehaviourInner {
+                    rendezvous,
+                    quote: quote::asb(),
+                },
                 static_quote,
                 registered: false,
             }
         });
 
         let asb_address = asb.listen_on_tcp_localhost().await;
-        asb.add_external_address(asb_address.clone(), AddressScore::Infinite);
+        asb.add_external_address(asb_address.clone());
 
         let asb_peer_id = *asb.local_peer_id();
 
@@ -113,62 +117,114 @@ mod tests {
         });
 
         Seller {
-            multiaddr: asb_address.with(Protocol::P2p(asb_peer_id.into())),
+            multiaddr: asb_address.with(Protocol::P2p(asb_peer_id)),
             status: Status::Online(static_quote),
         }
     }
 
-    #[derive(libp2p::NetworkBehaviour)]
-    #[behaviour(event_process = true)]
-    struct StaticQuoteAsbBehaviour {
+    #[derive(libp2p::swarm::NetworkBehaviour)]
+    struct StaticQuoteAsbBehaviourInner {
         rendezvous: asb::rendezvous::Behaviour,
-        // Support `Ping` as a workaround until https://github.com/libp2p/rust-libp2p/issues/2109 is fixed.
-        ping: libp2p::ping::Ping,
         quote: quote::Behaviour,
+    }
 
-        #[behaviour(ignore)]
+    struct StaticQuoteAsbBehaviour {
+        inner: StaticQuoteAsbBehaviourInner,
         static_quote: BidQuote,
-        #[behaviour(ignore)]
         registered: bool,
     }
-    impl NetworkBehaviourEventProcess<rendezvous::client::Event> for StaticQuoteAsbBehaviour {
-        fn inject_event(&mut self, event: rendezvous::client::Event) {
-            if let rendezvous::client::Event::Registered { .. } = event {
-                self.registered = true;
+
+    impl libp2p::swarm::NetworkBehaviour for StaticQuoteAsbBehaviour {
+        type ConnectionHandler =
+            <StaticQuoteAsbBehaviourInner as libp2p::swarm::NetworkBehaviour>::ConnectionHandler;
+        type ToSwarm = <StaticQuoteAsbBehaviourInner as libp2p::swarm::NetworkBehaviour>::ToSwarm;
+
+        fn handle_established_inbound_connection(
+            &mut self,
+            connection_id: ConnectionId,
+            peer: PeerId,
+            local_addr: &Multiaddr,
+            remote_addr: &Multiaddr,
+        ) -> Result<libp2p::swarm::THandler<Self>, ConnectionDenied> {
+            self.inner.handle_established_inbound_connection(
+                connection_id,
+                peer,
+                local_addr,
+                remote_addr,
+            )
+        }
+
+        fn handle_established_outbound_connection(
+            &mut self,
+            connection_id: ConnectionId,
+            peer: PeerId,
+            addr: &Multiaddr,
+            role_override: Endpoint,
+        ) -> Result<libp2p::swarm::THandler<Self>, ConnectionDenied> {
+            self.inner.handle_established_outbound_connection(
+                connection_id,
+                peer,
+                addr,
+                role_override,
+            )
+        }
+
+        fn on_swarm_event(&mut self, event: FromSwarm<'_>) {
+            self.inner.on_swarm_event(event);
+        }
+
+        fn on_connection_handler_event(
+            &mut self,
+            peer_id: PeerId,
+            connection_id: ConnectionId,
+            event: THandlerOutEvent<Self>,
+        ) {
+            self.inner
+                .on_connection_handler_event(peer_id, connection_id, event);
+        }
+
+        fn poll(
+            &mut self,
+            cx: &mut std::task::Context<'_>,
+        ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
+            match self.inner.poll(cx) {
+                Poll::Ready(ToSwarm::GenerateEvent(event)) => match event {
+                    StaticQuoteAsbBehaviourInnerEvent::Rendezvous(rendezvous_event) => {
+                        if let rendezvous::client::Event::Registered { .. } = rendezvous_event {
+                            self.registered = true;
+                        }
+
+                        Poll::Ready(ToSwarm::GenerateEvent(
+                            StaticQuoteAsbBehaviourInnerEvent::Rendezvous(rendezvous_event),
+                        ))
+                    }
+                    StaticQuoteAsbBehaviourInnerEvent::Quote(quote_event) => {
+                        if let request_response::Event::Message {
+                            message: quote::Message::Request { channel, .. },
+                            ..
+                        } = quote_event
+                        {
+                            self.inner
+                                .quote
+                                .send_response(channel, self.static_quote)
+                                .unwrap();
+
+                            return Poll::Pending;
+                        }
+
+                        Poll::Ready(ToSwarm::GenerateEvent(
+                            StaticQuoteAsbBehaviourInnerEvent::Quote(quote_event),
+                        ))
+                    }
+                },
+                other => other,
             }
         }
     }
 
-    impl NetworkBehaviourEventProcess<libp2p::ping::PingEvent> for StaticQuoteAsbBehaviour {
-        fn inject_event(&mut self, _: libp2p::ping::PingEvent) {}
-    }
-    impl NetworkBehaviourEventProcess<quote::OutEvent> for StaticQuoteAsbBehaviour {
-        fn inject_event(&mut self, event: quote::OutEvent) {
-            if let RequestResponseEvent::Message {
-                message: quote::Message::Request { channel, .. },
-                ..
-            } = event
-            {
-                self.quote
-                    .send_response(channel, self.static_quote)
-                    .unwrap();
-            }
-        }
-    }
-
-    #[derive(libp2p::NetworkBehaviour)]
-    #[behaviour(event_process = true)]
+    #[derive(libp2p::swarm::NetworkBehaviour)]
     struct RendezvousPointBehaviour {
         rendezvous: rendezvous::server::Behaviour,
-        // Support `Ping` as a workaround until https://github.com/libp2p/rust-libp2p/issues/2109 is fixed.
-        ping: libp2p::ping::Ping,
-    }
-
-    impl NetworkBehaviourEventProcess<rendezvous::server::Event> for RendezvousPointBehaviour {
-        fn inject_event(&mut self, _: rendezvous::server::Event) {}
-    }
-    impl NetworkBehaviourEventProcess<libp2p::ping::PingEvent> for RendezvousPointBehaviour {
-        fn inject_event(&mut self, _: libp2p::ping::PingEvent) {}
     }
 
     impl Default for RendezvousPointBehaviour {
@@ -177,7 +233,6 @@ mod tests {
                 rendezvous: rendezvous::server::Behaviour::new(
                     rendezvous::server::Config::default(),
                 ),
-                ping: Default::default(),
             }
         }
     }

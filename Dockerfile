@@ -13,7 +13,7 @@ WORKDIR /build/swap
 
 RUN cargo build --release --bin=asb
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 WORKDIR /data
 

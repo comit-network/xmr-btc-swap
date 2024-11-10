@@ -8,7 +8,7 @@ pub trait MultiAddrExt {
 impl MultiAddrExt for Multiaddr {
     fn extract_peer_id(&self) -> Option<PeerId> {
         match self.iter().last()? {
-            Protocol::P2p(multihash) => PeerId::from_multihash(multihash).ok(),
+            Protocol::P2p(peer_id) => Some(peer_id),
             _ => None,
         }
     }

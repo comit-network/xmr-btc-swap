@@ -19,6 +19,22 @@ pub fn is_complete(state: &BobState) -> bool {
     )
 }
 
+/// Identifies states that have already processed the transfer proof.
+/// This is used to be able to acknowledge the transfer proof multiple times (if it was already processed).
+/// This is necessary because sometimes our acknowledgement might not reach Alice.
+pub fn has_already_processed_transfer_proof(state: &BobState) -> bool {
+    // This match statement MUST match all states which Bob can enter after receiving the transfer proof.
+    // We do not match any of the cancel / refund states because in those, the swap cannot be successfull anymore.
+    matches!(
+        state,
+        BobState::XmrLockProofReceived { .. }
+            | BobState::XmrLocked(..)
+            | BobState::EncSigSent(..)
+            | BobState::BtcRedeemed(..)
+            | BobState::XmrRedeemed { .. }
+    )
+}
+
 // Identifies states that should be run at most once before exiting.
 // This is used to prevent infinite retry loops while still allowing manual resumption.
 //
@@ -334,8 +350,10 @@ async fn next_state(
                 result = event_loop_handle.send_encrypted_signature(state.tx_redeem_encsig()) => {
                     match result {
                         Ok(_) => BobState::EncSigSent(state),
-                        Err(bmrng::error::RequestError::RecvError | bmrng::error::RequestError::SendError(_)) => bail!("Failed to communicate encrypted signature through event loop channel"),
-                        Err(bmrng::error::RequestError::RecvTimeoutError) => unreachable!("We construct the channel with no timeout"),
+                        Err(err) => {
+                            tracing::error!(%err, "Failed to send encrypted signature to Alice");
+                            bail!("Failed to send encrypted signature to Alice");
+                        }
                     }
                 },
                 result = tx_lock_status.wait_until_confirmed_with(state.cancel_timelock) => {
@@ -457,9 +475,7 @@ async fn next_state(
             );
 
             tracing::info!("Attempting to cooperatively redeem XMR after being punished");
-            let response = event_loop_handle
-                .request_cooperative_xmr_redeem(swap_id)
-                .await;
+            let response = event_loop_handle.request_cooperative_xmr_redeem().await;
 
             match response {
                 Ok(Fullfilled { s_a, .. }) => {

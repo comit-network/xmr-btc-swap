@@ -626,7 +626,7 @@ pub async fn buy_xmr(
     )
     .await?;
 
-    swarm.behaviour_mut().add_address(seller_peer_id, seller);
+    swarm.add_peer_address(seller_peer_id, seller);
 
     context
         .db
@@ -816,9 +816,7 @@ pub async fn resume_swap(
 
     // Fetch the seller's addresses from the database and add them to the swarm
     for seller_address in seller_addresses {
-        swarm
-            .behaviour_mut()
-            .add_address(seller_peer_id, seller_address);
+        swarm.add_peer_address(seller_peer_id, seller_address);
     }
 
     let (event_loop, event_loop_handle) =
@@ -1222,9 +1220,17 @@ where
         }
 
         loop {
+            println!("max_giveable: {}", max_giveable);
+            println!("bid_quote.min_quantity: {}", bid_quote.min_quantity);
             let min_outstanding = bid_quote.min_quantity - max_giveable;
+            println!("min_outstanding: {}", min_outstanding);
             let min_bitcoin_lock_tx_fee = estimate_fee(min_outstanding).await?;
+            println!("min_bitcoin_lock_tx_fee: {}", min_bitcoin_lock_tx_fee);
             let min_deposit_until_swap_will_start = min_outstanding + min_bitcoin_lock_tx_fee;
+            println!(
+                "min_deposit_until_swap_will_start: {}",
+                min_deposit_until_swap_will_start
+            );
             let max_deposit_until_maximum_amount_is_reached =
                 maximum_amount - max_giveable + min_bitcoin_lock_tx_fee;
 

@@ -226,6 +226,11 @@ where
                        state3,
                    }
                 },
+                // TODO: We should already listen for the encrypted signature here.
+                //
+                // If we send Bob the transfer proof, but for whatever reason we do not receive an acknoledgement from him
+                // we would be stuck in this state forever (deadlock). By listening for the encrypted signature here we
+                // can still proceed to the next state even if Bob does not respond with an acknoledgement.
                 result = tx_lock_status.wait_until_confirmed_with(state3.cancel_timelock) => {
                     result?;
                     AliceState::CancelTimelockExpired {
@@ -245,7 +250,6 @@ where
 
             select! {
                 biased; // make sure the cancel timelock expiry future is polled first
-
                 result = tx_lock_status.wait_until_confirmed_with(state3.cancel_timelock) => {
                     result?;
                     AliceState::CancelTimelockExpired {
@@ -275,6 +279,7 @@ where
             ExpiredTimelocks::None { .. } => {
                 let tx_lock_status = bitcoin_wallet.subscribe_to(state3.tx_lock.clone()).await;
                 match state3.signed_redeem_transaction(*encrypted_signature) {
+                    // TODO: We should retry publishing the redeem transaction if it fails
                     Ok(tx) => match bitcoin_wallet.broadcast(tx, "redeem").await {
                         Ok((_, subscription)) => match subscription.wait_until_seen().await {
                             Ok(_) => AliceState::BtcRedeemTransactionPublished { state3 },
@@ -455,5 +460,17 @@ pub(crate) fn is_complete(state: &AliceState) -> bool {
             | AliceState::BtcRedeemed
             | AliceState::BtcPunished { .. }
             | AliceState::SafelyAborted
+    )
+}
+
+/// This function is used to check if Alice is in a state where it is clear that she has already received the encrypted signature from Bob.
+/// This allows us to acknowledge the encrypted signature multiple times
+/// If our acknowledgement does not reach Bob, he might send the encrypted signature again.
+pub(crate) fn has_already_processed_enc_sig(state: &AliceState) -> bool {
+    matches!(
+        state,
+        AliceState::EncSigLearned { .. }
+            | AliceState::BtcRedeemTransactionPublished { .. }
+            | AliceState::BtcRedeemed
     )
 }

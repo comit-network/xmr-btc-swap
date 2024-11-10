@@ -1,26 +1,23 @@
-use crate::network::json_pull_codec::JsonPullCodec;
+use std::time::Duration;
+
 use crate::{asb, bitcoin, cli};
-use libp2p::core::ProtocolName;
-use libp2p::request_response::{
-    ProtocolSupport, RequestResponse, RequestResponseConfig, RequestResponseEvent,
-    RequestResponseMessage,
-};
-use libp2p::PeerId;
+use libp2p::request_response::{self, ProtocolSupport};
+use libp2p::{PeerId, StreamProtocol};
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
 const PROTOCOL: &str = "/comit/xmr/btc/bid-quote/1.0.0";
-pub type OutEvent = RequestResponseEvent<(), BidQuote>;
-pub type Message = RequestResponseMessage<(), BidQuote>;
+pub type OutEvent = request_response::Event<(), BidQuote>;
+pub type Message = request_response::Message<(), BidQuote>;
 
-pub type Behaviour = RequestResponse<JsonPullCodec<BidQuoteProtocol, BidQuote>>;
+pub type Behaviour = request_response::json::Behaviour<(), BidQuote>;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct BidQuoteProtocol;
 
-impl ProtocolName for BidQuoteProtocol {
-    fn protocol_name(&self) -> &[u8] {
-        PROTOCOL.as_bytes()
+impl AsRef<str> for BidQuoteProtocol {
+    fn as_ref(&self) -> &str {
+        PROTOCOL
     }
 }
 
@@ -53,9 +50,8 @@ pub struct ZeroQuoteReceived;
 /// handing out quotes.
 pub fn asb() -> Behaviour {
     Behaviour::new(
-        JsonPullCodec::default(),
-        vec![(BidQuoteProtocol, ProtocolSupport::Inbound)],
-        RequestResponseConfig::default(),
+        vec![(StreamProtocol::new(PROTOCOL), ProtocolSupport::Inbound)],
+        request_response::Config::default().with_request_timeout(Duration::from_secs(60)),
     )
 }
 
@@ -65,9 +61,8 @@ pub fn asb() -> Behaviour {
 /// requesting quotes.
 pub fn cli() -> Behaviour {
     Behaviour::new(
-        JsonPullCodec::default(),
-        vec![(BidQuoteProtocol, ProtocolSupport::Outbound)],
-        RequestResponseConfig::default(),
+        vec![(StreamProtocol::new(PROTOCOL), ProtocolSupport::Outbound)],
+        request_response::Config::default().with_request_timeout(Duration::from_secs(60)),
     )
 }
 

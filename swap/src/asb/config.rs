@@ -23,7 +23,6 @@ pub struct Defaults {
     pub config_path: PathBuf,
     data_dir: PathBuf,
     listen_address_tcp: Multiaddr,
-    listen_address_ws: Multiaddr,
     electrum_rpc_url: Url,
     monero_wallet_rpc_url: Url,
     price_ticker_ws_url: Url,
@@ -38,7 +37,6 @@ impl GetDefaults for Testnet {
                 .join("config.toml"),
             data_dir: default_asb_data_dir()?.join("testnet"),
             listen_address_tcp: Multiaddr::from_str("/ip4/0.0.0.0/tcp/9939")?,
-            listen_address_ws: Multiaddr::from_str("/ip4/0.0.0.0/tcp/9940/ws")?,
             electrum_rpc_url: Url::parse("ssl://electrum.blockstream.info:60002")?,
             monero_wallet_rpc_url: Url::parse("http://127.0.0.1:38083/json_rpc")?,
             price_ticker_ws_url: Url::parse("wss://ws.kraken.com")?,
@@ -57,7 +55,6 @@ impl GetDefaults for Mainnet {
                 .join("config.toml"),
             data_dir: default_asb_data_dir()?.join("mainnet"),
             listen_address_tcp: Multiaddr::from_str("/ip4/0.0.0.0/tcp/9939")?,
-            listen_address_ws: Multiaddr::from_str("/ip4/0.0.0.0/tcp/9940/ws")?,
             electrum_rpc_url: Url::parse("ssl://blockstream.info:700")?,
             monero_wallet_rpc_url: Url::parse("http://127.0.0.1:18083/json_rpc")?,
             price_ticker_ws_url: Url::parse("wss://ws.kraken.com")?,
@@ -299,7 +296,7 @@ pub fn query_user_for_initial_config(testnet: bool) -> Result<Config> {
 
     let listen_addresses = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter multiaddresses (comma separated) on which asb should list for peer-to-peer communications or hit return to use default")
-        .default( format!("{},{}", defaults.listen_address_tcp, defaults.listen_address_ws))
+        .default( format!("{}", defaults.listen_address_tcp))
         .interact_text()?;
     let listen_addresses = listen_addresses
         .split(',')
@@ -429,7 +426,7 @@ mod tests {
                 network: bitcoin::Network::Testnet,
             },
             network: Network {
-                listen: vec![defaults.listen_address_tcp, defaults.listen_address_ws],
+                listen: vec![defaults.listen_address_tcp],
                 rendezvous_point: vec![],
                 external_addresses: vec![],
             },
@@ -473,7 +470,7 @@ mod tests {
                 network: bitcoin::Network::Bitcoin,
             },
             network: Network {
-                listen: vec![defaults.listen_address_tcp, defaults.listen_address_ws],
+                listen: vec![defaults.listen_address_tcp],
                 rendezvous_point: vec![],
                 external_addresses: vec![],
             },
