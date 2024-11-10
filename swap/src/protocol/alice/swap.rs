@@ -1,5 +1,7 @@
 //! Run an XMR/BTC swap in the role of Alice.
 //! Alice holds XMR and wishes receive BTC.
+use std::time::Duration;
+
 use crate::asb::{EventLoopHandle, LatestRate};
 use crate::bitcoin::ExpiredTimelocks;
 use crate::env::Config;
@@ -111,23 +113,72 @@ where
             }
         }
         AliceState::BtcLocked { state3 } => {
-            match state3.expired_timelocks(bitcoin_wallet).await? {
-                ExpiredTimelocks::None { .. } => {
-                    // Record the current monero wallet block height so we don't have to scan from
-                    // block 0 for scenarios where we create a refund wallet.
-                    let monero_wallet_restore_blockheight = monero_wallet.block_height().await?;
+            // We will retry indefinitely to lock the Monero funds, until the swap is cancelled
+            // Sometimes locking the Monero can fail e.g due to the daemon not being fully synced
+            let backoff = backoff::ExponentialBackoffBuilder::new()
+                .with_max_elapsed_time(None)
+                .with_max_interval(Duration::from_secs(60))
+                .build();
 
-                    let transfer_proof = monero_wallet
-                        .transfer(state3.lock_xmr_transfer_request())
-                        .await?;
+            let transfer_proof = backoff::future::retry(backoff, || async {
+                // We check the status of the Bitcoin lock transaction
+                // If the swap is cancelled, there is no need to lock the Monero funds anymore
+                // because there is no way for the swap to succeed.
+                if !matches!(
+                    state3.expired_timelocks(bitcoin_wallet).await?,
+                    ExpiredTimelocks::None { .. }
+                ) {
+                    return Ok(None);
+                }
 
+                // Record the current monero wallet block height so we don't have to scan from
+                // block 0 for scenarios where we create a refund wallet.
+                let monero_wallet_restore_blockheight = monero_wallet
+                    .block_height()
+                    .await
+                    .inspect_err(|e| {
+                        tracing::warn!(
+                            swap_id = %swap_id,
+                            error = ?e,
+                            "Failed to get Monero wallet block height while trying to lock XMR. We will retry."
+                        )
+                    })
+                    .map_err(backoff::Error::transient)?;
+
+                // Lock the Monero
+                monero_wallet
+                    .transfer(state3.lock_xmr_transfer_request())
+                    .await
+                    .map(|proof| Some((monero_wallet_restore_blockheight, proof)))
+                    .inspect_err(|e| {
+                        tracing::warn!(
+                            swap_id = %swap_id,
+                            error = ?e,
+                            "Failed to lock Monero. Make sure your monero-wallet-rpc is connected to a synced daemon and enough funds are available. We will retry."
+                        )
+                    })
+                    .map_err(backoff::Error::transient)
+            })
+            .await?;
+
+            match transfer_proof {
+                // If the transfer was successful, we transition to the next state
+                Some((monero_wallet_restore_blockheight, transfer_proof)) => {
                     AliceState::XmrLockTransactionSent {
                         monero_wallet_restore_blockheight,
                         transfer_proof,
                         state3,
                     }
                 }
-                _ => AliceState::SafelyAborted,
+                // If we were not able to lock the Monero funds before the timelock expired,
+                // we can safely abort the swap because we did not lock any funds
+                None => {
+                    tracing::info!(
+                        swap_id = %swap_id,
+                        "We did not manage to lock the Monero funds before the timelock expired. Aborting swap."
+                    );
+                    AliceState::SafelyAborted
+                }
             }
         }
         AliceState::XmrLockTransactionSent {

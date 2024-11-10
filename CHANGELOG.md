@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- ASB: We now retry indefinitely to lock Monero funds until the swap is cancelled. This fixes an issue where we would fail to lock Monero on the first try (e.g., due to the daemon not being fully synced) and would never try again, forcing the swap to be refunded.
 - ASB + CLI: You can now use the `logs` command to retrieve logs stored in the past, redacting addresses and id's using `logs --redact`.
 - ASB: The `--disable-timestamp` flag has been removed
 - ASB: The `history` command can now be used while the asb is running.
