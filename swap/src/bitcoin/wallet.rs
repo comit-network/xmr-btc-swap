@@ -468,6 +468,7 @@ where
     ) -> Result<bitcoin::Amount> {
         let client = self.client.lock().await;
         let fee_rate = client.estimate_feerate(self.target_block)?;
+
         let min_relay_fee = client.min_relay_fee()?;
 
         estimate_fee(weight, transfer_amount, fee_rate, min_relay_fee)
@@ -871,6 +872,11 @@ impl EstimateFeeRate for Client {
         // https://github.com/romanz/electrs/blob/f9cf5386d1b5de6769ee271df5eef324aa9491bc/src/rpc.rs#L213
         // Returned estimated fees are per BTC/kb.
         let fee_per_byte = self.electrum.estimate_fee(target_block)?;
+
+        if fee_per_byte < 0.0 {
+            bail!("Fee per byte returned by electrum server is negative: {}. This may indicate that fee estimation is not supported by this server", fee_per_byte);
+        }
+
         // we do not expect fees being that high.
         #[allow(clippy::cast_possible_truncation)]
         Ok(FeeRate::from_btc_per_kvb(fee_per_byte as f32))
