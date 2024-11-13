@@ -26,19 +26,21 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-function ProviderSpreadChip({ provider }: { provider: ExtendedProviderStatus }) {
-  const xmrBtcPrice = useAppSelector(s => s.rates?.xmrBtcRate);
-
-  if (xmrBtcPrice === null) {
+/**
+ * A chip that displays the markup of the provider's exchange rate compared to the market rate.
+ */
+function ProviderMarkupChip({ provider }: { provider: ExtendedProviderStatus }) {
+  const marketExchangeRate = useAppSelector(s => s.rates?.xmrBtcRate);
+  if (marketExchangeRate === null) 
     return null;
-  }
 
-  const providerPrice = satsToBtc(provider.price);
-  const spread = ((providerPrice - xmrBtcPrice) / xmrBtcPrice) * 100;
+  const providerExchangeRate = satsToBtc(provider.price);
+  /** The markup of the exchange rate compared to the market rate in percent */
+  const markup = (providerExchangeRate - marketExchangeRate) / marketExchangeRate * 100;
 
   return (
-    <Tooltip title="The spread is the difference between the provider's exchange rate and the market rate. A high spread indicates that the provider is charging more than the market rate.">
-      <Chip label={`Spread: ${spread.toFixed(2)} %`} />
+    <Tooltip title="The markup this provider charges compared to centralized markets. A lower markup means that you get more Monero for your Bitcoin.">
+      <Chip label={`Markup ${markup.toFixed(2)}%`} />
     </Tooltip>
   );
 
@@ -74,8 +76,8 @@ export default function ProviderInfo({
       <Box className={classes.chipsOuter}>
         <Chip label={provider.testnet ? "Testnet" : "Mainnet"} />
         {provider.uptime && (
-          <Tooltip title="A high uptime indicates reliability. Providers with low uptime may be unreliable and cause swaps to take longer to complete or fail entirely.">
-            <Chip label={`${Math.round(provider.uptime * 100)} % uptime`} />
+          <Tooltip title="A high uptime (>90%) indicates reliability. Providers with very low uptime may be unreliable and cause swaps to take longer to complete or fail entirely.">
+            <Chip label={`${Math.round(provider.uptime * 100)}% uptime`} />
           </Tooltip>
         )}
         {provider.age ? (
@@ -93,11 +95,11 @@ export default function ProviderInfo({
           </Tooltip>
         )}
         {isOutdated && (
-          <Tooltip title="This provider is running an outdated version of the software. Outdated providers may be unreliable and cause swaps to take longer to complete or fail entirely.">
+          <Tooltip title="This provider is running an older version of the software. Outdated providers may be unreliable and cause swaps to take longer to complete or fail entirely.">
             <Chip label="Outdated" icon={<WarningIcon />} color="primary" />
           </Tooltip>
         )}
-        <ProviderSpreadChip provider={provider} />
+        <ProviderMarkupChip provider={provider} />
       </Box>
     </Box>
   );

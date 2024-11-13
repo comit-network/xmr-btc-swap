@@ -50,7 +50,7 @@ export default function DaemonStatusAlert() {
             <Button
               size="small"
               variant="outlined"
-              onClick={() => navigate("/help")}
+              onClick={() => navigate("/help#daemon-control-box")}
             >
               View Logs
             </Button>

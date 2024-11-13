@@ -22,6 +22,11 @@ import {
   TauriTimelockChangeEvent,
   GetSwapInfoArgs,
   ExportBitcoinWalletResponse,
+  CheckMoneroNodeArgs,
+  CheckMoneroNodeResponse,
+  TauriSettings,
+  CheckElectrumNodeArgs,
+  CheckElectrumNodeResponse,
   GetMoneroAddressesResponse,
 } from "models/tauriModel";
 import {
@@ -38,7 +43,9 @@ import { providerToConcatenatedMultiAddr } from "utils/multiAddrUtils";
 import { MoneroRecoveryResponse } from "models/rpcModel";
 import { ListSellersResponse } from "../models/tauriModel";
 import logger from "utils/logger";
-import { isTestnet } from "store/config";
+import { getNetwork, getNetworkName, isTestnet } from "store/config";
+import { Blockchain, Network } from "store/features/settingsSlice";
+import { resetStatuses, setPromise, setStatus, setStatuses } from "store/features/nodesSlice";
 
 export async function initEventListeners() {
   // This operation is in-expensive
@@ -50,8 +57,13 @@ export async function initEventListeners() {
     // Warning: If we reload the page while the Context is being initialized, this function will throw an error
     initializeContext().catch((e) => {
       logger.error(e, "Failed to initialize context on page load. This might be because we reloaded the page while the context was being initialized");
+      // Wait a short time before retrying
+      setTimeout(() => {
+        initializeContext().catch((e) => {
+          logger.error(e, "Failed to initialize context even after retry");
+        });
+      }, 2000); // 2 second delay
     });
-    initializeContext();
   }
 
   listen<TauriSwapProgressEventWrapper>("swap-progress-update", (event) => {
@@ -208,11 +220,46 @@ export async function listSellersAtRendezvousPoint(
 }
 
 export async function initializeContext() {
+  console.log("Prepare: Initializing context with settings");
+
+  const network = getNetwork();
   const settings = store.getState().settings;
+  let statuses = store.getState().nodes.nodes;
+
+  // Initialize Tauri settings with null values
+  const tauriSettings: TauriSettings = {
+    electrum_rpc_url: null,
+    monero_node_url: null,
+  };
+
+  // Set the first available node, if set
+  if (Object.keys(statuses.bitcoin).length === 0) {
+    await updateAllNodeStatuses();
+    statuses = store.getState().nodes.nodes;
+  }
+
+  let firstAvailableElectrumNode = settings.nodes[network][Blockchain.Bitcoin]
+    .find(node => statuses.bitcoin[node] === true);
+
+  if (firstAvailableElectrumNode !== undefined) 
+    tauriSettings.electrum_rpc_url = firstAvailableElectrumNode;
+  else
+    logger.info("No custom Electrum node available, falling back to default.");
+
+  let firstAvailableMoneroNode = settings.nodes[network][Blockchain.Monero]
+    .find(node => statuses.monero[node] === true);
+
+  if (firstAvailableMoneroNode !== undefined)
+    tauriSettings.monero_node_url = firstAvailableMoneroNode;
+  else
+    logger.info("No custom Monero node available, falling back to default.");
+
   const testnet = isTestnet();
 
+  console.log("Initializing context with settings", tauriSettings);
+
   await invokeUnsafe<void>("initialize_context", {
-    settings,
+    settings: tauriSettings,
     testnet,
   });
 }
@@ -221,6 +268,54 @@ export async function getWalletDescriptor() {
   return await invokeNoArgs<ExportBitcoinWalletResponse>("get_wallet_descriptor");
 }
 
+export async function getMoneroNodeStatus(node: string): Promise<boolean> {
+  const response =await invoke<CheckMoneroNodeArgs, CheckMoneroNodeResponse>("check_monero_node", {
+    url: node,
+    network: getNetworkName(),
+  });
+
+  return response.available;
+}
+
+export async function getElectrumNodeStatus(url: string): Promise<boolean> {
+  const response = await invoke<CheckElectrumNodeArgs, CheckElectrumNodeResponse>("check_electrum_node", {
+    url,
+  });
+
+  return response.available;
+}
+
+export async function getNodeStatus(url: string, blockchain: Blockchain): Promise<boolean> {
+  switch (blockchain) {
+    case Blockchain.Monero: return await getMoneroNodeStatus(url);
+    case Blockchain.Bitcoin: return await getElectrumNodeStatus(url);
+    default: throw new Error(`Unknown blockchain: ${blockchain}`);
+  }
+}
+
+export async function updateAllNodeStatuses() {
+  const network = getNetwork();
+  const settings = store.getState().settings;
+
+  // We will update the statuses in batches
+  const newStatuses: Record<Blockchain, Record<string, boolean>> = {
+    [Blockchain.Bitcoin]: {},
+    [Blockchain.Monero]: {},
+  };
+
+  // For all nodes, check if they are available and store the new status (in parallel)
+  await Promise.all(
+    Object.values(Blockchain).flatMap(blockchain =>
+      settings.nodes[network][blockchain].map(async node => {
+        const status = await getNodeStatus(node, blockchain);
+        newStatuses[blockchain][node] = status;
+      })
+    )
+  );
+
+  // When we are done, we update the statuses in the store
+  store.dispatch(setStatuses(newStatuses));
+}
 export async function getMoneroAddresses(): Promise<GetMoneroAddressesResponse> {
   return await invokeNoArgs<GetMoneroAddressesResponse>("get_monero_addresses");
 }

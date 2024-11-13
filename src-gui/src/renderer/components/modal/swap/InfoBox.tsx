@@ -8,6 +8,7 @@ import {
 import { ReactNode } from "react";
 
 type Props = {
+  id?: string;
   title: ReactNode;
   mainContent: ReactNode;
   additionalContent: ReactNode;
@@ -31,6 +32,7 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 export default function InfoBox({
+  id = null,
   title,
   mainContent,
   additionalContent,
@@ -40,7 +42,7 @@ export default function InfoBox({
   const classes = useStyles();
 
   return (
-    <Paper variant="outlined" className={classes.outer}>
+    <Paper variant="outlined" className={classes.outer} id={id}>
       <Typography variant="subtitle1">{title}</Typography>
       <Box className={classes.upperContent}>
         {icon}

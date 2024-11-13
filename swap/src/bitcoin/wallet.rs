@@ -69,7 +69,7 @@ impl Wallet {
             err => err?,
         };
 
-        let client = Client::new(electrum_rpc_url, env_config.bitcoin_sync_interval())?;
+        let client = Client::new(electrum_rpc_url, env_config.bitcoin_sync_interval(), 5)?;
 
         let network = wallet.network();
 
@@ -722,9 +722,9 @@ pub struct Client {
 }
 
 impl Client {
-    fn new(electrum_rpc_url: Url, interval: Duration) -> Result<Self> {
+    pub fn new(electrum_rpc_url: Url, interval: Duration, retry_count: u8) -> Result<Self> {
         let config = bdk::electrum_client::ConfigBuilder::default()
-            .retry(5)
+            .retry(retry_count)
             .build();
 
         let electrum = bdk::electrum_client::Client::from_config(electrum_rpc_url.as_str(), config)

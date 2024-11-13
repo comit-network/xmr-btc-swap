@@ -18,7 +18,7 @@ const rootPersistConfig = {
 };
 
 // Use Tauri's store plugin for persistent settings
-const tauriStore = new LazyStore(`${getNetworkName()}_settings.bin`);
+const tauriStore = new LazyStore("settings.bin");
 
 // Configure how settings are stored and retrieved using Tauri's storage
 const settingsPersistConfig = {

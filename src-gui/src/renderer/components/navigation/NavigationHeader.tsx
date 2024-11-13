@@ -21,7 +21,7 @@ export default function NavigationHeader() {
         <RouteListItemIconButton name="Wallet" route="/wallet">
           <AccountBalanceWalletIcon />
         </RouteListItemIconButton>
-        <RouteListItemIconButton name="Help" route="/help">
+        <RouteListItemIconButton name="Help & Settings" route="/help">
           <HelpOutlineIcon />
         </RouteListItemIconButton>
       </List>

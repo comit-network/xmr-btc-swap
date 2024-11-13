@@ -4,7 +4,6 @@ import {
   TauriLogEvent,
   GetSwapInfoResponse,
   TauriContextStatusEvent,
-  TauriDatabaseStateEvent,
   TauriTimelockChangeEvent,
 } from "models/tauriModel";
 import { MoneroRecoveryResponse } from "../../models/rpcModel";

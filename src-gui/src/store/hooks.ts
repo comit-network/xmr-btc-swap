@@ -5,7 +5,9 @@ import type { AppDispatch, RootState } from "renderer/store/storeRenderer";
 import { parseDateString } from "utils/parseUtils";
 import { useMemo } from "react";
 import { isCliLogRelatedToSwap } from "models/cliModel";
-import { TauriSettings } from "models/tauriModel";
+import { SettingsState } from "./features/settingsSlice";
+import { NodesSlice } from "./features/nodesSlice";
+import { RatesState } from "./features/ratesSlice";
 
 export const useAppDispatch = () => useDispatch<AppDispatch>();
 export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
@@ -84,6 +86,17 @@ export function useSwapInfosSortedByDate() {
   );
 }
 
-export function useSettings<T>(selector: (settings: TauriSettings) => T): T {
-  return useAppSelector((state) => selector(state.settings));
+export function useRates<T>(selector: (rates: RatesState) => T): T {
+  const rates = useAppSelector((state) => state.rates);
+  return selector(rates);
+}
+
+export function useSettings<T>(selector: (settings: SettingsState) => T): T {
+  const settings = useAppSelector((state) => state.settings);
+  return selector(settings);
+}
+
+export function useNodes<T>(selector: (nodes: NodesSlice) => T): T {
+  const nodes = useAppSelector((state) => state.nodes);
+  return selector(nodes);
 }

@@ -136,7 +136,7 @@ function HasProviderSwapWidget({
     <Box className={classes.inner} component={Paper} elevation={5}>
       <Title />
       <TextField
-        label="Send"
+        label="For this many BTC"
         size="medium"
         variant="outlined"
         value={btcFieldValue}
@@ -152,7 +152,7 @@ function HasProviderSwapWidget({
         <ArrowDownwardIcon fontSize="small" />
       </Box>
       <TextField
-        label="Receive"
+        label="You'd receive that many XMR"
         variant="outlined"
         size="medium"
         value={xmrFieldValue.toFixed(6)}

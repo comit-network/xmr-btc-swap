@@ -1,6 +1,5 @@
 import { Box, CssBaseline, makeStyles } from "@material-ui/core";
-import { indigo } from "@material-ui/core/colors";
-import { createTheme, ThemeProvider } from "@material-ui/core/styles";
+import { ThemeProvider } from "@material-ui/core/styles";
 import "@tauri-apps/plugin-shell";
 import { Route, MemoryRouter as Router, Routes } from "react-router-dom";
 import Navigation, { drawerWidth } from "./navigation/Navigation";
@@ -9,15 +8,17 @@ import HistoryPage from "./pages/history/HistoryPage";
 import SwapPage from "./pages/swap/SwapPage";
 import WalletPage from "./pages/wallet/WalletPage";
 import GlobalSnackbarProvider from "./snackbar/GlobalSnackbarProvider";
-import { useEffect } from "react";
-import { fetchProvidersViaHttp, fetchAlertsViaHttp, fetchXmrPrice, fetchBtcPrice, fetchXmrBtcRate } from "renderer/api";
-import { initEventListeners } from "renderer/rpc";
-import { store } from "renderer/store/storeRenderer";
 import UpdaterDialog from "./modal/updater/UpdaterDialog";
-import { setAlerts } from "store/features/alertsSlice";
-import { setRegistryProviders, registryConnectionFailed } from "store/features/providersSlice";
-import { setXmrPrice, setBtcPrice, setXmrBtcRate } from "store/features/ratesSlice";
+import { useSettings } from "store/hooks";
+import { themes } from "./theme";
+import { initEventListeners, updateAllNodeStatuses } from "renderer/rpc";
+import { fetchAlertsViaHttp, fetchProvidersViaHttp, updateRates } from "renderer/api";
+import { store } from "renderer/store/storeRenderer";
 import logger from "utils/logger";
+import { setAlerts } from "store/features/alertsSlice";
+import { setRegistryProviders } from "store/features/providersSlice";
+import { registryConnectionFailed } from "store/features/providersSlice";
+import { useEffect } from "react";
 
 const useStyles = makeStyles((theme) => ({
   innerContent: {
@@ -28,20 +29,27 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const theme = createTheme({
-  palette: {
-    type: "dark",
-    primary: {
-      main: "#f4511e",
-    },
-    secondary: indigo,
-  },
-  typography: {
-    overline: {
-      textTransform: "none", // This prevents the text from being all caps
-    },
-  },
-});
+export default function App() {
+  useEffect(() => {
+    fetchInitialData();
+    initEventListeners();
+  }, []);
+
+  const theme = useSettings((s) => s.theme);
+
+  return (
+    <ThemeProvider theme={themes[theme]}>
+      <GlobalSnackbarProvider>
+        <CssBaseline />
+        <Router>
+          <Navigation />
+          <InnerContent />
+          <UpdaterDialog />
+        </Router>
+      </GlobalSnackbarProvider>
+    </ThemeProvider>
+  );
+}
 
 function InnerContent() {
   const classes = useStyles();
@@ -56,26 +64,6 @@ function InnerContent() {
         <Route path="/" element={<SwapPage />} />
       </Routes>
     </Box>
-  );
-}
-
-export default function App() {
-  useEffect(() => {
-    fetchInitialData();
-    initEventListeners();
-  }, []);
-
-  return (
-    <ThemeProvider theme={theme}>
-      <GlobalSnackbarProvider>
-        <CssBaseline />
-        <Router>
-          <Navigation />
-          <InnerContent />
-          <UpdaterDialog/>
-        </Router>
-      </GlobalSnackbarProvider>
-    </ThemeProvider>
   );
 }
 
@@ -94,6 +82,16 @@ async function fetchInitialData() {
   }
 
   try {
+    await updateAllNodeStatuses()
+  } catch (e) {
+    logger.error(e, "Failed to update node statuses")
+  }
+
+  // Update node statuses every 2 minutes
+  const STATUS_UPDATE_INTERVAL = 2 * 60 * 1_000;
+  setInterval(updateAllNodeStatuses, STATUS_UPDATE_INTERVAL);
+
+  try {
     const alerts = await fetchAlertsViaHttp();
     store.dispatch(setAlerts(alerts));
     logger.info({ alerts }, "Fetched alerts via UnstoppableSwap HTTP API");
@@ -102,22 +100,13 @@ async function fetchInitialData() {
   }
 
   try {
-    const xmrPrice = await fetchXmrPrice();
-    store.dispatch(setXmrPrice(xmrPrice));
-    logger.info({ xmrPrice }, "Fetched XMR price");
-
-    const btcPrice = await fetchBtcPrice();
-    store.dispatch(setBtcPrice(btcPrice));
-    logger.info({ btcPrice }, "Fetched BTC price");
-  } catch (e) {
-    logger.error(e, "Error retrieving fiat prices");
-  }
-
-  try {
-    const xmrBtcRate = await fetchXmrBtcRate();
-    store.dispatch(setXmrBtcRate(xmrBtcRate));
-    logger.info({ xmrBtcRate }, "Fetched XMR/BTC rate");
+    await updateRates();
+    logger.info("Fetched XMR/BTC rate");
   } catch (e) {
     logger.error(e, "Error retrieving XMR/BTC rate");
   }
+  
+  // Update the rates every 5 minutes (to respect the coingecko rate limit)
+  const RATE_UPDATE_INTERVAL = 5 * 60 * 1_000;
+  setInterval(updateRates, RATE_UPDATE_INTERVAL);
 }

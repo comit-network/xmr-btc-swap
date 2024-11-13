@@ -4,6 +4,7 @@ use big_bytes::BigByte;
 use data_encoding::HEXLOWER;
 use futures::{StreamExt, TryStreamExt};
 use monero_rpc::wallet::{Client, MoneroWalletRpc as _};
+use once_cell::sync::Lazy;
 use reqwest::header::CONTENT_LENGTH;
 use reqwest::Url;
 use serde::Deserialize;
@@ -22,24 +23,26 @@ use tokio_util::io::StreamReader;
 
 // See: https://www.moneroworld.com/#nodes, https://monero.fail
 // We don't need any testnet nodes because we don't support testnet at all
-const MONERO_DAEMONS: [MoneroDaemon; 16] = [
-    MoneroDaemon::new("xmr-node.cakewallet.com", 18081, Network::Mainnet),
-    MoneroDaemon::new("nodex.monerujo.io", 18081, Network::Mainnet),
-    MoneroDaemon::new("nodes.hashvault.pro", 18081, Network::Mainnet),
-    MoneroDaemon::new("p2pmd.xmrvsbeast.com", 18081, Network::Mainnet),
-    MoneroDaemon::new("node.monerodevs.org", 18089, Network::Mainnet),
-    MoneroDaemon::new("xmr-node-usa-east.cakewallet.com", 18081, Network::Mainnet),
-    MoneroDaemon::new("xmr-node-uk.cakewallet.com", 18081, Network::Mainnet),
-    MoneroDaemon::new("node.community.rino.io", 18081, Network::Mainnet),
-    MoneroDaemon::new("testingjohnross.com", 20031, Network::Mainnet),
-    MoneroDaemon::new("xmr.litepay.ch", 18081, Network::Mainnet),
-    MoneroDaemon::new("node.trocador.app", 18089, Network::Mainnet),
-    MoneroDaemon::new("stagenet.xmr-tw.org", 38081, Network::Stagenet),
-    MoneroDaemon::new("node.monerodevs.org", 38089, Network::Stagenet),
-    MoneroDaemon::new("singapore.node.xmr.pm", 38081, Network::Stagenet),
-    MoneroDaemon::new("xmr-lux.boldsuck.org", 38081, Network::Stagenet),
-    MoneroDaemon::new("stagenet.community.rino.io", 38081, Network::Stagenet),
-];
+const MONERO_DAEMONS: Lazy<[MoneroDaemon; 16]> = Lazy::new(|| {
+    [
+        MoneroDaemon::new("xmr-node.cakewallet.com", 18081, Network::Mainnet),
+        MoneroDaemon::new("nodex.monerujo.io", 18081, Network::Mainnet),
+        MoneroDaemon::new("nodes.hashvault.pro", 18081, Network::Mainnet),
+        MoneroDaemon::new("p2pmd.xmrvsbeast.com", 18081, Network::Mainnet),
+        MoneroDaemon::new("node.monerodevs.org", 18089, Network::Mainnet),
+        MoneroDaemon::new("xmr-node-usa-east.cakewallet.com", 18081, Network::Mainnet),
+        MoneroDaemon::new("xmr-node-uk.cakewallet.com", 18081, Network::Mainnet),
+        MoneroDaemon::new("node.community.rino.io", 18081, Network::Mainnet),
+        MoneroDaemon::new("testingjohnross.com", 20031, Network::Mainnet),
+        MoneroDaemon::new("xmr.litepay.ch", 18081, Network::Mainnet),
+        MoneroDaemon::new("node.trocador.app", 18089, Network::Mainnet),
+        MoneroDaemon::new("stagenet.xmr-tw.org", 38081, Network::Stagenet),
+        MoneroDaemon::new("node.monerodevs.org", 38089, Network::Stagenet),
+        MoneroDaemon::new("singapore.node.xmr.pm", 38081, Network::Stagenet),
+        MoneroDaemon::new("xmr-lux.boldsuck.org", 38081, Network::Stagenet),
+        MoneroDaemon::new("stagenet.community.rino.io", 38081, Network::Stagenet),
+    ]
+});
 
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
 compile_error!("unsupported operating system");
@@ -87,26 +90,26 @@ pub struct WalletRpcProcess {
     port: u16,
 }
 
-#[derive(Debug, Copy, Clone)]
-struct MoneroDaemon {
-    address: &'static str,
+#[derive(Debug, Clone)]
+pub struct MoneroDaemon {
+    address: String,
     port: u16,
     network: Network,
 }
 
 impl MoneroDaemon {
-    const fn new(address: &'static str, port: u16, network: Network) -> Self {
-        Self {
-            address,
+    pub fn new(address: impl Into<String>, port: u16, network: Network) -> MoneroDaemon {
+        MoneroDaemon {
+            address: address.into(),
             port,
             network,
         }
     }
 
-    pub fn from_str(address: String, network: Network) -> Result<Self, Error> {
-        let (address, port) = extract_host_and_port(address)?;
+    pub fn from_str(address: impl Into<String>, network: Network) -> Result<MoneroDaemon, Error> {
+        let (address, port) = extract_host_and_port(address.into())?;
 
-        Ok(Self {
+        Ok(MoneroDaemon {
             address,
             port,
             network,
@@ -114,7 +117,7 @@ impl MoneroDaemon {
     }
 
     /// Checks if the Monero daemon is available by sending a request to its `get_info` endpoint.
-    async fn is_available(&self, client: &reqwest::Client) -> Result<bool, Error> {
+    pub async fn is_available(&self, client: &reqwest::Client) -> Result<bool, Error> {
         let url = format!("http://{}:{}/get_info", self.address, self.port);
         let res = client
             .get(url)
@@ -162,15 +165,14 @@ async fn choose_monero_daemon(network: Network) -> Result<MoneroDaemon, Error> {
         .build()?;
 
     // We only want to check for daemons that match the specified network
-    let network_matching_daemons = MONERO_DAEMONS
-        .iter()
-        .filter(|daemon| daemon.network == network);
+    let daemons = &*MONERO_DAEMONS;
+    let network_matching_daemons = daemons.iter().filter(|daemon| daemon.network == network);
 
     for daemon in network_matching_daemons {
         match daemon.is_available(&client).await {
             Ok(true) => {
                 tracing::debug!(%daemon, "Found available Monero daemon");
-                return Ok(*daemon);
+                return Ok(daemon.clone());
             }
             Err(err) => {
                 tracing::debug!(%err, %daemon, "Failed to connect to Monero daemon");
@@ -402,7 +404,6 @@ impl WalletRpc {
             line?;
         }
 
-        // Send a json rpc request to make sure monero_wallet_rpc is ready
         Client::localhost(port)?.get_version().await?;
 
         Ok(WalletRpcProcess {
@@ -486,7 +487,7 @@ impl WalletRpc {
     }
 }
 
-fn extract_host_and_port(address: String) -> Result<(&'static str, u16), Error> {
+fn extract_host_and_port(address: String) -> Result<(String, u16), Error> {
     // Strip the protocol (anything before "://")
     let stripped_address = if let Some(pos) = address.find("://") {
         address[(pos + 3)..].to_string()
@@ -501,9 +502,7 @@ fn extract_host_and_port(address: String) -> Result<(&'static str, u16), Error> 
         let host = parts[0].to_string();
         let port = parts[1].parse::<u16>()?;
 
-        // Leak the host string to create a 'static lifetime string
-        let static_str_host: &'static str = Box::leak(host.into_boxed_str());
-        return Ok((static_str_host, port));
+        return Ok((host, port));
     }
 
     bail!(

@@ -8,16 +8,18 @@ export function AmountWithUnit({
   amount,
   unit,
   fixedPrecision,
-  dollarRate,
+  exchangeRate,
 }: {
   amount: Amount;
   unit: string;
   fixedPrecision: number;
-  dollarRate?: Amount;
+  exchangeRate?: Amount;
 }) {
+  const fetchFiatPrices = useAppSelector((state) => state.settings.fetchFiatPrices);
+  const fiatCurrency = useAppSelector((state) => state.settings.fiatCurrency);
   const title =
-    dollarRate != null && amount != null
-      ? `≈ $${(dollarRate * amount).toFixed(2)}`
+    fetchFiatPrices && exchangeRate != null && amount != null && fiatCurrency != null
+      ? `≈ ${(exchangeRate * amount).toFixed(2)} ${fiatCurrency}`
       : "";
 
   return (
@@ -33,31 +35,31 @@ export function AmountWithUnit({
 }
 
 AmountWithUnit.defaultProps = {
-  dollarRate: null,
+  exchangeRate: null,
 };
 
 export function BitcoinAmount({ amount }: { amount: Amount }) {
-  const btcUsdRate = useAppSelector((state) => state.rates.btcPrice);
+  const btcRate = useAppSelector((state) => state.rates.btcPrice);
 
   return (
     <AmountWithUnit
       amount={amount}
       unit="BTC"
       fixedPrecision={6}
-      dollarRate={btcUsdRate}
+      exchangeRate={btcRate}
     />
   );
 }
 
 export function MoneroAmount({ amount }: { amount: Amount }) {
-  const xmrUsdRate = useAppSelector((state) => state.rates.xmrPrice);
+  const xmrRate = useAppSelector((state) => state.rates.xmrPrice);
 
   return (
     <AmountWithUnit
       amount={amount}
       unit="XMR"
       fixedPrecision={4}
-      dollarRate={xmrUsdRate}
+      exchangeRate={xmrRate}
     />
   );
 }

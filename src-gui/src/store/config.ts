@@ -1,8 +1,17 @@
 import { ExtendedProviderStatus } from "models/apiModel";
 import { splitPeerIdFromMultiAddress } from "utils/parseUtils";
 import { getMatches } from '@tauri-apps/plugin-cli';
+import { Network } from "./features/settingsSlice";
 
 const matches = await getMatches();
+
+export function getNetwork(): Network {
+  if (isTestnet()) {
+    return Network.Testnet;
+  } else {
+    return Network.Mainnet;
+  }
+}
 
 export function isTestnet() {
   return matches.args.testnet?.value === true

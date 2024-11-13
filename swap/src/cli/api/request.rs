@@ -1,19 +1,22 @@
 use super::tauri_bindings::TauriHandle;
-use crate::bitcoin::{CancelTimelock, ExpiredTimelocks, PunishTimelock, TxLock};
+use crate::bitcoin::{wallet, CancelTimelock, ExpiredTimelocks, PunishTimelock, TxLock};
 use crate::cli::api::tauri_bindings::{TauriEmitter, TauriSwapProgressEvent};
 use crate::cli::api::Context;
 use crate::cli::{list_sellers as list_sellers_impl, EventLoop, Seller, SellerStatus};
 use crate::common::get_logs;
 use crate::libp2p_ext::MultiAddrExt;
+use crate::monero::wallet_rpc::MoneroDaemon;
 use crate::network::quote::{BidQuote, ZeroQuoteReceived};
 use crate::network::swarm;
 use crate::protocol::bob::{BobState, Swap};
 use crate::protocol::{bob, State};
 use crate::{bitcoin, cli, monero, rpc};
 use ::bitcoin::Txid;
+use ::monero::Network;
 use anyhow::{bail, Context as AnyContext, Result};
 use libp2p::core::Multiaddr;
 use libp2p::PeerId;
+use once_cell::sync::Lazy;
 use qrcode::render::unicode;
 use qrcode::QrCode;
 use serde::{Deserialize, Serialize};
@@ -25,6 +28,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use thiserror::Error;
 use tracing::debug_span;
 use tracing::Instrument;
 use tracing::Span;
@@ -1293,4 +1297,78 @@ where
     let btc_swap_amount = min(max_giveable, max_accepted);
 
     Ok((btc_swap_amount, fees))
+}
+
+#[typeshare]
+#[derive(Deserialize, Serialize)]
+pub struct CheckMoneroNodeArgs {
+    pub url: String,
+    pub network: String,
+}
+
+#[typeshare]
+#[derive(Deserialize, Serialize)]
+pub struct CheckMoneroNodeResponse {
+    pub available: bool,
+}
+
+#[derive(Error, Debug)]
+#[error("this is not one of the known monero networks")]
+struct UnknownMoneroNetwork(String);
+
+impl CheckMoneroNodeArgs {
+    pub async fn request(self) -> Result<CheckMoneroNodeResponse> {
+        let network = match self.network.to_lowercase().as_str() {
+            // When the GUI says testnet, it means monero stagenet
+            "mainnet" => Network::Mainnet,
+            "testnet" => Network::Stagenet,
+            otherwise => anyhow::bail!(UnknownMoneroNetwork(otherwise.to_string())),
+        };
+
+        static CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
+            reqwest::Client::builder()
+                .timeout(Duration::from_secs(30))
+                .https_only(false)
+                .build()
+                .expect("reqwest client to work")
+        });
+
+        let Ok(monero_daemon) = MoneroDaemon::from_str(self.url, network) else {
+            return Ok(CheckMoneroNodeResponse { available: false });
+        };
+
+        let Ok(available) = monero_daemon.is_available(&CLIENT).await else {
+            return Ok(CheckMoneroNodeResponse { available: false });
+        };
+
+        Ok(CheckMoneroNodeResponse { available })
+    }
+}
+
+#[typeshare]
+#[derive(Deserialize, Clone)]
+pub struct CheckElectrumNodeArgs {
+    pub url: String,
+}
+
+#[typeshare]
+#[derive(Serialize, Clone)]
+pub struct CheckElectrumNodeResponse {
+    pub available: bool,
+}
+
+impl CheckElectrumNodeArgs {
+    pub async fn request(self) -> Result<CheckElectrumNodeResponse> {
+        // Check if the URL is valid
+        let Ok(url) = self.url.parse() else {
+            return Ok(CheckElectrumNodeResponse { available: false });
+        };
+
+        // Check if the node is available
+        let res = wallet::Client::new(url, Duration::from_secs(10), 0);
+
+        Ok(CheckElectrumNodeResponse {
+            available: res.is_ok(),
+        })
+    }
 }

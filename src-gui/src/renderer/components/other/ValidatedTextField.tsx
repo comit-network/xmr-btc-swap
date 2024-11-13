@@ -6,6 +6,7 @@ interface ValidatedTextFieldProps extends Omit<TextFieldProps, "onChange" | "val
   isValid: (value: string) => boolean;
   onValidatedChange: (value: string | null) => void;
   allowEmpty?: boolean;
+  noErrorWhenEmpty?: boolean;
   helperText?: string;
 }
 
@@ -17,6 +18,7 @@ export default function ValidatedTextField({
   helperText = "Invalid input",
   variant = "standard",
   allowEmpty = false,
+  noErrorWhenEmpty = false,
   ...props
 }: ValidatedTextFieldProps) {
   const [inputValue, setInputValue] = useState(value || "");
@@ -39,7 +41,7 @@ export default function ValidatedTextField({
     setInputValue(value || "");
   }, [value]);
 
-  const isError = allowEmpty && inputValue === "" ? false : !isValid(inputValue);
+  const isError = allowEmpty && inputValue === "" || inputValue === "" && noErrorWhenEmpty ? false : !isValid(inputValue);
 
   return (
     <TextField

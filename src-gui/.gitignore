@@ -28,4 +28,4 @@ dist-ssr
 src/models/tauriModel.ts
 
 # Env files
-.env.*
+.env*

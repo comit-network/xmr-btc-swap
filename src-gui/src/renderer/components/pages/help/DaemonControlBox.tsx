@@ -33,6 +33,7 @@ export default function DaemonControlBox() {
 
   return (
     <InfoBox
+      id="daemon-control-box"
       title={`Daemon Controller (${stringifiedDaemonStatus})`}
       mainContent={
         <CliLogsBox

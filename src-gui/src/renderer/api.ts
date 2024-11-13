@@ -5,6 +5,9 @@
 // - and to submit feedback
 // - fetch currency rates from CoinGecko
 import { Alert, ExtendedProviderStatus } from "models/apiModel";
+import { store } from "./store/storeRenderer";
+import { setBtcPrice, setXmrBtcRate, setXmrPrice } from "store/features/ratesSlice";
+import { FiatCurrency } from "store/features/settingsSlice";
 
 const API_BASE_URL = "https://api.unstoppableswap.net";
 
@@ -45,20 +48,20 @@ export async function submitFeedbackViaHttp(
   return responseBody.feedbackId;
 }
 
-async function fetchCurrencyUsdPrice(currency: string): Promise<number> {
+async function fetchCurrencyPrice(currency: string, fiatCurrency: FiatCurrency): Promise<number> {
   try {
     const response = await fetch(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${currency}&vs_currencies=usd`,
+      `https://api.coingecko.com/api/v3/simple/price?ids=${currency}&vs_currencies=${fiatCurrency.toLowerCase()}`,
     );
     const data = await response.json();
-    return data[currency].usd;
+    return data[currency][fiatCurrency.toLowerCase()];
   } catch (error) {
     console.error(`Error fetching ${currency} price:`, error);
     throw error;
   }
 }
 
-export async function fetchXmrBtcRate(): Promise<number> {
+async function fetchXmrBtcRate(): Promise<number> {
   try {
     const response = await fetch('https://api.kraken.com/0/public/Ticker?pair=XMRXBT');
     const data = await response.json();
@@ -78,10 +81,35 @@ export async function fetchXmrBtcRate(): Promise<number> {
 }
 
 
-export async function fetchBtcPrice(): Promise<number> {
-  return fetchCurrencyUsdPrice("bitcoin");
+async function fetchBtcPrice(fiatCurrency: FiatCurrency): Promise<number> {
+  return fetchCurrencyPrice("bitcoin", fiatCurrency);
 }
 
-export async function fetchXmrPrice(): Promise<number> {
-  return fetchCurrencyUsdPrice("monero");
+async function fetchXmrPrice(fiatCurrency: FiatCurrency): Promise<number> {
+  return fetchCurrencyPrice("monero", fiatCurrency);
+}
+
+/**
+ * If enabled by the user, fetch the XMR, BTC and XMR/BTC rates 
+ * and store them in the Redux store.
+ */
+export async function updateRates(): Promise<void> {
+  const settings = store.getState().settings;
+  if (!settings.fetchFiatPrices) 
+    return;
+
+  try { 
+    const xmrBtcRate = await fetchXmrBtcRate();
+    store.dispatch(setXmrBtcRate(xmrBtcRate));
+
+    const btcPrice = await fetchBtcPrice(settings.fiatCurrency);
+    store.dispatch(setBtcPrice(btcPrice));
+    
+    const xmrPrice = await fetchXmrPrice(settings.fiatCurrency);
+    store.dispatch(setXmrPrice(xmrPrice));
+
+    console.log(`Fetched rates for ${settings.fiatCurrency}`);
+  } catch (error) {
+    console.error("Error fetching rates:", error);
+  }
 }

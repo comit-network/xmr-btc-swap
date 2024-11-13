@@ -1,4 +1,4 @@
-import { Typography } from "@material-ui/core";
+import { Link, Typography } from "@material-ui/core";
 import MoneroIcon from "../../icons/MoneroIcon";
 import DepositAddressInfoBox from "../../modal/swap/DepositAddressInfoBox";
 
@@ -13,11 +13,13 @@ export default function DonateInfoBox() {
       icon={<MoneroIcon />}
       additionalContent={
         <Typography variant="subtitle2">
-          We rely on generous donors like you to keep development moving
-          forward. To bring Atomic Swaps to life, we need resources. If you have
-          the possibility, please consider making a donation to the project. All
-          funds will be used to support contributors and critical
-          infrastructure.
+          <p>
+            As part of the Monero Community Crowdfunding System (CCS), we received funding for 6 months of full-time development by
+            generous donors from the Monero community (<Link href="https://ccs.getmonero.org/proposals/mature-atomic-swaps-ecosystem.html" target="_blank">link</Link>).
+          </p>
+          <p>
+            If you want to support our effort event further, you can do so at this address. 
+          </p>
         </Typography>
       }
     />

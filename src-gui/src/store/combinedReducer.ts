@@ -5,7 +5,7 @@ import rpcSlice from "./features/rpcSlice";
 import swapReducer from "./features/swapSlice";
 import torSlice from "./features/torSlice";
 import settingsSlice from "./features/settingsSlice";
-
+import nodesSlice from "./features/nodesSlice";
 export const reducers = {
   swap: swapReducer,
   providers: providersSlice,
@@ -14,4 +14,5 @@ export const reducers = {
   alerts: alertsSlice,
   rates: ratesSlice,
   settings: settingsSlice,
+  nodes: nodesSlice,
 };

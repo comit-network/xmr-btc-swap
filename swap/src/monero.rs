@@ -1,5 +1,5 @@
 pub mod wallet;
-mod wallet_rpc;
+pub mod wallet_rpc;
 
 pub use ::monero::network::Network;
 pub use ::monero::{Address, PrivateKey, PublicKey};

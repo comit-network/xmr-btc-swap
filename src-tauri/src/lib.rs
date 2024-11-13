@@ -4,10 +4,11 @@ use std::sync::Arc;
 use swap::cli::{
     api::{
         request::{
-            BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, ExportBitcoinWalletArgs, GetHistoryArgs,
-            GetLogsArgs, GetMoneroAddressesArgs, GetSwapInfoArgs, GetSwapInfosAllArgs,
-            ListSellersArgs, MoneroRecoveryArgs, ResumeSwapArgs, SuspendCurrentSwapArgs,
-            WithdrawBtcArgs,
+            BalanceArgs, BuyXmrArgs, CancelAndRefundArgs, CheckElectrumNodeArgs,
+            CheckElectrumNodeResponse, CheckMoneroNodeArgs, CheckMoneroNodeResponse,
+            ExportBitcoinWalletArgs, GetHistoryArgs, GetLogsArgs, GetMoneroAddressesArgs,
+            GetSwapInfoArgs, GetSwapInfosAllArgs, ListSellersArgs, MoneroRecoveryArgs,
+            ResumeSwapArgs, SuspendCurrentSwapArgs, WithdrawBtcArgs,
         },
         tauri_bindings::{TauriContextStatusEvent, TauriEmitter, TauriHandle, TauriSettings},
         Context, ContextBuilder,
@@ -161,6 +162,8 @@ pub fn run() {
             cancel_and_refund,
             is_context_available,
             initialize_context,
+            check_monero_node,
+            check_electrum_node,
             get_wallet_descriptor,
         ])
         .setup(setup)
@@ -202,7 +205,6 @@ tauri_command!(monero_recovery, MoneroRecoveryArgs);
 tauri_command!(get_logs, GetLogsArgs);
 tauri_command!(list_sellers, ListSellersArgs);
 tauri_command!(cancel_and_refund, CancelAndRefundArgs);
-
 // These commands require no arguments
 tauri_command!(get_wallet_descriptor, ExportBitcoinWalletArgs, no_args);
 tauri_command!(suspend_current_swap, SuspendCurrentSwapArgs, no_args);
@@ -216,6 +218,22 @@ tauri_command!(get_monero_addresses, GetMoneroAddressesArgs, no_args);
 async fn is_context_available(context: tauri::State<'_, RwLock<State>>) -> Result<bool, String> {
     // TODO: Here we should return more information about status of the context (e.g. initializing, failed)
     Ok(context.read().await.try_get_context().is_ok())
+}
+
+#[tauri::command]
+async fn check_monero_node(
+    args: CheckMoneroNodeArgs,
+    _: tauri::State<'_, RwLock<State>>,
+) -> Result<CheckMoneroNodeResponse, String> {
+    args.request().await.to_string_result()
+}
+
+#[tauri::command]
+async fn check_electrum_node(
+    args: CheckElectrumNodeArgs,
+    _: tauri::State<'_, RwLock<State>>,
+) -> Result<CheckElectrumNodeResponse, String> {
+    args.request().await.to_string_result()
 }
 
 /// Tauri command to initialize the Context
