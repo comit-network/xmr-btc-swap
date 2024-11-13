@@ -36,6 +36,12 @@ jobs:
           version: ${{ github.event.inputs.version }}
           manifest: swap/Cargo.toml
 
+      - name: Bump version in Cargo.toml for GUI
+        uses: thomaseizinger/set-crate-version@1.0.0
+        with:
+          version: ${{ github.event.inputs.version }}
+          manifest: src-tauri/Cargo.toml
+
       - name: Update Cargo.lock
         run: cargo update --workspace
 
