@@ -1,13 +1,13 @@
-# This file is used to build the preview release binaries for the Tauri GUI
-name: "Publish GUI preview release"
+# This file is used to build the release binaries for the Tauri GUI
+name: "Publish GUI release to GitHub"
 
 on:
-  push:
-    branches:
-      - master
+  release:
+    types: [created]
 
 jobs:
   publish-tauri:
+    if: ${{ !contains(github.ref_name, 'preview') }}
     permissions:
       contents: write
     strategy:
@@ -31,6 +31,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
+
+      - uses: Swatinem/rust-cache@v2.7.3
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@1.79
@@ -69,12 +71,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD:  ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: gui-preview
-          releaseName: "preview gui"
-          releaseBody: "This is a preview release of the GUI. This is not a stable release. Please only use this release for testing purposes. Download the [legacy GUI](https://github.com/UnstoppableSwap/Unstoppableswap-gui) instead."
-          releaseDraft: true
-          prerelease: true
-          includeDebug: true
+          releaseId: ${{ github.event.release.id }}
           projectPath: src-tauri
           args: ${{ matrix.args }}
           tauriScript: cargo tauri

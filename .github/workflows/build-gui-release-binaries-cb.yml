@@ -1,10 +1,9 @@
 # This file is used to build the preview release binaries for the Tauri GUI with CloudNebula integration
-name: "Publish GUI Preview Release with CloudNebula"
+name: "Publish GUI release to CloudNebula"
 
 on:
-  push:
-    branches:
-      - master
+  release:
+    types: [created]
 
 env:
   UBUNTU: "ubuntu-22.04"
@@ -46,6 +45,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'
+
+      - uses: Swatinem/rust-cache@v2.7.3
 
       - name: Install Rust Stable
         uses: dtolnay/rust-toolchain@1.79
