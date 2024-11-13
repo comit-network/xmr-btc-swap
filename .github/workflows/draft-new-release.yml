@@ -42,6 +42,10 @@ jobs:
           version: ${{ github.event.inputs.version }}
           manifest: src-tauri/Cargo.toml
 
+      - name: Update version in tauri.conf.json for GUI
+        run: |
+          sed -i 's/"version": "[^"]*"/"version": "${{ github.event.inputs.version }}"/' src-tauri/tauri.conf.json
+
       - name: Update Cargo.lock
         run: cargo update --workspace
 
