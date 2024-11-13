@@ -327,6 +327,7 @@ where
                             let swap_peer = self.db.get_peer_id(swap_id).await;
                             let swap_state = self.db.get_state(swap_id).await;
 
+                            // If we do not find the swap in the database, or we do not have a peer-id for it, reject
                             let (swap_peer, swap_state) = match (swap_peer, swap_state) {
                                 (Ok(peer), Ok(state)) => (peer, state),
                                 _ => {
@@ -343,6 +344,7 @@ where
                                 }
                             };
 
+                            // If the peer is not the one associated with the swap, reject
                             if swap_peer != peer {
                                 tracing::warn!(
                                     swap_id = %swap_id,
@@ -357,7 +359,10 @@ where
                                 continue;
                             }
 
-                            let State::Alice (AliceState::BtcPunished { state3 }) = swap_state else {
+                            // If we are in either of these states, the punish timelock has expired
+                            // Bob cannot refund the Bitcoin anymore. We can publish tx_punish to redeem the Bitcoin.
+                            // Therefore it is safe to reveal s_a to let him redeem the Monero
+                            let State::Alice (AliceState::BtcPunished { state3 } | AliceState::BtcPunishable { state3, .. }) = swap_state else {
                                 tracing::warn!(
                                     swap_id = %swap_id,
                                     reason = "swap is in invalid state",
