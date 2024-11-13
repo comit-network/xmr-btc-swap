@@ -98,7 +98,7 @@ impl NetworkBehaviour for Behaviour {
 
         if redial && self.sleep.is_none() {
             self.sleep = Some(Box::pin(tokio::time::sleep(self.backoff.initial_interval)));
-            tracing::info!(seconds_until_next_redial = %self.until_next_redial().unwrap().as_secs(), "Waiting for next redial attempt");
+            tracing::info!(seconds_until_next_redial = %self.until_next_redial().expect("We initialize the backoff without max_elapsed_time").as_secs(), "Waiting for next redial attempt");
         }
     }
 
