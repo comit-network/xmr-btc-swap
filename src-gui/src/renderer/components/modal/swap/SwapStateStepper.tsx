@@ -55,14 +55,14 @@ function getActiveStep(state: SwapState | null): PathStep | null {
     case "RequestingQuote":
     case "ReceivedQuote":
     case "WaitingForBtcDeposit":
-    case "Started":
+    case "SwapSetupInflight":
       return [PathType.HAPPY_PATH, 0, isReleased];
 
     // Step 1: Waiting for Bitcoin lock confirmation
     // Bitcoin has been locked, waiting for the counterparty to lock their XMR
     case "BtcLockTxInMempool":
       // We only display the first step as completed if the Bitcoin lock has been confirmed
-      if(latestState.content.btc_lock_confirmations > 0) {
+      if (latestState.content.btc_lock_confirmations > 0) {
         return [PathType.HAPPY_PATH, 1, isReleased];
       }
       return [PathType.HAPPY_PATH, 0, isReleased];
@@ -86,7 +86,7 @@ function getActiveStep(state: SwapState | null): PathStep | null {
     // XMR redemption transaction is in mempool, swap is essentially complete
     case "XmrRedeemInMempool":
       return [PathType.HAPPY_PATH, 4, false];
-      
+
     // Unhappy Path States
 
     // Step 1: Cancel timelock has expired. Waiting for cancel transaction to be published
@@ -117,8 +117,8 @@ function getActiveStep(state: SwapState | null): PathStep | null {
       return null;
     default:
       return fallbackStep("No step is assigned to the current state");
-      // TODO: Make this guard work. It should force the compiler to check if we have covered all possible cases.
-      // return exhaustiveGuard(latestState.type);  
+    // TODO: Make this guard work. It should force the compiler to check if we have covered all possible cases.
+    // return exhaustiveGuard(latestState.type);  
   }
 }
 

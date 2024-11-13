@@ -109,6 +109,16 @@ async fn next_state(
                 .estimate_fee(TxCancel::weight(), btc_amount)
                 .await?;
 
+            // Emit an event to tauri that we are negotiating with the swap provider to lock the Bitcoin
+            event_emitter.emit_swap_progress_event(
+                swap_id,
+                TauriSwapProgressEvent::SwapSetupInflight {
+                    btc_lock_amount: btc_amount,
+                    // TODO: Replace this with the actual fee
+                    btc_tx_lock_fee: bitcoin::Amount::ZERO,
+                },
+            );
+
             let state2 = event_loop_handle
                 .setup_swap(NewSwap {
                     swap_id,
@@ -145,16 +155,6 @@ async fn next_state(
 
             // Publish the signed Bitcoin lock transaction
             let (..) = bitcoin_wallet.broadcast(signed_tx, "lock").await?;
-
-            // Emit an event to tauri that the the swap started
-            event_emitter.emit_swap_progress_event(
-                swap_id,
-                TauriSwapProgressEvent::Started {
-                    btc_lock_amount: tx_lock.lock_amount(),
-                    // TODO: Replace this with the actual fee
-                    btc_tx_lock_fee: bitcoin::Amount::ZERO,
-                },
-            );
 
             BobState::BtcLocked {
                 state3,

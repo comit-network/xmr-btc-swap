@@ -24,12 +24,11 @@ export default function WaitingForBtcDepositPage({
   min_deposit_until_swap_will_start,
   max_deposit_until_maximum_amount_is_reached,
   min_bitcoin_lock_tx_fee,
+  max_giveable,
   quote,
 }: TauriSwapProgressEventContent<"WaitingForBtcDeposit">) {
   const classes = useStyles();
-  const bitcoinBalance = useAppSelector((s) => s.rpc.state.balance) || 0;
 
-  // TODO: Account for BTC lock tx fees
   return (
     <Box>
       <DepositAddressInfoBox
@@ -39,10 +38,10 @@ export default function WaitingForBtcDepositPage({
           <Box className={classes.additionalContent}>
             <Typography variant="subtitle2">
               <ul>
-                {bitcoinBalance > 0 ? (
+                {max_giveable > 0 ? (
                   <li>
-                    You have already deposited{" "}
-                    <SatsAmount amount={bitcoinBalance} />
+                    You have already deposited enough funds to swap
+                    <SatsAmount amount={max_giveable} />. However, that is below the minimum amount required to start the swap.
                   </li>
                 ) : null}
                 <li>
@@ -52,7 +51,7 @@ export default function WaitingForBtcDepositPage({
                     amount={max_deposit_until_maximum_amount_is_reached}
                   />{" "}
                   to the address above
-                  {bitcoinBalance > 0 && (
+                  {max_giveable > 0 && (
                     <> (on top of the already deposited funds)</>
                   )}
                 </li>

@@ -11,7 +11,7 @@ import BitcoinRedeemedPage from "./in_progress/BitcoinRedeemedPage";
 import CancelTimelockExpiredPage from "./in_progress/CancelTimelockExpiredPage";
 import EncryptedSignatureSentPage from "./in_progress/EncryptedSignatureSentPage";
 import ReceivedQuotePage from "./in_progress/ReceivedQuotePage";
-import StartedPage from "./in_progress/StartedPage";
+import SwapSetupInflightPage from "./in_progress/SwapSetupInflightPage";
 import XmrLockedPage from "./in_progress/XmrLockedPage";
 import XmrLockTxInMempoolPage from "./in_progress/XmrLockInMempoolPage";
 import InitPage from "./init/InitPage";
@@ -21,7 +21,7 @@ export default function SwapStatePage({ state }: { state: SwapState | null }) {
   if (state === null) {
     return <InitPage />;
   }
-  
+
   switch (state.curr.type) {
     case "RequestingQuote":
       return <CircularProgressWithSubtitle description="Requesting quote..." />;
@@ -31,8 +31,8 @@ export default function SwapStatePage({ state }: { state: SwapState | null }) {
       return <ReceivedQuotePage />;
     case "WaitingForBtcDeposit":
       return <WaitingForBitcoinDepositPage {...state.curr.content} />;
-    case "Started":
-      return <StartedPage {...state.curr.content} />;
+    case "SwapSetupInflight":
+      return <SwapSetupInflightPage {...state.curr.content} />;
     case "BtcLockTxInMempool":
       return <BitcoinLockTxInMempoolPage {...state.curr.content} />;
     case "XmrLockTxInMempool":

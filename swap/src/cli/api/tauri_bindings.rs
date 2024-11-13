@@ -149,7 +149,7 @@ pub enum TauriSwapProgressEvent {
         min_bitcoin_lock_tx_fee: bitcoin::Amount,
         quote: BidQuote,
     },
-    Started {
+    SwapSetupInflight {
         #[typeshare(serialized_as = "number")]
         #[serde(with = "::bitcoin::util::amount::serde::as_sat")]
         btc_lock_amount: bitcoin::Amount,
