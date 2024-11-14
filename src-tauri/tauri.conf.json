@@ -28,7 +28,8 @@
     "targets": [
       "appimage",
       "dmg",
-      "nsis"
+      "nsis",
+      "app"
     ],
     "icon": [
       "icons/32x32.png",
