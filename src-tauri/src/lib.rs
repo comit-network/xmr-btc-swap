@@ -113,11 +113,25 @@ impl State {
 
 /// Sets up the Tauri application
 /// Initializes the Tauri state
+/// Sets the window title
 fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    let app_handle = app.app_handle().to_owned();
+    // Set the window title to include the product name and version
+    let config = app.config();
+    let title = format!(
+        "{} (v{})",
+        config
+            .product_name
+            .as_ref()
+            .expect("Product name to be set"),
+        config.version.as_ref().expect("Version to be set")
+    );
 
-    #[cfg(desktop)]
-    app_handle.plugin(tauri_plugin_cli::init())?;
+    let _ = app
+        .get_webview_window("main")
+        .expect("main window to exist")
+        .set_title(&title);
+
+    let app_handle = app.app_handle().to_owned();
 
     // We need to set a value for the Tauri state right at the start
     // If we don't do this, Tauri commands will panic at runtime if no value is present
@@ -138,6 +152,8 @@ pub fn run() {
                 .expect("no main window")
                 .set_focus();
         }));
+
+        builder = builder.plugin(tauri_plugin_cli::init());
     }
 
     builder
@@ -244,6 +260,26 @@ async fn initialize_context(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, RwLock<State>>,
 ) -> Result<(), String> {
+    // When the app crashes, the monero-wallet-rpc process may not be killed
+    // This can lead to issues when the app is restarted
+    // because the monero-wallet-rpc has a lock on the wallet
+    // this will prevent the newly spawned instance from opening the wallet
+    // To fix this, we kill any running monero-wallet-rpc processes
+    let sys = sysinfo::System::new_with_specifics(
+        sysinfo::RefreshKind::new().with_processes(sysinfo::ProcessRefreshKind::new()),
+    );
+
+    for (pid, process) in sys.processes() {
+        if process
+            .name()
+            .to_string_lossy()
+            .starts_with("monero-wallet-rpc")
+        {
+            println!("Killing monero-wallet-rpc process with pid: {}", pid);
+            process.kill();
+        }
+    }
+
     // Acquire a write lock on the state
     let mut state_write_lock = state
         .try_write()
