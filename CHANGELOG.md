@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### **GUI**
+- Display a progress bar to user while we are downloading the `monero-wallet-rpc`
+- Release `.app` builds for Darwin
+
 ## [1.0.0-alpha.1] - 2024-11-14
 
 - GUI: Swaps will now be refunded as soon as the cancel timelock expires if the GUI is running but the swap dialog is not open.
