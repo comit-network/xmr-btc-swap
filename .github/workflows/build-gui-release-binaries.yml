@@ -7,6 +7,9 @@ on:
 
 jobs:
   publish-tauri:
+    # Do not publish preview releases to Github.
+    # Building takes too long for preview releases.
+    if: ${{ !contains(github.ref_name, 'preview') }}
     permissions:
       contents: write
     strategy:
