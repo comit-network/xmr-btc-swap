@@ -46,7 +46,7 @@ import { MoneroRecoveryResponse } from "models/rpcModel";
 import { ListSellersResponse } from "../models/tauriModel";
 import logger from "utils/logger";
 import { getNetwork, getNetworkName, isTestnet } from "store/config";
-import { Blockchain } from "store/features/settingsSlice";
+import { Blockchain, Network } from "store/features/settingsSlice";
 import { setStatus } from "store/features/nodesSlice";
 import { discoveredProvidersByRendezvous } from "store/features/providersSlice";
 
@@ -245,30 +245,39 @@ export async function initializeContext() {
   const network = getNetwork();
   const testnet = isTestnet();
 
+  // This looks convoluted but it does the following:
+  // - Fetch the status of all nodes for each blockchain in parallel
+  // - Return the first available node for each blockchain
+  // - If no node is available for a blockchain, return null for that blockchain
+  const [bitcoinNode, moneroNode] = await Promise.all([Blockchain.Bitcoin, Blockchain.Monero].map(async (blockchain) => {
+    const nodes = store.getState().settings.nodes[network][blockchain];
+
+    if (nodes.length === 0) {
+      return null;
+    }
+
+    try {
+      return await Promise.any(nodes.map(async node => {
+        const isAvailable = await getNodeStatus(node, blockchain, network);
+
+        if (isAvailable) {
+          return node;
+        }
+
+        throw new Error(`No available ${blockchain} node found`);
+      }));
+    } catch {
+      return null;
+    }
+  }),
+  );
+
+
   // Initialize Tauri settings with null values
   const tauriSettings: TauriSettings = {
-    electrum_rpc_url: null,
-    monero_node_url: null,
+    electrum_rpc_url: bitcoinNode,
+    monero_node_url: moneroNode,
   };
-
-  // If are missing any statuses, update them
-  if (Object.values(Blockchain).some(blockchain =>
-    Object.values(store.getState().nodes.nodes[blockchain]).length < store.getState().settings.nodes[network][blockchain].length
-  )) {
-    try {
-      console.log("Updating node statuses");
-      await updateAllNodeStatuses();
-    } catch (e) {
-      logger.error(e, "Failed to update node statuses");
-    }
-  }
-  const { bitcoin: bitcoinNodes, monero: moneroNodes } = store.getState().nodes.nodes;
-
-  const firstAvailableElectrumNode = Object.keys(bitcoinNodes).find(node => bitcoinNodes[node] === true);
-  const firstAvailableMoneroNode = Object.keys(moneroNodes).find(node => moneroNodes[node] === true);
-
-  tauriSettings.electrum_rpc_url = firstAvailableElectrumNode ?? null;
-  tauriSettings.monero_node_url = firstAvailableMoneroNode ?? null;
 
   console.log("Initializing context with settings", tauriSettings);
 
@@ -282,10 +291,10 @@ export async function getWalletDescriptor() {
   return await invokeNoArgs<ExportBitcoinWalletResponse>("get_wallet_descriptor");
 }
 
-export async function getMoneroNodeStatus(node: string): Promise<boolean> {
+export async function getMoneroNodeStatus(node: string, network: Network): Promise<boolean> {
   const response = await invoke<CheckMoneroNodeArgs, CheckMoneroNodeResponse>("check_monero_node", {
     url: node,
-    network: getNetworkName(),
+    network,
   });
 
   return response.available;
@@ -299,15 +308,16 @@ export async function getElectrumNodeStatus(url: string): Promise<boolean> {
   return response.available;
 }
 
-export async function getNodeStatus(url: string, blockchain: Blockchain): Promise<boolean> {
+export async function getNodeStatus(url: string, blockchain: Blockchain, network: Network): Promise<boolean> {
   switch (blockchain) {
-    case Blockchain.Monero: return await getMoneroNodeStatus(url);
+    case Blockchain.Monero: return await getMoneroNodeStatus(url, network);
     case Blockchain.Bitcoin: return await getElectrumNodeStatus(url);
+    default: throw new Error(`Unsupported blockchain: ${blockchain}`);
   }
 }
 
-async function updateNodeStatus(node: string, blockchain: Blockchain) {
-  const status = await getNodeStatus(node, blockchain);
+async function updateNodeStatus(node: string, blockchain: Blockchain, network: Network) {
+  const status = await getNodeStatus(node, blockchain, network);
 
   store.dispatch(setStatus({ node, status, blockchain }));
 }
@@ -319,7 +329,7 @@ export async function updateAllNodeStatuses() {
   // For all nodes, check if they are available and store the new status (in parallel)
   await Promise.all(
     Object.values(Blockchain).flatMap(blockchain =>
-      settings.nodes[network][blockchain].map(node => updateNodeStatus(node, blockchain))
+      settings.nodes[network][blockchain].map(node => updateNodeStatus(node, blockchain, network))
     )
   );
 }
