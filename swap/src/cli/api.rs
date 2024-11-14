@@ -301,6 +301,8 @@ impl ContextBuilder {
         let seed = Seed::from_file_or_generate(data_dir.as_path())
             .context("Failed to read seed in file")?;
 
+        let swap_lock = Arc::new(SwapLock::new());
+
         // We initialize the Bitcoin wallet below
         // To display the progress to the user, we emit events to the Tauri frontend
         self.tauri_handle
@@ -355,7 +357,12 @@ impl ContextBuilder {
         // we start a background task to watch for timelock changes.
         if let Some(wallet) = bitcoin_wallet.clone() {
             if self.tauri_handle.is_some() {
-                let watcher = Watcher::new(wallet, db.clone(), self.tauri_handle.clone());
+                let watcher = Watcher::new(
+                    wallet,
+                    db.clone(),
+                    self.tauri_handle.clone(),
+                    swap_lock.clone(),
+                );
                 tokio::spawn(watcher.run());
             }
         }
@@ -375,7 +382,7 @@ impl ContextBuilder {
                 is_testnet: self.is_testnet,
                 data_dir,
             },
-            swap_lock: Arc::new(SwapLock::new()),
+            swap_lock,
             tasks: Arc::new(PendingTaskList::default()),
             tauri_handle: self.tauri_handle,
         };

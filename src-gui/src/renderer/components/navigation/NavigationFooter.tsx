@@ -8,6 +8,7 @@ import UnfinishedSwapsAlert from "../alert/UnfinishedSwapsAlert";
 import DiscordIcon from "../icons/DiscordIcon";
 import LinkIconButton from "../icons/LinkIconButton";
 import { DISCORD_URL } from "../pages/help/ContactInfoBox";
+import BackgroundRefundAlert from "../alert/BackgroundRefundAlert";
 
 const useStyles = makeStyles((theme) => ({
   outer: {
@@ -29,6 +30,7 @@ export default function NavigationFooter() {
     <Box className={classes.outer}>
       <FundsLeftInWalletAlert />
       <UnfinishedSwapsAlert />
+      <BackgroundRefundAlert />
       <DaemonStatusAlert />
       <MoneroWalletRpcUpdatingAlert />
       <Box className={classes.linksOuter}>

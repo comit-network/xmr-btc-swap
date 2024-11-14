@@ -15,6 +15,8 @@ const SWAP_STATE_CHANGE_EVENT_NAME: &str = "swap-database-state-update";
 const TIMELOCK_CHANGE_EVENT_NAME: &str = "timelock-change";
 const CONTEXT_INIT_PROGRESS_EVENT_NAME: &str = "context-init-progress-update";
 const BALANCE_CHANGE_EVENT_NAME: &str = "balance-change";
+const BACKGROUND_REFUND_EVENT_NAME: &str = "background-refund";
+
 #[derive(Debug, Clone)]
 pub struct TauriHandle(
     #[cfg(feature = "tauri")]
@@ -80,6 +82,13 @@ pub trait TauriEmitter {
             BalanceResponse {
                 balance: new_balance,
             },
+        );
+    }
+
+    fn emit_background_refund_event(&self, swap_id: Uuid, state: BackgroundRefundState) {
+        let _ = self.emit_tauri_event(
+            BACKGROUND_REFUND_EVENT_NAME,
+            TauriBackgroundRefundEvent { swap_id, state },
         );
     }
 }
@@ -220,6 +229,23 @@ pub struct TauriTimelockChangeEvent {
     #[typeshare(serialized_as = "string")]
     swap_id: Uuid,
     timelock: Option<ExpiredTimelocks>,
+}
+
+#[derive(Serialize, Clone)]
+#[typeshare]
+#[serde(tag = "type", content = "content")]
+pub enum BackgroundRefundState {
+    Started,
+    Failed { error: String },
+    Completed,
+}
+
+#[derive(Serialize, Clone)]
+#[typeshare]
+pub struct TauriBackgroundRefundEvent {
+    #[typeshare(serialized_as = "string")]
+    swap_id: Uuid,
+    state: BackgroundRefundState,
 }
 
 /// This struct contains the settings for the Context

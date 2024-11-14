@@ -5,6 +5,7 @@ import {
   GetSwapInfoResponse,
   TauriContextStatusEvent,
   TauriTimelockChangeEvent,
+  BackgroundRefundState,
 } from "models/tauriModel";
 import { MoneroRecoveryResponse } from "../../models/rpcModel";
 import { GetSwapInfoResponseExt } from "models/tauriModelExt";
@@ -27,6 +28,10 @@ interface State {
     // TODO: Reimplement this using Tauri
     updateState: false;
   };
+  backgroundRefund: {
+    swapId: string;
+    state: BackgroundRefundState;
+  } | null;
 }
 
 export interface RPCSlice {
@@ -46,6 +51,7 @@ const initialState: RPCSlice = {
     moneroWalletRpc: {
       updateState: false,
     },
+    backgroundRefund: null,
   },
   logs: [],
 };
@@ -109,6 +115,12 @@ export const rpcSlice = createSlice({
     rpcResetMoneroRecoveryKeys(slice) {
       slice.state.moneroRecovery = null;
     },
+    rpcSetBackgroundRefundState(slice, action: PayloadAction<{ swap_id: string, state: BackgroundRefundState }>) {
+      slice.state.backgroundRefund = {
+        swapId: action.payload.swap_id,
+        state: action.payload.state,
+      };
+    },
   },
 });
 
@@ -122,6 +134,7 @@ export const {
   rpcSetSwapInfo,
   rpcSetMoneroRecoveryKeys,
   rpcResetMoneroRecoveryKeys,
+  rpcSetBackgroundRefundState,
   timelockChangeEventReceived
 } = rpcSlice.actions;
 

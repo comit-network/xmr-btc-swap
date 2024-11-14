@@ -28,10 +28,12 @@ import {
   CheckElectrumNodeArgs,
   CheckElectrumNodeResponse,
   GetMoneroAddressesResponse,
+  TauriBackgroundRefundEvent,
 } from "models/tauriModel";
 import {
   contextStatusEventReceived,
   receivedCliLog,
+  rpcSetBackgroundRefundState,
   rpcSetBalance,
   rpcSetSwapInfo,
   timelockChangeEventReceived,
@@ -99,6 +101,11 @@ export async function initEventListeners() {
   listen<TauriTimelockChangeEvent>('timelock-change', (event) => {
     console.log('Received timelock change event', event.payload);
     store.dispatch(timelockChangeEventReceived(event.payload));
+  })
+
+  listen<TauriBackgroundRefundEvent>('background-refund', (event) => {
+    console.log('Received background refund event', event.payload);
+    store.dispatch(rpcSetBackgroundRefundState(event.payload));
   })
 }
 
