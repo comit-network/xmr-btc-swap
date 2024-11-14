@@ -1,5 +1,5 @@
 import { createListenerMiddleware } from "@reduxjs/toolkit";
-import { getAllSwapInfos, checkBitcoinBalance, updateAllNodeStatuses } from "renderer/rpc";
+import { getAllSwapInfos, checkBitcoinBalance, updateAllNodeStatuses, fetchSellersAtPresetRendezvousPoints } from "renderer/rpc";
 import logger from "utils/logger";
 import { contextStatusEventReceived } from "store/features/rpcSlice";
 import { addNode, setFetchFiatPrices, setFiatCurrency } from "store/features/settingsSlice";
@@ -10,7 +10,7 @@ export function createMainListeners() {
   const listener = createListenerMiddleware();
 
   // Listener for when the Context becomes available
-  // When the context becomes available, we check the bitcoin balance and fetch all swap infos
+  // When the context becomes available, we check the bitcoin balance, fetch all swap infos and connect to the rendezvous point
   listener.startListening({
     actionCreator: contextStatusEventReceived,
     effect: async (action) => {
@@ -21,8 +21,11 @@ export function createMainListeners() {
         logger.debug(
           "Context is available, checking bitcoin balance and history",
         );
-        await checkBitcoinBalance();
-        await getAllSwapInfos();
+        await Promise.allSettled([
+          checkBitcoinBalance(),
+          getAllSwapInfos(),
+          fetchSellersAtPresetRendezvousPoints(),
+        ]);
       }
     },
   });

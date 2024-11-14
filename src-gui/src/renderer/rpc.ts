@@ -48,6 +48,21 @@ import logger from "utils/logger";
 import { getNetwork, getNetworkName, isTestnet } from "store/config";
 import { Blockchain } from "store/features/settingsSlice";
 import { setStatus } from "store/features/nodesSlice";
+import { discoveredProvidersByRendezvous } from "store/features/providersSlice";
+
+export const PRESET_RENDEZVOUS_POINTS = [
+  "/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE",
+];
+
+export async function fetchSellersAtPresetRendezvousPoints() {
+  await Promise.all(PRESET_RENDEZVOUS_POINTS.map(async (rendezvousPoint) => {
+    const response = await listSellersAtRendezvousPoint(rendezvousPoint);
+    store.dispatch(discoveredProvidersByRendezvous(response.sellers));
+
+    console.log(`Discovered ${response.sellers.length} sellers at rendezvous point ${rendezvousPoint} during startup fetch`);
+  }),
+  );
+}
 
 export async function initEventListeners() {
   // This operation is in-expensive

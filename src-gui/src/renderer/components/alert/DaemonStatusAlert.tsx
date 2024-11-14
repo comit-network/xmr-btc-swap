@@ -11,7 +11,7 @@ export default function DaemonStatusAlert() {
   const navigate = useNavigate();
 
   if (contextStatus === null) {
-    return <Alert severity="info">The daemon is not running</Alert>;
+    return <LoadingSpinnerAlert severity="warning">Checking for available remote nodes</LoadingSpinnerAlert>;
   }
 
   switch (contextStatus.type) {

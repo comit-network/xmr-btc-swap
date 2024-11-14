@@ -16,15 +16,10 @@ import { useSnackbar } from "notistack";
 import { ChangeEvent, useState } from "react";
 import TruncatedText from "renderer/components/other/TruncatedText";
 import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
-import { listSellersAtRendezvousPoint } from "renderer/rpc";
+import { listSellersAtRendezvousPoint, PRESET_RENDEZVOUS_POINTS } from "renderer/rpc";
 import { discoveredProvidersByRendezvous } from "store/features/providersSlice";
 import { useAppDispatch } from "store/hooks";
 import { isValidMultiAddressWithPeerId } from "utils/parseUtils";
-
-const PRESET_RENDEZVOUS_POINTS = [
-  "/dns4/discover.unstoppableswap.net/tcp/8888/p2p/12D3KooWA6cnqJpVnreBVnoro8midDL9Lpzmg8oJPoAGi7YYaamE",
-  "/dns4/eratosthen.es/tcp/7798/p2p/12D3KooWAh7EXXa2ZyegzLGdjvj1W4G3EXrTGrf6trraoT1MEobs",
-];
 
 const useStyles = makeStyles((theme: Theme) => ({
   chipOuter: {
