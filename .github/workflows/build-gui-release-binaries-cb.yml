@@ -13,7 +13,9 @@ env:
   CN_APPLICATION: "unstoppableswap/unstoppableswap-gui-rs"
 
 jobs:
-  draft:
+  draft-cb-release:
+    # Do not publish preview releases to CloudNebula
+    if: ${{ !contains(github.ref_name, 'preview') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,7 +26,7 @@ jobs:
           api-key: ${{ secrets.CN_API_KEY }}
 
   build:
-    needs: draft
+    needs: draft-cb-release
     strategy:
       fail-fast: false
       matrix:

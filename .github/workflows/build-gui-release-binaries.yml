@@ -7,7 +7,6 @@ on:
 
 jobs:
   publish-tauri:
-    if: ${{ !contains(github.ref_name, 'preview') }}
     permissions:
       contents: write
     strategy:
