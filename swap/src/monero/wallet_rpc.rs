@@ -366,7 +366,18 @@ impl WalletRpc {
             }
         };
 
-        let mut child = Command::new(self.exec_path())
+        let mut command = Command::new(self.exec_path());
+
+        #[cfg(target_os = "windows")]
+        {
+            // See: https://learn.microsoft.com/de-de/windows/win32/procthread/process-creation-flags
+            // This prevents a console window from appearing when the wallet is started
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            command.creation_flags(CREATE_NO_WINDOW);
+        }
+
+        let mut child = command
             .env("LANG", "en_AU.UTF-8")
             .stdout(Stdio::piped())
             .kill_on_drop(true)
