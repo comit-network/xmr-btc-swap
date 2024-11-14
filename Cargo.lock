@@ -7890,7 +7890,7 @@ checksum = "734676eb262c623cec13c3155096e08d1f8f29adce39ba17948b18dad1e54142"
 
 [[package]]
 name = "swap"
-version = "0.13.2"
+version = "1.0.0-alpha.1"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -9437,7 +9437,7 @@ dependencies = [
 
 [[package]]
 name = "unstoppableswap-gui-rs"
-version = "0.7.0"
+version = "1.0.0-alpha.1"
 dependencies = [
  "anyhow",
  "once_cell",

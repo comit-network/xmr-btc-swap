@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-alpha.1] - 2024-11-14
+
 - GUI: Swaps will now be refunded as soon as the cancel timelock expires if the GUI is running but the swap dialog is not open.
 - Breaking change: Increased Bitcoin refund window from 12 hours (72 blocks) to 24 hours (144 blocks) on mainnet. This change affects the default transaction configuration and requires both CLI and ASB to be updated to maintain compatibility. Earlier versions will not be able to initiate new swaps with peers running this version.
 - Breaking network protocol change: The libp2p version has been upgraded to 0.53 which includes breaking network protocol changes. ASBs and CLIs will not be able to swap if one of them is on the old version.
@@ -377,7 +379,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[unreleased]: https://github.com/comit-network/xmr-btc-swap/compare/0.13.2...HEAD
+[unreleased]: https://github.com/UnstoppableSwap/core/compare/1.0.0-alpha.1...HEAD
+[1.0.0-alpha.1]: https://github.com/UnstoppableSwap/core/compare/0.13.2...1.0.0-alpha.1
 [0.13.2]: https://github.com/comit-network/xmr-btc-swap/compare/0.13.1...0.13.2
 [0.13.1]: https://github.com/comit-network/xmr-btc-swap/compare/0.13.0...0.13.1
 [0.13.0]: https://github.com/comit-network/xmr-btc-swap/compare/0.12.3...0.13.0
