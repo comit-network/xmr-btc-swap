@@ -1327,7 +1327,8 @@ impl CheckMoneroNodeArgs {
 
         static CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
             reqwest::Client::builder()
-                .timeout(Duration::from_secs(30))
+                // This function is called very frequently, so we set the timeout to be short
+                .timeout(Duration::from_secs(5))
                 .https_only(false)
                 .build()
                 .expect("reqwest client to work")

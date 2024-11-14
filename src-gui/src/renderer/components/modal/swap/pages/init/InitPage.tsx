@@ -8,12 +8,12 @@ import {
 } from "@material-ui/core";
 import PlayArrowIcon from "@material-ui/icons/PlayArrow";
 import { useState } from "react";
+import RemainingFundsWillBeUsedAlert from "renderer/components/alert/RemainingFundsWillBeUsedAlert";
 import BitcoinAddressTextField from "renderer/components/inputs/BitcoinAddressTextField";
 import MoneroAddressTextField from "renderer/components/inputs/MoneroAddressTextField";
 import PromiseInvokeButton from "renderer/components/PromiseInvokeButton";
 import { buyXmr } from "renderer/rpc";
 import { useAppSelector } from "store/hooks";
-import RemainingFundsWillBeUsedAlert from "../../../../alert/RemainingFundsWillBeUsedAlert";
 
 const useStyles = makeStyles((theme) => ({
   initButton: {

@@ -15,6 +15,7 @@ import TruncatedText from "renderer/components/other/TruncatedText";
 import { PiconeroAmount, SatsAmount } from "../../../other/Units";
 import HistoryRowActions from "./HistoryRowActions";
 import HistoryRowExpanded from "./HistoryRowExpanded";
+import { bobStateNameToHumanReadable, GetSwapInfoResponseExt } from "models/tauriModelExt";
 
 const useStyles = makeStyles((theme) => ({
   amountTransferContainer: {
@@ -42,7 +43,7 @@ function AmountTransfer({
   );
 }
 
-export default function HistoryRow(swap: GetSwapInfoResponse) {
+export default function HistoryRow(swap: GetSwapInfoResponseExt) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -62,7 +63,7 @@ export default function HistoryRow(swap: GetSwapInfoResponse) {
             btcAmount={swap.btc_amount}
           />
         </TableCell>
-        <TableCell>{swap.state_name.toString()}</TableCell>
+        <TableCell>{bobStateNameToHumanReadable(swap.state_name)}</TableCell>
         <TableCell>
           <HistoryRowActions {...swap} />
         </TableCell>

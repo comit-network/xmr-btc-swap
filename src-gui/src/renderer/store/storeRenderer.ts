@@ -3,8 +3,8 @@ import { persistReducer, persistStore } from "redux-persist";
 import sessionStorage from "redux-persist/lib/storage/session";
 import { reducers } from "store/combinedReducer";
 import { createMainListeners } from "store/middleware/storeListener";
-import { LazyStore } from "@tauri-apps/plugin-store";
 import { getNetworkName } from "store/config";
+import { LazyStore } from "@tauri-apps/plugin-store";
 
 // Goal: Maintain application state across page reloads while allowing a clean slate on application restart
 // Settings are persisted across application restarts, while the rest of the state is cleared

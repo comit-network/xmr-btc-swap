@@ -347,6 +347,37 @@ function NodeTableModal({
   )
 }
 
+// Create a circle SVG with a given color and radius
+function Circle({ color, radius = 6 }: { color: string, radius?: number }) {
+  return <span>
+    <svg width={radius * 2} height={radius * 2} viewBox={`0 0 ${radius * 2} ${radius * 2}`}>
+      <circle cx={radius} cy={radius} r={radius} fill={color} />
+    </svg>
+  </span>
+}
+
+/**
+ * Displays a status indicator for a node
+ */
+function NodeStatus({ status }: { status: boolean | undefined }) {
+  const theme = useTheme();
+
+  switch (status) {
+    case true:
+      return <Tooltip title={"This node is available and responding to RPC requests"}>
+        <Circle color={theme.palette.success.dark} />
+      </Tooltip>;
+    case false:
+      return <Tooltip title={"This node is not available or not responding to RPC requests"}>
+        <Circle color={theme.palette.error.dark} />
+      </Tooltip>;
+    default:
+      return <Tooltip title={"The status of this node is currently unknown"}>
+        <HourglassEmpty />
+      </Tooltip>;
+  }
+}
+
 /**
  * A table that displays the available nodes for a given network and blockchain.
  * It allows you to add, remove, and move nodes up the list.
@@ -368,31 +399,6 @@ function NodeTable({
   const nodeStatuses = useNodes((s) => s.nodes);
   const [newNode, setNewNode] = useState("");
   const dispatch = useAppDispatch();
-  const theme = useTheme();
-
-  // Create a circle SVG with a given color and radius
-  const circle = (color: string, radius: number = 6) => <svg width={radius * 2} height={radius * 2} viewBox={`0 0 ${radius * 2} ${radius * 2}`}>
-    <circle cx={radius} cy={radius} r={radius} fill={color} />
-  </svg>;
-
-  // Show a green/red circle or a hourglass icon depending on the status of the node
-  const statusIcon = (node: string) => {
-    switch (nodeStatuses[blockchain][node]) {
-      case true:
-        return <Tooltip title={"This node is available and responding to RPC requests"}>
-          {circle(theme.palette.success.dark)}
-        </Tooltip>;
-      case false:
-        return <Tooltip title={"This node is not available or not responding to RPC requests"}>
-          {circle(theme.palette.error.dark)}
-        </Tooltip>;
-      default:
-        console.log(`Unknown status for node ${node}: ${nodeStatuses[node]}`);
-        return <Tooltip title={"The status of this node is currently unknown"}>
-          <HourglassEmpty />
-        </Tooltip>;
-    }
-  }
 
   const onAddNewNode = () => {
     dispatch(addNode({ network, type: blockchain, node: newNode }));
@@ -438,7 +444,9 @@ function NodeTable({
                 <Typography variant="overline">{node}</Typography>
               </TableCell>
               {/* Node status icon */}
-              <TableCell align="center" children={statusIcon(node)} />
+              <TableCell align="center">
+                <NodeStatus status={nodeStatuses[blockchain][node]} />
+              </TableCell>
               {/* Remove and move buttons */}
               <TableCell>
                 <Box style={{ display: "flex" }}>

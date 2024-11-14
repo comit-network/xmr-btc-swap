@@ -24,14 +24,12 @@ export const swapSlice = createSlice({
       //
       // Then we create a new swap state object that stores the current and previous events
       if (swap.state === null || action.payload.swap_id !== swap.state.swapId) {
-        console.log("Creating new swap state object");
         swap.state = {
           curr: action.payload.event,
           prev: null,
           swapId: action.payload.swap_id,
         };
       } else {
-        console.log("Updating existing swap state object");
         swap.state.prev = swap.state.curr;
         swap.state.curr = action.payload.event;
       }

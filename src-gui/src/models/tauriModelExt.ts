@@ -1,3 +1,4 @@
+import { exhaustiveGuard } from "utils/typescriptUtils";
 import {
   ExpiredTimelocks,
   GetSwapInfoResponse,
@@ -30,6 +31,26 @@ export enum BobStateName {
   SafelyAborted = "safely aborted",
 }
 
+export function bobStateNameToHumanReadable(stateName: BobStateName): string {
+  switch (stateName) {
+    case BobStateName.Started: return "Started";
+    case BobStateName.SwapSetupCompleted: return "Setup completed";
+    case BobStateName.BtcLocked: return "Bitcoin locked";
+    case BobStateName.XmrLockProofReceived: return "Monero locked";
+    case BobStateName.XmrLocked: return "Monero locked and fully confirmed";
+    case BobStateName.EncSigSent: return "Encrypted signature sent";
+    case BobStateName.BtcRedeemed: return "Bitcoin redeemed";
+    case BobStateName.CancelTimelockExpired: return "Cancel timelock expired";
+    case BobStateName.BtcCancelled: return "Bitcoin cancelled";
+    case BobStateName.BtcRefunded: return "Bitcoin refunded";
+    case BobStateName.XmrRedeemed: return "Monero redeemed";
+    case BobStateName.BtcPunished: return "Bitcoin punished";
+    case BobStateName.SafelyAborted: return "Safely aborted";
+    default:
+      return exhaustiveGuard(stateName);
+  }
+}
+
 // TODO: This is a temporary solution until we have a typeshare definition for BobStateName
 export type GetSwapInfoResponseExt = GetSwapInfoResponse & {
   state_name: BobStateName;
@@ -38,6 +59,22 @@ export type GetSwapInfoResponseExt = GetSwapInfoResponse & {
 export type TimelockNone = Extract<ExpiredTimelocks, { type: "None" }>;
 export type TimelockCancel = Extract<ExpiredTimelocks, { type: "Cancel" }>;
 export type TimelockPunish = Extract<ExpiredTimelocks, { type: "Punish" }>;
+
+// This function returns the absolute block number of the timelock relative to the block the tx_lock was included in
+export function getAbsoluteBlock(timelock: ExpiredTimelocks, cancelTimelock: number, punishTimelock: number): number {
+  if (timelock.type === "None") {
+    return cancelTimelock - timelock.content.blocks_left;
+  }
+  if (timelock.type === "Cancel") {
+    return cancelTimelock + punishTimelock - timelock.content.blocks_left;
+  }
+  if (timelock.type === "Punish") {
+    return cancelTimelock + punishTimelock;
+  }
+
+  // We match all cases
+  return exhaustiveGuard(timelock);
+}
 
 export type BobStateNameRunningSwap = Exclude<
   BobStateName,
@@ -50,7 +87,11 @@ export type BobStateNameRunningSwap = Exclude<
 >;
 
 export type GetSwapInfoResponseExtRunningSwap = GetSwapInfoResponseExt & {
-  stateName: BobStateNameRunningSwap;
+  state_name: BobStateNameRunningSwap;
+};
+
+export type GetSwapInfoResponseExtWithTimelock = GetSwapInfoResponseExt & {
+  timelock: ExpiredTimelocks;
 };
 
 export function isBobStateNameRunningSwap(
@@ -156,4 +197,15 @@ export function isGetSwapInfoResponseRunningSwap(
   response: GetSwapInfoResponseExt,
 ): response is GetSwapInfoResponseExtRunningSwap {
   return isBobStateNameRunningSwap(response.state_name);
+}
+
+/**
+ * Type guard for GetSwapInfoResponseExt to ensure timelock is not null
+ * @param response The swap info response to check
+ * @returns True if the timelock exists, false otherwise
+ */
+export function isGetSwapInfoResponseWithTimelock(
+  response: GetSwapInfoResponseExt
+): response is GetSwapInfoResponseExtWithTimelock {
+  return response.timelock !== null;
 }

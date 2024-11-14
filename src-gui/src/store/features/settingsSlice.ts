@@ -148,4 +148,5 @@ export const {
   setFetchFiatPrices,
   setFiatCurrency,
 } = alertsSlice.actions;
+
 export default alertsSlice.reducer;

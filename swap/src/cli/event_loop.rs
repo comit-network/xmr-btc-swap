@@ -343,6 +343,7 @@ impl EventLoop {
                     if self.swarm.behaviour_mut().transfer_proof.send_response(response_channel, ()).is_err() {
                         tracing::warn!("Failed to send acknowledgment to Alice that we have received the transfer proof");
                     } else {
+                        tracing::info!("Sent acknowledgment to Alice that we have received the transfer proof");
                         self.pending_transfer_proof = OptionFuture::from(None);
                     }
                 },

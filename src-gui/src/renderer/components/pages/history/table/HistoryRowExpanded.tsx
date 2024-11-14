@@ -27,6 +27,11 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(1),
     gap: theme.spacing(1),
   },
+  outerAddressBox: {
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.spacing(1),
+  },
   actionsOuter: {
     display: "flex",
     flexDirection: "row",
@@ -88,7 +93,7 @@ export default function HistoryRowExpanded({
             <TableRow>
               <TableCell>Provider Address</TableCell>
               <TableCell>
-                <Box>
+                <Box className={classes.outerAddressBox}>
                   {swap.seller.addresses.map((addr) => (
                     <ActionableMonospaceTextBox
                       key={addr}
@@ -122,16 +127,6 @@ export default function HistoryRowExpanded({
           variant="outlined"
           size="small"
         />
-        {/*
-          // TOOD: reimplement these buttons using Tauri
-
-          <SwapCancelRefundButton swap={swap} variant="contained" size="small" />
-          <SwapMoneroRecoveryButton
-            swap={swap}
-            variant="contained"
-            size="small"
-          />
-          */}
       </Box>
     </Box>
   );

@@ -1,6 +1,6 @@
 import { Box, makeStyles } from "@material-ui/core";
 import { useSwapInfosSortedByDate } from "store/hooks";
-import SwapStatusAlert from "./SwapStatusAlert";
+import SwapStatusAlert from "./SwapStatusAlert/SwapStatusAlert";
 
 const useStyles = makeStyles((theme) => ({
   outer: {
@@ -21,7 +21,7 @@ export default function SwapTxLockAlertsBox() {
   return (
     <Box className={classes.outer}>
       {swaps.map((swap) => (
-        <SwapStatusAlert key={swap.swap_id} swap={swap} />
+        <SwapStatusAlert key={swap.swap_id} swap={swap} isRunning={false} />
       ))}
     </Box>
   );

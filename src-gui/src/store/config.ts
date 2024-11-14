@@ -47,7 +47,7 @@ export function getStubTestnetProvider(): ExtendedProviderStatus | null {
 export function getNetworkName(): string {
   if (isTestnet()) {
     return "Testnet";
-  }else {
+  } else {
     return "Mainnet";
   }
 }

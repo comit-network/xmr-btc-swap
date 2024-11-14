@@ -6,21 +6,18 @@ export interface NodesSlice {
 }
 
 function initialState(): NodesSlice {
-    return {
-        nodes: {
-            [Blockchain.Bitcoin]: {},
-            [Blockchain.Monero]: {},
-        },
-    }
-}   
+  return {
+    nodes: {
+      [Blockchain.Bitcoin]: {},
+      [Blockchain.Monero]: {},
+    },
+  }
+}
 
 const nodesSlice = createSlice({
   name: "nodes",
   initialState: initialState(),
   reducers: {
-    setStatuses(slice, action: PayloadAction<Record<Blockchain, Record<string, boolean>>>) {
-      slice.nodes = action.payload;
-    },
     setStatus(slice, action: PayloadAction<{
       node: string,
       status: boolean,
@@ -29,13 +26,13 @@ const nodesSlice = createSlice({
       slice.nodes[action.payload.blockchain][action.payload.node] = action.payload.status;
     },
     resetStatuses(slice) {
-        slice.nodes = {
-            [Blockchain.Bitcoin]: {},
-            [Blockchain.Monero]: {},
-        }
+      slice.nodes = {
+        [Blockchain.Bitcoin]: {},
+        [Blockchain.Monero]: {},
+      }
     },
   },
 });
 
-export const { setStatus, setStatuses, resetStatuses } = nodesSlice.actions;
+export const { setStatus, resetStatuses } = nodesSlice.actions;
 export default nodesSlice.reducer;
