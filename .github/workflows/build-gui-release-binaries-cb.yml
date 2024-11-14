@@ -63,14 +63,20 @@ jobs:
         working-directory: src-gui
         run: yarn install
 
-      - name: Install Tauri CLI Globally
-        run: cargo install tauri-cli@^2.0.0-rc
+      - name: install tauri-cli globally
+        uses: taiki-e/cache-cargo-install-action@v2
+        with:
+          tool: tauri-cli@2.1.0
+          
+      - name: install typeshare-cli globally
+        uses: taiki-e/cache-cargo-install-action@v2
+        with:
+          tool: typeshare-cli
 
-      - name: Install Typeshare CLI Globally
-        run: cargo install typeshare-cli
-
-      - name: Install Dprint Globally
-        run: cargo install dprint@0.39.1
+      - name: install dprint globally
+        uses: taiki-e/cache-cargo-install-action@v2
+        with:
+          tool: dprint@0.39.1
 
       - name: Build Tauri App
         env:
