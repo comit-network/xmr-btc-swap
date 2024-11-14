@@ -11,11 +11,15 @@ import {
   makeStyles,
   LinearProgressProps,
   Box,
+  Link,
 } from '@material-ui/core';
 import SystemUpdateIcon from '@material-ui/icons/SystemUpdate';
 import { check, Update, DownloadEvent } from '@tauri-apps/plugin-updater';
 import { useSnackbar } from 'notistack';
 import { relaunch } from '@tauri-apps/plugin-process';
+
+const GITHUB_RELEASES_URL = "https://github.com/UnstoppableSwap/core/releases";
+const HOMEPAGE_URL = "https://unstoppableswap.net/";
 
 const useStyles = makeStyles((theme) => ({
   progress: {
@@ -54,16 +58,16 @@ export default function UpdaterDialog() {
   const classes = useStyles();
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
-  const {enqueueSnackbar} = useSnackbar();
+  const { enqueueSnackbar } = useSnackbar();
 
   useEffect(() => {
     // Check for updates when component mounts
     check().then((updateResponse) => {
-        setAvailableUpdate(updateResponse);
+      setAvailableUpdate(updateResponse);
     }).catch((err) => {
-        enqueueSnackbar(`Failed to check for updates: ${err}`, {
-            variant: 'error',
-        });
+      enqueueSnackbar(`Failed to check for updates: ${err}`, {
+        variant: 'error',
+      });
     });
   }, []);
 
@@ -93,9 +97,9 @@ export default function UpdaterDialog() {
       // Once the promise resolves, relaunch the application for the new version to be used
       relaunch();
     } catch (err) {
-        enqueueSnackbar(`Failed to install update: ${err}`, {
-            variant: "error"
-        });
+      enqueueSnackbar(`Failed to install update: ${err}`, {
+        variant: "error"
+      });
     }
   };
 
@@ -116,7 +120,8 @@ export default function UpdaterDialog() {
       <DialogContent>
         <DialogContentText>
           A new version (v{availableUpdate.version}) is available. Your current version is {availableUpdate.currentVersion}.
-          The update will be verified using PGP signature verification to ensure authenticity.
+          The update will be verified using PGP signature verification to ensure authenticity. Alternatively, you can download the
+          update from <Link href={GITHUB_RELEASES_URL} target="_blank">GitHub</Link> or visit the <Link href={HOMEPAGE_URL} target="_blank">download page</Link>.
           {availableUpdate.body && (
             <>
               <Typography variant="h6" className={classes.releaseNotes}>
@@ -128,16 +133,15 @@ export default function UpdaterDialog() {
             </>
           )}
         </DialogContentText>
-        
+
         {isDownloading && (
           <Box className={classes.progress}>
-            <LinearProgressWithLabel 
+            <LinearProgressWithLabel
               value={progress}
-              label={`${(downloadProgress.downloadedBytes / 1024 / 1024).toFixed(1)} MB${
-                downloadProgress.contentLength 
-                  ? ` / ${(downloadProgress.contentLength / 1024 / 1024).toFixed(1)} MB` 
-                  : ''
-              }`}
+              label={`${(downloadProgress.downloadedBytes / 1024 / 1024).toFixed(1)} MB${downloadProgress.contentLength
+                ? ` / ${(downloadProgress.contentLength / 1024 / 1024).toFixed(1)} MB`
+                : ''
+                }`}
             />
           </Box>
         )}
