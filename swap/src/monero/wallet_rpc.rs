@@ -21,6 +21,10 @@ use tokio::process::{Child, Command};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tokio_util::io::StreamReader;
 
+use crate::cli::api::tauri_bindings::{
+    TauriContextInitializationProgress, TauriContextStatusEvent, TauriEmitter, TauriHandle,
+};
+
 // See: https://www.moneroworld.com/#nodes, https://monero.fail
 // We don't need any testnet nodes because we don't support testnet at all
 const MONERO_DAEMONS: Lazy<[MoneroDaemon; 16]> = Lazy::new(|| {
@@ -201,7 +205,10 @@ pub struct WalletRpc {
 }
 
 impl WalletRpc {
-    pub async fn new(working_dir: impl AsRef<Path>) -> Result<WalletRpc> {
+    pub async fn new(
+        working_dir: impl AsRef<Path>,
+        tauri_handle: Option<TauriHandle>,
+    ) -> Result<WalletRpc> {
         let working_dir = working_dir.as_ref();
 
         if !working_dir.exists() {
@@ -255,6 +262,14 @@ impl WalletRpc {
                 "Downloading monero-wallet-rpc",
             );
 
+            // Emit a tauri event to update the progress
+            tauri_handle.emit_context_init_progress_event(TauriContextStatusEvent::Initializing(
+                TauriContextInitializationProgress::DownloadingMoneroWalletRpc {
+                    progress: 0,
+                    size: content_length,
+                },
+            ));
+
             let mut hasher = Sha256::new();
 
             let byte_stream = response
@@ -292,6 +307,16 @@ impl WalletRpc {
                         "Downloading monero-wallet-rpc",
                     );
                     notified = percent;
+
+                    // Emit a tauri event to update the progress
+                    tauri_handle.emit_context_init_progress_event(
+                        TauriContextStatusEvent::Initializing(
+                            TauriContextInitializationProgress::DownloadingMoneroWalletRpc {
+                                progress: percent,
+                                size: content_length,
+                            },
+                        ),
+                    );
                 }
                 file.write_all(&bytes).await?;
             }

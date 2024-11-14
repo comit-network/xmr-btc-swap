@@ -30,9 +30,8 @@ export function isBtcAddressValid(address: string, testnet: boolean) {
 }
 
 export function getBitcoinTxExplorerUrl(txid: string, testnet: boolean) {
-  return `https://mempool.space/${
-    testnet ? "/testnet" : ""
-  }/tx/${txid}`;
+  return `https://mempool.space/${testnet ? "/testnet" : ""
+    }/tx/${txid}`;
 }
 
 export function getMoneroTxExplorerUrl(txid: string, stagenet: boolean) {
@@ -66,4 +65,8 @@ export function rendezvousSellerToProviderStatus(
     multiAddr,
     testnet: isTestnet(),
   };
+}
+
+export function bytesToMb(bytes: number): number {
+  return bytes / (1024 * 1024);
 }

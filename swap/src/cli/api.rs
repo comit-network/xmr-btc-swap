@@ -336,8 +336,13 @@ impl ContextBuilder {
         let (monero_wallet, monero_rpc_process) = {
             if let Some(monero) = self.monero {
                 let monero_daemon_address = monero.apply_defaults(self.is_testnet);
-                let (wlt, prc) =
-                    init_monero_wallet(data_dir.clone(), monero_daemon_address, env_config).await?;
+                let (wlt, prc) = init_monero_wallet(
+                    data_dir.clone(),
+                    monero_daemon_address,
+                    env_config,
+                    self.tauri_handle.clone(),
+                )
+                .await?;
                 (Some(Arc::new(wlt)), Some(Arc::new(SyncMutex::new(prc))))
             } else {
                 (None, None)
@@ -473,12 +478,13 @@ async fn init_monero_wallet(
     data_dir: PathBuf,
     monero_daemon_address: String,
     env_config: EnvConfig,
+    tauri_handle: Option<TauriHandle>,
 ) -> Result<(monero::Wallet, monero::WalletRpcProcess)> {
     let network = env_config.monero_network;
 
     const MONERO_BLOCKCHAIN_MONITORING_WALLET_NAME: &str = "swap-tool-blockchain-monitoring-wallet";
 
-    let monero_wallet_rpc = monero::WalletRpc::new(data_dir.join("monero")).await?;
+    let monero_wallet_rpc = monero::WalletRpc::new(data_dir.join("monero"), tauri_handle).await?;
 
     tracing::debug!(
         address = monero_daemon_address,

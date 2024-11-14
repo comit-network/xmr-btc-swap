@@ -110,8 +110,17 @@ impl TauriEmitter for Option<TauriHandle> {
 
 #[typeshare]
 #[derive(Display, Clone, Serialize)]
+#[serde(tag = "type", content = "content")]
 pub enum TauriContextInitializationProgress {
     OpeningBitcoinWallet,
+    DownloadingMoneroWalletRpc {
+        // Progress of the download in percent (0-100)
+        #[typeshare(serialized_as = "number")]
+        progress: u64,
+        // Size of the download file in bytes
+        #[typeshare(serialized_as = "number")]
+        size: u64,
+    },
     OpeningMoneroWallet,
     OpeningDatabase,
 }
