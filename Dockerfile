@@ -1,6 +1,6 @@
 # This Dockerfile builds the asb binary
 
-FROM rust:1.79-slim AS builder
+FROM rust:1.79.0-slim-bookworm AS builder
 
 WORKDIR /build
 
