@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc.2] - 2024-11-16
+
 - GUI: ASBs discovered via rendezvous are now prioritized if they are running the latest version
 - GUI: Display up to 16 characters of the peer id of ASBs
 
@@ -393,7 +395,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[unreleased]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.1...HEAD
+[unreleased]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.2...HEAD
+[1.0.0-rc.2]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.1...1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/UnstoppableSwap/core/compare/1.0.0-alpha.3...1.0.0-rc.1
 [1.0.0-alpha.3]: https://github.com/UnstoppableSwap/core/compare/1.0.0-alpha.2...1.0.0-alpha.3
 [1.0.0-alpha.2]: https://github.com/UnstoppableSwap/core/compare/1.0.0-alpha.1...1.0.0-alpha.2
