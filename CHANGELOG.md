@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- GUI: ASBs discovered via rendezvous are now prioritized if they are running the latest version
+- GUI: Display up to 16 characters of the peer id of ASBs
+
 ## [1.0.0-rc.1] - 2024-11-15
 
 ## [1.0.0-alpha.3] - 2024-11-14
