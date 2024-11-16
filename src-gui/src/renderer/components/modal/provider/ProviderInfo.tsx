@@ -31,7 +31,7 @@ const useStyles = makeStyles((theme) => ({
  */
 function ProviderMarkupChip({ provider }: { provider: ExtendedProviderStatus }) {
   const marketExchangeRate = useAppSelector(s => s.rates?.xmrBtcRate);
-  if (marketExchangeRate === null) 
+  if (marketExchangeRate === null)
     return null;
 
   const providerExchangeRate = satsToBtc(provider.price);
@@ -63,7 +63,7 @@ export default function ProviderInfo({
         {provider.multiAddr}
       </Typography>
       <Typography color="textSecondary" gutterBottom>
-        <TruncatedText>{provider.peerId}</TruncatedText>
+        <TruncatedText limit={16} truncateMiddle>{provider.peerId}</TruncatedText>
       </Typography>
       <Typography variant="caption">
         Exchange rate:{" "}
@@ -82,9 +82,8 @@ export default function ProviderInfo({
         )}
         {provider.age ? (
           <Chip
-            label={`Went online ${Math.round(secondsToDays(provider.age))} ${
-              provider.age === 1 ? "day" : "days"
-            } ago`}
+            label={`Went online ${Math.round(secondsToDays(provider.age))} ${provider.age === 1 ? "day" : "days"
+              } ago`}
           />
         ) : (
           <Chip label="Discovered via rendezvous point" />
