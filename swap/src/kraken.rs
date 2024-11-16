@@ -186,8 +186,6 @@ mod connection {
                 return Ok(None);
             }
             Ok(wire::Event::Heartbeat) => {
-                tracing::trace!("Received heartbeat message");
-
                 return Ok(None);
             }
             // if the message is not an event, it is a ticker update or an unknown event

@@ -413,7 +413,7 @@ where
                                 "Communication error: {:#}", error);
                         }
                         SwarmEvent::ConnectionEstablished { peer_id: peer, endpoint, .. } => {
-                            tracing::debug!(%peer, address = %endpoint.get_remote_address(), "New connection established");
+                            tracing::trace!(%peer, address = %endpoint.get_remote_address(), "New connection established");
 
                             // If we have buffered transfer proofs for this peer, we can now send them
                             if let Some(transfer_proofs) = self.buffered_transfer_proofs.remove(&peer) {
@@ -429,13 +429,13 @@ where
                             }
                         }
                         SwarmEvent::IncomingConnectionError { send_back_addr: address, error, .. } => {
-                            tracing::warn!(%address, "Failed to set up connection with peer: {:#}", error);
+                            tracing::trace!(%address, "Failed to set up connection with peer: {:#}", error);
                         }
                         SwarmEvent::ConnectionClosed { peer_id: peer, num_established: 0, endpoint, cause: Some(error), connection_id } => {
-                            tracing::debug!(%peer, address = %endpoint.get_remote_address(), %connection_id, "Lost connection to peer: {:#}", error);
+                            tracing::trace!(%peer, address = %endpoint.get_remote_address(), %connection_id, "Lost connection to peer: {:#}", error);
                         }
                         SwarmEvent::ConnectionClosed { peer_id: peer, num_established: 0, endpoint, cause: None, connection_id } => {
-                            tracing::info!(%peer, address = %endpoint.get_remote_address(), %connection_id,  "Successfully closed connection");
+                            tracing::trace!(%peer, address = %endpoint.get_remote_address(), %connection_id,  "Successfully closed connection");
                         }
                         SwarmEvent::NewListenAddr{address, ..} => {
                             tracing::info!(%address, "New listen address reported");
@@ -493,7 +493,7 @@ where
         tracing::debug!(%ask_price, %xmr_balance, %max_bitcoin_for_monero, "Computed quote");
 
         if min_buy > max_bitcoin_for_monero {
-            tracing::warn!(
+            tracing::trace!(
                         "Your Monero balance is too low to initiate a swap, as your minimum swap amount is {}. You could at most swap {}",
                         min_buy, max_bitcoin_for_monero
                     );
@@ -506,7 +506,7 @@ where
         }
 
         if max_buy > max_bitcoin_for_monero {
-            tracing::warn!(
+            tracing::trace!(
                     "Your Monero balance is too low to initiate a swap with the maximum swap amount {} that you have specified in your config. You can at most swap {}",
                     max_buy, max_bitcoin_for_monero
                 );

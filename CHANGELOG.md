@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- ASB: We now log verbose messages to hourly rotating `tracing*.log` which are kept for 24 hours. General logs are written to `swap-all.log`.
+
 ## [1.0.0-rc.2] - 2024-11-16
 
 - GUI: ASBs discovered via rendezvous are now prioritized if they are running the latest version

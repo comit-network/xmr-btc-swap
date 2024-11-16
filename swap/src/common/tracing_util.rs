@@ -3,6 +3,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use anyhow::Result;
+use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::filter::{Directive, LevelFilter};
 use tracing_subscriber::fmt::time::UtcTime;
 use tracing_subscriber::fmt::MakeWriter;
@@ -31,8 +32,17 @@ pub fn init(
     tauri_handle: Option<TauriHandle>,
 ) -> Result<()> {
     // file logger will always write in JSON format and with timestamps
-    let file_appender = tracing_appender::rolling::never(&dir, "swap-all.log");
+    let file_appender: RollingFileAppender = tracing_appender::rolling::never(&dir, "swap-all.log");
 
+    let tracing_file_appender: RollingFileAppender = RollingFileAppender::builder()
+        .rotation(Rotation::HOURLY)
+        .filename_prefix("tracing")
+        .filename_suffix("log")
+        .max_log_files(24)
+        .build(&dir)
+        .expect("initializing rolling file appender failed");
+
+    // Log to file
     let file_layer = fmt::layer()
         .with_writer(file_appender)
         .with_ansi(false)
@@ -41,7 +51,15 @@ pub fn init(
         .json()
         .with_filter(env_filter(level_filter)?);
 
-    // terminal loger
+    let tracing_file_layer = fmt::layer()
+        .with_writer(tracing_file_appender)
+        .with_ansi(false)
+        .with_timer(UtcTime::rfc_3339())
+        .with_target(false)
+        .json()
+        .with_filter(env_filter(LevelFilter::TRACE)?);
+
+    // Log to stdout
     let is_terminal = atty::is(atty::Stream::Stderr);
     let terminal_layer = fmt::layer()
         .with_writer(std::io::stdout)
@@ -49,7 +67,7 @@ pub fn init(
         .with_timer(UtcTime::rfc_3339())
         .with_target(false);
 
-    // tauri layer (forwards logs to the tauri guest when connected)
+    // Forwards logs to the tauri guest
     let tauri_layer = fmt::layer()
         .with_writer(TauriWriter::new(tauri_handle))
         .with_ansi(false)
@@ -58,23 +76,22 @@ pub fn init(
         .json()
         .with_filter(env_filter(level_filter)?);
 
-    // combine the layers and start logging, format with json if specified
-    if let Format::Json = format {
-        tracing_subscriber::registry()
-            .with(file_layer)
-            .with(tauri_layer)
-            .with(terminal_layer.json().with_filter(env_filter(level_filter)?))
-            .try_init()?;
-    } else {
-        tracing_subscriber::registry()
-            .with(file_layer)
-            .with(tauri_layer)
-            .with(terminal_layer.with_filter(env_filter(level_filter)?))
-            .try_init()?;
-    }
+    let env_filtered = env_filter(level_filter)?;
+
+    let final_terminal_layer = match format {
+        Format::Json => terminal_layer.json().with_filter(env_filtered).boxed(),
+        Format::Raw => terminal_layer.with_filter(env_filtered).boxed(),
+    };
+
+    tracing_subscriber::registry()
+        .with(file_layer)
+        .with(tracing_file_layer)
+        .with(final_terminal_layer)
+        .with(tauri_layer)
+        .try_init()?;
 
     // Now we can use the tracing macros to log messages
-    tracing::info!(%level_filter, logs_dir=%dir.as_ref().display(), "Initialized tracing");
+    tracing::info!(%level_filter, logs_dir=%dir.as_ref().display(), "Initialized tracing. General logs will be written to swap-all.log, and verbose logs to tracing*.log");
 
     Ok(())
 }
