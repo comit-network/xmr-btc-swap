@@ -3,7 +3,7 @@ import { ExtendedProviderStatus, ProviderStatus } from "models/apiModel";
 import { Seller } from "models/tauriModel";
 import { getStubTestnetProvider } from "store/config";
 import { rendezvousSellerToProviderStatus } from "utils/conversionUtils";
-import { isProviderCompatible } from "utils/multiAddrUtils";
+import { isProviderOutdated } from "utils/multiAddrUtils";
 import { sortProviderList } from "utils/sortUtils";
 
 const stubTestnetProvider = getStubTestnetProvider();
@@ -37,13 +37,21 @@ function selectNewSelectedProvider(
 ): ProviderStatus {
   const selectedPeerId = peerId || slice.selectedProvider?.peerId;
 
-  return (
-    slice.registry.providers?.find((prov) => prov.peerId === selectedPeerId) ||
-    slice.rendezvous.providers.find((prov) => prov.peerId === selectedPeerId) ||
-    slice.registry.providers?.at(0) ||
-    slice.rendezvous.providers[0] ||
-    null
-  );
+  // Check if we still have a record of the currently selected provider
+  const currentProvider = slice.registry.providers?.find((prov) => prov.peerId === selectedPeerId) || slice.rendezvous.providers.find((prov) => prov.peerId === selectedPeerId);
+
+  // If the currently selected provider is not outdated, keep it
+  if (currentProvider != null && !isProviderOutdated(currentProvider)) {
+    return currentProvider;
+  }
+
+  // Otherwise we'd prefer to switch to a provider that has the newest version
+  const providers = sortProviderList([
+    ...(slice.registry.providers ?? []),
+    ...(slice.rendezvous.providers ?? []),
+  ]);
+
+  return providers.at(0) || null;
 }
 
 export const providersSlice = createSlice({
@@ -61,29 +69,22 @@ export const providersSlice = createSlice({
         }
 
         // If the provider was already discovered via the public registry, don't add it again
-        if (
-          !slice.registry.providers?.some(
-            (prov) =>
-              prov.peerId === discoveredProviderStatus.peerId &&
-              prov.multiAddr === discoveredProviderStatus.multiAddr,
-          )
-        ) {
-          const indexOfExistingProvider = slice.rendezvous.providers.findIndex(
-            (prov) =>
-              prov.peerId === discoveredProviderStatus.peerId &&
-              prov.multiAddr === discoveredProviderStatus.multiAddr,
-          );
+        const indexOfExistingProvider = slice.rendezvous.providers.findIndex(
+          (prov) =>
+            prov.peerId === discoveredProviderStatus.peerId &&
+            prov.multiAddr === discoveredProviderStatus.multiAddr,
+        );
 
-          // Avoid duplicate entries, replace them instead
-          if (indexOfExistingProvider !== -1) {
-            slice.rendezvous.providers[indexOfExistingProvider] =
-              discoveredProviderStatus;
-          } else {
-            slice.rendezvous.providers.push(discoveredProviderStatus);
-          }
+        // Avoid duplicate entries, replace them instead
+        if (indexOfExistingProvider !== -1) {
+          slice.rendezvous.providers[indexOfExistingProvider] =
+            discoveredProviderStatus;
+        } else {
+          slice.rendezvous.providers.push(discoveredProviderStatus);
         }
       });
 
+      // Sort the provider list and select a new provider if needed
       slice.rendezvous.providers = sortProviderList(slice.rendezvous.providers);
       slice.selectedProvider = selectNewSelectedProvider(slice);
     },
@@ -95,9 +96,8 @@ export const providersSlice = createSlice({
         action.payload.push(stubTestnetProvider);
       }
 
-      slice.registry.providers = sortProviderList(action.payload).filter(
-        isProviderCompatible,
-      );
+      // Sort the provider list and select a new provider if needed
+      slice.registry.providers = sortProviderList(action.payload);
       slice.selectedProvider = selectNewSelectedProvider(slice);
     },
     registryConnectionFailed(slice) {

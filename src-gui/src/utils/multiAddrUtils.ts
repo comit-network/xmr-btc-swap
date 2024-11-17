@@ -11,7 +11,7 @@ export function providerToConcatenatedMultiAddr(provider: Provider) {
     .toString();
 }
 
-export function isProviderCompatible(
+export function isProviderOnCorrectNetwork(
   provider: ExtendedProviderStatus,
 ): boolean {
   return provider.testnet === isTestnet();

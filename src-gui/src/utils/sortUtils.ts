@@ -1,10 +1,12 @@
 import { ExtendedProviderStatus } from "models/apiModel";
-import { isProviderCompatible, isProviderOutdated } from "./multiAddrUtils";
+import { isProviderOnCorrectNetwork, isProviderOutdated } from "./multiAddrUtils";
 
 export function sortProviderList(list: ExtendedProviderStatus[]) {
   return list
-    .filter(isProviderCompatible)
+    // Filter out providers that are on the wrong network (testnet / mainnet)
+    .filter(isProviderOnCorrectNetwork)
     .concat()
+    // Sort by criteria
     .sort((firstEl, secondEl) => {
       // If either provider is outdated, prioritize the one that isn't
       if (isProviderOutdated(firstEl) && !isProviderOutdated(secondEl)) return 1;
@@ -24,5 +26,9 @@ export function sortProviderList(list: ExtendedProviderStatus[]) {
         return -1;
       }
       return 1;
-    });
+    })
+    // Remove duplicate providers
+    .filter((provider, index, self) =>
+      index === self.findIndex((p) => p.peerId === provider.peerId)
+    )
 }
