@@ -9,7 +9,8 @@ jobs:
   publish-tauri:
     # Do not publish preview releases to Github.
     # Building takes too long for preview releases.
-    if: ${{ !contains(github.ref_name, 'preview') }}
+    # TODO: This has been temporarily enabled
+    # if: ${{ !contains(github.ref_name, 'preview') }}
     permissions:
       contents: write
     strategy:
@@ -20,7 +21,7 @@ jobs:
             args: "--target aarch64-apple-darwin"
           - platform: "macos-13" # for Intel based macs.
             args: "--target x86_64-apple-darwin"
-          - platform: "ubuntu-22.04"
+          - platform: "ubuntu-24.04"
             args: ""
           - platform: "windows-latest"
             args: ""
@@ -43,7 +44,7 @@ jobs:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04' # This must match the platform value defined above.
+        if: matrix.platform == 'ubuntu-24.04' # This must match the platform value defined above.
         run: |
           sudo apt update;
           sudo apt install -y \
