@@ -20,7 +20,7 @@ jobs:
             args: "--target aarch64-apple-darwin"
           - platform: "macos-13" # for Intel based macs.
             args: "--target x86_64-apple-darwin"
-          - platform: "ubuntu-20.04" # We build on an older version to support older glib versions
+          - platform: "ubuntu-22.04" # We build on an older version to support older glib versions
             args: ""
           - platform: "windows-latest"
             args: ""

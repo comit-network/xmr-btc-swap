@@ -7,7 +7,7 @@ on:
 
 env:
 # We build on an older version to support older glib versions
-  UBUNTU: "ubuntu-20.04"
+  UBUNTU: "ubuntu-22.04"
   MACOS_ARM: "macos-latest"
   MACOS_INTEL: "macos-13"
   WINDOWS: "windows-latest"
