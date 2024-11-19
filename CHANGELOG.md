@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc.5] - 2024-11-19
+
 - GUI: Set new Discord invite link to non-expired one
 - GUI: Fix an issues where asbs would not be sorted correctly
 - ASB: Change level of logs related to rendezvous registrations to `TRACE`
@@ -404,7 +406,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[unreleased]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.4...HEAD
+[unreleased]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.5...HEAD
+[1.0.0-rc.5]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.4...1.0.0-rc.5
 [1.0.0-rc.4]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.2...1.0.0-rc.4
 [1.0.0-rc.2]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.1...1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/UnstoppableSwap/core/compare/1.0.0-alpha.3...1.0.0-rc.1
