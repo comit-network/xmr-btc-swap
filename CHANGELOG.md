@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- GUI: Set new Discord invite link to non-expired one
+
 ## [1.0.0-rc.4] - 2024-11-17
 
 - GUI: Fix an issue where the AppImage would render a blank screen on some Linux systems
