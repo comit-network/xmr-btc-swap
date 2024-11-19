@@ -10,7 +10,7 @@
     "test:ui": "vitest --ui",
     "dev": "vite",
     "prebuild": "yarn run gen-bindings",
-    "build": "vite build --mode dev",
+    "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri"
   },
