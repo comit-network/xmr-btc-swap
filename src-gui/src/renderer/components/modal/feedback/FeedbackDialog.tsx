@@ -24,13 +24,14 @@ import { submitFeedbackViaHttp } from "../../../api";
 import LoadingButton from "../../other/LoadingButton";
 import { PiconeroAmount } from "../../other/Units";
 import { getLogsOfSwap } from "renderer/rpc";
+import logger from "utils/logger";
 
 async function submitFeedback(body: string, swapId: string | number, submitDaemonLogs: boolean) {
   let attachedBody = "";
 
   if (swapId !== 0 && typeof swapId === "string") {
     const swapInfo = store.getState().rpc.state.swapInfos[swapId];
-    
+
     if (swapInfo === undefined) {
       throw new Error(`Swap with id ${swapId} not found`);
     }
@@ -179,7 +180,7 @@ export default function FeedbackDialog({
                 variant: "success",
               });
             } catch (e) {
-              console.error(`Failed to submit feedback: ${e}`);
+              logger.error(`Failed to submit feedback: ${e}`);
               enqueueSnackbar(`Failed to submit feedback (${e})`, {
                 variant: "error",
               });

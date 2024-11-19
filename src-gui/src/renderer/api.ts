@@ -4,22 +4,26 @@
 // - fetch alerts to be displayed to the user
 // - and to submit feedback
 // - fetch currency rates from CoinGecko
+
 import { Alert, ExtendedProviderStatus } from "models/apiModel";
 import { store } from "./store/storeRenderer";
 import { setBtcPrice, setXmrBtcRate, setXmrPrice } from "store/features/ratesSlice";
 import { FiatCurrency } from "store/features/settingsSlice";
+import { setAlerts } from "store/features/alertsSlice";
+import { registryConnectionFailed, setRegistryProviders } from "store/features/providersSlice";
+import logger from "utils/logger";
 
-const API_BASE_URL = "https://api.unstoppableswap.net";
+const PUBLIC_REGISTRY_API_BASE_URL = "https://api.unstoppableswap.net";
 
-export async function fetchProvidersViaHttp(): Promise<
+async function fetchProvidersViaHttp(): Promise<
   ExtendedProviderStatus[]
 > {
-  const response = await fetch(`${API_BASE_URL}/api/list`);
+  const response = await fetch(`${PUBLIC_REGISTRY_API_BASE_URL}/api/list`);
   return (await response.json()) as ExtendedProviderStatus[];
 }
 
-export async function fetchAlertsViaHttp(): Promise<Alert[]> {
-  const response = await fetch(`${API_BASE_URL}/api/alerts`);
+async function fetchAlertsViaHttp(): Promise<Alert[]> {
+  const response = await fetch(`${PUBLIC_REGISTRY_API_BASE_URL}/api/alerts`);
   return (await response.json()) as Alert[];
 }
 
@@ -31,7 +35,7 @@ export async function submitFeedbackViaHttp(
     feedbackId: string;
   };
 
-  const response = await fetch(`${API_BASE_URL}/api/submit-feedback`, {
+  const response = await fetch(`${PUBLIC_REGISTRY_API_BASE_URL}/api/submit-feedback`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -49,39 +53,29 @@ export async function submitFeedbackViaHttp(
 }
 
 async function fetchCurrencyPrice(currency: string, fiatCurrency: FiatCurrency): Promise<number> {
-  try {
-    const response = await fetch(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${currency}&vs_currencies=${fiatCurrency.toLowerCase()}`,
-    );
-    const data = await response.json();
-    return data[currency][fiatCurrency.toLowerCase()];
-  } catch (error) {
-    console.error(`Error fetching ${currency} price:`, error);
-    throw error;
-  }
+  const response = await fetch(
+    `https://api.coingecko.com/api/v3/simple/price?ids=${currency}&vs_currencies=${fiatCurrency.toLowerCase()}`,
+  );
+  const data = await response.json();
+  return data[currency][fiatCurrency.toLowerCase()];
 }
 
 async function fetchXmrBtcRate(): Promise<number> {
-  try {
-    const response = await fetch('https://api.kraken.com/0/public/Ticker?pair=XMRXBT');
-    const data = await response.json();
-    
-    if (data.error && data.error.length > 0) {
-      throw new Error(`Kraken API error: ${data.error[0]}`);
-    }
+  const response = await fetch('https://api.kraken.com/0/public/Ticker?pair=XMRXBT');
+  const data = await response.json();
 
-    const result = data.result.XXMRXXBT;
-    const lastTradePrice = parseFloat(result.c[0]);
-
-    return lastTradePrice;
-  } catch (error) {
-    console.error('Error fetching XMR/BTC rate from Kraken:', error);
-    throw error;
+  if (data.error && data.error.length > 0) {
+    throw new Error(`Kraken API error: ${data.error[0]}`);
   }
+
+  const result = data.result.XXMRXXBT;
+  const lastTradePrice = parseFloat(result.c[0]);
+
+  return lastTradePrice;
 }
 
 
-async function fetchBtcPrice(fiatCurrency: FiatCurrency): Promise<number> {
+function fetchBtcPrice(fiatCurrency: FiatCurrency): Promise<number> {
   return fetchCurrencyPrice("bitcoin", fiatCurrency);
 }
 
@@ -95,21 +89,42 @@ async function fetchXmrPrice(fiatCurrency: FiatCurrency): Promise<number> {
  */
 export async function updateRates(): Promise<void> {
   const settings = store.getState().settings;
-  if (!settings.fetchFiatPrices) 
+  if (!settings.fetchFiatPrices)
     return;
 
-  try { 
+  try {
     const xmrBtcRate = await fetchXmrBtcRate();
     store.dispatch(setXmrBtcRate(xmrBtcRate));
 
     const btcPrice = await fetchBtcPrice(settings.fiatCurrency);
     store.dispatch(setBtcPrice(btcPrice));
-    
+
     const xmrPrice = await fetchXmrPrice(settings.fiatCurrency);
     store.dispatch(setXmrPrice(xmrPrice));
 
-    console.log(`Fetched rates for ${settings.fiatCurrency}`);
+    logger.info(`Fetched rates for ${settings.fiatCurrency}`);
   } catch (error) {
-    console.error("Error fetching rates:", error);
+    logger.error(error, "Error fetching rates");
+  }
+}
+
+
+/**
+ * Update public registry
+ */
+export async function updatePublicRegistry(): Promise<void> {
+  try {
+    const providers = await fetchProvidersViaHttp();
+    store.dispatch(setRegistryProviders(providers));
+  } catch (error) {
+    store.dispatch(registryConnectionFailed());
+    logger.error(error, "Error fetching providers");
+  }
+
+  try {
+    const alerts = await fetchAlertsViaHttp();
+    store.dispatch(setAlerts(alerts));
+  } catch (error) {
+    logger.error(error, "Error fetching alerts");
   }
 }

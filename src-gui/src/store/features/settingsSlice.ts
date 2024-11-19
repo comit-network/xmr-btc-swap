@@ -119,7 +119,6 @@ const alertsSlice = createSlice({
       slice.fetchFiatPrices = action.payload;
     },
     setFiatCurrency(slice, action: PayloadAction<FiatCurrency>) {
-      console.log("setFiatCurrency", action.payload);
       slice.fiatCurrency = action.payload;
     },
     addNode(slice, action: PayloadAction<{ network: Network, type: Blockchain, node: string }>) {

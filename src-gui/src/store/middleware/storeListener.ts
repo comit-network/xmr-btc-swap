@@ -35,7 +35,7 @@ export function createMainListeners() {
     actionCreator: setFiatCurrency,
     effect: async () => {
       if (store.getState().settings.fetchFiatPrices) {
-        console.log("Fiat currency changed, updating rates...");
+        logger.info("Fiat currency changed, updating rates...");
         await updateRates();
       }
     },
@@ -46,7 +46,7 @@ export function createMainListeners() {
     actionCreator: setFetchFiatPrices,
     effect: async (action) => {
       if (action.payload === true) {
-        console.log("Activated fetching fiat prices, updating rates...");
+        logger.info("Activated fetching fiat prices, updating rates...");
         await updateRates();
       }
     },

@@ -1,6 +1,7 @@
 import { Step, StepLabel, Stepper, Typography } from "@material-ui/core";
 import { SwapState } from "models/storeModel";
 import { useAppSelector } from "store/hooks";
+import logger from "utils/logger";
 
 export enum PathType {
   HAPPY_PATH = "happy path",
@@ -18,7 +19,7 @@ type PathStep = [type: PathType, step: number, isError: boolean];
 function getActiveStep(state: SwapState | null): PathStep | null {
   // In case we cannot infer a correct step from the state
   function fallbackStep(reason: string) {
-    console.error(
+    logger.error(
       `Unable to choose correct stepper type (reason: ${reason}, state: ${JSON.stringify(state)}`,
     );
     return null;

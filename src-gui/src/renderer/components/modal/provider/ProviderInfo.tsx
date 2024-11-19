@@ -74,7 +74,7 @@ export default function ProviderInfo({
         Maximum swap amount: <SatsAmount amount={provider.maxSwapAmount} />
       </Typography>
       <Box className={classes.chipsOuter}>
-        <Chip label={provider.testnet ? "Testnet" : "Mainnet"} />
+        {provider.testnet && <Chip label="Testnet" />}
         {provider.uptime && (
           <Tooltip title="A high uptime (>90%) indicates reliability. Providers with very low uptime may be unreliable and cause swaps to take longer to complete or fail entirely.">
             <Chip label={`${Math.round(provider.uptime * 100)}% uptime`} />
