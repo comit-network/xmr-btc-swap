@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 - GUI: Set new Discord invite link to non-expired one
+- GUI: Fix an issues where asbs would not be sorted correctly
+- ASB: Change level of logs related to rendezvous registrations to `TRACE`
 
 ## [1.0.0-rc.4] - 2024-11-17
 
