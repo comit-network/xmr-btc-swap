@@ -223,7 +223,7 @@ fn print_status_change(txid: Txid, old: Option<ScriptStatus>, new: ScriptStatus)
             tracing::debug!(%txid, status = %new_status, "Found relevant Bitcoin transaction");
         }
         (Some(old_status), new_status) if old_status != new_status => {
-            tracing::debug!(%txid, %new_status, %old_status, "Bitcoin transaction status changed");
+            tracing::trace!(%txid, %new_status, %old_status, "Bitcoin transaction status changed");
         }
         _ => {}
     }
@@ -836,7 +836,7 @@ impl Client {
         let latest_block_height = BlockHeight::try_from(latest_block)?;
 
         if latest_block_height > self.latest_block_height {
-            tracing::debug!(
+            tracing::trace!(
                 block_height = u32::from(latest_block_height),
                 "Got notification for new block"
             );

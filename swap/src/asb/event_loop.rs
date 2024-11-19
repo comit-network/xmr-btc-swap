@@ -382,10 +382,10 @@ where
                             tracing::info!(swap_id = %swap_id, peer = %peer, "Fullfilled cooperative XMR redeem request");
                         }
                         SwarmEvent::Behaviour(OutEvent::Rendezvous(libp2p::rendezvous::client::Event::Registered { rendezvous_node, ttl, namespace })) => {
-                            tracing::info!("Successfully registered with rendezvous node: {} with namespace: {} and TTL: {:?}", rendezvous_node, namespace, ttl);
+                            tracing::trace!("Successfully registered with rendezvous node: {} with namespace: {} and TTL: {:?}", rendezvous_node, namespace, ttl);
                         }
                         SwarmEvent::Behaviour(OutEvent::Rendezvous(libp2p::rendezvous::client::Event::RegisterFailed { rendezvous_node, namespace, error })) => {
-                            tracing::error!("Registration with rendezvous node {} failed for namespace {}: {:?}", rendezvous_node, namespace, error);
+                            tracing::trace!("Registration with rendezvous node {} failed for namespace {}: {:?}", rendezvous_node, namespace, error);
                         }
                         SwarmEvent::Behaviour(OutEvent::OutboundRequestResponseFailure {peer, error, request_id, protocol}) => {
                             tracing::error!(
