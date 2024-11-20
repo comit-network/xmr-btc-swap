@@ -11,7 +11,7 @@ You can read [this blogpost](https://comit.network/blog/2021/07/02/transaction-p
 
 ## Maintenance
 
-This repository is currently maintained by community volunteers. While it remains safe to use, the original developers (@comit-network) have stopped contributing. For a more actively maintained version that includes a GUI, please check out this community fork: https://github.com/UnstoppableSwap/core
+**This repository is unmaintained**. The original developers (@comit-network) have moved on to other projects. Community volunteers are continuing development at [UnstoppableSwap/core](https://github.com/UnstoppableSwap/core), which includes a graphical user interface. Please note that the fork has introduced network-level breaking changes, making it incompatible with peers running this repository - you will not be able to initiate swaps with them.
 
 ## Quick Start
 
