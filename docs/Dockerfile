@@ -5,8 +5,8 @@ FROM node:18-slim AS base
 FROM base AS deps
 WORKDIR /app
 
-# Copy the lockfiles and package.json to install dependencies
-COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
+# Copy the lockfiles and package.json from docs directory
+COPY docs/package.json docs/yarn.lock* docs/package-lock.json* docs/pnpm-lock.yaml* ./
 RUN \
   if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
   elif [ -f package-lock.json ]; then npm ci; \
@@ -20,7 +20,7 @@ WORKDIR /app
 
 # Copy the installed node_modules and the rest of the app's source code
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY docs/. .
 
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
