@@ -1,59 +1,35 @@
-# Installation Instructions
+import { Tabs } from 'nextra/components'
 
-Precompiled binaries of the _GUI_ are available for download for:
+# Installation
 
-- [Windows (64Bit)](#windows)
-- [Mac OS (Silicon)](#mac-os-silicon)
-- [Mac OS (Intel)](#mac-os-intel)
-- [Linux (Debian/Ubuntu, amd64/x86_64)](#linux-debian)
-- [Linux (Arch, x86_64)](#linux-pacman)
-- [Linux (AppImage, x86_64)](#linux-appimage)
+Precompiled binaries of the _GUI_ are available for most platforms. Simply download the appropriate binary for your system and follow the instructions.
 
-## Windows (64Bit) [#windows]
+<Tabs items={['Windows', 'macOS (Silicon)', 'macOS (Intel)', 'Linux (x86_64)']}>
+  <Tabs.Tab>
+    1. Download the latest release from GitHub [here](https://github.com/UnstoppableSwap/core/releases/download/1.0.0-rc.4/UnstoppableSwap_1.0.0-rc.4_x64-setup.exe)
+    2. Open the downloaded `.exe` installer
+    3. Follow the installation instructions
+    4. Open the `UnstoppableSwap` application from your Start menu
+  </Tabs.Tab>
+  <Tabs.Tab>
+    1. Download the latest release from GitHub [here](https://github.com/UnstoppableSwap/core/releases/download/1.0.0-rc.4/UnstoppableSwap_1.0.0-rc.4_aarch64.dmg)
+    2. Open the downloaded `.dmg` file
+    3. Drag the `UnstoppableSwap` icon to your Applications folder
+    4. Open the `UnstoppableSwap` application from your Applications folder
+  </Tabs.Tab>
+  <Tabs.Tab>
+    1. Download the latest release from GitHub [here](https://github.com/UnstoppableSwap/core/releases/download/1.0.0-rc.4/UnstoppableSwap_1.0.0-rc.4_x64.dmg)
+    2. Open the downloaded `.dmg` file
+    3. Drag the `UnstoppableSwap` icon to your Applications folder
+    4. Open the `UnstoppableSwap` application from your Applications folder
+  </Tabs.Tab>
+  <Tabs.Tab>
+    For other Linux distributions, you can download the AppImage and run it directly. It includes all dependencies and will work on most systems.
 
-1. Download the latest release from GitHub [here](https://github.com/UnstoppableSwap/unstoppableswap-gui/releases/download/v0.6.0/UnstoppableSwap-Setup-0.6.0.exe)
-2. Open the downloaded `.exe` installer
-3. Follow the installation instructions
-4. Open the `UnstoppableSwap` application from your Start menu
-
-## Mac OS (Silicon / ARM / M1 / M2 / M3) [#mac-os-silicon]
-
-1. Download the latest release from GitHub [here](https://github.com/UnstoppableSwap/unstoppableswap-gui/releases/download/v0.6.0/UnstoppableSwap-0.6.0-arm64.dmg)
-2. Open the downloaded `.dmg` file
-3. Drag the `UnstoppableSwap` icon to your Applications folder
-4. Open the `UnstoppableSwap` application from your Applications folder
-
-## Mac OS (Intel) [#mac-os-intel]
-
-1. Download the latest release from GitHub [here](https://github.com/UnstoppableSwap/unstoppableswap-gui/releases/download/v0.6.0/UnstoppableSwap-0.6.0.dmg)
-2. Open the downloaded `.dmg` file
-3. Drag the `UnstoppableSwap` icon to your Applications folder
-4. Open the `UnstoppableSwap` application from your Applications folder
-
-## Linux (Debian/Ubuntu, amd64/x86_64) [#linux-debian]
-
-For Debian-based distributions, you can download the Debian package and install it using `dpkg`.
-
-```bash filename="install.sh"
-wget https://github.com/UnstoppableSwap/unstoppableswap-gui/releases/download/v0.6.0/unstoppableswap-gui_0.6.0_amd64.deb
-sudo dpkg -i unstoppableswap-gui_0.6.0_amd64.deb
-```
-
-## Linux (Pacman, Arch, x86_64) [#linux-pacman]
-
-For Arch-based distributions, you can download the Pacman package and install it using `pacman`.
-
-```bash filename="install.sh"
-wget https://github.com/UnstoppableSwap/unstoppableswap-gui/releases/download/v0.6.0/unstoppableswap-gui-0.6.0.pacman
-sudo pacman -U unstoppableswap-gui-0.6.0.pacman
-```
-
-## Linux (AppImage) [#linux-appimage]
-
-For other Linux distributions, you can download the AppImage and run it directly. It includes all dependencies and will work on most systems.
-
-```bash filename="install.sh"
-wget https://github.com/UnstoppableSwap/unstoppableswap-gui/releases/download/v0.6.0/UnstoppableSwap-0.6.0.AppImage
-chmod +x UnstoppableSwap-0.6.0.AppImage
-./UnstoppableSwap-0.6.0.AppImage
-```
+    ```bash filename="install.sh"
+    wget https://github.com/UnstoppableSwap/core/releases/download/1.0.0-rc.4/UnstoppableSwap_1.0.0-rc.4_amd64.AppImage
+    chmod +x UnstoppableSwap_1.0.0-rc.4_amd64.AppImage
+    ./UnstoppableSwap_1.0.0-rc.4_amd64.AppImage
+    ```
+  </Tabs.Tab>
+</Tabs>

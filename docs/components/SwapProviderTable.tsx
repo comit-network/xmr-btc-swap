@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Table, Td, Th, Tr } from 'nextra/components'
 
 export default function SwapProviderTable() {
   function satsToBtc(sats) {
@@ -6,7 +7,6 @@ export default function SwapProviderTable() {
   }
 
   async function getProviders() {
-    // from https://unstoppableswap.net/api/list with cors disabled
     const response = await fetch("https://api.unstoppableswap.net/api/list");
     const data = await response.json();
     return data;
@@ -26,30 +26,32 @@ export default function SwapProviderTable() {
         overflowX: "scroll",
       }}
     >
-      <table>
+      <Table>
         <thead>
-          <tr>
-            <th>Multiaddress</th>
-            <th>Peer ID</th>
-            <th>Minimum Amount</th>
-            <th>Maximum Amount</th>
-            <th>Exchange Rate</th>
-            <th>Uptime</th>
-          </tr>
+          <Tr>
+            <Th>Network</Th>
+            <Th>Multiaddress</Th>
+            <Th>Peer ID</Th>
+            <Th>Minimum Amount</Th>
+            <Th>Maximum Amount</Th>
+            <Th>Exchange Rate</Th>
+          </Tr>
         </thead>
         <tbody>
           {providers.map((provider) => (
-            <tr key={provider.peerId}>
-              <td>{provider.multiAddr}</td>
-              <td>{provider.peerId}</td>
-              <td>{satsToBtc(provider.minSwapAmount)} BTC</td>
-              <td>{satsToBtc(provider.maxSwapAmount)} BTC</td>
-              <td>{satsToBtc(provider.price)} XMR/BTC</td>
-              <td>{(provider.uptime * 100).toFixed(1)}%</td>
-            </tr>
+            <Tr key={provider.peerId}>
+              <Td>
+                {provider.testnet ? "Testnet" : "Mainnet"}
+              </Td>
+              <Td>{provider.multiAddr}</Td>
+              <Td>{provider.peerId}</Td>
+              <Td>{satsToBtc(provider.minSwapAmount)} BTC</Td>
+              <Td>{satsToBtc(provider.maxSwapAmount)} BTC</Td>
+              <Td>{satsToBtc(provider.price)} XMR/BTC</Td>
+            </Tr>
           ))}
         </tbody>
-      </table>
+      </Table>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-# How to complete your first Atomic Swap
+# How to complete your first swap
 
 In this guide, we'll walk you through the process of completing your first atomic swap using the UnstoppableSwap GUI.
 Although the process is quite intuitive, there are some nuances to be aware of, so we'll cover everything you need to know to get started.
@@ -8,11 +8,9 @@ Although the process is quite intuitive, there are some nuances to be aware of, 
 To complete an Atomic Swap, you'll need to have the following:
 
 1. A Monero wallet you can use to receive funds
-2. A Bitcoin wallet you can use with some funds in it. 
-This wallet should also be able to generate a native SegWit address (an address starting with `bc1`). 
-This address will also receive any refunded Bitcoin if the swap is not completed.
-3. _UnstoppableSwap GUI_ installed on your computer. 
+2. _UnstoppableSwap GUI_ installed on your computer. 
 We'll refer to this as _GUI_ from now on. View the [installation instructions](../getting_started/install_instructions) if you haven't already installed the GUI.
+3. A Bitcoin wallet you can use with some funds in it which you want to convert to Monero.
 
 import { Steps } from 'nextra/components'
  
@@ -20,7 +18,6 @@ import { Steps } from 'nextra/components'
 <Steps>
 ### Choose a _Swap Provider_ to swap with
 
-After opening the GUI, you'll be greeted with the main screen. 
 In the bottom of the screen you can see the currently selected _Swap Provider_. 
 This is who you'll send your Bitcoin to and who you'll receive the Monero from. 
 You can change the _Swap Provider_ by clicking on the arrow and selecting a different _Swap Provider_ from the list.
@@ -31,7 +28,7 @@ import { Callout } from 'nextra/components'
 Different _Swap Providers_ offer different exchange rates and differing amounts of liquidity. You may want to choose the _Swap Provider_ that best suits your needs.
 </Callout>
 
-You can also use input field to calculate the approximate amount of Monero you'll receive for a given amount of Bitcoin. 
+You can use the input field to calculate the approximate amount of Monero you'll receive for a given amount of Bitcoin.
 
 <Callout type="info">
 The actual swap amount will be determined when you deposit your Bitcoin. 
