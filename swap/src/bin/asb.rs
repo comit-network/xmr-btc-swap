@@ -24,6 +24,7 @@ use std::convert::TryInto;
 use std::env;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
+use std::time::Duration;
 use structopt::clap;
 use structopt::clap::ErrorKind;
 use swap::asb::command::{parse_args, Arguments, Command};
@@ -182,6 +183,7 @@ async fn main() -> Result<()> {
                 &seed,
                 config.maker.min_buy_btc,
                 config.maker.max_buy_btc,
+                Duration::from_secs(120),
                 kraken_rate.clone(),
                 resume_only,
                 env_config,
@@ -213,6 +215,7 @@ async fn main() -> Result<()> {
                 kraken_rate.clone(),
                 config.maker.min_buy_btc,
                 config.maker.max_buy_btc,
+                Duration::from_secs(120),
                 config.maker.external_bitcoin_redeem_address,
             )
             .unwrap();

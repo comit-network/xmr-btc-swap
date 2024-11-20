@@ -135,9 +135,11 @@ pub mod behaviour {
     where
         LR: LatestRate + Send + 'static,
     {
+        #[allow(clippy::too_many_arguments)]
         pub fn new(
             min_buy: bitcoin::Amount,
             max_buy: bitcoin::Amount,
+            max_swap_timeout: Duration,
             latest_rate: LR,
             resume_only: bool,
             env_config: env::Config,
@@ -162,6 +164,7 @@ pub mod behaviour {
                 swap_setup: alice::Behaviour::new(
                     min_buy,
                     max_buy,
+                    max_swap_timeout,
                     env_config,
                     latest_rate,
                     resume_only,
