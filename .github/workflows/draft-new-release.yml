@@ -59,7 +59,7 @@ jobs:
           curl -fsSL https://dprint.dev/install.sh | sh -s $DPRINT_VERSION
           /home/runner/.dprint/bin/dprint fmt
 
-          git add CHANGELOG.md Cargo.lock swap/Cargo.toml src-tauri/tauri.conf.json
+          git add CHANGELOG.md Cargo.lock swap/Cargo.toml src-tauri/Cargo.toml src-tauri/tauri.conf.json
           git commit --message "Prepare release ${{ github.event.inputs.version }}"
 
           echo "::set-output name=commit::$(git rev-parse HEAD)"
