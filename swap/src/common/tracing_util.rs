@@ -102,7 +102,6 @@ fn env_filter(level_filter: LevelFilter) -> Result<EnvFilter> {
         .add_directive(Directive::from_str(&format!("asb={}", &level_filter))?)
         .add_directive(Directive::from_str(&format!("swap={}", &level_filter))?)
         .add_directive(Directive::from_str(&format!("arti={}", &level_filter))?)
-        .add_directive(Directive::from_str(&format!("libp2p={}", &level_filter))?)
         .add_directive(Directive::from_str(&format!(
             "libp2p_community_tor={}",
             &level_filter
