@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-rc.6] - 2024-11-21
+
 - CLI + GUI: Tor is now bundled with the application. All libp2p connections between peers are routed through Tor, if the `--enable-tor` flag is set. The `--tor-socks5-port` argument has been removed. This feature is powered by [arti](https://tpo.pages.torproject.net/core/arti/), an implementation of the Tor protocol in Rust by the Tor Project.
 - CLI + GUI: At startup the wallets and tor client are started in parallel. This will speed up the startup time of the application.
 
@@ -409,7 +411,8 @@ It is possible to migrate critical data from the old db to the sqlite but there 
 - Fixed an issue where Alice would not verify if Bob's Bitcoin lock transaction is semantically correct, i.e. pays the agreed upon amount to an output owned by both of them.
   Fixing this required a **breaking change** on the network layer and hence old versions are not compatible with this version.
 
-[unreleased]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.5...HEAD
+[unreleased]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.6...HEAD
+[1.0.0-rc.6]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.5...1.0.0-rc.6
 [1.0.0-rc.5]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.4...1.0.0-rc.5
 [1.0.0-rc.4]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.2...1.0.0-rc.4
 [1.0.0-rc.2]: https://github.com/UnstoppableSwap/core/compare/1.0.0-rc.1...1.0.0-rc.2
