@@ -13,6 +13,7 @@ import { useSettings } from "store/hooks";
 import { themes } from "./theme";
 import { useEffect } from "react";
 import { setupBackgroundTasks } from "renderer/background";
+import "@fontsource/roboto";
 
 const useStyles = makeStyles((theme) => ({
   innerContent: {

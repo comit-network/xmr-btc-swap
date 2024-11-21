@@ -72,7 +72,7 @@ pub fn init(
         .with_writer(TauriWriter::new(tauri_handle))
         .with_ansi(false)
         .with_timer(UtcTime::rfc_3339())
-        .with_target(false)
+        .with_target(true)
         .json()
         .with_filter(env_filter(level_filter)?);
 
@@ -101,6 +101,12 @@ fn env_filter(level_filter: LevelFilter) -> Result<EnvFilter> {
     Ok(EnvFilter::from_default_env()
         .add_directive(Directive::from_str(&format!("asb={}", &level_filter))?)
         .add_directive(Directive::from_str(&format!("swap={}", &level_filter))?)
+        .add_directive(Directive::from_str(&format!("arti={}", &level_filter))?)
+        .add_directive(Directive::from_str(&format!("libp2p={}", &level_filter))?)
+        .add_directive(Directive::from_str(&format!(
+            "libp2p_community_tor={}",
+            &level_filter
+        ))?)
         .add_directive(Directive::from_str(&format!(
             "unstoppableswap-gui-rs={}",
             &level_filter

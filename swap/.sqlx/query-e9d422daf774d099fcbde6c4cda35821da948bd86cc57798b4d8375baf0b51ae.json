@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n           SELECT proof\n           FROM buffered_transfer_proofs\n           WHERE swap_id = ?\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "proof",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e9d422daf774d099fcbde6c4cda35821da948bd86cc57798b4d8375baf0b51ae"
+}

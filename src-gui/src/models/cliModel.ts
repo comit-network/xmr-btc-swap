@@ -17,6 +17,7 @@ export interface CliLog {
     name: CliLogSpanType;
     [index: string]: unknown;
   }[];
+  target?: string;
 }
 
 function isCliLog(log: unknown): log is CliLog {

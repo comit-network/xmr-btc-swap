@@ -123,6 +123,7 @@ pub enum TauriContextInitializationProgress {
     },
     OpeningMoneroWallet,
     OpeningDatabase,
+    EstablishingTorCircuits,
 }
 
 #[typeshare]

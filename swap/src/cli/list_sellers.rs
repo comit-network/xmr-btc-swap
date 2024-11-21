@@ -2,6 +2,7 @@ use crate::network::quote::BidQuote;
 use crate::network::rendezvous::XmrBtcNamespace;
 use crate::network::{quote, swarm};
 use anyhow::{Context, Result};
+use arti_client::TorClient;
 use futures::StreamExt;
 use libp2p::multiaddr::Protocol;
 use libp2p::request_response;
@@ -12,7 +13,9 @@ use serde::Serialize;
 use serde_with::{serde_as, DisplayFromStr};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
+use tor_rtcompat::tokio::TokioRustlsRuntime;
 use typeshare::typeshare;
 
 /// Returns sorted list of sellers, with [Online](Status::Online) listed first.
@@ -25,7 +28,7 @@ pub async fn list_sellers(
     rendezvous_node_peer_id: PeerId,
     rendezvous_node_addr: Multiaddr,
     namespace: XmrBtcNamespace,
-    tor_socks5_port: u16,
+    maybe_tor_client: Option<Arc<TorClient<TokioRustlsRuntime>>>,
     identity: identity::Keypair,
 ) -> Result<Vec<Seller>> {
     let behaviour = Behaviour {
@@ -33,7 +36,7 @@ pub async fn list_sellers(
         quote: quote::cli(),
         ping: ping::Behaviour::new(ping::Config::new().with_timeout(Duration::from_secs(60))),
     };
-    let mut swarm = swarm::cli(identity, tor_socks5_port, behaviour).await?;
+    let mut swarm = swarm::cli(identity, maybe_tor_client, behaviour).await?;
 
     swarm.add_peer_address(rendezvous_node_peer_id, rendezvous_node_addr.clone());
 

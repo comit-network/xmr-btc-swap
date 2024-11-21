@@ -13,6 +13,7 @@ tauri = [ "dep:tauri" ]
 
 [dependencies]
 anyhow = "1"
+arti-client = { version = "0.24.0", features = [ "static-sqlite", "tokio", "rustls" ], default-features = false }
 async-compression = { version = "0.3", features = [ "bzip2", "tokio" ] }
 async-trait = "0.1"
 asynchronous-codec = "0.7.0"
@@ -29,7 +30,6 @@ conquer-once = "0.4"
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
 data-encoding = "2.6"
 dialoguer = "0.11"
-digest = "0.10.7"
 directories-next = "2"
 ecdsa_fun = { version = "0.10", default-features = false, features = [
     "libsecp_compat",
@@ -37,14 +37,12 @@ ecdsa_fun = { version = "0.10", default-features = false, features = [
     "adaptor",
 ] }
 ed25519-dalek = "1"
-erased-serde = "0.4.5"
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
-hyper = "0.14.20"
-itertools = "0.13"
 jsonrpsee = { version = "0.16.2", features = [ "server" ] }
 jsonrpsee-core = "0.16.2"
 libp2p = { version = "0.53.2", features = [ "tcp", "yamux", "dns", "noise", "request-response", "ping", "rendezvous", "identify", "macros", "cbor", "json", "tokio", "serde", "rsa" ] }
+libp2p-community-tor = { git = "https://github.com/UnstoppableSwap/libp2p-tor", branch = "main" }
 monero = { version = "0.12", features = [ "serde_support" ] }
 monero-rpc = { path = "../monero-rpc" }
 once_cell = "1.19"
@@ -73,10 +71,9 @@ sigma_fun = { version = "0.7", default-features = false, features = [
     "secp256k1",
     "alloc",
 ] }
-sqlx = { version = "0.6.3", features = [
+sqlx = { version = "0.8", features = [
     "sqlite",
     "runtime-tokio-rustls",
-    "offline",
 ] }
 structopt = "0.3"
 strum = { version = "0.26", features = [ "derive" ] }
@@ -95,10 +92,10 @@ tokio = { version = "1", features = [
     "net",
     "parking_lot",
 ] }
-tokio-socks = "0.5"
 tokio-tungstenite = { version = "0.15", features = [ "rustls-tls" ] }
 tokio-util = { version = "0.7", features = [ "io", "codec" ] }
 toml = "0.8"
+tor-rtcompat = "0.24.0"
 torut = { version = "0.2", default-features = false, features = [
     "v3",
     "control",
@@ -107,7 +104,6 @@ tower = { version = "0.4.13", features = [ "full" ] }
 tower-http = { version = "0.3.4", features = [ "full" ] }
 tracing = { version = "0.1", features = [ "attributes" ] }
 tracing-appender = "0.2"
-tracing-futures = { version = "0.2", features = [ "std-future", "futures-03" ] }
 tracing-subscriber = { version = "0.3", default-features = false, features = [
     "fmt",
     "ansi",
@@ -131,13 +127,10 @@ zip = "0.5"
 [dev-dependencies]
 bitcoin-harness = { git = "https://github.com/delta1/bitcoin-harness-rs.git", rev = "80cc8d05db2610d8531011be505b7bee2b5cdf9f" }
 get-port = "3"
-hyper = "1.3"
 jsonrpsee = { version = "0.16.2", features = [ "ws-client" ] }
 mockito = "1.4"
 monero-harness = { path = "../monero-harness" }
-port_check = "0.2"
 proptest = "1"
-sequential-test = "0.2.4"
 serde_cbor = "0.11"
 serial_test = "3.1"
 tempfile = "3"

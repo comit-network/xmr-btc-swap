@@ -57,6 +57,12 @@ export default function DaemonStatusAlert() {
               Opening the local database
             </LoadingSpinnerAlert>
           );
+        case "EstablishingTorCircuits":
+          return (
+            <LoadingSpinnerAlert severity="warning">
+              Connecting to the Tor network
+            </LoadingSpinnerAlert>
+          );
       }
       break;
     case "Available":

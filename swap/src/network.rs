@@ -7,7 +7,6 @@ pub mod redial;
 pub mod rendezvous;
 pub mod swap_setup;
 pub mod swarm;
-pub mod tor_transport;
 pub mod transfer_proof;
 pub mod transport;
 

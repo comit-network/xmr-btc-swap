@@ -4,6 +4,7 @@ pub mod cancel_and_refund;
 pub mod command;
 mod event_loop;
 mod list_sellers;
+mod tor;
 pub mod transport;
 pub mod watcher;
 
@@ -45,7 +46,7 @@ mod tests {
             rendezvous_peer_id,
             rendezvous_address,
             namespace,
-            0,
+            None,
             identity::Keypair::generate_ed25519(),
         );
         let sellers = tokio::time::timeout(Duration::from_secs(15), list_sellers)

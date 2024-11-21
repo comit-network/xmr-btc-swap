@@ -1,7 +1,7 @@
 pub mod request;
 pub mod tauri_bindings;
 
-use crate::cli::command::{Bitcoin, Monero, Tor};
+use crate::cli::command::{Bitcoin, Monero};
 use crate::common::tracing_util::Format;
 use crate::database::{open_db, AccessMode};
 use crate::env::{Config as EnvConfig, GetConfig, Mainnet, Testnet};
@@ -12,6 +12,7 @@ use crate::seed::Seed;
 use crate::{bitcoin, common, monero};
 use anyhow::anyhow;
 use anyhow::{bail, Context as AnyContext, Error, Result};
+use arti_client::TorClient;
 use futures::future::try_join_all;
 use std::fmt;
 use std::future::Future;
@@ -22,18 +23,19 @@ use tauri_bindings::{
 };
 use tokio::sync::{broadcast, broadcast::Sender, Mutex as TokioMutex, RwLock};
 use tokio::task::JoinHandle;
+use tor_rtcompat::tokio::TokioRustlsRuntime;
 use tracing::level_filters::LevelFilter;
 use tracing::Level;
 use url::Url;
 use uuid::Uuid;
 
+use super::tor::init_tor_client;
 use super::watcher::Watcher;
 
 static START: Once = Once::new();
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Config {
-    tor_socks5_port: u16,
     namespace: XmrBtcNamespace,
     pub env_config: EnvConfig,
     seed: Option<Seed>,
@@ -188,6 +190,7 @@ pub struct Context {
     bitcoin_wallet: Option<Arc<bitcoin::Wallet>>,
     monero_wallet: Option<Arc<monero::Wallet>>,
     monero_rpc_process: Option<Arc<SyncMutex<monero::WalletRpcProcess>>>,
+    tor_client: Option<Arc<TorClient<TokioRustlsRuntime>>>,
 }
 
 /// A conveniant builder struct for [`Context`].
@@ -196,11 +199,11 @@ pub struct Context {
 pub struct ContextBuilder {
     monero: Option<Monero>,
     bitcoin: Option<Bitcoin>,
-    tor: Option<Tor>,
     data: Option<PathBuf>,
     is_testnet: bool,
     debug: bool,
     json: bool,
+    tor: bool,
     tauri_handle: Option<TauriHandle>,
 }
 
@@ -219,11 +222,11 @@ impl ContextBuilder {
         ContextBuilder {
             monero: None,
             bitcoin: None,
-            tor: None,
             data: None,
             is_testnet: false,
             debug: false,
             json: false,
+            tor: false,
             tauri_handle: None,
         }
     }
@@ -244,12 +247,6 @@ impl ContextBuilder {
     /// Configures the Context to initialize a Bitcoin wallet with the given configuration.
     pub fn with_bitcoin(mut self, bitcoin: impl Into<Option<Bitcoin>>) -> Self {
         self.bitcoin = bitcoin.into();
-        self
-    }
-
-    /// Configures the Context to use Tor with the given configuration.
-    pub fn with_tor(mut self, tor: impl Into<Option<Tor>>) -> Self {
-        self.tor = tor.into();
         self
     }
 
@@ -274,6 +271,12 @@ impl ContextBuilder {
     /// Set logging format to json (default false)
     pub fn with_json(mut self, json: bool) -> Self {
         self.json = json;
+        self
+    }
+
+    /// Whether to initialize a Tor client (default false)
+    pub fn with_tor(mut self, tor: bool) -> Self {
+        self.tor = tor;
         self
     }
 
@@ -343,6 +346,7 @@ impl ContextBuilder {
                     self.tauri_handle.clone(),
                 )
                 .await?;
+
                 (Some(Arc::new(wlt)), Some(Arc::new(SyncMutex::new(prc))))
             } else {
                 (None, None)
@@ -355,8 +359,6 @@ impl ContextBuilder {
             .emit_context_init_progress_event(TauriContextStatusEvent::Initializing(
                 TauriContextInitializationProgress::OpeningDatabase,
             ));
-
-        let tor_socks5_port = self.tor.map_or(9050, |tor| tor.tor_socks5_port);
 
         // If we are connected to the Bitcoin blockchain and if there is a handle to Tauri present,
         // we start a background task to watch for timelock changes.
@@ -372,13 +374,28 @@ impl ContextBuilder {
             }
         }
 
+        self.tauri_handle
+            .emit_context_init_progress_event(TauriContextStatusEvent::Initializing(
+                TauriContextInitializationProgress::EstablishingTorCircuits,
+            ));
+
+        let tor = if self.tor {
+            init_tor_client(&data_dir)
+                .await
+                .inspect_err(|err| {
+                    tracing::error!(%err, "Failed to establish Tor client");
+                })
+                .ok()
+        } else {
+            None
+        };
+
         let context = Context {
             db,
             bitcoin_wallet,
             monero_wallet,
             monero_rpc_process,
             config: Config {
-                tor_socks5_port,
                 namespace: XmrBtcNamespace::from_is_testnet(self.is_testnet),
                 env_config,
                 seed: Some(seed),
@@ -390,6 +407,7 @@ impl ContextBuilder {
             swap_lock,
             tasks: Arc::new(PendingTaskList::default()),
             tauri_handle: self.tauri_handle,
+            tor_client: tor,
         };
 
         Ok(context)
@@ -423,6 +441,7 @@ impl Context {
             swap_lock: Arc::new(SwapLock::new()),
             tasks: Arc::new(PendingTaskList::default()),
             tauri_handle: None,
+            tor_client: None,
         }
     }
 
@@ -539,7 +558,6 @@ impl Config {
         let data_dir = data::data_dir_from(None, false).expect("Could not find data directory");
 
         Self {
-            tor_socks5_port: 9050,
             namespace: XmrBtcNamespace::from_is_testnet(false),
             env_config,
             seed: Some(seed),
@@ -576,7 +594,6 @@ pub mod api_test {
 
             let env_config = env_config_from(is_testnet);
             Self {
-                tor_socks5_port: 9050,
                 namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
                 env_config,
                 seed: Some(seed),

@@ -5,7 +5,7 @@ import { logsToRawString } from "utils/parseUtils";
 import ScrollablePaperTextBox from "./ScrollablePaperTextBox";
 
 function RenderedCliLog({ log }: { log: CliLog }) {
-  const { timestamp, level, fields } = log;
+  const { timestamp, level, fields, target } = log;
 
   const levelColorMap = {
     DEBUG: "#1976d2", // Blue
@@ -29,6 +29,9 @@ function RenderedCliLog({ log }: { log: CliLog }) {
           size="small"
           style={{ backgroundColor: levelColorMap[level], color: "white" }}
         />
+        {target && (
+          <Chip label={target.split("::")[0]} size="small" variant="outlined" />
+        )}
         <Chip label={timestamp} size="small" variant="outlined" />
         <Typography variant="subtitle2">{fields.message}</Typography>
       </Box>

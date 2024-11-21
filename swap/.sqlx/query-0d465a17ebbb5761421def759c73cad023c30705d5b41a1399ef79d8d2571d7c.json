@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT min(entered_at) as start_date\n                FROM swap_states\n                WHERE swap_id = ?\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "start_date",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "0d465a17ebbb5761421def759c73cad023c30705d5b41a1399ef79d8d2571d7c"
+}

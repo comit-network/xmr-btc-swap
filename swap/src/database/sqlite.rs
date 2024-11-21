@@ -29,7 +29,7 @@ impl SqliteDatabase {
 
         let path_str = format!("sqlite:{}", path.as_ref().display());
 
-        let mut options = SqliteConnectOptions::from_str(&path_str)?.read_only(read_only);
+        let options = SqliteConnectOptions::from_str(&path_str)?.read_only(read_only);
         let options = options.disable_statement_logging();
 
         let pool = SqlitePool::connect_with(options.to_owned()).await?;
@@ -59,8 +59,6 @@ impl SqliteDatabase {
 #[async_trait]
 impl Database for SqliteDatabase {
     async fn insert_peer_id(&self, swap_id: Uuid, peer_id: PeerId) -> Result<()> {
-        let mut conn = self.pool.acquire().await?;
-
         let swap_id = swap_id.to_string();
         let peer_id = peer_id.to_string();
 
@@ -74,15 +72,13 @@ impl Database for SqliteDatabase {
             swap_id,
             peer_id
         )
-        .execute(&mut conn)
+        .execute(&self.pool)
         .await?;
 
         Ok(())
     }
 
     async fn get_peer_id(&self, swap_id: Uuid) -> Result<PeerId> {
-        let mut conn = self.pool.acquire().await?;
-
         let swap_id = swap_id.to_string();
 
         let row = sqlx::query!(
@@ -93,7 +89,7 @@ impl Database for SqliteDatabase {
         "#,
             swap_id
         )
-        .fetch_one(&mut conn)
+        .fetch_one(&self.pool)
         .await?;
 
         let peer_id = PeerId::from_str(&row.peer_id)?;
@@ -101,8 +97,6 @@ impl Database for SqliteDatabase {
     }
 
     async fn insert_monero_address(&self, swap_id: Uuid, address: Address) -> Result<()> {
-        let mut conn = self.pool.acquire().await?;
-
         let swap_id = swap_id.to_string();
         let address = address.to_string();
 
@@ -116,15 +110,13 @@ impl Database for SqliteDatabase {
             swap_id,
             address
         )
-        .execute(&mut conn)
+        .execute(&self.pool)
         .await?;
 
         Ok(())
     }
 
     async fn get_monero_address(&self, swap_id: Uuid) -> Result<Address> {
-        let mut conn = self.pool.acquire().await?;
-
         let swap_id = swap_id.to_string();
 
         let row = sqlx::query!(
@@ -135,7 +127,7 @@ impl Database for SqliteDatabase {
         "#,
             swap_id
         )
-        .fetch_one(&mut conn)
+        .fetch_one(&self.pool)
         .await?;
 
         let address = row.address.parse()?;
@@ -144,10 +136,8 @@ impl Database for SqliteDatabase {
     }
 
     async fn get_monero_addresses(&self) -> Result<Vec<monero::Address>> {
-        let mut conn = self.pool.acquire().await?;
-
         let rows = sqlx::query!("SELECT DISTINCT address FROM monero_addresses")
-            .fetch_all(&mut conn)
+            .fetch_all(&self.pool)
             .await?;
 
         let addresses = rows
@@ -159,8 +149,6 @@ impl Database for SqliteDatabase {
     }
 
     async fn insert_address(&self, peer_id: PeerId, address: Multiaddr) -> Result<()> {
-        let mut conn = self.pool.acquire().await?;
-
         let peer_id = peer_id.to_string();
         let address = address.to_string();
 
@@ -174,15 +162,13 @@ impl Database for SqliteDatabase {
             peer_id,
             address
         )
-        .execute(&mut conn)
+        .execute(&self.pool)
         .await?;
 
         Ok(())
     }
 
     async fn get_addresses(&self, peer_id: PeerId) -> Result<Vec<Multiaddr>> {
-        let mut conn = self.pool.acquire().await?;
-
         let peer_id = peer_id.to_string();
 
         let rows = sqlx::query!(
@@ -193,7 +179,7 @@ impl Database for SqliteDatabase {
         "#,
             peer_id,
         )
-        .fetch_all(&mut conn)
+        .fetch_all(&self.pool)
         .await?;
 
         let addresses = rows
@@ -208,7 +194,6 @@ impl Database for SqliteDatabase {
     }
 
     async fn get_swap_start_date(&self, swap_id: Uuid) -> Result<String> {
-        let mut conn = self.pool.acquire().await?;
         let swap_id = swap_id.to_string();
 
         let row = sqlx::query!(
@@ -219,7 +204,7 @@ impl Database for SqliteDatabase {
                 "#,
             swap_id
         )
-        .fetch_one(&mut conn)
+        .fetch_one(&self.pool)
         .await?;
 
         row.start_date
@@ -227,7 +212,6 @@ impl Database for SqliteDatabase {
     }
 
     async fn insert_latest_state(&self, swap_id: Uuid, state: State) -> Result<()> {
-        let mut conn = self.pool.acquire().await?;
         let entered_at = OffsetDateTime::now_utc();
 
         let swap = serde_json::to_string(&Swap::from(state))?;
@@ -246,7 +230,7 @@ impl Database for SqliteDatabase {
             entered_at,
             swap
         )
-        .execute(&mut conn)
+        .execute(&self.pool)
         .await?;
 
         // Emit event to Tauri, the frontend will then send another request to get the latest state
@@ -257,7 +241,6 @@ impl Database for SqliteDatabase {
     }
 
     async fn get_state(&self, swap_id: Uuid) -> Result<State> {
-        let mut conn = self.pool.acquire().await?;
         let swap_id = swap_id.to_string();
         let row = sqlx::query!(
             r#"
@@ -270,7 +253,7 @@ impl Database for SqliteDatabase {
         "#,
             swap_id
         )
-        .fetch_all(&mut conn)
+        .fetch_all(&self.pool)
         .await?;
 
         let row = row
@@ -282,34 +265,38 @@ impl Database for SqliteDatabase {
     }
 
     async fn all(&self) -> Result<Vec<(Uuid, State)>> {
-        let mut conn = self.pool.acquire().await?;
         let rows = sqlx::query!(
             r#"
-           SELECT swap_id, state
-           FROM (
-           SELECT max(id), swap_id, state
-           FROM swap_states
-           GROUP BY swap_id
-           )
+            SELECT swap_id, state
+            FROM (
+                SELECT max(id), swap_id, state
+                FROM swap_states
+                GROUP BY swap_id
+            )
         "#
         )
-        .fetch_all(&mut conn)
+        .fetch_all(&self.pool)
         .await?;
 
         let result = rows
             .iter()
             .filter_map(|row| {
-                let swap_id = match Uuid::from_str(&row.swap_id) {
+                let (Some(swap_id), Some(state)) = (&row.swap_id, &row.state) else {
+                    tracing::error!("Row didn't contain state or swap_id when it should have");
+                    return None;
+                };
+
+                let swap_id = match Uuid::from_str(swap_id) {
                     Ok(id) => id,
                     Err(e) => {
-                        tracing::error!(swap_id = %row.swap_id, error = ?e, "Failed to parse UUID");
+                        tracing::error!(%swap_id, error = ?e, "Failed to parse UUID");
                         return None;
                     }
                 };
-                let state = match serde_json::from_str::<Swap>(&row.state) {
+                let state = match serde_json::from_str::<Swap>(state) {
                     Ok(a) => State::from(a),
                     Err(e) => {
-                        tracing::error!(swap_id = %swap_id, error = ?e, "Failed to deserialize state");
+                        tracing::error!(%swap_id, error = ?e, "Failed to deserialize state");
                         return None;
                     }
                 };
@@ -322,7 +309,6 @@ impl Database for SqliteDatabase {
     }
 
     async fn get_states(&self, swap_id: Uuid) -> Result<Vec<State>> {
-        let mut conn = self.pool.acquire().await?;
         let swap_id = swap_id.to_string();
 
         // TODO: We should use query! instead of query here to allow for at-compile-time validation
@@ -335,7 +321,7 @@ impl Database for SqliteDatabase {
         "#,
             swap_id
         )
-        .fetch_all(&mut conn)
+        .fetch_all(&self.pool)
         .await?;
 
         let result = rows
@@ -359,7 +345,6 @@ impl Database for SqliteDatabase {
         swap_id: Uuid,
         proof: TransferProof,
     ) -> Result<()> {
-        let mut conn = self.pool.acquire().await?;
         let swap_id = swap_id.to_string();
         let proof = serde_json::to_string(&proof)?;
 
@@ -373,14 +358,13 @@ impl Database for SqliteDatabase {
             swap_id,
             proof
         )
-        .execute(&mut conn)
+        .execute(&self.pool)
         .await?;
 
         Ok(())
     }
 
     async fn get_buffered_transfer_proof(&self, swap_id: Uuid) -> Result<Option<TransferProof>> {
-        let mut conn = self.pool.acquire().await?;
         let swap_id = swap_id.to_string();
 
         let row = sqlx::query!(
@@ -391,7 +375,7 @@ impl Database for SqliteDatabase {
             "#,
             swap_id
         )
-        .fetch_all(&mut conn)
+        .fetch_all(&self.pool)
         .await?;
 
         if row.is_empty() {

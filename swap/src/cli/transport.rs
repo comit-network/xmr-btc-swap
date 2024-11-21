@@ -1,11 +1,15 @@
-use crate::network::tor_transport::TorDialOnlyTransport;
+use std::sync::Arc;
+
 use crate::network::transport::authenticate_and_multiplex;
 use anyhow::Result;
+use arti_client::TorClient;
 use libp2p::core::muxing::StreamMuxerBox;
 use libp2p::core::transport::{Boxed, OptionalTransport};
 use libp2p::dns;
 use libp2p::tcp;
 use libp2p::{identity, PeerId, Transport};
+use libp2p_community_tor::{AddressConversion, TorTransport};
+use tor_rtcompat::tokio::TokioRustlsRuntime;
 
 /// Creates the libp2p transport for the swap CLI.
 ///
@@ -17,13 +21,16 @@ use libp2p::{identity, PeerId, Transport};
 ///   TCP transport.
 pub fn new(
     identity: &identity::Keypair,
-    maybe_tor_socks5_port: Option<u16>,
+    maybe_tor_client: Option<Arc<TorClient<TokioRustlsRuntime>>>,
 ) -> Result<Boxed<(PeerId, StreamMuxerBox)>> {
     let tcp = tcp::tokio::Transport::new(tcp::Config::new().nodelay(true));
     let tcp_with_dns = dns::tokio::Transport::system(tcp)?;
 
-    let maybe_tor_transport = match maybe_tor_socks5_port {
-        Some(port) => OptionalTransport::some(TorDialOnlyTransport::new(port)),
+    let maybe_tor_transport: OptionalTransport<TorTransport> = match maybe_tor_client {
+        Some(client) => OptionalTransport::some(libp2p_community_tor::TorTransport::from_client(
+            client,
+            AddressConversion::IpAndDns,
+        )),
         None => OptionalTransport::none(),
     };
 

@@ -27,7 +27,7 @@ use crate::cli::api::tauri_bindings::{
 
 // See: https://www.moneroworld.com/#nodes, https://monero.fail
 // We don't need any testnet nodes because we don't support testnet at all
-const MONERO_DAEMONS: Lazy<[MoneroDaemon; 16]> = Lazy::new(|| {
+static MONERO_DAEMONS: Lazy<[MoneroDaemon; 16]> = Lazy::new(|| {
     [
         MoneroDaemon::new("xmr-node.cakewallet.com", 18081, Network::Mainnet),
         MoneroDaemon::new("nodex.monerujo.io", 18081, Network::Mainnet),
@@ -169,8 +169,9 @@ async fn choose_monero_daemon(network: Network) -> Result<MoneroDaemon, Error> {
         .build()?;
 
     // We only want to check for daemons that match the specified network
-    let daemons = &*MONERO_DAEMONS;
-    let network_matching_daemons = daemons.iter().filter(|daemon| daemon.network == network);
+    let network_matching_daemons = MONERO_DAEMONS
+        .iter()
+        .filter(|daemon| daemon.network == network);
 
     for daemon in network_matching_daemons {
         match daemon.is_available(&client).await {
