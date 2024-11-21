@@ -22,7 +22,8 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 use tokio_util::io::StreamReader;
 
 use crate::cli::api::tauri_bindings::{
-    TauriContextInitializationProgress, TauriContextStatusEvent, TauriEmitter, TauriHandle,
+    DownloadProgress, PendingCompleted, TauriContextStatusEvent, TauriEmitter, TauriHandle,
+    TauriPartialInitProgress,
 };
 
 // See: https://www.moneroworld.com/#nodes, https://monero.fail
@@ -265,10 +266,12 @@ impl WalletRpc {
 
             // Emit a tauri event to update the progress
             tauri_handle.emit_context_init_progress_event(TauriContextStatusEvent::Initializing(
-                TauriContextInitializationProgress::DownloadingMoneroWalletRpc {
-                    progress: 0,
-                    size: content_length,
-                },
+                vec![TauriPartialInitProgress::DownloadingMoneroWalletRpc(
+                    PendingCompleted::Pending(DownloadProgress {
+                        progress: 0,
+                        size: content_length,
+                    }),
+                )],
             ));
 
             let mut hasher = Sha256::new();
@@ -311,12 +314,14 @@ impl WalletRpc {
 
                     // Emit a tauri event to update the progress
                     tauri_handle.emit_context_init_progress_event(
-                        TauriContextStatusEvent::Initializing(
-                            TauriContextInitializationProgress::DownloadingMoneroWalletRpc {
-                                progress: percent,
-                                size: content_length,
-                            },
-                        ),
+                        TauriContextStatusEvent::Initializing(vec![
+                            TauriPartialInitProgress::DownloadingMoneroWalletRpc(
+                                PendingCompleted::Pending(DownloadProgress {
+                                    progress: percent,
+                                    size: content_length,
+                                }),
+                            ),
+                        ]),
                     );
                 }
                 file.write_all(&bytes).await?;
@@ -346,6 +351,12 @@ impl WalletRpc {
             tracing::debug!("Extracting archive");
             Self::extract_archive(&monero_wallet_rpc).await?;
         }
+
+        // Emit a tauri event to update the progress
+        tauri_handle.emit_context_init_progress_event(TauriContextStatusEvent::Initializing(vec![
+            TauriPartialInitProgress::DownloadingMoneroWalletRpc(PendingCompleted::Completed),
+        ]));
+
         Ok(monero_wallet_rpc)
     }
 

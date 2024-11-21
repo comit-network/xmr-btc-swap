@@ -111,19 +111,31 @@ impl TauriEmitter for Option<TauriHandle> {
 #[typeshare]
 #[derive(Display, Clone, Serialize)]
 #[serde(tag = "type", content = "content")]
-pub enum TauriContextInitializationProgress {
-    OpeningBitcoinWallet,
-    DownloadingMoneroWalletRpc {
-        // Progress of the download in percent (0-100)
-        #[typeshare(serialized_as = "number")]
-        progress: u64,
-        // Size of the download file in bytes
-        #[typeshare(serialized_as = "number")]
-        size: u64,
-    },
-    OpeningMoneroWallet,
-    OpeningDatabase,
-    EstablishingTorCircuits,
+pub enum PendingCompleted<P> {
+    Pending(P),
+    Completed,
+}
+
+#[derive(Serialize, Clone)]
+#[typeshare]
+pub struct DownloadProgress {
+    // Progress of the download in percent (0-100)
+    #[typeshare(serialized_as = "number")]
+    pub progress: u64,
+    // Size of the download file in bytes
+    #[typeshare(serialized_as = "number")]
+    pub size: u64,
+}
+
+#[typeshare]
+#[derive(Display, Clone, Serialize)]
+#[serde(tag = "componentName", content = "progress")]
+pub enum TauriPartialInitProgress {
+    OpeningBitcoinWallet(PendingCompleted<()>),
+    DownloadingMoneroWalletRpc(PendingCompleted<DownloadProgress>),
+    OpeningMoneroWallet(PendingCompleted<()>),
+    OpeningDatabase(PendingCompleted<()>),
+    EstablishingTorCircuits(PendingCompleted<()>),
 }
 
 #[typeshare]
@@ -131,7 +143,7 @@ pub enum TauriContextInitializationProgress {
 #[serde(tag = "type", content = "content")]
 pub enum TauriContextStatusEvent {
     NotInitialized,
-    Initializing(TauriContextInitializationProgress),
+    Initializing(Vec<TauriPartialInitProgress>),
     Available,
     Failed,
 }

@@ -19,7 +19,7 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex as SyncMutex, Once};
 use tauri_bindings::{
-    TauriContextInitializationProgress, TauriContextStatusEvent, TauriEmitter, TauriHandle,
+    PendingCompleted, TauriContextStatusEvent, TauriEmitter, TauriHandle, TauriPartialInitProgress,
 };
 use tokio::sync::{broadcast, broadcast::Sender, Mutex as TokioMutex, RwLock};
 use tokio::task::JoinHandle;
@@ -282,9 +282,13 @@ impl ContextBuilder {
 
     /// Takes the builder, initializes the context by initializing the wallets and other components and returns the Context.
     pub async fn build(self) -> Result<Context> {
+        // These are needed for everything else, and are blocking calls
         let data_dir = data::data_dir_from(self.data, self.is_testnet)?;
         let env_config = env_config_from(self.is_testnet);
+        let seed = Seed::from_file_or_generate(data_dir.as_path())
+            .context("Failed to read seed in file")?;
 
+        // Initialize logging
         let format = if self.json { Format::Json } else { Format::Raw };
         let level_filter = if self.debug {
             LevelFilter::from_level(Level::DEBUG)
@@ -301,26 +305,15 @@ impl ContextBuilder {
             );
         });
 
-        let seed = Seed::from_file_or_generate(data_dir.as_path())
-            .context("Failed to read seed in file")?;
-
+        // Create the data structure we use to manage the swap lock
         let swap_lock = Arc::new(SwapLock::new());
+        let tasks = PendingTaskList::default().into();
 
-        // We initialize the Bitcoin wallet below
-        // To display the progress to the user, we emit events to the Tauri frontend
+        // Initialize the database
         self.tauri_handle
-            .emit_context_init_progress_event(TauriContextStatusEvent::Initializing(
-                TauriContextInitializationProgress::OpeningBitcoinWallet,
-            ));
-
-        let bitcoin_wallet = if let Some(bitcoin) = self.bitcoin {
-            let (url, target_block) = bitcoin.apply_defaults(self.is_testnet)?;
-            Some(Arc::new(
-                init_bitcoin_wallet(url, &seed, data_dir.clone(), env_config, target_block).await?,
-            ))
-        } else {
-            None
-        };
+            .emit_context_init_progress_event(TauriContextStatusEvent::Initializing(vec![
+                TauriPartialInitProgress::OpeningDatabase(PendingCompleted::Pending(())),
+            ]));
 
         let db = open_db(
             data_dir.join("sqlite"),
@@ -329,39 +322,112 @@ impl ContextBuilder {
         )
         .await?;
 
-        // We initialize the Monero wallet below
-        // To display the progress to the user, we emit events to the Tauri frontend
         self.tauri_handle
-            .emit_context_init_progress_event(TauriContextStatusEvent::Initializing(
-                TauriContextInitializationProgress::OpeningMoneroWallet,
-            ));
+            .emit_context_init_progress_event(TauriContextStatusEvent::Initializing(vec![
+                TauriPartialInitProgress::OpeningDatabase(PendingCompleted::Completed),
+            ]));
 
-        let (monero_wallet, monero_rpc_process) = {
-            if let Some(monero) = self.monero {
-                let monero_daemon_address = monero.apply_defaults(self.is_testnet);
-                let (wlt, prc) = init_monero_wallet(
-                    data_dir.clone(),
-                    monero_daemon_address,
-                    env_config,
-                    self.tauri_handle.clone(),
-                )
-                .await?;
+        // Initialize these components concurrently
+        let initialize_bitcoin_wallet = async {
+            match self.bitcoin {
+                Some(bitcoin) => {
+                    let (url, target_block) = bitcoin.apply_defaults(self.is_testnet)?;
 
-                (Some(Arc::new(wlt)), Some(Arc::new(SyncMutex::new(prc))))
-            } else {
-                (None, None)
+                    self.tauri_handle.emit_context_init_progress_event(
+                        TauriContextStatusEvent::Initializing(vec![
+                            TauriPartialInitProgress::OpeningBitcoinWallet(
+                                PendingCompleted::Pending(()),
+                            ),
+                        ]),
+                    );
+
+                    let wallet =
+                        init_bitcoin_wallet(url, &seed, data_dir.clone(), env_config, target_block)
+                            .await?;
+
+                    self.tauri_handle.emit_context_init_progress_event(
+                        TauriContextStatusEvent::Initializing(vec![
+                            TauriPartialInitProgress::OpeningBitcoinWallet(
+                                PendingCompleted::Completed,
+                            ),
+                        ]),
+                    );
+
+                    Ok::<std::option::Option<Arc<bitcoin::wallet::Wallet>>, Error>(Some(Arc::new(
+                        wallet,
+                    )))
+                }
+                None => Ok(None),
             }
         };
 
-        // We initialize the Database below
-        // To display the progress to the user, we emit events to the Tauri frontend
-        self.tauri_handle
-            .emit_context_init_progress_event(TauriContextStatusEvent::Initializing(
-                TauriContextInitializationProgress::OpeningDatabase,
-            ));
+        let initialize_monero_wallet = async {
+            match self.monero {
+                Some(monero) => {
+                    let monero_daemon_address = monero.apply_defaults(self.is_testnet);
 
-        // If we are connected to the Bitcoin blockchain and if there is a handle to Tauri present,
-        // we start a background task to watch for timelock changes.
+                    self.tauri_handle.emit_context_init_progress_event(
+                        TauriContextStatusEvent::Initializing(vec![
+                            TauriPartialInitProgress::OpeningMoneroWallet(
+                                PendingCompleted::Pending(()),
+                            ),
+                        ]),
+                    );
+
+                    let (wlt, prc) = init_monero_wallet(
+                        data_dir.clone(),
+                        monero_daemon_address,
+                        env_config,
+                        self.tauri_handle.clone(),
+                    )
+                    .await?;
+
+                    self.tauri_handle.emit_context_init_progress_event(
+                        TauriContextStatusEvent::Initializing(vec![
+                            TauriPartialInitProgress::OpeningMoneroWallet(
+                                PendingCompleted::Completed,
+                            ),
+                        ]),
+                    );
+
+                    Ok((Some(Arc::new(wlt)), Some(Arc::new(SyncMutex::new(prc)))))
+                }
+                None => Ok((None, None)),
+            }
+        };
+
+        let initialize_tor_client = async {
+            self.tauri_handle.emit_context_init_progress_event(
+                TauriContextStatusEvent::Initializing(vec![
+                    TauriPartialInitProgress::EstablishingTorCircuits(
+                        PendingCompleted::Pending(()),
+                    ),
+                ]),
+            );
+
+            let maybe_tor_client = init_tor_client(&data_dir)
+                .await
+                .inspect_err(|err| {
+                    tracing::warn!(%err, "Failed to create Tor client. We will continue without Tor");
+                })
+                .ok();
+
+            self.tauri_handle.emit_context_init_progress_event(
+                TauriContextStatusEvent::Initializing(vec![
+                    TauriPartialInitProgress::EstablishingTorCircuits(PendingCompleted::Completed),
+                ]),
+            );
+
+            Ok(maybe_tor_client)
+        };
+
+        let (bitcoin_wallet, (monero_wallet, monero_rpc_process), tor) = tokio::try_join!(
+            initialize_bitcoin_wallet,
+            initialize_monero_wallet,
+            initialize_tor_client,
+        )?;
+
+        // If we have a bitcoin wallet and a tauri handle, we start a background task
         if let Some(wallet) = bitcoin_wallet.clone() {
             if self.tauri_handle.is_some() {
                 let watcher = Watcher::new(
@@ -375,20 +441,7 @@ impl ContextBuilder {
         }
 
         self.tauri_handle
-            .emit_context_init_progress_event(TauriContextStatusEvent::Initializing(
-                TauriContextInitializationProgress::EstablishingTorCircuits,
-            ));
-
-        let tor = if self.tor {
-            init_tor_client(&data_dir)
-                .await
-                .inspect_err(|err| {
-                    tracing::error!(%err, "Failed to establish Tor client");
-                })
-                .ok()
-        } else {
-            None
-        };
+            .emit_context_init_progress_event(TauriContextStatusEvent::Available);
 
         let context = Context {
             db,
@@ -398,14 +451,14 @@ impl ContextBuilder {
             config: Config {
                 namespace: XmrBtcNamespace::from_is_testnet(self.is_testnet),
                 env_config,
-                seed: Some(seed),
+                seed: seed.into(),
                 debug: self.debug,
                 json: self.json,
                 is_testnet: self.is_testnet,
                 data_dir,
             },
             swap_lock,
-            tasks: Arc::new(PendingTaskList::default()),
+            tasks,
             tauri_handle: self.tauri_handle,
             tor_client: tor,
         };
@@ -431,15 +484,15 @@ impl Context {
         let config = Config::for_harness(seed, env_config);
 
         Self {
-            bitcoin_wallet: Some(bob_bitcoin_wallet),
-            monero_wallet: Some(bob_monero_wallet),
+            bitcoin_wallet: bob_bitcoin_wallet.into(),
+            monero_wallet: bob_monero_wallet.into(),
             config,
             db: open_db(db_path, AccessMode::ReadWrite, None)
                 .await
                 .expect("Could not open sqlite database"),
             monero_rpc_process: None,
-            swap_lock: Arc::new(SwapLock::new()),
-            tasks: Arc::new(PendingTaskList::default()),
+            swap_lock: SwapLock::new().into(),
+            tasks: PendingTaskList::default().into(),
             tauri_handle: None,
             tor_client: None,
         }
@@ -511,7 +564,7 @@ async fn init_monero_wallet(
     );
 
     let monero_wallet_rpc_process = monero_wallet_rpc
-        .run(network, Some(monero_daemon_address))
+        .run(network, monero_daemon_address.into())
         .await
         .context("Failed to start monero-wallet-rpc process")?;
 
@@ -560,7 +613,7 @@ impl Config {
         Self {
             namespace: XmrBtcNamespace::from_is_testnet(false),
             env_config,
-            seed: Some(seed),
+            seed: seed.into(),
             debug: false,
             json: false,
             is_testnet: false,
@@ -596,7 +649,7 @@ pub mod api_test {
             Self {
                 namespace: XmrBtcNamespace::from_is_testnet(is_testnet),
                 env_config,
-                seed: Some(seed),
+                seed: seed.into(),
                 debug,
                 json,
                 is_testnet,
