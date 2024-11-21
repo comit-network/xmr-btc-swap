@@ -1,4 +1,4 @@
-# `xmr-btc-swap`
+# UnstoppableSwap
 
 This is the monorepo containing the source code for all of our core projects:
 
@@ -10,3 +10,5 @@ This is the monorepo containing the source code for all of our core projects:
 If you're just here for the software, head over to the [releases](https://github.com/UnstoppableSwap/xmr-btc-swap/releases/latest) tab and grab the binary for your operating system! If you're just looking for documentation, check out our [docs page](https://docs.unstoppableswap.net/) or our [github docs](dev-docs/README.md).
 
 Join our [Matrix room](https://matrix.to/#/#unstoppableswap-core:matrix.org) to follow development more closely.
+
+![Screenshot 2024-11-21 at 6 19 03 PM](https://github.com/user-attachments/assets/a9fe110e-90b4-4af8-8980-d4207a5e2a71)
