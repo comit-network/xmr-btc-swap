@@ -7,7 +7,7 @@ on:
 
 env:
 # We build on an older version to support older glib versions
-  UBUNTU: "ubuntu-24.04"
+  UBUNTU: "ubuntu-22.04"
   MACOS_ARM: "macos-latest"
   MACOS_INTEL: "macos-13"
   WINDOWS: "windows-latest"
@@ -36,7 +36,7 @@ jobs:
             args: "--target aarch64-apple-darwin"
           - platform: "macos-13"       # For Intel-based Macs
             args: "--target x86_64-apple-darwin"
-          - platform: "ubuntu-24.04"
+          - platform: "ubuntu-22.04"
             args: ""
           - platform: "windows-latest"
             args: ""
@@ -57,7 +57,7 @@ jobs:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-24.04' # This must match the platform value defined above.
+        if: matrix.platform == 'ubuntu-22.04' # This must match the platform value defined above.
         run: |
           sudo apt update;
           sudo apt install -y \
@@ -71,12 +71,12 @@ jobs:
             librsvg2-dev;
 
           sudo apt install -y \
-            libwebkit2gtk-4.1-0=2.44.0-2 \
-            libwebkit2gtk-4.1-dev=2.44.0-2 \
-            libjavascriptcoregtk-4.1-0=2.44.0-2 \
-            libjavascriptcoregtk-4.1-dev=2.44.0-2 \
-            gir1.2-javascriptcoregtk-4.1=2.44.0-2 \
-            gir1.2-webkit2-4.1=2.44.0-2;
+            libwebkit2gtk-4.1-0=2.36.0 \
+            libwebkit2gtk-4.1-dev=2.36.0 \
+            libjavascriptcoregtk-4.1-0=2.36.0 \
+            libjavascriptcoregtk-4.1-dev=2.36.0 \
+            gir1.2-javascriptcoregtk-4.1=2.36.0 \
+            gir1.2-webkit2-4.1=2.36.0;
 
       - name: Install Frontend Dependencies
         working-directory: src-gui
